@@ -131,6 +131,29 @@ Recorded as a knowing difference rather than an oversight.
 `ORIGIN=https://chat.tradingroom.app` is exactly the SFU's `MEDIA_ALLOWED_ORIGIN`. A mismatch there
 would reject every grant, so both halves were read rather than trusted.
 
+**The firewall caveat is RESOLVED, and it resolved in our favour**
+
+`SFU-MIGRATION.md` warned that the Hetzner firewall "would not accept a TCP port range", leaving TCP
+on 40000-49999 "possibly absent" — and that a UDP-blocked client would then fail **silently**. That
+was the largest unknown left. Measured from OUTSIDE the box, which is the only place a cloud
+firewall is visible:
+
+| port | answer | meaning |
+| --- | --- | --- |
+| 443 | connects | control |
+| 40000, 40100, 40199 | **RST, immediately** | reachable; nothing is dropping packets |
+| 40500 (outside the range) | **RST, immediately** | reachable too |
+
+A dropped packet times out; a refused one proves the SYN reached the host and the host answered.
+There is no listener because mediasoup binds an RTC port only when a transport is created. **So TCP
+fallback works and the silent-failure scenario does not apply.**
+
+The 40500 result is the sting: **every** TCP port on that host is reachable, and on the box `ufw` is
+inactive with iptables INPUT `ACCEPT`. There is no firewall at either layer. Nothing is exposed
+today that should not be — signalling and the room are on loopback, Caddy owns 80/443, sshd owns 22
+— but the next service that binds `0.0.0.0` is public the moment it starts. Recorded as `TODO.md`
+item **L**.
+
 **NOT done, and honestly so**
 
 - **The two-browser screen-share test.** Step 5 of the brief, and the only proof that matters. It

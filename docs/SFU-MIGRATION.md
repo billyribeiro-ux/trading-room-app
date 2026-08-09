@@ -10,10 +10,21 @@
 > **Three things below are still open, and steps 1–4 are now history rather than instructions:**
 >
 > 1. **The two-browser screen-share test — step 5, and the only proof that matters.** Not run.
-> 2. **The Hetzner CLOUD firewall is still unverified.** The host filters nothing (`ufw inactive`,
->    INPUT `ACCEPT`), so it is the only gate, and it cannot be read from inside the box. The caveat
->    at the end of this document is therefore live: if TCP on 40000-40199 is absent, UDP-blocked
->    clients fail **silently**.
+> 2. ~~The Hetzner CLOUD firewall is still unverified.~~ **RESOLVED 2026-08-09 — TCP on the RTC
+>    range is NOT blocked, so the caveat at the end of this document does not apply.** Measured from
+>    outside the box, which is the only place the cloud firewall is visible: TCP 40000, 40100 and
+>    40199 all answer **RST — "connection refused", immediately**, not a timeout. A dropped packet
+>    times out; a refused one means the SYN reached the host and the host answered. There is no
+>    listener because mediasoup binds an RTC port only when a transport is created, which is
+>    expected. **A UDP-blocked client will therefore fall back to TCP as designed.**
+>
+>    That probe found something else, and it is a hardening gap rather than a media one: **TCP 40500
+>    — outside the configured range entirely — is refused just as fast**, which means every TCP port
+>    on this host is reachable from the internet. Combined with `ufw inactive` and iptables INPUT
+>    `ACCEPT` on the box, there is effectively **no firewall at either layer**. Nothing is exposed
+>    today that should not be (signalling is bound to loopback, the room to loopback, Caddy owns
+>    80/443, sshd owns 22), but the next service that binds `0.0.0.0` is public the moment it
+>    starts. Recorded as work item **L** in `TODO.md`.
 > 3. **Lightsail is still running and still billing.** Retire it only after step 5 passes.
 >
 > One correction to step 3 below, found by reading `ops/mediasoup/Caddyfile.example` against the
