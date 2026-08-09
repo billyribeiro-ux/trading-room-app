@@ -166,6 +166,29 @@ nothing and commits you to nothing.
 
 ---
 
+## 7a. Hostnames the app will depend on
+
+See `NEXT-SESSION.md` §4b for the full plan. What matters here:
+
+| host | the app's use |
+| --- | --- |
+| `www.tradingroom.app` | where PINs are issued and pairing links are generated |
+| `chat.tradingroom.app` | the room itself, once deployed |
+| `media.tradingroom.app` | the SFU, IF the app ever carries media (§6, unproven) |
+
+Two things to get right before the app ships, because a mobile client is the worst place to
+discover a hostname change:
+
+1. **Never ship the `sslip.io` name.** The SFU is currently `media.34-195-170-147.sslip.io`, which
+   embeds the IP in the hostname. A web page picks up a new host on the next load; an installed app
+   does not, and neither does one waiting on App Store review.
+2. **The pairing URL is per-tenant.** The reference's is
+   `https://chat.protradingroom.com/ptr_app/sessions/v2/addUser/<publicId>/?sec=<pairSecretKey>&email=…&name=…`
+   — the room's own host, its `publicId`, and its `pairSecretKey`. A white-label app (§7) cannot
+   hard-code any of that; it has to be configured per build or discovered at pair time.
+
+---
+
 ## 8. Suggested order
 
 1. **Write the token-registration endpoint** and give `push_tokens_json` a writer. Small, server

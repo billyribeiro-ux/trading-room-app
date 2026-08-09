@@ -197,18 +197,104 @@ site stays on Vercel or consolidates onto owned infrastructure.
 
 ---
 
+## 4b. Hostnames and DNS — the plan
+
+The original answers this for us. `chat.protradingroom.com` resolves to the **same two IPs** as the
+apex (§4a), so the room is a SUBDOMAIN of the product's own domain pointing at the room host — not a
+separate domain, and not one hostname per room.
+
+### The target layout
+
+| hostname | serves | host | state |
+| --- | --- | --- | --- |
+| `www.tradingroom.app` | admin / marketing | Vercel | **live** |
+| `tradingroom.app` | 308 → `www` | Vercel | **live** |
+| `chat.tradingroom.app` | **every room** | the room box | to create |
+| `media.tradingroom.app` | the SFU | the SFU box | to create |
+
+`chat` and `media` may be the same machine to begin with — the original does exactly that, and the
+SFU host already runs Caddy with valid TLS, so adding a second site to it is a Caddyfile block.
+
+### ONE hostname for all rooms, not one per room
+
+In the reference every room is served by the single `chat.` host and identified in the URL, never in
+the hostname:
+
+```
+/session?id=3627              the launch URL, from the account page's ng-href
+/u/6a6529b318781e20ed81947d   the Room Link, built from publicId
+/room/<vanitySlug>            the Vanity Link
+/room/<uniqueSlug>            the Unique Link
+```
+
+That is the property to preserve: **creating a room is a database row, not a DNS record and not a
+certificate.** A per-room hostname would mean a DNS API call and an ACME challenge on every signup,
+and a wildcard certificate to avoid it — all to solve a problem the URL already solves.
+
+### Retire the sslip.io hostname before launch
+
+The SFU is currently reachable at `media.34-195-170-147.sslip.io`. sslip.io resolves any
+IP-shaped name to that IP, which is a genuinely clever way to get a working TLS hostname with no DNS
+at all — and a bad thing to launch on, because **the hostname contains the IP address**. Change
+servers and every client that has cached, embedded or hard-coded that name breaks.
+
+`media.tradingroom.app` costs one A record and removes that permanently. Do it as part of the move
+off Lightsail, not after, so the name never has to change twice.
+
+### Ordering — this matters
+
+1. Provision the replacement host (§4a).
+2. Create `chat` and `media` A records pointing at it. **Do not point them at the Lightsail IP** —
+   it is being retired, and you would be re-pointing them within the week.
+3. Let Caddy issue certificates for both. It does this automatically on first request, provided the
+   DNS resolves and ports 80/443 are reachable.
+4. Deploy the room, deploy/redirect the SFU.
+5. **Only then** set `ROOM_BASE_URL=https://chat.tradingroom.app` on Vercel and redeploy the
+   controller.
+
+Step 5 last, on purpose: `ROOM_BASE_URL` is baked into every Launch link at page load, so pointing
+it at a host that is not answering yet produces broken links rather than a pending one.
+
+### What each host needs open
+
+| host | ports | why |
+| --- | --- | --- |
+| `chat` | 80, 443 TCP | HTTP + the SSE stream. No UDP. |
+| `media` | 80, 443 TCP | Caddy → loopback `127.0.0.1:4443` signalling |
+| `media` | **40000–49999 UDP _and_ TCP** | WebRTC. Every transport opens both — `services/media/src/session.rs:858-890`. This is the requirement that rules out most cheap hosting. |
+
+`MEDIA_ANNOUNCED_ADDRESS` must be the host's **public** address. The grant-enforcing build refuses
+to start if an externally-bound service announces a loopback address —
+`validate_announced_address_policy` in `services/media/src/main.rs`.
+
+### Also worth knowing
+
+- **`PUBLIC_SITE_ORIGIN`** is already `https://www.tradingroom.app` and is what every manage-page
+  link is built from — Room Link, Vanity, Unique, registration, app-pair, and the WordPress
+  shortcode. It is the ADMIN origin, not the room's; do not point it at `chat`.
+- **`MEDIA_ALLOWED_ORIGIN`** must list the origin the ROOM is served from, since the SFU checks the
+  browser `Origin` before admitting a grant (`services/media/src/server.rs:827-841`). When the room
+  moves to `chat.tradingroom.app`, that value has to change with it or media admission fails.
+- **TURN needs its own IP.** It relays media for members who cannot reach the SFU directly, so it is
+  a second egress-heavy service. The original runs its own; budget it as a peer of the SFU, not an
+  afterthought.
+
+---
+
 ## 5. Do these next, in order
 
 1. **Deploy the room** — Option A above. Unblocks items 2 and 3.
-2. **`ROOM_BASE_URL` is live and wrong.** It is `http://localhost:5174`, copied from a developer
+2. **Create the `chat` and `media` DNS records** against the new host — see §4b — and retire the
+   `sslip.io` name while you are there.
+3. **`ROOM_BASE_URL` is live and wrong.** It is `http://localhost:5174`, copied from a developer
    `.env`. Every Launch link on the account page currently points at a laptop. Only fixable once
    the room has a URL. `scripts/set-vercel-env.sh` now REFUSES to write a localhost URL, so this
    cannot recur.
-3. **`ROOM_JWT_SECRET` is 9 characters.** It signs room handoff tokens valid 360 days that travel in
+4. **`ROOM_JWT_SECRET` is 9 characters.** It signs room handoff tokens valid 360 days that travel in
    URLs and browser history. Rotate it on the controller and the room **in the same moment** or
    every existing link breaks. Cheapest right now, while no links exist.
-4. **Rotate the API key** in the UI. One row cannot be decrypted — see §7.
-5. **Continue the manage-page audit** against `must-match/`. §6 has the method.
+5. **Rotate the API key** in the UI. One row cannot be decrypted — see §7.
+6. **Continue the manage-page audit** against `must-match/`. §6 has the method.
 
 ---
 
