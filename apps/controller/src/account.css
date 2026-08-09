@@ -1269,8 +1269,27 @@ span.acc-label {
 .acc-btn:focus {
   text-decoration: none;
 }
-.acc-btn:focus,
-.acc-btn:active:focus {
+/* `:focus-visible`, not `:focus`, and that is a DELIBERATE DIVERGENCE with the rule kept intact.
+   ────────────────────────────────────────────────────────────────────────────
+   The ring itself IS the reference's. Its own bootstrap.min.css carries, verbatim
+   (`evidence-dumps/NEXT-STEP/gaps/sheet-2.css:782`):
+
+     .btn.active.focus, .btn.active:focus, .btn.focus, .btn:active.focus,
+     .btn:active:focus, .btn:focus { outline: -webkit-focus-ring-color auto 5px; outline-offset: -2px; }
+
+   and its styles.css (`sheet-9.css:324`) overrides only `box-shadow`, never `outline`. So the blue
+   exists there and deleting it would contradict the capture.
+
+   What does NOT survive contact with a real page is `:focus` on a <button>. A button keeps focus
+   after a mouse click, so the ring stays on until something else is clicked — the owner reported it
+   as a colour that "does not exist on the real app", and what does not exist there is the LINGER,
+   not the ring. `:focus-visible` fires for keyboard and programmatic focus and not for a pointer,
+   which is the same affordance for the people who need it and no stuck outline for everyone else.
+
+   Only the selector changes. Both declared values are byte-identical to sheet-2.css:782, and the
+   hover/focus lift above is left alone because sheet-9.css:324 puts `.btn:focus` in it explicitly. */
+.acc-btn:focus-visible,
+.acc-btn:active:focus-visible {
   outline: -webkit-focus-ring-color auto 5px;
   outline-offset: -2px;
 }

@@ -2048,12 +2048,23 @@ Please click this link to attend: ______ unique link will be here_____
                       step with the capture.
 
                       The href is `""`, and the reference's is `"#"` — the one attribute here that
-                      is deliberately NOT transcribed. Svelte rejects a bare fragment
-                      (`a11y_invalid_attribute`) and this package runs
-                      `svelte-check --fail-on-warnings`, so `#` cannot ship. `""` is the value the
-                      capture's other hundred-odd editable anchors already carry (file2:889, 991),
-                      it resolves to the current URL, and neither is ever followed: the click is
-                      always prevented.
+                      is deliberately NOT transcribed. `""` is the value the capture's other
+                      editable anchors already carry (file2:889, 991), it resolves to the current
+                      URL, and neither is ever followed: the click is always prevented.
+
+                      WHAT THIS COMMENT USED TO SAY, AND WHY IT WAS WRONG. It claimed `#` "cannot
+                      ship" because Svelte flags `a11y_invalid_attribute` under
+                      `svelte-check --fail-on-warnings`. Both halves were misleading: `""` is
+                      flagged by the SAME rule, so swapping one for the other bought nothing, and
+                      `pnpm check` really does run `--fail-on-warnings` — so these two anchors put
+                      the package's own gate at exit 1 from the moment they shipped, which is not
+                      what a comment explaining a workaround should leave behind.
+
+                      The warning is now SUPPRESSED rather than dodged, because the markup is
+                      right: an anchor is what the reference uses, the value is what its siblings
+                      carry, and the control is keyboard-reachable with a real `aria-label`. A
+                      suppression that names the rule is honest; picking a different invalid value
+                      and claiming the linter forced it was not.
 
                       The EDITING state is not captured: nothing in the dump was ever clicked, so
                       there is no evidence of what the date popover looks like. The input therefore
@@ -2081,12 +2092,13 @@ Please click this link to attend: ______ unique link will be here_____
                           dropping it at rest is also the closer match. Attributes are invisible to
                           the side-by-side comparison, which reads tag and classes only.
 
-                          svelte-ignore, because at rest the thing being captioned is an `<a>`, and
+                          a conditional `for`, because at rest the thing being captioned is an `<a>`, and
                           an anchor is not a labelable element — there is no id `for` could legally
                           point at. The anchor carries its own `aria-label` below, so the caption
-                          still reaches assistive tech.
+                          still reaches assistive tech. The `svelte-ignore` that used to sit here was removed on
+                          2026-08-09: with `for` conditional the rule no longer fires, so the
+                          suppression silenced nothing and was dead scaffolding.
                         -->
-                        <!-- svelte-ignore a11y_label_has_associated_control -->
                         <label class="col-sm-4 control-label" for={editingStatsFrom ? 'statsFrom' : undefined}
                           >Start Date:</label
                         >
@@ -2102,6 +2114,7 @@ Please click this link to attend: ______ unique link will be here_____
                           />
                         {:else}
                           <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
+                          <!-- svelte-ignore a11y_invalid_attribute -->
                           <a
                             class={[
                               'editable editable-click',
@@ -2132,12 +2145,13 @@ Please click this link to attend: ______ unique link will be here_____
                           dropping it at rest is also the closer match. Attributes are invisible to
                           the side-by-side comparison, which reads tag and classes only.
 
-                          svelte-ignore, because at rest the thing being captioned is an `<a>`, and
+                          a conditional `for`, because at rest the thing being captioned is an `<a>`, and
                           an anchor is not a labelable element — there is no id `for` could legally
                           point at. The anchor carries its own `aria-label` below, so the caption
-                          still reaches assistive tech.
+                          still reaches assistive tech. The `svelte-ignore` that used to sit here was removed on
+                          2026-08-09: with `for` conditional the rule no longer fires, so the
+                          suppression silenced nothing and was dead scaffolding.
                         -->
-                        <!-- svelte-ignore a11y_label_has_associated_control -->
                         <label class="col-sm-4 control-label" for={editingStatsTo ? 'statsTo' : undefined}
                           >End Date:</label
                         >
@@ -2153,6 +2167,7 @@ Please click this link to attend: ______ unique link will be here_____
                           />
                         {:else}
                           <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
+                          <!-- svelte-ignore a11y_invalid_attribute -->
                           <a
                             class={[
                               'editable editable-click',
