@@ -215,15 +215,70 @@
     }, 4000);
   }
 
+  /**
+   * Which toolbar buttons are lit.
+   *
+   * The reference tracks BLOCK format as well as inline state — its capture shows `p` active
+   * alongside `justifyLeft`, because the caret sits in a paragraph. Ours only ever asked
+   * `queryCommandState` about eight inline and alignment commands, so every heading, `P`, `pre`
+   * and `quote` stayed dark no matter where the caret was, and the lists never lit either.
+   *
+   * Block format needs `queryCommandValue('formatBlock')`, not `queryCommandState` — the latter
+   * answers yes/no about a toggle, and a block format is a value. Browsers return the tag name,
+   * lower-cased and occasionally wrapped in angle brackets, so both shapes are handled.
+   *
+   * Keyed by BUTTON NAME rather than command name, so the template reads `active[tool.name]`
+   * directly. That is why `italics` and `quote` are mapped: the reference's button is `italics`
+   * while the command is `italic`, and its `quote` button produces a `blockquote`.
+   */
+  const INLINE_COMMANDS: Record<string, string> = {
+    bold: 'bold',
+    italics: 'italic',
+    underline: 'underline',
+    strikeThrough: 'strikeThrough',
+    ul: 'insertUnorderedList',
+    ol: 'insertOrderedList',
+    justifyLeft: 'justifyLeft',
+    justifyCenter: 'justifyCenter',
+    justifyRight: 'justifyRight',
+    justifyFull: 'justifyFull'
+  };
+
+  /** button name -> the tag `formatBlock` reports when the caret is inside it */
+  const BLOCK_TAGS: Record<string, string> = {
+    h1: 'h1',
+    h2: 'h2',
+    h3: 'h3',
+    h4: 'h4',
+    h5: 'h5',
+    h6: 'h6',
+    p: 'p',
+    pre: 'pre',
+    quote: 'blockquote'
+  };
+
   function refreshActive() {
     const next: Record<string, boolean> = {};
-    for (const cmd of ['bold', 'italic', 'underline', 'strikeThrough', 'justifyLeft', 'justifyCenter', 'justifyRight', 'justifyFull']) {
+
+    for (const [button, command] of Object.entries(INLINE_COMMANDS)) {
       try {
-        next[cmd] = document.queryCommandState(cmd);
+        next[button] = document.queryCommandState(command);
       } catch {
-        next[cmd] = false;
+        next[button] = false;
       }
     }
+
+    let block = '';
+    try {
+      // Chrome returns "p"; some engines return "<p>". Strip the brackets rather than guess.
+      block = String(document.queryCommandValue('formatBlock') || '')
+        .toLowerCase()
+        .replace(/[<>]/g, '');
+    } catch {
+      block = '';
+    }
+    for (const [button, tag] of Object.entries(BLOCK_TAGS)) next[button] = block === tag;
+
     active = next;
   }
 
@@ -301,10 +356,13 @@
             class={[
               'btn btn-default',
               {
-                active:
-                  active[tool.name] ||
-                  (tool.name === 'italics' && active.italic) ||
-                  (tool.name === 'html' && showHtml)
+                /*
+                  `active` is now keyed by BUTTON name, so the `italics`/`italic` special case
+                  that used to live here is handled in `refreshActive` instead. `html` stays,
+                  because it reflects this component's own view state rather than a document
+                  command — there is nothing to query.
+                */
+                active: active[tool.name] || (tool.name === 'html' && showHtml)
               }
             ]}
             type="button"
