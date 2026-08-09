@@ -24,6 +24,30 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-09
 
+### 12:30 — Professional restraint pass + SSR hardening after owner review (pushed to `claude/tradingroom-home-redesign-avs20w`, NOT `main`)
+
+**Runtime impact: yes, once merged — same branch, same page.** The owner reported the deployed
+branch preview showing "An unexpected error occurred." for the home page body, and separately that
+the design read as childish. Both addressed:
+
+**The reported crash.** Could not be reproduced here despite running the exact production
+artifact three ways: the built SvelteKit `Server` directly, the traced Vercel function bundle, and
+`vite preview` — in marketing-only mode AND in postgres mode against a real PostgreSQL 16 with the
+app's own migrations applied (all 200, correct markup). The page's one fragile server dependency
+was removed anyway: the `og:url` meta read `page.url.origin` from `$app/state` — the only
+`$app/state` use on the page — and is gone, so page SSR now touches no request context at all. If
+the deployed error persists after a fresh redeploy (with build cache cleared — a stale cached
+chunk graph is the leading suspect, since the same bytes render fine under three local harnesses),
+the Vercel function log line `[request-error]` carries `errorId`/`errorType` that pinpoints it.
+
+**The restraint pass.** Institutional palette (neon `#22e58c` → emerald `#10b981`, red softened
+to `#e5484d`), glow tokens cut to roughly half alpha and the halo shadows removed, buttons from
+pills to 8px-radius rectangles with tighter type, headline capped at 96px (was 118px), aurora and
+grid-floor opacity reduced ~35%, footer watermark faded, stat values shed their text-glow, and the
+scramble "decode" effect deleted outright — stat values are plain text now, `motion.ts` lost the
+dead factory, and `home:contract` asserts plain-text values instead. Screenshotted on the fresh
+production build to confirm.
+
 ### 11:23 — `pnpm check` was RED and nobody knew; plus the focus ring that would not let go
 
 **RUNTIME IMPACT: yes, but only visual** — a focus outline no longer sticks after a mouse click.

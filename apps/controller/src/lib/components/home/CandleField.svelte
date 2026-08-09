@@ -62,8 +62,8 @@
   // The matrices are rewritten every frame; tell the driver so it stops optimizing for static data.
   field.instanceMatrix.setUsage(DynamicDrawUsage);
 
-  const up = new Color('#14b877');
-  const down = new Color('#e0374d');
+  const up = new Color('#0ea371');
+  const down = new Color('#c2383f');
   const scratch = new Color();
   const amplitude = new Float32Array(COUNT);
   const phase = new Float32Array(COUNT);

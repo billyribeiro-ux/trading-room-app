@@ -1,9 +1,9 @@
 <script lang="ts">
   /**
-   * The proof bar: four engineering claims that decode out of market noise as they enter the
-   * viewport. The scramble runs on an aria-hidden span; the accessible value never mutates.
+   * The proof bar: four engineering claims, stated plainly. The strip's only motion is the shared
+   * scroll reveal — the values are content, not effects.
    */
-  import { reveal, scramble } from '$lib/motion';
+  import { reveal } from '$lib/motion';
   import { STATS } from '$lib/content/home';
 </script>
 
@@ -11,10 +11,7 @@
   <div class="hc-container grid">
     {#each STATS as stat (stat.label)}
       <div class="stat">
-        <p class="value">
-          <span aria-hidden="true" {@attach scramble(stat.value)}>{stat.value}</span>
-          <span class="hc-sr">{stat.value}</span>
-        </p>
+        <p class="value">{stat.value}</p>
         <p class="label">{stat.label}</p>
         <p class="detail">{stat.detail}</p>
       </div>
@@ -47,11 +44,10 @@
   .value {
     margin: 0;
     font-family: var(--hc-font-mono);
-    font-size: clamp(34px, 3.6vw, 52px);
+    font-size: clamp(30px, 3.2vw, 44px);
     font-weight: 500;
     letter-spacing: -0.02em;
     color: var(--hc-up);
-    text-shadow: 0 0 26px var(--hc-glow-up);
   }
 
   .label {

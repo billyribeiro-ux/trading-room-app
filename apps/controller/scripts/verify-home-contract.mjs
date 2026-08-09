@@ -181,7 +181,7 @@ rejectPattern(
 );
 // The preloaded binary must actually be the display face in use: Roboto as the display token,
 // weight 300 on the headline that renders it.
-requirePattern(files.homeCss, sources.homeCss, "the Roboto display token", /--hc-font-display:\s*'Roboto'/);
+requirePattern(files.homeCss, sources.homeCss, 'the Roboto display token', /--hc-font-display:\s*'Roboto'/);
 requirePattern(files.hero, sources.hero, 'the 300-weight hero headline', /font-weight:\s*300/);
 
 /* ---- 4. Motion safety ---------------------------------------------------------------------- */
@@ -205,7 +205,7 @@ function exportedFunctionBody(source, name) {
   return source.slice(start, next === -1 ? undefined : next);
 }
 
-for (const factory of ['reveal', 'parallax', 'scramble', 'magnetic']) {
+for (const factory of ['reveal', 'parallax', 'magnetic']) {
   const body = exportedFunctionBody(sources.motion, factory);
   if (!body || !body.includes('prefersReducedMotion()')) {
     failures.push(`${files.motion}: ${factory}() is missing its own reduced-motion check`);
@@ -290,8 +290,8 @@ requirePattern(files.heroScene, sources.heroScene, 'aria-hidden on the WebGL can
 requirePattern(
   files.stats,
   sources.stats,
-  'static accessible copies of the scrambled stat values',
-  /class="hc-sr">\{stat\.value\}/
+  'plain-text stat values (no obfuscating text effects)',
+  /class="value">\{stat\.value\}/
 );
 requirePattern(files.tape, sources.tape, 'an accessible name on the live chart', /role="img"[\s\S]*?aria-label/);
 

@@ -1,6 +1,5 @@
 <script lang="ts">
   import { asset } from '$app/paths';
-  import { page } from '$app/state';
   import CtaSection from '$lib/components/home/CtaSection.svelte';
   import EngineeringSection from '$lib/components/home/EngineeringSection.svelte';
   import HeroCinematic from '$lib/components/home/HeroCinematic.svelte';
@@ -40,7 +39,6 @@
   <meta property="og:site_name" content="tradingroom.app" />
   <meta property="og:title" content={title} />
   <meta property="og:description" content={HERO_SUB} />
-  <meta property="og:url" content={page.url.origin + '/'} />
   <meta name="twitter:card" content="summary" />
   <meta name="twitter:title" content={title} />
   <meta name="twitter:description" content={description} />
