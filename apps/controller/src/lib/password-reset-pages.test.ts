@@ -106,10 +106,32 @@ describe('the reset page', () => {
     expect(reset({ valid: true, token: 't', minPassword: 12 })).toContain('signs you out on every other device');
   });
 
-  it('keeps the one-time credential out of search engines and Referer headers', () => {
+  it('keeps the one-time credential out of search engines', () => {
     const head = ssr(Reset as never, { props: { data: { valid: true, token: 't', minPassword: 12 } } as never }).head;
     expect(head).toMatch(/name="robots"[^>]*content="noindex, nofollow"/);
-    expect(head).toMatch(/name="referrer"[^>]*content="no-referrer"/);
+  });
+
+  it('does NOT set no-referrer, which would break its own form', () => {
+    /*
+      Pinned because it looks like an omission and is not.
+
+      A request whose referrer policy is `no-referrer` serialises its `Origin` as `null` (Fetch), and
+      SvelteKit's CSRF check refuses a POST whose Origin does not match the server's. Adding this
+      meta tag — the obvious "harden the page with the token in the URL" move, and one `verify-email`
+      genuinely does make — would make every reset fail with "Cross-site POST form submissions are
+      forbidden" while the page still rendered perfectly. `control-plane-policy.ts` records this
+      collision being hit once already.
+
+      Cross-origin referrer leakage is covered by the global `referrer-policy: same-origin` header,
+      which is applied to every response.
+    */
+    const head = ssr(Reset as never, { props: { data: { valid: true, token: 't', minPassword: 12 } } as never }).head;
+    expect(head).not.toMatch(/name="referrer"/);
+  });
+
+  it('still has the form the referrer policy would have broken', () => {
+    // The above only means something while this page actually posts.
+    expect(reset({ valid: true, token: 't', minPassword: 12 })).toMatch(/<form[^>]+method="POST"/);
   });
 });
 

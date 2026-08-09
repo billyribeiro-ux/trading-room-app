@@ -24,10 +24,26 @@
 
 <svelte:head>
   <title>Set a new password — TradingRoomApp</title>
-  <!-- A one-time credential in the query string must never be indexed, and must not travel onward
-       in a Referer header to any host this page touches. Same pair as `verify-email`. -->
   <meta name="robots" content="noindex, nofollow" />
-  <meta name="referrer" content="no-referrer" />
+  <!--
+    NO `<meta name="referrer" content="no-referrer">` here, deliberately, even though this page
+    carries a one-time credential in its query string and `verify-email` does set it.
+
+    `no-referrer` does not only suppress `Referer`. Per Fetch, a request whose referrer policy is
+    `no-referrer` serialises its `Origin` as `null` — and this page POSTs a form. SvelteKit's CSRF
+    check compares `Origin` against the server's origin and refuses `null` outright, so the meta tag
+    would make every reset fail with "Cross-site POST form submissions are forbidden" while the page
+    itself looked perfectly fine. `verify-email` carries it safely only because it has no form.
+
+    This is not a new discovery: `control-plane-policy.ts` records the same collision being hit once
+    already, which is why the global `referrer-policy` is `same-origin` for every response rather
+    than `no-referrer`.
+
+    Nothing leaks by leaving it off. `same-origin` already sends no referrer whatsoever to any
+    cross-origin destination, which is the disclosure that actually matters for a token in a URL. It
+    differs from `no-referrer` only in sending a referrer to this same site, where the URL is
+    already known.
+  -->
 </svelte:head>
 
 <div class="acc-center-block">

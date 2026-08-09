@@ -248,8 +248,19 @@ lookup — same ordering as registration, so an unverified submission cannot pro
 exist. Neither is a general rate limiter; that belongs at the edge, the same caveat
 `login-attempts.ts` carries.
 
-Covered by `password-reset.test.ts`, `password-reset-pages.test.ts` and the extended
-`email-verification.test.ts`. The cooldown boundary, the consumed-token exclusion, the newest-row
+One trap worth knowing, because it looks like an omission in the code: the reset page deliberately
+does **not** carry `<meta name="referrer" content="no-referrer">`, even though it has a token in its
+URL and `verify-email` does set it. A request whose referrer policy is `no-referrer` serialises its
+`Origin` as `null`, and SvelteKit's CSRF check refuses a POST whose Origin does not match — so the
+tag would break every reset while the page still rendered perfectly. `control-plane-policy.ts`
+records the same collision being hit once already. The global `referrer-policy: same-origin` already
+stops the token reaching any cross-origin destination.
+
+Covered by `password-reset.test.ts`, `password-reset-pages.test.ts`, the extended
+`email-verification.test.ts`, and `password-reset.db.test.ts` against a real PostgreSQL — the last
+because three guarantees live entirely in the SQL and a stub cannot see them: single-use under
+genuine concurrency (two redemptions fired at once, exactly one wins), the password write and the
+session revocation rolling back together, and the `created_at DESC` ordering. The cooldown boundary, the consumed-token exclusion, the newest-row
 ordering and the login link were each verified by breaking the implementation and watching the test
 go red — the ordering case passed a broken implementation on the first attempt, because the fixture
 happened to insert its rows in the order the sort would have produced.
