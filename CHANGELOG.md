@@ -24,6 +24,50 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-09
 
+### 10:28 — The e2e harness could not run at all; written, plus the manage-page spec (pushed to `main`)
+
+**No runtime impact** — test infrastructure and one `.gitignore` line. Nothing about what the site
+serves changed.
+
+**`test:e2e` is listed in the `quality` gate and could never have executed.** `e2e/` holds three
+specs and `package.json` runs `playwright test`, but **there was no `playwright.config.*` anywhere in
+the repository**. The specs navigate with `page.goto('/register')`, which needs a `baseURL` to
+resolve. A gate in the quality chain that cannot run is worse than no gate, because it reads as
+coverage.
+
+- **`playwright.config.ts`** — `testDir: e2e`, baseURL on 5173, serial (`workers: 1`), and a
+  `webServer` block so **Playwright owns the server's whole lifecycle**: it starts it, waits for
+  `/login`, and tears it down when the run ends. That is what makes an e2e run compatible with the
+  standing "nothing runs on local ports" rule — there is nothing left to forget about.
+- **`reuseExistingServer: false`**, against the usual `!process.env.CI`. Other projects on this
+  machine use this port range, and reusing a foreign server would run these assertions against a
+  different application and report the result as this one's — exactly the failure the standing rule
+  exists to prevent. Failing loudly on a busy port is the safer answer.
+- **`playwright-report/` and `test-results/` added to `.gitignore`.** They were not ignored;
+  `vite.config.ts` already excludes both from its watcher for the same reason, so this was an
+  oversight rather than a decision. Without it the HTML report lands in the next commit.
+
+**`e2e/manage-room.spec.ts`** covers the two things shipped earlier today that a unit test cannot
+prove, and which `CHANGELOG.md` recorded as unverified in a browser:
+
+- the URL a customer lands on carries the room's **short code** — read off the Manage link's own
+  `href` and asserted to be four-or-more digits, never a hardcoded value, since the code comes from
+  a database sequence;
+- the stats date field **takes focus on click**, the label's `for` is absent at rest and present
+  while editing, and **blur closes the row** — the half of the defect a stub cannot demonstrate,
+  because `blur` is a browser behaviour rather than a function call.
+
+The account is a throwaway registered through the real form, the same pattern
+`critical-journey.spec.ts` already uses. Nothing is forged and no session is inserted.
+
+**Verified:** the config parses and `playwright test --list` reports 9 tests across 4 files without
+starting anything. `svelte-check` 0 errors, 3 warnings (unchanged); 547 unit tests passing.
+
+**NOT yet executed, and that is the honest state.** Running it starts a dev server on 5173, which
+is the owner's explicit standing boundary, so it waits on their word rather than being assumed.
+Everything above is the harness being correct; none of it is the assertions having passed.
+
+
 ### 10:18 — Rooms are addressed by their short code, not the database id (pushed to `main`)
 
 **Runtime impact: yes, and it changes a URL.** `/account/rooms/1?tab=users` is now
