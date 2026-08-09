@@ -29,9 +29,19 @@ ENVF="$HOME/Desktop/new-room-control/.env"
 # originally configured from, and they stay only until those are rehomed. Nothing new goes there —
 # `new-room-control` is read-only reference, not a config store for this project.
 #
-# Relative because line 21 already cd'd into apps/controller. Not required to exist: a variable
-# with no value here is reported and skipped, never written blank.
-APPENV=".env"
+# `apps/controller/.env` is deliberately NOT read here any more. It is the LOCAL dev runtime and
+# nothing else; the one pair this script used to take from it now has its own file below.
+#
+# The PRODUCTION mail secrets, deliberately in their own file rather than in `.env`.
+#
+# `.env` is loaded by Vite, so every value in it configures the local dev server too. While the
+# Resend key lived there, running the app locally to test password reset sent LIVE email through
+# the production key — to a fake address, which hard-bounces against a new sending domain. The file
+# was doing two jobs and the second one was invisible.
+#
+# Two jobs, two files. Nothing reads `.env.deploy` at runtime, so a local server is honestly
+# mail-unconfigured by default, which `mail.ts` is built to handle.
+DEPLOYENV=".env.deploy"
 
 for f in "$PULL" "$ENVF"; do
   if [ ! -f "$f" ]; then
@@ -129,8 +139,8 @@ set_var SUPERADMIN_EMAILS        "$(read_value SUPERADMIN_EMAILS "$ENVF")"      
 # Setting these flips `verificationEnforced()` to true. Re-run the check in `docs/EMAIL.md` §5
 # first: any account with a NULL `email_verified_at` is gated out of creating rooms until it
 # confirms. Measured 2026-08-09 there were none, and that expires with the next registration.
-set_var RESEND_API_KEY           "$(read_value RESEND_API_KEY "$APPENV")"          "apps/controller/.env"
-set_var MAIL_FROM                "$(read_value MAIL_FROM "$APPENV")"               "apps/controller/.env"
+set_var RESEND_API_KEY           "$(read_value RESEND_API_KEY "$DEPLOYENV")"       "apps/controller/.env.deploy"
+set_var MAIL_FROM                "$(read_value MAIL_FROM "$DEPLOYENV")"            "apps/controller/.env.deploy"
 
 # API_KEY_ENCRYPTION_KEY is NOT set here any more, and generating a fresh one is exactly what
 # broke the account page.

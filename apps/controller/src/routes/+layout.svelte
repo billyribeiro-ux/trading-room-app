@@ -38,7 +38,8 @@
    */
   import '@fortawesome/fontawesome-free/css/all.min.css';
   import 'font-awesome/css/font-awesome.min.css';
-  import type { LayoutProps } from './$types';
+  import { resolveChrome } from '$lib/chrome';
+import type { LayoutProps } from './$types';
 
   /**
    * The single place chrome is decided.
@@ -55,7 +56,8 @@
    *
    *   marketing  `/`, `/contact`, `/privacy`, `/terms`
    *              navbar-inverse over #0e0e0e, #footer with the legal links
-   *   controller `/login`, `/register`, `/account`, `/account/rooms/*`
+   *   controller `/login`, `/register`, `/account`, `/account/rooms/*`,
+   *              `/forgot-password`, `/reset-password`
    *              the black `navbar topnavbar` and the © TradingRoomApp footer
    *   none       `/session/*`, `/account/api-docs`
    *              the room entry screen owns its full field; the API document
@@ -71,23 +73,20 @@
     document.documentElement.dataset.proroomHydrated = 'true';
   });
 
-  const CONTROLLER = ['/login', '/register', '/account', '/logout'];
 
   /* Manage Session is the controller's one full-bleed page — `.ng-fluid`, panel
      at x=0 w=1989, and no page footer. Everything else is the 1170 container. */
   const fluid = $derived(/^\/account\/rooms\//.test(page.url.pathname));
 
-  const chrome = $derived.by(() => {
-    const path = page.url.pathname;
-    if (path.startsWith('/session/')) return 'none';
-    // The captured API document is standalone HTML: its dark `.topbar` is the
-    // first body child, followed by its own 980px max-width container. Letting
-    // `/account` win here adds a second navbar, a 1170px controller container,
-    // and the controller footer—all disproved by the original source.
-    if (path === '/account/api-docs') return 'none';
-    if (CONTROLLER.some((p) => path === p || path.startsWith(`${p}/`))) return 'controller';
-    return 'marketing';
-  });
+  /*
+    The decision itself lives in `$lib/chrome.ts` so it can be tested.
+
+    It was inlined here, and a page was filed under the wrong shell without anything noticing:
+    `/forgot-password` and `/reset-password` fell through to `marketing` and rendered inside
+    `.pub-root` while wearing the controller's `acc-*` classes, which put every field at twice its
+    intended width. That file records the measurement and carries the cases.
+  */
+  const chrome = $derived(resolveChrome(page.url.pathname));
 
 </script>
 
