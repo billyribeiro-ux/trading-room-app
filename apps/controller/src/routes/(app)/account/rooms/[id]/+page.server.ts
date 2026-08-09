@@ -110,11 +110,8 @@ function siteOrigin(url: URL): string {
 export const load: PageServerLoad = async ({ params, locals, url }) => {
   const ORIGIN = siteOrigin(url);
   const user = requireUser(locals);
-  const [room] = await getDb()
-    .select()
-    .from(rooms)
-    .where(eq(rooms.id, Number(params.id)))
-    .limit(1);
+  // Addressed by short code, not by primary key — see `ownedRoom`.
+  const [room] = await getDb().select().from(rooms).where(eq(rooms.shortCode, params.id)).limit(1);
   requireOwnedRoom(locals, room);
   if (!room) error(404, 'Room not found');
 
@@ -272,14 +269,35 @@ export const load: PageServerLoad = async ({ params, locals, url }) => {
   };
 };
 
-async function ownedRoomId(locals: App.Locals, id: string) {
-  const [room] = await getDb()
-    .select()
-    .from(rooms)
-    .where(eq(rooms.id, Number(id)))
-    .limit(1);
+/**
+ * Resolves the URL's room identifier to a row, and checks ownership.
+ *
+ * ## The param is the SHORT CODE, not the database id
+ *
+ * `/account/rooms/1` was the primary key, and it read as a toy: the first room any account creates
+ * is `1`, which advertises the row count and belongs to the database rather than to the product.
+ * The short code is the room's own identity — it is what every surface already calls it. The
+ * reference's manage header reads `Manage Room id: 3627 ( 6a6529b318781e20ed81947d )`, the Sessions
+ * table lists Session ID `3625`, and `provisionRoom` names a new room `Room <shortCode>`.
+ *
+ * `rooms.short_code` is `NOT NULL` with a unique index (`rooms_short_code_idx`), so this is a
+ * single indexed lookup — the same cost as the primary key it replaces.
+ *
+ * ## Why old numeric-id links are NOT accepted as a fallback
+ *
+ * Both are digit strings, so "try the id, then the short code" is ambiguous: nothing stops one
+ * room's short code equalling another room's id, and the ambiguity would resolve silently to the
+ * wrong room. A 404 is the honest answer. This is a days-old deployment whose rooms have four-digit
+ * codes and single-digit ids, so the links that break are ones nobody has bookmarked.
+ */
+async function ownedRoom(locals: App.Locals, shortCode: string) {
+  const [room] = await getDb().select().from(rooms).where(eq(rooms.shortCode, shortCode)).limit(1);
   requireOwnedRoom(locals, room);
-  return room!.id;
+  return room!;
+}
+
+async function ownedRoomId(locals: App.Locals, shortCode: string) {
+  return (await ownedRoom(locals, shortCode)).id;
 }
 
 /**
@@ -372,11 +390,13 @@ export const actions: Actions = {
         clonedFromId: source.id,
         createdAt: new Date()
       })
-      .returning({ id: rooms.id });
+      // `shortCode` comes back too: the redirect below addresses the new room by its code, and
+      // reading it off the inserted row rather than the local proves it is the value that landed.
+      .returning({ id: rooms.id, shortCode: rooms.shortCode });
 
     // settings come across wholesale; links and members deliberately do not
     await writeSettings(created.id, await readSettings(source.id));
-    redirect(303, `/account/rooms/${created.id}`);
+    redirect(303, `/account/rooms/${created.shortCode}`);
   },
 
   /**

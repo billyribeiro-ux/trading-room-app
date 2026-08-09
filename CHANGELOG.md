@@ -24,6 +24,44 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-09
 
+### 10:18 — Rooms are addressed by their short code, not the database id (pushed to `main`)
+
+**Runtime impact: yes, and it changes a URL.** `/account/rooms/1?tab=users` is now
+`/account/rooms/3625?tab=users`. Raised by the owner: the old form read as unfinished, and it was —
+`1` is a row's primary key. It advertises how many rooms the database holds and belongs to the
+database rather than to the product.
+
+The short code is the room's own identity and the only number this product ever shows for it. The
+reference's manage header reads `Manage Room id: 3627 ( 6a6529b318781e20ed81947d )`, its Sessions
+table lists Session ID `3625`, and `provisionRoom` already names a new room `Room <shortCode>`.
+`rooms.short_code` is `NOT NULL` with a unique index, so the lookup costs exactly what the primary
+key did.
+
+- `+page.server.ts` — the load, `ownedRoom`/`ownedRoomId`, and the clone redirect all resolve by
+  short code. The clone's `returning` gained `shortCode` so the redirect reads the value that
+  actually landed rather than a local.
+- Eleven links updated: two on the account page, nine on the manage page.
+
+**Old numeric links 404, deliberately.** Accepting both would be ambiguous — id and short code are
+both digit strings, and nothing stops one room's code equalling another room's id, so a fallback
+would silently resolve to the WRONG room. A 404 is the honest answer, and on a days-old deployment
+whose rooms have four-digit codes and single-digit ids there is nothing bookmarked to break.
+
+**`?tab=` is left alone.** A query parameter for a tabbed view is a normal, correct pattern; moving
+it into the path would churn the most evidence-pinned page in the repository for no user-visible
+gain. The complaint was the `1`, and the `1` is what changed.
+
+**Verified before pushing:** `svelte-check` 0 errors, 3 warnings (unchanged). 50 files, 547 tests
+(up 6 — `room-url-identity.test.ts`). **All 37 database tests pass**, and getting there mattered:
+six of them failed on the first run because the harness passed numeric ids as the route param. That
+is the change working, not a flake — the harness now resolves id to short code with a real lookup,
+so the cases stay about the DON'T TOUCH actions.
+
+The new cases can tell the two identifiers apart because the fixture's differ on purpose — **id 1,
+short code 3625**. A fixture whose id happened to equal its code would pass on either
+implementation. Mutation-checked: reverting one link to `${room.id}` turns two of them red.
+
+
 ### 10:12 — Both open manage-page audit defects fixed (pushed to `main`)
 
 **Runtime impact: yes.** Two live UI bugs on the User Stats pane of a page already in production.

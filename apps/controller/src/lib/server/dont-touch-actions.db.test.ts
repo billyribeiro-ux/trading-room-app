@@ -143,17 +143,37 @@ async function world(tag: string) {
   return { db, mine: await tenant(`mine${tag}`), theirs: await tenant(`theirs${tag}`) };
 }
 
-/** Posts to a named action exactly as an enhanced form does: form data in, ActionResult out. */
+/**
+ * Posts to a named action exactly as an enhanced form does: form data in, ActionResult out.
+ *
+ * The cases below identify rooms by their primary key, because that is what the database helpers
+ * around them read and write. **The ROUTE does not** — `/account/rooms/<shortCode>` addresses a
+ * room by its short code, so this translates one to the other before building the event.
+ *
+ * Doing that here rather than at every call site keeps the cases about the DON'T TOUCH actions,
+ * which is what they are for. It is a real lookup, not a fabricated string: if a room's code and
+ * its id ever stopped agreeing, this would fail rather than paper over it.
+ */
 async function post(name: string, roomId: number, locals: App.Locals, fields: Record<string, string> = {}) {
   const { actions } = await import('../../routes/(app)/account/rooms/[id]/+page.server');
+  const { getDb } = await import('./db');
+  const { rooms } = await import('./db/schema');
+  const { eq } = await import('drizzle-orm');
   const action = actions[name];
   if (!action) throw new Error(`there is no ?/${name} action on the manage page`);
+
+  const [row] = await getDb()
+    .select({ shortCode: rooms.shortCode })
+    .from(rooms)
+    .where(eq(rooms.id, roomId))
+    .limit(1);
+  if (!row) throw new Error(`no room with id ${roomId} — the fixture did not create what it thinks`);
 
   const body = new FormData();
   for (const [key, value] of Object.entries(fields)) body.set(key, value);
   const event = {
-    request: new Request('http://127.0.0.1/account/rooms/1', { method: 'POST', body }),
-    params: { id: String(roomId) },
+    request: new Request(`http://127.0.0.1/account/rooms/${row.shortCode}`, { method: 'POST', body }),
+    params: { id: row.shortCode },
     locals
   } as unknown as Parameters<typeof action>[0];
 

@@ -529,13 +529,13 @@
                   rel="noopener noreferrer"><i class="fa fa-external-link"></i> Launch</a
                 >
                 <!-- eslint-enable svelte/no-navigation-without-resolve -->
-                <a class="acc-btn acc-btn-sm acc-btn-inverse" href={resolve(`/account/rooms/${room.id}`)}
+                <a class="acc-btn acc-btn-sm acc-btn-inverse" href={resolve(`/account/rooms/${room.shortCode}`)}
                   ><i class="fa fa-cogs"></i> Manage</a
                 >
                 {#if data.entitlements.marketplace}
                   <a
                     class="acc-btn acc-btn-sm acc-btn-default"
-                    href={resolve(`/account/rooms/${room.id}?tab=marketplace`)}
+                    href={resolve(`/account/rooms/${room.shortCode}?tab=marketplace`)}
                     ><i class="fa fa-credit-card"></i> Marketplace</a
                   >
                 {/if}
