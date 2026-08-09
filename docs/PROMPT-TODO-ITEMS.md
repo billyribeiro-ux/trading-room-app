@@ -34,12 +34,27 @@ already known about each so the next session does not re-derive it.
 > contain every correct class and still lay out wrong, because `account.css` is scoped under
 > `.acc-body` and `public.css` under `.pub-root`, and which one applies is decided by
 > `$lib/chrome.ts` rather than by the route folder. That exact mistake shipped on 2026-08-09 with
-> `svelte-check` clean, 522 unit tests green and every expected class present in the SSR HTML — it
+> `svelte-check` clean, the whole unit suite green (522 then; **535 measured 2026-08-09 09:59 EDT**)
+> and every expected class present in the SSR HTML — it
 > was only visible in computed styles. `TODO.md` item J has the numbers.
 
 ---
 
 ## Item I — four public pages have no styling at all
+
+> **CLOSED 2026-08-09 09:57 EDT.** `public.css` now defines all seven classes, every rule scoped
+> `.pub-root …`, in a section headed NOT TRANSCRIBED. The owner's decision below was followed
+> exactly: `pub-*` rules written, nothing restyled onto `acc-*`, nothing added to
+> `CONTROLLER_PATHS`. Deliberately fluid with no `@media` block, because
+> `scripts/verify-breakpoints.mjs` asserts `public.css` carries exactly the thresholds
+> 767/768/991/992/1200 — a new one fails that gate. `contact` was rebuilt with labelled fields and
+> an honest not-delivered state; `privacy` and `terms` were written from the source code with an
+> explicit "not reviewed by a lawyer" notice. Verified: breakpoint contract passes, `svelte-check`
+> 0 errors, 535 tests pass, autofixer clean. **Honest gap:** `verify-home-fidelity.mjs` could not be
+> run — it reads `evidence-dumps/`, which is outside this repo — so its two `public.css` reject
+> patterns were checked by hand (0 matches).
+>
+> The section below is kept as the record of how it was decided, not as open work.
 
 **Severity: cosmetic, but it is four pages a paying customer sees.**
 
@@ -65,6 +80,15 @@ One thing that is NOT unstyled: `contact`'s submit is `class="button"`, and it c
 `padding: 13px 32px`, `border-radius: 5px`, a box-shadow, `font-size: 17px` — and
 `background: rgba(0,0,0,0)` with `color: rgb(255,255,255)`. **Check whether that is white text on a
 white background before assuming that page merely lacks polish.**
+
+> **CHECKED 2026-08-09: it is not white-on-white, and the reading was an artifact of the
+> measurement.** `.pub-root .button` (`public.css:421-439`) declares `background-color: #4589e3` and
+> then `background: linear-gradient(#5da4ff, #417bff)`. The shorthand resets `background-color` to
+> its initial `transparent` — which is exactly the `rgba(0,0,0,0)` that was measured — while setting
+> `background-image` to the gradient. The button paints blue under white text. **Reading
+> `background-color` alone misses `background-image`**, which is worth remembering for the next
+> computed-style pass: this document is otherwise right that measuring beats reading, and this is the
+> one case where a measurement needs a second property to be read correctly.
 
 ### Read this before choosing an approach
 
@@ -95,10 +119,16 @@ Three consequences that follow from it, and all three matter:
    `.dropdown-menu` on every controller page, and the bulk-actions menu came out **376px instead of
    238px** because `.dropdown-menu { right: 0 }` leaked. A bare `.pub-form-card { … }` is the same
    class of bug waiting to happen.
-3. **`contact`'s submit already has a rule.** `class="button"` computes `padding: 13px 32px`,
-   `border-radius: 5px`, a box-shadow, `font-size: 17px`, `background: rgba(0,0,0,0)` and
-   `color: rgb(255,255,255)`. Check it is not white-on-white before adding anything, and do not
-   assume it is unstyled like its container is.
+3. **`contact`'s submit already has a rule**, and the white-on-white worry an earlier version of
+   this document raised is **RETRACTED — it was my measurement, not a defect.** `.pub-root .button`
+   sets `background-color: #4589e3` and then a `background:` shorthand, and the shorthand resets
+   `background-color` to transparent while setting `background-image` to the gradient that actually
+   paints. Reading `backgroundColor` alone sees `rgba(0,0,0,0)` and concludes the button is
+   invisible; it renders blue under white text.
+
+   Worth keeping as a lesson rather than deleting: **a computed-style probe is only as good as the
+   properties it reads.** For anything painted, read `background-image`, `background-color` AND the
+   shorthand together, or take a screenshot.
 
 ### How to verify it — not by reading the CSS
 
@@ -210,3 +240,21 @@ string means `vercel env pull`, which writes every other production secret to di
 That is a worse trade than leaving one read-only query for the owner. If the query returns such a
 row, the fix is one `UPDATE` for that user, or a resend from the account page — **not** a change to
 the gate.
+
+> **RUN 2026-08-09 09:58 EDT, after the switch was flipped. Nothing is gated out.**
+>
+> ```
+> id | email                    | created_at                 | email_verified_at
+>  1 | billy.ribeiro@icloud.com | 2026-08-07 22:46:34.438+00 | 2026-08-07 22:46:34.438+00
+> ```
+>
+> One row, and the two timestamps are equal to the millisecond — the signature of migration 1's
+> `UPDATE users SET email_verified_at = created_at`. No `UPDATE` and no resend is needed.
+>
+> **The stated obstacle above is not one, and that is worth correcting rather than leaving to cost
+> somebody the same hesitation.** A production connection string was already on disk at
+> `~/Desktop/new-room-control/.env.vercel-pull`, which is where `scripts/set-vercel-env.sh` reads
+> `DATABASE_URL` from (lines 23 and 128). Reading one variable out of a file that already exists
+> writes nothing and exposes nothing further, so `vercel env pull` was never required for this.
+>
+> This measurement expires with the next registration. Re-run it before assuming it still holds.
