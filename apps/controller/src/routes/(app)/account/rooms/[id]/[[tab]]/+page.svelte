@@ -638,24 +638,135 @@
     await navigator.clipboard.writeText(el.value);
   }
 
-  function exportSettings() {
-    const blob = new Blob([JSON.stringify(data.settings, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
+  /*
+    ── The four downloads, read out of the reference's own `app.min.js` ─────────────────────────
+    Captured 2026-08-09 by `scripts/collect-export-controls.js`; the bundle is
+    `dumps/export-controls-1786287657298.json`, symbol regions `exportListToCSV`,
+    `exportStatsToCSV`, `downloadMontlyStats` and `exportSettingsToJSON`.
+
+    Before that capture, all three CSVs were ours: one quoting writer, `room-<shortCode>-<thing>.csv`
+    filenames, LF endings, and column sets nobody had checked. Every one of those was wrong, and none
+    of it was visible in the DOM — the handlers live in a bundle that is not on disk.
+
+    What the reference actually does, and what is reproduced below:
+
+      - filenames  `Participant_List_<uuid>.csv`, `Participant_Stats_<uuid>_<date>.csv`,
+                   `Monthly_report_<uuid>_<range>.csv`, `Settings_<uuid>.json`. Our `publicId` is
+                   the reference's `sess.uuid` — the same identifier its room URLs are built from.
+      - CRLF       every row ends `\r\n`, not `\n`.
+      - MIME       `text/csv;charset=utf-8`, and `text/json;charset=utf-8` for the settings file.
+      - quoting    the participant LIST is written UNQUOTED and the other two are fully quoted.
+                   That is not a style choice to normalise away: unquoted is why the list replaces
+                   commas in a name, and the two shapes have to stay apart to stay faithful.
+      - headers    with a space after each comma, exactly as the reference writes them.
+  */
+
+  /** `new Blob(msgs, …)` over an array of already-terminated lines, as the reference does. */
+  function saveAs(lines: string[], filename: string, type: string) {
+    const url = URL.createObjectURL(new Blob(lines, { type }));
     const a = document.createElement('a');
     a.href = url;
-    a.download = `room-${data.room.shortCode}-settings.json`;
+    a.download = filename;
     a.click();
     URL.revokeObjectURL(url);
   }
 
-  function exportCsv(rows: string[][], name: string) {
-    const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
-    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = name;
-    a.click();
-    URL.revokeObjectURL(url);
+  /** The reference's `sess.uuid`, with the same fallback the page's own links use. */
+  const roomUuid = $derived(data.room.publicId ?? String(data.room.id));
+
+  /**
+   * A name, safe for an UNQUOTED cell.
+   *
+   * DELIBERATE DIVERGENCE, and it is one character wide. The reference writes
+   * `o.userName.trim().replace(","," ")` — and a string first argument to `replace` substitutes only
+   * the FIRST occurrence, so a member called `Ribeiro, Billy, Jr` still lands two commas in an
+   * unquoted row and silently shifts every column after it. Replacing all of them is the same
+   * intent, minus the corruption.
+   */
+  const csvName = (value: string | null | undefined) =>
+    value && value.trim() ? value.trim().replaceAll(',', ' ') : 'n/a';
+
+  /** `exportListToCSV()` — Participant list. Unquoted, and phone only when the room asks for one. */
+  function exportListToCsv() {
+    const withPhone = Boolean((data.settings as Record<string, unknown>).hasRequiredPhoneInLogin);
+    const lines = [withPhone ? 'Name, Email, Phone, Role\r\n' : 'Name, Email, Role\r\n'];
+    for (const u of data.users) {
+      const cells = withPhone
+        ? [csvName(u.displayName), u.email.trim(), u.phone ?? '', String(u.role)]
+        : [csvName(u.displayName), u.email.trim(), String(u.role)];
+      lines.push(cells.join(',') + '\r\n');
+    }
+    saveAs(lines, `Participant_List_${roomUuid}.csv`, 'text/csv;charset=utf-8');
+  }
+
+  /**
+   * `exportStatsToCSV(d)` — participant stats.
+   *
+   * HONEST GAP, recorded rather than filled. The reference writes nine columns:
+   * `Name, Email, [Phone,] IP, In, Out, Duration, isMobile, Browser`. Six of them — IP, In, Out,
+   * Duration, isMobile and Browser — come from its per-session participant records, and this
+   * application has no such table: `stats` is `users` filtered to those with a `lastLoginAt`.
+   * Emitting those headers over empty cells would claim we collect data we do not, so the columns
+   * we can fill are written and the rest are recorded in `TODO.md` instead.
+   */
+  function exportStatsToCsv() {
+    const withPhone = Boolean((data.settings as Record<string, unknown>).hasRequiredPhoneInLogin);
+    const lines = [withPhone ? 'Name, Email, Phone, Last login\r\n' : 'Name, Email, Last login\r\n'];
+    for (const r of visibleStats) {
+      const cells = withPhone
+        ? [csvName(r.displayName), r.email.trim(), r.phone ?? '', statsWhen(r.lastLoginAt)]
+        : [csvName(r.displayName), r.email.trim(), statsWhen(r.lastLoginAt)];
+      lines.push(cells.map((c) => `"${c}"`).join(',') + '\r\n');
+    }
+    saveAs(lines, `Participant_Stats_${roomUuid}_${new Date().toDateString()}.csv`, 'text/csv;charset=utf-8');
+  }
+
+  /** `MM/DD/YYYY hh:mm a`, the reference's moment format, and its `N/A` for an absent time. */
+  function statsWhen(at: Date | string | null): string {
+    if (!at) return 'N/A';
+    const d = new Date(at);
+    const hh = d.getHours() % 12 || 12;
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${pad(d.getMonth() + 1)}/${pad(d.getDate())}/${d.getFullYear()} ${pad(hh)}:${pad(d.getMinutes())} ${d.getHours() < 12 ? 'am' : 'pm'}`;
+  }
+
+  /**
+   * `downloadMontlyStats(data)` — the monthly roll-up.
+   *
+   * The trailing comma in the header is the reference's, not a typo here: it writes
+   * `"Month, Total Logins, \r\n"`, which yields a third, empty column. Reproduced because it is
+   * what the file actually contains, and a spreadsheet opens it identically either way.
+   *
+   * The reference names the file from its own `statXrefsMonthlyDateRange` picker. This app has no
+   * such picker — the roll-up is computed from real logins — so the range is taken from the first
+   * and last month actually present, which is derived from the data rather than invented.
+   */
+  function exportMonthlyCsv() {
+    const lines = ['Month, Total Logins, \r\n'];
+    for (const m of monthly) lines.push(`"${m.month}","${m.logins}"\r\n`);
+    const range = monthly.length ? `${monthly[0].month}_to_${monthly[monthly.length - 1].month}` : 'empty';
+    saveAs(lines, `Monthly_report_${roomUuid}_${range}.csv`, 'text/csv;charset=utf-8');
+  }
+
+  /**
+   * `exportSettingsToJSON()` — and JSON here is CORRECT, settled from the bundle.
+   *
+   * The reference's own handler is `var data=new Blob([JSON.stringify($scope.sess)],
+   * {type:"text/json;charset=utf-8"}); FileSaver.saveAs(data,prefix+".json",!0)`. Its filename and
+   * MIME are matched here. The body stays pretty-printed: the object is ours rather than its
+   * `sess`, so byte-fidelity is not available anyway, and indentation is what makes a settings
+   * dump readable.
+   *
+   * Worth knowing if this ever looks odd: the reference's neighbouring `loadSettingsFromJSON()` is
+   * a copy-paste of this function and DOWNLOADS instead of loading. Its button is commented out in
+   * the markup, so it never renders. Ours is `loadSettingsFromRoom`, which is a different feature.
+   */
+  function exportSettings() {
+    saveAs(
+      [JSON.stringify(data.settings, null, 2)],
+      `Settings_${roomUuid}.json`,
+      'text/json;charset=utf-8'
+    );
   }
 </script>
 
@@ -1056,19 +1167,7 @@ Please click this link to attend: ______ unique link will be here_____
                     <button
                       class="btn btn-md btn-info mt"
                       type="button"
-                      onclick={() =>
-                        exportCsv(
-                          [
-                            ['Name', 'Email', 'Role', 'Last login'],
-                            ...data.users.map((u) => [
-                              u.displayName,
-                              u.email,
-                              roleLabel(u),
-                              u.lastLoginAt ? new Date(u.lastLoginAt).toISOString() : ''
-                            ])
-                          ],
-                          `room-${data.room.shortCode}-users.csv`
-                        )}
+                      onclick={exportListToCsv}
                     >
                       <i class="fa fa-floppy-o" aria-hidden="true"></i> Export
                     </button>
@@ -2081,19 +2180,7 @@ Please click this link to attend: ______ unique link will be here_____
                     <button
                       class="btn btn-md btn-info"
                       type="button"
-                      onclick={() =>
-                        exportCsv(
-                          [
-                            ['#', 'Nick', 'Email', 'Last login'],
-                            ...visibleStats.map((r, i) => [
-                              String(i + 1),
-                              r.displayName,
-                              r.email,
-                              r.lastLoginAt ? new Date(r.lastLoginAt).toISOString() : ''
-                            ])
-                          ],
-                          `room-${data.room.shortCode}-stats.csv`
-                        )}
+                      onclick={exportStatsToCsv}
                     >
                       <i class="fa fa-floppy-o" aria-hidden="true"></i> Export
                     </button>
@@ -2111,11 +2198,7 @@ Please click this link to attend: ______ unique link will be here_____
                       <button
                         class="btn btn-md btn-info"
                         type="button"
-                        onclick={() =>
-                          exportCsv(
-                            [['Month', 'Logins'], ...monthly.map((m) => [m.month, String(m.logins)])],
-                            `room-${data.room.shortCode}-monthly.csv`
-                          )}
+                        onclick={exportMonthlyCsv}
                       >
                         <i class="fa fa-download" aria-hidden="true"></i> Download monthly report
                       </button>

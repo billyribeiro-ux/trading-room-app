@@ -1,0 +1,142 @@
+import { readFileSync } from 'node:fs';
+import { describe, expect, it } from 'vitest';
+
+/*
+  The four downloads, pinned against the reference's own `app.min.js`.
+
+  Every value here was READ out of the bundle captured 2026-08-09 by
+  `scripts/collect-export-controls.js` — `dumps/export-controls-1786287657298.json`, symbol regions
+  `exportListToCSV`, `exportStatsToCSV`, `downloadMontlyStats` and `exportSettingsToJSON`. None of it
+  is in the DOM: the manage page's markup carries only `ng-click="exportListToCSV()"`, so before that
+  capture the format was unknowable and what shipped was invented.
+
+  This file exists because all three CSVs were wrong in ways nothing could catch — wrong filenames,
+  LF instead of CRLF, quoted rows that should not be, and a `Last login` column the reference never
+  had. A format that only reveals itself in a downloaded file needs a test that reads the source.
+*/
+
+const page = readFileSync(
+  new URL('../routes/(app)/account/rooms/[id]/[[tab]]/+page.svelte', import.meta.url),
+  'utf8'
+);
+
+/** Comments stripped, so no assertion can be satisfied by the documentation that explains it. */
+const code = page.replace(/<!--[\s\S]*?-->/g, '').replace(/\/\*[\s\S]*?\*\//g, '');
+
+describe('filenames follow the reference, not our own scheme', () => {
+  it('names each file `<Thing>_<uuid>` the way the bundle does', () => {
+    // `var prefix="Participant_List_"+$scope.sess.uuid` — and `sess.uuid` is our `publicId`, the
+    // same identifier the page's own room/registration/app-pair links are built from.
+    expect(code).toContain('`Participant_List_${roomUuid}.csv`');
+    expect(code).toContain('`Participant_Stats_${roomUuid}_${new Date().toDateString()}.csv`');
+    expect(code).toContain('`Monthly_report_${roomUuid}_${range}.csv`');
+    expect(code).toContain('`Settings_${roomUuid}.json`');
+  });
+
+  it('no longer uses the invented room-<shortCode>-<thing> scheme', () => {
+    expect(code).not.toMatch(/room-\$\{data\.room\.shortCode\}-(users|stats|monthly|settings)/);
+  });
+});
+
+describe('the bytes in the file', () => {
+  it('ends every row CRLF, as the reference writes it', () => {
+    // Every `msgs.push(...)` in the bundle ends `\r\n`. The previous writer joined on '\n'.
+    expect(code).toContain('\\r\\n');
+    expect(code).not.toMatch(/\.join\('\\n'\)/);
+  });
+
+  it('declares the reference MIME types, charset included', () => {
+    expect(code).toContain("'text/csv;charset=utf-8'");
+    expect(code).toContain("'text/json;charset=utf-8'");
+    expect(code).not.toContain("'application/json'");
+  });
+
+  it('writes the headers with the reference spacing', () => {
+    expect(code).toContain("'Name, Email, Phone, Role\\r\\n'");
+    expect(code).toContain("'Name, Email, Role\\r\\n'");
+    // `msgs.push("Month, Total Logins, \r\n")` — the trailing comma is the reference's own, and it
+    // yields a third empty column. Reproduced because it is what the file contains.
+    expect(code).toContain("'Month, Total Logins, \\r\\n'");
+  });
+});
+
+describe('quoting differs per file, and that is the reference, not an inconsistency', () => {
+  it('writes the participant LIST unquoted', () => {
+    // `t=name+","+o.email.trim()+","+o.role+"\r\n"` — no quotes anywhere in that row.
+    expect(code).toMatch(/cells\.join\(','\) \+ '\\r\\n'/);
+  });
+
+  it('writes stats and monthly QUOTED', () => {
+    // `'"'+name+'","'+o.email.trim()+'",…'` and `'"'+stat.month+'","'+stat.totalLogins+'"'`.
+    expect(code).toMatch(/cells\.map\(\(c\) => `"\$\{c\}"`\)/);
+    expect(code).toContain('`"${m.month}","${m.logins}"\\r\\n`');
+  });
+
+  it('replaces EVERY comma in a name, which the reference does not', () => {
+    /*
+      A deliberate divergence, one character wide. The reference calls
+      `.replace(","," ")` with a string first argument, which substitutes only the FIRST occurrence
+      — so `Ribeiro, Billy, Jr` still lands a comma in an unquoted row and shifts every column
+      after it. `replaceAll` is the same intent without the corruption.
+    */
+    expect(code).toContain("replaceAll(',', ' ')");
+    expect(code).toContain("'n/a'");
+  });
+});
+
+describe('Export Badges is CSV, and the reported defect was real', () => {
+  const account = readFileSync(new URL('../routes/(app)/account/+page.svelte', import.meta.url), 'utf8')
+    .replace(/<!--[\s\S]*?-->/g, '')
+    .replace(/\/\*[\s\S]*?\*\//g, '');
+
+  it('writes BadgesList.csv, not badges.json', () => {
+    /*
+      Reported by the owner and INITIALLY DISMISSED here, wrongly: the control was searched for in
+      `must-match/important`, the MANAGE page, and it is on the ACCOUNT page. The bundle settles it:
+
+        $scope.exportBadges=function(){if($scope.badgesList&&$scope.badgesList.length>0){
+          var csv=convertToCSV($scope.badgesList),prefix="BadgesList",
+              data=new Blob([csv],{type:"text/csv;charset=utf-8"});
+          FileSaver.saveAs(data,prefix+".csv",!0)}}
+    */
+    expect(account).toContain("a.download = 'BadgesList.csv'");
+    expect(account).toContain("'text/csv;charset=utf-8'");
+    expect(account).not.toContain("a.download = 'badges.json'");
+    expect(account).not.toMatch(/JSON\.stringify\(data\.badges/);
+  });
+
+  it('keeps convertToCSV’s eleven keys, in its order', () => {
+    for (const key of ['_id', 'userID', 'text', 'imgURL', 'color', 'bkcolor', 'type', 'name', 'uploadTime', 'onlyP', 'roles']) {
+      expect(account, `${key} must be a column`).toContain(`'${key}'`);
+    }
+  });
+
+  it('uses LF and unspaced headers here, unlike the CRLF exports', () => {
+    // `convertToCSV` sets `lineDelimiter="\n"` and joins the header on a bare comma. The other
+    // three exports use `\r\n` and `Name, Email`. The difference is the reference's, not drift.
+    expect(account).toContain("BADGE_CSV_KEYS.join(',') + '\\n'");
+    expect(account).not.toMatch(/BADGE_CSV_KEYS\.join\(', '\)/);
+  });
+
+  it('quotes a cell only when it is a string containing a comma', () => {
+    expect(account).toContain("cell.includes(',') ? `\"${cell}\"` : cell");
+  });
+
+  it('writes nothing at all when there are no badges', () => {
+    // `if($scope.badgesList&&$scope.badgesList.length>0)` — no badges, no file. Not a header-only one.
+    expect(account).toContain('if (!data.badges.length) return;');
+  });
+});
+
+describe('settings stays JSON, because the bundle says so', () => {
+  it('keeps the .json extension the reference handler produces', () => {
+    /*
+      Reported as a defect — "it should be CSV". It is not. The reference's own handler reads
+      `var data=new Blob([JSON.stringify($scope.sess)],{type:"text/json;charset=utf-8"});
+       FileSaver.saveAs(data,prefix+".json",!0)`
+      and its name says JSON twice over. Pinned so the report does not come back and win next time.
+    */
+    expect(code).toContain('`Settings_${roomUuid}.json`');
+    expect(code).not.toMatch(/Settings_\$\{roomUuid\}\.csv/);
+  });
+});

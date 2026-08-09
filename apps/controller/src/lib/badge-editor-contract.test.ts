@@ -70,10 +70,14 @@ describe('the editor fields keep the reference ids', () => {
       An assertion that can be satisfied — or broken — by its own documentation is not an assertion.
     */
     const css = readFileSync(new URL('../account.css', import.meta.url), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
-    const rule = /#badgeRolesTxt\s*\{[^}]*\}/.exec(css);
-    expect(rule, '#badgeRolesTxt must carry a rule').not.toBeNull();
-    expect(rule[0]).toMatch(/max-width:\s*100%/);
-    expect(rule[0], 'width: 100% would contradict the measured width: auto').not.toMatch(/[^-]width:\s*100%/);
+    const match = /#badgeRolesTxt\s*\{[^}]*\}/.exec(css);
+    expect(match, '#badgeRolesTxt must carry a rule').not.toBeNull();
+    // `?? ''` rather than `match[0]`: `expect(...).not.toBeNull()` is a runtime assertion and does
+    // not narrow the type, which is how this file shipped two `possibly null` errors. An empty
+    // string still fails both assertions below, so the guard costs no strictness.
+    const rule = match?.[0] ?? '';
+    expect(rule).toMatch(/max-width:\s*100%/);
+    expect(rule, 'width: 100% would contradict the measured width: auto').not.toMatch(/[^-]width:\s*100%/);
     expect(markup).toContain('cols="70"');
   });
 

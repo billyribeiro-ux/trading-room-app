@@ -455,8 +455,14 @@ export const badges = pgTable('badges', {
    * an id, that is a new migration, not a rewrite.
    *
    * Equally honest: nothing here invents what a dark-theme badge LOOKS like. No CSS in our evidence
-   * describes a dark-theme chip, so the flag is stored, round-tripped, surfaced as the control's
-   * pressed state and included in Export Badges — and the chip renders exactly as it did before.
+   * describes a dark-theme chip, so the flag is stored, round-tripped and surfaced as the control's
+   * pressed state — and the chip renders exactly as it did before.
+   *
+   * It is NOT in Export Badges any more, and that changed on 2026-08-09. That export used to be a
+   * JSON dump of these rows, so every column rode along. The reference's `exportBadges()` was then
+   * captured and it writes CSV through a `convertToCSV` with ELEVEN fixed keys, none of them this
+   * one. Matching that key list matters more than carrying an extra flag into a file whose purpose
+   * is to interchange with the original's.
    */
   darkTheme: boolean('dark_theme').notNull().default(false),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull()

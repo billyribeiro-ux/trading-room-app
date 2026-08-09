@@ -24,6 +24,57 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-09
 
+### 11:12 — All five downloads rewritten from the reference's own bundle
+
+**RUNTIME IMPACT: yes.** Every export in the app changes filename, format, or both.
+
+The owner ran `collect-export-controls.js` and `collect-create-new.js` against the live original;
+both dumps are in `dumps/`. `app.min.js` — 455KB, never on disk before — is now readable, and it
+overturned one conclusion and corrected four formats.
+
+**Export Badges was a real defect, and the earlier dismissal of it was wrong.** The handler is
+`exportBadges()`, on the ACCOUNT page, writing `BadgesList.csv` through a `convertToCSV`. Ours wrote
+`badges.json`. The 10:50 entry said no such control existed; it had searched the manage-page capture
+only, which is the failure the house rules exist to prevent, quoted in the same entry that committed
+it.
+
+| download | was | now, from the bundle |
+| --- | --- | --- |
+| Export Badges | `badges.json`, `application/json` | **`BadgesList.csv`**, `text/csv;charset=utf-8`, eleven fixed keys |
+| Users → Export | `room-<code>-users.csv`, 4 quoted columns incl. an invented `Last login` | `Participant_List_<uuid>.csv`, **unquoted**, `Name, Email[, Phone], Role` |
+| Stats → Export | `room-<code>-stats.csv`, `#/Nick/Email/Last login` | `Participant_Stats_<uuid>_<date>.csv`, **quoted** |
+| Monthly | `room-<code>-monthly.csv` | `Monthly_report_<uuid>_<range>.csv`, header `Month, Total Logins, ` — trailing comma is the reference's |
+| Export Settings | `room-<code>-settings.json` | `Settings_<uuid>.json`, `text/json;charset=utf-8` — **JSON confirmed correct** |
+
+**Details that only a bundle read could give:** every CSV ends `\r\n` — except the badges one, which
+`convertToCSV` writes with `\n`. Headers carry a space after each comma — except the badges one,
+which has none. The participant list is unquoted and the other three are quoted. These look like
+inconsistencies and are the reference's own.
+
+**Two deliberate divergences, both one character wide.** The reference's `.replace(","," ")` on a
+member name substitutes only the FIRST comma, so a second one still corrupts an unquoted row —
+`replaceAll` here. And its `convertToCSV` guards on `!== undefined`, so a present-but-null key
+concatenates the literal text `null` into the cell; our `emoji` and `imgURL` are nullable, so null
+writes empty instead.
+
+**Honest gaps, recorded not filled:** the reference's stats CSV has six columns this app has no data
+for — IP, In, Out, Duration, isMobile, Browser — which come from per-session participant records
+that do not exist here. Now `TODO.md` item **K**; it is a schema question, not an export one. And
+three badge columns (`type`, `onlyP`, `roles`) are written empty; `roles` is collected by the editor
+and never stored, already recorded at `+page.server.ts:345`.
+
+`darkTheme` left the badges export as a result — the reference's key list is fixed at eleven and
+matching it wins. The now-false comment in `schema.ts` saying otherwise was corrected.
+
+**Also fixed: two type errors I shipped at 10:54.** `svelte-check` went 0 → 2 because
+`expect(...).not.toBeNull()` does not narrow a type, and I ran the test and the breakpoint gate but
+not `svelte-check` on a `.ts` change. Back to 0.
+
+**Verified:** 51 files, 562 tests passing; `svelte-check` 0 errors, 3 warnings (unchanged, all
+pre-existing); breakpoint contract passing; autofixer clean on both pages. Pinned by a new
+`export-format-contract.test.ts` — 14 cases over filenames, line endings, MIME, header spacing,
+per-file quoting and the empty-badges guard.
+
 ### 10:54 — The badge roles textarea no longer overflows its container (deliberate divergence)
 
 **RUNTIME IMPACT: yes.** One CSS rule on the account page's badge editor. The field stops escaping
@@ -56,7 +107,16 @@ assertion **strips CSS comments first** — its first version matched the note q
 **Verified:** mutation-checked — swapping `max-width` for `width` turns the test red, so it is not
 vacuous. Breakpoint contract passes; 5/5 badge editor tests pass.
 
-### 10:50 — "Export badges should be CSV": investigated, and NOT changed
+### 10:50 — "Export badges should be CSV": investigated, and NOT changed — **THIS ENTRY WAS WRONG**
+
+> **Corrected 11:12 by the bundle capture. The owner was right and this entry was not.**
+> There IS an `Export Badges` control — `ng-click="exportBadges()"` — and it writes
+> `BadgesList.csv`. The mistake below is a single word: this entry says "not in the reference",
+> having searched `must-match/important`, which is the **manage** page. The control is on the
+> **account** page. Searching one capture and concluding about the whole app is the exact failure
+> the house rules describe, committed while quoting them. Everything below about the four
+> manage-page exports is accurate and was confirmed by the same bundle; only the badges claim was
+> false. See the 11:12 entry.
 
 **No runtime impact** — one new collector script. **No application code was touched, deliberately.**
 
