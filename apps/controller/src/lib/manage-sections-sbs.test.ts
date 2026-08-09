@@ -156,7 +156,29 @@ function ourPage(tab: string) {
           { id: 'settings', label: 'Settings', visible: true, strip: true }
         ],
         entitlements: {},
-        settings: {},
+        /*
+          The tenant's OWN values, not an empty room.
+
+          `{}` made every editable print "empty" or "No", while the capture prints "Yes!" on seven
+          checkboxes and «0» on the simulated count — eight text rows that could never match
+          whatever the page did. The values are the schema's `captured` column, which is the
+          reference controller's own rendered state; cross-checked row by row against file2 for
+          980-1740, where the only «Yes!» are rosterVisibleToViewers (1118),
+          rosterCountVisibleToViewers (1154), hasQAOnAlerts (1286), sendReportEmails (1494),
+          archiveAlertsLog (1600), archiveChatLog (1608) and enableVideoPlayer (1631), plus
+          simUserCount 0 (1161) and tokenExpiresIn "1d" (1007).
+
+          `capturedIsDisplayOnly` entries are EXCLUDED: for authMode and webinarDate the captured
+          text is what the reference DISPLAYED, not what it stored, and feeding a display string
+          back in as a value is how authMode once got seeded with a whole sentence. Leaving
+          authMode unset is also what keeps the seven `ng-hide` rows hidden on both sides.
+        */
+        settings: Object.fromEntries(
+          ROOM_SETTINGS.filter((d) => !d.capturedIsDisplayOnly && d.captured !== null).map((d) => [
+            d.name,
+            d.captured
+          ])
+        ),
         landingHtml: '',
         users: USERS,
         unsupportedFilter: null,

@@ -40,7 +40,7 @@ read_value() {
 min_length_for() {
   case "$1" in
     ROOM_JWT_SECRET|API_KEY_ENCRYPTION_KEY) echo 32 ;;
-    RECAPTCHA_SECRET_KEY) echo 20 ;;
+    RECAPTCHA_SECRET_KEY|RESEND_API_KEY) echo 20 ;;
     *) echo 0 ;;
   esac
 }
@@ -61,6 +61,22 @@ set_var() {
       case "$value" in
         *localhost*|*127.0.0.1*|*0.0.0.0*)
           printf '  REFUSED %-24s points at a LOCAL address — not written\n' "$name"
+          REFUSED=$((REFUSED + 1))
+          return
+          ;;
+      esac
+      ;;
+  esac
+
+  # A from-address without an `@` is accepted here and rejected by the provider at send time, which
+  # surfaces as a broken registration rather than a bad variable — the same half-configured trap
+  # `mailConfigured()` exists to avoid. Caught at write time, where the value can still be seen.
+  case "$name" in
+    MAIL_FROM)
+      case "$value" in
+        *@*.*) ;;
+        *)
+          printf '  REFUSED %-24s not an email address — not written\n' "$name"
           REFUSED=$((REFUSED + 1))
           return
           ;;
@@ -95,6 +111,16 @@ set_var ROOM_BASE_URL            "$(read_value ROOM_BASE_URL "$ENVF")"          
 set_var RECAPTCHA_SECRET_KEY     "$(read_value RECAPTCHA_SECRET_KEY "$ENVF")"      ".env"
 set_var PUBLIC_RECAPTCHA_SITE_KEY "$(read_value PUBLIC_RECAPTCHA_SITE_KEY "$ENVF")" ".env"
 set_var SUPERADMIN_EMAILS        "$(read_value SUPERADMIN_EMAILS "$ENVF")"         ".env"
+
+# Mail. BOTH or neither — `mailConfigured()` requires the pair (`mail.ts:71-73`), and setting one
+# alone is the half-configured state it exists to refuse. Absent from `.env`, each is reported and
+# skipped, which leaves the deployment honestly unconfigured rather than half on.
+#
+# Setting these flips `verificationEnforced()` to true. Re-run the check in `docs/EMAIL.md` §5
+# first: any account with a NULL `email_verified_at` is gated out of creating rooms until it
+# confirms. Measured 2026-08-09 there were none, and that expires with the next registration.
+set_var RESEND_API_KEY           "$(read_value RESEND_API_KEY "$ENVF")"            ".env"
+set_var MAIL_FROM                "$(read_value MAIL_FROM "$ENVF")"                 ".env"
 
 # API_KEY_ENCRYPTION_KEY is NOT set here any more, and generating a fresh one is exactly what
 # broke the account page.

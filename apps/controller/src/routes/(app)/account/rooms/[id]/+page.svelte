@@ -17,6 +17,7 @@
     usesRoomPassword
   } from '$lib/auth-modes';
   import { isRoomTrial } from '$lib/room-member-role';
+  import { settingHelp } from '$lib/room-settings-help';
   import type { RoomSettingDef } from '$lib/room-settings-schema';
   import type { SubmitFunction } from '@sveltejs/kit';
   import { untrack } from 'svelte';
@@ -1792,15 +1793,23 @@ Please click this link to attend: ______ unique link will be here_____
                         shows a picture — and it read as a fault rather than a default, on a black
                         panel built to frame a logo.
 
-                        The path is the reference's own, byte for byte, so the asset drops
-                        straight in at `static/public/images/ptr_logo.png`.
+                        The BEHAVIOUR is the match, not the filename. The reference falls back to
+                        THE SITE'S OWN logo — for it, `ptr_logo.png`. For us the site is
+                        tradingroom.app, so the fallback is OUR logo, at a neutral path.
 
-                        The logo is white on transparent — which is why the surrounding panel is
-                        `background-color: #000`. That black box is not decoration; it exists so a
+                        Copying `ptr_logo.png` was briefly done here and was wrong twice: it would
+                        put a third party's brand asset into a public repository, and it would
+                        render somebody else's wordmark as this product's default.
+
+                        The logo is white on transparent, which is why the surrounding panel is
+                        `background-color: #000`. That black box is not decoration — it exists so a
                         white wordmark is visible at all. Worth knowing before anyone "simplifies"
                         the panel away.
+
+                        AWAITING THE ASSET: save it to
+                        `apps/controller/static/public/images/room-logo.png`.
                       -->
-                      <img class="navLogo" src="/public/images/ptr_logo.png" alt="" />
+                      <img class="navLogo" src="/public/images/room-logo.png" alt="" />
                     {/if}
                   </div>
                   <div class="col-sm-4">
@@ -2204,6 +2213,7 @@ Please click this link to attend: ______ unique link will be here_____
                   </p>
 
                   {#each settingsBeforeApiSecret as def (def.name)}
+                    {@const help = settingHelp(def)}
                     <p class="form-control-static">
                       <!--
                         NO `for`, AND NO WRAPPER around the editable.
@@ -2223,12 +2233,26 @@ Please click this link to attend: ______ unique link will be here_____
                       <!-- svelte-ignore a11y_label_has_associated_control -->
                       <label class="col-sm-2 control-label">{def.label ?? def.name}</label>
                       <Editable {def} value={settingValue(def.name)} markUnwired />
-                      {#if def.help}
+                      {#if help}
                         <br />
-                        <!-- the reference wraps helper copy in a <label> that
-                             labels no control; a span with the same computed box
-                             says the same thing and is valid -->
-                        <span class="muted">{def.help}</span>
+                        <!--
+                          A `<label>`, because that is what the reference's helper copy IS:
+                          `<br><label class="muted">If set, Presenters will need to enter the
+                          password to delete an alert</label>` (file2:1037), and the same on
+                          every row that has helper copy.
+
+                          This was a `<span class="muted">` on the argument that a span with the
+                          same computed box says the same thing. True of the paint, false of the
+                          shape — one differing row per helper, and there are 87 of them in the
+                          first half of this pane alone. It labels no control, same as the row
+                          label above, so the same rule is silenced with the same reason.
+
+                          Eight of them carry NO class in the capture (file2:1247 and seven
+                          others) — `$lib/room-settings-help` says which, and why the generated
+                          schema cannot.
+                        -->
+                        <!-- svelte-ignore a11y_label_has_associated_control -->
+                        <label class={help.muted ? 'muted' : undefined}>{help.text}</label>
                       {/if}
                     </p>
                   {/each}
@@ -2266,14 +2290,17 @@ Please click this link to attend: ______ unique link will be here_____
 
                   <!-- the settings the reference lists BELOW the docs link, starting at slackPostURL -->
                   {#each settingsAfterApiSecret as def (def.name)}
+                    {@const help = settingHelp(def)}
                     <p class="form-control-static">
                       <!-- same bare label and unwrapped editable as the loop above -->
                       <!-- svelte-ignore a11y_label_has_associated_control -->
                       <label class="col-sm-2 control-label">{def.label ?? def.name}</label>
                       <Editable {def} value={settingValue(def.name)} markUnwired />
-                      {#if def.help}
+                      {#if help}
                         <br />
-                        <span class="muted">{def.help}</span>
+                        <!-- the reference's own helper label again — see the loop above -->
+                        <!-- svelte-ignore a11y_label_has_associated_control -->
+                        <label class={help.muted ? 'muted' : undefined}>{help.text}</label>
                       {/if}
                     </p>
                   {/each}

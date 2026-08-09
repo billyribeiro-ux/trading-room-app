@@ -30,8 +30,8 @@ broken product. This is the one piece of infrastructure where consolidating onto
 | --- | --- | --- |
 | Single seam | — | swapping providers is one file, not a search-and-replace |
 | `RESEND_ENDPOINT = 'https://api.resend.com/emails'` | 42 | HTTP API, no SMTP, no long-lived connection |
-| `AbortSignal.timeout` on the request | 45 | a hung provider must not hold a registration request open |
-| `mailConfigured()` needs **both** `RESEND_API_KEY` **and** `MAIL_FROM` | 65-67 | a key with no from-address produces a provider rejection at send time; being obviously off is better |
+| `AbortSignal.timeout` on the request | 48 (`TIMEOUT_MS = 8_000`), used at 99 | a hung provider must not hold a registration request open |
+| `mailConfigured()` needs **both** `RESEND_API_KEY` **and** `MAIL_FROM` | 71-73 | a key with no from-address produces a provider rejection at send time; being obviously off is better |
 | Throws `No mail transport is configured` | 52 | callers check `mailConfigured()` first rather than discovering it in a 500 |
 
 The provider was **our decision, not a match**: no browser capture can reach the reference's
@@ -94,6 +94,15 @@ Keeps transactional sending reputation separate from the apex, so anything you l
 Start DMARC at `p=none` and read the reports for a week before tightening to `p=quarantine`.
 Tightening first, on an unverified setup, blackholes your own mail.
 
+**Where the records go: Porkbun, not Vercel.** `dig NS tradingroom.app` answers
+`fortaleza / maceio / salvador / curitiba .ns.porkbun.com` — Vercel serves the sites but does not
+hold the zone, so these are added in Porkbun's DNS panel. Checked 2026-08-09.
+
+**The zone is empty of mail records today** — `dig MX tradingroom.app`, `dig TXT tradingroom.app`,
+`dig TXT mail.tradingroom.app` and `dig TXT _dmarc.tradingroom.app` all return nothing. So there is
+no existing SPF to merge into and nothing to conflict with, and equally: nothing receives mail at
+this domain right now, which is step 6.
+
 ### Step 4 — set the variables
 
 ```
@@ -101,8 +110,16 @@ RESEND_API_KEY=…
 MAIL_FROM=noreply@mail.tradingroom.app
 ```
 
-Use `scripts/set-vercel-env.sh`, which refuses blank values and localhost addresses at write time —
-see `NEXT-SESSION.md` §8 for why that guard exists.
+**`scripts/set-vercel-env.sh` does NOT write these two variables yet.** Checked 2026-08-09: it
+carries eight `set_var` calls — `CONTROL_PLANE_MODE`, `PUBLIC_SITE_ORIGIN`, `DATABASE_URL`,
+`ROOM_JWT_SECRET`, `ROOM_BASE_URL`, `RECAPTCHA_SECRET_KEY`, `PUBLIC_RECAPTCHA_SITE_KEY`,
+`SUPERADMIN_EMAILS` — and neither `RESEND_API_KEY` nor `MAIL_FROM` appears anywhere in it. Following
+this step as written would set nothing.
+
+Two lines have to be added to that script, reading from `$ENVF`
+(`~/Desktop/new-room-control/.env`) the way the others do, and the values have to exist in that file
+first. Its guard then applies as designed — it refuses blank values and localhost addresses at write
+time, `NEXT-SESSION.md` §8 for why.
 
 ### Step 5 — verify by RECEIVING, not by sending
 
@@ -159,6 +176,18 @@ depends on when it was created relative to migration 1:
 ```sql
 SELECT id, email, created_at, email_verified_at FROM users ORDER BY id;
 ```
+
+**Run 2026-08-09 against the production database — one row, and it is the safe one:**
+
+```
+id | email                    | created_at                    | email_verified_at
+ 1 | billy.ribeiro@icloud.com | 2026-08-07 22:46:34.438+00    | 2026-08-07 22:46:34.438+00
+```
+
+The two timestamps are equal to the millisecond, which is the backfill's own signature —
+`email_verified_at = created_at` is what migration 1 wrote. So the owner's account is in the FIRST
+row of the table above, and **configuring mail today gates nobody**. This measurement expires the
+moment anyone registers: re-run it before flipping the variables, not instead of.
 
 Any row with a NULL will be gated out of creating rooms the moment mail is configured. The
 account page carries a resend-the-link action, so the route back exists — but it is worth knowing
