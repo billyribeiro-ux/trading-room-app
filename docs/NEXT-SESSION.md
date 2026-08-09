@@ -61,11 +61,12 @@ The room **cannot** deploy to Vercel. Two independent reasons, both from the cod
 This is the same reasoning `ADR 0003` used to move the controller off SQLite. The room is the last
 holdout.
 
-### Option A — put the room on the Lightsail box, beside the SFU
+### Option A — put the room on a VM, beside the SFU
 
-- **Needs:** SSH access to `34.195.170.147` (port 22 is open; no key on this machine)
+- **Needs:** a host with SSH. See §4a — the owner is leaving Lightsail, so this should go straight
+  to the replacement rather than onto Lightsail and then move again.
 - **Ready:** `ADAPTER=node` already builds; `ops/` holds the Caddyfile, both systemd units and the
-  env templates; that host already runs Caddy with valid TLS
+  env templates.
 - **Cost:** two databases — room data on SQLite, account data on Neon
 - **Time:** hours
 
@@ -76,12 +77,13 @@ holdout.
   this app, so it may not even buy the platform move
 - **Time:** days
 
-**DECIDED 2026-08-09: Option A.** The owner chose A. Get the room onto the Lightsail box beside the
-SFU; revisit the Postgres migration once it is not blocking a launch.
+**DECIDED 2026-08-09: Option A**, and the owner is **leaving Lightsail** — so the room goes onto
+whichever host replaces it, not onto Lightsail first. One migration, not two. Revisit the Postgres
+question once it is not blocking a launch.
 
 ### Executing A — the checklist
 
-1. SSH to `34.195.170.147` (port 22 open; no key on this machine yet).
+1. Provision the replacement host (§4a) and get SSH to it. Lightsail is being retired.
 2. Build the room with `ADAPTER=node pnpm --filter ./apps/room build`, which produces a Node server.
 3. Install it beside the SFU. `ops/` already holds the Caddyfile and both systemd units — model the
    room's unit on `tradingroom-media.service`.
@@ -112,6 +114,39 @@ SFU; revisit the Postgres migration once it is not blocking a launch.
 - **SFU: AWS Lightsail**, instance `mediasoup-test-01`, `us-east-1a`, static IP `34.195.170.147`,
   Caddy TLS on 443 → loopback `127.0.0.1:4443`. Stage 1 of `MEDIASOUP-DEPLOYMENT-PLAN.md`, executed
   2026-08-02.
+
+### 4a. What the ORIGINAL actually runs on — resolved 2026-08-09
+
+Measured with `dig` and `whois`, not recalled:
+
+```
+protradingroom.com       ->  148.251.195.139   Hetzner Online GmbH, fsn1-dc12 Falkenstein, DE
+                             172.98.193.74     Centrilogic, Inc., US
+www.protradingroom.com   ->  same two
+chat.protradingroom.com  ->  same two
+```
+
+Three findings that bear directly on the hosting decision:
+
+1. **Two providers, two continents, deliberately.** Every hostname is dual-homed across a Hetzner
+   box in Germany and a Centrilogic box in the US. Centrilogic is a managed-hosting/colo provider,
+   not a hyperscaler.
+2. **No AWS, GCP or Azure anywhere. No CDN in front** — the IPs answer directly.
+3. **The room shares the site's hosts.** `chat.protradingroom.com` is not on separate media
+   infrastructure; it resolves to the same pair. That is exactly the topology Option A describes.
+
+The most useful detail is the split itself. Hetzner's US locations (Ashburn, Hillsboro) carry a much
+smaller included-traffic allowance than its EU ones, so whoever built this appears to have solved US
+latency with a DIFFERENT US provider rather than paying Hetzner's US traffic terms.
+
+**Hetzner EU for bandwidth economics, a separate US provider for latency to US traders** is a
+pattern the original is already using, and it is worth copying rather than re-deriving.
+
+An earlier version of this document, and several statements in conversation, asserted
+"Hetzner + Centrilogic" from memory before it was verified. It happened to be right; it was still
+wrong to state. The commands above are cheap — re-run them rather than trusting this paragraph.
+
+---
 
 ### The genuinely open question: where the SFU lives at launch
 
@@ -148,7 +183,14 @@ for the same traffic.
 | Admin UI | stay on Vercel | pure rendering, no UDP, no state |
 
 Lightsail was correct for Stage 1 and the plan says so itself — "a smoke/integration host, not a
-production capacity claim". Nothing needs to move today. The decision is due before real load.
+production capacity claim". **The owner has decided to leave it**, so the ladder in
+`MEDIASOUP-DEPLOYMENT-PLAN.md` beyond Stage 1 is superseded: Stage 2 and 3 should not be provisioned
+on Lightsail.
+
+**Before a second SFU node is worth buying, room-aware placement has to exist.** The plan says so
+itself: routers, peers and producers are process-local, so two members of one room on two nodes
+cannot exchange media, and ordinary round-robin DNS or an HTTP load balancer will do exactly that.
+That is the real work between here and selling this — not the hosting choice.
 
 **Open sub-questions:** whether Postgres stays managed or moves self-hosted; whether the marketing
 site stays on Vercel or consolidates onto owned infrastructure.

@@ -94,7 +94,23 @@ export function shapeOf(source: string, { angular = false }: { angular?: boolean
       The same `\b` mistake this project fixed in the CSS gate this morning, reintroduced here in
       the tool built to find mistakes. An HTML attribute starts at a space or the string start.
     */
-    if (/(^|\s)hidden(\s|=|$)/.test(attrs ?? '')) continue;
+    /*
+      `hidden` HIDES THE SUBTREE, exactly as `ng-hide` does.
+
+      This used to `continue`, dropping the element and keeping its children — while the `ng-hide`
+      branch above skips the whole subtree. Asymmetric, and the tab strip is where it showed:
+      the reference's Text List `<li class="ng-hide">` vanishes with its anchor and its label
+      (file2:7-9), ours is `<li hidden>` (+page.svelte:918) and lost only the `<li>`, leaving an
+      orphan `action` and an orphan «Text List» behind. Two of those, four spurious nodes, and
+      every line after the first one read as a divergence. `hidden` is `display: none` on the
+      element AND everything inside it, so both sides now drop the same thing.
+    */
+    if (/(^|\s)hidden(\s|=|$)/.test(attrs ?? '')) {
+      // null for a void element — nothing to skip, since it has no subtree
+      const end = skipSubtree(html, tagRe.lastIndex, tag);
+      if (end !== null) tagRe.lastIndex = end;
+      continue;
+    }
 
     /*
       The ripple pair is framework decoration, not page content.
