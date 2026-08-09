@@ -24,7 +24,12 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-09
 
-### 10:35 — `TODO.md` now lists only open work (pushed to `main`)
+### 10:31 — `TODO.md` now lists only open work (`ca1fe65`, pushed to `main`)
+
+> This heading first read **10:35**, a time I wrote before checking the clock. It was 10:31.
+> Corrected to the commit's own timestamp, and left visible: this file's whole premise is that
+> every time here is measured rather than estimated, so an invented one in it is worse than an
+> invented one anywhere else.
 
 **No runtime impact** — one document.
 
