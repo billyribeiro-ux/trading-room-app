@@ -15,9 +15,15 @@
    * full-width `acc-btn-info`. Every class here is one the login page already uses and
    * `account.css` already defines.
    *
-   * The neighbouring public pages (`contact`, `verify-email`) use a `pub-*` set — `pub-auth`,
-   * `pub-form-card`, `pub-field`, `pub-hint` — which has **no CSS rule anywhere in this app**, so
-   * those pages render unstyled. That is recorded in `TODO.md` rather than propagated here.
+   * The neighbouring public pages (`contact`, `privacy`, `terms`, `verify-email`) use a `pub-*`
+   * set — `pub-auth`, `pub-container`, `pub-form-card`, `pub-field`, `pub-hint`. When this page was
+   * written none of those had a CSS rule anywhere in the app and those pages rendered unstyled,
+   * which is why this one did not copy them; that was `TODO.md` item I and `public.css` now defines
+   * the set, scoped `.pub-root`.
+   *
+   * This page still wears `acc-*` deliberately, and should stay that way: it is reached from the
+   * login panel and returns to it, and keeping the public sheet and the controller sheet apart is
+   * what stops a change to one reaching pages that have nothing to do with it.
    *
    * ## Nothing on this page is matched
    *

@@ -138,10 +138,15 @@ describe('the reset page', () => {
 describe('the styling exists rather than being asserted', () => {
   it('.acc-success has a real rule, unlike the pub-* classes these pages deliberately avoid', () => {
     /*
-      `contact` and `verify-email` render `pub-auth` / `pub-form-card` / `pub-hint`, none of which
-      has a rule anywhere in this app — so those pages are unstyled. Recorded in TODO.md. These two
-      pages use the login panel's classes, which are measured and real, and this pins the one class
-      that had to be added.
+      These two pages use the login panel's classes, which are measured and real, and this pins the
+      one class that had to be added.
+
+      They were written this way because `contact`, `privacy`, `terms` and `verify-email` rendered
+      `pub-auth` / `pub-container` / `pub-form-card` / `pub-hint` while none of those had a rule
+      anywhere in the app. That was TODO.md item I, and it is now CLOSED — `public.css` defines
+      them, scoped `.pub-root` like everything else in that sheet. These pages still use `acc-*`
+      rather than switching: they are reached from the login panel and belong to its flow, and the
+      two sets stay in their own stylesheets so a change to one cannot reach the other.
     */
     const css = readFileSync(new URL('../account.css', import.meta.url), 'utf8');
     expect(css).toMatch(/^\.acc-success\s*\{/m);
