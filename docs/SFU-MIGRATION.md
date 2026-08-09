@@ -42,7 +42,7 @@ Two reasons, and the second is the one that forces the timing.
 | `media.tradingroom.app` | resolves to `87.99.154.155`, **valid certificate already issued** |
 | Caddy | running, and its `media` block is a 503 placeholder ready to become a reverse proxy |
 | Docker | **29.7.2 installed and active** on the box |
-| Firewall | TCP 22/80/443, **UDP any**, and a TCP RTC range — see the caveat below |
+| Firewall | TCP 22/80/443, **UDP any**, and a TCP RTC range — **verify it, Step 0a** |
 | `ops/` | Caddyfile example, `tradingroom-media.service`, `media.env.example`, `caddy.env.example` |
 | Source | `services/media/`, Rust **1.97.1** pinned in `services/rust-toolchain.toml` |
 
@@ -64,6 +64,10 @@ The failure mode is the expensive one: **silent, and invisible from your own mac
 works from a normal network, and anyone behind a corporate firewall simply never connects, with no
 error to read. Open the Hetzner console, look at the rule, and fix it before you conclude the SFU
 is broken.
+
+If TCP on the range is missing and the console still refuses it, narrow BOTH sides to something it
+accepts — `40000-40999` — and set `MEDIA_RTC_PORT_MAX` to match. `Config::validate` requires ≥100
+ports per worker, so 1,000 is ample for testing.
 
 **0b. Decide the build strategy up front — do not discover the OOM.**
 
@@ -97,9 +101,8 @@ neither error mentions the variable that caused it unless you already suspect it
 topology requires Linux host networking** (`--network host`), because publishing 10,000 UDP ports as
 Docker mappings creates a userland proxy per port and exhausts file descriptors.
 
-**Watch the memory.** The box is 1.9 GB with 2 GB swap. A Rust release build of mediasoup is heavy;
-if it OOMs, either lower codegen parallelism (`CARGO_BUILD_JOBS=1`) or build the image elsewhere and
-ship it with `docker save` / `docker load`.
+Build strategy — in-place or `docker save`/`load` — is **Step 0b**, and is decided before you get
+here.
 
 ### 2. Configure it
 
@@ -110,7 +113,7 @@ From `ops/mediasoup/media.env.example`. The values that matter here:
 | `MEDIA_ANNOUNCED_ADDRESS` | `87.99.154.155` | the PUBLIC address. `validate_announced_address_policy` in `main.rs` refuses to start if an externally-bound service announces loopback |
 | `MEDIA_ALLOWED_ORIGIN` | `https://chat.tradingroom.app` | the room's origin. Wrong value = every grant rejected |
 | `MEDIA_BIND_ADDRESS` | `127.0.0.1:4443` | Caddy is the only thing that should reach signalling |
-| `MEDIA_RTC_PORT_MIN` / `MAX` | see the firewall caveat | must match what the firewall actually allows |
+| `MEDIA_RTC_PORT_MIN` / `MAX` | see Step 0a | must match what the firewall actually allows |
 | `MEDIA_GRANT_PUBLIC_KEY` | pair with the room's `MEDIA_GRANT_PRIVATE_KEY` | the room mints grants; the SFU verifies them |
 
 ### 3. Point Caddy at it
@@ -147,28 +150,6 @@ hostname** — it embeds the IP, so changing servers breaks every client that ca
 
 ---
 
-## The firewall caveat — read this before debugging connectivity
-
-During setup the Hetzner firewall **would not accept a TCP port range** for `40000-49999`. What is
-actually configured is:
-
-- **UDP: any** — the normal WebRTC path, fully covered
-- **TCP on the RTC range: possibly absent**
-
-mediasoup opens **both** a UDP and a TCP listener per transport
-(`services/media/src/session.rs:858-890`). The TCP one is the fallback for clients on networks that
-block UDP — typically locked-down corporate firewalls. So:
-
-- ordinary home and office networks will work on UDP alone
-- someone behind a UDP-blocking network will fail **silently**
-
-**Verify the rule in the Hetzner console before concluding the SFU is broken.** If TCP on the range
-is missing, either add it or narrow both sides to something the console accepts (e.g.
-`40000-40999`) and set `MEDIA_RTC_PORT_MAX` to match. `Config::validate` requires ≥100 ports per
-worker; 1,000 is ample for testing.
-
----
-
 ## Facts worth having before you start
 
 - **One room = one router = one worker = one core.** Adding a second SFU node needs **room-aware
@@ -188,4 +169,4 @@ worker; 1,000 is ample for testing.
 > `media.tradingroom.app` resolves there with a valid certificate and answers a 503 placeholder.
 > Move the mediasoup SFU from AWS Lightsail onto that box, serve it at `media.tradingroom.app`, wire
 > `MEDIA_GRANT_PRIVATE_KEY` into the room, and prove a screen share works between two browsers before
-> retiring the Lightsail instance. Check the firewall's TCP RTC range first — see the caveat.
+> retiring the Lightsail instance. Do Step 0 first.
