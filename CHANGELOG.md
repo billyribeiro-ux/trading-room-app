@@ -24,6 +24,79 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-09
 
+### 12:15 — Dependencies taken to latest, with three deliberate exceptions (pushed to `main`)
+
+**Runtime impact: yes** — `better-sqlite3` and `vite` are build/runtime dependencies. No source
+changed.
+
+Every version below was read from a registry or an official index **today**, not recalled.
+
+#### Node — latest **LTS**, as asked
+
+`nodejs.org/dist/index.json`: the newest LTS is **v24.19.0 "Krypton"**, released 2026-08-03. v26.7.0
+exists and is **Current, not LTS**, so it is deliberately not adopted.
+
+- `.nvmrc` created — there was none, so the Node version was implicit.
+- `engines` unified to `24.x`. The root said `>=22`, the controller said `24.x`, **and the room
+  declared none at all** — three answers to one question.
+
+#### Updated (10 packages + pnpm)
+
+`pnpm` 11.18.0 → **11.21.0**. `vite` 8.1.5 → 8.2.1 · `@sveltejs/vite-plugin-svelte` 7.2.0 → 7.3.0 ·
+`svelte-check` 4.7.4 → 4.7.5 · `typescript-eslint` 8.65.0 → 8.66.0 · `eslint` 10.8.0 → 10.8.1 ·
+`globals` 17.7.0 → 17.9.0 · `@types/node` 26.1.2 → 26.2.0 · `@types/better-sqlite3` 7.6.13 → 9.6.0 ·
+`@types/howler` 2.2.12 → 2.2.13 · `better-sqlite3` 13.0.2 → 13.0.3.
+
+**`svelte-check` now reports 0 errors and 0 WARNINGS.** The three long-standing `href=""` warnings
+are gone in 4.7.5 — they were the ones the manage page documented as unavoidable.
+
+#### TypeScript 7.0.2 — attempted, and REVERTED
+
+It is on `latest`, so "latest" would have taken it. It **breaks the toolchain**: `svelte-check`
+crashes on load, and no peer accepts it — SvelteKit wants `^5.3.3 || ^6.0.0`, `svelte-check`
+`^5.0.0 || ^6.0.0`, and `typescript-eslint` `>=4.8.4 <6.1.0`. **6.0.3 is already the ceiling those
+peers allow**, so the repository was correct before and stays there.
+
+#### NOT updated — three packages pinned to captured evidence
+
+Bumping these would break the pixel match, which is the premise of the whole reproduction:
+
+| package | pinned | latest | why it stays |
+| --- | --- | --- | --- |
+| `font-awesome` | **4.3.0** | 4.7.0 | both captures request `fontawesome-webfont.woff2?v=4.3.0`. 4.7.0 redrew `fa-user` from 1408 units to 1280 — **10.219px against 9.289px** at the 13px the dropdown uses. |
+| `@fortawesome/fontawesome-free` | **5.8.1** | 7.3.1 | the room is FA5, where the gear measures 16px = 1em; FA4's cog is 0.857em and shrank that button to 24.719. |
+| `animate.css` | **3.7.2** | 4.1.1 | the reference loads 3.7.2 and the app uses its class names (`animated fadeInDown`). **v4 renames every class** to `animate__animated animate__fadeInDown`, and `account.css` transcribes 3.7.2's exact reduced-motion contract. |
+
+#### Rust
+
+**The toolchain pin was already current**: `channel-rust-stable.toml` gives rustc **1.97.1
+(2026-07-14)**, which is exactly what `services/rust-toolchain.toml` pins.
+
+21 crates updated via `cargo update` (thiserror, wasm-bindgen, time, regex-automata, cc, …).
+`cargo check --workspace` exit 0; `cargo clippy --workspace --all-targets` exit 0.
+
+**Eight direct crates are still behind and are NOT done**, because each needs a `Cargo.toml` edit
+and an API migration rather than a lockfile bump: `base64` 0.22→0.23, `ed25519-dalek` 2→3,
+`mediasoup` 0.24→0.25, `password-hash` 0.5→0.6, `rand` 0.9→0.10, `sha2` 0.10→0.11,
+`tokio-tungstenite` 0.29→0.30, `tower-http` 0.6→0.7. `mediasoup` especially: the SFU migration is
+another session's live task and moving it underneath them would be reckless.
+
+#### Two defects found on the way, neither caused by this change
+
+- **The documented clippy gate is wrong for this workspace.** `cargo clippy --all-targets -- -D
+  warnings` fails with **46 errors on a clean tree**, because the test helpers
+  (`raw_for_tests`, `identity_pool_for_tests`, `set_relay_ready_for_tests`) sit behind a
+  deliberately non-default `testing` feature. Proven pre-existing by re-running it against the
+  stashed original lockfile: same 46. The correct invocation is
+  **`cargo clippy --workspace --all-targets --features tradingroom-api/testing -- -D warnings`**,
+  which exits 0.
+- **`ed25519-dalek` is declared twice and disagrees**: the workspace `Cargo.toml` says `3.0.0`,
+  `media/Cargo.toml` pins `"2"`. The lock resolves 2.2.0. Recorded, not silently reconciled.
+
+**Verified:** controller `svelte-check` 0/0, 51 files / 562 tests, `vite build` clean. Room
+`svelte-check` 0/0, 56 files / 523 tests. Rust check and clippy both exit 0.
+
+
 ### 11:23 — `pnpm check` was RED and nobody knew; plus the focus ring that would not let go
 
 **RUNTIME IMPACT: yes, but only visual** — a focus outline no longer sticks after a mouse click.
