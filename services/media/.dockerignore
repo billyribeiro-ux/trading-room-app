@@ -1,0 +1,6 @@
+# The build tree is gigabytes and is rebuilt inside the image anyway. Sending it as build context
+# would dominate the build time and, worse, a host-built artifact could shadow the image's own.
+target/
+.DS_Store
+Dockerfile
+.dockerignore

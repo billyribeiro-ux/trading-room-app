@@ -1,0 +1,169 @@
+/* NON-RUNTIME REFERENCE: the early controller prototype. The active application
+ * uses src/account.css and src/manage.css, whose contracts are executable.
+ * Every value here is measured from the reference capture,
+ * not guessed. Citations are to the decoded slices in
+ * ../new-room/NEXT-STEP/decoded/pieces/.
+ *
+ * Deliberately NOT importing the room's app.css. The room and the controller are
+ * two different visual systems; the room is a bespoke layout, the controller is
+ * float-based Bootstrap 3. Keeping them apart is what makes the later merge safe.
+ */
+
+:root {
+  /* Type — the reference uses the system stack, no licensed font. (P24) */
+  --font-body: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  --font-size: 14px;
+  --line-height: 20px;
+
+  /* Buttons render Bootstrap 3 defaults; the app's own palette barely reaches
+   * them. .btn-inverse is the only app semantic colour on a button. (P23) */
+  --btn-primary-bg: rgb(51, 122, 183);
+  --btn-primary-border: rgb(46, 109, 164);
+  --btn-success-bg: rgb(92, 184, 92);
+  --btn-success-border: rgb(76, 174, 76);
+  --btn-info-bg: rgb(91, 192, 222);
+  --btn-info-border: rgb(70, 184, 218);
+  --btn-warning-bg: rgb(240, 173, 78);
+  --btn-warning-border: rgb(238, 162, 54);
+  --btn-danger-bg: rgb(217, 83, 79);
+  --btn-danger-border: rgb(212, 63, 58);
+  --btn-inverse-bg: rgb(54, 63, 69);
+  --btn-default-border: rgb(230, 233, 238);
+
+  --text: rgb(51, 51, 51);
+  --muted: rgb(119, 119, 119);      /* what .text-muted ACTUALLY computes to (P23) */
+  --hairline: rgb(221, 221, 221);   /* th border-bottom / td border-top (P07) */
+  --panel-head-bg: rgb(245, 245, 245);
+  --stripe: rgb(249, 249, 249);     /* table-striped odd rows (P08) */
+
+  /* x-editable: value colour + the dashed underline that marks a field editable.
+   * The underline comes from the xeditable sheet, not the app's. (P23) */
+  --editable-text: rgb(10, 10, 10);
+  --editable-underline: rgb(66, 139, 202);
+
+  --dropdown-shadow: rgba(0, 0, 0, 0.176) 0 6px 12px;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: var(--font-body);
+  font-size: var(--font-size);
+  line-height: var(--line-height);
+  color: var(--text);
+  background: #fff;
+  /* The last sheet in the reference sets auto and beats an earlier hidden. (P25) */
+  overflow: auto;
+}
+
+/* ---- navbar: proven byte-identical across both reference pages, so it is app
+   shell rather than page furniture. Black comes from an inline style on <nav>. (Q01) */
+.topnavbar {
+  height: 50px;
+  background-color: rgb(0, 0, 0);
+  position: relative;
+}
+.navbar-brand { width: 320px; padding: 0 5px; margin: 0 15px; height: 50px; }
+.navbar-brand img { width: 200px; height: 24.5px; }
+
+/* NOTE: the reference puts font-family: FontAwesome on the header links themselves,
+   which renders the word "Account" in the icon face. That is a bug in the reference
+   and is deliberately NOT reproduced — the icon font is scoped to <i> only. (P02) */
+.topnavbar .nav-link { color: #fff; text-decoration: none; }
+.topnavbar .nav-link i { font-family: FontAwesome, 'Font Awesome 5 Free'; }
+
+/* ---- panel */
+.panel { border: 1px solid var(--hairline); border-radius: 4px; background: #fff; }
+.panel-heading {
+  height: 53px;
+  padding: 10px 15px;
+  background-color: var(--panel-head-bg);
+  border-bottom: 1px solid var(--hairline);
+}
+.panel-body { padding: 15px; }
+.panel-footer { height: 21px; padding: 0; background: var(--panel-head-bg); }
+
+/* ---- container: 1170px, auto-centred (Q07) */
+.container { width: 1170px; margin: 0 auto; }
+
+/* ---- the settings row quad: label | field | br | help (P21) */
+.control-label {
+  float: left;
+  width: 16.6667%;
+  padding: 0 15px;
+  font-weight: 700;
+}
+/* Helper text is bold 14px and the SAME colour as body text — .muted is a dead
+   class in the reference. Rendering it grey would not match. (P21) */
+.help-label { font-weight: 700; font-size: 14px; color: var(--text); }
+
+.editable {
+  color: var(--editable-text);
+  border-bottom: 1px dashed var(--editable-underline);
+  cursor: pointer;
+  display: inline;
+  text-decoration: none;
+}
+.editable.is-empty { font-style: italic; }
+
+/* ---- tables (P07) */
+table { width: 100%; border-collapse: collapse; }
+th {
+  padding: 20px 8px;
+  border-bottom: 1px solid var(--hairline);
+  font-weight: 700;
+  vertical-align: bottom;
+  text-align: left;
+}
+td { padding: 8px; border-top: 1px solid var(--hairline); vertical-align: top; }
+.table-striped tbody tr:nth-child(odd) { background: var(--stripe); }
+
+/* ---- buttons */
+.btn {
+  display: inline-block;
+  padding: 6px 12px;
+  font-size: 14px;
+  line-height: 1.42857;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  text-decoration: none;
+}
+.btn-primary { color: #fff; background: var(--btn-primary-bg); border-color: var(--btn-primary-border); }
+.btn-success { color: #fff; background: var(--btn-success-bg); border-color: var(--btn-success-border); }
+.btn-info    { color: #fff; background: var(--btn-info-bg);    border-color: var(--btn-info-border); }
+.btn-warning { color: #fff; background: var(--btn-warning-bg); border-color: var(--btn-warning-border); }
+.btn-danger  { color: #fff; background: var(--btn-danger-bg);  border-color: var(--btn-danger-border); }
+.btn-inverse { color: #fff; background: var(--btn-inverse-bg); border-color: var(--btn-inverse-bg); }
+.btn-default { color: var(--text); background: #fff; border-color: var(--btn-default-border); }
+
+/* ---- dropdowns: submenus drop DOWN (top:100%; left:0), NOT sideways, despite
+   the fa-caret-right icons. Verified on all four submenus. (P11-P14) */
+.dropdown { position: relative; display: inline-block; }
+.dropdown-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  display: none;
+  min-width: 160px;
+  padding: 5px 0;
+  margin: 2px 0 0;
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 4px;
+  box-shadow: var(--dropdown-shadow);
+  z-index: 1000;
+  list-style: none;
+}
+.dropdown.open > .dropdown-menu { display: block; }
+.dropdown-menu > li > a { display: block; padding: 3px 20px; color: var(--text); text-decoration: none; }
+.dropdown-menu .divider { height: 1px; margin: 9px 0; background: rgb(229, 229, 229); overflow: hidden; }
+
+/* ---- modal: z-1050, above every dropdown at 1000. The reference captures no
+   backdrop node and has no z-index 1040; 1040 here is the Bootstrap 3 value. (P16) */
+.modal { position: fixed; inset: 0; z-index: 1050; display: none; overflow: auto; }
+.modal.in { display: block; }
+.modal-dialog { width: 600px; margin: 30px auto; }
+.modal-content { background: #fff; border-radius: 6px; box-shadow: rgba(0, 0, 0, 0.5) 0 5px 15px; padding: 20px; }
+.modal-backdrop { position: fixed; inset: 0; z-index: 1040; background: #000; opacity: 0.5; }

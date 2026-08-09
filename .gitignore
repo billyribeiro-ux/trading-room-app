@@ -46,9 +46,10 @@ NEXT-STEP/*.json
 enterprise/
 docs/generated/
 
-# The original app's own JS bundles. SHA-256 pinned, so they cannot be redacted without breaking
-# their seal — and they contain real addresses. They stay in `new-room/docs/source/`.
-docs/source/
+# NOT ignored: `docs/source/` — the original app's own JS bundles, SHA-256 pinned. It was excluded
+# once on a false positive: a PII sweep flagged it, but the only address in all 203 files is
+# `johndoe@gmail.com`, the vendor's own placeholder. Excluding it broke 24 test files, because 42
+# of them read those bundles as the byte-for-byte authority they are pinned against.
 
 # The two predecessor repositories. Never a subdirectory of this one.
 new-room/
@@ -59,3 +60,18 @@ new-room-control/
 # ---------------------------------------------------------------------------------------------
 .DS_Store
 *.swp
+
+# Symlinks to the capture folders, which live in `new-room/` and are never copied here. The
+# evidence-bound tests read them by relative path, so the links make those tests runnable locally
+# without any of the captures entering this repository. Absent on CI, where those tests cannot run
+# anyway — the same limit the absolute-path side-by-side tests already have.
+/apps/room/alert-section
+/apps/room/app-message-modal
+/apps/room/app-modals
+/apps/room/app-room
+/apps/room/app-session
+/apps/room/css
+/apps/room/navbar-section
+/apps/room/new-evidence
+/apps/room/preview
+/apps/room/second-dump

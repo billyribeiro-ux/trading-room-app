@@ -1,0 +1,874 @@
+/* ============================================================================
+ * Public marketing site.
+ *
+ * The rendered home page is `evidence-dumps/home-page/file`. Values below are transcribed from
+ * the exact files it links, fetched 2026-08-01:
+ *
+ * - Bootstrap 3.1.1: SHA-256 e9503448692b738dd260fbd7f7cabf2e11f09b600fa97e6eb3a56eba5b1a7e9b
+ * - theme.css:       SHA-256 497733a044053a64d2ff340192b9542306269bde38a55db30308791ee26470ab
+ * - animate.css:     SHA-256 0cb9156494d7c7c70ee5d710c0452b3fd3c1e774ecb5d042385aa5972e869bfa
+ * - main.css:        SHA-256 a27b150001e49d3cb6b82f954c21c693c1e74e87d4fee6e7bcc4d87cfde10c42
+ *
+ * `main.css` has no home-page declarations. The applicable Bootstrap/theme/
+ * animation rules are scoped under `.pub-root` so the controller's separate
+ * Bootstrap build cannot alter them. See docs/reference/home-pixel-contract.md.
+ * ========================================================================== */
+
+/* The hero is the only public-site text that uses Roboto. This is the exact
+   Google-served v51 Latin normal-300 binary, now self-hosted and hash-locked by
+   scripts/verify-font-contract.mjs. `auto` preserves the original stylesheet's
+   font-display behavior. */
+@font-face {
+  font-family: 'Roboto';
+  font-style: normal;
+  font-weight: 300;
+  font-display: auto;
+  src: url('/fonts/roboto/roboto-v51-latin-300.woff2') format('woff2');
+}
+
+/* Bootstrap 3.1.1 applies border-box globally. */
+.pub-root,
+.pub-root *,
+.pub-root *::before,
+.pub-root *::after {
+  box-sizing: border-box;
+}
+
+/* Bootstrap 3.1.1 document and typography baseline, scoped to the public shell. */
+.pub-root {
+  font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  font-size: 14px;
+  line-height: 1.42857143;
+  color: #333;
+  background-color: #fff;
+}
+.pub-root input,
+.pub-root button,
+.pub-root select,
+.pub-root textarea {
+  margin: 0;
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
+}
+.pub-root button {
+  overflow: visible;
+  color: inherit;
+  text-transform: none;
+  appearance: button;
+  cursor: pointer;
+}
+.pub-root a {
+  /* theme.css follows Bootstrap's #428bca declaration. */
+  color: #459ce7;
+  text-decoration: none;
+}
+.pub-root a:hover,
+.pub-root a:focus {
+  color: #2a6496;
+  text-decoration: underline;
+}
+.pub-root img {
+  /* Bootstrap does not globally constrain images. */
+  vertical-align: middle;
+}
+.pub-root .img-responsive {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+.pub-root h1,
+.pub-root h2,
+.pub-root h3,
+.pub-root h4,
+.pub-root h5,
+.pub-root h6 {
+  font-family: inherit;
+  font-weight: 500;
+  line-height: 1.1;
+  color: inherit;
+}
+.pub-root h1,
+.pub-root h2,
+.pub-root h3 {
+  margin-top: 20px;
+  margin-bottom: 10px;
+}
+.pub-root h4,
+.pub-root h5,
+.pub-root h6 {
+  margin-top: 10px;
+  margin-bottom: 10px;
+}
+.pub-root h1 {
+  font-size: 36px;
+}
+.pub-root h2 {
+  font-size: 30px;
+}
+.pub-root h3 {
+  font-size: 24px;
+}
+.pub-root h4 {
+  font-size: 18px;
+}
+.pub-root h5 {
+  font-size: 14px;
+}
+.pub-root h6 {
+  font-size: 12px;
+}
+.pub-root p {
+  margin: 0 0 10px;
+}
+.pub-root ul,
+.pub-root ol {
+  margin-top: 0;
+  margin-bottom: 10px;
+}
+.pub-root hr {
+  margin-top: 20px;
+  margin-bottom: 20px;
+  border: 0;
+  border-top: 1px solid #eee;
+}
+
+/* The app-wide FA 4.3 font is retained for the controller. The public page's
+   only glyphs (f058 and f0e0) have byte-identical SVG paths and advance widths
+   in the original FA 4.0.3 font. Reset 4.3's added no-op transform so the public
+   computed style matches 4.0.3 as well. */
+.pub-root .fa {
+  transform: none;
+}
+
+/* Bootstrap 3.1.1 float grid. theme.css later restores the 970px container at
+   >=1200px; the exact min/max pairs live in docs/reference/breakpoints.md. */
+.pub-root .container,
+.pub-root .container-fluid {
+  padding-right: 15px;
+  padding-left: 15px;
+  margin-right: auto;
+  margin-left: auto;
+}
+.pub-root .row {
+  margin-right: -15px;
+  margin-left: -15px;
+}
+.pub-root .row > [class*='col-'] {
+  position: relative;
+  min-height: 1px;
+  padding-right: 15px;
+  padding-left: 15px;
+}
+.pub-root .col-xs-6,
+.pub-root .col-xs-12 {
+  float: left;
+}
+.pub-root .col-xs-6 {
+  width: 50%;
+}
+.pub-root .col-xs-12 {
+  width: 100%;
+}
+.pub-root .container::before,
+.pub-root .container::after,
+.pub-root .container-fluid::before,
+.pub-root .container-fluid::after,
+.pub-root .row::before,
+.pub-root .row::after,
+.pub-root .navbar::before,
+.pub-root .navbar::after,
+.pub-root .navbar-header::before,
+.pub-root .navbar-header::after,
+.pub-root .navbar-collapse::before,
+.pub-root .navbar-collapse::after {
+  display: table;
+  content: ' ';
+}
+.pub-root .container::after,
+.pub-root .container-fluid::after,
+.pub-root .row::after,
+.pub-root .navbar::after,
+.pub-root .navbar-header::after,
+.pub-root .navbar-collapse::after {
+  clear: both;
+}
+
+/* Consent banner: values are verbatim inline styles in evidence-dumps/home-page/file. */
+.pub-root #gdpr-banner {
+  display: block;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: rgba(0, 0, 0, 0.9);
+  color: white;
+  padding: 20px;
+  z-index: 9999;
+}
+.pub-root #gdpr-banner p {
+  margin: 0;
+}
+
+/* Bootstrap 3.1.1 navbar/dropdown plus the exact `.navbar.normal` theme rules. */
+.pub-root .collapse {
+  display: none;
+}
+.pub-root .collapse.in {
+  display: block;
+}
+.pub-root .navbar {
+  position: relative;
+  min-height: 50px;
+  margin-bottom: 20px;
+  border: 1px solid transparent;
+}
+.pub-root .navbar.normal {
+  min-height: 70px;
+  background: #000;
+  border-radius: 0;
+  box-shadow:
+    0 1px 3px 1px rgba(46, 46, 46, 0.3),
+    inset rgba(255, 255, 255, 0.2) 0 1px 1px;
+  border: none;
+  z-index: 9999;
+  -webkit-font-smoothing: antialiased;
+}
+.pub-root .navbar-collapse {
+  max-height: 340px;
+  padding-right: 15px;
+  padding-left: 15px;
+  overflow-x: visible;
+  -webkit-overflow-scrolling: touch;
+  border-top: 1px solid transparent;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+.pub-root .navbar-collapse.in {
+  overflow-y: auto;
+}
+.pub-root .navbar-inverse .navbar-collapse {
+  border-color: #101010;
+}
+.pub-root .container > .navbar-header,
+.pub-root .container > .navbar-collapse {
+  margin-right: -15px;
+  margin-left: -15px;
+}
+.pub-root .navbar-brand {
+  float: left;
+  height: 50px;
+  padding: 15px;
+  font-size: 18px;
+  line-height: 20px;
+}
+.pub-root .navbar.normal .navbar-header .navbar-brand {
+  color: #fff;
+  font-weight: 500;
+  font-size: 23px;
+}
+.pub-root .navbar-brand:hover,
+.pub-root .navbar-brand:focus {
+  color: #fff;
+  text-decoration: none;
+  background-color: transparent;
+}
+.pub-root .navbar-toggle {
+  position: relative;
+  float: right;
+  padding: 9px 10px;
+  margin-top: 17px;
+  margin-right: 15px;
+  margin-bottom: 8px;
+  background-color: transparent;
+  background-image: none;
+  border: 1px solid #333;
+  border-radius: 4px;
+}
+.pub-root .navbar-toggle:hover,
+.pub-root .navbar-toggle:focus {
+  background-color: #333;
+  outline: none;
+}
+.pub-root .navbar-toggle .icon-bar {
+  display: block;
+  width: 22px;
+  height: 2px;
+  border-radius: 1px;
+  background-color: #fff;
+}
+.pub-root .navbar-toggle .icon-bar + .icon-bar {
+  margin-top: 4px;
+}
+.pub-root .nav {
+  padding-left: 0;
+  margin-bottom: 0;
+  list-style: none;
+}
+.pub-root .nav > li {
+  position: relative;
+  display: block;
+}
+.pub-root .nav > li > a,
+.pub-root .nav > li > .navbar-dropdown-toggle {
+  position: relative;
+  display: block;
+  padding: 10px 15px;
+}
+.pub-root .navbar-dropdown-toggle {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  text-align: left;
+}
+.pub-root .navbar-nav {
+  margin: 7.5px -15px;
+}
+.pub-root .navbar-nav > li > a,
+.pub-root .navbar-nav > li > .navbar-dropdown-toggle {
+  padding-top: 10px;
+  padding-bottom: 10px;
+  line-height: 20px;
+}
+.pub-root .navbar.normal .navbar-collapse .navbar-nav > li {
+  float: none;
+  display: inline-block;
+}
+.pub-root .navbar.normal .navbar-collapse .navbar-nav > li > a,
+.pub-root .navbar.normal .navbar-collapse .navbar-nav > li > .navbar-dropdown-toggle {
+  padding: 25px 20px;
+  color: #d5d5d5;
+  font-weight: 500;
+  z-index: 1001;
+  transition: color 0.2s linear;
+}
+.pub-root .navbar.normal .navbar-collapse .navbar-nav > li > a:hover,
+.pub-root .navbar.normal .navbar-collapse .navbar-nav > li > a:focus,
+.pub-root .navbar.normal .navbar-collapse .navbar-nav > li > .navbar-dropdown-toggle:hover,
+.pub-root .navbar.normal .navbar-collapse .navbar-nav > li > .navbar-dropdown-toggle:focus {
+  color: #fff;
+  text-decoration: none;
+  background-color: transparent;
+}
+.pub-root .caret {
+  display: inline-block;
+  width: 0;
+  height: 0;
+  margin-left: 2px;
+  vertical-align: middle;
+  border-top: 4px solid;
+  border-right: 4px solid transparent;
+  border-left: 4px solid transparent;
+}
+.pub-root .dropdown {
+  position: relative;
+}
+.pub-root .dropdown-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 1000;
+  display: none;
+  float: left;
+  min-width: 160px;
+  padding: 5px 0;
+  margin: 2px 0 0;
+  font-size: 14px;
+  list-style: none;
+  background-color: #fff;
+  background-clip: padding-box;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 4px;
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.175);
+}
+.pub-root .navbar-nav > li > .dropdown-menu {
+  margin-top: 0;
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+}
+.pub-root .navbar.normal .navbar-collapse .navbar-nav > li ul.dropdown-menu {
+  text-align: left;
+  padding: 9px 0;
+}
+.pub-root .dropdown-menu > li > a {
+  display: block;
+  padding: 3px 20px;
+  clear: both;
+  font-weight: normal;
+  line-height: 1.42857143;
+  color: #333;
+  white-space: nowrap;
+}
+.pub-root .navbar.normal .navbar-collapse .navbar-nav > li ul.dropdown-menu li a {
+  padding: 8px 18px;
+}
+.pub-root .dropdown-menu > li > a:hover,
+.pub-root .dropdown-menu > li > a:focus {
+  color: #262626;
+  text-decoration: none;
+  background-color: #f5f5f5;
+}
+.pub-root .open > .dropdown-menu {
+  display: block;
+}
+.pub-root .navbar-inverse .navbar-nav > .open > a,
+.pub-root .navbar-inverse .navbar-nav > .open > .navbar-dropdown-toggle {
+  color: #fff;
+  background-color: #080808;
+}
+
+/* Exact theme.css button cascade. `button-large` and `button-primary` are dead
+   class names in the source; the Learn More CTA therefore uses `.button` only. */
+.pub-root .button {
+  -webkit-font-smoothing: antialiased;
+  display: inline-block;
+  vertical-align: middle;
+  zoom: 1;
+  padding: 13px 32px;
+  font-weight: 400;
+  font-size: 17px;
+  color: #fff !important;
+  text-shadow: rgba(0, 0, 0, 0.2) 0 -1px 0;
+  border: 0;
+  border-radius: 5px;
+  box-shadow:
+    rgba(0, 0, 0, 0.3) 0 1px 2px,
+    inset rgba(255, 255, 255, 0.88) 0 1px 3px -1px;
+  background-color: #4589e3;
+  background: linear-gradient(#5da4ff, #417bff);
+  transition: all 0.2s linear;
+}
+.pub-root .button:hover {
+  color: #fff;
+  text-decoration: none;
+}
+.pub-root .button:active {
+  box-shadow: inset 0 3px 3px rgba(0, 0, 0, 0.29);
+}
+.pub-root .button.button-small {
+  padding: 10px 33px;
+  border: 1px solid #68a2ee;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+/* animate.css 2013 — only the class/keyframes actually used by the page. */
+.pub-root .animated {
+  animation-duration: 0.7s;
+  animation-fill-mode: both;
+}
+@keyframes pub-fade-in-up {
+  0% {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.pub-root .animated.fadeInUp {
+  animation-name: pub-fade-in-up;
+}
+
+/* Exact #home4 section rules from theme.css. Inline declarations in the saved
+   HTML (hero padding/background and element-level alignment) still win. */
+.pub-root#home4 #hero {
+  background: #4b4848;
+  background-size: cover;
+  height: 583px;
+  position: relative;
+  top: -60px;
+  overflow: hidden;
+  box-shadow: 0 1px 5px -1px rgba(0, 0, 0, 0.35);
+}
+.pub-root#home4 #hero h1.hero-text {
+  text-align: center;
+  font-family: 'Roboto';
+  font-size: 36px;
+  font-weight: 300;
+  color: #fff;
+  text-shadow: 1px 1px 1px rgba(0, 0, 0, 0.8);
+}
+.pub-root#home4 #hero .col-md-8 img {
+  /* User-confirmed behavior: shrink to the column, never upscale the source. */
+  max-width: 100%;
+}
+/* Layout stability for the same element, in a SEPARATE block on purpose: the
+   rule above is pinned including its closing brace by the 'hero image
+   continuous downscaling' assertion in scripts/verify-home-fidelity.mjs, so
+   nothing may be added inside it.
+
+   `min(100%, 1440px)` is not a new sizing policy — it is the contract's OWN
+   model restated as CSS. verify-home-fidelity computes
+   `Math.min(1440, columnContentWidth)` and responsive-contract.spec.ts asserts
+   the identical expression, so the USED width is unchanged at every breakpoint.
+   The difference is that the width is now definite before the 712KB PNG
+   decodes, which lets `aspect-ratio` reserve the height instead of collapsing
+   to zero and shoving the whole page down on load. The intrinsic 1440x956 is
+   hash-locked, so the ratio cannot drift from the file. */
+.pub-root#home4 #hero .col-md-8 img {
+  width: min(100%, 1440px);
+  aspect-ratio: 1440 / 956;
+}
+.pub-root#home4 #second-option {
+  margin-top: 85px;
+}
+.pub-root#home4 #second-option .feature {
+  -webkit-font-smoothing: antialiased;
+}
+.pub-root#home4 #second-option .feature img {
+  max-width: 40px;
+  /* All three feature icons are hash-locked at 128x128 in verify-home-fidelity,
+     so they always meet the 40px cap and always render square. Declaring that
+     box makes it definite before decode — without it each icon is a 0x0 box
+     that snaps to 40x40 on load, shifting the three headings and their copy.
+     The cap above still governs; this only states the size it already resolves
+     to. Unlike the hero, this rule is pinned open-ended ('feature icon size'
+     matches up to `max-width: 40px;`), so the declarations belong inside it. */
+  width: 40px;
+  aspect-ratio: 1 / 1;
+}
+.pub-root#home4 #second-option .feature strong {
+  display: block;
+  font-weight: 400;
+  font-size: 17px;
+  color: #354e75;
+  margin-top: 15px;
+}
+.pub-root#home4 #second-option .feature p {
+  font-weight: normal;
+  font-size: 14px;
+  color: #797979;
+  margin-top: 10px;
+  line-height: 24px;
+}
+.pub-root#home4 #mobile {
+  -webkit-font-smoothing: antialiased;
+  background: #f7f8fb;
+  border: 1px solid #eaedf7;
+  box-shadow: inset rgba(100, 100, 100, 0.25) 0 1px 1px;
+  margin-top: 60px;
+}
+.pub-root#home4 #mobile .device {
+  margin: -30px 0 0;
+  position: relative;
+  top: 2px;
+}
+.pub-root#home4 #mobile .info {
+  margin-top: 50px;
+}
+.pub-root#home4 #mobile .info h3 {
+  font-weight: 400;
+  color: #444;
+}
+.pub-root#home4 #mobile .info p {
+  margin-top: 20px;
+  color: #666;
+  line-height: 21px;
+}
+.pub-root#home4 #cta {
+  margin-top: 100px;
+  -webkit-font-smoothing: antialiased;
+}
+.pub-root#home4 #cta .form-wrapper {
+  background: #f7f8fb;
+  border: 1px solid #eaedf7;
+  border-radius: 8px;
+  box-shadow: inset rgba(100, 100, 100, 0.25) 0 1px 1px;
+  padding: 20px 30px 30px;
+  margin: 0 auto;
+}
+.pub-root#home4 #cta h4 {
+  font-size: 21px;
+  color: #5f6e7c;
+  font-weight: 400;
+  text-shadow: 1px 1px 1px rgba(255, 255, 255, 0.5);
+}
+
+/* Exact generic footer rules from theme.css. */
+.pub-root #footer {
+  background: #000;
+  margin-top: 120px;
+  padding-top: 47px;
+  padding-bottom: 35px;
+  -webkit-font-smoothing: antialiased;
+}
+.pub-root #footer .menu ul {
+  list-style-type: none;
+  padding: 0;
+}
+.pub-root #footer .menu ul li {
+  display: inline-block;
+}
+.pub-root #footer .menu ul li a {
+  color: #ccc;
+  padding: 15px 17px;
+  font-weight: 500;
+  transition: color 0.2s linear;
+}
+.pub-root #footer .menu ul li a:hover {
+  color: #fff;
+  text-decoration: none;
+}
+
+/* Marketplace block — verbatim from the saved page's inline <style>. It did
+   not render in the capture, so it is preserved but is not a pixel claim. */
+.pub-root .marketplace-container {
+  padding: 50px 7.5%;
+  background-color: #f8f9fa;
+}
+.pub-root .marketplace-card {
+  cursor: pointer;
+  transition: transform 0.3s ease;
+  border-radius: 8px;
+  overflow: hidden;
+  background: white;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  margin: 0 15px;
+  min-height: 350px;
+}
+.pub-root .marketplace-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+}
+.pub-root .marketplace-card-image {
+  width: 100%;
+  height: 200px;
+  object-fit: cover;
+  position: relative;
+}
+.pub-root .marketplace-card-image-placeholder {
+  width: 100%;
+  height: 200px;
+  background-color: #e9ecef;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #6c757d;
+}
+.pub-root .marketplace-card-image-placeholder i {
+  font-size: 60px;
+}
+.pub-root .marketplace-card-price {
+  position: absolute;
+  bottom: 10px;
+  right: 10px;
+  background: rgba(0, 0, 0, 0.7);
+  color: white;
+  padding: 5px 10px;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: bold;
+}
+.pub-root .marketplace-card-content {
+  padding: 15px;
+}
+.pub-root .marketplace-card-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+.pub-root .marketplace-card-logo {
+  max-width: 250px;
+  max-height: 50px;
+  border-radius: 4px;
+  object-fit: contain;
+  margin-right: 15px;
+  background-color: #0e0e0e;
+}
+.pub-root .marketplace-card-title {
+  font-size: 18px;
+  font-weight: bold;
+  color: #333;
+  margin: 5px;
+}
+.pub-root .marketplace-card-tagline {
+  color: #666;
+  font-size: 14px;
+  margin-top: 10px;
+  line-height: 1.4;
+}
+.pub-root #marketplace-empty-section h2 {
+  font-size: 32px;
+  color: #333;
+}
+.pub-root #marketplace-btn {
+  font-size: 20px;
+  padding: 15px 40px;
+  text-transform: uppercase;
+  font-weight: bold;
+}
+.pub-root #marketplace-btn i {
+  margin-right: 10px;
+}
+
+@media (min-width: 768px) {
+  .pub-root .container {
+    width: 750px;
+  }
+  .pub-root .col-sm-6 {
+    float: left;
+    width: 50%;
+  }
+  .pub-root .navbar {
+    border-radius: 4px;
+  }
+  .pub-root .navbar.normal {
+    border-radius: 0;
+  }
+  .pub-root .navbar-header {
+    float: left;
+  }
+  .pub-root .navbar-toggle {
+    display: none;
+  }
+  .pub-root .navbar-collapse {
+    width: auto;
+    border-top: 0;
+    box-shadow: none;
+    text-align: center;
+  }
+  .pub-root .navbar-collapse.collapse {
+    display: block !important;
+    height: auto !important;
+    padding-bottom: 0;
+    overflow: visible !important;
+  }
+  .pub-root .container > .navbar-header,
+  .pub-root .container > .navbar-collapse {
+    margin-right: 0;
+    margin-left: 0;
+  }
+  .pub-root .navbar > .container .navbar-brand {
+    margin-left: -15px;
+  }
+  .pub-root .navbar-nav {
+    float: left;
+    margin: 0;
+  }
+  .pub-root .navbar.normal .navbar-collapse .navbar-nav {
+    float: none;
+    display: inline-block;
+  }
+  .pub-root .navbar-nav > li {
+    float: left;
+  }
+  .pub-root .navbar-nav > li > a,
+  .pub-root .navbar-nav > li > .navbar-dropdown-toggle {
+    padding-top: 15px;
+    padding-bottom: 15px;
+  }
+  .pub-root .navbar-right {
+    float: right !important;
+  }
+  .pub-root .navbar-nav.navbar-right:last-child {
+    margin-right: -15px;
+  }
+}
+
+@media (min-width: 992px) {
+  .pub-root .container {
+    width: 970px;
+  }
+  .pub-root .col-md-3,
+  .pub-root .col-md-4,
+  .pub-root .col-md-8,
+  .pub-root .col-md-9,
+  .pub-root .col-md-12 {
+    float: left;
+  }
+  .pub-root .col-md-3 {
+    width: 25%;
+  }
+  .pub-root .col-md-4 {
+    width: 33.33333333%;
+  }
+  .pub-root .col-md-8 {
+    width: 66.66666667%;
+  }
+  .pub-root .col-md-9 {
+    width: 75%;
+  }
+  .pub-root .col-md-12 {
+    width: 100%;
+  }
+  .pub-root#home4 #hero {
+    padding-top: 105px;
+  }
+  .pub-root#home4 #second-option .row {
+    margin-bottom: 50px;
+  }
+  .pub-root#home4 #mobile .container {
+    width: 870px;
+  }
+}
+
+@media (min-width: 1200px) {
+  /* theme.css deliberately overrides Bootstrap's nominal 1170px container. */
+  .pub-root .container {
+    width: 970px;
+  }
+}
+
+@media (max-width: 991px) {
+  .pub-root#home4 #hero {
+    padding-top: 100px;
+    height: 550px;
+  }
+  .pub-root#home4 #hero h1.hero-text {
+    font-size: 30px;
+  }
+  .pub-root#home4 #second-option {
+    margin-top: 50px;
+  }
+  .pub-root#home4 #second-option .feature {
+    text-align: center;
+    margin-bottom: 35px;
+  }
+  .pub-root#home4 #cta {
+    margin-top: 65px;
+  }
+  .pub-root #footer .menu ul li a {
+    padding: 15px 17px 15px 0;
+  }
+}
+
+@media (max-width: 767px) {
+  .pub-root .hidden-xs {
+    display: none !important;
+  }
+  .pub-root .navbar.normal .navbar-collapse .navbar-nav > li {
+    display: block;
+  }
+  .pub-root .navbar.normal .navbar-collapse .navbar-nav > li > a,
+  .pub-root .navbar.normal .navbar-collapse .navbar-nav > li > .navbar-dropdown-toggle {
+    padding: 18px 20px;
+  }
+  .pub-root .navbar-nav .open .dropdown-menu {
+    position: static;
+    float: none;
+    width: auto;
+    margin-top: 0;
+    background-color: transparent;
+    border: 0;
+    box-shadow: none;
+  }
+  .pub-root .navbar-inverse .navbar-nav .open .dropdown-menu > li > a,
+  .pub-root .navbar.normal .navbar-collapse .navbar-nav > li.open ul.dropdown-menu a {
+    color: #fff;
+    padding: 12px 18px 12px 30px;
+    line-height: 20px;
+  }
+  .pub-root#home4 #hero h1.hero-text {
+    font-size: 27px;
+  }
+  .pub-root#home4 #mobile .info {
+    margin: 35px;
+    text-align: center;
+  }
+  .pub-root #footer .menu {
+    text-align: center;
+    margin-top: 40px;
+  }
+}

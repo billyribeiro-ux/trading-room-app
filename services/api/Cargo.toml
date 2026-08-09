@@ -1,0 +1,82 @@
+[package]
+name = "tradingroom-api"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+axum.workspace = true
+tokio.workspace = true
+tower.workspace = true
+tower-http.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+uuid.workspace = true
+time.workspace = true
+base64.workspace = true
+ed25519-dalek.workspace = true
+sha2.workspace = true
+
+# `default-features = false` drops the bundled native-tls; rustls only, so there is no
+# OpenSSL to build or CVE-track in the container.
+sqlx = { version = "0.9.0", default-features = false, features = [
+  "runtime-tokio",
+  "tls-rustls-ring",
+  "postgres",
+  "uuid",
+  "time",
+  "json",
+  "rust_decimal",
+  "ipnetwork",
+  "macros",
+  "migrate",
+] }
+rust_decimal = "1.42.1"
+ipnetwork = "0.21"
+
+argon2 = { version = "0.5.3", features = ["std"] }
+password-hash = { version = "0.5", features = ["std"] }
+rand = "0.9"
+subtle = "2.6"
+
+# Only for `StreamExt`/`SinkExt` on the split WebSocket. axum re-exports neither.
+futures-util = { version = "0.3", default-features = false, features = ["sink"] }
+# HTML sanitiser for note bodies. `notes.content_html` is member-authored rich text that other
+# members render, so an unsanitised store is a stored-XSS vector: a member with `can_edit_notes`
+# could run script in an owner's browser. Sanitising on the *write* path means the column only
+# ever holds safe markup, so every reader is safe including ones written later.
+ammonia = "4"
+cookie = "0.18"
+hex = "0.4"
+# Rate limiting. GCRA rather than a fixed window: a fixed window lets an attacker
+# spend the whole quota in the last millisecond of one window and again in the first
+# of the next, doubling the effective burst at the boundary.
+governor = "0.10.4"
+url.workspace = true
+
+[features]
+# Exposes the raw connection inside a TenantTx so integration tests can issue arbitrary
+# SQL against a genuinely tenant-scoped transaction. Deliberately NOT a default: in a
+# production build the connection stays private, which is fence #2 of the tenancy kernel.
+testing = []
+
+[dev-dependencies]
+tokio = { version = "1.53.1", features = ["full"] }
+
+# The SFU, for one contract test: a grant this crate mints must be one `tradingroom-media`'s own
+# verifier accepts. Asserting against a *copy* of the SFU's rules would pass forever while the
+# two drifted apart, which is the entire failure this guards.
+#
+# A dev-dependency, so it is compiled for `cargo test` and NOT for `cargo build --bin` - the
+# API image never links mediasoup, and `api/Dockerfile` stubs the crate out entirely. Inside
+# the workspace it is already built, so this costs nothing.
+tradingroom-media = { path = "../media", version = "=0.1.0" }
+
+# A real WebSocket client for the realtime tests. The SFU's own tests use the same crate, so
+# this is the client the protocol is already exercised against elsewhere in the workspace.
+tokio-tungstenite = "0.29"
+futures-util = "0.3"

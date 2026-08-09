@@ -1,0 +1,51 @@
+# Workspace root for the Rust services.
+#
+# Deliberately at services/ rather than the repository root: the root is a
+# pnpm/SvelteKit project, and a Cargo.toml plus target/ there would sit inside the
+# Vite/vitest file-watching surface.
+#
+# `media` stays on edition 2021 (it predates this workspace and nothing is gained by
+# churning it); new crates use edition 2024. A workspace supports mixed editions.
+[workspace]
+resolver = "3"
+members = ["media", "api"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.97"
+publish = false
+
+[workspace.dependencies]
+# Versions resolved from crates.io on 2026-07-31; these are the current latest.
+axum = { version = "0.8.9", features = ["ws", "macros"] }
+tokio = { version = "1.53.1", features = ["macros", "rt-multi-thread", "signal", "sync", "time"] }
+tower = "0.5.3"
+tower-http = { version = "0.7.0", features = ["trace", "timeout", "limit", "request-id", "catch-panic"] }
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1"
+thiserror = "2.0.19"
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.23", features = ["env-filter", "json"] }
+uuid = { version = "1.24.0", features = ["v4", "serde"] }
+time = { version = "0.3.54", features = ["serde", "formatting"] }
+base64 = "0.22"
+ed25519-dalek = { version = "3.0.0", features = ["rand_core"] }
+sha2 = "0.10"
+url = "2.5.8"
+
+[profile.release]
+# Thin LTO and one codegen unit: this is a long-lived server binary, so build time is
+# a one-off cost and steady-state throughput is what matters.
+lto = "thin"
+codegen-units = 1
+strip = "debuginfo"
+panic = "unwind" # never "abort": a panicking request handler must not take the process down
+
+[profile.dev]
+# The dependency tree (sqlx, axum, mediasoup) dominates debug build time; optimising
+# dependencies while leaving our own crates unoptimised keeps the edit-test loop short.
+opt-level = 0
+
+[profile.dev.package."*"]
+opt-level = 2

@@ -1,0 +1,276 @@
+/* Authored component CSS recovered from /Users/billyribeiro/Downloads/new-dumps/room-login-1785587188183.json
+ * Angular scope id: ng-c177535397  —  41 unique rules
+ *
+ * Selectors have had their [_ngcontent-*] / [_nghost-*] guards stripped, so
+ * these are as the component's stylesheet was written. Values referencing
+ * var(--*) resolve against the room token reference (docs/reference/css/room-tokens.css).
+ */
+
+:host {
+  background-color: rgb(255, 255, 255);
+}
+
+.navLogo {
+  max-height: 35px;
+  max-width: 100%;
+}
+
+.navbar {
+  padding: 20px;
+}
+
+.nav a {
+  color: rgb(255, 255, 255);
+}
+
+.roomNameHeader {
+  text-align: left;
+  padding-left: 70px;
+  text-overflow: ellipsis;
+  width: 100%;
+  font-size: 2em;
+  color: rgb(255, 255, 255);
+}
+
+.login-wrapper {
+  font-size: 16px;
+  color: var(--dark-black);
+  background-color: var(--lighter-gray);
+  height: 100vh;
+  padding-bottom: 20px;
+  overflow-y: auto;
+}
+
+.login-wrapper .login-form-container {
+  padding-top: 15px;
+}
+
+.login-wrapper form {
+  max-width: 360px;
+  margin: auto;
+}
+
+.login-wrapper .input-group > .input-group-append > .input-group-text {
+  background-color: var(--white);
+}
+
+.login-wrapper input {
+  color: rgb(40, 161, 181);
+}
+
+.login-wrapper a {
+  color: rgb(55, 90, 127);
+}
+
+.login-wrapper .room-message {
+  padding-top: 30px;
+}
+
+.login-wrapper h1.room-title {
+  font-size: 24px;
+  padding: 0px 0px 15px;
+  border-bottom: 1px solid var(--light-gray);
+  text-align: center;
+  max-width: 360px;
+  margin: auto;
+}
+
+.login-wrapper div.room-description {
+  max-width: 80%;
+  margin: 5% auto;
+  font-size: 20px !important;
+}
+
+.login-wrapper .room-description img {
+  width: 100%;
+  height: auto;
+}
+
+.login-wrapper p {
+  margin: auto;
+  max-width: 360px;
+}
+
+.login-wrapper div.login-footer {
+  font-size: 12px;
+}
+
+.login-wrapper p.authenticate-info {
+  padding: 15px 0px;
+}
+
+.login-wrapper .form-control {
+  border-top-color:;
+  border-top-style:;
+  border-top-width:;
+  border-bottom-color:;
+  border-bottom-style:;
+  border-bottom-width:;
+  border-left-color:;
+  border-left-style:;
+  border-left-width:;
+  border-image-source:;
+  border-image-slice:;
+  border-image-width:;
+  border-image-outset:;
+  border-image-repeat:;
+  border-right-width: medium;
+  border-right-style: none;
+  border-right-color: currentcolor;
+}
+
+.login-wrapper .input-group-append {
+  border-top-color:;
+  border-top-style:;
+  border-top-width:;
+  border-right-color:;
+  border-right-style:;
+  border-right-width:;
+  border-bottom-color:;
+  border-bottom-style:;
+  border-bottom-width:;
+  border-image-source:;
+  border-image-slice:;
+  border-image-width:;
+  border-image-outset:;
+  border-image-repeat:;
+  border-left-width: medium;
+  border-left-style: none;
+  border-left-color: currentcolor;
+}
+
+.login-wrapper .form-control:focus {
+  border-top-color:;
+  border-top-style:;
+  border-top-width:;
+  border-bottom-color:;
+  border-bottom-style:;
+  border-bottom-width:;
+  border-left-color:;
+  border-left-style:;
+  border-left-width:;
+  border-image-source:;
+  border-image-slice:;
+  border-image-width:;
+  border-image-outset:;
+  border-image-repeat:;
+  border-right-width: medium;
+  border-right-style: none;
+  border-right-color: currentcolor;
+  box-shadow: 1px 1px 3px var(--lighter-gray);
+}
+
+.login-wrapper input {
+  font-size: 16px;
+}
+
+.login-options {
+  height: 56px;
+  background-color: var(--dark-black);
+  color: var(--white);
+}
+
+.login-form {
+  background-color: var(--white);
+  padding: 15px 25px;
+  box-shadow: 2px 2px 5px var(--light-gray);
+  border-radius: 7px;
+}
+
+.login-form label {
+  font-size: 14px;
+  margin-bottom: 2px;
+}
+
+.login-form .form-check-label {
+  font-size: 12px;
+}
+
+.user-avatar {
+  position: relative;
+}
+
+.user-avatar .setup-avatar {
+  cursor: pointer;
+  position: relative;
+  top: 25px;
+  left: -20px;
+  padding: var(--avatar-gear-icon-padding);
+  background-color: var(--white);
+  border-radius: 50%;
+}
+
+.avatar-options {
+  margin: 3px auto;
+  width: 155px;
+}
+
+.avatar-options a {
+  text-decoration: none;
+}
+
+.avatar-options a:hover {
+  color: var(--dark-black);
+}
+
+.user-nick {
+  font-style: italic;
+  font-size: 15px;
+  margin-left: 0px;
+}
+
+.btn-login {
+  min-width: 130px;
+  border-radius: 50px;
+  border-width: medium;
+  border-style: none;
+  border-color: currentcolor;
+  border-image: none;
+  font-weight: 700;
+  font-size: 14px;
+  line-height: 14px;
+  height: 30px;
+}
+
+.btn-login:focus, .btn-login:active {
+  border-width: medium;
+  border-style: none;
+  border-color: currentcolor;
+  border-image: none;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+.loginGravatar {
+  min-height: 106px;
+}
+
+.loginGravatar img {
+  width: 80px;
+  height: 80px;
+  object-fit: cover;
+  border-radius: 50%;
+  border: 1px solid var(--lighter-gray);
+  margin-left: 27px;
+}
+
+.login-row {
+  padding-top: 20px;
+}
+
+.login-form .form-check:hover {
+  cursor: pointer;
+}
+
+.loading-message {
+  font-size: 24px;
+}
+
+.session-login-link {
+  font-size: 14px;
+}
+
+.session-login-link:hover {
+  cursor: pointer;
+  text-decoration: underline !important;
+}

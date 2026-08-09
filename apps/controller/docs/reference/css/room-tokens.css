@@ -1,0 +1,191 @@
+/* NON-RUNTIME REFERENCE, GENERATED from the room app's inlined critical CSS
+ * (evidence-dumps/COPY/login-page-source).
+ * Regenerate rather than hand-edit.
+ *
+ * These are the ROOM's tokens, not the controller's. The controller has no CSS
+ * custom properties at all — see docs/ARCHITECTURE.md#theme. They are here so the
+ * controller can render true previews of what a room will look like, and so the
+ * light/dark pair a room owner picks with darkThemeAsDefault is a real choice
+ * between real values.
+ */
+
+:root {
+  /* Bootswatch Darkly base (28) */
+  --blue: #375a7f;
+  --indigo: #6610f2;
+  --purple: #6f42c1;
+  --pink: #e83e8c;
+  --red: #f00;
+  --orange: #fd7e14;
+  --yellow: #ff0;
+  --green: #00bc8c;
+  --teal: #20c997;
+  --cyan: #3498DB;
+  --white: #fff;
+  --gray: #bbb;
+  --gray-dark: #303030;
+  --primary: #375a7f;
+  --secondary: #444;
+  --success: #00bc8c;
+  --info: #3498DB;
+  --warning: #F39C12;
+  --danger: #E74C3C;
+  --light: #303030;
+  --dark: #adb5bd;
+  --breakpoint-xs: 0;
+  --breakpoint-sm: 576px;
+  --breakpoint-md: 768px;
+  --breakpoint-lg: 992px;
+  --breakpoint-xl: 1200px;
+  --font-family-sans-serif: "Lato", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+  --font-family-monospace: SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+
+  /* app tokens (99) */
+  --dark-gray: #aaa;
+  --darker-gray: #aaa6a6;
+  --light-gray: #ccc;
+  --lighter-gray: #eee;
+  --dark-black: #222;
+  --darker-black: #111;
+  --light-black: #373c42;
+  --lighter-black: #3e444a;
+  --light-green: #1edd6e;
+  --brown: #555;
+  --light-brown: #8c8686;
+  --dark-brown: #4b4b4b;
+  --lighter-blue: #edf2f6;
+  --black: #000;
+  --fire-yellow: #f7fd37;
+  --light-blue: #40e0d0;
+  --textarea-bg: var(--darker-black);
+  --name-color: #c0d8ed;
+  --transparent-gray: rgba(255, 255, 255, .331);
+  --app-font-family: Arial, Helvetica, sans-serif !important;
+  --app-link-color: #00bc8c;
+  --avatar-gear-icon-padding: 5px 5.5px;
+  --navbar-color: #fff;
+  --navbar-bg: #000;
+  --sidebar-menu-bg: #000;
+  --sidebar-menu-color: #ccc;
+  --sidebar-menu-active-color: #f7fd37;
+  --sidebar-navItem-border-color: transparent;
+  --users-color: #fff;
+  --users-border-color: #000;
+  --presenter-noRecording-color: #f7fd37;
+  --presenter-recording-color: #f00;
+  --textarea-holder-border-color: #fff;
+  --textarea-holder-btns-color: #bbb;
+  --presenter-area-bg: #111;
+  --tab-active-bg: #222;
+  --tabs-color: #fff;
+  --note-tabs-color: #00bc8c;
+  --notes-tabs-bg: #111;
+  --tabs-dropdown-bg: #323232;
+  --tabs-dropdown-color: #777;
+  --tabs-border-color: #444;
+  --session-control-dropdown-bg: #222;
+  --dropdown-divider-bg: #e9ecef;
+  --note-download-bg: #00bc8c;
+  --note-delete-bg: #e74c3c;
+  --note-next-bg: #375a7f;
+  --note-options-color: #fff;
+  --note-options-hover-color: #cccc;
+  --note-options-bg: #111;
+  --note-text-bg: #222;
+  --note-text-color: #ccc;
+  --file-download-bg: #00bc8c;
+  --file-delete-bg: #e74c3c;
+  --file-see-more-bg: #375a7f;
+  --file-list-odd-bg: #fff;
+  --file-list-even-bg: #f4f4f4;
+  --file-name-color: #333;
+  --file-size-color: #b2b2b2;
+  --file-searchbar-color: #b7b7b7;
+  --file-searchbar-icon-color: #666666;
+  --file-searchbar-bg: #fff;
+  --split-gutter-bg: #000;
+  --split-gutter-color: #fff;
+  --msgs-header-color: #ccc;
+  --msgs-header-bg: #111;
+  --msgs-separator-color: #373c42;
+  --msgs-separator-border-color: #373c42;
+  --msgs-separator-bg: #e8e8e8;
+  --archives-dropdown-menu-bg-color: #fff;
+  --archives-dropdown-menu-color: #222222;
+  --rosterImg-border-radius: 0;
+  --search-icon-bg-color: #adb5bd;
+  --search-icon-color: #222;
+  --reload-icon-bg-color: #00bc8c;
+  --reload-icon-color: #fff;
+  --users-badge-bg-color: #375a7f;
+  --users-badge-color: #fff;
+  --ptr-website-link-color: #00bc8c;
+  --mobileApp-info-bg-color: transparent;
+  --mobileApp-info-color: #676767;
+  --modal-content-bg-color: #303030;
+  --modal-content-color: #fff;
+  --modal-content-border-color: #444;
+  --modal-tabs-border-color: #444;
+  --modal-active-tab-bg-color: #222;
+  --modal-active-tab-color: #00bc8c;
+  --modal-active-tab-border-color: #444;
+  --checkbox-bg-color: #00bc8c;
+  --modal-btn-hover-opacity: .9;
+  --modal-btn-close-bg: #375a7f;
+  --modal-btn-close-border: #375a7f;
+  --modal-btn-success-bg: #00bc8c;
+  --modal-btn-success-border: #00bc8c;
+  --modal-btn-danger-bg: #e74c3c;
+  --modal-btn-danger-border: #e74c3c;
+  --modal-input-group-bg: #444;
+  --modal-upload-files-color: #555;
+  --modal-alert-link-color: #00bc8c;
+}
+
+/* 20 light-theme overrides */
+.theme-light {
+  --msg-bg: #d9d9d9;
+  --msg-border-color: #d9d9d9;
+  --date-color: #8394a9;
+  --msg-color: #1a1a1a;
+  --username-color: #000;
+  --msgs-bg: #f1f1f1;
+  --roster-bg: #f1f1f1;
+  --msgs-bg-adm: #e1e1e1;
+  --roster-bg-adm: #e1e1e1;
+  --textarea-color: #555;
+  --textarea-bg: #fff;
+  --user-location-color: #676767;
+  --sidebar-wrapper-bg-color: #fff;
+  --sidebar-wrapper-color: #676767;
+  --nickname-color: #676767;
+  --mobileApp-info-color: #676767;
+  --msgs-separator-color: #373c42;
+  --msgs-separator-border-color: #373c42;
+  --msgs-separator-bg: #e8e8e8;
+  --chat-bg: #eee;
+}
+
+/* 20 dark-theme overrides — selected by sess.darkThemeAsDefault */
+.theme-dark {
+  --msg-bg: #000;
+  --msg-border-color: #393939;
+  --date-color: #8394a9;
+  --msg-color: #f7fd37;
+  --msgs-bg: #111;
+  --roster-bg: #111;
+  --msgs-bg-adm: #000;
+  --roster-bg-adm: #000;
+  --username-color: #c0d8ed;
+  --textarea-color: #eee;
+  --textarea-bg: #111;
+  --user-location-color: #f7fd37;
+  --sidebar-wrapper-bg-color: #000;
+  --sidebar-wrapper-color: #f4f4f4;
+  --nickname-color: #c0d8ed;
+  --mobileApp-info-color: #f4f4f4;
+  --msgs-separator-color: #aaa;
+  --msgs-separator-border-color: #373c42;
+  --msgs-separator-bg: #222;
+  --chat-bg: #000;
+}

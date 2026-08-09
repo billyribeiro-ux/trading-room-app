@@ -1,0 +1,1403 @@
+/* ============================================================================
+ * Manage Session — the controller's `#/page/manageSession`.
+ *
+ * A DIFFERENT layout from /account. That page is `.container.container-sm`,
+ * 1170px and centred; this one is `.ng-fluid`, edge to edge: its panel measures
+ * x=0, w=1989 at a 1989-wide viewport, and it has no page footer at all — the
+ * last thing on it is the panel's own `.panel-footer`.
+ *
+ * There was no rect dump for this page — `evidence-dumps/login-page/manage` is served DOM only
+ * — so one was made: that markup rendered against the controller's real
+ * stylesheets (captured whole in room-login-1785587807656.json, same app, same
+ * CSS) at 1989x1265 @dpr2. Every number below came out of that render, and
+ * scripts/verify/verify-manage.mjs diffs our page against it.
+ *
+ * Selectors are the literal Bootstrap names, because that is the markup the
+ * reference emits, and they are scoped under `.mg-root` so none of it can reach
+ * the rest of the app.
+ * ========================================================================== */
+
+/* `.ng-fluid` — the full-bleed wrapper that replaces the centred container */
+.acc-fluid {
+  width: 100%;
+}
+
+/* line-height is Bootstrap's RATIO, not a pixel value, and to ITS precision.
+   Chrome lays out on a 1/64px grid: 14 x 1.428571429 is 20.0000000 which snaps
+   to 20, while the rounded 1.42857 gives 19.99998 and snaps to 19.984. Both look
+   like "20" until you diff against the real page. `20px` is wrong differently —
+   it compounds 2px per row through every button, label and tab.
+   The column percentages are Bootstrap's full-precision values for the same
+   reason: 16.6667% of 1957 lands 0.008 short of 16.66666667%. */
+.mg-root {
+  font-family: var(--acc-font);
+  font-size: 14px;
+  line-height: 1.428571429;
+  color: var(--acc-ink);
+}
+/* Bootstrap's reboot, which the UA otherwise wins. Both of these bite: the UA's
+   `1em 0` on <p> put every form-control-static 14px below its column, and its
+   `1em` top margin on <ul> collapsed out of the tabs wrapper and pushed the whole
+   tab strip — and everything under it — 14px down the page. */
+.mg-root p {
+  margin: 0 0 10px;
+}
+.mg-root ul,
+.mg-root ol {
+  margin-top: 0;
+  margin-bottom: 10px;
+}
+
+/* account.css pins .acc-btn to a 34px box, which is right for that page because
+   its buttons all sit on one line of 14px text. Here the reference's buttons are
+   content-sized — 33.984 for a default, 30 for a `.btn-sm`, 31.984 for a
+   borderless `.btn-link` — so the height comes back off the box model. */
+.mg-root .acc-btn {
+  height: auto;
+  line-height: 1.428571429;
+}
+.mg-root .acc-btn-sm {
+  height: auto;
+  line-height: 1.5;
+}
+.mg-root *,
+.mg-root *::before,
+.mg-root *::after {
+  box-sizing: border-box;
+}
+
+/* ── panel ────────────────────────────────────────────────────────────────── */
+.mg-root .panel {
+  margin-bottom: 20px;
+  background-color: #fff;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  box-shadow: rgba(0, 0, 0, 0.05) 0 1px 1px 0;
+}
+.mg-root .panel-default {
+  border-color: rgb(221, 221, 221);
+}
+.mg-root .panel-heading {
+  padding: 10px 15px;
+  border-bottom: 1px solid transparent;
+  border-top-left-radius: 3px;
+  border-top-right-radius: 3px;
+}
+.mg-root .panel-default > .panel-heading {
+  color: rgb(51, 51, 51);
+  background-color: rgb(245, 245, 245);
+  border-color: rgb(221, 221, 221);
+}
+/* the heading is 52.984 tall: 10 + a 31.984 title + 10, plus the 1px rule */
+.mg-root .panel-title {
+  margin-top: 0;
+  margin-bottom: 0;
+  font-size: 16px;
+  color: inherit;
+}
+/*
+   An <a class="btn"> in the panel title is DARK, not white.
+
+   Bootstrap's `.panel-title > a { color: inherit }` (specificity 0,1,1) beats `.btn-info`
+   (0,1,0), so the three header actions take the panel's own `rgb(51,51,51)` rather than the
+   button colour. The visible Launch anchor (`manage:header` node 9, 76.9x30, `display:block`)
+   measures `rgb(51,51,51)` on `rgb(91,192,222)`, and its recorded rule list contains this exact
+   selector. Clone Room and Delete Room (nodes 11, 13) are `ng-hide` and measure the same.
+
+   Every `<button class="btn-info">` in the same capture is correctly `rgb(255,255,255)` — the
+   split is anchor-versus-button, which is why the class-wide gate cannot see this one: `.btn-info`
+   carries two different colours within a single source, so its colour is dropped as
+   "disagreement WITHIN a source" and never reaches the contract.
+
+   Not, as this said, as a recorded `disagreement` — that array holds only the cases where the two
+   BUILDS differ, and `btn-info` is not in it. The two are counted separately by design, and the
+   within-a-source drops are silent, which is the whole reason this rule needed writing by hand.
+*/
+.mg-root .panel-title > a,
+.mg-root .panel-title > small,
+.mg-root .panel-title > small > a,
+.mg-root .panel-title > .small,
+.mg-root .panel-title > .small > a {
+  color: inherit;
+}
+.mg-root .panel-title::before,
+.mg-root .panel-title::after {
+  content: ' ';
+  display: table;
+}
+.mg-root .panel-title::after {
+  clear: both;
+}
+.mg-root .panel-body {
+  padding: 15px;
+}
+.mg-root .panel-body::before,
+.mg-root .panel-body::after {
+  content: ' ';
+  display: table;
+}
+.mg-root .panel-body::after {
+  clear: both;
+}
+.mg-root .panel-footer {
+  padding: 10px 15px;
+  background-color: rgb(245, 245, 245);
+  border-top: 1px solid rgb(221, 221, 221);
+  border-bottom-right-radius: 3px;
+  border-bottom-left-radius: 3px;
+}
+
+/* ── grid ─────────────────────────────────────────────────────────────────── */
+.mg-root [class*='col-sm-'] {
+  position: relative;
+  min-height: 1px;
+  padding-right: 15px;
+  padding-left: 15px;
+}
+/* Captured Bootstrap 3 source: `sm` columns do not float until 768px. */
+@media (min-width: 768px) {
+  .mg-root [class*='col-sm-'] {
+    float: left;
+  }
+  .mg-root .col-sm-2 {
+    width: 16.66666667%;
+  }
+  .mg-root .col-sm-3 {
+    width: 25%;
+  }
+  .mg-root .col-sm-4 {
+    width: 33.33333333%;
+  }
+  .mg-root .col-sm-8 {
+    width: 66.66666667%;
+  }
+  .mg-root .col-sm-10 {
+    width: 83.33333333%;
+  }
+  .mg-root .col-sm-12 {
+    width: 100%;
+  }
+}
+.mg-root .pull-right {
+  float: right !important;
+}
+.mg-root .pull-left {
+  float: left !important;
+}
+.mg-root .text-center {
+  text-align: center;
+}
+.mg-root .text-right {
+  text-align: right;
+}
+.mg-root .text-muted {
+  color: rgb(119, 119, 119);
+}
+
+/* styles.css spacing helpers */
+.mg-root .m0 {
+  margin: 0 !important;
+}
+.mg-root .mr {
+  margin-right: 10px;
+}
+.mg-root .mt {
+  margin-top: 10px;
+}
+
+/* ── forms ────────────────────────────────────────────────────────────────── */
+/* ZERO, not Bootstrap's 15px. Surveyed across every captured tab — baseline,
+   Users, Branding, SSO Setup, User Stats, Settings — and all 13 `.form-group`s
+   in each one compute `margin-bottom: 0px`, under `fieldset`, `.form-inline`,
+   `.form-horizontal` and `.form-vertical` alike. Carrying the 15px pushed the
+   Search Users row 15px down the page and everything under it with it. */
+.mg-root .form-group {
+  margin-bottom: 0;
+}
+.mg-root label {
+  display: inline-block;
+  max-width: 100%;
+  margin-bottom: 5px;
+  font-weight: 700;
+}
+.mg-root .control-label {
+  margin-bottom: 0;
+}
+/* `.form-control-static` — 34 tall with 7px of vertical padding, which is what
+   sits the editable link's 17px line box in the middle of a 34px row */
+.mg-root .form-control-static {
+  min-height: 34px;
+  padding-top: 7px;
+  padding-bottom: 7px;
+  margin-bottom: 0;
+}
+.mg-root .form-control {
+  display: block;
+  width: 100%;
+  height: 34px;
+  padding: 6px 18px;
+  font-size: 14px;
+  line-height: 20px;
+  color: rgb(85, 85, 85);
+  background-color: #fff;
+  background-image: none;
+  border: 1px solid rgb(219, 217, 217);
+  border-radius: 4px;
+  box-shadow: rgb(0, 0, 0) 0 0 0;
+  font-family: inherit;
+}
+/* The reference's `styles.css` strips the UA widget from text-like inputs, and the Users search
+   box measures `appearance: none`. Without it Chrome paints its own search chrome — a rounded
+   inset field with a clear button — inside our square bordered one. */
+.mg-root input[type='text'],
+.mg-root input[type='search'],
+.mg-root input[type='email'],
+.mg-root input[type='number'],
+.mg-root input[type='password'],
+.mg-root textarea {
+  appearance: none;
+}
+/* Bootstrap's readonly styling — the link fields are all `readonly`, and without
+   this they render white where the reference renders them grey. */
+.mg-root .form-control[readonly],
+.mg-root .form-control[disabled],
+.mg-root fieldset[disabled] .form-control {
+  background-color: rgb(238, 238, 238);
+  opacity: 1;
+}
+.mg-root .form-control[disabled] {
+  cursor: not-allowed;
+}
+.mg-root .form-control:focus {
+  outline: 0;
+}
+.mg-root .form-control:focus-visible {
+  outline: 2px solid rgb(102, 175, 233);
+  outline-offset: 1px;
+}
+.mg-root textarea.form-control {
+  height: auto;
+}
+/* BS3's `.form-horizontal .form-group` clearfix — without it the SSO pane
+   measured 0 tall, because its only row is a pair of floated columns.
+   Scoped to `.form-horizontal` ONLY: extending it to every `fieldset >
+   .form-group` also cleared the Users tab's right-floated button column, which
+   dropped the Search Users row onto its own line below the buttons instead of
+   beside them. */
+.mg-root .form-horizontal .form-group::before,
+.mg-root .form-horizontal .form-group::after {
+  content: ' ';
+  display: table;
+}
+.mg-root .form-horizontal .form-group::after {
+  clear: both;
+}
+.mg-root .form-inline .form-group {
+  display: inline-block;
+  margin-bottom: 0;
+  vertical-align: middle;
+}
+.mg-root .form-inline .form-control {
+  display: inline-block;
+  width: auto;
+  vertical-align: middle;
+}
+.mg-root .form-inline .control-label {
+  margin-bottom: 0;
+  vertical-align: middle;
+}
+
+/* ── input-group ──────────────────────────────────────────────────────────── */
+.mg-root .input-group {
+  position: relative;
+  display: table;
+  border-collapse: separate;
+}
+/* `max-width: none` is the fix, and it is not cosmetic: account.css carries
+   `.acc-body .col-md-6 { max-width: 50% }`, this page is inside `.acc-body`, and
+   the link inputs carry `col-md-6` — so every one of them was capped at half the
+   group and stopped a long way short of its Copy button. Bootstrap's own
+   `.col-md-6` sets width, never max-width, which is why the reference fills. */
+.mg-root .input-group .form-control {
+  position: relative;
+  z-index: 2;
+  float: left;
+  width: 100%;
+  max-width: none;
+  margin-bottom: 0;
+  display: table-cell;
+}
+.mg-root .input-group-btn {
+  position: relative;
+  display: table-cell;
+  width: 1%;
+  font-size: 0;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+.mg-root .input-group-btn > .btn {
+  position: relative;
+}
+.mg-root .input-group-btn > .btn + .btn {
+  margin-left: -1px;
+}
+.mg-root .input-group-btn:last-child > .btn {
+  z-index: 2;
+  margin-left: -1px;
+}
+/* Bootstrap's input-group corner rules, which produce exactly what the reference
+   measures: the field is rounded on its left only; a trailing button is square
+   on its left; and a button that is not the LAST one in the group is square on
+   both sides — which is why Edit and Generate are 0px all round and only the
+   Copy buttons keep their outer corners. */
+.mg-root .input-group .form-control:first-child {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+.mg-root .input-group-btn:last-child > .btn {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+.mg-root .input-group-btn:last-child > .btn:not(:last-child) {
+  border-radius: 0;
+}
+
+/* ── tabs ─────────────────────────────────────────────────────────────────── */
+.mg-root .nav {
+  padding-left: 0;
+  margin-bottom: 0;
+  list-style: none;
+}
+.mg-root .nav::before,
+.mg-root .nav::after {
+  content: ' ';
+  display: table;
+}
+.mg-root .nav::after {
+  clear: both;
+}
+/*
+   `hidden` means hidden, everywhere under `.mg-root`.
+
+   The HTML `hidden` attribute is only a UA-stylesheet `display: none`, so ANY author rule that
+   sets `display` outranks it. This repo has now been bitten by that three separate times: the tab
+   strip below, the `.mg-file` input further down, and — visibly, on every user row — four
+   Font Awesome icons that stayed on screen because `.fa { display: inline-block }` beat their
+   `hidden`. A folder and two phones sat between the checkbox and the avatar.
+
+   The reference never hits this because AngularJS hides with `ng-hide`, which is
+   `display: none !important`. This is that, once, for the whole subtree. The two `:not([hidden])`
+   guards below are now belt-and-braces; they are left alone because each documents its own
+   incident.
+*/
+.mg-root [hidden] {
+  display: none !important;
+}
+/* `:not([hidden])` — an author `display` rule outranks the UA's
+   `[hidden] { display: none }`, so without it the Text List, SSO Setup and
+   Marketplace tab links stayed on screen even when their feature is off, and the
+   strip showed seven entries against the reference's four. */
+.mg-root .nav > li:not([hidden]) {
+  position: relative;
+  display: block;
+}
+.mg-root .nav > li > a {
+  position: relative;
+  display: block;
+  padding: 10px 15px;
+  color: rgb(51, 122, 183);
+  text-decoration: none;
+  cursor: pointer;
+}
+.mg-root .nav > li > a:focus,
+.mg-root .nav > li > a:hover {
+  text-decoration: none;
+  background-color: rgb(238, 238, 238);
+}
+.mg-root .nav-tabs {
+  border-bottom: 1px solid rgb(221, 221, 221);
+}
+.mg-root .nav-tabs > li:not([hidden]) {
+  float: left;
+  margin-bottom: -1px;
+}
+.mg-root .nav-tabs > li > a {
+  margin-right: 2px;
+  line-height: 1.428571429;
+  border: 1px solid transparent;
+  border-radius: 4px 4px 0 0;
+}
+.mg-root .nav-tabs > li > a:hover {
+  border-color: rgb(238, 238, 238) rgb(238, 238, 238) rgb(221, 221, 221);
+}
+.mg-root .nav-tabs > li.active > a,
+.mg-root .nav-tabs > li.active > a:focus,
+.mg-root .nav-tabs > li.active > a:hover {
+  color: rgb(85, 85, 85);
+  cursor: default;
+  background-color: #fff;
+  border: 1px solid rgb(221, 221, 221);
+  border-bottom-color: transparent;
+}
+/* styles.css gives the panel its own tab body: 10px/20px and three borders */
+.mg-root .tab-content {
+  padding: 10px 20px;
+  border-style: solid;
+  border-width: 0 1px 1px;
+  border-color: rgb(230, 233, 238);
+}
+.mg-root .tab-content > .tab-pane {
+  display: none;
+}
+.mg-root .tab-content > .active {
+  display: block;
+}
+
+/* ── editable ─────────────────────────────────────────────────────────────── */
+/* angular-xeditable renders each value as a dashed-underline link; an unset one gets
+   `.editable-empty`, which is italic and near-black — NOT red. This comment said red, which is the
+   invented colour the rule 40 lines down was corrected away from; it survived the fix and would
+   have talked the next reader back into it. */
+/* inline, so the dashed rule under it costs no line height — see Editable.svelte */
+/*
+  The TEXT is near-black; only the UNDERLINE is blue.
+
+  This had the link colour on both, which reads as a blue hyperlink where the reference reads as a
+  value with a hint that it can be edited. Measured on the two fields in the header — Room Title
+  (`r.0.1.1.0.1.0.0.1.0.0`) and Authorization Mode (`r.0.1.1.0.1.0.2.1.0.0`) — and identical on
+  each:
+
+      color                rgb(10, 10, 10)
+      border-bottom        1px dashed rgb(66, 139, 202)
+      text-decoration-line none
+      font-weight          400
+      cursor               pointer
+
+  The underline blue was wrong too: rgb(51,122,183) is Bootstrap's `$link-color`, not the
+  rgb(66,139,202) the capture actually paints.
+*/
+.mg-root .editable-click {
+  display: inline;
+  border-bottom: 1px dashed rgb(66, 139, 202);
+  text-decoration: none;
+  color: rgb(10, 10, 10);
+  cursor: pointer;
+}
+/*
+  HONEST GAP: the capture is entirely in the resting state — no node was ever hovered — so the
+  hover colours are NOT evidence. Darkening the underline alone keeps the resting measurement
+  intact and leaves the text where the capture puts it; if a hover capture ever lands, this rule is
+  the one to correct.
+*/
+.mg-root .editable-click:hover,
+.mg-root .editable-click:focus {
+  border-bottom-color: rgb(35, 82, 124);
+  text-decoration: none;
+}
+/*
+  An unset field renders the word "empty" in italics — and in the SAME near-black, not red.
+
+  Measured across all 115 `.editable-empty` nodes in the capture, every one identical:
+  rgb(10,10,10) | border rgb(66,139,202) | italic. The rgb(217,83,79) here was invented; it made
+  ~115 unset fields on the Settings tab look like validation errors.
+*/
+.mg-root .editable-empty,
+.mg-root .editable-empty:hover,
+.mg-root .editable-empty:focus {
+  font-style: italic;
+  color: rgb(10, 10, 10);
+  border-bottom-color: rgb(66, 139, 202);
+}
+/* the inline editor that opens in place of the link */
+.mg-root .editable-form {
+  display: inline-block;
+}
+.mg-root .editable-form .form-control {
+  display: inline-block;
+  width: auto;
+  min-width: 220px;
+  vertical-align: middle;
+}
+.mg-root .editable-form textarea.form-control {
+  min-width: 340px;
+  vertical-align: top;
+}
+.mg-root .editable-buttons {
+  display: inline-block;
+  vertical-align: middle;
+  margin-left: 7px;
+}
+
+/* Helper copy under a field. NOT grey: `.muted` is a dead Bootstrap 2 class in
+   these stylesheets, so it contributes nothing and the text inherits the body
+   ink, rendering bold at 14px — the boldness comes from the <label> it sits in.
+   Ours is a span with that same computed box, because the reference's label
+   labels no control. */
+.mg-root .muted {
+  display: inline-block;
+  max-width: 100%;
+  margin-bottom: 5px;
+  font-weight: 700;
+}
+
+/* ── dropdown ─────────────────────────────────────────────────────────────── */
+.mg-root .dropdown {
+  position: relative;
+}
+.mg-root .caret {
+  display: inline-block;
+  width: 0;
+  height: 0;
+  margin-left: 2px;
+  vertical-align: middle;
+  border-top: 4px dashed;
+  border-right: 4px solid transparent;
+  border-left: 4px solid transparent;
+}
+/* Inside a button the caret loses its 2px lead — `.btn .caret { margin-left: 0 }`.
+   Without it the toggle measures 1.891px narrow, because the text's trailing space
+   and the caret's margin are not the same width and only one of them is supposed
+   to be there. */
+.mg-root .btn .caret {
+  margin-left: 0;
+}
+/* The caret inherits the button's text colour; `border-top: 4px dashed` above sets
+   no colour of its own, which is the whole mechanism.
+
+   There was a `border-top-color: rgb(0,0,0) !important` here, justified by a comment
+   claiming the captured cascade forced it black. It does not. Every `.caret` in
+   ptr1.json computes rgb(255,255,255) — measured on all five, including
+   `btn btn-md dropdown-toggle btn-primary mt` ("User List Actions",
+   r.0.1.1.0.1.3.1.0.0.0.0.3.0.0) and `btn dropdown-toggle btn-primary`
+   ("Actions With Selected", r.0.1.1.0.1.3.1.0.0.2.1.0.0) — over a
+   rgb(51,122,183) button whose own colour is rgb(255,255,255).
+
+   The `!important` was also doing the real damage: it beat the inheritance, so no
+   button variant could ever have a caret matching its own text. */
+.mg-root .dropdown-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 1000;
+  display: none;
+  float: left;
+  min-width: 160px;
+  padding: 5px 0;
+  margin: 2px 0 0;
+  font-size: 13px;
+  text-align: left;
+  list-style: none;
+  background-color: #fff;
+  background-clip: padding-box;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 2px;
+  box-shadow: rgba(0, 0, 0, 0.176) 0 6px 12px;
+}
+.mg-root .open > .dropdown-menu {
+  display: block;
+}
+/* The reference's items are plain <a>. Ours have to be <button>, several of
+   them wrapped in a <form> so the POST carries the op and the selected ids, and
+   both departures need undoing visually:
+   
+     - `> li > button` alone never matched the form-wrapped ones, so they kept
+       default UA button chrome — a bordered box instead of a link row.
+     - a block-level <button> does NOT stretch to its container the way a block
+       <a> does; it intrinsically sizes. The obvious patch, `width: 100%`, is a
+       trap: a percentage width makes the item's max-content contribution equal
+       to the AVAILABLE width, so the absolutely-positioned menu shrink-to-fits
+       to its containing block instead of to its text — 374.742px wide against
+       the reference's 238.68px. Column flex stretches the child on the cross
+       axis with no percentage anywhere, so max-content stays the text width. */
+.mg-root .dropdown-menu > li,
+.mg-root .dropdown-menu > li > form {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+}
+.mg-root .dropdown-menu > li > a,
+.mg-root .dropdown-menu > li > button,
+.mg-root .dropdown-menu > li > form > button {
+  display: block;
+  padding: 3px 20px;
+  clear: both;
+  font: inherit;
+  font-weight: 400;
+  line-height: 1.428571429;
+  color: rgb(51, 51, 51);
+  white-space: nowrap;
+  text-align: left;
+  text-decoration: none;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+.mg-root .dropdown-menu > li > a:focus,
+.mg-root .dropdown-menu > li > a:hover,
+.mg-root .dropdown-menu > li > button:focus,
+.mg-root .dropdown-menu > li > button:hover,
+.mg-root .dropdown-menu > li > form > button:focus,
+.mg-root .dropdown-menu > li > form > button:hover {
+  color: rgb(38, 38, 38);
+  text-decoration: none;
+  background-color: rgb(245, 245, 245);
+}
+.mg-root .dropdown-menu .divider {
+  height: 1px;
+  margin: 9px 0;
+  overflow: hidden;
+  background-color: rgb(229, 229, 229);
+}
+
+/* ── buttons ──────────────────────────────────────────────────────────────────
+   `.btn` itself, because the reference's markup on this page uses the plain
+   Bootstrap class, not the `.acc-btn` the account page uses. Without this the
+   Upload/Change and Reset buttons had no sizing at all and measured 21 tall
+   against the reference's 34. */
+.mg-root .btn {
+  display: inline-block;
+  padding: 6px 12px;
+  margin-bottom: 0;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.428571429;
+  text-align: center;
+  white-space: nowrap;
+  vertical-align: middle;
+  touch-action: manipulation;
+  cursor: pointer;
+  user-select: none;
+  background-image: none;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  appearance: none;
+  color: var(--acc-ink);
+  -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
+}
+.mg-root .btn:hover,
+.mg-root .btn:focus,
+.mg-root .btn:active {
+  box-shadow:
+    rgba(0, 0, 0, 0.23) 0 3px 10px,
+    rgba(0, 0, 0, 0.16) 0 3px 10px;
+  text-decoration: none;
+}
+.mg-root .btn-default {
+  color: var(--acc-ink);
+  background-color: #fff;
+  border-color: rgb(230, 233, 238);
+}
+.mg-root .btn-info {
+  color: #fff;
+  background-color: rgb(91, 192, 222);
+  border-color: rgb(70, 184, 218);
+}
+.mg-root .btn-primary {
+  color: #fff;
+  background-color: rgb(51, 122, 183);
+  border-color: rgb(46, 109, 164);
+}
+.mg-root .btn-warning {
+  color: #fff;
+  background-color: rgb(240, 173, 78);
+  border-color: rgb(238, 162, 54);
+}
+.mg-root .btn-success {
+  color: #fff;
+  background-color: rgb(92, 184, 92);
+  border-color: rgb(76, 174, 76);
+}
+.mg-root .btn-danger {
+  color: #fff;
+  background-color: rgb(217, 83, 79);
+  border-color: rgb(212, 63, 58);
+}
+/* `.btn-inverse` — Add Server and Remove Server, in the DON'T TOUCH block's repeater console.
+   Nearly black, and NOT one of Bootstrap 3's contextual variants: fill and border are the SAME
+   rgb(54,63,69), measured on all 4 nodes carrying the class. Nothing declared it before, so both
+   buttons rendered as a bare `.btn` — a transparent border over no background at all. */
+.mg-root .btn-inverse {
+  color: rgb(255, 255, 255);
+  background-color: rgb(54, 63, 69);
+  border-color: rgb(54, 63, 69);
+}
+
+/* `.btn-md` is not a Bootstrap size — it is undefined in these stylesheets, so
+   it measures exactly like a default `.btn`: 33.984 tall. Reproduced as a no-op
+   rather than silently mapped onto `.btn-sm`. */
+.mg-root .btn-md {
+  /* intentionally empty — see above */
+}
+/* 31.984 tall against a default button's 33.984: `.btn-link` carries no border
+   in this cascade, so it loses the 2px. */
+/* `.btn-sm` — 30 tall, 12px/1.5, 3px radius. Launch and Search / Load Users. */
+.mg-root .btn-sm {
+  padding: 5px 10px;
+  font-size: 12px;
+  line-height: 1.5;
+  border-radius: 3px;
+}
+.mg-root .btn-link {
+  border-width: 0;
+  font-weight: 400;
+  color: rgb(51, 122, 183);
+  border-radius: 0;
+  background-color: transparent;
+  box-shadow: none;
+  border-color: transparent;
+}
+.mg-root .btn-link:focus,
+.mg-root .btn-link:hover {
+  color: rgb(35, 82, 124);
+  text-decoration: underline;
+  background-color: transparent;
+  border-color: transparent;
+}
+/* `.btn-warning.btn-link` — the Reset Counts button. The link rules win on
+   source order, so it renders as a link, not an amber button. */
+
+/*
+  A red `.btn-assertive` block stood here and has been deleted.
+
+  It was dead — the real rule is ~250 lines below and wins on source order — but it was also wrong:
+  it declared rgb(217,83,79) on #fff where the capture measures rgb(239,239,239) on rgb(51,51,51).
+  A dead rule that contradicts the live one is a bug waiting for somebody to reorder the file, and
+  the comment beneath it already cites the measurement.
+
+  rgb(217,83,79) is Bootstrap's danger red, and this is the third place it had been reached for
+  wrongly, after `.editable-empty` and `.badge-danger`.
+
+  Precisely: it IS measured in this capture — as `.btn-danger`'s BACKGROUND, on the Delete Room
+  anchor and on the row's Remove button, and `.mg-root .btn-danger` below declares it correctly.
+  What it is not is a TEXT colour, and it is not what `.editable-empty`, `.badge-danger` or
+  `.btn-assertive` paint. An earlier version of this note said the colour "was never measured
+  anywhere", which is a broader claim than the evidence supports and would have justified deleting
+  a rule that is right.
+*/
+
+/* ── tables ───────────────────────────────────────────────────────────────── */
+.mg-root .table {
+  width: 100%;
+  max-width: 100%;
+  margin-bottom: 20px;
+  border-collapse: collapse;
+  border-spacing: 0;
+}
+.mg-root .table > thead > tr > th,
+.mg-root .table > tbody > tr > td,
+.mg-root .table > tbody > tr > th {
+  padding: 8px;
+  line-height: 20px;
+  vertical-align: top;
+  border-top: 1px solid rgb(221, 221, 221);
+}
+.mg-root .table > thead > tr > th {
+  padding-top: 20px;
+  padding-bottom: 20px;
+  vertical-align: bottom;
+  text-align: left;
+  /*
+     All three longhands, because a width alone paints nothing.
+
+     This declared `border-bottom-width: 1px` and stopped. `border-bottom-style` keeps its initial
+     `none`, so the used width is 0 and the rule under the headings never rendered — on every table
+     in the manage page. All five `th` nodes measure solid/1px/rgb(221,221,221)
+     (collect-account, manage:tab:Users nodes 91-95).
+  */
+  border-bottom: 1px solid rgb(221, 221, 221);
+}
+.mg-root .table > thead:first-child > tr:first-child > th {
+  border-top: 0;
+}
+.mg-root .table-striped > tbody > tr:nth-of-type(odd) {
+  background-color: rgb(249, 249, 249);
+}
+.mg-root .badge {
+  display: inline-block;
+  min-width: 10px;
+  padding: 3px 7px;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  color: #fff;
+  text-align: center;
+  white-space: nowrap;
+  vertical-align: middle;
+  background-color: rgb(119, 119, 119);
+  border-radius: 10px;
+}
+/*
+  `.badge-danger` adds NOTHING. It is a Bootstrap 4 class name on a Bootstrap 3 stylesheet, so
+  nothing defines it and the badge keeps `.badge`'s grey.
+
+  Measured: all 7 nodes carrying it — "Free Trials", "User Count Hidden", "User Personal Info
+  Hidden" — are rgb(119,119,119) on rgb(255,255,255), identical to a plain `.badge`. It was
+  rgb(217,83,79) here: Bootstrap's danger red, which this sheet does use — correctly — as
+  `.btn-danger`'s background, but which nothing in the capture applies to a badge.
+
+  Reproduced rather than "corrected": the markup carries the class, so the class stays and simply
+  does not paint. A rule that makes it red would be inventing a distinction the reference does not
+  draw.
+*/
+
+/*
+  `.badge-danger-chat` is the one that IS red — pure rgb(255, 0, 0), not Bootstrap's danger.
+  Measured on the three "TRIAL" badges, each of which also carries an inline
+  `color: white; margin-right: 20px`.
+*/
+.mg-root .badge-danger-chat {
+  background-color: rgb(255, 0, 0);
+}
+/* The TRIAL badge's two inline styles, which the class itself does not carry:
+   `color: white; margin-right: 20px`. */
+.mg-root .mg-trial {
+  color: rgb(255, 255, 255);
+  margin-right: 20px;
+}
+
+/*
+   `style="color: red"`, which the reference applies inline to five row states: the denied-archives
+   icon, "*** INACTIVE USER ***", "User PMs disabled", "CHAT MUTED" and "BANNED".
+
+   `red` is the CSS keyword, so it computes to rgb(255,0,0) — the same value measured on the
+   denied-archives icon's `::before`, which is the one of the five that was visible in the capture.
+   The other four were `ng-show`n off; they take this class because they carry the identical inline
+   declaration in the markup, not because their colour was measured.
+*/
+.mg-root .mg-red {
+  color: rgb(255, 0, 0);
+}
+
+/* ── misc ─────────────────────────────────────────────────────────────────── */
+/* 30px — the reference's computed `margin-top` on this element, not a guess.
+   It collapses with nothing above it because .form-group's bottom margin is 0. */
+.mg-root .users-many-actions {
+  margin-top: 30px;
+}
+/* "Select All" and "Apply to all rooms?", the two checkboxes that open
+   .users-many-actions. Every number is a computed value read off ptr1.json
+   caps[0] — node r.0.1.1.0.1.3.1.0.0.2.0 and its two labels, spans and inputs —
+   rather than Bootstrap recalled from memory. The absolutely positioned input
+   pulled back into the label's own 20px of padding is how the reference seats a
+   checkbox beside its words, and it only lines up if all four agree. */
+.mg-root .users-many-actions .checkbox {
+  display: block;
+  margin: 10px 0;
+}
+.mg-root .users-many-actions .checkbox label {
+  display: inline-block;
+  margin: 0;
+  padding-left: 20px;
+  font-weight: 400;
+  line-height: 20px;
+  cursor: pointer;
+}
+.mg-root .users-many-actions .checkbox label.checkbox-apply-to-all-rooms {
+  margin-left: 10px;
+}
+.mg-root .users-many-actions .checkbox label input[type='checkbox'] {
+  position: absolute;
+  margin-top: 4px;
+  margin-left: -20px;
+  line-height: normal;
+}
+.mg-root pre {
+  display: block;
+  padding: 9.5px;
+  margin: 0 0 10px;
+  font-size: 13px;
+  /* 13px x 1.428571, not a flat 20px. The email-preview <pre> measures 18.5714px, and the 20px we
+     had added ~1.43px per line inside a fixed `height:130px; overflow:scroll` box. */
+  line-height: 1.428571429;
+  color: rgb(51, 51, 51);
+  word-break: break-all;
+  word-wrap: break-word;
+  background-color: rgb(245, 245, 245);
+  border: 1px solid rgb(204, 204, 204);
+  border-radius: 4px;
+  /* The reference scrolls long preview lines horizontally rather than wrapping them:
+     measured `white-space: pre` with `overflow-x: scroll`. `pre-wrap` was ours. */
+  white-space: pre;
+}
+/* `overflow: hidden` is measured, not decorative: it makes the <hr> a block
+   formatting context, so it sits BESIDE the floated columns rather than running
+   under them — the reference's is 1117.086 wide starting at 834.914, exactly
+   where the col-sm-3 float ends. */
+.mg-root hr {
+  margin: 20px 0;
+  border: 0;
+  border-top: 1px solid rgb(238, 238, 238);
+  overflow: hidden;
+}
+.mg-root h3 {
+  font-size: 24px;
+  font-weight: 500;
+  line-height: 26.4px;
+  margin: 20px 0 10px;
+}
+.mg-root h4 {
+  font-size: 18px;
+  font-weight: 500;
+  line-height: 19.8px;
+  margin: 10px 0;
+}
+/*
+   The reference's fieldset is a 20px-padded, 20px-margined, dashed-underlined block — not the
+   zeroed-out UA reset this used to declare.
+
+   `styles.css` sets `fieldset { padding-bottom: 20px; border-bottom: 1px dashed rgb(238,238,238);
+   margin-bottom: 20px }` with `fieldset:last-child { border-bottom: 0 }`. Both captured fieldsets
+   (Users node 2, Branding node 103) measure the 20px padding and margin, and both measure
+   `border-width: 0` — because both are the last child, which is the second rule firing, not the
+   first one being absent. Declaring `padding: 0; margin: 0`
+   made every pane 40px shorter than the reference, which the arithmetic confirms: the Users pane
+   is 240px = 10 + 199 + 20 (fieldset margin) + 10 + 1px border.
+*/
+.mg-root fieldset {
+  min-width: 0;
+  padding: 0 0 20px;
+  margin: 0 0 20px;
+  border: 0;
+  border-bottom: 1px dashed rgb(238, 238, 238);
+}
+.mg-root fieldset:last-child {
+  border-bottom: 0;
+}
+.mg-root .d-block {
+  display: block;
+}
+/* a wired/unwired marker of ours, not the reference's — see the note it renders */
+.mg-unwired {
+  color: rgb(119, 119, 119);
+  font-size: 12px;
+  font-style: italic;
+  margin-left: 6px;
+}
+
+/* ── textAngular, the Branding tab's landing-page editor ──────────────────────
+   Measured from evidence-dumps/NEXT-STEP/gaps/rects-tab_Branding_Logo_Landing_Page_.json —
+   the real toolbar, captured with the pane revealed.
+
+   `.btn-group-small` is textAngular's own sizing and it is what makes these
+   buttons 37.711 tall rather than a normal button's 33.984: 10px of padding
+   around 11px/15.714 text, a 1px border, and 5px of clearance below. */
+.mg-root .ta-root {
+  display: block;
+}
+.mg-root .ta-toolbar {
+  margin-left: -5px;
+}
+.mg-root .ta-toolbar::before,
+.mg-root .ta-toolbar::after {
+  content: ' ';
+  display: table;
+}
+.mg-root .ta-toolbar::after {
+  clear: both;
+}
+.mg-root .ta-toolbar .btn-group {
+  position: relative;
+  float: left;
+  margin-left: 5px;
+  vertical-align: middle;
+}
+.mg-root .btn-group-small .btn {
+  padding: 10px;
+  font-size: 11px;
+  /* the reference computes 15.7143px here; stated in px so it cannot round to a
+     different 1/64 than 11 x the ratio does */
+  line-height: 15.7143px;
+  border-radius: 4px;
+  margin-bottom: 5px;
+  height: auto;
+  display: inline-block;
+  vertical-align: middle;
+  background-color: #fff;
+  border: 1px solid rgb(230, 233, 238);
+  color: var(--acc-ink);
+  cursor: pointer;
+  white-space: nowrap;
+}
+/* a btn-group's buttons butt together, only the ends are rounded */
+/* Bootstrap floats every .btn inside a .btn-group. That is what puts the two
+   counter <div>s — which carry `display: block` — on the SAME line as the
+   buttons: a float shrink-wraps, so `min-width: 100px` becomes their width.
+   Without the float they stacked and wrapped the toolbar to three rows, 128
+   tall against the reference's 42.711. */
+/*
+   Bootstrap's `.btn-group` base rule, which was never ported — and its absence broke the row menu.
+
+   The rule below floats every `.btn` inside a `.btn-group`. With no base rule, the group itself is
+   a plain BLOCK box: its only child floats out, the box collapses to height 0 and spans the full
+   column. `.dropdown-menu { top: 100% }` then resolves to `top: 0`, so the menu opened ON TOP of
+   the Actions button instead of below it, and `mb-sm`'s 5px margin applied to nothing.
+
+   The MECHANISM is `float: left`, not `inline-block`. All 35 nodes carrying this class, in both
+   sources, measure `display: block` with `float: left` — and a float shrink-wraps and establishes a
+   formatting context that contains its own floated children, which is why it produces the same
+   effect. I reasoned my way to `inline-block` and the style gate caught it against the measurement,
+   which is exactly what that gate is for. The shrink-wrap is what `.dropdown-menu-right` anchors to:
+   the measured menu and button share a right edge at 1615.9.
+*/
+.mg-root .btn-group {
+  position: relative;
+  display: block;
+  float: left;
+  vertical-align: middle;
+}
+.mg-root .btn-group > .btn {
+  position: relative;
+  float: left;
+}
+.mg-root .ta-toolbar .btn-group > .btn:not(:first-child):not(:last-child) {
+  border-radius: 0;
+}
+.mg-root .ta-toolbar .btn-group > .btn:first-child:not(:last-child) {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+.mg-root .ta-toolbar .btn-group > .btn:last-child:not(:first-child) {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+.mg-root .ta-toolbar .btn-group > .btn + .btn {
+  margin-left: -1px;
+}
+/* The border does NOT change on active or hover.
+
+   Bootstrap's `.btn-default.active { border-color: rgb(173,173,173) }` loses the cascade to
+   `styles.css .btn.btn-default { border-color: rgb(230,233,238) }`, and the one active control in
+   the capture — `justifyCenter` — measures `rgb(230,233,238)` with the grey fill. We had copied
+   Bootstrap's colour, which is the one the reference measurably does not paint.
+
+   The hover pair carries the same corrected colour. That state is not in any capture, so it is
+   inherited from the resting measurement rather than captured. */
+.mg-root .btn-group-small .btn:hover,
+.mg-root .btn-group-small .btn:focus {
+  background-color: rgb(230, 230, 230);
+  border-color: rgb(230, 233, 238);
+}
+.mg-root .btn-group-small .btn.active {
+  background-color: rgb(230, 230, 230);
+  border-color: rgb(230, 233, 238);
+  box-shadow: rgba(0, 0, 0, 0.125) 0 3px 5px inset;
+}
+/* The editor body: 300px of content, and the 302 is the border, not a number.
+
+   `textAngular.css` declares `min-height: 300px; height: auto`, and the capture measures exactly
+   that — the rendered 302 is 300 plus the two 1px borders. We had frozen both `height` and
+   `min-height` at 302px, which bakes the border arithmetic into a constant and stops the box
+   growing with its content the way the reference's `height: auto` does. */
+.mg-root .ta-editor {
+  min-height: 300px;
+  height: auto;
+  padding: 0;
+  overflow: auto;
+  background-color: #fff;
+  border: 1px solid rgb(219, 217, 217);
+  border-radius: 4px;
+  clear: both;
+}
+.mg-root .ta-scroll-window.form-control {
+  position: relative;
+}
+/*
+   The HTML-source view is NOT a code editor in the reference: the same 14px "Helvetica Neue" as
+   the rest of the page, and `resize: both`. The monospace stack and 13px we had were an
+   improvement nobody asked for, and a visible mismatch the moment the view is opened.
+
+   EVIDENCE QUALITY, stated because it is weaker than the other rules here: every
+   `textarea.ta-html.ta-editor` node in all eight captures is `ng-hide`, `display: none`, 0x0. So
+   `resize` is solid — it does not inherit, and the contract admits non-inherited properties from a
+   hidden node — but `font-size` and `font-family` are inherited, and the contract deliberately
+   REFUSES those from a hidden node, because such a value describes whatever the element happens to
+   hang under. Here that ancestor is the same editor column the visible `.ta-bind` sits in, which
+   is why 14px is very likely right; but it is inference from the cascade, not a measurement of
+   this element, and it should be re-checked against any capture that ever renders the HTML view.
+*/
+.mg-root textarea.ta-editor {
+  padding: 6px 18px;
+  font-size: 14px;
+  resize: both;
+}
+/* 12px, not 18px. `textAngular.css` declares `.ta-scroll-window > .ta-bind { padding: 6px 12px }`
+   and the measurement agrees downstream: the body's first <p> sits at x=65 = 53 + 12. The 18px we
+   had shifted every line of editor text 6px right. */
+.mg-root .ta-scroll-window > .ta-bind {
+  min-height: 300px;
+  padding: 6px 12px;
+  outline: 0;
+}
+.mg-root .ta-scroll-window > .ta-bind:focus-visible {
+  outline: 2px solid rgb(102, 175, 233);
+  outline-offset: -2px;
+}
+.mg-root .ta-notice {
+  margin: 6px 0 0;
+  color: rgb(217, 83, 79);
+  font-weight: 700;
+}
+
+/* The reference's own rule, verbatim from `styles.css`: all FOUR declarations, as written below.
+   Measured on the Branding logo at 203.75 x 25.
+
+   It fixes the HEIGHT at 25px and lets the width follow, clamped at 300px — so a logo of any
+   aspect ratio is scaled rather than squashed, which the `width="203" height="25"` attributes this
+   replaced could not do. (An earlier version of this note quoted only the two `max-*` lines and
+   called the rule a pure clamp; the rule under it has always set `height` too, and the two
+   statements disagreed.) */
+.mg-root .navLogo {
+  max-height: 25px;
+  max-width: 300px;
+  width: auto;
+  height: 25px;
+}
+
+/* `.btn-assertive` is an Ionic class these stylesheets never define, so the
+   button keeps the UA's grey and inherits its colour — rgb(239,239,239) on
+   rgb(51,51,51), measured. Reproduced rather than "corrected" to a variant. */
+.mg-root .btn-assertive {
+  background-color: rgb(239, 239, 239);
+  color: var(--acc-ink);
+  border-color: transparent;
+}
+.mg-root .btn-assertive:hover,
+.mg-root .btn-assertive:focus {
+  background-color: rgb(230, 230, 230);
+}
+
+/* Text List has no rule.
+
+   `.mg-textlist` used to re-skin that textarea as a form-control and contradicted the measurement
+   on six properties at once. The reference gives it no class at all, so the UA paints it — see the
+   note on the element in the Text List pane. Deleting the rule is the match. */
+/* the stats date fields stand in for the reference's xeditable date popovers,
+   which are scope-local there and never persist */
+/* 17.5 tall to match the inline <a> the reference uses here. An <input> is
+   inline-block, so its height drives the line box: left at its natural ~21 it
+   made each stats row 3px taller and walked the buttons below it down. */
+.mg-root .mg-date {
+  font: inherit;
+  height: 17.5px;
+  padding: 0;
+  border: 0;
+  /* The same near-black-with-a-blue-rule as every other editable, because that is what the
+     reference's date editables measure: Start Date and End Date on User Stats are
+     `color: rgb(10,10,10)` with `border-bottom-color: rgb(66,139,202)`. The link-blue here was
+     ours, and it contradicted our own `.editable-click` twenty lines up. */
+  border-bottom: 1px dashed rgb(66, 139, 202);
+  color: rgb(10, 10, 10);
+  background: none;
+  vertical-align: baseline;
+}
+/* a <form> is block-level; these two wrap single buttons that must sit on one
+   line, so the form is reduced to a wrapper */
+/* `contents`, not `inline`: an inline form still opens a line box of its own,
+   which made the logo column 75 tall against the reference's 34. With
+   `display: contents` the form generates no box at all and its button sits
+   directly in the column's line. */
+.mg-root .mg-inline-form {
+  display: contents;
+}
+/* `:not([hidden])` matters — an author `display` declaration outranks the UA's
+   `[hidden] { display: none }`, so without it the file input stayed on screen. */
+.mg-root .mg-file:not([hidden]) {
+  display: block;
+  margin-bottom: 6px;
+}
+
+/* ── user row ─────────────────────────────────────────────────────────────────
+   From the populated table in evidence-dumps/NEXT-STEP/ptr1.json — the only capture that has
+   real rows in it. `.thumb24` leads the Name/Email cell. */
+/*
+   Square, not round, and undistorted.
+
+   All three avatars measure `border-radius: 0px` on every corner and `object-fit: fill`; the
+   `margin-right: 5px` is an inline style on the tag, and `styles.css` adds
+   `.thumb24 { line-height: 24px !important }`. We had made it a 50% circle with `object-fit: cover`
+   and a 6px gap — a rounded crop of someone's avatar where the reference shows the whole square.
+*/
+.mg-root .thumb24 {
+  width: 24px;
+  height: 24px;
+  border-radius: 0;
+  object-fit: fill;
+  vertical-align: middle;
+  line-height: 24px;
+  margin-right: 5px;
+}
+/* `styles.css .mb-sm, .mv-sm { margin-bottom: 5px !important }` — measured on each row's
+   `.btn-group.mb-sm`, which had no rule at all on our side. */
+.mg-root .mb-sm {
+  margin-bottom: 5px;
+}
+/* The row menu opens to the LEFT of its button: `.dropdown-menu-right { right: 0; left: auto }`.
+   Measured, the menu's right edge sits exactly on the button's at 1615.9. Without it a 199px menu
+   opens rightward off the end of the Actions column. */
+.mg-root .dropdown-menu-right {
+  right: 0;
+  left: auto;
+}
+/* `styles.css .dropdown-submenu { position: relative }` — measured on all four submenu <li> of
+   every row menu. It is what a flyout would position against. */
+.mg-root .dropdown-submenu {
+  position: relative;
+}
+/*
+   A submenu opens in place rather than flying out — the reference nests a second .dropdown-menu
+   inside the first and toggles the `open` class on the parent li.
+
+   Its contents are ALWAYS in the DOM there, hidden by CSS. Ours rendered them only while open, so
+   a submenu's items did not exist in the served HTML until somebody clicked — a real difference in
+   what the page ships, and the single thing that pushed the element-for-element comparison 327
+   lines out of step. Visibility is CSS's job now, as it is in the reference.
+*/
+.mg-root .dropdown-submenu > .dropdown-menu {
+  position: static;
+  display: none;
+  float: none;
+  box-shadow: none;
+  border: 0;
+  margin: 0;
+  padding-left: 12px;
+}
+.mg-root .dropdown-submenu.open > .dropdown-menu {
+  display: block;
+}
+/* A bordered box, not grey italics. The reference styles the note inline —
+   `style="border: 1px solid #A0A0A0; padding: 5px;"` — with the text left at the cell's own
+   colour. Ours greyed and italicised it, which reads as a placeholder rather than a saved note. */
+.mg-root .mg-note {
+  border: 1px solid rgb(160, 160, 160);
+  padding: 5px;
+}
+/* The reference styles this one inline —
+   `style="color: red; font-size: 12px; margin-left: 10px;"` — and its computed
+   values confirm it: rgb(255, 0, 0), 12px, 10px. */
+.mg-root .mg-discord {
+  color: rgb(255, 0, 0);
+  font-size: 12px;
+  margin-left: 10px;
+}
+.mg-root .mg-rowform {
+  margin: 10px 0;
+  padding: 10px;
+  background-color: rgb(249, 249, 249);
+  border: 1px solid rgb(230, 233, 238);
+  border-radius: 4px;
+}
+.mg-root .mg-rowform .form-control {
+  min-width: 260px;
+  margin: 0 6px;
+}
+.mg-root .dropdown-menu > li > button[disabled],
+.mg-root .dropdown-menu > li > form > button[disabled] {
+  color: rgb(119, 119, 119);
+  cursor: not-allowed;
+  background: none;
+}
+
+/* a feature that is built but not switched on yet — states the setting that
+   enables it rather than leaving an owner guessing why a control is grey */
+.mg-root .mg-feature-off {
+  display: block;
+  margin: 0 0 10px;
+  padding: 8px 12px;
+  font-size: 13px;
+  color: rgb(138, 109, 59);
+  background-color: rgb(252, 248, 227);
+  border: 1px solid rgb(250, 235, 204);
+  border-radius: 4px;
+  white-space: normal;
+}
+.mg-root .dropdown-menu .mg-feature-off {
+  margin: 0 5px 5px;
+  max-width: 260px;
+}
+
+/* ── API documentation page ───────────────────────────────────────────────────
+   The reference serves this at /public/html/api-docs.html with its own inline
+   stylesheet — a GitHub-markdown look that is nothing like the controller's.
+   Transcribed verbatim and scoped under .ad-root, so a documentation page
+   cannot restyle the app around it. */
+
+.ad-root {
+  min-height: 100vh;
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', 'Apple Color Emoji',
+    'Segoe UI Emoji', 'Segoe UI Symbol';
+  margin: 0;
+  padding: 0;
+  background: #f6f8fa;
+}
+.ad-root .container {
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 24px;
+}
+.ad-root .card {
+  background: #fff;
+  border: 1px solid #d0d7de;
+  border-radius: 6px;
+  box-shadow: 0 1px 0 rgba(27, 31, 36, 0.04);
+}
+.ad-root .card-header {
+  padding: 16px;
+  border-bottom: 1px solid #d0d7de;
+  font-weight: 600;
+}
+.ad-root .card-body {
+  padding: 24px;
+}
+.ad-root .markdown-body {
+  line-height: 1.6;
+  color: #24292f;
+}
+.ad-root .markdown-body h1,
+.ad-root .markdown-body h2,
+.ad-root .markdown-body h3 {
+  border-bottom: 1px solid #d0d7de;
+  padding-bottom: 0.3em;
+}
+.ad-root .markdown-body code,
+.ad-root .markdown-body pre {
+  background-color: #f6f8fa;
+  border-radius: 6px;
+}
+.ad-root .markdown-body pre {
+  padding: 16px;
+  overflow: auto;
+}
+.ad-root .markdown-body table {
+  border-collapse: collapse;
+}
+.ad-root .markdown-body table th,
+.ad-root .markdown-body table td {
+  border: 1px solid #d0d7de;
+  padding: 6px 13px;
+}
+.ad-root .topbar {
+  background: #24292f;
+  color: #fff;
+  padding: 12px 16px;
+}
+.ad-root .topbar a {
+  color: #fff;
+  text-decoration: none;
+  opacity: 0.9;
+}
+.ad-root .topbar a:hover {
+  opacity: 1;
+}
+
+/* the reference uses `<br clear="both">`, a presentational attribute HTML5
+   dropped; this is the same effect through CSS */
+.mg-root .mg-clear {
+  clear: both;
+}
+/* `<pre>` in the email preview, and the Event Time input the reference leaves
+   unstyled (no .form-control on it) */
+.mg-root #webinarTimeTxt {
+  font: inherit;
+}

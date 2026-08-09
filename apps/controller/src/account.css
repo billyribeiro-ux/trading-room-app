@@ -1,0 +1,1951 @@
+/* ============================================================================
+ * Account dashboard — pixel match of the reference `#/page/welcome`.
+ *
+ * Every value is a computed value read out of ~/Downloads/new-dumps/room-login-1785587362638.json
+ * (881 elements, all ~340 computed properties, 1989x1265 @dpr2), with the
+ * element it was measured on named alongside.
+ *
+ * This is a DIFFERENT visual system from src/auth.css. The account page is the
+ * AngularJS controller: Bootstrap 3, Helvetica Neue, float/table layout. The
+ * login is the Angular room: Bootstrap 5, Arial, flex. Matching both means
+ * keeping both, not averaging them.
+ * ========================================================================== */
+
+:root {
+  /* body */
+  --acc-bg: rgb(255, 255, 255);
+  --acc-font: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  --acc-size: 14px;
+  --acc-line: 20px;
+  --acc-ink: rgb(51, 51, 51);
+
+  --acc-rule: rgb(238, 238, 238); /* hr border-top */
+  --acc-cell-rule: rgb(221, 221, 221); /* td border-top */
+  --acc-input-border: rgb(219, 217, 217); /* .form-control */
+  --acc-input-ink: rgb(85, 85, 85);
+
+  /* button variants, measured on the real buttons */
+  --btn-default-bg: rgb(255, 255, 255);
+  --btn-default-bd: rgb(230, 233, 238);
+  --btn-info-bg: rgb(91, 192, 222);
+  --btn-info-bd: rgb(70, 184, 218);
+  --btn-inverse-bg: rgb(54, 63, 69);
+  --btn-warning-bg: rgb(240, 173, 78);
+  --btn-warning-bd: rgb(238, 162, 54);
+  --btn-success-bg: rgb(92, 184, 92);
+  --btn-success-bd: rgb(76, 174, 76);
+  --btn-primary-bg: rgb(51, 122, 183);
+  --btn-primary-bd: rgb(46, 109, 164);
+  --btn-danger-bg: rgb(217, 83, 79);
+  --btn-danger-bd: rgb(212, 63, 58);
+}
+
+/* The UA's default 8px body margin was pushing every box 8px right and stealing
+   16px of width — the navbar measured 1958 instead of 1989. public.css reset it;
+   account.css never did. */
+body {
+  margin: 0;
+}
+/* bootstrap's `html { -webkit-text-size-adjust: 100% }` — stops iOS enlarging
+   text on rotate, which would break every measured width */
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+/* Bootstrap 3 sets border-box globally. Without it every fixed height here gains
+   its padding and borders — the 34px search field measured 48px, the 30px button
+   42px — and the whole vertical rhythm drifts. */
+.acc-body *,
+.acc-body *::before,
+.acc-body *::after {
+  box-sizing: border-box;
+}
+
+.acc-body {
+  background: var(--acc-bg);
+  font-family: var(--acc-font);
+  font-size: var(--acc-size);
+  line-height: var(--acc-line);
+  color: var(--acc-ink);
+  min-height: 100vh;
+}
+
+/* nav.navbar.topnavbar — 50px, pure black */
+.acc-navbar-shell {
+  width: 100%;
+}
+.acc-navbar {
+  position: relative;
+  min-height: 50px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: rgb(0, 0, 0);
+  color: var(--acc-ink);
+  filter: none !important;
+  -webkit-backface-visibility: hidden;
+}
+.acc-navbar::before,
+.acc-navbar::after,
+.acc-navbar-header::before,
+.acc-navbar-header::after,
+.acc-nav-wrapper::before,
+.acc-nav-wrapper::after,
+.acc-nav-right::before,
+.acc-nav-right::after {
+  content: ' ';
+  display: table;
+}
+.acc-navbar::after,
+.acc-navbar-header::after,
+.acc-nav-wrapper::after,
+.acc-nav-right::after {
+  clear: both;
+}
+.acc-navbar-header {
+  position: relative;
+  z-index: 1;
+  width: 350px;
+  height: 50px;
+}
+.acc-brand {
+  position: relative;
+  display: block;
+  height: 50px;
+  padding: 0 5px;
+  width: 250px;
+  margin: 0 50px;
+  color: rgb(250, 250, 250);
+  font-size: 18px;
+  line-height: 50px;
+  z-index: 1;
+}
+.acc-brand > a {
+  color: rgb(51, 122, 183);
+  font-size: 18px;
+  line-height: 50px;
+}
+.acc-brand-logo[hidden] {
+  display: none !important;
+}
+.acc-nav-wrapper {
+  padding: 0 15px;
+  border-top: 1px solid transparent;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+.acc-nav-right {
+  margin: 7.5px -15px;
+  padding: 0;
+  list-style: none;
+}
+.acc-nav-right > li {
+  position: relative;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.acc-nav-right > li > a,
+.acc-nav-right > li > form > button {
+  position: relative;
+  display: block;
+  width: 100%;
+  min-height: 40px;
+  padding: 10px 15px;
+  color: #fff;
+  background: none;
+  border: 0;
+  font-family: FontAwesome;
+  font-weight: 400;
+  line-height: 20px;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+.acc-nav-right > li > a:hover,
+.acc-nav-right > li > a:focus,
+.acc-nav-right > li > form > button:hover,
+.acc-nav-right > li > form > button:focus {
+  background-color: rgb(238, 238, 238);
+}
+.acc-nav-right > li > form {
+  margin: 0;
+}
+.acc-nav-logout {
+  height: 40px;
+}
+
+/*
+ * Angular UI Bootstrap's generated navbar tooltip. The raw navbar proves both
+ * labels and `bottom`; sheet-2.css:1397-1410 proves this Bootstrap 3 rendering
+ * contract. Angular UI Bootstrap inserts the popup immediately after its
+ * trigger, inside the positioned navbar item.
+ */
+.acc-tooltip.tooltip,
+.acc-tooltip.tooltip * {
+  box-sizing: border-box;
+}
+.acc-tooltip.tooltip {
+  position: absolute;
+  z-index: 1070;
+  display: block;
+  font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 1.42857;
+  text-align: start;
+  text-decoration: none;
+  text-shadow: none;
+  text-transform: none;
+  letter-spacing: normal;
+  word-break: normal;
+  word-spacing: normal;
+  overflow-wrap: normal;
+  white-space: normal;
+  opacity: 0;
+  transition: opacity 0.15s linear;
+  line-break: auto;
+}
+.acc-tooltip.tooltip.in {
+  opacity: 0.9;
+}
+.acc-tooltip.tooltip.bottom {
+  padding: 5px 0;
+  margin-top: 3px;
+}
+.acc-tooltip .tooltip-inner {
+  max-width: 200px;
+  padding: 3px 8px;
+  color: rgb(255, 255, 255);
+  text-align: center;
+  background-color: rgb(0, 0, 0);
+  border-radius: 4px;
+}
+.acc-tooltip .tooltip-arrow {
+  position: absolute;
+  width: 0;
+  height: 0;
+  border-color: transparent;
+  border-style: solid;
+}
+.acc-tooltip.tooltip.bottom .tooltip-arrow {
+  top: 0;
+  left: 50%;
+  margin-left: -5px;
+  border-width: 0 5px 5px;
+  border-bottom-color: rgb(0, 0, 0);
+}
+@media (min-width: 768px) {
+  .acc-navbar-header {
+    float: left;
+  }
+  .acc-brand {
+    width: 320px;
+    margin: 0 15px;
+  }
+  .acc-nav-wrapper {
+    position: relative;
+    border-top: 0;
+    box-shadow: none;
+  }
+  .acc-nav-right {
+    float: right;
+    width: 150.43px;
+    height: 50px;
+    margin: 0 -15px 0 0;
+  }
+  .acc-nav-right > li {
+    float: left;
+    height: 50px;
+  }
+  .acc-nav-right > li:first-child {
+    width: 96.43px;
+  }
+  .acc-nav-right > li:last-child {
+    width: 54px;
+  }
+  .acc-nav-right > li > a,
+  .acc-nav-right > li > form > button {
+    width: auto;
+    height: 50px;
+    padding: 15px;
+  }
+  .acc-nav-account {
+    width: 96.43px;
+  }
+  .acc-nav-logout {
+    width: 54px;
+  }
+  .acc-nav-right > li > a:hover,
+  .acc-nav-right > li > a:focus,
+  .acc-nav-right > li > form > button:hover,
+  .acc-nav-right > li > form > button:focus {
+    background-color: rgba(54, 63, 69, 0.05);
+  }
+}
+
+@media print {
+  .acc-navbar-shell {
+    display: none;
+  }
+}
+
+/* Bootstrap 3 container. The desktop capture proves the 1170 branch at 1842px;
+   the source supplies the lower branches: 750 at 768, 970 at 992, 1170 at 1200. */
+.acc-container {
+  margin: 0 auto;
+  padding: 0 15px;
+}
+/* Bootstrap 3's `.container::before/::after` clearfix. It is not decoration
+   here: the container has no top padding or border, so without that leading
+   `display: table` box the centre block's 30px top margin collapses straight
+   through and moves the CONTAINER down instead of the block. The reference has
+   the container at y=50 and the block at y=80, which only happens with this. */
+.acc-container::before,
+.acc-container::after {
+  content: ' ';
+  display: table;
+}
+.acc-container::after {
+  clear: both;
+}
+/* container 1170 with 15px padding → content starts at 424.5, which is exactly
+   where the panels sit. The 15px inset belongs to the HEADINGS, not to the whole
+   column: h4/h3/hr measure x=439.5 while .panel measures x=424.5. Insetting the
+   inner wrapper moved both and put the table 15px out. */
+/* .center-block.mt-xl — 424.5,80,1140x953.992.
+   `mt-xl` is a 30px top margin, NOT padding: the container sits at y=50 and this
+   block at y=80, and its own box must measure 953.992 and end at 1033.992, where
+   the footer begins. Folding the two into `padding: 45px 0 0` put the contents in
+   the right place but made the block itself start at 50 and run 30px long, so the
+   footer had nothing to butt against. The remaining 15px is this block's own top
+   padding, which is what lets the h4's 10px margin land the heading at 105. */
+.acc-inner {
+  margin-top: 30px;
+  padding: 15px 0 0;
+}
+
+/* h4 — "Total : N". MARGIN, not padding: getBoundingClientRect returns the border
+   box, so padding would leave it 1140 wide at x=424.5. The reference measures
+   1110 at 439.5, which is a 15px margin each side. */
+.acc-h4 {
+  font-size: 18px;
+  font-weight: 500;
+  line-height: 19.8px;
+  color: var(--acc-ink);
+  margin: 10px 15px;
+}
+/* h3 — section headings, same 15px margin inset */
+.acc-h3 {
+  font-size: 24px;
+  font-weight: 500;
+  line-height: 26.4px;
+  color: var(--acc-ink);
+  margin: 20px 15px 10px;
+}
+/* hr between sections, same 15px margin inset */
+.acc-hr {
+  border: 0;
+  border-top: 1px solid var(--acc-rule);
+  margin: 20px 15px;
+}
+
+/* .panel.pane-default — NOTE: `pane-default` is a typo for `panel-default` in
+   the reference, so the border colour resolves to transparent. Reproduced,
+   because transparent is what actually renders. */
+.acc-panel {
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0);
+  border-radius: 4px;
+  box-shadow: rgba(0, 0, 0, 0.05) 0 1px 1px 0;
+  padding: 0 15px;
+  margin-bottom: 20px;
+}
+
+/* ── tables ───────────────────────────────────────────────────────────────────
+   The reference's is `table table-striped table-bordered table-hover`, and all
+   four mattered. The earlier version here reverse-engineered a single
+   `border-top` from the computed values and dropped the other three classes
+   entirely, so the grid had no vertical rules, odd rows were not tinted, and
+   rows did not respond to the pointer at all.
+
+   `border-bottom-width` on a header cell is 1px, not Bootstrap's 2px: styles.css
+   overrides it, along with the 20px vertical padding. */
+.acc-table {
+  width: 100%;
+  max-width: 100%;
+  margin-bottom: 0;
+  border-collapse: collapse;
+  /* the UA default is 2px, and it inherits — every descendant of the table was
+     reporting `-webkit-border-*-spacing: 2px` against the reference's 0 */
+  border-spacing: 0;
+  border: 1px solid var(--acc-cell-rule);
+}
+.acc-table > thead > tr > th,
+.acc-table > thead > tr > td,
+.acc-table > tbody > tr > th,
+.acc-table > tbody > tr > td {
+  padding: 8px;
+  font-size: 14px;
+  color: var(--acc-ink);
+  line-height: 20px;
+  vertical-align: top;
+  border: 1px solid var(--acc-cell-rule);
+}
+.acc-table > thead > tr > th {
+  padding-top: 20px;
+  padding-bottom: 20px;
+  font-weight: 700;
+  text-align: left;
+  vertical-align: bottom;
+  border-bottom-width: 1px;
+}
+/* `.table > thead:first-child > tr:first-child > td/th { border-top: 0 }` — the
+   very first row has no rule above it, so the header does not draw one. */
+.acc-table > thead:first-child > tr:first-child > th,
+.acc-table > thead:first-child > tr:first-child > td {
+  border-top: 0;
+}
+/* .table-striped — every odd row */
+.acc-table > tbody > tr:nth-of-type(odd) {
+  background-color: rgb(249, 249, 249);
+}
+/* .table-hover — the row highlight, which was missing entirely */
+.acc-table > tbody > tr:hover {
+  background-color: rgb(245, 245, 245);
+}
+
+/* input.form-control — the sessions search box, 348x34 */
+.acc-input {
+  height: 34px;
+  padding: 6px 18px;
+  font-size: 14px;
+  color: var(--acc-input-ink);
+  background: #fff;
+  border: 1px solid var(--acc-input-border);
+  border-radius: 4px;
+  font-family: inherit;
+}
+.acc-search {
+  width: 100%;
+  max-width: 100%;
+}
+
+/* buttons — .btn is 34px / 14px, .btn-sm is 30px / 12px */
+.acc-btn {
+  display: inline-block;
+  height: 34px;
+  padding: 6px 12px;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 20px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  text-decoration: none;
+  color: #fff;
+  vertical-align: middle;
+  /* The rest of Bootstrap's `.btn`, all of which were missing. `white-space`
+     is the one that bites: without it a button wraps its label at a narrow
+     width instead of holding its measured size. */
+  /* `.btn { text-align: center }`. A <button> gets this from the UA stylesheet,
+     so it was invisible on the buttons that are buttons — but Launch, Manage and
+     API Docs are anchors, and they were left-aligning their labels. */
+  text-align: center;
+  white-space: nowrap;
+  touch-action: manipulation;
+  user-select: none;
+  appearance: none;
+  -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
+}
+.acc-btn-sm {
+  height: 30px;
+  padding: 5px 10px;
+  font-size: 12px;
+  line-height: 18px;
+  border-radius: 3px;
+}
+.acc-btn-default {
+  background: var(--btn-default-bg);
+  border-color: var(--btn-default-bd);
+  color: var(--acc-ink);
+}
+.acc-btn-info {
+  background: var(--btn-info-bg);
+  border-color: var(--btn-info-bd);
+}
+.acc-btn-inverse {
+  background: var(--btn-inverse-bg);
+  border-color: var(--btn-inverse-bg);
+}
+.acc-btn-warning {
+  background: var(--btn-warning-bg);
+  border-color: var(--btn-warning-bd);
+}
+.acc-btn-success {
+  background: var(--btn-success-bg);
+  border-color: var(--btn-success-bd);
+}
+.acc-btn-primary {
+  background: var(--btn-primary-bg);
+  border-color: var(--btn-primary-bd);
+}
+/*
+   UNUSED ON THE ACCOUNT PAGE, deliberately.
+
+   `btn-danger` does not appear once in the 860-node `account:page` capture. Every
+   destructive row action there is a plain blue link inside a <label>: the badges
+   Delete (#758) and the API-key `delete` (#823) both compute
+   `color: rgb(51,122,183)`, 14px/20, weight 700 — the same as their non-destructive
+   neighbours. The red buttons this class used to paint on Delete/Remove were ours.
+
+   The rule is retained because the variant IS in the reference's bootstrap sheet
+   (`bootstrap.min.css|.btn-danger`) and this file is shared with pages outside this
+   task's remit; nothing on the account page selects it any more.
+*/
+.acc-btn-danger {
+  background: var(--btn-danger-bg);
+  border-color: var(--btn-danger-bd);
+}
+/*
+   `.btn-secondary` is a Bootstrap 4 name and this is a Bootstrap 3 sheet, so the reference has no
+   rule for it at all: the "Close Add Admin User" button keeps the UA's own grey with a transparent
+   border, measured `rgb(239,239,239)` / `rgba(0,0,0,0)`. Reproduced rather than promoted to a
+   variant that looks deliberate.
+*/
+.acc-btn-secondary {
+  background: rgb(239, 239, 239);
+  border-color: rgba(0, 0, 0, 0);
+  color: var(--acc-ink);
+}
+/* Adjacent buttons get NO margin in the reference — they are separated only by
+   the whitespace text node between the tags: Launch ends at 1224.008 and Manage
+   starts at 1227.906, a 3.898px gap, which is one space at 14px. The
+   `margin-left: 5px` that used to live here is Bootstrap 3's, but BS3 scopes it
+   to `.modal-footer .btn + .btn`; applied to every pair it pushed the Badges
+   buttons and the Launch/Manage pair 5px apart. It now lives with the bootbox
+   styles at the foot of this file, which is the only place the reference has it. */
+
+/* A section toolbar sits with the headings, so it carries the same 15px margin.
+   Nested forms use .acc-inline-form — reusing .acc-toolbar inside itself
+   double-inset the search field to 454.5 instead of 440.5. */
+.acc-toolbar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin: 0 15px 10px;
+}
+
+.acc-empty {
+  color: var(--acc-ink);
+}
+.acc-error {
+  color: var(--btn-danger-bg);
+  font-weight: 700;
+}
+.acc-footer {
+  padding: 20px 0 40px;
+  font-size: 14px;
+  color: var(--acc-ink);
+}
+
+/* ── Register / auth pages of the controller (#/page/register) ────────────────
+   Same Bootstrap 3 system as the account dashboard. Class names below mirror the
+   reference's: .container-sm, .center-block.mt-xl, .panel > .panel-body,
+   .form-group.has-feedback with a .form-control-feedback icon, .c-checkbox,
+   .btn-block, and the ngInclude footer (hr + © + year + name). */
+
+/* `container container-sm` measures 1170 at x=409.5 in the welcome dump — the
+   same as a plain .container. `container-sm` does not narrow it. An earlier
+   guess of 540 made the panel 510 wide and the form fields 210 instead of the
+   half-column the reference renders. */
+.acc-container-sm {
+  margin: 0 auto;
+  padding: 0 15px;
+}
+
+/* Bootstrap 3 grid, as used by the login and register forms. `md` begins at
+   min-width 992 in the captured bootstrap.min.css. */
+.acc-body .row {
+  margin: 0 -15px;
+}
+.acc-body .row::before,
+.acc-body .row::after {
+  content: ' ';
+  display: table;
+}
+.acc-body .row::after {
+  clear: both;
+}
+.acc-body .row > [class*='col-'] {
+  position: relative;
+  min-height: 1px;
+  padding: 0 15px;
+}
+@media (min-width: 768px) {
+  .acc-container,
+  .acc-container-sm {
+    width: 750px;
+  }
+}
+@media (min-width: 992px) {
+  .acc-container,
+  .acc-container-sm {
+    width: 970px;
+  }
+  .acc-body .col-md-2,
+  .acc-body .col-md-4,
+  .acc-body .col-md-6,
+  .acc-body .col-md-9,
+  .acc-body .col-md-12 {
+    float: left;
+  }
+  .acc-body .col-md-2 {
+    width: 16.66666667%;
+  }
+  .acc-body .col-md-4 {
+    width: 33.33333333%;
+  }
+  .acc-body .col-md-6 {
+    width: 50%;
+    max-width: 50%;
+  }
+  .acc-body .col-md-9 {
+    width: 75%;
+  }
+  .acc-body .col-md-12 {
+    width: 100%;
+  }
+}
+@media (min-width: 1200px) {
+  .acc-container,
+  .acc-container-sm {
+    width: 1170px;
+  }
+}
+/* .center-block.mt-xl */
+.acc-center-block {
+  display: block;
+  margin: 0 auto;
+  padding-top: 30px;
+}
+/* the brand lockup above the panel: dark icon pulled left, black wordmark */
+.acc-brand-lockup {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+}
+.acc-brand-lockup .title {
+  color: black;
+  font-size: 20px;
+}
+
+/* .panel + .panel-body — the account page's .acc-panel has no padding because its
+   children are tables; this one is a form card. */
+.acc-panel-body {
+  padding: 15px;
+}
+/* p.pv.text-bold */
+.acc-panel-title {
+  font-weight: 700;
+  padding: 10px 0;
+  margin: 0 0 10px;
+}
+
+/* The reference drops the login/register form into a `.col-md-6` of a 1140px
+   panel, so the fields sit hard against the left edge of a very wide card. That
+   is what it does; it is not what anyone wants to look at.
+
+   `.acc-form-column` centres that column instead, keeping the col-md-6 width the
+   reference uses. Applied to the auth panels only — the account dashboard's
+   tables still span the full panel, as they should. */
+.acc-panel-narrow {
+  width: 570px;
+  max-width: 100%;
+  margin: 0 auto;
+}
+.acc-body .acc-panel-narrow .row {
+  margin: 0;
+}
+.acc-body .acc-panel-narrow .col-md-6 {
+  flex: 0 0 100%;
+  max-width: 100%;
+  padding: 0;
+}
+
+/* .form-group.has-feedback — the feedback icon sits inside the field's right edge */
+.acc-form-group {
+  position: relative;
+  margin-bottom: 15px;
+}
+.acc-form-group .acc-input {
+  width: 100%;
+  padding-right: 34px;
+}
+.acc-feedback {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 34px;
+  height: 34px;
+  line-height: 34px;
+  text-align: center;
+  pointer-events: none;
+  color: rgb(119, 119, 119); /* .text-muted */
+}
+.acc-text-muted {
+  color: rgb(119, 119, 119);
+}
+.acc-text-right {
+  text-align: right;
+  margin-top: 10px; /* .mt */
+}
+
+/* .checkbox.c-checkbox — the reference styles a fa-check next to a real checkbox */
+.acc-checkbox label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  margin: 0;
+}
+
+/* .btn-block */
+.acc-btn-block {
+  display: block;
+  width: 100%;
+}
+
+/* p.pt-lg.text-center.mt-sm */
+.acc-form-note {
+  padding-top: 20px;
+  margin-top: 5px;
+  text-align: center;
+}
+.acc-form-note a {
+  text-decoration: underline;
+}
+
+/* the ngInclude footer: `.p-lg.text-center` → hr, ©, year, name.
+   It sits INSIDE the 1170 container in the reference — measured 1140 wide at
+   x=424.5, not full-bleed — so it is centred to the same column width here. */
+/* `.p-lg.text-center` — 424.5,1033.992,1140x91, a plain block inside the
+   container, so it takes the container's 1140 content width on its own; the
+   explicit width and auto margins that used to be here were re-centring an
+   already-centred box. `p-lg` is 15px of padding, which is what puts the <hr>
+   at 439.5 x 1110 and adds up to the measured 91: 15 + 20 (hr margin-top) + 1
+   + 20 (hr margin-bottom) + 20 (the © line box) + 15. */
+.acc-page-footer {
+  padding: 15px;
+  text-align: center;
+}
+.acc-page-footer hr {
+  border: 0;
+  border-top: 1px solid var(--acc-rule);
+  margin: 20px 0;
+}
+.acc-page-footer .mr-sm {
+  margin-right: 5px;
+}
+
+/* ── animate.css entrance animations ──────────────────────────────────────────
+   The reference wraps the register/welcome container in
+   `container container-sm animated fadeInDown`, and loads animate.css. That is
+   the drop-from-the-top-and-settle effect: the element starts one full height
+   above its place, fully transparent, and lands over 1s.
+
+   Reproduced here rather than pulled from the library, since only three of its
+   animations are used across the whole app (fadeInDown, fadeInUp, fadeInRight). */
+
+.animated {
+  animation-duration: 1s;
+  animation-fill-mode: both;
+}
+
+@keyframes fadeInDown {
+  from {
+    opacity: 0;
+    transform: translate3d(0, -100%, 0);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.fadeInDown {
+  animation-name: fadeInDown;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 100%, 0);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.fadeInUp {
+  animation-name: fadeInUp;
+}
+
+@keyframes fadeInRight {
+  from {
+    opacity: 0;
+    transform: translate3d(100%, 0, 0);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.fadeInRight {
+  animation-name: fadeInRight;
+}
+
+/* The room's login carries `animated fadeInRight faster`. The captured page
+   loads animate.css 3.7.2, whose source defines `.animated.faster` as 500ms;
+   the raw computed-style capture independently reports animation-duration .5s. */
+.faster {
+  animation-duration: 0.5s;
+}
+
+/* animate.css 3.7.2's exact reduced-motion contract: retain the named entrance
+   for one 1ms iteration rather than replacing it with animation:none. */
+@media (print), (prefers-reduced-motion: reduce) {
+  .animated {
+    animation-duration: 1ms !important;
+    transition-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+
+/* ── Sessions table detail, from evidence-dumps/main-nav-login-clicked/file ──
+   The earlier decode showed the columns but not these: sortable headers with a
+   sort glyph, a bordered/striped/hover table, a coloured state label, and the
+   real action buttons with their icons. All values measured on the dump. */
+
+/* table.table-striped.table-bordered.table-hover */
+.acc-table th,
+.acc-table td {
+  border-right: 1px solid var(--acc-cell-rule);
+}
+.acc-table th:last-child,
+.acc-table td:last-child {
+  border-right: 0;
+}
+.acc-table tbody tr:nth-of-type(odd) {
+  background: rgb(249, 249, 249);
+}
+.acc-table tbody tr:hover {
+  background: rgb(245, 245, 245);
+}
+/* `.text-center { text-align: center !important }` in styles.css — the
+   !important is load-bearing, because `.table > thead > tr > th` sets `left`.
+   Scoping these under .acc-table gives the same outcome without one: the
+   "Name", "State", "Users" and "Actions" headers were rendering left-aligned. */
+.acc-table .acc-th-center,
+.acc-table .acc-td-center {
+  text-align: center;
+}
+
+/* The reference's sortable headers carry `ng-click` yet compute `cursor: auto`,
+   and ours are not wired to a sort at all — so `pointer` was advertising a click
+   target that does not exist. */
+/* NO margin. The reference's two sort glyphs — `account:page` #19 (Session ID)
+   and #21 (Name) — both measure `margin-top/right/bottom/left: 0px`, and neither
+   carries a rule that sets one (`bootstrap|*` and `font-awesome|.fa` only). The
+   gap you can see is the whitespace text node between "Session ID" and the
+   glyph in the markup, which our template has too. The 4px here was ours. */
+.acc-sort-icon {
+  display: inline-block;
+  font-size: 14px;
+  color: var(--acc-ink);
+}
+
+/* div.label.label-orange — the room State cell, and the badge-row wrapper */
+/* bootstrap.min.css `.label`, transcribed VERBATIM from the captured rule text:
+     .label { display:inline; padding:.2em .6em .3em; font-size:75%; font-weight:700;
+              line-height:1; color:rgb(255,255,255); text-align:center;
+              white-space:nowrap; vertical-align:baseline; border-radius:.25em }
+
+   The em/percentage units are load-bearing and the pixel constants that used to
+   be here were not a simplification, they were wrong for one of the two places
+   this class is used. ONE rule produces BOTH captured boxes purely from the
+   inherited font-size:
+     · #35  div.label.label-orange in a 14px <td>  → 10.5px/10.5, 2.1/6.3/3.15, r 2.625
+     · #57  span.label in the 18px <h4> preview    → 13.5px/13.5, 2.7 (see below), r 3.375
+   Hard-coding 10.5px made the preview chip render at the table's size. */
+.acc-label {
+  display: inline;
+  padding: 0.2em 0.6em 0.3em;
+  font-size: 75%;
+  line-height: 1;
+  font-weight: 700;
+  color: rgb(255, 255, 255);
+  text-align: center;
+  white-space: nowrap;
+  vertical-align: baseline;
+  border-radius: 0.25em;
+}
+/* styles.css `span.label { padding: .2em; margin-right: -4px !important }` — a
+   DIFFERENT rule from `.label`, and the reason #57 measures 2.7px of padding on
+   all four sides and `margin-right: -4px` where #35 measures 2.1/6.3/3.15 and no
+   margin. No `!important` needed here: `span.acc-label` (0,1,1) already outranks
+   `.acc-label` (0,1,0). */
+span.acc-label {
+  padding: 0.2em;
+  margin-right: -4px;
+}
+/* styles.css `.label-badge-img { padding: 0 !important }` — the wrapper around an
+   uploaded image badge, #749, which measures padding 0 on all four sides while
+   keeping `.label`'s 2.625px radius and 10.5px/700 type. The reference needs
+   `!important` because of its own load order; here plain source order after
+   `.acc-label` is enough. */
+.acc-label-badge-img {
+  padding: 0;
+}
+/* styles.css `.room-badge-id, .room-badge-name { color: rgb(0,0,0) }` and
+   `.room-badge-name { margin: 0 4px }`. Measured on #752 (name) and #753 (id):
+   black, and 10.5px/10.5/700 inherited from the `.label` wrapper they sit in —
+   NOT `.acc-muted`'s rgb(119,119,119) at 14px. */
+.acc-room-badge-name,
+.acc-room-badge-id {
+  color: rgb(0, 0, 0);
+}
+.acc-room-badge-name {
+  margin: 0 4px;
+}
+.acc-label-orange {
+  background: rgb(254, 86, 33);
+}
+.acc-label-warning {
+  background: var(--btn-warning-bg);
+}
+
+/*
+   The padlock beside a restricted API key's id — `rgb(254, 151, 0)`, measured.
+
+   This was written up as an HONEST GAP, on the grounds that the node is `ng-hide` so its colour was
+   never measured. That was wrong on both counts, and it is worth spelling out why, because the
+   reasoning looked sound.
+
+   `color` DOES inherit, so a hidden node's colour is usually evidence about its ancestors rather
+   than about its class — that is the rule the style contract enforces, and it is right. But this
+   node's colour comes from a rule keyed on the class ITSELF: `account:page` node 815 records
+   `styles.css|.text-warning { color: rgb(254,151,0) }` beating
+   `bootstrap.min.css|.text-warning { color: rgb(138,109,59) }` on source order. A class-keyed rule
+   is as true on a hidden element as on a visible one, so the caveat never applied here.
+
+   And the value it settled on instead — `--btn-warning-bg`, `rgb(240,173,78)` — is Bootstrap's own
+   `#f0ad4e`. So the change set out to avoid introducing one unevidenced Bootstrap colour and
+   introduced a different one, while the real measurement sat in the capture the whole time.
+*/
+.acc-text-warning {
+  color: rgb(254, 151, 0);
+}
+
+/* div.text-muted — the Users count */
+.acc-muted {
+  color: rgb(119, 119, 119);
+  font-size: 14px;
+}
+
+/* Bootstrap 3's .row carries a clearfix (`::after { display: table; clear: both }`)
+   which stops the panel's bottom margin escaping it. Without that, the panel's
+   20px margin-bottom collapses with the hr's 20px margin-top into one 20px gap
+   and every section below sits 20px high. */
+.acc-row-block::after {
+  content: '';
+  display: table;
+  clear: both;
+}
+
+/* A bootstrap .row sits at the column content edge (424.5), unlike the section
+   toolbars which carry the headings' 15px margin. The search panel lives in one.
+
+   A Bootstrap 3 row is floats plus a clearfix, NOT flexbox. The difference is
+   measurable: flex inserts its `gap` between the search panel and the Archived
+   button, while a float lets the button flow onto a line box that starts at the
+   float's edge — leading whitespace on that line is dropped, so the reference
+   has the button at exactly 424.5 + 380 = 804.5 with no gap at all. */
+.acc-row::before,
+.acc-row::after {
+  content: ' ';
+  display: table;
+}
+.acc-row::after {
+  clear: both;
+}
+/* bootstrap's shared column rule, `.col-xs-*, .col-sm-*, .col-md-*, .col-lg-*
+   { position: relative; min-height: 1px; padding-right: 15px; padding-left: 15px }`.
+   The 15px was missing: the two columns that already had it got it from
+   `.acc-panel` instead, so a column that is NOT a `.acc-panel` — the badge
+   editor's `.col-md-6` (#51, computed padding-left/right 15px) — had none. Same
+   value as `.acc-panel`'s, so nothing that already rendered correctly moves. */
+.acc-row > [class*='col-'],
+.acc-row-block > [class*='col-'] {
+  position: relative;
+  min-height: 1px;
+  padding-right: 15px;
+  padding-left: 15px;
+}
+
+/* .col-md-4.panel.pane-default — 380 wide, 15px padding, and the panel's own
+   transparent 1px border. 424.5 + 1 + 15 = 440.5, which is where the reference's
+   search input starts. */
+.acc-col-4 {
+  margin-bottom: 20px;
+}
+
+/* .btn-block, used by the New Room button */
+/* `.mb` — every element carrying it in the capture computes to 10px, not 20px:
+   the Badges buttons, the Add Admin User button, and both API Keys buttons all
+   report `margin-bottom: 10px`. At 20px the Extra Admin panel measured 168 tall
+   against the reference's 158 and the API Keys table-responsive 176 against 156. */
+.acc-mb {
+  margin-bottom: 10px;
+}
+
+/* The word "Sessions" in the h4 is a click target — five clicks reveal the New
+   Room button — but the reference computes `cursor: auto` on it, i.e. it is
+   deliberately unadvertised. A pointer here gave the easter egg away. The
+   role/tabindex stay, so it is still reachable by keyboard. */
+.acc-clickable {
+  cursor: auto;
+}
+
+/* the "Logging In, please wait..." state on the login panel */
+.acc-logging-in {
+  padding: 25px;
+  text-align: center;
+}
+
+/* ── Account sections, from evidence-dumps/login-page/logged-in-page ──────────
+   The add-forms are collapsible `.panel.panel-default` blocks INSIDE each
+   section panel, not inline toolbars, and each section's buttons sit inside the
+   panel too. */
+
+/* .panel.panel-default — the real bordered panel, unlike `pane-default` (a typo
+   in the reference, which is why the section panels have transparent borders) */
+.acc-panel-default {
+  background: #fff;
+  border: 1px solid var(--acc-cell-rule);
+  border-radius: 4px;
+  box-shadow: rgba(0, 0, 0, 0.05) 0 1px 1px 0;
+  margin-top: 15px;
+  /* bootstrap `.panel { margin-bottom: 20px }`. Both captured panel-defaults
+     report it — #51 (the badge editor) and #768 (Add Admin User) — and it was
+     missing here entirely, so neither collapsible card reserved any space below
+     itself. #768's 15px TOP margin is its own inline style, which is what
+     `margin-top` above reproduces. */
+  margin-bottom: 20px;
+}
+/* The badge editor is NOT a nested card: #51 is `panel panel-default col-md-6`,
+   a 50%-wide COLUMN sitting beside `.col-md-9` (#734) inside the Badges `.row`
+   (#50). It measures `margin-top: 0` — it has no inline top margin, unlike the
+   admin one — so the 15px above is cancelled here. Width and float come from
+   `.col-md-6`; the 15px side padding from the shared column rule. */
+.acc-badge-editor {
+  margin-top: 0;
+}
+.acc-panel-heading {
+  padding: 10px 15px;
+  background: rgb(245, 245, 245);
+  border-bottom: 1px solid var(--acc-cell-rule);
+  border-radius: 3px 3px 0 0;
+}
+.acc-panel-heading .acc-panel-title {
+  margin: 0;
+  padding: 0;
+  font-size: 16px;
+  font-weight: 500;
+}
+
+/* .form-group inside the collapsible add-forms: a block label above the field */
+.acc-field {
+  margin-bottom: 15px;
+}
+.acc-field label {
+  display: inline-block;
+  margin-bottom: 5px;
+  font-weight: 700;
+}
+.acc-field .acc-input {
+  width: 100%;
+}
+
+/* `.text-center.text-muted` — the empty-state cell. Scoped under .acc-table
+   because the cell rule that sets the default ink is more specific than a bare
+   class, so the muted grey never applied: it rendered at full strength. */
+.acc-table .acc-empty-cell,
+.acc-table .acc-empty {
+  text-align: center;
+  color: rgb(119, 119, 119);
+}
+/* Badges renders its empty state as an <h3>, not a table row */
+/* `.table-responsive` itself has no margin in the reference — the Sessions,
+   Badges and API Keys tables all start exactly 1px (the panel's border) below
+   their panel's top edge. Only the Extra Admin Users one is pushed down, by an
+   inline `style="margin-top: 15px"`; that is `.acc-mt-15` below. Baking the 15px
+   into the class put the API Keys buttons 16px too low. */
+/* Bootstrap gives `.table-responsive` horizontal auto overflow. The later
+   controller theme wins with `.panel > .table-responsive { overflow:auto }`,
+   so both axes remain scrollable at every width. The API Keys panel's nested
+   `.row` overhangs this box by 15px on each side, and a long unbroken secret can
+   widen the auto-layout table further. Both sources of horizontal scrolling are
+   original behavior. Below 768px Bootstrap additionally forces its cells to
+   `white-space:nowrap`; there is no original wrapping or truncation rule. */
+.acc-table-responsive {
+  overflow: auto;
+}
+@media screen and (max-width: 767px) {
+  .acc-table-responsive {
+    width: 100%;
+    margin-bottom: 15px;
+    overflow-x: auto;
+    overflow-y: auto;
+    border: 1px solid var(--acc-cell-rule);
+    -webkit-overflow-scrolling: touch;
+  }
+  .acc-table-responsive > .acc-table {
+    margin-bottom: 0;
+  }
+  .acc-table-responsive > .acc-table > tbody > tr > td,
+  .acc-table-responsive > .acc-table > tbody > tr > th,
+  .acc-table-responsive > .acc-table > thead > tr > td,
+  .acc-table-responsive > .acc-table > thead > tr > th {
+    white-space: nowrap;
+  }
+  .acc-table-responsive > .acc-table {
+    border: 0;
+  }
+  .acc-table-responsive > .acc-table > tbody > tr > td:first-child,
+  .acc-table-responsive > .acc-table > tbody > tr > th:first-child,
+  .acc-table-responsive > .acc-table > thead > tr > td:first-child,
+  .acc-table-responsive > .acc-table > thead > tr > th:first-child {
+    border-left: 0;
+  }
+  .acc-table-responsive > .acc-table > tbody > tr > td:last-child,
+  .acc-table-responsive > .acc-table > tbody > tr > th:last-child,
+  .acc-table-responsive > .acc-table > thead > tr > td:last-child,
+  .acc-table-responsive > .acc-table > thead > tr > th:last-child {
+    border-right: 0;
+  }
+  .acc-table-responsive > .acc-table > tbody > tr:last-child > td,
+  .acc-table-responsive > .acc-table > tbody > tr:last-child > th {
+    border-bottom: 0;
+  }
+}
+.acc-mt-15 {
+  margin-top: 15px;
+}
+
+/* .panel-body inside a collapsible add-form */
+.acc-panel-default .acc-panel-body {
+  padding: 15px;
+}
+
+/* badge editor — .pull-right, the inline control row and the preview */
+/* NO `.acc-btn-tiny`. The reference's "Transparent" button is
+   `class="btn btn-tiny btn-default"` (#63) and `.btn-tiny` has NO rule anywhere:
+   it is absent from the whole 237-entry ruleIndex, and the node's own rule list
+   is `.btn` + `.btn-default` only. So it computes a PLAIN `.btn` — padding
+   6px 12px, font 14px/20, radius 4px, border rgb(230,233,238) — which is exactly
+   `.acc-btn.acc-btn-default`. The 22px/11px box here was invented; the class is
+   gone from the markup rather than left behind styling nothing. */
+/* `margin-left: 5px` was OURS and is gone. Nodes [76], [77] and [78] are the three `pull-right`
+   buttons in the badge editor and all three measure `margin-left: 0px`; the only rules matching them
+   are `bootstrap.min.css|.pull-right` and `font-awesome.min.css|.pull-right`, which declare
+   `float: right` and nothing else. Removing it does not collide the buttons: they are floated right
+   in DOM order (Save/Add, then Close), so each one's left edge is set by the float that came before
+   it, and the gap the 5px was standing in for is not one the reference has. */
+.acc-pull-right {
+  float: right;
+}
+.acc-badge-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+/* input[type=color] — a bare UA colour well, not a themed field. Measured on the
+   two colour inputs #62 (Background) and #65 (Text), which carry only
+   `bootstrap|button, input, …`, `bootstrap|input`, `bootstrap|*` — no
+   `.form-control`, no styles.css rule: 50x27, padding 1px 2px, border
+   1px SOLID rgb(0,0,0), radius 0, background rgb(239,239,239), appearance auto.
+   The 44x34 / 2px / rgb(219,217,217) / 4px box here was the `.form-control`
+   treatment applied to a control the reference leaves alone. */
+.acc-badge-row input[type='color'] {
+  width: 50px;
+  height: 27px;
+  padding: 1px 2px;
+  border: 1px solid rgb(0, 0, 0);
+  border-radius: 0;
+  background-color: rgb(239, 239, 239);
+  appearance: auto;
+}
+.acc-badge-preview {
+  margin: 8px 0 0;
+  font-size: 18px;
+  font-weight: 500;
+}
+/* NO `#badgeRolesTxt { width: 100% }`. #74 computes `width: auto`; its box is set
+   by `cols="70"`, which the markup carries. */
+
+/* ============================================================================
+ * Interaction states — hover, focus, active, disabled.
+ *
+ * Every value below was read out of the stylesheets captured in
+ * room-login-1785587807656.json. None is estimated. These states are invisible
+ * to a screenshot and to a computed-style dump — the state never occurs during
+ * capture — so the authored rules are the only evidence there is for them.
+ *
+ * The pattern Bootstrap 3 uses, confirmed across all seven variants: hover and
+ * the first active step share a background; the pressed state goes one shade
+ * darker; disabled reverts to the resting colour.
+ * ========================================================================== */
+
+/* ── the lift, which is the whole visual effect ───────────────────────────────
+   `styles.css`:
+     .btn:active, .btn.active, .btn:hover, .btn:focus {
+       box-shadow: rgba(0,0,0,.23) 0 3px 10px, rgba(0,0,0,.16) 0 3px 10px;
+     }
+   Every button in the controller rises off the page on hover, focus and press.
+   This is the effect, and it was missing entirely — the earlier rules only
+   changed colours, transcribed from bootstrap.min.css without accounting for
+   styles.css loading after it and overriding the cascade. */
+.acc-btn:hover,
+.acc-btn:focus,
+.acc-btn:active {
+  box-shadow:
+    rgba(0, 0, 0, 0.23) 0 3px 10px,
+    rgba(0, 0, 0, 0.16) 0 3px 10px;
+}
+.acc-btn:hover,
+.acc-btn:focus {
+  text-decoration: none;
+}
+.acc-btn:focus,
+.acc-btn:active:focus {
+  outline: -webkit-focus-ring-color auto 5px;
+  outline-offset: -2px;
+}
+.acc-btn:active {
+  background-image: none;
+}
+
+/* ── per variant ──────────────────────────────────────────────────────────────
+   Read off the reference's OWN cascade, not off Bootstrap's source: its
+   stylesheets were reloaded into Chrome in document order and each state forced,
+   so these are the values the real page computes.
+
+   The shape, identical for all six: hover and a bare :active share one shade;
+   :focus keeps the hover background but takes a darker border; and pressing —
+   :active:hover, the state a mouse actually produces — goes one step darker
+   again. Two of these were previously wrong: :active carried the pressed colour
+   (so a keyboard-held button jumped straight to the darkest shade) and the
+   pressed pair did not exist at all. */
+/* .btn-default */
+.acc-btn-default:hover,
+.acc-btn-default:active {
+  color: rgb(51, 51, 51);
+  background-color: rgb(230, 230, 230);
+  border-color: rgb(173, 173, 173);
+}
+.acc-btn-default:focus {
+  color: rgb(51, 51, 51);
+  background-color: rgb(230, 230, 230);
+  border-color: rgb(140, 140, 140);
+}
+.acc-btn-default:active:hover,
+.acc-btn-default:active:focus {
+  color: rgb(51, 51, 51);
+  background-color: rgb(212, 212, 212);
+  border-color: rgb(140, 140, 140);
+}
+.acc-btn-default[disabled],
+.acc-btn-default[disabled]:hover,
+.acc-btn-default[disabled]:focus,
+.acc-btn-default[disabled]:active {
+  background-color: rgb(255, 255, 255);
+  border-color: rgb(230, 233, 238);
+  box-shadow: none;
+}
+/* .btn-primary */
+.acc-btn-primary:hover,
+.acc-btn-primary:active {
+  color: rgb(255, 255, 255);
+  background-color: rgb(40, 96, 144);
+  border-color: rgb(32, 77, 116);
+}
+.acc-btn-primary:focus {
+  color: rgb(255, 255, 255);
+  background-color: rgb(40, 96, 144);
+  border-color: rgb(18, 43, 64);
+}
+.acc-btn-primary:active:hover,
+.acc-btn-primary:active:focus {
+  color: rgb(255, 255, 255);
+  background-color: rgb(32, 77, 116);
+  border-color: rgb(18, 43, 64);
+}
+.acc-btn-primary[disabled],
+.acc-btn-primary[disabled]:hover,
+.acc-btn-primary[disabled]:focus,
+.acc-btn-primary[disabled]:active {
+  background-color: rgb(51, 122, 183);
+  border-color: rgb(46, 109, 164);
+  box-shadow: none;
+}
+/* .btn-success */
+.acc-btn-success:hover,
+.acc-btn-success:active {
+  color: rgb(255, 255, 255);
+  background-color: rgb(68, 157, 68);
+  border-color: rgb(57, 132, 57);
+}
+.acc-btn-success:focus {
+  color: rgb(255, 255, 255);
+  background-color: rgb(68, 157, 68);
+  border-color: rgb(37, 86, 37);
+}
+.acc-btn-success:active:hover,
+.acc-btn-success:active:focus {
+  color: rgb(255, 255, 255);
+  background-color: rgb(57, 132, 57);
+  border-color: rgb(37, 86, 37);
+}
+.acc-btn-success[disabled],
+.acc-btn-success[disabled]:hover,
+.acc-btn-success[disabled]:focus,
+.acc-btn-success[disabled]:active {
+  background-color: rgb(92, 184, 92);
+  border-color: rgb(76, 174, 76);
+  box-shadow: none;
+}
+/* .btn-info */
+.acc-btn-info:hover,
+.acc-btn-info:active {
+  color: rgb(255, 255, 255);
+  background-color: rgb(49, 176, 213);
+  border-color: rgb(38, 154, 188);
+}
+.acc-btn-info:focus {
+  color: rgb(255, 255, 255);
+  background-color: rgb(49, 176, 213);
+  border-color: rgb(27, 109, 133);
+}
+.acc-btn-info:active:hover,
+.acc-btn-info:active:focus {
+  color: rgb(255, 255, 255);
+  background-color: rgb(38, 154, 188);
+  border-color: rgb(27, 109, 133);
+}
+.acc-btn-info[disabled],
+.acc-btn-info[disabled]:hover,
+.acc-btn-info[disabled]:focus,
+.acc-btn-info[disabled]:active {
+  background-color: rgb(91, 192, 222);
+  border-color: rgb(70, 184, 218);
+  box-shadow: none;
+}
+/* .btn-warning */
+.acc-btn-warning:hover,
+.acc-btn-warning:active {
+  color: rgb(255, 255, 255);
+  background-color: rgb(236, 151, 31);
+  border-color: rgb(213, 133, 18);
+}
+.acc-btn-warning:focus {
+  color: rgb(255, 255, 255);
+  background-color: rgb(236, 151, 31);
+  border-color: rgb(152, 95, 13);
+}
+.acc-btn-warning:active:hover,
+.acc-btn-warning:active:focus {
+  color: rgb(255, 255, 255);
+  background-color: rgb(213, 133, 18);
+  border-color: rgb(152, 95, 13);
+}
+.acc-btn-warning[disabled],
+.acc-btn-warning[disabled]:hover,
+.acc-btn-warning[disabled]:focus,
+.acc-btn-warning[disabled]:active {
+  background-color: rgb(240, 173, 78);
+  border-color: rgb(238, 162, 54);
+  box-shadow: none;
+}
+/* .btn-danger */
+.acc-btn-danger:hover,
+.acc-btn-danger:active {
+  color: rgb(255, 255, 255);
+  background-color: rgb(201, 48, 44);
+  border-color: rgb(172, 41, 37);
+}
+.acc-btn-danger:focus {
+  color: rgb(255, 255, 255);
+  background-color: rgb(201, 48, 44);
+  border-color: rgb(118, 28, 25);
+}
+.acc-btn-danger:active:hover,
+.acc-btn-danger:active:focus {
+  color: rgb(255, 255, 255);
+  background-color: rgb(172, 41, 37);
+  border-color: rgb(118, 28, 25);
+}
+.acc-btn-danger[disabled],
+.acc-btn-danger[disabled]:hover,
+.acc-btn-danger[disabled]:focus,
+.acc-btn-danger[disabled]:active {
+  background-color: rgb(217, 83, 79);
+  border-color: rgb(212, 63, 58);
+  box-shadow: none;
+}
+/* .btn-inverse — the one variant styles.css declares outright, and the one that
+   does NOT darken on press: hover, focus and active all resolve to the same
+   pair. `color` is `!important` there, so it is stated on every state. */
+.acc-btn-inverse:hover,
+.acc-btn-inverse:focus,
+.acc-btn-inverse:active,
+.acc-btn-inverse:active:hover,
+.acc-btn-inverse:active:focus {
+  color: rgb(255, 255, 255);
+  background-color: rgb(45, 53, 58);
+  border-color: rgb(36, 42, 46);
+}
+.acc-btn-inverse[disabled],
+.acc-btn-inverse[disabled]:hover,
+.acc-btn-inverse[disabled]:focus {
+  background-color: rgb(54, 63, 69);
+  border-color: rgb(54, 63, 69);
+  box-shadow: none;
+}
+
+/* a:focus, a:hover — the colour shifts, and it does NOT underline. Bootstrap's
+   `a:hover { text-decoration: underline }` is overridden further down the
+   cascade; the reference computes `text-decoration-line: none` in every state. */
+.acc-body a:not(.acc-btn):hover,
+.acc-body a:not(.acc-btn):focus,
+.acc-link:hover,
+.acc-link:focus {
+  color: rgb(35, 82, 124);
+  text-decoration: none;
+}
+
+/* .dropdown-menu > li > a:focus, :hover */
+.acc-body .dropdown-menu > li > a:hover,
+.acc-body .dropdown-menu > li > a:focus {
+  color: rgb(38, 38, 38);
+  text-decoration: none;
+  background-color: rgb(245, 245, 245);
+}
+
+/* a disabled control should say so rather than invite a click */
+.acc-btn[disabled] {
+  opacity: 0.65;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+/* No blue ring. Bootstrap's `.form-control:focus` glow is cancelled outright by
+   styles.css:
+     .form-control { box-shadow: rgb(0,0,0) 0 0 0 !important; }
+   so the reference's fields show nothing at all on focus — the border colour
+   does not move either. That was reproduced here as a glow, which is 8px of
+   blue the real page never draws.
+
+   `:focus-visible` keeps an indicator for keyboard users, since it does not fire
+   for a mouse click: pointer users get the reference's appearance exactly, and
+   the field does not become impossible to locate when tabbed to. */
+.acc-input {
+  box-shadow: rgb(0, 0, 0) 0 0 0;
+}
+.acc-input:focus {
+  outline: 0;
+}
+.acc-input:focus-visible {
+  outline: 2px solid rgb(102, 175, 233);
+  outline-offset: 1px;
+}
+
+/* ── bootbox confirm ──────────────────────────────────────────────────────────
+   The reference confirms destructive actions with bootbox, which is a thin
+   wrapper over Bootstrap 3's own modal — it ships almost no CSS of its own, so
+   every value below is transcribed verbatim from the computed rules in the
+   captured `public/app/css/bootstrap.min.css`.
+
+   Selectors are the literal Bootstrap names because that is the markup the
+   reference emits (`bootbox modal fade in > .modal-dialog > .modal-content`),
+   and they are scoped under `.bootbox` so they cannot leak onto anything else
+   in this app. */
+.bootbox {
+  position: fixed;
+  inset: 0;
+  z-index: 1050;
+  overflow: hidden auto;
+  outline: 0;
+}
+.bootbox-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1040;
+  background-color: rgb(0, 0, 0);
+}
+/* `.fade`/`.fade.in` and `.modal.fade .modal-dialog`/`.modal.in .modal-dialog` */
+.bootbox.fade,
+.bootbox-backdrop.fade {
+  opacity: 0;
+  transition: opacity 0.15s linear;
+}
+.bootbox.fade.in {
+  opacity: 1;
+}
+/* The backdrop settles at 0.5, NOT at 1. In Bootstrap that is
+   `.modal-backdrop.in { opacity: .5 }` sitting AFTER `.fade.in { opacity: 1 }`
+   at equal specificity, so it wins on source order — which is why this rule has
+   to stay below the one above and cannot be folded into it. Folded in, the
+   backdrop goes fully opaque and the page behind the dialog turns solid black. */
+.bootbox-backdrop.in {
+  opacity: 0.5;
+}
+.bootbox.fade .modal-dialog {
+  transition: transform 0.3s ease-out;
+  transform: translate(0, -25%);
+}
+.bootbox.in .modal-dialog {
+  transform: translate(0, 0);
+}
+.bootbox .modal-dialog {
+  position: relative;
+  width: auto;
+  margin: 10px;
+}
+/* the only @media rule Bootstrap 3 applies to the dialog */
+@media (min-width: 768px) {
+  .bootbox .modal-dialog {
+    width: 600px;
+    margin: 30px auto;
+  }
+  .bootbox .modal-content {
+    box-shadow: rgba(0, 0, 0, 0.5) 0 5px 15px;
+  }
+}
+.bootbox .modal-content {
+  position: relative;
+  background-color: rgb(255, 255, 255);
+  background-clip: padding-box;
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  border-radius: 6px;
+  outline: 0;
+  box-shadow: rgba(0, 0, 0, 0.5) 0 3px 9px;
+}
+.bootbox .modal-body {
+  position: relative;
+  padding: 15px;
+  color: rgb(51, 51, 51);
+  font-size: 14px;
+  line-height: 20px;
+}
+.bootbox .modal-footer {
+  padding: 15px;
+  text-align: right;
+  border-top: 1px solid rgb(229, 229, 229);
+}
+/* `.modal-footer::before/::after` are part of Bootstrap's clearfix group */
+.bootbox .modal-footer::before,
+.bootbox .modal-footer::after {
+  content: ' ';
+  display: table;
+}
+.bootbox .modal-footer::after {
+  clear: both;
+}
+/* THE `.btn + .btn` margin — scoped exactly as Bootstrap scopes it, which is
+   why it no longer applies to the Badges or Launch/Manage rows. */
+.bootbox .modal-footer .btn + .btn {
+  margin-bottom: 0;
+  margin-left: 5px;
+}
+/* The prompt variant's header. Evidence: evidence-dumps/NEXT-STEP/gaps/sheet-2.css —
+     .modal-header { padding: 15px; border-bottom: 1px solid rgb(229,229,229) }
+     .modal-header .close { margin-top: -2px }
+     .modal-title { margin: 0; line-height: 1.42857 }
+     .h4, h4 { font-size: 18px }
+   plus the shared heading rule (font-weight 500, font-family/colour inherit)
+   and the clearfix group `.modal-header::before/::after`. The line-height is
+   written at full precision, not the CSSOM's 5-digit serialisation, for the
+   same reason every other Bootstrap ratio here is. */
+.bootbox .modal-header {
+  padding: 15px;
+  border-bottom: 1px solid rgb(229, 229, 229);
+}
+.bootbox .modal-header::before,
+.bootbox .modal-header::after {
+  content: ' ';
+  display: table;
+}
+.bootbox .modal-header::after {
+  clear: both;
+}
+.bootbox .modal-header .close {
+  margin-top: -2px;
+}
+.bootbox .modal-title {
+  margin: 0;
+  font-family: inherit;
+  font-weight: 500;
+  font-size: 18px;
+  line-height: 1.428571429;
+  color: inherit;
+}
+/* The prompt's textarea. `textarea.form-control { height: auto }` is what stops
+   the 34px input height applying, so the field is sized by its rows. */
+.bootbox .form-control {
+  display: block;
+  width: 100%;
+  height: 34px;
+  padding: 6px 12px;
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.428571429;
+  color: rgb(85, 85, 85);
+  background-color: rgb(255, 255, 255);
+  background-image: none;
+  border: 1px solid rgb(204, 204, 204);
+  border-radius: 4px;
+  box-shadow: rgba(0, 0, 0, 0.075) 0 1px 1px inset;
+  transition:
+    border-color 0.15s ease-in-out,
+    box-shadow 0.15s ease-in-out;
+}
+.bootbox textarea.form-control {
+  height: auto;
+  overflow: auto;
+}
+.bootbox .form-control:focus {
+  border-color: rgb(102, 175, 233);
+  outline: 0;
+  box-shadow:
+    rgba(0, 0, 0, 0.075) 0 1px 1px inset,
+    rgba(102, 175, 233, 0.6) 0 0 8px;
+}
+/* bootbox ships no rule for its own <form>; the margin comes from the UA sheet,
+   which Bootstrap does not reset. Stated so it does not depend on one. */
+.bootbox .bootbox-form {
+  margin: 0;
+}
+
+/* `.close` */
+.bootbox .close {
+  float: right;
+  padding: 0;
+  font-size: 21px;
+  font-weight: 700;
+  line-height: 1;
+  color: rgb(0, 0, 0);
+  text-shadow: rgb(255, 255, 255) 0 1px 0;
+  opacity: 0.2;
+  background: transparent;
+  border: 0;
+  appearance: none;
+}
+.bootbox .close:focus,
+.bootbox .close:hover {
+  color: rgb(0, 0, 0);
+  text-decoration: none;
+  cursor: pointer;
+  opacity: 0.5;
+}
+/* `.btn`, `.btn-default`, `.btn-primary` — the same computed values the
+   `.acc-btn-*` rules above carry, restated under the literal class names the
+   reference's bootbox markup uses. */
+.bootbox .btn {
+  display: inline-block;
+  padding: 6px 12px;
+  margin-bottom: 0;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.42857;
+  text-align: center;
+  white-space: nowrap;
+  vertical-align: middle;
+  touch-action: manipulation;
+  cursor: pointer;
+  user-select: none;
+  background-image: none;
+  border: 1px solid transparent;
+  border-radius: 4px;
+}
+.bootbox .btn-default {
+  color: rgb(51, 51, 51);
+  background-color: rgb(255, 255, 255);
+  border-color: rgb(204, 204, 204);
+}
+.bootbox .btn-default:hover {
+  color: rgb(51, 51, 51);
+  background-color: rgb(230, 230, 230);
+  border-color: rgb(173, 173, 173);
+}
+.bootbox .btn-default:focus {
+  color: rgb(51, 51, 51);
+  background-color: rgb(230, 230, 230);
+  border-color: rgb(140, 140, 140);
+}
+.bootbox .btn-default:active {
+  color: rgb(51, 51, 51);
+  background-color: rgb(212, 212, 212);
+  border-color: rgb(140, 140, 140);
+  background-image: none;
+  outline: 0;
+  box-shadow: rgba(0, 0, 0, 0.125) 0 3px 5px inset;
+}
+.bootbox .btn-primary {
+  color: rgb(255, 255, 255);
+  background-color: rgb(51, 122, 183);
+  border-color: rgb(46, 109, 164);
+}
+.bootbox .btn-primary:hover {
+  color: rgb(255, 255, 255);
+  background-color: rgb(40, 96, 144);
+  border-color: rgb(32, 77, 116);
+}
+.bootbox .btn-primary:focus {
+  color: rgb(255, 255, 255);
+  background-color: rgb(40, 96, 144);
+  border-color: rgb(18, 43, 64);
+}
+.bootbox .btn-primary:active {
+  color: rgb(255, 255, 255);
+  background-color: rgb(32, 77, 116);
+  border-color: rgb(18, 43, 64);
+  background-image: none;
+  outline: 0;
+  box-shadow: rgba(0, 0, 0, 0.125) 0 3px 5px inset;
+}
+/* `body.modal-open { overflow: hidden }` — Bootstrap sets this on <body> while a
+   modal is up so the page behind cannot scroll. */
+body.modal-open {
+  overflow: hidden;
+}
+
+/* The confirm animation is the one thing here that should respect the setting;
+   the page-level `.animated` rules already do. */
+@media (prefers-reduced-motion: reduce) {
+  .bootbox.fade,
+  .bootbox-backdrop.fade,
+  .bootbox.fade .modal-dialog {
+    transition: none;
+  }
+}
+
+/* ── API Keys row actions ─────────────────────────────────────────────────────
+   `regen secret | restrictions | delete`. The reference wraps each link in a
+   <label> — `display: inline-block; max-width: 100%; margin-bottom: 5px;
+   font-weight: 700`, measured at 83.766x20 / 75.688x20 / 41.203x20. The labels
+   label no control, so ours are spans carrying that exact computed box.
+
+   The links themselves are `<a ng-click="…">` with no href in the reference,
+   which is not reachable by keyboard at all. Ours are buttons: same font, same
+   colour (Bootstrap's `a { color: rgb(51,122,183) }`), same width, and they can
+   actually be tabbed to and pressed. */
+/* `cursor: default` — it stands in for a <label>, which is what the reference
+   computes there.
+
+   `.acc-row-action` is the SAME box under a name that is not about API keys,
+   because the reference uses the identical `<label><a>` wrapper for its OTHER
+   row actions too: the badges Actions cell is `label > a` three times over
+   (#755/#756 Edit, #757/#758 Delete, #759/#760 Dark Theme), and #755, #757 and
+   #759 compute exactly what #818/#820/#822 do — display inline-block,
+   max-width 100%, margin-bottom 5px, font-weight 700, all from
+   `bootstrap.min.css|label`. `.acc-api-label` is kept as a separate selector
+   because the forensics scripts address the API-key row by that name. */
+.acc-api-label,
+.acc-row-action {
+  cursor: default;
+  display: inline-block;
+  max-width: 100%;
+  margin-bottom: 5px;
+  font-weight: 700;
+}
+/* the POST wrapper is plumbing, not a layout box — without this the row breaks
+   onto three lines, because a form is block-level */
+.acc-api-label form,
+.acc-row-action form {
+  display: inline;
+}
+
+/* OURS, and unmapped on purpose — the element it exists for has no counterpart in the capture.
+
+   The Sessions row's Archive / Unarchive control is a POST, and a <form> is block-level, so without
+   this the Actions cell breaks onto a second line underneath Launch and Manage. It cannot reuse
+   `.acc-row-action form` above: that selector's parent also carries the <label> box (inline-block,
+   700 weight, 5px bottom margin) that belongs to the reference's link-style row actions, and this
+   wraps a `.acc-btn`, not a link. */
+.acc-inline-form {
+  display: inline;
+}
+.acc-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  line-height: 20px;
+  color: rgb(51, 122, 183);
+  text-decoration: none;
+  cursor: pointer;
+  vertical-align: baseline;
+}
+/* The hover/focus colour is declared with the other link states further up. It
+   used to be restated here WITH an underline, and because this block loads
+   later it won the cascade — the reference computes `text-decoration-line:
+   none` in every state. */
+.acc-link[disabled] {
+  opacity: 0.65;
+  cursor: not-allowed;
+  text-decoration: none;
+}
+
+/* an uploaded image badge. styles.css `.user-badge-img { width: auto; height: 100%;
+   max-height: 20px; margin: 0 4px }`, transcribed verbatim, and confirmed on both
+   captured nodes: #751 (the visible one) renders 30.125 x 20 — its natural aspect,
+   capped by max-height, NOT a 20x20 square — and #56 reports the same declared
+   values while hidden. `vertical-align: middle` is bootstrap's own `img` rule and
+   is what both nodes compute; `text-bottom` was ours. `object-fit` is untouched:
+   it computes `fill` here, and `fill` on every one of the capture's 860 nodes,
+   because nothing sets it — `contain` was ours too, and it would letterbox a
+   non-square badge the reference stretches.
+
+   The width/height ATTRIBUTES are gone from the markup with it. A badge image has
+   no fixed aspect, so `width="20" height="20"` was asserting a 1:1 ratio that is
+   false for the one image in evidence; `max-height: 20px` is what bounds the row's
+   growth, and a bounded, honest height beats a precise, invented one. */
+.acc-badge-img {
+  width: auto;
+  height: 100%;
+  max-height: 20px;
+  margin: 0 4px;
+  vertical-align: middle;
+}
+
+/* ── a table inside a panel ───────────────────────────────────────────────────
+   Bootstrap's `.panel > .table-responsive > .table-bordered` group, transcribed.
+   It is what makes a bordered table look built-in rather than boxed: the outer
+   border is dropped, the cells on each edge lose their outside edge, and the
+   top corners are rounded to sit inside the panel's own radius.
+
+   Missing it, our table drew a full 1px box the reference does not have and
+   measured 109 tall against its 107. */
+.acc-panel > .acc-table-responsive {
+  margin-bottom: 0;
+  border: 0;
+}
+.acc-panel > .acc-table-responsive > .acc-table {
+  margin-bottom: 0;
+  border: 0;
+}
+.acc-panel > .acc-table-responsive:first-child > .acc-table:first-child {
+  border-top-left-radius: 3px;
+  border-top-right-radius: 3px;
+}
+.acc-panel > .acc-table-responsive:first-child > .acc-table:first-child > thead:first-child > tr:first-child,
+.acc-panel > .acc-table-responsive:first-child > .acc-table:first-child > tbody:first-child > tr:first-child {
+  border-top-left-radius: 3px;
+  border-top-right-radius: 3px;
+}
+.acc-panel
+  > .acc-table-responsive:first-child
+  > .acc-table:first-child
+  > thead:first-child
+  > tr:first-child
+  th:first-child,
+.acc-panel
+  > .acc-table-responsive:first-child
+  > .acc-table:first-child
+  > tbody:first-child
+  > tr:first-child
+  td:first-child {
+  border-top-left-radius: 3px;
+}
+.acc-panel
+  > .acc-table-responsive:first-child
+  > .acc-table:first-child
+  > thead:first-child
+  > tr:first-child
+  th:last-child,
+.acc-panel
+  > .acc-table-responsive:first-child
+  > .acc-table:first-child
+  > tbody:first-child
+  > tr:first-child
+  td:last-child {
+  border-top-right-radius: 3px;
+}
+.acc-panel > .acc-table-responsive:last-child > .acc-table:last-child {
+  border-bottom-right-radius: 3px;
+  border-bottom-left-radius: 3px;
+}
+.acc-panel > .acc-table-responsive:last-child > .acc-table:last-child > tbody:last-child > tr:last-child {
+  border-bottom-right-radius: 3px;
+  border-bottom-left-radius: 3px;
+}
+/* the outermost cell edges */
+.acc-panel > .acc-table-responsive > .acc-table > thead > tr > th:first-child,
+.acc-panel > .acc-table-responsive > .acc-table > thead > tr > td:first-child,
+.acc-panel > .acc-table-responsive > .acc-table > tbody > tr > th:first-child,
+.acc-panel > .acc-table-responsive > .acc-table > tbody > tr > td:first-child {
+  border-left: 0;
+}
+.acc-panel > .acc-table-responsive > .acc-table > thead > tr > th:last-child,
+.acc-panel > .acc-table-responsive > .acc-table > thead > tr > td:last-child,
+.acc-panel > .acc-table-responsive > .acc-table > tbody > tr > th:last-child,
+.acc-panel > .acc-table-responsive > .acc-table > tbody > tr > td:last-child {
+  border-right: 0;
+}
+.acc-panel > .acc-table-responsive > .acc-table > thead > tr:first-child > th,
+.acc-panel > .acc-table-responsive > .acc-table > thead > tr:first-child > td,
+.acc-panel > .acc-table-responsive > .acc-table > tbody > tr:first-child > th,
+.acc-panel > .acc-table-responsive > .acc-table > tbody > tr:first-child > td {
+  border-bottom: 0;
+}
+.acc-panel > .acc-table-responsive > .acc-table > tbody > tr:last-child > th,
+.acc-panel > .acc-table-responsive > .acc-table > tbody > tr:last-child > td {
+  border-bottom: 0;
+}
+
+/* `.form-control` line-height — 20px, not the UA's `normal` */
+.acc-input {
+  line-height: 20px;
+}
+
+/* the API-key restrictions editor — ours; the reference opens a bootbox for it */
+.acc-restrictions {
+  margin-top: 15px;
+}
+.acc-restrictions legend {
+  font-size: 14px;
+  font-weight: 700;
+  border: 0;
+  margin-bottom: 4px;
+}
+.acc-scope {
+  display: block;
+  font-weight: 400;
+  font-family: Menlo, Monaco, Consolas, monospace;
+  font-size: 13px;
+}
+/* NOT `.acc-muted` — that name is already the Users count's `div.text-muted`,
+   which is 14px, and reusing it silently shrank every one of those to 12. */
+.acc-hint {
+  display: block;
+  color: rgb(119, 119, 119);
+  font-size: 12px;
+}

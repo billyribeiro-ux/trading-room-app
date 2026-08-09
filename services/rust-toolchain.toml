@@ -1,0 +1,6 @@
+# Pinned so every machine and CI runner compiles with the same compiler. Five toolchains
+# are installed locally; without this file the active default silently decides the build.
+[toolchain]
+channel = "1.97.1"
+components = ["rustfmt", "clippy", "rust-analyzer"]
+profile = "minimal"

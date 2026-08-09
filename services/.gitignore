@@ -1,0 +1,4 @@
+# Cargo build output for the whole workspace. `services/media/.gitignore` already covers
+# that crate; this catches the shared workspace target/ directory, which is where every
+# crate now actually builds (and which reached 7 GB during development).
+target/

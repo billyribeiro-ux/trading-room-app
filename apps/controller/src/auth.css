@@ -1,0 +1,535 @@
+/* ============================================================================
+ * Auth screens — pixel match of the reference room login.
+ *
+ * Every value here is a computed value read out of
+ * `room-login-1785587188183.json` (captured with scripts/capture-room-login.js
+ * at 1989x1265 @dpr2), not an estimate. The citation on each line is the
+ * element the value was measured on.
+ *
+ * One deliberate difference: the reference authenticates a room guest by name
+ * with a pre-filled, disabled email. The controller authenticates an account
+ * owner with a password. The fields therefore differ; the visual system does not.
+ * ========================================================================== */
+
+:root {
+  /* login-wrapper */
+  --auth-page-bg: rgb(238, 238, 238);
+  /* app-root: Arial, Helvetica, sans-serif 16px/24px */
+  --auth-font: Arial, Helvetica, sans-serif;
+  --auth-font-size: 16px;
+  --auth-line-height: 24px;
+
+  --auth-ink: rgb(34, 34, 34); /* h1, p, label, .user-nick, .login-footer */
+  --auth-rule: rgb(204, 204, 204); /* h1 border-bottom, and the card's shadow colour */
+  --auth-field-border: rgb(238, 238, 238); /* .form-control / .input-group-text */
+  --auth-value: rgb(40, 161, 181); /* .form-control colour — the teal */
+  --auth-addon-ink: rgb(33, 37, 41); /* .input-group-text */
+  --auth-primary: rgb(13, 110, 253); /* .btn-login, .form-check-input */
+  --auth-link: rgb(55, 90, 127); /* .session-login-link */
+}
+
+/* Bootstrap 5's global reset is part of the room-login geometry. Without it,
+   the card's 360px max-width describes only its content box and its 25px side
+   padding expands the rendered border box to 410px (409px in the supplied crop).
+   The raw reference computes every one of these elements as border-box. */
+.auth-wrapper,
+.auth-wrapper *,
+.auth-wrapper *::before,
+.auth-wrapper *::after {
+  box-sizing: border-box;
+}
+
+/* .login-wrapper — a full-height scroll region, not a min-height block.
+   NB the authored rule also says `overflow-x: none`, which is not a valid value
+   for that property, so the browser drops it. Omitted rather than reproduced. */
+.auth-wrapper {
+  height: 100vh;
+  overflow-y: auto;
+  /* No horizontal padding: the column measures 994.5 at x=497.25, i.e. exactly
+     50% of the 1989 viewport centred. 20px sides would make it 974.5 at 507.25. */
+  padding: 0 0 20px;
+  background: var(--auth-page-bg);
+  font-family: var(--auth-font);
+  font-size: var(--auth-font-size);
+  line-height: var(--auth-line-height);
+  color: var(--auth-ink);
+}
+
+/* The reference centres a 360px column inside a bootstrap col-md-6 offset-md-3
+   that is 994.5px wide at a 1989px viewport. Reproduced as a fixed 360px column
+   so the card lands identically at any width. */
+/* The reference is a bootstrap col-md-6.offset-md-3 — 994.5 wide at x=497.25 on a
+   1989 viewport, with 12px gutters. The h1, the sub-line and the card are each
+   `max-width: 360px; margin: auto` INSIDE it; only the footer spans the full
+   column. Treating the whole thing as a 360px column put the footer 610px narrow.
+
+   .login-row contributes padding-top 20, .login-form-container another 15. */
+.auth-column {
+  width: 100%;
+  margin: 20px auto 0; /* .login-row padding-top */
+  padding: 15px 12px 0; /* .login-form-container */
+}
+
+/* The original element carries both `col-sm-6 offset-sm-3` and md classes.
+   In its hashed Bootstrap bundle `sm` starts at 576px, so the half-width column
+   begins there—not at 768 and not at every viewport. */
+@media (min-width: 576px) {
+  .auth-column {
+    width: 50%;
+  }
+}
+
+/* h1.room-title */
+.auth-title {
+  margin: 0;
+  padding: 0 0 15px;
+  font-size: 24px;
+  font-weight: 500;
+  line-height: 1.2; /* 28.8px — heading line-height, not the body's 24px */
+  text-align: center;
+  color: var(--auth-ink);
+  border-bottom: 1px solid var(--auth-rule);
+}
+
+/* p.authenticate-info — padding on BOTH sides: 24px line + 30 = the 54 measured */
+.auth-sub {
+  margin: 0;
+  padding: 15px 0;
+  font-size: 16px;
+  text-align: center;
+  color: var(--auth-ink);
+}
+
+/* form.login-form — raw getBoundingClientRect + computed styles both prove an
+   exact 360x433 border box at the 1989px reference viewport. The screenshot's
+   x=770…1129 and y=134…566 spans corroborate that when counted inclusively. */
+.auth-card {
+  background: #fff;
+  border-radius: 7px;
+  box-shadow: rgb(204, 204, 204) 2px 2px 5px 0px;
+  padding: 15px 25px;
+  margin-bottom: 16px; /* .mb-3 */
+}
+
+/* .loginGravatar / .user-avatar */
+.auth-avatar {
+  position: relative;
+  text-align: center;
+}
+/* .loginGravatar img — the 27px left margin is what offsets the avatar so the
+   gear, nudged -20px, lands on its lower right. */
+.auth-avatar img {
+  width: 80px;
+  height: 80px;
+  object-fit: cover;
+  border-radius: 50%;
+  border: 1px solid var(--auth-field-border);
+  margin-left: 27px;
+  display: inline-block;
+}
+/* h1, the sub-line and the card are each a 360px block centred in the column;
+   only the footer spans its full width. Declared after their own rules so the
+   auto margins are not overwritten by an earlier `margin: 0`. */
+.auth-title,
+.auth-sub,
+.auth-card {
+  max-width: 360px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* .loginGravatar */
+.auth-gravatar {
+  min-height: 106px;
+}
+/* .user-avatar measures 102.5: an 80px image line plus the 22.5 nickname line */
+/* font-size 0 removes the whitespace text node between the image and the gear.
+   With it, the inline run measured 138.45 instead of 134 and the avatar landed
+   at x=952.27 rather than 954.5. */
+.auth-avatar {
+  line-height: 0;
+  font-size: 0;
+}
+.auth-avatar .auth-nick {
+  line-height: 1.5;
+}
+/* .user-avatar .setup-avatar — authored source:
+     position: relative; top: 25px; left: -20px;
+     padding: var(--avatar-gear-icon-padding);
+   NOT absolute. It sits in normal flow after the img and is nudged up-left, which
+   is why it overlaps the avatar's lower right. An earlier version here placed it
+   absolutely and happened to land close; this is the real rule. */
+.auth-avatar-gear {
+  position: relative;
+  top: 25px;
+  left: -20px;
+  padding: 5px 5.5px; /* --avatar-gear-icon-padding */
+  background: #fff;
+  border-radius: 50%;
+  border: 0;
+  cursor: pointer;
+  /* 5 + 18 + 5 = 28 tall, 5.5 + 16 + 5.5 = 27 wide — the measured disc.
+     It stays inline (its 27px of inline width is what puts the avatar image at
+     x=954.5 rather than 968), but aligns to the bottom of the line box so it adds
+     no descent: with baseline alignment the line grew to 88.5 and the avatar
+     block came out 111 tall instead of 102.5. */
+  line-height: 18px;
+  font-size: 16px;
+  vertical-align: bottom;
+  top: -2.352px;
+}
+/* .user-nick */
+.auth-nick {
+  font-size: 15px;
+  font-weight: 300;
+  line-height: 1.5; /* 22.5, not the wrapper's inherited 24px */
+  font-style: italic;
+  text-align: center;
+  color: var(--auth-ink);
+  -webkit-text-fill-color: var(--auth-ink);
+  opacity: 1;
+}
+
+/* app-session-login's captured avatar-options rules, verbatim values. The
+   compiled component proves showAvatarOptions() toggles this block and that the
+   two links use the user / file-upload Font Awesome glyphs. */
+.avatar-options {
+  width: 155px;
+  margin: 3px auto;
+}
+.avatar-options a {
+  color: var(--auth-link);
+  text-decoration: none;
+}
+.avatar-options a:hover {
+  color: var(--auth-ink);
+}
+
+/* .form-group */
+.auth-group {
+  margin-bottom: 16px;
+}
+.auth-group label {
+  display: block;
+  margin-bottom: 2px;
+  font-size: 14px;
+  font-weight: 300;
+  color: var(--auth-ink);
+}
+
+/* .input-group — field + trailing icon addon, seamless 6px pill ends */
+.auth-input-group {
+  display: flex;
+}
+.auth-input-group input {
+  flex: 1 1 auto;
+  height: 38px;
+  padding: 0 12px;
+  font: inherit;
+  font-size: 16px;
+  /* The captured form controls compute to 400 even though body computes to 300.
+     Pin the complete font tuple so native-input defaults cannot vary by browser. */
+  font-weight: 400;
+  font-style: normal;
+  line-height: 24px;
+  color: var(--auth-value);
+  -webkit-text-fill-color: var(--auth-value);
+  opacity: 1;
+  background: #fff;
+  border: 1px solid var(--auth-field-border);
+  border-right: 0;
+  border-radius: 6px 0 0 6px;
+}
+.auth-input-group input:disabled {
+  background: rgb(233, 236, 239);
+  /* WebKit otherwise substitutes its platform disabled-control colour. The raw
+     capture proves the disabled email remains the same #28a1b5 as the name. */
+  color: var(--auth-value);
+  -webkit-text-fill-color: var(--auth-value);
+  opacity: 1;
+}
+/* .login-wrapper .form-control:focus — keeps the grey border and adds a soft
+   shadow. There is no blue focus ring in the reference. */
+.auth-input-group input:focus {
+  outline: 0;
+  border: 1px solid var(--auth-field-border);
+  border-right: 0;
+  box-shadow: 1px 1px 3px var(--auth-field-border);
+}
+.auth-addon {
+  width: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 8px;
+  background: #fff;
+  color: var(--auth-addon-ink);
+  border: 1px solid var(--auth-field-border);
+  border-left: 0;
+  border-radius: 0 6px 6px 0;
+}
+
+/* div.error.text-danger.small */
+.auth-error {
+  font-size: 14px;
+  color: rgb(220, 53, 69);
+}
+
+/* .d-flex.p-2.justify-content-between.mt-3.align-items-center */
+.auth-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px;
+  margin-top: 16px;
+}
+/* .form-check-input — 3.25px down from the top of a 25px form-check line, which
+   is where the reference's checkbox sits (427.547 in a row starting 424.297). */
+.auth-actions input[type='checkbox'] {
+  width: 16px;
+  height: 16px;
+  vertical-align: top;
+  margin: 3.25px 6px 0 0;
+  accent-color: var(--auth-primary);
+  border-radius: 4px;
+}
+/* .login-form .form-check-label — 12px, not the 16px body size. The block is 25
+   tall in the reference, which is the line-height that produces it. */
+.auth-check {
+  font-size: 12px;
+  line-height: 25px;
+  cursor: pointer;
+}
+
+/* button.btn-login — 130x30, radius 50px */
+.auth-submit {
+  min-width: 130px;
+  height: 30px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 50px;
+  background: var(--auth-primary);
+  color: #fff;
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 14px;
+  font-weight: 700;
+  text-align: center;
+  cursor: pointer;
+}
+.auth-submit:focus,
+.auth-submit:active {
+  outline: none;
+  box-shadow: none;
+  border: none;
+}
+.auth-submit:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+/* a.session-login-link — 14px on a 20px line. Without this the two-line
+   "Have a password? / Click here" block inherits the wrapper's absolute 24px and
+   measures 48 instead of the 40 the reference renders. */
+.auth-link {
+  color: var(--auth-link);
+  font-size: 14px;
+  line-height: 20px;
+  text-decoration: none;
+  cursor: pointer;
+  background: none;
+  border: 0;
+  padding: 0;
+  font-family: inherit;
+}
+.auth-link:hover {
+  text-decoration: underline;
+  cursor: pointer;
+}
+.auth-link-right {
+  margin-top: 4px; /* .mt-1 */
+  text-align: right;
+}
+.auth-link-centre {
+  margin-top: 16px; /* .mt-3 */
+  text-align: center;
+}
+
+/*
+  `customEnterDisclosure`. The reference never rendered this block — the captured room leaves the
+  setting empty — so there is no captured geometry to match. These values are inherited from the
+  form controls beside it (.mt-3's 16px, the sheet's own ink colour) rather than measured, which is
+  stated here so nobody later cites it as evidence.
+*/
+.auth-disclosure {
+  margin-top: 16px;
+  font-size: 12px;
+  color: var(--auth-ink);
+}
+.auth-disclosure label {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  cursor: pointer;
+  text-align: left;
+}
+
+/* .login-footer */
+.auth-footer {
+  font-size: 12px;
+  color: var(--auth-ink);
+}
+.auth-footer p {
+  margin: 0;
+  line-height: 1.5; /* 18px at 12px — two lines make the 36 measured */
+  text-align: center;
+}
+.auth-footer a {
+  color: var(--auth-link);
+}
+
+/* ── Avatar modals ────────────────────────────────────────────────────────────
+   Measured on #avatar-from-gmail-modal / #avatar-from-facebook-modal with the
+   dialogs force-revealed. These are DARK (Bootswatch Darkly) while the login
+   card behind them is light — that contrast is the reference's, not a mistake. */
+/* `.modal.fade` is present but display:none until `.show` is added — the dialogs
+   live in the document permanently, as in the reference. */
+.auth-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1055;
+  overflow-y: auto;
+  background: rgba(0, 0, 0, 0);
+  display: none;
+}
+.auth-modal.auth-modal-show {
+  display: block;
+}
+.auth-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1050;
+  background: #000;
+  opacity: 0.5;
+}
+.auth-modal-dialog {
+  width: auto;
+  margin: 8px;
+}
+/* Exact Bootstrap modal branch from the saved room bundle. */
+@media (min-width: 576px) {
+  .auth-modal-dialog {
+    max-width: 500px;
+    margin: 28px auto;
+  }
+}
+.auth-modal-content {
+  background: rgb(48, 48, 48);
+  color: rgb(255, 255, 255);
+  border: 1px solid rgba(0, 0, 0, 0.176);
+  border-radius: 8px;
+}
+.auth-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  border-bottom: 1px solid rgb(68, 68, 68);
+}
+.auth-modal-header h5 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 500;
+}
+.auth-modal-close {
+  width: 16px;
+  height: 16px;
+  padding: 8px;
+  border: 0;
+  border-radius: 6px;
+  opacity: 0.5;
+  cursor: pointer;
+  background: transparent
+    url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%23fff'%3e%3cpath d='M.293.293a1 1 0 0 1 1.414 0L8 6.586 14.293.293a1 1 0 1 1 1.414 1.414L9.414 8l6.293 6.293a1 1 0 0 1-1.414 1.414L8 9.414l-6.293 6.293a1 1 0 0 1-1.414-1.414L6.586 8 .293 1.707a1 1 0 0 1 0-1.414z'/%3e%3c/svg%3e")
+    center / 16px no-repeat;
+  box-sizing: content-box;
+}
+.auth-modal-close:hover {
+  opacity: 1;
+}
+.auth-modal-body {
+  padding: 16px;
+  position: relative;
+}
+.auth-modal-body label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 16px;
+}
+.auth-modal-body input {
+  width: 100%;
+  height: 38px;
+  padding: 0 12px;
+  font-family: inherit;
+  font-size: 16px;
+  color: rgb(33, 37, 41);
+  background: #fff;
+  border: 1px solid rgb(222, 226, 230);
+  border-radius: 6px;
+}
+.auth-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px;
+  border-top: 1px solid rgb(68, 68, 68);
+}
+/* Bootswatch Darkly primary / success, as measured */
+.auth-modal-btn {
+  padding: 6px 12px;
+  font-family: inherit;
+  font-size: 16px;
+  color: #fff;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.auth-modal-btn-close {
+  background: rgb(55, 90, 127);
+  border-color: rgb(55, 90, 127);
+}
+.auth-modal-btn-save {
+  background: rgb(0, 188, 140);
+  border-color: rgb(0, 188, 140);
+}
+
+/* setupProfilePic() injects this upload area into its Bootbox body. */
+.auth-modal-body .auth-upload-area {
+  width: 100%;
+  margin: 0;
+  text-align: center;
+  cursor: pointer;
+}
+.auth-modal-body .auth-upload-area input {
+  display: none;
+}
+.auth-upload-name {
+  margin-left: 5px;
+}
+.auth-upload-preview {
+  display: block;
+  max-width: 125px;
+  max-height: 125px;
+  margin: 8px auto 0;
+}
+.auth-upload-clear {
+  clear: both;
+}
+
+/* the settings-driven help block the reference's aria-describedby points at but
+   never renders — see docs/reference/room-login-mapping.md §4 */
+.auth-help {
+  font-size: 14px;
+  color: rgb(85, 85, 85);
+  margin-top: 2px;
+}

@@ -1,0 +1,16 @@
+/* Authored component CSS recovered from /Users/billyribeiro/Downloads/new-dumps/room-login-1785587188183.json
+ * Angular scope id: ng-c4243810522  —  2 unique rules
+ *
+ * Selectors have had their [_ngcontent-*] / [_nghost-*] guards stripped, so
+ * these are as the component's stylesheet was written. Values referencing
+ * var(--*) resolve against the room token reference (docs/reference/css/room-tokens.css).
+ */
+
+.container-fluid {
+  height: 100%;
+  width: 100%;
+}
+
+.popOverDiv {
+  padding: 0px !important;
+}

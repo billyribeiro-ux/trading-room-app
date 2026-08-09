@@ -1,0 +1,75 @@
+import { defineEnvVars } from '@sveltejs/kit/env';
+import * as v from 'valibot';
+
+const optionalText = v.optional(v.string());
+const optionalUrl = v.optional(v.union([v.literal(''), v.pipe(v.string(), v.url())]));
+const optionalControlPlaneMode = v.optional(v.union([v.literal(''), v.picklist(['marketing-only', 'postgres'])]));
+
+/**
+ * The application environment contract.
+ *
+ * Standalone maintenance scripts have their own documented `process.env`
+ * boundary; SvelteKit application code imports only these named variables from
+ * `$app/env/private` or `$app/env/public`.
+ */
+export const variables = defineEnvVars({
+  CONTROL_PLANE_MODE: {
+    description:
+      'Fail-closed runtime boundary. marketing-only is the safe default and serves four static routes; postgres enables the application.',
+    schema: optionalControlPlaneMode
+  },
+  DATABASE_URL: {
+    description:
+      'PostgreSQL connection string. Required only when CONTROL_PLANE_MODE=postgres. Use the pooled endpoint on a serverless host.',
+    schema: optionalText
+  },
+  SUPERADMIN_EMAILS: {
+    description:
+      'Comma-separated emails allowed to reach /admin and see every account. Deliberately NOT a password: a superadmin signs in through the ordinary hardened login and this list grants the extra privilege, so the credential and the privilege can be revoked independently. An env var rather than a database column so granting it requires deploy access rather than an INSERT.',
+    schema: optionalText
+  },
+  RESEND_API_KEY: {
+    description:
+      'API key for outbound transactional email (verification, and password reset next). Optional, and the product behaves DIFFERENTLY without it rather than merely failing: when it is absent nothing is sent and email verification is NOT enforced, because enforcing a check that cannot be delivered locks every user out of a product that looks like it works.',
+    schema: optionalText
+  },
+  MAIL_FROM: {
+    description:
+      'The From address for outbound email. Required alongside RESEND_API_KEY — a key with no sender is a half-configured transport that fails at send time rather than at boot. There is deliberately no default: the sending domain needs DKIM/SPF records before any address on it is real, and a plausible-looking default would silently bounce.',
+    schema: optionalText
+  },
+  FCM_SERVICE_ACCOUNT_JSON: {
+    description:
+      'The complete Google service-account key JSON for the Firebase project that owns the mobile app, pasted verbatim — it must contain project_id, client_email and private_key, and the key needs the Firebase Cloud Messaging API enabled. Firebase Cloud Messaging HTTP v1 authenticates with an OAuth2 token minted from this key; there is no static server key any more. Optional, and absent it the push actions REFUSE rather than degrade: "Get FCM Tokens" and "Send Test Mobile Notifs" report that this variable is unset instead of returning an empty list, because a push subsystem that quietly answers "nothing to do" is indistinguishable from one that works. Hosts that take secrets through a web form store the PEM newlines as literal backslash-n; that is unescaped on read, so either form is accepted.',
+    schema: optionalText
+  },
+  ROOM_JWT_SECRET: {
+    description: 'Private HMAC secret used to sign short-lived room handoff tokens.',
+    schema: optionalText
+  },
+  API_KEY_ENCRYPTION_KEY: {
+    description: 'Private master key used to encrypt owner-visible API-key secrets at rest.',
+    schema: optionalText
+  },
+  ROOM_BASE_URL: {
+    description: 'Optional absolute URL of the separate live-room application.',
+    schema: optionalUrl
+  },
+  PUBLIC_SITE_ORIGIN: {
+    public: true,
+    description:
+      'Absolute origin the room, vanity, unique, registration and app-pair links are built from. Blank falls back to the request origin.',
+    schema: optionalUrl
+  },
+  PUBLIC_RECAPTCHA_SITE_KEY: {
+    public: true,
+    description:
+      'Public Google reCAPTCHA v2 site key. Blank disables the widget. Must be set together with RECAPTCHA_SECRET_KEY.',
+    schema: optionalText
+  },
+  RECAPTCHA_SECRET_KEY: {
+    description:
+      'Private Google reCAPTCHA v2 secret, used only for server-side siteverify. Setting the site key without this renders a widget nothing verifies, so a half-configured pair is a startup error.',
+    schema: optionalText
+  }
+});

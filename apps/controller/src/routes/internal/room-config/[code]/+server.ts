@@ -1,0 +1,184 @@
+import { error, json } from '@sveltejs/kit';
+import { eq } from 'drizzle-orm';
+import { ROOM_JWT_SECRET } from '$app/env/private';
+import { getDb } from '$lib/server/db';
+import { ACCOUNT_ACTIVE, accounts, roomUsers, rooms, users } from '$lib/server/db/schema';
+import { readPermissions, readSettings } from '$lib/server/rooms';
+import { roomVisibleConfig } from '$lib/room-config';
+import { isRoomPresenter } from '$lib/room-member-role';
+import { verifyConfigReadToken } from '$lib/server/room-handoff';
+import type { RequestHandler } from './$types';
+
+/**
+ * `GET /internal/room-config/<shortCode>` — what the room is allowed to know about itself.
+ *
+ * ## Why this exists
+ *
+ * The room application had no way to be told anything, so it invented what it could not be told:
+ * a hardcoded `sessData` literal standing in for 268 per-room settings, and four account columns
+ * standing in for per-room membership. Both are the same defect — a global constant where the
+ * controller owns per-room state.
+ *
+ * This is the read that removes it. Precedence is decided by `resolveRoomConfig()` in
+ * `$lib/room-config` — already documented there as "the single seam between the controller and the
+ * room" — and nothing is recomputed here.
+ *
+ * ## What it deliberately does NOT return
+ *
+ * `resolveRoomConfig()` resolves all 269 settings, and a configured room's set includes
+ * `webinarPW`, `ssoJWTSecret`, `apiSecret`, `s3KeySecret`, `twillioApiToken` and a dozen more
+ * credentials. The room serialises its config into SSR HTML on every load, so returning them would
+ * put a room's secrets in every viewer's page source — the same defect the room's own
+ * `page-load-contract.test.ts` exists to catch for a password hash.
+ *
+ * `roomVisibleConfig()` narrows the response to an explicit allow-list of settings the room has a
+ * consumer for. It fails closed: a setting added tomorrow is invisible here until somebody decides
+ * otherwise.
+ *
+ * ## Why not the public Sessions API
+ *
+ * `src/lib/content/api-docs.ts` documents nine endpoints for external integrators — users, stats,
+ * logs. None of them expose room configuration, and adding one would put a room's passwords,
+ * secrets and webhook URLs on a surface authenticated by a customer-visible API key.
+ *
+ * ## Why it 503s in production, correctly
+ *
+ * `decideControlPlaneRequest` allows only the four marketing routes unless
+ * `CONTROL_PLANE_MODE=postgres`. A deployment that has not been given a database therefore serves
+ * the marketing pages and 503s this, which is the honest answer to "what is this room configured
+ * like" when there is nowhere to read that from.
+ */
+export const GET: RequestHandler = async ({ params, request, url }) => {
+  const secret = ROOM_JWT_SECRET;
+  if (!secret) {
+    // Same posture as `launch/[id]`: fail loudly rather than accept an unauthenticated read, and
+    // do not name the private configuration variable in a response body.
+    error(500, 'Room configuration is not available.');
+  }
+
+  const presented = request.headers.get('authorization')?.replace(/^Bearer /, '');
+  const verified = verifyConfigReadToken(secret, params.code, presented);
+  if (!verified.ok) {
+    /*
+      One status and one message for all three failure reasons.
+
+      Distinguishing "stale" from "bad signature" tells an attacker which half of the credential
+      they got right. The reason is computed for the log line, not for the caller.
+    */
+    console.warn('[room-config] rejected', { code: params.code, reason: verified.reason });
+    error(401, 'Unauthorized.');
+  }
+
+  const [room] = await getDb().select().from(rooms).where(eq(rooms.shortCode, params.code)).limit(1);
+  if (!room) error(404, 'Room not found');
+
+  /*
+    A suspended account's rooms stop serving.
+
+    This is the third and last path that can produce an identity, and the only one the ROOM uses.
+    Without it, suspension would lock the owner out of the controller while every room they had
+    already launched carried on indefinitely — which is not a suspension, it is a locked door on a
+    building with the windows open.
+
+    404, not 403: to an unauthenticated observer a suspended room is indistinguishable from one that
+    never existed, and the room application's own `RoomConfigUnavailable` path already fails loudly
+    rather than serving defaults.
+  */
+  const [account] = await getDb()
+    .select({ status: accounts.status })
+    .from(accounts)
+    .where(eq(accounts.id, room.accountId))
+    .limit(1);
+  if (!account || account.status !== ACCOUNT_ACTIVE) {
+    console.warn('[room-config] refused: account not active', {
+      code: params.code,
+      status: account?.status ?? 'missing'
+    });
+    error(404, 'Room not found');
+  }
+
+  const resolved = roomVisibleConfig(await readSettings(room.id));
+
+  /*
+    The member, when the caller names one.
+
+    `email` rather than an id, because the room knows who arrived from the handoff token and the
+    two databases do not share a key space. An email that is not a member of this room is not an
+    error — it is a guest, and the room needs to render them as one rather than 404.
+  */
+  const email = url.searchParams.get('email')?.trim().toLowerCase();
+  const membership = email
+    ? (
+        await getDb()
+          .select({ roomUser: roomUsers, user: users })
+          .from(roomUsers)
+          .innerJoin(users, eq(roomUsers.userId, users.id))
+          .where(eq(roomUsers.roomId, room.id))
+      ).find((row) => row.user.email.trim().toLowerCase() === email)
+    : undefined;
+
+  return json({
+    room: {
+      shortCode: room.shortCode,
+      name: room.name,
+      state: room.state,
+      logoUrl: room.logoUrl,
+      publicId: room.publicId,
+      maxUsers: room.maxUsers
+    },
+    /*
+      The effective configuration after precedence, narrowed to what the room may see. `locked`
+      rides along because a policy setting the owner is enforcing must not render in the room as a
+      toggle the user can flip and watch snap back.
+    */
+    settings: resolved.values,
+    locked: resolved.locked,
+    /*
+      The member, translated once here so the room never has to know the numeric model.
+
+      `rooms.ts` reads it off the reference's own row template:
+        0 Owner · 1 Presenter (!nonPresenter) · 1 Admin (nonPresenter) · 2 Participant
+        · 3 CHAT MUTED · 4 BANNED
+      There is no role 5, and Trial is not a role — it is the `isFreeTrial` flag behind the TRIAL
+      badge. `schema.ts`'s own docblock still says "5 admin · 6 trial"; `rooms.ts` is the one that
+      was corrected against the capture, and it is the one followed here.
+    */
+    member: membership
+      ? {
+          displayName: membership.user.displayName,
+          email: membership.user.email,
+          role: membership.roomUser.role,
+          nonPresenter: membership.roomUser.nonPresenter,
+          /*
+            `isP` — presenter authority in the room.
+
+            The owner counts. `shouldRemoveAsNonPresenter` is `role !== 0 && !isRoomPresenter(m)`,
+            documented as "preserves only the owner and a true presenter", and `applyManyOpcode`
+            skips `role === 0` outright. Both group the owner with presenters, so a room that
+            answered `isP: false` for the account that owns it would drop its owner in as a
+            participant.
+          */
+          isP: membership.roomUser.role === 0 || isRoomPresenter(membership.roomUser),
+          /*
+            Role 1 WITH `nonPresenter` — the reference's "Admin". A distinct global in the room
+            (`globals.isNonPresenterAdmin`, initialised alongside `isPresenter`), and distinct from
+            the `hasAdminChat` permission below, which any role may hold.
+          */
+          isNonPresenterAdmin: membership.roomUser.role === 1 && membership.roomUser.nonPresenter,
+          /** `r.isFT`. Per room, which is why the room may not keep it on an account. */
+          isFT: membership.roomUser.isFreeTrial,
+          denyArchivesAccess: membership.roomUser.denyArchivesAccess,
+          restrictPmUser: membership.roomUser.restrictPmUser,
+          /*
+            Derived from the role, not from the legacy booleans. `applyUserOpcode` writes both, but
+            the roles are what the reference renders and the columns predate that correction —
+            reading the columns would trust the half that can go stale.
+          */
+          muted: membership.roomUser.role === 3,
+          banned: membership.roomUser.role === 4,
+          /** hasMic · hasScreen · hasCam · hasAdminChat · canEditNotes. */
+          permissions: readPermissions(membership.roomUser.permissionsJson)
+        }
+      : null
+  });
+};

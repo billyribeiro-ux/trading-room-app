@@ -1,0 +1,27 @@
+{
+	admin off
+	servers {
+		protocols h1 h2
+	}
+}
+
+{$MEDIA_HOSTNAME} {
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "no-referrer"
+		-Server
+	}
+
+	handle /health {
+		reverse_proxy 127.0.0.1:4443
+	}
+
+	handle /ws {
+		reverse_proxy 127.0.0.1:4443
+	}
+
+	handle {
+		respond 404
+	}
+}

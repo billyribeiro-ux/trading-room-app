@@ -1,0 +1,33 @@
+name: tradingroom-services
+
+services:
+  postgres:
+    # Official PostgreSQL 17 multi-architecture image resolved on 2026-08-02.
+    # The digest matches the backend CI service; a moving `postgres:17` tag is not
+    # an acceptable database bootstrap authority.
+    image: postgres:17@sha256:a426e44bac0b759c95894d68e1a0ac03ecc20b619f498a91aae373bf06d8508d
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-ptr_clone}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in services/.env}
+      POSTGRES_DB: ${POSTGRES_DB:-ptr_clone}
+      POSTGRES_APP_USER: ${POSTGRES_APP_USER:-ptr_clone_app}
+      POSTGRES_APP_PASSWORD: ${POSTGRES_APP_PASSWORD:?set POSTGRES_APP_PASSWORD in services/.env}
+    ports:
+      # Local development only. Do not expose PostgreSQL on a public interface.
+      - 127.0.0.1:${POSTGRES_PORT:-5432}:5432
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./docker/postgres/10-provision-roles.sh:/docker-entrypoint-initdb.d/10-provision-roles.sh:ro
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready --username "$${POSTGRES_USER}" --dbname "$${POSTGRES_DB}"
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+    stop_grace_period: 30s
+
+volumes:
+  postgres-data:
