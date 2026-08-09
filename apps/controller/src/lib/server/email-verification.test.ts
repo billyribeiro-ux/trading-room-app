@@ -73,8 +73,15 @@ vi.mock('./db/schema', () => ({
   }
 }));
 
-const { hashToken, issueToken, markEmailVerified, redeemToken, VERIFICATION_TTL_MS, verificationEnforced } =
-  await import('./email-verification');
+const {
+  hashToken,
+  inspectToken,
+  issueToken,
+  markEmailVerified,
+  redeemToken,
+  VERIFICATION_TTL_MS,
+  verificationEnforced
+} = await import('./email-verification');
 
 beforeEach(() => {
   rows.length = 0;
@@ -110,6 +117,67 @@ describe('issueToken', () => {
     const reset = await issueToken({ userId: 7, email: 'a@example.test', purpose: 'reset-password' });
     await issueToken({ userId: 7, email: 'a@example.test', purpose: 'verify-email' });
     expect(rows.find((r) => r.tokenHash === hashToken(reset))?.consumedAt).toBeNull();
+  });
+
+  it('honours a caller-supplied lifetime, which is how a reset link gets an hour', async () => {
+    const now = new Date('2026-08-09T10:00:00Z');
+    const oneHour = 60 * 60 * 1000;
+    await issueToken({ userId: 7, email: 'a@example.test', purpose: 'reset-password', now, ttlMs: oneHour });
+    expect((rows[0].expiresAt as Date).getTime() - now.getTime()).toBe(oneHour);
+  });
+
+  it('still defaults to the verification lifetime when no ttl is given', async () => {
+    const now = new Date('2026-08-09T10:00:00Z');
+    await issueToken({ userId: 7, email: 'a@example.test', purpose: 'verify-email', now });
+    expect((rows[0].expiresAt as Date).getTime() - now.getTime()).toBe(VERIFICATION_TTL_MS);
+  });
+});
+
+describe('inspectToken', () => {
+  /*
+    The reset flow's GET renders a form and its POST spends the token, separated by however long
+    somebody takes to type a password twice. If inspecting consumed, every reset would fail on
+    submit — which is the bug this function exists to make impossible.
+  */
+  it('does NOT consume the token it reports on', async () => {
+    const token = await issueToken({ userId: 7, email: 'a@example.test', purpose: 'reset-password' });
+
+    expect(await inspectToken(token, 'reset-password')).toEqual({ ok: true, userId: 7, email: 'a@example.test' });
+    // Twice, because a single call could have consumed and still reported the old value.
+    expect(await inspectToken(token, 'reset-password')).toEqual({ ok: true, userId: 7, email: 'a@example.test' });
+    // And the redemption that follows must still succeed.
+    expect(await redeemToken(token, 'reset-password')).toEqual({ ok: true, userId: 7, email: 'a@example.test' });
+  });
+
+  it('reports a spent token as already-used', async () => {
+    const token = await issueToken({ userId: 7, email: 'a@example.test', purpose: 'reset-password' });
+    await redeemToken(token, 'reset-password');
+    expect(await inspectToken(token, 'reset-password')).toEqual({ ok: false, reason: 'already-used' });
+  });
+
+  it('reports an expired token as expired', async () => {
+    const issuedAt = new Date('2026-08-09T10:00:00Z');
+    const token = await issueToken({
+      userId: 7,
+      email: 'a@example.test',
+      purpose: 'reset-password',
+      now: issuedAt,
+      ttlMs: 1000
+    });
+    expect(await inspectToken(token, 'reset-password', new Date(issuedAt.getTime() + 1001))).toEqual({
+      ok: false,
+      reason: 'expired'
+    });
+  });
+
+  it('refuses a token issued for another purpose, so a verification link cannot reset a password', async () => {
+    const token = await issueToken({ userId: 7, email: 'a@example.test', purpose: 'verify-email' });
+    expect(await inspectToken(token, 'reset-password')).toEqual({ ok: false, reason: 'unknown' });
+  });
+
+  it('refuses garbage and the empty string', async () => {
+    expect(await inspectToken('', 'reset-password')).toEqual({ ok: false, reason: 'unknown' });
+    expect(await inspectToken('not-a-token', 'reset-password')).toEqual({ ok: false, reason: 'unknown' });
   });
 });
 

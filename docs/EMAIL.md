@@ -203,10 +203,56 @@ Two consequences worth knowing:
 Google Workspace (~$6/user/month) and Fastmail / Zoho remain the alternatives if the mailbox ever
 needs to be more than one address.
 
-### Step 7 — build password reset
+### Step 7 — build password reset — ✅ DONE 2026-08-09
 
-The last piece, and straightforward once mail sends. Reuse the token design already proven in
-`email-verification.ts`: issue, store only a hash, expire, single-use, and invalidate on use.
+**Built. It is inert until steps 1–4 above are done, and it says so on screen rather than
+pretending.** `resetEnabled()` is `mailConfigured()`, so with `RESEND_API_KEY` and `MAIL_FROM`
+unset the request page renders "not available on this deployment yet" instead of accepting an
+address it cannot help. Setting those two variables turns the whole flow on; nothing else is
+needed.
+
+| | |
+| --- | --- |
+| request | `(public)/forgot-password` — the login link points here now, not at `/contact` |
+| redeem | `(public)/reset-password?token=…` |
+| policy | `lib/server/password-reset.ts` |
+| the write | `setPasswordFromReset` in `lib/server/auth.ts` |
+
+The token design is reused wholesale from `email-verification.ts` — issued once, stored only as a
+SHA-256, single-use through the conditional `UPDATE … WHERE consumed_at IS NULL`. Six decisions on
+top of it are worth knowing, because each is the answer to a specific way this goes wrong:
+
+- **One hour, not 24.** A verification link proves an address; a reset link changes the password
+  and signs a session in, which makes it the strongest credential this product ever puts in an
+  inbox. `issueToken` took a `ttlMs` parameter for this.
+- **The GET inspects, it does not consume.** `inspectToken` is new and exists only for this: the
+  link is redeemed by the POST that follows, minutes later. Consuming on arrival would make every
+  reset fail on submit.
+- **The password is validated BEFORE the token is spent.** Otherwise a mistyped confirmation burns
+  the single-use link and the person needs a whole new email to fix a typo.
+- **The request form is not an account oracle.** One sentence — `GENERIC_REQUEST_ACK` — for an
+  address with an account, one without, one inside its cooldown, and one whose message the provider
+  just refused. That last case is why a delivery failure is logged rather than shown: an error here
+  could only ever appear for an address that *has* an account, so during a provider outage it would
+  hand back exactly the enumeration the generic message prevents.
+- **Redeeming revokes every session**, in the same transaction as the password write. The usual
+  reason for a reset is believing somebody else has the password; if their cookie survives it, the
+  reset accomplished nothing. One fresh session is minted afterwards so the reset does not end on
+  the login page, and a suspended account is refused there instead of looping.
+- **Redeeming also marks the address proved.** Clicking a link in that mailbox is the identical
+  claim the verification link makes, so somebody who never confirmed at signup is not left blocked
+  by `emailIsProved` after recovering their account.
+
+One request per address per minute (`RESET_COOLDOWN_MS`), and reCAPTCHA runs before the account
+lookup — same ordering as registration, so an unverified submission cannot probe which addresses
+exist. Neither is a general rate limiter; that belongs at the edge, the same caveat
+`login-attempts.ts` carries.
+
+Covered by `password-reset.test.ts`, `password-reset-pages.test.ts` and the extended
+`email-verification.test.ts`. The cooldown boundary, the consumed-token exclusion, the newest-row
+ordering and the login link were each verified by breaking the implementation and watching the test
+go red — the ordering case passed a broken implementation on the first attempt, because the fixture
+happened to insert its rows in the order the sort would have produced.
 
 ---
 

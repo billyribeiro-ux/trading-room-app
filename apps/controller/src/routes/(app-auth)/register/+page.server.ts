@@ -2,7 +2,7 @@ import { fail, redirect } from '@sveltejs/kit';
 import { eq } from 'drizzle-orm';
 import { getDb } from '$lib/server/db';
 import { accounts, users } from '$lib/server/db/schema';
-import { createLoginSession, hashPassword } from '$lib/server/auth';
+import { MIN_PASSWORD, createLoginSession, hashPassword } from '$lib/server/auth';
 import { RECAPTCHA_FIELD, recaptchaFailureMessage, verifyRecaptcha } from '$lib/server/recaptcha';
 import { issueToken, sendVerificationEmail, verificationEnforced } from '$lib/server/email-verification';
 import { provisionRoom } from '$lib/server/provision-room';
@@ -13,7 +13,11 @@ export const load: PageServerLoad = ({ locals }) => {
   return {};
 };
 
-const MIN_PASSWORD = 12;
+/*
+  `MIN_PASSWORD` moved to `auth.ts` when password reset was built, so signup and reset cannot
+  disagree about the rule. A reset that accepted ten characters where signup demands twelve would
+  make the rule optional for anybody willing to click "forgot password".
+*/
 
 export const actions: Actions = {
   default: async ({ request, cookies, getClientAddress, url }) => {

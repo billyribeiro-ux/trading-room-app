@@ -1,5 +1,5 @@
 import { randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { error, redirect } from '@sveltejs/kit';
 import type { Cookies } from '@sveltejs/kit';
 import { getDb } from './db';
@@ -8,6 +8,16 @@ import { readImpersonation } from './impersonation';
 import { verificationEnforced } from './email-verification';
 
 const COOKIE = 'control_session';
+
+/**
+ * The minimum password length, in ONE place.
+ *
+ * Registration and password reset must agree, and they are in different files. A reset that accepts
+ * ten characters where signup demands twelve is not a cosmetic inconsistency — it is a documented
+ * rule that can be walked around by anybody who clicks "forgot password", which makes the rule
+ * decorative. Both import this.
+ */
+export const MIN_PASSWORD = 12;
 
 export function hashPassword(password: string): string {
   const salt = randomBytes(16).toString('hex');
@@ -35,6 +45,68 @@ export async function destroyLoginSession(cookies: Cookies) {
   const id = cookies.get(COOKIE);
   if (id) await getDb().delete(loginSessions).where(eq(loginSessions.id, id));
   cookies.delete(COOKIE, { path: '/' });
+}
+
+/**
+ * Sets a new password and signs every existing session out, atomically.
+ *
+ * ## Why the sessions go
+ *
+ * The commonest reason somebody resets a password is that they think somebody else has it. If the
+ * old sessions survive, the reset achieves nothing against exactly the case it exists for: whoever
+ * took the account keeps their cookie and stays signed in, while the owner congratulates themselves
+ * on having fixed it. Every session dies, including the caller's — the reset route mints a fresh
+ * one afterwards, so the person at the keyboard notices nothing and every other device is out.
+ *
+ * ## Why one transaction
+ *
+ * The two halves must not be separable. A password written without the sessions being cleared is
+ * the failure above; sessions cleared without the password written is a lockout. Neither is a state
+ * worth persisting, so neither is allowed to exist.
+ *
+ * ## Why `email` is a predicate and not just context
+ *
+ * Same reason as `markEmailVerified`: the reset token names the address it was issued to. If the
+ * account's address changed after the link was sent, the link is stale and must not set a password
+ * on whatever address is there now. Zero rows updated is reported back rather than assumed away.
+ */
+export async function setPasswordFromReset(input: {
+  userId: number;
+  email: string;
+  password: string;
+  now?: Date;
+}): Promise<boolean> {
+  const now = input.now ?? new Date();
+  /*
+    Hashed OUTSIDE the transaction. scrypt is deliberately slow, and holding a database transaction
+    open across it would pin a connection for the duration for no benefit — the hash depends on
+    nothing the transaction reads.
+  */
+  const passwordHash = hashPassword(input.password);
+
+  return getDb().transaction(async (tx) => {
+    const changed = await tx
+      .update(users)
+      .set({
+        passwordHash,
+        /*
+          Redeeming a reset link proves control of the mailbox, which is the identical claim the
+          verification link makes. Recording it here means somebody who registered, never clicked
+          confirm, and later reset their password does not end up with a proved address still marked
+          unproved — and then blocked by `emailIsProved` from creating a room.
+
+          Only ever set, never cleared, and only for the address the token named.
+        */
+        emailVerifiedAt: now
+      })
+      .where(and(eq(users.id, input.userId), eq(users.email, input.email)))
+      .returning({ id: users.id });
+
+    if (changed.length === 0) return false;
+
+    await tx.delete(loginSessions).where(eq(loginSessions.userId, input.userId));
+    return true;
+  });
 }
 
 /**

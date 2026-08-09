@@ -49,6 +49,15 @@ export async function issueToken(input: {
   email: string;
   purpose: TokenPurpose;
   now?: Date;
+  /**
+   * How long this particular link lives. Defaults to {@link VERIFICATION_TTL_MS}.
+   *
+   * A parameter rather than a second constant read from the purpose, because the caller is the one
+   * that knows what it is sending. A password reset is a stronger credential than a verification —
+   * redeeming it changes the password and signs a session in — so it gets a much shorter life
+   * ({@link RESET_TTL_MS}), and that decision belongs beside the code that sends it.
+   */
+  ttlMs?: number;
 }): Promise<string> {
   const now = input.now ?? new Date();
   const token = randomBytes(TOKEN_BYTES).toString('base64url');
@@ -71,7 +80,7 @@ export async function issueToken(input: {
       userId: input.userId,
       email: input.email,
       purpose: input.purpose,
-      expiresAt: new Date(now.getTime() + VERIFICATION_TTL_MS),
+      expiresAt: new Date(now.getTime() + (input.ttlMs ?? VERIFICATION_TTL_MS)),
       createdAt: now
     });
 
@@ -82,6 +91,42 @@ export async function issueToken(input: {
 export type RedeemFailureReason = 'unknown' | 'expired' | 'already-used';
 
 export type RedeemResult = { ok: true; userId: number; email: string } | { ok: false; reason: RedeemFailureReason };
+
+/**
+ * Reads a token's standing WITHOUT spending it.
+ *
+ * Exists for the password-reset page, where the two halves of the flow are separated by however
+ * long somebody takes to type a new password twice:
+ *
+ *  - the GET needs to know whether to render a form or an explanation, and must NOT consume,
+ *    because the token is the only thing authorising the POST that follows;
+ *  - the POST consumes, via {@link redeemToken}, which is where the single-use guarantee lives.
+ *
+ * Verification does not need this — its link is redeemed by the act of clicking, so there is
+ * nothing between arriving and spending.
+ *
+ * Deliberately NOT a "check then redeem" pair used as a substitute for the conditional UPDATE. What
+ * this returns is a snapshot that may be stale by the time the POST arrives; `redeemToken` is still
+ * the only thing that decides, and it decides atomically.
+ */
+export async function inspectToken(
+  token: string,
+  purpose: TokenPurpose,
+  now: Date = new Date()
+): Promise<{ ok: true; userId: number; email: string } | { ok: false; reason: RedeemFailureReason }> {
+  if (!token) return { ok: false, reason: 'unknown' };
+
+  const [row] = await getDb()
+    .select()
+    .from(emailVerificationTokens)
+    .where(and(eq(emailVerificationTokens.tokenHash, hashToken(token)), eq(emailVerificationTokens.purpose, purpose)))
+    .limit(1);
+
+  if (!row) return { ok: false, reason: 'unknown' };
+  if (row.consumedAt) return { ok: false, reason: 'already-used' };
+  if (row.expiresAt.getTime() <= now.getTime()) return { ok: false, reason: 'expired' };
+  return { ok: true, userId: row.userId, email: row.email };
+}
 
 /**
  * Consumes a token, or explains why it will not.

@@ -547,6 +547,14 @@ html {
   color: var(--btn-danger-bg);
   font-weight: 700;
 }
+/* The mirror of .acc-error, for a confirmation rather than a refusal.
+   No success MESSAGE was ever captured to measure — the reference shows none — so the colour is
+   inherited from --btn-success-bg, which WAS measured on the reference's own success button.
+   Inherited, not captured; the weight and the shape are .acc-error's. */
+.acc-success {
+  color: var(--btn-success-bg);
+  font-weight: 700;
+}
 .acc-footer {
   padding: 20px 0 40px;
   font-size: 14px;
