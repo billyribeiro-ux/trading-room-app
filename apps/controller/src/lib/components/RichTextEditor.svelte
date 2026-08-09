@@ -273,8 +273,21 @@
     is supposed to do: the editing surface itself is the focusable control, and each button keeps
     its `title` and `aria-label`. It is also simply what the reference does, so matching it removes
     an invention rather than adding one.
+
+    `unselectable="on"` is the reference's too, on every button, and it is FUNCTIONAL rather than
+    cosmetic: it stops the button taking the selection when it is clicked. `document.execCommand`
+    acts on the live selection, so a control that steals it is a control that formats nothing. This
+    code already works around that by saving and restoring the range around dialogs; the attribute
+    prevents the plain-click case from needing that at all.
+
+    HONEST GAP — `disabled="disabled"`. Every button in the capture carries it except `html`, and
+    that is still true in a capture taken after typing (`ng-dirty ng-touched` on the body). So it is
+    not simply "disabled until first edit". textAngular gates the toolbar on the editor holding
+    focus, and every capture so far was taken with focus elsewhere — which would explain it
+    entirely, but is not proven by anything on disk. Ours stay enabled: disabling them permanently
+    on this evidence would break a working editor, and that is the more expensive mistake.
   */
-  const TOOLBAR_BUTTON_FOCUS = { tabindex: -1 } as const;
+  const TOOLBAR_BUTTON_FOCUS = { tabindex: -1, unselectable: 'on' } as const;
 </script>
 
 <div class="btn-group-small ta-root">
