@@ -3,6 +3,7 @@ import { and, eq, isNull } from 'drizzle-orm';
 import { getDb } from './db';
 import { emailVerificationTokens, users } from './db/schema';
 import { mailConfigured, sendMail } from './mail';
+import { brandedHtml, brandedText } from './mail-template';
 
 /**
  * Proving that somebody owns the address they signed up with.
@@ -170,18 +171,29 @@ export async function sendVerificationEmail(input: {
   token: string;
   origin: string;
 }): Promise<void> {
+  /*
+    One description of the message, rendered twice.
+
+    `brandedHtml` and `brandedText` take the same input, so the two parts cannot drift apart — a
+    text body saying something different from the HTML is both a spam signal and a support problem.
+    The text part is not a courtesy: many clients block remote images by default, and a recipient
+    who has never received mail from this domain is exactly the one most likely to have them off.
+  */
+  const content = {
+    origin: input.origin,
+    greeting: `Hi ${input.displayName},`,
+    paragraphs: ['Confirm this address to finish setting up your account.'],
+    action: { label: 'Confirm my email', url: verificationLink(input.origin, input.token) },
+    footnotes: [
+      'The link works once and expires in 24 hours.',
+      'If you did not create an account, you can ignore this message.'
+    ]
+  };
+
   await sendMail({
     to: input.email,
     subject: 'Confirm your email address',
-    text: [
-      `Hi ${input.displayName},`,
-      '',
-      'Confirm this address to finish setting up your account:',
-      '',
-      verificationLink(input.origin, input.token),
-      '',
-      'The link works once and expires in 24 hours.',
-      'If you did not create an account, you can ignore this message.'
-    ].join('\n')
+    text: brandedText(content),
+    html: brandedHtml(content)
   });
 }

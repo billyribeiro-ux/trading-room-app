@@ -75,8 +75,22 @@ export function mailConfigured(): boolean {
 export interface Mail {
   to: string;
   subject: string;
-  /** Plain text only. Nothing this product sends needs markup, and text cannot carry a payload. */
+  /**
+   * The plain-text body, and it is NOT optional even when `html` is supplied.
+   *
+   * Every message goes out multipart. Text-only clients, screen readers and the preview pane all
+   * read this part, and spam scoring rewards a message whose two parts say the same thing. It is
+   * also the version that still works when a client blocks remote images, which many do by
+   * default — so the link must appear here as a URL, not only as a button over there.
+   */
   text: string;
+  /**
+   * Optional HTML body. When present the message is sent multipart/alternative.
+   *
+   * Everything this product sends must remain fully usable without it. The HTML carries branding,
+   * not information.
+   */
+  html?: string;
 }
 
 export async function sendMail(mail: Mail): Promise<void> {
@@ -94,7 +108,10 @@ export async function sendMail(mail: Mail): Promise<void> {
         from: MAIL_FROM,
         to: [mail.to],
         subject: mail.subject,
-        text: mail.text
+        text: mail.text,
+        // Omitted rather than sent empty: Resend treats a present-but-blank `html` as an HTML part,
+        // which would deliver a blank message to any client that prefers HTML — most of them.
+        ...(mail.html ? { html: mail.html } : {})
       }),
       signal: AbortSignal.timeout(TIMEOUT_MS)
     });
