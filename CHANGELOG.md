@@ -24,6 +24,129 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-09
 
+### 12:45 — SvelteKit 3 `@next` ADOPTED. The 12:25 entry's blocker was my mistake, not Kit's
+
+**Runtime impact: yes — this is a framework major.** `@sveltejs/kit` **3.0.0-next.16**,
+`adapter-vercel` **7.0.0-next.6**, `adapter-node` **6.0.0-next.8**. Both apps green.
+
+**The 12:25 entry said Kit 3 "ships no tsconfig to extend" and therefore was not adoptable. That was
+wrong, and the correction matters more than the conclusion did.** Kit 3 writes
+`node_modules/$app/tsconfig.json` — a real generated file — and `node_modules/$app/types/index.d.ts`
+beside it. I had looked in `.svelte-kit/types/`, the Kit 2 location, found nothing, and stopped.
+`svelte-kit sync` ALSO drops a placeholder `{}` at that path first "to squelch warnings", so the one
+time I did read the right file I read the placeholder and concluded the base was empty.
+
+Reading Kit's own `write_app_types.js` and `cli.js` settled it in two minutes. **Absence of evidence
+where I happened to look is not evidence of absence.**
+
+#### Every breaking change, and what each required
+
+| change | what it took |
+| --- | --- |
+| **`svelte.config.js` is removed** | Config moves into `sveltekit({…})`. The **`kit` namespace disappears** — `adapter`, `paths`, `preprocess` become siblings. |
+| **`experimental.explicitEnvironmentVariables` is gone** | It graduated. `src/env.ts` + `$app/env/*` is simply how it works; passing the old Kit 2.63 opt-in is a type error. |
+| **`$lib` is removed in favour of `#lib`** | Took Kit's own offered `alias: { $lib: 'src/lib' }`. Renaming several hundred imports inside a framework-major diff would make it unreviewable. Kit warns `config.alias` is itself deprecated — **`#lib` is a scheduled follow-up, not a resting place.** |
+| **`resolve()` takes ROUTE IDS, not pathnames** | 58 call sites. `resolve('/contact')` → `resolve('/(public)/contact')`; `` resolve(`/account/rooms/${code}/users?filter=x`) `` → `` `${resolve('/(app)/account/rooms/[id]/[[tab]]', { id: code, tab: 'users' })}?filter=x` ``. Query strings stay outside — `filter` is a query parameter, not a route parameter. |
+| **`asset()` paths lost their leading slash** | `asset('/ajax_loader.gif')` → `asset('ajax_loader.gif')`, matching Kit 3's `AssetPath()` union. |
+| **The generated tsconfig carries no `include` and `paths: {}`** | Both stated explicitly in each app's `tsconfig.json`. Without the include TypeScript checks *everything* under the project — that is the real story behind the "1238 errors" in the 12:25 entry, which were an artefact rather than defects. |
+| **The room's `$env/dynamic/*`** | Its declarations live in `.svelte-kit/ambient.d.ts`, which Kit 2's base included and Kit 3's does not. Listed explicitly. The controller needs none — it already uses `$app/env/*`. |
+
+#### The trap worth knowing about
+
+**`sveltekit()` with no arguments now means "no configuration at all"**, where it used to fall back to
+the shared file. `vitest.db.config.ts` called it bare, so **28 database tests failed on
+`Cannot find module '$lib/room-settings-profile'` while the unit suite and the build stayed green** —
+only the database config was missing the alias.
+
+Fixed properly rather than by copy-paste: the options live in **`apps/controller/kit.config.ts`** and
+every entry point imports them. `svelte.config.js` used to provide that sharing for free; under Kit 3
+it has to be deliberate.
+
+#### Also corrected
+
+The room's `tsconfig.json` was still extending a **stale `.svelte-kit/tsconfig.json` left over from
+Kit 2**, whose `$app/types` mapping pointed at a file Kit 3 no longer writes. It passed only because
+that app does not use typed `resolve()` — the kind of thing that bites later rather than now. Removed
+and repointed.
+
+**Verified:** controller `svelte-check` 0/0, 562 unit tests, **37 database tests**, `vite build` clean.
+Room `svelte-check` 0/0, 524 tests, build clean under both adapters.
+
+
+### 12:44 — THE SFU IS LIVE on the Hetzner box. `media.tradingroom.app` answers for real
+
+**RUNTIME IMPACT: yes, the largest today.** That hostname served a 503 placeholder for its whole
+life; it now serves the media service. The room was redeployed and restarted.
+
+`docs/SFU-MIGRATION.md` called this "the last piece between here and a working product". Done, bar
+the two-browser screen-share test, which needs a human at a keyboard.
+
+**What was built and started**
+
+- **The image builds on the target box** — `tradingroom-media:local`, 71.8MB. `CARGO_BUILD_JOBS` is
+  now an overridable `ARG`; it was hardcoded at 2, and two concurrent jobs on 2 cores with 1.9GB
+  push the C++ mediasoup worker compile into swap and, at the wrong moment, into the OOM killer —
+  which reads as a mediasoup error rather than as what it is. Built with 1. Peak headroom during
+  the build: 474MB free.
+- **An Ed25519 keypair generated ON the box**, so the private half never crossed the network. It
+  satisfies the contract `media-grant.test.ts` pins: 44 characters, ends `=`, decodes to exactly 32
+  bytes. Public half `sXCgMcEwHgVy0Hb1UGkn+dVpbTz948SSvy+c3vy4azU=` in the SFU's config; private
+  half in the room's `.env`, which was backed up first.
+- **`tradingroom-media.service` installed from `ops/`, enabled and started.** Its own log is the
+  evidence: `configuration validated bind_address=127.0.0.1:4443 announced_address=87.99.154.155
+  rtc_ports=40000-40199 workers=1`, `admission grants are required; verifying against this public
+  key`, `mediasoup worker started`. Container reports `(healthy)`.
+
+**The room needed a code fix before it could ever have worked**
+
+`media-grant.ts` now accepts a PEM whose newlines arrived escaped. **Measured on the box, not
+assumed**: the room runs under `EnvironmentFile=`, systemd has no multi-line value syntax, and
+`KEY="a\nb"` comes back with the backslash and the `n` as two characters — `printenv | od -c` shows
+`\   n`. Without this the migration would have ended at
+`MEDIA_GRANT_PRIVATE_KEY is not a readable private key`, which accuses the key instead of systemd.
+`fcm.ts:140` already solves this exact problem the exact same way. The room was rebuilt with
+`ADAPTER=node`, the previous build kept as `build.bak-1786293403`, and restarted.
+
+**The side-by-side audit changed the deployment**
+
+Reading `ops/mediasoup/Caddyfile.example` against what I had just deployed found a real divergence.
+I had used the bare `reverse_proxy 127.0.0.1:4443` from `SFU-MIGRATION.md` — but that doc's snippet
+is a simplification of the ops file, which is the engineered contract: it proxies **only `/health`
+and `/ws`**, returns **404 for everything else**, and sets HSTS, `X-Content-Type-Options`,
+`Referrer-Policy` and `-Server`. A bare proxy forwards every path to the media process, which is a
+wider surface than it has endpoints for. Corrected to the ops contract, and verified:
+
+| probe | result |
+| --- | --- |
+| `GET /health` | **200**, `{"status":"ok","workers":1,"workerDeaths":0,"admission":"require-grant"}` |
+| `GET /` and `/anything` | **404** — not proxied, per the contract |
+| `GET /ws` upgrade, no grant | **400** — admission refused it, and the worker did not die (`workerDeaths: 0`) |
+
+The example's global options (`admin off`, `protocols h1 h2`) were deliberately NOT applied: this
+Caddyfile also serves `chat.tradingroom.app`, so a global block would change the room's site too.
+Recorded as a knowing difference rather than an oversight.
+
+**Configuration agreement, read on both sides:** the room dials
+`MEDIA_WS_URL=wss://media.tradingroom.app/ws`, which is exactly the route Caddy proxies; the room's
+`ORIGIN=https://chat.tradingroom.app` is exactly the SFU's `MEDIA_ALLOWED_ORIGIN`. A mismatch there
+would reject every grant, so both halves were read rather than trusted.
+
+**NOT done, and honestly so**
+
+- **The two-browser screen-share test.** Step 5 of the brief, and the only proof that matters. It
+  needs a real browser and a real room; nothing above substitutes for it.
+- **The Hetzner CLOUD firewall is unverified.** The host itself filters nothing — `ufw inactive`,
+  iptables INPUT `ACCEPT` — so the cloud firewall is the only gate and it cannot be read from inside
+  the box. If TCP on 40000-40199 is missing, UDP-blocked clients fail **silently**. Check it in the
+  console before concluding the SFU is broken.
+- **Lightsail is still running.** The brief says retire it only after the browser test passes, and
+  a stopped Hetzner or Lightsail box still bills — only deletion stops it.
+- **A grant was never minted end to end from here.** Doing so meant reading the live
+  `ROOM_JWT_SECRET` and forging a token against production, which was refused — correctly. The chain
+  is proven in three separate pieces instead: the key parses (31 room tests, including both PEM
+  forms yielding the same public half), the deployed build contains that code, and the SFU refuses
+  an ungranted socket at the edge.
+
 ### 12:25 — SvelteKit 3 `@next` evaluated against the real repository, and NOT adopted
 
 **No runtime impact — nothing shipped.** The migration was performed in full, found to be blocked,

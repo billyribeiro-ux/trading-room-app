@@ -15,8 +15,8 @@
       <h2 class="hc-h2">{CTA.heading}</h2>
       <p class="hc-lede">{CTA.lede}</p>
       <div class="actions">
-        <a href={resolve('/contact')} class="hc-btn hc-btn-primary" {@attach magnetic()}>{CTA.primary.label}</a>
-        <a href={resolve('/contact')} class="hc-btn hc-btn-ghost">{CTA.secondary.label}</a>
+        <a href={resolve('/(public)/contact')} class="hc-btn hc-btn-primary" {@attach magnetic()}>{CTA.primary.label}</a>
+        <a href={resolve('/(public)/contact')} class="hc-btn hc-btn-ghost">{CTA.secondary.label}</a>
       </div>
       <p class="fine">{CTA.finePrint}</p>
     </div>

@@ -18,7 +18,7 @@
 
 <div class="ad-root">
   <div class="topbar">
-    <a href={resolve('/account')}>← Back to PTR</a>
+    <a href={resolve('/(app)/account')}>← Back to PTR</a>
   </div>
   <div class="container">
     <div class="card">

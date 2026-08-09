@@ -19,7 +19,7 @@
   <div class="hc-container">
     <div class="top">
       <div class="brand-block">
-        <a href={resolve('/')} class="brand">
+        <a href={resolve('/(public)')} class="brand">
           <svg viewBox="0 0 28 28" class="mark" aria-hidden="true">
             <line x1="6" y1="7" x2="6" y2="23" />
             <rect x="3.5" y="12" width="5" height="7" rx="1" class="down" />
@@ -48,9 +48,9 @@
         <div class="column">
           <h3>Company</h3>
           <ul>
-            <li><a href={resolve('/contact')}>Contact us</a></li>
-            <li><a href={resolve('/privacy')}>Privacy policy</a></li>
-            <li><a href={resolve('/terms')}>Terms of service</a></li>
+            <li><a href={resolve('/(public)/contact')}>Contact us</a></li>
+            <li><a href={resolve('/(public)/privacy')}>Privacy policy</a></li>
+            <li><a href={resolve('/(public)/terms')}>Terms of service</a></li>
           </ul>
         </div>
 
@@ -59,10 +59,10 @@
             <h3>Account</h3>
             <ul>
               {#if signedIn}
-                <li><a href={resolve('/account')}>My account</a></li>
+                <li><a href={resolve('/(app)/account')}>My account</a></li>
               {:else}
-                <li><a href={resolve('/login')}>Log in</a></li>
-                <li><a href={resolve('/register')}>Register</a></li>
+                <li><a href={resolve('/(public)/login')}>Log in</a></li>
+                <li><a href={resolve('/(app-auth)/register')}>Register</a></li>
               {/if}
             </ul>
           </div>

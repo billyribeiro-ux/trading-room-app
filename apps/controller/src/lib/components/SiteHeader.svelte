@@ -36,9 +36,9 @@
         <span class="icon-bar"></span>
         <span class="icon-bar"></span>
       </button>
-      <a href={resolve('/')} class="navbar-brand">
+      <a href={resolve('/(public)')} class="navbar-brand">
         <img
-          src={asset('/public/images/protradingroom_icon.png')}
+          src={asset('public/images/protradingroom_icon.png')}
           alt=""
           width={IMAGE_SIZES.brand.w}
           height={IMAGE_SIZES.brand.h}
@@ -53,7 +53,7 @@
       <ul class="nav navbar-nav navbar-right">
         {#if accountAccessEnabled}
           {#if signedIn}
-            <li><a href={resolve('/account')}>My account</a></li>
+            <li><a href={resolve('/(app)/account')}>My account</a></li>
           {:else}
             <li class={['dropdown', { open: accountMenuOpen }]}>
               <button
@@ -67,14 +67,14 @@
                 }}
               >Register/Login <b class="caret"></b></button>
               <ul class="dropdown-menu" aria-label="Account">
-                <li><a href={resolve('/login')} onclick={() => (accountMenuOpen = false)}>Login</a></li>
-                <li><a href={resolve('/register')} onclick={() => (accountMenuOpen = false)}>Register</a></li>
+                <li><a href={resolve('/(public)/login')} onclick={() => (accountMenuOpen = false)}>Login</a></li>
+                <li><a href={resolve('/(app-auth)/register')} onclick={() => (accountMenuOpen = false)}>Register</a></li>
               </ul>
             </li>
           {/if}
         {/if}
         <li>
-          <a href={resolve('/contact')}><i class="fa fa-envelope"></i> Contact Us</a>
+          <a href={resolve('/(public)/contact')}><i class="fa fa-envelope"></i> Contact Us</a>
         </li>
       </ul>
     </nav>

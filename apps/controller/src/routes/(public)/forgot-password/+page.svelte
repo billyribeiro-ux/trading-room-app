@@ -56,13 +56,13 @@
         <p class="acc-error" role="alert">Password reset is not available on this deployment yet.</p>
         <p class="acc-text-muted">
           Email delivery is not configured, so no link can be sent.
-          <a href={resolve('/contact')}>Get in touch</a> and we will sort it out directly.
+          <a href={resolve('/(public)/contact')}>Get in touch</a> and we will sort it out directly.
         </p>
       {:else if form?.sent}
         <!-- Deliberately the same answer whether or not that address has an account. -->
         <p class="acc-success" role="status">{form.message}</p>
         <p class="acc-text-muted">
-          Nothing arrived? Check spam, then <a href={resolve('/forgot-password')}>try again</a>.
+          Nothing arrived? Check spam, then <a href={resolve('/(public)/forgot-password')}>try again</a>.
         </p>
       {:else}
         <p class="acc-text-muted">
@@ -103,7 +103,7 @@
               </div>
 
               <div class="acc-text-right">
-                <a class="acc-text-muted" href={resolve('/login')}>Back to sign in</a>
+                <a class="acc-text-muted" href={resolve('/(public)/login')}>Back to sign in</a>
               </div>
             </div>
           </div>

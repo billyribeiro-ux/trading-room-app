@@ -29,7 +29,7 @@
     <p>
       We use cookies to enhance your experience. By continuing to visit this site you agree to our use of cookies.
       For more information, including how to manage your cookie settings, see our
-      <a href={resolve('/privacy')} target="_blank" rel="noopener noreferrer">Privacy Policy</a>.
+      <a href={resolve('/(public)/privacy')} target="_blank" rel="noopener noreferrer">Privacy Policy</a>.
     </p>
     <div class="choices">
       <button type="button" class="accept" onclick={() => choose('accepted')}>Accept All</button>
