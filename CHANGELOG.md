@@ -24,6 +24,30 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-09
 
+### 10:35 — `TODO.md` now lists only open work (pushed to `main`)
+
+**No runtime impact** — one document.
+
+Seven closed items removed rather than left struck through: evidence gap **13** (`ptr_logo.png`),
+and work items **A** (password reset), **B** (mail transport), **D** (`ROOM_BASE_URL`),
+**E** (`ROOM_JWT_SECRET`), **I** (four unstyled public pages) and **J** (the wrong-shell defect).
+
+Nothing is lost — every one of them is in this file, dated, timed, and against the commit that
+closed it. That is the point of the split: two places recording the same thing is how one of them
+goes stale, and a list that is mostly strikethrough is a list nobody reads to the bottom of. The
+header now says so, so the next person does not "helpfully" restore the history.
+
+**Two counts repaired, which is the part a plain deletion would have got wrong:**
+
+- "closes five of **thirteen** gaps" now reads "five of the **twelve remaining** gaps", because gap
+  13 was one of the thirteen.
+- checked for dangling references to the removed ids across the file — none.
+
+**What is left, and it is now the whole file:** evidence gaps **1–12**, and work items **C**
+(`push_tokens_json` has no writer), **G** (Neon under volume) and **H** (separate the media plane
+from the app tier). G and H are the owner's calls, recorded rather than queued.
+
+
 ### 10:28 — The e2e harness could not run at all; written, plus the manage-page spec (pushed to `main`)
 
 **No runtime impact** — test infrastructure and one `.gitignore` line. Nothing about what the site
