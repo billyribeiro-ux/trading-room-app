@@ -474,6 +474,42 @@
     setOpenMenu(openMenu === id ? null : id);
   }
 
+  /**
+   * The Vanity Link editor — a bootbox prompt, matching the reference.
+   *
+   * Its title, input type and button pair are transcribed from the reference's own rendered modal:
+   * a single-line `bootbox-input-text`, an OK and a Cancel, and the exact wording below. The
+   * constraint in that wording is real — the value becomes a URL path segment — so it is also
+   * enforced here rather than only described.
+   */
+  let vanityForm = $state<HTMLFormElement | null>(null);
+  let vanitySlug = $state('');
+
+  async function editVanity() {
+    const entered = await bootbox.prompt(
+      'Enter your desired name. (Only letters and numbers allowed. No spaces or special characters allowed, as this is a URL)',
+      'OK',
+      'text'
+    );
+    if (entered === null) return;
+
+    const slug = entered.trim();
+    if (!slug) return;
+
+    /*
+      Checked before posting, because the prompt's own title promises it. Letting an invalid value
+      reach the server would produce a refusal the operator has already been told to avoid — and
+      the server still validates, so this is a courtesy, not the guard.
+    */
+    if (!/^[A-Za-z0-9]+$/.test(slug)) {
+      await bootbox.confirm('Only letters and numbers are allowed. No spaces or special characters.');
+      return;
+    }
+
+    vanitySlug = slug;
+    vanityForm?.requestSubmit();
+  }
+
   function toggleRowMenu(memberId: number) {
     openMenu = null;
     openRowMenu = openRowMenu === memberId ? null : memberId;
@@ -767,14 +803,7 @@ Please click this link to attend: ______ unique link will be here_____
           <div class="input-group">
             <input class="form-control col-md-6" type="text" id="customLinkTxt" readonly value={data.links.vanity} />
             <span class="input-group-btn">
-              <button
-                class="btn btn-warning"
-                type="button"
-                data-menu-control
-                aria-expanded={openMenu === 'vanity'}
-                aria-controls="vanity-editor"
-                onclick={() => toggleMenu('vanity')}
-              >
+              <button class="btn btn-warning" type="button" onclick={editVanity}>
                 Edit <i class="fa fa-edit"></i>
               </button>
               <button class="btn btn-info" type="button" onclick={() => copy('customLinkTxt')}>
@@ -782,19 +811,37 @@ Please click this link to attend: ______ unique link will be here_____
               </button>
             </span>
           </div>
-          {#if openMenu === 'vanity'}
-            <form
-              method="POST"
-              action="?/setCustomRoomURL"
-              use:enhance={save}
-              class="form-inline"
-              id="vanity-editor"
-              data-menu-panel
-            >
-              <input class="form-control" name="slug" placeholder="yournamehere" required />
-              <button class="btn btn-primary" type="submit">Save vanity link</button>
-            </form>
-          {/if}
+          <!--
+            The vanity editor is a BOOTBOX PROMPT, not an inline form.
+
+            Ours dropped a `form-inline` into the page below the field. The reference opens a modal,
+            and the owner supplied its rendered markup:
+
+              <h4 class="modal-title">Enter your desired name. (Only letters and numbers allowed.
+              No spaces or special characters allowed, as this is a URL)</h4>
+              <form class="bootbox-form">
+                <input class="bootbox-input bootbox-input-text form-control" autocomplete="off" type="text">
+              </form>
+              <button data-bb-handler="cancel" class="btn btn-default">Cancel</button>
+              <button data-bb-handler="confirm" class="btn btn-primary">OK</button>
+
+            Three things come from that markup and are reproduced exactly: the title string, the
+            input type (`bootbox-input-text` — a single-line text field, NOT this app's textarea
+            default), and the OK/Cancel pair.
+
+            `?/setCustomRoomURL` is unchanged — only how the value is collected differs. The form
+            posts hidden so the action, its validation and its failure message all still apply.
+          -->
+          <form
+            method="POST"
+            action="?/setCustomRoomURL"
+            use:enhance={save}
+            id="vanity-editor"
+            bind:this={vanityForm}
+            hidden
+          >
+            <input type="hidden" name="slug" bind:value={vanitySlug} />
+          </form>
 
           <label class="col-sm-2 control-label" for="uniqueLinkTxt">Unique Link:</label>
           <div class="input-group">

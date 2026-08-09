@@ -658,6 +658,16 @@
   display: inline-block;
   padding: 6px 12px;
   margin-bottom: 0;
+  /*
+    `text-decoration: none` belongs on the RESTING rule, not only on `:active`.
+
+    Bootstrap declares it here; this transcription put it only on `.mg-root .btn:active` further
+    down, so a button that is also an ANCHOR — Launch, Marketplace, Manage — kept the browser's
+    default underline until it was pressed. Real `<button>` elements never showed it, which is
+    exactly why it survived review: the defect was visible only on the three controls that happen
+    to be links.
+  */
+  text-decoration: none;
   font-family: inherit;
   font-size: 14px;
   font-weight: 400;

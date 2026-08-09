@@ -90,3 +90,5 @@ new-room-control/
 /apps/room/toast-container
 /apps/room/mention-reply-private-chat.clean.html
 # `proroom-ULTIMATE-*.json` is already covered by the `proroom-*.json` rule above.
+.vercel
+.env*
