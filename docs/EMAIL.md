@@ -298,6 +298,21 @@ Registration confirms the middle row: `register/+page.server.ts:79-88` inserts `
 declares it nullable and NOT defaulted — a default would mark every future row verified, which is
 the opposite of the point.
 
+> ### ⚠️ The variables were set on 2026-08-09. This check is now OWED, not optional.
+>
+> `RESEND_API_KEY` and `MAIL_FROM` are both present in Vercel production. So
+> `verificationEnforced()` is **already true** and the gate below is **already real** — the
+> measurement further down was taken BEFORE that happened and no longer proves anything about
+> today.
+>
+> Re-run the query. It needs the production database and is a plain read; nothing in this session
+> could run it, because pulling the production environment to get a connection string materialises
+> every other secret alongside it, which is a worse trade than asking. Anyone who registered
+> between migration 1 and 2026-08-09 has a NULL `email_verified_at` and is now gated out of
+> creating a room until they click a link — which, until today, could not be sent to them. If the
+> query returns such a row, the fix is one `UPDATE` for that user or a resend from the account
+> page, not a change to the gate.
+
 **So check rather than assume.** Whether your own account is in the safe row or the caught one
 depends on when it was created relative to migration 1:
 

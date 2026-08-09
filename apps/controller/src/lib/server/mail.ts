@@ -28,9 +28,15 @@ import { MAIL_FROM, RESEND_API_KEY } from '$app/env/private';
  * it is working. That is strictly worse than not enforcing, and it is exactly the failure a "just
  * make it required" change would introduce.
  *
- * **As of this commit the deployment is in the unconfigured state**: there is no provider account
- * and no mailbox on a domain with DKIM/SPF. That is not a defect in this file — it is the two
- * things only the owner can do, and until they exist this module correctly sends nothing.
+ * **Production has been in the CONFIGURED state since 2026-08-09**: both variables are set on
+ * Vercel, so this module sends for real, verification is enforced, and password reset works. This
+ * paragraph previously said the opposite and was left stale for a day after the owner set them up —
+ * worth knowing, because a comment asserting "nothing is sent here" is exactly the sort of thing a
+ * later reader trusts instead of checking.
+ *
+ * Local development is normally still unconfigured, and that asymmetry is deliberate rather than an
+ * oversight: the two honest states above both behave correctly, so a developer without a key gets a
+ * product that works rather than one that appears to send.
  *
  * ## No silent swallow
  *
