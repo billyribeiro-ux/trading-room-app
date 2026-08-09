@@ -435,6 +435,9 @@ that also appears in a file's header JSDoc, and a PII sweep that flagged a vendo
 
 ## 7. Open evidence gaps — recorded, never invented
 
+**Indexed in the repo-root `TODO.md`**, which is where the project rule says gaps live. That file
+is the index; the write-ups stay here and in `MOBILE-APP.md`.
+
 - **`createNew()`** — the New Room handler. Three captures prove the control; none contains the
   function. It is in `/public/dist/app.min.js`, which is not on disk. Unknown: where a new room's
   NAME comes from. `scripts/collect-create-new.js` fetches the bundle and closes this.

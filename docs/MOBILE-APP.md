@@ -205,6 +205,8 @@ see §6.
 
 ## 6. Open questions — do NOT guess these
 
+**Also indexed in the repo-root `TODO.md`** — gaps 6, 7 and 12 there are the mobile ones.
+
 - **Does the app carry video/audio, or only alerts?** Every captured control is notification
   related. No capture shows a mobile media path. The SFU would support it, but nothing proves the
   app uses it.
