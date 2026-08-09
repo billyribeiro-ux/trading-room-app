@@ -785,3 +785,34 @@ The direct root must therefore be trusted and its validation does not prove all
 ancestors immutable. The observable violation signal and non-destructive
 quiesce/inspect/restore/restart recovery are recorded in ADR 0003. PostgreSQL
 remains the only production data authority.
+
+## 17. Cinematic home redesign — 2026-08-09
+
+`/` is no longer the evidence-pinned reconstruction. By owner directive it is an
+original cinematic surface (ADR
+[`0005-cinematic-home.md`](decisions/0005-cinematic-home.md)): Threlte 8 /
+three.js instanced hero scene behind a WebGL + hardware probe and dynamic
+import, GSAP 3 ScrollTrigger choreography delivered through `{@attach}`
+factories in `$lib/motion.ts`, a D3 simulated tape labeled as simulated, pure
+CSS/SVG product mocks in place of the three stock screenshots (all deleted), a
+dedicated nav/footer/consent chrome under `.home-cine`, and zero raster imagery.
+
+Framework placement follows the existing decisions: runes-only components with
+typed props, attachments over `bind:this` + `$effect` (the official autofixer
+reports no issues or suggestions on all sixteen touched `.svelte` files),
+component `<style>` for everything single-owner and `src/home.css` for shared
+tokens per ADR 0004, and SSR that emits the complete composition — the seeded
+market walks are deterministic, so server and client render identical charts.
+
+Section 16's "Layout stability" hero/icon work is superseded with the page it
+measured: there are no `<img>` elements left on `/` to reserve boxes for.
+`home:fidelity` is retired; its successor `home:contract`
+(`scripts/verify-home-contract.mjs`) is self-contained and runs on any clone.
+Verified this change: `home:contract`, `breakpoints:verify`, zero-error/zero-
+warning svelte-check and ESLint on every touched file (three pre-existing
+warnings and eleven pre-existing lint errors in untouched files remain), the
+adapter-vercel production build, and rendered Chromium screenshots at desktop,
+mobile, forced-WebGL, and reduced-motion. `fonts:verify` and the evidence-bound
+gates cannot run in this clone (owner-local captures); the font contract's
+in-repo requirements — exact Roboto preload lines and no remote fonts — are
+asserted by `home:contract` reading the same sources.
