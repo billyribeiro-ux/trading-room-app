@@ -60,7 +60,7 @@ From `apps/controller/src/lib/room-settings-schema.ts`:
 
 | setting | what it controls |
 | --- | --- |
-| `ptrMobileAppEnabled` | the ProTradingRoom app, for this room |
+| `ptrMobileAppEnabled` | the FIRST-PARTY app, for this room. The `ptr` prefix is the reference's — it is their setting name, kept because renaming a settings key would break the schema contract. For us it means the TradingRoomApp app. |
 | `ptrMobileAppCaseByCaseEnabled` | per-member opt-in rather than room-wide |
 | `ptrMobileAppExpirePairCodeDays` | pair-code lifetime |
 | `mobileAppExpireNotificationsDays` | how long notifications keep flowing |
@@ -72,7 +72,7 @@ From `apps/controller/src/lib/room-settings-schema.ts`:
 | `customMobileAppLaunchWord` | a launch keyword; "deep link" is the obvious reading, and obvious is not evidence |
 
 `customMobileApp*` is the commercially interesting group — and the one this document itself
-over-read once, describing it as "a WHITE-LABEL app instead of ProTradingRoom's". It proves a room
+over-read once, describing it as "a WHITE-LABEL app instead of the first-party one". It proves a room
 can POINT AT a different app; it does not prove who built that app. §7 separates what the evidence
 establishes from what it merely permits, because the difference decides the framework.
 

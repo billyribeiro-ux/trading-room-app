@@ -17,7 +17,7 @@
     usesRoomPassword
   } from '$lib/auth-modes';
   import { isRoomTrial } from '$lib/room-member-role';
-  import { settingHelp } from '$lib/room-settings-help';
+  import { settingHelp, type SettingHelp } from '$lib/room-settings-help';
   import type { RoomSettingDef } from '$lib/room-settings-schema';
   import type { SubmitFunction } from '@sveltejs/kit';
   import { untrack } from 'svelte';
@@ -315,7 +315,24 @@
       usesRoomPassword(settingValue('authMode'), settingValue('allowPWLoginWithSSO')) ||
       settingValue('authMode') === 'unamePW'
   };
-  const settingIsVisible = (def: RoomSettingDef) => authModeGated[def.name]?.() ?? true;
+  /*
+    The two rows the reference reveals only when the profanity filter is on.
+
+    file2:2109 and 2114 are `<p class="form-control-static ng-hide" ng-show="sess.hasProfanityFilter">`
+    — the Ignore List and the Extra Bad list. `ng-hide` is on both in the capture, because the
+    reference room has the filter off, so the reference contributes NOTHING for either row while
+    ours rendered two complete rows an operator of that room could never have seen.
+
+    HONEST GAP: no visibility field is recorded in the generated schema, and these are the only two
+    `ng-show` rows anywhere in the settings list, so — like `authModeGated` above — this is our own
+    plumbing, hand-written and keyed by name. Only the CONDITION is evidence.
+  */
+  const profanityGated: Record<string, () => boolean> = {
+    ingnoreBadWordsList: () => !!settingValue('hasProfanityFilter'),
+    additionalBadWordsList: () => !!settingValue('hasProfanityFilter')
+  };
+  const settingIsVisible = (def: RoomSettingDef) =>
+    (authModeGated[def.name]?.() ?? true) && (profanityGated[def.name]?.() ?? true);
 
   /** the Settings tab splits at the reference's "DON'T TOUCH" heading */
   const settingsMain = $derived(
@@ -702,6 +719,27 @@
          string literal is the only form the formatter cannot silently repair. -->
     {note}
   </p>
+{/snippet}
+
+<!--
+  The helper copy under a settings row, in the THREE forms the reference uses for it.
+
+  Most rows are `<br><label class="muted">…</label>`. But 41 use a CLASSLESS `<label>`, four of
+  those omit the `<br>` (file2:1903, 2112, 2117, 2415), and three carry the copy as a bare text
+  node on the row's own `<p>` with no element and no `<br>` at all (file2:2459, 2469, 2477) — the
+  same shape `dtNote` above models for the DON'T TOUCH block. Which row is which is read off the
+  capture line by line in `$lib/room-settings-help`; this snippet only renders what that says.
+
+  The labels label no control — they are copy sitting beside an editable, exactly like the row
+  label — so the a11y rule is silenced with the reason rather than satisfied with a `for` pointing
+  at nothing.
+-->
+{#snippet helpCopy(help: SettingHelp)}
+  {#if help.br}<br />{/if}
+  {#if help.shape === 'text'}{help.text}{:else}
+    <!-- svelte-ignore a11y_label_has_associated_control -->
+    <label class={help.shape === 'muted' ? 'muted' : undefined}>{help.text}</label>
+  {/if}
 {/snippet}
 
 <ToastHost />
@@ -2236,7 +2274,6 @@ Please click this link to attend: ______ unique link will be here_____
                       <label class="col-sm-2 control-label">{def.label ?? def.name}</label>
                       <Editable {def} value={settingValue(def.name)} markUnwired />
                       {#if help}
-                        <br />
                         <!--
                           A `<label>`, because that is what the reference's helper copy IS:
                           `<br><label class="muted">If set, Presenters will need to enter the
@@ -2246,42 +2283,51 @@ Please click this link to attend: ______ unique link will be here_____
                           This was a `<span class="muted">` on the argument that a span with the
                           same computed box says the same thing. True of the paint, false of the
                           shape — one differing row per helper, and there are 87 of them in the
-                          first half of this pane alone. It labels no control, same as the row
-                          label above, so the same rule is silenced with the same reason.
+                          first half of this pane alone.
 
-                          Eight of them carry NO class in the capture (file2:1247 and seven
-                          others) — `$lib/room-settings-help` says which, and why the generated
-                          schema cannot.
+                          41 of them carry NO class in the capture, four of those drop the `<br>`
+                          as well, and three are not an element at all — `helpCopy` above renders
+                          the three shapes and `$lib/room-settings-help` says which row is which,
+                          and why the generated schema cannot.
                         -->
-                        <!-- svelte-ignore a11y_label_has_associated_control -->
-                        <label class={help.muted ? 'muted' : undefined}>{help.text}</label>
+                        {@render helpCopy(help)}
                       {/if}
                     </p>
                   {/each}
 
                   {#if apiSecretDef}
-                    <!-- a div, not the reference's <p>: it holds a <form>, which
-                         cannot nest inside a paragraph. `.form-control-static`
-                         sets margin-bottom: 0 either way, so the box is the same. -->
-                    <div class="form-control-static">
+                    <!--
+                      The reference's own `<p class="form-control-static">` (file2:1907), not a div.
+
+                      This was a div because the New Secret button lived inside an inline `<form>`
+                      here, and a form cannot nest in a paragraph — so the row's outermost element
+                      was the one element on it that did not match. The button keeps its form and
+                      loses the nesting: `form="mg-generate-apisecret"` points at the detached
+                      `<form>` below, which is the pattern this file already uses for the cluster
+                      and repeater buttons in the DON'T TOUCH block.
+                    -->
+                    <p class="form-control-static">
                       <!-- same bare label and unwrapped editable as the loops above -->
                       <!-- svelte-ignore a11y_label_has_associated_control -->
                       <label class="col-sm-2 control-label">API secret</label>
                       <Editable def={apiSecretDef} value={settingValue('apiSecret')} markUnwired />
                       &nbsp;
-                      <form
-                        method="POST"
-                        action="?/generateApiSecret"
-                        style="display:inline"
-                        use:enhance={confirmThen(
-                          'Generate a new API secret for this room? The current one stops working immediately.'
-                        )}
+                      <button
+                        class="btn btn-sm btn-warning"
+                        type="submit"
+                        form="mg-generate-apisecret"
                       >
-                        <button class="btn btn-sm btn-warning" type="submit">
-                          <i class="fa fa-random"></i> New Secret
-                        </button>
-                      </form>
-                    </div>
+                        <i class="fa fa-random"></i> New Secret
+                      </button>
+                    </p>
+                    <form
+                      id="mg-generate-apisecret"
+                      method="POST"
+                      action="?/generateApiSecret"
+                      use:enhance={confirmThen(
+                        'Generate a new API secret for this room? The current one stops working immediately.'
+                      )}
+                    ></form>
                   {/if}
 
                   <p class="form-control-static">
@@ -2296,15 +2342,49 @@ Please click this link to attend: ______ unique link will be here_____
                     <p class="form-control-static">
                       <!-- same bare label and unwrapped editable as the loop above -->
                       <!-- svelte-ignore a11y_label_has_associated_control -->
-                      <label class="col-sm-2 control-label">{def.label ?? def.name}</label>
+                      <label class="col-sm-2 control-label">
+                        {#if def.name === 'chatTabsWithBadges'}
+                          <!--
+                            A row label that opens with a CHILD ELEMENT rather than with its text
+                            — the only one anywhere in this pane, which is why the schema carries
+                            `label: null` for it and the row came out titled with its raw key:
+                            `scripts/extract-manage-schema.mjs:203` takes the line AFTER the
+                            control-label opener, and here that line is the icon. Both the icon and
+                            the text are transcribed from file2:2081.
+
+                            HONEST GAP: the reference hangs
+                            `ng-click="openChatTabsWithBadgesEditor(sess.chatTabsWithBadges)"` off
+                            this `<i>`, and that editor never rendered anywhere in the capture. The
+                            markup is transcribed; the handler is not invented, so the icon here is
+                            an icon and nothing else. `ms-2` and `cursor-pointer` likewise have no
+                            rule in any stylesheet this repo holds — they are the capture's class
+                            list, carried across, not classes we style.
+                          -->
+                          <i class="fa fa-gear ms-2 cursor-pointer" title="Configure Chat Tabs"
+                          ></i> Chat Tabs With Badges:
+                        {:else}
+                          {def.label ?? def.name}
+                        {/if}
+                      </label>
                       <Editable {def} value={settingValue(def.name)} markUnwired />
                       {#if help}
-                        <br />
-                        <!-- the reference's own helper label again — see the loop above -->
-                        <!-- svelte-ignore a11y_label_has_associated_control -->
-                        <label class={help.muted ? 'muted' : undefined}>{help.text}</label>
+                        <!-- the reference's own helper copy again — see the loop above -->
+                        {@render helpCopy(help)}
                       {/if}
                     </p>
+                    {#if def.name === 's3BucketFolderPath' || def.name === 'restreamToURLKey'}
+                      <!-- a bare `<br>` BETWEEN two rows, not inside either: file2:2316 separates
+                           the S3 block from Save Recs to Vimeo, file2:2366 the Restream block from
+                           Custom Rec Params. Same furniture the DON'T TOUCH block already carries. -->
+                      <br />
+                    {/if}
+                    {#if def.name === 'doNotAutoSoftReset'}
+                      <!-- this row's copy is a SIBLING of its `<p>`, not a child of it, and has no
+                           `<br>` — file2:2450, sitting between `</p>` on 2449 and the next row's
+                           `<p>` on 2454. `help` cannot express that, so it is furniture here. -->
+                      <!-- svelte-ignore a11y_label_has_associated_control -->
+                      <label>Enable this to prevent media server soft reset each night...</label>
+                    {/if}
                   {/each}
 
                   <hr />

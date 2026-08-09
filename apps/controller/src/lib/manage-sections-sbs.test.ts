@@ -64,7 +64,7 @@ const BASELINE: Record<string, number> = {
   Branding: 0,
   'SSO Setup': 0,
   'User Stats': 6,
-  Settings: 567
+  Settings: 16
 };
 
 const member = (over: Record<string, unknown> = {}) => ({

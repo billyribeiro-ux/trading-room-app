@@ -23,6 +23,16 @@ cd "$(dirname "$0")/../apps/controller" || exit 1
 PULL="$HOME/Desktop/new-room-control/.env.vercel-pull"
 ENVF="$HOME/Desktop/new-room-control/.env"
 
+# THIS REPO's own env, and where every NEW value belongs.
+#
+# The two paths above are historical: they are the surviving source of values production was
+# originally configured from, and they stay only until those are rehomed. Nothing new goes there —
+# `new-room-control` is read-only reference, not a config store for this project.
+#
+# Relative because line 21 already cd'd into apps/controller. Not required to exist: a variable
+# with no value here is reported and skipped, never written blank.
+APPENV=".env"
+
 for f in "$PULL" "$ENVF"; do
   if [ ! -f "$f" ]; then
     echo "missing source file: $f" >&2
@@ -119,8 +129,8 @@ set_var SUPERADMIN_EMAILS        "$(read_value SUPERADMIN_EMAILS "$ENVF")"      
 # Setting these flips `verificationEnforced()` to true. Re-run the check in `docs/EMAIL.md` §5
 # first: any account with a NULL `email_verified_at` is gated out of creating rooms until it
 # confirms. Measured 2026-08-09 there were none, and that expires with the next registration.
-set_var RESEND_API_KEY           "$(read_value RESEND_API_KEY "$ENVF")"            ".env"
-set_var MAIL_FROM                "$(read_value MAIL_FROM "$ENVF")"                 ".env"
+set_var RESEND_API_KEY           "$(read_value RESEND_API_KEY "$APPENV")"          "apps/controller/.env"
+set_var MAIL_FROM                "$(read_value MAIL_FROM "$APPENV")"               "apps/controller/.env"
 
 # API_KEY_ENCRYPTION_KEY is NOT set here any more, and generating a fresh one is exactly what
 # broke the account page.

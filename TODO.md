@@ -68,6 +68,19 @@ of thirteen gaps.
 
 ---
 
+## Scope — what is NOT being matched
+
+- **The homepage / marketing site is being rewritten and redesigned.** It is the one surface where
+  matching the reference buys nothing, because it is being replaced. Do not spend audit effort on
+  `(public)/+page.svelte` or its sections.
+- **The marketing screenshots go with it.** `ptr_descrived_perspective.png`, `ss3.png` and
+  `user_comments.png` are photographs of the ORIGINAL's interface. Renaming the files would not
+  change what is inside them, and they will be retaken against this product once the room is live.
+- **Fidelity still matters everywhere else** — the admin, the account page, the manage page and the
+  room. Those are the product; the homepage is a brochure.
+
+---
+
 ## Not gaps — decisions taken deliberately
 
 Recorded so nobody "fixes" them back:

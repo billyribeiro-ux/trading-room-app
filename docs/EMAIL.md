@@ -11,8 +11,11 @@ Written 2026-08-09. Same rule as the other documents: sourced or labelled.
 | **Transactional sending** | *sends* verification links, password resets, invites | Resend, Postmark, SES |
 | **Mailbox hosting** | *receives* mail at `support@tradingroom.app` | Google Workspace, Fastmail, Zoho |
 
-You need **both**. A transactional provider will not give you an inbox, and a mailbox provider is
-the wrong tool for programmatic sending at volume.
+You need **both** — but "both" does not mean "buy two things". A transactional provider will not
+give you an inbox, and a mailbox provider is the wrong tool for programmatic sending at volume.
+At this product's stage the whole pair is free: Resend's free tier for sending, and a Porkbun
+forward for receiving (§4 steps 1 and 6). Paying starts at a second sending domain or a real
+shared mailbox, neither of which is a launch prerequisite.
 
 **Do not self-host sending from the app server.** A fresh VPS IP has no sending reputation, hosting
 ranges are widely greylisted, and a password reset in the spam folder is indistinguishable from a
@@ -67,8 +70,30 @@ today has no route back that does not involve you editing the database.
 
 ### Step 1 — a transactional provider
 
-**Resend.** The adapter is already written against it, the free tier is 3,000/month, and DNS setup
-is three records.
+**Resend.** The adapter is already written against it, and the free tier covers this product's
+volume several times over.
+
+Read off `resend.com/pricing` and `resend.com/docs` on 2026-08-09, because "the free tier is
+generous" is not a number:
+
+| | free | notes |
+| --- | --- | --- |
+| per month | **3,000** | one account, no customers — not a constraint |
+| per day | **100** | irrelevant for resets and verifications; a real ceiling if members are ever mailed in bulk |
+| domains | **1** | `mail.tradingroom.app` uses it. A SECOND sending domain is what forces the paid tier, not volume |
+| retention | 30 days | |
+| next tier | **Pro, $20/mo** | 50,000/month |
+
+Whether a card is required at signup is **not stated** on that pricing page and was not verified.
+
+Two things their docs confirm that this plan depends on:
+
+- **Subdomains are Resend's own recommendation**, for the reason in step 2: *"We recommend sending
+  your emails from one or more subdomains … instead of your root domain to isolate your sending
+  reputation."*
+- **`noreply@` is not a mailbox and costs nothing to create**: *"Send and receive emails using any
+  email address at your domain without any extra configuration."* It is a string in `MAIL_FROM`,
+  nothing more.
 
 Alternatives, if you want them: **Postmark** has the best deliverability reputation for
 transactional mail and costs more; **SES** is the cheapest at volume and much the most setup. Both
@@ -85,11 +110,28 @@ Keeps transactional sending reputation separate from the apex, so anything you l
 
 ### Step 3 — three DNS records, all required
 
-| record | purpose | consequence of omitting |
-| --- | --- | --- |
-| **SPF** | authorises the provider to send as you | receivers treat it as forged |
-| **DKIM** | cryptographically signs the message; the provider supplies the keys | Gmail and Outlook junk it |
-| **DMARC** | tells receivers what to do on failure, and where to report | no visibility, weaker placement |
+**It is four records, not three, and one of them is an MX.** Read off Resend's own DNS setup page
+2026-08-09: verification requires an **MX** on the `send` host as well as the two TXT records. An
+earlier draft of this step listed SPF/DKIM/DMARC and would have left the domain unverifiable.
+
+| record | host (as Resend shows it) | purpose | consequence of omitting |
+| --- | --- | --- | --- |
+| **MX** | `send.mail.tradingroom.app` | required for verification and sending | the domain never verifies |
+| **TXT (SPF)** | `send.mail.tradingroom.app` | authorises the provider to send as you | receivers treat it as forged |
+| **TXT (DKIM)** | `resend._domainkey.mail.tradingroom.app` | signs the message; Resend supplies the key | Gmail and Outlook junk it |
+| **TXT (DMARC)** | `_dmarc.tradingroom.app` | what receivers do on failure, and where to report | no visibility, weaker placement |
+
+DMARC is ours to add — Resend's setup page does not mention it — and at the apex it covers the
+subdomains too.
+
+**Porkbun's Host field is relative to the registered domain**, so strip the trailing
+`.tradingroom.app` from everything Resend displays: `send.mail.tradingroom.app` is entered as
+`send.mail`, and `_dmarc.tradingroom.app` as `_dmarc`. Pasting the full name creates
+`send.mail.tradingroom.app.tradingroom.app`, which resolves to nothing and looks identical to a
+propagation delay.
+
+**The two MX sets do not collide.** Resend's MX sits on `send.mail.tradingroom.app`; Porkbun's
+forwarding MX sits on the apex. Different hosts, both valid at once.
 
 Start DMARC at `p=none` and read the reports for a week before tightening to `p=quarantine`.
 Tightening first, on an unverified setup, blackholes your own mail.
@@ -129,8 +171,37 @@ point of steps 2 and 3.
 
 ### Step 6 — a real mailbox
 
-Google Workspace (~$6/user/month), or Fastmail / Zoho for less. You need somewhere `support@` and
-your DMARC reports actually land. Resend will not receive mail for you.
+**This step costs nothing today, and the earlier draft implying otherwise was wrong.**
+
+Porkbun is the registrar (step 3), and `porkbun.com/products/email_forwarding`, read 2026-08-09,
+states that each domain includes **up to 20 free forwarding addresses**, with extras at $3/address
+/year. So `support@tradingroom.app` forwards to an inbox that already exists, and the DMARC `rua=`
+can point at the same place. Both free.
+
+The forwarding is **receive-only** — Porkbun says so plainly: it is *"ideal if you're only looking
+to receive emails … but don't need to respond from that same email address."* That is sufficient
+here, because nothing sends as `support@`; the app sends as `noreply@mail.` and a human replies from
+whatever inbox the forward lands in.
+
+**DECIDED 2026-08-09: the owner is buying Porkbun hosted email for `support@tradingroom.app`** —
+$3/month per address billed yearly ($36/year), 10GB, and it can SEND as the address. The free
+forward was offered and declined: a reply arriving from a personal gmail address undercuts a paid
+product, and that is a judgement about how the business presents, not about cost.
+
+This is a purchase, not a prerequisite — nothing in the codebase depends on it, and the free forward
+remains the fallback if it is ever cancelled. Recorded so it is not later "optimised away" by
+someone reading only the price.
+
+Two consequences worth knowing:
+
+- **Do not also create a `support` FORWARD.** Porkbun's own KB states standard forwarding cannot use
+  the same address as a hosted account; to copy mail onward you use a redirect filter inside webmail
+  (Settings → Filters → Create) instead.
+- **It does not disturb Resend.** Porkbun's hosted-email MX lands on the apex; Resend's sits on
+  `send.mail.tradingroom.app`. Different hosts, both valid at once.
+
+Google Workspace (~$6/user/month) and Fastmail / Zoho remain the alternatives if the mailbox ever
+needs to be more than one address.
 
 ### Step 7 — build password reset
 
