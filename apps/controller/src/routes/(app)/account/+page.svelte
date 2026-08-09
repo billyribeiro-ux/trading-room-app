@@ -1030,6 +1030,14 @@
                   <td>
                     {#if key.secret}
                       {key.secret}
+                    {:else if key.undecryptable}
+                      <!-- Distinct from the legacy hash-only case above, and worth distinguishing:
+                           this row's ciphertext is intact but was written under a DIFFERENT
+                           `API_KEY_ENCRYPTION_KEY`, so it can never be read again. Rotating writes
+                           a fresh envelope under the current key and repairs the row. Saying only
+                           "unavailable" would suggest that waiting or reloading might help. It
+                           cannot. -->
+                      Secret cannot be decrypted with the current key — regen secret
                     {:else}
                       Secret unavailable — regen secret
                     {/if}

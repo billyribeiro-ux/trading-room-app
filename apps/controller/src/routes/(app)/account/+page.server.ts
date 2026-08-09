@@ -18,6 +18,46 @@ function apiKeyEncryptionMaster() {
 }
 
 /**
+ * One undecryptable API key must not take down the whole account page.
+ *
+ * `decryptApiKeySecret` throws on a malformed or unauthenticated envelope, and that throw was
+ * uncaught in the loader — so a single bad row turned every request for this page into a 500. The
+ * owner saw `An unexpected error occurred.` and an account they could not open at all.
+ *
+ * A row becomes undecryptable when `API_KEY_ENCRYPTION_KEY` is not the key that encrypted it. That
+ * is not hypothetical: it happened when this deployment moved to a new Vercel project and the
+ * original key could not be recovered from the old one. The ciphertext is intact and still safe —
+ * it simply cannot be read again, and retrying will never change that.
+ *
+ * So the page reports the row instead of dying on it. `undecryptable: true` lets the UI say the key
+ * exists and needs rotating, which is the only honest thing to say and the only action that helps:
+ * rotating writes a fresh envelope under the current key and the row heals.
+ *
+ * Not swallowed silently. A key that will not decrypt is either a configuration mistake or
+ * tampering, and both deserve a server-side trace — carrying the key id and never the ciphertext.
+ */
+function readApiKeySecret(
+  ciphertext: string | null,
+  accountId: number,
+  keyId: string
+): { secret: string | null; undecryptable: boolean } {
+  if (!ciphertext) return { secret: null, undecryptable: false };
+
+  try {
+    return {
+      secret: decryptApiKeySecret(ciphertext, { accountId, keyId }, apiKeyEncryptionMaster()),
+      undecryptable: false
+    };
+  } catch (cause) {
+    console.error(
+      `[api-key] key ${keyId} on account ${accountId} could not be decrypted with the configured ` +
+        `API_KEY_ENCRYPTION_KEY; it needs rotating. ${cause instanceof Error ? cause.message : String(cause)}`
+    );
+    return { secret: null, undecryptable: true };
+  }
+}
+
+/**
  * A row id out of a form, or a loud failure.
  *
  * `Number(null)` is 0 and `Number('')` is 0, so an absent field arrives at the WHERE clause as a
@@ -110,9 +150,7 @@ export const load: PageServerLoad = async ({ locals, setHeaders }) => {
       createdAt: k.createdAt,
       restrictionsJson: k.restrictionsJson,
       restrictions: readRestrictions(k.restrictionsJson),
-      secret: k.secretCiphertext
-        ? decryptApiKeySecret(k.secretCiphertext, { accountId, keyId: k.id }, apiKeyEncryptionMaster())
-        : null
+      ...readApiKeySecret(k.secretCiphertext, accountId, k.id)
     })),
     /** the real API's command list — see API_SCOPES */
     apiScopes: API_SCOPES
