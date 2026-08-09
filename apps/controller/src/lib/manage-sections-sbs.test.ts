@@ -167,7 +167,16 @@ function ourPage(tab: string) {
         fieldByName: Object.fromEntries(ROOM_SETTINGS.map((d) => [d.name, d])),
         featureReadiness: {},
         featureDefs: [],
-        wordpressShortcode: '',
+        /*
+          The capture's OWN shortcode (file2:1003), not a blank.
+
+          Empty, the page renders `<span id="mg-shortcode"></span>` — a classless empty span, which
+          is exactly the ripple-pair shape `dom-shape.ts` drops. So BOTH the span and its text row
+          vanished from our column while the reference kept `span` + its text, and the two columns
+          went out of step from there. The value is the reference's, room id and all.
+        */
+        wordpressShortcode:
+          "[protradingroom room='6a6529b318781e20ed81947d' key='' link_text='Enter Room' mode='urlv3']",
         apiScopes: []
       },
       form: null

@@ -124,15 +124,49 @@ The last piece, and straightforward once mail sends. Reuse the token design alre
 
 ## 5. The trap to know about before you flip it on
 
-**`verificationEnforced()` becomes `true` the moment mail is configured.**
+**`verificationEnforced()` becomes `true` the moment mail is configured.** That is correct — it is
+what makes the room-creation gate real. Who it catches is narrower than it first looks, and the
+answer required reading three files rather than one.
 
-That is correct behaviour — it is what makes the room-creation gate real — but it has an immediate
-consequence: **accounts created while mail was unconfigured have `email_verified_at IS NULL`**, and
-that includes the owner's own account. The instant `RESEND_API_KEY` and `MAIL_FROM` are set, those
-accounts are gated out of creating rooms until they confirm.
+**Migration 1 already grandfathered the accounts that existed when it ran.**
+`0001-email-verification.js:24`:
 
-There is a resend-the-link action on the account page, so the route back exists — but know this
-before you set the variables, not after you are locked out of your own admin.
+```sql
+UPDATE users SET email_verified_at = created_at WHERE email_verified_at IS NULL;
+```
+
+with the reason stated in its own header: *"Retroactively marking the owner's own account
+unverified — on a deployment that cannot yet send mail — would lock them out of the product with no
+way back in. Verification applies from here forward."* It is deliberately the first non-idempotent
+migration, which is why the migrator exists at all.
+
+So the risk is real but **bounded to a specific window**:
+
+| account | `email_verified_at` |
+| --- | --- |
+| existed when migration 1 ran | **backfilled to `created_at`** — verified, unaffected |
+| registered AFTER migration 1, while mail was unconfigured | **NULL** — will be gated |
+| registered after mail is configured | NULL until the link is clicked, which is the intent |
+
+Registration confirms the middle row: `register/+page.server.ts:79-88` inserts `accountId`, `email`,
+`displayName`, `passwordHash` and `createdAt` and **omits `emailVerifiedAt`**, and `schema.ts:89`
+declares it nullable and NOT defaulted — a default would mark every future row verified, which is
+the opposite of the point.
+
+**So check rather than assume.** Whether your own account is in the safe row or the caught one
+depends on when it was created relative to migration 1:
+
+```sql
+SELECT id, email, created_at, email_verified_at FROM users ORDER BY id;
+```
+
+Any row with a NULL will be gated out of creating rooms the moment mail is configured. The
+account page carries a resend-the-link action, so the route back exists — but it is worth knowing
+which rows those are before you set the variables rather than after.
+
+An earlier version of this section claimed every pre-configuration account would be caught,
+"including the owner's own". That was wrong: it read the registration path and the column default
+and stopped there, without reading the migration that backfills them.
 
 Check first:
 

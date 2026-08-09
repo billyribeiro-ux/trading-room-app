@@ -9,7 +9,13 @@
   import { editableText, isBlank, isEditableEmpty } from '$lib/editable-display';
   import PermissionsModal from '$lib/components/PermissionsModal.svelte';
   import RichTextEditor from '$lib/components/RichTextEditor.svelte';
-  import { AUTH_MODES, isRegistrationMode, showsRoomLinks } from '$lib/auth-modes';
+  import {
+    AUTH_MODES,
+    isRegistrationMode,
+    isSsoMode,
+    showsRoomLinks,
+    usesRoomPassword
+  } from '$lib/auth-modes';
   import { isRoomTrial } from '$lib/room-member-role';
   import type { RoomSettingDef } from '$lib/room-settings-schema';
   import type { SubmitFunction } from '@sveltejs/kit';
@@ -272,8 +278,47 @@
     return grouped;
   });
 
+  /*
+    SEVEN settings the reference only shows for certain auth modes.
+
+    Each of the seven carries `ng-hide` in the capture, which is AngularJS for "in the DOM,
+    display:none" — nobody sees them in a room whose auth mode is 'open', which is the room the
+    capture is of. Rendered unconditionally they put seven paragraphs of eight nodes each into a
+    pane that has none.
+
+    The conditions are the capture's own `ng-show` expressions, transcribed one for one:
+
+      ssoJWTSecret / allowPWLoginWithSSO / tokenExpiresIn   file2:989, 993, 1005
+        ng-show="sess.authMode=='jwt'"
+      webinarPW / webinarPW2 / webinarPW3                   file2:1012, 1017, 1022
+        ng-show="sess.authMode=='webinarRoom' || sess.allowPWLoginWithSSO"
+      webinarPWFreeTrial                                    file2:1027
+        ng-show="sess.authMode=='webinarRoom' || sess.authMode=='unamePW' || sess.allowPWLoginWithSSO"
+
+    `isSsoMode` and `usesRoomPassword` are the same two predicates `$lib/auth-modes` already
+    derived from those expressions for the link block — the JWT gate goes through `isSsoMode`
+    because their codebase spells the one mode both 'jwt' and 'sso' (see the note there).
+
+    HONEST GAP: only the CONDITIONS are evidence. The generated schema records no visibility field
+    for a setting, so this map is our own plumbing, written by hand and keyed by name.
+  */
+  const authModeGated: Record<string, () => boolean> = {
+    ssoJWTSecret: () => isSsoMode(settingValue('authMode')),
+    allowPWLoginWithSSO: () => isSsoMode(settingValue('authMode')),
+    tokenExpiresIn: () => isSsoMode(settingValue('authMode')),
+    webinarPW: () => usesRoomPassword(settingValue('authMode'), settingValue('allowPWLoginWithSSO')),
+    webinarPW2: () => usesRoomPassword(settingValue('authMode'), settingValue('allowPWLoginWithSSO')),
+    webinarPW3: () => usesRoomPassword(settingValue('authMode'), settingValue('allowPWLoginWithSSO')),
+    webinarPWFreeTrial: () =>
+      usesRoomPassword(settingValue('authMode'), settingValue('allowPWLoginWithSSO')) ||
+      settingValue('authMode') === 'unamePW'
+  };
+  const settingIsVisible = (def: RoomSettingDef) => authModeGated[def.name]?.() ?? true;
+
   /** the Settings tab splits at the reference's "DON'T TOUCH" heading */
-  const settingsMain = $derived((bySection.settings ?? []).filter((d) => d.group !== 'dont-touch'));
+  const settingsMain = $derived(
+    (bySection.settings ?? []).filter((d) => d.group !== 'dont-touch' && settingIsVisible(d))
+  );
 
   /*
     API secret sits in the MIDDLE of the settings list, not after it.
@@ -2146,6 +2191,11 @@ Please click this link to attend: ______ unique link will be here_____
                     </form>
                   {/if}
 
+                  <!-- the reference's own empty <p>, file2:1000, sitting between the JWT block
+                       and the shortcode. Not decoration — same 10px bottom margin as the empty
+                       one in the DON'T TOUCH block below. -->
+                  <p></p>
+
                   <!-- a plain <span>, not an editable: the reference builds this
                        from the room id and it is not a stored setting -->
                   <p class="form-control-static">
@@ -2155,10 +2205,24 @@ Please click this link to attend: ______ unique link will be here_____
 
                   {#each settingsBeforeApiSecret as def (def.name)}
                     <p class="form-control-static">
-                      <label class="col-sm-2 control-label" for={`mg-${def.name}`}>{def.label ?? def.name}</label>
-                      <span id={`mg-${def.name}`}>
-                        <Editable {def} value={settingValue(def.name)} markUnwired />
-                      </span>
+                      <!--
+                        NO `for`, AND NO WRAPPER around the editable.
+
+                        The reference's row is `<p class="form-control-static"><label
+                        class="col-sm-2 control-label">…</label><a … class="editable
+                        editable-click">…</a></p>` — file2:1035-1036, and the same on every row
+                        after it. Its label carries no `for`, and there is nothing between the
+                        paragraph and the anchor.
+
+                        Ours used to add `for` pointing at a `<span>` wrapped round the editable,
+                        which bought no accessibility — a span is not a labelable element, so the
+                        association does nothing — and cost one extra node on every one of the
+                        260 settings rows. So the span goes, and the a11y rule that asked for the
+                        `for` is silenced here with the reason rather than satisfied with a lie.
+                      -->
+                      <!-- svelte-ignore a11y_label_has_associated_control -->
+                      <label class="col-sm-2 control-label">{def.label ?? def.name}</label>
+                      <Editable {def} value={settingValue(def.name)} markUnwired />
                       {#if def.help}
                         <br />
                         <!-- the reference wraps helper copy in a <label> that
@@ -2174,10 +2238,10 @@ Please click this link to attend: ______ unique link will be here_____
                          cannot nest inside a paragraph. `.form-control-static`
                          sets margin-bottom: 0 either way, so the box is the same. -->
                     <div class="form-control-static">
-                      <label class="col-sm-2 control-label" for="mg-apisecret">API secret</label>
-                      <span id="mg-apisecret">
-                        <Editable def={apiSecretDef} value={settingValue('apiSecret')} markUnwired />
-                      </span>
+                      <!-- same bare label and unwrapped editable as the loops above -->
+                      <!-- svelte-ignore a11y_label_has_associated_control -->
+                      <label class="col-sm-2 control-label">API secret</label>
+                      <Editable def={apiSecretDef} value={settingValue('apiSecret')} markUnwired />
                       &nbsp;
                       <form
                         method="POST"
