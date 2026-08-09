@@ -230,6 +230,29 @@
   /** Capture the reviewed sink after it has preserved or seeded the DOM. */
   const captureBody: Attachment<HTMLElement> = (node) => {
     body = node;
+
+    /*
+      Paragraphs, not divs.
+
+      The reference's editing surface wraps its content in `<p>`:
+
+        <div id="taTextElement…" contenteditable="true" ta-bind class="ta-bind …"><p>hello everyone&nbsp;</p></div>
+
+      A bare `contenteditable` in Chrome uses `<div>` for each block instead, so ours produced
+      `<div style="text-align: center">…</div>` where the reference produces `<p>`. textAngular
+      normalises this; without the setting we were storing a different document shape for the same
+      typing, and the landing page rendered with different block semantics and margins.
+
+      `defaultParagraphSeparator` is a document-wide execCommand, so it is set when the surface
+      mounts rather than once at module load — the editor is only present on the Branding tab, and
+      setting it globally would change any other contenteditable this app grows later.
+    */
+    try {
+      document.execCommand('defaultParagraphSeparator', false, 'p');
+    } catch {
+      // Firefox has thrown here historically. The editor still works; blocks are just divs.
+    }
+
     value = editableHtml(node);
 
     return () => {
