@@ -2267,10 +2267,10 @@ Please click this link to attend: ______ unique link will be here_____
                   <!-- the settings the reference lists BELOW the docs link, starting at slackPostURL -->
                   {#each settingsAfterApiSecret as def (def.name)}
                     <p class="form-control-static">
-                      <label class="col-sm-2 control-label" for={`mg-${def.name}`}>{def.label ?? def.name}</label>
-                      <span id={`mg-${def.name}`}>
-                        <Editable {def} value={settingValue(def.name)} markUnwired />
-                      </span>
+                      <!-- same bare label and unwrapped editable as the loop above -->
+                      <!-- svelte-ignore a11y_label_has_associated_control -->
+                      <label class="col-sm-2 control-label">{def.label ?? def.name}</label>
+                      <Editable {def} value={settingValue(def.name)} markUnwired />
                       {#if def.help}
                         <br />
                         <span class="muted">{def.help}</span>

@@ -168,12 +168,6 @@ An earlier version of this section claimed every pre-configuration account would
 "including the owner's own". That was wrong: it read the registration path and the column default
 and stopped there, without reading the migration that backfills them.
 
-Check first:
-
-```sql
-SELECT id, email, email_verified_at FROM users WHERE email_verified_at IS NULL;
-```
-
 ---
 
 ## 6. What email is NOT blocking
