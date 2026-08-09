@@ -535,7 +535,7 @@
                 {#if data.entitlements.marketplace}
                   <a
                     class="acc-btn acc-btn-sm acc-btn-default"
-                    href={resolve(`/account/rooms/${room.shortCode}?tab=marketplace`)}
+                    href={resolve(`/account/rooms/${room.shortCode}/marketplace`)}
                     ><i class="fa fa-credit-card"></i> Marketplace</a
                   >
                 {/if}

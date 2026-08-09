@@ -25,7 +25,7 @@ import { describe, expect, it } from 'vitest';
  * and the failure only exists once a click bubbles.
  */
 
-const PAGE = new URL('../routes/(app)/account/rooms/[id]/+page.svelte', import.meta.url);
+const PAGE = new URL('../routes/(app)/account/rooms/[id]/[[tab]]/+page.svelte', import.meta.url);
 const source = readFileSync(PAGE, 'utf8');
 const markup = source.replace(/<!--[\s\S]*?-->/g, '');
 

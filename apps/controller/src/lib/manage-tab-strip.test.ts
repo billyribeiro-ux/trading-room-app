@@ -22,8 +22,8 @@ import { describe, expect, it } from 'vitest';
  */
 
 const CAPTURE = '/Users/billyribeiro/Desktop/new-room/must-match/important';
-const SERVER = new URL('../routes/(app)/account/rooms/[id]/+page.server.ts', import.meta.url);
-const PAGE = new URL('../routes/(app)/account/rooms/[id]/+page.svelte', import.meta.url);
+const SERVER = new URL('../routes/(app)/account/rooms/[id]/[[tab]]/+page.server.ts', import.meta.url);
+const PAGE = new URL('../routes/(app)/account/rooms/[id]/[[tab]]/+page.svelte', import.meta.url);
 
 /** The `heading="…"` of every `<li>` in the capture's `ul.nav.nav-tabs`, in document order. */
 function referenceTabs(): string[] {

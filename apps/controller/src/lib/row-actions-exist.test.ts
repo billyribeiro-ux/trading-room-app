@@ -15,7 +15,7 @@ import { describe, expect, it } from 'vitest';
   the page, and the check costs nothing extra.
 */
 
-const ROOT = new URL('../routes/(app)/account/rooms/[id]/', import.meta.url);
+const ROOT = new URL('../routes/(app)/account/rooms/[id]/[[tab]]/', import.meta.url);
 const page = readFileSync(new URL('+page.svelte', ROOT), 'utf8');
 const server = readFileSync(new URL('+page.server.ts', ROOT), 'utf8');
 

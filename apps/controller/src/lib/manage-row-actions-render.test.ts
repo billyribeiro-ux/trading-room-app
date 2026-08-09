@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { render } from 'svelte/server';
-import Page from '../routes/(app)/account/rooms/[id]/+page.svelte';
+import Page from '../routes/(app)/account/rooms/[id]/[[tab]]/+page.svelte';
 import { ROOM_SETTINGS } from './room-settings-schema';
 
 /**

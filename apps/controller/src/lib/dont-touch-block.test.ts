@@ -28,7 +28,7 @@ import { ROOM_SETTINGS } from './room-settings-schema';
   waves through.
 */
 
-const ROOT = new URL('../routes/(app)/account/rooms/[id]/', import.meta.url);
+const ROOT = new URL('../routes/(app)/account/rooms/[id]/[[tab]]/', import.meta.url);
 const page = readFileSync(new URL('+page.svelte', ROOT), 'utf8');
 const server = readFileSync(new URL('+page.server.ts', ROOT), 'utf8');
 

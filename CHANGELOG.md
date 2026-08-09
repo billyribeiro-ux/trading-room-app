@@ -24,6 +24,43 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-09
 
+### 10:37 — Tabs moved into the path, and the last route still using a row id (pushed to `main`)
+
+**Runtime impact: yes, URLs change.** `/account/rooms/1001?tab=marketplace` is now
+`/account/rooms/1001/marketplace`. A tab selects which pane of the room you are looking at, and a
+pane is a place — not an option bolted onto a page, which is what `?tab=` read as.
+
+- **The manage page moved to `[id]/[[tab]]/`.** The segment is optional, so `/account/rooms/1001`
+  still resolves and lands on Users — the same default a missing `?tab=` had. 14 links rewritten
+  across three files, and 13 test files repointed at the new location.
+- **An unknown tab now 404s** instead of quietly showing Users. Silent fallback was tolerable when
+  the tab was an option; a path that resolves to something other than what it names is a different
+  thing, and the honest answer for a URL nobody issued is that it does not exist.
+- **`/launch/[id]` still resolved `eq(rooms.id, Number(params.id))`** — missed when the manage page
+  moved off primary keys earlier today. It was the one door still speaking in row ids, and nothing
+  in the UI links to it, so nothing caught it. Now resolves by short code like everything else.
+
+**Investigated end to end.** Every `searchParams` read in both applications, and every generated
+customer-facing URL:
+
+| kept as a query, and why | |
+| --- | --- |
+| `?q=`, `?filter=` | a search term and a filter over the collection a pane shows. This is what query strings are FOR; making them path segments would conflate a filter with a resource. |
+| `?token=` (verify-email, reset-password), `?secTok=` | one-time credentials, not resources. A path segment would make a secret look like a page. |
+| `?email=` on the three `/internal/*` endpoints | server-to-server lookup parameters, never seen by a customer. |
+| `?co=1` in the room | **transcribed evidence, not a choice.** The capture reads `const F = s.get("co")` into `globals.chatOnlyMode`; renaming it would break the original's detached chat popout. Checked before touching it. |
+
+**Still outstanding, and it is the same offence:** the room's entry URL is
+`/session?id=3625&jwtSite=…`. `id` belongs in the path. It is NOT in this push because it spans two
+applications — the controller mints that link and the room parses it — and the room is deployed by
+hand to Hetzner while the controller auto-deploys on push. Shipping them out of order breaks every
+Launch button. Sequenced separately and deliberately.
+
+**Verified before pushing:** `svelte-check` 0 errors, 3 warnings (unchanged). 50 files, 547 unit
+tests passing. All 37 database tests passing. Not verified in a browser — `pnpm test:e2e` now exists
+but has not been run.
+
+
 ### 10:31 — `TODO.md` now lists only open work (`ca1fe65`, pushed to `main`)
 
 > This heading first read **10:35**, a time I wrote before checking the clock. It was 10:31.

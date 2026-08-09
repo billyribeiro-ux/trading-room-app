@@ -809,7 +809,7 @@
         {#if !data.disableMarketplace}
           <a
             class="btn btn-sm pull-right btn-default mr"
-            href={resolve(`/account/rooms/${data.room.shortCode}?tab=marketplace`)}
+            href={resolve(`/account/rooms/${data.room.shortCode}/marketplace`)}
           >
             <i class="fa fa-credit-card"></i>&nbsp;Marketplace
           </a>
@@ -1032,7 +1032,7 @@ Please click this link to attend: ______ unique link will be here_____
             <!-- hidden, not absent: `ng-hide` on the <li> is what the reference
                  does, and the pane behind it stays reachable by URL -->
             <li class={{ active: data.tab === tab.id }} hidden={!tab.visible}>
-              <a href={resolve(`/account/rooms/${data.room.shortCode}?tab=${tab.id}`)}>{tab.label}</a>
+              <a href={resolve(`/account/rooms/${data.room.shortCode}/${tab.id}`)}>{tab.label}</a>
             </li>
           {/each}
         </ul>
@@ -1096,14 +1096,14 @@ Please click this link to attend: ______ unique link will be here_____
                            reference gets back to the unfiltered list with its Reload Users
                            button, which we already render. -->
                       <ul class="dropdown-menu" role="menu">
-                        <li><a href={resolve(`/account/rooms/${data.room.shortCode}?tab=users&filter=trials`)}>Show Free Trials</a></li>
-                        <li><a href={resolve(`/account/rooms/${data.room.shortCode}?tab=users&filter=banned`)}><i class="fa fa-ban"></i> Show BANNED</a></li>
-                        <li><a href={resolve(`/account/rooms/${data.room.shortCode}?tab=users&filter=muted`)}><i class="fa fa-comment-o"></i> Show Chat Muted</a></li>
-                        <li><a href={resolve(`/account/rooms/${data.room.shortCode}?tab=users&filter=mobile`)}><i class="fa fa-mobile"></i> Show Mobile</a></li>
-                        <li><a href={resolve(`/account/rooms/${data.room.shortCode}?tab=users&filter=non-mobile`)}><i class="fa fa-mobile"></i> Show Non-Mobile</a></li>
-                        <li><a href={resolve(`/account/rooms/${data.room.shortCode}?tab=users&filter=presenters`)}><i class="fa fa-microphone"></i> Show Presenters</a></li>
+                        <li><a href={resolve(`/account/rooms/${data.room.shortCode}/users?filter=trials`)}>Show Free Trials</a></li>
+                        <li><a href={resolve(`/account/rooms/${data.room.shortCode}/users?filter=banned`)}><i class="fa fa-ban"></i> Show BANNED</a></li>
+                        <li><a href={resolve(`/account/rooms/${data.room.shortCode}/users?filter=muted`)}><i class="fa fa-comment-o"></i> Show Chat Muted</a></li>
+                        <li><a href={resolve(`/account/rooms/${data.room.shortCode}/users?filter=mobile`)}><i class="fa fa-mobile"></i> Show Mobile</a></li>
+                        <li><a href={resolve(`/account/rooms/${data.room.shortCode}/users?filter=non-mobile`)}><i class="fa fa-mobile"></i> Show Non-Mobile</a></li>
+                        <li><a href={resolve(`/account/rooms/${data.room.shortCode}/users?filter=presenters`)}><i class="fa fa-microphone"></i> Show Presenters</a></li>
                         <li>
-                          <a href={resolve(`/account/rooms/${data.room.shortCode}?tab=users&filter=marketplace`)}><i class="fa fa-credit-card"></i> Marketplace Users</a>
+                          <a href={resolve(`/account/rooms/${data.room.shortCode}/users?filter=marketplace`)}><i class="fa fa-credit-card"></i> Marketplace Users</a>
                         </li>
                         <li class="divider" role="separator"></li>
                         <li>

@@ -146,8 +146,25 @@ export const load: PageServerLoad = async ({ params, locals, url }) => {
             : true
   }));
 
-  const requested = url.searchParams.get('tab') ?? 'users';
-  const tab = tabs.some((t) => t.id === requested) ? requested : 'users';
+  /*
+    The tab is a PATH SEGMENT — `/account/rooms/1001/marketplace`, not `…/1001/marketplace`.
+
+    A tab here selects which pane of the room you are looking at, and a pane is a resource, not a
+    filter over one. `?tab=` said otherwise: it read as an option bolted onto a page rather than a
+    place, and it is what made the URL look unfinished.
+
+    `[[tab]]` is optional, so `/account/rooms/1001` still resolves and lands on Users — the same
+    default a missing `?tab=` had. `filter` and `q` stay in the query below, deliberately: those
+    genuinely ARE filters over the collection this pane shows, which is what a query string is for.
+
+    An unknown segment 404s rather than quietly showing Users. `/nonsense` silently falling back
+    was tolerable when the tab was an option; a path that resolves to something other than what it
+    names is a different thing, and the honest answer for a URL nobody issued is that it does not
+    exist.
+  */
+  const requested = params.tab ?? 'users';
+  if (!tabs.some((t) => t.id === requested)) error(404, 'No such tab');
+  const tab = requested;
 
   const q = (url.searchParams.get('q') ?? '').trim().toLowerCase();
   const filter = url.searchParams.get('filter');

@@ -13,7 +13,7 @@ import { describe, expect, it } from 'vitest';
   it belongs to whichever action is written next, by whoever is not thinking about tenancy that day.
 */
 
-const server = readFileSync(new URL('../routes/(app)/account/rooms/[id]/+page.server.ts', import.meta.url), 'utf8');
+const server = readFileSync(new URL('../routes/(app)/account/rooms/[id]/[[tab]]/+page.server.ts', import.meta.url), 'utf8');
 
 /** The `actions` object only — so a helper above it cannot be mistaken for an action. */
 const actionsBlock = server.slice(server.indexOf('export const actions: Actions = {'));

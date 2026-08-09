@@ -6,9 +6,9 @@ import Page from '../routes/(app)/account/+page.svelte';
 /**
  * A room is addressed in the URL by its SHORT CODE, never by its database id.
  *
- * `/account/rooms/1?tab=users` was the primary key, and it read as a toy: the first room any
- * account creates is `1`, which advertises the row count and belongs to the database rather than to
- * the product. The short code is the room's own identity and the only number this product ever
+ * `/account/rooms/1?tab=users` carried the primary key AND a query-string tab. The id was and it read as a toy: the first room any
+ * the offence: the first room any account creates is `1`, which advertises the row count and belongs
+ * to the database rather than to the product. The tab moved into the path in the same spirit. The short code is the room's own identity and the only number this product ever
  * shows for it — the reference's manage header reads `Manage Room id: 3627 (…)`, its Sessions table
  * lists Session ID `3625`, and `provisionRoom` names a new room `Room <shortCode>`.
  *
@@ -74,9 +74,14 @@ describe('the account page links to a room by its short code', () => {
     expect(out, 'no link may carry the database id').not.toMatch(/\/account\/rooms\/1(?![0-9])/);
   });
 
-  it('uses the short code on the tab links too, not just the bare one', () => {
+  it('puts the tab in the PATH, not a query string', () => {
     const out = html([room()]);
-    expect(out).toContain('/account/rooms/3625?tab=marketplace');
+    /*
+      `…/3625?tab=marketplace` until 2026-08-09. A tab selects which pane of the room you are
+      looking at, and a pane is a place rather than an option bolted onto one.
+    */
+    expect(out).toContain('/account/rooms/3625/marketplace');
+    expect(out, 'no link may still carry ?tab=').not.toContain('?tab=');
   });
 
   it('distinguishes two rooms by code rather than by id', () => {
@@ -101,7 +106,7 @@ describe('the server resolves that URL the same way', () => {
     ownership against real PostgreSQL.
   */
   const server = readFileSync(
-    new URL('../routes/(app)/account/rooms/[id]/+page.server.ts', import.meta.url),
+    new URL('../routes/(app)/account/rooms/[id]/[[tab]]/+page.server.ts', import.meta.url),
     'utf8'
   );
 
