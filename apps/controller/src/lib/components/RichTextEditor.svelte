@@ -236,6 +236,22 @@
       if (body === node) body = null;
     };
   };
+
+  /*
+    `tabindex="-1"` on every toolbar button, exactly as textAngular renders them.
+
+    All 31 toolbar buttons in the capture carry it (`must-match/file1`); ours carried none. The
+    difference is visible, not academic: without it these buttons join the tab order and take the
+    browser's focus ring, which Bootstrap declares as `outline: 5px auto -webkit-focus-ring-color`.
+    That is the heavy blue outline reported on the editor — five pixels where the reference shows
+    nothing at all.
+
+    Removing them from the tab order is not an accessibility regression here, it is what a toolbar
+    is supposed to do: the editing surface itself is the focusable control, and each button keeps
+    its `title` and `aria-label`. It is also simply what the reference does, so matching it removes
+    an invention rather than adding one.
+  */
+  const TOOLBAR_BUTTON_FOCUS = { tabindex: -1 } as const;
 </script>
 
 <div class="btn-group-small ta-root">
@@ -259,6 +275,7 @@
             name={tool.name}
             title={tool.title}
             aria-label={tool.title}
+            {...TOOLBAR_BUTTON_FOCUS}
             onclick={tool.run}
           >
             {#if tool.icon}<i class="fa {tool.icon}"></i>{:else}{tool.label}{/if}

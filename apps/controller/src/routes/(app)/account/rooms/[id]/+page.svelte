@@ -1678,7 +1678,27 @@ Please click this link to attend: ______ unique link will be here_____
                            fit it. Vertical CLS is still zero because the rule fixes `height: 25px`. -->
                       <img class="navLogo" src={data.links.logo} alt="Room logo" />
                     {:else}
-                      <span class="text-muted">No logo set</span>
+                      <!--
+                        The reference ALWAYS renders an `<img class="navLogo">` here — never a
+                        message. A room with no custom logo falls back to the site's own:
+
+                          <div class="col-sm-3 " style="background-color: #000; padding: 15px; ">
+                            <img ng-src="/public/images/ptr_logo.png" class="navLogo " src="…">
+                          </div>
+
+                        Ours printed "No logo set", which was invented text where the reference
+                        shows a picture — and it read as a fault rather than a default, on a black
+                        panel built to frame a logo.
+
+                        The path is the reference's own, byte for byte, so the asset drops
+                        straight in at `static/public/images/ptr_logo.png`.
+
+                        The logo is white on transparent — which is why the surrounding panel is
+                        `background-color: #000`. That black box is not decoration; it exists so a
+                        white wordmark is visible at all. Worth knowing before anyone "simplifies"
+                        the panel away.
+                      -->
+                      <img class="navLogo" src="/public/images/ptr_logo.png" alt="" />
                     {/if}
                   </div>
                   <div class="col-sm-4">
