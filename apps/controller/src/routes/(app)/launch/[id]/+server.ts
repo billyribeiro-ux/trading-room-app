@@ -14,12 +14,19 @@ import type { RequestHandler } from './$types';
  * `$lib/server/room-handoff`, which the guest door (`/session/[code]/joined`) also uses. They were
  * about to become two implementations of one credential.
  */
+/*
+  `[id]` is the room's SHORT CODE, not its row id — the same identifier `/account/rooms/<code>` uses.
+
+  This route was missed when the manage page moved off primary keys on 2026-08-09: it kept
+  `eq(rooms.id, Number(params.id))`, so the one door that still spoke in row ids was the one nothing
+  in the UI links to. Nothing linked to it, so nothing caught it.
+*/
 export const GET: RequestHandler = async ({ params, locals }) => {
   const user = requireUser(locals);
   const [room] = await getDb()
     .select()
     .from(rooms)
-    .where(eq(rooms.id, Number(params.id)))
+    .where(eq(rooms.shortCode, params.id))
     .limit(1);
   requireOwnedRoom(locals, room);
   if (!room) error(404, 'Room not found');

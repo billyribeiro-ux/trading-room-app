@@ -22,8 +22,8 @@ import { describe, expect, it } from 'vitest';
  * returns — and the whole point is that the page must never be silent about it again.
  */
 
-const PAGE = new URL('../routes/(app)/account/rooms/[id]/+page.svelte', import.meta.url);
-const SERVER = new URL('../routes/(app)/account/rooms/[id]/+page.server.ts', import.meta.url);
+const PAGE = new URL('../routes/(app)/account/rooms/[id]/[[tab]]/+page.svelte', import.meta.url);
+const SERVER = new URL('../routes/(app)/account/rooms/[id]/[[tab]]/+page.server.ts', import.meta.url);
 
 const markup = readFileSync(PAGE, 'utf8').replace(/<!--[\s\S]*?-->/g, '');
 const server = readFileSync(SERVER, 'utf8');

@@ -92,3 +92,7 @@ new-room-control/
 # `proroom-ULTIMATE-*.json` is already covered by the `proroom-*.json` rule above.
 .vercel
 .env*
+
+# Reference dumps captured from the live original. Large, and they carry the
+# original's own bundle text — kept locally, read, never published.
+dumps/

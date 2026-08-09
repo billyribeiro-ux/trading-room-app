@@ -287,16 +287,82 @@
   };
 
   /**
-   * "Export Badges" — the reference's `exportBadges()`. Writes the account's
-   * badges out as JSON, from the same rows the table above is rendering, so
-   * what is exported is what is on screen.
+   * "Export Badges" — `exportBadges()`, now CSV, which is what the reference has always written.
+   *
+   * This shipped as `badges.json` because the handler was not on disk to read. It is now, captured
+   * 2026-08-09 into `dumps/export-controls-1786287657298.json`:
+   *
+   *   $scope.exportBadges=function(){if($scope.badgesList&&$scope.badgesList.length>0){
+   *     var csv=convertToCSV($scope.badgesList),prefix="BadgesList",
+   *         data=new Blob([csv],{type:"text/csv;charset=utf-8"});
+   *     FileSaver.saveAs(data,prefix+".csv",!0)}}
+   *
+   * `BadgesList.csv` — no room id, no account id, no date. And the empty guard is the reference's
+   * own: with no badges it writes nothing at all rather than a header-only file. The button stays
+   * on screen either way, which is what `ng-show="badgesList"` does with a truthy empty array.
+   *
+   * ## The column list is the reference's, exactly
+   *
+   * `convertToCSV` (same bundle) fixes eleven keys and formats them in a way that differs from every
+   * other export in this app — worth stating, because it looks like an inconsistency and is not:
+   *
+   *   - **LF**, not the `\r\n` the participant, stats and monthly exports use;
+   *   - **no space** after the header commas, where the others write `Name, Email`;
+   *   - a cell is quoted **only** when it is a string containing a comma. Nothing else is quoted,
+   *     and an inner quote is never escaped.
+   *
+   * Three of the eleven have no source in this application and are written empty, which is what the
+   * reference itself emits for a key an object does not carry: `type` and `onlyP` have no
+   * equivalent, and `roles` is collected by the editor but never stored — an honest gap already
+   * recorded at `+page.server.ts:345`.
+   *
+   * `darkTheme` is OURS and is deliberately NOT a twelfth column: the reference's key list is fixed,
+   * and matching it matters more here than carrying one extra flag into a file whose whole purpose
+   * is to be interchangeable with the original's.
    */
+  const BADGE_CSV_KEYS = [
+    '_id', 'userID', 'text', 'imgURL', 'color', 'bkcolor', 'type', 'name', 'uploadTime', 'onlyP', 'roles'
+  ] as const;
+
   function exportBadges() {
-    const blob = new Blob([JSON.stringify(data.badges, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
+    // The reference's guard. No badges, no file — not an empty one.
+    if (!data.badges.length) return;
+
+    const rows = data.badges.map((b) => ({
+      _id: b.id,
+      userID: b.accountId,
+      text: b.emoji,
+      imgURL: b.imageUrl,
+      color: b.textColor,
+      bkcolor: b.backgroundColor,
+      type: '',
+      name: b.label,
+      uploadTime: b.createdAt ? new Date(b.createdAt).toISOString() : '',
+      onlyP: '',
+      roles: ''
+    })) as Record<string, unknown>[];
+
+    let csv = BADGE_CSV_KEYS.join(',') + '\n';
+    for (const row of rows) {
+      csv +=
+        BADGE_CSV_KEYS.map((key) => {
+          /*
+            DELIBERATE DIVERGENCE, and it is about null rather than about format. The reference
+            guards on `!== undefined`, so a key that is present and NULL concatenates as the literal
+            text `null` into the cell. Our `emoji` and `imgURL` are nullable columns, so faithfully
+            reproducing that would write the word "null" into a spreadsheet. Empty is what the
+            reference produces for a key it does not carry at all, so empty is what a null gets.
+          */
+          const value = row[key];
+          const cell = value === null || value === undefined ? '' : String(value);
+          return cell.includes(',') ? `"${cell}"` : cell;
+        }).join(',') + '\n';
+    }
+
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'badges.json';
+    a.download = 'BadgesList.csv';
     a.click();
     URL.revokeObjectURL(url);
   }
@@ -535,7 +601,7 @@
                 {#if data.entitlements.marketplace}
                   <a
                     class="acc-btn acc-btn-sm acc-btn-default"
-                    href={resolve(`/account/rooms/${room.shortCode}?tab=marketplace`)}
+                    href={resolve(`/account/rooms/${room.shortCode}/marketplace`)}
                     ><i class="fa fa-credit-card"></i> Marketplace</a
                   >
                 {/if}

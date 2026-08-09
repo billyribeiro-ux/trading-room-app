@@ -638,24 +638,135 @@
     await navigator.clipboard.writeText(el.value);
   }
 
-  function exportSettings() {
-    const blob = new Blob([JSON.stringify(data.settings, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
+  /*
+    ── The four downloads, read out of the reference's own `app.min.js` ─────────────────────────
+    Captured 2026-08-09 by `scripts/collect-export-controls.js`; the bundle is
+    `dumps/export-controls-1786287657298.json`, symbol regions `exportListToCSV`,
+    `exportStatsToCSV`, `downloadMontlyStats` and `exportSettingsToJSON`.
+
+    Before that capture, all three CSVs were ours: one quoting writer, `room-<shortCode>-<thing>.csv`
+    filenames, LF endings, and column sets nobody had checked. Every one of those was wrong, and none
+    of it was visible in the DOM — the handlers live in a bundle that is not on disk.
+
+    What the reference actually does, and what is reproduced below:
+
+      - filenames  `Participant_List_<uuid>.csv`, `Participant_Stats_<uuid>_<date>.csv`,
+                   `Monthly_report_<uuid>_<range>.csv`, `Settings_<uuid>.json`. Our `publicId` is
+                   the reference's `sess.uuid` — the same identifier its room URLs are built from.
+      - CRLF       every row ends `\r\n`, not `\n`.
+      - MIME       `text/csv;charset=utf-8`, and `text/json;charset=utf-8` for the settings file.
+      - quoting    the participant LIST is written UNQUOTED and the other two are fully quoted.
+                   That is not a style choice to normalise away: unquoted is why the list replaces
+                   commas in a name, and the two shapes have to stay apart to stay faithful.
+      - headers    with a space after each comma, exactly as the reference writes them.
+  */
+
+  /** `new Blob(msgs, …)` over an array of already-terminated lines, as the reference does. */
+  function saveAs(lines: string[], filename: string, type: string) {
+    const url = URL.createObjectURL(new Blob(lines, { type }));
     const a = document.createElement('a');
     a.href = url;
-    a.download = `room-${data.room.shortCode}-settings.json`;
+    a.download = filename;
     a.click();
     URL.revokeObjectURL(url);
   }
 
-  function exportCsv(rows: string[][], name: string) {
-    const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
-    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = name;
-    a.click();
-    URL.revokeObjectURL(url);
+  /** The reference's `sess.uuid`, with the same fallback the page's own links use. */
+  const roomUuid = $derived(data.room.publicId ?? String(data.room.id));
+
+  /**
+   * A name, safe for an UNQUOTED cell.
+   *
+   * DELIBERATE DIVERGENCE, and it is one character wide. The reference writes
+   * `o.userName.trim().replace(","," ")` — and a string first argument to `replace` substitutes only
+   * the FIRST occurrence, so a member called `Ribeiro, Billy, Jr` still lands two commas in an
+   * unquoted row and silently shifts every column after it. Replacing all of them is the same
+   * intent, minus the corruption.
+   */
+  const csvName = (value: string | null | undefined) =>
+    value && value.trim() ? value.trim().replaceAll(',', ' ') : 'n/a';
+
+  /** `exportListToCSV()` — Participant list. Unquoted, and phone only when the room asks for one. */
+  function exportListToCsv() {
+    const withPhone = Boolean((data.settings as Record<string, unknown>).hasRequiredPhoneInLogin);
+    const lines = [withPhone ? 'Name, Email, Phone, Role\r\n' : 'Name, Email, Role\r\n'];
+    for (const u of data.users) {
+      const cells = withPhone
+        ? [csvName(u.displayName), u.email.trim(), u.phone ?? '', String(u.role)]
+        : [csvName(u.displayName), u.email.trim(), String(u.role)];
+      lines.push(cells.join(',') + '\r\n');
+    }
+    saveAs(lines, `Participant_List_${roomUuid}.csv`, 'text/csv;charset=utf-8');
+  }
+
+  /**
+   * `exportStatsToCSV(d)` — participant stats.
+   *
+   * HONEST GAP, recorded rather than filled. The reference writes nine columns:
+   * `Name, Email, [Phone,] IP, In, Out, Duration, isMobile, Browser`. Six of them — IP, In, Out,
+   * Duration, isMobile and Browser — come from its per-session participant records, and this
+   * application has no such table: `stats` is `users` filtered to those with a `lastLoginAt`.
+   * Emitting those headers over empty cells would claim we collect data we do not, so the columns
+   * we can fill are written and the rest are recorded in `TODO.md` instead.
+   */
+  function exportStatsToCsv() {
+    const withPhone = Boolean((data.settings as Record<string, unknown>).hasRequiredPhoneInLogin);
+    const lines = [withPhone ? 'Name, Email, Phone, Last login\r\n' : 'Name, Email, Last login\r\n'];
+    for (const r of visibleStats) {
+      const cells = withPhone
+        ? [csvName(r.displayName), r.email.trim(), r.phone ?? '', statsWhen(r.lastLoginAt)]
+        : [csvName(r.displayName), r.email.trim(), statsWhen(r.lastLoginAt)];
+      lines.push(cells.map((c) => `"${c}"`).join(',') + '\r\n');
+    }
+    saveAs(lines, `Participant_Stats_${roomUuid}_${new Date().toDateString()}.csv`, 'text/csv;charset=utf-8');
+  }
+
+  /** `MM/DD/YYYY hh:mm a`, the reference's moment format, and its `N/A` for an absent time. */
+  function statsWhen(at: Date | string | null): string {
+    if (!at) return 'N/A';
+    const d = new Date(at);
+    const hh = d.getHours() % 12 || 12;
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${pad(d.getMonth() + 1)}/${pad(d.getDate())}/${d.getFullYear()} ${pad(hh)}:${pad(d.getMinutes())} ${d.getHours() < 12 ? 'am' : 'pm'}`;
+  }
+
+  /**
+   * `downloadMontlyStats(data)` — the monthly roll-up.
+   *
+   * The trailing comma in the header is the reference's, not a typo here: it writes
+   * `"Month, Total Logins, \r\n"`, which yields a third, empty column. Reproduced because it is
+   * what the file actually contains, and a spreadsheet opens it identically either way.
+   *
+   * The reference names the file from its own `statXrefsMonthlyDateRange` picker. This app has no
+   * such picker — the roll-up is computed from real logins — so the range is taken from the first
+   * and last month actually present, which is derived from the data rather than invented.
+   */
+  function exportMonthlyCsv() {
+    const lines = ['Month, Total Logins, \r\n'];
+    for (const m of monthly) lines.push(`"${m.month}","${m.logins}"\r\n`);
+    const range = monthly.length ? `${monthly[0].month}_to_${monthly[monthly.length - 1].month}` : 'empty';
+    saveAs(lines, `Monthly_report_${roomUuid}_${range}.csv`, 'text/csv;charset=utf-8');
+  }
+
+  /**
+   * `exportSettingsToJSON()` — and JSON here is CORRECT, settled from the bundle.
+   *
+   * The reference's own handler is `var data=new Blob([JSON.stringify($scope.sess)],
+   * {type:"text/json;charset=utf-8"}); FileSaver.saveAs(data,prefix+".json",!0)`. Its filename and
+   * MIME are matched here. The body stays pretty-printed: the object is ours rather than its
+   * `sess`, so byte-fidelity is not available anyway, and indentation is what makes a settings
+   * dump readable.
+   *
+   * Worth knowing if this ever looks odd: the reference's neighbouring `loadSettingsFromJSON()` is
+   * a copy-paste of this function and DOWNLOADS instead of loading. Its button is commented out in
+   * the markup, so it never renders. Ours is `loadSettingsFromRoom`, which is a different feature.
+   */
+  function exportSettings() {
+    saveAs(
+      [JSON.stringify(data.settings, null, 2)],
+      `Settings_${roomUuid}.json`,
+      'text/json;charset=utf-8'
+    );
   }
 </script>
 
@@ -809,7 +920,7 @@
         {#if !data.disableMarketplace}
           <a
             class="btn btn-sm pull-right btn-default mr"
-            href={resolve(`/account/rooms/${data.room.shortCode}?tab=marketplace`)}
+            href={resolve(`/account/rooms/${data.room.shortCode}/marketplace`)}
           >
             <i class="fa fa-credit-card"></i>&nbsp;Marketplace
           </a>
@@ -1032,7 +1143,7 @@ Please click this link to attend: ______ unique link will be here_____
             <!-- hidden, not absent: `ng-hide` on the <li> is what the reference
                  does, and the pane behind it stays reachable by URL -->
             <li class={{ active: data.tab === tab.id }} hidden={!tab.visible}>
-              <a href={resolve(`/account/rooms/${data.room.shortCode}?tab=${tab.id}`)}>{tab.label}</a>
+              <a href={resolve(`/account/rooms/${data.room.shortCode}/${tab.id}`)}>{tab.label}</a>
             </li>
           {/each}
         </ul>
@@ -1056,19 +1167,7 @@ Please click this link to attend: ______ unique link will be here_____
                     <button
                       class="btn btn-md btn-info mt"
                       type="button"
-                      onclick={() =>
-                        exportCsv(
-                          [
-                            ['Name', 'Email', 'Role', 'Last login'],
-                            ...data.users.map((u) => [
-                              u.displayName,
-                              u.email,
-                              roleLabel(u),
-                              u.lastLoginAt ? new Date(u.lastLoginAt).toISOString() : ''
-                            ])
-                          ],
-                          `room-${data.room.shortCode}-users.csv`
-                        )}
+                      onclick={exportListToCsv}
                     >
                       <i class="fa fa-floppy-o" aria-hidden="true"></i> Export
                     </button>
@@ -1096,14 +1195,14 @@ Please click this link to attend: ______ unique link will be here_____
                            reference gets back to the unfiltered list with its Reload Users
                            button, which we already render. -->
                       <ul class="dropdown-menu" role="menu">
-                        <li><a href={resolve(`/account/rooms/${data.room.shortCode}?tab=users&filter=trials`)}>Show Free Trials</a></li>
-                        <li><a href={resolve(`/account/rooms/${data.room.shortCode}?tab=users&filter=banned`)}><i class="fa fa-ban"></i> Show BANNED</a></li>
-                        <li><a href={resolve(`/account/rooms/${data.room.shortCode}?tab=users&filter=muted`)}><i class="fa fa-comment-o"></i> Show Chat Muted</a></li>
-                        <li><a href={resolve(`/account/rooms/${data.room.shortCode}?tab=users&filter=mobile`)}><i class="fa fa-mobile"></i> Show Mobile</a></li>
-                        <li><a href={resolve(`/account/rooms/${data.room.shortCode}?tab=users&filter=non-mobile`)}><i class="fa fa-mobile"></i> Show Non-Mobile</a></li>
-                        <li><a href={resolve(`/account/rooms/${data.room.shortCode}?tab=users&filter=presenters`)}><i class="fa fa-microphone"></i> Show Presenters</a></li>
+                        <li><a href={resolve(`/account/rooms/${data.room.shortCode}/users?filter=trials`)}>Show Free Trials</a></li>
+                        <li><a href={resolve(`/account/rooms/${data.room.shortCode}/users?filter=banned`)}><i class="fa fa-ban"></i> Show BANNED</a></li>
+                        <li><a href={resolve(`/account/rooms/${data.room.shortCode}/users?filter=muted`)}><i class="fa fa-comment-o"></i> Show Chat Muted</a></li>
+                        <li><a href={resolve(`/account/rooms/${data.room.shortCode}/users?filter=mobile`)}><i class="fa fa-mobile"></i> Show Mobile</a></li>
+                        <li><a href={resolve(`/account/rooms/${data.room.shortCode}/users?filter=non-mobile`)}><i class="fa fa-mobile"></i> Show Non-Mobile</a></li>
+                        <li><a href={resolve(`/account/rooms/${data.room.shortCode}/users?filter=presenters`)}><i class="fa fa-microphone"></i> Show Presenters</a></li>
                         <li>
-                          <a href={resolve(`/account/rooms/${data.room.shortCode}?tab=users&filter=marketplace`)}><i class="fa fa-credit-card"></i> Marketplace Users</a>
+                          <a href={resolve(`/account/rooms/${data.room.shortCode}/users?filter=marketplace`)}><i class="fa fa-credit-card"></i> Marketplace Users</a>
                         </li>
                         <li class="divider" role="separator"></li>
                         <li>
@@ -1949,12 +2048,23 @@ Please click this link to attend: ______ unique link will be here_____
                       step with the capture.
 
                       The href is `""`, and the reference's is `"#"` — the one attribute here that
-                      is deliberately NOT transcribed. Svelte rejects a bare fragment
-                      (`a11y_invalid_attribute`) and this package runs
-                      `svelte-check --fail-on-warnings`, so `#` cannot ship. `""` is the value the
-                      capture's other hundred-odd editable anchors already carry (file2:889, 991),
-                      it resolves to the current URL, and neither is ever followed: the click is
-                      always prevented.
+                      is deliberately NOT transcribed. `""` is the value the capture's other
+                      editable anchors already carry (file2:889, 991), it resolves to the current
+                      URL, and neither is ever followed: the click is always prevented.
+
+                      WHAT THIS COMMENT USED TO SAY, AND WHY IT WAS WRONG. It claimed `#` "cannot
+                      ship" because Svelte flags `a11y_invalid_attribute` under
+                      `svelte-check --fail-on-warnings`. Both halves were misleading: `""` is
+                      flagged by the SAME rule, so swapping one for the other bought nothing, and
+                      `pnpm check` really does run `--fail-on-warnings` — so these two anchors put
+                      the package's own gate at exit 1 from the moment they shipped, which is not
+                      what a comment explaining a workaround should leave behind.
+
+                      The warning is now SUPPRESSED rather than dodged, because the markup is
+                      right: an anchor is what the reference uses, the value is what its siblings
+                      carry, and the control is keyboard-reachable with a real `aria-label`. A
+                      suppression that names the rule is honest; picking a different invalid value
+                      and claiming the linter forced it was not.
 
                       The EDITING state is not captured: nothing in the dump was ever clicked, so
                       there is no evidence of what the date popover looks like. The input therefore
@@ -1982,12 +2092,13 @@ Please click this link to attend: ______ unique link will be here_____
                           dropping it at rest is also the closer match. Attributes are invisible to
                           the side-by-side comparison, which reads tag and classes only.
 
-                          svelte-ignore, because at rest the thing being captioned is an `<a>`, and
+                          a conditional `for`, because at rest the thing being captioned is an `<a>`, and
                           an anchor is not a labelable element — there is no id `for` could legally
                           point at. The anchor carries its own `aria-label` below, so the caption
-                          still reaches assistive tech.
+                          still reaches assistive tech. The `svelte-ignore` that used to sit here was removed on
+                          2026-08-09: with `for` conditional the rule no longer fires, so the
+                          suppression silenced nothing and was dead scaffolding.
                         -->
-                        <!-- svelte-ignore a11y_label_has_associated_control -->
                         <label class="col-sm-4 control-label" for={editingStatsFrom ? 'statsFrom' : undefined}
                           >Start Date:</label
                         >
@@ -2003,6 +2114,7 @@ Please click this link to attend: ______ unique link will be here_____
                           />
                         {:else}
                           <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
+                          <!-- svelte-ignore a11y_invalid_attribute -->
                           <a
                             class={[
                               'editable editable-click',
@@ -2033,12 +2145,13 @@ Please click this link to attend: ______ unique link will be here_____
                           dropping it at rest is also the closer match. Attributes are invisible to
                           the side-by-side comparison, which reads tag and classes only.
 
-                          svelte-ignore, because at rest the thing being captioned is an `<a>`, and
+                          a conditional `for`, because at rest the thing being captioned is an `<a>`, and
                           an anchor is not a labelable element — there is no id `for` could legally
                           point at. The anchor carries its own `aria-label` below, so the caption
-                          still reaches assistive tech.
+                          still reaches assistive tech. The `svelte-ignore` that used to sit here was removed on
+                          2026-08-09: with `for` conditional the rule no longer fires, so the
+                          suppression silenced nothing and was dead scaffolding.
                         -->
-                        <!-- svelte-ignore a11y_label_has_associated_control -->
                         <label class="col-sm-4 control-label" for={editingStatsTo ? 'statsTo' : undefined}
                           >End Date:</label
                         >
@@ -2054,6 +2167,7 @@ Please click this link to attend: ______ unique link will be here_____
                           />
                         {:else}
                           <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
+                          <!-- svelte-ignore a11y_invalid_attribute -->
                           <a
                             class={[
                               'editable editable-click',
@@ -2081,19 +2195,7 @@ Please click this link to attend: ______ unique link will be here_____
                     <button
                       class="btn btn-md btn-info"
                       type="button"
-                      onclick={() =>
-                        exportCsv(
-                          [
-                            ['#', 'Nick', 'Email', 'Last login'],
-                            ...visibleStats.map((r, i) => [
-                              String(i + 1),
-                              r.displayName,
-                              r.email,
-                              r.lastLoginAt ? new Date(r.lastLoginAt).toISOString() : ''
-                            ])
-                          ],
-                          `room-${data.room.shortCode}-stats.csv`
-                        )}
+                      onclick={exportStatsToCsv}
                     >
                       <i class="fa fa-floppy-o" aria-hidden="true"></i> Export
                     </button>
@@ -2111,11 +2213,7 @@ Please click this link to attend: ______ unique link will be here_____
                       <button
                         class="btn btn-md btn-info"
                         type="button"
-                        onclick={() =>
-                          exportCsv(
-                            [['Month', 'Logins'], ...monthly.map((m) => [m.month, String(m.logins)])],
-                            `room-${data.room.shortCode}-monthly.csv`
-                          )}
+                        onclick={exportMonthlyCsv}
                       >
                         <i class="fa fa-download" aria-hidden="true"></i> Download monthly report
                       </button>

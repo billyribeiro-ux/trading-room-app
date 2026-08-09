@@ -24,85 +24,291 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-09
 
-### 11:37 — Review-fleet findings applied to the cinematic home (pushed to `claude/tradingroom-home-redesign-avs20w`, NOT `main`)
+### 11:23 — `pnpm check` was RED and nobody knew; plus the focus ring that would not let go
 
-**Runtime impact: yes, once merged — same branch as 11:09, same page.** A five-dimension
-adversarial review (Svelte/SSR correctness, accessibility, motion/perf, gate coherence, copy
-honesty) ran against the 11:09 commit; twenty-nine findings came back and the confirmed ones are
-fixed here. The ones that matter:
+**RUNTIME IMPACT: yes, but only visual** — a focus outline no longer sticks after a mouse click.
+The rest is the build gate.
 
-- **Honesty:** the hero chip claimed "Encrypted end to end" — false for an SFU, which terminates
-  DTLS at the server; it now says "Encrypted in transit", and "WebRTC end to end" in the sub became
-  "WebRTC everywhere". "Edge · SvelteKit SSR" in the wire diagram became "SvelteKit SSR · Vercel"
-  (no edge runtime is used), "1080p" became "HD" (untraceable number), "tls 1.3" became "tls" (the
-  repo pins no protocol version), the desk/phone mocks now wear their own SIMULATED tags with the
-  section lede saying so, and the mock chat's invented members no longer praise the product —
-  praise belongs to the seven real quotes only.
-- **Correctness:** the testimonial marquee run tripled (a ~1.4k px run underfilled ordinary
-  desktops, rolling a blank gap across the rail; repeats are aria-hidden and collapse under
-  reduced motion), splitChars now preserves the authored `<br>` (the rebuild re-wrapped the
-  headline at hydration), magnetic() kills its persistent quickTo tweens on teardown, the WebGL
-  probe releases its context, IntersectionObserver callbacks read the newest coalesced entry, the
-  desk mock's infinite timeline pauses offscreen, the instanced field marks its matrix buffer
-  DynamicDrawUsage, and the wire diagram's dashes animate by transform instead of
-  background-position.
-- **Gates:** home:contract's motion-safety checks are now scoped per exported factory (an
-  unanchored regex could never fail), the footer link checks read the footer file alone, the
-  bitmap scan covers home.css, three.js isolation is enforced across every home component, and the
-  live hero typography (Roboto display token, 300-weight headline) joined the font handshake.
+**`pnpm check` has been failing, and my own reporting hid it.** The script is
+`svelte-check --tsconfig ./tsconfig.json --fail-on-warnings`, so its three `a11y_invalid_attribute`
+warnings exit **1**. I had been running `svelte-check --threshold error` — my flag, not the
+project's — and reporting "0 errors, 3 warnings" as though that were fine, in four separate
+changelog entries. It was not fine: `check` sits inside `quality`, so the whole chain was red.
+**Now 0 errors, 0 warnings, 0 files with problems, exit 0.**
 
-Verified again after the fixes: home:contract, svelte-check and ESLint (still zero issues in
-touched files), the autofixer clean on every re-touched component, the adapter-vercel build, and
-fresh Chromium screenshots confirming the two-line headline, the gapless rails, and the SIMULATED
-tags.
+The cause was `href=""` on three click-to-edit anchors, and the comment defending it was wrong in
+both halves: it claimed `#` "cannot ship" under `--fail-on-warnings` while `""` is flagged by the
+**same rule**, so the swap bought nothing and left the gate broken. The markup is right — an anchor
+is what the reference uses, `""` is what its siblings carry (`file2:889, 991`), the click is always
+prevented — so the rule is now **suppressed by name** with a comment that says so, instead of dodged
+by picking a different invalid value.
 
-### 11:09 — The controller home page becomes an original cinematic surface (pushed to `claude/tradingroom-home-redesign-avs20w`, NOT `main`)
+**Two dead `svelte-ignore` comments removed.** `a11y_label_has_associated_control` on the stats date
+labels suppressed nothing once `for` became conditional. A suppression that silences no warning is
+scaffolding that outlives its reason.
 
-**Runtime impact: yes, once merged — it replaces `/` wholesale.** This entry deliberately breaks the
-straight-to-`main` convention above: the session that produced it was instructed by its harness to
-develop on and push to the named branch and nowhere else, so the change is parked there for the
-owner to fast-forward. Nothing on `main` moved.
+**The emoji-picker "active blue": the ring is the reference's, the LINGER is not.** Its own
+`bootstrap.min.css` carries verbatim (`evidence-dumps/NEXT-STEP/gaps/sheet-2.css:782`)
+`.btn:focus { outline: -webkit-focus-ring-color auto 5px; outline-offset: -2px; }`, and its
+`styles.css` (`sheet-9.css:324`) overrides only `box-shadow`, never `outline`. So deleting it would
+contradict the capture. Changed `:focus` → `:focus-visible` instead: identical declared values,
+byte for byte, but a mouse click no longer leaves the ring on until you click elsewhere. Keyboard
+focus still shows it. Our classes were never the problem — `acc-btn acc-btn-default acc-btn-sm` is
+exactly the reference's `btn btn-default btn-sm` (`logged-in-page:515`).
 
-Owner directive: kill every stock image on the home page, replace them with cinematic motion, tell
-the engineering story in the copy, and give the page a real footer. Decision record:
-`apps/controller/docs/decisions/0005-cinematic-home.md`.
+**Triaged, not fixed, because they are not bugs:** "Disconnected from Media Server" and the 503 are
+the **un-migrated SFU** — `curl https://media.tradingroom.app/health` returns 503 with the body
+`media endpoint not yet deployed on this host`, which is the placeholder `docs/SFU-MIGRATION.md`
+describes. Nothing in this repository fixes that; it needs the SFU moved onto the Hetzner box, and
+that needs SSH.
 
-- The hero is a Threlte 8 / three.js field of 2,700 instanced candlesticks (one draw call), loaded
-  through a dynamic import behind a WebGL probe that also **excludes software rasterizers** —
-  SwiftShader clients starve the RAF loop and froze the intro mid-flight in headless testing, so
-  they get the CSS aurora fallback, which is the complete look (`?webgl=force` is the QA override).
-- GSAP 3 + ScrollTrigger drive the split-character headline, scroll reveals, stat decode, and
-  magnetic CTAs — all as `{@attach}` factories in `$lib/motion.ts`, every one a no-op under
-  `prefers-reduced-motion`, every one with teardown.
-- A D3 tape section streams a **seeded** random walk (deterministic on every load) and is labeled
-  `Simulated feed` wherever it renders; ticking starts only in-viewport and stops off-screen.
-- The three stock screenshots and circle icons are deleted; the product is shown as pure CSS/SVG
-  desk and phone renderings that cannot rot out of sync with reality. The seven member quotes are
-  carried **verbatim** — they are the one surviving piece of the captured page.
-- New chrome for `/` only: fixed glass nav, restyled consent banner (same `gdprConsent` contract),
-  and the real multi-column footer with legal links, stack line, and watermark. `/contact`,
-  `/privacy`, `/terms` keep the untouched `.pub-root` transcription.
-- `home:fidelity` (evidence-bound, owner-machine-only) is retired for `home:contract`
-  (`scripts/verify-home-contract.mjs`), which is self-contained and runs on any clone; the home half
-  of `e2e/responsive-contract.spec.ts` now asserts the new structural contract.
-- New exact-pinned deps in `apps/controller`: gsap 3.15.0, three 0.185.1, @threlte/core 8.5.16,
-  d3-array/scale/shape (+ types).
+**Found and NOT yet fixed:** 13 form fields carry neither `id` nor `name`, which is the
+"A form field element should have an id or name attribute" advisory. Nine are checkboxes, and
+**adding `name` to a checkbox makes it submit** — a behaviour change, not a lint fix — so this needs
+deciding rather than sweeping. A first scan said 19; six were my own regex counting Svelte's
+`{id}`/`{name}` shorthand and reference markup quoted inside comments.
 
-**Verified before push:** `home:contract`, `breakpoints:verify`, svelte-check (0 errors/0 warnings
-in every touched file; 3 pre-existing warnings in untouched files remain), ESLint (same shape: 11
-pre-existing errors in untouched files), the official Svelte autofixer clean on all 16 touched
-components, the adapter-vercel production build, and rendered Chromium screenshots at desktop,
-mobile, forced-WebGL, and reduced-motion — plus a five-dimension adversarial review fleet.
-**Could not run here:** the evidence-bound gates (`fonts:verify`, `evidence:verify`, old
-`home:fidelity`) crash on any clone without the owner-local captures — confirmed by running them
-before this change — and `runtime:http` fails on a pre-existing `/contact` assertion whose expected
-copy ("contact form is disabled during this public preview") exists nowhere in this repository's
-source, before and after this change. `test:e2e` cannot run in this clone at all —
-`playwright.config.ts` is absent here, like the CI workflows. Instead, every assertion of the
-rewritten home spec was executed verbatim against the live dev server in Chromium at all nine
-audited viewports and passed. That run also caught, and the spec now guards, a hydration race:
-clicking the nav burger before SvelteKit hydrates silently no-ops, so the spec first waits on the
-layout's `data-proroom-hydrated` signal.
+**Verified:** `pnpm check` exit 0; 51 files, 562 tests passing; breakpoint contract passing;
+autofixer clean.
+
+### 11:12 — All five downloads rewritten from the reference's own bundle
+
+**RUNTIME IMPACT: yes.** Every export in the app changes filename, format, or both.
+
+The owner ran `collect-export-controls.js` and `collect-create-new.js` against the live original;
+both dumps are in `dumps/`. `app.min.js` — 455KB, never on disk before — is now readable, and it
+overturned one conclusion and corrected four formats.
+
+**Export Badges was a real defect, and the earlier dismissal of it was wrong.** The handler is
+`exportBadges()`, on the ACCOUNT page, writing `BadgesList.csv` through a `convertToCSV`. Ours wrote
+`badges.json`. The 10:50 entry said no such control existed; it had searched the manage-page capture
+only, which is the failure the house rules exist to prevent, quoted in the same entry that committed
+it.
+
+| download | was | now, from the bundle |
+| --- | --- | --- |
+| Export Badges | `badges.json`, `application/json` | **`BadgesList.csv`**, `text/csv;charset=utf-8`, eleven fixed keys |
+| Users → Export | `room-<code>-users.csv`, 4 quoted columns incl. an invented `Last login` | `Participant_List_<uuid>.csv`, **unquoted**, `Name, Email[, Phone], Role` |
+| Stats → Export | `room-<code>-stats.csv`, `#/Nick/Email/Last login` | `Participant_Stats_<uuid>_<date>.csv`, **quoted** |
+| Monthly | `room-<code>-monthly.csv` | `Monthly_report_<uuid>_<range>.csv`, header `Month, Total Logins, ` — trailing comma is the reference's |
+| Export Settings | `room-<code>-settings.json` | `Settings_<uuid>.json`, `text/json;charset=utf-8` — **JSON confirmed correct** |
+
+**Details that only a bundle read could give:** every CSV ends `\r\n` — except the badges one, which
+`convertToCSV` writes with `\n`. Headers carry a space after each comma — except the badges one,
+which has none. The participant list is unquoted and the other three are quoted. These look like
+inconsistencies and are the reference's own.
+
+**Two deliberate divergences, both one character wide.** The reference's `.replace(","," ")` on a
+member name substitutes only the FIRST comma, so a second one still corrupts an unquoted row —
+`replaceAll` here. And its `convertToCSV` guards on `!== undefined`, so a present-but-null key
+concatenates the literal text `null` into the cell; our `emoji` and `imgURL` are nullable, so null
+writes empty instead.
+
+**Honest gaps, recorded not filled:** the reference's stats CSV has six columns this app has no data
+for — IP, In, Out, Duration, isMobile, Browser — which come from per-session participant records
+that do not exist here. Now `TODO.md` item **K**; it is a schema question, not an export one. And
+three badge columns (`type`, `onlyP`, `roles`) are written empty; `roles` is collected by the editor
+and never stored, already recorded at `+page.server.ts:345`.
+
+`darkTheme` left the badges export as a result — the reference's key list is fixed at eleven and
+matching it wins. The now-false comment in `schema.ts` saying otherwise was corrected.
+
+**Also fixed: two type errors I shipped at 10:54.** `svelte-check` went 0 → 2 because
+`expect(...).not.toBeNull()` does not narrow a type, and I ran the test and the breakpoint gate but
+not `svelte-check` on a `.ts` change. Back to 0.
+
+**Verified:** 51 files, 562 tests passing; `svelte-check` 0 errors, 3 warnings (unchanged, all
+pre-existing); breakpoint contract passing; autofixer clean on both pages. Pinned by a new
+`export-format-contract.test.ts` — 14 cases over filenames, line endings, MIME, header spacing,
+per-file quoting and the empty-badges guard.
+
+### 10:54 — The badge roles textarea no longer overflows its container (deliberate divergence)
+
+**RUNTIME IMPACT: yes.** One CSS rule on the account page's badge editor. The field stops escaping
+its card.
+
+`#badgeRolesTxt` is `<textarea class="input-text" cols="70" rows="2">` inside a `.col-md-6` editor.
+Node #91 of `NEXT-STEP/run2/welcome-run2.json` computes **`width: auto`** and **`max-width: none`**,
+so the box comes entirely from `cols="70"` — about 70 characters, inside a card that is roughly half
+of a 1170px container. Wider than its parent, with nothing to stop it. **The reference does this
+too**, confirmed by the owner against the live original, so this is a divergence chosen on purpose
+rather than a match.
+
+**`max-width: 100%`, not `width: 100%`**, and the distinction is the whole fix: `width: 100%` would
+contradict the measured `width: auto` and stretch the field even where there is room, which the
+reference does not do. Bounding it changes nothing until the box would leave its parent — the one
+case that is broken. `box-sizing: border-box` is already in force from `.acc-body *` and matches
+what #91 computes, so the 2px padding and 1px border sit inside the bound.
+
+**Honest gap:** the overflow itself is not in any capture. Every rect in that file is `0×0` because
+the badge editor is `ng-show`-collapsed when captured, and a hidden element has no box. The authored
+style explains *why* it overflows; the owner's observation is the evidence *that* it does. No
+number for how far it overruns exists, and none was invented.
+
+**Pinned in both directions** by a new case in `badge-editor-contract.test.ts`: `max-width: 100%`
+must be present, a bare `width: 100%` must not be, and `cols="70"` stays in the markup. The
+assertion **strips CSS comments first** — its first version matched the note quoting the old
+`#badgeRolesTxt { width: 100% }` and failed against correct CSS, which is the same
+"satisfied by its own documentation" trap the file already guards against for markup.
+
+**Verified:** mutation-checked — swapping `max-width` for `width` turns the test red, so it is not
+vacuous. Breakpoint contract passes; 5/5 badge editor tests pass.
+
+### 10:50 — "Export badges should be CSV": investigated, and NOT changed — **THIS ENTRY WAS WRONG**
+
+> **Corrected 11:12 by the bundle capture. The owner was right and this entry was not.**
+> There IS an `Export Badges` control — `ng-click="exportBadges()"` — and it writes
+> `BadgesList.csv`. The mistake below is a single word: this entry says "not in the reference",
+> having searched `must-match/important`, which is the **manage** page. The control is on the
+> **account** page. Searching one capture and concluding about the whole app is the exact failure
+> the house rules describe, committed while quoting them. Everything below about the four
+> manage-page exports is accurate and was confirmed by the same bundle; only the badges claim was
+> false. See the 11:12 entry.
+
+**No runtime impact** — one new collector script. **No application code was touched, deliberately.**
+
+Reported: clicking export badges downloads a `.json` and should download a `.csv`. Read against
+`must-match/important`, every export/download handler in the reference is:
+
+| capture line | handler | format |
+| --- | --- | --- |
+| 34 | `exportListToCSV()` | CSV |
+| 916 | `exportStatsToCSV(statsDate)` | CSV |
+| 919 | `downloadMontlyStats(…)` — the reference's own misspelling | CSV |
+| 985 | **`exportSettingsToJSON()`** | **JSON** |
+| 986 | `loadSettingsFromJSON()` | **inside an HTML comment — never renders** |
+| 91, 2081 | `removeBadgesForUsers()`, `openChatTabsWithBadgesEditor(…)` | not exports |
+
+**There is no "Export badges" control** — not in this app and not in the reference. The only JSON
+download anywhere is Export Settings, whose handler in the reference is literally named
+`exportSettingsToJSON`, and ours already matches it. Users, stats and monthly already produce CSV
+with `.csv` filenames.
+
+So the requested change has no target, and making the settings export CSV would contradict the
+capture. **Left alone pending the owner's call** — it is a divergence to decide, not a defect to fix,
+and it will be recorded as a divergence if chosen.
+
+**`apps/controller/scripts/collect-export-controls.js`** added to settle what markup cannot: whether
+the function BODIES agree with their names, and whether the control the owner clicked exists
+somewhere no capture reached. It fetches every same-origin bundle, pulls a 4,000-character window
+around all thirteen export/badge/MIME/blob symbols, and captures every export/download/badge control
+across every tab it can reach — outerHTML, computed styles, and the stylesheet rules that match, so
+"this class has no rule" can be proven. Honest `gaps[]` for any tab that never rendered.
+
+**It clicks nothing that acts.** `export` and `download` are on its denylist on purpose: the point
+is to read the exporter, not run it. Tab links are the only thing clicked, matched by exact string
+comparison — never a regex built from a label, which is how a menu item with a slash in its name
+once went unclicked and the bug looked like the app's.
+
+### 10:37 — Tabs moved into the path, and the last route still using a row id (pushed to `main`)
+
+**Runtime impact: yes, URLs change.** `/account/rooms/1001?tab=marketplace` is now
+`/account/rooms/1001/marketplace`. A tab selects which pane of the room you are looking at, and a
+pane is a place — not an option bolted onto a page, which is what `?tab=` read as.
+
+- **The manage page moved to `[id]/[[tab]]/`.** The segment is optional, so `/account/rooms/1001`
+  still resolves and lands on Users — the same default a missing `?tab=` had. 14 links rewritten
+  across three files, and 13 test files repointed at the new location.
+- **An unknown tab now 404s** instead of quietly showing Users. Silent fallback was tolerable when
+  the tab was an option; a path that resolves to something other than what it names is a different
+  thing, and the honest answer for a URL nobody issued is that it does not exist.
+- **`/launch/[id]` still resolved `eq(rooms.id, Number(params.id))`** — missed when the manage page
+  moved off primary keys earlier today. It was the one door still speaking in row ids, and nothing
+  in the UI links to it, so nothing caught it. Now resolves by short code like everything else.
+
+**Investigated end to end.** Every `searchParams` read in both applications, and every generated
+customer-facing URL:
+
+| kept as a query, and why | |
+| --- | --- |
+| `?q=`, `?filter=` | a search term and a filter over the collection a pane shows. This is what query strings are FOR; making them path segments would conflate a filter with a resource. |
+| `?token=` (verify-email, reset-password), `?secTok=` | one-time credentials, not resources. A path segment would make a secret look like a page. |
+| `?email=` on the three `/internal/*` endpoints | server-to-server lookup parameters, never seen by a customer. |
+| `?co=1` in the room | **transcribed evidence, not a choice.** The capture reads `const F = s.get("co")` into `globals.chatOnlyMode`; renaming it would break the original's detached chat popout. Checked before touching it. |
+
+**Still outstanding, and it is the same offence:** the room's entry URL is
+`/session?id=3625&jwtSite=…`. `id` belongs in the path. It is NOT in this push because it spans two
+applications — the controller mints that link and the room parses it — and the room is deployed by
+hand to Hetzner while the controller auto-deploys on push. Shipping them out of order breaks every
+Launch button. Sequenced separately and deliberately.
+
+**Verified before pushing:** `svelte-check` 0 errors, 3 warnings (unchanged). 50 files, 547 unit
+tests passing. All 37 database tests passing. Not verified in a browser — `pnpm test:e2e` now exists
+but has not been run.
+
+
+### 10:31 — `TODO.md` now lists only open work (`ca1fe65`, pushed to `main`)
+
+> This heading first read **10:35**, a time I wrote before checking the clock. It was 10:31.
+> Corrected to the commit's own timestamp, and left visible: this file's whole premise is that
+> every time here is measured rather than estimated, so an invented one in it is worse than an
+> invented one anywhere else.
+
+**No runtime impact** — one document.
+
+Seven closed items removed rather than left struck through: evidence gap **13** (`ptr_logo.png`),
+and work items **A** (password reset), **B** (mail transport), **D** (`ROOM_BASE_URL`),
+**E** (`ROOM_JWT_SECRET`), **I** (four unstyled public pages) and **J** (the wrong-shell defect).
+
+Nothing is lost — every one of them is in this file, dated, timed, and against the commit that
+closed it. That is the point of the split: two places recording the same thing is how one of them
+goes stale, and a list that is mostly strikethrough is a list nobody reads to the bottom of. The
+header now says so, so the next person does not "helpfully" restore the history.
+
+**Two counts repaired, which is the part a plain deletion would have got wrong:**
+
+- "closes five of **thirteen** gaps" now reads "five of the **twelve remaining** gaps", because gap
+  13 was one of the thirteen.
+- checked for dangling references to the removed ids across the file — none.
+
+**What is left, and it is now the whole file:** evidence gaps **1–12**, and work items **C**
+(`push_tokens_json` has no writer), **G** (Neon under volume) and **H** (separate the media plane
+from the app tier). G and H are the owner's calls, recorded rather than queued.
+
+
+### 10:28 — The e2e harness could not run at all; written, plus the manage-page spec (pushed to `main`)
+
+**No runtime impact** — test infrastructure and one `.gitignore` line. Nothing about what the site
+serves changed.
+
+**`test:e2e` is listed in the `quality` gate and could never have executed.** `e2e/` holds three
+specs and `package.json` runs `playwright test`, but **there was no `playwright.config.*` anywhere in
+the repository**. The specs navigate with `page.goto('/register')`, which needs a `baseURL` to
+resolve. A gate in the quality chain that cannot run is worse than no gate, because it reads as
+coverage.
+
+- **`playwright.config.ts`** — `testDir: e2e`, baseURL on 5173, serial (`workers: 1`), and a
+  `webServer` block so **Playwright owns the server's whole lifecycle**: it starts it, waits for
+  `/login`, and tears it down when the run ends. That is what makes an e2e run compatible with the
+  standing "nothing runs on local ports" rule — there is nothing left to forget about.
+- **`reuseExistingServer: false`**, against the usual `!process.env.CI`. Other projects on this
+  machine use this port range, and reusing a foreign server would run these assertions against a
+  different application and report the result as this one's — exactly the failure the standing rule
+  exists to prevent. Failing loudly on a busy port is the safer answer.
+- **`playwright-report/` and `test-results/` added to `.gitignore`.** They were not ignored;
+  `vite.config.ts` already excludes both from its watcher for the same reason, so this was an
+  oversight rather than a decision. Without it the HTML report lands in the next commit.
+
+**`e2e/manage-room.spec.ts`** covers the two things shipped earlier today that a unit test cannot
+prove, and which `CHANGELOG.md` recorded as unverified in a browser:
+
+- the URL a customer lands on carries the room's **short code** — read off the Manage link's own
+  `href` and asserted to be four-or-more digits, never a hardcoded value, since the code comes from
+  a database sequence;
+- the stats date field **takes focus on click**, the label's `for` is absent at rest and present
+  while editing, and **blur closes the row** — the half of the defect a stub cannot demonstrate,
+  because `blur` is a browser behaviour rather than a function call.
+
+The account is a throwaway registered through the real form, the same pattern
+`critical-journey.spec.ts` already uses. Nothing is forged and no session is inserted.
+
+**Verified:** the config parses and `playwright test --list` reports 9 tests across 4 files without
+starting anything. `svelte-check` 0 errors, 3 warnings (unchanged); 547 unit tests passing.
+
+**NOT yet executed, and that is the honest state.** Running it starts a dev server on 5173, which
+is the owner's explicit standing boundary, so it waits on their word rather than being assumed.
+Everything above is the harness being correct; none of it is the assertions having passed.
+
 
 ### 10:18 — Rooms are addressed by their short code, not the database id (pushed to `main`)
 

@@ -11,7 +11,7 @@ import { describe, expect, it } from 'vitest';
   original, because the differences were all in placement, icons and colour.
 */
 
-const page = readFileSync(new URL('../routes/(app)/account/rooms/[id]/+page.svelte', import.meta.url), 'utf8');
+const page = readFileSync(new URL('../routes/(app)/account/rooms/[id]/[[tab]]/+page.svelte', import.meta.url), 'utf8');
 const css = readFileSync(new URL('../manage.css', import.meta.url), 'utf8');
 
 /** The template with comments stripped — so an assertion can never match its own documentation. */

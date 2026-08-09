@@ -47,6 +47,40 @@ describe('the editor fields keep the reference ids', () => {
     }
   });
 
+  it('bounds the roles textarea to its container without stretching it', () => {
+    /*
+      A DELIBERATE DIVERGENCE, pinned in both directions because each half undoes the other.
+
+      The reference overflows: node #91 of `NEXT-STEP/run2/welcome-run2.json` computes
+      `width: auto` and `max-width: none`, so the box comes from the `cols="70"` in the markup and
+      is wider than the `.col-md-6` editor holding it. The owner confirmed it renders that way in
+      the live original. The capture cannot show the overflow itself — every rect in that file is
+      `0×0` because the editor is `ng-show`-collapsed when captured — so the numbers are an honest
+      gap and the observation is the evidence.
+
+      `max-width: 100%` bounds it. `width: 100%` would contradict the measured `width: auto` and
+      stretch the field even where there is room, which the reference does not do. So:
+      max-width yes, width no, and `cols="70"` stays in the markup because it is what sizes the
+      field everywhere it fits.
+    */
+    /*
+      Comments stripped FIRST, for the same reason `markup` above strips them: the note explaining
+      this rule quotes the older `#badgeRolesTxt { width: 100% }` it replaced, and the first version
+      of this assertion matched that quotation instead of the rule and failed against correct CSS.
+      An assertion that can be satisfied — or broken — by its own documentation is not an assertion.
+    */
+    const css = readFileSync(new URL('../account.css', import.meta.url), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+    const match = /#badgeRolesTxt\s*\{[^}]*\}/.exec(css);
+    expect(match, '#badgeRolesTxt must carry a rule').not.toBeNull();
+    // `?? ''` rather than `match[0]`: `expect(...).not.toBeNull()` is a runtime assertion and does
+    // not narrow the type, which is how this file shipped two `possibly null` errors. An empty
+    // string still fails both assertions below, so the guard costs no strictness.
+    const rule = match?.[0] ?? '';
+    expect(rule).toMatch(/max-width:\s*100%/);
+    expect(rule, 'width: 100% would contradict the measured width: auto').not.toMatch(/[^-]width:\s*100%/);
+    expect(markup).toContain('cols="70"');
+  });
+
   it('leaves the three editor fields as bare UA controls', () => {
     // The reference's are `input-emoji-txt` / `input-name-txt` / `input-text` — its own class
     // names, none of which has a rule. Applying `.acc-input` made them form-controls and

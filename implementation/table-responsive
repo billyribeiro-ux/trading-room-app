@@ -1,0 +1,37 @@
+<div class="table-responsive" ng-show="badgesList" ng-init="showBadgeID=false">
+                <table class="table table-striped table-bordered table-hover">
+                  <thead>
+                    <tr>
+                      <th ng-dblclick="showBadgeID=!showBadgeID;">Badge</th>
+                      <th class="text-center">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <!-- ngRepeat: b in badgesList | filter: sessSearch --><tr ng-repeat="b in badgesList | filter: sessSearch" class="ng-scope">
+                      <td>
+                        <div class="label label-badge-img" ng-class="{'label-badge-img': b.hasOwnProperty('imgURL') &amp;&amp; b.imgURL}" style="background-color: rgba(1,0,0,0); color: rgba(1,0,0,0)">
+                          <span ng-hide="b.hasOwnProperty('imgURL') &amp;&amp; b.imgURL" class="ng-binding ng-hide"></span>
+                          <img class="user-badge-img" ng-show="b.hasOwnProperty('imgURL') &amp;&amp; b.imgURL" ng-src="https://i.imgur.com/8RRlS9f.png" alt="https://i.imgur.com/8RRlS9f.png" src="https://i.imgur.com/8RRlS9f.png">
+                          <span class="room-badge-name ng-binding ng-hide" ng-show="b.hasOwnProperty('name') &amp;&amp; b.name">[""]</span>
+                          <span class="room-badge-id ng-binding ng-hide" ng-show="showBadgeID">&nbsp;&nbsp;(6a6f27a09cb16975cc8f132a)</span>
+                        </div>
+                      </td>
+                      <td class="">
+                        <!-- ng-hide="b.hasOwnProperty('imgURL') && b.imgURL" -->
+                        <label><a href="" ng-click="editBadge(b._id,b.text,b.bkcolor,b.color,b.roles,b.name,b.imgURL)">Edit</a></label>
+                        <!-- <label ng-show="b.hasOwnProperty('imgURL') && b.imgURL"><a href="" ngf-select="ngf-select" ngf-change="onImageSelect($files, b._id)">Edit</a></label> -->
+                        &nbsp; | &nbsp;
+                        <label><a href="" ng-click="deleteBadge(b._id,b.text,b.imgURL)">Delete</a></label>
+                        &nbsp; | &nbsp;
+                        <label><a href="" ng-click="addBadgeDarkTheme(b._id,b.text,b.imgURL,b.darkTheme)">Dark Theme </a>
+                          <span ng-show="b.hasOwnProperty('darkTheme') &amp;&amp; b.darkTheme" class="ng-hide">
+                            <!-- &nbsp;({{b.darkTheme}}) -->
+
+                            <!-- ngRepeat: roomBadge in badgesList --><!-- ngIf: roomBadge._id === b.darkTheme --><!-- end ngRepeat: roomBadge in badgesList -->
+                          </span>
+                        </label>
+                      </td>
+                    </tr><!-- end ngRepeat: b in badgesList | filter: sessSearch -->
+                  </tbody>
+                </table>
+              </div>

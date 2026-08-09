@@ -155,7 +155,7 @@ async function world(tag: string) {
  * its id ever stopped agreeing, this would fail rather than paper over it.
  */
 async function post(name: string, roomId: number, locals: App.Locals, fields: Record<string, string> = {}) {
-  const { actions } = await import('../../routes/(app)/account/rooms/[id]/+page.server');
+  const { actions } = await import('../../routes/(app)/account/rooms/[id]/[[tab]]/+page.server');
   const { getDb } = await import('./db');
   const { rooms } = await import('./db/schema');
   const { eq } = await import('drizzle-orm');

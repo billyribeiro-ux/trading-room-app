@@ -1,0 +1,657 @@
+<table class="table table-striped " ng-init="showPins=true;">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Name / Email</th>
+                                    <th>Last Login/Notes</th>
+                                    <th>Role / Status</th>
+                                    <th>Actions</th>
+
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!-- ngRepeat: user in xrefs --><tr ng-repeat="user in xrefs  " class="ng-scope">
+
+                                    <td class="ng-binding">0</td>
+                                    <td class="ng-binding">
+                                        <input ng-show="user.role!==0" type="checkbox" name="checkbox" ng-checked="checkedUserIds[user._id]" ng-click="getCheckedUserIds(user._id)" class="ng-hide">
+                                        <i ng-show="false" class="fa fa-folder-o fa-2x ng-hide" aria-hidden="true"></i>
+                                        <i ng-show="false" class="fa fa-mobile fa-2x ng-hide" aria-hidden="true"></i>
+                                        <i ng-show="false" class="fa fa-mobile ng-hide" aria-hidden="true"></i>
+                                        <i ng-show="false" class="fa fa-mobile ng-hide" style="color: red;" aria-hidden="true"></i>
+                                        <i class="fa fa-microphone ng-hide" ng-show="user.hasMic" aria-hidden="true"></i>
+                                        <i class="fa fa-video-camera ng-hide" ng-show="user.hasCam" aria-hidden="true"></i>
+                                        <i class="fa fa-desktop ng-hide" ng-show="user.hasScreen" aria-hidden="true"></i>
+                                        <i class="fa fa-comment-o ng-hide" ng-show="user.hasAdminChat" aria-hidden="true"></i>
+                                        <i class="fa fa-pencil-square-o ng-hide" ng-show="user.canEditNotes" aria-hidden="true"></i>
+                                        <i class="fa fa-hdd-o ng-hide" ng-show="user.denyArchivesAccess" aria-hidden="true" title="Denied Archives Access" style="color: red;"></i>
+                                        <img gravatar-src-once="user.email " style="margin-right:5px " class="thumb24 ">
+                                        <div ng-show="user.discordUserId" style="color: red; font-size: 12px; margin-left: 10px;" class="ng-binding ng-hide">
+                                        Discord Username:
+                                        </div>
+                                        <!-- stripe data here -->
+                                        <!-- ngIf: user.isMarketPlaceUser -->
+
+                                        <!-- ngIf: badges.hasBadges && user.badges.length -->
+                                        <span ng-show="user.isFreeTrial" class="badge badge-danger-chat ng-hide" style="color: white; margin-right: 20px;"> TRIAL </span><br>   <span ng-show="showPins &amp;&amp; user.mobilePairCode" class="ng-binding ng-hide"> |  <i class="fa fa-mobile"></i>  </span><span ng-show="user.phone" class="ng-binding ng-hide">&nbsp;&nbsp;<i class="fa fa-phone"></i> </span> <span ng-show="user.pw" class="ng-hide">&nbsp;&nbsp;&nbsp;&nbsp;<i class="fa fa-lock" aria-hidden="true"></i> PW set</span>
+                                        <span class="badge badge-danger ng-hide" ng-show="user.hideUserCount">User Count Hidden</span>
+                                        <span class="badge badge-danger ng-hide" ng-show="user.hidePersInfo">User Personal Info Hidden</span>
+                                    </td>
+
+                                    <td class="ng-binding">
+
+
+
+                                    <span ng-show="user.inactive" style="color: red;" class="ng-hide">
+                                        *** INACTIVE USER ***
+                                    </span>
+
+                                    <span ng-show="user.restrictPMUser" style="color: red;" class="ng-hide"><br><i class="fa fa-comment-o"></i> User PMs disabled</span>
+                                    <div ng-show="user.note" style="border: 1px solid #A0A0A0; padding: 5px; " class="ng-binding ng-hide"><br></div>
+                                    <!-- <hr>
+                                    Token:{{user.fcmTokens}} <br> Unregged: {{user.fcmUnreged ? 'y':'n'}} -->
+                                    </td>
+                                    <td> <button class="btn btn-small btn-warning ng-hide" ng-click="approveUser(user.userName,user._id,$index,'approved')" ng-show="user.inviteStatus=='pending' "> APPROVE</button>
+                                        <span ng-show="user.role==2 " class="ng-hide">Participant</span>
+                                        <span ng-show="user.role==0 ">Owner</span>
+                                        <span ng-show="user.role==1 &amp;&amp; !user.nonPresenter" class="ng-hide">Presenter</span>
+                                        <span ng-show="user.role==1 &amp;&amp; user.nonPresenter" class="ng-hide">Admin</span>
+                                        <span ng-hide="user.role==0" class="ng-binding ng-hide"> / </span>
+                                        <span ng-show="user.role==3 " style="color: red;" class="ng-hide">CHAT MUTED</span>
+                                        <span ng-show="user.role==4 " style="color: red;" class="ng-hide">BANNED</span>
+                                    </td>
+                                    <td>
+
+                                        <div ng-hide="user.role==0" dropdown="dropdown" class="btn-group mb-sm mr ng-hide" ng-init="submenuOpen={permissions:false, granular:false, app:false, badges:false}" on-toggle="!open &amp;&amp; (submenuOpen={permissions:false, granular:false, app:false, badges:false})">
+                                            <button type="button" ng-disabled="disabled" dropdown-toggle="" class="btn dropdown-toggle btn-primary" aria-haspopup="true" aria-expanded="false">Actions&nbsp;
+                                    <span class="caret"></span>
+                                    <span><span style="width: 107px; height: 107px; left: -10.6719px; top: -42.5px;"></span></span></button>
+                                            <ul role="menu" class="dropdown-menu dropdown-menu-right">
+
+                                                <!-- Permissions -->
+                                                <li class="dropdown-submenu" ng-class="{open: submenuOpen.permissions}">
+                                                    <a href="" ng-click="submenuOpen.permissions=!submenuOpen.permissions; submenuOpen.granular=false; submenuOpen.app=false; submenuOpen.badges=false; $event.preventDefault(); $event.stopPropagation();">
+                                                        <i class="fa fa-shield"></i>&nbsp;&nbsp;Permissions <i class="fa fa-caret-right pull-right"></i>
+                                                    </a>
+                                                    <ul class="dropdown-menu">
+                                                        <li>
+                                                            <a href="" ng-click="updateUser(1,user._id,user.userName,$index)"><i class="fa fa-microphone"></i>&nbsp;<i class="fa fa-desktop"></i>&nbsp;&nbsp;Make Presenter</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="" ng-click="updateUser(5,user._id,user.userName,$index)"><i class="fa fa-cog" aria-hidden="true"></i>&nbsp;<i class="fa fa-user-md"></i>&nbsp;&nbsp;Make Admin</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="" ng-click="updateUser(2,user._id,user.userName,$index)"><i class="fa fa-user"></i>&nbsp;&nbsp;Make Participant</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="" ng-click="updateUser(6,user._id,user.userName,$index)"><i class="fa fa-user"></i>&nbsp;&nbsp;Make Trial</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="" ng-click="updateUser(3,user._id,user.userName,$index)"><i class="fa fa-user-times"></i>&nbsp;&nbsp;MUTE Participant</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="" ng-click="updateUser(4,user._id,user.userName,$index)"><i class="fa fa-user-times"></i>&nbsp;&nbsp;BAN</a>
+                                                        </li>
+                                                        <li class="divider"></li>
+                                                        <li>
+                                                            <a href="" ng-click="updateUser(2,user._id,user.userName,$index)"><i class="fa fa-user"></i>&nbsp;&nbsp;Unban</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="" ng-click="updateUser(9,user._id,user.userName,$index)"><i class="fa fa-clock-o"></i>&nbsp;&nbsp;Freshen Login Date</a>
+                                                        </li>
+                                                    </ul>
+                                                </li>
+
+                                                <!-- Granular Perms -->
+                                                <li class="dropdown-submenu" ng-class="{open: submenuOpen.granular}">
+
+                                                    <a href="" ng-click="submenuOpen.granular=!submenuOpen.granular; submenuOpen.permissions=false; submenuOpen.app=false; submenuOpen.badges=false; $event.preventDefault(); $event.stopPropagation();">
+                                                        <i class="fa fa-sliders"></i>&nbsp;&nbsp;Granular Perms <i class="fa fa-caret-right pull-right"></i>
+                                                    </a>
+                                                    <ul class="dropdown-menu">
+                                                        <li ng-show="user.role !== 1">
+                                                            <a href="" ng-click="setPermissions(user)" data-toggle="modal" data-target="#permissionsModal">Adjust Mic/Cam/Screen/Chat/Notes</a>
+                                                        </li>
+                                                        <li class="divider"></li>
+                                                        <li>
+                                                            <a href="" ng-click="updateUser(8,user._id,user.userName,$index)"><i class="fa fa-user-circle"></i>Show User Count</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="" ng-click="updateUser(7,user._id,user.userName,$index)"><i class="fa fa-user-circle"></i>Hide User Count</a>
+                                                        </li>
+                                                        <li ng-show="!user.denyArchivesAccess">
+                                                            <a href="" ng-click="updateUser(13,user._id,user.userName,$index)"><i class="fa fa-hdd-o"></i>&nbsp;&nbsp;Deny Archives Access</a>
+                                                        </li>
+                                                        <li ng-show="user.denyArchivesAccess" class="ng-hide">
+                                                            <a href="" ng-click="updateUser(14,user._id,user.userName,$index)"><i class="fa fa-hdd-o"></i>&nbsp;&nbsp;Allow Archives Access</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="" ng-click="updateUser(10,user._id,user.userName,$index)"><i class="fa fa-lock"></i>&nbsp;&nbsp;Hide Pers User Data</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="" ng-click="updateUser(11,user._id,user.userName,$index)"><i class="fa fa-user"></i>&nbsp;&nbsp;Don't Hide Pers User Data</a>
+                                                        </li>
+
+                                                        <li class="divider"></li>
+                                                        <li>
+                                                            <a href="" ng-click="setUserRestrictPM(true,user._id,user.userName)"><i class="fa fa-comment-o"></i>&nbsp;&nbsp;Disallow User2User PM</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="" ng-click="setUserRestrictPM(false,user._id,user.userName)"><i class="fa fa-comment-o"></i>&nbsp;&nbsp;Allow User2User PM</a>
+                                                        </li>
+
+                                                        <li class="divider"></li>
+
+                                                    </ul>
+                                                </li>
+
+                                                <!-- App and Notifications -->
+                                                <li class="dropdown-submenu" ng-class="{open: submenuOpen.app}">
+                                                    <a href="" ng-click="submenuOpen.app=!submenuOpen.app; submenuOpen.permissions=false; submenuOpen.granular=false; submenuOpen.badges=false; $event.preventDefault(); $event.stopPropagation();">
+                                                        <i class="fa fa-mobile"></i>&nbsp;&nbsp;App and Notifications <i class="fa fa-caret-right pull-right"></i>
+                                                    </a>
+                                                    <ul class="dropdown-menu">
+                                                        <li>
+                                                            <a href="" ng-click="getAppPin(user.email,user.userName,$index)"><i class="fa fa-mobile"></i>&nbsp;&nbsp;Get App PIN</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="" ng-click="showAlerterAppTokens(user.userName,user.alerterAppTokens)"><i class="fa fa-mobile"></i>&nbsp;&nbsp;Show App Tokens</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="" ng-click="getFCMTokens(user._id,user.userName,$index)"><i class="fa fa-mobile" aria-hidden="true"></i>&nbsp;&nbsp;Get FCM Tokens</a>
+                                                        </li>
+                                                        <li class="divider"></li>
+                                                        <li>
+                                                            <a href="" ng-click="pauseUserNotifs(user._id,user.userName,$index,'pause')"><i class="fa fa-mobile" aria-hidden="true"></i><i class="fa fa fa-bell-o"></i>&nbsp;&nbsp;PAUSE Mobile Notifs</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="" ng-click="pauseUserNotifs(user._id,user.userName,$index,'resume')"><i class="fa fa-mobile" aria-hidden="true"></i><i class="fa fa-play"></i>&nbsp;&nbsp;RESUME Mobile Notifs</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="" ng-click="pauseUserNotifs(user._id,user.userName,$index,'unsub')"><i class="fa fa-mobile" aria-hidden="true"></i><i class="fa fa-trash"></i>&nbsp;&nbsp;Remove Mobile Notifs</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="" ng-click="sendTestFCM(user._id,user.userName,$index)"><i class="fa fa-mobile" aria-hidden="true"></i><i class="fa fa fa-bell-o"></i>&nbsp;&nbsp;Send Test Mobile Notifs</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="" ng-click="resetFCMForuser(user._id,user.userName,$index)"><i class="fa fa-mobile" aria-hidden="true"></i><i class="fa fa-reload"></i>&nbsp;&nbsp;Reset Mobile Notifs</a>
+                                                        </li>
+                                                        <!-- ngIf: sess.ptrMobileAppCaseByCaseEnabled -->
+                                                        <!-- ngIf: sess.ptrMobileAppCaseByCaseEnabled -->
+                                                        <!-- ngIf: sess.ptrMobileAppCaseByCaseEnabled -->
+                                                    </ul>
+                                                </li>
+
+                                                <!-- Badges -->
+                                                <li class="dropdown-submenu" ng-class="{open: submenuOpen.badges}">
+                                                    <a href="" ng-click="submenuOpen.badges=!submenuOpen.badges; submenuOpen.permissions=false; submenuOpen.granular=false; submenuOpen.app=false; $event.preventDefault(); $event.stopPropagation();">
+                                                        <i class="fa fa-certificate"></i>&nbsp;&nbsp;Badges <i class="fa fa-caret-right pull-right"></i>
+                                                    </a>
+                                                    <ul class="dropdown-menu">
+                                                        <!-- ngIf: badges.hasBadges -->
+                                                    </ul>
+                                                </li>
+
+                                                <li class="divider"></li>
+
+                                                <!-- Left on main menu (not in requested submenus) -->
+                                                <li>
+                                                    <a href="" ng-click="setNoteUser(user._id,user.userName,$index)"><i class="fa fa-pencil-square-o"></i>&nbsp;&nbsp;Set Note</a>
+                                                </li>
+                                                <li>
+                                                    <a href="" ng-click="editUsername(user._id, user.userName)"><i class="fa fa-edit"></i>&nbsp;&nbsp;Edit Username</a>
+                                                </li>
+                                                <li>
+                                                    <a href="" ng-click="deleteParticipant(user.userName,user._id,$index)"><i class="fa fa-trash"></i>&nbsp;&nbsp;Remove User</a>
+                                                </li>
+                                                <li class="divider"></li>
+                                                <li>
+                                                    <a href="" ng-click="setUserPW(user._id,user.userName,$index)"><i class="fa fa-lock"></i>&nbsp;&nbsp;Set/Change Password</a>
+                                                </li>
+                                                <li>
+                                                    <a href="" ng-click="sendWelcomeEmail(user._id,user.userName,$index)"><i class="fa fa-envelope"></i>&nbsp;&nbsp;Resend Welcome Email</a>
+                                                </li>
+
+                                                <li class="divider"></li>
+                                                <li>
+                                                    <a href="" ng-click="approveUser(user.userName,user._id,$index,'pending')"><i class="fa fa-pause"></i>&nbsp;&nbsp;Pause / Pending</a>
+                                                </li>
+
+                                                <!-- ngIf: sess.fileAccessCaseByCase -->
+                                                <!-- ngIf: sess.fileAccessCaseByCase -->
+                                                <!-- ngIf: sess.fileAccessCaseByCase -->
+                                            </ul>
+                                        </div>
+
+                                    </td>
+                                </tr><!-- end ngRepeat: user in xrefs --><tr ng-repeat="user in xrefs  " class="ng-scope">
+
+                                    <td class="ng-binding">1</td>
+                                    <td class="ng-binding">
+                                        <input ng-show="user.role!==0" type="checkbox" name="checkbox" ng-checked="checkedUserIds[user._id]" ng-click="getCheckedUserIds(user._id)">
+                                        <i ng-show="false" class="fa fa-folder-o fa-2x ng-hide" aria-hidden="true"></i>
+                                        <i ng-show="false" class="fa fa-mobile fa-2x ng-hide" aria-hidden="true"></i>
+                                        <i ng-show="false" class="fa fa-mobile ng-hide" aria-hidden="true"></i>
+                                        <i ng-show="false" class="fa fa-mobile ng-hide" style="color: red;" aria-hidden="true"></i>
+                                        <i class="fa fa-microphone ng-hide" ng-show="user.hasMic" aria-hidden="true"></i>
+                                        <i class="fa fa-video-camera ng-hide" ng-show="user.hasCam" aria-hidden="true"></i>
+                                        <i class="fa fa-desktop ng-hide" ng-show="user.hasScreen" aria-hidden="true"></i>
+                                        <i class="fa fa-comment-o ng-hide" ng-show="user.hasAdminChat" aria-hidden="true"></i>
+                                        <i class="fa fa-pencil-square-o ng-hide" ng-show="user.canEditNotes" aria-hidden="true"></i>
+                                        <i class="fa fa-hdd-o ng-hide" ng-show="user.denyArchivesAccess" aria-hidden="true" title="Denied Archives Access" style="color: red;"></i>
+                                        <img gravatar-src-once="user.email " style="margin-right:5px " class="thumb24 " src="https://secure.gravatar.com/avatar/2fcd19da402033914f251e6ded8e6316?size=80&amp;default=mm">Billy Ribeiro
+                                        <div ng-show="user.discordUserId" style="color: red; font-size: 12px; margin-left: 10px;" class="ng-binding ng-hide">
+                                        Discord Username:
+                                        </div>
+                                        <!-- stripe data here -->
+                                        <!-- ngIf: user.isMarketPlaceUser -->
+
+                                        <!-- ngIf: badges.hasBadges && user.badges.length -->
+                                        <span ng-show="user.isFreeTrial" class="badge badge-danger-chat ng-hide" style="color: white; margin-right: 20px;"> TRIAL </span><br> willribeirodrums@icloud.com  <span ng-show="showPins &amp;&amp; user.mobilePairCode" class="ng-binding ng-hide"> |  <i class="fa fa-mobile"></i>  </span><span ng-show="user.phone" class="ng-binding ng-hide">&nbsp;&nbsp;<i class="fa fa-phone"></i> </span> <span ng-show="user.pw">&nbsp;&nbsp;&nbsp;&nbsp;<i class="fa fa-lock" aria-hidden="true"></i> PW set</span>
+                                        <span class="badge badge-danger ng-hide" ng-show="user.hideUserCount">User Count Hidden</span>
+                                        <span class="badge badge-danger ng-hide" ng-show="user.hidePersInfo">User Personal Info Hidden</span>
+                                    </td>
+
+                                    <td class="ng-binding"> 08/07/2026 @ 5:05PM
+
+
+
+                                    <span ng-show="user.inactive" style="color: red;" class="ng-hide">
+                                        *** INACTIVE USER ***
+                                    </span>
+
+                                    <span ng-show="user.restrictPMUser" style="color: red;" class="ng-hide"><br><i class="fa fa-comment-o"></i> User PMs disabled</span>
+                                    <div ng-show="user.note" style="border: 1px solid #A0A0A0; padding: 5px; " class="ng-binding ng-hide"><br></div>
+                                    <!-- <hr>
+                                    Token:{{user.fcmTokens}} <br> Unregged: {{user.fcmUnreged ? 'y':'n'}} -->
+                                    </td>
+                                    <td> <button class="btn btn-small btn-warning ng-hide" ng-click="approveUser(user.userName,user._id,$index,'approved')" ng-show="user.inviteStatus=='pending' "> APPROVE</button>
+                                        <span ng-show="user.role==2 " class="ng-hide">Participant</span>
+                                        <span ng-show="user.role==0 " class="ng-hide">Owner</span>
+                                        <span ng-show="user.role==1 &amp;&amp; !user.nonPresenter">Presenter</span>
+                                        <span ng-show="user.role==1 &amp;&amp; user.nonPresenter" class="ng-hide">Admin</span>
+                                        <span ng-hide="user.role==0" class="ng-binding"> / manual</span>
+                                        <span ng-show="user.role==3 " style="color: red;" class="ng-hide">CHAT MUTED</span>
+                                        <span ng-show="user.role==4 " style="color: red;" class="ng-hide">BANNED</span>
+                                    </td>
+                                    <td>
+
+                                        <div ng-hide="user.role==0" dropdown="dropdown" class="btn-group mb-sm mr" ng-init="submenuOpen={permissions:false, granular:false, app:false, badges:false}" on-toggle="!open &amp;&amp; (submenuOpen={permissions:false, granular:false, app:false, badges:false})">
+                                            <button type="button" ng-disabled="disabled" dropdown-toggle="" class="btn dropdown-toggle btn-primary" aria-haspopup="true" aria-expanded="false">Actions&nbsp;
+                                    <span class="caret"></span>
+                                    <span><span style="width: 107px; height: 107px; left: -10.6719px; top: -42.5px;"></span></span></button>
+                                            <ul role="menu" class="dropdown-menu dropdown-menu-right">
+
+                                                <!-- Permissions -->
+                                                <li class="dropdown-submenu" ng-class="{open: submenuOpen.permissions}">
+                                                    <a href="" ng-click="submenuOpen.permissions=!submenuOpen.permissions; submenuOpen.granular=false; submenuOpen.app=false; submenuOpen.badges=false; $event.preventDefault(); $event.stopPropagation();">
+                                                        <i class="fa fa-shield"></i>&nbsp;&nbsp;Permissions <i class="fa fa-caret-right pull-right"></i>
+                                                    </a>
+                                                    <ul class="dropdown-menu">
+                                                        <li>
+                                                            <a href="" ng-click="updateUser(1,user._id,user.userName,$index)"><i class="fa fa-microphone"></i>&nbsp;<i class="fa fa-desktop"></i>&nbsp;&nbsp;Make Presenter</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="" ng-click="updateUser(5,user._id,user.userName,$index)"><i class="fa fa-cog" aria-hidden="true"></i>&nbsp;<i class="fa fa-user-md"></i>&nbsp;&nbsp;Make Admin</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="" ng-click="updateUser(2,user._id,user.userName,$index)"><i class="fa fa-user"></i>&nbsp;&nbsp;Make Participant</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="" ng-click="updateUser(6,user._id,user.userName,$index)"><i class="fa fa-user"></i>&nbsp;&nbsp;Make Trial</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="" ng-click="updateUser(3,user._id,user.userName,$index)"><i class="fa fa-user-times"></i>&nbsp;&nbsp;MUTE Participant</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="" ng-click="updateUser(4,user._id,user.userName,$index)"><i class="fa fa-user-times"></i>&nbsp;&nbsp;BAN</a>
+                                                        </li>
+                                                        <li class="divider"></li>
+                                                        <li>
+                                                            <a href="" ng-click="updateUser(2,user._id,user.userName,$index)"><i class="fa fa-user"></i>&nbsp;&nbsp;Unban</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="" ng-click="updateUser(9,user._id,user.userName,$index)"><i class="fa fa-clock-o"></i>&nbsp;&nbsp;Freshen Login Date</a>
+                                                        </li>
+                                                    </ul>
+                                                </li>
+
+                                                <!-- Granular Perms -->
+                                                <li class="dropdown-submenu" ng-class="{open: submenuOpen.granular}">
+
+                                                    <a href="" ng-click="submenuOpen.granular=!submenuOpen.granular; submenuOpen.permissions=false; submenuOpen.app=false; submenuOpen.badges=false; $event.preventDefault(); $event.stopPropagation();">
+                                                        <i class="fa fa-sliders"></i>&nbsp;&nbsp;Granular Perms <i class="fa fa-caret-right pull-right"></i>
+                                                    </a>
+                                                    <ul class="dropdown-menu">
+                                                        <li ng-show="user.role !== 1" class="ng-hide">
+                                                            <a href="" ng-click="setPermissions(user)" data-toggle="modal" data-target="#permissionsModal">Adjust Mic/Cam/Screen/Chat/Notes</a>
+                                                        </li>
+                                                        <li class="divider"></li>
+                                                        <li>
+                                                            <a href="" ng-click="updateUser(8,user._id,user.userName,$index)"><i class="fa fa-user-circle"></i>Show User Count</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="" ng-click="updateUser(7,user._id,user.userName,$index)"><i class="fa fa-user-circle"></i>Hide User Count</a>
+                                                        </li>
+                                                        <li ng-show="!user.denyArchivesAccess">
+                                                            <a href="" ng-click="updateUser(13,user._id,user.userName,$index)"><i class="fa fa-hdd-o"></i>&nbsp;&nbsp;Deny Archives Access</a>
+                                                        </li>
+                                                        <li ng-show="user.denyArchivesAccess" class="ng-hide">
+                                                            <a href="" ng-click="updateUser(14,user._id,user.userName,$index)"><i class="fa fa-hdd-o"></i>&nbsp;&nbsp;Allow Archives Access</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="" ng-click="updateUser(10,user._id,user.userName,$index)"><i class="fa fa-lock"></i>&nbsp;&nbsp;Hide Pers User Data</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="" ng-click="updateUser(11,user._id,user.userName,$index)"><i class="fa fa-user"></i>&nbsp;&nbsp;Don't Hide Pers User Data</a>
+                                                        </li>
+
+                                                        <li class="divider"></li>
+                                                        <li>
+                                                            <a href="" ng-click="setUserRestrictPM(true,user._id,user.userName)"><i class="fa fa-comment-o"></i>&nbsp;&nbsp;Disallow User2User PM</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="" ng-click="setUserRestrictPM(false,user._id,user.userName)"><i class="fa fa-comment-o"></i>&nbsp;&nbsp;Allow User2User PM</a>
+                                                        </li>
+
+                                                        <li class="divider"></li>
+
+                                                    </ul>
+                                                </li>
+
+                                                <!-- App and Notifications -->
+                                                <li class="dropdown-submenu" ng-class="{open: submenuOpen.app}">
+                                                    <a href="" ng-click="submenuOpen.app=!submenuOpen.app; submenuOpen.permissions=false; submenuOpen.granular=false; submenuOpen.badges=false; $event.preventDefault(); $event.stopPropagation();">
+                                                        <i class="fa fa-mobile"></i>&nbsp;&nbsp;App and Notifications <i class="fa fa-caret-right pull-right"></i>
+                                                    </a>
+                                                    <ul class="dropdown-menu">
+                                                        <li>
+                                                            <a href="" ng-click="getAppPin(user.email,user.userName,$index)"><i class="fa fa-mobile"></i>&nbsp;&nbsp;Get App PIN</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="" ng-click="showAlerterAppTokens(user.userName,user.alerterAppTokens)"><i class="fa fa-mobile"></i>&nbsp;&nbsp;Show App Tokens</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="" ng-click="getFCMTokens(user._id,user.userName,$index)"><i class="fa fa-mobile" aria-hidden="true"></i>&nbsp;&nbsp;Get FCM Tokens</a>
+                                                        </li>
+                                                        <li class="divider"></li>
+                                                        <li>
+                                                            <a href="" ng-click="pauseUserNotifs(user._id,user.userName,$index,'pause')"><i class="fa fa-mobile" aria-hidden="true"></i><i class="fa fa fa-bell-o"></i>&nbsp;&nbsp;PAUSE Mobile Notifs</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="" ng-click="pauseUserNotifs(user._id,user.userName,$index,'resume')"><i class="fa fa-mobile" aria-hidden="true"></i><i class="fa fa-play"></i>&nbsp;&nbsp;RESUME Mobile Notifs</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="" ng-click="pauseUserNotifs(user._id,user.userName,$index,'unsub')"><i class="fa fa-mobile" aria-hidden="true"></i><i class="fa fa-trash"></i>&nbsp;&nbsp;Remove Mobile Notifs</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="" ng-click="sendTestFCM(user._id,user.userName,$index)"><i class="fa fa-mobile" aria-hidden="true"></i><i class="fa fa fa-bell-o"></i>&nbsp;&nbsp;Send Test Mobile Notifs</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="" ng-click="resetFCMForuser(user._id,user.userName,$index)"><i class="fa fa-mobile" aria-hidden="true"></i><i class="fa fa-reload"></i>&nbsp;&nbsp;Reset Mobile Notifs</a>
+                                                        </li>
+                                                        <!-- ngIf: sess.ptrMobileAppCaseByCaseEnabled -->
+                                                        <!-- ngIf: sess.ptrMobileAppCaseByCaseEnabled -->
+                                                        <!-- ngIf: sess.ptrMobileAppCaseByCaseEnabled -->
+                                                    </ul>
+                                                </li>
+
+                                                <!-- Badges -->
+                                                <li class="dropdown-submenu" ng-class="{open: submenuOpen.badges}">
+                                                    <a href="" ng-click="submenuOpen.badges=!submenuOpen.badges; submenuOpen.permissions=false; submenuOpen.granular=false; submenuOpen.app=false; $event.preventDefault(); $event.stopPropagation();">
+                                                        <i class="fa fa-certificate"></i>&nbsp;&nbsp;Badges <i class="fa fa-caret-right pull-right"></i>
+                                                    </a>
+                                                    <ul class="dropdown-menu">
+                                                        <!-- ngIf: badges.hasBadges -->
+                                                    </ul>
+                                                </li>
+
+                                                <li class="divider"></li>
+
+                                                <!-- Left on main menu (not in requested submenus) -->
+                                                <li>
+                                                    <a href="" ng-click="setNoteUser(user._id,user.userName,$index)"><i class="fa fa-pencil-square-o"></i>&nbsp;&nbsp;Set Note</a>
+                                                </li>
+                                                <li>
+                                                    <a href="" ng-click="editUsername(user._id, user.userName)"><i class="fa fa-edit"></i>&nbsp;&nbsp;Edit Username</a>
+                                                </li>
+                                                <li>
+                                                    <a href="" ng-click="deleteParticipant(user.userName,user._id,$index)"><i class="fa fa-trash"></i>&nbsp;&nbsp;Remove User</a>
+                                                </li>
+                                                <li class="divider"></li>
+                                                <li>
+                                                    <a href="" ng-click="setUserPW(user._id,user.userName,$index)"><i class="fa fa-lock"></i>&nbsp;&nbsp;Set/Change Password</a>
+                                                </li>
+                                                <li>
+                                                    <a href="" ng-click="sendWelcomeEmail(user._id,user.userName,$index)"><i class="fa fa-envelope"></i>&nbsp;&nbsp;Resend Welcome Email</a>
+                                                </li>
+
+                                                <li class="divider"></li>
+                                                <li>
+                                                    <a href="" ng-click="approveUser(user.userName,user._id,$index,'pending')"><i class="fa fa-pause"></i>&nbsp;&nbsp;Pause / Pending</a>
+                                                </li>
+
+                                                <!-- ngIf: sess.fileAccessCaseByCase -->
+                                                <!-- ngIf: sess.fileAccessCaseByCase -->
+                                                <!-- ngIf: sess.fileAccessCaseByCase -->
+                                            </ul>
+                                        </div>
+
+                                    </td>
+                                </tr><!-- end ngRepeat: user in xrefs --><tr ng-repeat="user in xrefs  " class="ng-scope">
+
+                                    <td class="ng-binding">2</td>
+                                    <td class="ng-binding">
+                                        <input ng-show="user.role!==0" type="checkbox" name="checkbox" ng-checked="checkedUserIds[user._id]" ng-click="getCheckedUserIds(user._id)">
+                                        <i ng-show="false" class="fa fa-folder-o fa-2x ng-hide" aria-hidden="true"></i>
+                                        <i ng-show="false" class="fa fa-mobile fa-2x ng-hide" aria-hidden="true"></i>
+                                        <i ng-show="false" class="fa fa-mobile ng-hide" aria-hidden="true"></i>
+                                        <i ng-show="false" class="fa fa-mobile ng-hide" style="color: red;" aria-hidden="true"></i>
+                                        <i class="fa fa-microphone ng-hide" ng-show="user.hasMic" aria-hidden="true"></i>
+                                        <i class="fa fa-video-camera ng-hide" ng-show="user.hasCam" aria-hidden="true"></i>
+                                        <i class="fa fa-desktop ng-hide" ng-show="user.hasScreen" aria-hidden="true"></i>
+                                        <i class="fa fa-comment-o ng-hide" ng-show="user.hasAdminChat" aria-hidden="true"></i>
+                                        <i class="fa fa-pencil-square-o ng-hide" ng-show="user.canEditNotes" aria-hidden="true"></i>
+                                        <i class="fa fa-hdd-o ng-hide" ng-show="user.denyArchivesAccess" aria-hidden="true" title="Denied Archives Access" style="color: red;"></i>
+                                        <img gravatar-src-once="user.email " style="margin-right:5px " class="thumb24 " src="https://secure.gravatar.com/avatar/6ee71e550a8c162767abf7d2dc8eea84?size=80&amp;default=mm">Welber Ribeiro
+                                        <div ng-show="user.discordUserId" style="color: red; font-size: 12px; margin-left: 10px;" class="ng-binding ng-hide">
+                                        Discord Username:
+                                        </div>
+                                        <!-- stripe data here -->
+                                        <!-- ngIf: user.isMarketPlaceUser -->
+
+                                        <!-- ngIf: badges.hasBadges && user.badges.length -->
+                                        <span ng-show="user.isFreeTrial" class="badge badge-danger-chat ng-hide" style="color: white; margin-right: 20px;"> TRIAL </span><br> willribeirodrums@gmail.com  <span ng-show="showPins &amp;&amp; user.mobilePairCode" class="ng-binding ng-hide"> |  <i class="fa fa-mobile"></i>  </span><span ng-show="user.phone" class="ng-binding ng-hide">&nbsp;&nbsp;<i class="fa fa-phone"></i> </span> <span ng-show="user.pw">&nbsp;&nbsp;&nbsp;&nbsp;<i class="fa fa-lock" aria-hidden="true"></i> PW set</span>
+                                        <span class="badge badge-danger ng-hide" ng-show="user.hideUserCount">User Count Hidden</span>
+                                        <span class="badge badge-danger ng-hide" ng-show="user.hidePersInfo">User Personal Info Hidden</span>
+                                    </td>
+
+                                    <td class="ng-binding">
+
+
+
+                                    <span ng-show="user.inactive" style="color: red;" class="ng-hide">
+                                        *** INACTIVE USER ***
+                                    </span>
+
+                                    <span ng-show="user.restrictPMUser" style="color: red;" class="ng-hide"><br><i class="fa fa-comment-o"></i> User PMs disabled</span>
+                                    <div ng-show="user.note" style="border: 1px solid #A0A0A0; padding: 5px; " class="ng-binding ng-hide"><br></div>
+                                    <!-- <hr>
+                                    Token:{{user.fcmTokens}} <br> Unregged: {{user.fcmUnreged ? 'y':'n'}} -->
+                                    </td>
+                                    <td> <button class="btn btn-small btn-warning ng-hide" ng-click="approveUser(user.userName,user._id,$index,'approved')" ng-show="user.inviteStatus=='pending' "> APPROVE</button>
+                                        <span ng-show="user.role==2 " class="ng-hide">Participant</span>
+                                        <span ng-show="user.role==0 " class="ng-hide">Owner</span>
+                                        <span ng-show="user.role==1 &amp;&amp; !user.nonPresenter">Presenter</span>
+                                        <span ng-show="user.role==1 &amp;&amp; user.nonPresenter" class="ng-hide">Admin</span>
+                                        <span ng-hide="user.role==0" class="ng-binding"> / manual</span>
+                                        <span ng-show="user.role==3 " style="color: red;" class="ng-hide">CHAT MUTED</span>
+                                        <span ng-show="user.role==4 " style="color: red;" class="ng-hide">BANNED</span>
+                                    </td>
+                                    <td>
+
+                                        <div ng-hide="user.role==0" dropdown="dropdown" class="btn-group mb-sm mr" ng-init="submenuOpen={permissions:false, granular:false, app:false, badges:false}" on-toggle="!open &amp;&amp; (submenuOpen={permissions:false, granular:false, app:false, badges:false})">
+                                            <button type="button" ng-disabled="disabled" dropdown-toggle="" class="btn dropdown-toggle btn-primary" aria-haspopup="true" aria-expanded="false">Actions&nbsp;
+                                    <span class="caret"></span>
+                                    <span><span style="width: 107px; height: 107px; left: -10.6719px; top: -42.5px;"></span></span></button>
+                                            <ul role="menu" class="dropdown-menu dropdown-menu-right">
+
+                                                <!-- Permissions -->
+                                                <li class="dropdown-submenu" ng-class="{open: submenuOpen.permissions}">
+                                                    <a href="" ng-click="submenuOpen.permissions=!submenuOpen.permissions; submenuOpen.granular=false; submenuOpen.app=false; submenuOpen.badges=false; $event.preventDefault(); $event.stopPropagation();">
+                                                        <i class="fa fa-shield"></i>&nbsp;&nbsp;Permissions <i class="fa fa-caret-right pull-right"></i>
+                                                    </a>
+                                                    <ul class="dropdown-menu">
+                                                        <li>
+                                                            <a href="" ng-click="updateUser(1,user._id,user.userName,$index)"><i class="fa fa-microphone"></i>&nbsp;<i class="fa fa-desktop"></i>&nbsp;&nbsp;Make Presenter</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="" ng-click="updateUser(5,user._id,user.userName,$index)"><i class="fa fa-cog" aria-hidden="true"></i>&nbsp;<i class="fa fa-user-md"></i>&nbsp;&nbsp;Make Admin</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="" ng-click="updateUser(2,user._id,user.userName,$index)"><i class="fa fa-user"></i>&nbsp;&nbsp;Make Participant</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="" ng-click="updateUser(6,user._id,user.userName,$index)"><i class="fa fa-user"></i>&nbsp;&nbsp;Make Trial</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="" ng-click="updateUser(3,user._id,user.userName,$index)"><i class="fa fa-user-times"></i>&nbsp;&nbsp;MUTE Participant</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="" ng-click="updateUser(4,user._id,user.userName,$index)"><i class="fa fa-user-times"></i>&nbsp;&nbsp;BAN</a>
+                                                        </li>
+                                                        <li class="divider"></li>
+                                                        <li>
+                                                            <a href="" ng-click="updateUser(2,user._id,user.userName,$index)"><i class="fa fa-user"></i>&nbsp;&nbsp;Unban</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="" ng-click="updateUser(9,user._id,user.userName,$index)"><i class="fa fa-clock-o"></i>&nbsp;&nbsp;Freshen Login Date</a>
+                                                        </li>
+                                                    </ul>
+                                                </li>
+
+                                                <!-- Granular Perms -->
+                                                <li class="dropdown-submenu" ng-class="{open: submenuOpen.granular}">
+
+                                                    <a href="" ng-click="submenuOpen.granular=!submenuOpen.granular; submenuOpen.permissions=false; submenuOpen.app=false; submenuOpen.badges=false; $event.preventDefault(); $event.stopPropagation();">
+                                                        <i class="fa fa-sliders"></i>&nbsp;&nbsp;Granular Perms <i class="fa fa-caret-right pull-right"></i>
+                                                    </a>
+                                                    <ul class="dropdown-menu">
+                                                        <li ng-show="user.role !== 1" class="ng-hide">
+                                                            <a href="" ng-click="setPermissions(user)" data-toggle="modal" data-target="#permissionsModal">Adjust Mic/Cam/Screen/Chat/Notes</a>
+                                                        </li>
+                                                        <li class="divider"></li>
+                                                        <li>
+                                                            <a href="" ng-click="updateUser(8,user._id,user.userName,$index)"><i class="fa fa-user-circle"></i>Show User Count</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="" ng-click="updateUser(7,user._id,user.userName,$index)"><i class="fa fa-user-circle"></i>Hide User Count</a>
+                                                        </li>
+                                                        <li ng-show="!user.denyArchivesAccess">
+                                                            <a href="" ng-click="updateUser(13,user._id,user.userName,$index)"><i class="fa fa-hdd-o"></i>&nbsp;&nbsp;Deny Archives Access</a>
+                                                        </li>
+                                                        <li ng-show="user.denyArchivesAccess" class="ng-hide">
+                                                            <a href="" ng-click="updateUser(14,user._id,user.userName,$index)"><i class="fa fa-hdd-o"></i>&nbsp;&nbsp;Allow Archives Access</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="" ng-click="updateUser(10,user._id,user.userName,$index)"><i class="fa fa-lock"></i>&nbsp;&nbsp;Hide Pers User Data</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="" ng-click="updateUser(11,user._id,user.userName,$index)"><i class="fa fa-user"></i>&nbsp;&nbsp;Don't Hide Pers User Data</a>
+                                                        </li>
+
+                                                        <li class="divider"></li>
+                                                        <li>
+                                                            <a href="" ng-click="setUserRestrictPM(true,user._id,user.userName)"><i class="fa fa-comment-o"></i>&nbsp;&nbsp;Disallow User2User PM</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="" ng-click="setUserRestrictPM(false,user._id,user.userName)"><i class="fa fa-comment-o"></i>&nbsp;&nbsp;Allow User2User PM</a>
+                                                        </li>
+
+                                                        <li class="divider"></li>
+
+                                                    </ul>
+                                                </li>
+
+                                                <!-- App and Notifications -->
+                                                <li class="dropdown-submenu" ng-class="{open: submenuOpen.app}">
+                                                    <a href="" ng-click="submenuOpen.app=!submenuOpen.app; submenuOpen.permissions=false; submenuOpen.granular=false; submenuOpen.badges=false; $event.preventDefault(); $event.stopPropagation();">
+                                                        <i class="fa fa-mobile"></i>&nbsp;&nbsp;App and Notifications <i class="fa fa-caret-right pull-right"></i>
+                                                    </a>
+                                                    <ul class="dropdown-menu">
+                                                        <li>
+                                                            <a href="" ng-click="getAppPin(user.email,user.userName,$index)"><i class="fa fa-mobile"></i>&nbsp;&nbsp;Get App PIN</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="" ng-click="showAlerterAppTokens(user.userName,user.alerterAppTokens)"><i class="fa fa-mobile"></i>&nbsp;&nbsp;Show App Tokens</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="" ng-click="getFCMTokens(user._id,user.userName,$index)"><i class="fa fa-mobile" aria-hidden="true"></i>&nbsp;&nbsp;Get FCM Tokens</a>
+                                                        </li>
+                                                        <li class="divider"></li>
+                                                        <li>
+                                                            <a href="" ng-click="pauseUserNotifs(user._id,user.userName,$index,'pause')"><i class="fa fa-mobile" aria-hidden="true"></i><i class="fa fa fa-bell-o"></i>&nbsp;&nbsp;PAUSE Mobile Notifs</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="" ng-click="pauseUserNotifs(user._id,user.userName,$index,'resume')"><i class="fa fa-mobile" aria-hidden="true"></i><i class="fa fa-play"></i>&nbsp;&nbsp;RESUME Mobile Notifs</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="" ng-click="pauseUserNotifs(user._id,user.userName,$index,'unsub')"><i class="fa fa-mobile" aria-hidden="true"></i><i class="fa fa-trash"></i>&nbsp;&nbsp;Remove Mobile Notifs</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="" ng-click="sendTestFCM(user._id,user.userName,$index)"><i class="fa fa-mobile" aria-hidden="true"></i><i class="fa fa fa-bell-o"></i>&nbsp;&nbsp;Send Test Mobile Notifs</a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="" ng-click="resetFCMForuser(user._id,user.userName,$index)"><i class="fa fa-mobile" aria-hidden="true"></i><i class="fa fa-reload"></i>&nbsp;&nbsp;Reset Mobile Notifs</a>
+                                                        </li>
+                                                        <!-- ngIf: sess.ptrMobileAppCaseByCaseEnabled -->
+                                                        <!-- ngIf: sess.ptrMobileAppCaseByCaseEnabled -->
+                                                        <!-- ngIf: sess.ptrMobileAppCaseByCaseEnabled -->
+                                                    </ul>
+                                                </li>
+
+                                                <!-- Badges -->
+                                                <li class="dropdown-submenu" ng-class="{open: submenuOpen.badges}">
+                                                    <a href="" ng-click="submenuOpen.badges=!submenuOpen.badges; submenuOpen.permissions=false; submenuOpen.granular=false; submenuOpen.app=false; $event.preventDefault(); $event.stopPropagation();">
+                                                        <i class="fa fa-certificate"></i>&nbsp;&nbsp;Badges <i class="fa fa-caret-right pull-right"></i>
+                                                    </a>
+                                                    <ul class="dropdown-menu">
+                                                        <!-- ngIf: badges.hasBadges -->
+                                                    </ul>
+                                                </li>
+
+                                                <li class="divider"></li>
+
+                                                <!-- Left on main menu (not in requested submenus) -->
+                                                <li>
+                                                    <a href="" ng-click="setNoteUser(user._id,user.userName,$index)"><i class="fa fa-pencil-square-o"></i>&nbsp;&nbsp;Set Note</a>
+                                                </li>
+                                                <li>
+                                                    <a href="" ng-click="editUsername(user._id, user.userName)"><i class="fa fa-edit"></i>&nbsp;&nbsp;Edit Username</a>
+                                                </li>
+                                                <li>
+                                                    <a href="" ng-click="deleteParticipant(user.userName,user._id,$index)"><i class="fa fa-trash"></i>&nbsp;&nbsp;Remove User</a>
+                                                </li>
+                                                <li class="divider"></li>
+                                                <li>
+                                                    <a href="" ng-click="setUserPW(user._id,user.userName,$index)"><i class="fa fa-lock"></i>&nbsp;&nbsp;Set/Change Password</a>
+                                                </li>
+                                                <li>
+                                                    <a href="" ng-click="sendWelcomeEmail(user._id,user.userName,$index)"><i class="fa fa-envelope"></i>&nbsp;&nbsp;Resend Welcome Email</a>
+                                                </li>
+
+                                                <li class="divider"></li>
+                                                <li>
+                                                    <a href="" ng-click="approveUser(user.userName,user._id,$index,'pending')"><i class="fa fa-pause"></i>&nbsp;&nbsp;Pause / Pending</a>
+                                                </li>
+
+                                                <!-- ngIf: sess.fileAccessCaseByCase -->
+                                                <!-- ngIf: sess.fileAccessCaseByCase -->
+                                                <!-- ngIf: sess.fileAccessCaseByCase -->
+                                            </ul>
+                                        </div>
+
+                                    </td>
+                                </tr><!-- end ngRepeat: user in xrefs -->
+                            </tbody>
+                        </table>
