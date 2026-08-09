@@ -35,11 +35,44 @@ read_value() {
   grep -m1 "^$1=" "$2" 2>/dev/null | cut -d= -f2- | sed 's/^"//; s/"$//'
 }
 
+# Minimum length for anything that is a secret rather than a setting. ROOM_JWT_SECRET was 9
+# characters in production, signing 360-day handoff tokens that travel in URLs.
+min_length_for() {
+  case "$1" in
+    ROOM_JWT_SECRET|API_KEY_ENCRYPTION_KEY) echo 32 ;;
+    RECAPTCHA_SECRET_KEY) echo 20 ;;
+    *) echo 0 ;;
+  esac
+}
+
 set_var() {
   local name="$1" value="$2" source="${3:-literal}"
 
   if [ -z "$value" ]; then
     printf '  SKIP  %-26s no value in %s — NOT written blank\n' "$name" "$source"
+    return
+  fi
+
+  # Validate HERE, not after the fact. Vercel marks these sensitive and will not read them back,
+  # so this is the only moment the value can be inspected at all. `ROOM_BASE_URL` reached
+  # production as `http://localhost:5174` because nothing looked at it on the way through.
+  case "$name" in
+    *URL|*ORIGIN|*HOST)
+      case "$value" in
+        *localhost*|*127.0.0.1*|*0.0.0.0*)
+          printf '  REFUSED %-24s points at a LOCAL address — not written\n' "$name"
+          REFUSED=$((REFUSED + 1))
+          return
+          ;;
+      esac
+      ;;
+  esac
+
+  local min
+  min="$(min_length_for "$name")"
+  if [ "$min" -gt 0 ] && [ "${#value}" -lt "$min" ]; then
+    printf '  REFUSED %-24s %s chars, needs %s — not written\n' "$name" "${#value}" "$min"
+    REFUSED=$((REFUSED + 1))
     return
   fi
 
@@ -50,6 +83,7 @@ set_var() {
   fi
 }
 
+REFUSED=0
 echo "Setting production environment for trading-room-app"
 echo
 
@@ -62,10 +96,25 @@ set_var RECAPTCHA_SECRET_KEY     "$(read_value RECAPTCHA_SECRET_KEY "$ENVF")"   
 set_var PUBLIC_RECAPTCHA_SITE_KEY "$(read_value PUBLIC_RECAPTCHA_SITE_KEY "$ENVF")" ".env"
 set_var SUPERADMIN_EMAILS        "$(read_value SUPERADMIN_EMAILS "$ENVF")"         ".env"
 
-# Generated fresh rather than copied: this key encrypts stored API secrets, and reusing another
-# deployment's key would make one deployment able to decrypt the other's data.
-set_var API_KEY_ENCRYPTION_KEY   "$(openssl rand -hex 16)"
+# API_KEY_ENCRYPTION_KEY is NOT set here any more, and generating a fresh one is exactly what
+# broke the account page.
+#
+# This key decrypts the API-key secrets already stored in the database. A new key cannot read an
+# envelope written under the old one, so "rotating" it is not a rotation — it makes every existing
+# row permanently unreadable, and an uncaught throw in the loader turned that into a 500 on the
+# whole page.
+#
+# If it must change, the sequence is: set the new key, then regenerate every API key through the
+# UI so each row is rewritten under it. Ordering matters and it is not something a helper script
+# should do behind an operator's back.
+#
+#   openssl rand -hex 16 | npx vercel env add API_KEY_ENCRYPTION_KEY production --force --yes
 
 echo
+if [ "$REFUSED" -gt 0 ]; then
+  echo
+  echo "$REFUSED value(s) REFUSED — fix them and re-run; nothing bad was written."
+fi
+
 echo "Verifying nothing was left blank:"
 npx vercel env ls production 2>/dev/null | tail -n +2
