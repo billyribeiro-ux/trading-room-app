@@ -24,6 +24,74 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-09
 
+### 12:25 — SvelteKit 3 `@next` evaluated against the real repository, and NOT adopted
+
+**No runtime impact — nothing shipped.** The migration was performed in full, found to be blocked,
+and reverted to zero residue. This entry exists so the next attempt starts from evidence instead of
+repeating it.
+
+#### The `next` tags are not uniformly newer — taking them blindly is a downgrade
+
+| package | `latest` | `next` | |
+| --- | --- | --- | --- |
+| `@sveltejs/kit` | 2.70.2 | **3.0.0-next.16** | ahead |
+| `@sveltejs/adapter-vercel` | 6.3.4 | **7.0.0-next.6** | ahead |
+| `@sveltejs/adapter-node` | 5.5.7 | **6.0.0-next.8** | ahead |
+| `svelte` | **5.56.8** | 5.0.0-next.272 | **`next` is 56 minors BEHIND** |
+| `@sveltejs/vite-plugin-svelte` | **7.3.0** | 7.0.0-next.1 | **`next` is behind** |
+
+"Use @next" on the last two would have rolled Svelte back to a 5.0 prerelease.
+
+#### The repository is otherwise ready
+
+Kit 3's peers are `vite ^8.0.12`, `svelte ^5.56.4`, `typescript ^6.0.0`,
+`@sveltejs/vite-plugin-svelte ^7.0.0` — **all already satisfied** after this morning's updates.
+
+#### What was migrated, and it works
+
+- **`svelte.config.js` is removed in Kit 3.** It errors: *"svelte.config.js is no longer used. Please
+  pass configuration via the `sveltekit(...)` plugin in your Vite config."* Both apps were migrated —
+  and note the shape: the **`kit` namespace disappears**, so `adapter`, `paths` and `preprocess` sit
+  at the top level of `sveltekit({…})`. Per the docs that is "the only difference to the
+  `svelte.config.js` layout".
+- **`experimental.explicitEnvironmentVariables` is gone from Kit 3's types** — it graduated. `src/env.ts`
+  and `$app/env/private` are simply how it works now. This repository had opted in early under Kit
+  2.63, and that flag becomes a type error.
+- **`eslint.config.js` imported `./svelte.config.js`** for the Svelte parser. The only part the parser
+  uses is `preprocess`, so it can be declared inline — the file cannot come back, because its
+  presence is what Kit 3 errors on.
+
+#### Why it was reverted — the blocker, with evidence
+
+**Kit 3.0.0-next.16 breaks typed `resolve()`, which this codebase uses at 48 call sites.** Every one
+fails with `Argument of type '"/login"' is not assignable to parameter of type 'never'` — the route
+union is empty. Three findings, each checked rather than inferred:
+
+1. `svelte-kit sync` prints *"tsconfig.json should extend SvelteKit's built-in configuration:
+   `{ "extends": "$app/tsconfig" }"`* — **but Kit 3 ships no tsconfig to extend.** Searched the
+   installed package: there is none.
+2. Following that advice anyway produced **1238 errors across 111 files**, because the unresolvable
+   `extends` silently discards the base's `include`, `exclude` and `paths` and drags `scripts/**`
+   into the type check. Those errors were an artefact of the broken extends, not defects.
+3. Keeping the working `extends` leaves **`$app/types` mapped to `.svelte-kit/types/index.d.ts`,
+   which Kit 3 no longer writes.** `RouteId` exists in `non-ambient.d.ts` and the per-route
+   `$types.d.ts`, so the data is there — the entry point the typed router reads is not.
+
+That is a prerelease with an unfinished TypeScript story, not a mistake in this repository. Adopting
+it would mean giving up compile-time route checking on an app that auto-deploys on push.
+
+#### State
+
+Reverted to `@sveltejs/kit` 2.70.2, `adapter-vercel` 6.3.4, `adapter-node` 5.5.7, and `package.json`
+and `pnpm-lock.yaml` restored to HEAD so **not one byte remains** of the attempt.
+
+**Re-verified after reverting:** `svelte-check` 0 errors 0 warnings, 51 files / 562 tests passing,
+`vite build` clean, `pnpm install --frozen-lockfile` clean.
+
+**Retry when** Kit 3 either ships `$app/tsconfig` or writes `types/index.d.ts` again. The two-file
+config migration above is done and takes ten minutes to redo.
+
+
 ### 12:15 — Dependencies taken to latest, with three deliberate exceptions (pushed to `main`)
 
 **Runtime impact: yes** — `better-sqlite3` and `vite` are build/runtime dependencies. No source

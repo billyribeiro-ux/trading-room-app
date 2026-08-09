@@ -94,7 +94,11 @@
 <hr class="acc-hr" />
 
 <div class="acc-toolbar">
+  <!-- `id` and no `name`: a name would make this filter a submitted field if the toolbar is ever
+       wrapped in a form, and the id is what silences "a form field element should have an id or
+       name attribute" without changing what any request carries. -->
   <input
+    id="admin-account-filter"
     class="acc-input"
     type="search"
     placeholder="Filter by account name or owner email"

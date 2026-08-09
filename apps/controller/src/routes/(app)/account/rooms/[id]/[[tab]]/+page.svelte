@@ -1254,13 +1254,13 @@ Please click this link to attend: ______ unique link will be here_____
                   {#if data.users.length > 0}
                     <div class="checkbox">
                       <label>
-                        <input type="checkbox" checked={allSelected} onchange={toggleSelectAll} />
+                        <input id="select-all-members" type="checkbox" checked={allSelected} onchange={toggleSelectAll} />
                         <!-- `ng-if="!checkedAllUsers"` — the reference drops the words
                              once every row is checked, leaving a bare checkbox -->
                         {#if !allSelected}<span>Select All</span>{/if}
                       </label>
                       <label class="checkbox-apply-to-all-rooms">
-                        <input type="checkbox" bind:checked={applyToAllRooms} />
+                        <input id="apply-to-all-rooms" type="checkbox" bind:checked={applyToAllRooms} />
                         <span>Apply to all rooms?</span>
                       </label>
                     </div>
@@ -1371,7 +1371,12 @@ Please click this link to attend: ______ unique link will be here_____
                                the first child of this td and measures x=104.3, the td's own x plus
                                its 8px padding. `ng-show="user.role!==0"` — the owner has none. -->
                           {#if member.role !== 0}
+                            <!-- The id carries the member id because this renders once per row;
+                                 a constant would be duplicated across every row, which is worse
+                                 than having none. No `name`: these post through `selected`, and a
+                                 name would add a second, unread field to the form. -->
                             <input
+                              id={`select-member-${member.id}`}
                               type="checkbox"
                               aria-label={`Select ${member.displayName}`}
                               value={member.id}
@@ -2229,19 +2234,19 @@ Please click this link to attend: ______ unique link will be here_____
                       <input class="form-control" type="search" id="uSearchStat" required bind:value={statsSearch} />
                       <br />
                       <label>
-                        <input type="checkbox" bind:checked={statsOnlineOnly} />
+                        <input id="stats-online-only" type="checkbox" bind:checked={statsOnlineOnly} />
                         &nbsp;Show Online Users Only
                       </label>
                       <label>
-                        <input type="checkbox" bind:checked={statsTrialsOnly} />
+                        <input id="stats-trials-only" type="checkbox" bind:checked={statsTrialsOnly} />
                         &nbsp;Show <span class="badge badge-danger">Free Trials</span> Only?
                       </label>
                       <label>
-                        <input type="checkbox" bind:checked={statsMobileOnly} />
+                        <input id="stats-mobile-only" type="checkbox" bind:checked={statsMobileOnly} />
                         &nbsp;Show Mobile Only?
                       </label>
                       <label>
-                        <input type="checkbox" bind:checked={statsDedupe} />
+                        <input id="stats-dedupe" type="checkbox" bind:checked={statsDedupe} />
                         &nbsp;Remove duplicates?
                       </label>
                       <!--
