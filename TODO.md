@@ -15,6 +15,8 @@ will fetch it. A gap recorded in only one app's document is a gap the next perso
 | document | covers |
 | --- | --- |
 | `docs/NEXT-SESSION.md` | verified state, the room-hosting decision, backend + egress arithmetic, what the original actually runs on, hostname/DNS plan, consolidation, ordered next actions, audit method, traps |
+| `docs/DEPLOYMENT.md` | **what runs where** — the Hetzner box, the services on it, the secrets, and how to ship a new build |
+| `docs/SFU-MIGRATION.md` | the one piece still outstanding: moving the media service off AWS |
 | `docs/EMAIL.md` | transactional sending vs mailbox hosting, what is built, the DNS records, and the verification trap |
 | `docs/MOBILE-APP.md` | the phone/tablet app — decoded server surface, proposed endpoint contract, security constraints, the white-label question |
 | `apps/controller/docs/OUTSTANDING.md` | the controller's own gap register, §1–§7 |
@@ -54,8 +56,8 @@ value; each is a thing that was looked for and not found.
 | A | **No password reset flow.** `(public)/` has no `forgot-password` or `reset-password`; the link goes to `/contact`, which does not deliver. A user who loses their password has no route back. | **HIGH — blocks real customers** | `EMAIL.md` §3, §4 step 7 |
 | B | **Mail transport unconfigured.** Built and unused: `RESEND_API_KEY` and `MAIL_FROM` unset, so `verificationEnforced()` is false and the room-creation gate is inert. | HIGH — blocked on an account, a domain and DNS | `EMAIL.md` §2, §4 |
 | C | **`push_tokens_json` has no writer.** The endpoint the mobile app would call does not exist. | blocks the app | `MOBILE-APP.md` §4, §7b.3 |
-| D | **`ROOM_BASE_URL` is `http://localhost:5174` in production.** Every Launch link points at a laptop. Not fixable until the room has a host. | HIGH once anyone clicks Launch | `NEXT-SESSION.md` §5 |
-| E | **`ROOM_JWT_SECRET` is 9 characters**, signing 360-day tokens carried in URLs. Rotate on both sides in one sitting. | HIGH | `NEXT-SESSION.md` §5 |
+| ~~D~~ | ~~`ROOM_BASE_URL` is `http://localhost:5174`~~ — **CLOSED 2026-08-09.** Now `https://chat.tradingroom.app`, set on Vercel and deployed. | — | `DEPLOYMENT.md` |
+| ~~E~~ | ~~`ROOM_JWT_SECRET` is 9 characters~~ — **CLOSED 2026-08-09.** Rotated to 64 hex chars during the room's first deployment, set on the room and on Vercel in the same sitting, and verified byte-identical. Done before any handoff links existed, which was the cheapest moment. | — | `DEPLOYMENT.md` |
 
 ### The collector that closes most of these
 

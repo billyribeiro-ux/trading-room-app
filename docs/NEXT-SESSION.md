@@ -7,9 +7,15 @@ labelled open question. Nothing here is an assumption presented as a finding.
 
 ## 1. The one-line summary
 
-The **admin is live and working** at `https://www.tradingroom.app`. The **room is not deployed**
-and cannot go on Vercel. Deciding where it lives is the only thing blocking an end-to-end product,
-and it is a decision, not a task.
+**UPDATED 2026-08-09 — the room is deployed.** It runs at `https://chat.tradingroom.app` on a
+Hetzner box in Ashburn, with valid TLS, alongside the admin at `https://www.tradingroom.app`.
+`ROOM_JWT_SECRET` is rotated and matching on both sides, and `ROOM_BASE_URL` points at the real
+host. See `docs/DEPLOYMENT.md` for what runs where.
+
+**The one thing still missing is the SFU** — `media.tradingroom.app` answers a 503 placeholder and
+the media service is still on AWS Lightsail, so the room loads and the handoff works but there is no
+screen share or audio. That is `docs/SFU-MIGRATION.md`, and it is the last piece before this is a
+working product.
 
 ---
 

@@ -1,0 +1,40 @@
+# TradingRoomApp — reverse proxy and automatic TLS.
+#
+# One host serves EVERY room. A room is identified in the URL (/session?id=, /u/<publicId>,
+# /room/<slug>), never in the hostname — so creating a room stays a database row rather than a DNS
+# record plus an ACME challenge on every signup.
+
+# Access logs go to the journal, not to files. The packaged Caddy unit runs with ProtectSystem and
+# does not grant /var/log/caddy, so a `log { output file … }` block makes the service fail to START
+# rather than merely fail to log — which is how this configuration first came up dead.
+# Read them with: journalctl -u caddy -f
+
+chat.tradingroom.app {
+	encode zstd gzip
+
+	# The room serves a long-lived text/event-stream for its realtime channel.
+	#
+	# `flush_interval -1` disables response buffering — without it Caddy holds SSE frames until its
+	# buffer fills, so events arrive late and in bursts, or not at all. The long read/write timeouts
+	# stop Caddy severing a stream that is deliberately idle between events. Both matter: this is
+	# the one endpoint whose natural lifetime is hours.
+	reverse_proxy 127.0.0.1:3000 {
+		flush_interval -1
+		transport http {
+			read_timeout 24h
+			write_timeout 24h
+		}
+	}
+
+}
+
+# The SFU's signalling endpoint.
+#
+# NOT yet deployed on this host — the media service still runs on the AWS box. This block exists so
+# the certificate is issued alongside the other one; the upstream becomes 127.0.0.1:4443 when the
+# SFU moves here. It answers 503 rather than 404 so the difference between "not deployed" and
+# "deployed and broken" stays visible.
+media.tradingroom.app {
+	respond "media endpoint not yet deployed on this host" 503
+
+}
