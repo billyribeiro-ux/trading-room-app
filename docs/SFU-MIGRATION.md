@@ -48,6 +48,47 @@ Two reasons, and the second is the one that forces the timing.
 
 ---
 
+## Step 0 — do these THREE things before touching anything else
+
+Each is a fail-hard that looks like an unrelated bug if you are not expecting it. Together they are
+the difference between an afternoon and an evening.
+
+**0a. Verify the firewall's TCP RTC range. This is the FIRST debugging step, not the last.**
+
+During setup the Hetzner console **refused a TCP port range**. What is configured is UDP `any`; the
+TCP rule on `40000-49999` **may be absent**. mediasoup opens both a UDP and a TCP listener per
+transport (`services/media/src/session.rs:858-890`), and the TCP one is the fallback for clients on
+UDP-blocking networks.
+
+The failure mode is the expensive one: **silent, and invisible from your own machine.** Everything
+works from a normal network, and anyone behind a corporate firewall simply never connects, with no
+error to read. Open the Hetzner console, look at the rule, and fix it before you conclude the SFU
+is broken.
+
+**0b. Decide the build strategy up front — do not discover the OOM.**
+
+The box is **1.9 GB with 2 GB swap**. A Rust release build of mediasoup is the likeliest place in
+this whole job to lose time. Either accept a slow in-place build with `CARGO_BUILD_JOBS=1`, or build
+the image somewhere with real memory and move it:
+
+```bash
+docker save tradingroom-media:latest | gzip | ssh root@87.99.154.155 'gunzip | docker load'
+```
+
+Choose before you start. Deciding after an OOM costs the whole first attempt.
+
+**0c. Know that two env vars fail hard, and how each looks.**
+
+| variable | wrong value | symptom |
+| --- | --- | --- |
+| `MEDIA_ALLOWED_ORIGIN` | anything but `https://chat.tradingroom.app` | **every grant rejected** — looks like an auth bug, is a config bug |
+| `MEDIA_ANNOUNCED_ADDRESS` | loopback, or unset | **the service refuses to start** — `validate_announced_address_policy` in `main.rs` |
+
+Both are better wrong-and-loud than silently degraded, which is why they were built that way. But
+neither error mentions the variable that caused it unless you already suspect it.
+
+---
+
 ## The steps
 
 ### 1. Build the image on the box
@@ -141,7 +182,8 @@ worker; 1,000 is ample for testing.
 
 ## The prompt to open that session with
 
-> Read `docs/DEPLOYMENT.md` and `docs/SFU-MIGRATION.md` in trading-room-app. The room is deployed at
+> Read `docs/DEPLOYMENT.md` and `docs/SFU-MIGRATION.md` in trading-room-app — and do Step 0 before
+> anything else. The room is deployed at
 > `chat.tradingroom.app` on the Hetzner box `87.99.154.155` (SSH as root, key already authorised).
 > `media.tradingroom.app` resolves there with a valid certificate and answers a 503 placeholder.
 > Move the mediasoup SFU from AWS Lightsail onto that box, serve it at `media.tradingroom.app`, wire

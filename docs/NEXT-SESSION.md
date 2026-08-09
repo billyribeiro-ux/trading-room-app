@@ -83,11 +83,23 @@ holdout.
   this app, so it may not even buy the platform move
 - **Time:** days
 
-**DECIDED 2026-08-09: Option A**, and the owner is **leaving Lightsail** — so the room goes onto
-whichever host replaces it, not onto Lightsail first. One migration, not two. Revisit the Postgres
-question once it is not blocking a launch.
+> ## ✅ DONE 2026-08-09 — this section is history, not a plan
+>
+> Option A was chosen AND EXECUTED, but not onto Lightsail. Lightsail is being retired, so the room
+> went straight to a **Hetzner box in Ashburn (`87.99.154.155`)** and the SFU is following it there.
+> One migration, not two.
+>
+> **The room is live at `https://chat.tradingroom.app`.** For what actually runs where, read
+> **`docs/DEPLOYMENT.md`**. For the one piece still outstanding — the SFU — read
+> **`docs/SFU-MIGRATION.md`**.
+>
+> Note also that "put the room on a VM **beside the SFU**" is a TEST topology, not the target. See
+> `TODO.md` item H: production should separate the media plane from the app tier.
+>
+> The checklist below is kept because its reasoning is still the reasoning; treat it as a record of
+> how this was done, not as work remaining.
 
-### Executing A — the checklist
+### Executing A — the checklist (COMPLETED)
 
 1. Provision the replacement host (§4a) and get SSH to it. Lightsail is being retired.
 2. Build the room with `ADAPTER=node pnpm --filter ./apps/room build`, which produces a Node server.
@@ -402,14 +414,19 @@ real work between here and selling the product.
 
 ## 5. Do these next, in order
 
-1. **Deploy the room** — Option A above. Unblocks items 2 and 3.
-2. **Create the `chat` and `media` DNS records** against the new host — see §4b — and retire the
-   `sslip.io` name while you are there.
-3. **`ROOM_BASE_URL` is live and wrong.** It is `http://localhost:5174`, copied from a developer
+> **Items 1-4 are DONE as of 2026-08-09** — the room is deployed, DNS created, `ROOM_BASE_URL`
+> corrected, and `ROOM_JWT_SECRET` rotated on both sides. What remains is the SFU
+> (`docs/SFU-MIGRATION.md`), then password reset and the manage-page audit. Struck items are kept
+> so the order and the reasoning stay legible.
+
+1. ~~**Deploy the room**~~ — **DONE.** Hetzner Ashburn, `chat.tradingroom.app`, valid TLS.
+2. ~~**Create the `chat` and `media` DNS records**~~ — **DONE**, at Porkbun. The `sslip.io` name is
+   still live and is retired as part of the SFU move.
+3. ~~**`ROOM_BASE_URL` is live and wrong.**~~ — **DONE**, now `https://chat.tradingroom.app`. Original note: It is `http://localhost:5174`, copied from a developer
    `.env`. Every Launch link on the account page currently points at a laptop. Only fixable once
    the room has a URL. `scripts/set-vercel-env.sh` now REFUSES to write a localhost URL, so this
    cannot recur.
-4. **`ROOM_JWT_SECRET` is 9 characters.** It signs room handoff tokens valid 360 days that travel in
+4. ~~**`ROOM_JWT_SECRET` is 9 characters.**~~ — **DONE**, rotated to 64 hex and verified identical on both sides. Original note: It signs room handoff tokens valid 360 days that travel in
    URLs and browser history. Rotate it on the controller and the room **in the same moment** or
    every existing link breaks. Cheapest right now, while no links exist.
 5. **Rotate the API key** in the UI. One row cannot be decrypted — see §7.
