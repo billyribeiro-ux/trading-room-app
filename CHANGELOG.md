@@ -9,16 +9,49 @@ will be found later.
 end of a session. A change with no entry is a change the next person has to reverse-engineer from
 `git log`.
 
+**Branching: there isn't any, and that is deliberate.** Work is committed and pushed **straight to
+`main`** — confirmed by the owner 2026-08-09. No feature branches, no PRs. The consequence is worth
+stating once, here, rather than rediscovering it: **`main` auto-deploys**, so a push is a production
+release, not a reviewable step. Two things follow, and both are conventions of this file:
+
+1. **Every entry says whether it has runtime impact** — whether the push changed what the site
+   serves, or only documentation, comments and tests. That is the first thing anyone reading back
+   through an incident wants to know.
+2. **Verification happens before the push, not after**, because there is no review gate to catch it.
+   Each entry records what was run and what could not be.
+
 ---
 
 ## 2026-08-09
 
+### 10:03 — This changelog started, and two comments corrected (`8c5dca3`, pushed to `main`)
+
+**No runtime impact** — documentation, one code comment and one test comment. Nothing about what the
+site serves changed in this push; the pages and CSS themselves went up earlier in `6e7a151`.
+
+- **`CHANGELOG.md`** created at the repo root. It exists because several changes today landed in
+  commits whose messages described something else — the four rebuilt public pages went in under a
+  commit about the `pub-*` decision — which makes work unfindable without reading diffs.
+- **Two comments that were true when written and had since reversed**, in
+  `forgot-password/+page.svelte` and `password-reset-pages.test.ts`. Both stated that the `pub-*`
+  classes have no rule anywhere in the app; `public.css` had defined all seven an hour earlier. A
+  comment asserting a fact that has flipped is worse than no comment, because it is read as current.
+  `forgot-password` still wears `acc-*` on purpose, and the comment now says why it should stay that
+  way.
+
+**Verified before pushing:** 48 files, 535 tests passing; `svelte-check` 0 errors, 3 warnings
+(unchanged); breakpoint contract passing.
+
 ### 09:59 — Full controller unit suite re-measured
+
+**No runtime impact** — a measurement, plus one documented count corrected.
 
 **48 files, 535 tests, all passing.** `docs/PROMPT-TODO-ITEMS.md` said 522; corrected in place with
 the date of the new measurement rather than silently overwritten.
 
 ### 09:58 — The verification query that was owed, run against production
+
+**No runtime impact** — one read-only `SELECT`. Nothing was written to the database.
 
 `docs/EMAIL.md` §5 and `docs/PROMPT-TODO-ITEMS.md` both recorded a query that had to be re-run
 *after* `RESEND_API_KEY` and `MAIL_FROM` went live, because flipping them makes `verificationEnforced()`
@@ -36,6 +69,9 @@ requires `vercel env pull`, which would write every other production secret to d
 *This measurement expires with the next registration.*
 
 ### 09:57 — TODO item I closed: the four unstyled public pages (`6e7a151`)
+
+**RUNTIME IMPACT: yes.** Three public pages and a stylesheet, live on `main` and therefore deployed.
+`/contact`, `/privacy` and `/terms` render differently to a visitor from this commit onward.
 
 `contact`, `privacy`, `terms` and `verify-email` rendered with seven classes that had **no CSS rule
 anywhere in the app**. `pub-hint`, `pub-error` and `pub-success` were therefore visually identical,
