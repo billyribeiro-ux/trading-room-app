@@ -284,7 +284,7 @@ describe('manage page, section by section', () => {
           not the other pushes every row after it out of step and the whole tail reads as a
           divergence. The number to act on is therefore always the first one: fix that, and the
           count typically falls by hundreds. Printing rows 0-39 hid it for any section whose first
-          divergence sits past row 40 — Users' two are at rows 296 and 349 — and showed 40 rows of
+          divergence sits past row 40 — Users' two are at rows 166 and 345 — and showed 40 rows of
           agreement instead.
         */
         const first = Math.max(0, rows.findIndex((r) => r.startsWith(' ! ')) - 4);
