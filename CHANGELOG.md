@@ -24,6 +24,43 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-09
 
+### 10:50 — "Export badges should be CSV": investigated, and NOT changed
+
+**No runtime impact** — one new collector script. **No application code was touched, deliberately.**
+
+Reported: clicking export badges downloads a `.json` and should download a `.csv`. Read against
+`must-match/important`, every export/download handler in the reference is:
+
+| capture line | handler | format |
+| --- | --- | --- |
+| 34 | `exportListToCSV()` | CSV |
+| 916 | `exportStatsToCSV(statsDate)` | CSV |
+| 919 | `downloadMontlyStats(…)` — the reference's own misspelling | CSV |
+| 985 | **`exportSettingsToJSON()`** | **JSON** |
+| 986 | `loadSettingsFromJSON()` | **inside an HTML comment — never renders** |
+| 91, 2081 | `removeBadgesForUsers()`, `openChatTabsWithBadgesEditor(…)` | not exports |
+
+**There is no "Export badges" control** — not in this app and not in the reference. The only JSON
+download anywhere is Export Settings, whose handler in the reference is literally named
+`exportSettingsToJSON`, and ours already matches it. Users, stats and monthly already produce CSV
+with `.csv` filenames.
+
+So the requested change has no target, and making the settings export CSV would contradict the
+capture. **Left alone pending the owner's call** — it is a divergence to decide, not a defect to fix,
+and it will be recorded as a divergence if chosen.
+
+**`apps/controller/scripts/collect-export-controls.js`** added to settle what markup cannot: whether
+the function BODIES agree with their names, and whether the control the owner clicked exists
+somewhere no capture reached. It fetches every same-origin bundle, pulls a 4,000-character window
+around all thirteen export/badge/MIME/blob symbols, and captures every export/download/badge control
+across every tab it can reach — outerHTML, computed styles, and the stylesheet rules that match, so
+"this class has no rule" can be proven. Honest `gaps[]` for any tab that never rendered.
+
+**It clicks nothing that acts.** `export` and `download` are on its denylist on purpose: the point
+is to read the exporter, not run it. Tab links are the only thing clicked, matched by exact string
+comparison — never a regex built from a label, which is how a menu item with a slash in its name
+once went unclicked and the bug looked like the app's.
+
 ### 10:37 — Tabs moved into the path, and the last route still using a row id (pushed to `main`)
 
 **Runtime impact: yes, URLs change.** `/account/rooms/1001?tab=marketplace` is now
