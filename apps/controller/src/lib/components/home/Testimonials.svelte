@@ -7,7 +7,7 @@
   <div class="col-sm-6 col-xs-12" style="padding-left: 60px">
     <img
       src={asset('/public/images/user_comments.png')}
-      alt="Screenshot of ProTradingRoom customer comments"
+      alt="Screenshot of TradingRoomApp customer comments"
       width={IMAGE_SIZES.comments.w}
       height={IMAGE_SIZES.comments.h}
       style="width: 100%; height: auto; padding: 10px; border: 4px solid gray"

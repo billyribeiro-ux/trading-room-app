@@ -14,7 +14,7 @@
 				<img
 					src={asset('/public/images/ptr_descrived_perspective.png')}
 					style="height: 95%"
-					alt="ProTradingRoom interface showing trade alerts, group chat, market charts, and HD screen sharing"
+					alt="TradingRoomApp interface showing trade alerts, group chat, market charts, and HD screen sharing"
 				/>
 			</div>
 			<div class="col-md-4">

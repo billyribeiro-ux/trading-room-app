@@ -45,7 +45,7 @@ export const FEATURES: readonly Feature[] = [
   }
 ];
 
-export const TESTIMONIALS_HEADING = 'Real user comments after switching to ProTradingRoom:';
+export const TESTIMONIALS_HEADING = 'Real user comments after switching to TradingRoomApp:';
 
 export const TESTIMONIALS: readonly string[] = [
   'Looks way cleaner and sounds great!',
@@ -59,7 +59,7 @@ export const TESTIMONIALS: readonly string[] = [
 
 export const MOBILE = {
   heading: 'Connect to the trading room from mobile devices',
-  body: 'ProTradingRoom works from the mobile browser on Android, iOS, and other devices.'
+  body: 'TradingRoomApp works from the mobile browser on Android, iOS, and other devices.'
 } as const;
 
 export const CTA_HEADING = 'Need to talk to somebody to get more information about pricing and custom integrations?';

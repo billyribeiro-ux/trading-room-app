@@ -8,7 +8,7 @@
 
 <svelte:head>
   <title>Welcome to the {data.roomName}</title>
-  <meta name="description" content={`Enter the ${data.roomName} ProTradingRoom session.`} />
+  <meta name="description" content={`Enter the ${data.roomName} TradingRoomApp session.`} />
 </svelte:head>
 
 <RoomLogin

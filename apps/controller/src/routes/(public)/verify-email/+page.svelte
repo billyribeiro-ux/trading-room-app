@@ -18,7 +18,7 @@
 </script>
 
 <svelte:head>
-  <title>Confirm your email — ProTradingRoom</title>
+  <title>Confirm your email — TradingRoomApp</title>
   <!-- A one-time credential in the query string must never be indexed or sent onward as a referrer. -->
   <meta name="robots" content="noindex, nofollow" />
   <meta name="referrer" content="no-referrer" />

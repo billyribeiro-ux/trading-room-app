@@ -12,8 +12,8 @@
 </script>
 
 <svelte:head>
-  <title>API Documentation — ProTradingRoom</title>
-  <meta name="description" content="Authenticated ProTradingRoom API reference and command documentation." />
+  <title>API Documentation — TradingRoomApp</title>
+  <meta name="description" content="Authenticated TradingRoomApp API reference and command documentation." />
 </svelte:head>
 
 <div class="ad-root">

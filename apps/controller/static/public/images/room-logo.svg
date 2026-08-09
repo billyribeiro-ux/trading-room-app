@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 260 40" width="260" height="40" role="img" aria-label="TradingRoomApp">
+  <!--
+    The default room logo.
+
+    White on transparent, deliberately: the Branding panel that frames it is
+    `background-color: #000` (`must-match/file1:838`), and that black box exists precisely so a
+    white wordmark reads. A dark logo would vanish into it.
+
+    SVG rather than PNG because a wordmark is vector by nature — it stays crisp on a Retina display
+    and at the 25px `.navLogo` clamps it to, without shipping three raster sizes.
+
+    Two marks: a chart glyph and the name. The glyph is a rising line over a baseline, drawn with
+    `stroke` rather than a font so it needs no webfont to render correctly.
+  -->
+  <g fill="none" stroke="#ffffff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+    <!-- monitor outline -->
+    <rect x="2" y="6" width="30" height="22" rx="2.5" />
+    <!-- stand -->
+    <path d="M13 32h8" />
+    <!-- the rising line: down, then up and away, which is the shape of a recovery -->
+    <path d="M7.5 22l5.5-6 4.5 4 8.5-9" />
+  </g>
+  <text
+    x="42"
+    y="27"
+    font-family="'Helvetica Neue', Helvetica, Arial, sans-serif"
+    font-size="21"
+    letter-spacing="-0.3"
+    fill="#ffffff"
+  >Trading<tspan font-weight="700">Room</tspan><tspan font-weight="700" opacity="0.72">App</tspan></text>
+</svg>

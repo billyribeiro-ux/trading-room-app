@@ -314,8 +314,8 @@
 </script>
 
 <svelte:head>
-  <title>Account — ProTradingRoom</title>
-  <meta name="description" content="Manage ProTradingRoom rooms, badges, administrators, and API keys." />
+  <title>Account — TradingRoomApp</title>
+  <meta name="description" content="Manage TradingRoomApp rooms, badges, administrators, and API keys." />
 </svelte:head>
 
 <!-- The container, the fadeInDown and the footer all live in the root layout

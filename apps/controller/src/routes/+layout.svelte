@@ -56,7 +56,7 @@
    *   marketing  `/`, `/contact`, `/privacy`, `/terms`
    *              navbar-inverse over #0e0e0e, #footer with the legal links
    *   controller `/login`, `/register`, `/account`, `/account/rooms/*`
-   *              the black `navbar topnavbar` and the © ProTradingRoom footer
+   *              the black `navbar topnavbar` and the © TradingRoomApp footer
    *   none       `/session/*`, `/account/api-docs`
    *              the room entry screen owns its full field; the API document
    *              is a separate first-party HTML surface with its own topbar

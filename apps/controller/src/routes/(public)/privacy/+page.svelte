@@ -1,6 +1,6 @@
 <svelte:head>
-  <title>Privacy Policy — ProTradingRoom</title>
-  <meta name="description" content="Read the ProTradingRoom privacy policy." />
+  <title>Privacy Policy — TradingRoomApp</title>
+  <meta name="description" content="Read the TradingRoomApp privacy policy." />
 </svelte:head>
 
 <div class="pub-container">

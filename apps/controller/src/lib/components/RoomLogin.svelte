@@ -312,8 +312,8 @@
       {#if showPoweredBy}
         <p>
           Powered by:
-          <a href="https://protradingroom.com" target="_blank" rel="noopener noreferrer"
-            >ProTradingRoom.com</a
+          <a href="https://www.tradingroom.app" target="_blank" rel="noopener noreferrer"
+            >TradingRoomApp</a
           >
         </p>
       {/if}

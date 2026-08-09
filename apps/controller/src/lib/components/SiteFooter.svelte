@@ -12,7 +12,7 @@
           <li><a href={resolve('/terms')} target="_blank" rel="noopener noreferrer">Terms of Service</a></li>
           <li><a href={resolve('/contact')}>Contact Us</a></li>
         </ul>
-        © 2026 ProTradingRoom™
+        © 2026 TradingRoomApp™
       </div>
     </div>
   </div>

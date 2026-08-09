@@ -6,8 +6,8 @@
 </script>
 
 <svelte:head>
-  <title>Joined {data.roomName} — ProTradingRoom</title>
-  <meta name="description" content={`Entry was accepted for the ${data.roomName} ProTradingRoom session.`} />
+  <title>Joined {data.roomName} — TradingRoomApp</title>
+  <meta name="description" content={`Entry was accepted for the ${data.roomName} TradingRoomApp session.`} />
 </svelte:head>
 
 <div class="auth-wrapper">

@@ -10,7 +10,7 @@
         <img
           src={asset('/public/images/ss3.png')}
           class="device img-responsive"
-          alt="ProTradingRoom mobile interface"
+          alt="TradingRoomApp mobile interface"
           width={IMAGE_SIZES.mobile.w}
           height={IMAGE_SIZES.mobile.h}
         />

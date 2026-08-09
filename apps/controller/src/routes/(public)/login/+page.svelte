@@ -36,15 +36,15 @@
 </script>
 
 <svelte:head>
-  <title>Login to your ProTradingRoom.com account</title>
-  <meta name="description" content="Sign in to manage your ProTradingRoom account and trading rooms." />
+  <title>Login to your TradingRoomApp account</title>
+  <meta name="description" content="Sign in to manage your TradingRoomApp account and trading rooms." />
 </svelte:head>
 
   <div class="acc-center-block">
     <!-- START panel -->
     <div class="acc-panel acc-panel-narrow">
       <div class="acc-panel-body">
-        <p class="acc-panel-title">Login to your ProTradingRoom.com account</p>
+        <p class="acc-panel-title">Login to your TradingRoomApp account</p>
 
         {#if form?.message}
           <p class="acc-error">{form.message}</p>

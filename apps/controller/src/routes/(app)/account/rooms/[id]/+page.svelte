@@ -284,8 +284,9 @@
 
     Each of the seven carries `ng-hide` in the capture, which is AngularJS for "in the DOM,
     display:none" — nobody sees them in a room whose auth mode is 'open', which is the room the
-    capture is of. Rendered unconditionally they put seven paragraphs of eight nodes each into a
-    pane that has none.
+    capture is of. Rendered unconditionally, they added seven paragraphs to a pane the capture
+    shows none of them in — and, this being a positional comparison, pushed everything after them
+    out of step.
 
     The conditions are the capture's own `ng-show` expressions, transcribed one for one:
 
@@ -640,7 +641,7 @@
 </script>
 
 <svelte:head>
-  <title>Manage Room {data.room.shortCode} — ProTradingRoom</title>
+  <title>Manage Room {data.room.shortCode} — TradingRoomApp</title>
   <meta name="description" content={`Manage settings, members, branding, and permissions for ${data.room.name}.`} />
 </svelte:head>
 
@@ -1806,10 +1807,11 @@ Please click this link to attend: ______ unique link will be here_____
                         white wordmark is visible at all. Worth knowing before anyone "simplifies"
                         the panel away.
 
-                        AWAITING THE ASSET: save it to
-                        `apps/controller/static/public/images/room-logo.png`.
+                        SVG rather than PNG: a wordmark is vector by nature, so it stays crisp on
+                        a Retina display and at the 25px `.navLogo` clamps it to, without shipping
+                        three raster sizes. Replace the file to rebrand; nothing here changes.
                       -->
-                      <img class="navLogo" src="/public/images/room-logo.png" alt="" />
+                      <img class="navLogo" src="/public/images/room-logo.svg" alt="" />
                     {/if}
                   </div>
                   <div class="col-sm-4">

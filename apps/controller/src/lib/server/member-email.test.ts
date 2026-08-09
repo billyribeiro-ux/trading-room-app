@@ -195,7 +195,7 @@ describe('the welcome email', () => {
       roomName: 'R',
       roomLink: 'https://control.test/u/1'
     });
-    for (const invented of ['noreply@', 'example.com', 'ProTradingRoom', 'The Team', 'Unsubscribe']) {
+    for (const invented of ['noreply@', 'example.com', 'TradingRoomApp', 'The Team', 'Unsubscribe']) {
       expect(mail.subject + mail.text).not.toContain(invented);
     }
   });

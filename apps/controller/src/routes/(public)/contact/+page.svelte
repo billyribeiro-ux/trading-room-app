@@ -9,8 +9,8 @@
 </script>
 
 <svelte:head>
-  <title>Contact Us — ProTradingRoom</title>
-  <meta name="description" content="Contact ProTradingRoom about pricing, integrations, or a demonstration room." />
+  <title>Contact Us — TradingRoomApp</title>
+  <meta name="description" content="Contact TradingRoomApp about pricing, integrations, or a demonstration room." />
 </svelte:head>
 
 <div class="pub-auth">

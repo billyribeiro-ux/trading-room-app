@@ -25,8 +25,8 @@
 </script>
 
 <svelte:head>
-  <title>Create your ProTradingRoom account</title>
-  <meta name="description" content="Create a ProTradingRoom account for web-based professional trading rooms." />
+  <title>Create your TradingRoomApp account</title>
+  <meta name="description" content="Create a TradingRoomApp account for web-based professional trading rooms." />
 </svelte:head>
 
   <div class="acc-center-block">
@@ -41,13 +41,13 @@
       <!-- the reference's alt is the literal word "Image", which a screen reader
            reads as "Image image". The wordmark beside it already names the brand,
            so the icon is decorative. -->
-      <span class="title">ProTradingRoom.com</span>
+      <span class="title">TradingRoomApp</span>
     </a>
     <br /><br /><br />
 
     <div class="acc-panel acc-panel-narrow">
       <div class="acc-panel-body">
-        <p class="acc-panel-title">Create your ProTradingRoom account</p>
+        <p class="acc-panel-title">Create your TradingRoomApp account</p>
 
         {#if form?.message}
           <p class="acc-error">{form.message}</p>

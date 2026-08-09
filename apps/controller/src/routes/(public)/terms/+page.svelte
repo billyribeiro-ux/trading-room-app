@@ -1,6 +1,6 @@
 <svelte:head>
-  <title>Terms of Service — ProTradingRoom</title>
-  <meta name="description" content="Read the ProTradingRoom terms of service." />
+  <title>Terms of Service — TradingRoomApp</title>
+  <meta name="description" content="Read the TradingRoomApp terms of service." />
 </svelte:head>
 
 <div class="pub-container">

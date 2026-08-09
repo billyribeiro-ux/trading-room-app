@@ -10,7 +10,7 @@
 </script>
 
 <svelte:head>
-  <title>ProTradingRoom - Trading Room Software for professional traders</title>
+  <title>TradingRoomApp - Trading Room Software for professional traders</title>
   <!-- The hero is above the fold; preload its one evidence-backed face. -->
   <link
     rel="preload"
@@ -19,7 +19,7 @@
     type="font/woff2"
     crossorigin="anonymous"
   />
-  <meta name="description" content="ProTradingRoom Trading room software for professional traders" />
+  <meta name="description" content="TradingRoomApp Trading room software for professional traders" />
   <meta
     name="keywords"
     content="Trading room, chat room software, webinato replacement, omnovia replacement"

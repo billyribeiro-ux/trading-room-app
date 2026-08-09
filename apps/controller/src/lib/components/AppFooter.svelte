@@ -14,5 +14,5 @@
   <hr />
   <span class="mr-sm">©</span>
   <span class="mr-sm">2026</span>
-  <span>ProTradingRoom</span>
+  <span>TradingRoomApp</span>
 </div>

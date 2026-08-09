@@ -64,7 +64,7 @@ const BASELINE: Record<string, number> = {
   Branding: 0,
   'SSO Setup': 0,
   'User Stats': 6,
-  Settings: 1564
+  Settings: 567
 };
 
 const member = (over: Record<string, unknown> = {}) => ({
@@ -174,10 +174,7 @@ function ourPage(tab: string) {
           authMode unset is also what keeps the seven `ng-hide` rows hidden on both sides.
         */
         settings: Object.fromEntries(
-          ROOM_SETTINGS.filter((d) => !d.capturedIsDisplayOnly && d.captured !== null).map((d) => [
-            d.name,
-            d.captured
-          ])
+          ROOM_SETTINGS.filter((d) => !d.capturedIsDisplayOnly && d.captured !== null).map((d) => [d.name, d.captured])
         ),
         landingHtml: '',
         users: USERS,

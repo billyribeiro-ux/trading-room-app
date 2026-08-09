@@ -43,7 +43,7 @@
           width={IMAGE_SIZES.brand.w}
           height={IMAGE_SIZES.brand.h}
           style="width: auto; height: 45px"
-        /> ProTradingRoom
+        /> TradingRoomApp
       </a>
     </div>
     <nav
