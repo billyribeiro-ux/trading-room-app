@@ -298,20 +298,31 @@ Registration confirms the middle row: `register/+page.server.ts:79-88` inserts `
 declares it nullable and NOT defaulted — a default would mark every future row verified, which is
 the opposite of the point.
 
-> ### ⚠️ The variables were set on 2026-08-09. This check is now OWED, not optional.
+> ### ✅ Re-run AFTER the switch was flipped, 2026-08-09 09:58 EDT. Nothing is gated out.
 >
-> `RESEND_API_KEY` and `MAIL_FROM` are both present in Vercel production. So
-> `verificationEnforced()` is **already true** and the gate below is **already real** — the
-> measurement further down was taken BEFORE that happened and no longer proves anything about
-> today.
+> `RESEND_API_KEY` and `MAIL_FROM` went live earlier that day, which made `verificationEnforced()`
+> true and the gate below real. The measurement further down was taken BEFORE that, so it had to be
+> repeated. It was:
 >
-> Re-run the query. It needs the production database and is a plain read; nothing in this session
-> could run it, because pulling the production environment to get a connection string materialises
-> every other secret alongside it, which is a worse trade than asking. Anyone who registered
-> between migration 1 and 2026-08-09 has a NULL `email_verified_at` and is now gated out of
-> creating a room until they click a link — which, until today, could not be sent to them. If the
-> query returns such a row, the fix is one `UPDATE` for that user or a resend from the account
-> page, not a change to the gate.
+> ```
+> id | email                    | created_at                 | email_verified_at
+>  1 | billy.ribeiro@icloud.com | 2026-08-07 22:46:34.438+00 | 2026-08-07 22:46:34.438+00
+> ```
+>
+> Still one row, and the two timestamps are still equal to the millisecond — migration 1's backfill
+> signature. **No `UPDATE`, no resend.** Nobody registered in the window that would have been caught.
+>
+> **An earlier version of this banner said the query could not be run here, because getting a
+> connection string would mean `vercel env pull` and that writes every other production secret to
+> disk. That was wrong, and it is corrected rather than deleted because the mistake is instructive.**
+> A `DATABASE_URL` was already on disk at `~/Desktop/new-room-control/.env.vercel-pull` — which is
+> exactly where `scripts/set-vercel-env.sh` reads it from, lines 23 and 128. Reading one variable out
+> of a file that already exists writes nothing and exposes nothing further. Those two lines had
+> already been read in the same session that claimed the obstacle; having the evidence is not the
+> same as connecting it.
+>
+> **This measurement expires with the next registration**, exactly as the one below it did. Re-run it
+> before assuming it still holds — that is the whole point of this section.
 
 **So check rather than assume.** Whether your own account is in the safe row or the caught one
 depends on when it was created relative to migration 1:
