@@ -70,8 +70,10 @@ From `apps/controller/src/lib/room-settings-schema.ts`:
 | `customMobileAppIOSUrl`, `customMobileAppAndroidUrl` | store links for that white-label build |
 | `customMobileAppLaunchWord` | its deep-link / launch keyword |
 
-`customMobileApp*` is the commercially interesting group: the reference supports **per-tenant
-branded apps**, not just one shared app.
+`customMobileApp*` is the commercially interesting group — and the one most easily over-read. It
+proves a room can POINT AT a different app; it does not prove who built that app. §7 separates
+what the evidence establishes from what it merely permits, because the difference decides the
+framework.
 
 ---
 
@@ -147,22 +149,100 @@ already fetches the app bundle; the mobile handlers live in the same file.
 
 ---
 
-## 7. The decision that shapes everything else
+## 7. White-label — what the evidence actually says, and what it does not
 
-`customMobileAppEnabled` with per-tenant store URLs means the reference supports **white-label apps
-per customer**. That is a different product from one shared app, and it decides your framework:
+This is the decision that shapes the framework choice, so it is worth being exact about where the
+evidence stops.
 
-- **One shared app** — simplest. Members pick their room. `ptrMobileApp*` settings only.
-- **White-label per tenant** — every customer gets their own App Store and Play listing. Far more
-  commercially valuable, and far more operational work: separate builds, separate submissions,
-  separate review cycles, and Apple is strict about near-identical apps.
+### The settings, with their real labels
 
-If white-label is the goal, choose a stack that makes a per-tenant build a configuration change
-rather than a fork. That constraint should drive the framework choice, not the other way round.
+Read from `room-settings-schema.ts`, not paraphrased:
 
-**Recommendation:** ship one shared app first, and only then decide whether white-label is worth its
-operational cost. The server contract in §5 is identical either way, so building it now costs
-nothing and commits you to nothing.
+| setting | label in the UI | type | group | wired |
+| --- | --- | --- | --- | --- |
+| `ptrMobileAppEnabled` | **Enable PTR app?** | checkbox | `dont-touch` | yes |
+| `ptrMobileAppCaseByCaseEnabled` | **App for Some Members?** | checkbox | `dont-touch` | no |
+| `customMobileAppEnabled` | **Custom App?** | checkbox | `dont-touch` | yes |
+| `customMobileAppIOSUrl` | **Custom iOS App URL** | textarea | `dont-touch` | yes |
+| `customMobileAppAndroidUrl` | **Custom Android App URL** | textarea | `dont-touch` | yes |
+| `customMobileAppLaunchWord` | **Custom App launch Word** | textarea | `dont-touch` | no |
+| `hideMobileCredentials` | **Hide Mobile Credentials?** | checkbox | `dont-touch` | yes |
+| `hasAppPairLink` | **Pair Link For App?** | checkbox | — | no |
+| `pairSecretKey` | **Pair Secret Key** | textarea | — | no |
+| `ptrMobileAppExpirePairCodeDays` | **PTR app exp days** | number | — | no |
+| `mobileAppExpireNotificationsDays` | **Push expire days** | number | — | no |
+
+### What this PROVES
+
+1. **A room can be pointed at a different app than the default one.** `Custom App?` is a per-room
+   switch, and when it is on the room carries that app's **iOS and Android store URLs**. So a
+   member of that room is sent to a different listing than a member of another room.
+2. **It is operator-only, not self-serve.** Every `customMobileApp*` setting sits in the
+   **`dont-touch`** group — the reference's own marker for settings a tenant is not meant to change.
+   Somebody with operator access turns this on for a customer. It is not a checkbox a customer
+   finds and flips.
+3. **Two apps can coexist per room.** `Enable PTR app?` and `Custom App?` are independent
+   checkboxes, not a radio pair.
+4. **There is a per-app launch keyword.** `Custom App launch Word` — most plausibly a deep-link
+   scheme or a pairing keyword, and "most plausibly" is doing real work in that sentence.
+
+### What this does NOT prove — and this is the part that changes the decision
+
+**The settings store URLs. They do not build apps.**
+
+`Custom iOS App URL` is a text field holding a link to a store listing. Nothing in the evidence
+shows who produced the app behind that link. Both of these fit the evidence exactly as well:
+
+- **(a)** The operator ran a white-label service — built, branded and submitted an app per customer,
+  and pasted the resulting store URLs into these fields.
+- **(b)** Customers who already had their own app brought their own URLs, and the setting simply
+  redirects members there instead of to the PTR app.
+
+Nothing on disk distinguishes them. **(b) is a text field. (a) is a business.** Reading the field
+names and concluding (a) would be inventing a product line out of a URL input.
+
+### Why it decides the framework anyway
+
+Because the two answers have opposite build requirements, and the choice is expensive to reverse:
+
+| | one shared app | white-label per tenant |
+| --- | --- | --- |
+| Store listings | 2 (iOS + Android) | 2 **per customer** |
+| Review cycles | yours alone | every customer's, every release |
+| Branding | fixed | name, icon, splash, colours per build |
+| Config | none — members pick a room | per-build: bundle id, room binding, keys |
+| Apple risk | none | Apple **rejects near-identical apps** under Guideline 4.3 unless each is submitted under the customer's own developer account |
+| Release effort | one build | N builds, N submissions, N rejections to chase |
+
+That last row is the one that catches people. The usual escape is that each customer submits under
+**their own Apple Developer account** and you supply the build — which turns "we ship an app" into
+"we operate a build pipeline and a support relationship with every customer's developer account."
+
+So: if white-label is ever the goal, the stack must make a per-tenant build a **configuration
+change**, not a fork. React Native or Capacitor with per-flavour config handles this well; two
+separate native codebases do not.
+
+### Recommendation
+
+**Ship one shared app first.** Reasons, in order:
+
+1. The server contract in §5 is **identical either way** — pairing, token registration, push
+   fan-out, notification state. Building it now costs nothing and commits you to nothing.
+2. Whether the original offered white-label as a service is **not established**, so building for it
+   now is designing against a guess.
+3. It is the cheaper of the two to be wrong about. One shared app that later needs flavours is a
+   refactor; a white-label pipeline nobody buys is wasted quarters.
+
+**But choose the framework as if white-label were coming.** That costs nothing today and keeps the
+door open. It is the one decision here that is expensive to reverse.
+
+### To settle it properly
+
+`customMobileAppLaunchWord` is `wired: false` and its behaviour is unknown, and the three
+`ptrMobileAppCaseByCaseEnabled` branches never rendered. Both live in `/public/dist/app.min.js`.
+`scripts/collect-create-new.js` already fetches that bundle — running it against the live original
+would show what the launch word does and whether any real tenant ever had `Custom App?` enabled,
+which is the closest thing to a direct answer available without asking the original's operator.
 
 ---
 
