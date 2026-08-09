@@ -1,0 +1,79 @@
+node_modules
+.svelte-kit
+build
+.data
+coverage
+drizzle
+docs/generated
+docs/source/styles.*.css
+docs/source/main.*.js
+docs/source/*.component.css
+docs/source/*.compiled.js
+docs/source/components/
+docs/source/scripts.*.js
+docs/source/runtime.*.js
+docs/source/polyfills.*.js
+docs/source/deployed-index.html
+alert-section/
+navbar-section/
+app-modals/
+app-message-modal/
+app-room/
+jcrop/
+runtimes/
+audio
+really-free-geoip
+proroom-ULTIMATE-*.json
+src/lib/styles/protradingroom-source.css
+
+# ── Added 2026-08-04, resolving TODO 3d ──────────────────────────────────────
+#
+# The rule applied per entry: SOURCE gets formatted, GENERATED and EVIDENCE get
+# ignored. SSOT §1 forbids hand-editing a generated artifact, and reformatting a
+# capture destroys the byte-for-byte relationship its provenance depends on.
+
+# The Rust workspace. It has its own gate — `cargo fmt --all --check` — and this
+# repository holds it as a mirror. `services/target/` alone is 2,120 build
+# artifacts, which is why this entry accounts for 2,617 of the 2,679 failures.
+services/
+
+# Generated, with the source hash in its header.
+src/lib/styles/captured-runtime-components.css
+# ...and the file it is generated FROM.
+css/complete-app-styles.css
+
+# Raw DOM captures. Evidence, not source.
+subtitles.clean.html
+mention-reply-private-chat.clean.html
+preview/
+enterprise/
+NEXT-STEP/
+gap-dump/
+docs/website-ptr1-prt2-full-read.md
+
+# Resolved by the package manager, never by hand.
+pnpm-lock.yaml
+
+# Svelte components that reproduce captured DOM.
+#
+# NOT because they are generated — they are hand-written source. Because in a
+# reproduction that is verified by screenshot diff, whitespace BETWEEN inline
+# elements is rendered whitespace: prettier reflowing a template can move a text
+# node and shift layout by a space's width. `+page.svelte` alone is an 1,800-line
+# diff. Formatting them is a deliberate decision to re-verify the pixel match,
+# not a cleanup, so it stays out of the automatic gate until someone does that.
+src/routes/+page.svelte
+src/lib/components/PollPanel.svelte
+src/lib/components/RoomMessage.svelte
+src/lib/components/ScreenPane.svelte
+src/lib/components/ScreenTabs.svelte
+
+# Restored 2026-08-04 (TODO 8). Captured PostgreSQL schema evidence, SHA-256 and
+# byte-length pinned by scripts/verify-postgres-schema-artifacts.mjs — reformatting
+# any of it breaks the contract it exists to prove.
+second-dump/
+alert-section/
+
+# Bundle extractions from scripts/pull-component-source.js. Captured evidence:
+# reformatting changes bytes that are compared against the shipped bundle.
+new/

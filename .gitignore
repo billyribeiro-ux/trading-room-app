@@ -1,0 +1,61 @@
+# ---------------------------------------------------------------------------------------------
+# Build output and dependencies
+# ---------------------------------------------------------------------------------------------
+node_modules/
+.svelte-kit/
+build/
+dist/
+.vercel/
+target/
+*.log
+
+# Local database and scratch state
+.data/
+*.sqlite
+*.sqlite-journal
+
+# Environment. `.env.example` IS committed; nothing else is.
+.env
+.env.*
+!.env.example
+
+# ---------------------------------------------------------------------------------------------
+# Reference captures — NEVER committed to this repository.
+#
+# This repo exists because the previous one accumulated 215 MB of captures, 19 tracked files of
+# which carried the owner's real email addresses, in history where a tree deletion could not
+# reach them. Starting clean only stays clean if the rules that let it happen are carried
+# forward, so they are here from the first commit rather than added after the first mistake.
+#
+# Every one of these is a dump of a LIVE room: real names, real addresses, gravatar MD5s, and in
+# some cases a live JWT. They are read from `~/Desktop/new-room/`, never copied here. Findings
+# belong in docs/ with a citation to the file and line; the capture itself stays out.
+# ---------------------------------------------------------------------------------------------
+ptr-*.json
+ptr[0-9]*.json
+collect-*.json
+proroom-*.json
+must-match/
+account-page/
+mising/
+second-dump/
+more-fucking-evidence/
+new-evidence/
+gap-dump/
+NEXT-STEP/*.json
+enterprise/
+docs/generated/
+
+# The original app's own JS bundles. SHA-256 pinned, so they cannot be redacted without breaking
+# their seal — and they contain real addresses. They stay in `new-room/docs/source/`.
+docs/source/
+
+# The two predecessor repositories. Never a subdirectory of this one.
+new-room/
+new-room-control/
+
+# ---------------------------------------------------------------------------------------------
+# OS and editor
+# ---------------------------------------------------------------------------------------------
+.DS_Store
+*.swp

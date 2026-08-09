@@ -1,0 +1,302 @@
+/*
+ * Single source of truth for the room skin.
+ *
+ * Values in the first block are transcribed from
+ * proroom-ULTIMATE-staff-2026-07-24T12-42-02-part1.json. The geometry block is
+ * derived from the measured 1842×1265 baseline capture. Components consume
+ * these tokens and do not define a second palette.
+ */
+:root {
+  --app-font-family: Arial, Helvetica, sans-serif;
+  --app-link-color: #00bc8c;
+  --archives-dropdown-menu-bg-color: #fff;
+  --archives-dropdown-menu-color: #222222;
+  --avatar-gear-icon-padding: 5px 5.5px;
+  --black: #000;
+  --blue: #375a7f;
+  --breakpoint-lg: 992px;
+  --breakpoint-md: 768px;
+  --breakpoint-sm: 576px;
+  --breakpoint-xl: 1200px;
+  --breakpoint-xs: 0;
+  --brown: #555;
+  --checkbox-bg-color: #00bc8c;
+  --cyan: #3498db;
+  --danger: #e74c3c;
+  --dark: #adb5bd;
+  --dark-black: #222;
+  --dark-brown: #4b4b4b;
+  --dark-gray: #aaa;
+  --darkTheme-chat-bg: #000;
+  --darkTheme-date-color: #8394a9;
+  --darkTheme-mobileApp-info-color: #f4f4f4;
+  --darkTheme-msg-bg: #000;
+  --darkTheme-msg-border-color: #393939;
+  --darkTheme-msg-color: #f7fd37;
+  --darkTheme-msgs-bg: #111;
+  --darkTheme-msgs-bg-adm: #000;
+  --darkTheme-msgs-separator-bg: #222;
+  --darkTheme-msgs-separator-border-color: #373c42;
+  --darkTheme-msgs-separator-color: #aaa;
+  --darkTheme-nickname-color: #c0d8ed;
+  --darkTheme-roster-bg: #111;
+  --darkTheme-roster-bg-adm: #000;
+  --darkTheme-sidebar-wrapper-bg-color: #000;
+  --darkTheme-sidebar-wrapper-color: #f4f4f4;
+  --darkTheme-textarea-bg: #111;
+  --darkTheme-textarea-color: #eee;
+  --darkTheme-user-location-color: #f7fd37;
+  --darkTheme-username-color: #c0d8ed;
+  --darker-black: #111;
+  --darker-gray: #aaa6a6;
+  --dropdown-divider-bg: #e9ecef;
+  --file-delete-bg: #e74c3c;
+  --file-download-bg: #00bc8c;
+  --file-list-even-bg: #f4f4f4;
+  --file-list-odd-bg: #fff;
+  --file-name-color: #333;
+  --file-searchbar-bg: #fff;
+  --file-searchbar-color: #b7b7b7;
+  --file-searchbar-icon-color: #666666;
+  --file-see-more-bg: #375a7f;
+  --file-size-color: #b2b2b2;
+  --fire-yellow: #f7fd37;
+  --font-family-monospace:
+    SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+  --font-family-sans-serif:
+    'Lato', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
+    sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol';
+  --gray: #bbb;
+  --gray-dark: #303030;
+  --green: #00bc8c;
+  --indigo: #6610f2;
+  --info: #3498db;
+  --light: #303030;
+  --light-black: #373c42;
+  --light-blue: #40e0d0;
+  --light-brown: #8c8686;
+  --light-gray: #ccc;
+  --light-green: #1edd6e;
+  --lightTheme-chat-bg: #eee;
+  --lightTheme-date-color: #8394a9;
+  --lightTheme-mobileApp-info-color: #676767;
+  --lightTheme-msg-bg: #d9d9d9;
+  --lightTheme-msg-border-color: #d9d9d9;
+  --lightTheme-msg-color: #1a1a1a;
+  --lightTheme-msgs-bg: #f1f1f1;
+  --lightTheme-msgs-bg-adm: #e1e1e1;
+  --lightTheme-msgs-separator-bg: #e8e8e8;
+  --lightTheme-msgs-separator-border-color: #373c42;
+  --lightTheme-msgs-separator-color: #373c42;
+  --lightTheme-nickname-color: #676767;
+  --lightTheme-roster-bg: #f1f1f1;
+  --lightTheme-roster-bg-adm: #e1e1e1;
+  --lightTheme-sidebar-wrapper-bg-color: #fff;
+  --lightTheme-sidebar-wrapper-color: #676767;
+  --lightTheme-textarea-bg: #fff;
+  --lightTheme-textarea-color: #555;
+  --lightTheme-user-location-color: #676767;
+  --lightTheme-username-color: #000;
+  --lighter-black: #3e444a;
+  --lighter-blue: #edf2f6;
+  --lighter-gray: #eee;
+  --mobileApp-info-bg-color: transparent;
+  --mobileApp-info-color: #676767;
+  --modal-active-tab-bg-color: #222;
+  --modal-active-tab-border-color: #444;
+  --modal-active-tab-color: #00bc8c;
+  --modal-alert-link-color: #00bc8c;
+  --modal-btn-close-bg: #375a7f;
+  --modal-btn-close-border: #375a7f;
+  --modal-btn-danger-bg: #e74c3c;
+  --modal-btn-danger-border: #e74c3c;
+  --modal-btn-hover-opacity: 0.9;
+  --modal-btn-success-bg: #00bc8c;
+  --modal-btn-success-border: #00bc8c;
+  --modal-content-bg-color: #303030;
+  --modal-content-border-color: #444;
+  --modal-content-color: #fff;
+  --modal-input-group-bg: #444;
+  --modal-tabs-border-color: #444;
+  --modal-upload-files-color: #555;
+  --msgs-header-bg: #111;
+  --msgs-header-color: #ccc;
+  --msgs-separator-bg: #e8e8e8;
+  --msgs-separator-border-color: #373c42;
+  --msgs-separator-color: #373c42;
+  --msgs-separator-border-width: 1px;
+  --msgs-separator-date-font-style: italic;
+  --msgs-separator-date-font-weight: 600;
+  --name-color: #c0d8ed;
+  --navbar-bg: #000;
+  --navbar-color: #fff;
+  --note-delete-bg: #e74c3c;
+  --note-download-bg: #00bc8c;
+  --note-next-bg: #375a7f;
+  --note-options-bg: #111;
+  --note-options-color: #fff;
+  --note-options-hover-color: #cccc;
+  --note-tabs-color: #00bc8c;
+  --note-text-bg: #222;
+  --note-text-color: #ccc;
+  --notes-tabs-bg: #111;
+  --orange: #fd7e14;
+  --pink: #e83e8c;
+  --presenter-area-bg: #111;
+  --presenter-noRecording-color: #f7fd37;
+  --presenter-recording-color: #f00;
+  --primary: #375a7f;
+  --ptr-website-link-color: #00bc8c;
+  --purple: #6f42c1;
+  --red: #f00;
+  --reload-icon-bg-color: #00bc8c;
+  --reload-icon-color: #fff;
+  --rosterImg-border-radius: 0;
+  --search-icon-bg-color: #adb5bd;
+  --search-icon-color: #222;
+  --secondary: #444;
+  --session-control-dropdown-bg: #222;
+  --sidebar-menu-active-color: #f7fd37;
+  --sidebar-menu-bg: #000;
+  --sidebar-menu-color: #ccc;
+  --sidebar-navItem-border-color: transparent;
+  --split-gutter-bg: #000;
+  --split-gutter-color: #fff;
+  --split-gutter-horizontal-image: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAB4AAAAFCAMAAABl/6zIAAAABlBMVEUAAADMzMzIT8AyAAAAAXRSTlMAQObYZgAAABRJREFUeAFjYGRkwIMJSeMHlBkOABP7AEGzSuPKAAAAAElFTkSuQmCC');
+  --split-gutter-vertical-image: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAUAAAAeCAYAAADkftS9AAAAIklEQVQoU2M4c+bMfxAGAgYYmwGrIIiDjrELjpo5aiZeMwF+yNnOs5KSvgAAAABJRU5ErkJggg==');
+  --success: #00bc8c;
+  --tab-active-bg: #222;
+  --tabs-border-color: #444;
+  --tabs-color: #fff;
+  --tabs-dropdown-bg: #323232;
+  --tabs-dropdown-color: #777;
+  --teal: #20c997;
+  --textarea-bg: #111;
+  --textarea-holder-border-color: #fff;
+  --textarea-holder-btns-color: #bbb;
+  --transparent-gray: rgba(255, 255, 255, 0.331);
+  --users-badge-bg-color: #375a7f;
+  --users-badge-color: #fff;
+  --users-border-color: #000;
+  --users-color: #fff;
+  --warning: #f39c12;
+  --white: #fff;
+  --yellow: #ff0;
+
+  --layout-topbar-height: 49px;
+  --layout-sidebar-width: 250px;
+  /*
+   * Angular Split emitted these exact formulas in the baseline capture.
+   * Keep the percentage and gutter compensation together so the proportions
+   * remain faithful when the viewport changes.
+   */
+  --layout-primary-column: calc(35.1974% - 3.87171px);
+  --layout-presentation-column: calc(64.8026% - 7.12829px);
+  --layout-split-gutter: 11px;
+  --layout-alerts-row: calc(40.1365% - 4.41502px);
+  --layout-chat-row: calc(59.8635% - 6.58498px);
+  --layout-panel-header: 48px;
+  --layout-composer-height: 45px;
+  --layout-tab-height: 40.5px;
+  --layout-baseline-width: 1842;
+  --layout-baseline-height: 1265;
+
+  /* Computed colors present in the captured element styles. */
+  --capture-body-color: #212529;
+  --capture-bootstrap-primary: #0d6efd;
+  --capture-bootstrap-border: #fafafa;
+  --capture-bs-danger: #dc3545;
+  --capture-bs-info: #0dcaf0;
+  --capture-bs-light: #f8f9fa;
+  --capture-bs-secondary: #6c757d;
+  --capture-bs-warning: #ffc107;
+  --capture-modal-outer-border: rgba(0, 0, 0, 0.176);
+  --capture-close-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%23000'%3e%3cpath d='M.293.293a1 1 0 0 1 1.414 0L8 6.586 14.293.293a1 1 0 1 1 1.414 1.414L9.414 8l6.293 6.293a1 1 0 0 1-1.414 1.414L8 9.414l-6.293 6.293a1 1 0 0 1-1.414-1.414L6.586 8 .293 1.707a1 1 0 0 1 0-1.414z'/%3e%3c/svg%3e");
+  --topbar-icon-color: #abb0b5;
+  --debug-log-bg: #ebebeb;
+  --emoji-input-bg: #333;
+  --emoji-heading-color: #ddd;
+  --shadow-menu: 0 4px 12px rgba(0, 0, 0, 0.18);
+  --shadow-user-menu: 0 5px 16px rgba(0, 0, 0, 0.18);
+  --shadow-popover: 0 5px 15px rgba(0, 0, 0, 0.3);
+  --shadow-dropdown: 0 8px 18px rgba(0, 0, 0, 0.3);
+}
+
+/*
+ * One separator contract serves Alert and Chat.
+ * The color variables above are switched by the captured lightTheme/darkTheme
+ * rules. The border width matches the captured message divider, and the date
+ * weight matches the captured .created-at weight.
+ */
+app-st-message .separator:not(:root) {
+  border-top: var(--msgs-separator-border-width) solid var(--msg-border-color);
+}
+
+app-st-message .separator:not(:root) a:not(:root) {
+  font-style: var(--msgs-separator-date-font-style);
+  font-weight: var(--msgs-separator-date-font-weight);
+}
+
+/*
+ * The captured theme mapping, ported verbatim.
+ *
+ * `css/complete-app-styles.css` carries `.lightTheme` and `.darkTheme` blocks that map twenty
+ * UNPREFIXED variables onto their theme-prefixed values. This repository defined the prefixed ones
+ * and used them directly, but never ported the mapping - so every unprefixed `var(--...)` was
+ * undefined.
+ *
+ * That is not cosmetic. `src/lib/styles/captured-runtime-components.css` is GENERATED from the
+ * capture and therefore uses the capture's own unprefixed names: 18 of the 72 variables it
+ * referenced resolved to nothing. The visible symptom was a chat message rendering WHITE - it
+ * carries `msg-box-adm`, whose captured rule is `background-color: var(--msgs-bg-adm)`, and with
+ * that undefined the declaration was simply dropped.
+ *
+ * Defining them here rather than patching each rule is the fix at the right level: every generated
+ * captured rule resolves, and the theme switch keeps working because the values still come from
+ * the prefixed tokens above.
+ */
+.lightTheme {
+  --msg-bg: var(--lightTheme-msg-bg);
+  --msg-border-color: var(--lightTheme-msg-border-color);
+  --date-color: var(--lightTheme-date-color);
+  --msg-color: var(--lightTheme-msg-color);
+  --username-color: var(--lightTheme-username-color);
+  --msgs-bg: var(--lightTheme-msgs-bg);
+  --roster-bg: var(--lightTheme-roster-bg);
+  --msgs-bg-adm: var(--lightTheme-msgs-bg-adm);
+  --roster-bg-adm: var(--lightTheme-roster-bg-adm);
+  --textarea-color: var(--lightTheme-textarea-color);
+  --textarea-bg: var(--lightTheme-textarea-bg);
+  --user-location-color: var(--lightTheme-user-location-color);
+  --sidebar-wrapper-bg-color: var(--lightTheme-sidebar-wrapper-bg-color);
+  --sidebar-wrapper-color: var(--lightTheme-sidebar-wrapper-color);
+  --nickname-color: var(--lightTheme-nickname-color);
+  --mobileApp-info-color: var(--lightTheme-mobileApp-info-color);
+  --msgs-separator-color: var(--lightTheme-msgs-separator-color);
+  --msgs-separator-border-color: var(--lightTheme-msgs-separator-border-color);
+  --msgs-separator-bg: var(--lightTheme-msgs-separator-bg);
+  --chat-bg: var(--lightTheme-chat-bg);
+}
+
+.darkTheme {
+  --msg-bg: var(--darkTheme-msg-bg);
+  --msg-border-color: var(--darkTheme-msg-border-color);
+  --date-color: var(--darkTheme-date-color);
+  --msg-color: var(--darkTheme-msg-color);
+  --username-color: var(--darkTheme-username-color);
+  --msgs-bg: var(--darkTheme-msgs-bg);
+  --roster-bg: var(--darkTheme-roster-bg);
+  --msgs-bg-adm: var(--darkTheme-msgs-bg-adm);
+  --roster-bg-adm: var(--darkTheme-roster-bg-adm);
+  --textarea-color: var(--darkTheme-textarea-color);
+  --textarea-bg: var(--darkTheme-textarea-bg);
+  --user-location-color: var(--darkTheme-user-location-color);
+  --sidebar-wrapper-bg-color: var(--darkTheme-sidebar-wrapper-bg-color);
+  --sidebar-wrapper-color: var(--darkTheme-sidebar-wrapper-color);
+  --nickname-color: var(--darkTheme-nickname-color);
+  --mobileApp-info-color: var(--darkTheme-mobileApp-info-color);
+  --msgs-separator-color: var(--darkTheme-msgs-separator-color);
+  --msgs-separator-border-color: var(--darkTheme-msgs-separator-border-color);
+  --msgs-separator-bg: var(--darkTheme-msgs-separator-bg);
+  --chat-bg: var(--darkTheme-chat-bg);
+}

@@ -1,0 +1,3099 @@
+@import '../css/complete-app-styles.css';
+@import '@fortawesome/fontawesome-free/css/all.min.css';
+@import 'animate.css/animate.min.css';
+@import './lib/styles/tokens.css';
+@import './lib/styles/captured-runtime-components.css';
+
+.fa-disk::before,
+.fa-floppy-o::before {
+  content: '\f0c7';
+}
+
+/*
+  The icon faces are deliberately left with the upstream `font-display` from
+  css/complete-app-styles.css and @fortawesome/fontawesome-free. Re-declaring them here as
+  `optional` did remove the last 0.0019 of layout shift, but `optional` also permits the browser to
+  skip a face entirely for any load it judges too slow - which renders every `.fas`/`.far`/`.fab`
+  glyph from the fallback for that whole page view, so the icons differ from one reload to the
+  next. Correct glyphs on every load beat 0.0019 of CLS. The race is instead shortened from
+  +layout.svelte, which preloads the three woff2 files so they are in the cache before first paint.
+*/
+
+:root {
+  font-family: var(--app-font-family);
+  font-synthesis: none;
+  color-scheme: light;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/*
+  Carried over from the captured shell's inline <style>, which sets these on BOTH html and body:
+  `background-color: #fff; overflow: hidden !important`, plus the iOS viewport-height workaround
+  (`min-height: -webkit-fill-available` / `height: -webkit-fill-available`). On iOS Safari 100vh
+  resolves to the viewport *without* the browser chrome, so a 100vh app is taller than the visible
+  area and the bottom of the room - the composer - sits under the toolbar. The -webkit-fill-available
+  fallback follows the declaration it overrides, so browsers without it keep the 100vh value.
+*/
+html,
+body {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden !important;
+  background-color: var(--white);
+}
+
+html {
+  height: -webkit-fill-available !important;
+}
+
+body {
+  min-height: 100vh !important;
+  min-height: -webkit-fill-available !important;
+  color: var(--capture-body-color);
+  background: var(--white);
+  font-family: var(--app-font-family);
+  font-size: 16px;
+  font-weight: 300;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+.video-player-delete-btn:hover {
+  opacity: 0.85;
+  cursor: pointer;
+}
+
+.room-video-player {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  vertical-align: top;
+  max-height: calc(100vh - 140px);
+}
+
+.video-player-btns button {
+  width: 100px;
+  padding: 2px 4px;
+  font-size: 12px;
+}
+
+.videoPlayerUrl-iframe {
+  width: 100%;
+  height: 90%;
+}
+
+#topRoomDiv {
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+}
+
+app-root,
+#topRoomDiv {
+  display: block;
+}
+
+.webcamsHolderScreen,
+.recsHolderScreen {
+  position: fixed;
+  z-index: 100;
+  right: 0;
+  width: 350px;
+  height: 260px;
+  flex-direction: column;
+  padding: 0;
+  color: var(--capture-body-color);
+  border: 1px solid var(--capture-bootstrap-border);
+  border-radius: 6px;
+  background: var(--black);
+  cursor: move;
+}
+
+.webcamsHolderScreen {
+  bottom: 0;
+}
+
+.recsHolderScreen {
+  bottom: 265px;
+  display: none;
+}
+
+.webcamsHolderScreen > .card-body,
+.recsHolderScreen > .card-body {
+  width: 100%;
+  height: 100%;
+  padding: 0;
+}
+
+.webcamsHolderScreen .card-title,
+.recsHolderScreen .card-title {
+  margin: 0;
+  padding: 5px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 14.4px;
+}
+
+.webcamsHolderScreen #dropdownBasic1 {
+  padding: 6px 12px;
+  color: var(--msgs-header-color);
+  border: 1px solid var(--capture-body-color);
+  border-radius: 6px;
+  background: transparent;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 18px;
+}
+
+.webcamsHolderScreen [ngbdropdownmenu] {
+  top: 100%;
+  left: 0;
+  min-width: 160px;
+  padding: 8px 0;
+  color: var(--capture-body-color);
+  border: 1px solid var(--capture-modal-outer-border);
+  border-radius: 6px;
+  background: var(--white);
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 19.2px;
+}
+
+.webcamPreviewScreen {
+  width: 100%;
+  height: auto;
+  max-height: calc(100% - 42px);
+  padding: 3px;
+  object-fit: contain;
+}
+
+#mainAreaSplit.is-resizing {
+  user-select: none;
+}
+
+.alert-chat-box {
+  min-width: 0;
+  display: block;
+  overflow-x: hidden;
+  overflow-y: hidden;
+}
+
+/*
+  These split areas are fixed-height flex panes whose inner `app-roomscroller` owns the scrolling.
+  captured-runtime-components.css:6702 gives every split area `overflow: hidden auto` at
+  specificity (0,2,1), which nested three scroll containers around each message list: the wheel was
+  captured twice and the browser would not resolve the list's initial scroll position, so the list
+  painted at the top and was scrolled down by script afterwards. Matching that selector's shape is
+  what it takes to win the cascade - the plainer `.alert-chat-box` / `as-split-area.alert-box`
+  forms are (0,1,0) and (0,1,1) and silently lose. The panes clip instead; their content is
+  already sized to fill them exactly, so nothing becomes unreachable.
+*/
+as-split:not(:root) > .as-split-area.alert-chat-box,
+as-split:not(:root) > .as-split-area.alert-box,
+as-split:not(:root) > .as-split-area.chat-box {
+  overflow: hidden;
+}
+
+.alert-chat-box > as-split {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow-x: hidden;
+  overflow-y: hidden;
+}
+
+as-split-area.alert-box,
+as-split-area.chat-box {
+  min-height: 0;
+  display: block;
+  overflow-x: hidden;
+  overflow-y: hidden;
+}
+
+.alerts-panel,
+.chat-panel {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.horizontal-gutter,
+.vertical-gutter {
+  background: var(--split-gutter-bg);
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+.as-split-gutter {
+  display: flex;
+  flex: 0 0 var(--layout-split-gutter);
+  color: var(--white);
+  outline: 0;
+  background-color: var(--split-gutter-bg);
+  background-position: center;
+  background-repeat: no-repeat;
+  touch-action: none;
+}
+
+.as-split-gutter[aria-orientation='horizontal'] {
+  flex-direction: row;
+  cursor: col-resize;
+}
+
+.as-split-gutter[aria-orientation='vertical'] {
+  flex-direction: column;
+  cursor: row-resize;
+}
+
+.as-split-gutter-icon {
+  width: 100%;
+  height: 100%;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+.as-split-gutter[aria-orientation='horizontal'] > .as-split-gutter-icon {
+  background-image: var(--split-gutter-vertical-image);
+}
+
+.as-split-gutter[aria-orientation='vertical'] > .as-split-gutter-icon {
+  background-image: var(--split-gutter-horizontal-image);
+}
+
+app-alerts > .chat,
+app-chat > .chat {
+  width: 100%;
+  height: 100%;
+}
+
+/*
+  The alert and chat panel headers.
+ 
+  `min-height`, not `height`, and `flex: 0 0 auto`, not a fixed basis.
+ 
+  The captured stylesheet has NO `.bs-component` rule - this box is ours, and 48px is the height it
+  measured at one wide viewport. The header holds a nav that WRAPS: the title, the tab strip, the
+  search field and the gear. Narrow the room and that nav needs ~120px, measured, while the box
+  stayed clamped at 48px - so the header's own controls painted straight through the message list
+  underneath. Locking the flex basis to the same variable made it worse by refusing to grow even
+  when the column had room.
+ 
+  Keeping the captured 48px as a floor preserves the wide-viewport rendering exactly, and lets the
+  header take the height it actually needs below that.
+*/
+app-alerts .bs-component,
+app-chat .bs-component {
+  width: 100%;
+  min-height: var(--layout-panel-header);
+  flex: 0 0 auto;
+}
+
+app-roomscroller {
+  min-height: 0;
+  display: block;
+  flex: 1 1 auto;
+}
+
+/*
+  The alert and chat lists are pinned to the newest message. Doing that from script means the
+  server-rendered list paints at scrollTop 0 and is then scrolled down after first paint - traced
+  at 1512x900 as alerts 0 -> 723 and chat 0 -> 294, roughly 70-230ms after FCP. That is invisible
+  to CLS (a scroll is not a layout shift) but it is exactly the "messages jump up and down on
+  reload" the panel headers never show, because the headers sit outside the scroller.
+
+  `scroll-initial-target` is resolved during the scroll container's FIRST layout, so the list is
+  already at the bottom when it is painted. The $effect in +page.svelte still performs the same
+  scroll and remains the fallback for engines that do not support this property yet; where it is
+  supported the container is already there and the assignment is a no-op.
+
+  It sits on `.msg-box` rather than on `app-st-message` itself: the latter is an unknown element,
+  so it computes to `display: inline`, and the property is ignored on an inline box.
+*/
+app-roomscroller > div > *:last-child > .msg-box {
+  scroll-initial-target: nearest;
+}
+
+/*
+ * The alert card must not be the same colour as the panel it sits on.
+ *
+ * Owner-specified 2026-08-04: the alerts PANEL is #F1F1F1 and an ALERT is #E8E8E8, one step
+ * darker, so a card reads as a card. Measured before this rule: `#chatScrollViewParentAlerts`
+ * and its `.msg-box` children both computed `rgb(241, 241, 241)` - identical, so alerts had no
+ * edge against the surface at all.
+ *
+ * Why it is set here rather than left to the captured variables: the capture routes `.msg-box`
+ * through `--msgs-bg`, which IS `#f1f1f1` (`--lightTheme-msgs-bg`), the same token the panel
+ * uses. Its only darker message token is `--msgs-bg-adm: #e1e1e1`, reached through
+ * `.msg-box-adm`, and the captured fixture carries that class on 6 of 6 admin CHAT messages and
+ * on 0 of 8 alerts - so the alerts panel never picks it up. `#e8e8e8` appears in the captured
+ * variable table only as `--msgs-separator-bg`, the day separator. None of those three routes
+ * gives an alert card #E8E8E8, so this is an explicit owner decision recorded as one, not a
+ * transcription.
+ *
+ * Scoped to the alerts scroller and to the light theme: the dark theme's panel is #111 and was
+ * not part of the instruction, so it is left on the captured variables untouched.
+ *
+ * Pinned by `src/lib/alerts-background-contract.test.ts`. If a later edit moves either value,
+ * that test fails rather than the colours silently drifting back together.
+ */
+.lightTheme #chatScrollViewParentAlerts .msg-box {
+  background-color: #e8e8e8;
+}
+
+#chatScrollViewParentAlerts {
+  background: var(--lightTheme-msgs-bg);
+}
+
+app-chat > .chat {
+  color: var(--msgs-header-color);
+  background: var(--lightTheme-chat-bg);
+}
+
+app-chat app-roomscroller {
+  background: var(--lightTheme-msgs-bg);
+}
+
+.vertical-gutter {
+  cursor: col-resize;
+  background-image: var(--split-gutter-vertical-image);
+}
+
+.horizontal-gutter {
+  cursor: row-resize;
+  background-image: var(--split-gutter-horizontal-image);
+}
+
+.panel-header {
+  position: relative;
+  /* Same reason as `.bs-component` above: a wrapping header must be allowed to grow. */
+  flex: 0 0 auto;
+  min-height: var(--layout-panel-header);
+  display: flex;
+  align-items: center;
+  color: var(--msgs-header-color);
+  background: var(--msgs-header-bg);
+}
+
+.panel-title {
+  height: 40px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 8px;
+  padding: 5px 0;
+  color: var(--light-gray);
+  border: 0;
+  background: transparent;
+  font-size: 20px;
+  font-weight: 300;
+}
+
+.panel-tools {
+  width: 61.1px;
+  flex: 0 0 61.1px;
+  display: flex;
+  align-items: center;
+  gap: 0;
+  margin-left: auto;
+  margin-right: 4px;
+}
+
+.panel-tools button {
+  width: 16px;
+  height: 24px;
+  padding: 0;
+  color: var(--light-gray);
+  border: 0;
+  background: transparent;
+}
+
+.panel-tools button:first-child {
+  margin: 0 4px;
+}
+
+.panel-tools .settings-tool {
+  width: 29.1px;
+  display: flex;
+  align-items: center;
+  margin-left: 8px;
+}
+
+.settings-tool::after {
+  width: 0;
+  height: 0;
+  margin-left: 4px;
+  border-top: 4px solid;
+  border-right: 4px solid transparent;
+  border-left: 4px solid transparent;
+  content: '';
+}
+
+.messages-area {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  background: var(--lightTheme-msgs-bg);
+}
+
+.chat-panel {
+  background: var(--lightTheme-chat-bg);
+}
+
+.chat-header {
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.chat-room-icon {
+  flex: 0 0 16px;
+  width: 16px;
+  height: 16px;
+  margin-left: 8px;
+  margin-right: 4px;
+  font-size: 16px;
+  line-height: 16px;
+}
+
+.chat-tabs {
+  flex: 1;
+  height: 33px;
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  border-bottom: 1px solid var(--tabs-border-color);
+}
+
+.chat-tabs button {
+  height: 33px;
+  margin-right: 5px;
+  padding: 8px 5px 5px;
+  color: var(--light-gray);
+  border: 1px solid transparent;
+  background: transparent;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 18px;
+}
+
+.chat-tabs button.active {
+  color: var(--success);
+  border-color: var(--tabs-border-color);
+  background: var(--dark-black);
+}
+
+.chat-tools {
+  flex: 0 0 58.1px;
+  width: 58.1px;
+  justify-content: flex-start;
+  gap: 0;
+  margin-left: 0;
+}
+
+.chat-tools button {
+  height: 19px;
+}
+
+.chat-tools .settings-tool {
+  width: 26.1px;
+}
+
+.chat-tools .settings-tool::after {
+  border-top-width: 3px;
+  border-right-width: 3px;
+  border-left-width: 3px;
+}
+
+.chat-messages {
+  background: var(--lightTheme-msgs-bg);
+}
+
+#textAreaHolder {
+  display: flex;
+  align-items: center;
+  margin: 5px;
+  padding: 5px;
+  border-radius: 8px;
+  background: var(--lightTheme-textarea-bg);
+}
+
+/*
+  These two wrappers are `min-height` rather than `height` so the composer can grow with
+  its textarea. The captured values came from an empty composer, where the two are
+  identical at 35px; as a fixed height they would have clipped the auto-expanded field
+  (see autoExpandComposer in +page.svelte) and left the scrollbar the growth removes.
+  The captured markup has no fixed height on .txt-area or #textAreaHolder at all.
+*/
+#textAreaHolder > .flex-fill {
+  min-height: 35px;
+  flex: 1 1 auto;
+}
+
+#textAreaHolder > .flex-fill > .flex-fill {
+  min-height: 35px;
+  flex: 1 1 auto;
+}
+
+#textAreaHolder textarea {
+  width: 100%;
+  height: 35px;
+  min-height: 35px;
+  max-height: 300px;
+  display: block;
+  padding: 6px 5px;
+  color: var(--lightTheme-textarea-color);
+  border: 0;
+  border-radius: 0;
+  outline: 0;
+  background: var(--lightTheme-textarea-bg);
+  box-shadow: none;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 21px;
+  resize: none;
+}
+
+#textAreaHolder textarea:focus {
+  color: var(--lightTheme-textarea-color);
+  border-color: var(--darker-gray);
+  outline: 0;
+  background: var(--lightTheme-textarea-bg);
+  box-shadow: 1px 1px 1px var(--darker-gray);
+}
+
+.textAreaBtnsCol {
+  flex: 0 1 auto;
+  width: auto;
+  height: 35px;
+  color: var(--dark-gray);
+  background: var(--white);
+}
+
+.textAreaBtns {
+  width: auto;
+  height: 34px;
+  display: block;
+  padding: 5px;
+  color: var(--textarea-holder-btns-color);
+  background: transparent;
+  font-size: 16px;
+  line-height: 24px;
+}
+
+/*
+  Which composer button set applies is a pure width question, so a container query answers it at
+  first paint instead of a ResizeObserver swapping it in after hydration, which reads as a flicker.
+
+  The captured rule is `offsetWidth >= 400` on `#textAreaHolder`'s single child. That child fills
+  the holder's content box, and the holder carries `padding: 5px` on each side (measured: holder
+  372.9px, child 362.9px), so the same condition on the container is `>= 410px`. `#textAreaHolder`
+  is a stretched flex item in a column, so its inline size never depends on its contents and
+  `container-type: inline-size` cannot change its geometry.
+*/
+#textAreaHolder {
+  container-type: inline-size;
+}
+
+.composer-options {
+  display: contents;
+}
+
+@container (width < 410px) {
+  .textAreaBtnsCol:not(.composer-options-forced) .composer-options {
+    display: none;
+  }
+}
+
+@container (width >= 410px) {
+  .composer-expand {
+    display: none;
+  }
+}
+
+.composer-options-forced .composer-expand {
+  display: none;
+}
+
+.popOverDiv .popover-body {
+  width: auto;
+  height: auto;
+  padding: 0;
+  overflow: visible;
+}
+
+/*
+  The emoji picker is styled almost entirely by the captured upstream stylesheet
+  (css/complete-app-styles.css, imported at the top of this file), which is fluid:
+  `.emoji-mart-anchor` is `flex: 1 1 auto`, `.emoji-mart-search input` is `width: 100%`,
+  and the preview/skins are centred with `top: 50%; transform: translateY(-50%)`.
+
+  The override block that used to live here re-derived those values as fixed pixels
+  (338/336/324px) taken from one capture. Four of them contradicted the capture and were
+  visible defects, measured against
+  first-dump/decoded/01-caps/53-emoji-popover:0/nodes.json:
+
+    - `.emoji-mart-preview-emoji { top: 10px }` kept upstream's `translateY(-50%)`, so the
+      preview emoji drew 25px high. Captured computed `top` is 35px.
+    - `.emoji-mart-preview-skins { top: 26px }` did the same, 9px high. Captured `top`: 35px.
+    - `.emoji-mart-anchor { padding: 12px }` against the captured `padding: 12px 4px`, which
+      pushed all nine category icons 8px right and cancelled `flex: 1 1 auto`.
+    - `.emoji-mart-category-label > span { padding: 5px 0 }` against the captured
+      `padding: 5px 6px`, drawing every category heading 6px too far left.
+
+  Everything else in the block computed to the value upstream already produced, so it is
+  gone rather than duplicated - duplicating it is what let the four above drift. Only the
+  two rules upstream genuinely lacks are kept.
+*/
+
+/*
+  Upstream declares `-apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif`, but
+  every one of the 5588 captured nodes computes `-apple-system, "system-ui", "Helvetica Neue",
+  sans-serif`. `system-ui` is quoted because that is how the capture records it: unquoted it
+  is the CSS-wide generic, quoted it is a family lookup by name, and the two resolve
+  differently off Apple platforms. The search input picks this up through `font: inherit`.
+*/
+.emoji-mart {
+  font-family: -apple-system, 'system-ui', 'Helvetica Neue', sans-serif;
+}
+
+/*
+  The clear button is disabled while the search box is empty, and the capture computes
+  `cursor: default` on it (nodes.json, .emoji-mart-search-icon). Without this the global
+  `button { cursor: pointer }` above shows a hand over a dead control.
+*/
+.emoji-mart-search-icon:disabled {
+  cursor: default;
+}
+
+.giphy-search {
+  width: 400px;
+  height: 700px;
+  overflow: hidden;
+  border: 2px solid var(--modal-content-bg-color);
+  background-color: rgb(255, 255, 255);
+}
+
+.giphy-search .input-group-text {
+  border: medium none currentcolor;
+  background-color: var(--modal-input-group-bg);
+}
+
+.giphy-search .fa-times {
+  padding: 10px;
+  font-size: 16.5px;
+}
+
+.giphy-search .fa-times:hover {
+  cursor: pointer;
+  opacity: 0.85;
+}
+
+.giphy-header {
+  padding: 10px;
+  background-color: var(--modal-content-bg-color);
+}
+
+.search-results {
+  height: 100%;
+  padding: 5px;
+  overflow-y: auto;
+}
+
+.gif-result {
+  text-align: center;
+}
+
+.gif-result img {
+  cursor: pointer;
+}
+
+.giphy-search li {
+  padding: 10px;
+}
+
+.giphy-search li:hover {
+  background-color: var(--modal-upload-files-color);
+}
+
+.giphy-search h4,
+.giphy-search h6 {
+  color: var(--modal-content-color);
+}
+
+.giphy-hr {
+  margin: 0 0 10px;
+  padding: 0;
+  color: rgb(255, 255, 255);
+}
+
+#filedrag {
+  width: 100%;
+  height: 30vh;
+  display: none;
+  margin: 1em 0;
+  padding: 1em 0;
+  color: var(--modal-upload-files-color);
+  border: 2px dashed var(--modal-upload-files-color);
+  border-radius: 7px;
+  cursor: default;
+  font-weight: 700;
+  text-align: center;
+}
+
+#filedrag.hover,
+#filedragAlert.hover {
+  border-style: solid;
+  box-shadow: 1px 1px 5px var(--modal-upload-files-color);
+}
+
+.fileList {
+  width: 100%;
+  height: 100%;
+  display: none;
+  max-height: 350px;
+  overflow-y: auto;
+}
+
+.fileList img {
+  max-width: 250px;
+  max-height: 250px;
+  padding: 10px;
+}
+
+.upload-area:hover {
+  cursor: pointer;
+}
+
+.presentation-box {
+  min-width: 0;
+  position: relative;
+  overflow: hidden;
+  background: var(--presenter-area-bg);
+}
+
+.bootbox.modal.show {
+  display: block;
+}
+
+.mainPresentationAreaHolder {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+/*
+  Layout correction: #mainTabs and #mainTabsContent are siblings, so `height: 100%` on the
+  content box made it overflow its parent by the tab bar's height (measured 40.5px), and the
+  same pattern inside #notes added another 41px. That pushed .noteOptions (Edit / Download /
+  Delete) to y=889.5..940.5 in a 900px viewport, i.e. off screen. Selector specificity matches
+  the generated captured-runtime-components.css rules these override.
+*/
+app-presentationarea .mainPresentationAreaHolder:not(:root) {
+  display: flex;
+  flex-direction: column;
+}
+
+app-presentationarea #mainTabsContent:not(:root) {
+  min-height: 0;
+  flex: 1 1 auto;
+  height: auto;
+}
+
+app-presentationarea #notes:not(:root).active {
+  display: flex;
+  flex-direction: column;
+}
+
+app-presentationarea #notesTabsContent:not(:root) {
+  min-height: 0;
+  flex: 1 1 auto;
+  height: auto;
+}
+
+/*
+  Stacking correction: contain the shared screen's `z-index: 1999`.
+
+  `.video-screen-container` carries `position: relative; z-index: 1999` verbatim from the captured
+  stylesheet, and that value is left alone here. The defect is not the number, it is that nothing
+  gave it a containing stacking context - neither the capture nor this repository puts
+  `z-index`, `transform`, `opacity`, `filter` or `isolation` on `app-presentationarea` or
+  `.mainPresentationAreaHolder`. So 1999 competed at the ROOT, against every layer Bootstrap
+  defines in the same captured sheet:
+
+      .video-screen-container  1999
+      .tooltip                 1070
+      .popover                 1060
+      .modal                   1050
+      .modal-backdrop          1040
+      .dropdown-menu           1000
+
+  A shared screen therefore painted over the screen-name dropdown and over any open modal. The
+  dropdown case is guaranteed rather than incidental: `ScreenTabs` renders immediately BEFORE
+  `#screensTabsContent`, so equal-or-lower z-index plus earlier DOM order loses twice.
+
+  Making `#screensTabsContent` a stacking context at `z-index: 0` scopes the 1999 to the video's
+  own subtree, where it still orders the video against its zoom controls exactly as captured, and
+  lets the dropdown and the modal win outside it. One rule, and no captured declaration is
+  altered - which matters because `.video-screen-container` is pinned by the CSS evidence
+  contract.
+*/
+app-presentationarea #screensTabsContent,
+app-presentationarea #streamsTabsContent {
+  position: relative;
+  z-index: 0;
+}
+
+/* The captured `calc(100% - 40px)` compensated for the same parent overflow; it is now a gap. */
+app-presentationarea #files:not(:root) {
+  height: 100%;
+}
+
+/*
+  Same correction, same cause, one level down. `#screensTabsContent` carries the captured
+  `height: calc(100% - 82px)`, and that 82 is TWO bars: 40.5px for the #mainTabs overflow above
+  (measured in the capture: #mainTabs y 49..89.5 h 40.5, #mainTabsContent y 89.5 h 1216 inside a
+  1216px holder) plus 41.5px for #screenTabs itself. The overflow half is already gone here - the
+  holder is a flex column and #mainTabsContent is `flex: 1 1 auto` (above) - so subtracting 82
+  double-counts the main bar and leaves a dead band the height of #mainTabs at the bottom of the
+  video (measured here: 81px of dead band with the bar collapsed to 1px; 0px after both
+  corrections - #screenTabs y 89.5 h 40, #screensTabsContent bottom 913, holder bottom 913).
+  An intermediate figure for "bar restored, this override absent" was previously quoted here as
+  40px; it was not reproducible on re-measurement and has been dropped rather than corrected,
+  because only the start and end states were actually observed.
+
+  Reserving the bar's real height instead of a hard-coded 41 also survives `flex-wrap: wrap` on
+  `.nav nav-tabs`, which the captured calc did not.
+*/
+app-presentationarea #screens:not(:root).active {
+  display: flex;
+  flex-direction: column;
+}
+
+app-presentationarea #screensTabsContent:not(:root) {
+  min-height: 0;
+  flex: 1 1 auto;
+  height: auto;
+}
+
+/*
+ * The webcam preview, restored to the captured rules.
+ *
+ * `app-webcam-holder`'s entire stylesheet is one declaration
+ * (`docs/source/components/app-webcam-holder.component.css`):
+ *
+ *   .webcam-wrapper {
+  position: absolute;
+  bottom: 0;
+}
+ *
+ * This sheet had added `right: 0; left: 0; width: 100%; HEIGHT: 0`, and `height: 0` is what made
+ * the preview impossible to see: measured with a live camera attached, the card was a real
+ * 320x240 box but its wrapper computed 0px tall at y 913 in a 913px viewport, so the whole
+ * holder sat on the bottom edge with no room. `app-presenter-cams` was additionally forced to
+ * `width: 0; height: 0`, which collapsed the flex item around the card as well.
+ *
+ * `.webcamsHolder`'s captured rule, from `app-presenter-cams`' own stylesheet, is:
+ *
+ *   .webcamsHolder { position: absolute; z-index: 105; border: 1px solid yellowgreen;
+ *                    cursor: move; background-color: #000; width: 320px; height: 240px;
+ *                    margin: 5px }
+ *
+ * It declares NO `top`, `bottom` or `left`: the card sits at its static position and is then
+ * MOVED, by `initDrag()` and by whatever position was persisted. This sheet had pinned it to
+ * `bottom: -250px; left: 50%`, i.e. 250px below its containing block. `cursor: move` is part of
+ * the captured rule and is the visible half of the drag contract.
+ */
+.webcam-wrapper {
+  position: absolute;
+  bottom: 0;
+  /*
+   * Height is DERIVED, not invented: 240px card + its captured 5px margin top and bottom.
+   *
+   * The captured rule is `position: absolute; bottom: 0` alone, and that is enough THERE because
+   * the capture moves each card with `initDrag()` - jQuery UI writes top/left from localStorage
+   * and then calls `.show()`. On a first load with nothing stored, the card falls at its static
+   * position instead, and a zero-height wrapper pinned to `bottom: 0` puts that static position
+   * ON the bottom edge: measured at y 918 in a 913px viewport, i.e. the whole 240px card below
+   * the fold.
+   *
+   * Giving the wrapper the card's own box height moves that static position up by exactly one
+   * card, so the preview lands fully on screen before anyone drags it. The wrapper is absolutely
+   * positioned, so this reserves no space in the layout.
+   */
+  height: 250px;
+}
+
+app-presenter-cams {
+  display: block;
+}
+
+.webcamsHolder {
+  position: absolute;
+  z-index: 105;
+  width: 320px;
+  height: 240px;
+  margin: 5px;
+  cursor: move;
+  overflow: visible;
+  background: var(--black);
+}
+
+.webcamsHolderVideo {
+  width: 318px;
+  height: 238px;
+}
+
+/*
+ * The card header is the capture's, not a new one.
+ *
+ * `app-presenter-cams`' own stylesheet already designs it, and those rules are applied here via
+ * `src/lib/styles/captured-runtime-components.css`:
+ *
+ *   .pNameLabel { background-color: #00000080; color: #fff; text-align: center; width: 100% }
+ *   .overlay    { position: absolute; top: 0; left: 0; right: 0; z-index: 101 }
+ *   .closeIcon  { position: absolute; right: 5px; z-index: 102 }
+ *   .closeIcon:hover { cursor: pointer }
+ *
+ * A translucent black band across the top, centred white name, close icon pinned 5px from the
+ * right. This sheet had been suppressing all three:
+ *
+ *   .webcamsHolder > .overlay  { top: 1px; right: 1px; left: 1px; HEIGHT: 0 }
+ *   .webcamsHolder .pNameLabel { HEIGHT: 0 }
+ *   .webcamsHolder .closeIcon  { float: right }
+ *
+ * None of that is captured. `height: 0` on the label is why the name floated over the video with
+ * no band behind it - measured, the h5 computed 318x0 while carrying "Billy Ribeiro" at
+ * font-size 20px / line-height 24px. Removing our three overrides is the whole fix; the captured
+ * rules then apply on their own.
+ *
+ * The green border is a separate, deliberate departure. `.webcamsHolder` carries
+ * `border: 1px solid yellowgreen` in the capture, and the owner asked for it gone (2026-08-04).
+ * Recorded as an owner override rather than a transcription, and scoped to beat the generated
+ * rule's specificity - `app-presenter-cams .webcamsHolder:not(:root)` is 0-2-1, so this matches
+ * at 0-2-1 and wins on order, since app.css imports the generated sheet at line 5 and cascades
+ * after it.
+ */
+app-presenter-cams .card.webcamsHolder {
+  border: 0;
+}
+
+#mp3player {
+  display: none;
+}
+
+app-privchat.privChatHolder {
+  position: fixed;
+  z-index: 500;
+  bottom: 0;
+  left: 50%;
+  width: 600px;
+  max-width: calc(100vw - 100px);
+  height: 400px;
+  max-height: calc(100vh - 50px);
+  display: none;
+  overflow: visible;
+  color: var(--capture-body-color);
+  border: 1px solid rgb(133, 133, 133);
+  border-radius: 4px;
+  background: var(--black);
+  font-size: 14px;
+  line-height: 21px;
+}
+
+.pc-body {
+  overflow: hidden;
+  color: rgb(33, 37, 41);
+  background: var(--lightTheme-msgs-bg);
+  font-size: 14px;
+  line-height: 21px;
+}
+
+.notConnectedOverlay {
+  position: absolute;
+  z-index: 10000;
+  right: 5px;
+  bottom: 5px;
+  color: var(--darkTheme-msg-color);
+  background: var(--black);
+  opacity: 0.7;
+}
+
+#mainTabs {
+  /*
+    The main tab strip wraps below ~600px, where the capture also shrinks it
+    (`@media only screen and (max-width: 600px) { .mainTabset .nav-link { padding: .5rem;
+    font-size: 12px; line-height: 12px } }`). A fixed height clips the second row.
+  */
+  min-height: var(--layout-tab-height);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin: 0;
+  padding: 0;
+  border-bottom: 1px solid transparent;
+  list-style: none;
+}
+
+#mainTabs li {
+  list-style: none;
+}
+
+#mainTabs li[hidden] {
+  display: none;
+}
+
+#mainTabs > li > a {
+  display: block;
+  margin: 5px;
+  padding: 8px;
+  color: var(--white);
+  border: 1px solid transparent;
+  border-radius: 6px 6px 0 0;
+  background: transparent;
+  font-size: 12px;
+  font-weight: 300;
+  line-height: 12px;
+  cursor: pointer;
+}
+
+#mainTabs > li > a > div {
+  display: flex;
+  align-items: center;
+}
+
+#mainTabs > li > a .ml-1 {
+  margin-left: 4px;
+}
+
+#mainTabs > li > a .mx-1 {
+  margin-right: 4px;
+  margin-left: 4px;
+}
+
+#mainTabs > li > a.active {
+  color: var(--note-tabs-color);
+  border-color: transparent;
+  border-radius: 3px;
+  background-color: var(--tab-active-bg);
+}
+
+#mainTabs > li > a.presAreaTabs-notes.active {
+  position: relative;
+  z-index: 10;
+  margin-bottom: -1px;
+  padding-bottom: 15px;
+  border-color: var(--tabs-border-color);
+  border-bottom-color: transparent;
+  border-radius: 3px 3px 0 0;
+  background-color: var(--notes-tabs-bg);
+}
+
+#mainTabsContent {
+  min-height: 0;
+  flex: 1 1 auto;
+  /*
+   * No `overflow: hidden`. The captured rule for this element is height only -
+   * `#mainTabsContent{height:100%}` in `app-presentationarea.component.css`, grouped with #screens,
+   * #streams and #notes - and the omission is what lets the zoom trio be seen at all.
+   *
+   * The trio is `position:absolute` at `.zoom-controls{top:-33px}`, drawn into the row ABOVE its
+   * container: measured at y63 while this element begins at y89. Any clipping ancestor removes it,
+   * and there were two - `#screens` (removed above) and this one. `min-height: 0` and
+   * `flex: 1 1 auto` stay: they are the flex-column correction that stops the pane overflowing the
+   * holder, and they do that without a clip.
+   */
+}
+
+/*
+ * No `overflow` here. The captured rule for this group is height only:
+ *
+ *   #screens, #screens .tab-pane.active, #streams, #streams .tab-pane.active,
+ *   #mainTabsContent, #notes, #notesTabsContent { height: 100% }
+ *
+ * (`docs/source/components/app-presentationarea.component.css`.) The `overflow: auto` added here
+ * made every pane a scroll container, and a scroll container clips: the zoom trio is
+ * `position: absolute` at `top: -33px`, drawn deliberately into the row above, and it was cut off
+ * 26px short. `#files` is unaffected - it carries its own captured `overflow: auto` with
+ * `height: calc(100% - 40px)`, applied through the generated sheet.
+ */
+#screens,
+#notes,
+#streams,
+#videoplayer,
+#files {
+  width: 100%;
+  height: 100%;
+  display: none;
+}
+
+#screens.active,
+#notes.active,
+#videoplayer.active,
+#files.active {
+  display: block;
+}
+
+/*
+ * "Hide Files Section?" — `z('hidden', o.hideFiles)` on the `#files` pane
+ * (`docs/source/components/app-presentationarea.full.js:5410-5413`).
+ *
+ * The `hidden` attribute alone is not enough here. Its UA rule is `display: none`, but
+ * `#files.active` above sets `display: block` and a rule in a stylesheet beats the UA sheet
+ * regardless of specificity. `#files[hidden]` and `#files.active` are equally specific
+ * (one id, one class-or-attribute), so what decides is which comes last — which is why this
+ * sits below rather than above, and why it does not need `!important` to do it.
+ *
+ * The sibling gate on the main-tab `li` needs no new rule: `#mainTabs li[hidden]` is already
+ * declared above.
+ */
+#files[hidden] {
+  display: none;
+}
+
+#files {
+  height: 100%;
+}
+
+/*
+ * Verbatim from the captured sheet (`docs/source/styles.d622cb9ed2bbc221.css`):
+ *
+ *   .is-fullscreenshare{position:fixed;z-index:1030!important;width:100vw!important;
+ *                       height:100vh!important;top:0;left:0;background:#111;overflow:hidden}
+ *
+ * `app-presentationarea` puts it on the screens pane through
+ * `UCe = (t, n) => ({'show active': t, 'is-fullscreenshare': n})`, the second half being
+ * `isFullScreenshare`. The rule was in the capture and in neither of our sheets, and the class was
+ * applied nowhere - so the third dark button in the screens bar had nothing to do even once it
+ * existed.
+ */
+.is-fullscreenshare {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 1030 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  overflow: hidden;
+  background: #111;
+}
+
+/*
+ * No `overflow` on the screens pane. The capture has none, and the omission is load-bearing.
+ *
+ * `#screens{overflow:hidden}` appears in NONE of the three captured sheets - not
+ * `css/complete-app-styles.css`, not `docs/source/styles.d622cb9ed2bbc221.css`, and not
+ * `docs/source/components/app-presentationarea.component.css`, whose only `#screens` rule is
+ * `height:100%`. It was added here and it clipped the zoom trio.
+ *
+ * The trio is `position: absolute` at `.zoom-controls{top:-33px;left:-33px}`, i.e. deliberately
+ * drawn ABOVE its container and into the main tab row - measured at y63 while `#screens` starts at
+ * y89, so 26px of it sat outside and was cut off. The owner's capture of the bar shows those three
+ * warning buttons plainly, at the right-hand end of the row above the screen tabs.
+ *
+ * Removing this is what lets them be seen. `#screensTabsContent` keeps its own containment
+ * (`position: relative; z-index: 0`), which is what actually holds the shared screen below the
+ * dropdown and the modal - see `src/lib/screen-stacking-contract.test.ts`.
+ */
+
+#screens h3,
+#streams h3 {
+  height: 33.6px;
+  margin: 24px 0 8px;
+  text-align: center;
+  font-size: 28px;
+  font-weight: 500;
+  line-height: 33.6px;
+}
+
+/*
+  No `height` here on purpose. This block is a flattening of one captured computed-style node -
+  capture `main-tab:Screens`, path `r.0#screens.1#screenTabs` - which reads
+  position: relative / z-index: 1 / width: 1186.53px (= 100% of its 1186.5px parent) /
+  border-bottom: 1px solid rgba(0,0,0,0) / background-color: rgb(17,17,17) (= --darker-black, #111).
+  That node also reported `height: 1px`, and that number was copied in as a rule. It is not a style:
+  in that capture NO screen was shared (its sibling `r.0#screens.0` is the "no one is presenting"
+  h3, and no `#screenTabs.*` child node exists in ANY of the 58 captures), so the bar was an empty
+  flex container - 0px of content plus its own 1px bottom border, reported border-box as 1px.
+
+  Nothing in the captured CSS sizes this bar: `styles.d622cb9ed2bbc221.css` has exactly one
+  `.screens-tabs` rule (`border-color: transparent; position: relative; z-index: 1`) plus the
+  grouped `background-color: var(--notes-tabs-bg)`, `app-presentationarea.component.css` has none,
+  and the string `#screenTabs` appears in no captured stylesheet at all. Frozen at 1px the bar
+  collapses under its own 40px tabs, which then overhang the video.
+
+  The captured arithmetic gives the populated height. In `baseline-room`, #mainTabs is
+  y 49..89.5 (h 40.5) and #mainTabsContent is y 89.5 h 1216 inside a 1216px holder, i.e. it
+  overflows the holder bottom by exactly the 40.5px bar. In `main-tab:Screens`, #screens is h 1216
+  and #screensTabsContent is h 1134 = 1216 - 82. For the content to end on the holder bottom,
+  89.5 + screenTabs + 1134 = 1265, which puts the populated bar at 41.5px.
+
+  That 41.5 is DERIVED, not observed. No capture in the dump contains a populated #screenTabs -
+  every one was taken with nothing being shared, which is also why the bar measured 1px there. The
+  arithmetic is only as good as its premise (that the screens content ends on the holder bottom),
+  so it is stated as the reserve's decomposition rather than as a measured height.
+
+  `height: auto` reproduces both states, because `.nav-tabs .nav-item { margin-bottom: -1px }`
+  (protradingroom-source.css) cancels the bar's own 1px bottom border once it has tabs: empty it is
+  exactly the 1px border, populated it is exactly its tallest `li`.
+*/
+#screenTabs,
+#streamsTabs {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  border-bottom: 1px solid transparent;
+  background: var(--darker-black);
+}
+
+#screensTabsContent,
+#streamsTabsContent {
+  width: 100%;
+  height: calc(100% - 82px);
+}
+
+#notesTabsContent {
+  width: 100%;
+  min-height: 0;
+  flex: 1 1 auto;
+}
+
+/*
+  CLS: NoteTabContent is mounted client-side only (its nested <a> cannot survive SSR parsing),
+  so the tab anchor is empty until hydration. Reserving the mounted height keeps #notesTabs at
+  41px in both states instead of growing 29px -> 41px and pushing #notesTabsContent down 12px.
+*/
+#notesTabs .nav-link {
+  min-height: 30px;
+}
+
+/*
+  CLS: reserve the box an uploaded image settles into, for uploads whose intrinsic size is known.
+  The captured rules are `.img-container { display: inline-flex; padding: 3px }` and
+  `.uploaded-img { width: 100%; max-width: 300px }`, so the settled container border-box width is
+  min(available, min(intrinsicWidth, 300px) + 6px of padding) - reproduced exactly below. The
+  aspect ratio then comes from the width/height attributes, so the height needs no reservation.
+  Gated on the attributes being present: without a known intrinsic width the old shrink-to-fit
+  behaviour is kept rather than over-reserving a narrow image.
+*/
+.img-container:has(> .uploaded-img[width][height]) {
+  width: min(100%, calc(min(var(--upload-intrinsic-width, 300px), 300px) + 6px));
+}
+
+#streams {
+  display: none;
+}
+
+#myTab {
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin: 0;
+  padding: 0;
+  border-bottom: 1px solid transparent;
+  background: var(--darker-black);
+  list-style: none;
+}
+
+#myTab > li {
+  height: 40px;
+  margin-bottom: -1px;
+  list-style: none;
+}
+
+#myTab > li > a {
+  position: relative;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 5px;
+  padding: 5px 10px;
+  color: var(--light-gray);
+  border: 1px solid transparent;
+  border-radius: 6px 6px 0 0;
+  background: transparent;
+  font-size: 12px;
+  font-weight: 300;
+  line-height: 18px;
+  cursor: pointer;
+}
+
+#myTab > li > a.active {
+  color: var(--success);
+  border-radius: 3px;
+  background: var(--dark-black);
+}
+
+#myTab .files-badge {
+  display: block;
+  margin-top: -9px;
+  margin-left: 3px;
+  padding: 3.15px 5.85px;
+  color: var(--white);
+  border-radius: 800px;
+  /*
+    No `background` here. The badge carries Bootstrap's own `bg-danger` utility, and
+    `css/complete-app-styles.css:5236` declares it
+    `background-color: rgba(var(--bs-danger-rgb), var(--bs-bg-opacity)) !important` - `!important`
+    beats this rule's higher specificity, so `background: var(--bs-danger)` never applied. It was
+    also the same colour by definition (`--bs-danger: #dc3545`, `--bs-danger-rgb: 220,53,69`, both
+    at complete-app-styles.css:1464), which is why nothing looked wrong and the declaration sat
+    here reading as the source of a colour it did not set.
+  */
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 9px;
+}
+
+/*
+  `min-height`, not `height`.
+ 
+  These numbers were measured off a capture wide enough to fit the search field and the button row
+  on ONE line. Frozen as a fixed `height`, the box stays 48px tall while its content wraps to ~84px
+  at a narrower width, and the overflow lands underneath whatever follows - which is why the sort
+  bar sat on top of Refresh and Upload File. The captured measurement is preserved for the width it
+  was taken at, and the box grows instead of overlapping when the row wraps.
+*/
+#files > .mt-3 {
+  width: 75%;
+  min-height: 48px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  margin: 16px auto;
+}
+
+#files > .mt-3 > .flex-fill {
+  min-height: 32px;
+  flex: 1 1 auto;
+  margin-bottom: 4px;
+}
+
+.st-searchbar {
+  width: 100%;
+  height: 32px;
+  display: flex;
+  align-items: stretch;
+  margin: 0;
+  color: var(--file-searchbar-color);
+  border-radius: 4px;
+  background: var(--white);
+}
+
+.st-searchbar input {
+  flex: 1;
+  min-width: 0;
+  height: 32px;
+  padding: 6px 12px;
+  color: var(--capture-body-color);
+  border: 0;
+  border-radius: 6px 0 0 6px;
+  outline: 0;
+  background: var(--white);
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 24px;
+}
+
+.st-searchbar #basic-addon1 {
+  position: relative;
+  z-index: 2;
+  width: 38px;
+  height: 32px;
+  display: block;
+  margin-left: -1px;
+  padding: 3px 10px;
+  color: var(--file-searchbar-icon-color);
+  border: 1px solid var(--lighter-gray);
+  border-radius: 0 4px 4px 0;
+  background: var(--white);
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 24px;
+  cursor: pointer;
+}
+
+#files > .mt-3 > .ml-2 {
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-left: 8px;
+}
+
+.st-fileSeeMore {
+  height: 32px;
+  margin: 8px 8px 8px 0;
+  padding: 6px 12px;
+  color: var(--white);
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: var(--primary);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 18px;
+}
+
+.st-fileSeeMore i {
+  margin-left: 8px;
+}
+
+/*
+  `.file-list`, `.file-list article` and `.file-list article:nth-child(even)` were removed here.
+
+  They dressed the stub the Files pane used to be - an `<article>` per file, striped by
+  `nth-child` - and that stub was replaced by the captured `table.table-striped ... st-fileTable`
+  with a `tbody#filesDriveList`, which stripes through Bootstrap's own
+  `.table-striped tbody tr:nth-of-type(2n+1)` (css/complete-app-styles.css:1787, imported at the
+  top of this file). The class `file-list` appears in no markup in this repo, so the three rules
+  could never match.
+
+  `--file-list-even-bg`, `--file-list-odd-bg` and `--file-name-color` are left in
+  `src/lib/styles/tokens.css`: that file is a transcription of the captured palette, and it already
+  carries tokens with no consumer.
+*/
+
+.darkTheme .messages-area,
+.darkTheme .chat-messages {
+  color: var(--darkTheme-msg-color);
+  background: var(--darkTheme-msgs-bg);
+}
+
+.darkTheme #chatScrollViewParentAlerts,
+.darkTheme app-chat app-roomscroller {
+  color: var(--darkTheme-msg-color);
+  background: var(--darkTheme-msgs-bg);
+}
+
+.darkTheme .chat-panel {
+  background: var(--darkTheme-chat-bg);
+}
+
+.darkTheme app-chat > .chat {
+  background: var(--darkTheme-chat-bg);
+}
+
+.darkTheme #textAreaHolder {
+  background: var(--darkTheme-textarea-bg);
+}
+
+.darkTheme #textAreaHolder textarea,
+.darkTheme .textAreaBtnsCol,
+.darkTheme .textAreaBtns {
+  color: var(--darkTheme-textarea-color);
+  background: var(--darkTheme-textarea-bg);
+}
+
+.darkTheme #textAreaHolder textarea:focus {
+  color: var(--darkTheme-textarea-color);
+  border-color: var(--darker-gray);
+  background: var(--darkTheme-textarea-bg);
+  box-shadow: 1px 1px 1px var(--darker-gray);
+}
+
+.darkTheme .sort-menu,
+.darkTheme .user-menu {
+  color: var(--white);
+  background: var(--dark-black);
+}
+
+.darkTheme .user-menu button {
+  color: var(--white);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  clip-path: inset(50%);
+}
+
+/*
+  The one sanctioned local override of a captured shell selector; see the rationale and the
+  allow-list entry in src/lib/dump-contract.test.ts.
+
+  The captured markup keeps `animated fadeIn` on the idle talking indicator, and those classes are
+  reproduced verbatim. In the Angular original that <li> is rendered at boot
+  (docs/source/components/app-room.render-helpers.js:1327), so the animate.css entry animation ran
+  while the whole client-rendered UI was appearing at once. This app server-renders it, so the same
+  1s fade replays over an already-painted page on every load - captured frame by frame as the only
+  element on screen whose pixels change after first paint (rect 836,4 166x41, ~110ms to ~1100ms).
+
+  Only the idle variant is settled. The speaking variant is the one carrying `> a.talking`, and it
+  still fades in when someone actually starts speaking, which is the state change the animation
+  exists to convey.
+*/
+.talkingIndicator.animated.fadeIn:not(:has(> a.talking)) {
+  animation: none;
+}
+
+@media (max-width: 900px) {
+  .vertical-gutter,
+  .presentation-box {
+    display: none;
+  }
+}
+
+/* Dump-owned global styles: Modal.svelte */
+.modal {
+  position: fixed;
+  z-index: 1055;
+  inset: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  color: var(--capture-body-color);
+  background: transparent;
+}
+
+.modal-dialog {
+  position: relative;
+  width: auto;
+  max-width: 500px;
+  margin: 28px auto;
+  pointer-events: none;
+}
+
+.modal-dialog.modal-lg {
+  max-width: 90%;
+}
+
+.modal-dialog.modal-xl {
+  max-width: 1140px;
+}
+
+#user-modal > .modal-dialog,
+#alertQAModal > .modal-dialog {
+  max-width: 600px;
+}
+
+#play-youtube-modal > .modal-dialog,
+#user-settings-modal > .modal-dialog {
+  max-width: 700px;
+}
+
+#chat-logs-modal > .modal-dialog,
+#alerts-logs-modal > .modal-dialog,
+#alerts-advanced-search-modal > .modal-dialog {
+  max-width: 1000px;
+}
+
+#alert-send-report-modal > .modal-dialog,
+#all-user-pm-modal > .modal-dialog,
+#rteModal > .modal-dialog {
+  max-width: 800px;
+}
+
+.modal-content {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  color: var(--modal-content-color);
+  border: 1px solid var(--capture-modal-outer-border);
+  border-radius: 8px;
+  background: var(--modal-content-bg-color);
+  pointer-events: auto;
+}
+
+.modal-header {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px;
+  border-bottom: 1px solid var(--modal-content-border-color);
+  border-radius: 7px 7px 0 0;
+}
+
+.modal-body {
+  position: relative;
+  flex: 1 1 auto;
+  padding: 16px;
+}
+
+.modal-footer {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 12px;
+  border-top: 1px solid var(--modal-content-border-color);
+  border-radius: 0 0 7px 7px;
+}
+
+#user-modal .modal-footer {
+  flex-wrap: wrap;
+}
+
+#debug-log-modal .modal-header {
+  height: 75px;
+}
+
+@media (max-width: 576px) {
+  .modal-dialog {
+    max-width: calc(100% - 16px);
+    margin: 8px auto;
+  }
+}
+
+/* Dump-owned global styles: ModalHost.svelte */
+.modal-body {
+  font-size: 16px;
+  font-weight: 300;
+}
+
+.edit-user-avatar {
+  width: 90px;
+  height: 80px;
+}
+
+.edit-user-avatar img {
+  width: 80px;
+  height: 80px;
+  margin-right: 10px;
+}
+
+#user-modal h3.modal-title {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 500;
+  line-height: 42px;
+}
+
+#user-modal h3.modal-title .badge {
+  display: inline-block;
+  padding: 7.35px 13.65px;
+  color: var(--white);
+  border-radius: 6px;
+  background: var(--danger);
+  font-size: 21px;
+  font-weight: 700;
+  line-height: 21px;
+}
+
+#user-modal .modal-footer .btn {
+  width: 23%;
+  margin: 4px;
+}
+
+.followingSign::before {
+  content: '\2713';
+  margin-right: 5px;
+  color: inherit;
+  font-size: 12px;
+}
+
+#user-modal .modal-title {
+  vertical-align: middle;
+}
+
+#user-modal a {
+  color: var(--modal-content-color);
+}
+
+#user-modal nav {
+  margin-bottom: 16px;
+}
+
+#user-modal img {
+  display: block;
+  min-width: 50px;
+  max-width: 80px;
+  margin-right: 10px;
+}
+
+#nav-info table {
+  width: 0;
+  flex-basis: 100%;
+  margin-bottom: 0;
+}
+
+#user-modal .table {
+  color: var(--modal-content-color);
+}
+
+#user-modal thead {
+  font-size: 20px;
+}
+
+#user-modal .nav-tabs {
+  border-color: var(--modal-active-tab-border-color) !important;
+}
+
+#user-modal th,
+#user-modal td {
+  border: none !important;
+  color: var(--modal-content-color);
+  background-color: var(--modal-content-bg-color);
+}
+
+#user-modal th {
+  width: 100px;
+  font-size: 15px;
+}
+
+#user-modal td {
+  font-size: 14px;
+}
+
+#user-modal .modal-dialog {
+  max-width: 600px;
+}
+
+#user-modal .tagline {
+  display: block;
+  font-size: 14px;
+  font-style: italic;
+}
+
+.smallAvatarImg {
+  display: inline !important;
+  max-width: 20px !important;
+  max-height: auto !important;
+}
+
+.edit-username {
+  font-size: 14px;
+}
+
+.edit-username:hover {
+  cursor: pointer;
+  opacity: 0.85;
+}
+
+.chat-stars {
+  vertical-align: text-top !important;
+  font-size: 8px;
+}
+
+span.chat-stars {
+  display: inline-block;
+  margin-top: 2px;
+  margin-left: 2px;
+  color: var(--app-primary-color);
+}
+
+.stars-container {
+  position: relative;
+}
+
+.stars-container .stars-icon {
+  color: var(--msg-color);
+}
+
+.stars-num {
+  position: absolute;
+  top: 3px;
+  left: 5px;
+  color: var(--msgs-bg);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+#follow-chat-ticker-color,
+#follow-chat-text-color,
+#follow-chat-username-color,
+#follow-chat-bg-color,
+#follow-chat-text-size {
+  width: 45px;
+  height: 20px;
+}
+
+#chat-text-size {
+  font-size: 13px;
+}
+
+.follow-user-example {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px;
+  margin-bottom: 10px;
+  border-radius: 5px;
+}
+
+.text-mode-box .form-check-input:checked + label {
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.text-mode-box .form-check-input {
+  z-index: 1000;
+  position: relative;
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  margin-right: 0.5rem;
+  appearance: none;
+  border: 0;
+  border-radius: 50%;
+  outline: none;
+  color: var(--white);
+  background-color: var(--light-gray);
+  cursor: pointer;
+  transition: all 0.15s ease-out 0s;
+}
+
+.text-mode-box .form-check-label:hover {
+  cursor: pointer;
+  opacity: 0.85;
+}
+
+.text-mode-box .form-check-input:checked {
+  background-color: var(--checkbox-bg-color);
+}
+
+.edit-user-avatar {
+  position: relative;
+}
+
+.edit-user-avatar-options {
+  position: absolute;
+  right: 2px;
+  bottom: -8px;
+  padding: 3px 4px;
+  border-radius: 50%;
+  color: #444;
+  background-color: #fff;
+  font-size: 14px;
+  line-height: 16px;
+  text-align: center;
+}
+
+.edit-user-avatar-options:hover {
+  color: #000;
+}
+
+.edit-user-avatar-options .dropdown-toggle::after {
+  display: none;
+}
+
+.remove-profile-picture-btn {
+  margin: 0 4px;
+  font-size: 12px;
+}
+
+#session-control-modal p {
+  margin-top: 5px;
+  font-size: 14px;
+}
+
+#session-control-modal p:last-child {
+  margin-bottom: 0;
+}
+
+#session-control-modal .dropdown-menu {
+  background-color: var(--session-control-dropdown-bg);
+}
+
+#session-control-modal .dropdown-menu a:hover {
+  cursor: pointer;
+}
+
+#session-control-modal .modal-body form button {
+  width: 45%;
+  margin: 0 2.5%;
+}
+
+#session-control-modal .modal-body button,
+#session-control-modal textarea,
+#session-control-modal label {
+  font-size: 14px;
+}
+
+#session-control-modal .form-check-input:checked + label {
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+#session-control-modal .form-check-input {
+  z-index: 1000;
+  position: relative;
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  margin-right: 0.5rem;
+  appearance: none;
+  border: 0;
+  border-radius: 50%;
+  outline: none;
+  color: var(--white);
+  background-color: var(--light-gray);
+  cursor: pointer;
+  transition: all 0.15s ease-out 0s;
+}
+
+#session-control-modal .disable-video:hover,
+#session-control-modal .form-check-label:hover {
+  cursor: pointer;
+  opacity: 0.85;
+}
+
+#session-control-modal .form-check-input:checked {
+  background-color: var(--checkbox-bg-color);
+}
+
+#session-control-modal .restream-link:hover {
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+#mutedUsersModal .modal-dialog,
+#followedUsersModal .modal-dialog {
+  overflow-y: initial !important;
+}
+
+#mutedUsersModal .modal-body,
+#followedUsersModal .modal-body {
+  height: 100%;
+  max-height: 79vh;
+  overflow-y: auto;
+}
+
+#mutedUsersModal .list-group-item,
+#followedUsersModal .list-group-item {
+  color: #f1f1f1;
+  background-color: inherit;
+}
+
+#mutedUsersModal .list-group-item:hover {
+  background-color: #353535;
+}
+
+#followedUsersModal {
+  z-index: 1054 !important;
+}
+
+#followedUsersModal .list-group-item {
+  border-color: #97cef0;
+}
+
+#followedUsersModal .list-group-item:hover {
+  background-color: #164663;
+}
+
+#mutedUsersModal .fw-bold,
+#followedUsersModal .fw-bold {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+#mutedUsersModal .fw-bold img,
+#followedUsersModal .fw-bold img {
+  width: 30px;
+  height: 30px;
+}
+
+#play-youtube-modal .input-group {
+  width: 100%;
+  height: 38px;
+  display: flex;
+  margin-bottom: 16px;
+}
+
+#play-youtube-modal .input-group input,
+#basic-addonSave,
+#basic-addonPlay {
+  height: 38px;
+  padding: 6px 12px;
+  color: var(--capture-body-color);
+  border: 1px solid var(--bs-gray-300);
+  border-radius: 6px;
+  background: var(--white);
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 24px;
+}
+
+#play-youtube-modal .input-group input {
+  min-width: 0;
+  flex: 1;
+}
+
+#basic-addonSave,
+#basic-addonPlay {
+  display: block;
+  flex: 0 0 auto;
+  margin-left: -1px;
+  text-align: center;
+}
+
+#basic-addonSave {
+  width: 62.5px;
+}
+
+#basic-addonPlay {
+  width: 106.9px;
+}
+
+#av-settings-modal #userSettingsTab {
+  height: 41px;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+}
+
+#av-settings-modal #userSettingsTab > li > a {
+  width: 130px;
+  min-height: 42px;
+  margin-bottom: -1px;
+  padding: 8px 16px;
+  border: 1px solid var(--modal-tabs-border-color);
+  border-radius: 6px;
+}
+
+#av-settings-modal #user-audio-video-settings {
+  height: 152px;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 21px;
+}
+
+#av-settings-modal #user-audio-video-settings > nav {
+  height: 152px;
+}
+
+#av-settings-modal #user-audio-video-settings .navbar-nav {
+  height: 136px;
+}
+
+#av-settings-modal #user-audio-video-settings .navbar-nav > li:first-child {
+  height: 37px;
+}
+
+#av-settings-modal #user-audio-video-settings .navbar-nav > li:first-child > a {
+  width: 100%;
+  height: 37px;
+  padding: 8px 0;
+  color: var(--white);
+  border: 0;
+  background: transparent;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 21px;
+  text-align: left;
+}
+
+#av-settings-modal #user-audio-video-settings .navbar-nav > li:first-child > a i {
+  font-size: 14px;
+  line-height: 14px;
+}
+
+#av-settings-modal #user-audio-video-settings .navbar-nav > li:first-child > a > .pl-2 {
+  padding-left: 8px;
+}
+
+#av-settings-modal #user-audio-video-settings .navbar-nav > li:nth-child(2) {
+  height: 99px;
+}
+
+#av-settings-modal #user-audio-video-settings .navbar-nav > li:nth-child(2) .form-group {
+  height: 67px;
+  padding-top: 8px;
+}
+
+#av-settings-modal #user-audio-video-settings .navbar-nav > li:nth-child(2) .w-75 {
+  height: 67px;
+}
+
+#av-settings-modal #user-audio-video-settings label[for='speakers-device'] {
+  height: 21px;
+  display: block;
+  margin-bottom: 8px;
+}
+
+#av-settings-modal #speakers-device {
+  width: 100%;
+  height: 38px;
+  padding: 6px 12px;
+  color: var(--capture-body-color);
+  border: 1px solid var(--bs-gray-300);
+  border-radius: 6px;
+  background: var(--white);
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 24px;
+}
+
+#av-settings-modal #user-audio-video-settings .navbar-nav > li:nth-child(2) .w-25 {
+  height: 38px;
+}
+
+#av-settings-modal #user-audio-video-settings .w-25 > .btn {
+  width: 81.3px;
+  height: 38px;
+  margin: 0;
+}
+
+#av-settings-modal #user-audio-video-settings .w-25 > .btn > i {
+  margin-right: 8px;
+}
+
+#user-settings-modal #userSettingsTab {
+  height: 41px;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+}
+
+#user-settings-modal #userSettingsTab > li > a {
+  min-height: 42px;
+  margin-bottom: -1px;
+  padding: 8px 16px;
+}
+
+#user-settings-modal .pl-2 {
+  padding-left: 8px;
+}
+
+#user-settings-modal .ml-5 {
+  margin-left: 48px;
+}
+
+#user-settings-modal .ml-4 {
+  margin-left: 24px;
+}
+
+#user-settings-modal .text-right {
+  text-align: right;
+}
+
+#user-settings-modal .pb-2 {
+  height: 32px;
+}
+
+#user-settings-modal .ml-5 {
+  min-height: 24px;
+  line-height: 24px;
+}
+
+#user-settings-modal .form-check {
+  min-height: 24px;
+  margin-bottom: 2px;
+}
+
+#user-settings-modal .form-check-input {
+  position: relative;
+  z-index: 1000;
+  width: 20px;
+  height: 20px;
+  float: left;
+  margin: 4px 8px 0 -20px;
+  padding: 0;
+  border-color: var(--light-gray);
+  background-color: var(--light-gray);
+}
+
+#user-settings-modal .form-check > .form-check-input {
+  margin-left: 0;
+}
+
+#user-settings-modal .form-check-input:checked {
+  border-color: var(--checkbox-bg-color);
+  background-color: var(--checkbox-bg-color);
+}
+
+#user-settings-modal .form-check-label {
+  display: inline-block;
+  margin: 0;
+  font-size: 16px;
+  font-weight: 300;
+  line-height: 24px;
+}
+
+#user-settings-modal .form-check-input:checked + .form-check-label {
+  font-weight: 700;
+}
+
+#user-settings-modal input[type='color'].form-check-input,
+#user-settings-modal input[type='number'].form-check-input {
+  width: 45px;
+  height: 20px;
+  margin-right: -1px;
+  color: var(--capture-body-color);
+  border: 0;
+  background: var(--white);
+}
+
+#user-settings-modal input[type='number'].form-check-input {
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 19.5px;
+}
+
+#user-settings-modal .text-mode-box .ml-5 > hr {
+  height: 1px;
+  margin: 16px 0;
+  border: 0;
+  border-top: 1px solid var(--modal-content-color);
+  opacity: 0.25;
+}
+
+#user-settings-modal .btn.btn-warning.btn-sm.m-1 > i {
+  margin-right: 4px;
+}
+
+#alerts-advanced-search-modal .modal-header {
+  height: 72px;
+}
+
+#alerts-advanced-search-modal .modal-header > h5 {
+  width: 311.25px;
+  height: 31px;
+  margin: 0 0 8px;
+  font-size: 20px;
+  font-weight: 500;
+  line-height: 24px;
+}
+
+#alerts-advanced-search-modal .modal-header > h5 > .btn {
+  width: 84.2px;
+  height: 31px;
+  min-height: 31px;
+  margin: 0 4px;
+  vertical-align: top;
+}
+
+#alerts-advanced-search-modal .modal-header > h5 > .btn > i {
+  margin-right: 4px;
+}
+
+#alerts-advanced-search-modal .modal-body {
+  height: 218px;
+}
+
+#alerts-advanced-search-modal .modal-body > .d-flex {
+  width: 100%;
+  margin-bottom: 8px;
+}
+
+#alerts-advanced-search-modal .modal-body > .d-flex:first-child {
+  height: 46px;
+}
+
+#alerts-advanced-search-modal .modal-body > .d-flex:first-child > .d-flex {
+  width: 416px;
+  height: 38px;
+}
+
+#alerts-advanced-search-modal .dropdown-trader-select,
+#alerts-advanced-search-modal .dropdown-room-select {
+  width: 200px;
+  height: 38px;
+}
+
+#alerts-advanced-search-modal #selectTraderDropdown,
+#alerts-advanced-search-modal #selectRoomDropdown {
+  width: 200px;
+  height: 38px;
+  margin: 0;
+}
+
+#alerts-advanced-search-modal #search-term-input {
+  width: 542px;
+  height: 38px;
+}
+
+#alerts-advanced-search-modal .modal-body > .d-flex:nth-child(2) {
+  height: 60px;
+}
+
+#alerts-advanced-search-modal .modal-body > .d-flex:nth-child(2) > div:first-child {
+  width: 188.5px;
+  height: 60px;
+}
+
+#alerts-advanced-search-modal .modal-body > .d-flex:nth-child(2) .form-check {
+  width: 180.5px;
+  height: 24px;
+}
+
+#alerts-advanced-search-modal .modal-body > .d-flex:nth-child(2) .form-check-input {
+  width: 16px;
+  height: 16px;
+}
+
+#alerts-advanced-search-modal .date-input-container {
+  width: 551.6px;
+  height: 46px;
+}
+
+#alerts-advanced-search-modal .date-input-container > .d-flex {
+  height: 38px;
+}
+
+#alerts-advanced-search-modal .date-input-container > .d-flex:first-child {
+  width: 270.5px;
+}
+
+#alerts-advanced-search-modal .date-input-container > .d-flex:last-child {
+  width: 265.2px;
+}
+
+#alerts-advanced-search-modal .date-input-container input {
+  width: 190px;
+  height: 38px;
+}
+
+#alerts-advanced-search-modal .modal-body > .w-100 {
+  width: 100%;
+  height: 48px;
+}
+
+#alerts-advanced-search-modal .modal-body > .w-100 > div {
+  height: 48px;
+}
+
+#alerts-advanced-search-modal .modal-footer {
+  height: 87px;
+}
+
+#alerts-advanced-search-modal .modal-footer > div {
+  width: 200px;
+  height: 54px;
+}
+
+#alerts-advanced-search-modal .modal-footer > div > .btn {
+  height: 38px;
+  margin: 8px;
+}
+
+.debug-area {
+  height: 870px;
+  resize: none;
+  background: var(--debug-log-bg);
+}
+
+#chat-logs-modal .modal-body > div,
+#alerts-logs-modal .modal-body > div {
+  width: 100%;
+  height: 94px;
+}
+
+#chat-logs-modal .modal-body > div > .btn,
+#alerts-logs-modal .modal-body > div > .btn {
+  margin: 8px 0;
+}
+
+#chat-logs-modal .list-group,
+#alerts-logs-modal .list-group {
+  width: 600px;
+  height: 40px;
+  margin: 0 auto;
+}
+
+#chat-logs-modal .list-group h5,
+#alerts-logs-modal .list-group h5 {
+  height: 24px;
+  margin: 8px 0;
+  font-size: 20px;
+  font-weight: 500;
+  line-height: 24px;
+}
+
+#mobileAppInfoModal .modal-body > .d-flex {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  justify-content: space-evenly;
+  margin: 16px 16px 24px;
+}
+
+#mobileAppInfoModal .modal-body > .d-flex a:first-child,
+.google-badge {
+  width: 155px;
+  height: 60px;
+}
+
+#mobileAppInfoModal .modal-body > .d-flex a:last-child,
+#mobileAppInfoModal .modal-body > .d-flex a:last-child img {
+  width: 119.6px;
+  height: 40px;
+}
+
+#mobileAppInfoModal .modal-body > .mt-2 {
+  margin-top: 8px;
+}
+
+#mobileAppInfoModal .modal-body > .mt-2 hr {
+  margin: 16px 0;
+}
+
+#mobileAppInfoModal .modal-body > .mt-2 h5 {
+  margin: 24px 0;
+  font-size: 20px;
+  font-weight: 500;
+  line-height: 24px;
+}
+
+#mobileAppInfoModal .modal-body > .mt-2 div {
+  height: 24px;
+  margin-top: 8px;
+}
+
+#mobileAppInfoModal .modal-body > .mt-2 strong {
+  font-weight: 400;
+}
+
+#replyModal .modal-body > .flex-fill {
+  width: 100%;
+  height: 35px;
+  display: flex;
+}
+
+#textAreaReplyTxt,
+#textAreaQATxt {
+  min-width: 0;
+  height: 35px;
+  flex: 1 1 auto;
+  margin: 0;
+  padding: 6px 5px;
+  color: var(--capture-body-color);
+  border: 0;
+  border-radius: 0;
+  background: var(--white);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 21px;
+  resize: none;
+}
+
+/*
+  Removed for the same reason as the block below: `.modal-header { height: 132px }` and
+  `> .flex-fill { width: 542px; height: 99px }` were the pixel box the capture happened to render
+  for a one-line alert, so a two-line alert overflowed the header and printed across its bottom
+  border and into the body. The captured `.modal-header` sets no height at all - it is a flex row
+  with padding and a bottom border - and `align-items-start` is already a class on the markup.
+
+  `#alertQALabel` went with them: it declared `font-size: 20px; font-weight: 500`, while the
+  captured `.modal-title` that owns this element says `font-size: 18px; font-weight: 700;
+  color: rgb(255, 255, 255); margin-bottom: 0; line-height: 1.5`.
+*/
+
+/*
+  The rules that used to live here pinned the header box and the avatar to the pixel heights the
+  capture happened to render for its one-line alert (`.admin-alert { height: 61px }`, `[clas] {
+  height: 49px }`, `.avatar img { width: 45px; height: 45px }`) and gave the body a fixed
+  `height: 330px`. Because `#alertQAModal .admin-alert` outranks the captured
+  `app-alert-qa-modal .admin-alert` on specificity, they replaced the real rules rather than
+  supplementing them - so any alert whose body wrapped to a second line overflowed the border and
+  spilled onto the backdrop.
+
+  The captured component styles already say what these elements do, and none of them set a height:
+
+    .admin-alert  { border: 1px solid rgb(68, 68, 68); border-radius: 5px; padding: 5px; }
+    .avatar       { display: inline; }
+    .avatar img   { width: 100%; max-width: 50px; height: auto; }
+    #alertQAModal .modal-body { min-height: 330px; max-height: 70vh; height: 100%; overflow-y: auto; }
+
+  They ship in captured-runtime-components.css, so the fix is to stop overriding them. Margins and
+  padding come from the `mt-2`, `mr-1` and `pl-1` utility classes already on the captured markup.
+*/
+
+#webrtc-troubleshooter-modal .troubleshooter-tabs {
+  gap: 0.5rem;
+  padding: 0.5rem 1rem 0;
+  border-bottom: none;
+}
+
+#webrtc-troubleshooter-modal .troubleshooter-tabs .nav-item .nav-link {
+  padding: 0.6rem 1.2rem;
+  color: #94a3b8;
+  border: none;
+  border-radius: 0.5rem 0.5rem 0 0;
+  background: transparent;
+  font-size: 0.9rem;
+  font-weight: 600;
+  transition: all 0.25s ease;
+}
+
+#webrtc-troubleshooter-modal .troubleshooter-tabs .nav-item .nav-link:hover {
+  color: #e2e8f0;
+  background: #ffffff0d;
+}
+
+#webrtc-troubleshooter-modal .troubleshooter-tabs .nav-item .nav-link.active {
+  color: #22d3ee;
+  background: #22d3ee14;
+  box-shadow: inset 0 -2px #22d3ee;
+}
+
+#webrtc-troubleshooter-modal .troubleshooter-tabs .nav-item .nav-link i {
+  font-size: 0.85rem;
+}
+
+#webrtc-troubleshooter-modal .status-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.25rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.75rem;
+  background-color: #f8fafc;
+  transition: background-color 0.3s ease;
+}
+
+#webrtc-troubleshooter-modal .status-item span.fw-medium {
+  color: #1a202c !important;
+  font-size: 0.95rem;
+  font-weight: 600 !important;
+}
+
+#webrtc-troubleshooter-modal .status-item.passed {
+  border-left: 4px solid #10b981;
+  background-color: #ecfdf5;
+}
+
+#webrtc-troubleshooter-modal .status-item.failed {
+  border-left: 4px solid #ef4444;
+  background-color: #fef2f2;
+}
+
+#webrtc-troubleshooter-modal .status-icon {
+  min-width: 24px;
+  text-align: center;
+  font-size: 1.5rem;
+}
+
+#webrtc-troubleshooter-modal .status-icon.passed {
+  color: #10b981;
+}
+
+#webrtc-troubleshooter-modal .status-icon.failed {
+  color: #ef4444;
+}
+
+#webrtc-troubleshooter-modal .status-icon.pending {
+  color: #64748b;
+}
+
+@keyframes webrtc-spin {
+  0% {
+    transform: rotate(0);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+#webrtc-troubleshooter-modal .spin {
+  animation: webrtc-spin 1s linear infinite;
+}
+
+#webrtc-troubleshooter-modal .modal-header .modal-title {
+  color: #fff !important;
+  font-size: 1.25rem;
+  font-weight: 700 !important;
+}
+
+#webrtc-troubleshooter-modal .modal-body {
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+#webrtc-troubleshooter-modal .modal-body .text-muted {
+  color: #e5e7eb !important;
+  font-size: 0.95rem;
+  font-weight: 500 !important;
+}
+
+#webrtc-troubleshooter-modal .btn {
+  border-radius: 0.375rem;
+}
+
+#webrtc-troubleshooter-modal .btn i {
+  margin-right: 0.5rem;
+}
+
+#webrtc-troubleshooter-modal .alert {
+  border: none;
+  border-radius: 0.5rem;
+  font-size: 0.9rem;
+}
+
+#webrtc-troubleshooter-modal .alert.alert-info {
+  color: #1e40af;
+  background-color: #dbeafe;
+}
+
+#webrtc-troubleshooter-modal .alert.alert-success {
+  color: #047857;
+  background-color: #ecfdf5;
+}
+
+#webrtc-troubleshooter-modal .alert.alert-danger {
+  color: #dc2626;
+  background-color: #fef2f2;
+}
+
+#webrtc-troubleshooter-modal .no-mic-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1rem;
+  text-align: center;
+}
+
+#webrtc-troubleshooter-modal .no-mic-icon {
+  display: flex;
+  width: 64px;
+  height: 64px;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 1rem;
+  border-radius: 50%;
+  background: #ef44441a;
+}
+
+#webrtc-troubleshooter-modal .no-mic-icon i {
+  color: #ef4444;
+  font-size: 1.6rem;
+}
+
+#webrtc-troubleshooter-modal .no-mic-icon.loading {
+  background: #22d3ee1a;
+}
+
+#webrtc-troubleshooter-modal .no-mic-icon.loading i {
+  color: #22d3ee;
+}
+
+#webrtc-troubleshooter-modal .no-mic-title {
+  margin-bottom: 0.5rem;
+  color: #e2e8f0;
+  font-weight: 700;
+}
+
+#webrtc-troubleshooter-modal .no-mic-text {
+  max-width: 320px;
+  margin-bottom: 1rem;
+  color: #94a3b8;
+  font-size: 0.9rem;
+}
+
+#webrtc-troubleshooter-modal .mic-test-container .mic-label {
+  display: block;
+  color: #cbd5e1;
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+#webrtc-troubleshooter-modal .mic-select {
+  padding: 0.5rem 0.75rem;
+  color: #e2e8f0 !important;
+  border: 1px solid #334155 !important;
+  border-radius: 0.5rem !important;
+  background-color: #1e293b !important;
+  font-size: 0.9rem;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+#webrtc-troubleshooter-modal .mic-select:focus {
+  border-color: #22d3ee !important;
+  outline: none;
+  box-shadow: 0 0 0 2px #22d3ee26 !important;
+}
+
+#webrtc-troubleshooter-modal .mic-select:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+#webrtc-troubleshooter-modal .mic-select option {
+  color: #e2e8f0;
+  background-color: #1e293b;
+}
+
+#webrtc-troubleshooter-modal .waveform-wrapper {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid #1e293b;
+  border-radius: 0.75rem;
+  background: #0f172a;
+  transition:
+    border-color 0.3s ease,
+    box-shadow 0.3s ease;
+}
+
+#webrtc-troubleshooter-modal .waveform-wrapper.active {
+  border-color: #22d3ee;
+  box-shadow:
+    0 0 20px #22d3ee1f,
+    inset 0 0 30px #22d3ee08;
+}
+
+#webrtc-troubleshooter-modal .waveform-canvas {
+  display: block;
+  width: 100%;
+  height: 120px;
+}
+
+#webrtc-troubleshooter-modal .waveform-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  color: #475569;
+  background: #0f172ad9;
+}
+
+#webrtc-troubleshooter-modal .waveform-overlay i {
+  font-size: 1.5rem;
+}
+
+#webrtc-troubleshooter-modal .waveform-overlay span {
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+#webrtc-troubleshooter-modal .volume-meter .volume-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.4rem;
+}
+
+#webrtc-troubleshooter-modal .volume-meter .volume-value {
+  color: #475569;
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  transition: color 0.3s ease;
+}
+
+#webrtc-troubleshooter-modal .volume-meter .volume-value.active {
+  color: #22d3ee;
+}
+
+#webrtc-troubleshooter-modal .volume-bar-track {
+  overflow: hidden;
+  height: 10px;
+  border: 1px solid #334155;
+  border-radius: 999px;
+  background: #1e293b;
+}
+
+#webrtc-troubleshooter-modal .volume-bar-fill {
+  position: relative;
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.08s linear;
+}
+
+#webrtc-troubleshooter-modal .volume-bar-fill.low {
+  background: linear-gradient(90deg, #22d3ee, #10b981);
+  box-shadow: 0 0 8px #10b98166;
+}
+
+#webrtc-troubleshooter-modal .volume-bar-fill.mid {
+  background: linear-gradient(90deg, #10b981, #eab308);
+  box-shadow: 0 0 8px #eab30866;
+}
+
+#webrtc-troubleshooter-modal .volume-bar-fill.high {
+  background: linear-gradient(90deg, #eab308, #ef4444);
+  box-shadow: 0 0 8px #ef444466;
+}
+
+#webrtc-troubleshooter-modal .mic-status {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.75rem 1rem;
+  border-radius: 0.625rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  transition: all 0.3s ease;
+}
+
+#webrtc-troubleshooter-modal .mic-status-dot {
+  width: 10px;
+  height: 10px;
+  flex-shrink: 0;
+  border-radius: 50%;
+}
+
+#webrtc-troubleshooter-modal .mic-status-idle {
+  color: #94a3b8;
+  background: #1e293b;
+}
+
+#webrtc-troubleshooter-modal .mic-status-idle .mic-status-dot {
+  background: #475569;
+}
+
+#webrtc-troubleshooter-modal .mic-status-testing {
+  color: #22d3ee;
+  background: #22d3ee14;
+}
+
+#webrtc-troubleshooter-modal .mic-status-testing .mic-status-dot {
+  background: #22d3ee;
+  animation: webrtc-pulse-dot 1.5s ease-in-out infinite;
+}
+
+#webrtc-troubleshooter-modal .mic-status-success {
+  color: #10b981;
+  background: #10b9811a;
+}
+
+#webrtc-troubleshooter-modal .mic-status-success .mic-status-dot {
+  background: #10b981;
+  box-shadow: 0 0 6px #10b98180;
+}
+
+#webrtc-troubleshooter-modal .mic-status-no-audio {
+  color: #eab308;
+  background: #eab3081a;
+}
+
+#webrtc-troubleshooter-modal .mic-status-no-audio .mic-status-dot {
+  background: #eab308;
+  animation: webrtc-pulse-dot 1s ease-in-out infinite;
+}
+
+#webrtc-troubleshooter-modal .mic-status-error {
+  color: #ef4444;
+  background: #ef44441a;
+}
+
+#webrtc-troubleshooter-modal .mic-status-error .mic-status-dot {
+  background: #ef4444;
+}
+
+@keyframes webrtc-pulse-dot {
+  0%,
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+
+  50% {
+    transform: scale(1.6);
+    opacity: 0.5;
+  }
+}
+
+#webrtc-troubleshooter-modal .mic-actions .mic-actions-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+#webrtc-troubleshooter-modal .btn-mic-start {
+  padding: 0.5rem 1.2rem;
+  color: #fff;
+  border: none;
+  border-radius: 0.5rem;
+  background: linear-gradient(135deg, #0891b2, #22d3ee);
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+#webrtc-troubleshooter-modal .btn-mic-start:hover {
+  transform: translateY(-1px);
+  color: #fff;
+  background: linear-gradient(135deg, #0e7490, #06b6d4);
+  box-shadow: 0 4px 12px #22d3ee4d;
+}
+
+#webrtc-troubleshooter-modal .btn-mic-stop {
+  padding: 0.5rem 1.2rem;
+  color: #e2e8f0;
+  border: none;
+  border-radius: 0.5rem;
+  background: #334155;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+#webrtc-troubleshooter-modal .btn-mic-stop:hover {
+  color: #fff;
+  background: #475569;
+}
+
+#webrtc-troubleshooter-modal .btn-mic-record {
+  padding: 0.5rem 1.2rem;
+  color: #fca5a5;
+  border: none;
+  border-radius: 0.5rem;
+  background: #7f1d1d;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+#webrtc-troubleshooter-modal .btn-mic-record i.fa-circle {
+  color: #ef4444;
+}
+
+#webrtc-troubleshooter-modal .btn-mic-record:hover {
+  color: #fecaca;
+  background: #991b1b;
+}
+
+#webrtc-troubleshooter-modal .btn-mic-record.recording {
+  color: #fff;
+  background: #dc2626;
+  animation: webrtc-recording-glow 1.5s ease-in-out infinite;
+}
+
+#webrtc-troubleshooter-modal .btn-mic-record.recording i {
+  color: #fff;
+}
+
+@keyframes webrtc-recording-glow {
+  0%,
+  to {
+    box-shadow: 0 0 4px #dc26264d;
+  }
+
+  50% {
+    box-shadow: 0 0 16px #dc262699;
+  }
+}
+
+#webrtc-troubleshooter-modal .btn-mic-play {
+  padding: 0.5rem 1.2rem;
+  color: #fff;
+  border: none;
+  border-radius: 0.5rem;
+  background: linear-gradient(135deg, #047857, #10b981);
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+#webrtc-troubleshooter-modal .btn-mic-play:hover:not(:disabled) {
+  transform: translateY(-1px);
+  color: #fff;
+  background: linear-gradient(135deg, #065f46, #059669);
+  box-shadow: 0 4px 12px #10b9814d;
+}
+
+#webrtc-troubleshooter-modal .btn-mic-play:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th {
+  padding: 10px;
+  text-align: left;
+  border-bottom: 1px solid var(--modal-tabs-border-color);
+}
+
+@media (max-width: 680px) {
+  .debug-area {
+    height: 60vh;
+  }
+}
+
+/*
+  The Files sort bar, styled to the owner's rendered markup:
+
+      <div class="d-flex flex-wrap justify-content-center align-items-center mt-2 st-fileSortBar">
+        <span class="mr-2">Sorting by:</span>
+        <button class="btn btn-sm m-1 st-fileSortName active"
+                title="Sorted A to Z (click to sort Z to A)"> Name <i class="fas ml-2 fa-sort-alpha-down"></i></button>
+        <button class="btn btn-sm m-1 st-fileSortDate"
+                title="Sorted newest to oldest (click to sort oldest to newest)"> Date <i class="fas fa-sort ml-2"></i></button>
+      </div>
+
+  Layout comes entirely from those Bootstrap utilities - `mt-2` on the bar, `m-1` on the buttons -
+  so nothing here sets spacing. What IS needed is colour: `btn btn-sm` carries no variant, so
+  Bootstrap leaves the near-black body colour, which is invisible on the near-black Files pane.
+  That was my bug, and the fix is not a new value - it is the one every sibling control in the
+  captured pane already uses:
+
+      .st-fileName, .st-fileSize, .st-fileDeleteSelected, .st-fileSeeMore,
+      .st-fileDownload, .st-fileDelete, .st-fileUpload { font-size: 12px; }
+      .st-fileSeeMore { background-color: var(--file-see-more-bg); color: var(--tabs-color); }
+
+  `.active` is the governing sort. It gets the pane's own accent - `--file-see-more-bg`, the same
+  fill Refresh uses - rather than an invented highlight.
+*/
+.st-fileSortBar {
+  font-size: 12px;
+  color: var(--tabs-color);
+}
+
+.st-fileSortName,
+.st-fileSortDate {
+  font-size: 12px;
+  color: var(--tabs-color);
+  background-color: transparent;
+  border: 1px solid transparent;
+}
+
+.st-fileSortName:hover,
+.st-fileSortDate:hover {
+  color: var(--tabs-color);
+  border-color: var(--file-see-more-bg);
+  cursor: pointer;
+}
+
+.st-fileSortName.active,
+.st-fileSortDate.active {
+  background-color: var(--file-see-more-bg);
+  border-color: var(--file-see-more-bg);
+  color: var(--tabs-color);
+}
+
+/*
+  The upload drop zone, which DOES have captured rules - it was only missing because the modal was
+  never wired:
+
+      #filedrag { display: none; font-weight: 700; text-align: center; padding: 1em 0;
+                  margin: 1em 0; color: var(--modal-upload-files-color);
+                  border: 2px dashed var(--modal-upload-files-color); }
+      #filedrag.hover, #filedragAlert.hover { border-style: solid;
+                  box-shadow: 1px 1px 5px var(--modal-upload-files-color); }
+
+  Only the `.hover` state is restated here; the base rule already ships in the captured sheet, and
+  the inline `display` the capture sets from JS is reproduced on the element itself.
+*/
+#filedrag.hover {
+  border-style: solid;
+  box-shadow: 1px 1px 5px var(--modal-upload-files-color);
+}
+
+.upload-status {
+  margin-top: 0.75rem;
+  font-size: 12px;
+  color: var(--tabs-color);
+  text-align: center;
+}

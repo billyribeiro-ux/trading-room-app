@@ -1,0 +1,11 @@
+packages:
+  - 'apps/*'
+
+# Carried over from the room's own workspace file — these are the packages whose install scripts
+# are allowed to run, and the SvelteKit pin its lockfile was resolved against.
+allowBuilds:
+  '@fortawesome/fontawesome-free': false
+  better-sqlite3: true
+  esbuild: true
+minimumReleaseAgeExclude:
+  - '@sveltejs/kit@2.70.2'

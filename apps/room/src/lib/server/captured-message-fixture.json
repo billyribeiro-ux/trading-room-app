@@ -1,0 +1,716 @@
+{
+  "generatedFrom": "/Users/billyribeiro/Desktop/new-room/app-room/complete.html",
+  "sourceSha256": "09fabcc5f80a60e8835095d134d2225506a1a30ef47ac29fe09f611104b119f3",
+  "messages": [
+    {
+      "evidenceKey": "app-room-complete:app-st-message:1",
+      "sequence": 1,
+      "panel": "alert",
+      "room": "main",
+      "senderName": "Billy",
+      "senderAvatarUrl": "https://secure.gravatar.com/avatar/b27c0cfb1c74fb928f5e40ba6711669f?d=mm&s=50",
+      "senderEmailHash": "b27c0cfb1c74fb928f5e40ba6711669f",
+      "timestampText": "7/24/26, 9:37 AM",
+      "separatorText": null,
+      "body": "lets buy 100 shares of $AAPL FOR EDUCATIONAL PURPOSES ONLY, NOT FINANCIAL ADVICE",
+      "bodySegments": [
+        {
+          "kind": "text",
+          "text": "lets buy 100 shares of"
+        },
+        {
+          "kind": "stock",
+          "text": " $AAPL"
+        },
+        {
+          "kind": "text",
+          "text": "\n FOR EDUCATIONAL PURPOSES ONLY, NOT FINANCIAL ADVICE"
+        }
+      ],
+      "bodyStyle": "color: rgb(26, 26, 26);",
+      "messageBoxClass": "msg-box pb-1",
+      "messageBoxStyle": "background-color: rgb(232, 232, 232);",
+      "direction": "forward",
+      "isAdmin": false,
+      "question": false,
+      "questionCount": 1,
+      "questionAnswered": true,
+      "targetUrl": null,
+      "menuItems": [
+        "Delete Message",
+        "Mute Chat for 24hrs",
+        "User Info",
+        "Mention",
+        "Show message to all",
+        "Alert Send Report",
+        "Copy",
+        "Private Chat"
+      ],
+      "sourceNodeSha256": "89e058762ad05a55b19e890ffb7ff789806ab8d7a91b9cf31769fff243afcd25"
+    },
+    {
+      "evidenceKey": "app-room-complete:app-st-message:2",
+      "sequence": 2,
+      "panel": "alert",
+      "room": "main",
+      "senderName": "Billy Ribeiro",
+      "senderAvatarUrl": "https://secure.gravatar.com/avatar/b27c0cfb1c74fb928f5e40ba6711669f?d=mm&s=50",
+      "senderEmailHash": "b27c0cfb1c74fb928f5e40ba6711669f",
+      "timestampText": "7/24/26, 2:13 PM",
+      "separatorText": null,
+      "body": "Test FOR EDUCATIONAL PURPOSES ONLY, NOT FINANCIAL ADVICE",
+      "bodySegments": [
+        {
+          "kind": "text",
+          "text": "Test\n FOR EDUCATIONAL PURPOSES ONLY, NOT FINANCIAL ADVICE"
+        }
+      ],
+      "bodyStyle": "color: rgb(26, 26, 26);",
+      "messageBoxClass": "msg-box pb-1",
+      "messageBoxStyle": "background-color: rgb(232, 232, 232);",
+      "direction": "forward",
+      "isAdmin": false,
+      "question": false,
+      "questionCount": null,
+      "questionAnswered": false,
+      "targetUrl": null,
+      "menuItems": [
+        "Delete Message",
+        "Mute Chat for 24hrs",
+        "User Info",
+        "Mention",
+        "Show message to all",
+        "Alert Send Report",
+        "Copy",
+        "Private Chat"
+      ],
+      "sourceNodeSha256": "bb78b22cbc7d4a5b272247773e152f2ad7cdc77770359619913693faa195113a"
+    },
+    {
+      "evidenceKey": "app-room-complete:app-st-message:3",
+      "sequence": 3,
+      "panel": "alert",
+      "room": "main",
+      "senderName": "Billy Ribeiro",
+      "senderAvatarUrl": "https://secure.gravatar.com/avatar/b27c0cfb1c74fb928f5e40ba6711669f?d=mm&s=50",
+      "senderEmailHash": "b27c0cfb1c74fb928f5e40ba6711669f",
+      "timestampText": "7/25/26, 1:13 PM",
+      "separatorText": "Saturday, July 25, 2026",
+      "body": "lets buy TESLA at the current price. Stop $2 points below",
+      "bodySegments": [
+        {
+          "kind": "text",
+          "text": "lets buy TESLA at the current price. Stop $2 points below"
+        }
+      ],
+      "bodyStyle": "color: rgb(26, 26, 26);",
+      "messageBoxClass": "msg-box pb-1",
+      "messageBoxStyle": "background-color: rgb(232, 232, 232);",
+      "direction": "forward",
+      "isAdmin": false,
+      "question": false,
+      "questionCount": null,
+      "questionAnswered": false,
+      "targetUrl": null,
+      "menuItems": [
+        "Delete Message",
+        "Mute Chat for 24hrs",
+        "User Info",
+        "Mention",
+        "Show message to all",
+        "Alert Send Report",
+        "Copy",
+        "Private Chat"
+      ],
+      "sourceNodeSha256": "57d4a24306ba9d4d7b647cea4dc49b872a1e908c79d92e1c061c33fcc5eff029"
+    },
+    {
+      "evidenceKey": "app-room-complete:app-st-message:4",
+      "sequence": 4,
+      "panel": "alert",
+      "room": "main",
+      "senderName": "Billy Ribeiro",
+      "senderAvatarUrl": "https://secure.gravatar.com/avatar/b27c0cfb1c74fb928f5e40ba6711669f?d=mm&s=50",
+      "senderEmailHash": "b27c0cfb1c74fb928f5e40ba6711669f",
+      "timestampText": "7/25/26, 1:20 PM",
+      "separatorText": null,
+      "body": "buy 10 shares of Apple at current price FOR EDUCATIONAL PURPOSES ONLY, NOT FINANCIAL ADVICE",
+      "bodySegments": [
+        {
+          "kind": "text",
+          "text": "buy 10 shares of Apple at current price\n\n FOR EDUCATIONAL PURPOSES ONLY, NOT FINANCIAL ADVICE"
+        }
+      ],
+      "bodyStyle": "color: rgb(26, 26, 26);",
+      "messageBoxClass": "msg-box pb-1",
+      "messageBoxStyle": "background-color: rgb(232, 232, 232);",
+      "direction": "forward",
+      "isAdmin": false,
+      "question": false,
+      "questionCount": null,
+      "questionAnswered": false,
+      "targetUrl": null,
+      "menuItems": [
+        "Delete Message",
+        "Mute Chat for 24hrs",
+        "User Info",
+        "Mention",
+        "Show message to all",
+        "Alert Send Report",
+        "Copy",
+        "Private Chat"
+      ],
+      "sourceNodeSha256": "4ae85b6a597010d1cafb4433c11367cce6ed84db00098e3325897e31b423f4dc"
+    },
+    {
+      "evidenceKey": "app-room-complete:app-st-message:5",
+      "sequence": 5,
+      "panel": "alert",
+      "room": "main",
+      "senderName": "Billy Ribeiro",
+      "senderAvatarUrl": "https://secure.gravatar.com/avatar/b27c0cfb1c74fb928f5e40ba6711669f?d=mm&s=50",
+      "senderEmailHash": "b27c0cfb1c74fb928f5e40ba6711669f",
+      "timestampText": "7/25/26, 1:25 PM",
+      "separatorText": null,
+      "body": "Let's buy $TSLA at current price FOR EDUCATIONAL PURPOSES ONLY, NOT FINANCIAL ADVICE",
+      "bodySegments": [
+        {
+          "kind": "text",
+          "text": "Let's buy"
+        },
+        {
+          "kind": "stock",
+          "text": " $TSLA"
+        },
+        {
+          "kind": "text",
+          "text": " at current price\n FOR EDUCATIONAL PURPOSES ONLY, NOT FINANCIAL ADVICE"
+        }
+      ],
+      "bodyStyle": "color: rgb(26, 26, 26);",
+      "messageBoxClass": "msg-box pb-1",
+      "messageBoxStyle": "background-color: rgb(232, 232, 232);",
+      "direction": "forward",
+      "isAdmin": false,
+      "question": false,
+      "questionCount": null,
+      "questionAnswered": false,
+      "targetUrl": null,
+      "menuItems": [
+        "Delete Message",
+        "Mute Chat for 24hrs",
+        "User Info",
+        "Mention",
+        "Show message to all",
+        "Alert Send Report",
+        "Copy",
+        "Private Chat"
+      ],
+      "sourceNodeSha256": "985f39b49b909b76190742925c5fbe76cee8a5b440b1352c59502e9508060c71"
+    },
+    {
+      "evidenceKey": "app-room-complete:app-st-message:6",
+      "sequence": 6,
+      "panel": "alert",
+      "room": "main",
+      "senderName": "Billy Ribeiro",
+      "senderAvatarUrl": "https://secure.gravatar.com/avatar/b27c0cfb1c74fb928f5e40ba6711669f?d=mm&s=50",
+      "senderEmailHash": "b27c0cfb1c74fb928f5e40ba6711669f",
+      "timestampText": "7/25/26, 1:45 PM",
+      "separatorText": null,
+      "body": "Let's try buying $TSLA again at a lower price and still risking 2 points FOR EDUCATIONAL PURPOSES ONLY, NOT FINANCIAL ADVICE",
+      "bodySegments": [
+        {
+          "kind": "text",
+          "text": "Let's try buying"
+        },
+        {
+          "kind": "stock",
+          "text": " $TSLA"
+        },
+        {
+          "kind": "text",
+          "text": " again at a lower price and still risking 2 points\n FOR EDUCATIONAL PURPOSES ONLY, NOT FINANCIAL ADVICE"
+        }
+      ],
+      "bodyStyle": "color: rgb(26, 26, 26);",
+      "messageBoxClass": "msg-box pb-1",
+      "messageBoxStyle": "background-color: rgb(232, 232, 232);",
+      "direction": "forward",
+      "isAdmin": false,
+      "question": false,
+      "questionCount": null,
+      "questionAnswered": false,
+      "targetUrl": null,
+      "menuItems": [
+        "Delete Message",
+        "Mute Chat for 24hrs",
+        "User Info",
+        "Mention",
+        "Show message to all",
+        "Alert Send Report",
+        "Copy",
+        "Private Chat"
+      ],
+      "sourceNodeSha256": "d2441400a8a6f84e6581a2a01bb60ead09fc411ba799613394ab750297f543dc"
+    },
+    {
+      "evidenceKey": "app-room-complete:app-st-message:7",
+      "sequence": 7,
+      "panel": "alert",
+      "room": "main",
+      "senderName": "Billy Ribeiro",
+      "senderAvatarUrl": "https://secure.gravatar.com/avatar/b27c0cfb1c74fb928f5e40ba6711669f?d=mm&s=50",
+      "senderEmailHash": "b27c0cfb1c74fb928f5e40ba6711669f",
+      "timestampText": "7/25/26, 1:45 PM",
+      "separatorText": null,
+      "body": "Booooooo FOR EDUCATIONAL PURPOSES ONLY, NOT FINANCIAL ADVICE",
+      "bodySegments": [
+        {
+          "kind": "text",
+          "text": "Booooooo\n "
+        },
+        {
+          "kind": "image",
+          "url": "https://cdn1.protradingroom.com/uploads/images/6a628a99731b9f77ae9bf505_2026-07-18-FLEXIBLE_GRID_1785001553217.png",
+          "width": 2546,
+          "height": 1238
+        },
+        {
+          "kind": "text",
+          "text": "\n FOR EDUCATIONAL PURPOSES ONLY, NOT FINANCIAL ADVICE"
+        }
+      ],
+      "bodyStyle": "color: rgb(26, 26, 26);",
+      "messageBoxClass": "msg-box pb-1",
+      "messageBoxStyle": "background-color: rgb(232, 232, 232);",
+      "direction": "forward",
+      "isAdmin": false,
+      "question": false,
+      "questionCount": null,
+      "questionAnswered": false,
+      "targetUrl": "https://cdn1.protradingroom.com/uploads/images/6a628a99731b9f77ae9bf505_2026-07-18-FLEXIBLE_GRID_1785001553217.png",
+      "menuItems": [
+        "Delete Message",
+        "Mute Chat for 24hrs",
+        "User Info",
+        "Mention",
+        "Show message to all",
+        "Alert Send Report",
+        "Copy",
+        "Private Chat"
+      ],
+      "sourceNodeSha256": "08b51b2c4decd64d8154cc52986bafc1f315e22413918e99b4ea4a5e018e0fa5"
+    },
+    {
+      "evidenceKey": "app-room-complete:app-st-message:8",
+      "sequence": 8,
+      "panel": "alert",
+      "room": "main",
+      "senderName": "Billy Ribeiro",
+      "senderAvatarUrl": "https://secure.gravatar.com/avatar/6ee71e550a8c162767abf7d2dc8eea84?d=mm&s=50",
+      "senderEmailHash": "6ee71e550a8c162767abf7d2dc8eea84",
+      "timestampText": "7/29/26, 5:29 PM",
+      "separatorText": "Wednesday, July 29, 2026",
+      "body": "Buy 100 shares of Apple FOR EDUCATIONAL PURPOSES ONLY, NOT FINANCIAL ADVICE",
+      "bodySegments": [
+        {
+          "kind": "text",
+          "text": "Buy 100 shares of Apple\n FOR EDUCATIONAL PURPOSES ONLY, NOT FINANCIAL ADVICE"
+        }
+      ],
+      "bodyStyle": null,
+      "messageBoxClass": "msg-box pb-1",
+      "messageBoxStyle": null,
+      "direction": "forward",
+      "isAdmin": false,
+      "question": false,
+      "questionCount": null,
+      "questionAnswered": false,
+      "targetUrl": null,
+      "menuItems": [
+        "Delete Message",
+        "Mute Chat for 24hrs",
+        "User Info",
+        "Mention",
+        "Show message to all",
+        "Alert Send Report",
+        "Copy",
+        "Private Chat"
+      ],
+      "sourceNodeSha256": "b5d9b6c4c3f48d4567e6af279e8a8f9b105d825567e35122da5ff1855d366dce"
+    },
+    {
+      "evidenceKey": "app-room-complete:app-st-message:9",
+      "sequence": 9,
+      "panel": "chat",
+      "room": "main",
+      "senderName": "Billy Ribeiro",
+      "senderAvatarUrl": "https://secure.gravatar.com/avatar/6ee71e550a8c162767abf7d2dc8eea84?d=mm&s=50",
+      "senderEmailHash": "6ee71e550a8c162767abf7d2dc8eea84",
+      "timestampText": "09:30 AM",
+      "separatorText": null,
+      "body": "Testing",
+      "bodySegments": [
+        {
+          "kind": "text",
+          "text": "Testing"
+        }
+      ],
+      "bodyStyle": null,
+      "messageBoxClass": "msg-box pb-1",
+      "messageBoxStyle": null,
+      "direction": "forward",
+      "isAdmin": false,
+      "question": false,
+      "questionCount": null,
+      "questionAnswered": false,
+      "targetUrl": null,
+      "menuItems": [
+        "Delete Message",
+        "Mute Chat for 24hrs",
+        "User Info",
+        "Mention",
+        "Show message to all",
+        "Mark Answered",
+        "Private Chat"
+      ],
+      "sourceNodeSha256": "baf988c82b1e3681e930e224ce4860f7d8cc20a72fd6102af4d3596857f54fc9"
+    },
+    {
+      "evidenceKey": "app-room-complete:app-st-message:10",
+      "sequence": 10,
+      "panel": "chat",
+      "room": "main",
+      "senderName": "Billy Ribeiro",
+      "senderAvatarUrl": "https://secure.gravatar.com/avatar/6ee71e550a8c162767abf7d2dc8eea84?d=mm&s=50",
+      "senderEmailHash": "6ee71e550a8c162767abf7d2dc8eea84",
+      "timestampText": "09:30 AM",
+      "separatorText": null,
+      "body": "Good Morning",
+      "bodySegments": [
+        {
+          "kind": "text",
+          "text": "Good Morning"
+        }
+      ],
+      "bodyStyle": null,
+      "messageBoxClass": "msg-box pb-1",
+      "messageBoxStyle": null,
+      "direction": "forward",
+      "isAdmin": false,
+      "question": false,
+      "questionCount": null,
+      "questionAnswered": false,
+      "targetUrl": null,
+      "menuItems": [
+        "Delete Message",
+        "Mute Chat for 24hrs",
+        "User Info",
+        "Mention",
+        "Show message to all",
+        "Mark Answered",
+        "Private Chat"
+      ],
+      "sourceNodeSha256": "d796db31645729d5b878e26478e2f2a95598509c3dedd65c93fd0ab4a0dbd5b0"
+    },
+    {
+      "evidenceKey": "app-room-complete:app-st-message:11",
+      "sequence": 11,
+      "panel": "chat",
+      "room": "main",
+      "senderName": "Billy Ribeiro",
+      "senderAvatarUrl": "https://secure.gravatar.com/avatar/b27c0cfb1c74fb928f5e40ba6711669f?d=mm&s=50",
+      "senderEmailHash": "b27c0cfb1c74fb928f5e40ba6711669f",
+      "timestampText": "07:19 AM",
+      "separatorText": "Saturday, July 25, 2026",
+      "body": "how are you?",
+      "bodySegments": [
+        {
+          "kind": "text",
+          "text": "how are you?"
+        }
+      ],
+      "bodyStyle": "color: rgb(26, 26, 26);",
+      "messageBoxClass": "msg-box pb-1 msg-box-adm",
+      "messageBoxStyle": "background-color: rgb(232, 232, 232);",
+      "direction": "reverse",
+      "isAdmin": true,
+      "question": true,
+      "questionCount": null,
+      "questionAnswered": false,
+      "targetUrl": null,
+      "menuItems": [
+        "Delete Message",
+        "User Info",
+        "Mention",
+        "Show message to all",
+        "Reply",
+        "Mark Answered",
+        "Private Chat"
+      ],
+      "sourceNodeSha256": "9de095b000a2b9374dba1662c28e734bb348f31e2e5c5e354a30055ec603c401"
+    },
+    {
+      "evidenceKey": "app-room-complete:app-st-message:12",
+      "sequence": 12,
+      "panel": "chat",
+      "room": "main",
+      "senderName": "Billy Ribeiro",
+      "senderAvatarUrl": "https://secure.gravatar.com/avatar/b27c0cfb1c74fb928f5e40ba6711669f?d=mm&s=50",
+      "senderEmailHash": "b27c0cfb1c74fb928f5e40ba6711669f",
+      "timestampText": "01:20 PM",
+      "separatorText": null,
+      "body": "hello",
+      "bodySegments": [
+        {
+          "kind": "text",
+          "text": "hello"
+        }
+      ],
+      "bodyStyle": "color: rgb(26, 26, 26);",
+      "messageBoxClass": "msg-box pb-1 msg-box-adm",
+      "messageBoxStyle": "background-color: rgb(232, 232, 232);",
+      "direction": "reverse",
+      "isAdmin": true,
+      "question": false,
+      "questionCount": null,
+      "questionAnswered": false,
+      "targetUrl": null,
+      "menuItems": [
+        "Delete Message",
+        "User Info",
+        "Mention",
+        "Show message to all",
+        "Reply",
+        "Mark Answered",
+        "Private Chat"
+      ],
+      "sourceNodeSha256": "be5388dd9130544d48130f0a39ca7cb03b1e08eb71073423f0f589fc8f084eba"
+    },
+    {
+      "evidenceKey": "app-room-complete:app-st-message:13",
+      "sequence": 13,
+      "panel": "chat",
+      "room": "main",
+      "senderName": "Billy Ribeiro",
+      "senderAvatarUrl": "https://secure.gravatar.com/avatar/b27c0cfb1c74fb928f5e40ba6711669f?d=mm&s=50",
+      "senderEmailHash": "b27c0cfb1c74fb928f5e40ba6711669f",
+      "timestampText": "01:23 PM",
+      "separatorText": null,
+      "body": "How's everyone doing today?/",
+      "bodySegments": [
+        {
+          "kind": "text",
+          "text": "How's everyone doing today?/"
+        }
+      ],
+      "bodyStyle": "color: rgb(26, 26, 26);",
+      "messageBoxClass": "msg-box pb-1 msg-box-adm",
+      "messageBoxStyle": "background-color: rgb(232, 232, 232);",
+      "direction": "reverse",
+      "isAdmin": true,
+      "question": true,
+      "questionCount": null,
+      "questionAnswered": false,
+      "targetUrl": null,
+      "menuItems": [
+        "Delete Message",
+        "User Info",
+        "Mention",
+        "Show message to all",
+        "Reply",
+        "Mark Answered",
+        "Private Chat"
+      ],
+      "sourceNodeSha256": "f4391c97d0c02047369079ae10cbc2b74892be3d670889332552cf37751812bd"
+    },
+    {
+      "evidenceKey": "app-room-complete:app-st-message:14",
+      "sequence": 14,
+      "panel": "chat",
+      "room": "main",
+      "senderName": "Billy Ribeiro",
+      "senderAvatarUrl": "https://secure.gravatar.com/avatar/b27c0cfb1c74fb928f5e40ba6711669f?d=mm&s=50",
+      "senderEmailHash": "b27c0cfb1c74fb928f5e40ba6711669f",
+      "timestampText": "01:23 PM",
+      "separatorText": null,
+      "body": "excuse my typos",
+      "bodySegments": [
+        {
+          "kind": "text",
+          "text": "excuse my typos"
+        }
+      ],
+      "bodyStyle": "color: rgb(26, 26, 26);",
+      "messageBoxClass": "msg-box pb-1 msg-box-adm",
+      "messageBoxStyle": "background-color: rgb(232, 232, 232);",
+      "direction": "reverse",
+      "isAdmin": true,
+      "question": false,
+      "questionCount": null,
+      "questionAnswered": false,
+      "targetUrl": null,
+      "menuItems": [
+        "Delete Message",
+        "User Info",
+        "Mention",
+        "Show message to all",
+        "Reply",
+        "Mark Answered",
+        "Private Chat"
+      ],
+      "sourceNodeSha256": "3bbe16fcc690825ce09307ea39b35bac3039b79516716d194904f334da9f5eaf"
+    },
+    {
+      "evidenceKey": "app-room-complete:app-st-message:15",
+      "sequence": 15,
+      "panel": "chat",
+      "room": "main",
+      "senderName": "Billy Ribeiro",
+      "senderAvatarUrl": "https://secure.gravatar.com/avatar/b27c0cfb1c74fb928f5e40ba6711669f?d=mm&s=50",
+      "senderEmailHash": "b27c0cfb1c74fb928f5e40ba6711669f",
+      "timestampText": "01:26 PM",
+      "separatorText": null,
+      "body": "2 points of tisk, small size",
+      "bodySegments": [
+        {
+          "kind": "text",
+          "text": "2 points of tisk, small size"
+        }
+      ],
+      "bodyStyle": "color: rgb(26, 26, 26);",
+      "messageBoxClass": "msg-box pb-1 msg-box-adm",
+      "messageBoxStyle": "background-color: rgb(232, 232, 232);",
+      "direction": "reverse",
+      "isAdmin": true,
+      "question": false,
+      "questionCount": null,
+      "questionAnswered": false,
+      "targetUrl": null,
+      "menuItems": [
+        "Delete Message",
+        "User Info",
+        "Mention",
+        "Show message to all",
+        "Reply",
+        "Mark Answered",
+        "Private Chat"
+      ],
+      "sourceNodeSha256": "aab6f799985e10a3c8ad4983b028d840159895c6db2c43472aefd125e9edb50d"
+    },
+    {
+      "evidenceKey": "app-room-complete:app-st-message:16",
+      "sequence": 16,
+      "panel": "chat",
+      "room": "main",
+      "senderName": "Billy Ribeiro",
+      "senderAvatarUrl": "https://secure.gravatar.com/avatar/b27c0cfb1c74fb928f5e40ba6711669f?d=mm&s=50",
+      "senderEmailHash": "b27c0cfb1c74fb928f5e40ba6711669f",
+      "timestampText": "01:30 PM",
+      "separatorText": null,
+      "body": "What do you guys think about Spain winning the World Cup!?",
+      "bodySegments": [
+        {
+          "kind": "text",
+          "text": "What do you guys think about Spain winning the World Cup!?"
+        }
+      ],
+      "bodyStyle": "color: rgb(26, 26, 26);",
+      "messageBoxClass": "msg-box pb-1 msg-box-adm",
+      "messageBoxStyle": "background-color: rgb(232, 232, 232);",
+      "direction": "reverse",
+      "isAdmin": true,
+      "question": true,
+      "questionCount": null,
+      "questionAnswered": false,
+      "targetUrl": null,
+      "menuItems": [
+        "Delete Message",
+        "User Info",
+        "Mention",
+        "Show message to all",
+        "Reply",
+        "Mark Answered",
+        "Private Chat"
+      ],
+      "sourceNodeSha256": "ad69976487d337a801ba17a599f602cacacb568075719c113a3e0d0efde55acb"
+    },
+    {
+      "evidenceKey": "app-room-complete:app-st-message:17",
+      "sequence": 17,
+      "panel": "chat",
+      "room": "main",
+      "senderName": "Billy",
+      "senderAvatarUrl": "https://secure.gravatar.com/avatar/2fcd19da402033914f251e6ded8e6316?d=mm&s=50",
+      "senderEmailHash": "2fcd19da402033914f251e6ded8e6316",
+      "timestampText": "04:59 PM",
+      "separatorText": "Wednesday, July 29, 2026",
+      "body": "hey everyone",
+      "bodySegments": [
+        {
+          "kind": "text",
+          "text": "hey everyone"
+        }
+      ],
+      "bodyStyle": null,
+      "messageBoxClass": "msg-box pb-1",
+      "messageBoxStyle": null,
+      "direction": "forward",
+      "isAdmin": false,
+      "question": false,
+      "questionCount": null,
+      "questionAnswered": false,
+      "targetUrl": null,
+      "menuItems": [
+        "Delete Message",
+        "Mute Chat for 24hrs",
+        "User Info",
+        "Mention",
+        "Show message to all",
+        "Reply",
+        "Mark Answered",
+        "Private Chat"
+      ],
+      "sourceNodeSha256": "236606bfa0f3cd95c9a6683148219eebfe9a2e98ba0d79f11058b0518811f8b5"
+    },
+    {
+      "evidenceKey": "app-room-complete:app-st-message:18",
+      "sequence": 18,
+      "panel": "chat",
+      "room": "main",
+      "senderName": "Welber",
+      "senderAvatarUrl": "https://secure.gravatar.com/avatar/2fcd19da402033914f251e6ded8e6316?d=mm&s=50",
+      "senderEmailHash": "2fcd19da402033914f251e6ded8e6316",
+      "timestampText": "05:00 PM",
+      "separatorText": null,
+      "body": "hey guys, how you're doing???",
+      "bodySegments": [
+        {
+          "kind": "text",
+          "text": "hey guys, how you're doing???"
+        }
+      ],
+      "bodyStyle": null,
+      "messageBoxClass": "msg-box pb-1",
+      "messageBoxStyle": null,
+      "direction": "forward",
+      "isAdmin": false,
+      "question": true,
+      "questionCount": null,
+      "questionAnswered": false,
+      "targetUrl": null,
+      "menuItems": [
+        "Delete Message",
+        "Mute Chat for 24hrs",
+        "User Info",
+        "Mention",
+        "Show message to all",
+        "Reply",
+        "Mark Answered",
+        "Private Chat"
+      ],
+      "sourceNodeSha256": "b37791a12e7bf667cacf3a0725a5773c81f101f8c42d82bffc494f6cb36078b4"
+    }
+  ]
+}

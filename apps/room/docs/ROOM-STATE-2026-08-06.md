@@ -1,0 +1,356 @@
+# Room state: what was wrong, what is fixed, what is open
+
+**Current as of 2026-08-06.** Supersedes `REPOSITORY-STATE-2026-08-03.md` and
+`REPOSITORY-STATE-2026-07-30.md`, both of which carry banners pointing here.
+
+Gates at the time of writing: **385 tests / 51 files**, `svelte-check` **0 errors / 939 files**,
+prettier clean.
+
+**2026-08-05.** Every "fixed" row below was proven by a runtime measurement, not by reading code.
+Where something is only reasoned about, it says so. The two harnesses are `/tmp/ptr-probe`:
+`twopeer.mjs` (two isolated browser contexts against the live SFU) and `inventory.mjs` (drives
+every control and records what actually changed).
+
+Protocol evidence is regenerable: `node scripts/extract-realtime-protocol.mjs` writes
+`docs/generated/realtime-protocol.json` from the shipped bundle.
+
+---
+
+## 1. The finding that reframed everything
+
+The room had **no realtime channel at all**. Measured: zero `/api/v1` calls, no second socket, no
+polling, and `invalidateAll()` only after the acting user's own submission.
+
+The capture carries a **second socket** — SocketCluster pub/sub, separate from the media SFU —
+with ten session-keyed channels, 42 client commands and 104 server cases:
+
+```
+/sess/{id}/alerts/          /sess/{id}/cmds/          /sess/{id}/roster/
+/sess/{id}/chat/main/       /sess/{id}/cmdsAdmin/     /sess/{id}/{serverID}/roster/
+/sess/{id}/chat/{channel}/  /sess/{id}/privChatIn/{uid}/
+/sess/{id}/rosterEvents[Admin]/                       /sess/{id}/privCmdsIn/{uid}-{id}/
+```
+
+subscribed as `socket.subscribe(path, {waitForAuth: !0, priority: N})` and drained with `for await`.
+
+**Consequence:** an alert a presenter posted was invisible to every member until they reloaded.
+For a trading room that is the product, not a defect in it.
+
+### Why "get the presenter right, then decide what members render" was the wrong frame
+
+The member is not a subset of the presenter — it is the opposite code path. Presenter = produce and
+send. Member = consume and receive. Three times the presenter side was fine and the member side was
+**missing entirely**, not permission-gated:
+
+- `produceWebcam` was never called **and** no consume branch existed
+- `produceMicrophone` was never called **and** both `info.kind` guards were `!== 'video'`, so audio
+  was discarded on arrival
+- the talking indicator had no remote path at all
+
+A presenter testing alone saw a perfect room.
+
+---
+
+## 2. Fixed and proven
+
+| #   | Defect                                         | Evidence it was broken                                                                                                                                                                                                                               | Proof it is fixed                                                                                                                                                             |
+| --- | ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Alerts never reached members                   | no transport of any kind                                                                                                                                                                                                                             | member saw a posted alert in **~1.2s**, no reload                                                                                                                             |
+| 2   | Chat never reached members                     | same                                                                                                                                                                                                                                                 | **~1.2s**                                                                                                                                                                     |
+| 3   | Presenter commands did not exist               | `remotePresCommand` 0 occurrences                                                                                                                                                                                                                    | addressed command arrives ~1.2s; **dispatch muted the mic in 1.3s**; unknown subCmd → 400; wrong target correctly ignored                                                     |
+| 4   | Mic never reached the SFU                      | `produceMicrophone` uncalled                                                                                                                                                                                                                         | member receives a **live** audio track                                                                                                                                        |
+| 5   | Nothing consumed audio                         | both `kind` guards `!== 'video'`                                                                                                                                                                                                                     | `msRemAudio-610` sink with a live track                                                                                                                                       |
+| 6   | Webcam never reached the SFU                   | `produceWebcam` uncalled                                                                                                                                                                                                                             | member sees live **640×480**                                                                                                                                                  |
+| 7   | Nothing consumed remote webcams                | no `share !== true` branch                                                                                                                                                                                                                           | remote card renders                                                                                                                                                           |
+| 8   | Phantom webcam cards                           | guard accepted any untagged video producer                                                                                                                                                                                                           | capture tags positively (`{share:!1}` / `{share:!0}`); now requires explicit `false`; baseline **0 cards**                                                                    |
+| 9   | Talking indicator dead                         | local-only                                                                                                                                                                                                                                           | `"Billy Ribeiro"` appears on the member; `"( No one is speaking )"` on stop                                                                                                   |
+| 10  | Toolbar mute never released the camera         | `track.enabled` toggling                                                                                                                                                                                                                             | `readyState: "ended"`, fresh re-acquire on re-enable                                                                                                                          |
+| 11  | Toolbar mic used the wrong control             | capture's toolbar is `disableMic()`, not `muteMic()`                                                                                                                                                                                                 | producer closed; sink released                                                                                                                                                |
+| 12  | Master volume moved nothing                    | `[id^="msRemAudio-"]` queried against elements with no id                                                                                                                                                                                            | id restored                                                                                                                                                                   |
+| 13  | Volume slider caused pause/replay storms       | attachment read `volume`, so every tick tore it down                                                                                                                                                                                                 | untracked                                                                                                                                                                     |
+| 14  | Webcam invisible                               | `.webcam-wrapper{height:0}` + `app-presenter-cams{0×0}`, neither captured                                                                                                                                                                            | card fully on screen                                                                                                                                                          |
+| 15  | Webcam drift 5px per drag                      | captured `margin:5px` added to every `left` write                                                                                                                                                                                                    | 3 drags, exactly 50,40 each                                                                                                                                                   |
+| 16  | X could not close the card                     | `setPointerCapture` swallowed the click                                                                                                                                                                                                              | `cancel: '.closeIcon'`                                                                                                                                                        |
+| 17  | Card header invisible                          | our `height:0` on `.pNameLabel`/`.overlay`                                                                                                                                                                                                           | band renders                                                                                                                                                                  |
+| 18  | Screen controls on the gear                    | detached cluster in the attached slot                                                                                                                                                                                                                | right-aligned in `ms-auto`                                                                                                                                                    |
+| 19  | `#screenTabs{height:1px}`                      | not in any captured sheet                                                                                                                                                                                                                            | bar 40px                                                                                                                                                                      |
+| 20  | Advanced Search unreachable                    | `name==='advanced-search'` was its only reference                                                                                                                                                                                                    | opens; all state branches render                                                                                                                                              |
+| 21  | Alert = panel colour                           | both `#F1F1F1`                                                                                                                                                                                                                                       | alert `#E8E8E8`, pinned so they cannot re-merge                                                                                                                               |
+| 22  | Alerts toolbar: one flag, wrong gear           | capture has two flags, two toggles                                                                                                                                                                                                                   | magnifier = search-only, gear = full                                                                                                                                          |
+| 23  | Tokenizer lost `app-room`                      | `replaceAll("'",'"')`                                                                                                                                                                                                                                | 229 entries decode                                                                                                                                                            |
+| 24  | Permission checkboxes sent nowhere             | bound to local state only                                                                                                                                                                                                                            | now send `remotePresCommand` on revoke                                                                                                                                        |
+| 25  | Roster count frozen at page load               | badge rendered `data.connectedUsers.length` only                                                                                                                                                                                                     | 3rd peer joins → **5→6** on both peers; leaves → **6→5**                                                                                                                      |
+| 26  | `forceReload` did not exist                    | `/privCmdsIn/` unwired                                                                                                                                                                                                                               | addressed member reloaded; a member sending it gets **403**                                                                                                                   |
+| 27  | Poll answers invisible to presenters           | `/cmdsAdmin/` unwired                                                                                                                                                                                                                                | publishes on `gotPollAnswer`, presenter-gated (channel proven, flow not)                                                                                                      |
+| 28  | VideoPlayer tab shown to members               | our `<li>` had NO gate; captured gate is `(hideVideoPlayer && !isP) \|\| isP`                                                                                                                                                                        | member `["Screens","Notes","Files"]`, presenter `[…,"VideoPlayer",…]`                                                                                                         |
+| 29  | Maximize button missing from the screens bar   | capture's `ms-auto` has THREE dark buttons; we shipped two                                                                                                                                                                                           | `fa-expand` → `fa-compress-arrows-alt`; `#screens` 1105×824 → 1600×913                                                                                                        |
+| 30  | `.is-fullscreenshare` rule absent              | in the captured sheet, in neither of ours                                                                                                                                                                                                            | class applies and resizes the pane                                                                                                                                            |
+| 31  | Zoom trio clipped away                         | three of OUR non-captured `overflow` rules cut it                                                                                                                                                                                                    | all three buttons hit-test visible at y63                                                                                                                                     |
+| 32  | HTML comment leaked into the page              | `<!---->` quoted inside a comment ends it early                                                                                                                                                                                                      | tab bar back on one line; pinned by `comment-safety-contract.test.ts`                                                                                                         |
+| 33  | Chat message box white, alerts `#E8E8E8`       | ours applied the capture's FOLLOW-a-user default (`#ffffff`/14/playSound) as the ROOM chat style; `globals.chatStyle` is `#e8e8e8`/`13`                                                                                                              | split into `defaultChatStyleForTheme` and `defaultFollowChatStyle`; measured `rgb(232,232,232)` on both                                                                       |
+| 34  | Private-chat toolbar absent                    | `togglePMToolbar()` and `O(14, o.showPMToolbar ? 14 : -1)` unimplemented; the gear did nothing                                                                                                                                                       | `#pmSearchTermTxt`, "Don't Disturb" (the only place the capture binds `setDND`) and "Download Log" render for both roles                                                      |
+| 35  | Files: Delete Selected + Upload shown to all   | `O(77, o.isP ? 77 : -1)` / `O(81, o.isP ? 81 : -1)`; Refresh (node 78) unconditional                                                                                                                                                                 | presenter gets both, member gets the list and Refresh only                                                                                                                    |
+| 36  | File list was a stub                           | `<article>{item.name}</article>`                                                                                                                                                                                                                     | captured `table.st-fileTable > tbody#filesDriveList`, `st-fileName` / `st-fileSize ml-2` / `st-fileDownload`                                                                  |
+| 37  | Files sort bar missing                         | owner supplied the rendered markup; absent from every pinned artefact                                                                                                                                                                                | byte-identical to the owner's markup, including the icon class-order flip; sorting verified in both directions                                                                |
+| 38  | Empty state on the wrong condition             | `O(84, o.sessionFiles ? -1 : 84)` is "no files AT ALL", not "this tab is empty"                                                                                                                                                                      | keyed on `data.files.length === 0`; an empty tab shows an empty table                                                                                                         |
+| 39  | Row anchors carried the bucket, not the type   | owner's row has `type="image/png"`; ours emitted `type="image"`                                                                                                                                                                                      | added a `content_type` column; measured `audio/mpeg` and `image/png`                                                                                                          |
+| 40  | Rows filtered at the loop, breaking striping   | `more-fucking-evidence/sounds`: 30 empty `<tr>` around 2 mp3s, and `nth-of-type` stripes on ALL rows                                                                                                                                                 | a `<tr>` per searched file, cells collapsed off-tab; mp3 lands on `--file-list-even-bg`                                                                                       |
+| 41  | Upload was never built                         | no `onchange`, no drop handler, no `onclick`, and NO server endpoint                                                                                                                                                                                 | `l0`/`vf`/`doFileListUpload` transcribed; round-trip `200 · application/pdf · nosniff · 13 bytes · magic "%PDF-"`                                                             |
+| 42  | Upload modal focused an `aria-hidden` button   | we focused bootbox's close button, which it renders with `aria-hidden="true"`                                                                                                                                                                        | focustrap focuses the dialog (`tabindex="-1" role="dialog"`); `activeElement` is `DIV.bootbox.modal`                                                                          |
+| 43  | Every file row control was dead                | rendered with captured classes and gating, no handlers                                                                                                                                                                                               | Delete Selected / Delete / Play / Play For All wired; `No files where checked...` misspelling kept                                                                            |
+| 44  | "Disconnected from Media Server" never left    | fired per failed redial; `showToast` dedupes but its 5s timer still expires                                                                                                                                                                          | raised on the state transition only; any socket open dismisses it. Measured `[]`                                                                                              |
+| 45  | Room opened on Notes                           | `new-evidence/presenter-tab`: `screens-tab` is `nav-link active`                                                                                                                                                                                     | default `screens`; member lands on "No one is presenting right now..."                                                                                                        |
+| 46  | Links in messages were dead text               | `parseStockSegments` only split `$TICKER`; the capture has a `parseLinks` pipe                                                                                                                                                                       | `<a target="_blank" class="linkColor">`, computed `rgb(2,90,168)`, image URLs inline                                                                                          |
+| 47  | Alert image upload threw                       | `Missing captured upload configuration` — the CDN env vars are empty                                                                                                                                                                                 | falls back to the room's own uploader; captured CDN path kept and still wins                                                                                                  |
+| 48  | Alert/chat header overlapped at narrow widths  | OUR `.bs-component{height:48px}` — the capture has no such rule; content needs 120px                                                                                                                                                                 | `min-height` + `flex: 0 0 auto`; `overlapPx: 0` and no h-scroll at 1600→375                                                                                                   |
+| 49  | Recording was silent, unreachable, unsaved     | `getDisplayMedia({audio:false})`; the download link sat inside `{#if recording}` which the stop handler clears; nothing downloaded                                                                                                                   | mic mixed in, auto-download, `V_VP8` + `A_OPUS` verified on disk; **20/20**                                                                                                   |
+| 50  | "Show Rec Preview" was a dead control          | `recPreviewOpen` read only by its own label; defaulted `true` where the capture has `!1`                                                                                                                                                             | opens the capture's separate window; says so when the pop-up is blocked                                                                                                       |
+| 51  | No way to stop screen sharing                  | menu says "Start/Stop" but `stopScreenSharing()` was reachable only by a remote `mutescreens`                                                                                                                                                        | `e4e` transcribed: two dividers, bare `li > a`, "Stop Sharing All Screens"                                                                                                    |
+| 52  | OBS / virtual-cam share sent 640×480           | ours `{video:true}`; the capture spreads `JN.hdd` and passes `deviceId:{ideal:videoDeviceID}`                                                                                                                                                        | presenter 1920×1080, **member receives 1920×1080**; the saved camera is finally read back                                                                                     |
+| 53  | Private chat did not exist                     | no table, no send path, no history, no composer; the SSE event carried only two ids                                                                                                                                                                  | full build; **8/8** — live SSE both directions, unread, persistence, search, delete, guards                                                                                   |
+| 54  | X could not close the private chat             | `panelDragResize` captured the pointer on `pointerdown`, before any movement                                                                                                                                                                         | 3px threshold before capture; verified with REAL `Input.dispatchMouseEvent`; drag still works                                                                                 |
+| 55  | Private chat with yourself                     | capture alerts `Chatting with yourself again?` and does not open                                                                                                                                                                                     | guarded client-side and server-side                                                                                                                                           |
+| 56  | Members never saw `[ REC ]`                    | gated on `recording`, the presenter's LOCAL MediaRecorder flag                                                                                                                                                                                       | server-pushed room state; **8/8** — badge, paused, resume, tooltip suppression, sounds, and a member cannot fake it                                                           |
+| 57  | Member composer had only the emoji button      | ours `canPostImages = $derived(isPresenter)`; the capture is `(isPresenter \|\| sessData.userUploads)` in FIVE components (chat, privchat, alerts, extra-chat)                                                                                       | member now has emoji + Upload an Image + GIF; YouTube stays `isPresenter`. Presenter order matches the captured `presenterOrder` exactly. **5/5**                             |
+| 58  | Sidebar roster showed only YOU                 | `connectedUsers: [connectedUser]` - the list was one hard-coded entry while the badge was a live subscriber count, so a presenter saw "Users: 2" over a list containing nobody else                                                                  | the SSE hub carries identity; `getRoster` publishes the people. Measured: `["Welber Ribeiro","Billy Ribeiro"]`, badge matches the list                                        |
+| 59  | "Reconnecting Media..." spun forever           | hard-coded markup - a permanent `fa-spin` and a permanent tick, bound to nothing                                                                                                                                                                     | driven by `isMediaConnected` / `roomEventsConnected`, matching `O(15/16)` vs `O(18/19)` in the bundle. Measured: `["Media","Chat"]`, no spinner                               |
+| 60  | Roster badge counted TABS, not people          | `roomSubscriberCount` - one person with the room open twice read as two users                                                                                                                                                                        | counts `roomRoster().length`, deduped by user id                                                                                                                              |
+| 61  | Dead connections were never reaped             | `cancel()` only fires on a graceful close; `controller.enqueue` on a dead SSE does not throw in Node                                                                                                                                                 | teardown hangs off `request.signal`'s abort event                                                                                                                             |
+| 62  | `Get Random User` shown to everyone            | `O(43, e.appService.globals.isPresenter ? 43 : -1)`                                                                                                                                                                                                  | presenter-only, and wired to the captured `bootbox.confirm("Only select from Trials?")` flow                                                                                  |
+| 63  | `Archives` shown to everyone, ungated inside   | `O(32, e.archivesAvailableTo() ? 32 : -1)`, and inside it `O(6, isPresenter \|\| !hideRecs)`, `O(11/12, !hideChatLog \|\| isPresenter)`                                                                                                              | `archivesAvailableTo()` transcribed; all three inner gates applied. Member sees the captured four items exactly                                                               |
+| 64  | Four account flags did not exist               | `globals.user.hasAdminChat`, `globals.isLimitedPresenter`, `r.isFT`, `user.denyArchivesAccess` - read by six gates between them, absent from `users`                                                                                                 | real columns (`has_admin_chat`, `is_limited_presenter`, `is_free_trial`, `deny_archives_access`), added the additive idempotent way, named individually into the page payload |
+| 65  | `archivesAvailableTo()` was half-transcribed   | a LIMITED presenter takes the VIEWER branch, and the viewer branch is `!(!showArchivesToUsers \|\| user.denyArchivesAccess)`                                                                                                                         | both halves implemented; an allowlist naming a limited presenter correctly does nothing for them                                                                              |
+| 66  | The per-row roster gate did not exist          | `O(1, onlyPresentersVisibleToViewers && (e.isP \|\| e.hasAdminChat) \|\| rosterVisibleToViewers \|\| isPresenter \|\| user.hasAdminChat && (…))` - a DIFFERENT predicate from `O(44)`                                                                | applied per row. `onlyPresentersVisibleToViewers` now means what its name says instead of showing everyone to everyone                                                        |
+| 67  | Row classes came from a role string            | `Kn(2, u2e, !e.isP, e.isP \|\| e.hasAdminChat)`. Ours was `role === 'user' ? 'regUser' : 'presUser'` and no row holds `'user'` - the DB uses `'member'`, so every member rendered as `presUser`                                                      | `regUser`/`presUser` from `isP` and `hasAdminChat`, and they are not exclusive - an admin-chat member carries both                                                            |
+| 68  | The badge was gated with the list              | `O(6, rosterCountVisibleToViewers \|\| isPresenter ? 6 : -1)` is its own gate                                                                                                                                                                        | separated. A room can show the list and hide the headcount                                                                                                                    |
+| 69  | The navbar headcount was frozen at 1           | it read `data.connectedUsers.length`, and the load returns `[connectedUser]` - always just you                                                                                                                                                       | `globals.rosterCount + simUserCount`, the same number as the sidebar badge                                                                                                    |
+| 70  | Four roster-header controls were inert         | Reload / Sort Users / Search Users / Sort by Trials all rendered with no handler; `isSortUsers`, `isSortFTUsers`, `showUserSearch`, `visibleRoster` did not exist                                                                                    | all four wired: both pipes, `btn-dark` via `qB`, the `fa-check-circle` tick via `O(15)`, and the search input with const 73's attributes verbatim                             |
+| 71  | `Get Random User` had no draw                  | `roster.filter(r => !r.isP)` → `uniqueRoster` → optional `isFT` → `randomUser(s)`, and `if (o >= 2)` with no else                                                                                                                                    | the real two-phase dialog: giphy for 3s, then the name and "User Info". Fewer than two candidates opens nothing, as captured                                                  |
+| 72  | `canPM`'s trial branch was unreachable         | `canShowRosterPrivateChat` implemented `currentUserIsTrial` / `disablePmForTrials` and nothing ever passed them                                                                                                                                      | fed from `user.isFT` and the session flags; the row's `hasAdminChat` is its own flag, not `role !== 'user'`                                                                   |
+| 73  | The caption line was missing its sticky header | `Zwe`: `div.speech-reco-line > span.d-flex.align-items-center.position-sticky.top-0 > i.me-1 + strong.speech-reco-sender`, then `span.speech-reco-text`. Ours had a bare `<i>` and `<span>`, no wrapper, no `me-1`, no `<strong>`, no trailing colon | transcribed exactly. The speaker's name now stays pinned while a long caption scrolls under it                                                                                |
+| 74  | `single-line` carried an invented condition    | `Et("history-mode", m)("single-line", !m)` - exact complements. Ours added `&& history.length === 0`                                                                                                                                                 | complements. A caption arriving after any transcript no longer loses `max-height: none`                                                                                       |
+| 75  | The overlay closed when the room went quiet    | `hasSpeechRecognitionEntries()` is `historyMode ? history > 0 : current`. Ours was a flat `{#if current}`                                                                                                                                            | both branches. History mode stands on history alone                                                                                                                           |
+| 76  | Two overlay buttons were missing, one dead     | `O(5, archivesAvailableTo())` → Full Transcript History (icon 80, `fa-external-link-alt`); `O(6, hasHistoryAvailable())` → the toggle (icon 285, `fa-history`); close is const 270 + icon 93                                                         | all three, with the const table's own titles and aria-labels. The 286-entry table was previously recorded as an honest gap; it is in the dump                                 |
+| 77  | History rows were flattened                    | `t2e`: `.speech-reco-history-text` wraps `strong.speech-reco-history-sender` and a sibling span prefixed `\xa0`; `n2e` is a SEPARATE trailing `live-entry` reading "now"                                                                             | both, plus `date:'shortTime'` (`h:mm a`) instead of a leading-zero hour                                                                                                       |
+| 78  | The room had its own login                     | a second identity system for a product whose front door is `new-room-control`, which creates rooms, manages them and runs both sign-ins                                                                                                              | `/session?id=&jwtSite=` receives the controller's handoff; `/login` is deleted and `PUBLIC_PATHS` is `{/session}`                                                             |
+| 79  | The handoff was short-lived, not single-use    | the token is a URL — address bar, referrer, history sync, any proxy — all inside its own 60 seconds                                                                                                                                                  | `spent_handoffs` records each `jti`; the INSERT is the check, so a SELECT-then-INSERT race cannot be won                                                                      |
+| 80  | The password column was a proxy for provenance | `getSessionUser` required a hash, which retired auto-provisioned passwordless accounts. A handoff account is passwordless BY DESIGN, so the proxy stopped being true                                                                                 | `users.auth_source`: `'password'` still needs a hash, `'handoff'` does not. Every legacy row stays locked out                                                                 |
+| 81  | `sessData` was a hardcoded literal             | one global constant standing in for the settings of a room, in a product where rooms are created freely and configured individually                                                                                                                  | read from the controller per room, narrowed there to the twelve with a consumer. `simUserCount` 0→40→0 moves the headcount 1→41→1, proven live                                |
+| 82  | Which room was a URL parameter                 | `/?room=3625` is a hint a browser can edit and a reload can lose                                                                                                                                                                                     | `sessions.room_short_code`, written by `/session` from the handoff                                                                                                            |
+| 83  | `PTR_USER_UPLOADS` was process-wide            | an environment variable standing in for a per-room setting, so two rooms on one deployment could not disagree about member uploads                                                                                                                   | deleted; `uploadComposerImage` reads the room's own value, still server-side                                                                                                  |
+| 84  | Four flags were per-account                    | `is_free_trial`, `has_admin_chat`, `deny_archives_access` are per-ROOM in the controller. A column on `users` could only answer the same way everywhere                                                                                              | dropped; they arrive on the membership row. Proven by inviting a member and applying opcode 6                                                                                 |
+| 85  | `isLimitedPresenter` was stored at all         | nobody stores it — `giveMicScreen` assigns it in one statement beside `isPresenter`, so it is what a member BECOMES when handed mic and screen                                                                                                       | runtime `$state(false)`, set from `remotePresCommand`. `archivesAvailableTo()` unchanged; only its source moved                                                               |
+| 86  | The config read would have leaked every secret | the first version returned `resolveRoomConfig()` whole — `webinarPW`, `ssoJWTSecret`, `apiSecret`, `s3KeySecret`, `twillioApiToken` — into a room that serialises config into SSR HTML                                                               | an explicit allow-list in the controller, failing closed. Proven with a room that has a password set: it appears nowhere in what the room renders                             |
+
+### Channel status — 7 of 10 carried
+
+| channel                        | status                                                                                |
+| ------------------------------ | ------------------------------------------------------------------------------------- |
+| `alerts`                       | ✅ member sees a posted alert in ~1.2s                                                |
+| `privChat`                     | ✅ carries the MESSAGE, delivered to both parties; unread badge appears with no fetch |
+| `chat/main`                    | ✅ ~1.2s                                                                              |
+| `cmds`                         | ✅ `remotePresCommand` arrives and dispatches (mic muted)                             |
+| `roster` + `{serverID}/roster` | ✅ count live in both directions                                                      |
+| `cmdsAdmin`                    | ✅ `gotPollAnswer` published, presenter-gated                                         |
+| `privCmds`                     | ✅ `forceReload`; member → 403                                                        |
+| `privChat`                     | ⚠️ transport only — no action publishes it yet                                        |
+| `chat/{channel}`               | ⚠️ carried on the chat channel, not filtered per channel                              |
+| `rosterEvents[Admin]`          | ❌ not wired                                                                          |
+
+Measuring the handlers rather than trusting the channel names collapsed this work by an order of
+magnitude. Verbatim, the two dispatchers behind four of those channels:
+
+```js
+handleRosterCmd(e, i) {
+  case "getRosterCount": this.globals.rosterCount = parseInt(i.data); break;
+  case "getRosterQueue": console.log("getRosterQueue:", i.data.length);   // logs, nothing else
+}
+handleServerCmdAdmin(e, i) {
+  "gotPollAnswer" === e && this.appEventBus.emit("gotPollAnswer", i)      // one command, total
+}
+```
+
+`cmdsAdmin` - a name that implies broad admin power - carries exactly one command. `getRosterQueue`
+only logs, so not reproducing it is faithful rather than a gap. The roster count needed no presence
+table either: the SSE hub's subscriber set IS the connected set, so it publishes
+`roomSubscriberCount()` on connect and on cancel.
+
+**Gates:** `pnpm exec vitest run --dir src` → **48 files / 352 tests**; `svelte-check` → **0 errors /
+931 files**; `prettier --check src scripts docs` → clean.
+
+---
+
+## 3. Open, ranked by impact
+
+### P1 — reachability
+
+- **`giveMicScreen` is not built.** A member has no `#unmuteMuteMicrophone` at all, so `mutemic`
+  has nothing to act on for them. Granting is a role flip plus media reinit
+  (`globals.isPresenter = e.give; disconnectAll(); …init…`), deliberately not half-built.
+- ~~**`privChat` is transport only.**~~ **CLOSED 2026-08-06** - `private_messages`, three actions,
+  and the client. The event now carries the MESSAGE and is published to both parties, matching
+  `isMine = te.uid == myUserID`. 8/8 verified.
+- **`rosterEvents[Admin]` is unwired.** In the capture it is lazily subscribed behind
+  `rosterEventsOn` / `rosterEventsChannel` rather than in `subscribeToChannels`, so what triggers
+  it and what it carries are still unknown.
+- **Per-channel chat is not filtered.** The `chat` event carries its `room`, but every chat message
+  invalidates for every subscriber regardless of channel.
+- **`gotPollAnswer` is published but the flow is unverified** - it needs a live poll with a member
+  answering. The channel and the presenter gate are proven; that path is not.
+- **Still absent entirely**: `kickUser`, `closeSession`, `changeUserPerms`, `muteChat`, typing
+  indicators.
+
+### P2 — correctness
+
+- **Autoplay**: the capture retries `play()` 3× then prompts the user; we warn to console once. A
+  member who has not clicked gets silence with no UI.
+- **Mic ignores device selection** — no `deviceId`/AGC/NS/EC, so the AV-settings choice cannot apply.
+- **No mic re-produce on reconnect**; `remoteAudioStreams` keeps dead consumers after a disconnect.
+- **Per-presenter volume/mute** (`adjustVolPres`, `toggleTalkingPresenter`,
+  `stopListeningToPresenter`) — absent.
+- ~~**DND does not persist**~~ **NOT A DEFECT** - the capture does not persist it either.
+  `doNotDisturbOnChange()` flips the flag and returns while the method before it ends in
+  `savePreference(...)`, and `Preference("doNotDisturbOn` appears nowhere in the bundle. Our early
+  return is faithful, and is now pinned by a test.
+- **Mic icon** never becomes `fa-microphone-slash`.
+
+### P2b — closed 2026-08-05, all seven
+
+Every row below was re-derived from the bundle first and then measured in the running room with
+two logged-in peers (presenter `(staff A)`, member `(member B)`).
+Three of the seven turned out not to be app defects; that is recorded rather than papered over.
+
+| #   | Issue                                        | Outcome                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| --- | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A   | Green capture over `#screensTabsContent`     | **Not reproducible, and not the app.** In a clean member session `#screensTabsContent` measures 0×0 with zero children, there are no `position: fixed` overlays and no playing video. The green is Chrome's fake-device test pattern, which the probe harness enables with `--use-fake-device-for-media-stream`; that harness has parked live peers in the real room before. `greenoverlay.mjs` then crashed before its own `closeBrowser()`, proving the leak path was still open, so `cdp.mjs` now kills Chrome on `exit`, `uncaughtException`, `unhandledRejection`, `SIGINT` and `SIGTERM`. Screenshot: the member's Screens tab reads "No one is presenting right now...". |
+| B   | Chat `.msg-box` white, should be `#E8E8E8`   | **Fixed.** Two causes. `tokens.css` had no `.lightTheme` / `.darkTheme` mapping blocks at all (18 of 72 referenced vars undefined → now 5, all of which the captured sheets also leave undefined). The winner after that was an INLINE `background-color: #ffffff` from the global chat style, because one function was returning the capture's FOLLOW-A-USER default (`#ffffff`, 14, playSound) where the room's own `globals.chatStyle` is `#e8e8e8` / `13`. Split into `defaultChatStyleForTheme` and `defaultFollowChatStyle`. Measured `rgb(232, 232, 232)`, matching alerts.                                                                                              |
+| C   | DND badge missing from Chat and Private Chat | **Was already correct**; the real gap was elsewhere. Both roles get `#app-donot-disturb`, and ticking it raises all three badges with the exact const-table classes (alerts `ms-2`, chat `ml-2`, privchat `ml-2`). What was genuinely missing is the private-chat toolbar behind the gear — `togglePMToolbar()` / `O(14, o.showPMToolbar ? 14 : -1)` — carrying `#pmSearchTermTxt`, "Don't Disturb" (`setDND()`, the only place in the whole capture that method is bound) and "Download Log". Built and verified for both roles.                                                                                                                                               |
+| D   | Files: a member can only see and refresh     | **Was the captured behaviour; we were the ones diverging.** `O(77, o.isP ? 77 : -1)` Delete Selected, `O(81, o.isP ? 81 : -1)` Upload, node 78 Refresh unconditional, plus per row `O(0, i.isP)` checkbox and `O(19, i.isP)` Delete. We showed all of it to everyone. Now gated; measured presenter = delete+upload+checkbox+delete-row, member = refresh and the list only.                                                                                                                                                                                                                                                                                                    |
+| E   | Files sort bar missing                       | **Built, with an honest provenance note.** `st-fileSortBar` / `st-fileSortName` / `st-fileSortDate` / `fa-sort` / `fa-sort-amount-up` are in NONE of the pinned evidence — not `main.d6d3c112b59b7d0d.js`, not `complete-app-styles.css` (where `.fa-sort-amount-up` is only FontAwesome's glyph table), not the rendered Files dump. The captured deployment predates the feature, so this is built from the owner's own markup. Also replaced the file list itself, which was the stub `<article>{item.name}</article>`, with the captured `table.st-fileTable > tbody#filesDriveList` and the `<h4>No room files found.</h4>` empty state.                                   |
+| F   | Upload broken on presenter                   | **Fixed.** Bootbox really does render its close button with a literal `aria-hidden="true"` — that part was faithful. Ours then _focused_ that button via `focusUploadModalClose`, which is why Chrome logged "Blocked aria-hidden on an element because its descendant retained focus" and why focus never reached the upload control. Bootstrap's focustrap focuses the modal ELEMENT (`trapElement.focus()`); the dialog now carries the captured `tabindex="-1" role="dialog"` and takes focus itself. Measured: `activeElement` is `DIV.bootbox.modal`, the file input is present.                                                                                          |
+| G   | DND does not persist                         | **Not a defect.** The capture does not persist it either: `doNotDisturbOnChange()` flips the flag and returns while the method immediately before it ends in `savePreference(...)`, and `Preference("doNotDisturbOn` appears nowhere in the bundle. Our early `return` before `savePreference` is correct and is now pinned by a test so it is not "fixed" later.                                                                                                                                                                                                                                                                                                               |
+
+**Found while verifying A, and fixed:** the room opened on the **Notes** tab for both roles.
+`new-evidence/presenter-tab` shows `screens-tab` with `class="nav-link active"` and
+`aria-selected="true"`, and `notes-tab` with `aria-selected="false"`. Default is now `screens`.
+
+New contracts: `src/lib/files-pane-contract.test.ts`,
+`src/lib/privchat-toolbar-contract.test.ts`, and a chat-background section appended to
+`src/lib/alerts-background-contract.test.ts`. Suite: 50 files / 373 tests, svelte-check 0 errors.
+
+### The seam to `new-room-control` — closed 2026-08-06
+
+`new-room-control` is the FIRST part of the product: rooms are created there, managed there, and
+logged into there. This room is what you land in afterwards. Until today the two did not touch —
+the controller had been minting a handoff token and redirecting to a route this room did not have.
+
+Now: `/launch/[id]` and `/session/[code]/joined` both mint through one signer; `/session` receives;
+`internal/room-config/[code]` answers for the room's own settings and the connected member's
+per-room standing. Two repositories still, deliberately — consolidation is `TODO.md` entry 2 and
+the Rust API cutover is entry 5, both out of scope for this pass.
+
+Four probes hold it up, all against running servers:
+
+| probe                      |       |
+| -------------------------- | ----- |
+| `handoff-e2e.mjs`          | 20/20 |
+| `roster-gates-e2e.mjs`     | 24/24 |
+| `two-app-seam-e2e.mjs`     | 12/12 |
+| `room-config-seam-e2e.mjs` | 21/21 |
+
+`two-app-seam` registers an account in the controller, clicks "Sessions" five times to reveal New
+Room exactly as the reference gates it, creates a room, follows Launch across the seam, and lands
+here as a presenter. `room-config-seam` changes a setting on the Manage page and watches this room
+obey.
+
+### P2c — open after 2026-08-06
+
+- **The self-chat alert is unreachable through the UI.** `canPrivateMessage` already hides the item
+  on your own messages, so the guard is a backstop I could not click. The roster and user-info-modal
+  paths use a DIFFERENT string (`Chatting with yourself again???`, three question marks) and are not
+  built.
+- **Private chat is missing three captured features**: image upload (`imgUpload` / `onImagePaste`),
+  online status from the roster (`checkUserOnlineStatus` - ours defaults false until a message
+  arrives), and the title flash on a new message
+  (`"{name} messaged you - {sessionName}"`, alternating every 2s).
+- **`app-st-compactmessage` is rendered inline** in the private-chat scroller rather than as a shared
+  component. The room's compact message carries reactions, moderation and badges that private chat
+  does not use.
+- **The transcript page does not exist, and neither does its data.** `toggleSpeechRecoHistory()`
+  and `openTranscriptPage()` are the same body and both open `#/session-transcript?token=…&name=…`.
+  Nothing here produces a transcript — `currentCaption` is never assigned, because the capture runs
+  the Web Speech API on the presenter's machine and relays results over the socket, and neither half
+  is wired. Both controls now render behind their captured gates and say so plainly rather than
+  being dead links. `TODO.md` gap 18.
+- ~~**The session flags have no captured VALUES.**~~ Closed 2026-08-06. There is nothing left to
+  capture: the room holds no values for these at all. They come from the controller's
+  `room_settings` per room, and a newly created room has no settings row, so unset means off.
+- **Mobile App Info and Benzinga are not built.** Both are real captured features.
+  `O(12, hideAppInfo ? -1 : 12)` gates the Mobile App Info button; `O(31, hasBenzingaNews ? 31 : -1)`
+  gates the Benzinga item. The room renders an empty `<p>` for the first and nothing for the second,
+  so their two settings are held back from the controller's allow-list until consumers exist.
+  `TODO.md` gap 21.
+- **Recording pause is unverified in the OUTPUT.** `pause()`/`resume()` are proven to be called and
+  the state changes, but whether the paused segment is excluded from the file - and whether the
+  result is seekable across the pause - needs `ffprobe`, which is not installed here.
+- **"Stop For All"** (`O(83, o.isP && o.mp3Playing ? 83 : -1)`) is not built; we have no
+  `mp3Playing` state. Row Play / Play For All render with correct gating and are wired, but the
+  server contract behind them is unverified - every dump is DOM-only.
+- **Streaming quality rows 2, 3, 6** in `streaming-choices.md` need one measurement before they are
+  worth arguing about: `getStats()` `outbound-rtp` on a REAL desktop share. Measured so far: full
+  1920×1080 reaches the member with `qualityLimitationReason: none` and `bandwidth: 0, cpu: 0`, so
+  nothing is throttling - the lever is telling the encoder the content is text, not lifting a limit.
+
+### P3 — measured no-ops (from `inventory.mjs`)
+
+~~Four adjacent roster controls, likely one broken wire: **Get Random User**, **Users**,
+**Sort Users**, **Search Users**.~~ — all four fixed 2026-08-06 (rows 70-71); it was not one broken
+wire but four controls that had never been given handlers or state. **SoundCloud play-for-all**
+remains.
+
+### P4 — architecture
+
+- **The realtime hub is process-local.** It will not survive a restart or span instances. The
+  durable path exists and is unused: `services/api` listens on PostgreSQL `room_events`
+  (`services/api/src/jobs.rs`). That is `TODO.md` entry 5; the hub is shaped for a one-line swap.
+- Each event triggers `invalidateAll()` — one refetch per message. Fine now, worth batching.
+- No contract test covers the realtime path; it is proven by harness, not by the suite.
+
+---
+
+## 4. Things I got wrong, recorded so they are not repeated
+
+1. **Asserted `userId` was a string** from a Rust doc comment and a test name
+   (`a_media_user_id_is_always_a_string_on_the_wire`). **Measured**, the wire sends `"userId":610`
+   — a number. The string-only decoder returned null and silently disabled the talking indicator
+   and the roster avatar lookup. The decoder now accepts both.
+2. **Built a speech-level detector** for the talking indicator. The bundle has **one**
+   `createAnalyser` (the mic test) and zero `activeSpeaker`/`audioLevel`. The capture's "talking"
+   means _mic open_, pushed by the server. Removed and replaced.
+3. **Left probe browsers running.** Eight live WebSockets sat in the real room for over an hour with
+   fake cameras on, appearing as "Billy Ribeiro" with a green feed — indistinguishable from an app
+   bug. `closeBrowser()` is now mandatory in the harness.
+4. **Proved the X button with `element.click()`**, which bypasses pointer events. It passed while the
+   real thing was broken. All checks since use dispatched mouse events.
+5. **Rendered two static `app-presenter-cams`.** Those two are inert in the capture — no inputs
+   bound, so `initDrag()` and its `.show()` never run. Reproducing them put two black boxes on screen.
+
+6. **Reported five "failures" that were my own probe.** Clicking the outer nav `<li>` instead of the
+   menu item; patching `window.open` after the click meant to observe it; dispatching on a parent
+   when the handler sits on the child. A red result about MY tooling sent the owner looking at
+   working code.
+7. **A comment broke two source-scanning tests.** Quoting `` `{#if recording}` `` and `Number(uid)`
+   in prose is an unclosed block and a forbidden coercion to a regex. `svelte-check` stayed green
+   both times. Both scanners now strip comments first.
+8. **Used a writable `$derived` for `chatTabs`.** Overriding a derived is documented as TEMPORARY -
+   discarded when a dependency changes - so every unread count silently reset to 0 on any
+   `invalidateAll`. Measured: the SSE frame arrived correctly and the badge still read 0.
+9. **Said `contentHint` and browser recording were "free".** Neither was measured. Recording a second
+   1080p stream competes with the live encoder on the presenter's CPU and can drop frames on the
+   share members are watching; I asserted it could not.
+10. **Killed the media SFU during a cleanup and did not restart it**, then investigated the endless
+    "Disconnected from Media Server" toast it caused. The toast bug underneath was real, but I made
+    the symptom.
+
+The pattern in all ten: reading is not measuring, and a failing check is a claim about the CHECK
+until proven otherwise.

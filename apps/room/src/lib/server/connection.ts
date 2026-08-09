@@ -1,0 +1,150 @@
+import type { Cookies } from '@sveltejs/kit';
+import { createHash } from 'node:crypto';
+import { and, eq, gt, isNotNull, or } from 'drizzle-orm';
+import { db, ensureDatabase } from './db';
+import { SESSION_COOKIE } from './auth';
+import { sessions, users, userSettings, type User } from './db/schema';
+
+interface ConnectedIdentity {
+  /** Null when the request carries no valid session: hooks.server.ts turns that into a 403. */
+  user: User | null;
+  sessionId: string | undefined;
+  /**
+   * Which room this session was handed off into, from the session row rather than the URL.
+   *
+   * The page load asks the controller for this room's configuration, so the answer has to come
+   * from somewhere the browser cannot edit.
+   */
+  roomShortCode: string | null;
+}
+
+export function gravatarUrl(identity: string) {
+  const hash = createHash('md5').update(identity.trim().toLowerCase()).digest('hex');
+  return `https://secure.gravatar.com/avatar/${hash}?d=mm&s=50`;
+}
+
+/*
+  The longest cookie this app issues is 30 days (`THIRTY_DAYS` in auth.ts, used when
+  "remember me" is ticked). No session should outlive the cookie it was issued with.
+
+  Until this was added there was no expiry check anywhere: `sessions.lastSeenAt` was
+  written on every request and never read, and `createdAt` was never consulted, so a row
+  stayed valid indefinitely. A cookie's `maxAge` is a client-side hint only - it tells a
+  browser when to stop sending the value, and does nothing about a value that has been
+  copied. The practical effect was that a stolen session cookie authenticated forever, and
+  declining "remember me" bought no server-side protection at all.
+*/
+const SESSION_ABSOLUTE_TTL_MS = 1000 * 60 * 60 * 24 * 30;
+
+function getSessionUser(sessionId: string | undefined) {
+  if (!sessionId) return undefined;
+
+  const oldestValidCreatedAt = new Date(Date.now() - SESSION_ABSOLUTE_TTL_MS);
+
+  /*
+    A session only counts if its account can actually authenticate.
+
+    Every visitor used to be given an auto-provisioned `staff` account with no password, and those
+    sessions survived the switch to password login - so an old cookie walked straight into the
+    room, as a presenter, having proved nothing. The fix was to require a password hash.
+
+    That fix is kept, and the test is now stated rather than inferred. `auth_source` says HOW an
+    account may become a session: `'password'` still needs a hash, so every legacy passwordless row
+    remains locked out. `'handoff'` is passwordless by design - the controller is the front door,
+    and those accounts cannot be logged into here at all, only handed off to with a signed,
+    single-use, unexpired token that `/session` has already verified.
+  */
+  return db
+    .select({ user: users, roomShortCode: sessions.roomShortCode })
+    .from(sessions)
+    .innerJoin(users, eq(sessions.userId, users.id))
+    .where(
+      and(
+        eq(sessions.id, sessionId),
+        or(eq(users.authSource, 'handoff'), isNotNull(users.passwordHash)),
+        gt(sessions.createdAt, oldestValidCreatedAt)
+      )
+    )
+    .get();
+}
+
+/**
+ * A public, stable, one-way handle for a session.
+ *
+ * The page payload used to carry the raw `ptr_connection` value - the actual
+ * authentication credential - and the client put it in a third-party upload URL
+ * (`${uploadServer}/image/${sessionId}`) and in a popout window's query string. A
+ * credential in a URL ends up in the receiving server's access logs, in any proxy or CDN
+ * between here and there, in `Referer` headers, in browser history and in the SSR'd HTML
+ * itself. None of the six client call sites needed the secret; every one of them only
+ * needed something stable and unique per session.
+ *
+ * SHA-256 with no salt is sufficient here: the input is a `randomUUID`, so there are 122
+ * bits of entropy behind the digest and nothing to enumerate.
+ */
+export function publicSessionHandle(sessionId: string): string {
+  return createHash('sha256').update(sessionId).digest('hex').slice(0, 32);
+}
+
+function ensureSettings(userId: number, now: Date) {
+  const settings = db
+    .select({ userId: userSettings.userId })
+    .from(userSettings)
+    .where(eq(userSettings.userId, userId))
+    .get();
+
+  if (!settings) {
+    db.insert(userSettings)
+      .values({
+        userId,
+        theme: 'light',
+        roomLayout: 'left',
+        chatTextSize: 16,
+        updatedAt: now
+      })
+      .run();
+  }
+}
+
+export function resolveConnectedIdentity(cookies: Cookies): ConnectedIdentity {
+  ensureDatabase();
+
+  const now = new Date();
+  const sessionId = cookies.get(SESSION_COOKIE);
+  const session = getSessionUser(sessionId);
+  let user = session?.user;
+
+  // Identity comes from the session cookie alone. This deliberately no longer provisions an account
+  // from request headers, and no longer invents a guest user for anyone without a session: both
+  // handed out a working `staff` identity to any caller, which made the role column meaningless and
+  // left the room open to anyone who could reach it.
+  if (!user || !sessionId) return { user: null, sessionId: undefined, roomShortCode: null };
+
+  if (user.avatarUrl === '/avatar.svg') {
+    user = db
+      .update(users)
+      .set({ avatarUrl: gravatarUrl(user.email) })
+      .where(eq(users.id, user.id))
+      .returning()
+      .get();
+  }
+
+  // The row is guaranteed to exist: getSessionUser found this user by joining it. The cookie is
+  // deliberately left alone rather than re-issued per request, so the lifetime chosen at login
+  // ("Keep me logged in" or not) is the one that applies.
+  db.update(sessions).set({ lastSeenAt: now }).where(eq(sessions.id, sessionId)).run();
+
+  ensureSettings(user.id, now);
+
+  return { user, sessionId, roomShortCode: session?.roomShortCode ?? null };
+}
+
+/**
+ * The Gravatar identifier for an address - `md5(trim(lowercase(email)))`.
+ *
+ * Shared rather than duplicated: the page load and the roster stream both build user entries, and
+ * two copies of this would eventually disagree and give one person two avatars.
+ */
+export function hashEmail(email: string) {
+  return createHash('md5').update(email.trim().toLowerCase()).digest('hex');
+}

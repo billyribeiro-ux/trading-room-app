@@ -1,0 +1,55 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1785388514436,
+      "tag": "0000_dizzy_expediter",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1785388871714,
+      "tag": "0001_married_starhawk",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1785388880752,
+      "tag": "0002_neat_violations",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1785417191749,
+      "tag": "0003_great_scream",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1785418531442,
+      "tag": "0004_wonderful_xavin",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1785437966402,
+      "tag": "0005_burly_drax",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1785440347422,
+      "tag": "0006_late_juggernaut",
+      "breakpoints": true
+    }
+  ]
+}

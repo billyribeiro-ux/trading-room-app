@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <!--
+      The captured shell declares the viewport TWICE (docs/source/deployed-index.html):
+
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, target-densitydpi=device-dpi">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+      The second is what this reproduces. `target-densitydpi` was dropped from the spec years ago
+      and no current browser implements it - Chrome answers it with
+      `The key "target-densitydpi" is not supported.` on every load, in the original app as much as
+      here - so the first tag contributes nothing but that console line. Carrying the second gives
+      the identical layout viewport without it.
+    -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#000000" />
+    <!--
+      The icon link the captured shell declares (docs/source/deployed-index.html). Its
+      type="image/x-icon" is load-bearing rather than decorative: changeFavicon(url) locates the
+      tag it replaces with querySelector('link[type="image/x-icon"]') before swapping in a room's
+      sessData.customFaviconURL. Without the type attribute a custom favicon would be added while
+      this one was never removed, leaving two icon links and letting the browser choose.
+
+      static/favicon.ico is the real 16x16 asset from protradingroom.com, not a stand-in - it is
+      referenced by the captured shell but its bytes appear in no capture artifact.
+    -->
+    <link rel="icon" type="image/x-icon" href="%sveltekit.assets%/favicon.ico" />
+    <title>PTRChat</title>
+    %sveltekit.head%
+  </head>
+  <body data-sveltekit-preload-data="hover">
+    <div style="display: contents">%sveltekit.body%</div>
+  </body>
+</html>
