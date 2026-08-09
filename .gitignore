@@ -46,10 +46,20 @@ NEXT-STEP/*.json
 enterprise/
 docs/generated/
 
-# NOT ignored: `docs/source/` — the original app's own JS bundles, SHA-256 pinned. It was excluded
-# once on a false positive: a PII sweep flagged it, but the only address in all 203 files is
-# `johndoe@gmail.com`, the vendor's own placeholder. Excluding it broke 24 test files, because 42
-# of them read those bundles as the byte-for-byte authority they are pinned against.
+# `docs/source/` — the original application's 203 compiled JS bundles.
+#
+# Excluded once as PII-bearing, which was wrong: the only address in all 203 files is
+# `johndoe@gmail.com`, a vendor placeholder. Restored on that correction, while this repository
+# was private.
+#
+# Excluded again, for a different and better reason: the repository is PUBLIC. Committing a third
+# party's compiled application to a public repository is a republication question that has nothing
+# to do with PII, and it is not one to answer by accident. Every other capture already lives
+# outside this repo and is symlinked in; this is the same category and is now treated the same way.
+#
+# 42 test files pin against these bundles byte-for-byte. The symlink keeps every one of them
+# runnable locally without publishing anything.
+/apps/room/docs/source
 
 # The two predecessor repositories. Never a subdirectory of this one.
 new-room/

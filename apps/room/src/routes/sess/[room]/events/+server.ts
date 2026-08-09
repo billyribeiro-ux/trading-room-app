@@ -1,4 +1,23 @@
 import type { RequestHandler } from './$types';
+
+/*
+  This route is the room's realtime channel: a long-lived `text/event-stream` with a heartbeat.
+
+  On a serverless platform it is the one endpoint whose natural lifetime exceeds the platform's.
+  Left on the default, the stream would be cut after a few seconds and `EventSource` would
+  reconnect immediately, producing a reconnect storm rather than a live room.
+
+  `maxDuration` asks for the longest run the plan allows, which turns "reconnects constantly" into
+  "reconnects rarely". It does NOT make the stream permanent — no serverless function is permanent
+  — so the reconnect path stays load-bearing and must keep working.
+
+  `svelte.config.js` documents the alternative: `ADAPTER=node` deploys this to a long-running host
+  where the stream lives as long as the session does. This config is inert under that adapter.
+*/
+export const config = {
+  runtime: 'nodejs22.x',
+  maxDuration: 800
+};
 import {
   publishToRoom,
   roomRoster,
