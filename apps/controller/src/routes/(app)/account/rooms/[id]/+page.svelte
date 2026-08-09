@@ -6,6 +6,7 @@
   import { toast } from '$lib/toast.svelte';
   import Editable from '$lib/components/Editable.svelte';
   import { formatLastLogin } from '$lib/last-login-format';
+  import { editableText, isBlank, isEditableEmpty } from '$lib/editable-display';
   import PermissionsModal from '$lib/components/PermissionsModal.svelte';
   import RichTextEditor from '$lib/components/RichTextEditor.svelte';
   import { AUTH_MODES, isRegistrationMode, showsRoomLinks } from '$lib/auth-modes';
@@ -173,6 +174,11 @@
      persist (they carry no onaftersave), so these are page state too. */
   let statsFrom = $state('');
   let statsTo = $state('');
+  /* Which of the two date fields has been clicked open. The reference edits both through
+     angular-xeditable's `editable-date` directive (file2:905, 910), so the resting state is an
+     anchor and the input only exists while one is being edited. */
+  let editingStatsFrom = $state(false);
+  let editingStatsTo = $state(false);
   let statsSearch = $state('');
   let statsOnlineOnly = $state(false);
   let statsTrialsOnly = $state(false);
@@ -212,6 +218,29 @@
     }
     return statsReversed ? [...rows].reverse() : rows;
   });
+
+  /**
+   * What a stats date anchor prints.
+   *
+   * MONTH FIRST, with dashes. The capture's two anchors read «08-07-2026» and «08-08-2026»
+   * (file2:905, 910), and the app's other rendered date — the Users table's last-login cell,
+   * « 08/07/2026 @ 5:05PM » (file2:446), which this suite's fixture reads as 7 August 2026 —
+   * settles the ordering as month/day/year rather than day/month/year.
+   *
+   * The `yyyy-mm-dd` a date input stores is reordered by splitting the string, never by building a
+   * Date: `new Date('2026-08-07')` is UTC midnight and prints as the 6th anywhere west of
+   * Greenwich.
+   *
+   * INHERITED, NOT CAPTURED: both anchors are populated in the capture — they are the only two
+   * `editable-date` nodes in it — so what one shows with NO value is not evidence this repo holds.
+   * It goes through the same `editableText` as every other editable, which is what the capture's
+   * empty ones do print (`editable-display.ts` tallies 47 of them; file2:889 and 991 are two).
+   */
+  function statsDateText(iso: string) {
+    if (isBlank(iso)) return editableText(iso, false);
+    const [year, month, day] = iso.split('-');
+    return `${month}-${day}-${year}`;
+  }
 
   /*
     Two of the four Stats checkboxes CANNOT filter, and say so rather than silently doing nothing.
@@ -1812,16 +1841,91 @@ Please click this link to attend: ______ unique link will be here_____
               <fieldset>
                 <div class="form-group">
                   <div class="col-sm-4 pull-left">
+                    <!--
+                      A CLICK-TO-EDIT ANCHOR, not a bare date input.
+
+                      The reference edits both stats dates through angular-xeditable's
+                      `editable-date` directive — `<a href="#" editable-date="statsDate" class="…
+                      editable editable-click">08-07-2026</a>` on file2:905, and its End Date twin
+                      on file2:910 — carrying the current value as the anchor's own text. Ours was
+                      an `<input type="date">`: a different tag, and one node fewer than the
+                      anchor-plus-text pair, which put every element after it in this pane out of
+                      step with the capture.
+
+                      The href is `""`, and the reference's is `"#"` — the one attribute here that
+                      is deliberately NOT transcribed. Svelte rejects a bare fragment
+                      (`a11y_invalid_attribute`) and this package runs
+                      `svelte-check --fail-on-warnings`, so `#` cannot ship. `""` is the value the
+                      capture's other hundred-odd editable anchors already carry (file2:889, 991),
+                      it resolves to the current URL, and neither is ever followed: the click is
+                      always prevented.
+
+                      The EDITING state is not captured: nothing in the dump was ever clicked, so
+                      there is no evidence of what the date popover looks like. The input therefore
+                      keeps exactly the styling it already had and closes on change (a date was
+                      picked) or on blur (clicked away), which is this page's own choice, not a
+                      transcription.
+
+                      The `for`/`id` pair stays. The reference's labels carry no `for` (file2:904,
+                      909) and it does dangle while the field is resting, but it is invisible to
+                      this comparison — `shapeOf` reads tag and classes only — and dropping it
+                      would leave an orphan `<label>`, which `svelte-check --fail-on-warnings`
+                      rejects as `a11y_label_has_associated_control`.
+                    -->
                     <div>
                       <p class="form-control-static">
                         <label class="col-sm-4 control-label" for="statsFrom">Start Date:</label>
-                        <input class="mg-date" type="date" id="statsFrom" bind:value={statsFrom} />
+                        {#if editingStatsFrom}
+                          <input
+                            class="mg-date"
+                            type="date"
+                            id="statsFrom"
+                            bind:value={statsFrom}
+                            onchange={() => (editingStatsFrom = false)}
+                            onblur={() => (editingStatsFrom = false)}
+                          />
+                        {:else}
+                          <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
+                          <a
+                            class={[
+                              'editable editable-click',
+                              { 'editable-empty': isEditableEmpty(statsFrom, false) }
+                            ]}
+                            href=""
+                            onclick={(e) => {
+                              e.preventDefault();
+                              editingStatsFrom = true;
+                            }}>{statsDateText(statsFrom)}</a
+                          >
+                        {/if}
                         <br />
                         <span class="muted">Choose a start date</span>
                       </p>
                       <p class="form-control-static">
                         <label class="col-sm-4 control-label" for="statsTo">End Date:</label>
-                        <input class="mg-date" type="date" id="statsTo" bind:value={statsTo} />
+                        {#if editingStatsTo}
+                          <input
+                            class="mg-date"
+                            type="date"
+                            id="statsTo"
+                            bind:value={statsTo}
+                            onchange={() => (editingStatsTo = false)}
+                            onblur={() => (editingStatsTo = false)}
+                          />
+                        {:else}
+                          <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
+                          <a
+                            class={[
+                              'editable editable-click',
+                              { 'editable-empty': isEditableEmpty(statsTo, false) }
+                            ]}
+                            href=""
+                            onclick={(e) => {
+                              e.preventDefault();
+                              editingStatsTo = true;
+                            }}>{statsDateText(statsTo)}</a
+                          >
+                        {/if}
                         <br />
                         <span class="muted">Choose an end date</span>
                       </p>

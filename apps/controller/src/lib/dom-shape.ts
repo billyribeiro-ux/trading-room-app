@@ -29,9 +29,18 @@
  * This module holds the comparison; the test file supplies the render.
  */
 
-/** AngularJS bookkeeping — present in the reference, meaningless to appearance. */
+/**
+ * AngularJS bookkeeping — present in the reference, meaningless to appearance.
+ *
+ * `ng-valid` and `ng-invalid` take an optional PER-VALIDATOR suffix. ngModel writes
+ * `ng-invalid ng-invalid-required` as a pair, and this enumerated only the first half — so the
+ * reference's stats search box (file2:927, `class="form-control ng-pristine ng-untouched ng-invalid
+ * ng-invalid-required"`) normalised to `input.form-control.ng-invalid-required` and read as a class
+ * our page was missing. It is not: our box carries the same `required` the reference does. One
+ * piece of framework bookkeeping was surviving the filter that exists to remove it.
+ */
 const FRAMEWORK_CLASS =
-  /^(ng-scope|ng-binding|ng-isolate-scope|ng-pristine|ng-untouched|ng-valid|ng-dirty|ng-touched|ng-invalid|ng-empty|ng-not-empty)$/;
+  /^(ng-scope|ng-binding|ng-isolate-scope|ng-pristine|ng-untouched|ng-valid(-[a-z0-9-]+)?|ng-dirty|ng-touched|ng-invalid(-[a-z0-9-]+)?|ng-empty|ng-not-empty)$/;
 
 /**
  * One line per element, in document order.

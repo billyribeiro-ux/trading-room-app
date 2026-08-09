@@ -15,6 +15,7 @@ will fetch it. A gap recorded in only one app's document is a gap the next perso
 | document | covers |
 | --- | --- |
 | `docs/NEXT-SESSION.md` | verified state, the room-hosting decision, backend + egress arithmetic, what the original actually runs on, hostname/DNS plan, consolidation, ordered next actions, audit method, traps |
+| `docs/EMAIL.md` | transactional sending vs mailbox hosting, what is built, the DNS records, and the verification trap |
 | `docs/MOBILE-APP.md` | the phone/tablet app — decoded server surface, proposed endpoint contract, security constraints, the white-label question |
 | `apps/controller/docs/OUTSTANDING.md` | the controller's own gap register, §1–§7 |
 | `apps/controller/docs/MEDIASOUP-DEPLOYMENT-PLAN.md` | the SFU deployment ladder — **Stage 2+ superseded**, see `NEXT-SESSION.md` §4c |
@@ -45,6 +46,16 @@ value; each is a thing that was looked for and not found.
 | 11 | **The Settings capture is truncated twice over** — node array stops at index 900, **35.6%** of the pane unmeasured; every tab's `html` stops at 120,000 characters. | the collector output | 13 settings from `slackPostURL` on have markup but no measurements; 121 after `customClientAlertPostSecret` have neither | `OUTSTANDING.md` §6b |
 | 12 | **The app-pair sample link has no endpoint.** The reference renders `…/ptr_app/sessions/v2/addUser/<publicId>/?sec=<pairSecretKey>&…`; we have no `addUser` route. | searched `src/routes`, `src/lib` | self-serve mobile pairing | `OUTSTANDING.md` §6b; `MOBILE-APP.md` §4 |
 | 13 | **`ptr_logo.png` was never captured.** The markup points at the reference's own path; the asset is missing. It is white-on-transparent, which is why the panel is `background-color: #000`. | `evidence-dumps/`, `must-match/` | the Branding tab's default logo. Save it to `apps/controller/static/public/images/ptr_logo.png`. | in-code comment; `NEXT-SESSION.md` §7 |
+
+### Not an evidence gap — missing work, recorded so it is not lost
+
+| # | what | severity | written up |
+| --- | --- | --- | --- |
+| A | **No password reset flow.** `(public)/` has no `forgot-password` or `reset-password`; the link goes to `/contact`, which does not deliver. A user who loses their password has no route back. | **HIGH — blocks real customers** | `EMAIL.md` §3, §4 step 7 |
+| B | **Mail transport unconfigured.** Built and unused: `RESEND_API_KEY` and `MAIL_FROM` unset, so `verificationEnforced()` is false and the room-creation gate is inert. | HIGH — blocked on an account, a domain and DNS | `EMAIL.md` §2, §4 |
+| C | **`push_tokens_json` has no writer.** The endpoint the mobile app would call does not exist. | blocks the app | `MOBILE-APP.md` §4, §7b.3 |
+| D | **`ROOM_BASE_URL` is `http://localhost:5174` in production.** Every Launch link points at a laptop. Not fixable until the room has a host. | HIGH once anyone clicks Launch | `NEXT-SESSION.md` §5 |
+| E | **`ROOM_JWT_SECRET` is 9 characters**, signing 360-day tokens carried in URLs. Rotate on both sides in one sitting. | HIGH | `NEXT-SESSION.md` §5 |
 
 ### The collector that closes most of these
 

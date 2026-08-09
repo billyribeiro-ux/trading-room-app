@@ -19,10 +19,17 @@
   all plausible and they produce four different UIs, so the correct move is to read it rather than
   pick one.
 
+  IT IS NOT ONLY createNew — IT CLOSES FIVE GAPS
+  ----------------------------------------------
+  `TODO.md` gaps 1, 2, 3, 6 and 7 all live in this one file. The bundle text was always captured
+  whole, so their bytes already landed in the download; what was missing is that only `createNew`
+  was ever SEARCHED for, so a run reported "found" while saying nothing about the other four. Each
+  is now a target in its own right and each reports its own absence.
+
   WHAT IT DOES
   ------------
   Pastes into the Chrome console on the live site while logged in, as member OR admin, and downloads
-  a JSON containing the bundle text plus every region mentioning the handler.
+  a JSON containing the bundle text plus every region mentioning each target handler.
 
   It is a GET of a public static asset. It clicks nothing, submits nothing, posts nothing and
   mutates nothing — see the denylist assertion below, which is why there is no click path at all.
@@ -33,6 +40,18 @@
   2. Open DevTools -> Console.
   3. Paste this whole file, press Enter.
   4. A JSON downloads on its own. No follow-up call, no terminal step.
+
+  RUN IT ON THE MANAGE PAGE TOO, NOT ONLY THE ACCOUNT PAGE
+  --------------------------------------------------------
+  This fetches every same-origin `script[src]` ON THE PAGE IT IS PASTED INTO. Four of the five gaps
+  are manage-page handlers, and the reference can serve a DIFFERENT bundle per room: `altCodeAppJS`
+  ("Alt AppJS ... ie. 'app2.min.js'"), `altCodeVendorJS` and `alt_roomjs` are real settings —
+  `room-settings-schema.ts:302-305`. So "the bundle" is not necessarily one file, and a run on the
+  account page may fetch a different set than the manage page loads. Run it on both; the download
+  records `href`, so which page produced which bundle stays attributable.
+
+  Note the five-clicks step in the New Room gap message below applies ONLY to `controlInDom`. The
+  bundle fetch needs no clicking at all, so gaps 2, 3, 6 and 7 need no interaction with the page.
 */
 
 (async () => {
@@ -49,10 +68,36 @@
     origin: location.origin,
     role: null,
     bundles: [],
-    createNew: { found: false, regions: [] },
+    handlers: {},
     related: {},
     gaps: []
   };
+
+  /*
+    One target per gap in `TODO.md`, so a single run answers all five instead of one.
+
+    `needle` is what is searched for; `why` is written into the download so the JSON explains itself
+    to whoever opens it without this file to hand.
+
+    The toolbar target is a LIST of candidates rather than one name, and that is deliberate. Gap 3
+    is about an ATTRIBUTE (`disabled="disabled"` on 29 of 30 buttons), not a function, and searching
+    a minified bundle for "disabled" returns thousands of hits that mean nothing. The candidates
+    below are the textAngular identifiers actually present in the capture — `text-angular-toolbar`,
+    `name="textAngularToolbar…"`, `class="ta-toolbar btn-toolbar"`, `ta-root` — read off
+    `must-match/important:879`. Any that is absent is reported as absent rather than assumed.
+  */
+  const TARGETS = [
+    { needle: 'createNew', why: 'gap 1 — the New Room handler; where a new room NAME comes from' },
+    { needle: 'htmlDescChanged', why: 'gap 2 — Save Editor Changes; whether the original shows anything on save' },
+    { needle: 'textAngularToolbar', why: 'gap 3 — toolbar disabled state (candidate, from must-match/important:879)' },
+    { needle: 'taToolbar', why: 'gap 3 — toolbar disabled state (candidate)' },
+    { needle: 'ta-toolbar', why: 'gap 3 — toolbar disabled state (candidate, the class in the capture)' },
+    { needle: 'ptrMobileAppCaseByCaseEnabled', why: 'gap 6 — the three branches Angular stripped; labels and handlers unknown' },
+    { needle: 'customMobileAppLaunchWord', why: 'gap 7 — what the launch word actually does' },
+    /* Gap 4 is resolved SERVER-side by the reference, so the bundle can show at most what the
+       client asks for. Included because that request is still more than we have today. */
+    { needle: 'loadMobileUsers', why: 'gap 4 — the Show Mobile filter; may only reveal the request, not the predicate' }
+  ];
 
   /* Role, from what is actually on screen — recorded because a member and an admin may be served
      different bundles, and a claim about "the" bundle needs to say which session produced it. */
@@ -96,24 +141,32 @@
     which is where a shared prompt helper or a default name would actually live.
   */
   const WINDOW = 4000;
-  for (const b of out.bundles) {
-    if (!b.text) continue;
-    let from = 0;
-    for (;;) {
-      const at = b.text.indexOf('createNew', from);
-      if (at === -1) break;
-      out.createNew.found = true;
-      out.createNew.regions.push({
-        bundle: b.url,
-        offset: at,
-        text: b.text.slice(Math.max(0, at - WINDOW), at + WINDOW)
-      });
-      from = at + 9;
+  for (const target of TARGETS) {
+    const entry = { why: target.why, found: false, regions: [] };
+    for (const b of out.bundles) {
+      if (!b.text) continue;
+      let from = 0;
+      for (;;) {
+        const at = b.text.indexOf(target.needle, from);
+        if (at === -1) break;
+        entry.found = true;
+        entry.regions.push({
+          bundle: b.url,
+          offset: at,
+          text: b.text.slice(Math.max(0, at - WINDOW), at + WINDOW)
+        });
+        from = at + target.needle.length;
+      }
     }
-  }
+    out.handlers[target.needle] = entry;
 
-  if (!out.createNew.found) {
-    out.gaps.push('the string "createNew" does not occur in any same-origin bundle this page loads');
+    /* Absence is REPORTED, never filled in. A target that is not in the bundle is a finding about
+       where the answer is not, which is worth having written down. */
+    if (!entry.found) {
+      out.gaps.push(
+        `"${target.needle}" does not occur in any same-origin bundle this page loads (${target.why})`
+      );
+    }
   }
 
   /* Neighbouring names worth having in the same file: whatever createNew calls is likely here. */
@@ -162,7 +215,10 @@
   setTimeout(() => URL.revokeObjectURL(a.href), 10000);
 
   console.log('[collect-create-new] role:', out.role);
+  console.log('[collect-create-new] page:', out.href);
   console.log('[collect-create-new] bundles fetched:', out.bundles.length);
-  console.log('[collect-create-new] createNew regions:', out.createNew.regions.length);
+  for (const [needle, entry] of Object.entries(out.handlers)) {
+    console.log(`[collect-create-new] ${needle}: ${entry.found ? entry.regions.length + ' region(s)' : 'ABSENT'}`);
+  }
   console.log('[collect-create-new] gaps:', out.gaps.length ? out.gaps : 'none');
 })();
