@@ -24,6 +24,38 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-09
 
+### 10:54 — The badge roles textarea no longer overflows its container (deliberate divergence)
+
+**RUNTIME IMPACT: yes.** One CSS rule on the account page's badge editor. The field stops escaping
+its card.
+
+`#badgeRolesTxt` is `<textarea class="input-text" cols="70" rows="2">` inside a `.col-md-6` editor.
+Node #91 of `NEXT-STEP/run2/welcome-run2.json` computes **`width: auto`** and **`max-width: none`**,
+so the box comes entirely from `cols="70"` — about 70 characters, inside a card that is roughly half
+of a 1170px container. Wider than its parent, with nothing to stop it. **The reference does this
+too**, confirmed by the owner against the live original, so this is a divergence chosen on purpose
+rather than a match.
+
+**`max-width: 100%`, not `width: 100%`**, and the distinction is the whole fix: `width: 100%` would
+contradict the measured `width: auto` and stretch the field even where there is room, which the
+reference does not do. Bounding it changes nothing until the box would leave its parent — the one
+case that is broken. `box-sizing: border-box` is already in force from `.acc-body *` and matches
+what #91 computes, so the 2px padding and 1px border sit inside the bound.
+
+**Honest gap:** the overflow itself is not in any capture. Every rect in that file is `0×0` because
+the badge editor is `ng-show`-collapsed when captured, and a hidden element has no box. The authored
+style explains *why* it overflows; the owner's observation is the evidence *that* it does. No
+number for how far it overruns exists, and none was invented.
+
+**Pinned in both directions** by a new case in `badge-editor-contract.test.ts`: `max-width: 100%`
+must be present, a bare `width: 100%` must not be, and `cols="70"` stays in the markup. The
+assertion **strips CSS comments first** — its first version matched the note quoting the old
+`#badgeRolesTxt { width: 100% }` and failed against correct CSS, which is the same
+"satisfied by its own documentation" trap the file already guards against for markup.
+
+**Verified:** mutation-checked — swapping `max-width` for `width` turns the test red, so it is not
+vacuous. Breakpoint contract passes; 5/5 badge editor tests pass.
+
 ### 10:50 — "Export badges should be CSV": investigated, and NOT changed
 
 **No runtime impact** — one new collector script. **No application code was touched, deliberately.**

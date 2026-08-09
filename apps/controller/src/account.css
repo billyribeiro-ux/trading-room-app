@@ -1205,8 +1205,36 @@ span.acc-label {
   font-size: 18px;
   font-weight: 500;
 }
-/* NO `#badgeRolesTxt { width: 100% }`. #74 computes `width: auto`; its box is set
-   by `cols="70"`, which the markup carries. */
+/* `#badgeRolesTxt` is BOUNDED to its container, and that is a deliberate divergence.
+   ────────────────────────────────────────────────────────────────────────────
+   The reference overflows here, and the owner confirmed it does so in the live
+   original. The cause is in the capture: node #91 of
+   `NEXT-STEP/run2/welcome-run2.json` computes `width: auto` and
+   `max-width: none`, so the box comes entirely from the `cols="70"` the markup
+   carries — about 70 characters wide, inside a `.col-md-6` badge editor that is
+   roughly half of a 1170px container. Wider than its parent, with nothing to
+   stop it.
+
+   What the capture does NOT hold is the overflow itself: every rect in that
+   file is `0×0`, because the badge editor is `ng-show`-collapsed at capture
+   time and a hidden element has no box. So the numbers are an honest gap, and
+   the owner's observation of the live app is the evidence that it renders
+   wrong.
+
+   `max-width` rather than `width`, and this is the whole point of the fix:
+   `width: 100%` would contradict the measured `width: auto` and would stretch
+   the field even when there is room, which the reference does not do. Bounding
+   it changes nothing until the box would leave its parent — the only case that
+   is broken. `box-sizing: border-box` is already in force from `.acc-body *`
+   above and matches what #91 computes, so the 2px padding and 1px border are
+   inside the bound rather than added to it.
+
+   An earlier note here read "NO `#badgeRolesTxt { width: 100% }`" and was
+   right about `width` and silent about the overflow. Pinned by
+   `badge-editor-contract.test.ts` so neither half is undone by accident. */
+#badgeRolesTxt {
+  max-width: 100%;
+}
 
 /* ============================================================================
  * Interaction states — hover, focus, active, disabled.

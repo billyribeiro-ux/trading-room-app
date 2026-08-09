@@ -1,0 +1,54 @@
+<ul role="menu" class="dropdown-menu">
+                                         <li>
+                                            <a href="" ng-click="updateManyUsers(10)">
+                                <i class="icon fa fa-trash"></i> Remove All
+                                            </a>
+                                        </li>
+                                        <li>
+                                            <a href="" ng-click="updateManyUsers(2)">
+        <i class="icon fa fa-user"></i> UNBAN Participant
+                                            </a>
+                                        </li>
+                                        <li>
+                                            <a href="" ng-click="updateManyUsers(1)">
+        <i class="fa fa-microphone"></i>&nbsp;<i class="fa fa-desktop"></i> Make Presenter
+                                            </a>
+                                        </li>
+                                        <li>
+                                            <a href="" ng-click="updateManyUsers(5)">
+        <i class="fa fa-cog" aria-hidden="true"></i>&nbsp;<i class="fa fa-user-md"></i> Make Admin (Non-Presenter)
+                                            </a>
+                                        </li>
+                                        <li>
+                                            <a href="" ng-click="updateManyUsers(2)">
+        <i class="icon fa fa-user"></i> Make Participant
+                                            </a>
+                                        </li>
+                                        <li>
+                                            <a href="" ng-click="updateManyUsers(6)">
+        <i class="icon fa fa-user"></i> Make TRIAL user
+                                            </a>
+                                        </li>
+                                        <li>
+                                            <a href="" ng-click="updateManyUsers(3)">
+        <i class="fa fa-user-times"></i> MUTE Participant
+                                            </a>
+                                        </li>
+                                        <li>
+                                            <a href="" ng-click="updateManyUsers(4)">
+        <i class="fa fa-user-times"></i> BAN Participant
+                                            </a>
+                                        </li>
+
+                                        <li>
+                                            <a href="" ng-click="updateManyUsersBadgePrompt('add')">
+        <i class="icon fa fa-user"></i> Add Badge
+                                            </a>
+                                        </li>
+                                        <li>
+                                            <a href="" ng-click="updateManyUsersBadgePrompt('remove')">
+
+        <i class="icon fa fa-user"></i> Remove Badge
+                                            </a>
+                                        </li>
+                                    </ul>

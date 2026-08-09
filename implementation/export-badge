@@ -1,0 +1,8 @@
+<a type="button" ngf-select="ngf-select" ngf-change="onImageSelect($files, '')" class="btn btn-info mb">
+                <i class="fa fa-cloud-upload"></i> Upload Image Badge
+              </a>
+
+              <a type="button" ng-show="badgesList" class="btn btn btn-default mb" ng-click="exportBadges()">Export Badges</a>
+
+
+              <h3 ng-show="!badgesList" class="ng-hide">No Badges defined</h3>
