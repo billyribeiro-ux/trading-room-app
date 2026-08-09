@@ -180,7 +180,7 @@ for the same traffic.
 | Room | same box or beside it | needs a durable filesystem and long-lived connections |
 | Control API | Hetzner CCX (dedicated vCPU) if/when the Rust API lands | no cold starts, long-lived connections |
 | Postgres | **managed** (Neon today) | the system of record; paying for someone else's on-call is worth it here |
-| Admin UI | stay on Vercel | pure rendering, no UDP, no state |
+| Admin UI | ~~stay on Vercel~~ → **consolidate, see §4c** | superseded 2026-08-09: the owner is putting everything on one provider |
 
 Lightsail was correct for Stage 1 and the plan says so itself — "a smoke/integration host, not a
 production capacity claim". **The owner has decided to leave it**, so the ladder in
@@ -278,6 +278,119 @@ to start if an externally-bound service announces a loopback address —
 - **TURN needs its own IP.** It relays media for members who cannot reach the SFU directly, so it is
   a second egress-heavy service. The original runs its own; budget it as a peer of the SFU, not an
   afterthought.
+
+---
+
+## 4c. Consolidation — one provider for everything
+
+Decided direction 2026-08-09: stop splitting the app across Vercel and a VM. Put the application
+tier on one provider. This section supersedes the "Admin UI — stay on Vercel" line in the §4 table.
+
+### First: "the backend" is TWO things, and one of them has never run
+
+This is the most important fact in this document for anyone planning infrastructure.
+
+| # | thing | stack | data store | deployed |
+| --- | --- | --- | --- | --- |
+| 1 | **Controller / admin** | SvelteKit server routes + Drizzle | **Neon Postgres** | yes — Vercel |
+| 2 | **Room** | SvelteKit server routes + SSE | **SQLite file** | **no** |
+| 3 | **`services/api`** | **Rust / Axum + sqlx** | **Postgres** | **NEVER** |
+| 4 | **`services/media`** | Rust mediasoup SFU | none (ephemeral) | yes — Lightsail |
+
+**#3 deserves attention.** `services/api` is 75 tracked files with ten route modules:
+
+```
+account (3)   alerts (5)   join (2)     media (1)    messages (2)
+moderation (11)  notes (9)  polls (10)  rooms (3)    mod.rs (30 route registrations)
+```
+
+It has its own migrations — `0001_baseline` through `0005_harden_runtime_role_and_room_events_policy`
+— and the room already ships a client for it, `apps/room/src/lib/server/tradingroom-api.ts`, with
+`CONTROL_BASE_URL` to point at it. It has never been deployed and the room has never called it.
+
+Per **ADR 0003** that Rust API was always meant to BE the backend: SvelteKit owns rendering, Rust
+owns authentication, tenancy, validation and media-grant issuance, PostgreSQL owns the data. Today
+the SvelteKit controller talks to Neon directly and the Rust API sits idle.
+
+So there are currently **two backends and the intended one is not running.** Whoever plans hosting
+should know that before drawing a diagram.
+
+### The target topology
+
+```
+Hetzner (one box to start, split later)
+├── Caddy :80/:443 ─ automatic TLS, routes by hostname
+│     ├── www.tradingroom.app    → controller   (SvelteKit, ADAPTER=node)
+│     ├── chat.tradingroom.app   → room         (SvelteKit, ADAPTER=node)
+│     └── media.tradingroom.app  → SFU signalling → loopback 127.0.0.1:4443
+├── services/media ─ UDP + TCP 40000-49999, host networking
+├── services/api ─── only if/when the cutover happens (see below)
+└── .data/ ───────── the room's SQLite file, on a real disk
+
+Neon ─────────────── PostgreSQL, stays managed
+```
+
+### What consolidation buys
+
+- **One provider, one bill, one ops surface.** One place to look when something is wrong.
+- **Flat bandwidth.** The entire reason for leaving AWS — see the egress table above.
+- **No cross-provider hops** between controller, API and SFU.
+- **It is what the original does.** Both of its hostnames resolve to the same pair of IPs (§4a);
+  the room is not on separate infrastructure.
+- **The room stops being a special case.** Its SQLite file and its SSE stream are only awkward
+  because Vercel cannot host them. On a VM they are unremarkable.
+
+### What it costs — stated honestly
+
+- **Vercel's CDN** for marketing pages. Caddy can serve static assets well, but it is one origin,
+  not an edge network. For a handful of marketing pages this is a small loss.
+- **Preview deployments per pull request**, and one-click rollback. These are genuinely useful and
+  you would be rebuilding them with a deploy script plus keeping the previous release directory.
+- **You own uptime, restarts and TLS renewal.** Caddy automates certificates, and systemd handles
+  restarts — `ops/` already contains working units — so this is smaller than it first sounds, but
+  it is not zero.
+- **`adapter-vercel` → `adapter-node` for the controller.** Both already build in this repo, so it
+  is a config change, not a port. The room's `svelte.config.js` already selects by `ADAPTER`; do
+  the same for the controller.
+
+### What should NOT move
+
+**PostgreSQL stays managed.** Self-hosting saves perhaps €20/month and buys backups, point-in-time
+recovery, failover and a 3am pager. It is the system of record; this is the one tier where paying
+for someone else's on-call is straightforwardly worth it. Neon today; any managed Postgres later.
+
+### Sequencing — this matters more than the destination
+
+**Move the hosting first. Change the architecture second. Never both at once.**
+
+1. Provision the Hetzner host. Verify UDP 40000-49999 is permitted and check the included-traffic
+   figure for that specific location (§4, §4a).
+2. Create `chat` and `media` DNS records against it (§4b).
+3. Deploy the SFU there; retire the Lightsail instance and the `sslip.io` hostname.
+4. Deploy the room with `ADAPTER=node`. Rotate `ROOM_JWT_SECRET` on both sides in the same sitting.
+5. Point `ROOM_BASE_URL` at `chat.tradingroom.app`, redeploy, prove Launch end to end.
+6. Move the controller to `ADAPTER=node` behind the same Caddy. Keep the Vercel project until the
+   new one is proven, then repoint DNS.
+7. **Only then** consider deploying `services/api` and running the cutover in
+   `docs/CUTOVER-ROOM-TO-API.md`.
+
+Step 7 is a separate project with its own document. Bundling it into a hosting move means that when
+something breaks you will not know which change caused it.
+
+### One box or several?
+
+Start with one. Split when a measurement says to, not before:
+
+| symptom | action |
+| --- | --- |
+| approaching the bandwidth cap (~250 concurrent viewers on 1 Gbit) | move the SFU to its own box |
+| SFU CPU saturating before bandwidth | add SFU nodes — but see below |
+| the room's SSE connections exhausting file descriptors | tune limits first, then split |
+
+**Adding a second SFU node requires room-aware placement, which does not exist.** Routers, peers
+and producers are process-local, so two members of one room on two nodes cannot exchange media.
+Round-robin DNS or an HTTP load balancer in front of two SFUs will do exactly that. This is the
+real work between here and selling the product.
 
 ---
 

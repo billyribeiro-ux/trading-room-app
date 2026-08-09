@@ -61,7 +61,7 @@ const BASELINE: Record<string, number> = {
   'tab strip': 0,
   Users: 2,
   'Text List': 0,
-  Branding: 13,
+  Branding: 0,
   'SSO Setup': 0,
   'User Stats': 45,
   Settings: 1564

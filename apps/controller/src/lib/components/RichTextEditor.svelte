@@ -42,9 +42,24 @@
 
   let { value = $bindable(), initialContent, name = 'value' }: Props = $props();
 
+  /**
+   * The reference seeds an EMPTY editor with one empty paragraph.
+   *
+   * file2:879's editing surface, on a room with no description, is
+   * `<div id="taTextElement…" contenteditable="true" ta-bind class="… ta-bind"><p><br></p></div>` —
+   * textAngular gives the body a first block so there is a line to put the caret on. Ours rendered
+   * `initialContent` verbatim, and that is `sanitizeHtml('')` = `''` for such a room
+   * (+page.server.ts:224), so the surface came up with no block at all.
+   *
+   * Both tags are in the shared allowlist (sanitize-html.ts:11-12), so the seed goes THROUGH the
+   * sanitiser rather than around it — the branded type has one producer and this is not an exception
+   * to it.
+   */
+  const EMPTY_DOCUMENT = sanitizeHtml('<p><br></p>');
+
   let body: HTMLElement | null = null;
   let showHtml = $state(false);
-  let renderedContent = $derived(initialContent);
+  let renderedContent = $derived(initialContent || EMPTY_DOCUMENT);
   let active = $state<Record<string, boolean>>({});
 
   /** counters, recomputed from the rendered text rather than the markup */
@@ -116,15 +131,39 @@
     return clone.innerHTML;
   }
 
+  /**
+   * The seed is DISPLAY ONLY. It must never become the stored description.
+   *
+   * The same reference line ends with
+   * `<input type="hidden" tabindex="-1" style="display: none;" name="wysiswyg-editor" value="">`,
+   * and that `name` is the ta-root's own — `name="wysiswyg-editor" ng-model="sess.description"`. So
+   * the reference's MODEL is empty while its BODY shows the paragraph. Without this, opening the
+   * Branding tab on a never-configured room would read the seed off the surface and the save button
+   * would post it as that room's description (+page.svelte:1776 posts the bound value).
+   *
+   * The comparison is against the browser's OWN serialisation of the seed rather than a pattern
+   * written here: the sanitiser emits `<br />` and the DOM gives back `<br>`, and picking between
+   * them by hand is a regex over text this code does not control.
+   */
+  function editorValue(node: HTMLElement) {
+    const html = editableHtml(node);
+    const probe = document.createElement('div');
+    probe.innerHTML = EMPTY_DOCUMENT;
+    return html === probe.innerHTML ? '' : html;
+  }
+
   function sync() {
-    if (body) value = editableHtml(body);
+    if (body) value = editorValue(body);
     refreshActive();
   }
 
   function toggleHtml() {
     if (showHtml) {
-      renderedContent = sanitizeHtml(value);
-      value = renderedContent;
+      // the model and the surface part ways here for the same reason as above: an editor emptied
+      // from the HTML view stores nothing and still shows a paragraph to type in
+      const sanitized = sanitizeHtml(value);
+      value = sanitized;
+      renderedContent = sanitized || EMPTY_DOCUMENT;
       showHtml = false;
       return;
     }
@@ -308,7 +347,7 @@
       // Firefox has thrown here historically. The editor still works; blocks are just divs.
     }
 
-    value = editableHtml(node);
+    value = editorValue(node);
 
     return () => {
       if (body === node) body = null;

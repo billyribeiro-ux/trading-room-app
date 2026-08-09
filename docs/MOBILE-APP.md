@@ -66,14 +66,86 @@ From `apps/controller/src/lib/room-settings-schema.ts`:
 | `mobileAppExpireNotificationsDays` | how long notifications keep flowing |
 | `hasAppPairLink` + `pairSecretKey` | the self-serve pairing URL |
 | `hideMobileCredentials` | hides them from the member |
-| `customMobileAppEnabled` | a WHITE-LABEL app instead of ProTradingRoom's |
-| `customMobileAppIOSUrl`, `customMobileAppAndroidUrl` | store links for that white-label build |
-| `customMobileAppLaunchWord` | its deep-link / launch keyword |
+| `customMobileAppEnabled` | points the room at a DIFFERENT app than the default one |
+| `customMobileAppIOSUrl`, `customMobileAppAndroidUrl` | store-listing links for that app |
+| `customMobileAppV3Name` | an unexplained string, `wired: false` — purpose unknown (§7) |
+| `customMobileAppLaunchWord` | a launch keyword; "deep link" is the obvious reading, and obvious is not evidence |
 
-`customMobileApp*` is the commercially interesting group — and the one most easily over-read. It
-proves a room can POINT AT a different app; it does not prove who built that app. §7 separates
-what the evidence establishes from what it merely permits, because the difference decides the
-framework.
+`customMobileApp*` is the commercially interesting group — and the one this document itself
+over-read once, describing it as "a WHITE-LABEL app instead of ProTradingRoom's". It proves a room
+can POINT AT a different app; it does not prove who built that app. §7 separates what the evidence
+establishes from what it merely permits, because the difference decides the framework.
+
+---
+
+## 2a. The server surface that already exists — decoded
+
+Every symbol below was read out of the tree, not inferred from a name.
+
+### `apps/controller/src/lib/server/rooms.ts`
+
+| function | line | what it does |
+| --- | --- | --- |
+| `issueMobilePairCode(roomId, roomUserId, expireDays)` | 576 | mints a **fresh six-digit code** and moves the expiry. This is "Get App PIN". |
+| `readPushTokens(json)` | 594 | parses `push_tokens_json` into `PushToken[]` |
+| `listPushTokens(roomId, roomUserId)` | 610 | returns tokens **masked to the last six characters** — a push token is a credential for sending to that device |
+| `listFcmRegistrations(…)` | 663 | same masking; **only `unregistered` tokens are deleted**, i.e. only when FCM says in as many words that the registration is gone |
+
+The masking is deliberate and commented as such: *"One function rather than a `.slice(-6)` at each
+call site, so 'Get FCM Tokens' cannot drift into printing a whole credential."* Preserve it.
+
+### `apps/controller/src/lib/server/fcm.ts`
+
+| export | line | notes |
+| --- | --- | --- |
+| `fcmConfigured()` | 97 | false until `FCM_SERVICE_ACCOUNT_JSON` is set — callers check this rather than throwing |
+| `readServiceAccount()` | 110 | parses the Google service-account JSON |
+| `sendPush(message, fetchImpl?)` | 304 | FCM **HTTP v1**. The legacy `fcm.googleapis.com/fcm/send` server-key endpoint was retired, so v1 with service-account auth is the only option. `fetchImpl` is injectable, which is how `fcm.test.ts` runs without network. |
+
+### `POST /internal/mobile-pin/<shortCode>` — the wire contract
+
+```
+POST /internal/mobile-pin/9312
+→ 200  { "pin": "418290", "expiresAt": "2026-08-16T04:11:52.000Z" }
+```
+
+`expiresAt` is driven by the room's `ptrMobileAppExpirePairCodeDays`.
+
+**Why it is a POST on its own route, and must stay that way.** The endpoint's own comment explains
+it: a pair code is a live credential, and `internal/room-config` is fetched on every page load and
+serialised into the room's SSR HTML — so putting the pin there would print a working credential into
+every page. It also mints a NEW code per call rather than returning a stored one, because returning
+a stored one would mean a code that leaks once is valid until it expires.
+
+### What the reference's own API publishes
+
+From `evidence-dumps/login-page/api-docs`, the `/sessions/users` response:
+
+```json
+"alerterAppTokens": ["fcm-token-1", "fcm-token-2"],
+"alerterAppFCMUserOff": false
+```
+
+and the users endpoint documents a filter: **"Filter for mobile users only"**, plus an `isMobile`
+field. So the server can distinguish app users from browser users — which is what
+`loadMobileUsers()` / `Show Mobile` on the manage page filters on.
+
+**We cannot reproduce that filter yet.** Recorded as an evidence gap in `OUTSTANDING.md §6b`:
+`room_users` has three columns that could each plausibly mean "mobile" — `mobilePairCode`,
+`pushTokensJson`, `notificationsState` — and choosing one would be inventing the semantics. The
+loader reports the filter as unsupported rather than silently returning everyone.
+
+### The database columns
+
+| column | line | default | meaning |
+| --- | --- | --- | --- |
+| `mobile_pair_code` | `schema.ts:297` | null | the six-digit PIN |
+| `mobile_pair_code_expires_at` | `schema.ts:298` | null | its expiry |
+| `push_tokens_json` | `schema.ts:300` | `'[]'` | FCM registration tokens |
+| `notifications_state` | `schema.ts:302` | `'active'` | `active` / paused / unsubscribed |
+
+`push_tokens_json` **has no writer**. Nothing in the codebase appends to it, because the endpoint
+the app would call does not exist. That is item 2 in §4.
 
 ---
 
@@ -138,14 +210,19 @@ see §6.
   app uses it.
 - **The three `ptrMobileAppCaseByCaseEnabled` branches never rendered.** Angular stripped them
   because the captured room has the flag off, so their labels and handlers are unknown.
-- **`perms` shape for app users** — recorded as an open gap in `OUTSTANDING.md §1e.d`.
+- **`perms` shape for app users** — recorded as an open gap in `OUTSTANDING.md §1e.d`, which lives
+  OUTSIDE this repo at `~/Desktop/new-room-control/docs/OUTSTANDING.md`. That folder is not
+  disposable: its `.env` and `.env.vercel-pull` are still the only surviving source of production's
+  Vercel values, and `scripts/set-vercel-env.sh` reads them by absolute path.
 - **Native, React Native, or Capacitor?** Nothing in the evidence says. This is our decision, and it
   interacts with §7.
 - **What `customMobileAppLaunchWord` actually does** — a deep-link scheme is the obvious reading,
   and obvious is not evidence.
 
-To close the first two, the same collector approach applies: `scripts/collect-create-new.js`
-already fetches the app bundle; the mobile handlers live in the same file.
+To close the first two, the same collector approach applies:
+`apps/controller/scripts/collect-create-new.js` already fetches the app bundle; the mobile handlers
+live in the same file. (Note the path — it is under the controller app, not the repo-root
+`scripts/`, which holds only the two Vercel env tools.)
 
 ---
 
@@ -153,6 +230,22 @@ already fetches the app bundle; the mobile handlers live in the same file.
 
 This is the decision that shapes the framework choice, so it is worth being exact about where the
 evidence stops.
+
+### The claim this section retracts
+
+Recorded 2026-08-09, because the failure mode is worth more than the fact.
+
+**What was claimed:** "the reference supports white-label apps per customer."
+
+**What the evidence actually supports:** the reference lets you point a room at a different app. It
+says nothing about who built that app.
+
+Nothing new was captured between the claim and the correction. The same `customMobileApp*` settings
+supported both readings the whole time, and only the narrower one is what they say. The distance between
+those two sentences is an entire product line inferred from a URL input box — the same failure this
+project has a rule against, committed against its own evidence. It is written down here so the next
+reader inherits the correction along with the finding, rather than re-deriving the optimistic
+version from the field names.
 
 ### The settings, with their real labels
 
@@ -163,6 +256,7 @@ Read from `room-settings-schema.ts`, not paraphrased:
 | `ptrMobileAppEnabled` | **Enable PTR app?** | checkbox | `dont-touch` | yes |
 | `ptrMobileAppCaseByCaseEnabled` | **App for Some Members?** | checkbox | `dont-touch` | no |
 | `customMobileAppEnabled` | **Custom App?** | checkbox | `dont-touch` | yes |
+| `customMobileAppV3Name` | **Custom app String** | textarea | `dont-touch` | no |
 | `customMobileAppIOSUrl` | **Custom iOS App URL** | textarea | `dont-touch` | yes |
 | `customMobileAppAndroidUrl` | **Custom Android App URL** | textarea | `dont-touch` | yes |
 | `customMobileAppLaunchWord` | **Custom App launch Word** | textarea | `dont-touch` | no |
@@ -201,6 +295,12 @@ shows who produced the app behind that link. Both of these fit the evidence exac
 Nothing on disk distinguishes them. **(b) is a text field. (a) is a business.** Reading the field
 names and concluding (a) would be inventing a product line out of a URL input.
 
+**And one field in the group has no reading at all.** `customMobileAppV3Name` — "Custom app
+String", a textarea, `wired: false` — read off `room-settings-schema.ts:321`. It surfaced only by
+reading that region of the schema rather than searching it for the four names already known, which
+is the point of the read-don't-search rule. No capture shows it populated and no label explains it.
+It is listed as unknown here rather than guessed at.
+
 ### Why it decides the framework anyway
 
 Because the two answers have opposite build requirements, and the choice is expensive to reverse:
@@ -224,25 +324,32 @@ separate native codebases do not.
 
 ### Recommendation
 
-**Ship one shared app first.** Reasons, in order:
+Argued from what is proven rather than from the field names:
 
-1. The server contract in §5 is **identical either way** — pairing, token registration, push
-   fan-out, notification state. Building it now costs nothing and commits you to nothing.
-2. Whether the original offered white-label as a service is **not established**, so building for it
-   now is designing against a guess.
-3. It is the cheaper of the two to be wrong about. One shared app that later needs flavours is a
-   refactor; a white-label pipeline nobody buys is wasted quarters.
-
-**But choose the framework as if white-label were coming.** That costs nothing today and keeps the
-door open. It is the one decision here that is expensive to reverse.
+1. **Build the server contract now.** Pairing, token registration, push fan-out, notification state
+   — §5. It is **identical either way**, so it costs nothing and commits you to nothing.
+2. **Ship one shared app first.** Whether the original offered white-label as a service is **not
+   established**, so building for it now is designing against a guess. It is also the cheaper of
+   the two to be wrong about: one shared app that later needs flavours is a refactor; a white-label
+   pipeline nobody buys is wasted quarters.
+3. **But pick a stack where a per-tenant build is a configuration change, not a fork** — React
+   Native or Capacitor with per-flavour config. That costs nothing today, keeps the door open, and
+   is the one decision here that is expensive to undo.
 
 ### To settle it properly
 
-`customMobileAppLaunchWord` is `wired: false` and its behaviour is unknown, and the three
-`ptrMobileAppCaseByCaseEnabled` branches never rendered. Both live in `/public/dist/app.min.js`.
-`scripts/collect-create-new.js` already fetches that bundle — running it against the live original
-would show what the launch word does and whether any real tenant ever had `Custom App?` enabled,
-which is the closest thing to a direct answer available without asking the original's operator.
+`customMobileAppLaunchWord` is `wired: false` and its behaviour is unknown, `customMobileAppV3Name`
+is unexplained, and the three `ptrMobileAppCaseByCaseEnabled` branches never rendered. All of them
+live in `/public/dist/app.min.js`. `apps/controller/scripts/collect-create-new.js` already fetches
+that bundle — running it against the live original would show what the launch word does and whether
+any real tenant ever had `Custom App?` enabled, which is the closest thing to a direct answer
+available without asking the original's operator.
+
+Note what that second question would and would not settle. Finding `Custom App?` enabled on a real
+tenant proves a room was pointed at another app; it still does not say who built it. Only (a) —
+the operator running a white-label service — would be settled by evidence the bundle does not hold:
+a build pipeline, per-customer branding, or submissions under someone else's developer account.
+The honest ceiling on this question without asking the operator is "somebody's app, not ours."
 
 ---
 
@@ -266,6 +373,106 @@ discover a hostname change:
    `https://chat.protradingroom.com/ptr_app/sessions/v2/addUser/<publicId>/?sec=<pairSecretKey>&email=…&name=…`
    — the room's own host, its `publicId`, and its `pairSecretKey`. A white-label app (§7) cannot
    hard-code any of that; it has to be configured per build or discovered at pair time.
+
+---
+
+## 7b. The endpoints the app needs — proposed contract
+
+None of these exist yet except the first. Written down so the app and the server are built against
+the same shape rather than negotiated later.
+
+### 1. Issue a PIN — EXISTS
+
+```
+POST /internal/mobile-pin/<shortCode>
+→ { "pin": "418290", "expiresAt": "…" }
+```
+
+Called by the room on the member's behalf. The member reads the PIN off the screen.
+
+### 2. Redeem a PIN — MISSING
+
+```
+POST /api/mobile/pair
+     { "pin": "418290" }
+→ { "deviceToken": "…", "room": { … }, "member": { … } }
+```
+
+Must: match `mobile_pair_code` **and** check `mobile_pair_code_expires_at`; be rate-limited, because
+six digits is 10^6 and an unthrottled endpoint is brute-forceable in minutes; and **clear the code
+on success** so it is single-use.
+
+Returns a long-lived device credential — the app cannot hold the `__Host-` session cookie the web
+client uses.
+
+### 3. Register a push token — MISSING
+
+```
+POST /api/mobile/push-token
+     { "token": "<fcm registration token>", "platform": "ios" | "android" }
+→ 204
+```
+
+Appends to `push_tokens_json`. Must be idempotent — FCM rotates registration tokens, and the app
+will re-send on every launch.
+
+**This is the smallest useful piece of work in the whole mobile effort**, and it closes a dead
+column.
+
+### 4. Unregister — MISSING
+
+```
+DELETE /api/mobile/push-token   { "token": "…" }
+```
+
+Called on logout or notification opt-out. Distinct from FCM reporting `unregistered`, which
+`listFcmRegistrations` already prunes.
+
+### 5. Receive alerts — the payload
+
+Sent by the server via `sendPush`. The shape is ours to define; the app must handle a cold start
+from a notification tap, so it needs enough to deep-link:
+
+```json
+{ "roomShortCode": "9312", "alertId": 123, "kind": "alert" }
+```
+
+Keep the body out of the payload if alerts can contain sensitive positions — push payloads pass
+through Google's infrastructure and land on a lock screen.
+
+---
+
+## 7c. Security constraints the app inherits
+
+Not optional, and each has a reason already in the code:
+
+1. **A pair code is single-use and time-boxed.** `issueMobilePairCode` mints a fresh one per call
+   rather than returning a stored one, so a leaked code expires rather than persisting.
+2. **The pin is never in `room-config`.** That route is fetched every page load and serialised into
+   SSR HTML.
+3. **Tokens are masked to the last six characters** everywhere they are displayed.
+4. **Only `unregistered` tokens are deleted.** Not `invalid`, not on a failed send — FCM has to say
+   the registration is gone. Deleting on transient failure would silently unsubscribe working
+   devices.
+5. **Rate-limit the redeem endpoint.** Six digits is a small space.
+6. **`hideMobileCredentials`** exists as a room setting; if it is on, the UI must not show pins or
+   tokens to the member.
+
+---
+
+## 7d. Effort, honestly
+
+| piece | size | blocked on |
+| --- | --- | --- |
+| Token-registration endpoint (§7b.3) | hours | nothing |
+| Pair-redeem endpoint (§7b.2) | hours | nothing |
+| `FCM_SERVICE_ACCOUNT_JSON` + prove a real push | ~1 hour | a Firebase project |
+| `addUser` self-serve pairing route | day | deciding whether you want self-serve |
+| The app itself, one shared build | weeks | framework choice |
+| White-label pipeline | months | §7 decision, and per-customer developer accounts |
+
+**Steps 1-3 need no app, no store account and no framework decision, and they de-risk everything
+after them.** Until a real push arrives on a real device, the entire mobile plan is theory.
 
 ---
 

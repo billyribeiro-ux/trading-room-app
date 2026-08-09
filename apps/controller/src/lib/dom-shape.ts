@@ -138,6 +138,49 @@ export function shapeOf(source: string, { angular = false }: { angular?: boolean
     }
 
     /*
+      textAngular's OWN injected chrome, dropped by the same argument as the ripple pair above.
+
+      Inside the reference's `.ta-scroll-window`, BEFORE the editing surface, sit two subtrees the
+      editor injects for itself (all of this is on file2:879):
+
+        <div class="popover fade bottom" style="max-width: none; width: 305px;">
+          <div class="arrow"></div><div class="popover-content"></div>
+        </div>
+        <div class="ta-resizer-handle-overlay">
+          a background, four corners in the order tl, tr, bl, br, and an info readout
+        </div>
+
+      Ten elements, every one of them EMPTY — no text, and no children beyond more empty divs. The
+      popover is Bootstrap's link/image bubble, positioned and filled on demand; its only non-class
+      attribute is inline geometry (`width: 305px`) that positioning computed at one moment. The
+      overlay is the image-resize grip set, driven by a drag.
+
+      We have neither. `manage.css`'s textAngular block (988-1167) declares `.ta-root`, `.ta-toolbar`,
+      `.btn-group-small .btn`, `.ta-editor`, `.ta-scroll-window.form-control`, `textarea.ta-editor`
+      and `.ta-scroll-window > .ta-bind`, and stops — nothing for `.popover`, `.arrow`,
+      `.popover-content`, or any `.ta-resizer-handle-*`. Transcribing them would ship ten divs that no
+      rule paints and no handler drives, plus a pixel width copied from one click: dead scaffolding
+      and invented data, which is what the ripple rule above exists to refuse. Left in, they push
+      every row after them out of step, which is worse than either.
+
+      HONEST GAP: the reference's own stylesheets are not in this repo, so "invisible in the capture"
+      is NOT claimed here. What is claimed is only what was read — empty, ruleless on our side, and
+      injected by an editor we reimplemented rather than embedded.
+
+      The popover match is deliberately narrow, requiring BOTH `popover` and `fade` — that is the
+      shell in its un-shown state. A popover the page actually filled would still be compared.
+    */
+    const editorChrome =
+      tag === 'div' &&
+      ((classes.includes('popover') && classes.includes('fade')) ||
+        classes.includes('ta-resizer-handle-overlay'));
+    if (editorChrome) {
+      const end = skipSubtree(html, tagRe.lastIndex, tag);
+      if (end !== null) tagRe.lastIndex = end;
+      continue;
+    }
+
+    /*
       A menu ACTION is one token, however it is plumbed.
 
       The reference fires each menu item from `<a href="" ng-click="updateUser(…)">` — an anchor
