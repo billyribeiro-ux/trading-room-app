@@ -58,8 +58,9 @@
       }, 420);
     }
 
-    const observer = new IntersectionObserver(([entry]) => {
-      if (entry.isIntersecting) start();
+    const observer = new IntersectionObserver((entries) => {
+      // Coalesced batches arrive oldest-first; the newest entry is the current state.
+      if (entries[entries.length - 1].isIntersecting) start();
       else stop();
     });
     observer.observe(node);

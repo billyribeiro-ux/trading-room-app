@@ -140,22 +140,33 @@
     background: var(--hc-bg-0);
   }
 
+  /* The moving dashes ride a transform on an oversized pseudo-element, not background-position:
+     a permanent animation must composite, never repaint. */
   .link {
+    position: relative;
     flex: 1;
     min-width: 34px;
     height: 1px;
+    overflow: hidden;
+    opacity: 0.75;
+  }
+
+  .link::after {
+    content: '';
+    position: absolute;
+    inset: 0 0 0 -14px;
     background-image: linear-gradient(90deg, var(--hc-up) 0 6px, transparent 6px 14px);
     background-size: 14px 1px;
     animation: wire-flow 0.9s linear infinite;
-    opacity: 0.75;
+    will-change: transform;
   }
 
   @keyframes wire-flow {
     from {
-      background-position: 0 0;
+      transform: translateX(0);
     }
     to {
-      background-position: 14px 0;
+      transform: translateX(14px);
     }
   }
 
@@ -193,8 +204,22 @@
       min-width: 0;
       height: 22px;
       margin-inline: auto;
+    }
+
+    .link::after {
+      inset: -14px 0 0;
       background-image: linear-gradient(180deg, var(--hc-up) 0 6px, transparent 6px 14px);
       background-size: 1px 14px;
+      animation-name: wire-flow-down;
+    }
+  }
+
+  @keyframes wire-flow-down {
+    from {
+      transform: translateY(0);
+    }
+    to {
+      transform: translateY(14px);
     }
   }
 </style>

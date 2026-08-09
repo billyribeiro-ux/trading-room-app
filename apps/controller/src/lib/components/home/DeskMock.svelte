@@ -34,21 +34,32 @@
     { initials: 'RS', name: 'Ram S', role: 'Swing', live: false }
   ];
 
+  /* Trade talk only — no product endorsements from invented people. Praise belongs to the real,
+     verbatim quotes in VoicesSection. */
   const messages = [
     { who: 'Maya K', tag: 'HEAD TRADER', text: 'Watching 18,240 — if we reclaim it, I’m long.' },
     { alert: true, text: 'LONG NQ 18,242 · STOP 18,196 · T1 18,320' },
     { who: 'Dev O', tag: 'FUTURES', text: 'Filled 18,244. Size on.' },
-    { who: 'Jo T', tag: 'OPTIONS', text: 'Share is crystal clear — zero lag on the chart.' },
-    { who: 'Ram S', tag: 'SWING', text: 'Alert hit my phone before the fill confirm did.' }
+    { who: 'Jo T', tag: 'OPTIONS', text: 'Taking half off into 18,290.' },
+    { who: 'Ram S', tag: 'SWING', text: 'Stop to breakeven. Nice call.' }
   ];
 
-  /** The chat rail's message loop — client-only by construction, torn down with the element. */
+  /**
+   * The chat rail's message loop — client-only by construction, torn down with the element, and
+   * paused offscreen so an infinite timeline never keeps the rAF ticker warm for the whole session.
+   */
   const chatLoop: Attachment = (node) => {
     if (prefersReducedMotion()) return undefined;
     const items = node.querySelectorAll('.msg');
     const timeline = gsap.timeline({ repeat: -1, repeatDelay: 3.2 });
     timeline.from(items, { autoAlpha: 0, y: 16, duration: 0.55, stagger: 1.15, ease: 'power3.out' });
+    const observer = new IntersectionObserver((entries) => {
+      if (entries[entries.length - 1].isIntersecting) timeline.play();
+      else timeline.pause();
+    });
+    observer.observe(node);
     return () => {
+      observer.disconnect();
       timeline.kill();
       gsap.set(items, { clearProps: 'all' });
     };
@@ -65,6 +76,7 @@
   <div class="bar">
     <span class="room">MOMENTUM DESK</span>
     <span class="live">LIVE</span>
+    <span class="sim-tag">SIMULATED</span>
     <span class="count">132 in room</span>
   </div>
 
@@ -221,6 +233,15 @@
     border-radius: 50%;
     background: var(--hc-down);
     animation: trhome-pulse 1.6s ease-in-out infinite;
+  }
+
+  .sim-tag {
+    padding: 2px 8px;
+    border: 1px solid var(--hc-line);
+    border-radius: 4px;
+    font-size: 8.5px;
+    letter-spacing: 0.18em;
+    color: var(--hc-ink-faint);
   }
 
   .count {

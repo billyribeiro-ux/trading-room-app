@@ -8,7 +8,17 @@
   import { TESTIMONIALS, VOICES } from '$lib/content/home';
   import { reveal } from '$lib/motion';
 
-  const rows = [TESTIMONIALS.slice(0, 4), TESTIMONIALS.slice(4)];
+  /*
+   * Each rail run repeats its quotes three times: a run must be at least as wide as the viewport
+   * for the -50% marquee loop to be seamless, and a single pass of four ~350px cards (~1.4k px)
+   * underfills ordinary desktops — the gap rolled across the rail once per cycle. Three passes
+   * (~4.2k px) cover up to 4K. The second run is the aria-hidden loop copy; under reduced motion
+   * the repeats collapse away and the plain quote list wraps statically.
+   */
+  const rows = [TESTIMONIALS.slice(0, 4), TESTIMONIALS.slice(4)].map((row) => ({
+    quotes: row,
+    run: [...row, ...row, ...row]
+  }));
 </script>
 
 <section class="voices" id="voices">
@@ -26,8 +36,12 @@
         <div class="rail-track">
           {#each [0, 1] as pass (pass)}
             <div class="rail-run" aria-hidden={pass === 1}>
-              {#each row as quote (quote)}
-                <figure class="card">
+              {#each row.run as quote, repeatIndex (`${repeatIndex}-${quote}`)}
+                <figure
+                  class="card"
+                  class:repeat={repeatIndex >= row.quotes.length}
+                  aria-hidden={repeatIndex >= row.quotes.length ? true : undefined}
+                >
                   <span class="mark" aria-hidden="true">“</span>
                   <blockquote>{quote}</blockquote>
                   <figcaption>Member comment</figcaption>
@@ -137,7 +151,8 @@
       flex-wrap: wrap;
     }
 
-    .rail-run[aria-hidden='true'] {
+    .rail-run[aria-hidden='true'],
+    .card.repeat {
       display: none;
     }
 

@@ -17,7 +17,7 @@
   const title = 'tradingroom.app — The trading floor, re-engineered';
   const description =
     'Real-time trading rooms for professional desks: HD screen-share, voice, chat, and trade alerts ' +
-    'on an engine built like a trading system — Svelte 5, a Rust core, WebRTC end to end. ' +
+    'on an engine built like a trading system — Svelte 5, a Rust core, WebRTC everywhere. ' +
     'White-label, zero installs, desktop and mobile.';
 </script>
 

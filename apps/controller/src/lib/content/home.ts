@@ -23,13 +23,15 @@ export const HERO_HEADLINE = HERO_HEADLINE_LINES.join(' ');
 export const HERO_SUB =
   'tradingroom.app puts your entire desk — HD screen-share, voice, chat, and trade alerts — on one ' +
   'real-time surface, driven by an engine built like a trading system: Svelte 5 on the wire, a Rust ' +
-  'core, WebRTC end to end.';
+  'core, WebRTC everywhere.';
 
 export const HERO_CTA_PRIMARY = { label: 'Book a private demo', href: '/contact' } as const;
 
 export const HERO_CTA_SECONDARY = { label: 'Inspect the engineering', href: '#engineering' } as const;
 
-export const HERO_CHIPS = ['White-label', 'Zero installs', 'Desktop + mobile', 'Encrypted end to end'] as const;
+/* "Encrypted in transit", never "end to end": an SFU terminates DTLS at the server, and this page
+   does not claim cryptography it does not have. */
+export const HERO_CHIPS = ['White-label', 'Zero installs', 'Desktop + mobile', 'Encrypted in transit'] as const;
 
 export interface TickerEntry {
   readonly symbol: string;
@@ -73,8 +75,8 @@ export const STATS: readonly Stat[] = [
     detail: 'Pure HTML5 in any modern browser. No Flash, no Java, nothing for members to maintain.'
   },
   {
-    value: '1080p',
-    label: 'HD share and voice',
+    value: 'HD',
+    label: 'screen-share and voice',
     detail: 'Engineered for charts and order flow — crisp lines, readable numbers, clean audio.'
   },
   {
@@ -134,7 +136,7 @@ export const PILLARS: readonly Pillar[] = [
   },
   {
     index: '05',
-    tag: 'tls 1.3 · rls',
+    tag: 'tls · rls',
     title: 'Encrypted and isolated',
     body:
       'TLS on every byte, encrypted media, and row-level security in the database. Your calls, ' +
@@ -149,7 +151,7 @@ export const PILLARS: readonly Pillar[] = [
 ];
 
 /** The wire, drawn as a diagram strip under the pillars. */
-export const ARCH_FLOW = ['Browser', 'Edge · SvelteKit SSR', 'Rust API', 'PostgreSQL 17'] as const;
+export const ARCH_FLOW = ['Browser', 'SvelteKit SSR · Vercel', 'Rust API', 'PostgreSQL 17'] as const;
 
 export const ARCH_MEDIA_LANE = 'WebRTC SFU · mediasoup — media never touches the request path';
 
@@ -159,7 +161,7 @@ export const SHOWCASE = {
   lede:
     'Screen-share, voice, chat, alerts, and your member roster — in one window, under your brand. ' +
     'What you see below is a live rendering, not a screenshot: it is drawn by the same engine that ' +
-    'runs the room.'
+    'runs the room, showing simulated activity rather than a customer’s.'
 } as const;
 
 export const SHOWCASE_FEATURES = [

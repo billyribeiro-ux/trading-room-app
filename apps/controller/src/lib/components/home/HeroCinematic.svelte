@@ -44,7 +44,9 @@
          * Two-stage probe: WebGL must exist AND be hardware-accelerated. A software rasterizer
          * (SwiftShader, llvmpipe) renders the field on the main thread, starving the RAF loop the
          * GSAP intro also rides — those clients get the CSS aurora, which is the complete look.
-         * `?webgl=force` bypasses the software check for QA screenshots of the 3D field.
+         * When the renderer string is unavailable (privacy-hardened browsers), the scene stays
+         * enabled on purpose: those are overwhelmingly real GPUs, and the field degrades to a slow
+         * canvas rather than a broken page. `?webgl=force` bypasses the software check for QA.
          */
         const probe = document.createElement('canvas');
         const gl = (probe.getContext('webgl2') ?? probe.getContext('webgl')) as WebGLRenderingContext | null;
@@ -54,14 +56,16 @@
           const software = /swiftshader|software|llvmpipe/i.test(renderer);
           const forced = new URLSearchParams(window.location.search).get('webgl') === 'force';
           sceneEnabled = !software || forced;
+          gl.getExtension('WEBGL_lose_context')?.loseContext();
         }
       } catch {
         sceneEnabled = false;
       }
     }
 
-    const observer = new IntersectionObserver(([entry]) => {
-      sceneActive = entry.isIntersecting;
+    const observer = new IntersectionObserver((entries) => {
+      // Coalesced batches arrive oldest-first; the newest entry is the current state.
+      sceneActive = entries[entries.length - 1].isIntersecting;
     });
     observer.observe(hero);
 

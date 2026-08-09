@@ -20,6 +20,7 @@
     BufferAttribute,
     BufferGeometry,
     Color,
+    DynamicDrawUsage,
     FogExp2,
     InstancedMesh,
     MeshBasicMaterial,
@@ -58,6 +59,8 @@
   geometry.translate(0, 0.5, 0);
   const material = new MeshBasicMaterial();
   const field = new InstancedMesh(geometry, material, COUNT);
+  // The matrices are rewritten every frame; tell the driver so it stops optimizing for static data.
+  field.instanceMatrix.setUsage(DynamicDrawUsage);
 
   const up = new Color('#14b877');
   const down = new Color('#e0374d');

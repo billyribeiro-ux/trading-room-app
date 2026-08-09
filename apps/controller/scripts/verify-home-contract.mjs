@@ -81,6 +81,10 @@ const sources = Object.fromEntries(
 const surfaceKeys = Object.keys(files).filter((key) => !['packageJson', 'layout', 'homeCss'].includes(key));
 for (const key of surfaceKeys) {
   rejectPattern(files[key], sources[key], 'the no-raster-imagery rule (<img> on the home surface)', /<img\b/);
+}
+// The token sheet joins the bitmap scan: a CSS background bitmap is raster imagery too. (Its one
+// data URI is SVG, which the rule deliberately allows.)
+for (const key of [...surfaceKeys, 'homeCss']) {
   rejectPattern(
     files[key],
     sources[key],
@@ -175,6 +179,10 @@ rejectPattern(
   'local-only font delivery (no remote font hosts)',
   /fonts\.(?:googleapis|gstatic)\.com/
 );
+// The preloaded binary must actually be the display face in use: Roboto as the display token,
+// weight 300 on the headline that renders it.
+requirePattern(files.homeCss, sources.homeCss, "the Roboto display token", /--hc-font-display:\s*'Roboto'/);
+requirePattern(files.hero, sources.hero, 'the 300-weight hero headline', /font-weight:\s*300/);
 
 /* ---- 4. Motion safety ---------------------------------------------------------------------- */
 
@@ -184,18 +192,25 @@ requireText(
   'the window-guarded single GSAP plugin registration',
   "if (typeof window !== 'undefined') { gsap.registerPlugin(ScrollTrigger); }"
 );
-requirePattern(
-  files.motion,
-  sources.motion,
-  'a reduced-motion check in every attachment factory',
-  /export function reveal[\s\S]*?prefersReducedMotion\(\)/
-);
-requirePattern(
-  files.motion,
-  sources.motion,
-  'reduced-motion handling in scramble',
-  /export function scramble[\s\S]*?prefersReducedMotion\(\)/
-);
+
+/*
+ * Scope the reduced-motion requirement to each factory's own body. An unanchored
+ * `reveal[\s\S]*?prefersReducedMotion` span could be satisfied by ANY later occurrence in the
+ * file, which means deleting one factory's guard would never trip the gate.
+ */
+function exportedFunctionBody(source, name) {
+  const start = source.indexOf(`export function ${name}`);
+  if (start === -1) return null;
+  const next = source.indexOf('\nexport ', start + 1);
+  return source.slice(start, next === -1 ? undefined : next);
+}
+
+for (const factory of ['reveal', 'parallax', 'scramble', 'magnetic']) {
+  const body = exportedFunctionBody(sources.motion, factory);
+  if (!body || !body.includes('prefersReducedMotion()')) {
+    failures.push(`${files.motion}: ${factory}() is missing its own reduced-motion check`);
+  }
+}
 requirePattern(files.homeCss, sources.homeCss, 'the global reduced-motion clamp', /prefers-reduced-motion:\s*reduce/);
 for (const key of ['hero', 'voices', 'phoneMock']) {
   requirePattern(
@@ -208,12 +223,26 @@ for (const key of ['hero', 'voices', 'phoneMock']) {
 
 /* ---- 5. SSR and WebGL safety ---------------------------------------------------------------- */
 
-rejectPattern(
-  files.hero,
-  sources.hero,
-  'lazy three.js loading (HeroScene must never be imported statically)',
-  /import\s+HeroScene\s+from/
-);
+/*
+ * three.js isolation, repo-wide across the home surface: only HeroScene and CandleField — reached
+ * exclusively through the dynamic import — may touch three/threlte, and nothing anywhere may
+ * import HeroScene statically.
+ */
+for (const key of surfaceKeys) {
+  if (key === 'heroScene' || key === 'candleField') continue;
+  rejectPattern(
+    files[key],
+    sources[key],
+    'three.js chunk isolation (three/threlte outside the lazy scene pair)',
+    /from\s+'(?:three|@threlte\/core)'/
+  );
+  rejectPattern(
+    files[key],
+    sources[key],
+    'lazy three.js loading (HeroScene must never be imported statically)',
+    /import\s+HeroScene\s+from/
+  );
+}
 requirePattern(
   files.hero,
   sources.hero,
@@ -274,15 +303,17 @@ requirePattern(files.consent, sources.consent, 'the client-only stored-consent r
 
 /* ---- 9. Footer contract ---------------------------------------------------------------------- */
 
+/* The links must live in the footer itself; the copyright line lives in the deck the footer
+   renders. Testing a combined blob let either side silently lose its half. */
 for (const [claim, pattern] of [
-  ['the privacy link', /\/privacy/],
-  ['the terms link', /\/terms/],
-  ['the contact link', /\/contact/],
-  ['the copyright line', /© 2026 TradingRoomApp™/]
+  ['the privacy link', /resolve\('\/privacy'\)/],
+  ['the terms link', /resolve\('\/terms'\)/],
+  ['the contact link', /resolve\('\/contact'\)/],
+  ['the rendered copyright line', /\{FOOTER\.copyright\}/]
 ]) {
-  const source = sources.footer + sources.content;
-  if (!pattern.test(source)) failures.push(`${files.footer}: missing ${claim}`);
+  if (!pattern.test(sources.footer)) failures.push(`${files.footer}: missing ${claim}`);
 }
+requireText(files.content, sources.content, 'the copyright text', "copyright: '© 2026 TradingRoomApp™'");
 
 if (failures.length) {
   console.error('Home surface contract failed:\n' + failures.map((failure) => `- ${failure}`).join('\n'));

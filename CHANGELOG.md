@@ -24,6 +24,38 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-09
 
+### 11:37 — Review-fleet findings applied to the cinematic home (pushed to `claude/tradingroom-home-redesign-avs20w`, NOT `main`)
+
+**Runtime impact: yes, once merged — same branch as 11:09, same page.** A five-dimension
+adversarial review (Svelte/SSR correctness, accessibility, motion/perf, gate coherence, copy
+honesty) ran against the 11:09 commit; twenty-nine findings came back and the confirmed ones are
+fixed here. The ones that matter:
+
+- **Honesty:** the hero chip claimed "Encrypted end to end" — false for an SFU, which terminates
+  DTLS at the server; it now says "Encrypted in transit", and "WebRTC end to end" in the sub became
+  "WebRTC everywhere". "Edge · SvelteKit SSR" in the wire diagram became "SvelteKit SSR · Vercel"
+  (no edge runtime is used), "1080p" became "HD" (untraceable number), "tls 1.3" became "tls" (the
+  repo pins no protocol version), the desk/phone mocks now wear their own SIMULATED tags with the
+  section lede saying so, and the mock chat's invented members no longer praise the product —
+  praise belongs to the seven real quotes only.
+- **Correctness:** the testimonial marquee run tripled (a ~1.4k px run underfilled ordinary
+  desktops, rolling a blank gap across the rail; repeats are aria-hidden and collapse under
+  reduced motion), splitChars now preserves the authored `<br>` (the rebuild re-wrapped the
+  headline at hydration), magnetic() kills its persistent quickTo tweens on teardown, the WebGL
+  probe releases its context, IntersectionObserver callbacks read the newest coalesced entry, the
+  desk mock's infinite timeline pauses offscreen, the instanced field marks its matrix buffer
+  DynamicDrawUsage, and the wire diagram's dashes animate by transform instead of
+  background-position.
+- **Gates:** home:contract's motion-safety checks are now scoped per exported factory (an
+  unanchored regex could never fail), the footer link checks read the footer file alone, the
+  bitmap scan covers home.css, three.js isolation is enforced across every home component, and the
+  live hero typography (Roboto display token, 300-weight headline) joined the font handshake.
+
+Verified again after the fixes: home:contract, svelte-check and ESLint (still zero issues in
+touched files), the autofixer clean on every re-touched component, the adapter-vercel build, and
+fresh Chromium screenshots confirming the two-line headline, the gapless rails, and the SIMULATED
+tags.
+
 ### 11:09 — The controller home page becomes an original cinematic surface (pushed to `claude/tradingroom-home-redesign-avs20w`, NOT `main`)
 
 **Runtime impact: yes, once merged — it replaces `/` wholesale.** This entry deliberately breaks the

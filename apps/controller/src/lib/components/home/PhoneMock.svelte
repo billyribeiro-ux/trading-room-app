@@ -31,7 +31,7 @@
 
     <div class="widget">
       <div class="widget-head">
-        <span class="sym">NQ</span>
+        <span class="sym">NQ · SIM</span>
         <span class="price">18,243.5</span>
         <span class="delta">+0.68%</span>
       </div>

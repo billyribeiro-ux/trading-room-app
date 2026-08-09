@@ -172,6 +172,9 @@ export function magnetic(strength = 0.28): Attachment {
     return () => {
       element.removeEventListener('mousemove', onMove);
       element.removeEventListener('mouseleave', onLeave);
+      // quickTo keeps a persistent paused tween per axis; kill both or they outlive the element.
+      xTo.tween.kill();
+      yTo.tween.kill();
       gsap.set(element, { clearProps: 'transform' });
     };
   };
@@ -183,26 +186,42 @@ export function magnetic(strength = 0.28): Attachment {
  * Returns the spans; the caller owns their animation. Under reduced motion nothing is touched.
  */
 export function splitChars(element: HTMLElement): HTMLElement[] {
-  // Markup whitespace (template indentation, <br>) collapses to single spaces; without this the
-  // split would emit whitespace-only spans that render as visible gaps.
-  const text = (element.textContent ?? '').replace(/\s+/g, ' ').trim();
-  element.setAttribute('aria-label', text);
+  // Preserve the authored line structure: a rebuild that dropped <br> re-wrapped the headline at
+  // hydration on some widths — a visible layout shift. Lines are captured first, then rebuilt with
+  // the same breaks.
+  const lines: string[] = [];
+  let current = '';
+  for (const node of Array.from(element.childNodes)) {
+    if (node.nodeName === 'BR') {
+      lines.push(current);
+      current = '';
+    } else {
+      current += node.textContent ?? '';
+    }
+  }
+  lines.push(current);
+  const cleaned = lines.map((line) => line.replace(/\s+/g, ' ').trim()).filter((line) => line.length > 0);
+
+  element.setAttribute('aria-label', cleaned.join(' '));
   element.textContent = '';
 
   const spans: HTMLElement[] = [];
-  for (const word of text.split(' ')) {
-    const wordSpan = document.createElement('span');
-    wordSpan.className = 'hc-word';
-    wordSpan.setAttribute('aria-hidden', 'true');
-    for (const char of word) {
-      const charSpan = document.createElement('span');
-      charSpan.className = 'hc-char';
-      charSpan.textContent = char;
-      wordSpan.appendChild(charSpan);
-      spans.push(charSpan);
+  cleaned.forEach((line, lineIndex) => {
+    if (lineIndex > 0) element.appendChild(document.createElement('br'));
+    for (const word of line.split(' ')) {
+      const wordSpan = document.createElement('span');
+      wordSpan.className = 'hc-word';
+      wordSpan.setAttribute('aria-hidden', 'true');
+      for (const char of word) {
+        const charSpan = document.createElement('span');
+        charSpan.className = 'hc-char';
+        charSpan.textContent = char;
+        wordSpan.appendChild(charSpan);
+        spans.push(charSpan);
+      }
+      element.appendChild(wordSpan);
+      element.appendChild(document.createTextNode(' '));
     }
-    element.appendChild(wordSpan);
-    element.appendChild(document.createTextNode(' '));
-  }
+  });
   return spans;
 }
