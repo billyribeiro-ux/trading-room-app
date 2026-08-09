@@ -1401,3 +1401,15 @@
 .mg-root #webinarTimeTxt {
   font: inherit;
 }
+
+/* A server refusal, shown to the operator.
+
+   The manage page has 43 `fail()` paths and rendered none of them, so every rejected edit looked
+   like a dead control: the click worked, the save posted, the server declined, and the page redrew
+   identically with nothing in the console. Matches `.acc-error` on the account page, which exists
+   for the same reason. */
+.mg-root .mg-error {
+  color: rgb(255, 0, 0);
+  font-weight: 700;
+  margin: 0 0 10px;
+}

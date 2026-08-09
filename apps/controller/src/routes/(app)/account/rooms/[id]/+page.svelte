@@ -647,6 +647,29 @@
     </div>
 
     <div class="panel-body">
+      <!--
+        EVERY failure on this page was silent, and that is why "nothing works".
+
+        `+page.server.ts` has 43 `fail()` paths — a name that is blank, a vanity slug already
+        taken, a setting that is not in the schema, a logo of the wrong type, a member who is not
+        in this room — and each returns a `message` that NOTHING here rendered. `form` was declared
+        as a prop on line 36 and never read once.
+
+        So editing a field did this: the click opened the editor, the save posted, the server
+        refused it, `enhance` put the reason on `form`, and the page redrew EXACTLY as before. No
+        change, no error, and nothing in the browser console — because there was no error. The
+        server was declining politely and nobody was listening. From the operator's side that is
+        indistinguishable from a dead control, which is precisely how it was reported.
+
+        The same defect was fixed on the account page earlier; this page was missed. `.acc-error`
+        already existed for it there, so this uses `mg-error` scoped to the manage stylesheet.
+
+        Not a divergence from the reference: it reports failures through bootbox alerts, which is
+        the same information in a different container. Silence is not what it does.
+      -->
+      {#if form?.message}
+        <p class="mg-error" role="alert">{form.message}</p>
+      {/if}
       <div class="form-vertical">
         <div class="form-group m0">
           <label class="col-sm-2 control-label" for="mg-name">Room Title</label>
