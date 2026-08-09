@@ -75,3 +75,8 @@ new-room-control/
 /apps/room/new-evidence
 /apps/room/preview
 /apps/room/second-dump
+/apps/room/emojis
+/apps/room/modal
+/apps/room/toast-container
+/apps/room/mention-reply-private-chat.clean.html
+# `proroom-ULTIMATE-*.json` is already covered by the `proroom-*.json` rule above.
