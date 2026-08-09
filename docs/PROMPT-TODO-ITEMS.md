@@ -74,27 +74,47 @@ and "which shell is it in" are the same question and must be answered together �
 answering only the first produced a page with flawless markup and every field twice its intended
 width.
 
-### The decision to make first
+### DECIDED BY THE OWNER 2026-08-09 — this is not an open question
 
-Two honest routes, genuinely different in kind:
+**Use the `pub-*` classes. Write the missing rules; do not restyle these pages onto `acc-*`.**
 
-1. **Restyle those four onto `acc-*`** and move them into `CONTROLLER_PATHS`. Consistent with
-   everything a signed-in customer sees, and every value in `account.css` is a computed value read
-   out of a capture with the element named beside it.
-2. **Write the `pub-*` rules**, keeping them visually distinct, and leave them in the marketing
-   shell.
+The owner's instruction, given directly, and the reason is to avoid making a mess. An earlier
+version of this document offered two routes and leaned the other way for `verify-email`. That
+recommendation is **withdrawn** — it is recorded here only so nobody re-derives it and reopens a
+settled call.
 
-Route 2 is probably right for `contact`, `privacy` and `terms` and route 1 for `verify-email`,
-because `verify-email` is transactional and arrives from the same emails as the reset pages — but
-that is a judgement, not evidence, and `TODO.md` records that **the marketing site is being
-rewritten and redesigned**. Confirm the scope with the owner before styling the first three at all.
+Three consequences that follow from it, and all three matter:
+
+1. **These pages STAY in the marketing shell.** Do **not** add them to `CONTROLLER_PATHS` in
+   `$lib/chrome.ts`. `pub-*` rules only reach them inside `.pub-root`, so moving the page and
+   keeping the classes would break them the same way item J broke — just in the other direction.
+2. **Scope every new rule under `.pub-root`.** Every existing rule in `public.css` is written
+   `.pub-root …`, and that is not a style preference — it is load-bearing. The layout's own comment
+   records what happened when these sheets were loaded unscoped: they fought with the controller
+   bundle over `.container`, `.row`, `.col-md-*`, `hr`, `img`, `.navbar`, `.caret` and
+   `.dropdown-menu` on every controller page, and the bulk-actions menu came out **376px instead of
+   238px** because `.dropdown-menu { right: 0 }` leaked. A bare `.pub-form-card { … }` is the same
+   class of bug waiting to happen.
+3. **`contact`'s submit already has a rule.** `class="button"` computes `padding: 13px 32px`,
+   `border-radius: 5px`, a box-shadow, `font-size: 17px`, `background: rgba(0,0,0,0)` and
+   `color: rgb(255,255,255)`. Check it is not white-on-white before adding anything, and do not
+   assume it is unstyled like its container is.
 
 ### How to verify it — not by reading the CSS
 
 Render the page and compare computed styles against a bare element, which is how the table above
 was produced. A class with no rule and a class whose rule happens to match the UA default are
-indistinguishable in source and obvious in a computed-style read. `zz`-prefixed throwaway scripts
-were used for this and deleted; the durable version belongs in the Playwright suite.
+indistinguishable in source and obvious in a computed-style read.
+
+**Measure against a Vercel PREVIEW deployment, not localhost.** The owner's standing instruction is
+that nothing runs on local ports for this project — it is deployed, more than one agent is working
+in it, and a stray dev server on 5173 means the next person measures somebody else's code and
+believes it is their own. `vercel deploy` (without `--prod`) gives a preview URL to point the
+browser at, and it exercises the same adapter and the same build as production, which localhost
+does not.
+
+If you do need a local server for something a preview cannot give you, say so first, and stop it the
+moment you are done.
 
 ## Item C — `push_tokens_json` has no writer
 

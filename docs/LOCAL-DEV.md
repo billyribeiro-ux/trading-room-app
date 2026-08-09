@@ -3,6 +3,20 @@
 Written 2026-08-09, the day the controller was first run locally against a real database in this
 repository. Everything below was executed, not planned.
 
+> ## ⛔ Default: run NOTHING on local ports for this project
+>
+> **The owner's standing instruction, 2026-08-09.** The app is deployed, more than one agent works
+> in this repository, and other projects on this machine already hold `3000` and a row of vite
+> processes. A stray dev server on `5173` means the next person measures somebody else's code and
+> believes it is their own — which is not hypothetical, it is why this warning exists.
+>
+> **Verify against a Vercel preview deployment instead.** `vercel deploy` (no `--prod`) gives a URL
+> that exercises the same adapter and the same build as production, which localhost does not.
+>
+> This document stays because a local server is occasionally the only way to see something — the
+> shell defect in `TODO.md` item J was invisible everywhere else. If you need one: **say so first,
+> and stop it the moment you are done.** `pkill -f "vite dev"`, then confirm the port is closed.
+
 ---
 
 ## The one thing that makes the difference

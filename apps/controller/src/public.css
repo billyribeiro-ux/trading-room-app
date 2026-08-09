@@ -872,3 +872,123 @@
     margin-top: 40px;
   }
 }
+
+/* ============================================================================
+ * Public APPLICATION pages — contact, privacy, terms, verify-email.
+ *
+ * NOT TRANSCRIBED, and the boundary matters. Everything above this line is
+ * measured from the reference's own stylesheets, hash-locked at the top of this
+ * file. Nothing below it is, because those pages were never captured: `/contact`
+ * appears in the capture only as five links TO it (`home-page/file` lines 380,
+ * 397, 457, 487 and 506), and the reference serves its privacy and terms as
+ * static files at `/public/html/ppolicy.html` and `/public/html/tos.html` that
+ * were never fetched. So these are OUR pages, not reproductions, and no rule
+ * below may be cited as evidence of what the reference looked like.
+ *
+ * They exist because the markup used `pub-auth`, `pub-container`,
+ * `pub-form-card`, `pub-field`, `pub-hint`, `pub-error` and `pub-success` while
+ * not one of them had a rule anywhere in the app — the four pages rendered as
+ * unstyled text on white. Recorded as TODO.md item I.
+ *
+ * Values are taken from what the app already uses rather than picked fresh:
+ * the card is Bootstrap 3.1.1 panel geometry (this whole file is a 3.1.1
+ * transcription), the field is its `.form-control`, `#777` is the same muted ink
+ * as `account.css`'s `.acc-text-muted`, and the two message colours are the same
+ * rgb as its measured `--btn-danger-bg` / `--btn-success-bg`. Written literally
+ * rather than as `var(...)` so this sheet does not depend on that one loading.
+ *
+ * Deliberately FLUID — there is no `@media` block here on purpose.
+ * `scripts/verify-breakpoints.mjs` asserts this file contains exactly the width
+ * thresholds 767/768/991/992/1200, so introducing another one fails that gate.
+ * ========================================================================== */
+
+/* The reading column. `pub-auth` matches the 570px of the login panel's
+   `.acc-panel-narrow`, so the two form pages line up; `pub-container` is wider
+   because legal text at 570px runs to an unreadable number of lines. */
+.pub-root .pub-auth,
+.pub-root .pub-container {
+  margin: 0 auto;
+  padding: 30px 15px 60px;
+}
+.pub-root .pub-auth {
+  max-width: 570px;
+}
+.pub-root .pub-container {
+  max-width: 720px;
+}
+
+.pub-root .pub-form-card {
+  background: #fff;
+  border: 1px solid #e5e5e5;
+  border-radius: 4px;
+  box-shadow: rgba(0, 0, 0, 0.05) 0 1px 1px 0;
+  padding: 25px 30px 30px;
+}
+/* `.pub-root h1` carries `margin-top: 20px`, which reads as a dent above the
+   title when the heading is the card's first child. */
+.pub-root .pub-form-card h1 {
+  margin-top: 0;
+  font-size: 28px;
+}
+/* Bootstrap's h2 is 30px — nearly the page title. Section headings inside a
+   document want the 18px that `account.css`'s `.acc-h4` already uses. */
+.pub-root .pub-form-card h2 {
+  font-size: 18px;
+  font-weight: 500;
+  margin: 25px 0 8px;
+}
+.pub-root .pub-form-card ul {
+  padding-left: 20px;
+}
+.pub-root .pub-form-card li {
+  margin-bottom: 6px;
+}
+
+/* Bootstrap 3.1.1 `.form-group` + `.form-control`, with a visible label: three
+   fields with placeholders alone would leave nothing on screen once typing
+   starts, which is the failure the login panel avoids by having one field. */
+.pub-root .pub-field {
+  margin-bottom: 15px;
+}
+.pub-root .pub-field label {
+  display: block;
+  margin-bottom: 5px;
+  font-weight: 500;
+}
+.pub-root .pub-field input,
+.pub-root .pub-field textarea {
+  display: block;
+  width: 100%;
+  padding: 6px 12px;
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.42857143;
+  color: #555;
+  background: #fff;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+.pub-root .pub-field input:focus,
+.pub-root .pub-field textarea:focus {
+  border-color: #66afe9;
+  outline: 0;
+}
+/* Vertical only: a textarea that can be dragged wider escapes the card. */
+.pub-root .pub-field textarea {
+  min-height: 140px;
+  resize: vertical;
+}
+
+.pub-root .pub-hint {
+  color: #777;
+}
+/* Weight as well as colour. Colour alone is not a signal for the people most
+   likely to be reading an error. */
+.pub-root .pub-error {
+  color: rgb(217, 83, 79);
+  font-weight: 700;
+}
+.pub-root .pub-success {
+  color: rgb(92, 184, 92);
+  font-weight: 700;
+}
