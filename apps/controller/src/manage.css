@@ -1091,7 +1091,24 @@
 .mg-root .btn-group-small .btn.active {
   background-color: rgb(230, 230, 230);
   border-color: rgb(230, 233, 238);
-  box-shadow: rgba(0, 0, 0, 0.125) 0 3px 5px inset;
+  /*
+    The LIFT, not an inset.
+
+    `styles.css` lists `.btn.active` alongside the interaction states:
+
+      .btn:active, .btn.active, .btn:hover, .btn:focus {
+        box-shadow: rgba(0,0,0,.23) 0 3px 10px, rgba(0,0,0,.16) 0 3px 10px;
+      }
+
+    so an active toolbar control rises off the page exactly like a hovered one. This rule had
+    Bootstrap's `inset` pressed-in shadow instead, which is the opposite effect and comes from
+    bootstrap.min.css — the sheet `styles.css` loads AFTER and overrides. Copying Bootstrap's
+    source rather than the reference's resolved cascade is the same mistake the `.btn-default`
+    border colour made a few rules above.
+  */
+  box-shadow:
+    rgba(0, 0, 0, 0.23) 0 3px 10px,
+    rgba(0, 0, 0, 0.16) 0 3px 10px;
 }
 /* The editor body: 300px of content, and the 302 is the border, not a number.
 

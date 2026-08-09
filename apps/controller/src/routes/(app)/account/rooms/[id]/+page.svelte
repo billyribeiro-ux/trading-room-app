@@ -2,6 +2,8 @@
   import { enhance } from '$app/forms';
   import { asset, resolve } from '$app/paths';
   import { bootbox } from '$lib/bootbox.svelte';
+  import ToastHost from '$lib/components/ToastHost.svelte';
+  import { toast } from '$lib/toast.svelte';
   import Editable from '$lib/components/Editable.svelte';
   import { formatLastLogin } from '$lib/last-login-format';
   import PermissionsModal from '$lib/components/PermissionsModal.svelte';
@@ -443,7 +445,22 @@
     { op: 4, label: 'BAN Participant', icons: ['fa fa-user-times'] }
   ];
 
-  const save: SubmitFunction = () => async ({ update }) => update({ reset: false });
+  /**
+   * Every form on this page posts through here, so this is the one place a success can be
+   * confirmed.
+   *
+   * `result.type` is what distinguishes them: `success` for an action that returned data,
+   * `failure` for a `fail(...)`. The failure branch is deliberately silent HERE — the red
+   * `form.message` at the top of the panel already carries the server's own wording, and a toast
+   * repeating it would say the same thing twice in two places.
+   *
+   * Only the confirmation is new. Before this, a save that WORKED looked exactly like a save that
+   * did nothing, which is the complaint that started all of this.
+   */
+  const save: SubmitFunction = () => async ({ result, update }) => {
+    await update({ reset: false });
+    if (result.type === 'success') toast.success('Changes have been saved.');
+  };
 
   /** close the inline row form once its save has landed */
   const rowFormDone =
@@ -610,6 +627,8 @@
     {note}
   </p>
 {/snippet}
+
+<ToastHost />
 
 <div class="mg-root">
   <div class="panel panel-default">
