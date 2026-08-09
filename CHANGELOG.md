@@ -24,6 +24,50 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-09
 
+### 10:12 — Both open manage-page audit defects fixed (pushed to `main`)
+
+**Runtime impact: yes.** Two live UI bugs on the User Stats pane of a page already in production.
+Both were found by the manage-page audit's own adversarial verifier and had been open since.
+
+- **The stats date fields were a one-way trap.** Clicking either date swapped its anchor for an
+  `<input type="date">` and stopped there — the field never took focus. The picker never opened,
+  nothing could be typed without a second click, and **the row could not close**, because its only
+  exits are `change` and `blur` and `blur` cannot fire on an element that never held focus. One
+  click put the row into an edit state with no way out.
+
+  Fixed with `{@attach focusDateField}` — an attachment rather than a `use:` action, which is what
+  the current Svelte docs list as the replacement under "avoid legacy features", and which runs at
+  element creation, exactly when focus needs to move.
+
+- **`for="statsFrom"` / `for="statsTo"` were orphaned at rest.** Both pointed at ids that exist only
+  while editing, so at rest the labels referenced nothing: a screen reader announces a label whose
+  control cannot be found, and clicking it moves focus nowhere. `for` is now set only while the
+  field exists.
+
+  At rest the captioned thing is an `<a>`, which is not a labelable element — there is no id `for`
+  could legally point at — so the label carries a documented `svelte-ignore` and the anchor gained
+  an `aria-label` so the caption still reaches assistive tech. This is also the closer match: the
+  reference's own labels carry no `for` at all (file2:904, 909), and attributes are invisible to the
+  side-by-side comparison, which reads tag and classes only.
+
+- **`focusDateField` was extracted to `$lib/focus-date-field.ts`** rather than left in a 2,000-line
+  component, for the same reason as `chrome.ts`: it has three branches that are easy to get wrong
+  and impossible to see in review — a browser with no `showPicker`, a `showPicker` that throws
+  because the call is not user-activated, and the ordering of focus against it. **Focus runs first
+  and unconditionally**, so a refused popup cannot take the stuck-row fix down with it; that
+  ordering is pinned by a test.
+
+**Verified before pushing:** `svelte-check` 0 errors, 3 warnings — unchanged, and all three are the
+pre-existing `href=""` ones this block already documents. 49 files, 541 tests passing (up 6:
+`focus-date-field.test.ts`). 47 manage-page tests still passing, so the side-by-side match is intact.
+
+**Not verified in a browser**, and worth stating plainly: nothing runs on local ports for this
+project by standing instruction, and the manage page needs a signed-in session and a room. The
+picker opening is asserted against a stub, not against Chromium. The two behaviours a stub cannot
+prove — that the native calendar actually appears, and that blur now fires — are the reason the
+`showPicker` call is best-effort rather than assumed.
+
+
 ### 10:03 — This changelog started, and two comments corrected (`8c5dca3`, pushed to `main`)
 
 **No runtime impact** — documentation, one code comment and one test comment. Nothing about what the

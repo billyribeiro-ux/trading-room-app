@@ -6,6 +6,7 @@
   import { toast } from '$lib/toast.svelte';
   import Editable from '$lib/components/Editable.svelte';
   import { formatLastLogin } from '$lib/last-login-format';
+  import { focusDateField } from '$lib/focus-date-field';
   import { editableText, isBlank, isEditableEmpty } from '$lib/editable-display';
   import PermissionsModal from '$lib/components/PermissionsModal.svelte';
   import RichTextEditor from '$lib/components/RichTextEditor.svelte';
@@ -248,6 +249,7 @@
     const [year, month, day] = iso.split('-');
     return `${month}-${day}-${year}`;
   }
+
 
   /*
     Two of the four Stats checkboxes CANNOT filter, and say so rather than silently doing nothing.
@@ -1968,7 +1970,27 @@ Please click this link to attend: ______ unique link will be here_____
                     -->
                     <div>
                       <p class="form-control-static">
-                        <label class="col-sm-4 control-label" for="statsFrom">Start Date:</label>
+                        <!--
+                          `for` is set only WHILE the field exists.
+
+                          It used to be unconditional, pointing at an id that is only in the DOM
+                          during editing — so at rest the label referenced nothing. A dangling
+                          `for` is not inert: a screen reader announces a label whose control
+                          cannot be found, and clicking it moves focus nowhere.
+
+                          The reference's own labels carry no `for` at all (file2:904, 909), so
+                          dropping it at rest is also the closer match. Attributes are invisible to
+                          the side-by-side comparison, which reads tag and classes only.
+
+                          svelte-ignore, because at rest the thing being captioned is an `<a>`, and
+                          an anchor is not a labelable element — there is no id `for` could legally
+                          point at. The anchor carries its own `aria-label` below, so the caption
+                          still reaches assistive tech.
+                        -->
+                        <!-- svelte-ignore a11y_label_has_associated_control -->
+                        <label class="col-sm-4 control-label" for={editingStatsFrom ? 'statsFrom' : undefined}
+                          >Start Date:</label
+                        >
                         {#if editingStatsFrom}
                           <input
                             class="mg-date"
@@ -1977,6 +1999,7 @@ Please click this link to attend: ______ unique link will be here_____
                             bind:value={statsFrom}
                             onchange={() => (editingStatsFrom = false)}
                             onblur={() => (editingStatsFrom = false)}
+                            {@attach focusDateField}
                           />
                         {:else}
                           <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
@@ -1989,14 +2012,36 @@ Please click this link to attend: ______ unique link will be here_____
                             onclick={(e) => {
                               e.preventDefault();
                               editingStatsFrom = true;
-                            }}>{statsDateText(statsFrom)}</a
+                            }}
+                            aria-label="Start Date: {statsDateText(statsFrom)}"
+                            >{statsDateText(statsFrom)}</a
                           >
                         {/if}
                         <br />
                         <span class="muted">Choose a start date</span>
                       </p>
                       <p class="form-control-static">
-                        <label class="col-sm-4 control-label" for="statsTo">End Date:</label>
+                        <!--
+                          `for` is set only WHILE the field exists.
+
+                          It used to be unconditional, pointing at an id that is only in the DOM
+                          during editing — so at rest the label referenced nothing. A dangling
+                          `for` is not inert: a screen reader announces a label whose control
+                          cannot be found, and clicking it moves focus nowhere.
+
+                          The reference's own labels carry no `for` at all (file2:904, 909), so
+                          dropping it at rest is also the closer match. Attributes are invisible to
+                          the side-by-side comparison, which reads tag and classes only.
+
+                          svelte-ignore, because at rest the thing being captioned is an `<a>`, and
+                          an anchor is not a labelable element — there is no id `for` could legally
+                          point at. The anchor carries its own `aria-label` below, so the caption
+                          still reaches assistive tech.
+                        -->
+                        <!-- svelte-ignore a11y_label_has_associated_control -->
+                        <label class="col-sm-4 control-label" for={editingStatsTo ? 'statsTo' : undefined}
+                          >End Date:</label
+                        >
                         {#if editingStatsTo}
                           <input
                             class="mg-date"
@@ -2005,6 +2050,7 @@ Please click this link to attend: ______ unique link will be here_____
                             bind:value={statsTo}
                             onchange={() => (editingStatsTo = false)}
                             onblur={() => (editingStatsTo = false)}
+                            {@attach focusDateField}
                           />
                         {:else}
                           <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
@@ -2017,7 +2063,9 @@ Please click this link to attend: ______ unique link will be here_____
                             onclick={(e) => {
                               e.preventDefault();
                               editingStatsTo = true;
-                            }}>{statsDateText(statsTo)}</a
+                            }}
+                            aria-label="End Date: {statsDateText(statsTo)}"
+                            >{statsDateText(statsTo)}</a
                           >
                         {/if}
                         <br />
