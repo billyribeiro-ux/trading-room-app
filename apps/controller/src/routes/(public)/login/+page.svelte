@@ -4,6 +4,7 @@
   import Recaptcha from '$lib/components/Recaptcha.svelte';
   import '../../../account.css';
   import type { PageProps } from './$types';
+  import PasswordReveal from '$lib/components/PasswordReveal.svelte';
 
   /**
 	 * Rebuilt from `evidence-dumps/login-page/login` — the served HTML of the controller's
@@ -70,16 +71,13 @@
               </div>
               <br />
               <div class="acc-form-group">
-                <input
-                  class="acc-input"
+                <PasswordReveal
                   id="exampleInputPassword1"
                   name="password"
-                  type="password"
                   placeholder="Your password"
-                  aria-label="Your password"
+                  autocomplete="current-password"
                   required
                 />
-                <span class="acc-feedback"><i class="fa fa-lock"></i></span>
                 <div class="acc-text-right">
                   <a class="acc-text-muted" href={resolve('/contact')}>Forgot your password?</a>
                 </div>

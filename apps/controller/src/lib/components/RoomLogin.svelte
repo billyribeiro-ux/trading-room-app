@@ -1,6 +1,7 @@
 <script lang="ts">
   import { enhance } from '$app/forms';
   import { asset } from '$app/paths';
+  import PasswordReveal from '$lib/components/PasswordReveal.svelte';
 
   /**
    * The room entry screen, reproduced from `app-session-login`.
@@ -246,8 +247,14 @@
         <div class="auth-group">
           <label for="login-password">Room password</label>
           <div class="auth-input-group">
-            <input id="login-password" name="password" type="password" placeholder="Password" />
-            <span class="auth-addon" aria-hidden="true"><i class="fas fa-lock"></i></span>
+            <PasswordReveal
+              id="login-password"
+              name="password"
+              placeholder="Password"
+              inputClass=""
+              toggleClass="auth-addon"
+              autocomplete="current-password"
+            />
           </div>
         </div>
       {/if}

@@ -3,6 +3,7 @@
   import { untrack } from 'svelte';
   import Recaptcha from '$lib/components/Recaptcha.svelte';
   import type { PageProps } from './$types';
+  import PasswordReveal from '$lib/components/PasswordReveal.svelte';
 
   /**
 	 * Rebuilt from `evidence-dumps/register-page/register-page-file` — the served HTML of the
@@ -86,30 +87,23 @@
               </div>
 
               <div class="acc-form-group">
-                <input
-                  class="acc-input"
+                <PasswordReveal
                   id="signupInputPassword1"
                   name="password"
-                  type="password"
                   placeholder="Your password"
-                  autocomplete="off"
-                  aria-label="Your password"
-                  minlength="12"
+                  autocomplete="new-password"
+                  minlength={12}
                   required
                 />
-                <span class="acc-feedback"><i class="fa fa-lock"></i></span>
               </div>
 
               <div class="acc-form-group">
-                <input
-                  class="acc-input"
+                <PasswordReveal
                   id="signupInputRePassword1"
                   name="confirm"
-                  type="password"
                   placeholder="Type your password again"
-                  autocomplete="off"
-                  aria-label="Type your password again"
-                  minlength="12"
+                  autocomplete="new-password"
+                  minlength={12}
                   required
                 />
                 <span class="acc-feedback"><i class="fa fa-lock"></i></span>

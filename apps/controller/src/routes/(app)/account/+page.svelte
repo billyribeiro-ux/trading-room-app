@@ -67,6 +67,7 @@
   import { bootbox } from '$lib/bootbox.svelte';
   import type { SubmitFunction } from '@sveltejs/kit';
   import type { PageProps } from './$types';
+  import PasswordReveal from '$lib/components/PasswordReveal.svelte';
 
   let { data, form }: PageProps = $props();
 
@@ -913,7 +914,7 @@
               </div>
               <div class="acc-field">
                 <label for="adminPassword">Password</label>
-                <input class="acc-input" id="adminPassword" name="password" type="password" placeholder="Enter password" required />
+                <PasswordReveal id="adminPassword" name="password" placeholder="Enter password" autocomplete="new-password" required />
               </div>
               <div class="acc-field">
                 <button class="acc-btn acc-btn-primary" type="submit">Add Admin User</button>
