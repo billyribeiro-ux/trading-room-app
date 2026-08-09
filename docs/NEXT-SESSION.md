@@ -54,6 +54,22 @@ configured from.
 
 ## 3. THE DECISION — where does the room live?
 
+> ## ✅ DONE 2026-08-09 — this section is history, not a plan
+>
+> Option A was chosen AND EXECUTED, but not onto Lightsail. Lightsail is being retired, so the room
+> went straight to a **Hetzner box in Ashburn (`87.99.154.155`)** and the SFU is following it there.
+> One migration, not two.
+>
+> **The room is live at `https://chat.tradingroom.app`.** For what actually runs where, read
+> **`docs/DEPLOYMENT.md`**. For the one piece still outstanding — the SFU — read
+> **`docs/SFU-MIGRATION.md`**.
+>
+> Note also that "put the room on a VM **beside the SFU**" is a TEST topology, not the target. See
+> `TODO.md` item H: production should separate the media plane from the app tier.
+>
+> The checklist below is kept because its reasoning is still the reasoning; treat it as a record of
+> how this was done, not as work remaining.
+
 The room **cannot** deploy to Vercel. Two independent reasons, both from the code:
 
 1. **`apps/room/src/lib/server/db/index.ts:7`** opens a SQLite file with WAL mode. Vercel's
@@ -82,22 +98,6 @@ holdout.
 - **Cost:** schema port plus data migration — and the SSE constraint STILL argues against Vercel for
   this app, so it may not even buy the platform move
 - **Time:** days
-
-> ## ✅ DONE 2026-08-09 — this section is history, not a plan
->
-> Option A was chosen AND EXECUTED, but not onto Lightsail. Lightsail is being retired, so the room
-> went straight to a **Hetzner box in Ashburn (`87.99.154.155`)** and the SFU is following it there.
-> One migration, not two.
->
-> **The room is live at `https://chat.tradingroom.app`.** For what actually runs where, read
-> **`docs/DEPLOYMENT.md`**. For the one piece still outstanding — the SFU — read
-> **`docs/SFU-MIGRATION.md`**.
->
-> Note also that "put the room on a VM **beside the SFU**" is a TEST topology, not the target. See
-> `TODO.md` item H: production should separate the media plane from the app tier.
->
-> The checklist below is kept because its reasoning is still the reasoning; treat it as a record of
-> how this was done, not as work remaining.
 
 ### Executing A — the checklist (COMPLETED)
 

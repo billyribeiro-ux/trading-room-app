@@ -163,10 +163,11 @@ hostname** — it embeds the IP, so changing servers breaks every client that ca
 
 ## The prompt to open that session with
 
-> Read `docs/DEPLOYMENT.md` and `docs/SFU-MIGRATION.md` in trading-room-app — and do Step 0 before
-> anything else. The room is deployed at
-> `chat.tradingroom.app` on the Hetzner box `87.99.154.155` (SSH as root, key already authorised).
-> `media.tradingroom.app` resolves there with a valid certificate and answers a 503 placeholder.
-> Move the mediasoup SFU from AWS Lightsail onto that box, serve it at `media.tradingroom.app`, wire
-> `MEDIA_GRANT_PRIVATE_KEY` into the room, and prove a screen share works between two browsers before
-> retiring the Lightsail instance. Do Step 0 first.
+> Read `docs/DEPLOYMENT.md` and `docs/SFU-MIGRATION.md` in trading-room-app, and do **Step 0**
+> before anything else — all three parts of it.
+>
+> The room is deployed at `chat.tradingroom.app` on the Hetzner box `87.99.154.155` (SSH as root,
+> key already authorised). `media.tradingroom.app` resolves there with a valid certificate and
+> answers a 503 placeholder. Move the mediasoup SFU from AWS Lightsail onto that box, serve it at
+> `media.tradingroom.app`, wire `MEDIA_GRANT_PRIVATE_KEY` into the room, and prove a screen share
+> works between two browsers before retiring the Lightsail instance.
