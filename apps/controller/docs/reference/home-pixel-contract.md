@@ -1,6 +1,11 @@
 # Home-page fidelity contract
 
-Status: **normative for `/`**  
+Status: **superseded, 2026-08-09** — `/` is now the original cinematic surface decided in
+[`docs/decisions/0005-cinematic-home.md`](../decisions/0005-cinematic-home.md) and enforced by
+`pnpm home:contract` (`scripts/verify-home-contract.mjs`). This document is kept as the historical
+record of the reconstruction era; nothing below is normative for the current page.
+
+Status at capture time: normative for `/`  
 Captured: 2026-08-01  
 Rendered source: `evidence-dumps/home-page/file`
 

@@ -1,5 +1,10 @@
 # Public marketing site (`/`) — pre-login
 
+> **2026-08-09:** `/` no longer follows this capture — it renders the original cinematic surface
+> decided in [`docs/decisions/0005-cinematic-home.md`](../decisions/0005-cinematic-home.md). This
+> document remains the evidence record for the captured original and stays normative for the
+> legacy marketing chrome still used by `/contact`, `/privacy`, and `/terms`.
+
 Evidence: full server-rendered HTML of `https://protradingroom.com/`, supplied as a
 paste. Structure, inline CSS and scripts only — no computed styles or rects.
 

@@ -12,3 +12,4 @@ Accepted decisions:
 - [0002 — Persist owner-visible API secrets encrypted at rest](0002-owner-visible-api-secrets.md)
 - [0003 — Adopt the Vercel, Rust, PostgreSQL, and mediasoup production boundary](0003-vercel-rust-postgresql-control-plane.md)
 - [0004 — Where CSS lives: global sheets vs component `<style>`](0004-css-architecture.md)
+- [0005 — The home page becomes an original cinematic surface](0005-cinematic-home.md)

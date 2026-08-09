@@ -24,6 +24,54 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-09
 
+### 11:09 — The controller home page becomes an original cinematic surface (pushed to `claude/tradingroom-home-redesign-avs20w`, NOT `main`)
+
+**Runtime impact: yes, once merged — it replaces `/` wholesale.** This entry deliberately breaks the
+straight-to-`main` convention above: the session that produced it was instructed by its harness to
+develop on and push to the named branch and nowhere else, so the change is parked there for the
+owner to fast-forward. Nothing on `main` moved.
+
+Owner directive: kill every stock image on the home page, replace them with cinematic motion, tell
+the engineering story in the copy, and give the page a real footer. Decision record:
+`apps/controller/docs/decisions/0005-cinematic-home.md`.
+
+- The hero is a Threlte 8 / three.js field of 2,700 instanced candlesticks (one draw call), loaded
+  through a dynamic import behind a WebGL probe that also **excludes software rasterizers** —
+  SwiftShader clients starve the RAF loop and froze the intro mid-flight in headless testing, so
+  they get the CSS aurora fallback, which is the complete look (`?webgl=force` is the QA override).
+- GSAP 3 + ScrollTrigger drive the split-character headline, scroll reveals, stat decode, and
+  magnetic CTAs — all as `{@attach}` factories in `$lib/motion.ts`, every one a no-op under
+  `prefers-reduced-motion`, every one with teardown.
+- A D3 tape section streams a **seeded** random walk (deterministic on every load) and is labeled
+  `Simulated feed` wherever it renders; ticking starts only in-viewport and stops off-screen.
+- The three stock screenshots and circle icons are deleted; the product is shown as pure CSS/SVG
+  desk and phone renderings that cannot rot out of sync with reality. The seven member quotes are
+  carried **verbatim** — they are the one surviving piece of the captured page.
+- New chrome for `/` only: fixed glass nav, restyled consent banner (same `gdprConsent` contract),
+  and the real multi-column footer with legal links, stack line, and watermark. `/contact`,
+  `/privacy`, `/terms` keep the untouched `.pub-root` transcription.
+- `home:fidelity` (evidence-bound, owner-machine-only) is retired for `home:contract`
+  (`scripts/verify-home-contract.mjs`), which is self-contained and runs on any clone; the home half
+  of `e2e/responsive-contract.spec.ts` now asserts the new structural contract.
+- New exact-pinned deps in `apps/controller`: gsap 3.15.0, three 0.185.1, @threlte/core 8.5.16,
+  d3-array/scale/shape (+ types).
+
+**Verified before push:** `home:contract`, `breakpoints:verify`, svelte-check (0 errors/0 warnings
+in every touched file; 3 pre-existing warnings in untouched files remain), ESLint (same shape: 11
+pre-existing errors in untouched files), the official Svelte autofixer clean on all 16 touched
+components, the adapter-vercel production build, and rendered Chromium screenshots at desktop,
+mobile, forced-WebGL, and reduced-motion — plus a five-dimension adversarial review fleet.
+**Could not run here:** the evidence-bound gates (`fonts:verify`, `evidence:verify`, old
+`home:fidelity`) crash on any clone without the owner-local captures — confirmed by running them
+before this change — and `runtime:http` fails on a pre-existing `/contact` assertion whose expected
+copy ("contact form is disabled during this public preview") exists nowhere in this repository's
+source, before and after this change. `test:e2e` cannot run in this clone at all —
+`playwright.config.ts` is absent here, like the CI workflows. Instead, every assertion of the
+rewritten home spec was executed verbatim against the live dev server in Chromium at all nine
+audited viewports and passed. That run also caught, and the spec now guards, a hydration race:
+clicking the nav burger before SvelteKit hydrates silently no-ops, so the spec first waits on the
+layout's `data-proroom-hydrated` signal.
+
 ### 10:18 — Rooms are addressed by their short code, not the database id (pushed to `main`)
 
 **Runtime impact: yes, and it changes a URL.** `/account/rooms/1?tab=users` is now

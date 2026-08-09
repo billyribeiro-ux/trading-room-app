@@ -2,44 +2,53 @@ import { expect, test } from '@playwright/test';
 
 const viewportWidths = [320, 767, 768, 991, 992, 1199, 1200, 1989, 2205] as const;
 
-test('home hero follows every evidence-backed breakpoint branch', async ({ page }) => {
+test('the cinematic home holds its structural contract at every breakpoint', async ({ page }) => {
   for (const width of viewportWidths) {
     await page.setViewportSize({ width, height: 1300 });
     await page.goto('/');
+    // The burger is a hydrated control; interacting before SvelteKit attaches handlers silently
+    // no-ops. The layout stamps this attribute from afterNavigate exactly for this purpose.
+    await page.waitForSelector('html[data-proroom-hydrated="true"]');
 
-    const hero = page.locator('#hero');
-    const heading = hero.getByRole('heading', {
-      name: 'Web-based Trading Room for Professionals'
-    });
-    const image = hero.locator('img[src="/public/images/ptr_descrived_perspective.png"]');
-
+    // The hero fills the viewport, carries the headline, and contains no raster imagery anywhere.
+    const hero = page.locator('#top');
     await expect(hero).toBeVisible();
-    await expect(image).toBeVisible();
+    await expect(hero.getByRole('heading', { level: 1 })).toHaveText(/The trading floor,\s*re-engineered\./);
+    expect(await page.locator('main img').count()).toBe(0);
 
-    const metrics = await page.evaluate(() => {
-      const heroElement = document.querySelector<HTMLElement>('#hero');
-      const headingElement = document.querySelector<HTMLElement>('#hero h1.hero-text');
-      const imageElement = document.querySelector<HTMLImageElement>(
-        '#hero img[src="/public/images/ptr_descrived_perspective.png"]'
-      );
-      if (!heroElement || !headingElement || !imageElement) throw new Error('hero contract element missing');
-      return {
-        headingFontSize: Number.parseFloat(getComputedStyle(headingElement).fontSize),
-        heroHeight: Number.parseFloat(getComputedStyle(heroElement).height),
-        imageWidth: imageElement.getBoundingClientRect().width,
-        naturalWidth: imageElement.naturalWidth
-      };
-    });
+    // The simulated-feed honesty label rides both live surfaces.
+    await expect(page.locator('#top .hc-sim')).toHaveText(/simulated feed/i);
+    await expect(page.locator('#tape .hc-sim')).toHaveText(/simulated feed/i);
 
-    const expectedImageWidth = Math.min(1440, width < 992 ? width - 30 : width * (2 / 3) - 30);
-    const expectedHeadingFontSize = width < 768 ? 27 : width < 992 ? 30 : 36;
-    const expectedHeroHeight = width < 992 ? 550 : 583;
+    // The live tape chart renders as SVG with an accessible name, server-side and after hydration.
+    await expect(page.locator('#tape svg[role="img"]')).toHaveAttribute('aria-label', /Simulated futures price chart/);
 
-    expect(metrics.naturalWidth).toBe(1440);
-    expect(metrics.imageWidth).toBeCloseTo(expectedImageWidth, 1);
-    expect(metrics.headingFontSize).toBe(expectedHeadingFontSize);
-    expect(metrics.heroHeight).toBe(expectedHeroHeight);
-    await expect(heading).toBeVisible();
+    // The footer is real: legal links, contact, copyright, on every viewport.
+    const footer = page.locator('footer');
+    await expect(footer.getByRole('link', { name: 'Privacy policy' })).toBeVisible();
+    await expect(footer.getByRole('link', { name: 'Terms of service' })).toBeVisible();
+    await expect(footer.getByRole('link', { name: 'Contact us' })).toBeVisible();
+    await expect(footer).toContainText('© 2026 TradingRoomApp™');
+
+    // Nav collapses to the burger below 880px and shows inline links above it.
+    const burger = page.getByRole('button', { name: 'Toggle navigation' });
+    const inlineNav = page.getByRole('navigation', { name: 'Home sections' });
+    if (width <= 880) {
+      await expect(burger).toBeVisible();
+      await burger.click();
+      await expect(inlineNav.getByRole('link', { name: 'Engineering' })).toBeVisible();
+      await burger.click();
+    } else {
+      await expect(burger).toBeHidden();
+      await expect(inlineNav.getByRole('link', { name: 'Engineering' })).toBeVisible();
+    }
+
+    // The composition never leaks horizontal scroll.
+    const overflow = await page.evaluate(() => ({
+      scrollWidth: document.documentElement.scrollWidth,
+      clientWidth: document.documentElement.clientWidth
+    }));
+    expect(overflow.scrollWidth).toBeLessThanOrEqual(overflow.clientWidth + 1);
   }
 });
 

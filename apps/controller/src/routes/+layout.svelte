@@ -3,11 +3,14 @@
   import { page } from '$app/state';
   import ControllerChrome from '$lib/components/ControllerChrome.svelte';
   import ConsentBanner from '$lib/components/home/ConsentBanner.svelte';
+  import HomeFooter from '$lib/components/home/HomeFooter.svelte';
+  import HomeNav from '$lib/components/home/HomeNav.svelte';
   import SiteFooter from '$lib/components/SiteFooter.svelte';
   import SiteHeader from '$lib/components/SiteHeader.svelte';
   import '../account.css';
   import '../manage.css';
   import '../public.css';
+  import '../home.css';
   /*
    * TWO FontAwesomes, because the two apps being matched load two.
    *
@@ -118,22 +121,32 @@ import type { LayoutProps } from './$types';
     >{@render children()}</ControllerChrome
   >
 {:else if chrome === 'marketing'}
-  <!-- public.css is scoped under .pub-root. It has to be: the marketing site is
-       Bootstrap 3.1.1 plus a theme that overrides the desktop container, while
-       the controller uses a different Bootstrap 3/app bundle. Loaded unscoped
-       they fought over `.container`, `.row`,
-       `.col-md-*`, `hr`, `img`, `.navbar`, `.caret` and `.dropdown-menu` on
-       every controller page — the bulk-actions menu came out 376px wide instead
-       of 238px because `.dropdown-menu { right: 0 }` from this sheet turned a
-       shrink-to-fit box into a left-and-right-anchored one. -->
-  <div class="pub-root" id={page.url.pathname === '/' ? 'home4' : undefined}>
-    {#if page.url.pathname === '/'}
+  {#if page.url.pathname === '/'}
+    <!-- The cinematic home surface (docs/decisions/0005-cinematic-home.md) owns its own chrome —
+         nav, consent, footer — and its styles live in home.css under `.home-cine` plus component
+         <style> blocks. It deliberately does NOT render inside `.pub-root`: the Bootstrap 3.1.1
+         transcription would fight the new composition over headings, containers, and buttons. -->
+    <div class="home-cine">
       <ConsentBanner />
-    {/if}
-    <SiteHeader signedIn={!!data.user} accountAccessEnabled={data.accountAccessEnabled} />
-    {@render children()}
-    <SiteFooter />
-  </div>
+      <HomeNav signedIn={!!data.user} accountAccessEnabled={data.accountAccessEnabled} />
+      <main id="home-main">{@render children()}</main>
+      <HomeFooter signedIn={!!data.user} accountAccessEnabled={data.accountAccessEnabled} />
+    </div>
+  {:else}
+    <!-- public.css is scoped under .pub-root. It has to be: the marketing site is
+         Bootstrap 3.1.1 plus a theme that overrides the desktop container, while
+         the controller uses a different Bootstrap 3/app bundle. Loaded unscoped
+         they fought over `.container`, `.row`,
+         `.col-md-*`, `hr`, `img`, `.navbar`, `.caret` and `.dropdown-menu` on
+         every controller page — the bulk-actions menu came out 376px wide instead
+         of 238px because `.dropdown-menu { right: 0 }` from this sheet turned a
+         shrink-to-fit box into a left-and-right-anchored one. -->
+    <div class="pub-root">
+      <SiteHeader signedIn={!!data.user} accountAccessEnabled={data.accountAccessEnabled} />
+      {@render children()}
+      <SiteFooter />
+    </div>
+  {/if}
 {:else}
   {@render children()}
 {/if}
