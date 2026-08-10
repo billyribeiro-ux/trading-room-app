@@ -24,6 +24,69 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-10
 
+### 12:10 — TODO item C CLOSED: `push_tokens_json` has a writer, and the mobile app has a brief
+
+**No runtime impact until deployed** — a new public endpoint nothing calls yet, plus migration 0006.
+Item **C** is removed from `TODO.md`. New: `routes/api/mobile/pair/+server.ts`,
+`lib/server/mobile-pairing.ts` (+ 11 tests), `db/migrations/0006-mobile-pair-attempts.js`,
+`mobile-app/PROMPT.md`.
+
+The column has existed since the schema was written and **nothing had ever appended to it**, because
+the endpoint a device would call did not exist. So the FCM client, the fan-out and the manage-page
+controls were all built against a list that could only ever be empty.
+
+`POST /api/mobile/pair` takes room + email + PIN + FCM token, verifies, appends the token and
+**consumes the PIN**. It is `/api/` rather than `/internal/` because a phone that has never paired
+holds no shared secret — that is what pairing is for.
+
+**Which makes a six-digit PIN the credential on a public endpoint, so two things carry the weight:**
+
+- **Single use.** Consumed on success. Without it, a PIN read over someone's shoulder stays valid
+  for days — `ptrMobileAppExpirePairCodeDays` sets the window.
+- **Five failures destroy the code.** A million combinations, five guesses, and then the thing being
+  attacked no longer exists. A member who mistypes five times asks for another; one click.
+
+**The counter is a column, not a rate limiter, and that is the interesting decision.** The obvious
+answer is a limiter — and it is the wrong one here, because this controller runs **serverless on
+Vercel**: an in-process count lives and dies with one instance and shares nothing with the next. It
+would look like protection and provide almost none. Migration 0006 adds
+`room_users.mobile_pair_attempts`, following the precedent `login-attempts.ts` already set.
+
+Failures are counted **only against a live code**. Incrementing on an expired or exhausted one would
+let anyone run the counter up on a member who is not currently pairing, so their *next* code would
+start part-spent.
+
+Room and email are required alongside the PIN because the reference's own pair URL carries both —
+`…/addUser/<publicId>/?sec=…&email=__userEmail__&name=__userName__` — so an attacker needs a room
+code and a member's address, not just six digits swept across every room.
+
+Every failure returns the same 403 with no detail. Wrong room, unknown email, expired, wrong PIN,
+exhausted — one answer, because distinguishing them turns the endpoint into a way to discover which
+email addresses are members of which room. The reason goes to the log, where the audience is us; the
+**email is logged and the PIN is not**, since knowing which six digits were tried helps nobody and
+writes a live credential into the log.
+
+Ten devices per member, oldest evicted, and re-pairing the same device **replaces** its entry rather
+than adding one — a reinstall is the common case and must not fill the array with duplicates of one
+phone.
+
+**`svelte-check` caught a real error the tests could not.** The query was written against
+`roomUsers.email`, and `room_users` has no such column — a membership is a join row carrying room,
+account and role, while the identity lives once on `users`. Every test in that file exercises the
+pure half, so all 646 passed while the database query was wrong. It now joins through `users`. That
+is the argument for running the type gate on a `.ts` change rather than trusting a green suite.
+
+**And `mobile-app/PROMPT.md`** — the folder and brief for the app's own session, as the owner asked.
+It fixes the wire contract so a future session cannot redesign it to suit the client, lists what is
+already built and tested, and puts §5's open questions where they cannot be skipped. The first of
+those decides the whole project: **does the app carry video, or only alerts?** Every captured control
+is notification-related and no capture shows a mobile media path — an alert receiver is a small app
+and a media client is not, so the framework choice deliberately waits on that answer rather than
+being made first and regretted.
+
+Verified: **646 tests across 58 files** (635 → 646), `svelte-check` **0 errors, 0 warnings**, format
+gate green, `vite build` clean with the new route present in the output.
+
 ### 11:53 — TODO item N CLOSED: the connectivity test now tests THIS deployment
 
 **Runtime impact: yes, in the room** — the troubleshooter's "Network Test" changes what it measures.

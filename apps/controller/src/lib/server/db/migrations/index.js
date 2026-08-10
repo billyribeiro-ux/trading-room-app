@@ -4,6 +4,7 @@ import { sql as badgeDarkThemeAndRoomArchiving } from './0002-badge-dark-theme-a
 import { sql as roomShortCodeSequence } from './0003-room-short-code-sequence.js';
 import { sql as backfillRoomPublicId } from './0004-backfill-room-public-id.js';
 import { sql as openExistingRooms } from './0005-open-existing-rooms.js';
+import { sql as mobilePairAttempts } from './0006-mobile-pair-attempts.js';
 
 /**
  * Versioned, forward-only, apply-exactly-once migrations.
@@ -83,6 +84,11 @@ export const MIGRATIONS = [
     version: 5,
     name: 'open_existing_rooms',
     sql: openExistingRooms
+  },
+  {
+    version: 6,
+    name: 'mobile_pair_attempts',
+    sql: mobilePairAttempts
   }
 ];
 

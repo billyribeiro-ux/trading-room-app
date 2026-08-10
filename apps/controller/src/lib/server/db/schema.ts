@@ -296,6 +296,16 @@ export const roomUsers = pgTable(
      */
     mobilePairCode: text('mobile_pair_code'),
     mobilePairCodeExpiresAt: timestamp('mobile_pair_code_expires_at', { withTimezone: true }),
+    /**
+     * Failed pairing attempts against the current code.
+     *
+     * Six digits is a million combinations and the pairing endpoint is public by necessity — a
+     * phone that has never paired holds no credential. Five failures invalidates the code, so an
+     * attacker gets five guesses and then the thing they were attacking no longer exists. Durable
+     * rather than in-process because this controller is serverless: an instance-local counter would
+     * look like protection and provide almost none. Reset on success.
+     */
+    mobilePairAttempts: integer('mobile_pair_attempts').notNull().default(0),
     /** push registrations, as a JSON array of { token, platform, addedAt } */
     pushTokensJson: text('push_tokens_json').notNull().default('[]'),
     /** 'active' | 'paused' | 'unsubscribed' — PAUSE / RESUME / Remove Mobile Notifs */

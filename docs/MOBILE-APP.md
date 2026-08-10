@@ -173,8 +173,14 @@ a separate POST. Do not "simplify" it into the config payload.
 Everything client-side, and one server piece:
 
 1. **The app itself.** No iOS or Android project exists.
-2. **A token-registration endpoint.** The app must POST its FCM registration token after pairing.
-   `push_tokens_json` has no writer — see `NEXT-SESSION.md`, the two dead columns.
+2. ~~**A token-registration endpoint.**~~ **BUILT 2026-08-10** — `POST /api/mobile/pair`
+   (`routes/api/mobile/pair/+server.ts`, rules in `lib/server/mobile-pairing.ts`, 11 unit tests).
+   The app posts room + email + PIN + FCM token; the server verifies, appends the token and
+   **consumes the PIN**. `push_tokens_json` finally has a writer. It is `/api/` rather than
+   `/internal/` because a phone that has never paired holds no shared secret — the PIN is the
+   credential, which is why it is single-use and why five failures destroy it
+   (`mobile_pair_attempts`, migration 0006). Room and email are required alongside it because the
+   reference's own pair URL carries both.
 3. **The `addUser` pairing route.** The reference renders a readonly `#pairURLLink`:
    `https://chat.protradingroom.com/ptr_app/sessions/v2/addUser/<publicId>/?sec=<pairSecretKey>&email=__userEmail__&name=__userName__`
    We have no such route — a search of `src/routes` returns nothing. It is `ng-hide` in the capture
