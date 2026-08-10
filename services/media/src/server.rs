@@ -1118,6 +1118,22 @@ async fn serve_peer(
             "role": identity.role,
         }),
     );
+    // Liveness. Every per-peer resource - the `max_peers` slot, the per-identity count, the room's
+    // router, the RTC ports - is released when this task ends, and this task ends only when the
+    // socket produces an event. A client that vanishes without a clean close produces none, so
+    // without this arm the peer is held forever. See `Config::peer_silence_limit`.
+    //
+    // `interval_at` rather than `interval`: the first tick of a plain `interval` completes
+    // immediately, which would put a ping on the wire in the same breath as the welcome frame.
+    let mut heartbeat = tokio::time::interval_at(
+        tokio::time::Instant::now() + state.config.peer_ping_interval,
+        state.config.peer_ping_interval,
+    );
+    // A peer whose task was starved must not be closed for ticks it never got to see; skipping the
+    // backlog keeps this a liveness probe rather than a scheduling penalty.
+    heartbeat.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+    let mut last_heard = tokio::time::Instant::now();
+
     if outbound.send(welcome).await.is_ok() {
         loop {
             let event = tokio::select! {
@@ -1126,6 +1142,11 @@ async fn serve_peer(
                 biased;
 
                 _ = shutdown.recv() => PeerEvent::ShuttingDown,
+
+                // Above the traffic arms, and cheap enough that it costs them nothing: one tick
+                // does at most one 2-byte frame, and a tick is consumed when it fires, so it
+                // cannot preempt twice in a row.
+                _ = heartbeat.tick() => PeerEvent::Heartbeat,
 
                 // The other two share one arm, and an inner unbiased `select!`, on purpose. With
                 // all three in one biased `select!` the notification arm outranks the inbound one,
@@ -1153,6 +1174,33 @@ async fn serve_peer(
                     break;
                 }
 
+                PeerEvent::Heartbeat => {
+                    let silent_for = last_heard.elapsed();
+                    if silent_for >= state.config.peer_silence_limit {
+                        tracing::info!(
+                            silent_for_secs = silent_for.as_secs(),
+                            "peer stopped answering; closing its socket and releasing its slot"
+                        );
+                        // Sent on a socket that is probably already gone, so the result is
+                        // deliberately ignored - the point of this branch is `break`, which drops
+                        // the RAII guards. A well-behaved client sees 1001 and reconnects.
+                        let _ = outbound
+                            .send(close_frame(CLOSE_GOING_AWAY, "no response to heartbeat"))
+                            .await;
+                        break;
+                    }
+                    // An unanswered ping does NOT fail here: a write into a socket whose peer has
+                    // silently gone succeeds into the kernel buffer for a long time. The pong
+                    // deadline above is what detects the loss; this send only asks the question.
+                    if outbound
+                        .send(Message::Ping(Default::default()))
+                        .await
+                        .is_err()
+                    {
+                        break;
+                    }
+                }
+
                 // The hub dropped our sender: we fell too far behind. Close so we reconnect.
                 PeerEvent::Notification(None) => break,
                 PeerEvent::Notification(Some(message)) => {
@@ -1166,36 +1214,43 @@ async fn serve_peer(
                     tracing::debug!(%error, "websocket read failed");
                     break;
                 }
-                PeerEvent::Frame(Some(Ok(frame))) => match frame {
-                    Message::Text(text) => {
-                        let (reply, outcome) =
-                            on_request(&state, &identity, &session, text.as_str()).await;
-                        if outbound.send(reply).await.is_err() {
-                            break;
+                PeerEvent::Frame(Some(Ok(frame))) => {
+                    // Any frame at all is proof of life, which is why this sits above the match
+                    // rather than in the Pong arm: a peer sending commands is obviously present,
+                    // and a peer that pings us is answering for itself.
+                    last_heard = tokio::time::Instant::now();
+
+                    match frame {
+                        Message::Text(text) => {
+                            let (reply, outcome) =
+                                on_request(&state, &identity, &session, text.as_str()).await;
+                            if outbound.send(reply).await.is_err() {
+                                break;
+                            }
+                            if matches!(outcome, Outcome::Finished) {
+                                let _ = outbound
+                                    .send(close_frame(CLOSE_GOING_AWAY, "closed on request"))
+                                    .await;
+                                break;
+                            }
                         }
-                        if matches!(outcome, Outcome::Finished) {
-                            let _ = outbound
-                                .send(close_frame(CLOSE_GOING_AWAY, "closed on request"))
-                                .await;
-                            break;
+                        Message::Binary(_) => {
+                            let refusal = error_reply(
+                                None,
+                                "badEnvelope",
+                                "this signalling channel carries JSON text frames only",
+                            );
+                            if outbound.send(refusal).await.is_err() {
+                                break;
+                            }
                         }
+                        Message::Close(_) => break,
+                        // "Ping messages will be automatically responded to by the server, so you
+                        // do not have to worry about dealing with them yourself"
+                        // (`axum-0.8.9/src/extract/ws.rs:781-782`).
+                        Message::Ping(_) | Message::Pong(_) => {}
                     }
-                    Message::Binary(_) => {
-                        let refusal = error_reply(
-                            None,
-                            "badEnvelope",
-                            "this signalling channel carries JSON text frames only",
-                        );
-                        if outbound.send(refusal).await.is_err() {
-                            break;
-                        }
-                    }
-                    Message::Close(_) => break,
-                    // "Ping messages will be automatically responded to by the server, so you
-                    // do not have to worry about dealing with them yourself"
-                    // (`axum-0.8.9/src/extract/ws.rs:781-782`).
-                    Message::Ping(_) | Message::Pong(_) => {}
-                },
+                }
             }
         }
     }
@@ -1210,6 +1265,8 @@ async fn serve_peer(
 /// What woke [`serve_peer`]'s loop.
 enum PeerEvent {
     ShuttingDown,
+    /// The liveness timer fired: ping the peer, or close it if it has gone silent.
+    Heartbeat,
     Notification(Option<Message>),
     Frame(Option<Result<Message, axum::Error>>),
 }
@@ -1692,6 +1749,8 @@ mod tests {
             workers: 1,
             grant_public_key: None,
             allowed_origin: Some("https://app.example.test".into()),
+            peer_ping_interval: Duration::from_secs(20),
+            peer_silence_limit: Duration::from_secs(60),
         }
     }
 
@@ -2757,6 +2816,89 @@ mod tests {
             .ok("getRouterRtpCapabilities", json!(null))
             .await;
 
+        harness.shutdown().await;
+    }
+
+    /// A peer that stops answering must be closed, or every resource it holds is held forever.
+    ///
+    /// This is the exact shape measured in production on 2026-08-10: two sockets to the SFU, alive
+    /// at the TCP layer with the client's stack still ACKing keepalives, and **zero application
+    /// bytes in over two hours**. The room never emptied, `/health` reported two participants, and
+    /// two of that user's four connection slots were held by sockets nobody was behind.
+    ///
+    /// The socket here is connected and then never polled again, which is what makes it a faithful
+    /// reproduction: a tungstenite client answers pings only while its stream is being polled, so
+    /// an unpolled socket is a peer whose TCP stack is fine and whose application is not - and
+    /// nothing else in the server can tell the difference.
+    #[tokio::test]
+    async fn a_peer_that_stops_answering_is_closed_and_its_slot_released() {
+        let mut config = test_config();
+        config.peer_ping_interval = Duration::from_millis(50);
+        config.peer_silence_limit = Duration::from_millis(200);
+        let mut harness = Harness::start_with(Admission::RequireGrant, config).await;
+
+        let grant = harness.grant_for("trading-floor", 4242, Role::Presenter);
+        let held = harness
+            .connect(&format!("grant={grant}"))
+            .await
+            .expect("the peer is admitted normally");
+        assert_eq!(
+            harness.state.peer_count(),
+            1,
+            "the peer must be counted while it is connected"
+        );
+
+        // Deliberately not polled: this is the ghost.
+        for _ in 0..250 {
+            if harness.state.peer_count() == 0 {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+        assert_eq!(
+            harness.state.peer_count(),
+            0,
+            "a peer silent past the limit must have its socket closed and its slot released"
+        );
+
+        drop(held);
+        harness.shutdown().await;
+    }
+
+    /// The other half, and the more dangerous one to get wrong: the heartbeat must not evict a peer
+    /// that IS answering. Closing live sockets every minute would be a worse defect than the leak,
+    /// and it would look like an intermittent network fault rather than a server decision.
+    ///
+    /// Nothing here answers the ping deliberately - the client is simply *read*, and RFC 6455
+    /// §5.5.2 auto-pong does the rest. That is the property the fix depends on: no client change.
+    #[tokio::test]
+    async fn a_peer_that_keeps_answering_is_never_evicted() {
+        let mut config = test_config();
+        config.peer_ping_interval = Duration::from_millis(50);
+        config.peer_silence_limit = Duration::from_millis(200);
+        let mut harness = Harness::start_with(Admission::RequireGrant, config).await;
+
+        let grant = harness.grant_for("trading-floor", 7, Role::Presenter);
+        let peer = harness
+            .connect(&format!("grant={grant}"))
+            .await
+            .expect("the peer is admitted normally");
+
+        // Keep the stream polled so tungstenite answers the pings, and hold it well past several
+        // silence limits.
+        let pump = tokio::spawn(async move {
+            let mut peer = peer;
+            while let Some(Ok(_)) = peer.socket.next().await {}
+        });
+        tokio::time::sleep(Duration::from_millis(1_000)).await;
+
+        assert_eq!(
+            harness.state.peer_count(),
+            1,
+            "a peer answering the heartbeat must still be connected after five silence limits"
+        );
+
+        pump.abort();
         harness.shutdown().await;
     }
 

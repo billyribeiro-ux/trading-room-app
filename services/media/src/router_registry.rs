@@ -361,6 +361,8 @@ mod tests {
             workers,
             grant_public_key: None,
             allowed_origin: None,
+            peer_ping_interval: std::time::Duration::from_secs(20),
+            peer_silence_limit: std::time::Duration::from_secs(60),
         }
     }
 

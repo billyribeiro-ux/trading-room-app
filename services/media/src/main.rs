@@ -25,6 +25,8 @@
 //! | `MEDIA_GRANT_PUBLIC_KEY`  | -                          | Ed25519 public key, raw 32 bytes, padded base64 |
 //! | `MEDIA_ALLOWED_ORIGIN`    | -                          | exact browser origin allowed to open `/ws`     |
 //! | `MEDIA_ALLOW_ANONYMOUS`   | unset                      | development only; see below                     |
+//! | `MEDIA_PEER_PING_SECONDS` | `20`                       | how often each peer is pinged for liveness      |
+//! | `MEDIA_PEER_SILENCE_SECONDS` | `60`                    | silence after which a peer's socket is closed   |
 //! | `RUST_LOG`                | `info`                     | tracing filter                                  |
 //!
 //! `MEDIA_ALLOW_ANONYMOUS` is read here rather than added to [`Config`] deliberately: it is not a
@@ -289,6 +291,8 @@ mod tests {
             workers: 1,
             grant_public_key: None,
             allowed_origin: allowed_origin.map(str::to_owned),
+            peer_ping_interval: std::time::Duration::from_secs(20),
+            peer_silence_limit: std::time::Duration::from_secs(60),
         }
     }
 
@@ -392,6 +396,8 @@ mod tests {
                 .expect("example worker count must parse"),
             grant_public_key: Some("A6EHv/POEL4dcN0Y50vAmWfk1jCbpQ1fHdyGZBJVMbg=".into()),
             allowed_origin: Some(example_value("MEDIA_ALLOWED_ORIGIN").into()),
+            peer_ping_interval: std::time::Duration::from_secs(20),
+            peer_silence_limit: std::time::Duration::from_secs(60),
         };
 
         assert_eq!(

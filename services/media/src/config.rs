@@ -6,6 +6,7 @@
 
 use crate::session::{MAX_TRANSPORTS_PER_SESSION, PORTS_PER_TRANSPORT};
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use std::time::Duration;
 use thiserror::Error;
 use url::{Host, Url};
 
@@ -31,6 +32,19 @@ pub enum ConfigError {
 /// meaningful number of concurrent transports.
 const MIN_PORTS_PER_WORKER: u32 = 100;
 
+/// Default [`Config::peer_ping_interval`].
+///
+/// Short enough that a vanished peer is reclaimed while a human is still looking at the screen,
+/// long enough to be irrelevant next to media traffic: one 2-byte frame every 20 seconds per peer.
+const DEFAULT_PEER_PING_SECONDS: u64 = 20;
+
+/// Default [`Config::peer_silence_limit`] — three missed pings.
+///
+/// One missed pong is a hiccup; three in a row over a minute is a peer that is not there. Erring
+/// long is deliberate: closing a live socket costs a reconnect, and reconnecting is exactly what a
+/// client does when it sees the close.
+const DEFAULT_PEER_SILENCE_SECONDS: u64 = 60;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Config {
     /// Where the axum server listens for signalling.
@@ -46,6 +60,30 @@ pub struct Config {
     /// Exact canonical browser origin allowed to open signalling WebSockets. Required in
     /// grant-enforcing deployments; optional only in explicitly anonymous local mode.
     pub allowed_origin: Option<String>,
+    /// How often the server sends a WebSocket ping to each peer.
+    ///
+    /// See [`Self::peer_silence_limit`] for why this exists at all.
+    pub peer_ping_interval: Duration,
+    /// How long a peer may say nothing at all before its socket is closed.
+    ///
+    /// **This is a resource-release mechanism, not a tuning preference.** Every per-peer resource
+    /// the SFU holds — the global `max_peers` slot, the per-identity connection count, the room's
+    /// router, and the RTC ports underneath it — is released when the peer's task ends, and that
+    /// task ends only when the socket produces an event. A client that disappears *without* a clean
+    /// close (a closed laptop, a dropped network, a killed browser process, a phone leaving
+    /// coverage) produces no event at all, so without this the peer is held forever: the room never
+    /// empties, `/health` reports participants who are gone, and after
+    /// `MAX_CONNECTIONS_PER_VERIFIED_USER` such ghosts that user is refused entry to their own room
+    /// with a 503 while the service reports itself healthy.
+    ///
+    /// TCP keepalive is not a substitute. It is the *kernel's* policy on a socket the application
+    /// never sees — this process talks to a reverse proxy over loopback, which never fails on its
+    /// own — and on a stock Linux host it would take over two hours to conclude anything
+    /// (`tcp_keepalive_time` 7200s plus 9 probes at 75s).
+    ///
+    /// Nothing is required of the client: browsers answer a WebSocket ping automatically at the
+    /// protocol level (RFC 6455 §5.5.2), so the pong arrives without a single line of client code.
+    pub peer_silence_limit: Duration,
 }
 
 fn var(key: &'static str) -> Option<String> {
@@ -86,6 +124,14 @@ impl Config {
             workers,
             grant_public_key: var("MEDIA_GRANT_PUBLIC_KEY"),
             allowed_origin: var("MEDIA_ALLOWED_ORIGIN"),
+            peer_ping_interval: Duration::from_secs(parse(
+                "MEDIA_PEER_PING_SECONDS",
+                DEFAULT_PEER_PING_SECONDS,
+            )?),
+            peer_silence_limit: Duration::from_secs(parse(
+                "MEDIA_PEER_SILENCE_SECONDS",
+                DEFAULT_PEER_SILENCE_SECONDS,
+            )?),
         };
         config.validate()?;
         Ok(config)
@@ -113,6 +159,27 @@ impl Config {
 
         if let Some(origin) = &self.allowed_origin {
             validate_origin(origin)?;
+        }
+
+        // A zero interval would busy-spin the peer loop; a silence limit at or below the interval
+        // would close every peer on its first tick, before any pong could possibly arrive. Both
+        // are worse than the leak this mechanism exists to fix, so they fail at startup rather
+        // than at the first peer.
+        if self.peer_ping_interval.is_zero() {
+            return Err(ConfigError::Invalid {
+                key: "MEDIA_PEER_PING_SECONDS",
+                value: "0".into(),
+            });
+        }
+        if self.peer_silence_limit <= self.peer_ping_interval {
+            return Err(ConfigError::Invalid {
+                key: "MEDIA_PEER_SILENCE_SECONDS",
+                value: format!(
+                    "{}s must exceed MEDIA_PEER_PING_SECONDS ({}s)",
+                    self.peer_silence_limit.as_secs(),
+                    self.peer_ping_interval.as_secs()
+                ),
+            });
         }
 
         self.bind_socket_address()?;
@@ -229,6 +296,8 @@ mod tests {
             workers,
             grant_public_key: None,
             allowed_origin: Some("https://app.example.test".into()),
+            peer_ping_interval: Duration::from_secs(20),
+            peer_silence_limit: Duration::from_secs(60),
         }
     }
 
