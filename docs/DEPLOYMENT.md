@@ -198,6 +198,15 @@ and it is fine as long as it is written down, which is what this paragraph is fo
 Config lives in `/etc/tradingroom-media/` (mode 600): `media.env` holds the announced address, the
 RTC range and the grant PUBLIC key; `media-image.env` holds the image tag the unit runs.
 
+**Two optional variables were added 2026-08-10 and are not yet on the deployed build**
+(`TODO.md` item P): `MEDIA_PEER_PING_SECONDS` (default 20) and `MEDIA_PEER_SILENCE_SECONDS`
+(default 60) control the peer liveness probe — how often each signalling socket is pinged, and how
+long it may say nothing before it is closed and its resources released. Both default correctly if
+absent, so no `media.env` change is required to take the fix. **Until that build ships, a client
+that disappears without a clean close is counted as a peer indefinitely**, holding a `max_peers`
+slot, one of its user's four connection slots, and the room's router. `CHANGELOG.md` 2026-08-10
+05:42 has the measurement.
+
 **Shipping a new room build**, from a developer machine.
 
 **Run the smoke test after EVERY deploy — either app.** One command, about a second, exits

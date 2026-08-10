@@ -24,6 +24,92 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-10
 
+### 05:42 — "Two real peers" investigated: the SFU cannot tell a live peer from an abandoned socket
+
+**No runtime impact yet — the fix is committed (`a11883c`) and NOT deployed.** The box still runs
+the 2026-08-09 build. Deploying needs a ~15-minute rebuild on the box and a service restart.
+
+At 05:09 I wrote that `media.tradingroom.app` showed `rooms:1, peers:2` and called it "two real
+peers connected to a real room… the media plane is carrying real peers." **That claim was not
+supported by anything I had measured.** What follows is what the box actually says.
+
+**The journal — both peers are the same person, and neither has produced anything.**
+
+```
+07:22:47Z  peer 64840acf… room=tra-1001 user=Some(Legacy(1)) role=Some(Presenter)  peer connected
+07:40:33Z  peer 87c1c059… room=tra-1001 user=Some(Legacy(1)) role=Some(Presenter)  peer connected
+```
+
+No `peer is producing` line for either, and no disconnect. The session before them
+(06:58:41–07:09:17) *did* produce audio and video and then disconnected cleanly — so the media path
+works and disconnect detection works when a socket closes properly.
+
+**The sockets — alive at the TCP layer, silent at the application layer.** `ss -tni` at 09:30:06Z,
+against the two client connections from `216.49.131.90`:
+
+| socket | `lastsnd`/`lastrcv` | connected at | `lastack` |
+| --- | --- | --- | --- |
+| `:5147` | **7,639,280 ms — 2h 07m 19s** | 07:22:47Z | 5.4 s |
+| `:5425` | **6,573,063 ms — 1h 49m 33s** | 07:40:33Z | 14.5 s |
+
+Both idle times match their connect timestamps **to the second**: not one application byte has
+crossed either socket since the moment it was established. `lastack` in seconds means the client's
+TCP stack is still answering keepalives, so these are most likely two idle browser tabs rather than
+ghosts. **That is the point — the server cannot tell, and neither can I.** An idle tab and an
+abandoned socket are byte-for-byte identical to this service.
+
+**Why that is a defect and not a cosmetic stat.** Reading `serve_peer`, the loop selects on exactly
+three things — shutdown, notifications, inbound frames — and **no timer**. Every per-peer resource
+is RAII on that task: `LiveConnection` (which holds both the global `max_peers` slot *and* the
+per-identity count, capped at `MAX_CONNECTIONS_PER_VERIFIED_USER = 4`), `HubMembership`, and the
+`Session` holding the room's router. The task ends only when the socket produces an event. A client
+that disappears **without a clean close** — closed laptop, dropped network, killed browser process,
+phone leaving coverage — produces none, so:
+
+- the room never empties and its router stays open;
+- `/health` reports participants who are gone;
+- and after four such sockets **that user is refused entry to their own room with a 503 while the
+  service reports itself healthy** — precisely the failure `Config::max_peers`' own documentation
+  says the ceiling exists to prevent. Both current sockets belong to `Legacy(1)`, so that user is
+  already holding **2 of their 4** slots on connections that have said nothing for two hours.
+
+TCP keepalive is not a fallback. It is the kernel's policy on a socket this process never sees — it
+talks to Caddy over loopback, which never fails on its own — and the box's own settings
+(`tcp_keepalive_time 7200`, `intvl 75`, `probes 9`, read from `sysctl`) would take **over two
+hours** to conclude anything.
+
+**The fix — a heartbeat arm in the peer loop.** Ping every `peer_ping_interval`; close the peer when
+it has said nothing for `peer_silence_limit`. Any inbound frame counts as proof of life, which is
+why that assignment sits above the `match` rather than in the `Pong` arm. Defaults 20 s and 60 s —
+three missed pings — both now `Config` fields (`MEDIA_PEER_PING_SECONDS`,
+`MEDIA_PEER_SILENCE_SECONDS`) validated at startup, so a zero interval or a silence limit below the
+ping interval fails the boot instead of the first peer.
+
+**No client change is required.** Browsers answer a WebSocket ping automatically at the protocol
+level (RFC 6455 §5.5.2), so the pong arrives without a line of room code.
+
+Two tests, and the pair is the point:
+
+- `a_peer_that_stops_answering_is_closed_and_its_slot_released` — connects a socket and then never
+  polls it, which is a faithful reproduction: a tungstenite client answers pings only while its
+  stream is polled, so an unpolled socket is exactly a peer whose TCP stack is fine and whose
+  application is not.
+- `a_peer_that_keeps_answering_is_never_evicted` — **a heartbeat that evicts live sockets would be a
+  worse defect than the leak**, and would look like an intermittent network fault rather than a
+  server decision.
+
+**Negative control, because a test that passes either way is worthless:** with the reclaim branch
+disabled, the first test fails `left: 1, right: 0`. It measures the mechanism.
+
+Verified: **114 lib + 11 bin tests pass**, `cargo clippy -p tradingroom-media --all-targets -D
+warnings` clean, `cargo fmt` applied. Scope was the changed crate only, per the standing rule.
+
+**Two honest notes.** The **rust-analyzer MCP was not available** in this session — absent from the
+tool registry entirely, not merely unresponsive — so this used `cargo check`/`clippy`, which the
+house rules allow only with this disclosure. And `services/**` is a **mirror**: this change makes
+this copy diverge from `new-room-control`'s, which is `apps/room/TODO.md` entry 2 and has already
+bitten twice. It must be promoted upstream and re-sealed rather than left to drift.
+
 ### 05:14 — The old SFU is DELETED. It was Lightsail all along, and the 04:56 entry below was my error
 
 **No runtime impact on this repository** — no code changed. Real-world impact: an AWS resource that
