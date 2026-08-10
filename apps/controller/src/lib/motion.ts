@@ -14,8 +14,40 @@
  *    ScrollTriggers, so client-side navigation away from `/` leaves no orphaned observers.
  */
 import { gsap } from 'gsap';
-import { ScrollTrigger } from 'gsap/ScrollTrigger';
+/*
+  DEFAULT IMPORT, NOT A NAMED ONE — and this took the home page down for hours.
+
+  `import { ScrollTrigger } from 'gsap/ScrollTrigger'` threw at module instantiation inside the
+  Vercel function, so EVERY request to `/` answered 500 while every other route stayed healthy:
+
+    SyntaxError: Named export 'ScrollTrigger' not found. The requested module
+    'gsap/ScrollTrigger' is a CommonJS module, which may not support all module.exports as named
+    exports. CommonJS modules can always be imported via the default export, for example using:
+      import pkg from 'gsap/ScrollTrigger';
+
+  gsap 3.15's exports map `./*` to `./*.js` for `import` and `./dist/*.js` for `require`, and the
+  package declares no `"type": "module"`. Locally Node resolves the ESM file and the named import
+  works — verified — which is exactly why this passed `svelte-check`, 564 unit tests, a clean
+  `vite build` AND a production build served from `vite preview` on this machine. In the deployed
+  function it resolves to the CommonJS build instead, and a named import of a CJS module is a
+  syntax error before a single line of guarded code runs.
+
+  The form below is the one Node's own error message prescribes, and it holds under BOTH
+  resolutions: the default is the plugin in the ESM build and `module.exports` in the CJS one, so
+  taking `.ScrollTrigger` off it when present covers both.
+
+  The window guard below is NOT what makes this safe. An ESM import is instantiated before any
+  statement in this module executes, so guarding `registerPlugin` never protected server rendering
+  from the import itself — the comment above this module says SSR is inert, and that was true of
+  the registration and untrue of the import. Keeping GSAP out of the server module graph entirely,
+  with a browser-only dynamic import, is the structural fix and is recorded in `TODO.md`.
+*/
+import ScrollTriggerModule from 'gsap/ScrollTrigger';
 import type { Attachment } from 'svelte/attachments';
+
+const ScrollTrigger = (
+  (ScrollTriggerModule as unknown as { ScrollTrigger?: unknown }).ScrollTrigger ?? ScrollTriggerModule
+) as typeof ScrollTriggerModule;
 
 if (typeof window !== 'undefined') {
   gsap.registerPlugin(ScrollTrigger);
