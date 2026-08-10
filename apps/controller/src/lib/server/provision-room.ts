@@ -53,9 +53,7 @@ export interface ProvisionedRoom {
  */
 async function allocateShortCode(db: Db): Promise<string | null> {
   for (let attempt = 0; attempt < 20; attempt++) {
-    const issued = await db.execute<{ code: string }>(
-      sql`SELECT nextval('room_short_code_seq')::TEXT AS code`
-    );
+    const issued = await db.execute<{ code: string }>(sql`SELECT nextval('room_short_code_seq')::TEXT AS code`);
     const candidate = (issued as unknown as Array<{ code: string }>)[0]?.code;
     if (!candidate) return null;
     const [clash] = await db.select().from(rooms).where(eq(rooms.shortCode, candidate)).limit(1);

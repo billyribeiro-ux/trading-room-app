@@ -162,11 +162,7 @@ async function post(name: string, roomId: number, locals: App.Locals, fields: Re
   const action = actions[name];
   if (!action) throw new Error(`there is no ?/${name} action on the manage page`);
 
-  const [row] = await getDb()
-    .select({ shortCode: rooms.shortCode })
-    .from(rooms)
-    .where(eq(rooms.id, roomId))
-    .limit(1);
+  const [row] = await getDb().select({ shortCode: rooms.shortCode }).from(rooms).where(eq(rooms.id, roomId)).limit(1);
   if (!row) throw new Error(`no room with id ${roomId} — the fixture did not create what it thinks`);
 
   const body = new FormData();

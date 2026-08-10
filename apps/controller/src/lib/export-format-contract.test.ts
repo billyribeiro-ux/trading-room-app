@@ -15,10 +15,7 @@ import { describe, expect, it } from 'vitest';
   had. A format that only reveals itself in a downloaded file needs a test that reads the source.
 */
 
-const page = readFileSync(
-  new URL('../routes/(app)/account/rooms/[id]/[[tab]]/+page.svelte', import.meta.url),
-  'utf8'
-);
+const page = readFileSync(new URL('../routes/(app)/account/rooms/[id]/[[tab]]/+page.svelte', import.meta.url), 'utf8');
 
 /** Comments stripped, so no assertion can be satisfied by the documentation that explains it. */
 const code = page.replace(/<!--[\s\S]*?-->/g, '').replace(/\/\*[\s\S]*?\*\//g, '');
@@ -106,7 +103,19 @@ describe('Export Badges is CSV, and the reported defect was real', () => {
   });
 
   it('keeps convertToCSV’s eleven keys, in its order', () => {
-    for (const key of ['_id', 'userID', 'text', 'imgURL', 'color', 'bkcolor', 'type', 'name', 'uploadTime', 'onlyP', 'roles']) {
+    for (const key of [
+      '_id',
+      'userID',
+      'text',
+      'imgURL',
+      'color',
+      'bkcolor',
+      'type',
+      'name',
+      'uploadTime',
+      'onlyP',
+      'roles'
+    ]) {
       expect(account, `${key} must be a column`).toContain(`'${key}'`);
     }
   });
@@ -119,7 +128,7 @@ describe('Export Badges is CSV, and the reported defect was real', () => {
   });
 
   it('quotes a cell only when it is a string containing a comma', () => {
-    expect(account).toContain("cell.includes(',') ? `\"${cell}\"` : cell");
+    expect(account).toContain('cell.includes(\',\') ? `"${cell}"` : cell');
   });
 
   it('writes nothing at all when there are no badges', () => {

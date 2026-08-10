@@ -30,10 +30,7 @@ function base64Url(value: object | string): string {
 }
 
 /** Mints exactly what a WordPress plugin would send. */
-function mint(
-  payload: Record<string, unknown>,
-  options: { secret?: string; alg?: string } = {}
-): string {
+function mint(payload: Record<string, unknown>, options: { secret?: string; alg?: string } = {}): string {
   const header = base64Url({ alg: options.alg ?? 'HS256', typ: 'JWT' });
   const body = base64Url(payload);
   const mac = createHmac('sha256', options.secret ?? SECRET)
@@ -186,7 +183,9 @@ describe('verifySsoToken', () => {
     const result = verifySsoToken(
       SECRET,
       ROOM,
-      mint(claims({ memberships: undefined, products: 42, permissions: [1, 'ok', null] })), { nowSeconds: NOW });
+      mint(claims({ memberships: undefined, products: 42, permissions: [1, 'ok', null] })),
+      { nowSeconds: NOW }
+    );
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.claims.memberships).toEqual([]);

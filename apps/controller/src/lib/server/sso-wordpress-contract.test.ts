@@ -79,7 +79,8 @@ describe('a token shaped exactly as the plugin builds it', () => {
     bytes you were given" is exactly the kind of invariant a well-meaning refactor breaks.
   */
   it('is accepted even when PHP escapes forward slashes in a claim', () => {
-    const escaped = '{"name":"Dana","email":"dana@example.com","room":"1001","memberships":["plan\\/gold"],"products":[],"permissions":[],"iat":1800000000,"exp":1800000120}';
+    const escaped =
+      '{"name":"Dana","email":"dana@example.com","room":"1001","memberships":["plan\\/gold"],"products":[],"permissions":[],"iat":1800000000,"exp":1800000120}';
     expect(escaped).toContain('\\/');
 
     const result = verifySsoToken(SECRET, ROOM, mintAsPlugin(escaped), { nowSeconds: NOW });
@@ -107,7 +108,9 @@ describe('a token shaped exactly as the plugin builds it', () => {
   });
 
   it('is accepted with unicode escaped, as wp_json_encode emits it', () => {
-    const token = mintAsPlugin('{"name":"Ren\\u00e9e","email":"r@example.com","room":"1001","memberships":[],"products":[],"permissions":[],"iat":1800000000,"exp":1800000120}');
+    const token = mintAsPlugin(
+      '{"name":"Ren\\u00e9e","email":"r@example.com","room":"1001","memberships":[],"products":[],"permissions":[],"iat":1800000000,"exp":1800000120}'
+    );
     const result = verifySsoToken(SECRET, ROOM, token, { nowSeconds: NOW });
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -129,12 +132,12 @@ describe('the plugin source still honours the contract', () => {
     invisible if it silently changed — and unlike the TypeScript, nothing else in this repository
     would catch it.
   */
-  it('mints on click rather than at render, so a page cache cannot leak one member\'s token', () => {
+  it("mints on click rather than at render, so a page cache cannot leak one member's token", () => {
     // The shortcode must link to the plugin's own endpoint, not straight to the controller.
-    expect(PLUGIN).toContain('TRADINGROOM_SSO_QUERY_VAR => \'1\'');
-    expect(PLUGIN).toContain("add_query_arg(");
+    expect(PLUGIN).toContain("TRADINGROOM_SSO_QUERY_VAR => '1'");
+    expect(PLUGIN).toContain('add_query_arg(');
     // And the mint must happen in the init handler, after that link is followed.
-    const shortcode = PLUGIN.indexOf("add_shortcode(");
+    const shortcode = PLUGIN.indexOf('add_shortcode(');
     const mintCall = PLUGIN.indexOf('$token = tradingroom_sso_mint(');
     expect(mintCall).toBeGreaterThan(shortcode);
   });

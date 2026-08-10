@@ -78,10 +78,7 @@ function normalise(value: string): string {
 /** A comma-separated filter as the owner typed it, into a list of comparable entries. */
 export function parseFilterList(value: string | null | undefined): readonly string[] {
   if (!value) return [];
-  return value
-    .split(',')
-    .map(normalise)
-    .filter(Boolean);
+  return value.split(',').map(normalise).filter(Boolean);
 }
 
 /**
@@ -91,10 +88,7 @@ export function parseFilterList(value: string | null | undefined): readonly stri
  * admitted. An audit trail that only records "allowed" cannot answer the question anybody actually
  * asks later, which is "on what basis".
  */
-export function evaluateEntitlement(
-  filters: EntitlementFilters,
-  asserted: AssertedEntitlements
-): EntitlementDecision {
+export function evaluateEntitlement(filters: EntitlementFilters, asserted: AssertedEntitlements): EntitlementDecision {
   const families: Family[] = [
     {
       label: 'membership',
@@ -131,9 +125,7 @@ export function evaluateEntitlement(
   return {
     allowed: false,
     reason: 'no-match',
-    requiredOneOf: configured.flatMap((family) =>
-      family.required.map((required) => `${family.label}:${required}`)
-    )
+    requiredOneOf: configured.flatMap((family) => family.required.map((required) => `${family.label}:${required}`))
   };
 }
 

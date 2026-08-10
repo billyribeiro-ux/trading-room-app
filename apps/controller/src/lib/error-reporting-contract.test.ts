@@ -14,10 +14,7 @@ import { describe, expect, it } from 'vitest';
   layout. So the split below is the contract — everything to the log, nothing but an id to the
   client — and both halves are asserted, because fixing either one by hand tends to break the other.
 */
-const hook = readFileSync(new URL('../hooks.server.ts', import.meta.url), 'utf8').replace(
-  /\/\*[\s\S]*?\*\//g,
-  ''
-);
+const hook = readFileSync(new URL('../hooks.server.ts', import.meta.url), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
 
 describe('handleError', () => {
   it('logs the message, the stack and the URL, not just the error name', () => {

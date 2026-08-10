@@ -23,11 +23,7 @@ import type { RequestHandler } from './$types';
 */
 export const GET: RequestHandler = async ({ params, locals }) => {
   const user = requireUser(locals);
-  const [room] = await getDb()
-    .select()
-    .from(rooms)
-    .where(eq(rooms.shortCode, params.id))
-    .limit(1);
+  const [room] = await getDb().select().from(rooms).where(eq(rooms.shortCode, params.id)).limit(1);
   requireOwnedRoom(locals, room);
   if (!room) error(404, 'Room not found');
 

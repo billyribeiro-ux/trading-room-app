@@ -43,8 +43,7 @@ export function referenceUsers(captureHtml: string): ReferenceUser[] {
       writes `class="thumb24 "` with a trailing space inside the attribute.
     */
     const afterAvatar = row.indexOf('class="thumb24');
-    const displayName =
-      afterAvatar === -1 ? '' : textAfterTag(row.slice(afterAvatar));
+    const displayName = afterAvatar === -1 ? '' : textAfterTag(row.slice(afterAvatar));
 
     const br = row.indexOf('<br>');
     const email = br === -1 ? '' : textAfterTag(row.slice(br));

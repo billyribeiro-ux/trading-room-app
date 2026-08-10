@@ -62,7 +62,7 @@ describe('dropdown menus survive their own opening click', () => {
     expect(recognised, `the wrapper is invisible to the closer:\n${tag}`).toBe(true);
   });
 
-  it('keeps the reference\'s class list on that wrapper', () => {
+  it("keeps the reference's class list on that wrapper", () => {
     // the fix must not have been "add .dropdown to the class", which diverges from the capture
     expect(markup).toContain("'btn-group mb-sm mr'");
   });

@@ -24,6 +24,71 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-10
 
+### 07:09 — Full audit: three broken gates found and fixed, one of them mine
+
+**No runtime impact** — gates, formatting and one stale contract list. Files: the room's
+`.prettierignore`, the controller's `package.json` and `scripts/verify-room-settings-schema.mjs`,
+`src/lib/sso-boundary.test.ts`, plus 29 files reformatted.
+
+Everything was re-run from scratch — both apps, the Rust workspace, production. **Three real
+defects, and two false alarms that were my own tooling.**
+
+---
+
+**1. A stale contract list — and it was mine, from four commits ago.**
+`scripts/verify-room-settings-schema.mjs` carries its own `EXPECTED_WIRED_SETTINGS`, a **third**
+copy of the wired set beside the generator's and the generated file's. Phase 2 and 3 wired six
+settings and left this one at 35.
+
+Nothing failed, because **this gate cannot run in this repository** — it shells out to the generator,
+which reads `evidence-dumps/`, which is not here (`ENOENT: no such file or directory …
+evidence-dumps/login-page/manage`). It is the strongest of the three checks — it regenerates the
+schema twice and compares bytes — and it is the one that would have gone red on the first machine
+that had the dump.
+
+Fixed to 41 entries, and the note above it corrected. More usefully, `sso-boundary.test.ts` now
+**reads that script and asserts its list equals the schema's wired set**, so an unrunnable gate is
+mirrored by one vitest can execute. Negative control: removing a single entry fails the new test;
+restoring it passes.
+
+That note already said *"a count that appears twice is a count that goes wrong once."* It appeared
+three times, and went wrong a third time. It now goes wrong loudly.
+
+**2. The room's format gate had regressed — 33 files.** It was closed green on 2026-08-04 by
+`TODO.md` 3d. **29 of the 33 were `.vercel/output/**`** — minified chunks and generated JSON from an
+adapter-vercel build that did not exist when that entry was written, so the directory was never
+ignored. `.vercel` added beside `.svelte-kit` and `build`, following the file's own stated rule
+("SOURCE gets formatted, GENERATED gets ignored"). The remaining 4 were real and are formatted. The
+five `.svelte` files deliberately excluded for whitespace-geometry reasons were **not** touched.
+
+**3. The controller's format gate could never pass at all.** Its script globbed
+`.github/**/*.{yaml,yml}`, but `.github/` lives at the repository root, not inside `apps/controller`
+— so prettier exited on `No files matching the pattern were found` regardless of the code. The stale
+glob is removed and 25 files formatted (6 from this SSO work, 3 from earlier today, ~16
+pre-existing).
+
+---
+
+**Two false alarms, both my own tooling, reported here rather than as findings:**
+
+- **`pnpm smoke` failed 6 of 9**, including `media /health: fetch failed`. An immediate re-run passed
+  **9 of 9**, and probing the same three hosts from the Hetzner box returned 200/403/200. It was this
+  machine's transient network — the same fault that was failing `git push` and the Docker Hub pull in
+  the same minutes. **Production was never down.** Checking from a second network before reporting is
+  the only reason that is not in here as an outage.
+- **`cargo check --workspace --all-targets` reported 12 errors** in `tradingroom-api`'s tests. Every
+  one was a missing `*_for_tests` helper — which are behind the `testing` feature, deliberately not
+  default ("in a production build the connection stays private, which is fence #2 of the tenancy
+  kernel"). With `--features testing`: clean. **My invocation was wrong; the crate is fine.**
+
+---
+
+**Verified after every fix:** controller **631 tests / 57 files**, `svelte-check` 0/0, `vite build`
+clean, format gate green. Room **524 tests / 56 files**, `svelte-check` 0/0, node-adapter build
+clean, format gate green — "All matched files use Prettier code style!" for the first time since it
+regressed. Rust: `tradingroom-api` checks clean with its feature, `clippy -D warnings` clean on
+`tradingroom-media`. `pnpm smoke` **9 of 9** against production.
+
 ### 06:57 — WordPress SSO, phase 4: the plugin, and an honest limit on it
 
 **No runtime impact.** New: `integrations/wordpress/tradingroom-sso/tradingroom-sso.php`,

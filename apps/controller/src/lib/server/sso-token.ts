@@ -220,10 +220,16 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  */
 function readList(value: unknown): readonly string[] {
   if (Array.isArray(value)) {
-    return value.filter((entry): entry is string => typeof entry === 'string').map((entry) => entry.trim()).filter(Boolean);
+    return value
+      .filter((entry): entry is string => typeof entry === 'string')
+      .map((entry) => entry.trim())
+      .filter(Boolean);
   }
   if (typeof value === 'string') {
-    return value.split(',').map((entry) => entry.trim()).filter(Boolean);
+    return value
+      .split(',')
+      .map((entry) => entry.trim())
+      .filter(Boolean);
   }
   return [];
 }

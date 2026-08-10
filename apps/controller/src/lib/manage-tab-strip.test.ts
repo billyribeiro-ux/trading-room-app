@@ -53,7 +53,7 @@ describe('the manage tab strip', () => {
     ]);
   });
 
-  it('every captured tab is in the strip, in the capture\'s own order', () => {
+  it("every captured tab is in the strip, in the capture's own order", () => {
     const source = readFileSync(SERVER, 'utf8');
     // the labels the code will actually put in `ul.nav.nav-tabs`
     const ours: string[] = [];

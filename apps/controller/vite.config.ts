@@ -49,9 +49,7 @@ export default defineConfig({
     and `$app/env/private` are simply how environment variables work in Kit 3, and passing the old
     Kit 2.63 opt-in is now a type error.
   */
-  plugins: [
-    sveltekit(kitConfig)
-  ],
+  plugins: [sveltekit(kitConfig)],
   server: {
     host: localHost,
     port: localPort,

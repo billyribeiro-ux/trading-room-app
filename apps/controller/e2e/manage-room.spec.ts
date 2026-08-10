@@ -63,10 +63,7 @@ test('a room is managed at its short code, and the stats dates behave', async ({
   */
   const startLabel = page.locator('label', { hasText: 'Start Date:' }).first();
   await expect(startLabel).toBeVisible();
-  expect(
-    await startLabel.getAttribute('for'),
-    'at rest there is no input, so the label must not claim one'
-  ).toBeNull();
+  expect(await startLabel.getAttribute('for'), 'at rest there is no input, so the label must not claim one').toBeNull();
 
   /*
     THE DEFECT THIS SPEC EXISTS FOR.
@@ -76,7 +73,11 @@ test('a room is managed at its short code, and the stats dates behave', async ({
     its only exits are `change` and `blur` and `blur` cannot fire on an element that never held
     focus. One click put the row into an edit state with no way out.
   */
-  await page.locator('a.editable').filter({ hasText: /\d{2}-\d{2}-\d{4}|Empty/ }).first().click();
+  await page
+    .locator('a.editable')
+    .filter({ hasText: /\d{2}-\d{2}-\d{4}|Empty/ })
+    .first()
+    .click();
 
   const field = page.locator('input.mg-date').first();
   await expect(field, 'the click must produce a date input').toBeVisible();

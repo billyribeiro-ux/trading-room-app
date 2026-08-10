@@ -20,10 +20,7 @@ import { ROOM_SETTINGS } from './room-settings-schema';
  *     the moment the two drift.
  */
 
-const GENERATOR = readFileSync(
-  new URL('../../scripts/extract-manage-schema.mjs', import.meta.url),
-  'utf8'
-);
+const GENERATOR = readFileSync(new URL('../../scripts/extract-manage-schema.mjs', import.meta.url), 'utf8');
 
 function declaredList(name: string): string[] {
   const block = GENERATOR.match(new RegExp(`const ${name} = \\[([^\\]]*)\\]`));
@@ -81,6 +78,41 @@ describe('the SSO settings contract', () => {
   });
 });
 
+/*
+  The THIRD copy of the wired set, and the reason this test exists.
+
+  `scripts/verify-room-settings-schema.mjs` carries its own `EXPECTED_WIRED_SETTINGS`. It is the
+  strongest of the three checks — it regenerates the schema twice and compares bytes — and it is the
+  only one that CANNOT RUN in this repository, because the generator reads `evidence-dumps/`, which
+  is not here.
+
+  On 2026-08-10 the SSO door wired six settings and that list was left at 35. Nothing failed, because
+  nothing could run it; it was found by reading. A gate that cannot execute is a gate that drifts
+  silently, so its expectations are mirrored here where vitest can see them.
+*/
+describe('the verifier script that cannot run here', () => {
+  const VERIFIER = readFileSync(new URL('../../scripts/verify-room-settings-schema.mjs', import.meta.url), 'utf8');
+
+  it('expects exactly the settings the generated schema marks wired', () => {
+    const block = VERIFIER.match(/const EXPECTED_WIRED_SETTINGS = \[([^\]]*)\]/);
+    expect(block, 'the verifier must declare EXPECTED_WIRED_SETTINGS').not.toBeNull();
+
+    const expected = [...(block?.[1] ?? '').matchAll(/'([^']+)'/g)].map((match) => match[1]).sort();
+    const actual = ROOM_SETTINGS.filter((definition) => definition.wired)
+      .map((definition) => definition.name)
+      .sort();
+
+    expect(expected).toEqual(actual);
+  });
+
+  it('states the same total in its explanatory note', () => {
+    // The note is what a reader trusts; a count in prose that disagrees with the list beneath it is
+    // how this went wrong twice before.
+    const wired = ROOM_SETTINGS.filter((definition) => definition.wired).length;
+    expect(VERIFIER).toContain(`the union is ${wired}`);
+  });
+});
+
 describe('the signing key stays in the controller', () => {
   it('never appears on the room allow-list', () => {
     expect(ROOM_VISIBLE_SETTINGS as readonly string[]).not.toContain('ssoJWTSecret');
@@ -104,10 +136,7 @@ describe('the SSO route itself', () => {
     What this pins is that none of the gates has been dropped. Each line below is a decision that
     would be invisible if it silently disappeared in a refactor.
   */
-  const ROUTE = readFileSync(
-    new URL('../routes/(public)/sso/[code]/+server.ts', import.meta.url),
-    'utf8'
-  );
+  const ROUTE = readFileSync(new URL('../routes/(public)/sso/[code]/+server.ts', import.meta.url), 'utf8');
 
   it('refuses a room that is not open', () => {
     expect(ROUTE).toContain("if (room.state !== 'open') refuse('room-closed');");

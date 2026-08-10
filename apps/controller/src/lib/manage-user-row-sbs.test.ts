@@ -52,9 +52,7 @@ function shapeOf(html: string, hiddenBy: 'ng-hide' | 'hidden'): string[] {
       `aria-hidden`, which every icon on this row carries, and that silently hid the lot.
     */
     const isHidden =
-      hiddenBy === 'ng-hide'
-        ? /(^|\s)ng-hide(\s|$)/.test(cls)
-        : /(^|\s)hidden(\s|=|>|$)/.test(attrs ?? '');
+      hiddenBy === 'ng-hide' ? /(^|\s)ng-hide(\s|$)/.test(cls) : /(^|\s)hidden(\s|=|>|$)/.test(attrs ?? '');
 
     if (!skip.length && !isHidden) {
       const keep = cls

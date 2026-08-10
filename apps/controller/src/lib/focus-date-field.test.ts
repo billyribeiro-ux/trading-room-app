@@ -62,9 +62,7 @@ describe('focusDateField', () => {
       is the one failure mode the catch above cannot absorb.
     */
     const focus = vi.fn();
-    expect(() =>
-      focusDateField({ focus, showPicker: 'not a function' as unknown as () => void })
-    ).not.toThrow();
+    expect(() => focusDateField({ focus, showPicker: 'not a function' as unknown as () => void })).not.toThrow();
     expect(focus).toHaveBeenCalledOnce();
   });
 });

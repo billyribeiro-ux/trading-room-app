@@ -45,11 +45,7 @@ export interface BrandedMail {
 
 /** Minimal escaping. Every value here is ours or a display name, and a display name is user input. */
 function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+  return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
 /**
@@ -60,17 +56,11 @@ function escapeHtml(value: string): string {
  */
 export function brandedHtml(mail: BrandedMail): string {
   const body = mail.paragraphs
-    .map(
-      (p) =>
-        `<p style="margin:0 0 16px;font-size:15px;line-height:22px;color:#333333">${escapeHtml(p)}</p>`
-    )
+    .map((p) => `<p style="margin:0 0 16px;font-size:15px;line-height:22px;color:#333333">${escapeHtml(p)}</p>`)
     .join('');
 
   const notes = mail.footnotes
-    .map(
-      (n) =>
-        `<p style="margin:0 0 6px;font-size:13px;line-height:19px;color:#777777">${escapeHtml(n)}</p>`
-    )
+    .map((n) => `<p style="margin:0 0 6px;font-size:13px;line-height:19px;color:#777777">${escapeHtml(n)}</p>`)
     .join('');
 
   return `<!doctype html>
@@ -124,12 +114,7 @@ export function brandedHtml(mail: BrandedMail): string {
  * something different from the HTML is both a spam signal and a support problem.
  */
 export function brandedText(mail: BrandedMail): string {
-  return [
-    mail.greeting,
-    '',
-    ...mail.paragraphs.flatMap((p) => [p, '']),
-    mail.action.url,
-    '',
-    ...mail.footnotes
-  ].join('\n');
+  return [mail.greeting, '', ...mail.paragraphs.flatMap((p) => [p, '']), mail.action.url, '', ...mail.footnotes].join(
+    '\n'
+  );
 }

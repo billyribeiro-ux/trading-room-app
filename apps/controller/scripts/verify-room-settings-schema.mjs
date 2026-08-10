@@ -14,14 +14,22 @@ const CANONICAL_SCHEMA = resolve(REPO_ROOT, 'src/lib/room-settings-schema.ts');
 
 /*
   Eleven consumed by this repository's room-login page, twenty-five by the room application through
-  `internal/room-config/[code]`. `allowUsersToChangeUsername` is on both lists, so the union is 35.
+  `internal/room-config/[code]`, and six by the WordPress SSO door at `(public)/sso/[code]`.
+  `allowUsersToChangeUsername` is on the first two lists, so the union is 41.
   Kept as one flat list so a drift shows up as a diff here rather than as a category argument.
 
   (Two copies of this note used to sit here, one of them stale at "twelve". A count that appears
-  twice is a count that goes wrong once.)
+  twice is a count that goes wrong once. It went wrong a third time on 2026-08-10: the SSO door
+  wired six settings and this list — a THIRD copy of the wired set, and the only one that cannot
+  run in this repository because it needs `evidence-dumps/` — was left at 35. It was found by
+  auditing rather than by failing, which is precisely the problem with a gate that cannot run.
+  `sso-boundary.test.ts` now reads this list too, so the next omission fails in vitest instead.)
 */
 const EXPECTED_WIRED_SETTINGS = [
   'allowUsersToChangeUsername',
+  'allowedMemberships',
+  'allowedPerms',
+  'allowedProducts',
   'altBenzingaLinkURL',
   'altBenzingaLogoURL',
   'claimNickName',
@@ -41,6 +49,7 @@ const EXPECTED_WIRED_SETTINGS = [
   'hideRecs',
   'hideWelcomeTo',
   'loginErrorMsg',
+  'loginErrorURL',
   'nickFilter',
   'onlyPresentersVisibleToViewers',
   'overwriteCashRegisterSound',
@@ -51,9 +60,11 @@ const EXPECTED_WIRED_SETTINGS = [
   'showArchivesToUsers',
   'showPasswordField',
   'simUserCount',
+  'ssoJWTSecret',
   'userPM',
   'userToPresenterPM',
   'userUploads',
+  'tokenExpiresIn',
   'usernameInstructions',
   'webinarPW'
 ].sort();

@@ -74,7 +74,8 @@ export const variables = defineEnvVars({
     schema: optionalText
   },
   MEDIA_STUN_URLS: {
-    description: 'Comma-separated STUN URLs offered to the browser. Empty means none are advertised.',
+    description:
+      'Comma-separated STUN URLs offered to the browser. Empty means none are advertised.',
     schema: optionalText
   },
   MEDIA_TURN_URLS: {
@@ -98,7 +99,8 @@ export const variables = defineEnvVars({
   },
   PUBLIC_PTR_CDN_UPLOAD_KEY: {
     public: true,
-    description: 'Public key for that upload endpoint. Public by construction — it reaches the browser.',
+    description:
+      'Public key for that upload endpoint. Public by construction — it reaches the browser.',
     schema: optionalText
   },
   PUBLIC_PTR_GIPHY_API_KEY: {

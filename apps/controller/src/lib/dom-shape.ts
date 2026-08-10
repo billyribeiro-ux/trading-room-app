@@ -181,8 +181,7 @@ export function shapeOf(source: string, { angular = false }: { angular?: boolean
     */
     const editorChrome =
       tag === 'div' &&
-      ((classes.includes('popover') && classes.includes('fade')) ||
-        classes.includes('ta-resizer-handle-overlay'));
+      ((classes.includes('popover') && classes.includes('fade')) || classes.includes('ta-resizer-handle-overlay'));
     if (editorChrome) {
       const end = skipSubtree(html, tagRe.lastIndex, tag);
       if (end !== null) tagRe.lastIndex = end;

@@ -56,4 +56,4 @@ describe('an API key encrypted under a different master key', () => {
     // and it must not still be called bare in the row mapping
     expect(loader).not.toMatch(/secret:\s*k\.secretCiphertext\s*\n?\s*\?\s*decryptApiKeySecret/);
   });
-})
+});

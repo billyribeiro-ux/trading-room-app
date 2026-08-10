@@ -1,6 +1,14 @@
 node_modules
 .svelte-kit
 build
+# Adapter output, exactly as generated as `.svelte-kit` and `build` beside it.
+#
+# Added 2026-08-10. Its absence is why this gate went red again after TODO 3d
+# closed it green on 2026-08-04: nothing had built the room under
+# adapter-vercel yet, so the directory did not exist to be checked. When it
+# appeared it brought 29 minified chunks and generated JSON with it, which is
+# 29 of the 33 files the gate was failing on.
+.vercel
 .data
 coverage
 drizzle

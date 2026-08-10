@@ -24,10 +24,7 @@ const viteConfig = readFileSync(new URL('../../vite.config.ts', import.meta.url)
   /\/\*[\s\S]*?\*\//g,
   ''
 );
-const motion = readFileSync(new URL('./motion.ts', import.meta.url), 'utf8').replace(
-  /\/\*[\s\S]*?\*\//g,
-  ''
-);
+const motion = readFileSync(new URL('./motion.ts', import.meta.url), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
 
 describe('the GSAP server bundling contract', () => {
   it('marks gsap noExternal, so the server chunk carries it', () => {

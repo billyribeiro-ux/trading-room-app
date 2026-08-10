@@ -7,21 +7,13 @@
  * stop them, and its comment says where the semantics came from.
  */
 import { describe, expect, it } from 'vitest';
-import {
-  evaluateEntitlement,
-  explainEntitlementDecision,
-  parseFilterList
-} from './sso-entitlement';
+import { evaluateEntitlement, explainEntitlementDecision, parseFilterList } from './sso-entitlement';
 
 const NOTHING = { memberships: [], products: [], permissions: [] };
 
 describe('parseFilterList', () => {
   it('splits, trims, lower-cases and drops empties', () => {
-    expect(parseFilterList(' Gold Annual , silver ,, PLATINUM ')).toEqual([
-      'gold annual',
-      'silver',
-      'platinum'
-    ]);
+    expect(parseFilterList(' Gold Annual , silver ,, PLATINUM ')).toEqual(['gold annual', 'silver', 'platinum']);
   });
 
   it('treats blank, whitespace, null and undefined as no filter at all', () => {
@@ -90,10 +82,7 @@ describe('evaluateEntitlement', () => {
   });
 
   it('does not match on prefix or substring', () => {
-    const decision = evaluateEntitlement(
-      { allowedMemberships: 'gold-plus' },
-      { ...NOTHING, memberships: ['gold'] }
-    );
+    const decision = evaluateEntitlement({ allowedMemberships: 'gold-plus' }, { ...NOTHING, memberships: ['gold'] });
     expect(decision.allowed).toBe(false);
   });
 
@@ -132,10 +121,7 @@ describe('evaluateEntitlement', () => {
   });
 
   it('permissions participate in the same disjunction', () => {
-    const decision = evaluateEntitlement(
-      { allowedPerms: 'vip' },
-      { ...NOTHING, permissions: ['vip'] }
-    );
+    const decision = evaluateEntitlement({ allowedPerms: 'vip' }, { ...NOTHING, permissions: ['vip'] });
     expect(decision.allowed).toBe(true);
   });
 });

@@ -82,12 +82,12 @@ Addresses and display names are redacted — this repository does not carry the 
 real accounts. What matters to a cutover is the SHAPE, which is unchanged: two staff rows for the
 same person, one of them unauthenticatable, and two members.
 
-| id  | display_name | email                | role   | can authenticate?                |
-| --- | ------------ | -------------------- | ------ | -------------------------------- |
-| 1   | (staff A)    | (redacted)           | staff  | **no** — `password_hash IS NULL` |
-| 463 | (staff A)    | (redacted)           | staff  | yes — scrypt                     |
-| 464 | (member B)   | (redacted)           | member | yes — scrypt                     |
-| 471 | (member C)   | (redacted)           | member | yes — scrypt                     |
+| id  | display_name | email      | role   | can authenticate?                |
+| --- | ------------ | ---------- | ------ | -------------------------------- |
+| 1   | (staff A)    | (redacted) | staff  | **no** — `password_hash IS NULL` |
+| 463 | (staff A)    | (redacted) | staff  | yes — scrypt                     |
+| 464 | (member B)   | (redacted) | member | yes — scrypt                     |
+| 471 | (member C)   | (redacted) | member | yes — scrypt                     |
 
 `connection.ts:44` requires `isNotNull(users.passwordHash)`, so id 1 is already a row that
 cannot log in. **Three** accounts actually move.

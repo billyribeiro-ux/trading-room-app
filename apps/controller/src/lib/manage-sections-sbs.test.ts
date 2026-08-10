@@ -281,9 +281,7 @@ function closeOf(html: string, from: number) {
  */
 const withoutPaneActive = (nodes: ReturnType<typeof shapeOf>) =>
   nodes.map((n) =>
-    n.kind === 'el' && n.classes?.includes('tab-pane')
-      ? { ...n, classes: n.classes.filter((c) => c !== 'active') }
-      : n
+    n.kind === 'el' && n.classes?.includes('tab-pane') ? { ...n, classes: n.classes.filter((c) => c !== 'active') } : n
   );
 
 describe('manage page, section by section', () => {

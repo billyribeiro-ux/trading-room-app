@@ -48,10 +48,8 @@ vi.mock('drizzle-orm', () => ({
     (r: Record<string, unknown>) =>
       preds.every((p) => p(r)),
   // Newest first, which is what `.orderBy(desc(createdAt))` means.
-  desc:
-    (col: { name: string }) =>
-    (a: Record<string, unknown>, b: Record<string, unknown>) =>
-      (b[col.name] as Date).getTime() - (a[col.name] as Date).getTime()
+  desc: (col: { name: string }) => (a: Record<string, unknown>, b: Record<string, unknown>) =>
+    (b[col.name] as Date).getTime() - (a[col.name] as Date).getTime()
 }));
 
 vi.mock('./db/schema', () => ({
