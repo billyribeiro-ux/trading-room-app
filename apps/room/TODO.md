@@ -55,8 +55,36 @@ the live room, as either role, and it downloads a JSON by itself.
 
 ## 1. Rename `ptr_clone` → `tradingroom`
 
-**Status:** deferred 2026-08-03. Investigated, not started. **Nothing has been
-changed.**
+**Status 2026-08-10: the runtime role is DONE by migration; the rest is smaller than this entry
+claimed, and belongs at the source repository.**
+
+`services/api/migrations/0009_rename_runtime_roles.sql` renames `ptr_clone_app` →
+`tradingroom_app`, forward-only, guarded and idempotent. Proven against PostgreSQL 16.13 on all four
+paths: absent → no-op; present → renamed; twice → clean; **both names present → refuses**, because
+choosing one silently would decide which role owns the grants.
+
+**A trap this entry did not record, now measured:** the OWNER role cannot be renamed by a migration
+at all. Migrations authenticate as `ptr_clone`, and PostgreSQL answers
+`ERROR: session user cannot be renamed` — while the same statement from another session succeeds.
+It is an operator step, written up in `ops/postgres-runtime-role-hardening.md`.
+
+**The scope below is wrong, and that matters.** It says 570 occurrences as though the job were a
+find-and-replace. Measured 2026-08-10: **594 outside `second-dump/`, of which ~445 (three quarters)
+must keep the old name permanently** — 383 in the checksum-pinned `0001_baseline.sql` alone, plus
+the applied migrations, the provisioning script that must keep creating `ptr_clone_app` for those
+migrations to apply, the evidence verifier, and the historical documents. RLS policies need nothing:
+targets are stored by OID, not by name.
+
+**What is left: ~150 live occurrences**, all inside `services/**` — connection defaults, the
+release-attestation expected values, and the role-name assertions in `tests/migrations.rs` (43) and
+`tests/tenancy.rs` (11). Deliberately not done from this repository: `services/**` is a mirror, this
+entry itself says to do it "at the source repository, as its own dedicated change", that tree has
+already diverged twice, and every one of those assertions is a runtime check needing a provisioned
+cluster to verify. Tracked with the rest of the mirror promotion as root `TODO.md` item **P**.
+
+The original write-up is kept below, because its four traps are still the reason this is careful
+work — and trap 3's answer changed: neither role exists in the local cluster any more, so
+scram-sha-256 must be re-verified per target rather than trusted from 2026-08-03.
 
 ### The decision
 

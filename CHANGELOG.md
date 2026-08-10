@@ -24,6 +24,56 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-10
 
+### 07:35 — Item 1, the `ptr_clone` rename: the runtime role is renamed, and the job was 4× smaller than recorded
+
+**No runtime impact** — a new forward-only migration nothing has applied yet, plus documentation.
+Files: `services/api/migrations/0009_rename_runtime_roles.sql`,
+`ops/postgres-runtime-role-hardening.md`, `apps/room/TODO.md`.
+
+**Migration 0009 renames `ptr_clone_app` → `tradingroom_app`**, forward-only because the five applied
+migrations that name the old role cannot be touched: editing one changes its sqlx checksum and every
+existing database refuses to migrate, which has already happened on this project to a legacy database
+that can never be migrated forward again. `0001_baseline.sql` is pinned twice besides.
+
+Proven against a real PostgreSQL 16.13, all four paths — absent → no-op; present → renamed; run
+twice → clean; **both names present → refuses**, because choosing one silently would decide which
+role owns the grants, and that is an operator's call.
+
+**A trap the entry did not record, and it would have failed on every database.** The OWNER role
+cannot be renamed by a migration at all:
+
+```
+connected AS the role     ERROR:  session user cannot be renamed
+from another session      ALTER ROLE
+```
+
+Migrations authenticate as `ptr_clone`, so an in-migration owner rename is impossible, not merely
+risky. Measured with a throwaway role rather than assumed from documentation. It is now an operator
+step with its own runbook.
+
+**The scope in the entry was wrong by a factor of four, and that is the more useful finding.** It
+read as a 570-occurrence find-and-replace. Measured: **594 outside the evidence dump, and ~445 of
+them — three quarters — must keep the old name permanently.** 383 are in the checksum-pinned
+`0001_baseline.sql` alone; the rest are the other applied migrations, the provisioning script that
+must keep creating `ptr_clone_app` so those migrations can apply, the SHA-256-pinned evidence
+verifier, and historical documents whose provenance rewriting would falsify. RLS policies need
+nothing at all — policy targets are stored by OID, not by name.
+
+Treating this as a text substitution is precisely how a database stops migrating, so the breakdown
+is now a table in the runbook rather than a sentence in a TODO.
+
+**What is left, and why it is not done here.** ~150 live occurrences, all inside `services/**`:
+connection defaults, the release-attestation expected values, and the role-name assertions in
+`tests/migrations.rs` (43) and `tests/tenancy.rs` (11). `services/**` is a mirror of
+`new-room-control`; the entry itself says to do this "at the source repository, as its own dedicated
+change with nothing else moving"; that tree has already diverged twice — the second time with
+`new-room-control` serving the unsafe copy — and every one of those assertions is a runtime check
+that needs a provisioned cluster with both roles to verify. Doing it from this side would deepen a
+divergence already open as item **P**. Recorded rather than half-done.
+
+Verified: `cargo check -p tradingroom-api --all-targets --features testing` clean, room format gate
+green.
+
 ### 07:22 — The WordPress plugin is EXECUTED: `php -l` clean, and a PHP-minted token verified here
 
 **No runtime impact** — closes the executable half of `TODO.md` item **Q**. New:

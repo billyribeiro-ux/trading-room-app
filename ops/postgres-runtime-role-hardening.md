@@ -294,3 +294,78 @@ promotion action, never an incidental test side effect.
 - Do not edit or roll back an applied migration. If a production correction is needed,
   add the next forward migration. Migrations 5 and 6 run transactionally, so a policy or
   ACL replacement failure rolls back instead of leaving a partially applied state.
+
+---
+
+## Renaming the roles to `tradingroom_*` (2026-08-10)
+
+`apps/room/TODO.md` entry 1: `ptr_clone` is the last holdout of the old name. Everything else
+settled on `tradingroom` long ago — the crates, the cookies, `TRADINGROOM_API_URL`, the domain.
+
+**Migration `0009_rename_runtime_roles.sql` does the runtime role and nothing else.** It is
+forward-only, guarded and idempotent, and it was proven against PostgreSQL 16.13 on all four paths:
+role absent → no-op; role present → renamed; run twice → clean; **both names present → refuses**,
+because choosing one silently would decide which role owns the grants, and that is an operator's
+call rather than a migration's.
+
+### The owner role cannot be renamed by a migration — measured, not assumed
+
+```console
+-- connected AS the role
+ALTER ROLE tr_probe RENAME TO tr_probe2;
+ERROR:  session user cannot be renamed
+
+-- from a different session
+ALTER ROLE tr_probe RENAME TO tr_probe2;
+ALTER ROLE
+```
+
+Migrations authenticate as the owner (`ptr_clone`, created by the image from `POSTGRES_USER`), so a
+migration that renamed it would fail on every database, every time. It is an operator step:
+
+```bash
+# 1. Confirm the password survives the rename. scram-sha-256 keeps it; md5 CLEARS it, and a
+#    cleared password is a login that stops working with no other symptom.
+psql -d postgres -tAc "SELECT rolname, substring(rolpassword from 1 for 14) FROM pg_authid
+                       WHERE rolname IN ('ptr_clone','ptr_clone_app','tradingroom_app');"
+
+# 2. From a session that is NOT the role being renamed, and with the API stopped.
+psql -d postgres -c "ALTER ROLE ptr_clone RENAME TO tradingroom_owner;"
+
+# 3. The database itself, which needs zero active connections.
+psql -d postgres -c "ALTER DATABASE ptr_clone RENAME TO tradingroom;"
+
+# 4. Update the connection strings, then restart. The role posture assertions run at startup and
+#    will refuse to bind if anything is wrong, which is the check you want here.
+```
+
+### What must keep the old name, permanently
+
+Measured 2026-08-10: **594 occurrences outside the captured evidence dump, and about 445 of them —
+roughly three quarters — are permanent by design.** This is not a find-and-replace, and treating it
+as one is how a database stops migrating.
+
+| | | |
+| --- | ---: | --- |
+| `migrations/0001_baseline.sql` | **383** | sha256 pinned by the source repo's `verify-backend.mjs` **and** by `tradingroom_api::db::migrate::BASELINE_SHA256`. Its bytes are not editable by anyone. |
+| `migrations/0003`–`0008` | ~25 | applied. Editing one changes its sqlx checksum and every existing database refuses to migrate — which has already happened once on this project. |
+| `migrations/0009` | 14 | must name the old role in order to rename it. |
+| `apps/room/scripts/verify-postgres-schema-artifacts.mjs` | 13 | asserts against SHA-256-pinned captured artifacts; its references are part of the contract. |
+| `docker/postgres/10-provision-roles.sh` | 10 | **must keep creating `ptr_clone_app`**, because migrations 1–6 `GRANT` to that name before 0009 runs. A fresh database ends at `tradingroom_app` having passed through `ptr_clone_app`. That reads like a mistake and is not. |
+| historical documents | ~30 | records of what the imported system was called. Rewriting them falsifies the provenance they exist to carry. |
+
+RLS policies need no attention at all: policy targets are stored by OID, not by name, so they follow
+the rename automatically.
+
+### What is left, and where it belongs
+
+The remaining ~150 live occurrences are connection defaults, the release-attestation expected values
+(`"scram-sha-256:ptr_clone_app"`, `certificate-subject:ptr_clone`) and the role-name assertions in
+`tests/migrations.rs` (43) and `tests/tenancy.rs` (11).
+
+**They were deliberately not changed here.** `services/**` is a mirror of `new-room-control`, entry 1
+says to do this "at the source repository, as its own dedicated change with nothing else moving",
+and that tree has already diverged twice — the second time with `new-room-control` serving the
+unsafe copy. Editing 150 lines of it from this side would deepen a divergence that is already open
+as `TODO.md` item **P**. Verifying them also requires a provisioned cluster with both roles, since
+every one of those assertions is a runtime check rather than a compile-time one.
