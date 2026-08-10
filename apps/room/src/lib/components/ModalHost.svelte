@@ -414,7 +414,7 @@
     'presenter-enable-rte': false,
     'presenter-follow-my-screens': false
   });
-  type ConnectivityTestState = 'pending' | 'passed' | 'failed';
+  type ConnectivityTestState = 'pending' | 'passed' | 'failed' | 'unconfigured';
   type MicStatus = 'idle' | 'testing' | 'success' | 'no-audio' | 'error';
   let activeConnectivityTab = $state<'network' | 'mic'>('network');
   let testResults = $state({ udp: false, tcp: false, stun: false, turn: false });
@@ -510,22 +510,47 @@
     testResults = { udp: false, tcp: false, stun: false, turn: false };
     isTestRunning = true;
 
+    /*
+      THE REFERENCE'S TURN SERVER IS GONE FROM HERE, AND IT SHOULD NEVER HAVE SHIPPED.
+
+      This block used to carry, transcribed from the capture:
+
+        { urls: 'turn:flash.protradingroom.com:3478?transport=udp', username: 'ptrUser', credential: 'ptr123' }
+        { urls: 'turn:flash.protradingroom.com:3478?transport=tcp', username: 'ptrUser', credential: 'ptr123' }
+
+      Every run of this test therefore opened two authenticated relay allocations against a THIRD
+      PARTY's server, using that third party's credentials, and sent our user's IP addresses to it.
+      It also tested the wrong thing: this deployment's media path is `media.tradingroom.app`, so a
+      green tick here said nothing about whether OUR relay works, and a red one blamed the user's
+      firewall for someone else's server being unreachable.
+
+      The two STUN entries stay. They are Google's public servers — not the reference's — they were
+      in the captured configuration for the same reason anyone uses them, and they are what makes
+      the `typ srflx` check below meaningful.
+
+      TURN is reported as `unconfigured` rather than `failed` when this deployment has none, which is
+      the honest answer: `mediaIceServers` (`lib/server/media-grant.ts:411`) builds relay entries from
+      `MEDIA_TURN_URLS` + `MEDIA_TURN_SECRET` and returns none when they are unset, which is the
+      state today. Saying "check your network or firewall" for a relay nobody configured is blaming
+      the user for our own missing setting.
+
+      STILL TO DO, and recorded in `TODO.md`: feed this test the ICE servers the ROOM actually uses.
+      `+page.svelte` already receives them from `/api/media/grant` and hands them to the media
+      session, but it holds them in a function-local, so surfacing them here is a refactor rather
+      than a prop — and doing it badly would make this test lie in the other direction.
+    */
     const configuration: RTCConfiguration = {
       iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:stun1.l.google.com:19302' },
-        {
-          urls: 'turn:flash.protradingroom.com:3478?transport=udp',
-          username: 'ptrUser',
-          credential: 'ptr123'
-        },
-        {
-          urls: 'turn:flash.protradingroom.com:3478?transport=tcp',
-          username: 'ptrUser',
-          credential: 'ptr123'
-        }
+        { urls: 'stun:stun1.l.google.com:19302' }
       ]
     };
+
+    const relayConfigured = (configuration.iceServers ?? []).some((server) => {
+      const urls = typeof server.urls === 'string' ? [server.urls] : server.urls;
+      return urls.some((url) => url.startsWith('turn:') || url.startsWith('turns:'));
+    });
+    if (!relayConfigured) testStates.turn = 'unconfigured';
 
     let peerConnection: RTCPeerConnection;
     try {
@@ -585,7 +610,12 @@
         testStates.stun = 'failed';
         showMessageBox('STUN connectivity test failed. Check your network.', 5000);
       }
-      if (!testResults.turn) {
+      /*
+        Only call TURN failed if a relay was actually offered. With none configured the state is
+        already `unconfigured`, and overwriting it with `failed` — plus "check your network or
+        firewall" — would blame the user for a server this deployment never set.
+      */
+      if (!testResults.turn && testStates.turn !== 'unconfigured') {
         testStates.turn = 'failed';
         showMessageBox('TURN connectivity test failed. Check your network or firewall.', 5000);
       }
@@ -4917,9 +4947,14 @@
           class="status-item mb-4"
         >
           <span class="fw-medium">TURN Server Connectivity</span>
+          <!-- `–` for unconfigured, never `✖`. A cross next to "check your network or firewall"
+               reads as the user's fault; this deployment simply has no relay set. -->
           <span
             class:spin={testStates.turn === 'pending' && isTestRunning}
             class="status-icon {testStates.turn}"
+            title={testStates.turn === 'unconfigured'
+              ? 'No TURN relay is configured for this deployment'
+              : undefined}
           >
             {testStates.turn === 'pending'
               ? isTestRunning
@@ -4927,7 +4962,9 @@
                 : '●'
               : testStates.turn === 'passed'
                 ? '✔'
-                : '✖'}
+                : testStates.turn === 'unconfigured'
+                  ? '–'
+                  : '✖'}
           </span>
         </div>
         {#if showConnectivityMessage}

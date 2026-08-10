@@ -6671,11 +6671,17 @@
                 <li class="nav-item text-center">
                   <p>
                     Powered by:
+                    <!-- OURS, not the reference's. This shipped as
+                         `href="https://protradingroom.com"` with the text "ProTradingRoom.com" —
+                         transcribed with the rest of the sidebar — so every room this product
+                         serves credited, and linked out to, a different company. The class name
+                         stays `ptr-website-link` because `app.css` styles that selector and
+                         renaming it would change the rendering, which this is not. -->
                     <a
-                      href="https://protradingroom.com"
+                      href="https://www.tradingroom.app"
                       target="_blank"
                       rel="noopener noreferrer"
-                      class="ptr-website-link">ProTradingRoom.com</a
+                      class="ptr-website-link">TradingRoomApp</a
                     >
                   </p>
                   <p>Version: {DUMP_CONTRACT.version}</p>
