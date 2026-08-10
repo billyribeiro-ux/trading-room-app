@@ -24,6 +24,37 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-10
 
+### 07:38 — The other two items: the collector verified ready, and a staging checklist for item Q
+
+**No runtime impact** — one new document and two TODO rows. New:
+`integrations/wordpress/STAGING-TEST.md`.
+
+**Evidence gap 1 (`createNew()`) — prepared, and it is the owner's to run.** The function lives in
+`/public/dist/app.min.js` on the LIVE original; nothing in this repository can reach it. What I could
+do was make it a single paste and prove the script is safe to paste:
+`node --check` clean, and re-read end to end — it performs **one `fetch` GET** of same-origin scripts
+and the only `.click()` in the file is on an anchor it creates to trigger the download. It touches no
+page control, submits nothing and posts nothing. Its eight targets cover gaps **1, 2, 3, 6 and 7** in
+a single run, plus an attempt at 4. The TODO row now says so, rather than leaving the next reader to
+re-audit it before daring to run it.
+
+**Item Q — the missing half is a real WordPress, so it is now a checklist rather than a research
+task.** `STAGING-TEST.md` is nine numbered steps with expected results and the exact log lines to
+look for. Two of them are the point:
+
+- **§5, the cache trap.** Copy the button's `href` and confirm it contains **no `jwt=` token**, then
+  open it logged-out and confirm you get the WordPress login rather than the room. If a token is
+  ever in that href, every visitor served the cached page enters as whoever loaded it first. The
+  design prevents it; this is how you check the design survived.
+- **§6, cancelling the subscription.** Cancel in WooCommerce, do not log out, click again — expect a
+  refusal with `reason: "no-match"`. **This is the only step that proves entitlement is live rather
+  than decorative; every other step passes with the gate wide open.** Item Q closes when §6 passes,
+  and not before.
+
+It also warns to leave the second and third filters blank during the test, because filters are
+OR-ed — a second one would admit a visitor who matches only it, and the membership gate would never
+be exercised at all.
+
 ### 07:35 — Item 1, the `ptr_clone` rename: the runtime role is renamed, and the job was 4× smaller than recorded
 
 **No runtime impact** — a new forward-only migration nothing has applied yet, plus documentation.
