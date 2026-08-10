@@ -11,14 +11,34 @@ import { verifySsoToken } from './sso-token';
  * **Proves:** that a token built with the exact byte operations the plugin performs is accepted
  * here, including the PHP-specific encoding hazards below.
  *
- * **Does not prove:** that the PHP itself produces those bytes. **The plugin has never been
- * executed.** PHP is not installed on this machine and Docker Hub was unreachable
- * (`context deadline exceeded` pulling `php:8.3-cli`), so neither `php -l` nor a real mint was
- * possible. That is recorded as an evidence gap in `TODO.md` rather than glossed over, with the one
- * command that closes it.
+ * **Also proves, since 2026-08-10:** that real PHP produces bytes this verifier accepts. The golden
+ * vector below was minted by `integrations/wordpress/tradingroom-sso/tests/mint-golden-token.php`
+ * running the plugin's OWN `tradingroom_sso_entitlements()` and `tradingroom_sso_mint()` under
+ * PHP 8.3.33, and `php -l` reports no syntax errors. Both ran in a container, so no local PHP is
+ * required to reproduce them — the command is in that script's header.
  *
- * So: read this as "our side honours the contract we wrote down", not as "the plugin works".
+ * **Still does not prove:** that it works inside a live WordPress against a real WooCommerce. The
+ * harness stubs the three WordPress functions the plugin touches at load time; it does not boot
+ * WordPress, and no subscription was cancelled mid-test. That remainder is `TODO.md` item Q.
+ *
+ * So: read this as "the contract holds in both languages", not yet as "it works in production".
  */
+
+/** Minted by real PHP. See the module docs. */
+const GOLDEN = JSON.parse(
+  readFileSync(
+    new URL('../../../../../integrations/wordpress/tradingroom-sso/tests/golden-token.json', import.meta.url),
+    'utf8'
+  )
+) as {
+  phpVersion: string;
+  secret: string;
+  room: string;
+  nowSeconds: number;
+  payloadJson: string;
+  token: string;
+  claims: Record<string, unknown>;
+};
 
 const PLUGIN = readFileSync(
   new URL('../../../../../integrations/wordpress/tradingroom-sso/tradingroom-sso.php', import.meta.url),
@@ -122,6 +142,63 @@ describe('a token shaped exactly as the plugin builds it', () => {
     expect(verifySsoToken(SECRET, ROOM, token, { nowSeconds: NOW })).toEqual({
       ok: false,
       reason: 'bad-signature'
+    });
+  });
+});
+
+describe('the golden vector, minted by real PHP', () => {
+  /*
+    The one test in this file that is not a description of what PHP would do.
+
+    Everything else here builds a token with Node's crypto and asserts our side handles it. This
+    takes bytes that a real `hash_hmac` and a real `json_encode` produced — PHP 8.3.33, via
+    `tests/mint-golden-token.php` — and runs them through the verifier a customer's login will hit.
+    If either side's encoding ever drifts, this fails instead of a member being locked out.
+  */
+  it('is accepted by the verifier', () => {
+    const result = verifySsoToken(GOLDEN.secret, GOLDEN.room, GOLDEN.token, {
+      nowSeconds: GOLDEN.nowSeconds
+    });
+    expect(result.ok, `token minted by PHP ${GOLDEN.phpVersion} must verify`).toBe(true);
+    if (!result.ok) return;
+    expect(result.claims.email).toBe('dana@example.com');
+    expect(result.claims.room).toBe(GOLDEN.room);
+  });
+
+  /*
+    PHP's `json_encode` emits `{}` for a non-sequential array, and `array_filter()` leaves gaps.
+    The plugin wraps its lists in `array_values( array_unique( … ) )` for exactly this reason, and
+    the harness feeds it a duplicate and a blank so the golden vector exercises that path rather
+    than a already-clean list.
+  */
+  it('carries entitlements as JSON ARRAYS, de-duplicated and trimmed', () => {
+    expect(GOLDEN.payloadJson).toContain('"memberships":["gold-annual"]');
+    expect(GOLDEN.payloadJson).toContain('"permissions":[]');
+    // The failure this guards against: `{"0":"gold-annual"}`, which our reader treats as nothing
+    // asserted — failing closed, but baffling.
+    expect(GOLDEN.payloadJson).not.toMatch(/"memberships":\{/);
+    expect(GOLDEN.payloadJson).not.toMatch(/"permissions":\{/);
+
+    const result = verifySsoToken(GOLDEN.secret, GOLDEN.room, GOLDEN.token, {
+      nowSeconds: GOLDEN.nowSeconds
+    });
+    expect(result.ok && result.claims.memberships).toEqual(['gold-annual']);
+    expect(result.ok && result.claims.products).toEqual(['options-mastery']);
+  });
+
+  it('is refused once it is older than the ceiling, like any other token', () => {
+    // Proof the golden vector is a real credential subject to the real rules, not a bypass.
+    const stale = GOLDEN.nowSeconds + 86_400;
+    expect(verifySsoToken(GOLDEN.secret, GOLDEN.room, GOLDEN.token, { nowSeconds: stale })).toEqual({
+      ok: false,
+      reason: 'expired'
+    });
+  });
+
+  it('is refused against a different room', () => {
+    expect(verifySsoToken(GOLDEN.secret, '2002', GOLDEN.token, { nowSeconds: GOLDEN.nowSeconds })).toEqual({
+      ok: false,
+      reason: 'wrong-room'
     });
   });
 });

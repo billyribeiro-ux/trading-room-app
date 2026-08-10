@@ -24,6 +24,48 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-10
 
+### 07:22 — The WordPress plugin is EXECUTED: `php -l` clean, and a PHP-minted token verified here
+
+**No runtime impact** — closes the executable half of `TODO.md` item **Q**. New:
+`integrations/wordpress/tradingroom-sso/tests/mint-golden-token.php`, `tests/golden-token.json`.
+
+Docker Hub was reachable again (it and `git push` were failing from the same network fault an hour
+earlier), so the thing that could not be done, was done.
+
+**`php -l` under PHP 8.3.33: no syntax errors.**
+
+**And a real cross-language proof, which is the part that matters.** `tests/mint-golden-token.php`
+loads the plugin with the three WordPress functions it touches at load time stubbed, then mints a
+token through the plugin's **own** `tradingroom_sso_entitlements()` and `tradingroom_sso_mint()`.
+The result is committed as `golden-token.json` and pinned by four new tests: the bytes a real
+`hash_hmac` and a real `json_encode` produced are run through the verifier a customer's login will
+hit. Everything else in that file *describes* what PHP would emit; this is PHP emitting it.
+
+**It caught the encoding hazard in the act.** The harness deliberately feeds the entitlement path a
+duplicate and a blank — `['gold-annual', 'gold-annual', '  ']` — and the minted payload reads
+`"memberships":["gold-annual"]`. A JSON **array**, de-duplicated and trimmed. Without the plugin's
+`array_values( array_unique( … ) )` wrapper, `array_filter` would have left a gap in the keys and
+PHP would have emitted `{"0":"gold-annual"}`, which our reader treats as nothing asserted — failing
+closed, but baffling to debug. That wrapper is now proven load-bearing rather than argued to be.
+
+The vector is also proven to be a real credential rather than a bypass: it is refused once stale
+(`expired`) and refused against another room (`wrong-room`). Negative control: changing a single
+signature byte fails four of the sixteen tests; restoring it passes.
+
+Both commands run in a container, so **no local PHP is required** to reproduce or to regenerate the
+vector after a change to the minting path — the command is in the script's header and in the
+README.
+
+**What is left of item Q, stated precisely rather than closed early:** the harness stubs WordPress;
+it does not boot it. Nothing here has exercised `wc_memberships_get_user_active_memberships`,
+`wcs_get_users_subscriptions`, the settings screen or the cached-page path. Before a customer uses
+this it needs a staging site: enter as a paid member, then **cancel the subscription and prove the
+next entry is refused**. That needs a real WordPress, not a build machine — so item Q is narrowed to
+exactly that, and the README's Status section now says which half is proven.
+
+Verified: **635 tests across 57 files** (631 → 635), `svelte-check` **0 errors, 0 warnings**, format
+gate green.
+
 ### 07:09 — Full audit: three broken gates found and fixed, one of them mine
 
 **No runtime impact** — gates, formatting and one stale contract list. Files: the room's

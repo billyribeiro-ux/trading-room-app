@@ -94,17 +94,28 @@ and an action, `tradingroom_sso_before_redirect( $user_id, $room, $entitlements 
 
 ## Status — read this before shipping it to a customer
 
-**The plugin has never been executed.** It was written against the WordPress and WooCommerce APIs
-and its contract with our verifier is covered by
-`apps/controller/src/lib/server/sso-wordpress-contract.test.ts` — 12 tests, including the two
-PHP-specific encoding hazards (forward-slash escaping, and `json_encode` emitting `{}` for a
-non-sequential array). But PHP is not installed on the development machine and Docker Hub was
-unreachable, so neither `php -l` nor a real mint was possible.
+**The PHP is executed and proven; the WordPress integration is not yet.**
 
-Closing that is one command wherever PHP exists:
+Done, on 2026-08-10 under **PHP 8.3.33** in a container (no local PHP needed):
+
+- `php -l` — no syntax errors.
+- `tests/mint-golden-token.php` mints a token through the plugin's own
+  `tradingroom_sso_entitlements()` and `tradingroom_sso_mint()`. That exact token is committed as
+  `tests/golden-token.json` and verified by
+  `apps/controller/src/lib/server/sso-wordpress-contract.test.ts` — **16 tests**, including the two
+  PHP-specific encoding hazards (forward-slash escaping, and `json_encode` emitting `{}` for a
+  non-sequential array). Negative control: changing one signature byte fails it.
+
+Regenerate the vector after any change to the minting path:
 
 ```bash
-php -l integrations/wordpress/tradingroom-sso/tradingroom-sso.php
+docker run --rm -v "$PWD/integrations/wordpress/tradingroom-sso":/app php:8.3-cli \
+  php /app/tests/mint-golden-token.php > integrations/wordpress/tradingroom-sso/tests/golden-token.json
 ```
 
-followed by a real install against a staging WooCommerce. Tracked as an evidence gap in `TODO.md`.
+**Still outstanding, and it needs a real site rather than a build machine:** the harness stubs the
+three WordPress functions the plugin touches at load time — it does not boot WordPress. Before a
+customer uses this, install it on a staging site with WooCommerce, enter as a paid member, then
+**cancel the subscription and confirm the next entry is refused**. That is the only thing that
+exercises `wc_memberships_get_user_active_memberships`, `wcs_get_users_subscriptions`, the settings
+screen and the cached-page path. Tracked as `TODO.md` item **Q**.
