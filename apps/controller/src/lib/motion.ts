@@ -13,7 +13,7 @@
  * 3. Everything cleans up. Each attachment returns a teardown that kills its tweens and
  *    ScrollTriggers, so client-side navigation away from `/` leaves no orphaned observers.
  */
-import gsapModule from 'gsap';
+import gsapModule from 'gsap/dist/gsap.js';
 /*
   DEFAULT IMPORTS, NOT NAMED ONES — and this took the home page down for hours.
 
@@ -22,9 +22,23 @@ import gsapModule from 'gsap';
 
     SyntaxError: Named export 'gsap' not found. The requested module 'gsap' is a CommonJS module…
 
-  The lesson is worth more than the diff: when a runtime tells you a package resolves as CommonJS,
-  that is true of EVERY specifier into it, not the one in the stack trace. The stack names where
-  instantiation stopped first, not the extent of the problem.
+  And the interop form was still not enough, because the problem was never HOW the module is
+  imported — it is WHICH FILE Node resolves. With richer logging in place, production finally said
+  it plainly:
+
+    Cannot use import statement outside a module
+    /var/task/node_modules/.pnpm/gsap@3.15.0/node_modules/gsap/index.js:1
+    import { gsap, ... } from "./gsap-core.js";
+
+  gsap 3.15's `index.js` is written in ESM but the package declares no `"type": "module"`, so Node
+  loads it as CommonJS and fails on its first line. That file is only usable through a bundler. On
+  this machine Vite bundles it and everything works; in the deployed function gsap is EXTERNAL and
+  Node reads it directly.
+
+  So the specifiers below point at the `dist/` builds, which ARE real CommonJS and are explicitly
+  exported by the package (`"./dist/*.js": "./dist/*.js"`). Node loads them natively and a bundler
+  handles them equally well. Three attempts, each fixing something true and insufficient:
+  the subpath named import, then the root named import, then the file itself.
 
   `import { ScrollTrigger } from 'gsap/ScrollTrigger'` threw at module instantiation inside the
   Vercel function, so EVERY request to `/` answered 500 while every other route stayed healthy:
@@ -51,7 +65,7 @@ import gsapModule from 'gsap';
   the registration and untrue of the import. Keeping GSAP out of the server module graph entirely,
   with a browser-only dynamic import, is the structural fix and is recorded in `TODO.md`.
 */
-import ScrollTriggerModule from 'gsap/ScrollTrigger';
+import ScrollTriggerModule from 'gsap/dist/ScrollTrigger.js';
 import type { Attachment } from 'svelte/attachments';
 
 /*
