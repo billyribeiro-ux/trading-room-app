@@ -24,6 +24,76 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-10
 
+### 06:40 — WordPress SSO, phase 1: the verifier for a customer-minted token
+
+**No runtime impact** — new module and its tests; nothing routes to it yet. Files:
+`apps/controller/src/lib/server/sso-token.ts`, `sso-token.test.ts`.
+
+**The goal, in one line:** a customer running WordPress + WooCommerce (Simpler Trading is the worked
+example) embeds a room short code on their site, and *their* billing system decides whether a member
+may enter — payment up to date or not.
+
+**The evidence this is built on, not inferred.** `room-settings-schema.ts:67`, the help text the
+reference itself renders for `ssoJWTSecret`:
+
+> "Use this key in combination with the **WordPRess plugin**, or other JWT SSO, make it hard to
+> getss, like: `5081b73a690762e2526bc1fef3c46eedf1ec8832`"
+
+with `ssoHost`, `allowPWLoginWithSSO` and `tokenExpiresIn` (captured `"1d"`) beside it, and the
+owner's own shortcode carrying `key=''` and `mode='urlv3'` — a URL-borne JWT.
+
+**The architecture decision, and it removes most of the work.** Reading the room's `/session` route
+first paid for itself: *"The controller owns identity… Either way the controller mints a token and
+redirects here."* So WordPress SSO is a **third door on the controller**, beside owner-launch and
+guest-login — the customer's site redirects to us, we verify and evaluate entitlement, then mint the
+**existing** handoff through `room-handoff.ts`. Three consequences:
+
+- **the room application needs no change at all** — it still trusts exactly one credential;
+- **`ssoJWTSecret` never leaves the controller process.** It is not in `ROOM_VISIBLE_SETTINGS` and is
+  never serialised into page data, which matters because the room puts its config into SSR HTML on
+  every load;
+- **one signer, one verifier.** A second implementation of the handoff is how two implementations
+  drift apart.
+
+**What is transcribed and what is ours, stated rather than blurred.** Transcribed: that the
+mechanism exists, and its key. **Ours:** the claim set. The reference's captured token is
+`{ name, email, id, type, issued, iat, exp }` — byte-for-byte from `ptr1.json` — and carries **no
+membership, product or permission field**, so the dump cannot say how `allowedMemberships` /
+`allowedProducts` / `allowedPerms` were evaluated: either their plugin checked before minting, or
+their server called back to WordPress. Rather than invent a mechanism and present it as recovered,
+the entitlements ride **inside** the signed token — no callback, no shared network path, no
+WooCommerce credential on our side. Recorded as a deliberate divergence in the module docs.
+
+**The check that makes the payment gate real, and the reason it exists.** The customer controls
+`exp`; we enforce `SSO_MAX_TOKEN_AGE_SECONDS = 3600` on top. Without it a site minting year-long
+tokens — which is exactly what the reference's own handoff does, at **360 days** — would turn "is
+this subscription paid?" into "was it paid at some point last year". One hour survives a slow
+checkout or a link opened in a new tab, and makes a cancellation bite within a trading session
+rather than a trading week. Its test is named for the job it does.
+
+Also strict, each one an allow rather than a reject: `HS256` pinned (`alg: none` is the textbook
+forgery), constant-time comparison over the **presented** bytes rather than a re-serialisation,
+`exp` required, future-dated `iat` refused, and **`room` required and matched against the URL** —
+per-room keys already make cross-room replay hard, but a customer who reuses one key across two
+rooms would otherwise hand every token holder entry to both. Binding costs nothing and does not
+depend on the customer's key hygiene. Rejections are opaque to the caller and detailed in the log,
+because naming the failed check turns the endpoint into an oracle for probing a customer's key.
+
+Two integrator-friendliness decisions, both free: entitlements are accepted as a JSON array **or** a
+comma-separated string, because `json_encode` of a term list gives one and `implode(',', $slugs)`
+gives the other; and email is lower-cased once, here, since it is the join key to a membership row.
+
+`generateSsoSecret()` emits **32 bytes** of hex rather than the reference example's 20 — this is an
+HMAC-SHA256 key, and matching a screenshot is not a reason to hand a customer less entropy than the
+algorithm's block size. The value is opaque to the plugin, which only copies it.
+
+Verified: **17 tests pass**, `svelte-check` **0 errors, 0 warnings**. No migration was needed —
+`ssoJWTSecret` is already one of the 269 keys in `room_settings.settings_json`.
+
+**Not yet wired.** `wired: true` is flipped only when a consumer exists, and the consumer is the
+route in phase 2. The flag lives in `scripts/extract-manage-schema.mjs`'s `WIRED_SETTINGS` and the
+schema is regenerated — hand-editing the generated file would be undone by the next `schema:extract`.
+
 ### 06:01 — The liveness fix is DEPLOYED and proven against production
 
 **Runtime impact: yes.** `tradingroom-media` on `87.99.154.155` was rebuilt and restarted at
