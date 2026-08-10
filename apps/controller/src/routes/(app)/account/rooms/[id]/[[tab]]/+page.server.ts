@@ -1,10 +1,10 @@
 import { error, fail, redirect } from '@sveltejs/kit';
 import { randomBytes } from 'node:crypto';
-import { eq } from 'drizzle-orm';
+import { desc, eq } from 'drizzle-orm';
 import { PUBLIC_SITE_ORIGIN } from '$app/env/public';
 import { ROOM_BASE_URL, ROOM_JWT_SECRET } from '$app/env/private';
 import { getDb } from '$lib/server/db';
-import { badges, rooms } from '$lib/server/db/schema';
+import { badges, roomSessions, rooms } from '$lib/server/db/schema';
 import { requireOwnedRoom, requireUser } from '$lib/server/auth';
 import {
   MANY_OPCODES,
@@ -241,6 +241,38 @@ export const load: PageServerLoad = async ({ params, locals, url }) => {
     unsupportedFilter,
     /** the User Stats table — real logins only, never invented rows */
     stats: users.filter((u) => u.lastLoginAt).sort((a, b) => Number(b.lastLoginAt) - Number(a.lastLoginAt)),
+    /**
+     * One row per ARRIVAL, which is what the reference's `statXrefs` is and what its CSV exports.
+     *
+     * `stats` above is one row per PERSON, keyed on `lastLoginAt`, and it stays — the User Stats
+     * table renders it. This is the different question the export needed answering: who was here,
+     * from when to when, from where. `TODO.md` item K.
+     *
+     * Bounded at 5,000. A busy room accumulates a row per entry indefinitely, and an unbounded
+     * SELECT behind a page load is a slow-motion outage; newest first, so the cap drops the oldest
+     * history rather than today's. If a room ever needs more than that in one export, the answer is
+     * a date range on the query and not a larger number.
+     */
+    visits: (
+      await getDb()
+        .select({
+          displayName: roomSessions.displayName,
+          email: roomSessions.email,
+          ip: roomSessions.ip,
+          isMobile: roomSessions.isMobile,
+          browser: roomSessions.browser,
+          joinedAt: roomSessions.joinedAt,
+          leftAt: roomSessions.leftAt
+        })
+        .from(roomSessions)
+        .where(eq(roomSessions.roomId, room.id))
+        .orderBy(desc(roomSessions.joinedAt))
+        .limit(5000)
+    ).map((visit) => ({
+      ...visit,
+      joinedAt: visit.joinedAt.toISOString(),
+      leftAt: visit.leftAt ? visit.leftAt.toISOString() : null
+    })),
     links: {
       room: `${ORIGIN}/u/${publicId}`,
       vanity: room.vanitySlug ? `${ORIGIN}/room/${room.vanitySlug}` : `${ORIGIN}/room/[yournamehere]`,

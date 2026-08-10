@@ -24,6 +24,72 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-10
 
+### 12:21 — TODO item K CLOSED: the stats export writes all nine of the reference's columns
+
+**No runtime impact until deployed** — a new table, two write points and a rewritten export. Item
+**K** is removed from `TODO.md`. New: migration `0007-room-sessions.js`,
+`lib/server/room-visits.ts` (+ 7 tests), `lib/humanize-duration.ts`.
+
+The reference's `exportStatsToCSV` writes nine columns, read verbatim from its own bundle in
+`dumps/export-controls-1786287657298.json`:
+
+```
+Name, Email, [Phone,] IP, In, Out, Duration, isMobile, Browser
+```
+
+Six of them came from its per-visit `statXrefs` records, and this application had no equivalent:
+`stats` is **one row per PERSON**, keyed on `lastLoginAt`, which cannot answer when somebody
+arrived, when they left, or how long they stayed. So the export wrote three columns and the rest was
+recorded as an honest gap rather than filled with blanks that would claim we collect data we do not.
+
+**`room_sessions` records one row per ARRIVAL** — which is what an *xref* row plainly is. A member
+who enters four times in a day is four rows, and that is what makes Duration a real number rather
+than an average of nothing.
+
+**The detail that settled the design: an open visit is faithful, not broken.** The reference's own
+writer defaults `outMStr` to `"N/A"` and computes `dur` only when both times exist — so a row for
+somebody still in the room renders `N/A, N/A` in its file too. Ours does the same, which meant the
+feature could ship complete without waiting on a reliable "left" signal.
+
+Written at the only place it can be: the moment the controller mints a handoff, at **both** doors —
+owner launch and guest join. That request is the only one that sees the IP and the user agent, since
+the room application runs behind a proxy on another host and sees neither the browser's original
+address nor our account context.
+
+**Name and email are copied into the row rather than only referenced**, and that is deliberate: a
+guest has no membership at all, and a member later removed or renamed must not silently rewrite
+visits that already happened. A stats export is evidence of who was present; joining live rows would
+make last month's report change when somebody edits their profile.
+
+`recordVisit` never throws into its caller. A stats row failing to write must not stop somebody
+entering a room they paid for — a lost row is a gap in a report, a thrown error is a member staring
+at an error page.
+
+**The user-agent parser is small on purpose, and its ORDER is the whole thing.** Edge and Opera both
+carry `Chrome` in their strings, and Chrome carries `Safari`, so the most specific token has to win
+or every browser reads as Chrome — which looks right, because Chrome is the common case, and is
+wrong for everyone else. Also handled: an Android **tablet** omits the `Mobile` token a phone
+carries, so a naive `/Mobile/` test reports every Android tablet as a desktop, in a product built
+explicitly for tablets. Both are pinned by tests. `isMobile` and `browser` are treated as **labels a
+visitor supplied**, never as security inputs; nothing decides anything from them.
+
+`humanizeDuration` reproduces moment's `relativeTime` defaults — "a few seconds", "an hour" — because
+the reference calls `moment(out).from(in, true)`, and matching the thresholds is what makes our file
+read the same as theirs rather than merely similar. It lives outside `$lib/server` because both
+halves need it and SvelteKit refuses a `$lib/server` import from a component; duplicating the
+thresholds is how two files quietly disagree about what an hour is.
+
+**And the contract test had a hole worth naming.** `export-format-contract.test.ts` exists precisely
+because these formats were once invented — its own header says a `Last login` column *"the reference
+never had"* was the giveaway. It pinned filenames and CRLF and **not the stats header**, which is why
+a three-column version survived until now. Four assertions added: both phone variants of the
+nine-column header, the absence of `Last login`, one row per visit rather than per person, and the
+`N/A` for an open one.
+
+Verified: **657 tests across 59 files** (646 → 657), `svelte-check` **0 errors, 0 warnings**, format
+gate green, `vite build` clean. `svelte-kit sync` was needed once — the loader's new `visits` key is
+invisible to the page until Kit regenerates its types.
+
 ### 12:10 — TODO item C CLOSED: `push_tokens_json` has a writer, and the mobile app has a brief
 
 **No runtime impact until deployed** — a new public endpoint nothing calls yet, plus migration 0006.

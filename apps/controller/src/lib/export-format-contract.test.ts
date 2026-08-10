@@ -35,6 +35,44 @@ describe('filenames follow the reference, not our own scheme', () => {
   });
 });
 
+describe('the participant stats header, which is now nine columns', () => {
+  /*
+    Read from the bundle verbatim:
+
+      $scope.sess.hasRequiredPhoneInLogin
+        ? msgs.push("Name, Email, Phone, IP, In, Out, Duration, isMobile, Browser\r\n")
+        : msgs.push("Name, Email, IP, In, Out, Duration, isMobile, Browser\r\n")
+
+    Six of those columns had no data behind them until `room_sessions` (migration 0007) recorded one
+    row per arrival — `TODO.md` item K. This header was the single thing that had been invented
+    before the bundle was captured, and nothing in this file pinned it, which is why a three-column
+    version survived until now. It is pinned here.
+  */
+  it('matches the reference exactly, in both phone variants', () => {
+    expect(code).toContain("'Name, Email, Phone, IP, In, Out, Duration, isMobile, Browser\\r\\n'");
+    expect(code).toContain("'Name, Email, IP, In, Out, Duration, isMobile, Browser\\r\\n'");
+  });
+
+  it('no longer writes the invented `Last login` column', () => {
+    // The reference has no such column. It was ours, and it was the giveaway that the whole format
+    // had been guessed rather than read.
+    expect(code).not.toContain('Last login');
+  });
+
+  it('exports one row per VISIT, not one per person', () => {
+    // `statXrefs` is a cross-reference row — a person crossing into a room at a moment in time. A
+    // member who entered four times is four rows, which is what makes Duration meaningful.
+    expect(code).toContain('for (const visit of data.visits)');
+    expect(code).not.toMatch(/for \(const r of visibleStats\)[\s\S]{0,400}Participant_Stats/);
+  });
+
+  it('renders N/A for an open visit rather than inventing an end time', () => {
+    // The reference's own behaviour: `outMStr` defaults to "N/A" and `dur` is computed only when
+    // both times exist. A row for somebody still in the room is faithful, not broken.
+    expect(code).toContain("humanizeDuration(inAt.getTime(), outAt.getTime()) : 'N/A'");
+  });
+});
+
 describe('the bytes in the file', () => {
   it('ends every row CRLF, as the reference writes it', () => {
     // Every `msgs.push(...)` in the bundle ends `\r\n`. The previous writer joined on '\n'.

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { enhance } from '$app/forms';
+  import { humanizeDuration } from '$lib/humanize-duration';
   import { asset, resolve } from '$app/paths';
   import { bootbox } from '$lib/bootbox.svelte';
   import ToastHost from '$lib/components/ToastHost.svelte';
@@ -700,22 +701,53 @@
   }
 
   /**
-   * `exportStatsToCSV(d)` — participant stats.
+   * `exportStatsToCSV(d)` — participant stats, now with all nine of the reference's columns.
    *
-   * HONEST GAP, recorded rather than filled. The reference writes nine columns:
-   * `Name, Email, [Phone,] IP, In, Out, Duration, isMobile, Browser`. Six of them — IP, In, Out,
-   * Duration, isMobile and Browser — come from its per-session participant records, and this
-   * application has no such table: `stats` is `users` filtered to those with a `lastLoginAt`.
-   * Emitting those headers over empty cells would claim we collect data we do not, so the columns
-   * we can fill are written and the rest are recorded in `TODO.md` instead.
+   * The header and every cell are transcribed from the reference's own bundle
+   * (`dumps/export-controls-1786287657298.json`):
+   *
+   *     Name, Email, [Phone,] IP, In, Out, Duration, isMobile, Browser
+   *
+   * Six of those come from per-visit records. This app had none — `stats` is one row per PERSON,
+   * keyed on `lastLoginAt` — so the export could only write three columns and `TODO.md` item K
+   * recorded the rest as an honest gap. `room_sessions` (migration 0007) now records one row per
+   * ARRIVAL, written by both doors into the room, and the gap is closed with real data.
+   *
+   * **An open visit renders `N/A` for Out and Duration, and that is the reference's own behaviour**
+   * rather than a placeholder of ours: its `outMStr` defaults to `"N/A"` and `dur` is only computed
+   * when both times exist. So a row for somebody still in the room is faithful, not broken.
+   *
+   * The reference replaces commas in a name with spaces and quotes every cell; `csvName` does the
+   * first and the join does the second.
    */
   function exportStatsToCsv() {
     const withPhone = Boolean((data.settings as Record<string, unknown>).hasRequiredPhoneInLogin);
-    const lines = [withPhone ? 'Name, Email, Phone, Last login\r\n' : 'Name, Email, Last login\r\n'];
-    for (const r of visibleStats) {
-      const cells = withPhone
-        ? [csvName(r.displayName), r.email.trim(), r.phone ?? '', statsWhen(r.lastLoginAt)]
-        : [csvName(r.displayName), r.email.trim(), statsWhen(r.lastLoginAt)];
+    const lines = [
+      withPhone
+        ? 'Name, Email, Phone, IP, In, Out, Duration, isMobile, Browser\r\n'
+        : 'Name, Email, IP, In, Out, Duration, isMobile, Browser\r\n'
+    ];
+
+    // Phone lives on the member row, not on the visit — a guest has no membership at all. Looked up
+    // by email so a visit still exports when the person has since been removed from the room.
+    const phoneByEmail = new Map(
+      data.users.map((u) => [u.email.trim().toLowerCase(), u.phone ?? ''] as const)
+    );
+
+    for (const visit of data.visits) {
+      const inAt = new Date(visit.joinedAt);
+      const outAt = visit.leftAt ? new Date(visit.leftAt) : null;
+      const cells = [
+        csvName(visit.displayName),
+        visit.email.trim(),
+        ...(withPhone ? [phoneByEmail.get(visit.email.trim().toLowerCase()) ?? ''] : []),
+        visit.ip ?? '',
+        statsWhen(visit.joinedAt),
+        statsWhen(visit.leftAt),
+        outAt ? humanizeDuration(inAt.getTime(), outAt.getTime()) : 'N/A',
+        String(visit.isMobile),
+        visit.browser ?? 'unknown'
+      ];
       lines.push(cells.map((c) => `"${c}"`).join(',') + '\r\n');
     }
     saveAs(lines, `Participant_Stats_${roomUuid}_${new Date().toDateString()}.csv`, 'text/csv;charset=utf-8');

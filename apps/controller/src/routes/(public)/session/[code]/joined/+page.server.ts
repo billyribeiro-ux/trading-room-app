@@ -4,6 +4,7 @@ import { eq } from 'drizzle-orm';
 import { getDb } from '$lib/server/db';
 import { rooms } from '$lib/server/db/schema';
 import { guestHandoffToken, handoffUrl } from '$lib/server/room-handoff';
+import { recordVisit } from '$lib/server/room-visits';
 import type { PageServerLoad } from './$types';
 
 /**
@@ -24,7 +25,7 @@ import type { PageServerLoad } from './$types';
  * When `ROOM_BASE_URL` is blank this repository is serving the room itself, so the confirmation
  * page still renders — it is the destination in that configuration, not a placeholder.
  */
-export const load: PageServerLoad = async ({ params, cookies }) => {
+export const load: PageServerLoad = async ({ params, cookies, request, getClientAddress }) => {
   const [room] = await getDb().select().from(rooms).where(eq(rooms.shortCode, params.code)).limit(1);
   if (!room) error(404, 'Room not found');
 
@@ -63,6 +64,20 @@ export const load: PageServerLoad = async ({ params, cookies }) => {
     room having passed no check at all on this request.
   */
   if (room.state !== 'open') redirect(303, `/session/${params.code}`);
+
+  /*
+    The guest's visit. `roomUserId` is null and that is precisely true: a guest satisfied the room's
+    own login rules without holding an account here, which is why `room_sessions` copies the name
+    and email rather than only referencing a membership.
+  */
+  await recordVisit({
+    roomId: room.id,
+    roomUserId: null,
+    displayName: name,
+    email,
+    ip: getClientAddress(),
+    userAgent: request.headers.get('user-agent')
+  });
 
   if (ROOM_BASE_URL?.trim()) {
     const secret = ROOM_JWT_SECRET;

@@ -235,6 +235,43 @@ export const rooms = pgTable(
  * so the shape can change with a regenerate instead of a migration each time.
  * Reads go through resolveRoomConfig(), never straight into this blob.
  */
+/**
+ * One row per ARRIVAL in a room — the table the participant stats CSV is built from.
+ *
+ * The reference calls these `statXrefs`, and an xref row is exactly what this is: a person crossing
+ * into a room at a moment in time. A member who enters four times in a day is four rows, which is
+ * what makes Duration a meaningful number rather than an average of nothing.
+ *
+ * `leftAt` is null while a visit is in progress. The reference renders `N/A` for both Out and
+ * Duration in that case, so an open row is faithful rather than broken.
+ *
+ * Name and email are COPIED rather than only referenced. A guest has no membership row at all, and
+ * a member who is later removed or renamed must not silently rewrite visits that already happened —
+ * a stats export is evidence of who was present, and joining live rows would make last month's
+ * report change when somebody edits their profile.
+ */
+export const roomSessions = pgTable(
+  'room_sessions',
+  {
+    id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
+    roomId: integer('room_id')
+      .notNull()
+      .references(() => rooms.id),
+    /** Null for a guest, who satisfied the room's own login without an account here. */
+    roomUserId: integer('room_user_id').references(() => roomUsers.id),
+    displayName: text('display_name').notNull(),
+    email: text('email').notNull(),
+    ip: text('ip'),
+    userAgent: text('user_agent'),
+    isMobile: boolean('is_mobile').notNull().default(false),
+    browser: text('browser'),
+    joinedAt: timestamp('joined_at', { withTimezone: true }).notNull(),
+    /** Null while the visit is open. */
+    leftAt: timestamp('left_at', { withTimezone: true })
+  },
+  (t) => [index('room_sessions_room_joined_idx').on(t.roomId, t.joinedAt)]
+);
+
 export const roomSettings = pgTable('room_settings', {
   roomId: integer('room_id')
     .primaryKey()
