@@ -24,6 +24,34 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-10
 
+### 04:52 — The smoke test now runs itself: CI on every push to `main`
+
+**No runtime impact** — one workflow file. This repository had **no `.github` directory at all**;
+there was no CI of any kind.
+
+`pnpm smoke` as a command still depended on somebody remembering it, which is the same failure mode
+as having no check. `.github/workflows/smoke.yml` makes it structural:
+
+- **On every push to `main`** — precisely when the controller auto-deploys, and therefore the only
+  moment the answer can change.
+- **It waits for the deployment first.** Vercel builds asynchronously after the push, so an
+  immediate probe would race it. The job polls `/` for up to five minutes, and failing that poll is
+  itself a finding: the deploy never became healthy.
+- **`workflow_dispatch` too**, because the room is shipped by hand to the Hetzner box and no push
+  corresponds to that deploy.
+- **`concurrency` with `cancel-in-progress`** — smoking a deployment that has already been
+  superseded tells you nothing and spends minutes to do it.
+- **No install step at all.** `scripts/smoke.mjs` uses nothing but `fetch`, so the job needs no
+  dependency tree, no lockfile install and no build.
+
+**Deliberately not on a schedule.** A 15-minute canary would be 96 billed runs a day to re-prove
+something that only changes on deploy. Uptime monitoring belongs in a service built for it, not in
+CI, and Actions minutes are real money.
+
+It gates nothing — by the time it runs the controller is already live, because Vercel deploys on
+push. What it changes is who finds out: within a minute or two, automatically, instead of hours
+later from a customer.
+
 ### 04:48 — `pnpm smoke`: the check whose absence let both of today's outages ship
 
 **No runtime impact** — one script, one npm script, one documented deploy step. Nothing deployed

@@ -1,0 +1,70 @@
+# Post-deploy smoke test.
+#
+# WHY THIS RUNS AT ALL
+#
+# Two total outages reached production on 2026-08-10 — the controller's home page answering 500 for
+# hours, and the room refusing every handoff — and both passed a completely green pipeline:
+# `svelte-check` 0/0 on both apps, 566 + 524 unit tests, clean builds under both adapters, and a
+# production build served 200 from `vite preview` on a developer machine. Every one of those
+# inspects source or a bundle. None starts the artefact that ships and asks it for a page.
+#
+# `pnpm smoke` does exactly that, in about a second. It existed as a command first, which still left
+# it depending on someone remembering. This makes it structural.
+#
+# WHY ONLY ON PUSH, AND NOT ON A SCHEDULE
+#
+# A 15-minute canary would be 96 runs a day of billed Actions minutes to re-prove something that
+# only changes when a deploy happens. This repository deploys the controller automatically on push
+# to `main`, so a push is precisely when the answer can change — and that is when this runs. If an
+# uptime canary is wanted later it belongs in a monitoring service that is built for it, not in CI.
+#
+# WHAT IT DOES NOT DO
+#
+# It does not deploy, gate, or block anything: by the time it runs the controller is already live,
+# because Vercel deploys on push. It tells you within a minute or two that production is serving,
+# which is the difference between finding an outage yourself and being told about it.
+name: smoke
+
+on:
+  push:
+    branches: [main]
+  # Runnable by hand from the Actions tab, which is what you want after a manual room deploy —
+  # the room is shipped by hand to the Hetzner box and no push corresponds to it.
+  workflow_dispatch:
+
+# A newer push supersedes an older run: smoking a deployment that has already been replaced tells
+# you nothing, and cancelling keeps the minutes for the run that matters.
+concurrency:
+  group: smoke-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      # No install step: `scripts/smoke.mjs` deliberately uses nothing but `fetch`, so this job
+      # needs no dependency tree, no lockfile install and no build. That is what makes it fast
+      # enough to be worth running on every push.
+      - name: Wait for the deployment to go live
+        # Vercel builds asynchronously after the push, so the first probe would race it. Poll the
+        # home page until it answers 200, then hand over to the real checks. Failing here after
+        # five minutes is itself a finding: the deploy did not become healthy.
+        run: |
+          for i in $(seq 1 30); do
+            status=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 https://www.tradingroom.app/ || echo 000)
+            echo "attempt $i: / = $status"
+            if [ "$status" = "200" ]; then exit 0; fi
+            sleep 10
+          done
+          echo "::error::the home page never returned 200 within five minutes of the push"
+          exit 1
+
+      - name: pnpm smoke
+        run: node scripts/smoke.mjs
