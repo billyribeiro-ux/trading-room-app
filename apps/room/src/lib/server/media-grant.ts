@@ -215,9 +215,27 @@ export function loadSigningKey(env: NodeJS.ProcessEnv = serverEnv()): KeyObject 
     );
   }
 
+  /*
+    A PEM is multi-line and `systemd`'s `EnvironmentFile` is not.
+
+    The room runs under `trading-room-app.service` with
+    `EnvironmentFile=/opt/trading-room-app/room/.env`, and systemd has no multi-line value syntax.
+    Measured on the box rather than assumed: a value written `"line1\nline2"` arrives with the
+    backslash and the `n` as two literal characters — `printenv | od -c` shows `\   n`, not a
+    newline — so `createPrivateKey` sees a single-line string and rejects it as unreadable.
+
+    So the escaped form is accepted as well as the real one. `fcm.ts:140` already does exactly this
+    for the Google service-account key, for the same reason and with the same expression; this is
+    the same problem in the other application, not a second parser for a new one.
+
+    A key that already contains real newlines is untouched: there is no `\n` two-character sequence
+    left in it to replace.
+  */
+  const normalised = pem.replace(/\\n/g, '\n');
+
   let key: KeyObject;
   try {
-    key = createPrivateKey(pem);
+    key = createPrivateKey(normalised);
   } catch (error) {
     throw new GrantConfigError(
       `MEDIA_GRANT_PRIVATE_KEY is not a readable private key: ${(error as Error).message}`

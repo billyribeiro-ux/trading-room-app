@@ -4,7 +4,16 @@ import { defineConfig, globalIgnores } from 'eslint/config';
 import svelte from 'eslint-plugin-svelte';
 import globals from 'globals';
 import ts from 'typescript-eslint';
-import svelteConfig from './svelte.config.js';
+import { vitePreprocess } from '@sveltejs/vite-plugin-svelte';
+
+/*
+  `svelte.config.js` is gone — Kit 3 refuses to read it and takes configuration through the
+  `sveltekit(...)` plugin instead. `eslint-plugin-svelte`'s parser still wants a Svelte config
+  object, and the only part it uses is `preprocess`: without it every `<script lang="ts">` fails to
+  parse. Declared here rather than by resurrecting the file, because the file's presence is what
+  Kit 3 errors on.
+*/
+const svelteConfig = { preprocess: vitePreprocess() };
 
 export default defineConfig(
   globalIgnores([

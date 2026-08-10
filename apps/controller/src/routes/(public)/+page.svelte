@@ -11,7 +11,7 @@
 
   // The hero headline is set in self-hosted Roboto 300 and is above the fold; preload the exact
   // binary pinned by docs/reference/font-contract.md.
-  const heroFontUrl = asset('/fonts/roboto/roboto-v51-latin-300.woff2');
+  const heroFontUrl = asset('fonts/roboto/roboto-v51-latin-300.woff2');
 
   const title = 'tradingroom.app — The trading floor, re-engineered';
   const description =

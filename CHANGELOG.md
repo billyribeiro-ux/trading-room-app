@@ -24,29 +24,292 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-09
 
-### 12:30 — Professional restraint pass + SSR hardening after owner review (pushed to `claude/tradingroom-home-redesign-avs20w`, NOT `main`)
+### 12:45 — SvelteKit 3 `@next` ADOPTED. The 12:25 entry's blocker was my mistake, not Kit's
 
-**Runtime impact: yes, once merged — same branch, same page.** The owner reported the deployed
-branch preview showing "An unexpected error occurred." for the home page body, and separately that
-the design read as childish. Both addressed:
+**Runtime impact: yes — this is a framework major.** `@sveltejs/kit` **3.0.0-next.16**,
+`adapter-vercel` **7.0.0-next.6**, `adapter-node` **6.0.0-next.8**. Both apps green.
 
-**The reported crash.** Could not be reproduced here despite running the exact production
-artifact three ways: the built SvelteKit `Server` directly, the traced Vercel function bundle, and
-`vite preview` — in marketing-only mode AND in postgres mode against a real PostgreSQL 16 with the
-app's own migrations applied (all 200, correct markup). The page's one fragile server dependency
-was removed anyway: the `og:url` meta read `page.url.origin` from `$app/state` — the only
-`$app/state` use on the page — and is gone, so page SSR now touches no request context at all. If
-the deployed error persists after a fresh redeploy (with build cache cleared — a stale cached
-chunk graph is the leading suspect, since the same bytes render fine under three local harnesses),
-the Vercel function log line `[request-error]` carries `errorId`/`errorType` that pinpoints it.
+**The 12:25 entry said Kit 3 "ships no tsconfig to extend" and therefore was not adoptable. That was
+wrong, and the correction matters more than the conclusion did.** Kit 3 writes
+`node_modules/$app/tsconfig.json` — a real generated file — and `node_modules/$app/types/index.d.ts`
+beside it. I had looked in `.svelte-kit/types/`, the Kit 2 location, found nothing, and stopped.
+`svelte-kit sync` ALSO drops a placeholder `{}` at that path first "to squelch warnings", so the one
+time I did read the right file I read the placeholder and concluded the base was empty.
 
-**The restraint pass.** Institutional palette (neon `#22e58c` → emerald `#10b981`, red softened
-to `#e5484d`), glow tokens cut to roughly half alpha and the halo shadows removed, buttons from
-pills to 8px-radius rectangles with tighter type, headline capped at 96px (was 118px), aurora and
-grid-floor opacity reduced ~35%, footer watermark faded, stat values shed their text-glow, and the
-scramble "decode" effect deleted outright — stat values are plain text now, `motion.ts` lost the
-dead factory, and `home:contract` asserts plain-text values instead. Screenshotted on the fresh
-production build to confirm.
+Reading Kit's own `write_app_types.js` and `cli.js` settled it in two minutes. **Absence of evidence
+where I happened to look is not evidence of absence.**
+
+#### Every breaking change, and what each required
+
+| change | what it took |
+| --- | --- |
+| **`svelte.config.js` is removed** | Config moves into `sveltekit({…})`. The **`kit` namespace disappears** — `adapter`, `paths`, `preprocess` become siblings. |
+| **`experimental.explicitEnvironmentVariables` is gone** | It graduated. `src/env.ts` + `$app/env/*` is simply how it works; passing the old Kit 2.63 opt-in is a type error. |
+| **`$lib` is removed in favour of `#lib`** | Took Kit's own offered `alias: { $lib: 'src/lib' }`. Renaming several hundred imports inside a framework-major diff would make it unreviewable. Kit warns `config.alias` is itself deprecated — **`#lib` is a scheduled follow-up, not a resting place.** |
+| **`resolve()` takes ROUTE IDS, not pathnames** | 58 call sites. `resolve('/contact')` → `resolve('/(public)/contact')`; `` resolve(`/account/rooms/${code}/users?filter=x`) `` → `` `${resolve('/(app)/account/rooms/[id]/[[tab]]', { id: code, tab: 'users' })}?filter=x` ``. Query strings stay outside — `filter` is a query parameter, not a route parameter. |
+| **`asset()` paths lost their leading slash** | `asset('/ajax_loader.gif')` → `asset('ajax_loader.gif')`, matching Kit 3's `AssetPath()` union. |
+| **The generated tsconfig carries no `include` and `paths: {}`** | Both stated explicitly in each app's `tsconfig.json`. Without the include TypeScript checks *everything* under the project — that is the real story behind the "1238 errors" in the 12:25 entry, which were an artefact rather than defects. |
+| **The room's `$env/dynamic/*`** | Its declarations live in `.svelte-kit/ambient.d.ts`, which Kit 2's base included and Kit 3's does not. Listed explicitly. The controller needs none — it already uses `$app/env/*`. |
+
+#### The trap worth knowing about
+
+**`sveltekit()` with no arguments now means "no configuration at all"**, where it used to fall back to
+the shared file. `vitest.db.config.ts` called it bare, so **28 database tests failed on
+`Cannot find module '$lib/room-settings-profile'` while the unit suite and the build stayed green** —
+only the database config was missing the alias.
+
+Fixed properly rather than by copy-paste: the options live in **`apps/controller/kit.config.ts`** and
+every entry point imports them. `svelte.config.js` used to provide that sharing for free; under Kit 3
+it has to be deliberate.
+
+#### Also corrected
+
+The room's `tsconfig.json` was still extending a **stale `.svelte-kit/tsconfig.json` left over from
+Kit 2**, whose `$app/types` mapping pointed at a file Kit 3 no longer writes. It passed only because
+that app does not use typed `resolve()` — the kind of thing that bites later rather than now. Removed
+and repointed.
+
+**Verified:** controller `svelte-check` 0/0, 562 unit tests, **37 database tests**, `vite build` clean.
+Room `svelte-check` 0/0, 524 tests, build clean under both adapters.
+
+
+### 12:44 — THE SFU IS LIVE on the Hetzner box. `media.tradingroom.app` answers for real
+
+**RUNTIME IMPACT: yes, the largest today.** That hostname served a 503 placeholder for its whole
+life; it now serves the media service. The room was redeployed and restarted.
+
+`docs/SFU-MIGRATION.md` called this "the last piece between here and a working product". Done, bar
+the two-browser screen-share test, which needs a human at a keyboard.
+
+**What was built and started**
+
+- **The image builds on the target box** — `tradingroom-media:local`, 71.8MB. `CARGO_BUILD_JOBS` is
+  now an overridable `ARG`; it was hardcoded at 2, and two concurrent jobs on 2 cores with 1.9GB
+  push the C++ mediasoup worker compile into swap and, at the wrong moment, into the OOM killer —
+  which reads as a mediasoup error rather than as what it is. Built with 1. Peak headroom during
+  the build: 474MB free.
+- **An Ed25519 keypair generated ON the box**, so the private half never crossed the network. It
+  satisfies the contract `media-grant.test.ts` pins: 44 characters, ends `=`, decodes to exactly 32
+  bytes. Public half `sXCgMcEwHgVy0Hb1UGkn+dVpbTz948SSvy+c3vy4azU=` in the SFU's config; private
+  half in the room's `.env`, which was backed up first.
+- **`tradingroom-media.service` installed from `ops/`, enabled and started.** Its own log is the
+  evidence: `configuration validated bind_address=127.0.0.1:4443 announced_address=87.99.154.155
+  rtc_ports=40000-40199 workers=1`, `admission grants are required; verifying against this public
+  key`, `mediasoup worker started`. Container reports `(healthy)`.
+
+**The room needed a code fix before it could ever have worked**
+
+`media-grant.ts` now accepts a PEM whose newlines arrived escaped. **Measured on the box, not
+assumed**: the room runs under `EnvironmentFile=`, systemd has no multi-line value syntax, and
+`KEY="a\nb"` comes back with the backslash and the `n` as two characters — `printenv | od -c` shows
+`\   n`. Without this the migration would have ended at
+`MEDIA_GRANT_PRIVATE_KEY is not a readable private key`, which accuses the key instead of systemd.
+`fcm.ts:140` already solves this exact problem the exact same way. The room was rebuilt with
+`ADAPTER=node`, the previous build kept as `build.bak-1786293403`, and restarted.
+
+**The side-by-side audit changed the deployment**
+
+Reading `ops/mediasoup/Caddyfile.example` against what I had just deployed found a real divergence.
+I had used the bare `reverse_proxy 127.0.0.1:4443` from `SFU-MIGRATION.md` — but that doc's snippet
+is a simplification of the ops file, which is the engineered contract: it proxies **only `/health`
+and `/ws`**, returns **404 for everything else**, and sets HSTS, `X-Content-Type-Options`,
+`Referrer-Policy` and `-Server`. A bare proxy forwards every path to the media process, which is a
+wider surface than it has endpoints for. Corrected to the ops contract, and verified:
+
+| probe | result |
+| --- | --- |
+| `GET /health` | **200**, `{"status":"ok","workers":1,"workerDeaths":0,"admission":"require-grant"}` |
+| `GET /` and `/anything` | **404** — not proxied, per the contract |
+| `GET /ws` upgrade, no grant | **400** — admission refused it, and the worker did not die (`workerDeaths: 0`) |
+
+The example's global options (`admin off`, `protocols h1 h2`) were deliberately NOT applied: this
+Caddyfile also serves `chat.tradingroom.app`, so a global block would change the room's site too.
+Recorded as a knowing difference rather than an oversight.
+
+**Configuration agreement, read on both sides:** the room dials
+`MEDIA_WS_URL=wss://media.tradingroom.app/ws`, which is exactly the route Caddy proxies; the room's
+`ORIGIN=https://chat.tradingroom.app` is exactly the SFU's `MEDIA_ALLOWED_ORIGIN`. A mismatch there
+would reject every grant, so both halves were read rather than trusted.
+
+**The firewall caveat is RESOLVED, and it resolved in our favour**
+
+`SFU-MIGRATION.md` warned that the Hetzner firewall "would not accept a TCP port range", leaving TCP
+on 40000-49999 "possibly absent" — and that a UDP-blocked client would then fail **silently**. That
+was the largest unknown left. Measured from OUTSIDE the box, which is the only place a cloud
+firewall is visible:
+
+| port | answer | meaning |
+| --- | --- | --- |
+| 443 | connects | control |
+| 40000, 40100, 40199 | **RST, immediately** | reachable; nothing is dropping packets |
+| 40500 (outside the range) | **RST, immediately** | reachable too |
+
+A dropped packet times out; a refused one proves the SYN reached the host and the host answered.
+There is no listener because mediasoup binds an RTC port only when a transport is created. **So TCP
+fallback works and the silent-failure scenario does not apply.**
+
+The 40500 result is the sting: **every** TCP port on that host is reachable, and on the box `ufw` is
+inactive with iptables INPUT `ACCEPT`. There is no firewall at either layer. Nothing is exposed
+today that should not be — signalling and the room are on loopback, Caddy owns 80/443, sshd owns 22
+— but the next service that binds `0.0.0.0` is public the moment it starts. Recorded as `TODO.md`
+item **L**.
+
+**NOT done, and honestly so**
+
+- **The two-browser screen-share test.** Step 5 of the brief, and the only proof that matters. It
+  needs a real browser and a real room; nothing above substitutes for it.
+- **The Hetzner CLOUD firewall is unverified.** The host itself filters nothing — `ufw inactive`,
+  iptables INPUT `ACCEPT` — so the cloud firewall is the only gate and it cannot be read from inside
+  the box. If TCP on 40000-40199 is missing, UDP-blocked clients fail **silently**. Check it in the
+  console before concluding the SFU is broken.
+- **Lightsail is still running.** The brief says retire it only after the browser test passes, and
+  a stopped Hetzner or Lightsail box still bills — only deletion stops it.
+- **A grant was never minted end to end from here.** Doing so meant reading the live
+  `ROOM_JWT_SECRET` and forging a token against production, which was refused — correctly. The chain
+  is proven in three separate pieces instead: the key parses (31 room tests, including both PEM
+  forms yielding the same public half), the deployed build contains that code, and the SFU refuses
+  an ungranted socket at the edge.
+
+### 12:25 — SvelteKit 3 `@next` evaluated against the real repository, and NOT adopted
+
+**No runtime impact — nothing shipped.** The migration was performed in full, found to be blocked,
+and reverted to zero residue. This entry exists so the next attempt starts from evidence instead of
+repeating it.
+
+#### The `next` tags are not uniformly newer — taking them blindly is a downgrade
+
+| package | `latest` | `next` | |
+| --- | --- | --- | --- |
+| `@sveltejs/kit` | 2.70.2 | **3.0.0-next.16** | ahead |
+| `@sveltejs/adapter-vercel` | 6.3.4 | **7.0.0-next.6** | ahead |
+| `@sveltejs/adapter-node` | 5.5.7 | **6.0.0-next.8** | ahead |
+| `svelte` | **5.56.8** | 5.0.0-next.272 | **`next` is 56 minors BEHIND** |
+| `@sveltejs/vite-plugin-svelte` | **7.3.0** | 7.0.0-next.1 | **`next` is behind** |
+
+"Use @next" on the last two would have rolled Svelte back to a 5.0 prerelease.
+
+#### The repository is otherwise ready
+
+Kit 3's peers are `vite ^8.0.12`, `svelte ^5.56.4`, `typescript ^6.0.0`,
+`@sveltejs/vite-plugin-svelte ^7.0.0` — **all already satisfied** after this morning's updates.
+
+#### What was migrated, and it works
+
+- **`svelte.config.js` is removed in Kit 3.** It errors: *"svelte.config.js is no longer used. Please
+  pass configuration via the `sveltekit(...)` plugin in your Vite config."* Both apps were migrated —
+  and note the shape: the **`kit` namespace disappears**, so `adapter`, `paths` and `preprocess` sit
+  at the top level of `sveltekit({…})`. Per the docs that is "the only difference to the
+  `svelte.config.js` layout".
+- **`experimental.explicitEnvironmentVariables` is gone from Kit 3's types** — it graduated. `src/env.ts`
+  and `$app/env/private` are simply how it works now. This repository had opted in early under Kit
+  2.63, and that flag becomes a type error.
+- **`eslint.config.js` imported `./svelte.config.js`** for the Svelte parser. The only part the parser
+  uses is `preprocess`, so it can be declared inline — the file cannot come back, because its
+  presence is what Kit 3 errors on.
+
+#### Why it was reverted — the blocker, with evidence
+
+**Kit 3.0.0-next.16 breaks typed `resolve()`, which this codebase uses at 48 call sites.** Every one
+fails with `Argument of type '"/login"' is not assignable to parameter of type 'never'` — the route
+union is empty. Three findings, each checked rather than inferred:
+
+1. `svelte-kit sync` prints *"tsconfig.json should extend SvelteKit's built-in configuration:
+   `{ "extends": "$app/tsconfig" }"`* — **but Kit 3 ships no tsconfig to extend.** Searched the
+   installed package: there is none.
+2. Following that advice anyway produced **1238 errors across 111 files**, because the unresolvable
+   `extends` silently discards the base's `include`, `exclude` and `paths` and drags `scripts/**`
+   into the type check. Those errors were an artefact of the broken extends, not defects.
+3. Keeping the working `extends` leaves **`$app/types` mapped to `.svelte-kit/types/index.d.ts`,
+   which Kit 3 no longer writes.** `RouteId` exists in `non-ambient.d.ts` and the per-route
+   `$types.d.ts`, so the data is there — the entry point the typed router reads is not.
+
+That is a prerelease with an unfinished TypeScript story, not a mistake in this repository. Adopting
+it would mean giving up compile-time route checking on an app that auto-deploys on push.
+
+#### State
+
+Reverted to `@sveltejs/kit` 2.70.2, `adapter-vercel` 6.3.4, `adapter-node` 5.5.7, and `package.json`
+and `pnpm-lock.yaml` restored to HEAD so **not one byte remains** of the attempt.
+
+**Re-verified after reverting:** `svelte-check` 0 errors 0 warnings, 51 files / 562 tests passing,
+`vite build` clean, `pnpm install --frozen-lockfile` clean.
+
+**Retry when** Kit 3 either ships `$app/tsconfig` or writes `types/index.d.ts` again. The two-file
+config migration above is done and takes ten minutes to redo.
+
+
+### 12:15 — Dependencies taken to latest, with three deliberate exceptions (pushed to `main`)
+
+**Runtime impact: yes** — `better-sqlite3` and `vite` are build/runtime dependencies. No source
+changed.
+
+Every version below was read from a registry or an official index **today**, not recalled.
+
+#### Node — latest **LTS**, as asked
+
+`nodejs.org/dist/index.json`: the newest LTS is **v24.19.0 "Krypton"**, released 2026-08-03. v26.7.0
+exists and is **Current, not LTS**, so it is deliberately not adopted.
+
+- `.nvmrc` created — there was none, so the Node version was implicit.
+- `engines` unified to `24.x`. The root said `>=22`, the controller said `24.x`, **and the room
+  declared none at all** — three answers to one question.
+
+#### Updated (10 packages + pnpm)
+
+`pnpm` 11.18.0 → **11.21.0**. `vite` 8.1.5 → 8.2.1 · `@sveltejs/vite-plugin-svelte` 7.2.0 → 7.3.0 ·
+`svelte-check` 4.7.4 → 4.7.5 · `typescript-eslint` 8.65.0 → 8.66.0 · `eslint` 10.8.0 → 10.8.1 ·
+`globals` 17.7.0 → 17.9.0 · `@types/node` 26.1.2 → 26.2.0 · `@types/better-sqlite3` 7.6.13 → 9.6.0 ·
+`@types/howler` 2.2.12 → 2.2.13 · `better-sqlite3` 13.0.2 → 13.0.3.
+
+**`svelte-check` now reports 0 errors and 0 WARNINGS.** The three long-standing `href=""` warnings
+are gone in 4.7.5 — they were the ones the manage page documented as unavoidable.
+
+#### TypeScript 7.0.2 — attempted, and REVERTED
+
+It is on `latest`, so "latest" would have taken it. It **breaks the toolchain**: `svelte-check`
+crashes on load, and no peer accepts it — SvelteKit wants `^5.3.3 || ^6.0.0`, `svelte-check`
+`^5.0.0 || ^6.0.0`, and `typescript-eslint` `>=4.8.4 <6.1.0`. **6.0.3 is already the ceiling those
+peers allow**, so the repository was correct before and stays there.
+
+#### NOT updated — three packages pinned to captured evidence
+
+Bumping these would break the pixel match, which is the premise of the whole reproduction:
+
+| package | pinned | latest | why it stays |
+| --- | --- | --- | --- |
+| `font-awesome` | **4.3.0** | 4.7.0 | both captures request `fontawesome-webfont.woff2?v=4.3.0`. 4.7.0 redrew `fa-user` from 1408 units to 1280 — **10.219px against 9.289px** at the 13px the dropdown uses. |
+| `@fortawesome/fontawesome-free` | **5.8.1** | 7.3.1 | the room is FA5, where the gear measures 16px = 1em; FA4's cog is 0.857em and shrank that button to 24.719. |
+| `animate.css` | **3.7.2** | 4.1.1 | the reference loads 3.7.2 and the app uses its class names (`animated fadeInDown`). **v4 renames every class** to `animate__animated animate__fadeInDown`, and `account.css` transcribes 3.7.2's exact reduced-motion contract. |
+
+#### Rust
+
+**The toolchain pin was already current**: `channel-rust-stable.toml` gives rustc **1.97.1
+(2026-07-14)**, which is exactly what `services/rust-toolchain.toml` pins.
+
+21 crates updated via `cargo update` (thiserror, wasm-bindgen, time, regex-automata, cc, …).
+`cargo check --workspace` exit 0; `cargo clippy --workspace --all-targets` exit 0.
+
+**Eight direct crates are still behind and are NOT done**, because each needs a `Cargo.toml` edit
+and an API migration rather than a lockfile bump: `base64` 0.22→0.23, `ed25519-dalek` 2→3,
+`mediasoup` 0.24→0.25, `password-hash` 0.5→0.6, `rand` 0.9→0.10, `sha2` 0.10→0.11,
+`tokio-tungstenite` 0.29→0.30, `tower-http` 0.6→0.7. `mediasoup` especially: the SFU migration is
+another session's live task and moving it underneath them would be reckless.
+
+#### Two defects found on the way, neither caused by this change
+
+- **The documented clippy gate is wrong for this workspace.** `cargo clippy --all-targets -- -D
+  warnings` fails with **46 errors on a clean tree**, because the test helpers
+  (`raw_for_tests`, `identity_pool_for_tests`, `set_relay_ready_for_tests`) sit behind a
+  deliberately non-default `testing` feature. Proven pre-existing by re-running it against the
+  stashed original lockfile: same 46. The correct invocation is
+  **`cargo clippy --workspace --all-targets --features tradingroom-api/testing -- -D warnings`**,
+  which exits 0.
+- **`ed25519-dalek` is declared twice and disagrees**: the workspace `Cargo.toml` says `3.0.0`,
+  `media/Cargo.toml` pins `"2"`. The lock resolves 2.2.0. Recorded, not silently reconciled.
+
+**Verified:** controller `svelte-check` 0/0, 51 files / 562 tests, `vite build` clean. Room
+`svelte-check` 0/0, 56 files / 523 tests. Rust check and clippy both exit 0.
+
 
 ### 11:23 — `pnpm check` was RED and nobody knew; plus the focus ring that would not let go
 

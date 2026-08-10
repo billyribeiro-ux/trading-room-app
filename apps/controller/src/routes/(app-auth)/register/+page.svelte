@@ -31,9 +31,9 @@
 </svelte:head>
 
   <div class="acc-center-block">
-    <a class="acc-brand-lockup" href={resolve('/')}>
+    <a class="acc-brand-lockup" href={resolve('/(public)')}>
       <img
-        src={asset('/public/images/protradingroom_icon_dark.png')}
+        src={asset('public/images/protradingroom_icon_dark.png')}
         alt=""
         width="128"
         height="80"
@@ -108,7 +108,7 @@
                 />
                 <span class="acc-feedback"><i class="fa fa-lock"></i></span>
                 <div class="acc-text-right">
-                  <a class="acc-text-muted" href={resolve('/contact')}>Forgot your password?</a>
+                  <a class="acc-text-muted" href={resolve('/(public)/contact')}>Forgot your password?</a>
                 </div>
               </div>
 
@@ -121,7 +121,7 @@
                   <label>
                     <input type="checkbox" name="agreeTOS" required />
                     <span class="fa fa-check"></span>
-                    I agree with the <a href={resolve('/terms')}>terms</a>
+                    I agree with the <a href={resolve('/(public)/terms')}>terms</a>
                   </label>
                 </div>
               </div>
@@ -134,7 +134,7 @@
                   <!-- "Already register?" is the reference's own wording, typo and
                        all. Kept, because the copy deck is the copy deck. -->
                   Already register?
-                  <a href={resolve('/login')}> Login here </a>
+                  <a href={resolve('/(public)/login')}> Login here </a>
                 </p>
               </div>
             </div>

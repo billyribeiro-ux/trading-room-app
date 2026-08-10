@@ -1,4 +1,5 @@
 import { sveltekit } from '@sveltejs/kit/vite';
+import { kitConfig } from './kit.config';
 import { configDefaults, defineConfig } from 'vitest/config';
 
 /*
@@ -16,7 +17,22 @@ const localHost = '127.0.0.1';
 const localPort = 5173;
 
 export default defineConfig({
-  plugins: [sveltekit()],
+  /*
+    SvelteKit configuration lives HERE. Kit 3 removed `svelte.config.js` and errors on its presence:
+    "svelte.config.js is no longer used. Please pass configuration via the `sveltekit(...)` plugin in
+    your Vite config."
+
+    Note the shape — the `kit` namespace is GONE. The docs put it exactly: "the `kit` namespace is at
+    the same level as the other top level entries; this is the only difference to the
+    `svelte.config.js` layout." So `adapter`, `paths` and `preprocess` are siblings here.
+
+    There is no `experimental.explicitEnvironmentVariables` any more either. It graduated: `src/env.ts`
+    and `$app/env/private` are simply how environment variables work in Kit 3, and passing the old
+    Kit 2.63 opt-in is now a type error.
+  */
+  plugins: [
+    sveltekit(kitConfig)
+  ],
   server: {
     host: localHost,
     port: localPort,

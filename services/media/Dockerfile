@@ -38,7 +38,13 @@ RUN rustup component add rustfmt
 RUN python3 -m venv /opt/venv
 ENV PYTHON=/opt/venv/bin/python3
 ENV PATH="/opt/venv/bin:${PATH}"
-ENV CARGO_BUILD_JOBS=2
+# Overridable, because where this builds decides what it can afford. Two jobs is right on a build
+# host with room; the Hetzner box this deploys to has 2 cores and 1.9GB of RAM, and the C++ worker
+# compile is the heaviest thing in the image — two concurrent jobs there push it into swap and, at
+# the wrong moment, into the OOM killer, which surfaces as a mediasoup build error rather than as
+# what it is. `docker build --build-arg CARGO_BUILD_JOBS=1` on such a host.
+ARG CARGO_BUILD_JOBS=2
+ENV CARGO_BUILD_JOBS=${CARGO_BUILD_JOBS}
 
 WORKDIR /build
 

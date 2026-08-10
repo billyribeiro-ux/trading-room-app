@@ -595,13 +595,13 @@
                   rel="noopener noreferrer"><i class="fa fa-external-link"></i> Launch</a
                 >
                 <!-- eslint-enable svelte/no-navigation-without-resolve -->
-                <a class="acc-btn acc-btn-sm acc-btn-inverse" href={resolve(`/account/rooms/${room.shortCode}`)}
+                <a class="acc-btn acc-btn-sm acc-btn-inverse" href={resolve('/(app)/account/rooms/[id]/[[tab]]', { id: room.shortCode })}
                   ><i class="fa fa-cogs"></i> Manage</a
                 >
                 {#if data.entitlements.marketplace}
                   <a
                     class="acc-btn acc-btn-sm acc-btn-default"
-                    href={resolve(`/account/rooms/${room.shortCode}/marketplace`)}
+                    href={resolve('/(app)/account/rooms/[id]/[[tab]]', { id: room.shortCode, tab: 'marketplace' })}
                     ><i class="fa fa-credit-card"></i> Marketplace</a
                   >
                 {/if}
@@ -1062,7 +1062,7 @@
           <div class="col-md-2">
             <a
               class="acc-btn acc-btn-primary acc-mb"
-              href={resolve('/account/api-docs')}
+              href={resolve('/(app)/account/api-docs')}
               target="_blank"
               rel="noopener noreferrer">API Docs</a
             >

@@ -1,4 +1,21 @@
 import { sveltekit } from '@sveltejs/kit/vite';
+import vercel from '@sveltejs/adapter-vercel';
+import node from '@sveltejs/adapter-node';
+import { vitePreprocess } from '@sveltejs/vite-plugin-svelte';
+
+/*
+  Two adapters, selected by `ADAPTER`, defaulting to Vercel.
+
+  `ADAPTER=node` is kept deliberately and is not spare scaffolding — it is the escape hatch for a
+  constraint this application actually has. `src/routes/sess/[room]/events/+server.ts` serves a
+  long-lived `text/event-stream` with a heartbeat; a serverless function has a bounded maximum
+  duration, so a trading session lasting hours will be cut and the browser will reconnect for as
+  long as the room stays open. That degrades rather than breaks — but "degrades on a timer" is worth
+  naming here rather than discovering under load.
+
+  Moved from `svelte.config.js`, which Kit 3 no longer reads.
+*/
+const target = process.env.ADAPTER ?? 'vercel';
 import { defineConfig } from 'vitest/config';
 
 /**
@@ -37,7 +54,21 @@ const localHost = '127.0.0.1';
 const localPort = 5174;
 
 export default defineConfig({
-  plugins: [sveltekit()],
+  // Kit 3 takes configuration through the plugin; `svelte.config.js` is gone and the `kit` namespace
+  // with it, so these sit at the top level.
+  plugins: [
+    sveltekit({
+      /*
+        Kit 3 removed `$lib` in favour of `#lib`, and offers this alias to keep the old specifier
+        working — the error names it directly. Taken deliberately rather than renaming several
+        hundred import sites inside the same diff as a framework major, which would make the upgrade
+        unreviewable. Migrating to `#lib` is its own change.
+      */
+      alias: { $lib: 'src/lib' },
+      preprocess: vitePreprocess(),
+      adapter: target === 'node' ? node() : vercel()
+    })
+  ],
   server: {
     host: localHost,
     port: localPort,

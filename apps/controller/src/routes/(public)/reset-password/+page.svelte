@@ -54,7 +54,7 @@
       {#if !data.valid}
         <p class="acc-error" role="alert">{data.message}</p>
         <div class="acc-text-right">
-          <a class="acc-text-muted" href={resolve('/forgot-password')}>Request a new link</a>
+          <a class="acc-text-muted" href={resolve('/(public)/forgot-password')}>Request a new link</a>
         </div>
       {:else}
         {#if form?.message}

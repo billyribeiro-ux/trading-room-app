@@ -1,14 +1,30 @@
 {
-  "extends": "./.svelte-kit/tsconfig.json",
+  // Kit 3 generates this at `node_modules/$app/tsconfig.json`. The old `./.svelte-kit/tsconfig.json`
+  // still exists on disk as a leftover from Kit 2 and still points `$app/types` at a file Kit 3 no
+  // longer writes — extending it worked only because this app does not use typed `resolve()`, which
+  // is exactly the kind of thing that bites later rather than now.
+  "extends": "$app/tsconfig",
   "compilerOptions": {
-    "allowJs": true,
-    "checkJs": true,
     "esModuleInterop": true,
-    "forceConsistentCasingInFileNames": true,
-    "resolveJsonModule": true,
-    "skipLibCheck": true,
     "sourceMap": true,
     "strict": true,
-    "moduleResolution": "bundler"
-  }
+    // Kit 3's base ships `paths: {}`; Kit 2's supplied these.
+    "paths": {
+      "$lib": ["./src/lib"],
+      "$lib/*": ["./src/lib/*"]
+    }
+  },
+  // Kit 3's base carries no `include`, so it is stated here. Without it TypeScript checks everything
+  // under the project directory, including tooling that was never in the gate.
+  // `.svelte-kit/ambient.d.ts` is listed explicitly: it carries the `$env/dynamic/*` and
+  // `$env/static/*` module declarations, which this app still imports. Kit 2's generated base
+  // included it; Kit 3's does not, so without this line every `$env/*` import reads as a missing
+  // module. The controller does not need it — it uses the newer `$app/env/*` API.
+  "include": [
+    "src/**/*.js",
+    "src/**/*.ts",
+    "src/**/*.svelte",
+    "vite.config.ts",
+    ".svelte-kit/ambient.d.ts"
+  ]
 }

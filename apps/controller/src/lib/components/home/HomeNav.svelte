@@ -45,7 +45,7 @@
 
 <header class="nav" class:scrolled class:open>
   <div class="inner">
-    <a href={resolve('/')} class="brand" onclick={close}>
+    <a href={resolve('/(public)')} class="brand" onclick={close}>
       <svg viewBox="0 0 28 28" class="mark" aria-hidden="true">
         <line x1="6" y1="7" x2="6" y2="23" />
         <rect x="3.5" y="12" width="5" height="7" rx="1" class="down" />
@@ -63,18 +63,18 @@
         <li><a href="#engineering" onclick={close}>Engineering</a></li>
         <li><a href="#tape" onclick={close}>Live tape</a></li>
         <li><a href="#voices" onclick={close}>Voices</a></li>
-        <li><a href={resolve('/contact')} onclick={close}>Contact</a></li>
+        <li><a href={resolve('/(public)/contact')} onclick={close}>Contact</a></li>
         {#if accountAccessEnabled}
           <li>
             {#if signedIn}
-              <a href={resolve('/account')} onclick={close}>My account</a>
+              <a href={resolve('/(app)/account')} onclick={close}>My account</a>
             {:else}
-              <a href={resolve('/login')} onclick={close}>Log in</a>
+              <a href={resolve('/(public)/login')} onclick={close}>Log in</a>
             {/if}
           </li>
         {/if}
       </ul>
-      <a href={resolve('/contact')} class="hc-btn hc-btn-primary demo" onclick={close}>Book a demo</a>
+      <a href={resolve('/(public)/contact')} class="hc-btn hc-btn-primary demo" onclick={close}>Book a demo</a>
     </nav>
 
     <button

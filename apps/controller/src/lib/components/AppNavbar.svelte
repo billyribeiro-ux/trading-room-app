@@ -22,7 +22,7 @@
   <nav class="acc-navbar navbar topnavbar" style="background-color: black;">
     <div class="acc-navbar-header navbar-header">
       <div class="acc-brand navbar-brand">
-        <a href={resolve('/account')} aria-hidden="true" tabindex="-1">
+        <a href={resolve('/(app)/account')} aria-hidden="true" tabindex="-1">
           <img class="acc-brand-logo brand-logo ng-hide" hidden alt="" />
         </a>
       </div>
@@ -33,14 +33,14 @@
         <ul class="acc-nav-right nav navbar-nav navbar-right hidden-material">
           <li>
             <a
-              href={resolve('/account')}
+              href={resolve('/(app)/account')}
               class="acc-nav-account icon fa fa-cog"
               style="color: #FFFFFF"
               {@attach accountSettingsTooltip}
             >&nbsp; Account</a>
           </li>
           <li>
-            <form method="POST" action={resolve('/logout')}>
+            <form method="POST" action={resolve('/(app)/logout')}>
               <button
                 type="submit"
                 class="acc-nav-logout icon fa fa-2x fa-power-off"

@@ -30,10 +30,10 @@
     {#if data.verified}
       <p class="pub-success">{data.email} is confirmed.</p>
       <p class="pub-hint">That is everything — you can carry on.</p>
-      <a class="pub-hint" href={resolve('/account')}>Go to your account</a>
+      <a class="pub-hint" href={resolve('/(app)/account')}>Go to your account</a>
     {:else}
       <p class="pub-error">{REASONS[data.reason]}</p>
-      <a class="pub-hint" href={resolve('/login')}>Sign in</a>
+      <a class="pub-hint" href={resolve('/(public)/login')}>Sign in</a>
     {/if}
   </div>
 </div>

@@ -110,7 +110,7 @@
     </h1>
     <p class="sub" data-hero-fade>{HERO_SUB}</p>
     <div class="actions" data-hero-fade>
-      <a href={resolve('/contact')} class="hc-btn hc-btn-primary" {@attach magnetic()}>
+      <a href={resolve('/(public)/contact')} class="hc-btn hc-btn-primary" {@attach magnetic()}>
         {HERO_CTA_PRIMARY.label}
       </a>
       <a href="#engineering" class="hc-btn hc-btn-ghost">{HERO_CTA_SECONDARY.label}</a>

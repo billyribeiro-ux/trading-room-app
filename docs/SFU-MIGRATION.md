@@ -1,5 +1,37 @@
 # Move the SFU off AWS — a brief for the next session
 
+> ## DONE 2026-08-09 12:44 EDT — the SFU runs on the Hetzner box
+>
+> `media.tradingroom.app` serves the media service instead of its 503 placeholder. Built on the box
+> (`tradingroom-media:local`, 71.8MB), keypair generated there, `tradingroom-media.service` enabled
+> and healthy, Caddy proxying `/health` and `/ws` only. `GET /health` → 200; `/` → 404; an ungranted
+> `/ws` upgrade → 400 with `workerDeaths: 0`.
+>
+> **Three things below are still open, and steps 1–4 are now history rather than instructions:**
+>
+> 1. **The two-browser screen-share test — step 5, and the only proof that matters.** Not run.
+> 2. ~~The Hetzner CLOUD firewall is still unverified.~~ **RESOLVED 2026-08-09 — TCP on the RTC
+>    range is NOT blocked, so the caveat at the end of this document does not apply.** Measured from
+>    outside the box, which is the only place the cloud firewall is visible: TCP 40000, 40100 and
+>    40199 all answer **RST — "connection refused", immediately**, not a timeout. A dropped packet
+>    times out; a refused one means the SYN reached the host and the host answered. There is no
+>    listener because mediasoup binds an RTC port only when a transport is created, which is
+>    expected. **A UDP-blocked client will therefore fall back to TCP as designed.**
+>
+>    That probe found something else, and it is a hardening gap rather than a media one: **TCP 40500
+>    — outside the configured range entirely — is refused just as fast**, which means every TCP port
+>    on this host is reachable from the internet. Combined with `ufw inactive` and iptables INPUT
+>    `ACCEPT` on the box, there is effectively **no firewall at either layer**. Nothing is exposed
+>    today that should not be (signalling is bound to loopback, the room to loopback, Caddy owns
+>    80/443, sshd owns 22), but the next service that binds `0.0.0.0` is public the moment it
+>    starts. Recorded as work item **L** in `TODO.md`.
+> 3. **Lightsail is still running and still billing.** Retire it only after step 5 passes.
+>
+> One correction to step 3 below, found by reading `ops/mediasoup/Caddyfile.example` against the
+> deployment: the bare `reverse_proxy 127.0.0.1:4443` shown there is a SIMPLIFICATION of that ops
+> file, which is the real contract — `/health` and `/ws` only, 404 for everything else, plus four
+> security headers. The deployment follows the ops file. See `CHANGELOG.md` 2026-08-09 12:44.
+
 Written 2026-08-09, immediately after the room was deployed. This is the last piece between here and
 a working product: the room loads and the handoff works, but **there is no screen share and no audio
 until this is done.**

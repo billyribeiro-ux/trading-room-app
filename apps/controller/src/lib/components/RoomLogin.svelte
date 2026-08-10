@@ -28,7 +28,7 @@
 
   // Exact 80x80 JPEG returned by the captured `?d=mm` Gravatar URL. Keep it as
   // a deterministic local fallback without suppressing a real Gravatar.
-  const EMPTY_AVATAR = asset('/default-avatar.jpg');
+  const EMPTY_AVATAR = asset('default-avatar.jpg');
 
   const on = (k: string) => settings[k] === true;
   const str = (k: string) => (typeof settings[k] === 'string' ? (settings[k] as string) : '');

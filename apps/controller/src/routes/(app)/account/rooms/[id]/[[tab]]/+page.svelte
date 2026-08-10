@@ -46,8 +46,8 @@
    */
   let { data, form }: PageProps = $props();
 
-  const ajaxLoader = asset('/ajax_loader.gif');
-  const avatarPlaceholder = asset('/avatar-placeholder.svg');
+  const ajaxLoader = asset('ajax_loader.gif');
+  const avatarPlaceholder = asset('avatar-placeholder.svg');
 
   let openMenu = $state<string | null>(null);
   let openRowMenu = $state<number | null>(null);
@@ -920,7 +920,7 @@
         {#if !data.disableMarketplace}
           <a
             class="btn btn-sm pull-right btn-default mr"
-            href={resolve(`/account/rooms/${data.room.shortCode}/marketplace`)}
+            href={resolve('/(app)/account/rooms/[id]/[[tab]]', { id: data.room.shortCode, tab: 'marketplace' })}
           >
             <i class="fa fa-credit-card"></i>&nbsp;Marketplace
           </a>
@@ -1143,7 +1143,7 @@ Please click this link to attend: ______ unique link will be here_____
             <!-- hidden, not absent: `ng-hide` on the <li> is what the reference
                  does, and the pane behind it stays reachable by URL -->
             <li class={{ active: data.tab === tab.id }} hidden={!tab.visible}>
-              <a href={resolve(`/account/rooms/${data.room.shortCode}/${tab.id}`)}>{tab.label}</a>
+              <a href={resolve('/(app)/account/rooms/[id]/[[tab]]', { id: data.room.shortCode, tab: tab.id })}>{tab.label}</a>
             </li>
           {/each}
         </ul>
@@ -1195,14 +1195,14 @@ Please click this link to attend: ______ unique link will be here_____
                            reference gets back to the unfiltered list with its Reload Users
                            button, which we already render. -->
                       <ul class="dropdown-menu" role="menu">
-                        <li><a href={resolve(`/account/rooms/${data.room.shortCode}/users?filter=trials`)}>Show Free Trials</a></li>
-                        <li><a href={resolve(`/account/rooms/${data.room.shortCode}/users?filter=banned`)}><i class="fa fa-ban"></i> Show BANNED</a></li>
-                        <li><a href={resolve(`/account/rooms/${data.room.shortCode}/users?filter=muted`)}><i class="fa fa-comment-o"></i> Show Chat Muted</a></li>
-                        <li><a href={resolve(`/account/rooms/${data.room.shortCode}/users?filter=mobile`)}><i class="fa fa-mobile"></i> Show Mobile</a></li>
-                        <li><a href={resolve(`/account/rooms/${data.room.shortCode}/users?filter=non-mobile`)}><i class="fa fa-mobile"></i> Show Non-Mobile</a></li>
-                        <li><a href={resolve(`/account/rooms/${data.room.shortCode}/users?filter=presenters`)}><i class="fa fa-microphone"></i> Show Presenters</a></li>
+                        <li><a href={`${resolve('/(app)/account/rooms/[id]/[[tab]]', { id: data.room.shortCode, tab: 'users' })}?filter=trials`}>Show Free Trials</a></li>
+                        <li><a href={`${resolve('/(app)/account/rooms/[id]/[[tab]]', { id: data.room.shortCode, tab: 'users' })}?filter=banned`}><i class="fa fa-ban"></i> Show BANNED</a></li>
+                        <li><a href={`${resolve('/(app)/account/rooms/[id]/[[tab]]', { id: data.room.shortCode, tab: 'users' })}?filter=muted`}><i class="fa fa-comment-o"></i> Show Chat Muted</a></li>
+                        <li><a href={`${resolve('/(app)/account/rooms/[id]/[[tab]]', { id: data.room.shortCode, tab: 'users' })}?filter=mobile`}><i class="fa fa-mobile"></i> Show Mobile</a></li>
+                        <li><a href={`${resolve('/(app)/account/rooms/[id]/[[tab]]', { id: data.room.shortCode, tab: 'users' })}?filter=non-mobile`}><i class="fa fa-mobile"></i> Show Non-Mobile</a></li>
+                        <li><a href={`${resolve('/(app)/account/rooms/[id]/[[tab]]', { id: data.room.shortCode, tab: 'users' })}?filter=presenters`}><i class="fa fa-microphone"></i> Show Presenters</a></li>
                         <li>
-                          <a href={resolve(`/account/rooms/${data.room.shortCode}/users?filter=marketplace`)}><i class="fa fa-credit-card"></i> Marketplace Users</a>
+                          <a href={`${resolve('/(app)/account/rooms/[id]/[[tab]]', { id: data.room.shortCode, tab: 'users' })}?filter=marketplace`}><i class="fa fa-credit-card"></i> Marketplace Users</a>
                         </li>
                         <li class="divider" role="separator"></li>
                         <li>
@@ -1254,13 +1254,13 @@ Please click this link to attend: ______ unique link will be here_____
                   {#if data.users.length > 0}
                     <div class="checkbox">
                       <label>
-                        <input type="checkbox" checked={allSelected} onchange={toggleSelectAll} />
+                        <input id="select-all-members" type="checkbox" checked={allSelected} onchange={toggleSelectAll} />
                         <!-- `ng-if="!checkedAllUsers"` — the reference drops the words
                              once every row is checked, leaving a bare checkbox -->
                         {#if !allSelected}<span>Select All</span>{/if}
                       </label>
                       <label class="checkbox-apply-to-all-rooms">
-                        <input type="checkbox" bind:checked={applyToAllRooms} />
+                        <input id="apply-to-all-rooms" type="checkbox" bind:checked={applyToAllRooms} />
                         <span>Apply to all rooms?</span>
                       </label>
                     </div>
@@ -1371,7 +1371,12 @@ Please click this link to attend: ______ unique link will be here_____
                                the first child of this td and measures x=104.3, the td's own x plus
                                its 8px padding. `ng-show="user.role!==0"` — the owner has none. -->
                           {#if member.role !== 0}
+                            <!-- The id carries the member id because this renders once per row;
+                                 a constant would be duplicated across every row, which is worse
+                                 than having none. No `name`: these post through `selected`, and a
+                                 name would add a second, unread field to the form. -->
                             <input
+                              id={`select-member-${member.id}`}
                               type="checkbox"
                               aria-label={`Select ${member.displayName}`}
                               value={member.id}
@@ -2229,19 +2234,19 @@ Please click this link to attend: ______ unique link will be here_____
                       <input class="form-control" type="search" id="uSearchStat" required bind:value={statsSearch} />
                       <br />
                       <label>
-                        <input type="checkbox" bind:checked={statsOnlineOnly} />
+                        <input id="stats-online-only" type="checkbox" bind:checked={statsOnlineOnly} />
                         &nbsp;Show Online Users Only
                       </label>
                       <label>
-                        <input type="checkbox" bind:checked={statsTrialsOnly} />
+                        <input id="stats-trials-only" type="checkbox" bind:checked={statsTrialsOnly} />
                         &nbsp;Show <span class="badge badge-danger">Free Trials</span> Only?
                       </label>
                       <label>
-                        <input type="checkbox" bind:checked={statsMobileOnly} />
+                        <input id="stats-mobile-only" type="checkbox" bind:checked={statsMobileOnly} />
                         &nbsp;Show Mobile Only?
                       </label>
                       <label>
-                        <input type="checkbox" bind:checked={statsDedupe} />
+                        <input id="stats-dedupe" type="checkbox" bind:checked={statsDedupe} />
                         &nbsp;Remove duplicates?
                       </label>
                       <!--
@@ -2477,7 +2482,7 @@ Please click this link to attend: ______ unique link will be here_____
                   {/if}
 
                   <p class="form-control-static">
-                    <a class="btn btn-default" target="_blank" rel="noopener noreferrer" href={resolve('/account/api-docs')}>
+                    <a class="btn btn-default" target="_blank" rel="noopener noreferrer" href={resolve('/(app)/account/api-docs')}>
                       API POST Routes Docs
                     </a>
                   </p>

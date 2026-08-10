@@ -82,7 +82,7 @@
                   <!-- Pointed at /contact until 2026-08-09, which did not deliver: the contact
                        action explicitly stores and sends nothing, so this link was the whole of
                        account recovery and it went nowhere. -->
-                  <a class="acc-text-muted" href={resolve('/forgot-password')}>Forgot your password?</a>
+                  <a class="acc-text-muted" href={resolve('/(public)/forgot-password')}>Forgot your password?</a>
                 </div>
               </div>
 

@@ -1,4 +1,5 @@
 import { sveltekit } from '@sveltejs/kit/vite';
+import { kitConfig } from './kit.config';
 import { defineConfig } from 'vitest/config';
 
 /**
@@ -14,7 +15,9 @@ import { defineConfig } from 'vitest/config';
  * had PostgreSQL installed.
  */
 export default defineConfig({
-  plugins: [sveltekit()],
+  // The SAME options the application build uses. `sveltekit()` bare means "no configuration" in
+  // Kit 3, which cost 28 database tests a missing `$lib` alias before this import existed.
+  plugins: [sveltekit(kitConfig)],
   test: {
     include: ['src/**/*.db.test.ts'],
     // One cluster at a time; two would race on ports and on the temp directory.

@@ -325,6 +325,30 @@ describe('minting a grant for a signed-in user', () => {
     ).toThrow(GrantConfigError);
   });
 
+  it('accepts a PEM whose newlines arrived escaped, because systemd cannot carry real ones', () => {
+    /*
+      MEASURED ON THE DEPLOYED BOX, not assumed. The room runs under `trading-room-app.service`
+      with `EnvironmentFile=/opt/trading-room-app/room/.env`, and systemd has no multi-line value
+      syntax. Writing `KEY="a\nb"` there and reading it back with `printenv | od -c` shows the
+      backslash and the `n` as two separate characters — so a PEM pasted that way reaches
+      `createPrivateKey` on one line and is rejected as unreadable.
+
+      Both forms therefore load, and produce the SAME key: the escaped one is the only form the
+      deployment can actually supply, and the real one is what a local `.env` or a container secret
+      gives. `fcm.ts:140` solves the identical problem the identical way.
+    */
+    const real = privateKeyPem(testSigningKey());
+    const escaped = real.replace(/\n/g, '\\n');
+    expect(escaped).not.toContain('\n');
+
+    const fromEscaped = loadSigningKey({ MEDIA_GRANT_PRIVATE_KEY: escaped } as NodeJS.ProcessEnv);
+    const fromReal = loadSigningKey({ MEDIA_GRANT_PRIVATE_KEY: real } as NodeJS.ProcessEnv);
+
+    expect(fromEscaped.asymmetricKeyType).toBe('ed25519');
+    // Same key material, so the same public half — which is what the SFU is configured with.
+    expect(publicKeyBase64(fromEscaped)).toBe(publicKeyBase64(fromReal));
+  });
+
   it('carries the display name verbatim, including non-ASCII', () => {
     // `name` is `users.display_name`, which is notNull in the schema. The payload is UTF-8 JSON
     // and the signature covers its base64url encoding, so a non-ASCII name round-trips.

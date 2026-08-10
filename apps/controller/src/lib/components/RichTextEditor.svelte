@@ -42,6 +42,18 @@
 
   let { value = $bindable(), initialContent, name = 'value' }: Props = $props();
 
+  /*
+    A per-instance id for the HTML-source textarea. Chrome reports "a form field element should have
+    an id or name attribute" without one, and a CONSTANT id would be wrong here: this editor is a
+    component and two on one page would collide, which is a worse defect than the warning.
+
+    `$props.id()` (Svelte 5.20+) is unique per instance and stable across hydration, so the id the
+    server rendered is the id the client keeps. `name` is deliberately not used for this element —
+    it belongs to the hidden input that actually submits, and putting it here would post the raw
+    HTML twice under one key.
+  */
+  const uid = $props.id();
+
   /**
    * The reference seeds an EMPTY editor with one empty paragraph.
    *
@@ -428,7 +440,11 @@
   </div>
 
   {#if showHtml}
-    <textarea class="ta-bind ta-html ta-editor form-control" bind:value aria-label="HTML source"
+    <textarea
+      id="{uid}-html-source"
+      class="ta-bind ta-html ta-editor form-control"
+      bind:value
+      aria-label="HTML source"
     ></textarea>
   {:else}
     <div class="ta-scroll-window ta-text ta-editor form-control">
