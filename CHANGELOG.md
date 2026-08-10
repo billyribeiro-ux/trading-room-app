@@ -24,6 +24,67 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-10
 
+### 07:52 — A collector for the six gaps I cannot reach, and it is EXECUTED rather than just written
+
+**No runtime impact** — two scripts and six TODO rows. New:
+`apps/controller/scripts/collect-manage-gaps.js`, `collect-manage-gaps.smoke.mjs`.
+
+Paste-and-go for `TODO.md` gaps **5, 8, 9, 10, 11 and 12** — the manage-page ones that
+`collect-create-new.js` does not touch. It downloads its own JSON; no terminal command, no
+follow-up.
+
+**It fixes the two defects that spoiled the last capture,** both recorded in `TODO.md` and both
+silent failures:
+
+- **Truncation.** The previous collector stopped its node array at index 900 and cut every tab's
+  `html` at 120,000 characters — 35.6% of the Settings pane unmeasured. This one has no cap, and
+  writes any limit it *does* hit into `gaps[]`, so a short capture can never again look complete.
+- **The DON'T TOUCH block.** The previous one "logged the step and serialised the wrong element",
+  leaving 49 settings verified only against an older dump. This one counts fields **before and
+  after** clicking the disclosure and refuses to serialise if nothing changed — an empty result is
+  reported as a failure instead of written out as evidence.
+
+**Safety is structural, not a promise.** Every click goes through `safeClick()`, which refuses any
+element whose text or attributes match a denylist (delete, upload, play, stop, send, save, submit,
+post, ban, kick, clear, reset, launch, archive, pay, invite, email) and records the refusal. The only
+clicks are on tab strips and disclosures — controls whose entire function is to reveal something
+already present. It issues **no** network request of any kind. Credential-shaped field values are
+masked before they reach the file.
+
+**And it was actually run.** `node --check` only proves a file parses, and this gets pasted into a
+live system once — a script that throws halfway writes a partial capture that looks complete.
+`collect-manage-gaps.smoke.mjs` executes the real file against a dependency-free DOM stub:
+
+```
+SMOKE PASSED
+  reached download: 21.2 KB of valid JSON
+  settings fields captured: 3
+  DON'T TOUCH disclosure clicked: true
+  honest gaps recorded: 4
+  secret redacted: true
+```
+
+That run caught **three problems, two of them mine and one real**:
+
+1. A `const description` I had glued into `constdescription` while replacing a stray non-ASCII
+   identifier. **`node --check` passed it** — it is legal as an implicit global — and it would have
+   thrown at runtime under `'use strict'`, on the first click, on the live system. Only executing it
+   found that.
+2. My stub's `body` lacked `querySelectorAll`, which every real body has. My bug — but it exposed
+   that the collector falls back to capturing the whole document when `.tab-pane.active` is absent,
+   which the output now states as `paneSelector: "body (fallback)"`.
+3. A four-second wait shorter than the collector's own deliberate sleeps, reported as "never reached
+   the download step". The harness polls for 30s now instead of guessing.
+
+`user rows captured: 0` in that output is a limit of the stub — it has no descendant-selector
+support, so `table tr` matches nothing — and both the code and the printed line say so, because a
+number that looks like a failure and is not is how a real failure gets ignored later.
+
+**Attempted and abandoned, recorded rather than hidden:** verifying it in a real browser needed the
+file served over `http://127.0.0.1`, and that navigation was declined — correctly, since the
+standing rule is that nothing runs on local ports for this project. The server was stopped and the
+port confirmed closed within the minute.
+
 ### 07:38 — The other two items: the collector verified ready, and a staging checklist for item Q
 
 **No runtime impact** — one new document and two TODO rows. New:
