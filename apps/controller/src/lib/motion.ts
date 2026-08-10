@@ -102,46 +102,6 @@ export function parallax(from: number, to: number): Attachment {
   };
 }
 
-const SCRAMBLE_GLYPHS = '01▮▯$+-%#≠≈';
-
-/**
- * Terminal-style decode: the node's text resolves left to right out of market noise when it
- * scrolls into view. Attach only to `aria-hidden` spans — the accessible copy stays static.
- */
-export function scramble(finalText: string): Attachment {
-  if (prefersReducedMotion()) return NOOP;
-
-  return (node) => {
-    const element = node as HTMLElement;
-    const progress = { value: 0 };
-
-    const tween = gsap.to(progress, {
-      value: 1,
-      duration: 1.15,
-      ease: 'power2.inOut',
-      scrollTrigger: { trigger: element, start: 'top 88%', once: true },
-      onUpdate: () => {
-        const settled = Math.floor(progress.value * finalText.length);
-        let text = finalText.slice(0, settled);
-        for (let i = settled; i < finalText.length; i += 1) {
-          const glyph = SCRAMBLE_GLYPHS[Math.floor(Math.random() * SCRAMBLE_GLYPHS.length)];
-          text += finalText[i] === ' ' ? ' ' : glyph;
-        }
-        element.textContent = text;
-      },
-      onComplete: () => {
-        element.textContent = finalText;
-      }
-    });
-
-    return () => {
-      tween.scrollTrigger?.kill();
-      tween.kill();
-      element.textContent = finalText;
-    };
-  };
-}
-
 /**
  * Magnetic pull for primary controls: the element leans toward a fine pointer and springs home
  * when it leaves. Touch devices and reduced motion get the plain element.

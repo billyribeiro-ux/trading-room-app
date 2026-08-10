@@ -35,7 +35,7 @@
     text-align: center;
     padding: clamp(56px, 9vw, 110px) clamp(24px, 6vw, 80px);
     border: 1px solid var(--hc-line-strong);
-    border-radius: 24px;
+    border-radius: 16px;
     background: var(--hc-bg-1);
   }
 
@@ -44,8 +44,8 @@
     inset: -30%;
     z-index: -1;
     background:
-      radial-gradient(45% 60% at 30% 20%, rgba(34, 229, 140, 0.14), transparent 70%),
-      radial-gradient(40% 55% at 75% 80%, rgba(122, 169, 255, 0.12), transparent 70%);
+      radial-gradient(45% 60% at 30% 20%, rgba(16, 185, 129, 0.09), transparent 70%),
+      radial-gradient(40% 55% at 75% 80%, rgba(122, 169, 255, 0.07), transparent 70%);
     filter: blur(40px);
     animation: cta-drift 22s ease-in-out infinite alternate;
   }

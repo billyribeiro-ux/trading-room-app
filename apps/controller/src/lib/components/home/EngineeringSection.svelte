@@ -69,7 +69,7 @@
 
   .pillar:hover {
     background: var(--hc-bg-2);
-    box-shadow: inset 0 0 0 1px var(--hc-line-strong), inset 0 -40px 80px -60px var(--hc-glow-up);
+    box-shadow: inset 0 0 0 1px var(--hc-line-strong);
   }
 
   .pillar-head {

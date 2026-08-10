@@ -166,9 +166,9 @@
     position: absolute;
     inset: -20%;
     background:
-      radial-gradient(42% 55% at 18% 18%, rgba(34, 229, 140, 0.16), transparent 70%),
-      radial-gradient(38% 48% at 82% 12%, rgba(122, 169, 255, 0.13), transparent 70%),
-      radial-gradient(50% 60% at 55% 92%, rgba(139, 123, 255, 0.1), transparent 72%);
+      radial-gradient(42% 55% at 18% 18%, rgba(16, 185, 129, 0.1), transparent 70%),
+      radial-gradient(38% 48% at 82% 12%, rgba(122, 169, 255, 0.08), transparent 70%),
+      radial-gradient(50% 60% at 55% 92%, rgba(139, 123, 255, 0.06), transparent 72%);
     filter: blur(46px);
     animation: aurora-drift 26s ease-in-out infinite alternate;
   }
@@ -183,7 +183,7 @@
     transform: perspective(620px) rotateX(63deg) scale(1.6);
     transform-origin: 50% 0;
     mask-image: linear-gradient(to bottom, transparent, #000 22%, transparent 88%);
-    opacity: 0.5;
+    opacity: 0.35;
   }
 
   @keyframes aurora-drift {
@@ -231,7 +231,7 @@
     margin: 26px 0 0;
     font-family: var(--hc-font-display);
     font-weight: 300;
-    font-size: clamp(46px, 8.4vw, 118px);
+    font-size: clamp(42px, 7vw, 96px);
     line-height: 1.02;
     letter-spacing: -0.02em;
     color: var(--hc-ink);

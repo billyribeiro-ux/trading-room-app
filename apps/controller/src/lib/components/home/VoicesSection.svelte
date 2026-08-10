@@ -101,7 +101,7 @@
     margin: 0;
     padding: 22px 24px;
     border: 1px solid var(--hc-line);
-    border-radius: 14px;
+    border-radius: 12px;
     background: var(--hc-bg-1);
     transition:
       border-color 0.35s ease,
@@ -115,7 +115,7 @@
 
   .mark {
     font-family: var(--hc-font-display);
-    font-size: 34px;
+    font-size: 26px;
     line-height: 0.6;
     color: var(--hc-up);
   }

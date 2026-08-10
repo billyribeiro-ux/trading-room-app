@@ -225,7 +225,7 @@
     letter-spacing: -0.04em;
     line-height: 1;
     color: transparent;
-    background: linear-gradient(to bottom, rgba(151, 166, 198, 0.14), rgba(151, 166, 198, 0.015));
+    background: linear-gradient(to bottom, rgba(151, 166, 198, 0.08), rgba(151, 166, 198, 0.01));
     background-clip: text;
     pointer-events: none;
     user-select: none;
