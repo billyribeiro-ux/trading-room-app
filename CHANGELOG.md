@@ -24,6 +24,43 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-10
 
+### 12:43 — Item R: searched the two reference folders, and the MP4/quality work is not in them
+
+**No code change** — a read-only search and its honest result. `TODO.md` item **R** rewritten from a
+placeholder into a record of where I looked; item **P** updated with what the owner's pull-only rule
+means for it.
+
+The owner granted permission to pull files **from** `new-room-control` and `new-room` into this
+repository, never the other way. So the first task for R was to find what that work actually did
+rather than re-derive it. **It is not in either folder.**
+
+- `diff -rq apps/room/src ~/Desktop/new-room/src` → **6 differing files, and every difference is
+  work done in THIS repo today**: the `inert` modal fix, the connectivity test, the media-grant
+  newline fix, `env.ts`. The only file unique to theirs is `handoff-redemption.test.ts`, the
+  single-use guard deliberately removed on 08-07. **Our room is ahead of that folder, not behind
+  it** — there is nothing there to pull.
+- `MediaRecorder` appears in both trees **exactly once**, in `ModalHost`'s mic test. Neither has a
+  room recorder.
+- Every `recording` hit in `new-room-control/src` is a **settings surface** — `room-config.ts`,
+  `room-settings-schema.ts`, the dont-touch block — the same `wired: false` entries already here.
+- Every `ffmpeg` / `transcode` hit in both is **documentation or captured evidence**, never
+  implementation.
+
+So the memory is either of a discussion rather than an implementation, or the code lives somewhere
+outside the two folders. **The owner needs to say which**, because the alternative is building it
+from first principles and presenting the result as a match — the specific thing the house rules
+forbid. The row now records the search so the next session does not repeat it.
+
+What is genuinely here to start from: `streaming-choices.md` measured VP9 screen share at
+**3841 kbps** on realistic chart content; `setPreferredLayers` is implemented in `services/media`,
+deliberately beyond the capture, so per-consumer layer choice already exists; and `useH264`,
+`useVP9`, `useHQVideo`, `hideRecs` and "Disable download button for Recordings for users" are all in
+the settings schema with `wired: false` — the surfaces exist, the pipeline does not.
+
+**Item P is now blocked by definition rather than by preference.** It needs `services/**` promoted
+*to* `new-room-control`, and that direction is exactly the one the owner has prohibited. Recorded as
+an owner action.
+
 ### 12:21 — TODO item K CLOSED: the stats export writes all nine of the reference's columns
 
 **No runtime impact until deployed** — a new table, two write points and a rewritten export. Item
