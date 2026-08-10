@@ -18,6 +18,25 @@ const localPort = 5173;
 
 export default defineConfig({
   /*
+    GSAP IS BUNDLED INTO THE SERVER OUTPUT, NOT RESOLVED AT RUNTIME.
+
+    This one line is what actually fixed a total outage of `/`. gsap 3.15 ships ESM in `index.js`
+    and `ScrollTrigger.js` while declaring no `"type": "module"`, so those files are loadable only
+    through a bundler. Left external, the Vercel function tried three different ways to load them
+    and failed three different ways — a named export missing, then `Cannot use import statement
+    outside a module`, then, when pointed at the CommonJS `dist/` builds, `Cannot find package
+    'gsap'` because the tracer no longer included it.
+
+    Every one of those is the same mistake underneath: a package whose entry points only work
+    inside a bundler must not be left for Node to resolve. `noExternal` inlines it into the server
+    chunk, so there is nothing to resolve, nothing to trace, and no CJS/ESM ambiguity — and the
+    imports in `lib/motion.ts` can stay the ordinary named ESM ones the library documents.
+
+    Local signals cannot catch the external case: `vite dev`, `vite build` and `vite preview` all
+    bundle it. The only place it appeared was production.
+  */
+  ssr: { noExternal: ['gsap'] },
+  /*
     SvelteKit configuration lives HERE. Kit 3 removed `svelte.config.js` and errors on its presence:
     "svelte.config.js is no longer used. Please pass configuration via the `sveltekit(...)` plugin in
     your Vite config."

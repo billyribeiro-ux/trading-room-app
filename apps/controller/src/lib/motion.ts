@@ -13,7 +13,7 @@
  * 3. Everything cleans up. Each attachment returns a teardown that kills its tweens and
  *    ScrollTriggers, so client-side navigation away from `/` leaves no orphaned observers.
  */
-import gsapModule from 'gsap/dist/gsap.js';
+import { gsap } from 'gsap';
 /*
   DEFAULT IMPORTS, NOT NAMED ONES — and this took the home page down for hours.
 
@@ -65,7 +65,7 @@ import gsapModule from 'gsap/dist/gsap.js';
   the registration and untrue of the import. Keeping GSAP out of the server module graph entirely,
   with a browser-only dynamic import, is the structural fix and is recorded in `TODO.md`.
 */
-import ScrollTriggerModule from 'gsap/dist/ScrollTrigger.js';
+import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import type { Attachment } from 'svelte/attachments';
 
 /*
@@ -75,12 +75,6 @@ import type { Attachment } from 'svelte/attachments';
     gsap/dist/ScrollTrigger.js (CJS) -> default -> function ScrollTrigger
     gsap/ScrollTrigger.js      (ESM) -> default -> function ScrollTrigger
 */
-const gsap = ((gsapModule as unknown as { gsap?: unknown }).gsap ?? gsapModule) as typeof gsapModule;
-
-const ScrollTrigger = (
-  (ScrollTriggerModule as unknown as { ScrollTrigger?: unknown }).ScrollTrigger ?? ScrollTriggerModule
-) as typeof ScrollTriggerModule;
-
 if (typeof window !== 'undefined') {
   gsap.registerPlugin(ScrollTrigger);
 }
