@@ -24,6 +24,55 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-10
 
+### 06:01 — The liveness fix is DEPLOYED and proven against production
+
+**Runtime impact: yes.** `tradingroom-media` on `87.99.154.155` was rebuilt and restarted at
+09:56:21 UTC (05:56 EDT). It now runs the build containing `a11883c`.
+
+**How it was verified, in order.** Nothing below is inferred:
+
+1. **The build carries the fix.** The image is distroless and has no shell, so the binary was copied
+   out with `docker create` + `docker cp` and read directly: both new log strings
+   (`no response to heartbeat`, `peer stopped answering`) are present. Build log: zero errors.
+   Image 71.8 MB, unchanged in size from the previous one.
+2. **The service came back healthy** — `systemctl is-active` → `active`, worker started, admission
+   still `require-grant` against the same public key.
+3. **`pnpm smoke` → `All 9 checks passed.`**
+4. **A real ghost was reclaimed, on the deployed build.** A probe minted a genuine Ed25519 grant on
+   the box (so the signing key never left it), opened `/ws` over raw TLS with a hand-written
+   upgrade — deliberately not a WebSocket library, because one would auto-pong and hide the very
+   thing being measured — and then answered nothing at all:
+
+   ```
+   09:58:11.183  peer connected                  room=tra-liveness-probe user=Legacy(424242)
+   09:59:11.185  peer stopped answering; closing its socket and releasing its slot  silent_for_secs=60
+   09:59:11.185  room emptied; router closed     room=tra-liveness-probe
+   09:59:11.185  peer disconnected
+   probe:        server closed us after 60.0 s
+   ```
+
+   `/health` moved `rooms:1,peers:2` → `rooms:2,peers:3` while it was connected and back to
+   `rooms:1,peers:2` sixty seconds later. **The router was closed and the slot released**, which is
+   the whole point: before today that socket would have been counted forever.
+5. **The live peers were NOT evicted.** The owner's two sockets stayed connected throughout the
+   probe and are still connected now. That is the second test's property holding in production.
+
+**And the restart settled the open question from 05:42.** Both peers **reconnected 1.4 seconds
+after the service came back** (09:56:22, same room, same user). A ghost cannot reconnect — so those
+two sockets were live browser tabs, idle and producing nothing, not abandoned ones. My 05:09 claim
+was wrong in a different way than I feared: they were real sessions, but "the media plane is
+carrying real peers" was still overstated, because no media was flowing on either and the earlier
+06:58–07:09 session was the only one that ever produced audio or video.
+
+Probe artefacts (`/tmp/liveness-probe.mjs`, its log, the extracted binary, the build log) were
+removed from the box afterwards.
+
+**Still open, and deliberately not done here:** `services/**` is a mirror, so this change now
+diverges from `new-room-control`'s copy and must be promoted upstream and re-sealed
+(`apps/room/TODO.md` entry 2, a drift that has already happened twice). That folder is under a
+standing instruction not to be edited from this repository, so it needs the owner's call rather than
+a quiet sync. `TODO.md` item **P** is narrowed to that alone.
+
 ### 05:42 — "Two real peers" investigated: the SFU cannot tell a live peer from an abandoned socket
 
 **No runtime impact yet — the fix is committed (`a11883c`) and NOT deployed.** The box still runs

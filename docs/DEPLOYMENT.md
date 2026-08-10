@@ -198,14 +198,17 @@ and it is fine as long as it is written down, which is what this paragraph is fo
 Config lives in `/etc/tradingroom-media/` (mode 600): `media.env` holds the announced address, the
 RTC range and the grant PUBLIC key; `media-image.env` holds the image tag the unit runs.
 
-**Two optional variables were added 2026-08-10 and are not yet on the deployed build**
-(`TODO.md` item P): `MEDIA_PEER_PING_SECONDS` (default 20) and `MEDIA_PEER_SILENCE_SECONDS`
-(default 60) control the peer liveness probe — how often each signalling socket is pinged, and how
-long it may say nothing before it is closed and its resources released. Both default correctly if
-absent, so no `media.env` change is required to take the fix. **Until that build ships, a client
-that disappears without a clean close is counted as a peer indefinitely**, holding a `max_peers`
-slot, one of its user's four connection slots, and the room's router. `CHANGELOG.md` 2026-08-10
-05:42 has the measurement.
+**Two optional variables control peer liveness, live since 2026-08-10 05:56 EDT:**
+`MEDIA_PEER_PING_SECONDS` (default 20) and `MEDIA_PEER_SILENCE_SECONDS` (default 60). The server
+pings every signalling socket on the first interval and closes it once it has said nothing for the
+second, releasing its `max_peers` slot, one of its user's four connection slots, and the room's
+router. **Neither is set in `media.env` and neither needs to be** — the defaults are compiled in.
+
+Before this shipped, a client that disappeared without a clean close was counted as a peer
+indefinitely; two sockets were measured holding slots for over two hours with zero bytes exchanged.
+Proven on the deployed build: a probe answering nothing was closed in exactly 60.0s with
+`peer stopped answering … silent_for_secs=60`, while connected peers were unaffected.
+`CHANGELOG.md` 2026-08-10 05:42 and 06:01 have the measurements.
 
 **Shipping a new room build**, from a developer machine.
 
