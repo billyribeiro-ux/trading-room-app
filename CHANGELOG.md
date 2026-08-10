@@ -24,6 +24,64 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-10
 
+### 12:56 — Item R, the recorder half: VP9 at 8 Mbps instead of the browser's guess
+
+**Runtime impact: yes, in the room** — recordings change codec and bitrate. New:
+`apps/room/src/lib/recording-codec.ts` (+ 10 tests); `+page.svelte`'s `startRecording` wired to it.
+
+**The research the owner remembered was already in this repository**: `apps/room/docs/streaming-choices.md`,
+written 2026-08-05, a measured and evidence-tagged ranking of ten options — byte-identical to the
+copy in `new-room`, so there was nothing to pull. The earlier "not found" result was about the
+IMPLEMENTATION, and that distinction is the whole of this entry.
+
+**The recorder was `new MediaRecorder(recordedStream)` — no options at all.** No codec, no bitrate.
+So the browser chose both, at roughly 2.5 Mbps, and row 4's measurement says what that costs on
+realistic chart content (34 lines of 13px monospace, 120 animated candlesticks, 1080p30):
+
+| codec | cap 2 Mbps | cap 8 Mbps | cap 16 Mbps |
+| --- | ---: | ---: | ---: |
+| **VP9 (webm)** | 1429 | **3841** | **6414** |
+| AV1 (webm) | 1928 | 3778 | 3802 |
+| H.264 (mp4) | 1582 | 2033 | 1990 |
+| HEVC (mp4) | 1238 | 1723 | 1626 |
+
+**Only VP9 keeps scaling.** Everything else saturates and ignores a higher cap, so for 1080p text a
+~2 Mbps ceiling is a quality ceiling you cannot buy your way out of. The detail was available and
+simply never asked for.
+
+**On the owner's MP4 request, honestly.** MP4 and maximum sharpness are in direct tension and the
+measurement is why — `.webm` does not open in QuickTime, while mp4/H.264 saturates near 2 Mbps. The
+instruction was "the very best without sacrificing performance", so **quality wins the ordering**:
+VP9, then AV1, then VP8, and mp4 only when nothing better is supported — which on **Safari is
+immediately**, since it produces `video/mp4` natively. A Safari presenter therefore gets an MP4 with
+nothing special done, and a Chrome presenter gets the sharpest file the machine can make. Making MP4
+universal *without* losing ~1.8 Mbps of detail is server-side remux — row 10, needing the
+transcoding workers the deployment plan defers. Demoting VP9 to avoid a conversion nobody has asked
+for yet would be the wrong trade, and it is recorded rather than quietly made.
+
+**8 Mbps, not 12, and that is the performance half of the instruction.** Row 4's own warning:
+*"not bandwidth-free for the presenter's CPU. A second 1080p encode competes with the live encoder,
+and on a loaded machine that can drop frames on the share members are watching."* The recording is
+for the presenter; the live share is for everyone. So it takes the measured 3841 kbps at 8 Mbps and
+declines to chase the extra 2573 kbps a 16 Mbps cap would allow.
+
+An unsupported `mimeType` makes `new MediaRecorder` **throw**, so nothing-supported yields
+`undefined` and the browser's default — a recording at the old quality beats a recording that never
+starts. Ten tests pin the ordering, the Safari path, the throw-avoidance and the bitrate, with
+`isSupported` injected so none of it rests on a manual check in one browser.
+
+**Three rows remain, and they all need the same measurement**: row 2 `contentHint='detail'` (the
+doc's strongest remaining candidate — the wire shows full resolution arriving with `bandwidth: 0,
+cpu: 0`, so nothing is throttling and the only lever left is telling the encoder the content is
+text), row 6 raising the 1920 cap for Retina, and row 8 an explicit `maxBitrate`. All three are
+settled by one thing: **a presenter sharing a REAL desktop with a member attached, reading
+`outbound-rtp` from `getStats()` before and after each change.** Headless `getDisplayMedia` returns
+Chrome's synthetic gradient, which compresses too easily to show any difference — which is why the
+doc's own 525 kbps figure is not the real number and why these rows are not being changed blind.
+
+Verified: **541 tests across 58 files** (531 → 541), `svelte-check` **0 errors, 0 warnings**, format
+gate green, node-adapter build clean.
+
 ### 12:43 — Item R: searched the two reference folders, and the MP4/quality work is not in them
 
 **No code change** — a read-only search and its honest result. `TODO.md` item **R** rewritten from a

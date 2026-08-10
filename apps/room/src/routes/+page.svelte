@@ -1,5 +1,6 @@
 <script lang="ts">
   import { deserialize } from '$app/forms';
+  import { chooseRecordingOptions } from '$lib/recording-codec';
   import { page } from '$app/state';
   import { panelDragResize, readPanelBounds } from '$lib/panel-drag';
   import { invalidate, invalidateAll } from '$app/navigation';
@@ -4250,7 +4251,24 @@
     const recordedStream = new MediaStream(tracks);
 
     recordedScreenChunks = [];
-    screenRecorder = new MediaRecorder(recordedStream);
+    /*
+      Explicit codec and bitrate, where this was `new MediaRecorder(recordedStream)` with NO options.
+
+      With none, the browser chose both the container and roughly 2.5 Mbps. `docs/streaming-choices.md`
+      row 4 measured, on realistic chart content, that VP9 produces 3841 kbps at an 8 Mbps cap and
+      keeps scaling, while H.264 saturates near 2033 and ignores anything higher — so the detail was
+      available and simply never asked for. See `recording-codec.ts` for the full ordering and for
+      why 8 Mbps rather than 12: a second 1080p encode competes with the live encoder, and the share
+      members are watching matters more than the presenter's own file.
+    */
+    const recordingOptions = chooseRecordingOptions();
+    screenRecorder = new MediaRecorder(recordedStream, {
+      // Omitted entirely when nothing is supported: passing an unsupported `mimeType` THROWS, and a
+      // recording that fails to start is worse than one at the browser's default.
+      ...(recordingOptions.mimeType ? { mimeType: recordingOptions.mimeType } : {}),
+      videoBitsPerSecond: recordingOptions.videoBitsPerSecond,
+      audioBitsPerSecond: recordingOptions.audioBitsPerSecond
+    });
     screenRecorder.addEventListener('dataavailable', (event) => {
       if (event.data.size > 0) recordedScreenChunks.push(event.data);
     });
