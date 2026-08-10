@@ -42,12 +42,33 @@ export const handle: Handle = async ({ event, resolve }) => {
  */
 export const handleError: HandleServerError = ({ error, event, status }) => {
   const errorId = randomUUID();
+  /*
+    THE MESSAGE AND STACK GO TO THE SERVER LOG. They used to be dropped, and that cost real time.
+
+    This hook logged `errorType` alone — the constructor name. So when the home page began
+    answering 500 in production on 2026-08-10, every diagnostic anyone had was
+    `{ errorId, status: 500, route: '/(public)', errorType: 'SyntaxError' }`: the fact that
+    something failed to parse, with no hint of what, where, or which line. The page rendered
+    correctly under SSR locally, a production build served it 200 locally, and all 100 modules in
+    the built server bundle passed `node --check`, so nothing reproducible pointed at the cause.
+    A name without a message is not an error report; it is a notification that one happened.
+
+    What is logged here and what is RETURNED are deliberately different. The response keeps the
+    generic message and the id — a stack trace in a browser is an information leak, and the id is
+    what ties a user's screenshot to this line. Vercel's function logs are not public.
+  */
   console.error('[request-error]', {
     errorId,
     status,
     method: event.request.method,
     route: event.route.id,
-    errorType: error instanceof Error ? error.name : typeof error
+    url: event.url.pathname,
+    errorType: error instanceof Error ? error.name : typeof error,
+    message: error instanceof Error ? error.message : String(error),
+    stack: error instanceof Error ? error.stack : undefined,
+    // A `SyntaxError` from `JSON.parse` names neither the input nor the caller; the cause chain is
+    // often the only thing that does.
+    cause: error instanceof Error && error.cause ? String(error.cause) : undefined
   });
 
   return {
