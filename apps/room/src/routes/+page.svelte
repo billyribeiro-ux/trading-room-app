@@ -898,6 +898,22 @@
   );
   /** The live socket, so the caption sender can issue commands without reaching into MediaSession. */
   let mediaSignalling: SignallingClient | null = null;
+  /**
+   * The ICE servers THIS deployment minted, hoisted out of `onMount` so the connectivity test can
+   * see them (`TODO.md` item N).
+   *
+   * They were a `let` inside `onMount`, reachable only by the media session. The consequence was a
+   * diagnostic that tested somebody else's infrastructure: the modal fell back to Google's public
+   * STUN, so a green tick said nothing about whether `media.tradingroom.app` is reachable, and a red
+   * one blamed the user's firewall for a server we do not run.
+   *
+   * `$state.raw` rather than `$state`: the array is REPLACED on every grant, never mutated, so deep
+   * proxying would cost something and buy nothing.
+   *
+   * Empty until the first grant is minted, which happens when the socket opens. The modal treats
+   * empty as "not connected yet" and says so rather than pretending.
+   */
+  let mediaIceServers = $state.raw<RTCIceServer[]>([]);
   let micMuted = $state(true);
   let micLaunching = $state(false);
   let talkingUsers = $state<TalkingUser[]>([]);
@@ -5347,7 +5363,6 @@
      * because the transports read it through a getter, so a reconnect uses the credentials minted
      * for the new grant instead of the expired ones from the first attempt.
      */
-    let iceServers: RTCIceServer[] = [];
     const media = new SignallingClient({
       url: data.mediaWsUrl,
       grant: async () => {
@@ -5357,7 +5372,9 @@
           grant: string;
           iceServers?: RTCIceServer[];
         };
-        iceServers = minted.iceServers ?? [];
+        // Component-level now, not a local: the connectivity test reads the same value, so it
+        // tests THIS deployment's relay instead of Google's STUN. See `mediaIceServers`.
+        mediaIceServers = minted.iceServers ?? [];
         return minted.grant;
       }
     });
@@ -5387,7 +5404,7 @@
         hasCam: data.user.hasCam,
         hasScreen: data.user.hasScreen
       }),
-      iceServers: () => iceServers
+      iceServers: () => mediaIceServers
     });
     mediaSession = session;
     mediaSignalling = media;
@@ -8765,6 +8782,7 @@
     </div>
     <ModalHost
       name={modal}
+      {mediaIceServers}
       {mobilePin}
       mobileAndroidUrl={data.sessData?.customMobileAppEnabled
         ? data.sessData?.customMobileAppAndroidUrl

@@ -37,6 +37,13 @@
 
   interface Props {
     name: ModalName;
+    /**
+     * The ICE servers THIS deployment minted, from `/api/media/grant` via `+page.svelte`.
+     *
+     * Empty until the media socket has opened once, which the connectivity test reports honestly
+     * rather than papering over. See `runWebRTCTest`.
+     */
+    mediaIceServers?: RTCIceServer[];
     settingsTab: SettingsTab;
     alertTab: AlertTab;
     theme: Theme;
@@ -153,6 +160,7 @@
 
   let {
     name,
+    mediaIceServers = [],
     settingsTab,
     alertTab,
     theme,
@@ -418,6 +426,17 @@
   type MicStatus = 'idle' | 'testing' | 'success' | 'no-audio' | 'error';
   let activeConnectivityTab = $state<'network' | 'mic'>('network');
   let testResults = $state({ udp: false, tcp: false, stun: false, turn: false });
+  /**
+   * Which ICE servers the last run used.
+   *
+   * `deployment` — this deployment's own, from `/api/media/grant`; the result is about US.
+   * `public-fallback` — Google's public STUN, because the media socket had not opened yet and we
+   * had nothing of our own to offer. A pass then says the user's network can reach a public STUN
+   * server, which is worth knowing and is NOT the same claim.
+   */
+  let testIceSource = $state<'deployment' | 'public-fallback'>('public-fallback');
+  /** Whether a run has completed at least once, so the source line describes fact, not intent. */
+  let hasRunTest = $state(false);
   let testStates = $state<Record<'udp' | 'tcp' | 'stun' | 'turn', ConnectivityTestState>>({
     udp: 'pending',
     tcp: 'pending',
@@ -534,16 +553,28 @@
       state today. Saying "check your network or firewall" for a relay nobody configured is blaming
       the user for our own missing setting.
 
-      STILL TO DO, and recorded in `TODO.md`: feed this test the ICE servers the ROOM actually uses.
-      `+page.svelte` already receives them from `/api/media/grant` and hands them to the media
-      session, but it holds them in a function-local, so surfacing them here is a refactor rather
-      than a prop — and doing it badly would make this test lie in the other direction.
+      RESOLVED 2026-08-10 (`TODO.md` item N): this test now runs against the ICE servers THIS
+      deployment minted. `+page.svelte` hoisted them out of its `onMount` local into
+      `mediaIceServers` and passes them down.
+
+      When they are available they are used ALONE, and that is the whole point. Adding Google's
+      STUN alongside would mean a green `stun` tick could have come from Google's server while ours
+      was unreachable — the same lie as before, pointing the other way. A result is only worth
+      showing a user if it is about the infrastructure they are actually trying to reach.
+
+      The public servers remain as a labelled FALLBACK for the window before the media socket has
+      opened, when we have nothing of our own to test. The UI says which of the two ran, because
+      "STUN passed" means different things in those two cases and a support conversation should not
+      have to guess which.
     */
+    const usingDeploymentServers = mediaIceServers.length > 0;
+    testIceSource = usingDeploymentServers ? 'deployment' : 'public-fallback';
+    hasRunTest = true;
+
     const configuration: RTCConfiguration = {
-      iceServers: [
-        { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:stun1.l.google.com:19302' }
-      ]
+      iceServers: usingDeploymentServers
+        ? mediaIceServers
+        : [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }]
     };
 
     const relayConfigured = (configuration.iceServers ?? []).some((server) => {
@@ -4884,6 +4915,23 @@
         <p class="text-muted mb-4">
           This tool checks your network and connectivity to essential WebRTC servers.
         </p>
+        <!--
+          WHICH servers were tested, said out loud.
+
+          "STUN passed" against this deployment's own servers and against a public fallback are two
+          different claims, and a support conversation should not have to guess which one it is
+          reading. Rendered only after a run, so it reports what happened rather than what will.
+        -->
+        {#if hasRunTest}
+          <p class="text-muted mb-4" data-testid="ice-source">
+            {#if testIceSource === 'deployment'}
+              Tested against this room's own media servers.
+            {:else}
+              Tested against public STUN only — the media connection has not opened yet, so this
+              says nothing about this room's servers. Join the room, then run it again.
+            {/if}
+          </p>
+        {/if}
         <div
           class:passed={testStates.udp === 'passed'}
           class:failed={testStates.udp === 'failed'}

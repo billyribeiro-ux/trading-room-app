@@ -24,6 +24,72 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-10
 
+### 11:53 — TODO item N CLOSED: the connectivity test now tests THIS deployment
+
+**Runtime impact: yes, in the room** — the troubleshooter's "Network Test" changes what it measures.
+Item **N** is removed from `TODO.md`. Files: `apps/room/src/routes/+page.svelte`,
+`src/lib/components/ModalHost.svelte`, new `src/lib/connectivity-test-contract.test.ts`.
+
+The test ran against Google's public STUN servers only, which made every result misleading in a way
+a user could not detect: a green tick said nothing about whether `media.tradingroom.app` was
+reachable, and a red one blamed the user's firewall for infrastructure we do not run.
+
+The room already had the right values — `/api/media/grant` returns this deployment's ICE servers on
+every mint — but `+page.svelte` held them in a `let` inside `onMount`, reachable only by the media
+session. They are now component-level `$state.raw` (raw because the array is REPLACED on each grant
+and never mutated, so deep proxying would cost something and buy nothing) and passed to `ModalHost`
+as a prop.
+
+**The decision worth recording: when the deployment's servers are available they are used ALONE.**
+Appending the public STUN entries "just in case" is the obvious thing to do and it would reintroduce
+the same defect pointing the other way — a passing `stun` tick could have come from Google while
+ours was unreachable, and nothing in the UI would distinguish them. A result is only worth showing
+if it is about the infrastructure the user is actually trying to reach.
+
+The public servers survive as a **labelled fallback** for the window before the media socket has
+opened, when we have nothing of our own to offer. The modal now says which of the two ran — *"Tested
+against this room's own media servers"* or *"Tested against public STUN only … Join the room, then
+run it again"* — and only after a run, so it reports fact rather than intent. "STUN passed" is a
+different claim in each case and a support conversation should not have to guess which one it is
+reading.
+
+`turn: 'unconfigured'` is unchanged and still correct: `MEDIA_TURN_URLS`/`MEDIA_TURN_SECRET` are
+unset, so the minted list carries STUN only. Saying "check your network or firewall" for a relay
+nobody configured blames the user for our own missing setting.
+
+**Pinned by seven contract tests**, because all three decisions are invisible once made. The sharpest
+asserts structurally that the public servers appear only on the fallback branch and are never
+concatenated onto the deployment list. Another guards the thing that already shipped once and must
+never return: the reference's `turn:flash.protradingroom.com` with `ptrUser`/`ptr123`, which opened
+two authenticated relay allocations against a third party's host and leaked our users' IP addresses
+to it on every run.
+
+**One of those tests was wrong first, and the fix is the interesting part.** It asserted the TURN
+host was absent from the file and failed — because the comment above `runWebRTCTest` quotes the
+removed configuration verbatim, which is exactly what makes that comment worth having. Asserting on
+raw text would have forced a future maintainer to delete the explanation to get the suite green. It
+now strips comments before checking the live code, and separately asserts the explanation is still
+there.
+
+Verified: **531 tests across 57 files** (524 → 531), `svelte-check` **0 errors, 0 warnings**, the
+Svelte autofixer reports **zero issues** on `ModalHost.svelte`, format gate green, and the
+node-adapter build — the artefact that ships — is clean.
+
+### 11:53 — New TODO item R: MP4 recording downloads and member screenshare quality
+
+Raised by the owner: both were built in the other folder/repo and need re-establishing here.
+
+Recorded as a **placeholder for a review, not a description of a defect** — nothing has been measured
+on this side yet, and the first task is to find what that repo actually did rather than re-derive it
+from first principles and call the result a match.
+
+What is already known here, so the review starts from evidence: `docs/streaming-choices.md` measured
+VP9 screen share at **3841 kbps** on realistic chart content; `setPreferredLayers` is implemented in
+`services/media` (deliberately beyond the capture, precisely so a viewer is not forced to decode a
+background tab's top layer); and `useH264`, `useVP9`, `useHQVideo`, `hideRecs` and "Disable download
+button for Recordings for users" all exist in the settings schema with `wired: false` — so the
+surfaces exist while the pipeline does not.
+
 ### 11:39 — TODO item L CLOSED: the Hetzner box has a firewall at last
 
 **Runtime impact: yes, on production.** `ufw` is active and enabled at boot on `87.99.154.155`,
