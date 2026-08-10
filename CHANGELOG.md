@@ -24,6 +24,63 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-10
 
+### 11:39 — TODO item L CLOSED: the Hetzner box has a firewall at last
+
+**Runtime impact: yes, on production.** `ufw` is active and enabled at boot on `87.99.154.155`,
+which serves both `media.tradingroom.app` and `chat.tradingroom.app`. Item **L** is removed from
+`TODO.md`.
+
+**Every rule came from a measured listener. Nothing was assumed.** `ss -tlnp` / `ss -ulnp` first:
+
+| bound publicly | rule |
+| --- | --- |
+| `sshd` :22 | `22/tcp` |
+| `caddy` :80 | `80/tcp` — also ACME renewals |
+| `caddy` :443 | `443/tcp` |
+| **`caddy` UDP :443** | **`443/udp`** |
+| mediasoup RTC, `40000-40199` from `media.env` | `40000:40199/udp` **and** `/tcp` |
+
+**The UDP 443 rule is the one that would have been missed.** Caddy listens on UDP 443 for HTTP/3;
+a TCP-only ruleset looks complete, passes an HTTPS check, and silently breaks QUIC for every client
+that negotiates it. It is in the `ss -ulnp` output and nowhere in any document.
+
+Everything else — the SFU's signalling on `127.0.0.1:4443`, the room on `127.0.0.1:3000`, Caddy's
+admin API on `127.0.0.1:2019`, resolved, chrony — is **loopback-bound**, so it needed no rule and is
+now unreachable regardless.
+
+**The Docker trap was checked rather than assumed.** When Docker *publishes* a port its DNAT chain
+jumps ahead of ufw's INPUT rules and the firewall is decorative — a well-known way to believe a box
+is protected when it is not. Measured: the media container runs `NetworkMode=host` with `ports=[]`,
+and both `DOCKER-USER` and the nat `DOCKER` chain are empty. No bypass exists here, so ufw genuinely
+governs the SFU.
+
+**A dead-man switch was armed before anything changed.** `DEFAULT_INPUT_POLICY` is `DROP`, so one
+missing rule locks SSH out of a box with no console access. `systemd-run --on-active=10min ufw
+--force disable`, detached from the session, would have undone it with nobody needing to get in. It
+was cancelled only after the verification below, and the firewall was then confirmed still active a
+minute past the original deadline.
+
+**Verified from outside, and the proof is a pair of ports:**
+
+| | before | after |
+| --- | --- | --- |
+| 22 / 80 / 443 | succeeded | succeeded |
+| **40000, 40199** (allowed) | refused | **refused** — still reaching the host; mediasoup binds on demand |
+| **40500** (outside the range) | refused | **dropped, no answer** |
+| **2019** (Caddy admin) | — | **dropped, no answer** |
+
+"Refused" means the packet reached the host and nothing was listening; a timeout means the firewall
+ate it. That flip on 40500 — and only on 40500, while 40199 next door still answers — is what
+distinguishes a working ruleset from a hopeful one.
+
+Also verified: a **new** SSH connection succeeds (the lockout test), all three hostnames respond, and
+`pnpm smoke` passes **9 of 9** both immediately after enabling and again after the deadline passed.
+
+The 2026-08-09 finding that opened this item is reproduced exactly in the "before" column: TCP 40000
+**and 40500** both refused, `ufw inactive`, iptables INPUT `ACCEPT`. Nothing was wrongly exposed at
+the time — but the next service to bind `0.0.0.0` would have been public the second it started, and
+now it will not be.
+
 ### 07:52 — A collector for the six gaps I cannot reach, and it is EXECUTED rather than just written
 
 **No runtime impact** — two scripts and six TODO rows. New:

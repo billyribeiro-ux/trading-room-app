@@ -24,7 +24,7 @@
 >    `ACCEPT` on the box, there is effectively **no firewall at either layer**. Nothing is exposed
 >    today that should not be (signalling is bound to loopback, the room to loopback, Caddy owns
 >    80/443, sshd owns 22), but the next service that binds `0.0.0.0` is public the moment it
->    starts. Recorded as work item **L** in `TODO.md`.
+>    starts. Recorded as work item **L** in `TODO.md` — **CLOSED 2026-08-10 11:39 EDT**: `ufw` is active and enabled at boot, allowing 22/80/443 tcp, **443/udp for Caddy's HTTP/3**, and 40000-40199 on both protocols for mediasoup. Verified from outside — 40500 now drops where it used to refuse, while 40199 still answers — with `pnpm smoke` 9/9 either side.
 > 3. **A SECOND SFU is live at `media.34-195-170-147.sslip.io`, and this repository cannot say
 >    whose host it is.** Measured 2026-08-09 20:51 EDT: `/health` returns this project's own payload
 >    (`workers: 1`, `admission: require-grant`) behind Caddy, on a Let's Encrypt certificate issued
