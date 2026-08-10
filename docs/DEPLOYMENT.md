@@ -12,8 +12,8 @@ not planned.
 | `www.tradingroom.app` | admin / marketing | **Vercel**, project `trading-room-app` (`prj_oxlP8Tig…`) | live |
 | `tradingroom.app` | 308 → `www` | Vercel | live |
 | `chat.tradingroom.app` | **the room, all rooms** | **Hetzner `87.99.154.155`**, Ashburn VA | **live** |
-| `media.tradingroom.app` | the SFU | same box | **503 placeholder — SFU not yet moved** |
-| — | mediasoup SFU | AWS Lightsail `mediasoup-test-01` | still running, to be retired |
+| `media.tradingroom.app` | **the SFU** | same box | **live since 2026-08-09 12:44** |
+| — | mediasoup SFU | AWS Lightsail `mediasoup-test-01` | **still running and still billing** — retire after the two-browser test |
 | — | PostgreSQL | **Neon** | live |
 
 DNS is at **Porkbun** (`curitiba.ns.porkbun.com`). `www` is a CNAME to Vercel; `chat` and `media`
@@ -50,7 +50,8 @@ machine gets OOM-killed; 2 GB of swap turns that into a slowdown instead.
 | --- | --- | --- |
 | `caddy` | TLS + reverse proxy | Caddy 2.11.4, certs auto-issued and auto-renewing |
 | `trading-room-app` | the room | node 22, bound to `127.0.0.1:3000`, `Restart=always` |
-| `docker` | for the SFU build | installed, nothing running yet |
+| `tradingroom-media` | **the SFU** | Docker 29.7.2, `--network host`, signalling on `127.0.0.1:4443`, RTC 40000-40199 |
+| `docker` | runs the SFU container | image `tradingroom-media:local` |
 
 The room listens on **loopback only**. Caddy is the sole thing that reaches it, so the app never
 terminates TLS and is never exposed directly.
@@ -97,9 +98,13 @@ because no handoff links existed yet — the cheapest moment it will ever be.
 
 ## What is NOT done
 
-1. **The SFU has not moved.** `media.tradingroom.app` answers a 503 placeholder; the real service is
-   still on AWS Lightsail. Until it moves, the room loads and the handoff works, but **there is no
-   screen share or audio**. See `docs/SFU-MIGRATION.md`.
+1. ~~The SFU has not moved.~~ **DONE 2026-08-09.** It runs on this box and
+   `media.tradingroom.app` serves it. Proven end to end at 20:36: a grant minted by the deployed
+   room build was answered `101 Switching Protocols`, and the SFU logged
+   `peer connected user=Some(Legacy(999999)) role=Some(Presenter)` with a real mediasoup router
+   created for the room. The same endpoint refuses an ungranted socket with 400.
+   **What remains is the two-browser screen-share test** — a human watching video actually move —
+   and then retiring Lightsail, which is still running and still billing.
 2. **The controller is still on Vercel.** Consolidating it onto this box is `NEXT-SESSION.md` §4c and
    deliberately deferred — one change at a time.
 3. **Room data is SQLite, account data is Neon.** Two stores. Tolerable, and worth unifying before it
@@ -118,6 +123,34 @@ journalctl -u caddy -f                     # TLS + proxy
 
 systemctl restart trading-room-app         # after shipping a new build
 ```
+
+**Operating the SFU:**
+
+```bash
+systemctl status tradingroom-media          # the SFU
+journalctl -u tradingroom-media -f          # its logs — peer connects and refusals both appear here
+curl -s http://127.0.0.1:4443/health        # bypasses Caddy
+curl -s https://media.tradingroom.app/health # through it
+```
+
+**Rebuilding the SFU image.** The source is kept on the box at `/opt/sfu-build` (1.8 MB) precisely
+so this does not need a developer machine:
+
+```bash
+cd /opt/sfu-build && docker build --build-arg CARGO_BUILD_JOBS=1 -f media/Dockerfile -t tradingroom-media:local .
+systemctl restart tradingroom-media
+```
+
+**`CARGO_BUILD_JOBS=1` is not optional here.** Two jobs on 2 cores with 1.9 GB pushes the C++
+mediasoup worker compile into swap and, at the wrong moment, into the OOM killer — which surfaces as
+a mediasoup build error rather than as what it is. The build takes roughly 15 minutes.
+
+**The image is LOCAL ONLY** — tag `:local`, no registry anywhere. If this box is rebuilt or the
+image pruned, it must be rebuilt from that directory. That is the trade for not running a registry,
+and it is fine as long as it is written down, which is what this paragraph is for.
+
+Config lives in `/etc/tradingroom-media/` (mode 600): `media.env` holds the announced address, the
+RTC range and the grant PUBLIC key; `media-image.env` holds the image tag the unit runs.
 
 **Shipping a new room build**, from a developer machine:
 

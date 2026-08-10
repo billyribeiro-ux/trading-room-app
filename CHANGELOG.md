@@ -24,6 +24,60 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-09
 
+### 20:36 — END TO END, PROVEN: a real grant admitted by the live SFU, router created
+
+**No runtime impact** — a verification probe and three documentation corrections. Nothing about the
+running system changed.
+
+The 12:44 entry recorded one honest gap: "a grant was never minted end to end from here", because
+doing it looked like it required reading `ROOM_JWT_SECRET` and forging a handoff token against
+production — which was refused, correctly. **That framing was wrong, and the narrower path proves
+strictly more.** A handoff token is the CONTROLLER's door; the media chain does not need it. What it
+needs is the media key, and that key can be used *in place* by the room's own code without ever
+being read, printed or copied.
+
+Two steps, on the box, using the deployed build:
+
+1. **`mintGrant` succeeded** — 2 segments, 243 characters. It calls `loadSigningKey` internally, so
+   a successful mint IS the proof that the escaped PEM parses in the **deployed** artefact, not just
+   in a unit test.
+2. **The SFU answered `HTTP/1.1 101 Switching Protocols`** to that grant over
+   `wss://media.tradingroom.app/ws`, through Caddy, with `Origin: https://chat.tradingroom.app`.
+
+The server's own log is the other half, and it shows the claims were not merely accepted but *acted
+on*:
+
+```
+room router created room=tra-1001 router=709669c1-88a8-428c-954e-d89bca709d2e
+peer connected   user=Some(Legacy(999999))  role=Some(Presenter)
+room emptied; router closed
+peer disconnected
+```
+
+The probe's user id and presenter role crossed the wire intact, a real mediasoup router was created
+for the room, and it was torn down cleanly when the socket dropped. Health afterwards:
+`rooms: 0, peers: 0, workerDeaths: 0` — no leak, no crash.
+
+**The A/B is what makes this conclusive.** Same endpoint, same Origin, minutes apart:
+
+| request | result |
+| --- | --- |
+| `/ws` with **no** grant | **400** — refused |
+| `/ws` with a **minted** grant | **101** — admitted, router created, role honoured |
+
+So every link is now evidenced: escaped PEM → deployed build parses it → grant signed with the
+private half → Caddy routes `/ws` → SFU verifies against the public half → Origin check → admission
+→ mediasoup router. **The only thing left is a human watching video move between two browsers**,
+which is what step 5 of `SFU-MIGRATION.md` has always been.
+
+No credential was read, printed or copied: only `MEDIA_GRANT_PRIVATE_KEY` was placed in the probe
+process's environment — the key generated on that box three hours earlier for exactly this purpose —
+and the only artefacts logged were a length, a segment count and an HTTP status line.
+
+**`docs/DEPLOYMENT.md` corrected**, which had gone stale the moment the SFU started: the hosts table
+called `media.tradingroom.app` a 503 placeholder, the services table said Docker had "nothing running
+yet", and "What is NOT done" led with "the SFU has not moved".
+
 ### 12:45 — SvelteKit 3 `@next` ADOPTED. The 12:25 entry's blocker was my mistake, not Kit's
 
 **Runtime impact: yes — this is a framework major.** `@sveltejs/kit` **3.0.0-next.16**,
