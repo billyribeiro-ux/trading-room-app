@@ -24,6 +24,43 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-10
 
+### 04:56 — The second SFU is **EC2, not Lightsail**. The owner was right; four documents were wrong
+
+**No runtime impact** — documentation only. Files: `docs/SFU-MIGRATION.md`, `docs/DEPLOYMENT.md`,
+`docs/NEXT-SESSION.md`.
+
+The owner said, more than once, that no Lightsail instance was ever deployed. Rather than argue the
+point again, the IP was identified directly — which nobody in this repository had ever done:
+
+```
+whois 34.195.170.147          -> Organization: Amazon Technologies Inc. (AT-88-Z), NetRange 34.192.0.0/10
+dig +short -x 34.195.170.147  -> ec2-34-195-170-147.compute-1.amazonaws.com
+```
+
+`ec2-….compute-1.amazonaws.com` is **EC2**'s own reverse-DNS form, and `compute-1` is **us-east-1**.
+So the vendor was right and the *service* was wrong: it is an EC2 instance, and the owner has no
+Lightsail instance to find because there never was one. "AWS Lightsail, instance `mediasoup-test-01`,
+us-east-1a, still billing" originated in `MEDIASOUP-DEPLOYMENT-PLAN.md`'s Stage 1 **plan** and was
+copied between documents until a plan read as a measurement. That is the same failure this changelog
+already records twice; it cost the owner two rounds of being told to look for something that does not
+exist.
+
+Corrected in place rather than deleted, since `NEXT-SESSION.md` §2/§4c and `DEPLOYMENT.md` were all
+read in that state. One inherited number also changed: the egress case cited "Lightsail bundles 6 TB,
+~$1,900/month at 22.8 TB". EC2 has **no bundle** — 100 GB/month free, then list ~$0.09/GB to 10 TB
+and ~$0.085/GB above — so the same traffic is **~$2,000/month**. List-price arithmetic, not a bill.
+The move to Hetzner (€1/TB) is unaffected and marginally better justified.
+
+**Status at 04:56 EDT:** still running, still answering `/health` with `rooms:0, peers:0` — no
+sessions, no participants. It is fully orphaned from this system (verified 2026-08-09: no reference
+in `apps/`, `services/`, `ops/`, `scripts/`, any `.env`, or the Caddyfile), so nothing breaks when it
+stops. **Not yet retired**, and the blocker is access, not permission: `aws sts get-caller-identity`
+returns *"Your session has expired. Please reauthenticate using `aws login`"* (account
+`255248181057`, IAM user `trading-app-admin`), and `ssh root@34.195.170.147` is
+`Permission denied (publickey)`. `aws login` is an interactive browser sign-in and is the owner's to
+run. The exact `describe` → `stop` → `terminate` commands, including releasing the Elastic IP, are at
+the top of `docs/SFU-MIGRATION.md`.
+
 ### 04:52 — The smoke test now runs itself: CI on every push to `main`
 
 **No runtime impact** — one workflow file. This repository had **no `.github` directory at all**;

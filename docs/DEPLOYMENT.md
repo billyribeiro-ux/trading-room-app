@@ -132,6 +132,34 @@ because no handoff links existed yet — the cheapest moment it will ever be.
    account, a console, an instance list or a bill. **The owner states it was never deployed to
    Lightsail.** The claim was repeated between documents until it read as fact.
 
+   **IDENTIFIED 2026-08-10 04:56 EDT — it is an EC2 instance, NOT Lightsail.** Measured, not inherited:
+
+   ```
+   whois 34.195.170.147      -> Organization: Amazon Technologies Inc. (AT-88-Z), 34.192.0.0/10
+   dig +short -x 34.195.170.147 -> ec2-34-195-170-147.compute-1.amazonaws.com
+   ```
+
+   `ec2-….compute-1.amazonaws.com` is EC2's own reverse-DNS form and `compute-1` is **us-east-1**. The
+   owner said plainly that no Lightsail instance was ever deployed, and the owner was right: "Lightsail,
+   instance `mediasoup-test-01`" came from `MEDIASOUP-DEPLOYMENT-PLAN.md`'s Stage 1 PLAN and was copied
+   between documents until it read as fact. Nobody ever checked the IP.
+
+   **Find and retire it (EC2, us-east-1):**
+
+   ```bash
+   aws login                                    # interactive; only the owner can do this
+   aws ec2 describe-instances --region us-east-1 \
+     --filters 'Name=ip-address,Values=34.195.170.147' \
+     --query 'Reservations[].Instances[].{id:InstanceId,state:State.Name,type:InstanceType,name:Tags[?Key==`Name`]|[0].Value}'
+   aws ec2 stop-instances     --region us-east-1 --instance-ids <id>   # reversible; prove nothing broke
+   aws ec2 terminate-instances --region us-east-1 --instance-ids <id>  # only after that
+   ```
+
+   Stop first and confirm `https://media.34-195-170-147.sslip.io/health` stops answering. Then
+   terminate, because a stopped instance still bills for its EBS volume and its Elastic IP — and
+   release that Elastic IP too, or AWS charges for an address attached to nothing.
+
+
    What matters operationally does not depend on whose it is: **two SFUs are live at once**, only the
    Hetzner one is wired to `chat.tradingroom.app`, and the old hostname embeds an IP — so anything
    still pointing at it keeps working silently while diverging from production. Retire the name and

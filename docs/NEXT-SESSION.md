@@ -151,6 +151,14 @@ holdout.
   `DEPLOYMENT.md` and `SFU-MIGRATION.md`, until a plan read as a measurement. The egress arithmetic
   in §4 below is unaffected: it is about bandwidth pricing, not about which company owns that box.
 
+  **RESOLVED 2026-08-10 04:56 EDT — it is AWS, but EC2, not Lightsail.** `whois 34.195.170.147`
+  returns *Amazon Technologies Inc.* and reverse DNS returns
+  **`ec2-34-195-170-147.compute-1.amazonaws.com`**, which is EC2's own rDNS form; `compute-1` is
+  **us-east-1**. So the owner was right that no Lightsail instance exists, the service was right,
+  and the *product name* in every document was wrong. Retirement steps are in `SFU-MIGRATION.md`.
+  It still answered `/health` with `rooms:0, peers:0` at that timestamp: **running, billing, and
+  serving nobody.**
+
 ### 4a. What the ORIGINAL actually runs on — resolved 2026-08-09
 
 Measured with `dig` and `whois`, not recalled:
