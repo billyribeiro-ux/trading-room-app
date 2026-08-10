@@ -185,7 +185,22 @@ RTC range and the grant PUBLIC key; `media-image.env` holds the image tag the un
 
 **Shipping a new room build**, from a developer machine.
 
-**Run the smoke test after every room deploy.** It needs no valid token and takes one second:
+**Run the smoke test after EVERY deploy — either app.** One command, about a second, exits
+non-zero on failure:
+
+```bash
+pnpm smoke                                        # production
+SMOKE_CONTROLLER=https://<preview>.vercel.app pnpm smoke   # a preview deployment
+```
+
+`scripts/smoke.mjs` probes all three tiers: the controller's six public routes (with a content
+check, because a 200 rendering an error page passes a status check), the room's invalid-token
+refusal, and the SFU's health payload plus its 404 contract. **This is the check neither app had,
+and its absence is why two total outages shipped on 2026-08-10 past a green `svelte-check`, 1,090
+passing tests and clean builds** — every one of those inspects source or bundles, and none starts
+the artefact that ships.
+
+The room's probe is the sharpest single line in it:
 
 ```bash
 curl -s -o /dev/null -w '%{http_code}\n' \

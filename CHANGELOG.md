@@ -24,6 +24,87 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-10
 
+### 04:48 — `pnpm smoke`: the check whose absence let both of today's outages ship
+
+**No runtime impact** — one script, one npm script, one documented deploy step. Nothing deployed
+changed.
+
+Two total outages reached production on 2026-08-10 through a completely green pipeline:
+`svelte-check` 0/0 on both apps, 566 + 524 tests passing, clean builds under both adapters, and a
+production build served 200 from `vite preview` on this machine. **Every one of those inspects
+source or a bundle. Not one starts the artefact that ships and asks it for a page.** Both failures
+lived exactly in that gap — gsap resolving differently inside the Vercel function, and Kit 3's
+`$env/dynamic/private` returning nothing without a `src/env.ts`.
+
+`scripts/smoke.mjs` closes it in about a second:
+
+```
+  ok  controller  /: 200                    ← the route that broke; content-checked, not just status
+  ok  controller  /login /contact /privacy /terms /forgot-password: 200
+  ok  room        /session (invalid token must be refused, not 500): 403
+  ok  media       /health: 200              ← status, workers, workerDeaths and admission asserted
+  ok  media       / (must not proxy): 404   ← the ops Caddyfile contract
+  All 9 checks passed.
+```
+
+**Verified in both directions, because a check that cannot go red is decoration.** Against
+production it exits **0**; pointed at a host that answers differently it reports
+`6 of 9 checks FAILED` and exits **1**.
+
+Three deliberate design points:
+
+- **The room's probe is the sharpest.** `/session` with a knowingly invalid token must answer
+  **403** — parsed and refused. A **500** there means the room cannot read `ROOM_JWT_SECRET`, which
+  is exactly what the Kit 3 regression produced, and it needs no valid credential to run.
+- **Content, not only status.** `/` is checked for a `<title>`, because a 200 rendering an error
+  page passes a status-only check.
+- **Safe against production at any time.** Every request is a GET, nothing mutates, and the single
+  token it sends is invalid on purpose.
+
+`pnpm smoke` at the repo root; `SMOKE_CONTROLLER`, `SMOKE_ROOM` and `SMOKE_MEDIA` retarget it at a
+preview deployment. Documented in `DEPLOYMENT.md` as a step after every deploy of either app.
+
+### 04:42 — The older SFU: orphaned from this system, and the retirement is one command the owner has
+
+**No runtime impact.** Nothing in this repository reached that host before this entry, and this
+records the proof rather than changing anything.
+
+Measured 2026-08-10 04:42 EDT — it is still serving:
+
+```
+curl https://media.34-195-170-147.sslip.io/health
+{"status":"ok","workers":1,"workerDeaths":0,"rooms":0,"peers":0,"admission":"require-grant"}
+```
+
+`rooms: 0, peers: 0` — idle, with no client on it, while ours carries live traffic.
+
+**It is fully orphaned from our side, and that was verified rather than assumed.** A search for
+`34.195.170.147` and `sslip` across `apps/*/src`, both `.env.example` files, `services/`, `ops/` and
+`scripts/` returns nothing, and on the Hetzner box neither the room's `.env`, nor
+`/etc/caddy/Caddyfile`, nor `/etc/tradingroom-media/*.env` mentions it. The room dials
+`wss://media.tradingroom.app/ws`. **No traffic of ours can reach that machine.**
+
+**Why it cannot be retired from here, stated plainly.** Both routes are closed to this session:
+`ssh root@34.195.170.147` answers `Permission denied (publickey)`, and the AWS CLI — configured for
+account `255248181057`, IAM user `trading-app-admin`, region `us-east-1` — answers
+`Your session has expired. Please reauthenticate using 'aws login'`. That is an interactive browser
+sign-in, and authenticating on the owner's behalf is not something to do quietly.
+
+**The owner's two commands, in order.** The first also settles what that host actually is, which no
+document in this repository has ever established:
+
+```bash
+aws login
+aws lightsail get-instances --query 'instances[].{name:name,ip:publicIpAddress,state:state.name}'
+# if it is not there:
+aws ec2 describe-instances --filters 'Name=ip-address,Values=34.195.170.147' \
+  --query 'Reservations[].Instances[].{id:InstanceId,state:State.Name}'
+```
+
+Then **stop before delete**: stopping is reversible and proves nothing depended on it — confirm
+`https://media.34-195-170-147.sslip.io/health` stops answering — and only then delete, because a
+stopped instance still bills. Snapshot first if the configured machine is worth keeping.
+
 ### 04:35 — The room is on Kit 3, and the env contract that Kit 3 requires
 
 **RUNTIME IMPACT: yes.** The room now runs the current build (mtime `2026-08-10 08:33:38 UTC`)
