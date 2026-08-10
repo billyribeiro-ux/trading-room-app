@@ -214,8 +214,12 @@ hostname** — it embeds the IP, so changing servers breaks every client that ca
 > Read `docs/DEPLOYMENT.md` and `docs/SFU-MIGRATION.md` in trading-room-app, and do **Step 0**
 > before anything else — all three parts of it.
 >
-> The room is deployed at `chat.tradingroom.app` on the Hetzner box `87.99.154.155` (SSH as root,
-> key already authorised). `media.tradingroom.app` resolves there with a valid certificate and
-> answers a 503 placeholder. Move the mediasoup SFU from AWS Lightsail onto that box, serve it at
-> `media.tradingroom.app`, wire `MEDIA_GRANT_PRIVATE_KEY` into the room, and prove a screen share
-> works between two browsers before retiring the Lightsail instance.
+> **SUPERSEDED — do not run this prompt. Everything it asks for is done except the last clause.**
+> The SFU was moved onto `87.99.154.155` on 2026-08-09, `media.tradingroom.app` serves it (not a
+> 503), `MEDIA_GRANT_PRIVATE_KEY` is wired into the room, and a minted grant is admitted with a
+> mediasoup router created. Left as a record of what was asked for, because a prompt that tells the
+> next session to redo finished work is worse than no prompt.
+>
+> **What is actually left: prove a screen share between two browsers**, then retire the older SFU
+> still answering at `media.34-195-170-147.sslip.io` — whose host this repository cannot identify,
+> see the DONE banner at the top.

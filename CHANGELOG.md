@@ -24,6 +24,92 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-10
 
+### 04:35 — The room is on Kit 3, and the env contract that Kit 3 requires
+
+**RUNTIME IMPACT: yes.** The room now runs the current build (mtime `2026-08-10 08:33:38 UTC`)
+instead of the 2026-08-09 one it was rolled back to. Previous build kept as `build.bak-1786350819`.
+
+**The bug that forced the rollback, and why nothing caught it.** Kit 3 turned `$env/dynamic/private`
+into a five-line shim over `$app/env/private`:
+
+```js
+import * as env from '../../app/env/private.js';
+export { env };
+```
+
+and `$app/env/private` exports exactly the variables **declared in `src/env.ts`**. The controller has
+had that file since the explicit-env work. The room never did. So every private lookup in the room
+returned `undefined` while the values sat in `process.env` — measured on the box, where
+`/proc/<pid>/environ` showed `ROOM_JWT_SECRET` at its full 64 characters while the app logged
+`[session] ROOM_JWT_SECRET is not configured; refusing every handoff`. Every Launch answered 500.
+
+`svelte-check` passed, 524 tests passed, both adapters built clean. The failure only exists when a
+built server boots against a real environment, and nothing in the pipeline did that.
+
+**Reproduced and fixed against a built server, same request either way:**
+
+| build | result |
+| --- | --- |
+| without `src/env.ts` | **500** + `ROOM_JWT_SECRET is not configured` |
+| with `src/env.ts` | **403**, and no such line |
+
+**Confirmed in production after the deploy** — `GET /session?id=1001&jwtSite=bogus` returns **403**
+and the log reads `[session] handoff rejected { room: '1001', reason: 'malformed' }`. The token was
+*parsed and rejected*, which is only possible if the secret was read. **That request is now the
+room's smoke test**: it needs no valid token, and it distinguishes "secret readable" (403) from
+"Kit 3 env broken" (500) in one call. This deployment never had such a check.
+
+Schemas are plain functions rather than valibot — `EnvVarConfig.schema` accepts either and the room
+does not otherwise depend on it — and all are optional, because each use site already fails closed
+naming its variable, which beats a boot-time error that names one and stops.
+
+**Shipped in the same deploy, from the console audit:**
+
+- The connectivity test no longer opens two authenticated TURN allocations against
+  `turn:flash.protradingroom.com` using that third party's credentials. It was sending our users'
+  IPs to their server and testing THEIR relay, not ours — a green tick there said nothing about
+  `media.tradingroom.app`. TURN now reports `unconfigured` rather than `failed` when this deployment
+  has no relay, because "check your network or firewall" blames the user for a server nobody set.
+- The sidebar's "Powered by" credited and linked to **ProTradingRoom.com** from every room this
+  product serves. It is ours now.
+- Closed modals are `inert`, so Chrome stops discarding their `aria-hidden` — a closed dialog was
+  staying in the accessibility tree where a screen-reader user could tab into it.
+
+`npm install --omit=dev` was run on the box, which is only needed when dependencies change: Kit 3
+changed them, and `better-sqlite3` is native so a macOS build cannot be shipped for it.
+
+### 04:24 — The home page outage: four failures, one cause, and the log line that found it
+
+**RUNTIME IMPACT: yes — `/` was returning 500 for hours and now returns 200**, rendering its real
+content. Every other public route was healthy throughout, which is what made it look small.
+
+**It was found by fixing the diagnostics first.** `handleError` logged only `error.name`, so the only
+evidence anywhere was `{ errorId, status: 500, route: '/(public)', errorType: 'SyntaxError' }`. The
+page SSR-rendered correctly locally, a production build served it 200 locally, and all 100 modules
+of the built server bundle passed `node --check`. Nothing was reproducible because the one component
+that knew what failed had been told not to say. Logging `message`, `stack`, `url` and `cause` — while
+still returning only the generic sentence and the id — produced the answer in one request.
+
+**The cause:** gsap 3.15 ships ESM in `index.js` and `ScrollTrigger.js` while declaring no
+`"type": "module"`, so those entry points are loadable only through a bundler. Left external for the
+Vercel function to resolve, it failed four different ways in sequence:
+
+1. `Named export 'ScrollTrigger' not found …is a CommonJS module`
+2. `Named export 'gsap' not found …is a CommonJS module`
+3. `Cannot use import statement outside a module` — `gsap/index.js:1`
+4. `Cannot find package 'gsap'` — after switching to the CommonJS `dist/` builds, the dependency
+   tracer stopped including it
+
+Three commits fixed the import FORM twice and the FILE once. Each was true and each was
+insufficient, because the real defect was that a bundler-only package was being resolved at runtime
+at all. **`ssr: { noExternal: ['gsap'] }`** inlines it into the server chunk — nothing to resolve,
+nothing to trace, no CJS/ESM ambiguity. Verified in the built output: no `from "gsap"` import
+survives and gsap's code sits inside `entries/pages/(public)/_page.svelte.js`.
+
+**No local signal could have caught this.** `vite dev`, `vite build` and `vite preview` all bundle
+gsap. The external case exists only in the deployed function, which is exactly why it shipped with
+every gate green — and why the contract test asserts the CONFIG rather than the import spelling.
+
 ### 03:12 — Two production defects from the console: closed modals kept focus, uploads died at 512KB
 
 **RUNTIME IMPACT: yes.** Room rebuilt, `BODY_SIZE_LIMIT` set, service restarted. Previous build kept

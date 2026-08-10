@@ -12,10 +12,16 @@ Hetzner box in Ashburn, with valid TLS, alongside the admin at `https://www.trad
 `ROOM_JWT_SECRET` is rotated and matching on both sides, and `ROOM_BASE_URL` points at the real
 host. See `docs/DEPLOYMENT.md` for what runs where.
 
-**The one thing still missing is the SFU** — `media.tradingroom.app` answers a 503 placeholder and
-the media service is still on AWS Lightsail, so the room loads and the handoff works but there is no
-screen share or audio. That is `docs/SFU-MIGRATION.md`, and it is the last piece before this is a
-working product.
+~~**The one thing still missing is the SFU**~~ — **DONE 2026-08-09, and this line was the last place
+still saying otherwise.** `media.tradingroom.app` serves the media service from the Hetzner box.
+Measured 2026-08-10 07:2x EDT, not inherited: `/health` returns
+`{"status":"ok","workers":1,...,"admission":"require-grant"}` — and at the time of writing
+`"rooms":1,"peers":1`, i.e. a real peer connected to a real room. A minted grant is answered `101`
+and the SFU logs `peer connected role=Some(Presenter)`; an ungranted socket gets `400`.
+
+The screen-share/audio path therefore exists. What has NOT been done is a human watching video move
+between two browsers — see `docs/SFU-MIGRATION.md`, whose DONE banner carries the detail and the two
+genuinely open items.
 
 ---
 

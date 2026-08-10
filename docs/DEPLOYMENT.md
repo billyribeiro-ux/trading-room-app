@@ -49,7 +49,7 @@ machine gets OOM-killed; 2 GB of swap turns that into a slowdown instead.
 | unit | what | notes |
 | --- | --- | --- |
 | `caddy` | TLS + reverse proxy | Caddy 2.11.4, certs auto-issued and auto-renewing |
-| `trading-room-app` | the room | node 22, bound to `127.0.0.1:3000`, `Restart=always` |
+| `trading-room-app` | the room | node 22, bound to `127.0.0.1:3000`, `Restart=always`. **SvelteKit 3** since 2026-08-10 |
 | `tradingroom-media` | **the SFU** | Docker 29.7.2, `--network host`, signalling on `127.0.0.1:4443`, RTC 40000-40199 |
 | `docker` | runs the SFU container | image `tradingroom-media:local` |
 
@@ -88,7 +88,14 @@ That endpoint's natural lifetime is hours. Default proxy behaviour breaks it.
 | `DATABASE_URL` (room) | room `.env` | a FILE PATH, not a connection string |
 | `DATABASE_URL` (controller) | Vercel | Neon PostgreSQL |
 | `CONTROL_BASE_URL` | room `.env` | `https://www.tradingroom.app` |
-| `MEDIA_WS_URL` | room `.env` | `wss://media.tradingroom.app/ws` — points at the placeholder until the SFU moves |
+| `MEDIA_WS_URL` | room `.env` | `wss://media.tradingroom.app/ws` — the live SFU since 2026-08-09 |
+| `MEDIA_GRANT_PRIVATE_KEY` | room `.env` | Ed25519 PKCS#8 PEM, generated ON the box. **Escaped newlines**, because `EnvironmentFile` carries no multi-line value |
+| `BODY_SIZE_LIMIT` | room `.env` | `32M`. Without it adapter-node rejects any upload over **512K** with a bare 413, before `MAX_UPLOAD_BYTES` (25MB) is consulted |
+
+**Every variable the room reads must ALSO be declared in `apps/room/src/env.ts`.** Under Kit 3
+`$env/dynamic/private` is a shim over `$app/env/private`, which exports only what that file
+declares — an undeclared variable reads `undefined` no matter what is in the environment. Adding one
+to `.env` without adding it there is a silent no-op.
 
 **`ROOM_JWT_SECRET` must be byte-identical on both sides or every Launch link is rejected.** It was
 9 characters, signing tokens valid 360 days that travel in URLs. Rotated during this deployment
@@ -176,7 +183,24 @@ and it is fine as long as it is written down, which is what this paragraph is fo
 Config lives in `/etc/tradingroom-media/` (mode 600): `media.env` holds the announced address, the
 RTC range and the grant PUBLIC key; `media-image.env` holds the image tag the unit runs.
 
-**Shipping a new room build**, from a developer machine:
+**Shipping a new room build**, from a developer machine.
+
+**Run the smoke test after every room deploy.** It needs no valid token and takes one second:
+
+```bash
+curl -s -o /dev/null -w '%{http_code}\n' \
+  'https://chat.tradingroom.app/session?id=1001&jwtSite=bogus'
+```
+
+**403 means the room read `ROOM_JWT_SECRET` and rejected a bogus token — healthy. 500 means it could
+not read its own environment**, which is what a missing `src/env.ts` does under Kit 3: every private
+variable reads `undefined` while `process.env` holds the real value, and every Launch fails. That
+went to production once, on 2026-08-10, past a green `svelte-check`, 524 passing tests and a clean
+build under both adapters — because none of them boots the built server against a real environment.
+The log distinguishes the two cases as clearly as the status does:
+`handoff rejected { reason: 'malformed' }` versus `ROOM_JWT_SECRET is not configured`.
+
+
 
 ```bash
 cd apps/room && ADAPTER=node npx vite build
@@ -186,7 +210,9 @@ ssh root@87.99.154.155 'cd /opt/trading-room-app/room && tar xzf /tmp/room.tgz \
   && chown -R tradingroomapp:tradingroomapp . && systemctl restart trading-room-app'
 ```
 
-Only re-run `npm install --omit=dev` on the box when dependencies change.
+Only re-run `npm install --omit=dev` on the box when dependencies change — the SvelteKit 3
+upgrade did change them, and `better-sqlite3` is a native module, so a macOS build cannot be shipped
+for it.
 
 **This box is a five-day test.** A *stopped* Hetzner server still bills — only deleting stops it.
 Snapshot before deleting, and the whole configured machine comes back in minutes.
