@@ -19,9 +19,19 @@ const motion = readFileSync(new URL('./motion.ts', import.meta.url), 'utf8').rep
   ''
 );
 
-describe('the GSAP ScrollTrigger import', () => {
-  it('is a default import, which works under both CJS and ESM resolution', () => {
+describe('the GSAP imports', () => {
+  it('are default imports, which work under both CJS and ESM resolution', () => {
     expect(motion).toMatch(/import\s+ScrollTriggerModule\s+from\s+'gsap\/ScrollTrigger'/);
+    /*
+      BOTH specifiers, because the first fix repaired only the subpath and simply moved the crash
+      one line up to `Named export 'gsap' not found`. A runtime that resolves a package as CommonJS
+      does so for every specifier into it; the stack only names where instantiation stopped first.
+    */
+    expect(motion).toMatch(/import\s+gsapModule\s+from\s+'gsap'/);
+  });
+
+  it('never uses a named import of the package root either', () => {
+    expect(motion).not.toMatch(/import\s*\{[^}]*gsap[^}]*\}\s*from\s*'gsap'/);
   });
 
   it('never uses a named import of the CommonJS subpath', () => {

@@ -13,9 +13,18 @@
  * 3. Everything cleans up. Each attachment returns a teardown that kills its tweens and
  *    ScrollTriggers, so client-side navigation away from `/` leaves no orphaned observers.
  */
-import { gsap } from 'gsap';
+import gsapModule from 'gsap';
 /*
-  DEFAULT IMPORT, NOT A NAMED ONE — and this took the home page down for hours.
+  DEFAULT IMPORTS, NOT NAMED ONES — and this took the home page down for hours.
+
+  BOTH specifiers needed it, which the first fix got wrong by fixing only one. Repairing
+  `gsap/ScrollTrigger` alone simply moved the crash one line up:
+
+    SyntaxError: Named export 'gsap' not found. The requested module 'gsap' is a CommonJS module…
+
+  The lesson is worth more than the diff: when a runtime tells you a package resolves as CommonJS,
+  that is true of EVERY specifier into it, not the one in the stack trace. The stack names where
+  instantiation stopped first, not the extent of the problem.
 
   `import { ScrollTrigger } from 'gsap/ScrollTrigger'` threw at module instantiation inside the
   Vercel function, so EVERY request to `/` answered 500 while every other route stayed healthy:
@@ -44,6 +53,15 @@ import { gsap } from 'gsap';
 */
 import ScrollTriggerModule from 'gsap/ScrollTrigger';
 import type { Attachment } from 'svelte/attachments';
+
+/*
+  Verified against each build explicitly, so neither line is a guess:
+
+    gsap/dist/gsap.js          (CJS) -> default -> object with `.gsap` and `.to`
+    gsap/dist/ScrollTrigger.js (CJS) -> default -> function ScrollTrigger
+    gsap/ScrollTrigger.js      (ESM) -> default -> function ScrollTrigger
+*/
+const gsap = ((gsapModule as unknown as { gsap?: unknown }).gsap ?? gsapModule) as typeof gsapModule;
 
 const ScrollTrigger = (
   (ScrollTriggerModule as unknown as { ScrollTrigger?: unknown }).ScrollTrigger ?? ScrollTriggerModule
