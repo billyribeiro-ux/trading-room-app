@@ -37,7 +37,8 @@ const SSO_READS = [
   'allowedPerms',
   'allowedProducts',
   'loginErrorURL',
-  'ssoJWTSecret'
+  'ssoJWTSecret',
+  'tokenExpiresIn'
 ].sort();
 
 describe('the SSO settings contract', () => {
@@ -113,8 +114,24 @@ describe('the SSO route itself', () => {
   });
 
   it('verifies the token against the room short code, not just the secret', () => {
-    // Binding is what stops one customer key from opening every room that customer owns.
-    expect(ROUTE).toContain('verifySsoToken(secret, shortCode, url.searchParams.get(\'jwt\'))');
+    /*
+      Binding is what stops one customer key from opening every room that customer owns.
+
+      Asserted as a call PREFIX rather than the whole expression: the first version pinned the
+      complete single-line call and broke the moment an options object was added, which is a test
+      failing over formatting rather than over behaviour. What matters is that `shortCode` reaches
+      the verifier.
+    */
+    expect(ROUTE).toContain('verifySsoToken(secret, shortCode,');
+    expect(ROUTE).toContain("url.searchParams.get('jwt')");
+  });
+
+  it("applies the room's own tokenExpiresIn as the staleness ceiling", () => {
+    // Wired, not decorative: the resolved number is passed into the verifier, and anything the
+    // owner typed that could not be read or had to be capped is logged rather than swallowed.
+    expect(ROUTE).toContain('resolveMaxTokenAge(settings.tokenExpiresIn)');
+    expect(ROUTE).toContain('maxAgeSeconds: maxAge.seconds');
+    expect(ROUTE).toContain("console.warn('[sso] tokenExpiresIn'");
   });
 
   it('applies the entitlement filters before minting anything', () => {

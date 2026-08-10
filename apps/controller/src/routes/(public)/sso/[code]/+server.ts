@@ -6,7 +6,7 @@ import { rooms } from '$lib/server/db/schema';
 import { readSettings } from '$lib/server/rooms';
 import { guestHandoffToken, handoffUrl } from '$lib/server/room-handoff';
 import { evaluateEntitlement } from '$lib/server/sso-entitlement';
-import { verifySsoToken, type SsoRejection } from '$lib/server/sso-token';
+import { resolveMaxTokenAge, verifySsoToken, type SsoRejection } from '$lib/server/sso-token';
 import type { RequestHandler } from './$types';
 
 /**
@@ -95,8 +95,31 @@ export const GET: RequestHandler = async ({ params, url, getClientAddress }) => 
   */
   if (room.state !== 'open') refuse('room-closed');
 
+  /*
+    How stale an assertion this room tolerates.
+
+    The customer's site controls the token's own `exp`; the room owner controls this. Both must
+    pass, which is what stops a site minting year-long tokens from turning "is this subscription
+    paid?" into "was it paid at some point last year".
+
+    Anything the owner typed that we could not read, or had to cap, is logged once per entry rather
+    than swallowed — a settings box that silently does nothing is the exact complaint that produced
+    the `wired` flag in the first place.
+  */
+  const maxAge = resolveMaxTokenAge(settings.tokenExpiresIn);
+  if (maxAge.source === 'unparsed' || maxAge.source === 'clamped') {
+    console.warn('[sso] tokenExpiresIn', {
+      room: shortCode,
+      configured: settings.tokenExpiresIn,
+      applied: maxAge.seconds,
+      outcome: maxAge.source
+    });
+  }
+
   const secret = typeof settings.ssoJWTSecret === 'string' ? settings.ssoJWTSecret : '';
-  const verified = verifySsoToken(secret, shortCode, url.searchParams.get('jwt'));
+  const verified = verifySsoToken(secret, shortCode, url.searchParams.get('jwt'), {
+    maxAgeSeconds: maxAge.seconds
+  });
   if (!verified.ok) refuse(verified.reason);
 
   const decision = evaluateEntitlement(

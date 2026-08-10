@@ -10,7 +10,7 @@
 // roomType has no captured value because its editor is absent from rendered evidence.
 //
 // `wired` is the honest bit: false means the controller can store the value but
-// nothing in the room reads it yet. 40 of 269 are wired today.
+// nothing in the room reads it yet. 41 of 269 are wired today.
 // Flip one to true ONLY when a consumer exists, so the UI can mark the rest
 // instead of pretending they do something.
 
@@ -66,7 +66,7 @@ export const ROOM_SETTINGS: readonly RoomSettingDef[] = [
   { name: "ssoHost", section: "sso-setup", type: "text", label: "SSO Host", help: null, captured: null, capturedIsDisplayOnly: false, group: null, wired: false },
   { name: "ssoJWTSecret", section: "settings", type: "textarea", label: "JWT Secret Key:", help: "Use this key in combination with the WordPRess plugin, or other JWT SSO, make it hard to getss, like: '5081b73a690762e2526bc1fef3c46eedf1ec8832'", captured: null, capturedIsDisplayOnly: false, group: null, wired: true },
   { name: "allowPWLoginWithSSO", section: "settings", type: "checkbox", label: "Allow PW based logins on SSO?", help: "if ON, you can give a link and PW to enter the SSO room as well", captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
-  { name: "tokenExpiresIn", section: "settings", type: "textarea", label: "Token Expiration", help: "A string like '1d', '1h', '12h\" etc...", captured: "1d", capturedIsDisplayOnly: false, group: null, wired: false },
+  { name: "tokenExpiresIn", section: "settings", type: "textarea", label: "Token Expiration", help: "A string like '1d', '1h', '12h\" etc...", captured: "1d", capturedIsDisplayOnly: false, group: null, wired: true },
   { name: "webinarPW", section: "settings", type: "textarea", label: "Room Password:", help: "Give this password to your", captured: null, capturedIsDisplayOnly: false, group: null, wired: true },
   { name: "webinarPW2", section: "settings", type: "textarea", label: "Temp Room Password:", help: "Temp password/additional pw.. Works in addition to the other passwords", captured: null, capturedIsDisplayOnly: false, group: null, wired: false },
   { name: "webinarPW3", section: "settings", type: "textarea", label: "Temp Room Password 2:", help: "Temp password 2/additional pw.. Works in addition to the other passwords", captured: null, capturedIsDisplayOnly: false, group: null, wired: false },

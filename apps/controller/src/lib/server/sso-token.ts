@@ -89,6 +89,19 @@ export const SSO_MAX_TOKEN_AGE_SECONDS = 3_600;
  */
 export const SSO_CLOCK_SKEW_SECONDS = 60;
 
+/**
+ * The longest ceiling an owner may configure through `tokenExpiresIn`, whatever they type.
+ *
+ * 24 hours, and the number is not arbitrary: `tokenExpiresIn`'s captured value in the reference
+ * tenant is exactly `"1d"`, so a day is demonstrably a value the original expected people to use.
+ * Beyond it the setting stops being a payment gate and becomes a way to disable one, which is not a
+ * choice a room owner should be able to make by typing `365d` into a text box.
+ *
+ * An over-long value is clamped and logged rather than refused: refusing would lock an owner out of
+ * their own room over a typo, and silently honouring it would make the gate decorative.
+ */
+export const SSO_MAX_CONFIGURABLE_AGE_SECONDS = 86_400;
+
 /** Bytes of entropy in a generated `ssoJWTSecret`. */
 const SSO_SECRET_BYTES = 32;
 
@@ -144,6 +157,47 @@ export function generateSsoSecret(): string {
   return randomBytes(SSO_SECRET_BYTES).toString('hex');
 }
 
+/** What {@link resolveMaxTokenAge} decided, and whether the owner got what they asked for. */
+export interface ResolvedMaxTokenAge {
+  seconds: number;
+  /** `default` — nothing configured; `configured` — honoured as typed; `clamped` — capped; `unparsed` — not understood. */
+  source: 'default' | 'configured' | 'clamped' | 'unparsed';
+}
+
+/**
+ * Turns the room's `tokenExpiresIn` into the age ceiling this room enforces.
+ *
+ * The reference's own help text defines the format: *"A string like '1d', '1h', '12h" etc…"*, and
+ * the captured value is `"1d"`. Bare digits are also accepted as seconds, because that is what
+ * somebody types when the units are not obvious and refusing it would help nobody.
+ *
+ * Every path returns a usable number. An unparseable value falls back to
+ * {@link SSO_MAX_TOKEN_AGE_SECONDS} rather than throwing, because this runs on the entry path: a
+ * typo in a settings box must not take a room offline, and `source` tells the caller to say so in
+ * the log.
+ */
+export function resolveMaxTokenAge(tokenExpiresIn: unknown): ResolvedMaxTokenAge {
+  if (typeof tokenExpiresIn !== 'string' || !tokenExpiresIn.trim()) {
+    return { seconds: SSO_MAX_TOKEN_AGE_SECONDS, source: 'default' };
+  }
+
+  const match = /^(\d+)\s*([smhd]?)$/i.exec(tokenExpiresIn.trim());
+  if (!match) return { seconds: SSO_MAX_TOKEN_AGE_SECONDS, source: 'unparsed' };
+
+  const amount = Number(match[1]);
+  const unit = match[2].toLowerCase();
+  const multiplier = unit === 'd' ? 86_400 : unit === 'h' ? 3_600 : unit === 'm' ? 60 : 1;
+  const requested = amount * multiplier;
+
+  // Zero would refuse every token the instant it was minted, which reads as "SSO is broken" rather
+  // than "SSO is strict". Treated as unconfigured.
+  if (requested <= 0) return { seconds: SSO_MAX_TOKEN_AGE_SECONDS, source: 'unparsed' };
+  if (requested > SSO_MAX_CONFIGURABLE_AGE_SECONDS) {
+    return { seconds: SSO_MAX_CONFIGURABLE_AGE_SECONDS, source: 'clamped' };
+  }
+  return { seconds: requested, source: 'configured' };
+}
+
 function decodeSegment(segment: string): unknown {
   // `base64url` rejects nothing, so a malformed segment yields garbage rather than throwing; the
   // JSON.parse is what actually fails, and the caller treats that as malformed.
@@ -186,18 +240,24 @@ function signature(secret: string, signingInput: string): string {
 /**
  * Verifies a WordPress-minted token against one room's `ssoJWTSecret`.
  *
- * `nowSeconds` is a parameter rather than a `Date.now()` call so every expiry branch is testable
- * without faking the clock globally — the same shape as `room-handoff.ts`.
+ * An options object rather than positional arguments, deliberately: there are now two independent
+ * knobs and a third would arrive eventually. `verifySsoToken(secret, code, token, 3600)` reads as a
+ * timestamp at a glance and would be a silent bug on the entry path.
  *
  * @param secret the room's `ssoJWTSecret`; blank or missing means SSO is not configured
  * @param shortCode the room being entered, from the URL — the token must name the same one
+ * @param options.maxAgeSeconds this room's ceiling, from {@link resolveMaxTokenAge}
+ * @param options.nowSeconds injected rather than read, so every expiry branch is testable without
+ *   faking the clock globally — the same shape as `room-handoff.ts`
  */
 export function verifySsoToken(
   secret: string | null | undefined,
   shortCode: string,
   token: string | null | undefined,
-  nowSeconds: number = Math.floor(Date.now() / 1000)
+  options: { maxAgeSeconds?: number; nowSeconds?: number } = {}
 ): SsoResult {
+  const maxAgeSeconds = options.maxAgeSeconds ?? SSO_MAX_TOKEN_AGE_SECONDS;
+  const nowSeconds = options.nowSeconds ?? Math.floor(Date.now() / 1000);
   // A room with no key configured has not enabled SSO. Refusing here rather than further down
   // means an unconfigured room cannot be probed for claim shapes.
   if (!secret?.trim()) return { ok: false, reason: 'no-secret' };
@@ -252,8 +312,9 @@ export function verifySsoToken(
   // A token stamped well ahead of our clock is either a misconfigured host or an attempt to mint
   // something long-lived that our max-age check would otherwise not see.
   if (iat > nowSeconds + SSO_CLOCK_SKEW_SECONDS) return { ok: false, reason: 'from-the-future' };
-  // Our ceiling, on top of the customer's own `exp`. See SSO_MAX_TOKEN_AGE_SECONDS.
-  if (nowSeconds - iat > SSO_MAX_TOKEN_AGE_SECONDS + SSO_CLOCK_SKEW_SECONDS) {
+  // Our ceiling, on top of the customer's own `exp`. See SSO_MAX_TOKEN_AGE_SECONDS, and
+  // resolveMaxTokenAge for where a room's own `tokenExpiresIn` narrows it.
+  if (nowSeconds - iat > maxAgeSeconds + SSO_CLOCK_SKEW_SECONDS) {
     return { ok: false, reason: 'too-old' };
   }
 

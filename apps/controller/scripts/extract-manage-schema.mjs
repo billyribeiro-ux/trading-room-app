@@ -129,7 +129,8 @@ const SSO_CONSUMED = [
   'allowedPerms',
   'allowedProducts',
   'loginErrorURL',
-  'ssoJWTSecret'
+  'ssoJWTSecret',
+  'tokenExpiresIn'
 ];
 
 const WIRED_SETTINGS = new Set([...LOGIN_CONSUMED, ...ROOM_CONSUMED, ...SSO_CONSUMED]);
@@ -332,7 +333,7 @@ if (defs.length !== EXPECTED_TOTAL_COUNT) {
 }
 
 const missingWiredSettings = [...WIRED_SETTINGS].filter((name) => !defs.some((definition) => definition.name === name));
-if (WIRED_SETTINGS.size !== 40 || missingWiredSettings.length > 0) {
+if (WIRED_SETTINGS.size !== 41 || missingWiredSettings.length > 0) {
   throw new Error(
     `wired-setting contract invalid: ${WIRED_SETTINGS.size} keys, missing ${missingWiredSettings.join(', ') || 'none'}`
   );

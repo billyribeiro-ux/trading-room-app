@@ -24,6 +24,44 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-10
 
+### 06:50 — WordPress SSO, phase 3: `tokenExpiresIn` becomes the room's own staleness ceiling
+
+**No runtime impact until deployed.** Files: `src/lib/server/sso-token.ts` (+ tests),
+`(public)/sso/[code]/+server.ts`, `sso-boundary.test.ts`, the generator and the generated schema.
+
+Phase 1 enforced one hour for every room. That is now the **default**, and a room owner narrows it
+with the setting the reference already provides: `tokenExpiresIn`, whose help reads *"A string like
+'1d', '1h', '12h" etc…"* and whose captured value in the reference tenant is exactly `"1d"`.
+
+`resolveMaxTokenAge()` accepts `s`/`m`/`h`/`d`, bare digits as seconds, and tolerates spacing and
+case. **Every path returns a usable number** — this runs on the entry path, so a typo in a settings
+box must not take a room offline. It reports how it got there (`default` · `configured` · `clamped` ·
+`unparsed`) and the route logs anything that is not a clean read, because a settings box that
+silently does nothing is the exact complaint the `wired` flag exists to prevent.
+
+**The clamp, at 24 hours.** An owner typing `365d` would turn the payment gate into a decoration.
+The ceiling is not arbitrary: `1d` is the reference's own captured value, so a day is demonstrably a
+value the original expected people to use, and the boundary itself is honoured rather than clamped.
+Over-long values are capped and logged rather than refused — refusing would lock an owner out of
+their own room over a text box, while honouring it silently would make the gate meaningless.
+
+**`verifySsoToken` takes an options object now.** There are two independent knobs and a third would
+eventually arrive; `verifySsoToken(secret, code, token, 3600)` reads as a timestamp at a glance and
+would be a silent bug on the entry path. The twenty existing call sites were migrated by walking
+balanced parentheses rather than by regex, because `NOW` also appears inside the claim literals and
+a regex would have rewritten those too.
+
+**`tokenExpiresIn` is wired — 40 → 41 of 269.** Generator, generated file and the boundary test's
+count-lock all moved together, which is what that lock is for.
+
+**A second test of mine broke on formatting rather than behaviour**, and the fix is the same lesson
+as phase 2's: it pinned the complete single-line `verifySsoToken(...)` expression and failed the
+moment the options object was added. Rewritten to assert the call **prefix** — that `shortCode`
+reaches the verifier — which is the behaviour worth pinning. A test that fails when a line wraps
+teaches people to stop reading tests.
+
+Verified: **617 tests across 56 files pass** (610 → 617), `svelte-check` **0 errors, 0 warnings**.
+
 ### 06:46 — WordPress SSO, phase 2: the door, and the entitlement rule
 
 **No runtime impact until deployed** — new route and helper. Files:
