@@ -24,6 +24,55 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-10
 
+### 06:57 — WordPress SSO, phase 4: the plugin, and an honest limit on it
+
+**No runtime impact.** New: `integrations/wordpress/tradingroom-sso/tradingroom-sso.php`,
+`integrations/wordpress/README.md`, `apps/controller/src/lib/server/sso-wordpress-contract.test.ts`.
+
+The customer-side half. A logged-in member clicks "Enter Room"; the plugin asks WooCommerce what
+they currently hold — active memberships, active subscriptions, purchased products — signs it with
+that room's key, and redirects to `/sso/<code>?jwt=…`.
+
+**The design decision that matters most: the token is minted on CLICK, never at render.** A token
+embedded in rendered HTML is stored by the page cache, the CDN and every "copy of this page" plugin,
+and then served to **every subsequent visitor** — each of whom would enter the room as whoever
+loaded the page first. So the shortcode links to the plugin's own endpoint and the mint happens when
+that link is followed. On a cached WordPress site the alternative is not a performance issue, it is
+a total authentication failure, and it is the single easiest thing to get wrong here.
+
+**The key is never a shortcode attribute.** The reference's own shortcode carried `key=''`, which
+puts a room credential into post content — visible to every editor, every revision, every export.
+Ours keeps keys in site options, masked on the settings screen, and a masked row left untouched
+keeps its stored value so an admin can edit the controller URL without re-entering every key.
+
+Also: entry requires a logged-in user (and sends them to log in and come back rather than losing the
+click); an unknown room is refused rather than redirected to, which is what makes the one outbound
+`wp_redirect` safe; and three filters plus an action are exposed for sites whose entitlements do not
+live in WooCommerce at all.
+
+**Two PHP hazards, both now pinned by tests.** `wp_json_encode` escapes forward slashes by default —
+`https://x` becomes `https:\/\/x` — which is the classic "works in Postman, fails from WordPress"
+bug when a verifier re-serialises the payload before checking the signature. Ours cannot hit it,
+because the signature is computed over the payload **segment as presented**, never over a re-encoding
+of the decoded object; the test exists to keep that invariant through future refactors. And
+`json_encode` turns a non-sequential PHP array into `{}` rather than `[]`, which is why the plugin's
+`array_values()` wrapper is load-bearing — our reader treats a non-array as nothing asserted, which
+fails **closed**, but the failure would be baffling without the note.
+
+**The honest limit, and it is a real one: the plugin has never been executed.** PHP is not installed
+here and Docker Hub was unreachable (`context deadline exceeded` pulling `php:8.3-cli`), so neither
+`php -l` nor a real mint was possible. The 12 contract tests prove **our side honours the contract we
+wrote down** — they do not prove the PHP produces those bytes. Recorded as `TODO.md` item **Q** with
+the one command that closes it, and stated in the README's Status section rather than left for a
+customer to discover. **It should not ship to a customer before `php -l` and a staging install with
+a real subscription cancelled mid-test.**
+
+Verified: **629 tests across 57 files pass** (617 → 629), `svelte-check` **0 errors, 0 warnings**.
+
+**All four phases are done.** `ssoJWTSecret` and the three entitlement filters are wired and
+enforced; `tokenExpiresIn` bounds staleness; the room application was never touched. What remains
+before a customer uses it is item **Q** and a decision on the default expiry (`1h` is in place).
+
 ### 06:50 — WordPress SSO, phase 3: `tokenExpiresIn` becomes the room's own staleness ceiling
 
 **No runtime impact until deployed.** Files: `src/lib/server/sso-token.ts` (+ tests),
