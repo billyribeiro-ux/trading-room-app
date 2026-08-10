@@ -25,7 +25,23 @@
 >    today that should not be (signalling is bound to loopback, the room to loopback, Caddy owns
 >    80/443, sshd owns 22), but the next service that binds `0.0.0.0` is public the moment it
 >    starts. Recorded as work item **L** in `TODO.md`.
-> 3. **Lightsail is still running and still billing.** Retire it only after step 5 passes.
+> 3. **A SECOND SFU is live at `media.34-195-170-147.sslip.io`, and this repository cannot say
+>    whose host it is.** Measured 2026-08-09 20:51 EDT: `/health` returns this project's own payload
+>    (`workers: 1`, `admission: require-grant`) behind Caddy, on a Let's Encrypt certificate issued
+>    2026-08-02, with TCP 22 and 443 open. So something IS running.
+>
+>    **The "AWS Lightsail / `mediasoup-test-01` / still billing" description everywhere in this
+>    repository was never verified from here** — no account access, no console, no bill was ever
+>    seen — and **the owner states it was never deployed to Lightsail**. It was one document
+>    repeating another until it read as measured fact. Corrected rather than deleted, because the
+>    same sentence appears in `NEXT-SESSION.md` §2 and §4c and in
+>    `MEDIASOUP-DEPLOYMENT-PLAN.md`, and a reader who has seen those deserves to know which part is
+>    evidence: **an SFU answers there; whose machine it is, is unverified.**
+>
+>    What matters does not depend on the answer: two SFUs are live, only the Hetzner one is wired to
+>    `chat.tradingroom.app`, and that hostname embeds an IP — so anything still pointing at it works
+>    silently while diverging from production. Retire the name and stop that instance once step 5
+>    passes.
 >
 > One correction to step 3 below, found by reading `ops/mediasoup/Caddyfile.example` against the
 > deployment: the bare `reverse_proxy 127.0.0.1:4443` shown there is a SIMPLIFICATION of that ops

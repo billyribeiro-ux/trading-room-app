@@ -24,6 +24,43 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-09
 
+### 21:24 — "AWS Lightsail" was never verified by anyone here. Three documents corrected
+
+**No runtime impact** — documentation only. Nothing deployed changed.
+
+The owner said the SFU was never deployed to Lightsail. I had repeated "AWS Lightsail,
+`mediasoup-test-01`, still running and still billing" in this changelog, in `DEPLOYMENT.md`, and in
+answers, as though it were established. **It never was.** No one working in this repository has had
+access to that account — no console, no instance list, no bill. It came from
+`MEDIASOUP-DEPLOYMENT-PLAN.md`'s Stage 1 **plan**, was copied into `NEXT-SESSION.md`, then into
+`SFU-MIGRATION.md`, then into `DEPLOYMENT.md`, and a plan became a fact by repetition. Same failure
+as "no Export Badges control exists": trusting a document instead of measuring.
+
+**What I actually measured, 20:51 EDT:**
+
+```
+curl https://media.34-195-170-147.sslip.io/health
+{"status":"ok","workers":1,"workerDeaths":0,"rooms":0,"peers":0,"admission":"require-grant"}
+via: 1.1 Caddy · strict-transport-security · referrer-policy: no-referrer
+TLS  CN=media.34-195-170-147.sslip.io, Let's Encrypt, notBefore 2026-08-02
+TCP  22 and 443 both open on 34.195.170.147
+```
+
+So an SFU **is** live there — that payload is this project's own health shape, and the certificate
+dates to 2026-08-02. **Whose machine it is remains unverified**, and the documents now say exactly
+that instead of naming a vendor.
+
+**Why it matters regardless of the label:** two SFUs are serving simultaneously, only the Hetzner one
+is wired to `chat.tradingroom.app`, and the old hostname embeds an IP — so anything still pointing at
+it keeps working silently while diverging from production. That is the reason to retire it, and it
+holds whoever owns the box.
+
+Corrected in `docs/DEPLOYMENT.md` (hosts table and "What is NOT done"), `docs/SFU-MIGRATION.md`
+(the DONE banner), and `docs/NEXT-SESSION.md` (§2 verified-state table and §4). Struck through rather
+than deleted, and each says which half is evidence and which half was inherited, because the same
+sentence still appears in `MEDIASOUP-DEPLOYMENT-PLAN.md` and a reader who has seen it deserves to
+know which part was ever checked.
+
 ### 20:36 — END TO END, PROVEN: a real grant admitted by the live SFU, router created
 
 **No runtime impact** — a verification probe and three documentation corrections. Nothing about the

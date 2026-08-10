@@ -28,7 +28,8 @@ working product.
 | Controller tests | 45 files / 485 tests passing, `svelte-check` 0 errors | run from `apps/controller` |
 | Room tests | 56 of 56 test files passing | run from `apps/room` |
 | Room build | builds under BOTH `adapter-vercel` and `ADAPTER=node` | `vite build` twice |
-| SFU | live on AWS Lightsail, `/health` → 200, valid TLS behind Caddy | `curl https://media.34-195-170-147.sslip.io/health` |
+| SFU | **live on the Hetzner box** since 2026-08-09, `media.tradingroom.app` | `/health` 200; a minted grant answered `101` and the SFU logged `peer connected role=Some(Presenter)` |
+| older SFU | still answering at `media.34-195-170-147.sslip.io` — **host provenance UNVERIFIED** | `/health` 200 behind Caddy, LE cert from 2026-08-02. The "AWS Lightsail / `mediasoup-test-01`" wording below was never checked from this repository and **the owner says it was never a Lightsail deployment** |
 | Database | Neon Postgres — 1 user, 1 API key, 1 room | direct SQL against `DATABASE_URL` |
 | Vercel | ONE project, `trading-room-app` (`prj_oxlP8Tig…`), owns both domains | `vercel project ls`, `vercel domains inspect` |
 | PII | no real addresses or secrets in any tracked file | `git ls-files | xargs grep` |
@@ -129,9 +130,20 @@ holdout.
   `NEON_PROJECT_ID`, `PGHOST`, `DATABASE_URL_UNPOOLED`. It is provisioned and in use.
 - **Admin hosting: Vercel.** Live, correct, and the one tier serverless genuinely suits — it is
   request/response with no durable local state.
-- **SFU: AWS Lightsail**, instance `mediasoup-test-01`, `us-east-1a`, static IP `34.195.170.147`,
-  Caddy TLS on 443 → loopback `127.0.0.1:4443`. Stage 1 of `MEDIASOUP-DEPLOYMENT-PLAN.md`, executed
-  2026-08-02.
+- ~~**SFU: AWS Lightsail**, instance `mediasoup-test-01`, `us-east-1a`~~ — **SUPERSEDED, and the
+  hosting half of it was never verified.** The SFU now runs on the **Hetzner box**
+  (`87.99.154.155`) at `media.tradingroom.app`, deployed 2026-08-09.
+
+  What remains true and measured: an SFU still answers at `34.195.170.147` behind Caddy on 443 →
+  loopback `127.0.0.1:4443`, with a Let's Encrypt certificate issued 2026-08-02. Checked
+  2026-08-09 20:51 EDT.
+
+  What was never true as written: **that it is AWS Lightsail.** No one working in this repository
+  has ever had access to that account — no console, no instance list, no bill — and **the owner
+  states it was never deployed to Lightsail.** The instance name, region and "still billing" all
+  came from `MEDIASOUP-DEPLOYMENT-PLAN.md`'s Stage 1 *plan* and were then repeated here, and in
+  `DEPLOYMENT.md` and `SFU-MIGRATION.md`, until a plan read as a measurement. The egress arithmetic
+  in §4 below is unaffected: it is about bandwidth pricing, not about which company owns that box.
 
 ### 4a. What the ORIGINAL actually runs on — resolved 2026-08-09
 

@@ -13,7 +13,7 @@ not planned.
 | `tradingroom.app` | 308 → `www` | Vercel | live |
 | `chat.tradingroom.app` | **the room, all rooms** | **Hetzner `87.99.154.155`**, Ashburn VA | **live** |
 | `media.tradingroom.app` | **the SFU** | same box | **live since 2026-08-09 12:44** |
-| — | mediasoup SFU | AWS Lightsail `mediasoup-test-01` | **still running and still billing** — retire after the two-browser test |
+| `media.34-195-170-147.sslip.io` | **a second, older SFU** | `34.195.170.147` — **provenance unverified**, see below | **live right now**, serving `workers: 1` |
 | — | PostgreSQL | **Neon** | live |
 
 DNS is at **Porkbun** (`curitiba.ns.porkbun.com`). `www` is a CNAME to Vercel; `chat` and `media`
@@ -104,7 +104,31 @@ because no handoff links existed yet — the cheapest moment it will ever be.
    `peer connected user=Some(Legacy(999999)) role=Some(Presenter)` with a real mediasoup router
    created for the room. The same endpoint refuses an ungranted socket with 400.
    **What remains is the two-browser screen-share test** — a human watching video actually move —
-   and then retiring Lightsail, which is still running and still billing.
+   and then dealing with the second SFU described below.
+
+2. **There is a SECOND SFU live, and this repository cannot say whose it is.** Measured
+   2026-08-09 20:51 EDT, not inherited from a document:
+
+   ```
+   curl https://media.34-195-170-147.sslip.io/health
+   {"status":"ok","workers":1,"workerDeaths":0,"rooms":0,"peers":0,"admission":"require-grant"}
+   via: 1.1 Caddy · TLS CN=media.34-195-170-147.sslip.io, Let's Encrypt, notBefore 2026-08-02
+   TCP 22 and 443 both open on 34.195.170.147
+   ```
+
+   That is this project's own SFU health payload, behind Caddy, on a certificate issued 2026-08-02.
+   So an SFU **is** running there.
+
+   **What is NOT established: that it is AWS Lightsail.** Every previous document in this repository
+   called it "AWS Lightsail, instance `mediasoup-test-01`, us-east-1a, still billing" — and none of
+   that was ever verified from here. Nobody working in this repository has had access to that
+   account, a console, an instance list or a bill. **The owner states it was never deployed to
+   Lightsail.** The claim was repeated between documents until it read as fact.
+
+   What matters operationally does not depend on whose it is: **two SFUs are live at once**, only the
+   Hetzner one is wired to `chat.tradingroom.app`, and the old hostname embeds an IP — so anything
+   still pointing at it keeps working silently while diverging from production. Retire the name and
+   shut that instance down once the two-browser test passes; whoever owns it will know where.
 2. **The controller is still on Vercel.** Consolidating it onto this box is `NEXT-SESSION.md` §4c and
    deliberately deferred — one change at a time.
 3. **Room data is SQLite, account data is Neon.** Two stores. Tolerable, and worth unifying before it
