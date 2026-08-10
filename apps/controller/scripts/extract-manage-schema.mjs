@@ -113,7 +113,26 @@ const ROOM_CONSUMED = [
   'userUploads'
 ];
 
-const WIRED_SETTINGS = new Set([...LOGIN_CONSUMED, ...ROOM_CONSUMED]);
+/**
+ * The WordPress SSO door, via `(public)/sso/[code]/+server.ts`.
+ *
+ * A customer's WooCommerce decides whether a member has paid; that route checks the assertion their
+ * site signs and applies these filters before minting a handoff. `ssoJWTSecret` is the signing key
+ * and is deliberately NOT in `ROOM_VISIBLE_SETTINGS` — it is a credential, it stays in the
+ * controller, and the room never sees it.
+ *
+ * `loginErrorMsg` is already in LOGIN_CONSUMED and is reused here, so the two doors refuse in the
+ * same words; `loginErrorURL` is new, and is the customer's own "your subscription has lapsed" page.
+ */
+const SSO_CONSUMED = [
+  'allowedMemberships',
+  'allowedPerms',
+  'allowedProducts',
+  'loginErrorURL',
+  'ssoJWTSecret'
+];
+
+const WIRED_SETTINGS = new Set([...LOGIN_CONSUMED, ...ROOM_CONSUMED, ...SSO_CONSUMED]);
 
 /* Reuse the outline decoder so the parse below sees the same tree the docs do. */
 const tempDirectory = mkdtempSync(join(tmpdir(), 'proroom-schema-'));
@@ -313,7 +332,7 @@ if (defs.length !== EXPECTED_TOTAL_COUNT) {
 }
 
 const missingWiredSettings = [...WIRED_SETTINGS].filter((name) => !defs.some((definition) => definition.name === name));
-if (WIRED_SETTINGS.size !== 35 || missingWiredSettings.length > 0) {
+if (WIRED_SETTINGS.size !== 40 || missingWiredSettings.length > 0) {
   throw new Error(
     `wired-setting contract invalid: ${WIRED_SETTINGS.size} keys, missing ${missingWiredSettings.join(', ') || 'none'}`
   );

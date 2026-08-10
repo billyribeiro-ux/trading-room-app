@@ -24,6 +24,73 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-10
 
+### 06:46 — WordPress SSO, phase 2: the door, and the entitlement rule
+
+**No runtime impact until deployed** — new route and helper. Files:
+`apps/controller/src/routes/(public)/sso/[code]/+server.ts`,
+`src/lib/server/sso-entitlement.ts` (+ tests), `src/lib/sso-boundary.test.ts`,
+`scripts/extract-manage-schema.mjs`, `src/lib/room-settings-schema.ts`.
+
+`GET /sso/<shortCode>?jwt=<HS256 JWT>` — verify, evaluate entitlement, mint the **existing** guest
+handoff, redirect into the room. Roughly 60 lines of decision surrounded by the reasons for each.
+
+**Why it mints a GUEST token, and why that is the property to defend.** A WordPress visitor has no
+account here, and inventing one would be inventing authority. `type: 'guest'` with an empty `id` is
+precisely true, and the room then resolves their role from its own membership, failing closed to
+`member`. So **entitlement is delegated; authority is not** — if a customer's WordPress is
+compromised, the blast radius is people entering a room they did not pay for, not somebody arriving
+as staff. `sso-boundary.test.ts` asserts the route calls `guestHandoffToken` and never
+`siteHandoffToken`.
+
+**The entitlement semantics come from the reference's help text, and they are surprising.**
+`allowedProducts` and `allowedPerms` both read *"Either a product or membership, or both must
+match"* — an explicit disjunction. So configured filters are **OR-ed**: filling in a second family
+to be stricter actually **widens** access. That runs against the usual fail-closed instinct, and it
+is implemented as the evidence states rather than as instinct prefers, with the ambiguity named in
+the module docs: the same sentence is repeated verbatim on `allowedPerms`, where "a product or
+membership" does not mention permissions at all, so it reads like copied help text and the dump
+cannot settle it. `explainEntitlementDecision()` exists so the Manage page can warn an owner in the
+place they are typing rather than leaving them to discover it from who turns up.
+
+The lapsed-payment path needs no special signal: WooCommerce simply stops reporting the plan, the
+token arrives with nothing in it, and no filter matches. **Absence is the signal**, which means we
+cannot drift out of step with their billing state machine.
+
+**Ordering, and one deliberate inconsistency.** The verifier checks the signature before reading any
+claim, because reporting on unauthenticated bytes is how a verifier becomes an oracle. The route
+does the opposite — room-state before signature — and says why: whether a room is open is not a
+secret (the guest login already reveals it to anyone holding the code), so there is no oracle to
+protect and an early refusal avoids an HMAC per probe.
+
+Every refusal returns the same words. `loginErrorURL` (the customer's own "your subscription has
+lapsed" page) takes precedence, then `loginErrorMsg`, which the room-login page already uses — so
+both doors refuse consistently. Admissions are logged too, with the filter entry that opened the
+door: *"on what basis was this person let in"* is the question asked months later, and it cannot be
+answered from a log of failures only.
+
+**Wiring, and a generated file edited by hand — deliberately, and with a lock.** Five settings now
+have a consumer: `ssoJWTSecret`, `allowedMemberships`, `allowedProducts`, `allowedPerms`,
+`loginErrorURL`. **35 → 40 of 269 wired.** The flag lives in `scripts/extract-manage-schema.mjs`'s
+`WIRED_SETTINGS`, which was updated properly — but **`pnpm schema:extract` cannot run in this
+repository**: it reads `evidence-dumps/login-page/manage`, which is not here (the same absence that
+blocked `verify-home-fidelity.mjs` on 2026-08-09). So the identical transformation was applied by
+hand to the generated file, which its own header forbids.
+
+That is only acceptable with something enforcing it, so `sso-boundary.test.ts` reads the generator's
+contract number and asserts the generated file's wired count and header text agree with it. Flip a
+flag in one without the other and it fails. It is the difference between "edited a generated file
+once, carefully" and "the generated file is now hand-maintained by accident".
+
+**One test was wrong and the code was right** — worth recording, because it is the failure mode the
+house rules name. The ordering test used `indexOf('evaluateEntitlement')` and failed; it had matched
+the *import* statements at the top of the file, where the entitlement module happens to be imported
+before the token one. The route was correct throughout. Fixed by anchoring on call syntax, with the
+mistake written into the test so the next person does not repeat it.
+
+Verified: **610 tests across 56 files pass**, `svelte-check` **0 errors, 0 warnings**. The full suite
+was run rather than a targeted one because the wired count changed in a generated file many tests
+read. `svelte-kit sync` was needed first — a new route has no `./$types` until Kit generates them.
+
 ### 06:40 — WordPress SSO, phase 1: the verifier for a customer-minted token
 
 **No runtime impact** — new module and its tests; nothing routes to it yet. Files:
