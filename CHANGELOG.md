@@ -24,6 +24,59 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-10
 
+### 05:09 — A retirement runbook for the AWS SFU, and all three TODO files carry only open work
+
+**No runtime impact** — documentation only. New: `docs/RETIRE-AWS-SFU.md`,
+`apps/room/docs/RESOLVED-ARCHIVE.md`. Edited: `TODO.md`, `apps/room/TODO.md`,
+`docs/PROMPT-TODO-ITEMS.md`, and four files carrying references that pointed at removed entries.
+
+**`docs/RETIRE-AWS-SFU.md` — every step and command, start to finish.** It opens by settling the
+thing that has cost two rounds of argument: it is **EC2 in us-east-1**, not Lightsail, so the empty
+Lightsail console the owner kept seeing was correct. Two routes that do the same job — the browser
+console (A1–A8, nothing to install) and the CLI (B1–B10, paste-ready) — plus what happens when it
+stops, what is safe to skip, and a symptom table.
+
+Four things in it are worth naming because each is a way this goes wrong:
+
+- **Stop before terminate.** Stopping is reversible and costs a fraction of running; terminating
+  takes the disk with it. Between the two, B5 runs `node scripts/smoke.mjs` — if all 9 checks still
+  pass, nothing depended on the machine. That is the whole reason the steps are in that order.
+- **Release the Elastic IP.** An address attached to nothing is billed hourly, so terminating the
+  instance alone can leave a charge behind. `describe-addresses` tells you whether there is one.
+- **Delete any orphaned volume.** The root disk normally goes with the instance; a volume left in
+  `available` state does not, and keeps billing.
+- **There is nothing to clean up in DNS.** `media.34-195-170-147.sslip.io` is not a record anyone
+  created — `sslip.io` is a public wildcard resolver that returns the IP embedded in the hostname.
+  No zone, no registrar entry, nothing in Porkbun to touch.
+
+It also carries commands to prove the negative — `aws lightsail get-instances` across five regions —
+and to find anything else the account pays for, including a Cost Explorer query by service.
+
+**The TODO files now list only open work,** which is the convention the root `TODO.md` already
+stated and only the root file was following.
+
+| file | removed | added |
+| --- | --- | --- |
+| `TODO.md` | the four smoke-test rows — `M`/`M2` struck through **and** `M-orig`/`M2-orig`, all closed earlier today | item **O**, retiring the AWS SFU, with the identification evidence and the honest blocker |
+| `apps/room/TODO.md` | 11 resolved evidence-gap rows (15, 16, 17, 20, 21, 25, 26, 27, 28, 32, 33), the Files-pane section, and sections 3, 3d and 8 — **549 → 412 lines** | a pointer to the archive; gap 1 rewritten to state only its open half |
+| `docs/PROMPT-TODO-ITEMS.md` | item **I** (closed 09:57 yesterday) and the production `users` query that was owed (run 09:58) | "Two lessons that outlived their item", and **O** in the opening prompt as the owner's to run |
+
+**Moved, not deleted.** `CHANGELOG.md` begins on 2026-08-09 and every room entry removed here closed
+between 08-04 and 08-08, so deleting them would have erased the only record in the working tree.
+They are in `apps/room/docs/RESOLVED-ARCHIVE.md` verbatim — including §8, where restoring the
+evidence base turned up a real tenancy defect within the hour. The archive header says plainly that
+nothing in it is a live instruction, **with one flagged exception**: §3d explains why five `.svelte`
+templates are in `.prettierignore`, and that decision still holds — reflowing a template moves
+rendered whitespace, and this room is verified by screenshot diff.
+
+**Two corrections fell out of the sweep.** `apps/room/TODO.md` §4 still said "The SFU is deployed on
+AWS Lightsail", wrong twice over — it moved to Hetzner on 08-09 and the AWS host it meant is EC2.
+And four files referenced entries that no longer exist: `apps/room/AGENTS.md` (entry 3d),
+`apps/room/docs/DOMAIN-MODEL-MAP.md` (entry 3), `docs/LOCAL-DEV.md` and
+`apps/controller/docs/decisions/0004-css-architecture.md` (both item J, which was removed before
+today). All four now point at where the content actually lives. Removing closed items from a list is
+how those references break, so checking for them is part of the job rather than a follow-up.
+
 ### 04:56 — The second SFU is **EC2, not Lightsail**. The owner was right; four documents were wrong
 
 **No runtime impact** — documentation only. Files: `docs/SFU-MIGRATION.md`, `docs/DEPLOYMENT.md`,

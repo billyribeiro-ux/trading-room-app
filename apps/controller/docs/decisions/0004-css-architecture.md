@@ -58,7 +58,8 @@ would break the evidence trail: each of those values is pinned to a capture, and
 (`verify-manage-styles.mjs`, `verify-breakpoints.mjs`, `verify-home-fidelity.mjs`) read these files.
 
 **Their manual `.acc-body …` / `.pub-root …` prefixes are a hand-rolled version of what Svelte's
-scoping does automatically**, and they are the direct cause of `TODO.md` item J: a page rendered
+scoping does automatically**, and they are the direct cause of what `TODO.md` carried as item J
+(closed; `CHANGELOG.md` 2026-08-09 09:50): a page rendered
 under the wrong ancestor, so none of the rules matched and every field came out at twice its width.
 That is the cost of tier 2, it is accepted for transcribed framework CSS, and it is the reason for
 the rule below.

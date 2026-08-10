@@ -38,7 +38,8 @@ documentation work. At least one — `captured-runtime-components.css` — is a
 GENERATED artifact whose own header names its generator, so the SSOT rule "do
 not hand-edit generated artifacts" means prettier should not be checking it at
 all; it belongs in `.prettierignore`. Do not "fix" these by reformatting until
-that is decided. Recorded as `TODO.md` entry 3d.
+that is decided. Recorded as entry 3d in `docs/RESOLVED-ARCHIVE.md`, where it moved on
+2026-08-10 when the entry closed — the `.prettierignore` decision it explains is still in force.
 
 Rust work, from `services/`:
 

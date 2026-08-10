@@ -20,7 +20,8 @@ rather than bridged to it.
 
 The local database also cannot be carried forward even if someone wanted to: its
 recorded sqlx checksums for migrations 2 and 3 no longer match the files, so it
-refuses to migrate (`TODO.md` entry 3).
+refuses to migrate (`TODO.md` entry 3, closed 2026-08-04 and now in
+`docs/RESOLVED-ARCHIVE.md`).
 
 ## 2. The real model
 

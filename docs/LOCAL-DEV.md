@@ -14,7 +14,8 @@ repository. Everything below was executed, not planned.
 > that exercises the same adapter and the same build as production, which localhost does not.
 >
 > This document stays because a local server is occasionally the only way to see something — the
-> shell defect in `TODO.md` item J was invisible everywhere else. If you need one: **say so first,
+> shell defect that was item J in `TODO.md` — closed, and now in `CHANGELOG.md` 2026-08-09 09:50 —
+> was invisible everywhere else. If you need one: **say so first,
 > and stop it the moment you are done.** `pkill -f "vite dev"`, then confirm the port is closed.
 
 ---

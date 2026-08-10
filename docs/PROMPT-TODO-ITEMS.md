@@ -4,7 +4,17 @@ Written 2026-08-09, straight after password reset (item A) and the mail transpor
 closed. This covers **what is left on `TODO.md`**, in the order it is worth doing, with what is
 already known about each so the next session does not re-derive it.
 
-**The SFU is not in here.** It has its own brief — `docs/SFU-MIGRATION.md` — and its own session.
+**Closed items have been removed from this file rather than struck through**, matching the
+convention at the top of `TODO.md`: two places recording the same thing is how one of them goes
+stale. Their history is in `CHANGELOG.md`, dated and timed, with the commit that closed each.
+Removed on 2026-08-10: **item I** (four unstyled public pages — closed 2026-08-09 09:57, commit
+`6e7a151`, `CHANGELOG.md` 09:57) and **the verification query that was owed** against the production
+`users` table (run 2026-08-09 09:58; one row, both timestamps equal, nobody gated out —
+`CHANGELOG.md` 09:58).
+
+**The SFU is not in here.** Moving it to Hetzner is done — `docs/SFU-MIGRATION.md` is the record.
+Shutting down the OLD one on AWS is `docs/RETIRE-AWS-SFU.md`, and it is the owner's to run because
+it needs an interactive `aws login`.
 
 ---
 
@@ -12,10 +22,14 @@ already known about each so the next session does not re-derive it.
 
 > Read `TODO.md`, `docs/LOCAL-DEV.md` and this file before touching anything.
 >
-> Work the open items in `TODO.md` in this order: **I** (four public pages render with classes that
-> have no CSS rule), then **C** (`push_tokens_json` has no writer), then the evidence gaps 1/2/3/6/7
-> if and only if the owner has run `scripts/collect-create-new.js` against the live original —
-> without that capture those five cannot be closed honestly and must not be guessed at.
+> Work the open items in `TODO.md` in this order: **C** (`push_tokens_json` has no writer), then
+> **N** (the connectivity test does not test this deployment's relay), then the evidence gaps
+> 1/2/3/6/7 if and only if the owner has run `scripts/collect-create-new.js` against the live
+> original — without that capture those five cannot be closed honestly and must not be guessed at.
+>
+> **O is the owner's, not yours.** Retiring the old AWS SFU needs an interactive browser sign-in
+> (`aws login`). `docs/RETIRE-AWS-SFU.md` has every command; run them only once the owner has
+> authenticated, and stop the instance before terminating it.
 >
 > **G and H are the owner's calls, not yours.** They are recorded so they are not lost. Do not
 > implement either; if you have something to add, add evidence to the write-up.
@@ -35,116 +49,45 @@ already known about each so the next session does not re-derive it.
 > `.acc-body` and `public.css` under `.pub-root`, and which one applies is decided by
 > `$lib/chrome.ts` rather than by the route folder. That exact mistake shipped on 2026-08-09 with
 > `svelte-check` clean, the whole unit suite green (522 then; **535 measured 2026-08-09 09:59 EDT**)
-> and every expected class present in the SSR HTML — it
-> was only visible in computed styles. `TODO.md` item J has the numbers.
+> and every expected class present in the SSR HTML — it was only visible in computed styles. Item J
+> carried the numbers and has been removed as closed; the two lessons that survived it are in the
+> next section, and `CHANGELOG.md` 2026-08-09 09:50 and 09:57 have the detail.
 
 ---
 
-## Item I — four public pages have no styling at all
+## Two lessons that outlived their item
 
-> **CLOSED 2026-08-09 09:57 EDT.** `public.css` now defines all seven classes, every rule scoped
-> `.pub-root …`, in a section headed NOT TRANSCRIBED. The owner's decision below was followed
-> exactly: `pub-*` rules written, nothing restyled onto `acc-*`, nothing added to
-> `CONTROLLER_PATHS`. Deliberately fluid with no `@media` block, because
-> `scripts/verify-breakpoints.mjs` asserts `public.css` carries exactly the thresholds
-> 767/768/991/992/1200 — a new one fails that gate. `contact` was rebuilt with labelled fields and
-> an honest not-delivered state; `privacy` and `terms` were written from the source code with an
-> explicit "not reviewed by a lawyer" notice. Verified: breakpoint contract passes, `svelte-check`
-> 0 errors, 535 tests pass, autofixer clean. **Honest gap:** `verify-home-fidelity.mjs` could not be
-> run — it reads `evidence-dumps/`, which is outside this repo — so its two `public.css` reject
-> patterns were checked by hand (0 matches).
->
-> The section below is kept as the record of how it was decided, not as open work.
+Item I (four public pages rendering with classes that had no CSS rule) closed 2026-08-09 09:57 in
+`6e7a151`. The item is gone; these two findings from it are not, because both cost real time and
+both will cost it again.
 
-**Severity: cosmetic, but it is four pages a paying customer sees.**
+1. **Scope every new rule in `public.css` under `.pub-root`, and every rule in `account.css` under
+   `.acc-body`.** This is load-bearing, not a style preference. The layout's own comment records
+   what happened when those sheets were loaded unscoped: they fought the controller bundle over
+   `.container`, `.row`, `.col-md-*`, `hr`, `img`, `.navbar`, `.caret` and `.dropdown-menu` on every
+   controller page, and the bulk-actions menu rendered **376px instead of 238px** because
+   `.dropdown-menu { right: 0 }` leaked. Related: which shell a page renders in is decided by
+   `$lib/chrome.ts`, **not** by the `(public)/` folder — `/login` lives in `(public)/` and is a
+   controller page. "Which stylesheet" and "which shell" are one question and must be answered
+   together.
 
-### What is measured, not read
+2. **A computed-style probe is only as good as the properties it reads.** `contact`'s submit button
+   was reported as invisible white-on-white on the strength of `background-color: rgba(0,0,0,0)`.
+   It renders blue: `.pub-root .button` sets `background-color: #4589e3` and then a `background:`
+   shorthand, and the shorthand resets `background-color` to transparent while setting
+   `background-image` to the gradient that actually paints. For anything painted, read
+   `background-image`, `background-color` **and** the shorthand together — or take a screenshot.
 
-Rendered in Chromium at 1280px, each element compared against a bare sibling of the same tag —
-identical computed styles means no rule reaches it:
+And the method that produced the item in the first place, which is still the right one: **render the
+page and compare computed styles against a bare element of the same tag.** A class with no rule and
+a class whose rule matches the UA default are indistinguishable in source and obvious in a computed
+read. Measure against a **Vercel preview deployment, not localhost** — the owner's standing
+instruction is that nothing runs on local ports for this project, because more than one agent works
+in it and a stray dev server on 5173 means the next person measures somebody else's code believing
+it is their own. `vercel deploy` without `--prod` gives a preview URL on the same adapter and build
+as production.
 
-| class | pages | result |
-| --- | --- | --- |
-| `.pub-auth` | contact, verify-email | **no rule** |
-| `.pub-container` | privacy, terms | **no rule** |
-| `.pub-form-card` | all four | **no rule** |
-| `.pub-field` | contact | **no rule** |
-| `.pub-hint` | contact, privacy, verify-email | **no rule** |
-| `.pub-error`, `.pub-success` | contact, verify-email | **not measured** — they render only on states that run did not reach |
-
-**Seven classes, not six.** An earlier version of this item listed six and missed `pub-container`,
-because it was written from reading the pages instead of rendering them. That is the whole lesson of
-item J below; do not repeat it.
-
-One thing that is NOT unstyled: `contact`'s submit is `class="button"`, and it computes
-`padding: 13px 32px`, `border-radius: 5px`, a box-shadow, `font-size: 17px` — and
-`background: rgba(0,0,0,0)` with `color: rgb(255,255,255)`. **Check whether that is white text on a
-white background before assuming that page merely lacks polish.**
-
-> **CHECKED 2026-08-09: it is not white-on-white, and the reading was an artifact of the
-> measurement.** `.pub-root .button` (`public.css:421-439`) declares `background-color: #4589e3` and
-> then `background: linear-gradient(#5da4ff, #417bff)`. The shorthand resets `background-color` to
-> its initial `transparent` — which is exactly the `rgba(0,0,0,0)` that was measured — while setting
-> `background-image` to the gradient. The button paints blue under white text. **Reading
-> `background-color` alone misses `background-image`**, which is worth remembering for the next
-> computed-style pass: this document is otherwise right that measuring beats reading, and this is the
-> one case where a measurement needs a second property to be read correctly.
-
-### Read this before choosing an approach
-
-The shell a page renders in is decided by **`$lib/chrome.ts`**, not by the `(public)/` folder.
-`/login` lives in `(public)/` and is a controller page. So "which stylesheet should this page use"
-and "which shell is it in" are the same question and must be answered together — see item J, where
-answering only the first produced a page with flawless markup and every field twice its intended
-width.
-
-### DECIDED BY THE OWNER 2026-08-09 — this is not an open question
-
-**Use the `pub-*` classes. Write the missing rules; do not restyle these pages onto `acc-*`.**
-
-The owner's instruction, given directly, and the reason is to avoid making a mess. An earlier
-version of this document offered two routes and leaned the other way for `verify-email`. That
-recommendation is **withdrawn** — it is recorded here only so nobody re-derives it and reopens a
-settled call.
-
-Three consequences that follow from it, and all three matter:
-
-1. **These pages STAY in the marketing shell.** Do **not** add them to `CONTROLLER_PATHS` in
-   `$lib/chrome.ts`. `pub-*` rules only reach them inside `.pub-root`, so moving the page and
-   keeping the classes would break them the same way item J broke — just in the other direction.
-2. **Scope every new rule under `.pub-root`.** Every existing rule in `public.css` is written
-   `.pub-root …`, and that is not a style preference — it is load-bearing. The layout's own comment
-   records what happened when these sheets were loaded unscoped: they fought with the controller
-   bundle over `.container`, `.row`, `.col-md-*`, `hr`, `img`, `.navbar`, `.caret` and
-   `.dropdown-menu` on every controller page, and the bulk-actions menu came out **376px instead of
-   238px** because `.dropdown-menu { right: 0 }` leaked. A bare `.pub-form-card { … }` is the same
-   class of bug waiting to happen.
-3. **`contact`'s submit already has a rule**, and the white-on-white worry an earlier version of
-   this document raised is **RETRACTED — it was my measurement, not a defect.** `.pub-root .button`
-   sets `background-color: #4589e3` and then a `background:` shorthand, and the shorthand resets
-   `background-color` to transparent while setting `background-image` to the gradient that actually
-   paints. Reading `backgroundColor` alone sees `rgba(0,0,0,0)` and concludes the button is
-   invisible; it renders blue under white text.
-
-   Worth keeping as a lesson rather than deleting: **a computed-style probe is only as good as the
-   properties it reads.** For anything painted, read `background-image`, `background-color` AND the
-   shorthand together, or take a screenshot.
-
-### How to verify it — not by reading the CSS
-
-Render the page and compare computed styles against a bare element, which is how the table above
-was produced. A class with no rule and a class whose rule happens to match the UA default are
-indistinguishable in source and obvious in a computed-style read.
-
-**Measure against a Vercel PREVIEW deployment, not localhost.** The owner's standing instruction is
-that nothing runs on local ports for this project — it is deployed, more than one agent is working
-in it, and a stray dev server on 5173 means the next person measures somebody else's code and
-believes it is their own. `vercel deploy` (without `--prod`) gives a preview URL to point the
-browser at, and it exercises the same adapter and the same build as production, which localhost
-does not.
-
-If you do need a local server for something a preview cannot give you, say so first, and stop it the
-moment you are done.
+---
 
 ## Item C — `push_tokens_json` has no writer
 
@@ -192,7 +135,7 @@ branches, and what `customMobileAppLaunchWord` does.
 
 `scripts/collect-create-new.js` already fetches it. It is a GET of a public static asset — it clicks
 nothing, submits nothing and mutates nothing. **Running it once against the live original closes
-five of thirteen gaps.**
+five of the twelve remaining gaps.**
 
 That is the owner's action, not the next session's: it needs a logged-in browser on the original.
 If it has not been run, say so and work on I and C instead. **Do not fill any of these five in from
@@ -220,41 +163,3 @@ If either comes up, the useful contribution is **measurement** — connection co
 room, or a costed topology — added to the write-up. Not a migration.
 
 ---
-
-## One thing that is owed before any of this
-
-`docs/EMAIL.md` §5 carries a query that must be re-run against the production database:
-
-```sql
-SELECT id, email, created_at, email_verified_at FROM users ORDER BY id;
-```
-
-`RESEND_API_KEY` and `MAIL_FROM` went live on 2026-08-09, which flipped `verificationEnforced()` to
-`true` and made the room-creation gate real. The measurement in §5 proving nobody would be locked
-out was taken *before* that. Anyone who registered between migration 1 and that day has a NULL
-`email_verified_at` and is now gated out of creating a room — and until that day, the link that
-would clear it could not be sent to them.
-
-It was not run in the session that flipped the switch, because obtaining a production connection
-string means `vercel env pull`, which writes every other production secret to disk alongside it.
-That is a worse trade than leaving one read-only query for the owner. If the query returns such a
-row, the fix is one `UPDATE` for that user, or a resend from the account page — **not** a change to
-the gate.
-
-> **RUN 2026-08-09 09:58 EDT, after the switch was flipped. Nothing is gated out.**
->
-> ```
-> id | email                    | created_at                 | email_verified_at
->  1 | billy.ribeiro@icloud.com | 2026-08-07 22:46:34.438+00 | 2026-08-07 22:46:34.438+00
-> ```
->
-> One row, and the two timestamps are equal to the millisecond — the signature of migration 1's
-> `UPDATE users SET email_verified_at = created_at`. No `UPDATE` and no resend is needed.
->
-> **The stated obstacle above is not one, and that is worth correcting rather than leaving to cost
-> somebody the same hesitation.** A production connection string was already on disk at
-> `~/Desktop/new-room-control/.env.vercel-pull`, which is where `scripts/set-vercel-env.sh` reads
-> `DATABASE_URL` from (lines 23 and 128). Reading one variable out of a file that already exists
-> writes nothing and exposes nothing further, so `vercel env pull` was never required for this.
->
-> This measurement expires with the next registration. Re-run it before assuming it still holds.
