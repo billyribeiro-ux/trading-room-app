@@ -22,6 +22,67 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ---
 
+## 2026-08-10
+
+### 03:12 — Two production defects from the console: closed modals kept focus, uploads died at 512KB
+
+**RUNTIME IMPACT: yes.** Room rebuilt, `BODY_SIZE_LIMIT` set, service restarted. Previous build kept
+as `build.bak-1786345915`.
+
+#### 1. `413` on every composer image over ~512KB — the app's own 25MB limit was never reached
+
+Reported as `POST /?/uploadComposerImage 413` with a bare "Upload failed." The cause is one line in
+a dependency, and nothing in this repository ever set it:
+
+```
+@sveltejs/adapter-node/files/handler.js:25
+const body_size_limit = parse_as_bytes(env('BODY_SIZE_LIMIT', '512K'));
+```
+
+**512K by default**, enforced by the ADAPTER before any application code runs — so
+`file-storage.ts:20`'s `MAX_UPLOAD_BYTES = 25 * 1024 * 1024` was never consulted, and the 413
+carried no message saying why. The app promised 25MB and the server refused at half a megabyte.
+
+`BODY_SIZE_LIMIT=32M` is now set on the box and documented in `apps/room/.env.example` — deliberately
+**above** `MAX_UPLOAD_BYTES` so the app's limit is the one that answers, with a readable message
+naming the size, rather than a bare status from the adapter. 32M covers multipart boundaries and the
+other form fields around a 25MB file. Verified live in the running process:
+`tr '\0' '\n' < /proc/80462/environ` returns `BODY_SIZE_LIMIT=32M`.
+
+**Honest gap on this one:** I could not reproduce the 413 from outside to get a before/after pair.
+The room's auth gate answers **403 first** — measured, at 100KB and at 1MB alike, with and without a
+same-origin `Origin` header — so the body is never read for an unauthenticated request and the size
+limit never fires. The proof is the dependency's own default, the absence of the variable, and the
+owner's console. **The confirming test is a real upload over 512KB by a signed-in user.**
+
+#### 2. Chrome refused `aria-hidden` on two closed modals, so they stayed in the accessibility tree
+
+```
+Blocked aria-hidden on an element because its descendant retained focus.
+Element with focus: <button.btn btn-success>        ancestor: <div.modal fade#alert-modal>
+Element with focus: <button.btn-close btn-close-white> ancestor: <div.modal fade#play-youtube-modal>
+```
+
+`Modal.svelte:76` applies `aria-hidden="true"` the moment `open` goes false. That is the ordinary
+path, not an edge case: a modal is closed BY clicking a control inside it, so focus is still on that
+button when its ancestor is hidden. **Chrome then ignores the `aria-hidden` entirely** — which means
+a closed dialog remains in the accessibility tree and a screen-reader user can tab into a dialog
+nobody can see. Not cosmetic.
+
+Fixed in the shared component, so both modals and every other one are covered: the root is now
+`inert` while closed — the browser's own suggestion in that message, and the spec's answer, because
+`inert` removes the subtree from the accessibility tree AND makes it unfocusable, so the conflict
+cannot arise. `aria-hidden` stays beside it since the reference's markup carries it.
+
+Focus is also released explicitly through a Svelte attachment. Making an element inert is defined to
+move focus out, but that happens as the attribute is applied and both attributes change in the same
+update — releasing focus ourselves means the result does not depend on which the browser processes
+first. Written as `{@attach …}` rather than `bind:this` on the autofixer's advice, matching the
+idiom already used elsewhere in this codebase.
+
+**Verified:** room `svelte-check` 0 errors 0 warnings, 56 files / 524 tests, autofixer clean,
+service active after restart, `chat` and `media` both answering as before.
+
 ## 2026-08-09
 
 ### 21:24 — "AWS Lightsail" was never verified by anyone here. Three documents corrected
