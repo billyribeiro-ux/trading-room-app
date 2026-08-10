@@ -12,9 +12,9 @@ Removed on 2026-08-10: **item I** (four unstyled public pages — closed 2026-08
 `users` table (run 2026-08-09 09:58; one row, both timestamps equal, nobody gated out —
 `CHANGELOG.md` 09:58).
 
-**The SFU is not in here.** Moving it to Hetzner is done — `docs/SFU-MIGRATION.md` is the record.
-Shutting down the OLD one on AWS is `docs/RETIRE-AWS-SFU.md`, and it is the owner's to run because
-it needs an interactive `aws login`.
+**The SFU is not in here, and both halves are done.** It moved to Hetzner on 2026-08-09
+(`docs/SFU-MIGRATION.md`) and the old AWS Lightsail instance was deleted on 2026-08-10
+(`docs/RETIRE-AWS-SFU.md`).
 
 ---
 
@@ -26,10 +26,7 @@ it needs an interactive `aws login`.
 > **N** (the connectivity test does not test this deployment's relay), then the evidence gaps
 > 1/2/3/6/7 if and only if the owner has run `scripts/collect-create-new.js` against the live
 > original — without that capture those five cannot be closed honestly and must not be guessed at.
->
-> **O is the owner's, not yours.** Retiring the old AWS SFU needs an interactive browser sign-in
-> (`aws login`). `docs/RETIRE-AWS-SFU.md` has every command; run them only once the owner has
-> authenticated, and stop the instance before terminating it.
+
 >
 > **G and H are the owner's calls, not yours.** They are recorded so they are not lost. Do not
 > implement either; if you have something to add, add evidence to the write-up.

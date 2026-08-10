@@ -38,33 +38,20 @@
 >    `MEDIASOUP-DEPLOYMENT-PLAN.md`, and a reader who has seen those deserves to know which part is
 >    evidence: **an SFU answers there; whose machine it is, is unverified.**
 >
->    **IDENTIFIED 2026-08-10 04:56 EDT — it is an EC2 instance, NOT Lightsail.** Measured, not inherited:
+>    **RETIRED 2026-08-10 05:14 EDT — and it WAS Lightsail.** Deleted: `mediasoup-test-01`,
+>    us-east-1a, Ubuntu, bundle `small_3_0` ($12.00/month), created 2026-08-02 12:54:31 -0400. Static IP
+>    `mediasoup-test-ip` released, both CloudWatch alarms removed with it, and `aws lightsail
+>    get-instances` now returns empty in all eleven regions. Stopped first, verified dark while
+>    `media.tradingroom.app` still served its 2 connected peers and `pnpm smoke` passed 9/9, then
+>    deleted.
 >
->    ```
->    whois 34.195.170.147      -> Organization: Amazon Technologies Inc. (AT-88-Z), 34.192.0.0/10
->    dig +short -x 34.195.170.147 -> ec2-34-195-170-147.compute-1.amazonaws.com
->    ```
->
->    `ec2-….compute-1.amazonaws.com` is EC2's own reverse-DNS form and `compute-1` is **us-east-1**. The
->    owner said plainly that no Lightsail instance was ever deployed, and the owner was right: "Lightsail,
->    instance `mediasoup-test-01`" came from `MEDIASOUP-DEPLOYMENT-PLAN.md`'s Stage 1 PLAN and was copied
->    between documents until it read as fact. Nobody ever checked the IP.
->
->    **Find and retire it (EC2, us-east-1):**
->
->    ```bash
->    aws login                                    # interactive; only the owner can do this
->    aws ec2 describe-instances --region us-east-1 \
->      --filters 'Name=ip-address,Values=34.195.170.147' \
->      --query 'Reservations[].Instances[].{id:InstanceId,state:State.Name,type:InstanceType,name:Tags[?Key==`Name`]|[0].Value}'
->    aws ec2 stop-instances     --region us-east-1 --instance-ids <id>   # reversible; prove nothing broke
->    aws ec2 terminate-instances --region us-east-1 --instance-ids <id>  # only after that
->    ```
->
->    Stop first and confirm `https://media.34-195-170-147.sslip.io/health` stops answering. Then
->    terminate, because a stopped instance still bills for its EBS volume and its Elastic IP — and
->    release that Elastic IP too, or AWS charges for an address attached to nothing.
->
+>    **The 04:56 "it is EC2, not Lightsail" identification above was MY error — disregard it.** `whois`
+>    and reverse DNS prove the vendor and the region, not the product: Lightsail runs on EC2, so its
+>    public IPs carry `ec2-<ip>.compute-1.amazonaws.com` rDNS. And Lightsail resources never appear in
+>    the EC2 API, so the empty `describe-instances` across every region — which felt like confirmation —
+>    was the strongest sign the wrong service was being queried. The original Stage 1 description in
+>    `MEDIASOUP-DEPLOYMENT-PLAN.md` was accurate all along. Full account in
+>    **`docs/RETIRE-AWS-SFU.md`**.
 
 >    What matters does not depend on the answer: two SFUs are live, only the Hetzner one is wired to
 >    `chat.tradingroom.app`, and that hostname embeds an IP — so anything still pointing at it works
@@ -86,14 +73,14 @@ Read `docs/DEPLOYMENT.md` first. It describes the box you are working on.
 
 ## The one-paragraph brief
 
-The mediasoup SFU currently runs on **AWS** at `34.195.170.147`, reachable at
-`https://media.34-195-170-147.sslip.io`. (This paragraph said "AWS Lightsail, `mediasoup-test-01`"
-when it was written, and that was never checked. It is an **EC2** instance in **us-east-1** — see
-the identification note at the top of this file.) It must move to the **Hetzner box**
+The mediasoup SFU currently runs on **AWS Lightsail** (`mediasoup-test-01`, `34.195.170.147`,
+reachable at `https://media.34-195-170-147.sslip.io`) — confirmed against the Lightsail API on
+2026-08-10 and **deleted the same day**, see the note at the top of this file. It must move to the
+**Hetzner box**
 (`87.99.154.155`, Ashburn) where the room now runs, and be served at
 **`media.tradingroom.app`** — which already resolves there, already has a valid certificate, and
 currently answers a 503 placeholder. When it is done, the `sslip.io` hostname is retired and the
-EC2 instance is terminated.
+Lightsail instance is deleted. **Both done — 2026-08-09 and 2026-08-10 respectively.**
 
 ---
 
@@ -103,11 +90,10 @@ Two reasons, and the second is the one that forces the timing.
 
 1. **Cost at scale.** `docs/streaming-choices.md` measured VP9 screen share on realistic chart
    content at **3841 kbps per member**. An SFU sends that to every member. 100 concurrent members is
-   ~22.8 TB/month. This originally read "Lightsail bundles 6 TB and charges ~$0.09/GB over —
-   roughly $1,900/month"; the host is EC2, which has **no bundled allowance at all** — 100 GB/month
-   free, then list price ~$0.09/GB to 10 TB and ~$0.085/GB beyond. The same 22.8 TB is therefore
-   **~$2,000/month** rather than $1,900. Arithmetic against published list price, not a bill.
-   Hetzner's overage is **€1/TB**, so the conclusion is unchanged and slightly stronger.
+   ~22.8 TB/month. This paragraph originally said "Lightsail bundles 6 TB"; the bundle actually
+   deployed was `small_3_0`, which the Lightsail API reports as **3 TB** included at **$12.00/month**
+   (read 2026-08-10). Overage is ~$0.09/GB, so 22.8 TB is roughly **$1,800/month** — the same order
+   as the $1,900 originally quoted, and the conclusion is unchanged. Hetzner's overage is **€1/TB**.
    See `NEXT-SESSION.md` §4.
 2. **`MEDIA_ALLOWED_ORIGIN`.** The SFU checks the browser `Origin` before admitting a grant
    (`services/media/src/server.rs:827-841`). The room is now served from
@@ -227,7 +213,7 @@ Create a room in the admin, click Launch, and confirm with **two browsers**:
 - a screen share from one appears in the other
 - `getStats()` shows frames actually decoding, not just a connection
 
-Only then: terminate the EC2 instance and stop using the `sslip.io` name. **Never ship that
+Only then: delete the Lightsail instance and stop using the `sslip.io` name. **Never ship that
 hostname** — it embeds the IP, so changing servers breaks every client that cached it.
 
 ---

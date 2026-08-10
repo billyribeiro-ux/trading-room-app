@@ -24,6 +24,81 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-10
 
+### 05:14 — The old SFU is DELETED. It was Lightsail all along, and the 04:56 entry below was my error
+
+**No runtime impact on this repository** — no code changed. Real-world impact: an AWS resource that
+had been billing since 2026-08-02 no longer exists.
+
+**What was deleted,** read from the Lightsail API rather than inferred from anything:
+
+| | |
+| --- | --- |
+| Instance | `mediasoup-test-01`, us-east-1a, Ubuntu |
+| Bundle | `small_3_0` — **$12.00/month**, 2 vCPU, 2 GB RAM, 60 GB SSD, 3 TB transfer |
+| Created | 2026-08-02 12:54:31 -0400 — so **$12/month for 8 days** |
+| Static IP | `mediasoup-test-ip` = `34.195.170.147`, released |
+| Alarms | `mediasoup-cpu-high`, `mediasoup-status-check-failed`, both removed with it |
+
+`aws lightsail get-instances` now returns empty across all eleven regions, as do `get-static-ips`,
+`get-disks` and `get-instance-snapshots`. EC2, EBS and S3 were already empty everywhere.
+
+**The order was stop → verify → delete, and the verify step is the point.** After stopping,
+`https://media.34-195-170-147.sslip.io/health` was unreachable while `media.tradingroom.app` still
+answered — **with `rooms:1, peers:2`, the first real peers ever observed on the Hetzner SFU** — and
+`node scripts/smoke.mjs` printed `All 9 checks passed`. Only then was it deleted. Stopping is
+reversible; if anything had depended on that machine, smoke would have said so while
+`start-instance` was still an option. Smoke passed 9/9 again after deletion.
+
+Releasing the static IP is a separate call and is easy to miss: a Lightsail static IP is **free
+while attached to a running instance and billed once it is not**, and `delete-instance` detaches it.
+
+---
+
+**Now the correction, and it is mine.** The 04:56 entry below says *"it is EC2 in us-east-1, not
+Lightsail — the owner was right that no Lightsail instance was ever deployed."* **That was wrong.**
+`mediasoup-test-01` existed, in Lightsail, exactly as `MEDIASOUP-DEPLOYMENT-PLAN.md` had described
+it since Stage 1. The entry is left in place rather than rewritten, because it was read.
+
+Both pieces of evidence I used were read correctly and neither supports the conclusion I drew:
+
+- **`whois` → Amazon, and reverse DNS → `ec2-34-195-170-147.compute-1.amazonaws.com`.** Lightsail
+  instances *are* EC2 instances underneath, so a Lightsail IP carries exactly that rDNS form.
+  **Reverse DNS establishes the vendor and the region. It cannot distinguish the product.**
+- **`aws ec2 describe-instances` empty in every region.** This felt like confirmation and was the
+  opposite: **Lightsail resources never appear in the EC2 API**, so an empty EC2 sweep is precisely
+  what a Lightsail-only account returns. The sweep that seemed to prove the finding was the
+  strongest available sign that the wrong service was being queried.
+
+One command settles it, and it is the service's own:
+
+```console
+$ aws lightsail get-instances --region us-east-1 --query 'instances[].name' --output text
+mediasoup-test-01
+```
+
+**This is the house rule in `CLAUDE.md` almost word for word — "rule out my own tooling before
+reporting a single failure", and "if it cannot be found, it does NOT get invented".** I inferred a
+product from a hostname format and then told the owner they were right, which is worse than being
+wrong quietly: it endorsed a conclusion with authority it had not earned. The honest answer at 04:56
+was *"the vendor is Amazon and the region is us-east-1; which product it is cannot be determined
+without account access."* The blocker was always account access, and that is what it stayed.
+
+What that means for the older record: the 2026-08-09 21:24 entry, which flagged "AWS Lightsail /
+`mediasoup-test-01` / still billing" as never verified from this repository, was **fair about
+provenance and wrong in its implication.** Nobody here had checked it — and it was true anyway,
+including "still billing", at $12.00/month.
+
+Documents corrected: `docs/RETIRE-AWS-SFU.md` (rewritten from a runbook into the record of what was
+run, leading with the correction), `docs/SFU-MIGRATION.md`, `docs/NEXT-SESSION.md` — including its
+verified-state table row — `docs/DEPLOYMENT.md`, `apps/room/TODO.md` §4, and `TODO.md`, where item
+**O** is removed as done four hours after being added.
+
+One inherited number was corrected properly this time. The egress case said "Lightsail bundles
+6 TB"; the deployed bundle included **3 TB** at $12.00/month, per `get-bundles`. At ~$0.09/GB
+overage, 22.8 TB/month is roughly **$1,800** — the same order as the $1,900 originally quoted, so
+the argument for Hetzner (€1/TB) is unchanged. My 04:56 revision of this figure to "~$2,000, EC2 has
+no bundled allowance" was wrong along with everything else built on the EC2 reading.
+
 ### 05:09 — A retirement runbook for the AWS SFU, and all three TODO files carry only open work
 
 **No runtime impact** — documentation only. New: `docs/RETIRE-AWS-SFU.md`,
@@ -31,8 +106,10 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 `docs/PROMPT-TODO-ITEMS.md`, and four files carrying references that pointed at removed entries.
 
 **`docs/RETIRE-AWS-SFU.md` — every step and command, start to finish.** It opens by settling the
-thing that has cost two rounds of argument: it is **EC2 in us-east-1**, not Lightsail, so the empty
-Lightsail console the owner kept seeing was correct. Two routes that do the same job — the browser
+thing that had cost two rounds of argument — and got it **wrong**, saying "EC2 in us-east-1, not
+Lightsail". It was Lightsail; see the 05:14 entry. The runbook has since been rewritten as the
+record of the deletion. The mechanics below were sound and were followed; only the identification
+at the top of it was false. Two routes that do the same job — the browser
 console (A1–A8, nothing to install) and the CLI (B1–B10, paste-ready) — plus what happens when it
 stops, what is safe to skip, and a symptom table.
 
@@ -77,7 +154,12 @@ And four files referenced entries that no longer exist: `apps/room/AGENTS.md` (e
 today). All four now point at where the content actually lives. Removing closed items from a list is
 how those references break, so checking for them is part of the job rather than a follow-up.
 
-### 04:56 — The second SFU is **EC2, not Lightsail**. The owner was right; four documents were wrong
+### 04:56 — ~~The second SFU is EC2, not Lightsail~~ — **WRONG, superseded by the 05:14 entry above**
+
+> **This entry is incorrect and is kept because it was read.** It WAS Lightsail: `mediasoup-test-01`,
+> confirmed against the Lightsail API at 05:10 and deleted at 05:14. Reverse DNS shows
+> `ec2-…compute-1.amazonaws.com` for Lightsail instances too, because Lightsail runs on EC2 — so the
+> evidence below establishes the vendor and region and nothing more. Read the 05:14 entry instead.
 
 **No runtime impact** — documentation only. Files: `docs/SFU-MIGRATION.md`, `docs/DEPLOYMENT.md`,
 `docs/NEXT-SESSION.md`.

@@ -264,9 +264,10 @@ admitted end to end (101, router created). **RTP, TURN, and real-device cells ar
 open: single-use/node-bound grants, a real readiness check, bitrate ceilings, media metrics, and
 the OpenSSL 3.0.8 rebuild.
 
-(This entry said "AWS Lightsail" until 2026-08-10, which was wrong twice over: the SFU moved to
-Hetzner on 08-09, and the old AWS host it meant is an **EC2** instance, not Lightsail. Retiring
-that one is `docs/RETIRE-AWS-SFU.md`.)
+(This entry said "AWS Lightsail" until 2026-08-10. The product name was right — it was
+`mediasoup-test-01` on Lightsail, confirmed against the Lightsail API — but the deployment had
+already moved to Hetzner on 08-09, and the Lightsail instance was **deleted 2026-08-10 05:14 EDT**.
+`docs/RETIRE-AWS-SFU.md` is the record.)
 
 ---
 

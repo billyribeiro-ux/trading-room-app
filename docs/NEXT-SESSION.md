@@ -35,7 +35,7 @@ genuinely open items.
 | Room tests | 56 of 56 test files passing | run from `apps/room` |
 | Room build | builds under BOTH `adapter-vercel` and `ADAPTER=node` | `vite build` twice |
 | SFU | **live on the Hetzner box** since 2026-08-09, `media.tradingroom.app` | `/health` 200; a minted grant answered `101` and the SFU logged `peer connected role=Some(Presenter)` |
-| older SFU | still answering at `media.34-195-170-147.sslip.io` — **host provenance UNVERIFIED** | `/health` 200 behind Caddy, LE cert from 2026-08-02. The "AWS Lightsail / `mediasoup-test-01`" wording below was never checked from this repository and **the owner says it was never a Lightsail deployment** |
+| older SFU | **DELETED 2026-08-10 05:14 EDT.** It was Lightsail after all — `mediasoup-test-01`, us-east-1a, `small_3_0` at $12.00/month, created 2026-08-02 | read from the Lightsail API, not inferred: `aws lightsail get-instance`. Deleted, static IP released, both alarms removed; `get-instances` empty in all eleven regions. `pnpm smoke` 9/9 before and after. See `docs/RETIRE-AWS-SFU.md` |
 | Database | Neon Postgres — 1 user, 1 API key, 1 room | direct SQL against `DATABASE_URL` |
 | Vercel | ONE project, `trading-room-app` (`prj_oxlP8Tig…`), owns both domains | `vercel project ls`, `vercel domains inspect` |
 | PII | no real addresses or secrets in any tracked file | `git ls-files | xargs grep` |
@@ -151,14 +151,20 @@ holdout.
   `DEPLOYMENT.md` and `SFU-MIGRATION.md`, until a plan read as a measurement. The egress arithmetic
   in §4 below is unaffected: it is about bandwidth pricing, not about which company owns that box.
 
-  **RESOLVED 2026-08-10 04:56 EDT — it is AWS, but EC2, not Lightsail.** `whois 34.195.170.147`
-  returns *Amazon Technologies Inc.* and reverse DNS returns
-  **`ec2-34-195-170-147.compute-1.amazonaws.com`**, which is EC2's own rDNS form; `compute-1` is
-  **us-east-1**. So the owner was right that no Lightsail instance exists, the service was right,
-  and the *product name* in every document was wrong. Retirement steps are in `SFU-MIGRATION.md`.
-  It still answered `/health` with `rooms:0, peers:0` at that timestamp: **running, billing, and
-  serving nobody.**
+  **RETIRED 2026-08-10 05:14 EDT — and it WAS Lightsail.** Deleted: `mediasoup-test-01`,
+  us-east-1a, Ubuntu, bundle `small_3_0` ($12.00/month), created 2026-08-02 12:54:31 -0400. Static IP
+  `mediasoup-test-ip` released, both CloudWatch alarms removed with it, and `aws lightsail
+  get-instances` now returns empty in all eleven regions. Stopped first, verified dark while
+  `media.tradingroom.app` still served its 2 connected peers and `pnpm smoke` passed 9/9, then
+  deleted.
 
+  **The 04:56 "it is EC2, not Lightsail" identification above was MY error — disregard it.** `whois`
+  and reverse DNS prove the vendor and the region, not the product: Lightsail runs on EC2, so its
+  public IPs carry `ec2-<ip>.compute-1.amazonaws.com` rDNS. And Lightsail resources never appear in
+  the EC2 API, so the empty `describe-instances` across every region — which felt like confirmation —
+  was the strongest sign the wrong service was being queried. The original Stage 1 description in
+  `MEDIASOUP-DEPLOYMENT-PLAN.md` was accurate all along. Full account in
+  **`docs/RETIRE-AWS-SFU.md`**.
 ### 4a. What the ORIGINAL actually runs on — resolved 2026-08-09
 
 Measured with `dig` and `whois`, not recalled:

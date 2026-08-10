@@ -1,367 +1,218 @@
-# Retiring the old SFU on AWS — every step, every command
+# Retiring the old SFU on AWS — DONE 2026-08-10 05:14 EDT
 
-**Written 2026-08-10 05:0x EDT.** One page, start to finish, for shutting down the second media
-server at `34.195.170.147`. Follow it top to bottom; nothing here depends on anything outside this
-file except an AWS sign-in.
+**It was Lightsail after all.** `mediasoup-test-01`, exactly as the original documents said. It is
+now deleted, its static IP released, and the AWS account holds nothing in any region.
+
+This file was written an hour earlier as a runbook built on a wrong identification. It is kept as
+the record of what was actually run, and of how the wrong identification happened — because that
+mistake is repeatable by anyone with the same two tools.
 
 ---
 
-## First: it is **EC2**, not Lightsail. That is why you could not find it
+## The correction, first
 
-You said, more than once, that you never deployed a Lightsail instance. **You were right.** Every
-document in this repository said "AWS Lightsail, instance `mediasoup-test-01`, us-east-1a" — that
-sentence came from the Stage 1 *plan* in `apps/controller/docs/MEDIASOUP-DEPLOYMENT-PLAN.md` and was
-copied between four documents until a plan read as a measurement. Nobody had ever asked the machine
-what it was.
+At 04:56 I reported **"it is EC2 in us-east-1, not Lightsail — the owner was right that no
+Lightsail instance was ever deployed."** That was wrong, and it was my error, not an inherited one.
 
-Asked on 2026-08-10 at 04:56 EDT:
+The evidence I used:
 
 ```console
 $ whois 34.195.170.147
 Organization:  Amazon Technologies Inc. (AT-88-Z)
-NetRange:      34.192.0.0 - 34.255.255.255
 
 $ dig +short -x 34.195.170.147
 ec2-34-195-170-147.compute-1.amazonaws.com.
 ```
 
-`ec2-<ip>.compute-1.amazonaws.com` is **EC2**'s own reverse-DNS format, and `compute-1` is Amazon's
-legacy name for **us-east-1** (N. Virginia). So: right company, right region, wrong *product* in
-every document. There is no Lightsail instance to delete. There is an **EC2 instance**.
+Both readings are correct. **The conclusion drawn from them was not.** Lightsail instances *are*
+EC2 instances underneath — Lightsail is a managed wrapper over the same infrastructure — so a
+Lightsail public IP carries `ec2-<ip>.compute-1.amazonaws.com` reverse DNS just like a bare EC2
+instance. **Reverse DNS proves the vendor and the region. It cannot distinguish the product.**
 
-**If you look in the Lightsail console you will keep seeing an empty page, and that page is correct.**
+The second signal that looked confirming was also a property of Lightsail rather than a finding:
+
+```console
+$ aws ec2 describe-instances --region us-east-1        # → empty, in EVERY region
+```
+
+**Lightsail resources do not appear in the EC2 API at all.** An empty `describe-instances` is
+exactly what a Lightsail-only account returns, so the sweep that felt like proof was the strongest
+sign I was querying the wrong service.
+
+The one command that answers the question is the service's own:
+
+```console
+$ aws lightsail get-instances --region us-east-1 --query 'instances[].name' --output text
+mediasoup-test-01
+```
+
+**The lesson, and it is the house rule in `CLAUDE.md` almost word for word: an inference from two
+tools is not evidence, and ruling out my own method comes before reporting a finding.** I told the
+owner they were right on the strength of a hostname format. The honest answer at 04:56 was "the
+vendor is Amazon and the region is us-east-1; I cannot tell which product without account access."
+
+Where this leaves the older record: **`MEDIASOUP-DEPLOYMENT-PLAN.md`'s Stage 1 description was
+accurate all along** — AWS Lightsail, `mediasoup-test-01`, us-east-1a. The 2026-08-09 21:24 entry
+that flagged it as "never verified" was fair at the time (nobody here had account access), but its
+implication that the product name was wrong is now falsified.
 
 ---
 
-## What it is, and what happens when it stops
+## What it actually was, read from the Lightsail API
 
 | | |
 | --- | --- |
-| Address | `34.195.170.147`, served as `https://media.34-195-170-147.sslip.io` |
-| What it runs | this project's own mediasoup SFU, behind Caddy on 443 → loopback `127.0.0.1:4443` |
-| Certificate | Let's Encrypt, issued **2026-08-02** |
-| Open ports seen from outside | TCP **22** and **443** |
-| In use? | **No.** `/health` reported `rooms:0, peers:0` at 2026-08-10 04:56 EDT |
-| Referenced by this repo? | **No.** Verified 2026-08-09 by reading — not grepping — `apps/`, `services/`, `ops/`, `scripts/`, every `.env` and `.env.example`, and the live Caddyfile on the Hetzner box. Zero references. |
-| What replaced it | `media.tradingroom.app` on the Hetzner box `87.99.154.155`, live since 2026-08-09 12:44 EDT |
+| Name | `mediasoup-test-01` |
+| Location | `us-east-1a` |
+| Blueprint | Ubuntu |
+| Bundle | `small_3_0` — **$12.00/month**, 2 vCPU, 2.0 GB RAM, 60 GB SSD, 3 TB transfer |
+| Created | **2026-08-02 12:54:31 -0400** |
+| State at 05:10 | `running` |
+| Static IP | `mediasoup-test-ip` = `34.195.170.147`, attached |
+| Alarms | `mediasoup-cpu-high`, `mediasoup-status-check-failed` |
 
-**Nothing in the product breaks when this is switched off.** The room connects to
-`media.tradingroom.app` and to nothing else. That is measured, not assumed.
-
-Two reasons it is still worth doing:
-
-1. **It bills for existing.** An EC2 instance is charged by the hour whether it has 0 peers or 400,
-   plus its EBS volume, plus an Elastic IP if one is attached. This document cannot tell you the
-   monthly figure — the instance type is only visible from inside the account, and step 2 prints it.
-2. **It is exposed.** SSH and HTTPS are open to the internet on a host running a build frozen at
-   2026-08-02 that nobody is patching.
-
-Neither is urgent. Both are still true in eight months if nobody does this.
+So it had been billing **$12/month since 2026-08-02**, which is the one part of the inherited
+description — "still billing" — that nobody had been able to confirm until now. It was true.
 
 ---
 
-## Before you start
+## What was run, in order
 
-You need an AWS sign-in for account **`255248181057`**, IAM user **`trading-app-admin`**, region
-**`us-east-1`**. That is what the local CLI is configured against; its session has expired.
+Every command below was executed; the output quoted is what came back.
 
-**There are two routes and they do the same thing.** Route A is the browser console and needs
-nothing installed. Route B is the CLI, is faster, and is what to paste here if you want me to drive
-it. Use either.
+### 1. Authenticate
 
-> **Order matters, and it is the only thing in here that does.** **Stop** before you **terminate**.
-> Stopping is reversible and proves nothing depended on the machine; terminating is permanent and
-> takes the disk with it. Wait a day between them if you like — a stopped instance costs a fraction
-> of a running one.
+```console
+$ aws sts get-caller-identity
+Account  255248181057
+Arn      arn:aws:iam::255248181057:user/trading-app-admin
+```
+
+### 2. Find it — and the false trail
+
+```console
+$ aws ec2 describe-instances --region us-east-1 --filters 'Name=ip-address,Values=34.195.170.147'
+                                                    # empty
+$ aws ec2 describe-network-interfaces … 'Name=association.public-ip,Values=34.195.170.147'
+                                                    # empty
+$ aws ec2 describe-addresses --region us-east-1     # empty
+$ for r in $(aws ec2 describe-regions …); do aws ec2 describe-instances --region "$r" …; done
+                                                    # empty in EVERY region
+$ aws lightsail get-instances --region us-east-1 --query 'instances[].name' --output text
+mediasoup-test-01                                   # ← there it is
+```
+
+### 3. Confirm it was idle before touching it
+
+```console
+$ curl -s https://media.34-195-170-147.sslip.io/health
+{"status":"ok","workers":1,"workerDeaths":0,"rooms":0,"peers":0,"admission":"require-grant"}
+
+$ curl -s https://media.tradingroom.app/health
+{"status":"ok","workers":1,"workerDeaths":0,"rooms":1,"peers":2,"admission":"require-grant"}
+```
+
+`rooms:0, peers:0` on the old one — nobody on it. And the live one showing **`rooms:1, peers:2`**,
+which is the first time real peers have been observed on the Hetzner SFU.
+
+### 4. Stop (reversible), then prove the right machine went dark
+
+```console
+$ aws lightsail stop-instance --region us-east-1 --instance-name mediasoup-test-01
+StopInstance  Started
+# polled get-instance-state → running → stopping → stopped (about 40 seconds)
+
+$ curl -s --max-time 10 https://media.34-195-170-147.sslip.io/health
+unreachable — correct
+
+$ curl -s --max-time 10 https://media.tradingroom.app/health
+{"status":"ok", … "rooms":1,"peers":2, …}          # still serving, peers still connected
+
+$ node scripts/smoke.mjs
+All 9 checks passed.
+```
+
+**That is the step that made the deletion safe.** Stopping is reversible; if anything had depended
+on the machine, `smoke.mjs` would have said so while a `start-instance` was still possible.
+
+### 5. Delete (permanent)
+
+```console
+$ aws lightsail delete-instance --region us-east-1 --instance-name mediasoup-test-01
+DetachStaticIp  mediasoup-test-ip                Succeeded
+DetachStaticIp  mediasoup-test-01                Succeeded
+DeleteAlarm     mediasoup-cpu-high               Succeeded
+DeleteAlarm     mediasoup-status-check-failed    Succeeded
+DeleteInstance  mediasoup-test-01                Succeeded
+```
+
+Both CloudWatch alarms went with it, which is worth noting: they would otherwise have been left
+pointing at a resource that no longer existed.
+
+### 6. Release the static IP — the step that is easy to miss
+
+```console
+$ aws lightsail release-static-ip --region us-east-1 --static-ip-name mediasoup-test-ip
+ReleaseStaticIp  mediasoup-test-ip  Succeeded
+```
+
+A Lightsail static IP is **free while attached to a running instance and billed once it is not**.
+Deleting the instance detaches it (see the `DetachStaticIp` line above), so stopping at step 5 would
+have left a charge behind for an address pointing at nothing.
+
+### 7. Verify the account is empty, in every region
+
+```console
+us-east-1       instances:[] staticIps:[] disks:[] snapshots:[]
+us-east-2       instances:[] staticIps:[] disks:[] snapshots:[]
+us-west-2       instances:[] staticIps:[] disks:[] snapshots:[]
+eu-west-1       instances:[] staticIps:[] disks:[] snapshots:[]
+eu-central-1    instances:[] staticIps:[] disks:[] snapshots:[]
+eu-west-2       instances:[] staticIps:[] disks:[] snapshots:[]
+eu-west-3       instances:[] staticIps:[] disks:[] snapshots:[]
+ap-southeast-1  instances:[] staticIps:[] disks:[] snapshots:[]
+ap-southeast-2  instances:[] staticIps:[] disks:[] snapshots:[]
+ap-northeast-1  instances:[] staticIps:[] disks:[] snapshots:[]
+ca-central-1    instances:[] staticIps:[] disks:[] snapshots:[]
+```
+
+EC2, EBS and S3 were already empty in every region — checked during the search at step 2.
+
+### 8. Final state
+
+```console
+$ curl -s https://media.34-195-170-147.sslip.io/health
+dead — correct
+
+$ node scripts/smoke.mjs
+All 9 checks passed.
+```
 
 ---
 
-# Route A — the browser console
+## What needed no cleanup, and why
 
-### A1. Sign in and go to the right place
+- **DNS.** `media.34-195-170-147.sslip.io` was never a record anybody created — `sslip.io` is a
+  public wildcard resolver returning whatever IP is embedded in the hostname. No zone, no registrar
+  entry, nothing in Porkbun. The name now resolves to an address that answers nothing, which is the
+  end of it.
+- **The certificate.** Let's Encrypt certificates expire on their own; there is nothing to revoke.
+- **This repository.** Verified 2026-08-09 by reading `apps/`, `services/`, `ops/`, `scripts/`,
+  every `.env` and `.env.example`, and the live Caddyfile: zero references to that host. No code
+  change accompanied the deletion, and `pnpm smoke` passing before and after is the proof.
 
-<https://console.aws.amazon.com/ec2/home?region=us-east-1#Instances:>
+## If a media server is ever needed on AWS again
 
-That link already selects **EC2** and **us-east-1**. If the console opens in another region the
-instance will not be listed — the region selector is top right and must read **N. Virginia**.
+Nothing here is reusable as-is; the instance is gone and so is its disk. The reason it existed —
+Stage 1 of `apps/controller/docs/MEDIASOUP-DEPLOYMENT-PLAN.md` — is served by the Hetzner box now,
+and `docs/SFU-MIGRATION.md` §"Why it has to move at all" records the egress arithmetic that makes
+AWS the wrong home for this workload at any real volume.
 
-### A2. Find it by its IP
-
-In the instances search box paste:
-
-```
-34.195.170.147
-```
-
-Exactly one instance should match. Click it and note, from the **Details** tab:
-
-- **Instance ID** (`i-…`) — needed for every later step
-- **Instance type** (`t3.medium`, `c6i.large`, …) — this is what sets the bill
-- **Public IPv4 address** and whether it says **Elastic IP** beside it — decides step A6
-- **Launch time**
-- **Name** tag, if it has one
-
-### A3. Confirm it is the machine described above
-
-Before stopping anything, open <https://media.34-195-170-147.sslip.io/health> in a tab. It should
-return JSON containing `"admission":"require-grant"` and `"rooms":0`. That payload is this project's
-own SFU with nobody on it. If it shows a non-zero `peers` count, **someone is connected — stop and
-find out who before continuing.**
-
-### A4. Stop it (reversible)
-
-**Instance state → Stop instance → Stop.** Wait for **Stopped**.
-
-Now reload <https://media.34-195-170-147.sslip.io/health>. It must fail to connect. Then load
-<https://media.tradingroom.app/health> — it must still answer `"status":"ok"`. That pair is the
-proof: the old one is dark, the real one is fine.
-
-**Leave it stopped for as long as you want.** A stopped instance bills only for storage. If anything
-turns out to have needed it, **Instance state → Start instance** brings it back unchanged.
-
-### A5. Terminate it (permanent)
-
-**Instance state → Terminate (delete) instance → Terminate.**
-
-The root disk is deleted with it unless somebody changed the default. After termination, check
-**Elastic Block Store → Volumes** in the left sidebar and look for any volume left in the
-**available** state — that is an orphan that still bills. Select it → **Actions → Delete volume**.
-
-### A6. Release the Elastic IP — the step everyone forgets
-
-If step A2 said **Elastic IP**, go to **Network & Security → Elastic IPs**. An Elastic IP attached to
-nothing is **billed hourly**, so terminating the instance without releasing the address leaves a
-charge behind for an address doing nothing.
-
-Select `34.195.170.147` → **Actions → Release Elastic IP addresses**.
-
-If A2 did *not* say Elastic IP, it was an auto-assigned public IP; it is gone already and costs
-nothing.
-
-### A7. Prove there is no Lightsail, once, so it never comes up again
-
-<https://lightsail.aws.amazon.com/ls/webapp/home/instances>
-
-Expect an empty page. That confirms what you have been saying, and it is worth doing once so the
-question is closed with a screenshot rather than an argument.
-
-### A8. Check nothing else in the account is running
-
-<https://console.aws.amazon.com/billing/home#/bills> shows what is actually being charged and for
-what — a far better answer than clicking through services. If EC2 still appears next month, something
-else exists that this document does not know about.
-
----
-
-# Route B — the CLI
-
-Everything below is copy-paste. `aws login` is interactive and opens a browser: **run that one
-yourself.** After it succeeds, the rest can be run by anyone with the terminal, including me.
-
-### B1. Authenticate
+The one command worth carrying forward is the identification one, since it is what this whole
+episode turned on:
 
 ```bash
-aws login
-aws sts get-caller-identity
+aws lightsail get-instances --region <region> --query 'instances[].name' --output text
 ```
 
-The second must print account `255248181057` and the `trading-app-admin` user. If it still says
-*"Your session has expired"*, the login did not take.
-
-### B2. Find the instance and read its cost drivers
-
-```bash
-aws ec2 describe-instances --region us-east-1 \
-  --filters 'Name=ip-address,Values=34.195.170.147' \
-  --query 'Reservations[].Instances[].{
-      id:InstanceId, state:State.Name, type:InstanceType, launched:LaunchTime,
-      name:Tags[?Key==`Name`]|[0].Value,
-      publicIp:PublicIpAddress, volumes:BlockDeviceMappings[].Ebs.VolumeId
-  }' --output table
-```
-
-Save the `id` — every later command needs it. Then set it once:
-
-```bash
-INSTANCE_ID=i-xxxxxxxxxxxxxxxxx     # paste the real one
-```
-
-If this returns an empty list, the address is not an instance's primary IP — it may sit on a network
-interface or a load balancer. Widen the search:
-
-```bash
-aws ec2 describe-network-interfaces --region us-east-1 \
-  --filters 'Name=association.public-ip,Values=34.195.170.147' \
-  --query 'NetworkInterfaces[].{eni:NetworkInterfaceId,desc:Description,attachedTo:Attachment.InstanceId}' \
-  --output table
-```
-
-### B3. Confirm it is idle, from outside
-
-```bash
-curl -s https://media.34-195-170-147.sslip.io/health; echo
-```
-
-Expect `"rooms":0,"peers":0`. **A non-zero `peers` means somebody is connected — stop here.**
-
-### B4. Stop it (reversible)
-
-```bash
-aws ec2 stop-instances --region us-east-1 --instance-ids "$INSTANCE_ID"
-
-aws ec2 wait instance-stopped --region us-east-1 --instance-ids "$INSTANCE_ID"
-echo "stopped"
-```
-
-### B5. Prove the right one went dark and the live one did not
-
-```bash
-echo -n 'old SFU (should FAIL): '
-curl -s --max-time 8 https://media.34-195-170-147.sslip.io/health || echo 'unreachable — correct'
-
-echo -n 'live SFU (must answer): '
-curl -s --max-time 8 https://media.tradingroom.app/health; echo
-
-node scripts/smoke.mjs
-```
-
-`scripts/smoke.mjs` checks all three tiers of the real product in about a second. **It must still
-print `All 9 checks passed.`** If it does, nothing depended on the machine you just stopped.
-
-### B6. Terminate it (permanent)
-
-Only after B5 is clean. Optionally wait a day first.
-
-```bash
-aws ec2 terminate-instances --region us-east-1 --instance-ids "$INSTANCE_ID"
-aws ec2 wait instance-terminated --region us-east-1 --instance-ids "$INSTANCE_ID"
-echo "terminated"
-```
-
-### B7. Delete any orphaned disk
-
-The root volume is normally deleted with the instance. Check for one that was not:
-
-```bash
-aws ec2 describe-volumes --region us-east-1 \
-  --filters 'Name=status,Values=available' \
-  --query 'Volumes[].{id:VolumeId,size:Size,type:VolumeType,created:CreateTime}' --output table
-```
-
-Anything listed is attached to nothing and billing. Delete each:
-
-```bash
-aws ec2 delete-volume --region us-east-1 --volume-id vol-xxxxxxxxxxxxxxxxx
-```
-
-### B8. Release the Elastic IP if there is one
-
-```bash
-aws ec2 describe-addresses --region us-east-1 \
-  --query 'Addresses[].{ip:PublicIp,alloc:AllocationId,assoc:AssociationId,instance:InstanceId}' \
-  --output table
-```
-
-If `34.195.170.147` appears with an empty `instance`, it is an Elastic IP attached to nothing and
-**billed hourly**. Release it with its `alloc` value:
-
-```bash
-aws ec2 release-address --region us-east-1 --allocation-id eipalloc-xxxxxxxxxxxxxxxxx
-```
-
-If the address does not appear at all, it was auto-assigned and is already gone at no cost.
-
-### B9. Prove there is no Lightsail anywhere
-
-```bash
-aws lightsail get-instances --region us-east-1 \
-  --query 'instances[].{name:name,ip:publicIpAddress,state:state.name}' --output table
-```
-
-Expect an empty result. Worth running in the other regions Lightsail is offered in too, since a
-console visit only ever shows one region at a time:
-
-```bash
-for r in us-east-1 us-east-2 us-west-2 eu-west-1 eu-central-1; do
-  echo "== $r"
-  aws lightsail get-instances --region "$r" --query 'instances[].name' --output text 2>&1
-done
-```
-
-### B10. Find anything else the account is paying for
-
-```bash
-aws ec2 describe-instances --region us-east-1 \
-  --query 'Reservations[].Instances[].{id:InstanceId,state:State.Name,type:InstanceType,ip:PublicIpAddress}' \
-  --output table
-
-aws ec2 describe-volumes  --region us-east-1 --query 'Volumes[].{id:VolumeId,state:State,size:Size}' --output table
-aws ec2 describe-addresses --region us-east-1 --query 'Addresses[].PublicIp' --output text
-aws s3 ls
-```
-
-And the only figure that settles it — last month's actual charges by service:
-
-```bash
-aws ce get-cost-and-usage --region us-east-1 \
-  --time-period Start=2026-07-01,End=2026-08-01 \
-  --granularity MONTHLY --metrics UnblendedCost \
-  --group-by Type=DIMENSION,Key=SERVICE \
-  --query 'ResultsByTime[].Groups[].{service:Keys[0],cost:Metrics.UnblendedCost.Amount}' --output table
-```
-
-(Cost Explorer must be enabled on the account for that last one; if it errors, the billing console
-in step A8 gives the same answer.)
-
----
-
-## What you do **not** have to clean up
-
-- **DNS.** `media.34-195-170-147.sslip.io` is not a record anybody created. `sslip.io` is a public
-  wildcard resolver that returns whatever IP is embedded in the hostname — no zone, no record, no
-  registrar entry. When the instance dies the name resolves to a dead address and that is the end of
-  it. **Nothing to delete, and nothing in Porkbun to touch.**
-- **The certificate.** Let's Encrypt certificates expire on their own; there is no revocation to do.
-- **This repository.** Nothing references the instance, so no code change accompanies the shutdown.
-- **`media.tradingroom.app`.** Different machine entirely (Hetzner, `87.99.154.155`). Leave it alone.
-
-## Optional, and only if the account is otherwise empty
-
-The security group and SSH key pair the instance used cost nothing and can stay. If you want a clean
-account:
-
-```bash
-aws ec2 describe-security-groups --region us-east-1 \
-  --query 'SecurityGroups[?GroupName!=`default`].{id:GroupId,name:GroupName}' --output table
-aws ec2 delete-security-group --region us-east-1 --group-id sg-xxxxxxxxxxxxxxxxx
-
-aws ec2 describe-key-pairs --region us-east-1 --query 'KeyPairs[].KeyName' --output text
-aws ec2 delete-key-pair --region us-east-1 --key-name <name>
-```
-
-A security group still attached to something refuses to delete, which makes this safe to attempt.
-
----
-
-## If something goes wrong
-
-| symptom | what it means | what to do |
-| --- | --- | --- |
-| `describe-instances` returns `[]` | the IP is not an instance's primary address, or it is in another region | run the `describe-network-interfaces` query in B2; then try `--region us-east-2` and `us-west-2` |
-| `UnauthorizedOperation` | `trading-app-admin` lacks EC2 permissions | use the root account in the console (Route A) |
-| `Your session has expired` | `aws login` did not complete | re-run `aws login`; confirm with `aws sts get-caller-identity` |
-| `scripts/smoke.mjs` fails after B4 | something DID depend on the instance | `aws ec2 start-instances --region us-east-1 --instance-ids "$INSTANCE_ID"`, then work out what — this is exactly why B4 comes before B6 |
-| the health URL still answers after stopping | you stopped a different instance | check the instance ID against B2 before terminating anything |
-
----
-
-## When it is done
-
-Append an entry to `CHANGELOG.md` — dated and timed, per the convention at the top of that file —
-recording the instance ID, its type, whether an Elastic IP was released, and the `pnpm smoke` result
-afterwards. Then delete item **O** from `TODO.md`.
-
-The three documents that still describe this machine as live —
-`docs/SFU-MIGRATION.md`, `docs/NEXT-SESSION.md`, `docs/DEPLOYMENT.md` — should have their
-identification notes updated to say it was retired, with the date. They are already correct about
-*what* it is; only its status changes.
+**Ask the service you suspect. A hostname will not tell you.**
