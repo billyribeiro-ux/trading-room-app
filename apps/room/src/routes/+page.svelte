@@ -5365,6 +5365,41 @@
 
       // Our own post already refetched. Re-invalidating would refetch twice per alert.
       if (payload.data?.senderId === data.user.id) return;
+
+      /*
+        The chat ding, transcribed from `app-chat.compiled.js:112-137`:
+
+          !preferences.doNotDisturbOn && preferences.chatSoundOn
+            ? followedUsers[e.avt].followChatStyle.playSound
+                ? pling.play()
+                : ((playChatMessageSoundFor.length && hashEmail(user.email) !== e.avt
+                     && playChatMessageSoundFor.includes(e.avt))
+                   || (sessData.dingOnNewMessage && hashEmail(user.email) !== e.avt))
+                  && followed.play()
+
+        Three things about it are worth stating, because each is easy to get wrong:
+
+        * **A followed user wins, and plays a DIFFERENT sound.** `pling`, not `followed` — the
+          per-user preference outranks the room-wide setting, and it is the only branch that does.
+        * **`followed` is the sound for an ordinary new message.** The name is the reference's, and
+          it is confusing: the sound file called "followed" is what the ROOM-WIDE ding uses, while
+          a followed user gets "pling".
+        * **Never for your own message.** The reference compares `hashEmail(user.email) !== e.avt`;
+          the `senderId` guard directly above already does that here, so the check is not repeated.
+
+        `playChatMessageSoundFor` — the per-email list — is NOT implemented. It is a room setting
+        holding member email addresses, and the reference compares it against `e.avt`, an email
+        HASH, so honouring it means the server sending hashed addresses rather than the raw list.
+        Sending raw member emails to every browser to decide a sound would be the wrong trade;
+        recorded rather than quietly skipped.
+      */
+      if (payload.channel === 'chat' && !doNotDisturbOn && chatSoundOn) {
+        const senderHash = (payload.data as { senderEmailHash?: string } | undefined)?.senderEmailHash;
+        const followStyle = senderHash ? followedUsers[senderHash]?.followChatStyle : undefined;
+        if (followStyle?.playSound) playSoundEffect('pling');
+        else if (data.sessData?.dingOnNewMessage) playSoundEffect('followed');
+      }
+
       void invalidateAll();
     });
 

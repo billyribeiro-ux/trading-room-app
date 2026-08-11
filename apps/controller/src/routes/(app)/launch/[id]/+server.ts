@@ -6,6 +6,7 @@ import { roomUsers, rooms } from '$lib/server/db/schema';
 import { requireOwnedRoom, requireUser } from '$lib/server/auth';
 import { handoffUrl, siteHandoffToken } from '$lib/server/room-handoff';
 import { recordVisit } from '$lib/server/room-visits';
+import { isRoomPresenter } from '$lib/room-member-role';
 import type { RequestHandler } from './$types';
 
 /**
@@ -55,10 +56,37 @@ export const GET: RequestHandler = async ({ params, locals, request, getClientAd
   // (`apps/room/TODO.md` gap 31) — so this is a lookup with a null fallback rather than an
   // assumption. The export reads name and email regardless; the id is for joining later.
   const [membership] = await getDb()
-    .select({ id: roomUsers.id })
+    .select({ id: roomUsers.id, role: roomUsers.role, nonPresenter: roomUsers.nonPresenter })
     .from(roomUsers)
     .where(and(eq(roomUsers.roomId, room.id), eq(roomUsers.userId, user.id)))
     .limit(1);
+
+  /*
+    A CLOSED room admits its presenters and nobody else — `apps/room/TODO.md` gap 30.
+
+    The guest door has always enforced this (`/session/[code]/joined` redirects when
+    `room.state !== 'open'`) and the room's own `/session` enforces it through
+    `isShutOutByRoomState`. This door did not, and it is the widest of the three:
+    `requireOwnedRoom` admits **anyone in the ACCOUNT**, so a role-2 Participant could launch
+    straight into a room their owner had deliberately closed — past a check the other two doors
+    were making.
+
+    The rule is copied from the room rather than invented, so the two cannot disagree: open lets
+    everyone through; closed shuts out only those who are neither the owner nor a true presenter.
+    Presenters keep their way in on purpose — closing a room is how you prepare it, and locking the
+    person who has to open it out of it would be the obvious next bug.
+
+    `isRoomPresenter` is the controller's own predicate, and role 1 counts only when the
+    `nonPresenter` discriminator is false — the captured model, not a numeric guess.
+  */
+  const isOwnerOrPresenter =
+    membership?.role === 0 || (membership ? isRoomPresenter({ ...membership, isFreeTrial: false }) : false);
+
+  if (room.state !== 'open' && !isOwnerOrPresenter) {
+    // The same destination the guest door uses, so a closed room looks identical whichever way you
+    // arrived at it, rather than one door explaining more than another.
+    redirect(303, `/session/${encodeURIComponent(room.shortCode)}`);
+  }
 
   await recordVisit({
     roomId: room.id,

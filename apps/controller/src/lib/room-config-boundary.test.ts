@@ -207,7 +207,8 @@ describe('the allow-list itself', () => {
         'alertSoundButtonFor() — picks Set / Remove as alert sound, or neither, per audio row',
       userPM: 'canPM in the roster kebab',
       userToPresenterPM: 'canPM in the roster kebab',
-      disablePMForTrials: 'canPM in the roster kebab'
+      disablePMForTrials: 'canPM in the roster kebab',
+      dingOnNewMessage: 'the chat ding — `app-chat.compiled.js:135`, played on an incoming message from somebody else'
     };
     expect(Object.keys(consumers).sort()).toEqual([...ROOM_VISIBLE_SETTINGS].sort());
   });

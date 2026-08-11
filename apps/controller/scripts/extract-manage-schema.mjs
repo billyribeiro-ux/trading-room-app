@@ -92,6 +92,7 @@ const ROOM_CONSUMED = [
   'customMobileAppAndroidUrl',
   'customMobileAppEnabled',
   'customMobileAppIOSUrl',
+  'dingOnNewMessage',
   'disablePMForTrials',
   'freeTrialsGetApp',
   'hasBenzingaNews',
@@ -333,7 +334,7 @@ if (defs.length !== EXPECTED_TOTAL_COUNT) {
 }
 
 const missingWiredSettings = [...WIRED_SETTINGS].filter((name) => !defs.some((definition) => definition.name === name));
-if (WIRED_SETTINGS.size !== 41 || missingWiredSettings.length > 0) {
+if (WIRED_SETTINGS.size !== 42 || missingWiredSettings.length > 0) {
   throw new Error(
     `wired-setting contract invalid: ${WIRED_SETTINGS.size} keys, missing ${missingWiredSettings.join(', ') || 'none'}`
   );

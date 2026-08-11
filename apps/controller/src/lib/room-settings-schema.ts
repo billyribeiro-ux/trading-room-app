@@ -10,7 +10,7 @@
 // roomType has no captured value because its editor is absent from rendered evidence.
 //
 // `wired` is the honest bit: false means the controller can store the value but
-// nothing in the room reads it yet. 41 of 269 are wired today.
+// nothing in the room reads it yet. 42 of 269 are wired today.
 // Flip one to true ONLY when a consumer exists, so the UI can mark the rest
 // instead of pretending they do something.
 
@@ -95,7 +95,7 @@ export const ROOM_SETTINGS: readonly RoomSettingDef[] = [
   { name: "simUserCount", section: "settings", type: "number", label: "Simulated Count?", help: "A number from 0 to 5000. You can add \"simulated users\" to the total user count shown in the room. the roster list will be hidden if you enable this feature", captured: 0, capturedIsDisplayOnly: false, group: null, wired: true },
   { name: "userPM", section: "settings", type: "checkbox", label: "User PMs?", help: "If enabled, users can Private msg each other", captured: false, capturedIsDisplayOnly: false, group: null, wired: true },
   { name: "enablePrivateMessageHistory", section: "settings", type: "checkbox", label: "Enable Private Message History?", help: "If enabled, can load users private message history", captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
-  { name: "dingOnNewMessage", section: "settings", type: "checkbox", label: "Sound alert when a new message is posted?", help: "If enabled, it will play a sound when a new message is posted", captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
+  { name: "dingOnNewMessage", section: "settings", type: "checkbox", label: "Sound alert when a new message is posted?", help: "If enabled, it will play a sound when a new message is posted", captured: false, capturedIsDisplayOnly: false, group: null, wired: true },
   { name: "beepOnUserJoin", section: "settings", type: "checkbox", label: "Sound when the user joins/leaves?", help: "If enabled, moderators will hear a sound when users join/leave", captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
   { name: "userJoinAndLeavePopup", section: "settings", type: "checkbox", label: "Popup alert when the user joins/leaves?", help: "If enabled, moderators will get a popup when users join/leave", captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
   { name: "hideAvatars", section: "settings", type: "checkbox", label: "Hide User Avatars?", help: "If enabled, user avatars will be hidden", captured: false, capturedIsDisplayOnly: false, group: null, wired: true },

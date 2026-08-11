@@ -56,6 +56,14 @@ export interface RoomSessionSettings {
   userToPresenterPM?: boolean;
   disablePMForTrials?: boolean;
   /**
+   * "Sound alert when a new message is posted?" — the room-wide chat ding.
+   *
+   * `app-chat.compiled.js:135` reads it as `sessData.dingOnNewMessage`, behind
+   * `!doNotDisturbOn && chatSoundOn`, and plays the sound named `followed`. A user who is
+   * explicitly FOLLOWED outranks it and gets `pling` instead.
+   */
+  dingOnNewMessage?: boolean;
+  /**
    * "Hide Files Section?" — the Files main tab and the `#files` pane.
    *
    * The reference binds both to `hideFiles || globals.videoOnlyMode`. Only the first half is a

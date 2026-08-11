@@ -902,7 +902,11 @@ export const actions: Actions = {
     */
     publishToRoom(requireRoomShortCode(locals), {
       channel: 'chat',
-      data: { senderId: requireUser(locals).id, room }
+      data: {
+        senderId: requireUser(locals).id,
+        senderEmailHash: hashEmail(requireUser(locals).email),
+        room
+      }
     });
 
     return { success: true };
@@ -981,7 +985,11 @@ export const actions: Actions = {
     */
     publishToRoom(requireRoomShortCode(locals), {
       channel: 'chat',
-      data: { senderId: requireUser(locals).id, room: original.room }
+      data: {
+        senderId: requireUser(locals).id,
+        senderEmailHash: hashEmail(requireUser(locals).email),
+        room: original.room
+      }
     });
 
     return { success: true };

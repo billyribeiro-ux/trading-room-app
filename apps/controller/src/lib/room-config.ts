@@ -145,6 +145,14 @@ export const ROOM_VISIBLE_SETTINGS = [
   // `canPostImages` in the composer, and `canPM` in the roster kebab.
   'disablePMForTrials',
   'userPM',
+  /*
+    "Sound alert when a new message is posted?" — the gate on the chat ding.
+
+    Not a credential and not a policy the room could infer: it is a per-room preference the owner
+    ticks, and the room is where the sound plays. The reference reads it as
+    `sessData.dingOnNewMessage` in `app-chat.compiled.js:135`.
+  */
+  'dingOnNewMessage',
   'userToPresenterPM',
   'userUploads',
   /*

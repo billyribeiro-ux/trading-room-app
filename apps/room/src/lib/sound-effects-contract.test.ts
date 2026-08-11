@@ -43,3 +43,57 @@ describe('alert and sound source contract', () => {
     }
   });
 });
+
+/*
+  The chat ding — `app-chat.compiled.js:112-137`.
+
+  Three things it is easy to get wrong, and each is pinned below. Read as source text: the dispatch
+  needs an EventSource, a room config and a live SSE frame to execute.
+*/
+describe('the sound on an incoming chat message', () => {
+  const page = readFileSync(new URL('../routes/+page.svelte', import.meta.url), 'utf8');
+  const code = page.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+  /*
+    The end marker is searched FROM the start position, not from the beginning of the file.
+
+    The first version used a bare `indexOf('void invalidateAll()')`, which matches an EARLIER call
+    elsewhere in the dispatch — so the slice came out empty and three assertions failed against
+    code that was correct. A test that slices source has to anchor both ends.
+  */
+  const start = code.indexOf("payload.channel === 'chat' && !doNotDisturbOn");
+  const block = code.slice(start, code.indexOf('void invalidateAll()', start));
+
+  it('is gated on do-not-disturb AND the chat-sound preference', () => {
+    // The reference's outer condition, both halves. Dropping either makes the room noisy for
+    // somebody who explicitly asked it not to be.
+    expect(block).toContain('!doNotDisturbOn && chatSoundOn');
+  });
+
+  it('plays `pling` for a FOLLOWED user and `followed` for everyone else', () => {
+    /*
+      The naming is the reference's and it is genuinely confusing: the sound file called `followed`
+      is what the ROOM-WIDE ding uses, while an explicitly followed user gets `pling`. Swapping
+      them is the obvious mistake and nothing else would catch it.
+    */
+    expect(block).toContain("playSoundEffect('pling')");
+    expect(block).toContain("playSoundEffect('followed')");
+    expect(block.indexOf("playSoundEffect('pling')")).toBeLessThan(
+      block.indexOf("playSoundEffect('followed')")
+    );
+  });
+
+  it('lets a followed user outrank the room-wide setting', () => {
+    // `followStyle?.playSound` is checked FIRST and short-circuits, so a followed user is heard
+    // even when the room has the ding switched off.
+    expect(block).toMatch(/followStyle\?\.playSound[\s\S]*else if[\s\S]*dingOnNewMessage/);
+  });
+
+  it('never fires for your own message', () => {
+    // The reference compares `hashEmail(user.email) !== e.avt`. Here the senderId guard above the
+    // block already returns, so the sound is unreachable for your own post.
+    const dispatch = code.slice(code.indexOf('payload.data?.senderId === data.user.id'));
+    expect(dispatch.indexOf('return;')).toBeLessThan(
+      dispatch.indexOf("payload.channel === 'chat'")
+    );
+  });
+});
