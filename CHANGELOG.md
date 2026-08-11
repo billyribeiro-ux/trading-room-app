@@ -24,6 +24,38 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-10
 
+### 11:01 — The share-quality measurement, written down rather than rushed
+
+**No code change** — one document. New: `apps/room/docs/MEASURE-SHARE-QUALITY.md`.
+
+An attempt at the row 6 / row 8 measurement was made and abandoned, for a reason worth recording:
+**`chrome://webrtc-internals` lists every page in the BROWSER, not one app.** The window had six
+`simplertrading.com` tabs and two `chatgpt.com` tabs open, each contributing its own peer
+connections, and the panel that was expanded turned out to be Simpler Trading's — a dead connection
+stuck at `ICE: new => new => new`, nothing to do with this app. Ours was there, correctly named
+`chat.tradingroom.app/?room=1001`, four boxes along.
+
+Rather than have the owner close tabs they are actively using, the procedure is now a document:
+which tabs to close and in what order, why `webrtc-internals` must be opened **before** the share
+starts (it logs from the moment it opens, so opening it first captures negotiation and the bitrate
+ramp instead of joining midway), and how the second session works — an **incognito window joining as
+a GUEST**, name and email, no second account and no logging out.
+
+It also records the two things that make the reading meaningful and are easy to get wrong: a second
+session must actually be **receiving**, or the encoder has no reason to spend bits; and the shared
+surface should be a **chart**, since the doc's 3841 kbps was measured on candlesticks and 13px text
+and a desktop wallpaper is not comparable to it.
+
+And it says what each possible result would MEAN — bitrate up with `limitation: none` closes rows 6
+and 8; `qualityLimitationReason: bandwidth` makes row 8 a real conversation and row 6 actively
+harmful; a drop in `framesPerSecond` is `contentHint='detail'` trading smoothness for sharpness,
+which is the caveat recorded when it shipped and the point at which it should be reconsidered rather
+than defended.
+
+**Why it needs a human at all**, stated so nobody re-litigates it: `getDisplayMedia` requires a real
+user gesture and an operating-system screen-picker dialog. Browser automation can drive a page; it
+cannot click an OS dialog.
+
 ### 10:51 — Item R, the share half: `contentHint = 'detail'`, and why rows 6 and 8 were NOT taken
 
 **Runtime impact: yes, in the room** — one property on the captured screen track. Files:
