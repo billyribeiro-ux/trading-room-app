@@ -686,13 +686,24 @@ describe('a role change restarts the media session', () => {
     expect(handler.slice(0, 2000)).toContain('setTimeout(() => void restart(), 3000)');
   });
 
-  it('drops the screens it was showing', () => {
-    // Their transports are gone; a tab bar still painting them is a frozen picture pretending to be
-    // live, which is the exact failure the disconnect handler already guards against.
+  it('drops everything it was consuming, not just the screens', () => {
+    /*
+      Their transports are gone; a tab bar still painting them is a frozen picture pretending to be
+      live, which is the exact failure the disconnect handler already guards against.
+
+      This asserted `screenStreams.clear()`, and that was too weak in a way that mattered: it is not
+      the map any dedupe guard reads. `addRemoteScreen` returns early on `sharedScreens`,
+      `addRemoteWebcam` on `webcamPresenters`, `addRemoteAudio` on `remoteAudioStreams` — so the
+      rebuild from `getProducers` immediately below found every producer already "known" and
+      re-consumed none of them. The room came back from a role change to a blank bar and silence.
+
+      `dropRemoteMedia()` clears the guards as well as the streams; what it must contain is pinned
+      in `media-restart-contract.test.ts` so this assertion cannot be satisfied by an empty function.
+    */
     const body = code.slice(
       code.indexOf('restartMediaSession = async () => {'),
       code.indexOf("media.on('newProducer'")
     );
-    expect(body).toContain('screenStreams.clear()');
+    expect(body).toContain('dropRemoteMedia()');
   });
 });

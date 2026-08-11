@@ -213,10 +213,30 @@ describe('the plugin source still honours the contract', () => {
     // The shortcode must link to the plugin's own endpoint, not straight to the controller.
     expect(PLUGIN).toContain("TRADINGROOM_SSO_QUERY_VAR => '1'");
     expect(PLUGIN).toContain('add_query_arg(');
-    // And the mint must happen in the init handler, after that link is followed.
+    /*
+      And the mint must happen in the init handler, after that link is followed.
+
+      This compared the mint's byte offset against `add_shortcode(`'s, which proves nothing: the
+      shortcode's CALLBACK BODY also lies after that token, so a mint moved into it — baking a
+      token into the rendered page, which is exactly the page-cache leak this test is named for —
+      still scored greater and still passed. The adversarial review of 2026-08-11 built that mutant
+      and measured it: the mint landed at byte 14677, `add_shortcode(` was at 12941, green.
+
+      The property is not "the mint comes later in the file". It is "the shortcode callback does
+      not mint", and that is what the last assertion says.
+    */
     const shortcode = PLUGIN.indexOf('add_shortcode(');
+    const initHandler = PLUGIN.search(/add_action\(\s*'init'/);
     const mintCall = PLUGIN.indexOf('$token = tradingroom_sso_mint(');
-    expect(mintCall).toBeGreaterThan(shortcode);
+
+    expect(shortcode, 'the shortcode registration must still be there').toBeGreaterThan(-1);
+    expect(initHandler, 'the init handler must still be there').toBeGreaterThan(shortcode);
+    expect(mintCall, 'the mint must live inside the init handler').toBeGreaterThan(initHandler);
+
+    // THE assertion. Everything between the two registrations is the shortcode's own callback, and
+    // a render-time mint is a token in cacheable HTML.
+    const shortcodeCallback = PLUGIN.slice(shortcode, initHandler);
+    expect(shortcodeCallback, 'the shortcode callback must never mint a token').not.toContain('tradingroom_sso_mint(');
   });
 
   it('signs HS256 over header.payload', () => {

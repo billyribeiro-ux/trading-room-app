@@ -22,6 +22,378 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ---
 
+## 2026-08-11
+
+### 14:35 — `css-modals` identified: the product runs TWO Bootstrap generations, and it verifies the manage page
+
+**No runtime impact.** One evidence file pulled in, one contract test, documentation. No `.css` or
+`.svelte` changed.
+
+The owner supplied `new-room-control/css-modals`. Read as evidence, it answers a question nobody had
+asked and that nothing in this repository recorded: **the product is built on two different
+Bootstrap generations, on two different surfaces.**
+
+| surface | generation | proof |
+| --- | --- | --- |
+| the room (Angular 2+) | **Bootstrap 5** | the live tooltip renders `tooltip fade show bs-tooltip-start` with `data-popper-placement`, which only 5 emits; its modals carry `modal fade show` + `aria-modal` and **zero** `modal fade in` |
+| account / manage / login (AngularJS) | **Bootstrap 3.3.7** | `div class="panel panel-default"` six times across `evidence-dumps/login-page/{login,logged-in-page,manage,complimentary}`, beside `ng-show`/`ng-hide`. `.panel` is Bootstrap 3 only — 4 replaced it with `.card`, 5 dropped it |
+
+`css-modals` is the source for the second surface: the Bootstrap 3.3.7 LESS tree, the compiled
+`bootstrap.css`, and a `styes.css` headed **"Naut - Bootstrap Admin Theme + AngularJS"** — the theme
+the AngularJS half was built on.
+
+**It changes nothing in the room, and that is a result rather than a disappointment.** Bootstrap 3
+spells tooltips `.tooltip.left` + `.in`, with arrows drawn from `width:0;height:0` borders. There are
+**zero** such rules in our applied sheet or in the reference's own `styles.d622cb9ed2bbc221.css`, so
+Bootstrap 3 is not in the room's cascade at all and the tooltip work stands unchanged.
+
+**What it did do is verify work already shipped.** `apps/controller/src/manage.css` was transcribed
+from a RENDER — its own header records that no rect dump for that page existed. Every `.panel*` value
+in it matches Bootstrap 3.3.7 to the byte: `margin-bottom: 20px`, `background-color: #fff`,
+`border: 1px solid transparent`, `border-radius: 4px`, `padding: 10px 15px`, `border-color: #ddd`,
+`color: #333333`, `background-color: #f5f5f5`. And `account.css`'s note that "the 15px inset belongs
+to the HEADINGS" — derived from `439.5 - 424.5` measured in a capture — is
+`.panel-heading { padding: 10px 15px }` upstream.
+
+Two independent derivations agreeing to the byte is the strongest form this evidence takes. **Nothing
+was edited to make them agree.** `bootstrap.css` is pinned as `apps/controller/evidence-bootstrap-3.3.7.css`
+(SHA-256 `74a581f4…`) and `manage-panel-bootstrap3-contract.test.ts` reads BOTH sides out of files —
+no literal is typed into the test — so it cannot pass because the same wrong number was written
+twice. Negative control: a 1px drift in one padding fails it.
+
+It also names the authority for eight open gaps. Gaps 1, 2, 3, 5, 8, 9, 10, 11 and item S are all on
+the AngularJS surface, and their styling questions now have a source instead of a sampled computed
+style.
+
+### 14:24 — The collector ran, disproved the tooltip implementation, and it was rebuilt from the capture
+
+**Runtime impact: yes, in the room.** 593 tests / 61 files, `svelte-check` 0 errors 0 warnings.
+
+**The implementation shipped at 13:55 was wrong in every decision it made, and it was wrong because
+it was built on inference.** It emitted a `div.tooltip.show.bs-tooltip-left` with a `.arrow` and
+`x-placement`, appended to `document.body`, reasoning from `x-placement` appearing in three modal
+captures that the app must be Bootstrap 4. That reasoning was written up as though it were evidence.
+It is the one thing this project does not allow, and the collector — which should have been written
+FIRST — disproved all five decisions in a single run.
+
+What the live original actually renders, captured on `chat.protradingroom.com` as a presenter:
+
+```html
+<ngb-tooltip-window role="tooltip" id="ngb-tooltip-9"
+  class="tooltip fade show bs-tooltip-start"
+  data-popper-placement="left"
+  style="position: absolute; inset: 0px 0px auto auto; margin: 0px;
+         transform: translate3d(-1255.5px, 1074.5px, 0px);">
+  <div data-popper-arrow="" class="tooltip-arrow"></div>
+  <div class="tooltip-inner">Add Emojis</div>
+</ngb-tooltip-window>
+```
+
+A custom element, not a div. `tooltip-arrow`, not `arrow`. `data-popper-placement`, not
+`x-placement`. `bs-tooltip-start`, not `bs-tooltip-left`. A **sibling of the host** inside
+`span.textAreaBtns` — `isDirectChildOfBody: false` — not appended to the body. And a `fade` class,
+caught mid-transition at `opacity: 0.099804`, which is the proof it animates.
+
+**The rebuild asserts against the capture, not against a description of it.** The output is
+committed as `apps/room/evidence-tooltips-presenter-2026-08-11.json`, and every expectation in
+`ngb-tooltip.test.ts` is READ OUT of that file at run time — element name, class set, placement
+attribute, arrow markup, insertion point, id format. Nothing is transcribed by hand, so the test
+cannot drift from the evidence and cannot be satisfied by a value somebody typed into it. Negative
+control: restoring the inference-based implementation fails 6 of the 21 cases, one for each wrong
+decision.
+
+**The CSS half is closed too, and by the owner's own pointer** — every stylesheet is saved in
+`new-room`/`new-room-control`, and `docs/source/styles.d622cb9ed2bbc221.css` is the reference's own
+sheet, already SHA-256 pinned here. Every captured computed value now traces to a rule in it:
+
+- `.tooltip{--bs-tooltip-zindex:1080;…}` — the Bootstrap 5 block comes after the Bootstrap 4 one and
+  wins, which is why the captured `z-index` is 1080 and not 1070
+- `.tooltip-inner{padding:var(--bs-tooltip-padding-y) var(--bs-tooltip-padding-x)}` = `.25rem .5rem`
+  = the captured `4px 8px`; `border-radius:var(--bs-border-radius)` = the captured `6px`
+- `.bs-tooltip-start .tooltip-arrow{width:var(--bs-tooltip-arrow-height);height:var(--bs-tooltip-arrow-width)}`
+  — `.4rem`/`.8rem` **swapped**, which is exactly the captured `6.39844 x 12.7969`
+- `.bs-tooltip-start .tooltip-arrow:before{…border-left-color:var(--bs-tooltip-bg)}` — the captured
+  `border-width: 6px 0px 6px 6px` on a black arrow
+
+**What is deliberately NOT implemented, because it was not captured.** Only `placement="left"` was
+observed, so `left → bs-tooltip-start` is the only mapping in the code. Bootstrap 5 renamed left and
+right to start and end, so `right` is presumably `end` and top/bottom presumably keep their names —
+**presumably is not evidence.** Any other placement refuses to render and logs why, and a test
+asserts that refusal. All nine wired sites use `left`, so nothing is missing today.
+
+Three things the run could not reach, recorded as `TODO.md` gap 10a rather than filled in: the
+`placement="bottom"` eye badge never rendered because no screen was being shared; `Search for GIFs`
+never rendered, which is consistent with its transcribed `triggers: 'manual'` but is a reading
+rather than proof; and the run left four tooltips on the page in the modal copies, so the
+collector's close events need widening before the next run.
+
+### 14:11 — A collector for the one thing the tooltip work could not verify
+
+**No runtime impact.** Two new files under `apps/room/scripts/`, neither shipped to a browser by the
+app.
+
+The owner's standing rule, restated today and correctly: **whatever cannot be verified 100% on hard
+evidence gets a console script, at all times.** The tooltip implementation an hour earlier is exactly
+that case — it was shipped with an honest gap recorded rather than a match claimed, and a recorded
+gap with no way to close it is half the rule.
+
+**`collect-tooltips.js`** closes it. Paste into the Chrome console on the live original with the chat
+pane visible; it downloads one JSON and needs nothing else — no terminal, no second step, no `stop()`.
+
+**Why this gap is closable when the rest of gap 10 is not.** A synthetic event cannot trigger a real
+CSS `:hover`, which is why the manage-page collector captures `:hover` RULES rather than states and
+says so in its own output. A tooltip is different: `ngbTooltip` is a **directive** with real
+JavaScript listeners on `mouseenter`/`focusin`. Dispatching those runs the same code path a real
+pointer runs, and the element it builds is the real one. So this half of gap 10 is now `10a` and has
+a collector; the `:hover` half stays open and unchanged.
+
+**It never clicks anything on the main pass.** It hovers. That means it cannot send, save, upload,
+delete, play, stop, post or submit — a stronger guarantee than checking a denylist, though the same
+hard denylist as the other collectors is present for the optional dropdown pass. Every hover is
+followed by its matching leave, and the run ends by asserting no tooltip was left behind; if one was,
+it says so in `gaps` and tells the reader to reload.
+
+**The four questions it answers**, none of which the evidence here can: `.arrow` or `.tooltip-arrow`;
+`x-placement` or `data-popper-placement`; `bs-tooltip-left` or `bs-tooltip-start` (Bootstrap 5 renamed
+the logical directions); and whether the bubble is inserted into `document.body` or as a sibling of
+its host, which decides how ours must be positioned. It also **measures the open delay**, which was
+assumed to be ng-bootstrap's default of 0 and never observed. Native `title=` tooltips are recorded
+as text with an explicit note that the OS draws them and no script can capture their appearance.
+
+**Verified by EXECUTION, not by `node --check`.** That check passed once on `constdescription`, which
+was a legal implicit global and would have thrown under `'use strict'` on the first click.
+`collect-tooltips.smoke.mjs` runs the real file against a simulated room under jsdom: 9 assertions
+covering role detection, both attribute spellings, the captured markup and generation detection,
+clean close-down, the native `title=` note, the verdict block, and — the one that matters most — that
+a control which never renders becomes an honest **gap** rather than a silent omission. One failure
+during the run was my harness, not the collector: jsdom needs `runScripts: 'outside-only'` before
+`window.eval` is the window's own, and without it the script ran in a context with no `location`.
+Fixed in the harness and noted there.
+
+### 13:55 — The tooltips work, and every remaining review finding is closed
+
+**Runtime impact: yes**, in both apps and in the Rust API. Room **584 tests / 61 files**, controller
+**671 / 61** plus **46 db tests / 8 files** against a real PostgreSQL, `tradingroom-api` **155** lib tests, both `svelte-check` 0 errors 0 warnings, clippy
+clean at `-D warnings`. One new dependency: `jsdom`, devDependency of `apps/room` only.
+
+**The nine `ngbtooltip` attributes now show a tooltip.** `$lib/ngb-tooltip.ts` is an attachment that
+reads `ngbtooltip` and `placement` off the element it is attached to, so the markup stays
+byte-identical to the capture — including the attribute order — and the transcribed strings stay in
+one place rather than being duplicated into a call.
+
+**No new CSS was written, because none was needed.** The complete rule set is already in
+`css/complete-app-styles.css`, applied and SHA-256 pinned: `.tooltip` at `z-index: 1070`,
+`position: absolute`, `opacity: 0` rising to `0.9` on `.show`; `.tooltip .arrow` at
+`0.8rem x 0.4rem`; `.bs-tooltip-left .arrow` flipping to `0.4rem x 0.8rem` at `right: 0` with
+`border-left-color: rgb(0,0,0)`; `.tooltip-inner` at `max-width: 200px`, `padding: .25rem .5rem`,
+white on black, `border-radius: .25rem`. The attachment only produces the DOM those rules expect,
+and a test asserts each selector it emits **exists as a rule in the pinned sheet** — this repository
+has shipped a `.flipped` class with no CSS before.
+
+**Which Bootstrap generation, decided on evidence.** The sheet carries BOTH — the Bootstrap 4 block
+using `.arrow` and `x-placement`, and the Bootstrap 5 block using `.tooltip-arrow` and
+`data-popper-placement`. The discriminator is what the reference's own Popper emits: `x-placement`
+appears in three captures (`app-modals/app-muted-users-modal`, `app-privchat`, `app-alert-qa-modal`),
+which is Popper 1 and therefore the ng-bootstrap generation that owns `ngbtooltip`. Bootstrap 5's
+`data-popper-placement` appears only on `data-bs-toggle="dropdown"` menus, driven by Bootstrap's own
+JS. Both libraries run in the reference; the tooltips belong to the ng-bootstrap half.
+
+**HONEST GAP, stated plainly: this is not verified against a rendered original.** `tooltip-arrow`
+and `bs-tooltip-` appear in **zero** capture files — no capture in this repository contains a
+rendered tooltip, which is `TODO.md` gap 10. So the CSS is captured and the class names are
+**inherited from that captured sheet**, not read off a rendered element. A pixel-match claim would
+be a fabrication. What is proven is that the DOM matches the rules the reference's own stylesheet
+declares, and that is as far as the evidence goes until gap 10 is collected.
+
+Twelve tests, driven rather than read as source text — the first DOM-exercising tests in this app,
+which is why `jsdom` arrived. They cover the built markup, cleanup on leave/click/destroy, no
+duplicate stacking, `aria-describedby` pointing at a live element, an absent attribute producing
+nothing, and the text never being treated as markup.
+
+**`recordVisit` was an unbounded public write.** `/session/[code]/joined` calls it on a page load
+that needs only a `room_identity` cookie — and `/session/[code]` writes that cookie with
+`httpOnly: false` as plain JSON, so it is attacker-set. `user_agent` was bounded to 512; `display_name`,
+`email` and `ip` were not, and both are bare `TEXT`. A loop of requests wrote unbounded rows of
+unbounded width to the production database with no rate limit anywhere in front of it. Widths are
+now bounded (254 by RFC 5321, 45 for the longest IPv6 text form, 200 for a name) and — the half that
+actually matters — a second OPEN visit is never opened for the same person in the same room, which
+is what the data model already said: `closeVisit` looks up "the open row for one person" and 0007
+created `room_sessions_open_idx ON (room_id, email) WHERE left_at IS NULL` for exactly that lookup.
+A genuine re-entry still gets its own row, because leaving closes the previous one.
+
+**The SSO door could grant presenter authority, and its docblock claimed it could not.** The room
+resolves role from the token's email alone and deliberately ignores its `type`
+(`apps/room/src/routes/session/+server.ts:94`, `:125`), so a compromised WordPress, a malicious WP
+admin, or a leaked `wp-config.php` could sign a token carrying a presenter's address and arrive with
+presenter commands, archives, admin chat, ban and kick. The invariant is now **enforced** rather than
+asserted: the door refuses any address holding staff authority in that room, computed exactly as
+`/internal/room-config/[code]` computes it, and refused through the same `refuse()` path as every
+other check so it returns identical words and cannot be used to enumerate a room's staff. The cost is
+real and accepted — a presenter who is also a subscriber cannot use the SSO link. Staff enter through
+the controller's own login, where the authority comes from an account we authenticate.
+
+**Two more tests that could not fail.** The PHP mint-ordering test compared byte offsets against
+`add_shortcode(`, so a mint moved INTO the shortcode callback — the exact page-cache token leak the
+test is named for — still scored greater and still passed; it now asserts the callback body contains
+no mint at all. The `contentHint` test counted global occurrences with no position, so moving the
+statement to the webcam block kept the count at one while stripping the hint off the screen encoder;
+it is now anchored between the two capture sites. Both were verified by building the reviewer's exact
+mutant and watching the test go red.
+
+**And the critical Rust one is fixed after all.** `0009_rename_runtime_roles.sql` renames the runtime
+role, while `migrate.rs:41` pinned a single name and the preflight runs BEFORE the migration chain —
+so the first migrate succeeded and every run after it, including `assert_runtime_role_is_restricted`
+at `main.rs:74` and therefore API startup, failed with `RuntimeRoleMissing`. The preflight now accepts
+either name during the transition, with the posture checks unchanged and applied to whichever is
+present. Proven against a real PostgreSQL across all four states: old only → found; both → the renamed
+one, deterministically; new only → found, which is the case that was broken; neither → no row, so the
+safety check still fires. `RENAMED_RUNTIME_ROLE` is documented as the transition and expected to be
+deleted once no cluster carries the old name.
+
+This lands in `services/**`, which is a mirror — it still needs promoting at the source per TODO
+item P, and that direction remains the owner's.
+
+### 13:16 — The screens bar renders again, and seven review findings are closed with runtime proof
+
+**Runtime impact: yes**, in both apps. Room 572 tests / 60 files, controller 662 / 60, both
+`svelte-check` 0 errors 0 warnings, both formatted, plus 6 new tests against a real PostgreSQL.
+
+**The screens tab bar was missing its background because it was missing entirely.** The owner
+reported a div with a different background absent from where the screens go. `ScreenTabs` sat in
+the alternate branch of the "no one is presenting" conditional, so an idle room rendered the
+heading INSTEAD of `ul#screenTabs`.
+
+Settled by reading the capture rather than reasoning about it. `main-tab:Screens` holds three
+children under `r.0#screens`, in a session where **nothing was shared**: `.0` the h3 (y 113.5,
+h 33.6), `.1#screenTabs` (y 155.1, h 1), `.2#screensTabsContent` (y 156.1, h 1134). Siblings, not
+alternatives — the content starts at exactly where the 1px bar ends. And the bar is the **only**
+element in that whole region with an opaque background: `#screens`, the h3 and the content are all
+`rgba(0,0,0,0)`, the bar is `rgb(17,17,17)`. Removing it removed the only paint, which is precisely
+what was reported.
+
+The bar is now unconditional and only its contents are conditional, which `ScreenTabs` already
+handled. Its background also now reads `var(--notes-tabs-bg)` rather than `var(--darker-black)` —
+both are `#111`, so no pixel moved, but the captured sheet keys `.screens-tabs` off that variable
+by name and matching it keeps the bar with its siblings under a future theme.
+
+**Two adversarial reviews ran over the day's work; 15 security and 2 quality findings survived
+refutation.** Seven are closed here. Every fix has a negative control — the defect restored, the
+test watched to go red, the fix restored.
+
+**`room_sessions` had two foreign keys with no ON DELETE, which broke every delete path.** Migration
+0007 used bare `REFERENCES`, defaulting to NO ACTION, and `recordVisit` writes a child row on a
+public page load — so in practice every active room had them. `deleteRoomCascade` deletes
+memberships first and failed on its opening statement; removing a single member failed the same way
+at four call sites. Migration **0009** adds the actions, proven on a scratch PostgreSQL 16 built
+from these same migration strings: with 0007's constraints restored both deletes raise FK
+violations; after 0009 the member delete leaves the visit standing as
+`room_user_id=NULL display_name=Owner email=o@x.com` and the room delete takes its visits with it.
+The two actions differ deliberately, and 0007's own docblock is the authority — a removed member
+"must not silently rewrite or erase visits that already happened", so that is SET NULL; a deleted
+room has no honest record to keep, so that is CASCADE. Idempotent, verified by running it twice.
+
+**Five wrong PINs bricked a member's phone pairing for ever.** `redeemPairCode` refuses on
+`attempts >= 5` before it compares the PIN, and `issueMobilePairCode` wrote only the code and its
+expiry — so a reissued PIN was refused too, and no interface could clear the counter. Anyone who
+knew a room code and a member's email could do it in five requests.
+
+**And the counter was a read-then-write, so the cap was per round, not per guess.** Every request in
+a parallel burst read the same value and wrote the same value. It is now `mobile_pair_attempts + 1`
+evaluated by PostgreSQL under the UPDATE's own row lock, with the live-code predicates repeated in
+the WHERE so a request that lost a race cannot push past the cap. The success path was the same
+shape and is now a conditional claim on the code still being present, so only one of two
+simultaneous correct redemptions can win — the loser used to overwrite the winner's token list with
+its own stale copy, quietly unpairing the device that got there first.
+
+`redeemPairCode` had no coverage at all, which is why both lived in it. It now has
+`mobile-pairing.db.test.ts` — six cases against a real PostgreSQL, including a positive control, a
+20-request concurrent burst, and the two migration-0009 delete paths.
+
+**Three handlers in the room read a session that no longer existed.** `restartMediaSession` must
+build a new `MediaSession` because `close()` latches permanently, but `newProducer`, `peerClosed`
+and the `onMount` teardown all closed over the `const session` captured at build time. After a mic
+hand-over, arriving producers were consumed on a closed session and rendered nothing, in silence;
+a peer leaving tore down nothing; and leaving the room closed the already-closed original while the
+rebuilt session's transports and RTCPeerConnections survived the component, still holding the SFU
+peer slot.
+
+**And the reset either side of it cleared the wrong thing.** It cleared `screenStreams`, which is
+not the map any dedupe guard reads — `addRemoteScreen` guards on `sharedScreens`, `addRemoteWebcam`
+on `webcamPresenters`, `addRemoteAudio` on `remoteAudioStreams`. So the rebuild from `getProducers`
+found every producer already "known" and re-consumed none of them. One `dropRemoteMedia()` now
+clears the guards as well as the streams, used by both the reconnect and the role-change paths; the
+reconnect half of that bug predates today.
+
+**A test written today to prevent a privilege escalation passed when the gate was deleted.**
+`media-elevation-contract.test.ts` compared `indexOf(...)` offsets, and `indexOf` returns -1 when
+the needle is absent — which is less than any real offset. Both offsets are now asserted to exist
+before being compared; deleting the staff gate fails it.
+
+**Two payload findings.** The manage page loaded 5,000 visit rows on every tab for data only the CSV
+button reads — ~755 KB measured with this project's own devalue, and every row carries a visitor's
+IP address and email. Now gated on the Stats tab; the complete fix is a streaming endpoint, recorded
+as TODO W. And `RoomMessage` constructed three `Intl.DateTimeFormat` objects per rendered item, of
+which at most one is ever called — hoisted to `$lib/message-formatters`, where they are built once.
+
+**One critical finding is NOT fixed, deliberately.** `services/api/migrations/0009` renames the
+runtime role that `migrate.rs:41` hardcodes and the preflight requires to exist *before* migrations
+run, so the first migrate succeeds and every run after it — including API startup — fails.
+`services/**` is a mirror and a change authored here is lost on the next sync, so it is written up
+in full as TODO V for the owner to author at the source.
+
+**Also fixed: the documented-test-count gate had been red before any of this.** Four sites across
+three controller documents claimed 215 Vitest tests against 657 at HEAD. Verified stale at HEAD by
+stashing, so it is not something today introduced. Now 662 across 60 files, and the gate passes.
+
+### 12:50 — The standard is written down at the root, and the dead tooltips are recorded
+
+**No runtime impact.** Documentation only: one new file, two pointers, one TODO row. Nothing under
+`src/` was touched, so no gate was run — there was nothing for one to check.
+
+**`CLAUDE.md` at the repository root is new, and is now the root standard.** The owner restated the
+bar twice today — "Level 8+ enterprise grade, built for the next 20 years, following Svelte and
+Rust's best practices, clean maintainable code, maximized for the highest performance ALWAYS", then
+"THIS IS APPLE/GOOGLE/MICROSOFT LEVEL STUFF" — and asked for it written into `CLAUDE.md` and every
+necessary file.
+
+The reason a new file was needed rather than an edit: **operating rules existed in
+`apps/room/AGENTS.md` and `apps/controller/AGENTS.md`, and in neither case at the root.** A session
+opened at the repository root loaded neither, so the standard bound whoever happened to read one of
+the two app files. It now loads for every session in this repository and binds every sub-agent.
+
+It translates the directive into what it actually means here — the comment-plus-test pair as the
+unit of work, fail-closed and server-side authority, performance as shape rather than
+micro-optimisation, nothing without a consumer — then the mandatory Svelte and rust-analyzer MCP
+workflows, the money and migration rules, the test-what-changed table, and the diff re-read
+checklist. Each rule that has already cost something says what it cost.
+
+**The two `AGENTS.md` files got a pointer, not a copy.** This repository's own most expensive defect
+class is one rule implemented twice and then drifting — `isP` vs `isPresenter`, the `services/**`
+mirror twice, the wired-settings count in three places. Three copies of a written standard fails the
+same way, so neither app file restates anything; both say the root file wins.
+
+**TODO row T: the `ngbtooltip` attributes are inert.** The owner sent two elements from the
+send-message field — `far fa-smile` / "Add Emojis" and `fas fa-plus` / "Show message options", both
+`placement="left"` — and asked for that whole section matched.
+
+Reading them against ours: **both already match byte for byte**, at
+`apps/room/src/routes/+page.svelte:7848-7854` and `:7923-7929`, down to the attribute order, which
+differs between the two elements in the capture and differs the same way in ours. The markup was
+never the problem.
+
+The problem is that `ngbtooltip` is an ng-bootstrap directive. In a Svelte application it is a
+string attribute the browser ignores, so **all nine of them — five in `+page.svelte`, four in
+`ModalHost.svelte` — are silent.** Nine icons that look interactive and do nothing on hover. No
+tooltip renderer exists anywhere under `apps/room/src`; the only other hits for "tooltip" are the
+two contract constants.
+
+The CSS is not the gap: `apps/room/css/complete-app-styles.css:2550-2566` already holds the whole
+ng-bootstrap 4 rule set, and 4577+ holds the Bootstrap 5 `--bs-tooltip-*` flavour as well — so which
+one the reference uses has to come from a render, not from the stylesheet. **What is missing is the
+rendered hover DOM, and that is already gap 10** ("no hover, focus or open-menu state in any
+capture"). Row T therefore names what gap 10 blocks rather than opening a second gap for the same
+absence.
+
 ## 2026-08-10
 
 ### 12:39 — Gap 22 fully CLOSED: the hand-over works, and the escalation is not reintroduced

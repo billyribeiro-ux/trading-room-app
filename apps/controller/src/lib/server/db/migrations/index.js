@@ -7,6 +7,7 @@ import { sql as openExistingRooms } from './0005-open-existing-rooms.js';
 import { sql as mobilePairAttempts } from './0006-mobile-pair-attempts.js';
 import { sql as roomSessions } from './0007-room-sessions.js';
 import { sql as backfillOwnerMemberships } from './0008-backfill-owner-memberships.js';
+import { sql as roomSessionsFkActions } from './0009-room-sessions-fk-actions.js';
 
 /**
  * Versioned, forward-only, apply-exactly-once migrations.
@@ -101,6 +102,11 @@ export const MIGRATIONS = [
     version: 8,
     name: 'backfill_owner_memberships',
     sql: backfillOwnerMemberships
+  },
+  {
+    version: 9,
+    name: 'room_sessions_fk_actions',
+    sql: roomSessionsFkActions
   }
 ];
 

@@ -580,7 +580,20 @@ export async function issueMobilePairCode(roomId: number, roomUserId: number, ex
   const expiresAt = new Date(Date.now() + days * 86_400_000);
   await getDb()
     .update(roomUsers)
-    .set({ mobilePairCode: code, mobilePairCodeExpiresAt: expiresAt })
+    /*
+      `mobilePairAttempts: 0` is not tidiness — without it a new PIN is dead on arrival.
+
+      `redeemPairCode` refuses on `attempts >= MAX_PAIR_ATTEMPTS` before it ever compares the PIN,
+      and the same condition gates the only other write to the counter, so once it reaches five
+      nothing can lower it. Reissuing left it at five, so every subsequent code was refused and the
+      member could never pair a phone in that room again through any interface. Five wrong guesses
+      by anyone who knows the room code and the member's email were enough to do it permanently.
+
+      Found by the adversarial review of 2026-08-11 and reproduced against the real function. This
+      is the one place both reissue paths meet — the manage page action and the room's own
+      `/internal/mobile-pin/[code]` endpoint both call it — so resetting here covers both.
+    */
+    .set({ mobilePairCode: code, mobilePairCodeExpiresAt: expiresAt, mobilePairAttempts: 0 })
     .where(scoped(roomId, roomUserId));
   return { code, expiresAt };
 }

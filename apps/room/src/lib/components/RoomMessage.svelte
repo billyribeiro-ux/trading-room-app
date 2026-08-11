@@ -3,6 +3,11 @@
   import type { EmojiDumpEntry } from '$lib/emoji-data';
   import { calculateMessageMenuPosition } from '$lib/message-menu-position';
   import {
+    alertDateFormatter,
+    chatTimeFormatter,
+    longDateFormatter
+  } from '$lib/message-formatters';
+  import {
     capturedMenuAllows,
     MESSAGE_MENU_LABEL,
     sourceMessageBehavior
@@ -367,24 +372,15 @@
   const stockSegments = $derived(parseBodySegments(item.body));
   const replyStockSegments = $derived(item.replyToBody ? parseBodySegments(item.replyToBody) : []);
 
-  const longDateFormatter = new Intl.DateTimeFormat('en-US', {
-    weekday: 'long',
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric'
-  });
-  const alertDateFormatter = new Intl.DateTimeFormat('en-US', {
-    year: '2-digit',
-    month: 'numeric',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit'
-  });
-  const chatTimeFormatter = new Intl.DateTimeFormat('en-US', {
-    hour: '2-digit',
-    minute: '2-digit'
-  });
+  /*
+    The three formatters live in `$lib/message-formatters` and are built ONCE for the page.
 
+    This script runs per rendered item — one per alert, one per chat message — so declaring them
+    here constructed three `Intl.DateTimeFormat` objects per message, of which at most one is ever
+    called: the long date only under the separator, the alert stamp only on the alert branch, the
+    chat time only on the chat branch. Construction costs ~35x a `format()` call, and the objects
+    are byte-identical every time because the locale and every option are literals.
+  */
   function runAction(action: MessageAction, payload?: MouseEvent | MessageReactionPayload) {
     onaction(action, item, payload);
   }

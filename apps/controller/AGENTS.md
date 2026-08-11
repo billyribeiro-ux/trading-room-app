@@ -1,5 +1,12 @@
 # Repository operating rules
 
+**Read [`../../CLAUDE.md`](../../CLAUDE.md) first.** That is the root standard —
+the owner's 2026-08-11 directive and what it means concretely for Svelte, Rust,
+performance, testing scope and boundaries. It binds every agent on every task.
+This file adds what is specific to the controller; where the two disagree, the
+root file wins. Nothing here restates it, deliberately: a rule written down twice
+is a rule that will disagree with itself.
+
 Before changing this repository, read and follow
 [`docs/ENGINEERING-SSOT.md`](docs/ENGINEERING-SSOT.md). It is the normative
 engineering standard and definition of done. Other documents provide evidence or

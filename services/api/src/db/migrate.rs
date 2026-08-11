@@ -40,6 +40,21 @@ pub const EXPECTED_MIGRATOR_ROLE: &str = "ptr_clone";
 /// The runtime login that must exist before the pinned baseline is allowed to run.
 pub const EXPECTED_RUNTIME_ROLE: &str = "ptr_clone_app";
 
+/// The name `EXPECTED_RUNTIME_ROLE` is renamed TO by `0009_rename_runtime_roles.sql`.
+///
+/// The preflight accepts either, and it has to. It runs BEFORE the migration chain, on every start,
+/// so it sees the old name on a cluster that has not migrated yet and the new one on a cluster that
+/// has. Pinning a single name made 0009 rename the role its own preflight requires to exist: the
+/// first migrate succeeded, and every run after it — including `assert_runtime_role_is_restricted`
+/// at `main.rs:74`, and therefore API startup — failed with `RuntimeRoleMissing`.
+///
+/// Found by the adversarial review of 2026-08-11. The posture checks are unchanged and are applied
+/// to whichever name is present, so a cluster mid-transition is held to exactly the same standard.
+///
+/// This constant is the transition and is expected to be deleted. Once no cluster carries
+/// `ptr_clone_app`, `EXPECTED_RUNTIME_ROLE` becomes `tradingroom_app` and this goes with it.
+pub const RENAMED_RUNTIME_ROLE: &str = "tradingroom_app";
+
 #[derive(Debug, thiserror::Error)]
 pub enum MigrateError {
     #[error(transparent)]
@@ -166,6 +181,14 @@ async fn preflight_for_roles_on_connection(
         expected_migrator,
     )?;
 
+    // Either name. `0009_rename_runtime_roles.sql` renames the runtime role, and this preflight runs
+    // BEFORE the migration chain — so a cluster that has not migrated yet presents the old name and
+    // one that has presents the new one. Matching only the pinned name made the migration break its
+    // own precondition on every run after the first. See `RENAMED_RUNTIME_ROLE`.
+    //
+    // `ORDER BY` keeps it deterministic if a cluster somehow carries both: the renamed name wins,
+    // because that is the post-migration truth. 0009 itself refuses to run in that state and says
+    // so, which is where that situation is meant to be resolved.
     let posture: Option<RuntimeRolePosture> = sqlx::query_as(
         "SELECT runtime_role.rolcanlogin AS can_login, \
                 runtime_role.rolsuper AS is_superuser, \
@@ -178,9 +201,12 @@ async fn preflight_for_roles_on_connection(
                  FROM pg_catalog.pg_auth_members AS membership \
                  WHERE membership.member = runtime_role.oid)::bigint AS membership_count \
          FROM pg_catalog.pg_roles AS runtime_role \
-         WHERE runtime_role.rolname = $1",
+         WHERE runtime_role.rolname IN ($1, $2) \
+         ORDER BY (runtime_role.rolname = $2) DESC \
+         LIMIT 1",
     )
     .bind(expected_runtime)
+    .bind(RENAMED_RUNTIME_ROLE)
     .fetch_optional(&mut *connection)
     .await?;
     validate_runtime_role_posture(expected_runtime, posture.as_ref())?;

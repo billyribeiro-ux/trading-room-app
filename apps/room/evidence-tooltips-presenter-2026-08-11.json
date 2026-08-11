@@ -1,0 +1,2553 @@
+{
+  "meta": {
+    "startedAt": "2026-08-11T18:14:26.936Z",
+    "url": "https://chat.protradingroom.com/?id=6a6529b318781e20ed81947d",
+    "title": "Tarzan",
+    "userAgent": "Mozilla/5.0 (Linux; Android 15; Pixel 9) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Mobile Safari/537.36",
+    "viewport": {
+      "w": 1904,
+      "h": 1166,
+      "dpr": 2
+    },
+    "themeClass": "",
+    "libraries": {
+      "angularVersion": null,
+      "hasNgbTooltipElement": false,
+      "bootstrapGlobal": "object",
+      "bootstrapVersion": "5.3.3",
+      "jQueryTooltip": "function"
+    }
+  },
+  "role": {
+    "uploadImage": true,
+    "playYouTube": true,
+    "searchGifs": true,
+    "screenTabs": true,
+    "postAlert": false,
+    "detected": "presenter"
+  },
+  "steps": [
+    {
+      "at": "2026-08-11T18:14:26.937Z",
+      "step": "role detected",
+      "detail": "presenter"
+    },
+    {
+      "at": "2026-08-11T18:14:26.937Z",
+      "step": "tooltipped elements found",
+      "detail": "8"
+    },
+    {
+      "at": "2026-08-11T18:14:26.937Z",
+      "step": "hovering",
+      "detail": "Add Emojis"
+    },
+    {
+      "at": "2026-08-11T18:14:27.125Z",
+      "step": "hovering",
+      "detail": "Upload an Image"
+    },
+    {
+      "at": "2026-08-11T18:14:27.310Z",
+      "step": "hovering",
+      "detail": "Play YouTube For All"
+    },
+    {
+      "at": "2026-08-11T18:14:27.493Z",
+      "step": "hovering",
+      "detail": "Search for GIFs"
+    },
+    {
+      "at": "2026-08-11T18:14:28.698Z",
+      "step": "hovering",
+      "detail": "Add Emojis"
+    },
+    {
+      "at": "2026-08-11T18:14:28.890Z",
+      "step": "hovering",
+      "detail": "Upload an Image"
+    },
+    {
+      "at": "2026-08-11T18:14:29.080Z",
+      "step": "hovering",
+      "detail": "Add Emojis"
+    },
+    {
+      "at": "2026-08-11T18:14:29.271Z",
+      "step": "hovering",
+      "detail": "Upload an Image"
+    }
+  ],
+  "tooltips": [
+    {
+      "label": "Add Emojis",
+      "host": {
+        "tag": "I",
+        "className": "far fa-smile",
+        "attrs": {
+          "_ngcontent-ng-c3761163150": "",
+          "placement": "left",
+          "ngbtooltip": "Add Emojis",
+          "class": "far fa-smile",
+          "aria-describedby": "ngb-tooltip-9"
+        },
+        "rect": {
+          "x": 654.71,
+          "y": 1129.99,
+          "w": 15.5,
+          "h": 16
+        },
+        "style": {
+          "position": "static",
+          "display": "inline-block",
+          "zIndex": "auto",
+          "opacity": "1",
+          "visibility": "visible",
+          "top": "auto",
+          "left": "auto",
+          "right": "auto",
+          "bottom": "auto",
+          "transform": "none",
+          "margin": "0px",
+          "padding": "0px",
+          "maxWidth": "none",
+          "width": "15.5px",
+          "height": "16px",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "color": "rgb(187, 187, 187)",
+          "borderRadius": "0px",
+          "borderWidth": "0px",
+          "borderStyle": "none",
+          "borderTopColor": "rgb(187, 187, 187)",
+          "borderRightColor": "rgb(187, 187, 187)",
+          "borderBottomColor": "rgb(187, 187, 187)",
+          "borderLeftColor": "rgb(187, 187, 187)",
+          "fontFamily": "\"Font Awesome 5 Free\"",
+          "fontSize": "16px",
+          "fontWeight": "400",
+          "lineHeight": "16px",
+          "textAlign": "center",
+          "whiteSpace": "normal",
+          "pointerEvents": "auto",
+          "transition": "all",
+          "animation": "none",
+          "boxShadow": "none"
+        },
+        "outerHTML": "<i _ngcontent-ng-c3761163150=\"\" placement=\"left\" ngbtooltip=\"Add Emojis\" class=\"far fa-smile\" aria-describedby=\"ngb-tooltip-9\"></i>"
+      },
+      "appeared": true,
+      "appearedAfterMs": 34,
+      "tooltip": {
+        "tag": "NGB-TOOLTIP-WINDOW",
+        "className": "tooltip fade show bs-tooltip-start",
+        "attrs": {
+          "role": "tooltip",
+          "id": "ngb-tooltip-9",
+          "class": "tooltip fade show bs-tooltip-start",
+          "data-popper-placement": "left",
+          "style": "position: absolute; inset: 0px 0px auto auto; margin: 0px; transform: translate3d(-1255.5px, 1074.5px, 0px);"
+        },
+        "rect": {
+          "x": 560.8,
+          "y": 1123.5,
+          "w": 87.7,
+          "h": 29
+        },
+        "style": {
+          "position": "absolute",
+          "display": "block",
+          "zIndex": "1080",
+          "opacity": "0.099804",
+          "visibility": "visible",
+          "top": "0px",
+          "left": "1816.3px",
+          "right": "0px",
+          "bottom": "1088px",
+          "transform": "matrix(1, 0, 0, 1, -1255.5, 1074.5)",
+          "margin": "0px",
+          "padding": "0px",
+          "maxWidth": "none",
+          "width": "87.6953px",
+          "height": "29px",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "color": "rgb(187, 187, 187)",
+          "borderRadius": "0px",
+          "borderWidth": "0px",
+          "borderStyle": "none",
+          "borderTopColor": "rgb(187, 187, 187)",
+          "borderRightColor": "rgb(187, 187, 187)",
+          "borderBottomColor": "rgb(187, 187, 187)",
+          "borderLeftColor": "rgb(187, 187, 187)",
+          "fontFamily": "system-ui, -apple-system, \"Segoe UI\", Roboto, \"Helvetica Neue\", \"Noto Sans\", \"Liberation Sans\", Arial, sans-serif, \"Apple Color Emoji\", \"Segoe UI Emoji\", \"Segoe UI Symbol\", \"Noto Color Emoji\"",
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "lineHeight": "21px",
+          "textAlign": "start",
+          "whiteSpace": "normal",
+          "pointerEvents": "none",
+          "transition": "opacity 0.15s linear",
+          "animation": "none",
+          "boxShadow": "none"
+        },
+        "outerHTML": "<ngb-tooltip-window role=\"tooltip\" id=\"ngb-tooltip-9\" class=\"tooltip fade show bs-tooltip-start\" data-popper-placement=\"left\" style=\"position: absolute; inset: 0px 0px auto auto; margin: 0px; transform: translate3d(-1255.5px, 1074.5px, 0px);\"><div data-popper-arrow=\"\" class=\"tooltip-arrow\" style=\"position: absolute; top: 0px; transform: translate3d(0px, 8px, 0px);\"></div><div class=\"tooltip-inner\">Add Emojis</div></ngb-tooltip-window>"
+      },
+      "parts": {
+        "inner": {
+          "tag": "DIV",
+          "className": "tooltip-inner",
+          "attrs": {
+            "class": "tooltip-inner"
+          },
+          "rect": {
+            "x": 560.8,
+            "y": 1123.5,
+            "w": 87.7,
+            "h": 29
+          },
+          "style": {
+            "position": "static",
+            "display": "block",
+            "zIndex": "auto",
+            "opacity": "1",
+            "visibility": "visible",
+            "top": "auto",
+            "left": "auto",
+            "right": "auto",
+            "bottom": "auto",
+            "transform": "none",
+            "margin": "0px",
+            "padding": "4px 8px",
+            "maxWidth": "200px",
+            "width": "87.6953px",
+            "height": "29px",
+            "backgroundColor": "rgb(0, 0, 0)",
+            "color": "rgb(255, 255, 255)",
+            "borderRadius": "6px",
+            "borderWidth": "0px",
+            "borderStyle": "none",
+            "borderTopColor": "rgb(255, 255, 255)",
+            "borderRightColor": "rgb(255, 255, 255)",
+            "borderBottomColor": "rgb(255, 255, 255)",
+            "borderLeftColor": "rgb(255, 255, 255)",
+            "fontFamily": "system-ui, -apple-system, \"Segoe UI\", Roboto, \"Helvetica Neue\", \"Noto Sans\", \"Liberation Sans\", Arial, sans-serif, \"Apple Color Emoji\", \"Segoe UI Emoji\", \"Segoe UI Symbol\", \"Noto Color Emoji\"",
+            "fontSize": "14px",
+            "fontWeight": "400",
+            "lineHeight": "21px",
+            "textAlign": "center",
+            "whiteSpace": "normal",
+            "pointerEvents": "auto",
+            "transition": "all",
+            "animation": "none",
+            "boxShadow": "none"
+          },
+          "outerHTML": "<div class=\"tooltip-inner\">Add Emojis</div>"
+        },
+        "arrowBs4": null,
+        "arrowBs5": {
+          "tag": "DIV",
+          "className": "tooltip-arrow",
+          "attrs": {
+            "data-popper-arrow": "",
+            "class": "tooltip-arrow",
+            "style": "position: absolute; top: 0px; transform: translate3d(0px, 8px, 0px);"
+          },
+          "rect": {
+            "x": 648.5,
+            "y": 1131.5,
+            "w": 6.4,
+            "h": 12.8
+          },
+          "style": {
+            "position": "absolute",
+            "display": "block",
+            "zIndex": "auto",
+            "opacity": "1",
+            "visibility": "visible",
+            "top": "0px",
+            "left": "87.6953px",
+            "right": "-6.4px",
+            "bottom": "16.2031px",
+            "transform": "matrix(1, 0, 0, 1, 0, 8)",
+            "margin": "0px",
+            "padding": "0px",
+            "maxWidth": "none",
+            "width": "6.39844px",
+            "height": "12.7969px",
+            "backgroundColor": "rgba(0, 0, 0, 0)",
+            "color": "rgb(187, 187, 187)",
+            "borderRadius": "0px",
+            "borderWidth": "0px",
+            "borderStyle": "none",
+            "borderTopColor": "rgb(187, 187, 187)",
+            "borderRightColor": "rgb(187, 187, 187)",
+            "borderBottomColor": "rgb(187, 187, 187)",
+            "borderLeftColor": "rgb(187, 187, 187)",
+            "fontFamily": "system-ui, -apple-system, \"Segoe UI\", Roboto, \"Helvetica Neue\", \"Noto Sans\", \"Liberation Sans\", Arial, sans-serif, \"Apple Color Emoji\", \"Segoe UI Emoji\", \"Segoe UI Symbol\", \"Noto Color Emoji\"",
+            "fontSize": "14px",
+            "fontWeight": "400",
+            "lineHeight": "21px",
+            "textAlign": "start",
+            "whiteSpace": "normal",
+            "pointerEvents": "none",
+            "transition": "all",
+            "animation": "none",
+            "boxShadow": "none"
+          },
+          "outerHTML": "<div data-popper-arrow=\"\" class=\"tooltip-arrow\" style=\"position: absolute; top: 0px; transform: translate3d(0px, 8px, 0px);\"></div>"
+        },
+        "arrowBefore": {
+          "position": "absolute",
+          "display": "block",
+          "zIndex": "auto",
+          "opacity": "1",
+          "visibility": "visible",
+          "top": "0px",
+          "left": "-1px",
+          "right": "1.39844px",
+          "bottom": "0.796875px",
+          "transform": "none",
+          "margin": "0px",
+          "padding": "0px",
+          "maxWidth": "none",
+          "width": "6px",
+          "height": "12px",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "color": "rgb(187, 187, 187)",
+          "borderRadius": "0px",
+          "borderWidth": "6px 0px 6px 6px",
+          "borderStyle": "solid",
+          "borderTopColor": "rgba(0, 0, 0, 0)",
+          "borderRightColor": "rgba(0, 0, 0, 0)",
+          "borderBottomColor": "rgba(0, 0, 0, 0)",
+          "borderLeftColor": "rgb(0, 0, 0)",
+          "fontFamily": "system-ui, -apple-system, \"Segoe UI\", Roboto, \"Helvetica Neue\", \"Noto Sans\", \"Liberation Sans\", Arial, sans-serif, \"Apple Color Emoji\", \"Segoe UI Emoji\", \"Segoe UI Symbol\", \"Noto Color Emoji\"",
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "lineHeight": "21px",
+          "textAlign": "start",
+          "whiteSpace": "normal",
+          "pointerEvents": "none",
+          "transition": "all",
+          "animation": "none",
+          "boxShadow": "none",
+          "content": "\"\""
+        }
+      },
+      "insertedInto": {
+        "parentTag": "SPAN",
+        "parentClass": "textAreaBtns",
+        "parentId": null,
+        "isDirectChildOfBody": false,
+        "isSiblingOfHost": true
+      },
+      "generation": {
+        "arrowSpelling": "tooltip-arrow (Bootstrap 5)",
+        "placementAttribute": "data-popper-placement (Popper 2 / BS5)",
+        "placementAttributeValue": "left",
+        "directionClass": "bs-tooltip-start",
+        "usesLogicalDirections": true,
+        "allClasses": [
+          "tooltip",
+          "fade",
+          "show",
+          "bs-tooltip-start"
+        ]
+      },
+      "hostWhileOpen": {
+        "attrs": {
+          "_ngcontent-ng-c3761163150": "",
+          "placement": "left",
+          "ngbtooltip": "Add Emojis",
+          "class": "far fa-smile",
+          "aria-describedby": "ngb-tooltip-9"
+        }
+      },
+      "closedCleanly": true
+    },
+    {
+      "label": "Upload an Image",
+      "host": {
+        "tag": "I",
+        "className": "fas fa-image",
+        "attrs": {
+          "_ngcontent-ng-c3761163150": "",
+          "ngbtooltip": "Upload an Image",
+          "placement": "left",
+          "class": "fas fa-image",
+          "aria-describedby": "ngb-tooltip-10"
+        },
+        "rect": {
+          "x": 680.21,
+          "y": 1129.99,
+          "w": 16,
+          "h": 16
+        },
+        "style": {
+          "position": "static",
+          "display": "inline-block",
+          "zIndex": "auto",
+          "opacity": "1",
+          "visibility": "visible",
+          "top": "auto",
+          "left": "auto",
+          "right": "auto",
+          "bottom": "auto",
+          "transform": "none",
+          "margin": "0px",
+          "padding": "0px",
+          "maxWidth": "none",
+          "width": "16px",
+          "height": "16px",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "color": "rgb(187, 187, 187)",
+          "borderRadius": "0px",
+          "borderWidth": "0px",
+          "borderStyle": "none",
+          "borderTopColor": "rgb(187, 187, 187)",
+          "borderRightColor": "rgb(187, 187, 187)",
+          "borderBottomColor": "rgb(187, 187, 187)",
+          "borderLeftColor": "rgb(187, 187, 187)",
+          "fontFamily": "\"Font Awesome 5 Free\"",
+          "fontSize": "16px",
+          "fontWeight": "900",
+          "lineHeight": "16px",
+          "textAlign": "center",
+          "whiteSpace": "normal",
+          "pointerEvents": "auto",
+          "transition": "all",
+          "animation": "none",
+          "boxShadow": "none"
+        },
+        "outerHTML": "<i _ngcontent-ng-c3761163150=\"\" ngbtooltip=\"Upload an Image\" placement=\"left\" class=\"fas fa-image\" aria-describedby=\"ngb-tooltip-10\"></i>"
+      },
+      "appeared": true,
+      "appearedAfterMs": 30,
+      "tooltip": {
+        "tag": "NGB-TOOLTIP-WINDOW",
+        "className": "tooltip fade show bs-tooltip-start",
+        "attrs": {
+          "role": "tooltip",
+          "id": "ngb-tooltip-10",
+          "class": "tooltip fade show bs-tooltip-start",
+          "data-popper-placement": "left",
+          "style": "position: absolute; inset: 0px 0px auto auto; margin: 0px; transform: translate3d(-1230px, 1074.5px, 0px);"
+        },
+        "rect": {
+          "x": 549.3,
+          "y": 1123.5,
+          "w": 124.7,
+          "h": 29
+        },
+        "style": {
+          "position": "absolute",
+          "display": "block",
+          "zIndex": "1080",
+          "opacity": "0.100212",
+          "visibility": "visible",
+          "top": "0px",
+          "left": "1779.3px",
+          "right": "0px",
+          "bottom": "1088px",
+          "transform": "matrix(1, 0, 0, 1, -1230, 1074.5)",
+          "margin": "0px",
+          "padding": "0px",
+          "maxWidth": "none",
+          "width": "124.703px",
+          "height": "29px",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "color": "rgb(187, 187, 187)",
+          "borderRadius": "0px",
+          "borderWidth": "0px",
+          "borderStyle": "none",
+          "borderTopColor": "rgb(187, 187, 187)",
+          "borderRightColor": "rgb(187, 187, 187)",
+          "borderBottomColor": "rgb(187, 187, 187)",
+          "borderLeftColor": "rgb(187, 187, 187)",
+          "fontFamily": "system-ui, -apple-system, \"Segoe UI\", Roboto, \"Helvetica Neue\", \"Noto Sans\", \"Liberation Sans\", Arial, sans-serif, \"Apple Color Emoji\", \"Segoe UI Emoji\", \"Segoe UI Symbol\", \"Noto Color Emoji\"",
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "lineHeight": "21px",
+          "textAlign": "start",
+          "whiteSpace": "normal",
+          "pointerEvents": "none",
+          "transition": "opacity 0.15s linear",
+          "animation": "none",
+          "boxShadow": "none"
+        },
+        "outerHTML": "<ngb-tooltip-window role=\"tooltip\" id=\"ngb-tooltip-10\" class=\"tooltip fade show bs-tooltip-start\" data-popper-placement=\"left\" style=\"position: absolute; inset: 0px 0px auto auto; margin: 0px; transform: translate3d(-1230px, 1074.5px, 0px);\"><div data-popper-arrow=\"\" class=\"tooltip-arrow\" style=\"position: absolute; top: 0px; transform: translate3d(0px, 8px, 0px);\"></div><div class=\"tooltip-inner\">Upload an Image</div></ngb-tooltip-window>"
+      },
+      "parts": {
+        "inner": {
+          "tag": "DIV",
+          "className": "tooltip-inner",
+          "attrs": {
+            "class": "tooltip-inner"
+          },
+          "rect": {
+            "x": 549.3,
+            "y": 1123.5,
+            "w": 124.7,
+            "h": 29
+          },
+          "style": {
+            "position": "static",
+            "display": "block",
+            "zIndex": "auto",
+            "opacity": "1",
+            "visibility": "visible",
+            "top": "auto",
+            "left": "auto",
+            "right": "auto",
+            "bottom": "auto",
+            "transform": "none",
+            "margin": "0px",
+            "padding": "4px 8px",
+            "maxWidth": "200px",
+            "width": "124.703px",
+            "height": "29px",
+            "backgroundColor": "rgb(0, 0, 0)",
+            "color": "rgb(255, 255, 255)",
+            "borderRadius": "6px",
+            "borderWidth": "0px",
+            "borderStyle": "none",
+            "borderTopColor": "rgb(255, 255, 255)",
+            "borderRightColor": "rgb(255, 255, 255)",
+            "borderBottomColor": "rgb(255, 255, 255)",
+            "borderLeftColor": "rgb(255, 255, 255)",
+            "fontFamily": "system-ui, -apple-system, \"Segoe UI\", Roboto, \"Helvetica Neue\", \"Noto Sans\", \"Liberation Sans\", Arial, sans-serif, \"Apple Color Emoji\", \"Segoe UI Emoji\", \"Segoe UI Symbol\", \"Noto Color Emoji\"",
+            "fontSize": "14px",
+            "fontWeight": "400",
+            "lineHeight": "21px",
+            "textAlign": "center",
+            "whiteSpace": "normal",
+            "pointerEvents": "auto",
+            "transition": "all",
+            "animation": "none",
+            "boxShadow": "none"
+          },
+          "outerHTML": "<div class=\"tooltip-inner\">Upload an Image</div>"
+        },
+        "arrowBs4": null,
+        "arrowBs5": {
+          "tag": "DIV",
+          "className": "tooltip-arrow",
+          "attrs": {
+            "data-popper-arrow": "",
+            "class": "tooltip-arrow",
+            "style": "position: absolute; top: 0px; transform: translate3d(0px, 8px, 0px);"
+          },
+          "rect": {
+            "x": 674,
+            "y": 1131.5,
+            "w": 6.4,
+            "h": 12.8
+          },
+          "style": {
+            "position": "absolute",
+            "display": "block",
+            "zIndex": "auto",
+            "opacity": "1",
+            "visibility": "visible",
+            "top": "0px",
+            "left": "124.703px",
+            "right": "-6.4px",
+            "bottom": "16.2031px",
+            "transform": "matrix(1, 0, 0, 1, 0, 8)",
+            "margin": "0px",
+            "padding": "0px",
+            "maxWidth": "none",
+            "width": "6.39844px",
+            "height": "12.7969px",
+            "backgroundColor": "rgba(0, 0, 0, 0)",
+            "color": "rgb(187, 187, 187)",
+            "borderRadius": "0px",
+            "borderWidth": "0px",
+            "borderStyle": "none",
+            "borderTopColor": "rgb(187, 187, 187)",
+            "borderRightColor": "rgb(187, 187, 187)",
+            "borderBottomColor": "rgb(187, 187, 187)",
+            "borderLeftColor": "rgb(187, 187, 187)",
+            "fontFamily": "system-ui, -apple-system, \"Segoe UI\", Roboto, \"Helvetica Neue\", \"Noto Sans\", \"Liberation Sans\", Arial, sans-serif, \"Apple Color Emoji\", \"Segoe UI Emoji\", \"Segoe UI Symbol\", \"Noto Color Emoji\"",
+            "fontSize": "14px",
+            "fontWeight": "400",
+            "lineHeight": "21px",
+            "textAlign": "start",
+            "whiteSpace": "normal",
+            "pointerEvents": "none",
+            "transition": "all",
+            "animation": "none",
+            "boxShadow": "none"
+          },
+          "outerHTML": "<div data-popper-arrow=\"\" class=\"tooltip-arrow\" style=\"position: absolute; top: 0px; transform: translate3d(0px, 8px, 0px);\"></div>"
+        },
+        "arrowBefore": {
+          "position": "absolute",
+          "display": "block",
+          "zIndex": "auto",
+          "opacity": "1",
+          "visibility": "visible",
+          "top": "0px",
+          "left": "-1px",
+          "right": "1.39844px",
+          "bottom": "0.796875px",
+          "transform": "none",
+          "margin": "0px",
+          "padding": "0px",
+          "maxWidth": "none",
+          "width": "6px",
+          "height": "12px",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "color": "rgb(187, 187, 187)",
+          "borderRadius": "0px",
+          "borderWidth": "6px 0px 6px 6px",
+          "borderStyle": "solid",
+          "borderTopColor": "rgba(0, 0, 0, 0)",
+          "borderRightColor": "rgba(0, 0, 0, 0)",
+          "borderBottomColor": "rgba(0, 0, 0, 0)",
+          "borderLeftColor": "rgb(0, 0, 0)",
+          "fontFamily": "system-ui, -apple-system, \"Segoe UI\", Roboto, \"Helvetica Neue\", \"Noto Sans\", \"Liberation Sans\", Arial, sans-serif, \"Apple Color Emoji\", \"Segoe UI Emoji\", \"Segoe UI Symbol\", \"Noto Color Emoji\"",
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "lineHeight": "21px",
+          "textAlign": "start",
+          "whiteSpace": "normal",
+          "pointerEvents": "none",
+          "transition": "all",
+          "animation": "none",
+          "boxShadow": "none",
+          "content": "\"\""
+        }
+      },
+      "insertedInto": {
+        "parentTag": "SPAN",
+        "parentClass": "textAreaBtns",
+        "parentId": null,
+        "isDirectChildOfBody": false,
+        "isSiblingOfHost": true
+      },
+      "generation": {
+        "arrowSpelling": "tooltip-arrow (Bootstrap 5)",
+        "placementAttribute": "data-popper-placement (Popper 2 / BS5)",
+        "placementAttributeValue": "left",
+        "directionClass": "bs-tooltip-start",
+        "usesLogicalDirections": true,
+        "allClasses": [
+          "tooltip",
+          "fade",
+          "show",
+          "bs-tooltip-start"
+        ]
+      },
+      "hostWhileOpen": {
+        "attrs": {
+          "_ngcontent-ng-c3761163150": "",
+          "ngbtooltip": "Upload an Image",
+          "placement": "left",
+          "class": "fas fa-image",
+          "aria-describedby": "ngb-tooltip-10"
+        }
+      },
+      "closedCleanly": true
+    },
+    {
+      "label": "Play YouTube For All",
+      "host": {
+        "tag": "I",
+        "className": "fas fa-video",
+        "attrs": {
+          "_ngcontent-ng-c3761163150": "",
+          "ngbtooltip": "Play YouTube For All",
+          "placement": "left",
+          "class": "fas fa-video",
+          "aria-describedby": "ngb-tooltip-11"
+        },
+        "rect": {
+          "x": 706.21,
+          "y": 1129.99,
+          "w": 18,
+          "h": 16
+        },
+        "style": {
+          "position": "static",
+          "display": "inline-block",
+          "zIndex": "auto",
+          "opacity": "1",
+          "visibility": "visible",
+          "top": "auto",
+          "left": "auto",
+          "right": "auto",
+          "bottom": "auto",
+          "transform": "none",
+          "margin": "0px",
+          "padding": "0px",
+          "maxWidth": "none",
+          "width": "18px",
+          "height": "16px",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "color": "rgb(187, 187, 187)",
+          "borderRadius": "0px",
+          "borderWidth": "0px",
+          "borderStyle": "none",
+          "borderTopColor": "rgb(187, 187, 187)",
+          "borderRightColor": "rgb(187, 187, 187)",
+          "borderBottomColor": "rgb(187, 187, 187)",
+          "borderLeftColor": "rgb(187, 187, 187)",
+          "fontFamily": "\"Font Awesome 5 Free\"",
+          "fontSize": "16px",
+          "fontWeight": "900",
+          "lineHeight": "16px",
+          "textAlign": "center",
+          "whiteSpace": "normal",
+          "pointerEvents": "auto",
+          "transition": "all",
+          "animation": "none",
+          "boxShadow": "none"
+        },
+        "outerHTML": "<i _ngcontent-ng-c3761163150=\"\" ngbtooltip=\"Play YouTube For All\" placement=\"left\" class=\"fas fa-video\" aria-describedby=\"ngb-tooltip-11\"></i>"
+      },
+      "appeared": true,
+      "appearedAfterMs": 30,
+      "tooltip": {
+        "tag": "NGB-TOOLTIP-WINDOW",
+        "className": "tooltip fade show bs-tooltip-start",
+        "attrs": {
+          "role": "tooltip",
+          "id": "ngb-tooltip-11",
+          "class": "tooltip fade show bs-tooltip-start",
+          "data-popper-placement": "left",
+          "style": "position: absolute; inset: 0px 0px auto auto; margin: 0px; transform: translate3d(-1204px, 1074.5px, 0px);"
+        },
+        "rect": {
+          "x": 553.6,
+          "y": 1123.5,
+          "w": 146.4,
+          "h": 29
+        },
+        "style": {
+          "position": "absolute",
+          "display": "block",
+          "zIndex": "1080",
+          "opacity": "0.199656",
+          "visibility": "visible",
+          "top": "0px",
+          "left": "1757.6px",
+          "right": "0px",
+          "bottom": "1088px",
+          "transform": "matrix(1, 0, 0, 1, -1204, 1074.5)",
+          "margin": "0px",
+          "padding": "0px",
+          "maxWidth": "none",
+          "width": "146.398px",
+          "height": "29px",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "color": "rgb(187, 187, 187)",
+          "borderRadius": "0px",
+          "borderWidth": "0px",
+          "borderStyle": "none",
+          "borderTopColor": "rgb(187, 187, 187)",
+          "borderRightColor": "rgb(187, 187, 187)",
+          "borderBottomColor": "rgb(187, 187, 187)",
+          "borderLeftColor": "rgb(187, 187, 187)",
+          "fontFamily": "system-ui, -apple-system, \"Segoe UI\", Roboto, \"Helvetica Neue\", \"Noto Sans\", \"Liberation Sans\", Arial, sans-serif, \"Apple Color Emoji\", \"Segoe UI Emoji\", \"Segoe UI Symbol\", \"Noto Color Emoji\"",
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "lineHeight": "21px",
+          "textAlign": "start",
+          "whiteSpace": "normal",
+          "pointerEvents": "none",
+          "transition": "opacity 0.15s linear",
+          "animation": "none",
+          "boxShadow": "none"
+        },
+        "outerHTML": "<ngb-tooltip-window role=\"tooltip\" id=\"ngb-tooltip-11\" class=\"tooltip fade show bs-tooltip-start\" data-popper-placement=\"left\" style=\"position: absolute; inset: 0px 0px auto auto; margin: 0px; transform: translate3d(-1204px, 1074.5px, 0px);\"><div data-popper-arrow=\"\" class=\"tooltip-arrow\" style=\"position: absolute; top: 0px; transform: translate3d(0px, 8px, 0px);\"></div><div class=\"tooltip-inner\">Play YouTube For All</div></ngb-tooltip-window>"
+      },
+      "parts": {
+        "inner": {
+          "tag": "DIV",
+          "className": "tooltip-inner",
+          "attrs": {
+            "class": "tooltip-inner"
+          },
+          "rect": {
+            "x": 553.6,
+            "y": 1123.5,
+            "w": 146.4,
+            "h": 29
+          },
+          "style": {
+            "position": "static",
+            "display": "block",
+            "zIndex": "auto",
+            "opacity": "1",
+            "visibility": "visible",
+            "top": "auto",
+            "left": "auto",
+            "right": "auto",
+            "bottom": "auto",
+            "transform": "none",
+            "margin": "0px",
+            "padding": "4px 8px",
+            "maxWidth": "200px",
+            "width": "146.398px",
+            "height": "29px",
+            "backgroundColor": "rgb(0, 0, 0)",
+            "color": "rgb(255, 255, 255)",
+            "borderRadius": "6px",
+            "borderWidth": "0px",
+            "borderStyle": "none",
+            "borderTopColor": "rgb(255, 255, 255)",
+            "borderRightColor": "rgb(255, 255, 255)",
+            "borderBottomColor": "rgb(255, 255, 255)",
+            "borderLeftColor": "rgb(255, 255, 255)",
+            "fontFamily": "system-ui, -apple-system, \"Segoe UI\", Roboto, \"Helvetica Neue\", \"Noto Sans\", \"Liberation Sans\", Arial, sans-serif, \"Apple Color Emoji\", \"Segoe UI Emoji\", \"Segoe UI Symbol\", \"Noto Color Emoji\"",
+            "fontSize": "14px",
+            "fontWeight": "400",
+            "lineHeight": "21px",
+            "textAlign": "center",
+            "whiteSpace": "normal",
+            "pointerEvents": "auto",
+            "transition": "all",
+            "animation": "none",
+            "boxShadow": "none"
+          },
+          "outerHTML": "<div class=\"tooltip-inner\">Play YouTube For All</div>"
+        },
+        "arrowBs4": null,
+        "arrowBs5": {
+          "tag": "DIV",
+          "className": "tooltip-arrow",
+          "attrs": {
+            "data-popper-arrow": "",
+            "class": "tooltip-arrow",
+            "style": "position: absolute; top: 0px; transform: translate3d(0px, 8px, 0px);"
+          },
+          "rect": {
+            "x": 700,
+            "y": 1131.5,
+            "w": 6.4,
+            "h": 12.8
+          },
+          "style": {
+            "position": "absolute",
+            "display": "block",
+            "zIndex": "auto",
+            "opacity": "1",
+            "visibility": "visible",
+            "top": "0px",
+            "left": "146.398px",
+            "right": "-6.4px",
+            "bottom": "16.2031px",
+            "transform": "matrix(1, 0, 0, 1, 0, 8)",
+            "margin": "0px",
+            "padding": "0px",
+            "maxWidth": "none",
+            "width": "6.39844px",
+            "height": "12.7969px",
+            "backgroundColor": "rgba(0, 0, 0, 0)",
+            "color": "rgb(187, 187, 187)",
+            "borderRadius": "0px",
+            "borderWidth": "0px",
+            "borderStyle": "none",
+            "borderTopColor": "rgb(187, 187, 187)",
+            "borderRightColor": "rgb(187, 187, 187)",
+            "borderBottomColor": "rgb(187, 187, 187)",
+            "borderLeftColor": "rgb(187, 187, 187)",
+            "fontFamily": "system-ui, -apple-system, \"Segoe UI\", Roboto, \"Helvetica Neue\", \"Noto Sans\", \"Liberation Sans\", Arial, sans-serif, \"Apple Color Emoji\", \"Segoe UI Emoji\", \"Segoe UI Symbol\", \"Noto Color Emoji\"",
+            "fontSize": "14px",
+            "fontWeight": "400",
+            "lineHeight": "21px",
+            "textAlign": "start",
+            "whiteSpace": "normal",
+            "pointerEvents": "none",
+            "transition": "all",
+            "animation": "none",
+            "boxShadow": "none"
+          },
+          "outerHTML": "<div data-popper-arrow=\"\" class=\"tooltip-arrow\" style=\"position: absolute; top: 0px; transform: translate3d(0px, 8px, 0px);\"></div>"
+        },
+        "arrowBefore": {
+          "position": "absolute",
+          "display": "block",
+          "zIndex": "auto",
+          "opacity": "1",
+          "visibility": "visible",
+          "top": "0px",
+          "left": "-1px",
+          "right": "1.39844px",
+          "bottom": "0.796875px",
+          "transform": "none",
+          "margin": "0px",
+          "padding": "0px",
+          "maxWidth": "none",
+          "width": "6px",
+          "height": "12px",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "color": "rgb(187, 187, 187)",
+          "borderRadius": "0px",
+          "borderWidth": "6px 0px 6px 6px",
+          "borderStyle": "solid",
+          "borderTopColor": "rgba(0, 0, 0, 0)",
+          "borderRightColor": "rgba(0, 0, 0, 0)",
+          "borderBottomColor": "rgba(0, 0, 0, 0)",
+          "borderLeftColor": "rgb(0, 0, 0)",
+          "fontFamily": "system-ui, -apple-system, \"Segoe UI\", Roboto, \"Helvetica Neue\", \"Noto Sans\", \"Liberation Sans\", Arial, sans-serif, \"Apple Color Emoji\", \"Segoe UI Emoji\", \"Segoe UI Symbol\", \"Noto Color Emoji\"",
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "lineHeight": "21px",
+          "textAlign": "start",
+          "whiteSpace": "normal",
+          "pointerEvents": "none",
+          "transition": "all",
+          "animation": "none",
+          "boxShadow": "none",
+          "content": "\"\""
+        }
+      },
+      "insertedInto": {
+        "parentTag": "SPAN",
+        "parentClass": "textAreaBtns",
+        "parentId": null,
+        "isDirectChildOfBody": false,
+        "isSiblingOfHost": true
+      },
+      "generation": {
+        "arrowSpelling": "tooltip-arrow (Bootstrap 5)",
+        "placementAttribute": "data-popper-placement (Popper 2 / BS5)",
+        "placementAttributeValue": "left",
+        "directionClass": "bs-tooltip-start",
+        "usesLogicalDirections": true,
+        "allClasses": [
+          "tooltip",
+          "fade",
+          "show",
+          "bs-tooltip-start"
+        ]
+      },
+      "hostWhileOpen": {
+        "attrs": {
+          "_ngcontent-ng-c3761163150": "",
+          "ngbtooltip": "Play YouTube For All",
+          "placement": "left",
+          "class": "fas fa-video",
+          "aria-describedby": "ngb-tooltip-11"
+        }
+      },
+      "closedCleanly": true
+    },
+    {
+      "label": "Search for GIFs",
+      "host": {
+        "tag": "SPAN",
+        "className": "textAreaBtns",
+        "attrs": {
+          "_ngcontent-ng-c3761163150": "",
+          "ngbtooltip": "Search for GIFs",
+          "placement": "auto",
+          "container": "body",
+          "autoclose": "outside",
+          "popoverclass": "popOverDiv",
+          "triggers": "manual",
+          "class": "textAreaBtns",
+          "style": "font-size: 12px;"
+        },
+        "rect": {
+          "x": 729.21,
+          "y": 1124.49,
+          "w": 30,
+          "h": 28
+        },
+        "style": {
+          "position": "static",
+          "display": "block",
+          "zIndex": "auto",
+          "opacity": "1",
+          "visibility": "visible",
+          "top": "auto",
+          "left": "auto",
+          "right": "auto",
+          "bottom": "auto",
+          "transform": "none",
+          "margin": "0px",
+          "padding": "5px",
+          "maxWidth": "none",
+          "width": "30px",
+          "height": "28px",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "color": "rgb(187, 187, 187)",
+          "borderRadius": "0px",
+          "borderWidth": "0px",
+          "borderStyle": "none",
+          "borderTopColor": "rgb(187, 187, 187)",
+          "borderRightColor": "rgb(187, 187, 187)",
+          "borderBottomColor": "rgb(187, 187, 187)",
+          "borderLeftColor": "rgb(187, 187, 187)",
+          "fontFamily": "Arial, Helvetica, sans-serif",
+          "fontSize": "12px",
+          "fontWeight": "300",
+          "lineHeight": "18px",
+          "textAlign": "center",
+          "whiteSpace": "normal",
+          "pointerEvents": "auto",
+          "transition": "all",
+          "animation": "none",
+          "boxShadow": "none"
+        },
+        "outerHTML": "<span _ngcontent-ng-c3761163150=\"\" ngbtooltip=\"Search for GIFs\" placement=\"auto\" container=\"body\" autoclose=\"outside\" popoverclass=\"popOverDiv\" triggers=\"manual\" class=\"textAreaBtns\" style=\"font-size: 12px;\"><span _ngcontent-ng-c3761163150=\"\">GIF</span><!----></span>"
+      },
+      "appeared": false,
+      "appearedAfterMs": null,
+      "tooltip": null,
+      "parts": {},
+      "insertedInto": null,
+      "generation": null,
+      "closedCleanly": true
+    },
+    {
+      "label": "Add Emojis",
+      "host": {
+        "tag": "I",
+        "className": "far fa-smile",
+        "attrs": {
+          "_ngcontent-ng-c1823712792": "",
+          "placement": "left",
+          "ngbtooltip": "Add Emojis",
+          "class": "far fa-smile",
+          "aria-describedby": "ngb-tooltip-0"
+        },
+        "rect": {
+          "x": 0,
+          "y": 0,
+          "w": 0,
+          "h": 0
+        },
+        "style": {
+          "position": "static",
+          "display": "inline-block",
+          "zIndex": "auto",
+          "opacity": "1",
+          "visibility": "visible",
+          "top": "auto",
+          "left": "auto",
+          "right": "auto",
+          "bottom": "auto",
+          "transform": "none",
+          "margin": "0px",
+          "padding": "0px",
+          "maxWidth": "none",
+          "width": "auto",
+          "height": "auto",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "color": "rgb(187, 187, 187)",
+          "borderRadius": "0px",
+          "borderWidth": "0px",
+          "borderStyle": "none",
+          "borderTopColor": "rgb(187, 187, 187)",
+          "borderRightColor": "rgb(187, 187, 187)",
+          "borderBottomColor": "rgb(187, 187, 187)",
+          "borderLeftColor": "rgb(187, 187, 187)",
+          "fontFamily": "\"Font Awesome 5 Free\"",
+          "fontSize": "16px",
+          "fontWeight": "400",
+          "lineHeight": "16px",
+          "textAlign": "center",
+          "whiteSpace": "normal",
+          "pointerEvents": "auto",
+          "transition": "all",
+          "animation": "none",
+          "boxShadow": "none"
+        },
+        "outerHTML": "<i _ngcontent-ng-c1823712792=\"\" placement=\"left\" ngbtooltip=\"Add Emojis\" class=\"far fa-smile\" aria-describedby=\"ngb-tooltip-0\"></i>"
+      },
+      "appeared": true,
+      "appearedAfterMs": 37,
+      "tooltip": {
+        "tag": "NGB-TOOLTIP-WINDOW",
+        "className": "tooltip fade show bs-tooltip-start",
+        "attrs": {
+          "role": "tooltip",
+          "id": "ngb-tooltip-0",
+          "class": "tooltip fade show bs-tooltip-start",
+          "data-popper-placement": "left",
+          "style": "position: absolute; inset: 0px 0px auto auto; margin: 0px; transform: translate3d(-1910px, 0px, 0px);"
+        },
+        "rect": {
+          "x": 0,
+          "y": 0,
+          "w": 0,
+          "h": 0
+        },
+        "style": {
+          "position": "absolute",
+          "display": "block",
+          "zIndex": "1080",
+          "opacity": "0.9",
+          "visibility": "visible",
+          "top": "0px",
+          "left": "auto",
+          "right": "0px",
+          "bottom": "auto",
+          "transform": "none",
+          "margin": "0px",
+          "padding": "0px",
+          "maxWidth": "none",
+          "width": "auto",
+          "height": "auto",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "color": "rgb(187, 187, 187)",
+          "borderRadius": "0px",
+          "borderWidth": "0px",
+          "borderStyle": "none",
+          "borderTopColor": "rgb(187, 187, 187)",
+          "borderRightColor": "rgb(187, 187, 187)",
+          "borderBottomColor": "rgb(187, 187, 187)",
+          "borderLeftColor": "rgb(187, 187, 187)",
+          "fontFamily": "system-ui, -apple-system, \"Segoe UI\", Roboto, \"Helvetica Neue\", \"Noto Sans\", \"Liberation Sans\", Arial, sans-serif, \"Apple Color Emoji\", \"Segoe UI Emoji\", \"Segoe UI Symbol\", \"Noto Color Emoji\"",
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "lineHeight": "21px",
+          "textAlign": "start",
+          "whiteSpace": "normal",
+          "pointerEvents": "none",
+          "transition": "opacity 0.15s linear",
+          "animation": "none",
+          "boxShadow": "none"
+        },
+        "outerHTML": "<ngb-tooltip-window role=\"tooltip\" id=\"ngb-tooltip-0\" class=\"tooltip fade show bs-tooltip-start\" data-popper-placement=\"left\" style=\"position: absolute; inset: 0px 0px auto auto; margin: 0px; transform: translate3d(-1910px, 0px, 0px);\"><div data-popper-arrow=\"\" class=\"tooltip-arrow\" style=\"position: absolute; top: 0px; transform: translate3d(0px, 0px, 0px);\"></div><div class=\"tooltip-inner\">Add Emojis</div></ngb-tooltip-window>"
+      },
+      "parts": {
+        "inner": {
+          "tag": "DIV",
+          "className": "tooltip-inner",
+          "attrs": {
+            "class": "tooltip-inner"
+          },
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "w": 0,
+            "h": 0
+          },
+          "style": {
+            "position": "static",
+            "display": "block",
+            "zIndex": "auto",
+            "opacity": "1",
+            "visibility": "visible",
+            "top": "auto",
+            "left": "auto",
+            "right": "auto",
+            "bottom": "auto",
+            "transform": "none",
+            "margin": "0px",
+            "padding": "4px 8px",
+            "maxWidth": "200px",
+            "width": "auto",
+            "height": "auto",
+            "backgroundColor": "rgb(0, 0, 0)",
+            "color": "rgb(255, 255, 255)",
+            "borderRadius": "6px",
+            "borderWidth": "0px",
+            "borderStyle": "none",
+            "borderTopColor": "rgb(255, 255, 255)",
+            "borderRightColor": "rgb(255, 255, 255)",
+            "borderBottomColor": "rgb(255, 255, 255)",
+            "borderLeftColor": "rgb(255, 255, 255)",
+            "fontFamily": "system-ui, -apple-system, \"Segoe UI\", Roboto, \"Helvetica Neue\", \"Noto Sans\", \"Liberation Sans\", Arial, sans-serif, \"Apple Color Emoji\", \"Segoe UI Emoji\", \"Segoe UI Symbol\", \"Noto Color Emoji\"",
+            "fontSize": "14px",
+            "fontWeight": "400",
+            "lineHeight": "21px",
+            "textAlign": "center",
+            "whiteSpace": "normal",
+            "pointerEvents": "auto",
+            "transition": "all",
+            "animation": "none",
+            "boxShadow": "none"
+          },
+          "outerHTML": "<div class=\"tooltip-inner\">Add Emojis</div>"
+        },
+        "arrowBs4": null,
+        "arrowBs5": {
+          "tag": "DIV",
+          "className": "tooltip-arrow",
+          "attrs": {
+            "data-popper-arrow": "",
+            "class": "tooltip-arrow",
+            "style": "position: absolute; top: 0px; transform: translate3d(0px, 0px, 0px);"
+          },
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "w": 0,
+            "h": 0
+          },
+          "style": {
+            "position": "absolute",
+            "display": "block",
+            "zIndex": "auto",
+            "opacity": "1",
+            "visibility": "visible",
+            "top": "0px",
+            "left": "auto",
+            "right": "-6.4px",
+            "bottom": "auto",
+            "transform": "none",
+            "margin": "0px",
+            "padding": "0px",
+            "maxWidth": "none",
+            "width": "6.4px",
+            "height": "12.8px",
+            "backgroundColor": "rgba(0, 0, 0, 0)",
+            "color": "rgb(187, 187, 187)",
+            "borderRadius": "0px",
+            "borderWidth": "0px",
+            "borderStyle": "none",
+            "borderTopColor": "rgb(187, 187, 187)",
+            "borderRightColor": "rgb(187, 187, 187)",
+            "borderBottomColor": "rgb(187, 187, 187)",
+            "borderLeftColor": "rgb(187, 187, 187)",
+            "fontFamily": "system-ui, -apple-system, \"Segoe UI\", Roboto, \"Helvetica Neue\", \"Noto Sans\", \"Liberation Sans\", Arial, sans-serif, \"Apple Color Emoji\", \"Segoe UI Emoji\", \"Segoe UI Symbol\", \"Noto Color Emoji\"",
+            "fontSize": "14px",
+            "fontWeight": "400",
+            "lineHeight": "21px",
+            "textAlign": "start",
+            "whiteSpace": "normal",
+            "pointerEvents": "none",
+            "transition": "all",
+            "animation": "none",
+            "boxShadow": "none"
+          },
+          "outerHTML": "<div data-popper-arrow=\"\" class=\"tooltip-arrow\" style=\"position: absolute; top: 0px; transform: translate3d(0px, 0px, 0px);\"></div>"
+        },
+        "arrowBefore": {
+          "position": "absolute",
+          "display": "block",
+          "zIndex": "auto",
+          "opacity": "1",
+          "visibility": "visible",
+          "top": "auto",
+          "left": "-1px",
+          "right": "auto",
+          "bottom": "auto",
+          "transform": "none",
+          "margin": "0px",
+          "padding": "0px",
+          "maxWidth": "none",
+          "width": "auto",
+          "height": "auto",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "color": "rgb(187, 187, 187)",
+          "borderRadius": "0px",
+          "borderWidth": "6px 0px 6px 6px",
+          "borderStyle": "solid",
+          "borderTopColor": "rgba(0, 0, 0, 0)",
+          "borderRightColor": "rgba(0, 0, 0, 0)",
+          "borderBottomColor": "rgba(0, 0, 0, 0)",
+          "borderLeftColor": "rgb(0, 0, 0)",
+          "fontFamily": "system-ui, -apple-system, \"Segoe UI\", Roboto, \"Helvetica Neue\", \"Noto Sans\", \"Liberation Sans\", Arial, sans-serif, \"Apple Color Emoji\", \"Segoe UI Emoji\", \"Segoe UI Symbol\", \"Noto Color Emoji\"",
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "lineHeight": "21px",
+          "textAlign": "start",
+          "whiteSpace": "normal",
+          "pointerEvents": "none",
+          "transition": "all",
+          "animation": "none",
+          "boxShadow": "none",
+          "content": "\"\""
+        }
+      },
+      "insertedInto": {
+        "parentTag": "SPAN",
+        "parentClass": "textAreaBtns",
+        "parentId": null,
+        "isDirectChildOfBody": false,
+        "isSiblingOfHost": true
+      },
+      "generation": {
+        "arrowSpelling": "tooltip-arrow (Bootstrap 5)",
+        "placementAttribute": "data-popper-placement (Popper 2 / BS5)",
+        "placementAttributeValue": "left",
+        "directionClass": "bs-tooltip-start",
+        "usesLogicalDirections": true,
+        "allClasses": [
+          "tooltip",
+          "fade",
+          "show",
+          "bs-tooltip-start"
+        ]
+      },
+      "hostWhileOpen": {
+        "attrs": {
+          "_ngcontent-ng-c1823712792": "",
+          "placement": "left",
+          "ngbtooltip": "Add Emojis",
+          "class": "far fa-smile",
+          "aria-describedby": "ngb-tooltip-0"
+        }
+      },
+      "closedCleanly": false
+    },
+    {
+      "label": "Upload an Image",
+      "host": {
+        "tag": "I",
+        "className": "fas fa-image",
+        "attrs": {
+          "_ngcontent-ng-c1823712792": "",
+          "ngbtooltip": "Upload an Image",
+          "placement": "left",
+          "class": "fas fa-image",
+          "aria-describedby": "ngb-tooltip-3"
+        },
+        "rect": {
+          "x": 0,
+          "y": 0,
+          "w": 0,
+          "h": 0
+        },
+        "style": {
+          "position": "static",
+          "display": "inline-block",
+          "zIndex": "auto",
+          "opacity": "1",
+          "visibility": "visible",
+          "top": "auto",
+          "left": "auto",
+          "right": "auto",
+          "bottom": "auto",
+          "transform": "none",
+          "margin": "0px",
+          "padding": "0px",
+          "maxWidth": "none",
+          "width": "auto",
+          "height": "auto",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "color": "rgb(187, 187, 187)",
+          "borderRadius": "0px",
+          "borderWidth": "0px",
+          "borderStyle": "none",
+          "borderTopColor": "rgb(187, 187, 187)",
+          "borderRightColor": "rgb(187, 187, 187)",
+          "borderBottomColor": "rgb(187, 187, 187)",
+          "borderLeftColor": "rgb(187, 187, 187)",
+          "fontFamily": "\"Font Awesome 5 Free\"",
+          "fontSize": "16px",
+          "fontWeight": "900",
+          "lineHeight": "16px",
+          "textAlign": "center",
+          "whiteSpace": "normal",
+          "pointerEvents": "auto",
+          "transition": "all",
+          "animation": "none",
+          "boxShadow": "none"
+        },
+        "outerHTML": "<i _ngcontent-ng-c1823712792=\"\" ngbtooltip=\"Upload an Image\" placement=\"left\" class=\"fas fa-image\" aria-describedby=\"ngb-tooltip-3\"></i>"
+      },
+      "appeared": true,
+      "appearedAfterMs": 34,
+      "tooltip": {
+        "tag": "NGB-TOOLTIP-WINDOW",
+        "className": "tooltip fade show bs-tooltip-start",
+        "attrs": {
+          "role": "tooltip",
+          "id": "ngb-tooltip-3",
+          "class": "tooltip fade show bs-tooltip-start",
+          "data-popper-placement": "left",
+          "style": "position: absolute; inset: 0px 0px auto auto; margin: 0px; transform: translate3d(-1910px, 0px, 0px);"
+        },
+        "rect": {
+          "x": 0,
+          "y": 0,
+          "w": 0,
+          "h": 0
+        },
+        "style": {
+          "position": "absolute",
+          "display": "block",
+          "zIndex": "1080",
+          "opacity": "0.9",
+          "visibility": "visible",
+          "top": "0px",
+          "left": "auto",
+          "right": "0px",
+          "bottom": "auto",
+          "transform": "none",
+          "margin": "0px",
+          "padding": "0px",
+          "maxWidth": "none",
+          "width": "auto",
+          "height": "auto",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "color": "rgb(187, 187, 187)",
+          "borderRadius": "0px",
+          "borderWidth": "0px",
+          "borderStyle": "none",
+          "borderTopColor": "rgb(187, 187, 187)",
+          "borderRightColor": "rgb(187, 187, 187)",
+          "borderBottomColor": "rgb(187, 187, 187)",
+          "borderLeftColor": "rgb(187, 187, 187)",
+          "fontFamily": "system-ui, -apple-system, \"Segoe UI\", Roboto, \"Helvetica Neue\", \"Noto Sans\", \"Liberation Sans\", Arial, sans-serif, \"Apple Color Emoji\", \"Segoe UI Emoji\", \"Segoe UI Symbol\", \"Noto Color Emoji\"",
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "lineHeight": "21px",
+          "textAlign": "start",
+          "whiteSpace": "normal",
+          "pointerEvents": "none",
+          "transition": "opacity 0.15s linear",
+          "animation": "none",
+          "boxShadow": "none"
+        },
+        "outerHTML": "<ngb-tooltip-window role=\"tooltip\" id=\"ngb-tooltip-3\" class=\"tooltip fade show bs-tooltip-start\" data-popper-placement=\"left\" style=\"position: absolute; inset: 0px 0px auto auto; margin: 0px; transform: translate3d(-1910px, 0px, 0px);\"><div data-popper-arrow=\"\" class=\"tooltip-arrow\" style=\"position: absolute; top: 0px; transform: translate3d(0px, 0px, 0px);\"></div><div class=\"tooltip-inner\">Upload an Image</div></ngb-tooltip-window>"
+      },
+      "parts": {
+        "inner": {
+          "tag": "DIV",
+          "className": "tooltip-inner",
+          "attrs": {
+            "class": "tooltip-inner"
+          },
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "w": 0,
+            "h": 0
+          },
+          "style": {
+            "position": "static",
+            "display": "block",
+            "zIndex": "auto",
+            "opacity": "1",
+            "visibility": "visible",
+            "top": "auto",
+            "left": "auto",
+            "right": "auto",
+            "bottom": "auto",
+            "transform": "none",
+            "margin": "0px",
+            "padding": "4px 8px",
+            "maxWidth": "200px",
+            "width": "auto",
+            "height": "auto",
+            "backgroundColor": "rgb(0, 0, 0)",
+            "color": "rgb(255, 255, 255)",
+            "borderRadius": "6px",
+            "borderWidth": "0px",
+            "borderStyle": "none",
+            "borderTopColor": "rgb(255, 255, 255)",
+            "borderRightColor": "rgb(255, 255, 255)",
+            "borderBottomColor": "rgb(255, 255, 255)",
+            "borderLeftColor": "rgb(255, 255, 255)",
+            "fontFamily": "system-ui, -apple-system, \"Segoe UI\", Roboto, \"Helvetica Neue\", \"Noto Sans\", \"Liberation Sans\", Arial, sans-serif, \"Apple Color Emoji\", \"Segoe UI Emoji\", \"Segoe UI Symbol\", \"Noto Color Emoji\"",
+            "fontSize": "14px",
+            "fontWeight": "400",
+            "lineHeight": "21px",
+            "textAlign": "center",
+            "whiteSpace": "normal",
+            "pointerEvents": "auto",
+            "transition": "all",
+            "animation": "none",
+            "boxShadow": "none"
+          },
+          "outerHTML": "<div class=\"tooltip-inner\">Upload an Image</div>"
+        },
+        "arrowBs4": null,
+        "arrowBs5": {
+          "tag": "DIV",
+          "className": "tooltip-arrow",
+          "attrs": {
+            "data-popper-arrow": "",
+            "class": "tooltip-arrow",
+            "style": "position: absolute; top: 0px; transform: translate3d(0px, 0px, 0px);"
+          },
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "w": 0,
+            "h": 0
+          },
+          "style": {
+            "position": "absolute",
+            "display": "block",
+            "zIndex": "auto",
+            "opacity": "1",
+            "visibility": "visible",
+            "top": "0px",
+            "left": "auto",
+            "right": "-6.4px",
+            "bottom": "auto",
+            "transform": "none",
+            "margin": "0px",
+            "padding": "0px",
+            "maxWidth": "none",
+            "width": "6.4px",
+            "height": "12.8px",
+            "backgroundColor": "rgba(0, 0, 0, 0)",
+            "color": "rgb(187, 187, 187)",
+            "borderRadius": "0px",
+            "borderWidth": "0px",
+            "borderStyle": "none",
+            "borderTopColor": "rgb(187, 187, 187)",
+            "borderRightColor": "rgb(187, 187, 187)",
+            "borderBottomColor": "rgb(187, 187, 187)",
+            "borderLeftColor": "rgb(187, 187, 187)",
+            "fontFamily": "system-ui, -apple-system, \"Segoe UI\", Roboto, \"Helvetica Neue\", \"Noto Sans\", \"Liberation Sans\", Arial, sans-serif, \"Apple Color Emoji\", \"Segoe UI Emoji\", \"Segoe UI Symbol\", \"Noto Color Emoji\"",
+            "fontSize": "14px",
+            "fontWeight": "400",
+            "lineHeight": "21px",
+            "textAlign": "start",
+            "whiteSpace": "normal",
+            "pointerEvents": "none",
+            "transition": "all",
+            "animation": "none",
+            "boxShadow": "none"
+          },
+          "outerHTML": "<div data-popper-arrow=\"\" class=\"tooltip-arrow\" style=\"position: absolute; top: 0px; transform: translate3d(0px, 0px, 0px);\"></div>"
+        },
+        "arrowBefore": {
+          "position": "absolute",
+          "display": "block",
+          "zIndex": "auto",
+          "opacity": "1",
+          "visibility": "visible",
+          "top": "auto",
+          "left": "-1px",
+          "right": "auto",
+          "bottom": "auto",
+          "transform": "none",
+          "margin": "0px",
+          "padding": "0px",
+          "maxWidth": "none",
+          "width": "auto",
+          "height": "auto",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "color": "rgb(187, 187, 187)",
+          "borderRadius": "0px",
+          "borderWidth": "6px 0px 6px 6px",
+          "borderStyle": "solid",
+          "borderTopColor": "rgba(0, 0, 0, 0)",
+          "borderRightColor": "rgba(0, 0, 0, 0)",
+          "borderBottomColor": "rgba(0, 0, 0, 0)",
+          "borderLeftColor": "rgb(0, 0, 0)",
+          "fontFamily": "system-ui, -apple-system, \"Segoe UI\", Roboto, \"Helvetica Neue\", \"Noto Sans\", \"Liberation Sans\", Arial, sans-serif, \"Apple Color Emoji\", \"Segoe UI Emoji\", \"Segoe UI Symbol\", \"Noto Color Emoji\"",
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "lineHeight": "21px",
+          "textAlign": "start",
+          "whiteSpace": "normal",
+          "pointerEvents": "none",
+          "transition": "all",
+          "animation": "none",
+          "boxShadow": "none",
+          "content": "\"\""
+        }
+      },
+      "insertedInto": {
+        "parentTag": "SPAN",
+        "parentClass": "textAreaBtns",
+        "parentId": null,
+        "isDirectChildOfBody": false,
+        "isSiblingOfHost": true
+      },
+      "generation": {
+        "arrowSpelling": "tooltip-arrow (Bootstrap 5)",
+        "placementAttribute": "data-popper-placement (Popper 2 / BS5)",
+        "placementAttributeValue": "left",
+        "directionClass": "bs-tooltip-start",
+        "usesLogicalDirections": true,
+        "allClasses": [
+          "tooltip",
+          "fade",
+          "show",
+          "bs-tooltip-start"
+        ]
+      },
+      "hostWhileOpen": {
+        "attrs": {
+          "_ngcontent-ng-c1823712792": "",
+          "ngbtooltip": "Upload an Image",
+          "placement": "left",
+          "class": "fas fa-image",
+          "aria-describedby": "ngb-tooltip-3"
+        }
+      },
+      "closedCleanly": false
+    },
+    {
+      "label": "Add Emojis",
+      "host": {
+        "tag": "I",
+        "className": "far fa-smile",
+        "attrs": {
+          "_ngcontent-ng-c698792182": "",
+          "placement": "left",
+          "ngbtooltip": "Add Emojis",
+          "class": "far fa-smile",
+          "aria-describedby": "ngb-tooltip-1"
+        },
+        "rect": {
+          "x": 0,
+          "y": 0,
+          "w": 0,
+          "h": 0
+        },
+        "style": {
+          "position": "static",
+          "display": "inline-block",
+          "zIndex": "auto",
+          "opacity": "1",
+          "visibility": "visible",
+          "top": "auto",
+          "left": "auto",
+          "right": "auto",
+          "bottom": "auto",
+          "transform": "none",
+          "margin": "0px",
+          "padding": "0px",
+          "maxWidth": "none",
+          "width": "auto",
+          "height": "auto",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "color": "rgb(187, 187, 187)",
+          "borderRadius": "0px",
+          "borderWidth": "0px",
+          "borderStyle": "none",
+          "borderTopColor": "rgb(187, 187, 187)",
+          "borderRightColor": "rgb(187, 187, 187)",
+          "borderBottomColor": "rgb(187, 187, 187)",
+          "borderLeftColor": "rgb(187, 187, 187)",
+          "fontFamily": "\"Font Awesome 5 Free\"",
+          "fontSize": "16px",
+          "fontWeight": "400",
+          "lineHeight": "16px",
+          "textAlign": "center",
+          "whiteSpace": "normal",
+          "pointerEvents": "auto",
+          "transition": "all",
+          "animation": "none",
+          "boxShadow": "none"
+        },
+        "outerHTML": "<i _ngcontent-ng-c698792182=\"\" placement=\"left\" ngbtooltip=\"Add Emojis\" class=\"far fa-smile\" aria-describedby=\"ngb-tooltip-1\"></i>"
+      },
+      "appeared": true,
+      "appearedAfterMs": 36,
+      "tooltip": {
+        "tag": "NGB-TOOLTIP-WINDOW",
+        "className": "tooltip fade show bs-tooltip-start",
+        "attrs": {
+          "role": "tooltip",
+          "id": "ngb-tooltip-1",
+          "class": "tooltip fade show bs-tooltip-start",
+          "data-popper-placement": "left",
+          "style": "position: absolute; inset: 0px 0px auto auto; margin: 0px; transform: translate3d(-1910px, 0px, 0px);"
+        },
+        "rect": {
+          "x": 0,
+          "y": 0,
+          "w": 0,
+          "h": 0
+        },
+        "style": {
+          "position": "absolute",
+          "display": "block",
+          "zIndex": "1080",
+          "opacity": "0.9",
+          "visibility": "visible",
+          "top": "0px",
+          "left": "auto",
+          "right": "0px",
+          "bottom": "auto",
+          "transform": "none",
+          "margin": "0px",
+          "padding": "0px",
+          "maxWidth": "none",
+          "width": "auto",
+          "height": "auto",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "color": "rgb(187, 187, 187)",
+          "borderRadius": "0px",
+          "borderWidth": "0px",
+          "borderStyle": "none",
+          "borderTopColor": "rgb(187, 187, 187)",
+          "borderRightColor": "rgb(187, 187, 187)",
+          "borderBottomColor": "rgb(187, 187, 187)",
+          "borderLeftColor": "rgb(187, 187, 187)",
+          "fontFamily": "system-ui, -apple-system, \"Segoe UI\", Roboto, \"Helvetica Neue\", \"Noto Sans\", \"Liberation Sans\", Arial, sans-serif, \"Apple Color Emoji\", \"Segoe UI Emoji\", \"Segoe UI Symbol\", \"Noto Color Emoji\"",
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "lineHeight": "21px",
+          "textAlign": "start",
+          "whiteSpace": "normal",
+          "pointerEvents": "none",
+          "transition": "opacity 0.15s linear",
+          "animation": "none",
+          "boxShadow": "none"
+        },
+        "outerHTML": "<ngb-tooltip-window role=\"tooltip\" id=\"ngb-tooltip-1\" class=\"tooltip fade show bs-tooltip-start\" data-popper-placement=\"left\" style=\"position: absolute; inset: 0px 0px auto auto; margin: 0px; transform: translate3d(-1910px, 0px, 0px);\"><div data-popper-arrow=\"\" class=\"tooltip-arrow\" style=\"position: absolute; top: 0px; transform: translate3d(0px, 0px, 0px);\"></div><div class=\"tooltip-inner\">Add Emojis</div></ngb-tooltip-window>"
+      },
+      "parts": {
+        "inner": {
+          "tag": "DIV",
+          "className": "tooltip-inner",
+          "attrs": {
+            "class": "tooltip-inner"
+          },
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "w": 0,
+            "h": 0
+          },
+          "style": {
+            "position": "static",
+            "display": "block",
+            "zIndex": "auto",
+            "opacity": "1",
+            "visibility": "visible",
+            "top": "auto",
+            "left": "auto",
+            "right": "auto",
+            "bottom": "auto",
+            "transform": "none",
+            "margin": "0px",
+            "padding": "4px 8px",
+            "maxWidth": "200px",
+            "width": "auto",
+            "height": "auto",
+            "backgroundColor": "rgb(0, 0, 0)",
+            "color": "rgb(255, 255, 255)",
+            "borderRadius": "6px",
+            "borderWidth": "0px",
+            "borderStyle": "none",
+            "borderTopColor": "rgb(255, 255, 255)",
+            "borderRightColor": "rgb(255, 255, 255)",
+            "borderBottomColor": "rgb(255, 255, 255)",
+            "borderLeftColor": "rgb(255, 255, 255)",
+            "fontFamily": "system-ui, -apple-system, \"Segoe UI\", Roboto, \"Helvetica Neue\", \"Noto Sans\", \"Liberation Sans\", Arial, sans-serif, \"Apple Color Emoji\", \"Segoe UI Emoji\", \"Segoe UI Symbol\", \"Noto Color Emoji\"",
+            "fontSize": "14px",
+            "fontWeight": "400",
+            "lineHeight": "21px",
+            "textAlign": "center",
+            "whiteSpace": "normal",
+            "pointerEvents": "auto",
+            "transition": "all",
+            "animation": "none",
+            "boxShadow": "none"
+          },
+          "outerHTML": "<div class=\"tooltip-inner\">Add Emojis</div>"
+        },
+        "arrowBs4": null,
+        "arrowBs5": {
+          "tag": "DIV",
+          "className": "tooltip-arrow",
+          "attrs": {
+            "data-popper-arrow": "",
+            "class": "tooltip-arrow",
+            "style": "position: absolute; top: 0px; transform: translate3d(0px, 0px, 0px);"
+          },
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "w": 0,
+            "h": 0
+          },
+          "style": {
+            "position": "absolute",
+            "display": "block",
+            "zIndex": "auto",
+            "opacity": "1",
+            "visibility": "visible",
+            "top": "0px",
+            "left": "auto",
+            "right": "-6.4px",
+            "bottom": "auto",
+            "transform": "none",
+            "margin": "0px",
+            "padding": "0px",
+            "maxWidth": "none",
+            "width": "6.4px",
+            "height": "12.8px",
+            "backgroundColor": "rgba(0, 0, 0, 0)",
+            "color": "rgb(187, 187, 187)",
+            "borderRadius": "0px",
+            "borderWidth": "0px",
+            "borderStyle": "none",
+            "borderTopColor": "rgb(187, 187, 187)",
+            "borderRightColor": "rgb(187, 187, 187)",
+            "borderBottomColor": "rgb(187, 187, 187)",
+            "borderLeftColor": "rgb(187, 187, 187)",
+            "fontFamily": "system-ui, -apple-system, \"Segoe UI\", Roboto, \"Helvetica Neue\", \"Noto Sans\", \"Liberation Sans\", Arial, sans-serif, \"Apple Color Emoji\", \"Segoe UI Emoji\", \"Segoe UI Symbol\", \"Noto Color Emoji\"",
+            "fontSize": "14px",
+            "fontWeight": "400",
+            "lineHeight": "21px",
+            "textAlign": "start",
+            "whiteSpace": "normal",
+            "pointerEvents": "none",
+            "transition": "all",
+            "animation": "none",
+            "boxShadow": "none"
+          },
+          "outerHTML": "<div data-popper-arrow=\"\" class=\"tooltip-arrow\" style=\"position: absolute; top: 0px; transform: translate3d(0px, 0px, 0px);\"></div>"
+        },
+        "arrowBefore": {
+          "position": "absolute",
+          "display": "block",
+          "zIndex": "auto",
+          "opacity": "1",
+          "visibility": "visible",
+          "top": "auto",
+          "left": "-1px",
+          "right": "auto",
+          "bottom": "auto",
+          "transform": "none",
+          "margin": "0px",
+          "padding": "0px",
+          "maxWidth": "none",
+          "width": "auto",
+          "height": "auto",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "color": "rgb(187, 187, 187)",
+          "borderRadius": "0px",
+          "borderWidth": "6px 0px 6px 6px",
+          "borderStyle": "solid",
+          "borderTopColor": "rgba(0, 0, 0, 0)",
+          "borderRightColor": "rgba(0, 0, 0, 0)",
+          "borderBottomColor": "rgba(0, 0, 0, 0)",
+          "borderLeftColor": "rgb(0, 0, 0)",
+          "fontFamily": "system-ui, -apple-system, \"Segoe UI\", Roboto, \"Helvetica Neue\", \"Noto Sans\", \"Liberation Sans\", Arial, sans-serif, \"Apple Color Emoji\", \"Segoe UI Emoji\", \"Segoe UI Symbol\", \"Noto Color Emoji\"",
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "lineHeight": "21px",
+          "textAlign": "start",
+          "whiteSpace": "normal",
+          "pointerEvents": "none",
+          "transition": "all",
+          "animation": "none",
+          "boxShadow": "none",
+          "content": "\"\""
+        }
+      },
+      "insertedInto": {
+        "parentTag": "SPAN",
+        "parentClass": "textAreaBtns",
+        "parentId": null,
+        "isDirectChildOfBody": false,
+        "isSiblingOfHost": true
+      },
+      "generation": {
+        "arrowSpelling": "tooltip-arrow (Bootstrap 5)",
+        "placementAttribute": "data-popper-placement (Popper 2 / BS5)",
+        "placementAttributeValue": "left",
+        "directionClass": "bs-tooltip-start",
+        "usesLogicalDirections": true,
+        "allClasses": [
+          "tooltip",
+          "fade",
+          "show",
+          "bs-tooltip-start"
+        ]
+      },
+      "hostWhileOpen": {
+        "attrs": {
+          "_ngcontent-ng-c698792182": "",
+          "placement": "left",
+          "ngbtooltip": "Add Emojis",
+          "class": "far fa-smile",
+          "aria-describedby": "ngb-tooltip-1"
+        }
+      },
+      "closedCleanly": false
+    },
+    {
+      "label": "Upload an Image",
+      "host": {
+        "tag": "I",
+        "className": "fas fa-image",
+        "attrs": {
+          "_ngcontent-ng-c698792182": "",
+          "ngbtooltip": "Upload an Image",
+          "placement": "left",
+          "class": "fas fa-image",
+          "aria-describedby": "ngb-tooltip-4"
+        },
+        "rect": {
+          "x": 0,
+          "y": 0,
+          "w": 0,
+          "h": 0
+        },
+        "style": {
+          "position": "static",
+          "display": "inline-block",
+          "zIndex": "auto",
+          "opacity": "1",
+          "visibility": "visible",
+          "top": "auto",
+          "left": "auto",
+          "right": "auto",
+          "bottom": "auto",
+          "transform": "none",
+          "margin": "0px",
+          "padding": "0px",
+          "maxWidth": "none",
+          "width": "auto",
+          "height": "auto",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "color": "rgb(187, 187, 187)",
+          "borderRadius": "0px",
+          "borderWidth": "0px",
+          "borderStyle": "none",
+          "borderTopColor": "rgb(187, 187, 187)",
+          "borderRightColor": "rgb(187, 187, 187)",
+          "borderBottomColor": "rgb(187, 187, 187)",
+          "borderLeftColor": "rgb(187, 187, 187)",
+          "fontFamily": "\"Font Awesome 5 Free\"",
+          "fontSize": "16px",
+          "fontWeight": "900",
+          "lineHeight": "16px",
+          "textAlign": "center",
+          "whiteSpace": "normal",
+          "pointerEvents": "auto",
+          "transition": "all",
+          "animation": "none",
+          "boxShadow": "none"
+        },
+        "outerHTML": "<i _ngcontent-ng-c698792182=\"\" ngbtooltip=\"Upload an Image\" placement=\"left\" class=\"fas fa-image\" aria-describedby=\"ngb-tooltip-4\"></i>"
+      },
+      "appeared": true,
+      "appearedAfterMs": 30,
+      "tooltip": {
+        "tag": "NGB-TOOLTIP-WINDOW",
+        "className": "tooltip fade show bs-tooltip-start",
+        "attrs": {
+          "role": "tooltip",
+          "id": "ngb-tooltip-4",
+          "class": "tooltip fade show bs-tooltip-start",
+          "data-popper-placement": "left",
+          "style": "position: absolute; inset: 0px 0px auto auto; margin: 0px; transform: translate3d(-1910px, 0px, 0px);"
+        },
+        "rect": {
+          "x": 0,
+          "y": 0,
+          "w": 0,
+          "h": 0
+        },
+        "style": {
+          "position": "absolute",
+          "display": "block",
+          "zIndex": "1080",
+          "opacity": "0.9",
+          "visibility": "visible",
+          "top": "0px",
+          "left": "auto",
+          "right": "0px",
+          "bottom": "auto",
+          "transform": "none",
+          "margin": "0px",
+          "padding": "0px",
+          "maxWidth": "none",
+          "width": "auto",
+          "height": "auto",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "color": "rgb(187, 187, 187)",
+          "borderRadius": "0px",
+          "borderWidth": "0px",
+          "borderStyle": "none",
+          "borderTopColor": "rgb(187, 187, 187)",
+          "borderRightColor": "rgb(187, 187, 187)",
+          "borderBottomColor": "rgb(187, 187, 187)",
+          "borderLeftColor": "rgb(187, 187, 187)",
+          "fontFamily": "system-ui, -apple-system, \"Segoe UI\", Roboto, \"Helvetica Neue\", \"Noto Sans\", \"Liberation Sans\", Arial, sans-serif, \"Apple Color Emoji\", \"Segoe UI Emoji\", \"Segoe UI Symbol\", \"Noto Color Emoji\"",
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "lineHeight": "21px",
+          "textAlign": "start",
+          "whiteSpace": "normal",
+          "pointerEvents": "none",
+          "transition": "opacity 0.15s linear",
+          "animation": "none",
+          "boxShadow": "none"
+        },
+        "outerHTML": "<ngb-tooltip-window role=\"tooltip\" id=\"ngb-tooltip-4\" class=\"tooltip fade show bs-tooltip-start\" data-popper-placement=\"left\" style=\"position: absolute; inset: 0px 0px auto auto; margin: 0px; transform: translate3d(-1910px, 0px, 0px);\"><div data-popper-arrow=\"\" class=\"tooltip-arrow\" style=\"position: absolute; top: 0px; transform: translate3d(0px, 0px, 0px);\"></div><div class=\"tooltip-inner\">Upload an Image</div></ngb-tooltip-window>"
+      },
+      "parts": {
+        "inner": {
+          "tag": "DIV",
+          "className": "tooltip-inner",
+          "attrs": {
+            "class": "tooltip-inner"
+          },
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "w": 0,
+            "h": 0
+          },
+          "style": {
+            "position": "static",
+            "display": "block",
+            "zIndex": "auto",
+            "opacity": "1",
+            "visibility": "visible",
+            "top": "auto",
+            "left": "auto",
+            "right": "auto",
+            "bottom": "auto",
+            "transform": "none",
+            "margin": "0px",
+            "padding": "4px 8px",
+            "maxWidth": "200px",
+            "width": "auto",
+            "height": "auto",
+            "backgroundColor": "rgb(0, 0, 0)",
+            "color": "rgb(255, 255, 255)",
+            "borderRadius": "6px",
+            "borderWidth": "0px",
+            "borderStyle": "none",
+            "borderTopColor": "rgb(255, 255, 255)",
+            "borderRightColor": "rgb(255, 255, 255)",
+            "borderBottomColor": "rgb(255, 255, 255)",
+            "borderLeftColor": "rgb(255, 255, 255)",
+            "fontFamily": "system-ui, -apple-system, \"Segoe UI\", Roboto, \"Helvetica Neue\", \"Noto Sans\", \"Liberation Sans\", Arial, sans-serif, \"Apple Color Emoji\", \"Segoe UI Emoji\", \"Segoe UI Symbol\", \"Noto Color Emoji\"",
+            "fontSize": "14px",
+            "fontWeight": "400",
+            "lineHeight": "21px",
+            "textAlign": "center",
+            "whiteSpace": "normal",
+            "pointerEvents": "auto",
+            "transition": "all",
+            "animation": "none",
+            "boxShadow": "none"
+          },
+          "outerHTML": "<div class=\"tooltip-inner\">Upload an Image</div>"
+        },
+        "arrowBs4": null,
+        "arrowBs5": {
+          "tag": "DIV",
+          "className": "tooltip-arrow",
+          "attrs": {
+            "data-popper-arrow": "",
+            "class": "tooltip-arrow",
+            "style": "position: absolute; top: 0px; transform: translate3d(0px, 0px, 0px);"
+          },
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "w": 0,
+            "h": 0
+          },
+          "style": {
+            "position": "absolute",
+            "display": "block",
+            "zIndex": "auto",
+            "opacity": "1",
+            "visibility": "visible",
+            "top": "0px",
+            "left": "auto",
+            "right": "-6.4px",
+            "bottom": "auto",
+            "transform": "none",
+            "margin": "0px",
+            "padding": "0px",
+            "maxWidth": "none",
+            "width": "6.4px",
+            "height": "12.8px",
+            "backgroundColor": "rgba(0, 0, 0, 0)",
+            "color": "rgb(187, 187, 187)",
+            "borderRadius": "0px",
+            "borderWidth": "0px",
+            "borderStyle": "none",
+            "borderTopColor": "rgb(187, 187, 187)",
+            "borderRightColor": "rgb(187, 187, 187)",
+            "borderBottomColor": "rgb(187, 187, 187)",
+            "borderLeftColor": "rgb(187, 187, 187)",
+            "fontFamily": "system-ui, -apple-system, \"Segoe UI\", Roboto, \"Helvetica Neue\", \"Noto Sans\", \"Liberation Sans\", Arial, sans-serif, \"Apple Color Emoji\", \"Segoe UI Emoji\", \"Segoe UI Symbol\", \"Noto Color Emoji\"",
+            "fontSize": "14px",
+            "fontWeight": "400",
+            "lineHeight": "21px",
+            "textAlign": "start",
+            "whiteSpace": "normal",
+            "pointerEvents": "none",
+            "transition": "all",
+            "animation": "none",
+            "boxShadow": "none"
+          },
+          "outerHTML": "<div data-popper-arrow=\"\" class=\"tooltip-arrow\" style=\"position: absolute; top: 0px; transform: translate3d(0px, 0px, 0px);\"></div>"
+        },
+        "arrowBefore": {
+          "position": "absolute",
+          "display": "block",
+          "zIndex": "auto",
+          "opacity": "1",
+          "visibility": "visible",
+          "top": "auto",
+          "left": "-1px",
+          "right": "auto",
+          "bottom": "auto",
+          "transform": "none",
+          "margin": "0px",
+          "padding": "0px",
+          "maxWidth": "none",
+          "width": "auto",
+          "height": "auto",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "color": "rgb(187, 187, 187)",
+          "borderRadius": "0px",
+          "borderWidth": "6px 0px 6px 6px",
+          "borderStyle": "solid",
+          "borderTopColor": "rgba(0, 0, 0, 0)",
+          "borderRightColor": "rgba(0, 0, 0, 0)",
+          "borderBottomColor": "rgba(0, 0, 0, 0)",
+          "borderLeftColor": "rgb(0, 0, 0)",
+          "fontFamily": "system-ui, -apple-system, \"Segoe UI\", Roboto, \"Helvetica Neue\", \"Noto Sans\", \"Liberation Sans\", Arial, sans-serif, \"Apple Color Emoji\", \"Segoe UI Emoji\", \"Segoe UI Symbol\", \"Noto Color Emoji\"",
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "lineHeight": "21px",
+          "textAlign": "start",
+          "whiteSpace": "normal",
+          "pointerEvents": "none",
+          "transition": "all",
+          "animation": "none",
+          "boxShadow": "none",
+          "content": "\"\""
+        }
+      },
+      "insertedInto": {
+        "parentTag": "SPAN",
+        "parentClass": "textAreaBtns",
+        "parentId": null,
+        "isDirectChildOfBody": false,
+        "isSiblingOfHost": true
+      },
+      "generation": {
+        "arrowSpelling": "tooltip-arrow (Bootstrap 5)",
+        "placementAttribute": "data-popper-placement (Popper 2 / BS5)",
+        "placementAttributeValue": "left",
+        "directionClass": "bs-tooltip-start",
+        "usesLogicalDirections": true,
+        "allClasses": [
+          "tooltip",
+          "fade",
+          "show",
+          "bs-tooltip-start"
+        ]
+      },
+      "hostWhileOpen": {
+        "attrs": {
+          "_ngcontent-ng-c698792182": "",
+          "ngbtooltip": "Upload an Image",
+          "placement": "left",
+          "class": "fas fa-image",
+          "aria-describedby": "ngb-tooltip-4"
+        }
+      },
+      "closedCleanly": false
+    }
+  ],
+  "stylesheet": {
+    "tooltip": [
+      {
+        "href": "https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.7.2/animate.min.css",
+        "error": "CORS — cannot read"
+      }
+    ],
+    "bsTooltip": [
+      {
+        "href": "https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.7.2/animate.min.css",
+        "error": "CORS — cannot read"
+      }
+    ],
+    "arrowBs4": [
+      {
+        "href": "https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.7.2/animate.min.css",
+        "error": "CORS — cannot read"
+      }
+    ],
+    "arrowBs5": [
+      {
+        "href": "https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.7.2/animate.min.css",
+        "error": "CORS — cannot read"
+      }
+    ],
+    "logicalDirections": [
+      {
+        "href": "https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.7.2/animate.min.css",
+        "error": "CORS — cannot read"
+      },
+      {
+        "href": "https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.7.2/animate.min.css",
+        "error": "CORS — cannot read"
+      }
+    ],
+    "physicalDirections": [
+      {
+        "href": "https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.7.2/animate.min.css",
+        "error": "CORS — cannot read"
+      },
+      {
+        "href": "https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.7.2/animate.min.css",
+        "error": "CORS — cannot read"
+      }
+    ],
+    "variables": {
+      "--bs-tooltip-zindex": null,
+      "--bs-tooltip-bg": null,
+      "--bs-tooltip-color": null,
+      "--bs-tooltip-opacity": null,
+      "--bs-tooltip-max-width": null,
+      "--bs-tooltip-padding-x": null,
+      "--bs-tooltip-padding-y": null,
+      "--bs-tooltip-font-size": null,
+      "--bs-tooltip-border-radius": null,
+      "--bs-tooltip-arrow-width": null,
+      "--bs-tooltip-arrow-height": null
+    }
+  },
+  "native": [
+    {
+      "title": "Connectivity Check",
+      "tag": "A",
+      "className": "nav-link sidebar-item"
+    },
+    {
+      "title": "General Settings",
+      "tag": "A",
+      "className": "nav-link sidebar-item"
+    },
+    {
+      "title": "Archives",
+      "tag": "A",
+      "className": "nav-link sidebar-item dropdown-toggle"
+    },
+    {
+      "title": "Manage Muted Users",
+      "tag": "A",
+      "className": "nav-link sidebar-item ps-1"
+    },
+    {
+      "title": "Manage Followed Users",
+      "tag": "A",
+      "className": "nav-link sidebar-item ps-1"
+    },
+    {
+      "title": "Get Random User",
+      "tag": "A",
+      "className": "nav-link sidebar-item ps-1"
+    },
+    {
+      "title": "Users",
+      "tag": "DIV",
+      "className": ""
+    },
+    {
+      "title": "Users Options",
+      "tag": "DIV",
+      "className": "dropdown user-options"
+    },
+    {
+      "title": "Reload Users",
+      "tag": "BUTTON",
+      "className": "btn btn-sm btn-default ml-1 float-right reload-room-users border-0"
+    },
+    {
+      "title": "Sort Users",
+      "tag": "BUTTON",
+      "className": "btn btn-sm btn-secondary float-right border-0 ms-1"
+    },
+    {
+      "title": "Search Users",
+      "tag": "BUTTON",
+      "className": "btn btn-sm btn-default float-right search-room-users border-0"
+    },
+    {
+      "title": "Open Sidebar",
+      "tag": "SPAN",
+      "className": "sidebar-menu"
+    },
+    {
+      "title": "Users Connected",
+      "tag": "SPAN",
+      "className": "users ml-1 mr-1 d-flex align-items-center"
+    },
+    {
+      "title": "Star/Stop Recording",
+      "tag": "LI",
+      "className": "nav-item dropdown"
+    },
+    {
+      "title": "Play music from SoundCloud for all",
+      "tag": "LI",
+      "className": "nav-item dropdown"
+    },
+    {
+      "title": "Unmute/Mute Microphone",
+      "tag": "LI",
+      "className": "nav-item d-flex align-items-center"
+    },
+    {
+      "title": "Audio Device Settings",
+      "tag": "A",
+      "className": "nav-link mic-gear-btn p-0 m-0"
+    },
+    {
+      "title": "Start/Stop Screen Sharing",
+      "tag": "LI",
+      "className": "screen-sharing nav-item dropdown"
+    },
+    {
+      "title": "(Regular Bandwidth) ** RECOMMENDED",
+      "tag": "LI",
+      "className": ""
+    },
+    {
+      "title": "OBS",
+      "tag": "LI",
+      "className": ""
+    },
+    {
+      "title": "Start / Stop WebCam",
+      "tag": "LI",
+      "className": "nav-item"
+    },
+    {
+      "title": "Session Control",
+      "tag": "LI",
+      "className": "nav-item"
+    },
+    {
+      "title": "Volume",
+      "tag": "INPUT",
+      "className": "mx-auto py-2 volCtrl ng-untouched ng-pristine ng-valid"
+    },
+    {
+      "title": "Mute Audio",
+      "tag": "BUTTON",
+      "className": "btn btn-primary btn-sm"
+    },
+    {
+      "title": "Alert sound",
+      "tag": "INPUT",
+      "className": "form-check-input"
+    },
+    {
+      "title": "QA sound",
+      "tag": "INPUT",
+      "className": "form-check-input"
+    },
+    {
+      "title": "Non-trade alert sound",
+      "tag": "INPUT",
+      "className": "form-check-input"
+    },
+    {
+      "title": "Chat sound",
+      "tag": "INPUT",
+      "className": "form-check-input"
+    },
+    {
+      "title": "Show Speech Recognition Overlay",
+      "tag": "INPUT",
+      "className": "form-check-input"
+    },
+    {
+      "title": "Don't Disturb",
+      "tag": "INPUT",
+      "className": "form-check-input"
+    },
+    {
+      "title": "Reload",
+      "tag": "LI",
+      "className": "nav-item"
+    },
+    {
+      "title": "Search",
+      "tag": "A",
+      "className": "nav-link p-0"
+    },
+    {
+      "title": "Settings",
+      "tag": "I",
+      "className": "fas fa-cog chat-header-gear"
+    },
+    {
+      "title": "Ask a question",
+      "tag": "BUTTON",
+      "className": "btn btn-sm btn-secondary me-1 alert-qa"
+    },
+    {
+      "title": "Ask a question",
+      "tag": "BUTTON",
+      "className": "btn btn-sm btn-secondary me-1 alert-qa"
+    },
+    {
+      "title": "Ask a question",
+      "tag": "BUTTON",
+      "className": "btn btn-sm btn-secondary me-1 alert-qa"
+    },
+    {
+      "title": "Open Private chat",
+      "tag": "A",
+      "className": "nav-link"
+    },
+    {
+      "title": "Search",
+      "tag": "A",
+      "className": "nav-link p-0"
+    },
+    {
+      "title": "Settings",
+      "tag": "I",
+      "className": "fas fa-cog chat-header-gear"
+    },
+    {
+      "title": "Delete Selected",
+      "tag": "BUTTON",
+      "className": "btn m-2 st-fileDeleteSelected"
+    },
+    {
+      "title": "Reload list",
+      "tag": "BUTTON",
+      "className": "btn mt-2 mr-2 mb-2 st-fileSeeMore"
+    },
+    {
+      "title": "Upload New File",
+      "tag": "BUTTON",
+      "className": "btn btn-secondary mt-2 mr-2 mb-2 st-fileUpload"
+    },
+    {
+      "title": "Edit username",
+      "tag": "SPAN",
+      "className": "text-primary mx-1 edit-username"
+    },
+    {
+      "title": "Choose Color Theme",
+      "tag": "DIV",
+      "className": "pb-2"
+    },
+    {
+      "title": "Choose Room Layout",
+      "tag": "DIV",
+      "className": "pb-2"
+    },
+    {
+      "title": "Chat Color Mode",
+      "tag": "DIV",
+      "className": "pb-2"
+    },
+    {
+      "title": "Do not disturb",
+      "tag": "DIV",
+      "className": "pb-2"
+    },
+    {
+      "title": "Disable/Enable Video",
+      "tag": "DIV",
+      "className": "pb-2"
+    },
+    {
+      "title": "Show Speech Recognition Overlay",
+      "tag": "DIV",
+      "className": "pb-2"
+    },
+    {
+      "title": "Alert Text Mode",
+      "tag": "DIV",
+      "className": "pb-2"
+    },
+    {
+      "title": "Alert Do not disturb",
+      "tag": "DIV",
+      "className": "pb-2"
+    },
+    {
+      "title": "Alert popup",
+      "tag": "DIV",
+      "className": "pb-2"
+    },
+    {
+      "title": "Chat Text Mode",
+      "tag": "DIV",
+      "className": "pb-2"
+    },
+    {
+      "title": "Chat Image Preview",
+      "tag": "DIV",
+      "className": "pb-2"
+    },
+    {
+      "title": "chat Do not disturb",
+      "tag": "DIV",
+      "className": "pb-2"
+    },
+    {
+      "title": "Extra Chat Column",
+      "tag": "DIV",
+      "className": "pb-2"
+    },
+    {
+      "title": "Always Scroll To Bottom",
+      "tag": "DIV",
+      "className": "pb-2"
+    },
+    {
+      "title": "Reduce Chatlog Memory",
+      "tag": "DIV",
+      "className": "pb-2"
+    },
+    {
+      "title": "Group Chat Control",
+      "tag": "DIV",
+      "className": "pb-2"
+    },
+    {
+      "title": "Presenter Do not disturb",
+      "tag": "DIV",
+      "className": "pb-2"
+    }
+  ],
+  "gaps": [
+    {
+      "what": "tooltip: Search for GIFs",
+      "why": "Hovering produced no tooltip element. Either the directive is not bound on this build, the control is off-screen, or the events it listens for differ. Nothing has been invented for it."
+    },
+    {
+      "what": "tooltip left open: Add Emojis",
+      "why": "The tooltip did not disappear after the leave events. The page has been altered; reload before using it."
+    },
+    {
+      "what": "tooltip left open: Upload an Image",
+      "why": "The tooltip did not disappear after the leave events. The page has been altered; reload before using it."
+    },
+    {
+      "what": "tooltip left open: Add Emojis",
+      "why": "The tooltip did not disappear after the leave events. The page has been altered; reload before using it."
+    },
+    {
+      "what": "tooltip left open: Upload an Image",
+      "why": "The tooltip did not disappear after the leave events. The page has been altered; reload before using it."
+    },
+    {
+      "what": "title= tooltips are the browser own",
+      "why": "60 elements use a native title attribute. The OS draws those and no script can capture their appearance — the text is recorded, the rendering is not ours to match."
+    }
+  ],
+  "verdict": {
+    "arrowSpelling": [
+      "tooltip-arrow (Bootstrap 5)"
+    ],
+    "placementAttribute": [
+      "data-popper-placement (Popper 2 / BS5)"
+    ],
+    "directionClasses": [
+      "bs-tooltip-start"
+    ],
+    "insertedIntoBody": [
+      false
+    ],
+    "openDelaysMs": [
+      34,
+      30,
+      37,
+      36
+    ]
+  }
+}

@@ -94,7 +94,11 @@ describe('screens tab bar height', () => {
     expect(bar).toMatch(/position:\s*relative/);
     expect(bar).toMatch(/z-index:\s*1/);
     expect(bar).toMatch(/border-bottom:\s*1px solid transparent/);
-    expect(bar).toMatch(/background:\s*var\(--darker-black\)/);
+    // `--notes-tabs-bg`, not `--darker-black`. This assertion previously pinned the latter; both
+    // hold #111 and both compute to the captured rgb(17,17,17), so no pixel moved. It was changed
+    // because the captured sheet keys `.screens-tabs` off `--notes-tabs-bg` by name, and matching
+    // the source's own variable is what keeps this bar with its siblings under a future theme.
+    expect(bar).toMatch(/background:\s*var\(--notes-tabs-bg\)/);
   });
 
   it('closes the capture arithmetic: 82 = the main bar plus this bar', () => {
@@ -189,5 +193,83 @@ describe('screens tab bar height', () => {
     const mainContent = ourRulesFor('app-presentationarea #mainTabsContent:not(:root)')[0];
     expect(mainContent).toMatch(/flex:\s*1 1 auto/);
     expect(mainContent).toMatch(/height:\s*auto/);
+  });
+});
+
+/*
+  The bar exists whether or not anyone is sharing.
+
+  Reported by the owner 2026-08-11: the strip's background was missing from where the screens go.
+  The cause was that the tab bar sat in the alternate branch of the "no one is presenting"
+  conditional, so an idle room rendered the heading INSTEAD of the bar and the only element in that
+  whole region carrying a background was not in the document at all.
+
+  The capture is unambiguous that they are siblings, and it is a capture taken with NOTHING shared -
+  which is exactly the state that was broken. Under `r.0#screens` it holds three children in order:
+  `.0` the h3, `.1#screenTabs`, `.2#screensTabsContent`. The bar is the only one of the three with
+  an opaque background, and `#screens` itself is transparent, so it is the layer the owner was
+  pointing at.
+*/
+describe('the screens tab bar is not conditional on anyone sharing', () => {
+  const page = readFileSync(new URL('../routes/+page.svelte', import.meta.url), 'utf8');
+
+  it('renders the bar as a sibling of the idle heading, not as its alternative', () => {
+    // Comments stripped first: the block above and the one in `+page.svelte` both DESCRIBE the
+    // defect, and a test that matches its own explanation proves nothing.
+    const source = page.replace(/<!--[\s\S]*?-->/g, '').replace(/\/\*[\s\S]*?\*\//g, '');
+
+    const guard = source.indexOf('sharedScreens.length === 0');
+    expect(guard, 'the idle heading guard must still exist').toBeGreaterThan(-1);
+
+    const heading = source.indexOf('No one is presenting right now...', guard);
+    const tabs = source.indexOf('<ScreenTabs', guard);
+    expect(heading).toBeGreaterThan(-1);
+    expect(tabs).toBeGreaterThan(-1);
+
+    // THE assertion. Everything between the guard and the bar is the heading's branch, and it has
+    // to CLOSE before the bar - an alternate branch there is the defect, restored.
+    const between = source.slice(guard, tabs);
+    expect(between).toContain('{/if}');
+    expect(between, 'the bar must not sit in the alternate branch').not.toContain('{:else}');
+    expect(between.indexOf('{/if}')).toBeGreaterThan(between.indexOf(heading > -1 ? 'No one' : ''));
+  });
+
+  it('gives the bar the background the capture recorded, from the variable the source used', () => {
+    const bar = ourRulesFor('#screenTabs')[0];
+    expect(bar, '#screenTabs must still be declared').toBeTruthy();
+
+    // rgb(17,17,17) in the capture; `--notes-tabs-bg` is what the captured sheet names for
+    // `.screens-tabs`, and `--darker-black` is a second token holding the same #111. Naming the
+    // one the source names keeps this bar with its siblings if a theme ever moves it.
+    expect(bar).toMatch(/background:\s*var\(--notes-tabs-bg\)/);
+    expect(capturedGlobal).toContain('.screens-tabs,.files-tabs,.noteTabset');
+    expect(capturedGlobal).toMatch(
+      /\.screens-tabs[^{]*\{background-color:var\(--notes-tabs-bg\)\}/
+    );
+  });
+
+  it('is the only background in the region, and sits between the heading and the content', () => {
+    const dump = readFileSync(CAPTURE_DUMP, 'utf8');
+
+    /** The computed value of one property on one captured node path. */
+    const styleOf = (path: string, prop: string) => {
+      const at = dump.indexOf(`"path":"${path}","tag":"`);
+      expect(at, `${path} must be in the dump`).toBeGreaterThan(-1);
+      const style = dump.indexOf('"style":{', at);
+      const key = `"${prop}":"`;
+      const start = dump.indexOf(key, style) + key.length;
+      return dump.slice(start, dump.indexOf('"', start));
+    };
+
+    expect(styleOf('r.0#screens.1#screenTabs', 'background-color')).toBe('rgb(17, 17, 17)');
+    // Its parent and both siblings are transparent - so removing the bar removes the only paint.
+    expect(styleOf('r.0#screens', 'background-color')).toBe('rgba(0, 0, 0, 0)');
+    expect(styleOf('r.0#screens.0', 'background-color')).toBe('rgba(0, 0, 0, 0)');
+    expect(styleOf('r.0#screens.2#screensTabsContent', 'background-color')).toBe(
+      'rgba(0, 0, 0, 0)'
+    );
+
+    // And it occupies layout while idle: the content starts exactly where the 1px bar ends.
+    expect(155.1 + 1).toBeCloseTo(156.1, 5);
   });
 });

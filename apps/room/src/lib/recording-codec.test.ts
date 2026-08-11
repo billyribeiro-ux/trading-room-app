@@ -148,8 +148,31 @@ describe('the screen track tells the encoder what it is looking at', () => {
   });
 
   it('applies it to the screen path only, never the camera', () => {
-    // libvpx's default heuristic is tuned for camera video and is CORRECT there — blurring a moving
-    // background is free. It is wrong only for text and gridlines.
-    expect(code.match(/contentHint = 'detail'/g) ?? []).toHaveLength(1);
+    /*
+      libvpx's default heuristic is tuned for camera video and is CORRECT there — blurring a moving
+      background is free. It is wrong only for text and gridlines.
+
+      ANCHORED to the screen path. This asserted only that the string appears exactly once, which
+      is a global count with no position: moving the statement into the webcam block — where the
+      local is also called `track` — left the count at one, stripped the hint off the screen
+      encoder, and gave the camera the wrong heuristic, with both cases still green. Found by the
+      adversarial review of 2026-08-11, which built that mutant and ran it.
+    */
+    const occurrences = code.match(/contentHint = 'detail'/g) ?? [];
+    expect(occurrences).toHaveLength(1);
+
+    // The two capture sites, each identified by the stream it reads its track from.
+    const webcamTrack = code.indexOf('webcamStream.getVideoTracks()[0]');
+    const screenTrack = code.indexOf('stream.getVideoTracks()[0]', webcamTrack + 1);
+    const hint = code.indexOf("contentHint = 'detail'");
+    expect(webcamTrack, 'the webcam capture must still be there to anchor against').toBeGreaterThan(
+      -1
+    );
+    expect(screenTrack, 'the screen capture must still be there').toBeGreaterThan(-1);
+
+    // THE assertion: the hint follows the SCREEN capture, not the webcam one.
+    expect(hint).toBeGreaterThan(screenTrack);
+    // And it is not sitting in the webcam block between the two.
+    expect(hint > webcamTrack && hint < screenTrack).toBe(false);
   });
 });

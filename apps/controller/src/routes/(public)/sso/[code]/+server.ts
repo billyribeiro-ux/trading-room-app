@@ -1,9 +1,10 @@
 import { error, redirect } from '@sveltejs/kit';
 import { ROOM_BASE_URL, ROOM_JWT_SECRET } from '$app/env/private';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { getDb } from '$lib/server/db';
-import { rooms } from '$lib/server/db/schema';
+import { roomUsers, rooms, users } from '$lib/server/db/schema';
 import { readSettings } from '$lib/server/rooms';
+import { isRoomPresenter } from '$lib/room-member-role';
 import { guestHandoffToken, handoffUrl } from '$lib/server/room-handoff';
 import { evaluateEntitlement } from '$lib/server/sso-entitlement';
 import { resolveMaxTokenAge, verifySsoToken, type SsoRejection } from '$lib/server/sso-token';
@@ -22,13 +23,24 @@ import type { RequestHandler } from './$types';
  *
  * A WordPress visitor has no account in this controller, and inventing one would be inventing
  * authority. `type: 'guest'` with an empty `id` is precisely true: they satisfied a room's entry
- * rules without authenticating as an account here. The room then resolves their role from its own
- * membership lookup by email and **fails closed to `member`** when there is none — so a customer's
- * site can grant entry and can never grant presenter.
+ * rules without authenticating as an account here.
  *
- * That is the security property worth protecting in every future change to this file: **entitlement
- * is delegated, authority is not.** If a customer's WordPress is compromised, the blast radius is
+ * The security property worth protecting in every future change to this file: **entitlement is
+ * delegated, authority is not.** If a customer's WordPress is compromised, the blast radius is
  * people getting into a room they did not pay for — not somebody arriving as staff.
+ *
+ * ## How that is ENFORCED, and why the enforcement is not free
+ *
+ * It does not follow from `type: 'guest'`, and until 2026-08-11 this docblock claimed it did. The
+ * room deliberately ignores the token's type when deciding role and looks the membership up by
+ * email alone (`apps/room/src/routes/session/+server.ts:94` and `:125`), so a token signed with a
+ * PRESENTER'S address arrived holding presenter authority — signature valid, entitlement satisfied,
+ * staff on the other side. Found by the adversarial review of 2026-08-11.
+ *
+ * So the door now refuses any address that holds staff authority in the room, computed the same way
+ * `/internal/room-config/[code]` computes it. **Staff do not enter through a customer's key**; they
+ * use the controller's own login, where the authority comes from an account we authenticate. The
+ * cost is real and accepted: a presenter who is also a subscriber cannot use the SSO link.
  *
  * ## Failure is quiet to the caller and loud in the log
  *
@@ -70,7 +82,7 @@ export const GET: RequestHandler = async ({ params, url, getClientAddress }) => 
   // — and so only narrows `verified` to the ok branch below — when the call target is a function
   // declaration or a `const` carrying an explicit type annotation. The arrow form compiles and
   // silently stops narrowing, which surfaces as a confusing error at `verified.claims`.
-  function refuse(reason: SsoRejection | 'room-closed' | 'not-configured' | 'no-match'): never {
+  function refuse(reason: SsoRejection | 'room-closed' | 'not-configured' | 'no-match' | 'staff-address'): never {
     console.warn('[sso] refused', {
       room: shortCode,
       reason,
@@ -158,6 +170,51 @@ export const GET: RequestHandler = async ({ params, url, getClientAddress }) => 
   if (!ROOM_JWT_SECRET) {
     console.error('[sso] ROOM_JWT_SECRET is not configured; refusing to mint a handoff');
     error(500, 'This room is not available right now.');
+  }
+
+  /*
+    The door refuses anyone the ROOM would treat as staff. This is the enforcement of the invariant
+    stated at the top of this file, which until 2026-08-11 was only asserted.
+
+    The claim was that a customer's site "can grant entry and can never grant presenter". It was
+    false. The room resolves role from the email alone — `readRoomConfig(request, shortCode,
+    claims.email)` then `roomRoleFor(membership)` at `apps/room/src/routes/session/+server.ts:94`
+    and `:125` — and deliberately ignores the token's `type` when deciding it. So a compromised
+    WordPress, a malicious WP admin, or a leaked `wp-config.php` could sign a token carrying a
+    PRESENTER'S email and arrive holding presenter commands, archives, admin chat, ban and kick.
+    Signature valid, entitlement satisfied, staff on the other side.
+
+    `isP` is computed here exactly as `/internal/room-config/[code]` computes it for the room —
+    `role === 0 || isRoomPresenter(roomUser)` — because agreeing with the room is the entire point.
+    Two spellings of "is this person staff" is how the two ends stop agreeing.
+
+    This is a deliberate product decision, not only a mitigation: **staff do not enter through a
+    customer's key.** A presenter reaches their own room through the controller's own login, where
+    the authority comes from an account we authenticate. The cost is that a presenter who is also a
+    WooCommerce subscriber cannot use the SSO link, and that is the correct trade — it is the one
+    case where the delegated-entitlement model would otherwise delegate authority too.
+
+    Refused through `refuse()` like every other check, so it returns the SAME words, honours the
+    room's `loginErrorURL`/`loginErrorMsg`, and is logged with its own reason. A distinct message
+    here would turn the door into an oracle for enumerating a room's staff by address.
+  */
+  const [staffMatch] = await getDb()
+    .select({ role: roomUsers.role, nonPresenter: roomUsers.nonPresenter })
+    .from(roomUsers)
+    .innerJoin(users, eq(users.id, roomUsers.userId))
+    .where(and(eq(roomUsers.roomId, room.id), eq(users.email, verified.claims.email)))
+    .limit(1);
+
+  if (
+    staffMatch &&
+    (staffMatch.role === 0 ||
+      isRoomPresenter({
+        role: staffMatch.role,
+        nonPresenter: staffMatch.nonPresenter,
+        isFreeTrial: false
+      }))
+  ) {
+    refuse('staff-address');
   }
 
   const target = handoffUrl(

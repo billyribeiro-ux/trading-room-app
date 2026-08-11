@@ -1,5 +1,12 @@
 # Repository operating rules
 
+**Read [`../../CLAUDE.md`](../../CLAUDE.md) first.** That is the root standard —
+the owner's 2026-08-11 directive and what it means concretely for Svelte, Rust,
+performance, testing scope and boundaries. It binds every agent on every task.
+This file adds what is specific to the room; where the two disagree, the root
+file wins. Nothing here restates it, deliberately: a rule written down twice is a
+rule that will disagree with itself.
+
 This repository is one half of one product. The other half is the sibling
 `new-room-control` repository (`billyribeiro-ux/trading-app-main`).
 

@@ -253,26 +253,50 @@ export const load: PageServerLoad = async ({ params, locals, url }) => {
      * history rather than today's. If a room ever needs more than that in one export, the answer is
      * a date range on the query and not a larger number.
      */
-    visits: (
-      await getDb()
-        .select({
-          displayName: roomSessions.displayName,
-          email: roomSessions.email,
-          ip: roomSessions.ip,
-          isMobile: roomSessions.isMobile,
-          browser: roomSessions.browser,
-          joinedAt: roomSessions.joinedAt,
-          leftAt: roomSessions.leftAt
-        })
-        .from(roomSessions)
-        .where(eq(roomSessions.roomId, room.id))
-        .orderBy(desc(roomSessions.joinedAt))
-        .limit(5000)
-    ).map((visit) => ({
-      ...visit,
-      joinedAt: visit.joinedAt.toISOString(),
-      leftAt: visit.leftAt ? visit.leftAt.toISOString() : null
-    })),
+    /*
+      Loaded ONLY for the Stats tab, because that is the only tab that can consume it.
+
+      Its sole reader is `exportStatsToCsv()`, and the button that calls it lives inside the Stats
+      pane. Every other tab — Users, Branding, Settings, SSO, Marketplace — was paying for it
+      anyway: the tab links are same-route anchors, so SvelteKit re-runs this load on every tab
+      click, and clicking through all six refetched the same rows six times.
+
+      The cost was measured at 150.9 bytes per row with this project's own devalue, so 5,000 rows is
+      ~755 KB of serialised page data per load — and that measurement is optimistic, because it used
+      one repeated user-agent string, which devalue deduplicates.
+
+      It is also a privacy reduction and that is the more important half: every row carries a
+      visitor's IP ADDRESS and email. Shipping those into the HTML of a page about branding colours
+      widened the blast radius of anything that could read this payload, for no feature at all. They
+      now travel only when somebody has opened the tab whose purpose is to export them.
+
+      Both halves found by the reviews of 2026-08-11. The complete fix is a dedicated CSV endpoint
+      so the addresses never enter a page payload — recorded in `TODO.md`; this is the part that is
+      correct, small, and provable now.
+    */
+    visits:
+      tab !== 'stats'
+        ? []
+        : (
+            await getDb()
+              .select({
+                displayName: roomSessions.displayName,
+                email: roomSessions.email,
+                ip: roomSessions.ip,
+                isMobile: roomSessions.isMobile,
+                browser: roomSessions.browser,
+                joinedAt: roomSessions.joinedAt,
+                leftAt: roomSessions.leftAt
+              })
+              .from(roomSessions)
+              .where(eq(roomSessions.roomId, room.id))
+              .orderBy(desc(roomSessions.joinedAt))
+              .limit(5000)
+          ).map((visit) => ({
+            ...visit,
+            joinedAt: visit.joinedAt.toISOString(),
+            leftAt: visit.leftAt ? visit.leftAt.toISOString() : null
+          })),
     links: {
       room: `${ORIGIN}/u/${publicId}`,
       vanity: room.vanitySlug ? `${ORIGIN}/room/${room.vanitySlug}` : `${ORIGIN}/room/[yournamehere]`,

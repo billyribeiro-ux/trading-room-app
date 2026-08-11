@@ -9,6 +9,7 @@
   import { SvelteMap, SvelteSet } from 'svelte/reactivity';
   import BootboxDialog from '$lib/components/BootboxDialog.svelte';
   import ScreenTabs, { type ScreenTab } from '$lib/components/ScreenTabs.svelte';
+  import { ngbTooltip } from '$lib/ngb-tooltip';
   import SpeechRecoOverlay from '$lib/components/SpeechRecoOverlay.svelte';
   import { SignallingClient, legacyUserId, type ProducerInfo } from '$lib/media/signalling';
   import { MediaSession } from '$lib/media/session';
@@ -5528,13 +5529,43 @@
     mediaSession = session;
     mediaSignalling = media;
 
+    /*
+      Everything this peer consumed from other people, dropped in one place.
+
+      This has to reset the DEDUPE GUARDS, not just the visible streams, and that distinction is the
+      whole reason it exists. `addRemoteScreen` returns early on
+      `sharedScreens.some(entry => entry.id === info.producerId)`, `addRemoteWebcam` on
+      `webcamPresenters.some(...)`, and `addRemoteAudio` on `remoteAudioStreams.has(...)`. Clearing
+      `screenStreams` — which is a DIFFERENT map from `sharedScreens` — cleared no guard at all, so
+      the rebuild from `getProducers` that both callers below rely on found every producer already
+      "known" and consumed none of them. The result was a room that reconnected to silence and a
+      blank tab bar.
+
+      Found by the adversarial review of 2026-08-11. The reconnect half predates that day's work;
+      the role-change half arrived with it.
+
+      Dropping remote state is always safe here: both callers are points where the far side has
+      already closed every consumer, so what is on screen is a still frame pretending to be live.
+      `audioProducerOwners` goes too — it is keyed by producer id and would otherwise attribute a
+      recycled id to whoever held it last.
+    */
+    function dropRemoteMedia() {
+      sharedScreens = [];
+      screenStreams.clear();
+      // `webcamPresenters` is a `const` $state array, so it is emptied in place rather than
+      // reassigned; reassigning it would replace the array every other reader is holding.
+      webcamPresenters.splice(0, webcamPresenters.length);
+      remoteAudioStreams.clear();
+      audioProducerOwners.clear();
+    }
+
     media.on('socketopen', ({ reconnected }) => mediaServerConnected(reconnected));
     media.on('disconnected', () => {
       mediaServerDisconnected();
-      // The far side closed every consumer with the socket. Drop the streams so a stale picture is
-      // never left frozen on screen pretending to be live; the tabs rebuild from `getProducers`
-      // on the next connect.
-      screenStreams.clear();
+      // The far side closed every consumer with the socket. Drop them so a stale picture is never
+      // left frozen on screen pretending to be live; the tabs rebuild from `getProducers` on the
+      // next connect.
+      dropRemoteMedia();
     });
 
     /*
@@ -5598,10 +5629,11 @@
       const previous = mediaSession;
       mediaSession = null;
       sessionReady = null;
-      // Closes every transport, producer and consumer this peer held. Screens must go with them, or
-      // the tab bar keeps painting a stream whose transport no longer exists.
+      // Closes every transport, producer and consumer this peer held. What was consumed must go
+      // with them, or the tab bar keeps painting a stream whose transport no longer exists — and
+      // the dedupe guards would refuse to re-consume any of it below.
       previous?.close();
-      screenStreams.clear();
+      dropRemoteMedia();
 
       const rebuilt = new MediaSession({
         signalling: media,
@@ -5630,10 +5662,25 @@
       }
     };
 
+    /*
+      `mediaSession`, never the captured `session`.
+
+      `session` is the const built at the top of this block. `restartMediaSession` replaces it —
+      it must, because `close()` latches `#closed` permanently — and every handler registered here
+      closes over the ORIGINAL. Reading it after a role change consumes on a session whose
+      transports are gone, so every producer arriving after a mic hand-over rendered nothing, in
+      silence, with no error. Found by the adversarial review of 2026-08-11.
+
+      The null check is not defensive padding: `restartMediaSession` sets `mediaSession = null` for
+      the window between closing the old session and the new one being assigned, and a producer can
+      arrive inside it.
+    */
     media.on('newProducer', (info) => {
-      void addRemoteScreen(session, info);
-      void addRemoteWebcam(session, info);
-      void addRemoteAudio(session, info);
+      const active = mediaSession;
+      if (!active) return;
+      void addRemoteScreen(active, info);
+      void addRemoteWebcam(active, info);
+      void addRemoteAudio(active, info);
     });
 
     /*
@@ -5665,7 +5712,10 @@
       removeRemoteAudio(producerId);
     });
     media.on('peerClosed', ({ peerId }) => {
-      for (const remote of session.remoteStreams.values()) {
+      // The current session, for the same reason as `newProducer` above: after a role change the
+      // captured `session` holds the streams of a connection that no longer exists, so a peer
+      // leaving would tear down nothing and leave their tile painted.
+      for (const remote of mediaSession?.remoteStreams.values() ?? []) {
         if (remote.peerId === peerId) {
           removeRemoteScreen(remote.producerId);
           removeRemoteWebcam(remote.producerId);
@@ -5734,8 +5784,21 @@
       stopGeoLookup();
       endSpeechRecognition();
       mediaSignalling = null;
+      /*
+        Close whichever session is LIVE, which after a role change is not the captured `session`.
+
+        This read `session.close()`, so leaving a room in which a mic had been handed over closed
+        the already-closed original and left the REBUILT session's transports and
+        RTCPeerConnections open — they survived the component, held the SFU peer slot, and kept the
+        microphone light on. Found by the adversarial review of 2026-08-11.
+
+        Closing `mediaSession` alone covers both cases exactly, with no double close: if no restart
+        happened it IS `session`, and if one did, `restartMediaSession` already closed the original
+        before replacing it.
+      */
+      const live = mediaSession;
       mediaSession = null;
-      session.close();
+      live?.close();
       media.close();
       stopRefresh();
       document.removeEventListener('visibilitychange', handleVisibility);
@@ -7850,6 +7913,7 @@
                                   placement: 'left',
                                   ngbtooltip: 'Add Emojis'
                                 } as Record<string, string>}
+                                {@attach ngbTooltip}
                                 class="far fa-smile"
                               ></i>
                             </span>
@@ -7862,6 +7926,7 @@
                                     ngbtooltip: 'Upload an Image',
                                     placement: 'left'
                                   } as Record<string, string>}
+                                  {@attach ngbTooltip}
                                   class="fas fa-image"
                                 ></i>
                               </span>
@@ -7880,6 +7945,7 @@
                                     ngbtooltip: 'Play YouTube For All',
                                     placement: 'left'
                                   } as Record<string, string>}
+                                  {@attach ngbTooltip}
                                   class="fas fa-video"
                                 ></i>
                               </span>
@@ -7894,6 +7960,7 @@
                                   popoverclass: 'popOverDiv',
                                   triggers: 'manual'
                                 } as Record<string, string>}
+                                {@attach ngbTooltip}
                                 class="textAreaBtns"
                                 style="font-size: 12px;"
                                 aria-describedby={giphyOpen ? 'ngb-popover-giphy' : undefined}
@@ -7925,6 +7992,7 @@
                                 ngbtooltip: 'Show message options',
                                 placement: 'left'
                               } as Record<string, string>}
+                              {@attach ngbTooltip}
                               class="fas fa-plus"
                             ></i>
                           </span>
@@ -8276,47 +8344,68 @@
                       N sharers x M screens each all land here as sibling tabs - the captured bar
                       carried three at once, all belonging to a single presenter.
                     -->
+                    <!--
+                      The h3 and the bar are SIBLINGS, not alternatives. The bar used to sit in the
+                      alternate branch of this conditional, so an idle room rendered the h3 INSTEAD
+                      of `ul#screenTabs` and the strip's background simply did not exist - the
+                      owner's report, 2026-08-11, that the background div is missing from where the
+                      screens go.
+
+                      The capture settles it without ambiguity. `app.css:1225` cites the computed
+                      style at path `r.0#screens.1#screenTabs`, and 1229 records that in that same
+                      capture NO screen was shared: index `.0` is this h3, index `.1` is the bar.
+                      Both present, in that order, with nothing being presented. The bar reported
+                      `background-color: rgb(17,17,17)`, `width: 1186.53px` and `height: 1px` -
+                      that 1px being 0px of content plus its own bottom border, which is exactly
+                      what an empty flex container measures.
+
+                      So the bar is unconditional and only its CONTENTS are conditional, which
+                      `ScreenTabs` already handles: the `{#each}` renders nothing and the
+                      `li.nav-item.ms-auto` controls slot is gated on `screens.length > 0`.
+                      `height: auto` then reproduces both states for free, because
+                      `.nav-tabs .nav-item { margin-bottom: -1px }` cancels the bar's own border
+                      once it has tabs.
+                    -->
                     {#if sharedScreens.length === 0}
                       <h3 class="text-center mt-4">No one is presenting right now...</h3>
-                    {:else}
-                      <ScreenTabs
-                        screens={sharedScreens}
-                        selectedScreenId={selectedScreenTab}
-                        {forcedScreenId}
-                        {lockedScreenId}
-                        {isPresenter}
-                        onselect={(id) => (selectedScreenTab = id)}
-                        ondetach={detachScreen}
-                        ontogglelock={toggleLockScreen}
-                        onbringeveryone={bringEveryoneToScreen}
-                        onstopscreen={stopSharedScreen}
-                      >
-                        <!--
-                          The `li.nav-item.ms-auto` slot, which the capture fills and this page
-                          never did. `ScreenTabs` already renders the captured container around it
-                          (`div.zoom-controls-container.position-relative`, const 88 of
-                          `app-presentationarea`), so the snippet supplies that container's
-                          children only.
-                        -->
-                        {#snippet controls()}
-                          <ScreenZoomControls
-                            variant="attached"
-                            {showZoomCtrl}
-                            ontoggle={togglePanZoom}
-                            oncapture={() => {
-                              // The captured payload names the screen, and only that screen's view
-                              // answers: `e.screenId !== this.muser._id` returns early.
-                              if (selectedScreenTab) captureVideoImage(selectedScreenTab);
-                            }}
-                            onzoomin={panZoomIn}
-                            onzoomout={panZoomOut}
-                            onreset={panZoomReset}
-                            fullscreen={isFullScreenshare}
-                            onfullscreen={() => (isFullScreenshare = !isFullScreenshare)}
-                          />
-                        {/snippet}
-                      </ScreenTabs>
                     {/if}
+                    <ScreenTabs
+                      screens={sharedScreens}
+                      selectedScreenId={selectedScreenTab}
+                      {forcedScreenId}
+                      {lockedScreenId}
+                      {isPresenter}
+                      onselect={(id) => (selectedScreenTab = id)}
+                      ondetach={detachScreen}
+                      ontogglelock={toggleLockScreen}
+                      onbringeveryone={bringEveryoneToScreen}
+                      onstopscreen={stopSharedScreen}
+                    >
+                      <!--
+                        The `li.nav-item.ms-auto` slot, which the capture fills and this page
+                        never did. `ScreenTabs` already renders the captured container around it
+                        (`div.zoom-controls-container.position-relative`, const 88 of
+                        `app-presentationarea`), so the snippet supplies that container's
+                        children only.
+                      -->
+                      {#snippet controls()}
+                        <ScreenZoomControls
+                          variant="attached"
+                          {showZoomCtrl}
+                          ontoggle={togglePanZoom}
+                          oncapture={() => {
+                            // The captured payload names the screen, and only that screen's view
+                            // answers: `e.screenId !== this.muser._id` returns early.
+                            if (selectedScreenTab) captureVideoImage(selectedScreenTab);
+                          }}
+                          onzoomin={panZoomIn}
+                          onzoomout={panZoomOut}
+                          onreset={panZoomReset}
+                          fullscreen={isFullScreenshare}
+                          onfullscreen={() => (isFullScreenshare = !isFullScreenshare)}
+                        />
+                      {/snippet}
+                    </ScreenTabs>
                     <div id="screensTabsContent" class="tab-content">
                       {#each sharedScreens as screen (screen.id)}
                         <ScreenPane

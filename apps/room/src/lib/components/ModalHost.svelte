@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { ngbTooltip } from '$lib/ngb-tooltip';
   import { panelDragResize } from '$lib/panel-drag';
   import { deserialize } from '$app/forms';
   import { invalidateAll } from '$app/navigation';
@@ -4139,6 +4140,7 @@
         >
           <i
             {...{ placement: 'left', ngbtooltip: 'Add Emojis' } as Record<string, string>}
+            {@attach ngbTooltip}
             class="far fa-smile"
           ></i>
         </span>
@@ -4151,6 +4153,7 @@
         <span class="textAreaBtns">
           <i
             {...{ ngbtooltip: 'Upload an Image', placement: 'left' } as Record<string, string>}
+            {@attach ngbTooltip}
             class="fas fa-image"
           ></i>
         </span>
@@ -4287,6 +4290,7 @@
             >
               <i
                 {...{ placement: 'left', ngbtooltip: 'Add Emojis' } as Record<string, string>}
+                {@attach ngbTooltip}
                 class="far fa-smile"
               ></i>
             </span>
@@ -4308,6 +4312,7 @@
                     ngbtooltip: 'Upload an Image',
                     placement: 'left'
                   } as Record<string, string>}
+                  {@attach ngbTooltip}
                   class="fas fa-image"
                 ></i>
               </span>

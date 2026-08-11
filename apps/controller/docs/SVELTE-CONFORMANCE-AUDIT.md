@@ -579,8 +579,8 @@ touching the developer server on port 5300.
 | Official Svelte autofixer                 | `RichTextEditor.svelte`, `SanitizedHtml.svelte`, root `+layout.svelte`, and room-manager `+page.svelte`: 0 issues, 0 suggestions                                                                                                        |
 | Deterministic Chromium hydration contract | 5 tests passed, including the composite member/menu/editor/sanitizer regression                                                                                                                                                         |
 | Full Playwright matrix                    | 20 tests passed across Chromium, Firefox, WebKit, and responsive Chromium against production build/preview; CI flaky-test rejection remained enabled                                                                                    |
-| Vitest                                    | 20 files, 215 tests passed with all ratcheted coverage thresholds met                                                                                                                                                                   |
-| Current-tree `pnpm quality`               | passed: lint, formatting, zero-warning Svelte check, every quality-gate source/evidence/privacy/font/breakpoint contract, the fail-closed runtime HTTP contract, 215 Vitest tests, 20 Playwright tests, and the Vercel production build |
+| Vitest                                    | 61 files, 671 tests passed with all ratcheted coverage thresholds met                                                                                                                                                                   |
+| Current-tree `pnpm quality`               | passed: lint, formatting, zero-warning Svelte check, every quality-gate source/evidence/privacy/font/breakpoint contract, the fail-closed runtime HTTP contract, 671 Vitest tests, 20 Playwright tests, and the Vercel production build |
 
 ## 14. Hosted release-evidence closure — 2026-08-02
 

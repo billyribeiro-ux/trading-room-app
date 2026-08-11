@@ -43,7 +43,7 @@
  * Distinguishing them turns this into an oracle for discovering which emails are members of which
  * room, which is a membership list nobody has agreed to publish.
  */
-import { and, eq } from 'drizzle-orm';
+import { and, eq, gt, isNotNull, lt, sql } from 'drizzle-orm';
 import { getDb } from './db';
 import { roomUsers, rooms, users } from './db/schema';
 import { readPushTokens, type PushToken } from './rooms';
@@ -173,17 +173,46 @@ export async function redeemPairCode(request: PairRequest, now: Date = new Date(
       counter exists to bound guesses at one specific live secret.
     */
     if (codeIssued && !expired && !exhausted) {
-      const attempts = row.attempts + 1;
+      /*
+        Counted in the DATABASE, not in this process.
+
+        This read `row.attempts + 1` — a value SELECTed in a separate statement — and wrote it back
+        unconditionally. Every request in a concurrent burst reads the same number and writes the
+        same number, so N simultaneous guesses advanced the counter by one. The cap was per ROUND,
+        not per guess: an attacker who knows the room code and a member's email could fire thousands
+        of PINs in parallel against a one-in-a-million secret that lives for days, and there is no
+        rate limit in front of this route. Winning binds the attacker's own FCM token to the
+        member's membership, so the room's push alerts go to their device.
+
+        Found by the adversarial review of 2026-08-11. The expression below is evaluated by
+        PostgreSQL against the current row under the row lock the UPDATE itself takes, so
+        concurrent requests serialise and each one counts.
+
+        The predicates are the other half. They repeat the `codeIssued && !expired && !exhausted`
+        test that was checked above against the SELECTed snapshot, so a request that lost a race in
+        between cannot push the counter past the cap or run it up on a code that has since expired
+        or been consumed.
+      */
+      const nextAttempts = sql`${roomUsers.mobilePairAttempts} + 1`;
+      // Destroy the code itself on the last failure. Leaving it with a spent counter would keep a
+      // guessable secret alive in the row; the owner reissuing is one click, and reissuing now
+      // clears the counter with it.
+      const spent = sql`${roomUsers.mobilePairAttempts} + 1 >= ${MAX_PAIR_ATTEMPTS}`;
       await db
         .update(roomUsers)
-        .set(
-          attempts >= MAX_PAIR_ATTEMPTS
-            ? // Destroy the code itself. Leaving it with a spent counter would keep a guessable
-              // secret alive in the row, and the owner reissuing is one click.
-              { mobilePairAttempts: attempts, mobilePairCode: null, mobilePairCodeExpiresAt: null }
-            : { mobilePairAttempts: attempts }
-        )
-        .where(eq(roomUsers.id, row.roomUserId));
+        .set({
+          mobilePairAttempts: nextAttempts,
+          mobilePairCode: sql`CASE WHEN ${spent} THEN NULL ELSE ${roomUsers.mobilePairCode} END`,
+          mobilePairCodeExpiresAt: sql`CASE WHEN ${spent} THEN NULL ELSE ${roomUsers.mobilePairCodeExpiresAt} END`
+        })
+        .where(
+          and(
+            eq(roomUsers.id, row.roomUserId),
+            isNotNull(roomUsers.mobilePairCode),
+            gt(roomUsers.mobilePairCodeExpiresAt, now),
+            lt(roomUsers.mobilePairAttempts, MAX_PAIR_ATTEMPTS)
+          )
+        );
     }
     return { ok: false, reason: 'refused' };
   }
@@ -195,7 +224,19 @@ export async function redeemPairCode(request: PairRequest, now: Date = new Date(
     now.getTime()
   );
 
-  await db
+  /*
+    The claim is conditional, and 0 rows means somebody else got there first.
+
+    The PIN is single-use, so exactly one request may consume it. Written as an unconditional
+    `WHERE id = ?` this had the same read-then-write gap as the counter above: two requests that
+    both presented the correct PIN would both pass the check and both write, and the second would
+    overwrite the first's token list with its own stale copy — quietly unpairing the device that
+    won. Requiring the code to still be present is what makes exactly one of them the winner.
+
+    `mobilePairCodeExpiresAt` is re-checked here too, so a code that expired between the SELECT and
+    this statement cannot be consumed.
+  */
+  const claimed = await db
     .update(roomUsers)
     .set({
       pushTokensJson: JSON.stringify(tokens),
@@ -204,7 +245,18 @@ export async function redeemPairCode(request: PairRequest, now: Date = new Date(
       mobilePairCodeExpiresAt: null,
       mobilePairAttempts: 0
     })
-    .where(eq(roomUsers.id, row.roomUserId));
+    .where(
+      and(
+        eq(roomUsers.id, row.roomUserId),
+        eq(roomUsers.mobilePairCode, request.pin),
+        gt(roomUsers.mobilePairCodeExpiresAt, now)
+      )
+    )
+    .returning({ roomUserId: roomUsers.id });
+
+  // Lost the race. Refused with the same opaque answer as a wrong PIN — telling the caller "someone
+  // else just used this code" confirms the code was right.
+  if (claimed.length === 0) return { ok: false, reason: 'refused' };
 
   return {
     ok: true,

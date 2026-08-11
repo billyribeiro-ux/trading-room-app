@@ -73,6 +73,24 @@ export function parseUserAgent(userAgent: string | null | undefined): VisitorAge
   return { isMobile, browser };
 }
 
+/*
+  Column bounds for the three fields a visitor controls.
+
+  `userAgent` was already bounded here — "a header is attacker-controlled and this column is written
+  on every entry" — and the same sentence is true of the other three, which the review of
+  2026-08-11 pointed out. The identity does NOT arrive from a trusted place: `/session/[code]`
+  writes `room_identity` with `httpOnly: false` and it is plain JSON, so a request can carry any
+  name and email it likes. `display_name` and `email` are bare `TEXT` in `0007-room-sessions.js`,
+  so a 64 KB name was a 64 KB row on a public path.
+
+  254 is the RFC 5321 maximum length of a forward path, so no deliverable address is truncated.
+  45 is the longest textual IPv6 address (the IPv4-mapped form). 200 for a display name is generous
+  against every name this product has seen and still bounds the column.
+*/
+const MAX_DISPLAY_NAME = 200;
+const MAX_EMAIL = 254;
+const MAX_IP = 45;
+
 export interface RecordVisitInput {
   roomId: number;
   /** Null for a guest, who has no membership row here. */
@@ -92,17 +110,46 @@ export interface RecordVisitInput {
  */
 export async function recordVisit(input: RecordVisitInput, now: Date = new Date()): Promise<void> {
   const { isMobile, browser } = parseUserAgent(input.userAgent);
+  const email = input.email.trim().toLowerCase().slice(0, MAX_EMAIL);
 
   try {
+    /*
+      One OPEN visit per person per room, which is what bounds this table on a public path.
+
+      `/session/[code]/joined` calls this on a page load that needs only a `room_identity` cookie,
+      and that cookie is `httpOnly: false` plain JSON — so a loop of requests wrote a row per
+      request into a table on the production database, with no rate limit anywhere in front of it
+      (`hooks.server.ts` has none, and the controller is serverless so an in-process limiter would
+      not hold anyway). Capping the column widths above bounds each row; this bounds the COUNT.
+
+      It is not merely a mitigation, it is what the data model already says: a person cannot be in
+      one room twice at once, `closeVisit` looks up "the open row for one person", and
+      `0007-room-sessions.js` created `room_sessions_open_idx ON (room_id, email) WHERE
+      left_at IS NULL` for exactly this lookup. A genuine re-entry still gets its own row, because
+      leaving closes the previous one — "one row per ARRIVAL" is unchanged.
+
+      Checked rather than enforced by a unique index deliberately: a partial UNIQUE index would make
+      a duplicate arrival throw, and this function's whole contract is that it never throws into the
+      entry path. The race between this SELECT and the INSERT costs at most one extra row, which is
+      the same outcome as not checking, so the cheap check is the right one.
+    */
+    const [alreadyOpen] = await getDb()
+      .select({ id: roomSessions.id })
+      .from(roomSessions)
+      .where(and(eq(roomSessions.roomId, input.roomId), eq(roomSessions.email, email), isNull(roomSessions.leftAt)))
+      .limit(1);
+    if (alreadyOpen) return;
+
     await getDb()
       .insert(roomSessions)
       .values({
         roomId: input.roomId,
         roomUserId: input.roomUserId,
-        displayName: input.displayName,
-        email: input.email.trim().toLowerCase(),
-        ip: input.ip,
-        // Bounded: a header is attacker-controlled and this column is written on every entry.
+        // Every one of these is bounded, and every one of them is attacker-controlled on the
+        // `/joined` path. See the constants above for where each limit comes from.
+        displayName: input.displayName.slice(0, MAX_DISPLAY_NAME),
+        email,
+        ip: input.ip ? input.ip.slice(0, MAX_IP) : null,
         userAgent: input.userAgent ? input.userAgent.slice(0, 512) : null,
         isMobile,
         browser,

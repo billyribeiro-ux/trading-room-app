@@ -1257,7 +1257,17 @@ app-privchat.privChatHolder {
   z-index: 1;
   width: 100%;
   border-bottom: 1px solid transparent;
-  background: var(--darker-black);
+  /*
+    `--notes-tabs-bg`, not `--darker-black`. Both are `#111` and both resolve to the captured
+    `rgb(17,17,17)`, so this changes no pixel today - but the captured stylesheet keys this bar off
+    `--notes-tabs-bg` specifically, in the grouped rule
+    `.screens-tabs,.files-tabs,.noteTabset,… { background-color: var(--notes-tabs-bg) }`
+    (`docs/source/styles.d622cb9ed2bbc221.css`). Naming the same variable the source names means a
+    future theme that moves one and not the other moves this bar with its siblings rather than
+    silently leaving it behind. Neither token is theme-overridden today; both are declared once in
+    `tokens.css` (:50 and :142) and the theme system uses `--darkTheme-*`-prefixed names.
+  */
+  background: var(--notes-tabs-bg);
 }
 
 #screensTabsContent,

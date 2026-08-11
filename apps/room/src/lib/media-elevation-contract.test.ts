@@ -69,11 +69,21 @@ describe('the elevation is decided on the server', () => {
       code.indexOf('giveMicScreen: async'),
       code.indexOf('giveMicScreen: async') + 2500
     );
-    // The authority check comes FIRST — the row must never be written by someone who could not
-    // issue the command.
-    expect(handler.indexOf("actor.role !== 'staff'")).toBeLessThan(
-      handler.indexOf('grantMediaElevation(')
-    );
+    /*
+      The authority check comes FIRST — the row must never be written by someone who could not
+      issue the command.
+
+      Both offsets are asserted to EXIST before they are compared. The comparison alone was a
+      tautology: `indexOf` returns -1 when the needle is absent, and -1 is less than any real
+      offset, so deleting the staff gate outright made this assertion pass. Found by the
+      adversarial review of 2026-08-11, in a test written the same day to prevent exactly the
+      privilege escalation the missing gate would reopen.
+    */
+    const gateAt = handler.indexOf("actor.role !== 'staff'");
+    const writeAt = handler.indexOf('grantMediaElevation(');
+    expect(gateAt, 'the staff gate must be present').toBeGreaterThan(-1);
+    expect(writeAt, 'the elevation write must be present').toBeGreaterThan(-1);
+    expect(gateAt).toBeLessThan(writeAt);
     expect(handler).toContain('if (give) grantMediaElevation(');
     expect(handler).toContain('else revokeMediaElevation(');
   });
