@@ -18,3 +18,10 @@ src/lib/room-settings-schema.ts
 
 # Generated dependency graph; pnpm is its only writer.
 pnpm-lock.yaml
+
+# Captured from the LIVE original and asserted against by contract tests. These are evidence:
+# reformatting changes the bytes the implementation is checked against, and one of them is
+# SHA-256 pinned by manage-panel-bootstrap3-contract.test.ts.
+evidence-manage-gaps-2026-08-11.json
+evidence-bootstrap-3.3.7.css
+evidence-page.manageSession.html

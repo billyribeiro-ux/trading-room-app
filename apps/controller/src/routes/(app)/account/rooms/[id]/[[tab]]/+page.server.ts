@@ -14,6 +14,7 @@ import {
   applyUserOpcode,
   listRoomUsers,
   readPermissions,
+  readPushTokens,
   readSettings,
   savePermissions,
   saveSetting,
@@ -206,18 +207,45 @@ export const load: PageServerLoad = async ({ params, locals, url }) => {
   else if (filter === 'muted') users = users.filter((u) => u.muted || u.role === 3);
 
   /*
-     `mobile`, `non-mobile` and `marketplace` are in the reference's menu and are NOT filtered here.
+     `mobile` and `non-mobile`, read out of the reference's own bundle on 2026-08-11.
 
-     Those three used to fall through this chain and return every member, so the list said "Show
-     Mobile" and showed everyone — a silent wrong answer. The predicate behind `loadMobileUsers()`
-     and `loadMarketplaceUsers()` is server-side in the reference and appears in no capture, and
-     `room_users` has three columns that could each plausibly mean "mobile" (`mobilePairCode`,
-     `pushTokensJson`, `notificationsState`). Picking one would be inventing the semantics.
+     These were unsupported because the predicate "is server-side in the reference and appears in no
+     capture", and three columns could each plausibly have meant "mobile". Both halves of that turned
+     out to be wrong. `loadMobileUsers()` posts `makeReqTokenForCmd("userList")` — the SAME command
+     the unfiltered list uses — and then filters IN THE BROWSER:
 
-     So the request is reported as unsupported instead of being quietly ignored. Recorded in
-     TODO.md under "Evidence gaps".
+         user.alerterAppTokens && user.alerterAppTokens.length          // Show Mobile
+         !user.alerterAppTokens || 0 == user.alerterAppTokens.length    // Show Non-Mobile
+
+     So it is a client-side predicate on one field, and `alerterAppTokens` is this schema's
+     `pushTokensJson`. Of the three candidate columns, that is the one; the other two are not
+     consulted at all.
+
+     `readPushTokens` is used rather than a length check on the raw text because the column holds
+     JSON and `'[]'` is both non-empty as a string and empty as a list.
+
+     ## The upstream bug that is deliberately NOT reproduced
+
+     `loadNonMobileUsers` has a branch for rooms over 10,000 members that slices to the first 10,000
+     and then keeps users who **have** tokens — the inverse of its own name, so a large room's
+     "Show Non-Mobile" returns mobile users. Ours applies one predicate at every size. This is the
+     one place a faithful transcription would ship a wrong answer, so it is called out here rather
+     than silently corrected.
   */
-  const unsupportedFilter = filter && !['banned', 'presenters', 'trials', 'muted'].includes(filter) ? filter : null;
+  else if (filter === 'mobile') users = users.filter((u) => readPushTokens(u.pushTokensJson).length > 0);
+  else if (filter === 'non-mobile') users = users.filter((u) => readPushTokens(u.pushTokensJson).length === 0);
+
+  /*
+     `marketplace` stays unsupported, and now for a precise reason rather than a general one.
+
+     `loadMarketplaceUsers()` does NOT reuse `userList` — it posts a different command entirely,
+     `makeReqTokenForCmd("userListMarketplace")`, and applies no client-side filter. So that one
+     really is resolved server-side, by an endpoint this product has no equivalent of, and there is
+     no column here to stand in for it. Reported as unsupported instead of quietly returning
+     everyone.
+  */
+  const unsupportedFilter =
+    filter && !['banned', 'presenters', 'trials', 'muted', 'mobile', 'non-mobile'].includes(filter) ? filter : null;
 
   const publicId = room.publicId ?? String(room.id);
 

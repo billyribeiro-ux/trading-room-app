@@ -113,16 +113,41 @@
   {#each screens as screen (screen.id)}
     <li role="presentation" class="nav-item">
       <!-- svelte-ignore a11y_missing_attribute -->
+      <!--
+        Attributes matched against the owner's populated `#screenTabs`, 2026-08-11 — the first
+        capture of this bar with tabs in it. Three differences were found; one is matched and two
+        are deliberate divergences, by one consistent rule: **a captured value is reproduced unless
+        reproducing it locks a real person out.**
+
+        MATCHED — `data-bs-target` is gone. The reference drives the pane with `data-bs-toggle="tab"`
+        and `aria-controls` alone, and nothing is lost by doing the same.
+
+        DIVERGED — `aria-selected`. The reference emits `aria-selected="true"` on all three tabs,
+        including the two without `.active`, which tells a screen reader that three tabs are selected
+        at once.
+
+        DIVERGED — `tabindex`. The reference carries none, and its anchors have no `href` either, so
+        upstream these tabs cannot be reached by keyboard at all. Keeping the roving tabindex is what
+        makes the screen switcher operable without a mouse.
+
+        The earlier note here justified `-1` from "a live member dump"; the populated capture
+        disagrees, so the VALUE is no longer evidence-backed and is kept as an accessibility decision
+        instead of a transcription. Both divergences are recorded in `TODO.md` under decisions taken
+        deliberately, beside "the editor toolbar stays enabled" and "failures render", which are the
+        same kind of call.
+
+        Everything else captured here is still reproduced verbatim, including the duplicate
+        `id="dropdownMenuScreen"` across every gear, because that one costs a reader nothing.
+      -->
       <a
         id="{screen.id}-tab"
         class="nav-link"
         class:active={screen.id === selectedScreenId}
         role="tab"
-        tabindex={screen.id === selectedScreenId ? undefined : -1}
+        tabindex={screen.id === selectedScreenId ? 0 : -1}
         aria-controls={screen.id}
         aria-selected={screen.id === selectedScreenId}
         data-bs-toggle="tab"
-        data-bs-target="#{screen.id}"
         onclick={() => onselect?.(screen.id)}
         onkeydown={(event) => {
           if (event.key === 'Enter' || event.key === ' ') onselect?.(screen.id);

@@ -1532,21 +1532,30 @@ Please click this link to attend: ______ unique link will be here_____
                           {/if}
                           <span>{roleLabel(member)}</span>
                           <!--
-                            HONEST GAP: the reference prints a second token after this slash. Both
-                            non-owner rows render " / manual" (file2:464, file2:678); the owner row's
-                            copy (file2:250) carries `ng-hide` and drops out on both sides, which is
-                            why role 0 renders nothing here. docs/OUTSTANDING.md:285 records "login"
-                            as the value measured on a row in another capture, so the token is not a
-                            constant.
+                            The field is `user.type`. Named 2026-08-11 from the UNCOMPILED manage
+                            view, pulled out of AngularJS's own `$templateCache` at
+                            `/public/app/views/page.manageSession.html` and committed as
+                            `evidence-page.manageSession.html`. Line 420, verbatim:
 
-                            The span's whole attribute set is `ng-hide="user.role==0"` and
-                            `class="ng-binding"` — a DOM dump keeps the rendered text, not the
-                            interpolation — so the field behind it is not nameable from this
-                            evidence and there is nothing on our membership row to source it from.
-                            The slash therefore stands alone rather than hard-coding either token,
-                            one of which is provably wrong for a measured row. These two rows are
-                            the entire remaining Users difference against file2:27-850. Recorded in
-                            docs/OUTSTANDING.md §1d.9 item 3.
+                                span ng-hide="user.role==0" then " / " then user.type in braces
+
+                            So the earlier note here was right about the shape and wrong about one
+                            thing: the interpolation was never unnameable, only unfetched. A DOM
+                            dump keeps the rendered text; the partial keeps the binding.
+
+                            "login" is WITHDRAWN. `docs/OUTSTANDING.md:285` recorded it as a measured
+                            value, and it is not: `manual` is the only value in any capture, and
+                            `login` appears in none of the five files that carry this row
+                            (`must-match/file1`, `must-match/important`, `must-match/match`,
+                            `mising/file1`, `mising/file2`). It was read into the record somewhere
+                            and repeated since.
+
+                            The slash still stands alone, and now for a known reason rather than an
+                            unknown one: `room_users` has no column meaning "how this membership came
+                            to exist", and inventing one would be inventing the semantics. This is
+                            EXACTLY what the reference renders for a user whose `type` is empty — the
+                            owner's own row proves that shape, carrying " / " with nothing after it.
+                            Giving the column a meaning is a product decision, recorded in TODO.md.
                           -->
                           {#if member.role !== 0}<span> / </span>{/if}
                           <!-- Their own red spans, beside the role rather than instead of it — and

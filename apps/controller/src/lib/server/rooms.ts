@@ -255,6 +255,14 @@ export function listRoomUsers(roomId: number) {
       inactive: roomUsers.inactive,
       hasPassword: roomUsers.hasPassword,
       mobilePairCode: roomUsers.mobilePairCode,
+      /*
+        Selected for the Show Mobile / Show Non-Mobile filters, whose predicate was read out of the
+        reference's own bundle on 2026-08-11: `loadMobileUsers()` keeps a user when
+        `user.alerterAppTokens && user.alerterAppTokens.length`, and `alerterAppTokens` is this
+        column. It is the ONLY one of the three "mobile-ish" columns the reference consults —
+        `mobilePairCode` and `notificationsState` play no part in either filter.
+      */
+      pushTokensJson: roomUsers.pushTokensJson,
       notificationsState: roomUsers.notificationsState,
       inviteStatus: roomUsers.inviteStatus,
       discordUserId: roomUsers.discordUserId,
