@@ -68,6 +68,18 @@ export function ensureDatabase() {
     );
     CREATE INDEX IF NOT EXISTS alert_questions_alert_created_idx
       ON alert_questions (alert_id, created_at);
+    CREATE TABLE IF NOT EXISTS media_elevations (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      room_short_code TEXT NOT NULL,
+      target_user_id INTEGER NOT NULL REFERENCES users(id),
+      granted_by_user_id INTEGER NOT NULL REFERENCES users(id),
+      expires_at INTEGER NOT NULL,
+      created_at INTEGER NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS media_elevations_lookup_idx
+      ON media_elevations (room_short_code, target_user_id, expires_at);
+
     CREATE TABLE IF NOT EXISTS shared_files (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL,

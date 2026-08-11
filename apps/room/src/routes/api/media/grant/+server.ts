@@ -25,6 +25,7 @@ import {
   mintGrant
 } from '$lib/server/media-grant';
 import { RoomConfigUnavailable, readRoomConfig } from '$lib/server/room-config-client';
+import { hasMediaElevation } from '$lib/server/media-elevation';
 import type { RequestHandler } from './$types';
 
 export const POST: RequestHandler = async ({ locals, request }) => {
@@ -45,11 +46,25 @@ export const POST: RequestHandler = async ({ locals, request }) => {
   let admission;
   try {
     const config = await readRoomConfig(request, requireRoomShortCode(locals), user.email);
+    /*
+      A live hand-over counts, and it is read from OUR database rather than claimed by the browser.
+
+      `giveMicScreen` is the reference's runtime elevation: a presenter hands a member mic/screen
+      for the session without changing their standing permissions. It never touches the controller's
+      membership, so without this line the recipient restarts its media, re-mints the same `member`
+      grant, and the SFU answers `forbidden` — the media restarts and nothing works.
+
+      The reference makes it work by letting the client re-join asserting its own `isP`. That is the
+      privilege escalation removed on 2026-08-07, so the decision stays here: the row is written by
+      the staff-gated `giveMicScreen` action and simply read back. `TODO.md` gap 22.
+    */
+    const elevated = hasMediaElevation(requireRoomShortCode(locals), user.id);
+
     admission = {
       isPresenter: config.member?.isP === true,
-      hasMic: config.member?.permissions.hasMic ?? false,
+      hasMic: (config.member?.permissions.hasMic ?? false) || elevated,
       hasCam: config.member?.permissions.hasCam ?? false,
-      hasScreen: config.member?.permissions.hasScreen ?? false
+      hasScreen: (config.member?.permissions.hasScreen ?? false) || elevated
     };
   } catch (error) {
     if (error instanceof RoomConfigUnavailable) {

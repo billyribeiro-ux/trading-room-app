@@ -33,6 +33,7 @@ import { isBannedFromRoom, isShutOutByRoomState, roomRoleFor } from '$lib/server
 import { consumeRateLimit } from '$lib/server/rate-limit';
 import { mediaSignallingUrl } from '$lib/server/media-grant';
 import { publishToRoom } from '$lib/server/room-events';
+import { grantMediaElevation, revokeMediaElevation } from '$lib/server/media-elevation';
 import { deleteStoredFile, storeUpload } from '$lib/server/file-storage';
 import {
   deleteThread,
@@ -1712,6 +1713,21 @@ export const actions: Actions = {
         message: `Can't ${give ? 'give' : 'take'} 'Mic/Screenshare' to yourself.`
       });
     }
+
+    /*
+      Recorded on the SERVER before it is announced — `TODO.md` gap 22.
+
+      The SFU decides who may produce from the grant's role, and `/api/media/grant` reads this row
+      when it mints. Without it the recipient restarts its media and is refused `forbidden`, because
+      a runtime hand-over never touches the controller's membership.
+
+      Written here rather than trusted from the client: the reference achieves the same thing by
+      letting the browser re-join asserting its own `isP`, which is the privilege escalation removed
+      on 2026-08-07. This action is already staff-gated and refuses a self-target, so the authority
+      is established before the row is written.
+    */
+    if (give) grantMediaElevation(requireRoomShortCode(locals), targetUserId, actor.id);
+    else revokeMediaElevation(requireRoomShortCode(locals), targetUserId);
 
     publishToRoom(requireRoomShortCode(locals), {
       channel: 'cmds',

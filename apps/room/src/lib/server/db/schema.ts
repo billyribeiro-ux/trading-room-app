@@ -367,6 +367,62 @@ export const chatMutes = sqliteTable(
   (table) => [index('chat_mutes_target_expires_idx').on(table.targetUserId, table.expiresAt)]
 );
 
+/**
+ * A presenter handing a member mic/screen at runtime — `giveMicScreen`.
+ *
+ * ## Why this exists at all, when `permissions_json` already holds mic/screen
+ *
+ * The reference has BOTH mechanisms and they are different things. `#permissionsModal` →
+ * `saveCustomPerms()` sends `changeUserPerms` with `hasMic`/`hasScreen`/`hasCam`/`hasAdminChat`/
+ * `canEditNotes`: durable, per-membership, and already ours on the controller. `giveMicScreen` is
+ * the OTHER one — a live hand-over during a session, which the capture treats as transient and
+ * explicitly does not store (`is_limited_presenter` was removed as a column for exactly that
+ * reason).
+ *
+ * ## Why it is a server-side row rather than a client flag
+ *
+ * The reference makes this work by having the client re-join asserting its own `isP`:
+ * `giveMicScreen` sets `globals.user.isPresenter = true`, then `disconnectAll()`, and the new join
+ * payload computes `isP: isPresenter || hasCam || hasMic || hasScreen` from those client globals.
+ *
+ * **That is client-asserted authority, and it is precisely what was removed on 2026-08-07** — the
+ * room used to map a token type to `staff` and it was a privilege escalation. Media admission comes
+ * from the server now, so the elevation has to as well. This row is written by the `giveMicScreen`
+ * action, which is already presenter-gated (`403` for anyone else), and read by
+ * `/api/media/grant` when it mints. The client is told what happened; it never asserts it.
+ *
+ * ## The expiry, and the divergence it represents
+ *
+ * The capture's elevation dies with the browser's globals, so a reload silently takes the
+ * microphone back. Ours survives a reload, deliberately: a member who refreshes mid-sentence should
+ * not lose the ability to speak, and the server already knows the truth. The expiry bounds a grant
+ * somebody forgot to revoke — {@link MEDIA_ELEVATION_TTL_MS}, a trading day rather than for ever.
+ */
+export const mediaElevations = sqliteTable(
+  'media_elevations',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    /** Room-scoped, like every other realtime row — see `messages.roomShortCode`. */
+    roomShortCode: text('room_short_code').notNull(),
+    targetUserId: integer('target_user_id')
+      .notNull()
+      .references(() => users.id),
+    /** Who handed it over. An audit trail needs the giver, not just the receiver. */
+    grantedByUserId: integer('granted_by_user_id')
+      .notNull()
+      .references(() => users.id),
+    expiresAt: integer('expires_at', { mode: 'timestamp' }).notNull(),
+    createdAt: integer('created_at', { mode: 'timestamp' }).notNull()
+  },
+  (table) => [
+    index('media_elevations_lookup_idx').on(
+      table.roomShortCode,
+      table.targetUserId,
+      table.expiresAt
+    )
+  ]
+);
+
 export const sessions = sqliteTable(
   'sessions',
   {

@@ -24,6 +24,57 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-10
 
+### 12:39 — Gap 22 fully CLOSED: the hand-over works, and the escalation is not reintroduced
+
+**Runtime impact: yes, in the room.** New: `src/lib/server/media-elevation.ts`,
+`src/lib/media-elevation-contract.test.ts`, the `media_elevations` table. Changed: the
+`giveMicScreen` action and `/api/media/grant`.
+
+Earlier today the media restart landed and the GIVE direction was left open, with the decision
+written up as the owner's. **The evidence settled it instead**, which is the better outcome.
+
+**What the capture actually does.** Two mechanisms, kept separate:
+
+| | mechanism | storage |
+| --- | --- | --- |
+| `#permissionsModal` → `saveCustomPerms()` | `changeUserPerms` with `hasMic`/`hasScreen`/`hasCam`/`hasAdminChat`/`canEditNotes` | **durable** |
+| `giveMicScreen` | sets client globals, re-joins asserting `isP` | **transient, client-asserted** |
+
+The first is already ours as the controller's `permissions_json`. The second works there because the
+browser re-joins computing `isP: isPresenter || hasCam || hasMic || hasScreen` **from its own
+globals**, which `giveMicScreen` had just set.
+
+**That is client-asserted authority — precisely what was removed on 2026-08-07**, when a token type
+mapped to `staff` and turned out to be a privilege escalation. So the reference's mechanism could not
+be copied, and folding the hand-over into the durable permissions was equally wrong: it would make a
+transient act permanent and mean a presenter lending a microphone had quietly edited somebody's
+standing permissions.
+
+**The answer both the evidence and the security model allow:** keep it transient, and decide it on
+the server. `media_elevations` is written by the `giveMicScreen` action — already staff-gated, and
+it refuses a self-target — and read by `/api/media/grant` when it mints. The client is *told* over
+the `cmds` channel so it can restart its media; it never asserts anything.
+
+Three properties, each pinned by a test with a negative control:
+
+* **It widens `hasMic` and `hasScreen`, never `isPresenter`.** An elevation is "you may talk and
+  share", not "you are a presenter" — folding it into the presenter flag would hand the recipient
+  every presenter-only server action (archives, polls, alerts) from a control labelled
+  "Mic/Screenshare". Making that mistake fails the test.
+* **It is read from our database, never from the request.** If the grant ever took mic/screen from a
+  body or query parameter, any member could mint themselves a producer grant and the SFU would
+  believe it.
+* **It expires.** The capture's dies with the browser's globals, so a reload silently takes the
+  microphone back. Ours survives one deliberately — a member who refreshes mid-sentence should not
+  lose the ability to speak — which is why it needs its own ceiling: twelve hours, and the expiry is
+  compared in SQL so a drifted clock cannot honour a dead row.
+
+Revoking deletes rather than tombstoning, because a lingering row is a second state for `hasMic` to
+be read from wrongly.
+
+Verified: **561 tests across 59 files** (554 → 561), `svelte-check` **0 errors, 0 warnings**, format
+gate green, node-adapter build clean.
+
 ### 12:30 — Gap 22: a role change restarts the media, and the half that cannot work yet is named
 
 **Runtime impact: yes, in the room.** Files: `apps/room/src/routes/+page.svelte`,
