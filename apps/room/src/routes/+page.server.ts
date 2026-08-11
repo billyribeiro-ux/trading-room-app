@@ -517,20 +517,40 @@ export const load: PageServerLoad = async ({ depends, locals, request, cookies }
     };
   }
 
-  const storedPolls = db
-    .select({
-      id: savedPolls.id,
-      q: savedPolls.question,
-      choicesJson: savedPolls.choicesJson
-    })
-    .from(savedPolls)
-    .where(eq(savedPolls.roomShortCode, requireRoomShortCode(locals)))
-    .orderBy(asc(savedPolls.createdAt), asc(savedPolls.id))
-    .all()
-    .map(({ choicesJson, ...poll }) => ({
-      ...poll,
-      choices: parsePollChoices(choicesJson) ?? []
-    }));
+  /*
+    Pre-canned polls are PRESENTER-ONLY, and this gate is the fix for `TODO.md` entry 7.
+
+    This query ran for every role and its result was returned to every role. A member never opens
+    the poll panel, so they never SAW the list — but their browser was handed every unsent draft a
+    presenter had written, in the SSR HTML and in `__sveltekit` data, on every page load. Invisible
+    is not private: it reaches the browser, any cache in front of it, and any HAR attached to a
+    support ticket. Same class as the `password_hash` that was spread into the page payload on
+    2026-08-04.
+
+    Gated on `connectedUser.isP` — the membership's own answer, the same predicate the poll panel
+    renders from — rather than on `role`, so a Participant granted presenter rights in the
+    controller and a Presenter who had them withheld both get the right answer.
+
+    It also pre-empts entry 5. `GET /api/v1/rooms/{id}/saved-polls` refuses non-staff with 403, so
+    when the room moves onto the API a member page load would have started failing. Returning an
+    empty list here is what that route will agree with.
+  */
+  const storedPolls = !connectedUser.isP
+    ? []
+    : db
+        .select({
+          id: savedPolls.id,
+          q: savedPolls.question,
+          choicesJson: savedPolls.choicesJson
+        })
+        .from(savedPolls)
+        .where(eq(savedPolls.roomShortCode, requireRoomShortCode(locals)))
+        .orderBy(asc(savedPolls.createdAt), asc(savedPolls.id))
+        .all()
+        .map(({ choicesJson, ...poll }) => ({
+          ...poll,
+          choices: parsePollChoices(choicesJson) ?? []
+        }));
 
   return {
     // A one-way handle, never the credential itself. See publicSessionHandle.

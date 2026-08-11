@@ -24,6 +24,41 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-10
 
+### 11:06 — Room TODO entry 7 CLOSED: pre-canned polls were reaching every member's browser
+
+**Runtime impact: yes, in the room** — the page payload shrinks for members, and stops carrying
+something it should never have carried. Files: `apps/room/src/routes/+page.server.ts`,
+`src/lib/page-load-contract.test.ts`.
+
+The loader selected `savedPolls` and returned them to **every role**. A member never opens the poll
+panel, so they never SAW the list — but their browser was handed **every unsent draft a presenter
+had written**, in the SSR HTML and in `__sveltekit` data, on every page load.
+
+**Invisible is not private.** It reaches the browser, any cache in front of it, and any HAR a user
+attaches to a support ticket. This is the same class as the `password_hash` that was spread into the
+page payload on 2026-08-04 — and that one also looked harmless right up until somebody printed the
+keys.
+
+Gated on **`connectedUser.isP`**, the membership's own answer and the same predicate the poll panel
+renders from. Not on `role`, which gets it wrong in both directions: a Participant granted presenter
+rights in the controller would be refused, and a Presenter who had them withheld would be served.
+That distinction is exactly the bug `canEditNotes` had before it was fixed the same way.
+
+The empty list is the ternary's **first** branch, so a member's page load now makes **no database
+read for polls at all** — the value cannot leak back through a refactor that returns a query result
+unconditionally.
+
+**It also pre-empts entry 5**, which is what that TODO row was written to warn about:
+`GET /api/v1/rooms/{id}/saved-polls` refuses non-staff with 403, so the API cutover would have
+started failing member page loads. An empty list is what that route already agrees with.
+
+Three tests pin it, and the negative control confirms they bite: removing the gate fails two of
+them. The two writes needed nothing — `savePoll` and `deleteSavedPoll` were already staff-gated,
+which is what `require_staff` enforces.
+
+Verified: **546 tests across 58 files** (543 → 546), `svelte-check` **0 errors, 0 warnings**, format
+gate green, node-adapter build clean.
+
 ### 11:01 — The share-quality measurement, written down rather than rushed
 
 **No code change** — one document. New: `apps/room/docs/MEASURE-SHARE-QUALITY.md`.

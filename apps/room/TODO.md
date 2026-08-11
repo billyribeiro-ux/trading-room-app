@@ -339,24 +339,31 @@ that will see far more concurrency in production than this suite does.
 
 ---
 
-## 7. Rewiring the room's Pre-Canned list must not 403 a member
+## 7. Pre-Canned polls no longer reach a member's browser — RESOLVED 2026-08-11
 
-**Status:** open, blocking nothing yet. Created 2026-08-04 alongside migration
-`0007_saved_polls.sql`.
+**Status:** closed. The loader returns `[]` to anyone who is not a presenter, and does not run the
+query at all for them.
 
-`src/routes/+page.server.ts:319-331` selects `savedPolls` and returns it to
-**every** role from the page load, gated by nothing. A member never opens the
-poll panel, so they never see the list — but their browser is handed every
-unsent draft a presenter has written. Invisible is not private.
+It selected `savedPolls` and returned them to EVERY role. A member never opens the poll panel, so
+they never SAW the list — but their browser was handed **every unsent draft a presenter had
+written**, in the SSR HTML and in `__sveltekit` data, on every page load. Invisible is not private:
+it reaches the browser, any cache in front of it, and any HAR attached to a support ticket. Same
+class as the `password_hash` spread into the page payload on 2026-08-04.
 
-`GET /api/v1/rooms/{room_id}/saved-polls` refuses non-staff (403). That is a
-deliberate tightening, not a match. Whoever does entry 5 must give members an
-empty list rather than calling the route, or member page loads will start
-failing.
+Gated on `connectedUser.isP` — the membership's own answer, the same predicate the poll panel
+renders from — rather than on `role`, which gets it wrong in both directions: a Participant granted
+presenter rights in the controller would be refused, and a Presenter who had them withheld served.
 
-The two writes need no such care: `savePoll` and `deleteSavedPoll` are already
-`role === 'staff' || role === 'admin'` in the same file, which is exactly what
-`require_staff` enforces.
+**It also pre-empts entry 5.** `GET /api/v1/rooms/{id}/saved-polls` refuses non-staff with 403, so
+the cutover would have started failing member page loads. An empty list here is what that route
+already agrees with — the concern this entry was originally written to record.
+
+Pinned by three tests in `page-load-contract.test.ts`, including that the empty list is the
+ternary's FIRST branch, so a member's load makes no database read for polls at all. Negative
+control: removing the gate fails two of them.
+
+The two writes needed no change: `savePoll` and `deleteSavedPoll` were already
+`role === 'staff' || role === 'admin'`, which is what `require_staff` enforces.
 
 ---
 

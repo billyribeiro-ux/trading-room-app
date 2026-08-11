@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { db, ensureDatabase } from '$lib/server/db';
 import { users } from '$lib/server/db/schema';
@@ -253,5 +254,51 @@ describe('page load contract', () => {
     // `room_members.can_edit_notes` rather than from a global role column, and it must not
     // change value for the same person.
     expect(data.canEditNotes).toBe(true);
+  });
+});
+
+/*
+  Pre-canned polls must never reach a member's browser.
+
+  `TODO.md` entry 7. The loader selected `savedPolls` and returned them to EVERY role. A member
+  never opens the poll panel so they never SAW the list — but their browser was handed every unsent
+  draft a presenter had written, in the SSR HTML and in `__sveltekit` data, on every page load.
+  Invisible is not private: it reaches the browser, any cache in front of it, and any HAR attached
+  to a support ticket. Exactly the class of the `password_hash` that was spread into the page
+  payload on 2026-08-04, which is why that fix has a test and this now does too.
+
+  Read as source text: the loader needs a database, `$app/env/private` and a live room config to
+  execute. What is pinned is the DECISION, which is invisible once made and one refactor from being
+  undone.
+*/
+describe('pre-canned polls are presenter-only', () => {
+  const loader = readFileSync(new URL('../routes/+page.server.ts', import.meta.url), 'utf8');
+  const code = loader.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+
+  it('returns an empty list to anyone who is not a presenter', () => {
+    expect(code).toContain('const storedPolls = !connectedUser.isP');
+    expect(code).toMatch(/!connectedUser\.isP\s*\?\s*\[\]/);
+  });
+
+  it('gates on the membership predicate, not on the account role', () => {
+    /*
+      `isP` is the membership's own answer — the same predicate the poll panel renders from. Gating
+      on `role` instead gets it wrong in BOTH directions: a Participant granted presenter rights in
+      the controller would be refused, and a Presenter who had them withheld would be served.
+    */
+    const gate = code.slice(code.indexOf('const storedPolls'), code.indexOf('.from(savedPolls)'));
+    expect(gate).toContain('connectedUser.isP');
+    expect(gate).not.toMatch(/role === .(staff|admin)./);
+  });
+
+  it('does not even run the query for a member', () => {
+    // The empty list is the ternary's first branch, so a member's page load makes no database read
+    // for polls at all — the value cannot leak through a later refactor that returns the query
+    // result unconditionally.
+    const gate = code.slice(
+      code.indexOf('const storedPolls'),
+      code.indexOf('.orderBy(asc(savedPolls')
+    );
+    expect(gate.indexOf('[]')).toBeLessThan(gate.indexOf('.select('));
   });
 });

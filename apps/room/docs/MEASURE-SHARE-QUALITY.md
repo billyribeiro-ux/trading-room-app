@@ -30,7 +30,7 @@ seconds it takes, and no amount of tooling removes that.
 
 ## The procedure
 
-Order matters: `chrome://webrtc-internals` logs from the moment it is opened, so opening it *before*
+Order matters: `chrome://webrtc-internals` logs from the moment it is opened, so opening it _before_
 the connection exists captures the whole timeline — negotiation, first keyframe, the bitrate ramp —
 instead of joining midway.
 
@@ -52,7 +52,7 @@ Only `chat.tradingroom.app/?room=1001` should appear in the list. If anything el
 still open.
 
 **Alternative:** `apps/room/scripts/collect-share-stats.js` pasted into the presenter's console
-*before* starting the share. It samples for 30 seconds, prints kbps per second, and downloads its
+_before_ starting the share. It samples for 30 seconds, prints kbps per second, and downloads its
 own JSON. It must go in first — it hooks `RTCPeerConnection` at construction and cannot see a
 connection that already exists.
 
@@ -62,13 +62,13 @@ connection that already exists.
 
 From `outbound-rtp (video)` on the `room=1001` connection:
 
-| stat | what it settles |
-| --- | --- |
-| `bytesSent` over time | the real bitrate on real content — the number the whole exercise is for |
+| stat                                                     | what it settles                                                                          |
+| -------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `bytesSent` over time                                    | the real bitrate on real content — the number the whole exercise is for                  |
 | `qualityLimitationReason` + `qualityLimitationDurations` | whether anything is throttling. The 2026-08-05 read was `none`, `bandwidth: 0`, `cpu: 0` |
-| `frameWidth` / `frameHeight` | whether full resolution survives to the wire |
-| `framesPerSecond` | whether `contentHint='detail'` traded frame rate for sharpness |
-| codec `mimeType` | that VP9 is still winning the negotiation |
+| `frameWidth` / `frameHeight`                             | whether full resolution survives to the wire                                             |
+| `framesPerSecond`                                        | whether `contentHint='detail'` traded frame rate for sharpness                           |
+| codec `mimeType`                                         | that VP9 is still winning the negotiation                                                |
 
 ## What each result would mean
 
