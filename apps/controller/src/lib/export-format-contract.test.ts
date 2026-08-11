@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import { buildStatsCsv, statsFilename } from './stats-csv';
 
 /*
   The four downloads, pinned against the reference's own `app.min.js`.
@@ -15,17 +16,37 @@ import { describe, expect, it } from 'vitest';
   had. A format that only reveals itself in a downloaded file needs a test that reads the source.
 */
 
+/*
+  The stats CSV moved out of the page on 2026-08-11 — `TODO.md` item W. It was built in the browser
+  from a `data.visits` array the loader shipped on every load, up to 5,000 rows each carrying a
+  visitor's IP address and email. It is now produced by
+  `GET /account/rooms/<shortCode>/stats.csv`, and the FORMAT lives in `$lib/stats-csv.ts` so the
+  endpoint and this test share one definition rather than two that can drift.
+
+  Both files are read and concatenated, because the four downloads did not all move: the participant
+  list and the settings JSON are still assembled in the page. Concatenating means each assertion
+  below keeps finding its subject wherever it now lives, and a format that moves again does not
+  quietly stop being checked.
+*/
 const page = readFileSync(new URL('../routes/(app)/account/rooms/[id]/[[tab]]/+page.svelte', import.meta.url), 'utf8');
+const statsCsv = readFileSync(new URL('./stats-csv.ts', import.meta.url), 'utf8');
 
 /** Comments stripped, so no assertion can be satisfied by the documentation that explains it. */
-const code = page.replace(/<!--[\s\S]*?-->/g, '').replace(/\/\*[\s\S]*?\*\//g, '');
+const code = `${page}\n${statsCsv}`
+  .replace(/<!--[\s\S]*?-->/g, '')
+  .replace(/\/\*[\s\S]*?\*\//g, '')
+  .replace(/^\s*\/\/.*$/gm, '');
 
 describe('filenames follow the reference, not our own scheme', () => {
   it('names each file `<Thing>_<uuid>` the way the bundle does', () => {
     // `var prefix="Participant_List_"+$scope.sess.uuid` — and `sess.uuid` is our `publicId`, the
     // same identifier the page's own room/registration/app-pair links are built from.
     expect(code).toContain('`Participant_List_${roomUuid}.csv`');
-    expect(code).toContain('`Participant_Stats_${roomUuid}_${new Date().toDateString()}.csv`');
+    // EXERCISED rather than matched as source text: the stats filename is now built by
+    // `statsFilename()`, so the real string is available and is worth more than its spelling.
+    expect(statsFilename('abc123', new Date('2026-08-11T12:00:00'))).toBe(
+      'Participant_Stats_abc123_Tue Aug 11 2026.csv'
+    );
     expect(code).toContain('`Monthly_report_${roomUuid}_${range}.csv`');
     expect(code).toContain('`Settings_${roomUuid}.json`');
   });
@@ -49,8 +70,12 @@ describe('the participant stats header, which is now nine columns', () => {
     version survived until now. It is pinned here.
   */
   it('matches the reference exactly, in both phone variants', () => {
-    expect(code).toContain("'Name, Email, Phone, IP, In, Out, Duration, isMobile, Browser\\r\\n'");
-    expect(code).toContain("'Name, Email, IP, In, Out, Duration, isMobile, Browser\\r\\n'");
+    // The header is now produced from `STATS_COLUMNS`, so this asserts the OUTPUT — which is what
+    // the owner's spreadsheet actually receives — instead of a literal in the source.
+    expect(buildStatsCsv([], { withPhone: true })).toBe(
+      'Name, Email, Phone, IP, In, Out, Duration, isMobile, Browser\r\n'
+    );
+    expect(buildStatsCsv([], { withPhone: false })).toBe('Name, Email, IP, In, Out, Duration, isMobile, Browser\r\n');
   });
 
   it('no longer writes the invented `Last login` column', () => {
@@ -62,7 +87,34 @@ describe('the participant stats header, which is now nine columns', () => {
   it('exports one row per VISIT, not one per person', () => {
     // `statXrefs` is a cross-reference row — a person crossing into a room at a moment in time. A
     // member who entered four times is four rows, which is what makes Duration meaningful.
-    expect(code).toContain('for (const visit of data.visits)');
+    // Two visits by ONE person must produce two rows. Asserted by running it, because "one row per
+    // arrival" is the property that makes Duration mean anything and a source match cannot show it.
+    const twice = buildStatsCsv(
+      [
+        {
+          displayName: 'Dana',
+          email: 'd@x.com',
+          ip: '203.0.113.1',
+          isMobile: false,
+          browser: 'Chrome',
+          joinedAt: '2026-08-11T10:00:00',
+          leftAt: '2026-08-11T10:30:00'
+        },
+        {
+          displayName: 'Dana',
+          email: 'd@x.com',
+          ip: '203.0.113.1',
+          isMobile: false,
+          browser: 'Chrome',
+          joinedAt: '2026-08-11T14:00:00',
+          leftAt: null
+        }
+      ],
+      { withPhone: false }
+    );
+    const rows = twice.trimEnd().split('\r\n');
+    expect(rows).toHaveLength(3); // header + two arrivals by the same person
+    expect(rows[2]).toContain('"N/A"'); // the open one
     expect(code).not.toMatch(/for \(const r of visibleStats\)[\s\S]{0,400}Participant_Stats/);
   });
 

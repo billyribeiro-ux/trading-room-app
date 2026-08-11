@@ -282,49 +282,18 @@ export const load: PageServerLoad = async ({ params, locals, url }) => {
      * a date range on the query and not a larger number.
      */
     /*
-      Loaded ONLY for the Stats tab, because that is the only tab that can consume it.
+      `visits` is GONE from this payload, and that is the whole point of `TODO.md` item W.
 
-      Its sole reader is `exportStatsToCsv()`, and the button that calls it lives inside the Stats
-      pane. Every other tab — Users, Branding, Settings, SSO, Marketplace — was paying for it
-      anyway: the tab links are same-route anchors, so SvelteKit re-runs this load on every tab
-      click, and clicking through all six refetched the same rows six times.
+      It used to be selected here — 5,000 rows, each carrying a visitor's IP ADDRESS and email — so
+      that the browser could build a CSV from them. Two reviews on 2026-08-11 flagged the same line
+      independently: ~755 KB of serialised rows per load, and personal data travelling in the HTML
+      of a page about branding colours. Gating it on the Stats tab removed five sixths of that; this
+      removes the rest.
 
-      The cost was measured at 150.9 bytes per row with this project's own devalue, so 5,000 rows is
-      ~755 KB of serialised page data per load — and that measurement is optimistic, because it used
-      one repeated user-agent string, which devalue deduplicates.
-
-      It is also a privacy reduction and that is the more important half: every row carries a
-      visitor's IP ADDRESS and email. Shipping those into the HTML of a page about branding colours
-      widened the blast radius of anything that could read this payload, for no feature at all. They
-      now travel only when somebody has opened the tab whose purpose is to export them.
-
-      Both halves found by the reviews of 2026-08-11. The complete fix is a dedicated CSV endpoint
-      so the addresses never enter a page payload — recorded in `TODO.md`; this is the part that is
-      correct, small, and provable now.
+      The export is now `GET /account/rooms/<shortCode>/stats.csv`, which reads the rows at the
+      moment somebody asks for the file, behind the same `requireOwnedRoom` gate as this page. Those
+      addresses no longer enter a page payload at any point, on any tab.
     */
-    visits:
-      tab !== 'stats'
-        ? []
-        : (
-            await getDb()
-              .select({
-                displayName: roomSessions.displayName,
-                email: roomSessions.email,
-                ip: roomSessions.ip,
-                isMobile: roomSessions.isMobile,
-                browser: roomSessions.browser,
-                joinedAt: roomSessions.joinedAt,
-                leftAt: roomSessions.leftAt
-              })
-              .from(roomSessions)
-              .where(eq(roomSessions.roomId, room.id))
-              .orderBy(desc(roomSessions.joinedAt))
-              .limit(5000)
-          ).map((visit) => ({
-            ...visit,
-            joinedAt: visit.joinedAt.toISOString(),
-            leftAt: visit.leftAt ? visit.leftAt.toISOString() : null
-          })),
     links: {
       room: `${ORIGIN}/u/${publicId}`,
       vanity: room.vanitySlug ? `${ORIGIN}/room/${room.vanitySlug}` : `${ORIGIN}/room/[yournamehere]`,
