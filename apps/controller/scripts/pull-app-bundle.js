@@ -29,7 +29,7 @@
 (async function () {
   var OUT = {
     tool: 'pull-app-bundle',
-    version: 1,
+    version: 2,
     capturedAt: new Date().toISOString(),
     href: location.href,
     origin: location.origin,
@@ -66,24 +66,48 @@
     { needle: 'showMobile', why: 'gap 4 — the filter flag' }
   ];
 
-  /* Only what this app serves. Every other script on the page is a CDN or an analytics tag, and a
-     cross-origin fetch would fail noisily for nothing. Discovered from the DOM rather than
-     hardcoded, so a versioned filename cannot break it. */
+  /* EVERY script tag is recorded, matched or not.
+     Version 1 required `src.indexOf(location.origin) === 0`, which found nothing on the live page:
+     `www.protradingroom.com` and `protradingroom.com` are different origins by that test, so the
+     bundle the 2026-08-08 dump proves is there was filtered out by its own hostname. Recording all
+     of them means a miss can be diagnosed from the download instead of guessed at. */
+  var allScripts = [];
   var wanted = [];
   try {
     var tags = document.querySelectorAll('script[src]');
     for (var i = 0; i < tags.length; i++) {
       var src = tags[i].src || '';
-      if (src.indexOf(location.origin) === 0 && /\/dist\/|\/app\/|\.min\.js/.test(src)) {
-        if (wanted.indexOf(src) === -1) wanted.push(src);
+      if (!src) continue;
+      allScripts.push(src);
+      // Host-based, not origin-based: any protradingroom host, www or not, room or app.
+      if (/(^|\/\/|\.)protradingroom\.com\//.test(src) && wanted.indexOf(src) === -1) {
+        wanted.push(src);
       }
     }
   } catch (e) {
     fail('reading script tags', e);
   }
-  step('same-origin bundles found: ' + wanted.length);
-  if (wanted.length === 0) {
-    OUT.gaps.push('No same-origin bundle on this page. Are you on protradingroom.com and logged in?');
+  OUT.allScripts = allScripts;
+
+  /* The known paths, tried DIRECTLY whether or not a tag advertised them.
+     `/public/dist/app.min.js` is recorded in `collect-manage-2026-08-08T20-16-32-687Z.json`'s
+     `scripts` list, so it exists on this host even when the tag scan comes back empty — a
+     hash-routed AngularJS page can have replaced the tags by the time this runs. Relative to
+     `location.origin`, so it follows whichever host you are actually on. */
+  var KNOWN = ['/public/dist/app.min.js', '/public/dist/vendor.min.js'];
+  for (var kk2 = 0; kk2 < KNOWN.length; kk2++) {
+    var abs = location.origin + KNOWN[kk2];
+    var already = false;
+    for (var w = 0; w < wanted.length; w++) {
+      if (wanted[w].indexOf(KNOWN[kk2]) !== -1) already = true;
+    }
+    if (!already) wanted.push(abs);
+  }
+
+  step('bundles to fetch: ' + wanted.length + ' (of ' + allScripts.length + ' script tags seen)');
+  for (var q = 0; q < wanted.length; q++) step('  · ' + wanted[q]);
+  if (allScripts.length === 0) {
+    OUT.gaps.push('No <script src> on this page at all. The known paths are still being tried directly.');
   }
 
   var WINDOW = 6000;
@@ -95,8 +119,26 @@
       step('fetching ' + url.split('/').pop());
       var res = await fetch(url, { credentials: 'include' });
       text = await res.text();
-      OUT.bundles.push({ url: url, status: res.status, bytes: text.length });
-      step('  got ' + text.length + ' bytes');
+      // A 404 on this app returns the SPA's index.html, which is a perfectly valid string and would
+      // otherwise be scanned as if it were the bundle and report every target as absent.
+      var looksLikeHtml = /^\s*(<!doctype|<html)/i.test(text.slice(0, 200));
+      OUT.bundles.push({
+        url: url,
+        status: res.status,
+        bytes: text.length,
+        looksLikeHtml: looksLikeHtml
+      });
+      step('  got ' + text.length + ' bytes, status ' + res.status + (looksLikeHtml ? ' — HTML, not JS' : ''));
+      if (!res.ok || looksLikeHtml) {
+        OUT.gaps.push(
+          url +
+            ' returned ' +
+            res.status +
+            (looksLikeHtml ? ' and HTML rather than JavaScript' : '') +
+            ' — not scanned.'
+        );
+        continue;
+      }
     } catch (e) {
       OUT.bundles.push({ url: url, error: String(e && e.message ? e.message : e) });
       fail('fetch ' + url, e);
