@@ -253,6 +253,29 @@ for (let i = 0; i < lines.length; i++) {
   let help = null;
   for (let j = i + 1; j < lines.length && j < i + 10; j++) {
     if (/<a\.editable|<label[^>]*\.control-label/.test(lines[j])) break;
+    /*
+      A CONDITIONAL container ends the search, because what is inside it belongs to that block and
+      not to the field above it.
+
+      `pairSecretKey` is the case that proved it. The outline reads:
+
+          <a.editable … saveSessField('pairSecretKey') …>
+            · "empty"
+          <div ng-show="sess.hasAppPairLink && sess.pairSecretKey">
+            <br>
+            <label>
+              · "Sample link you would need to use to add each user: …"
+
+      Without this clause that label is taken as `pairSecretKey`'s helper, and it is not — it labels
+      the sample-link input inside the block, which the reference renders only when BOTH the flag and
+      a secret are set. Attributing it to the setting made our Settings pane emit an extra `br` +
+      `label.muted` that the reference has nowhere, offsetting every node after it: the side-by-side
+      went from 16 differing elements to 1094, all of them that single shift.
+
+      The other three helper shapes this loop was widened to catch are unaffected — they are plain
+      siblings, and `pairOKRedirect`'s `<label.muted>` two lines below is one of them.
+    */
+    if (/<div[^>]*\bng-(show|if)=/.test(lines[j])) break;
     if (/<label/.test(lines[j])) {
       help = textOf(j + 1);
       break;
