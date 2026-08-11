@@ -24,6 +24,57 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-11
 
+### 14:55 — The manage collector ran; gap 12 closed, and four defects in the collector fixed
+
+**No runtime impact.** One evidence file, one collector fixed. No application code.
+
+The owner ran `collect-manage-gaps.js` three times. The first two were on the wrong page — the room,
+then `#/page/welcome` — and the collector said so rather than inventing data. The third was on
+`#/page/manageSession/6a6529b318781e20ed81947d`, which is the right one, and it is committed as
+`apps/controller/evidence-manage-gaps-2026-08-11.json`.
+
+**Gap 12 is closed as an evidence gap.** The app-pair link is an
+`<input class="form-control col-md-6">` — a read-only URL field, not an anchor — holding
+
+```
+https://chat.protradingroom.com/ptr_app/sessions/v2/addUser/6a6529b318781e20ed81947d/?sec=&email=__userEmail__&name=__userName__
+```
+
+Three guesses became facts: the host is the **room** (`chat.`) and not the controller; the path is
+`/ptr_app/sessions/v2/addUser/<publicId>/`; and the placeholders are the literal strings
+`__userEmail__` and `__userName__`. `sec=` came back **empty**, which is its own finding — this room
+has no `pairSecretKey` set. What remains is not an evidence gap but missing work: no `addUser` route
+exists on either host.
+
+**Gap 8 is answered, and the answer is an absence.** `unamePWCommentPresent: true` — the
+`ngIf` comment is in the DOM, so Angular evaluated the condition and stripped the block. This room is
+not in `unamePW` mode and the two items are genuinely absent, which is exactly the shape the
+collector's own note predicted the answer would take.
+
+**The rest of that run was the collector failing, and its own log said how.** Four defects, all mine,
+all now fixed and verified against a real DOM rather than the hand-rolled stub the existing smoke
+harness uses:
+
+1. **It captured the wrong pane.** `paneSelector: "tab-pane ng-scope active"` with **one** field — a
+   search box named `title` carrying `ng-enter="loadUsers(uSearch)"`, which is the USERS pane. The
+   Settings tab was found by matching text across `a, button, li`, a `li` won, and in AngularJS the
+   handler is on the `a` inside it. `clickableWithin()` now clicks the innermost control.
+2. **It could not tell "not rendered yet" from "wrong pane".** A fixed 1200ms sleep then serialise.
+   It now records the active pane before clicking, polls until the field count is stable for two
+   consecutive reads, and reports `paneChanged` and `settledAfterMs` — so those two failures produce
+   two different messages instead of one misleading one.
+3. **The denylist refused a menu on the word "email".** "Actions With the Email List" was never
+   opened, and gap 10 stayed open over a false positive. The guard is now applied by CAPABILITY: an
+   element whose only power is `data-toggle="dropdown"`/`tab`/`collapse` reveals what is already on
+   the page and is opened; anything carrying an `ng-click` handler is still refused by wording. No
+   menu ITEM is ever clicked, and that is enforced by there being no code path that clicks one.
+4. **Gap 9 counted a different set of fields than gap 11.** `input, select, textarea` in one place
+   against a wider set in the other, so its "23 → 23" could not have been trusted even if the click
+   had worked. One `FIELD_SELECTOR` now serves both.
+
+Verified by execution: against a real DOM the Settings pane now reports `paneChanged: true`,
+`fieldCount: 264` — up from 1 — settled after 638ms, with zero refused clicks and the menu captured.
+
 ### 14:35 — `css-modals` identified: the product runs TWO Bootstrap generations, and it verifies the manage page
 
 **No runtime impact.** One evidence file pulled in, one contract test, documentation. No `.css` or

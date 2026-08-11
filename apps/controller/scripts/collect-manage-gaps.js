@@ -48,7 +48,7 @@
 
   const OUT = {
     tool: 'collect-manage-gaps',
-    version: 1,
+    version: 2,
     capturedAt: new Date().toISOString(),
     href: location.href,
     origin: location.origin,
@@ -67,7 +67,45 @@
 
   /* ─── safety ────────────────────────────────────────────────────────────── */
 
+  /**
+   * What counts as a settings field.
+   *
+   * One definition, used by the Settings capture and by the DON'T TOUCH before/after count, so the
+   * two can be compared. They previously counted different things — `input, select, textarea` here
+   * against a wider set there — which means a "23 -> 23" result could never have been trusted even
+   * if the click had worked.
+   */
+  const FIELD_SELECTOR =
+    'input, select, textarea, [editable-text], [editable-checkbox], [editable-select]';
+
   const DENY = /\b(delete|remove|upload|play|stop|send|save|submit|post|ban|kick|clear|reset|launch|archive|pay|invite|email)\b/i;
+
+  /**
+   * Whether an element is STRUCTURALLY incapable of mutating anything.
+   *
+   * A tab link and a dropdown toggle change what is visible and nothing else — that is the entire
+   * contract of `data-toggle`. The word denylist cannot see that, and on 2026-08-11 it refused to
+   * open the menu labelled "Actions With the Email List" because the word `email` appears in its
+   * text. The menu was never captured, and gap 10 stayed open over a false positive.
+   *
+   * So the denylist is applied by CAPABILITY rather than by wording: a toggle is opened, its items
+   * are serialised, and **no item is ever clicked** — which is where the real danger lives and is
+   * enforced by there being no code path that clicks one.
+   */
+  function isDisclosureOnly(element) {
+    const toggle = (
+      element.getAttribute('data-toggle') ||
+      element.getAttribute('data-bs-toggle') ||
+      ''
+    ).toLowerCase();
+    if (toggle === 'dropdown' || toggle === 'tab' || toggle === 'collapse' || toggle === 'pill') {
+      return true;
+    }
+    const role = (element.getAttribute('role') || '').toLowerCase();
+    if (role === 'tab') return true;
+    const cls = String(element.className || '');
+    return /\bdropdown-toggle\b/.test(cls);
+  }
 
   function safeClick(element, why) {
     if (!element) return false;
@@ -79,13 +117,34 @@
       element.id || '',
       element.className || ''
     ].join(' ');
-    if (DENY.test(description)) {
-      OUT.refusedClicks.push({ why, text: (element.textContent || '').trim().slice(0, 80) });
+    // An `ng-click` naming a handler is a real action whatever the element looks like, so the
+    // capability exemption never applies to one.
+    const hasHandler = !!(element.getAttribute('ng-click') || '').trim();
+    if (DENY.test(description) && !(isDisclosureOnly(element) && !hasHandler)) {
+      OUT.refusedClicks.push({
+        why,
+        text: (element.textContent || '').trim().slice(0, 80),
+        matched: (description.match(DENY) || [])[0] ?? null
+      });
       console.warn('[refused]', why);
       return false;
     }
     element.click();
     return true;
+  }
+
+  /**
+   * Clicks the innermost thing that actually carries the behaviour.
+   *
+   * The Settings tab was located with a text match across `a, button, li` and a `li` can win, but
+   * in AngularJS the handler is on the `a` inside it — so the click landed on the wrapper, nothing
+   * happened, and the run went on to serialise whatever pane was already active. That is how the
+   * 2026-08-11 run captured the USERS pane and reported "only 1 field" against an expected 264.
+   */
+  function clickableWithin(element) {
+    if (!element) return null;
+    if (element.tagName === 'A' || element.tagName === 'BUTTON') return element;
+    return element.querySelector('a, button') || element;
   }
 
   /* ─── serialisation ─────────────────────────────────────────────────────── */
@@ -178,27 +237,83 @@
       note('gap 11: no "Settings" tab found on this page — is this the Manage page?');
       return;
     }
-    safeClick(tab, 'open the Settings tab');
-    await sleep(1200);
+    /*
+      PROVE the pane changed, then prove it finished rendering. Both were assumed before.
 
-    const pane =
-      document.querySelector('.tab-pane.active') ||
-      tab.closest('[ng-controller]') ||
-      document.body;
+      The 2026-08-11 run clicked, slept 1200ms and serialised `.tab-pane.active` — which was still
+      the USERS pane, so it captured one field (a search box named `title` carrying
+      `ng-enter="loadUsers(uSearch)"`) and reported it as "only 1 of ~264 Settings fields". A fixed
+      sleep cannot tell "not rendered yet" from "wrong pane", and those need different answers.
+    */
+    const paneOf = () => document.querySelector('.tab-pane.active');
+    const before = paneOf();
+    const beforeFields = before ? before.querySelectorAll(FIELD_SELECTOR).length : 0;
 
-    const fields = Array.from(pane.querySelectorAll('input, select, textarea, [editable-text], [editable-checkbox], [editable-select]'));
+    const clicked = safeClick(clickableWithin(tab), 'open the Settings tab');
+    if (!clicked) {
+      note('gap 11: the Settings tab was refused by the denylist, so the pane was never opened.');
+      return;
+    }
+
+    // Poll until the field count STOPS changing for two consecutive reads, up to ~8s. Angular
+    // renders 264 controls in stages, so the first non-zero count is not the final one.
+    let pane = null;
+    let settledAfterMs = null;
+    let previousCount = -1;
+    let stableReads = 0;
+    const startedAt = Date.now();
+    for (let i = 0; i < 40; i++) {
+      await sleep(200);
+      pane = paneOf();
+      if (!pane) continue;
+      // Only the COUNT is needed while polling; the fields themselves are read once, after the
+      // loop, from whichever pane it settled on.
+      const count = pane.querySelectorAll(FIELD_SELECTOR).length;
+      if (count === previousCount && count > 0) {
+        if (++stableReads >= 2) {
+          settledAfterMs = Date.now() - startedAt;
+          break;
+        }
+      } else {
+        stableReads = 0;
+      }
+      previousCount = count;
+    }
+
+    pane = pane || document.body;
+    const fields = Array.from(pane.querySelectorAll(FIELD_SELECTOR));
+    const paneChanged = !!before && pane !== before;
 
     OUT.targets.settings = {
       note: 'No node cap and no html truncation. The previous capture stopped at index 900 and cut html at 120,000 chars.',
       paneSelector: pane === document.body ? 'body (fallback)' : (pane.className || pane.id),
+      paneChanged,
+      previousPaneSelector: before ? before.className || before.id : null,
+      previousPaneFieldCount: beforeFields,
+      settledAfterMs,
       fieldCount: fields.length,
       htmlLength: pane.innerHTML.length,
       html: pane.innerHTML,
       fields: fields.map((field) => describe(field))
     };
 
-    if (fields.length < 200) {
-      note(`gap 11: only ${fields.length} fields found in the Settings pane; the schema expects ~264. The pane may not have finished rendering, or this role sees fewer.`);
+    /*
+      Two different failures, reported as two different things. Conflating them is what made the
+      last run unreadable: "only 1 field" looked like a rendering problem and was actually the
+      wrong pane entirely.
+    */
+    if (!paneChanged) {
+      note(
+        `gap 11: the active pane did NOT change after clicking Settings (still "${OUT.targets.settings.paneSelector}", ${fields.length} field(s)). The tab click did not take effect, so this is NOT the Settings pane and its contents are not evidence about it.`
+      );
+    } else if (settledAfterMs === null) {
+      note(
+        `gap 11: the Settings pane never stopped changing within 8s (last count ${fields.length}). Captured anyway, but treat the count as a floor rather than the total.`
+      );
+    } else if (fields.length < 200) {
+      note(
+        `gap 11: the Settings pane settled at ${fields.length} fields after ${settledAfterMs}ms; the schema expects ~264. The pane DID change and DID finish rendering, so this role genuinely sees fewer — which is itself the finding.`
+      );
     }
   }
 
@@ -213,10 +328,10 @@
       return;
     }
 
-    const before = document.querySelectorAll('input, select, textarea').length;
-    const opened = safeClick(toggle, "open the DON'T TOUCH block");
+    const before = document.querySelectorAll(FIELD_SELECTOR).length;
+    const opened = safeClick(clickableWithin(toggle), "open the DON'T TOUCH block");
     await sleep(900);
-    const after = document.querySelectorAll('input, select, textarea').length;
+    const after = document.querySelectorAll(FIELD_SELECTOR).length;
 
     /*
       The previous collector's exact failure: it logged the step and serialised the wrong element.
