@@ -640,3 +640,59 @@ describe('media admission is one formula, not two', () => {
     expect(pageSource).not.toContain('canProduce: isPresenter');
   });
 });
+
+/*
+  `giveMicScreen` must restart the recipient's media — `TODO.md` gap 22.
+
+  The capture follows the flag assignment with `disconnectAll()` and a re-init after 3s, so the peer
+  actually gains or loses a producer. Setting the flag alone changes what the sidebar renders and
+  nothing about what the SFU carries.
+
+  Read as source text: the handler needs an EventSource, a live SFU and a role change to execute.
+*/
+describe('a role change restarts the media session', () => {
+  const page = readFileSync(new URL('../routes/+page.svelte', import.meta.url), 'utf8');
+  const code = page.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+
+  it('rebuilds rather than reusing, because close() latches permanently', () => {
+    /*
+      `MediaSession.close()` sets `#closed` and `load()` calls `#assertOpen()`, so a closed instance
+      throws `sessionClosed` for ever. Reusing it is the obvious implementation and it would fail on
+      the first role change.
+    */
+    expect(code).toContain('restartMediaSession = async () => {');
+    const body = code.slice(
+      code.indexOf('restartMediaSession = async () => {'),
+      code.indexOf("media.on('newProducer'")
+    );
+    expect(body).toContain('previous?.close()');
+    expect(body).toContain('new MediaSession(');
+  });
+
+  it('reuses the SAME signalling client', () => {
+    // A second socket would leave the SFU holding two peers for one person, and the per-identity
+    // connection cap is four.
+    const body = code.slice(
+      code.indexOf('restartMediaSession = async () => {'),
+      code.indexOf("media.on('newProducer'")
+    );
+    expect(body).toContain('signalling: media');
+    expect(body).not.toContain('new SignallingClient(');
+  });
+
+  it("waits the capture's 3 seconds before re-initialising", () => {
+    // Reconnecting into a teardown that has not finished is how you get two peers for one person.
+    const handler = code.slice(code.indexOf("command?.cmd === 'giveMicScreen'"));
+    expect(handler.slice(0, 2000)).toContain('setTimeout(() => void restart(), 3000)');
+  });
+
+  it('drops the screens it was showing', () => {
+    // Their transports are gone; a tab bar still painting them is a frozen picture pretending to be
+    // live, which is the exact failure the disconnect handler already guards against.
+    const body = code.slice(
+      code.indexOf('restartMediaSession = async () => {'),
+      code.indexOf("media.on('newProducer'")
+    );
+    expect(body).toContain('screenStreams.clear()');
+  });
+});

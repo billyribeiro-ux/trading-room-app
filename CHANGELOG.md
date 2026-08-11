@@ -24,6 +24,58 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-10
 
+### 12:30 — Gap 22: a role change restarts the media, and the half that cannot work yet is named
+
+**Runtime impact: yes, in the room.** Files: `apps/room/src/routes/+page.svelte`,
+`src/lib/roster-gates.test.ts`.
+
+The capture's own handler, transcribed:
+
+```js
+subscribe("giveMicScreen", e => {
+  globals.user.isPresenter = globals.isLimitedPresenter = globals.isPresenter = e.give,
+  this.mediaHandlerService.disconnectAll(),
+  setTimeout(() => this.mediaHandlerService.initWithGlobalsAndEventHandler(...), 3e3)
+})
+```
+
+The room set the flag and stopped, so the sidebar read it correctly and the media did not change at
+all. It now tears the session down and builds a new one after the capture's own 3 seconds — kept
+rather than tuned, because the server tears the peer down when the socket's session ends and
+reconnecting into an unfinished teardown is how you get two peers for one person.
+
+**A NEW session, not the old one reused**, and that is the trap in this change:
+`MediaSession.close()` latches `#closed` permanently and `load()` calls `#assertOpen()`, so a closed
+instance throws `sessionClosed` for ever. The obvious implementation — close, then reload the same
+object — fails on the first role change. For the same reason the `connected` handler no longer uses
+the `session` const it closed over; it reads the current `mediaSession`, or it would throw on the
+first reconnect after a restart and the room would silently stop consuming. Everything else is
+deliberately reused: the same signalling client, because a second socket leaves the SFU holding two
+peers for one person against a per-identity cap of four.
+
+**Taking mic/screen away now works completely** — the rebuild closes every producer that peer held,
+immediately and server-side, and drops the screens it was painting so a dead transport cannot leave
+a frozen picture pretending to be live.
+
+**Giving still does not grant produce rights, and this is the finding worth recording.** It is
+architectural, not a forgotten line. The SFU decides who may produce from the GRANT's role, and
+`/api/media/grant` mints that from the CONTROLLER's membership —
+`joinsMediaAsProducer(isPresenter || hasCam || hasMic || hasScreen)`, read through `readRoomConfig`.
+`isLimitedPresenter` is runtime state that never touches the membership. So a rebuilt session
+re-mints the **same `member` grant** and the SFU answers `forbidden` to `produce`. Restarting the
+media was necessary and is not sufficient.
+
+Closing it needs a decision that is the owner's, and neither half was invented: either
+`giveMicScreen` writes `hasMic`/`hasScreen` onto the membership — durable, works, and diverges from
+the capture's explicitly transient model — or the grant learns to carry a runtime elevation, which
+means the client asserting its own authority. Written into `TODO.md` and into the handler itself.
+
+Four tests pin it, including that the rebuild reuses the signalling client and waits 3 seconds.
+Negative control: removing the delay fails that test.
+
+Verified: **554 tests across 58 files** (550 → 554), `svelte-check` **0 errors, 0 warnings**, format
+gate green, node-adapter build clean.
+
 ### 12:13 — Gap 31 CLOSED: owners are seated in their own rooms again
 
 **No runtime impact until the migration runs** — one forward-only backfill. Files:

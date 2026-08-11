@@ -900,6 +900,15 @@
   /** The live socket, so the caption sender can issue commands without reaching into MediaSession. */
   let mediaSignalling: SignallingClient | null = null;
   /**
+   * Tears the media session down and builds a new one — the capture's `disconnectAll()` plus
+   * re-init, for `giveMicScreen` (`TODO.md` gap 22).
+   *
+   * A closure assigned in `onMount` rather than a top-level function, because building a session
+   * needs the signalling client and the ICE getter that live in that scope. Duplicating the
+   * construction here is how the two copies drift.
+   */
+  let restartMediaSession: (() => Promise<void>) | null = null;
+  /**
    * The ICE servers THIS deployment minted, hoisted out of `onMount` so the connectivity test can
    * see them (`TODO.md` item N).
    *
@@ -5254,11 +5263,35 @@
             enableHtml: false
           });
           /*
-            Honest gap: the capture follows this with `mediaHandlerService.disconnectAll()` and a
-            re-init after a 3s timeout, so the peer actually gains or loses a producer. This room
-            changes the flag and shows the toast but does not restart the media session, so a
-            member handed mic and screen must reload before they can use it. `TODO.md` gap 22.
+            The media actually restarts now — `TODO.md` gap 22. The capture's own handler:
+
+              disconnectAll(), setTimeout(() => initWithGlobalsAndEventHandler(...), 3e3)
+
+            The 3-second delay is the capture's, kept rather than tuned: the server tears the peer
+            down when the socket's session ends, and reconnecting into a teardown that has not
+            finished is how you get two peers for one person.
+
+            **TAKING mic/screen away works completely.** The rebuild closes every producer this peer
+            held, so a member who was talking stops, immediately and server-side.
+
+            **GIVING is still half a feature, and the reason is architectural rather than a
+            forgotten line.** The SFU decides who may produce from the GRANT's role, and
+            `/api/media/grant` mints that from the CONTROLLER's membership —
+            `joinsMediaAsProducer(isPresenter || hasCam || hasMic || hasScreen)`, read from
+            `readRoomConfig`. `isLimitedPresenter` is runtime state that never touches the
+            membership, so a rebuilt session re-mints the SAME `member` grant and the SFU answers
+            `forbidden` to `produce`.
+
+            Closing that needs a decision nobody has taken, and it is not ours to invent: either
+            `giveMicScreen` writes `hasMic`/`hasScreen` onto the membership — durable, works, and
+            diverges from the capture's explicitly transient model — or the grant learns to carry a
+            runtime elevation, which means the client asserting its own authority. Recorded in
+            `TODO.md` rather than guessed at.
           */
+          if (restartMediaSession) {
+            const restart = restartMediaSession;
+            setTimeout(() => void restart(), 3000);
+          }
           return;
         }
 
@@ -5521,13 +5554,23 @@
            * is what made the first working build fail silently: the presenter's share threw, the
            * viewer's tab never appeared, and the only trace was one console error.
            */
-          sessionReady = session.load();
+          /*
+            `mediaSession`, not the `session` this handler closed over.
+
+            `giveMicScreen` REPLACES the session (see `restartMediaSession`), and `MediaSession.close()`
+            latches `#closed` permanently — `load()` calls `#assertOpen()` and throws `sessionClosed`
+            on a closed instance. A handler holding the original const would therefore throw on the
+            first reconnect after a role change, and the room would silently stop consuming.
+          */
+          const active = mediaSession;
+          if (!active) return;
+          sessionReady = active.load();
           await sessionReady;
           const { producers } = await media.request('getProducers');
           for (const producer of producers) {
-            await addRemoteScreen(session, producer);
-            await addRemoteWebcam(session, producer);
-            await addRemoteAudio(session, producer);
+            await addRemoteScreen(active, producer);
+            await addRemoteWebcam(active, producer);
+            await addRemoteAudio(active, producer);
           }
         } catch (error) {
           // Leaving `sessionReady` pending would hang every future consume on a promise that can
@@ -5537,6 +5580,56 @@
         }
       })();
     });
+    /*
+      `disconnectAll()` + re-init, from the capture's own handler:
+
+        subscribe("giveMicScreen", e => {
+          globals.user.isPresenter = globals.isLimitedPresenter = globals.isPresenter = e.give,
+          this.mediaHandlerService.disconnectAll(),
+          setTimeout(() => this.mediaHandlerService.initWithGlobalsAndEventHandler(...), 3e3)
+        })
+
+      A new MediaSession rather than a reused one: `close()` latches `#closed` permanently, so the
+      old instance can never `load()` again. Everything else is deliberately reused — the same
+      signalling client, the same ICE getter — because a second socket would leave the SFU holding
+      two peers for one person.
+    */
+    restartMediaSession = async () => {
+      const previous = mediaSession;
+      mediaSession = null;
+      sessionReady = null;
+      // Closes every transport, producer and consumer this peer held. Screens must go with them, or
+      // the tab bar keeps painting a stream whose transport no longer exists.
+      previous?.close();
+      screenStreams.clear();
+
+      const rebuilt = new MediaSession({
+        signalling: media,
+        canProduce: joinsMediaAsProducer({
+          isPresenter,
+          hasMic: data.user.hasMic,
+          hasCam: data.user.hasCam,
+          hasScreen: data.user.hasScreen
+        }),
+        iceServers: () => mediaIceServers
+      });
+      mediaSession = rebuilt;
+
+      try {
+        sessionReady = rebuilt.load();
+        await sessionReady;
+        const { producers } = await media.request('getProducers');
+        for (const producer of producers) {
+          await addRemoteScreen(rebuilt, producer);
+          await addRemoteWebcam(rebuilt, producer);
+          await addRemoteAudio(rebuilt, producer);
+        }
+      } catch (error) {
+        sessionReady = null;
+        console.error('[media] the session could not be rebuilt after a role change', error);
+      }
+    };
+
     media.on('newProducer', (info) => {
       void addRemoteScreen(session, info);
       void addRemoteWebcam(session, info);
