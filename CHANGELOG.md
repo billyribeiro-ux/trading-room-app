@@ -24,6 +24,61 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-10
 
+### 12:13 — Gap 31 CLOSED: owners are seated in their own rooms again
+
+**No runtime impact until the migration runs** — one forward-only backfill. Files:
+`apps/controller/src/lib/server/db/migrations/0008-backfill-owner-memberships.js`, plus `TODO.md`.
+
+`provisionRoom` has seated the owner at role 0 since 2026-08-07. **Every room created before that
+has no such row**, so its owner reads as `member: null` — and the room resolves role from the
+membership and fails closed to `member`. The owner of an older room is therefore **not a presenter
+in their own room**.
+
+Three pieces of this repository presume that row exists and none could fire without it: `roleLabel`
+maps `role === 0` to "Owner", `applyManyOpcode` skips role 0 so bulk actions cannot touch the owner,
+and `shouldRemoveAsNonPresenter` preserves "only the owner and a true presenter". That last one is
+the sharp edge — "Remove non-presenters" was never protecting anybody's owner by name, because
+there was no owner row to protect.
+
+**Who the owner is, and why this is not a guess.** `accounts.owner_email` is explicit and unique,
+written at registration from the registering user's own address, and `provisionRoom` is called with
+that user's id. So the backfill joins room → account → the user whose email matches
+`owner_email`, rather than picking the lowest user id and hoping. Compared **case-insensitively**,
+because the two columns are written by different paths and a single capitalised address would
+otherwise leave that owner unseated with no error at all.
+
+**It never changes an existing row.** If an owner already holds some other role — invited as a
+participant, demoted deliberately — that was somebody's decision, and a migration that silently
+promoted them to role 0 would overwrite it with no way to tell afterwards. The honest limit: this
+fixes "the owner has no row", which is gap 31, and not "the owner has the wrong row", which nobody
+has reported and which cannot be distinguished from a deliberate demotion.
+
+**Proven against a real PostgreSQL, all four cases**, on a scratch database built to the same shape:
+
+| case | before | after |
+| --- | --- | --- |
+| old room, owner unseated — the bug | `(none)` | **0** |
+| room created after 08-07 | `0` | `0`, no duplicate |
+| **owner deliberately at role 2** | `2` | **2 — untouched** |
+| `owner_email` capitalised differently | `(none)` | **0** |
+
+Re-running left four membership rows in total, so it is idempotent — belt and braces, since
+`room_users_unique_idx` is unique on `(room_id, user_id)` and `ON CONFLICT DO NOTHING` would catch
+what `NOT EXISTS` somehow raced. The scratch database was dropped afterwards.
+
+Verified: **657 tests across 59 files**, `svelte-check` **0 errors, 0 warnings**, format gate green.
+
+### 12:13 — TODO item S: the login page, to be scoped by Will
+
+Recorded at the owner's request as a **placeholder, explicitly not a description of a problem**.
+Nothing has been investigated, measured or decided, and writing a problem statement from guesswork
+is how a "fix" arrives for something nobody asked to change.
+
+The row carries only context so the conversation can start from facts: the room's guest login is
+`(public)/session/[code]` rendering through `RoomLogin.svelte`, with eleven settings already driving
+it, and the controller's own account login is a separate page at `(public)/login`. **Which of the
+two is meant, and what should change, comes from Will.**
+
 ### 12:06 — Gap 30 CLOSED (a closed room actually refuses), and the chat ding is wired
 
 **Runtime impact: yes, both apps.** Files: `apps/controller/src/routes/(app)/launch/[id]/+server.ts`,
