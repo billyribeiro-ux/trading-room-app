@@ -24,6 +24,48 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-10
 
+### 10:51 — Item R, the share half: `contentHint = 'detail'`, and why rows 6 and 8 were NOT taken
+
+**Runtime impact: yes, in the room** — one property on the captured screen track. Files:
+`apps/room/src/routes/+page.svelte`, `src/lib/recording-codec.test.ts`, and
+`scripts/collect-share-stats.js` for the measurement that is still owed.
+
+`streaming-choices.md` row 2, and the reasoning is that document's own wire measurement rather than
+a preference. Presenter-to-member, 12 seconds with a member attached: full 1920x1080 leaves the
+presenter, arrives at the member, paints at 1920x1080, VP9 end to end, **zero dropped frames** — and
+`qualityLimitationReason: none` with cumulative `bandwidth: 0, cpu: 0`. The encoder spent **zero
+seconds constrained**.
+
+**So a soft-looking share was never a limit to lift.** Nothing throttles it; nothing asks it to spend
+more. With `encodings: undefined` there is no floor, no ceiling and no content hint, so libvpx's own
+heuristic decides — and that heuristic is tuned for camera video, where blurring a moving background
+is free. For candlesticks, gridlines and 13px quote text it is exactly the wrong trade. One property
+tells it otherwise, on the screen path only; the camera path keeps the default, where it is correct.
+
+**Two caveats, kept rather than buried.** Its cost is **unmeasured** — it may raise the bitrate, and
+under genuine congestion it degrades frame rate instead of resolution, so a share could end up
+sharper and choppier. And it is a **divergence**: the capture sets this hint on its alert-overlay
+canvas stream and never on the raw screen track. Taken anyway because the measurement shows the
+headroom is real and unused, and because reverting is deleting one line.
+
+**Rows 6 and 8 were deliberately not taken.** Row 6 (raising the 1920 cap for Retina) makes every
+member pay bandwidth and decode CPU for pixels most of their screens cannot show, and diverges from
+a constraint that is byte-identical to the capture. Row 8 (an explicit `maxBitrate`/`minBitrate`)
+puts a floor under everyone's bandwidth, and a floor is precisely what hurts the member on the worst
+connection. Both change what every viewer receives, so both wait for the measurement — unlike row 2,
+which asks the encoder to use headroom already proven to exist.
+
+**And the measurement I cannot take myself, stated plainly.** `getDisplayMedia` requires a real user
+gesture and an OS screen-picker dialog. Browser automation can drive a page; it cannot click an
+operating-system dialog. So the presenter-side `getStats()` read needs a human sharing a real
+desktop with a second session receiving — `apps/room/scripts/collect-share-stats.js` collects it in
+one paste and downloads the JSON. Worth recording why the second session is not an obstacle: it is
+an **incognito window joining as a GUEST** with a name and an email. No second account, no logging
+out of anything.
+
+Verified: **543 tests across 58 files** (541 → 543), `svelte-check` **0 errors, 0 warnings**, format
+gate green, node-adapter build clean.
+
 ### 12:56 — Item R, the recorder half: VP9 at 8 Mbps instead of the browser's guess
 
 **Runtime impact: yes, in the room** — recordings change codec and bitrate. New:

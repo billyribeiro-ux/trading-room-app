@@ -4133,6 +4133,39 @@
       const track = stream.getVideoTracks()[0];
 
       /*
+        `contentHint = 'detail'` — `docs/streaming-choices.md` row 2, and the reasoning is the wire
+        measurement in that document rather than a preference.
+
+        Presenter-to-member, 12 seconds with a member attached: full 1920x1080 leaves the presenter,
+        arrives at the member, paints at 1920x1080, VP9 end to end, ZERO dropped frames. And
+        `qualityLimitationReason: none` with cumulative `bandwidth: 0, cpu: 0` — the encoder spent
+        **zero seconds constrained**.
+
+        So a soft-looking share is not a limit to lift. Nothing is throttling it; nothing is ASKING
+        the encoder to spend more. With `encodings: undefined` there is no floor, no ceiling and no
+        content hint, so libvpx's own heuristic decides — and that heuristic is tuned for camera
+        video, where blurring a moving background is free. For candlesticks, gridlines and 13px
+        quote text it is exactly the wrong trade.
+
+        This is the one line that tells it otherwise. Applied to the SCREEN capture only, never to
+        the camera path above, where the default heuristic is correct.
+
+        Two honest caveats, both from the doc:
+
+        * **Its cost is unmeasured.** It may raise the bitrate, and under genuine congestion it
+          degrades frame rate rather than resolution — a share may end up sharper and choppier. The
+          doc previously called this free; that was an assumption and it was wrong.
+        * **It is a divergence.** The capture sets `contentHint = "detail"` on its alert-overlay
+          canvas stream and never on the raw screen track.
+
+        Chosen anyway because the measurement says the headroom is real and unused, and because it
+        is one property on one track: reverting is deleting this line. The `getStats()` read that
+        would settle it needs a presenter sharing a REAL desktop with a member attached, which is
+        `scripts/collect-share-stats.js`.
+      */
+      if (track) track.contentHint = 'detail';
+
+      /*
        * Send it to the SFU. Without this the capture is purely local - the presenter sees their own
        * preview and nobody else sees anything, which is what this room did until now.
        *

@@ -4,6 +4,7 @@
  * Every branch here decides someone's recording quality, and none of them should rest on a manual
  * check in one browser — which is why `chooseRecordingOptions` takes `isSupported` as an argument.
  */
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
   chooseRecordingOptions,
@@ -126,5 +127,29 @@ describe('the preference list itself', () => {
     // fallback, and Safari accepts nothing more specific.
     const bare = RECORDING_PREFERENCES.filter((t) => !t.includes('codecs='));
     expect(bare).toEqual(['video/mp4']);
+  });
+});
+
+/*
+  `contentHint` on the screen track — `streaming-choices.md` row 2.
+
+  Pinned here rather than in a new file because it is the same subject: what the encoder is told to
+  spend bits on. Read as source text; the component needs a browser and a real screen share.
+*/
+describe('the screen track tells the encoder what it is looking at', () => {
+  const page = readFileSync(new URL('../routes/+page.svelte', import.meta.url), 'utf8');
+  const code = page.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+
+  it("sets contentHint='detail' on the captured screen track", () => {
+    // The measurement says the encoder has room and is not using it: full resolution arrives with
+    // `qualityLimitationReason: none` and cumulative `bandwidth: 0, cpu: 0`. Nothing is throttling
+    // it; nothing is asking it to spend more. This is the ask.
+    expect(code).toContain("track.contentHint = 'detail'");
+  });
+
+  it('applies it to the screen path only, never the camera', () => {
+    // libvpx's default heuristic is tuned for camera video and is CORRECT there — blurring a moving
+    // background is free. It is wrong only for text and gridlines.
+    expect(code.match(/contentHint = 'detail'/g) ?? []).toHaveLength(1);
   });
 });
