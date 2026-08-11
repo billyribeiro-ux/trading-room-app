@@ -24,6 +24,69 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-10
 
+### 12:06 — Gap 30 CLOSED (a closed room actually refuses), and the chat ding is wired
+
+**Runtime impact: yes, both apps.** Files: `apps/controller/src/routes/(app)/launch/[id]/+server.ts`,
+`apps/room/src/routes/+page.svelte`, `+page.server.ts`, `room-config-client.ts`, plus the three
+settings lists and two contract tests.
+
+## A closed room now refuses at every door
+
+`apps/room/TODO.md` gap 30. Three doors lead into a room and only two checked `state`: the guest
+login redirects when `room.state !== 'open'`, and the room's own `/session` enforces
+`isShutOutByRoomState`. **`/launch/[id]` did not — and it is the widest of the three**, because
+`requireOwnedRoom` admits **anyone in the ACCOUNT**. So a role-2 Participant could launch straight
+into a room their owner had deliberately closed, past a check the other two doors were making.
+
+The rule is **copied from the room rather than invented**, so the two cannot drift: open lets
+everyone through; closed shuts out only those who are neither the owner nor a true presenter.
+Presenters keep their way in on purpose — closing a room is how you prepare it, and locking out the
+person who has to open it would be the obvious next bug. `isRoomPresenter` is the controller's own
+predicate, where role 1 counts only when the `nonPresenter` discriminator is false.
+
+The refusal redirects to the same place the guest door uses, so a closed room looks identical
+whichever way you arrived — one door explaining more than another is how people learn to probe.
+
+## The chat ding
+
+Transcribed from `app-chat.compiled.js:112-137` rather than designed:
+
+```js
+!doNotDisturbOn && chatSoundOn
+  ? followedUsers[e.avt].followChatStyle.playSound
+      ? pling.play()
+      : (… || (sessData.dingOnNewMessage && hashEmail(user.email) !== e.avt)) && followed.play()
+```
+
+**The naming is the reference's and it is genuinely confusing:** the sound file called `followed` is
+what the ROOM-WIDE ding plays, while an explicitly *followed* user gets `pling`. Swapping them is
+the obvious mistake and nothing else would catch it, so a test pins the order.
+
+A followed user **outranks** the room setting — that branch short-circuits, so they are heard even
+when the room's ding is off. And it never fires for your own message: the reference compares
+`hashEmail(user.email) !== e.avt`, and the `senderId` guard already above the block makes it
+unreachable, which a test also pins.
+
+The chat event now carries `senderEmailHash`, because the followed-user branch keys on it and the
+payload previously held only the sender id and the room.
+
+**`playChatMessageSoundFor` is deliberately NOT implemented.** It is a room setting holding member
+email addresses, and the reference compares it against `e.avt` — a HASH. Honouring it means the
+server sending hashed addresses; sending raw member emails to every browser to decide a sound would
+be the wrong trade. Recorded rather than quietly skipped.
+
+`dingOnNewMessage` wired through all three lists — `ROOM_VISIBLE_SETTINGS`, the generator, and the
+verifier that cannot run here — **41 → 42 of 269**. The boundary test caught the omission
+immediately: its consumers map requires every allow-listed setting to name the code that reads it.
+
+**Two of my own tests were wrong before the code was.** One sliced the source with a bare
+`indexOf('void invalidateAll()')`, which matched an earlier call and produced an empty block, so
+three assertions failed against correct code — a slice needs both ends anchored. The other
+duplicated an existing `readFileSync` import and failed to parse at all.
+
+Verified: room **550 tests / 58 files** (546 → 550), controller **657 / 59** (646 → 657), both
+`svelte-check` **0/0**, both format gates green, node-adapter build clean.
+
 ### 11:06 — Room TODO entry 7 CLOSED: pre-canned polls were reaching every member's browser
 
 **Runtime impact: yes, in the room** — the page payload shrinks for members, and stops carrying
