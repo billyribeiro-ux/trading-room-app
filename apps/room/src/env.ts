@@ -107,5 +107,26 @@ export const variables = defineEnvVars({
     public: true,
     description: 'Public Giphy key for the emoji/GIF picker.',
     schema: optionalText
+  },
+  /*
+    The tawk.to property the presenter support widget opens into.
+
+    Optional, and its absence is a real state rather than a misconfiguration: with no property set
+    no script is injected and the "TAWK Support" control does not render at all. That is deliberate.
+
+    The reference hardcodes its own property — `5aecb59f227d3d7edc24f7c2`
+    (`app-room.full.js:2279`) — and reproducing that literal would open every presenter's support
+    chat into protradingroom's inbox, with `setAttributes` posting their name and email address
+    into it. So this is the one value in that feature that is configuration rather than
+    transcription. See `$lib/tawk-support`.
+
+    Public by construction: it reaches the browser inside the script URL, exactly as the reference's
+    does. It is an embed id, not a credential.
+  */
+  PUBLIC_PTR_TAWK_PROPERTY_ID: {
+    public: true,
+    description:
+      'tawk.to property id for presenter support. Unset means the widget is not loaded at all.',
+    schema: optionalText
   }
 });
