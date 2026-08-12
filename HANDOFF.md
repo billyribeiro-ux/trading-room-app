@@ -198,23 +198,59 @@ Checked with a search across `apps/room/src`; each of these is absent except whe
 cannot be established from the bundle or the room-settings schema, that is a gap: report it, and
 write the console script.
 
-### START HERE — the four sources still unread
+### The four state sources — READ 2026-08-12, verbatim below
 
-Two of the six were sourced 2026-08-12 and are cited in the table above (`viewerOnlyMode` → the `vo`
-query param; `individualVolumeControls` → `sessData`). **These four have NOT been read yet.** Each has
-a known occurrence count in `apps/room/docs/source/main.d6d3c112b59b7d0d.js`, so none of them is a
-gap — they are reads nobody has done:
+All four were read on 2026-08-12. Nothing here is inferred; offsets are into
+`apps/room/docs/source/main.d6d3c112b59b7d0d.js`.
 
-| symbol                   | occurrences | what to establish                                                  |
-| ------------------------ | ----------- | ------------------------------------------------------------------ |
-| `audioMutedFor`          | 30          | where the map lives, how a key is set, what writes it              |
-| `audioVolumeFor`         | 24          | same, plus its default for a user with no entry                    |
-| `toggleTalkingPresenter` | 4           | the handler body — what it toggles and what it emits               |
-| `adjustVolPres`          | 6           | the handler body — its arguments and what it applies the volume to |
+**`toggleTalkingPresenter(user)`** — offset 1977077 (and an identical copy at 2510885):
 
-Do these first, in one pass, and record each with its offset in this file before writing any state.
-Reading them is roughly one Python slice each; guessing any of them re-opens the exact failure this
-document exists to prevent.
+```text
+toggleTalkingPresenter(e){const{userID:i,mediaValue:o}=e;
+this.appService.globals.preferences.audioMutedFor[i]
+ ?(delete this.appService.globals.preferences.audioMutedFor[i],
+   this.mediaSoupService.startListeningToPresenter(e),
+   this.appService.globals.preferences.audioVolumeFor[i]=100)
+ :(this.appService.globals.preferences.audioMutedFor[i]={name:o.name},
+   this.mediaSoupService.stopListeningToPresenter(e),
+   this.appService.globals.preferences.audioVolumeFor[i]=0),
+this.appService.setPreference("audioMutedFor",this.appService.globals.preferences.audioMutedFor),
+this.appService.setPreference("audioVolumeFor",this.appService.globals.preferences.audioVolumeFor)}
+```
+
+**`adjustVolPres(event, user)`** — offset ~1976104:
+
+```text
+adjustVolPres(e,i){const{userID:o,mediaValue:s}=i,r=e.target.value,a=r/100;
+this.appService.globals.preferences.audioVolumeFor[o]=r,
+ii("[id^=msRemAudio-"+o+"]").prop("volume",a),
+0==r&&(this.appService.globals.preferences.audioMutedFor[o]={name:s.name},
+  this.mediaSoupService.stopListeningToPresenter(i)),
+r>0&&this.appService.globals.preferences.audioMutedFor[o]&&(
+  delete this.appService.globals.preferences.audioMutedFor[o],
+  this.mediaSoupService.startListeningToPresenter(i)),
+this.appService.setPreference("audioMutedFor",…
+```
+
+**What that establishes — the parts most likely to be got wrong:**
+
+- **`audioMutedFor[userID]` is an OBJECT, `{name}`, not a boolean.** Every read of it is a truthiness
+  check and unmuting is `delete`, not `= false`. Model it as a map to `{ name: string }` and delete
+  the key; a boolean map will look identical in the template and be wrong at the persistence layer.
+- Mute and volume are **one state, kept in step**: muting sets volume 0, unmuting sets volume **100**,
+  dragging to 0 mutes, dragging above 0 unmutes. Both handlers do both halves.
+- The slider's value is used as a **string** from `e.target.value`, stored raw in `audioVolumeFor`,
+  and divided by 100 only for the audio element.
+- The audio elements are selected by **`[id^=msRemAudio-<userID>]`** and set with `.volume` in the
+  range 0–1.
+- Both handlers persist through **`setPreference("audioMutedFor", …)`** and
+  **`setPreference("audioVolumeFor", …)`**, and both call
+  `mediaSoupService.startListeningToPresenter` / `stopListeningToPresenter` — so this is not local UI
+  state; it changes what the SFU sends.
+
+Remaining unknown, and it is a real one: `setPreference` and
+`startListeningToPresenter`/`stopListeningToPresenter` have not been read. Read them before wiring
+persistence or SFU calls.
 
 ### The two `room-sound-options` are NOT the same content
 
