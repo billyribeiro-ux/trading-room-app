@@ -129,6 +129,17 @@ rounding reproduces all three captured transforms and all three final rects EXAC
 half-toward-`+∞` behaviour of `Math.round` is load-bearing — rounding half away from zero misses by
 half a pixel.
 
+**The five tooltips the reference BINDS are wired too — 2026-08-12 11:52 EDT.** Angular marks
+bindings with `3` in `TAttributes`, and a property binding sets no attribute, so
+`["placement","top",1,"created-at","mx-2",3,"ngbTooltip","ngStyle"]` renders a host carrying
+`placement="top"` and no `ngbtooltip` at all. Three spans in this app carried exactly that and showed
+nothing: two in `RoomMessage.svelte`, one in `ModalHost.svelte`. `ngbTooltipWith(text)` takes the
+value through the attachment instead of writing an attribute the reference never sets. The bound
+value is `xn("ngbTooltip", Ct(27, 24, e.msg.t, "short"))` — Angular's `date:'short'`, which for en-US
+is `M/d/yy, h:mm a` and is exactly what the existing `alertDateFormatter` already produces, so it is
+reused rather than re-derived. Covered by a sixth case in `verify:tooltips`, which also fails if a
+bound host gains the attribute.
+
 **Popper's collision pass is not implemented, and does not need to be.** `RI` hands flip
 `fallbackPlacements: r` AFTER `r.shift()` has taken the primary, so for any fixed placement that list
 is empty; `[] || …` is `[]` in JavaScript, so flip receives no alternatives and never moves the

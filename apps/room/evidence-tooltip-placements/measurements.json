@@ -15,6 +15,7 @@
           "bs-tooltip-start",
           "show"
         ],
+        "hostHasAttribute": true,
         "popperPlacement": "left",
         "opacity": "0.9",
         "zIndex": "1080",
@@ -77,6 +78,7 @@
           "bs-tooltip-end",
           "show"
         ],
+        "hostHasAttribute": true,
         "popperPlacement": "right",
         "opacity": "0.9",
         "zIndex": "1080",
@@ -139,6 +141,7 @@
           "bs-tooltip-top",
           "show"
         ],
+        "hostHasAttribute": true,
         "popperPlacement": "top",
         "opacity": "0.9",
         "zIndex": "1080",
@@ -201,6 +204,7 @@
           "bs-tooltip-bottom",
           "show"
         ],
+        "hostHasAttribute": true,
         "popperPlacement": "bottom",
         "opacity": "0.9",
         "zIndex": "1080",
@@ -264,6 +268,7 @@
           "bs-tooltip-top-end",
           "show"
         ],
+        "hostHasAttribute": true,
         "popperPlacement": "top-end",
         "opacity": "0.9",
         "zIndex": "1080",
@@ -307,6 +312,70 @@
         "centres": {
           "host": 450,
           "bubble": 395.6484375,
+          "arrow": 450.1953125
+        }
+      }
+    },
+    {
+      "placement": "top",
+      "bound": true,
+      "cls": "bs-tooltip-top",
+      "side": "top",
+      "border": "borderTopColor",
+      "height": 41.797,
+      "ok": true,
+      "problems": [],
+      "measured": {
+        "classes": [
+          "tooltip",
+          "fade",
+          "bs-tooltip-top",
+          "show"
+        ],
+        "hostHasAttribute": false,
+        "popperPlacement": "top",
+        "opacity": "0.9",
+        "zIndex": "1080",
+        "bubble": {
+          "left": 387.796875,
+          "top": 251,
+          "right": 512.5,
+          "bottom": 292.78125,
+          "width": 124.703125,
+          "height": 41.78125
+        },
+        "host": {
+          "left": 442,
+          "top": 299,
+          "right": 458,
+          "bottom": 315,
+          "width": 16,
+          "height": 16
+        },
+        "arrow": {
+          "left": 443.796875,
+          "top": 292.78125,
+          "right": 456.59375,
+          "bottom": 299.171875,
+          "width": 12.796875,
+          "height": 6.390625
+        },
+        "innerBg": "rgb(0, 0, 0)",
+        "innerColor": "rgb(255, 255, 255)",
+        "innerRadius": "6px",
+        "innerPadding": "4px 8px",
+        "innerMaxWidth": "200px",
+        "arrowBorders": {
+          "borderTopColor": "rgb(0, 0, 0)",
+          "borderRightColor": "rgba(0, 0, 0, 0)",
+          "borderBottomColor": "rgba(0, 0, 0, 0)",
+          "borderLeftColor": "rgba(0, 0, 0, 0)"
+        },
+        "arrowBorderWidth": "6px 6px 0px",
+        "gap": 6.219,
+        "centres": {
+          "host": 450,
+          "bubble": 450.1484375,
           "arrow": 450.1953125
         }
       }

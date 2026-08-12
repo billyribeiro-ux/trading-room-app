@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { ngbTooltip } from '$lib/ngb-tooltip';
+  import { ngbTooltip, ngbTooltipWith } from '$lib/ngb-tooltip';
+  import { alertDateFormatter } from '$lib/message-formatters';
   import { panelDragResize } from '$lib/panel-drag';
   import { deserialize } from '$app/forms';
   import { invalidateAll } from '$app/navigation';
@@ -325,6 +326,22 @@
     minute: '2-digit'
   });
   // Captured alerts carry the timestamp exactly as it was rendered; database rows are formatted.
+  /*
+    The tooltip beside the visible time, which the reference BINDS rather than writes:
+    `xn("ngbTooltip", Ct(27, 24, e.msg.t, "short"))` against a visible `hh:mm a`. Angular's
+    `date:'short'` for en-US is `M/d/yy, h:mm a`, which is exactly what `alertDateFormatter` already
+    produces — reused rather than re-derived, because a second formatter for the same shape is how
+    two of them drift apart.
+
+    Empty when there is no timestamp to format: `ngbTooltipWith` renders nothing for an empty string,
+    which matches a reference binding that evaluates to nothing.
+  */
+  const qaAlertTooltip = $derived.by(() => {
+    if (!targetMessage) return '';
+    return 'createdAt' in targetMessage && targetMessage.createdAt
+      ? alertDateFormatter.format(new Date(targetMessage.createdAt as string | Date))
+      : '';
+  });
   const qaAlertTimestamp = $derived.by(() => {
     if (!targetMessage) return '';
     if ('evidenceTimestampText' in targetMessage && targetMessage.evidenceTimestampText) {
@@ -4204,8 +4221,10 @@
               </div>
               <div class="w-100">
                 <div class="d-flex justify-content-between align-items-center w-100">
-                  <span {...{ placement: 'top' } as Record<string, string>} class="created-at mr-2"
-                    >{qaAlertTimestamp}</span
+                  <span
+                    {...{ placement: 'top' } as Record<string, string>}
+                    {@attach ngbTooltipWith(qaAlertTooltip)}
+                    class="created-at mr-2">{qaAlertTimestamp}</span
                   >
                   <div class="d-flex align-items-center justify-content-between flex-nowrap">
                     <strong class="username mx-1">{targetMessage?.senderName ?? ''}</strong>

@@ -2,7 +2,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { ngbTooltip, restingPosition, roundToDevicePixels } from './ngb-tooltip';
+import { ngbTooltip, ngbTooltipWith, restingPosition, roundToDevicePixels } from './ngb-tooltip';
 
 /**
  * Every placement the room uses, and the rules that paint each one.
@@ -351,5 +351,82 @@ describe('no tooltip in the room can flip, so not running Popper costs nothing',
       expect(t.appeared, `${t.label} must not open on hover`).toBe(false);
       expect(t.host.attrs.triggers).toBe('manual');
     }
+  });
+});
+
+describe('the tooltips the reference BINDS rather than writes', () => {
+  const ROOM_MESSAGE = readFileSync(resolve(cwd, 'src/lib/components/RoomMessage.svelte'), 'utf8');
+  const MODAL_HOST = readFileSync(resolve(cwd, 'src/lib/components/ModalHost.svelte'), 'utf8');
+
+  it('the bundle binds five of them, all message timestamps', () => {
+    /*
+      `3` marks the start of the binding list in `TAttributes`, so these hosts set no `ngbtooltip`
+      attribute at all — which is why `placement="top"` sat on three spans here for weeks with
+      nothing attached and nothing to notice.
+    */
+    const bound = '3,"ngbTooltip"';
+    expect(
+      BUNDLE.includes('"placement","top",1,"created-at","mx-2",3,"ngbTooltip","ngStyle"'),
+      bound
+    ).toBe(true);
+    expect(BUNDLE.includes('xn("ngbTooltip",Ct('), 'a pipe-bound value').toBe(true);
+  });
+
+  it('the bound value is the date pipe in `short`, and the visible text is the time', () => {
+    // `xn("ngbTooltip", Ct(27, 24, e.msg.t, "short"))` beside `Ne(" [", Ct(29, 27, e.msg.t, "h:mm a"), "] ")`.
+    const at = BUNDLE.indexOf('xn("ngbTooltip",Ct(');
+    const call = BUNDLE.slice(at, at + 200);
+    expect(call).toContain('"short"');
+    expect(call).toContain('e.msg.t');
+  });
+
+  it('renders from a passed value, with no attribute on the host', () => {
+    const parent = document.createElement('span');
+    const host = document.createElement('span');
+    host.setAttribute('placement', 'top');
+    parent.append(host);
+    document.body.append(parent);
+
+    ngbTooltipWith('8/12/26, 11:27 AM')(host);
+    host.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }));
+
+    const bubble = parent.querySelector('ngb-tooltip-window');
+    expect(bubble?.querySelector('.tooltip-inner')?.textContent).toBe('8/12/26, 11:27 AM');
+    // The reference sets no attribute for a binding, so neither do we.
+    expect(host.hasAttribute('ngbtooltip')).toBe(false);
+  });
+
+  it('renders nothing when the bound value is empty, which a binding can be', () => {
+    for (const empty of ['', null, undefined]) {
+      document.body.innerHTML = '';
+      const parent = document.createElement('span');
+      const host = document.createElement('span');
+      host.setAttribute('placement', 'top');
+      parent.append(host);
+      document.body.append(parent);
+      ngbTooltipWith(empty)(host);
+      host.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }));
+      expect(parent.querySelector('ngb-tooltip-window'), String(empty)).toBeNull();
+    }
+  });
+
+  it('all three timestamp hosts in this app are wired to it', () => {
+    // Each carries `placement: 'top'`; before this they carried it with nothing attached.
+    expect((ROOM_MESSAGE.match(/@attach ngbTooltipWith\(/g) ?? []).length).toBe(2);
+    expect((MODAL_HOST.match(/@attach ngbTooltipWith\(/g) ?? []).length).toBe(1);
+    for (const src of [ROOM_MESSAGE, MODAL_HOST]) {
+      expect(src).toContain('alertDateFormatter');
+    }
+  });
+
+  it('reuses the existing `short` formatter rather than declaring a second one', () => {
+    /*
+      `alertDateFormatter` is already `M/d/yy, h:mm a` — Angular's `date:'short'` for en-US. A second
+      formatter for the same shape is how two of them drift apart, and this repository already
+      hoisted these three precisely to stop that.
+    */
+    const FORMATTERS = readFileSync(resolve(cwd, 'src/lib/message-formatters.ts'), 'utf8');
+    expect(FORMATTERS).toContain('alertDateFormatter');
+    expect(ROOM_MESSAGE).toContain('ngbTooltipWith(alertDateFormatter.format(item.createdAt))');
   });
 });

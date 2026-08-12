@@ -2,6 +2,7 @@
   import EmojiPicker from '$lib/components/EmojiPicker.svelte';
   import type { EmojiDumpEntry } from '$lib/emoji-data';
   import { calculateMessageMenuPosition } from '$lib/message-menu-position';
+  import { ngbTooltipWith } from '$lib/ngb-tooltip';
   import {
     alertDateFormatter,
     chatTimeFormatter,
@@ -673,6 +674,7 @@
             {#if reverseMessage}
               <span
                 {...{ placement: 'top' } as Record<string, string>}
+                {@attach ngbTooltipWith(alertDateFormatter.format(item.createdAt))}
                 class="created-at mx-2"
                 style={dateStyle}
                 >{item.evidenceTimestampText ?? chatTimeFormatter.format(item.createdAt)}
@@ -752,6 +754,7 @@
             {:else if !reverseMessage}
               <span
                 {...{ placement: 'top' } as Record<string, string>}
+                {@attach ngbTooltipWith(alertDateFormatter.format(item.createdAt))}
                 class="created-at mx-2"
                 style={dateStyle}
                 >{item.evidenceTimestampText ?? chatTimeFormatter.format(item.createdAt)}

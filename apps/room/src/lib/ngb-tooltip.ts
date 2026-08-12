@@ -402,8 +402,26 @@ function centreArrow(
  * An element with no `ngbtooltip`, or with a placement that was never captured, gets nothing — so
  * this is safe to attach unconditionally.
  */
-export const ngbTooltip: Attachment<Element> = (host) => {
-  const text = host.getAttribute('ngbtooltip');
+export const ngbTooltip: Attachment<Element> = (host) =>
+  bind(host, host.getAttribute('ngbtooltip'));
+
+/**
+ * The same tooltip, for the hosts where the reference BINDS its text rather than writing it.
+ *
+ * Angular's `TAttributes` marks bindings with `3`, and five of the room's tooltips are declared that
+ * way — the message timestamps, e.g.
+ * `["placement","top",1,"created-at","mx-2",3,"ngbTooltip","ngStyle"]`, whose value comes from
+ * `xn("ngbTooltip", Ct(27, 24, e.msg.t, "short"))`.
+ *
+ * A property binding sets no attribute, so those hosts carry `placement="top"` and NO `ngbtooltip` in
+ * the rendered DOM. Passing the text through the attachment keeps that true; writing it into an
+ * `ngbtooltip` attribute instead would show the right bubble on an element the reference never marks.
+ */
+export function ngbTooltipWith(text: string | null | undefined): Attachment<Element> {
+  return (host) => bind(host, text ?? null);
+}
+
+function bind(host: Element, text: string | null): (() => void) | undefined {
   if (!text) return;
 
   /*
@@ -510,4 +528,4 @@ export const ngbTooltip: Attachment<Element> = (host) => {
     host.removeEventListener('click', hide);
     hide();
   };
-};
+}

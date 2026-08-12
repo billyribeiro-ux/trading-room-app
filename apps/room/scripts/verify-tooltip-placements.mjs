@@ -99,6 +99,20 @@ const CASES = [
     side: 'top',
     border: 'borderTopColor',
     height: ONE_LINE + BS4_VERTICAL_PADDING
+  },
+  /*
+    The BOUND shape: `["placement","top",1,"created-at","mx-2",3,"ngbTooltip","ngStyle"]`. A property
+    binding sets no attribute, so this host carries `placement` and NO `ngbtooltip` — and it must
+    still render. Before `ngbTooltipWith` existed, the three message-timestamp spans in this app
+    carried `placement="top"` and showed nothing at all.
+  */
+  {
+    placement: 'top',
+    bound: true,
+    cls: 'bs-tooltip-top',
+    side: 'top',
+    border: 'borderTopColor',
+    height: ONE_LINE + BS4_VERTICAL_PADDING
   }
 ];
 
@@ -124,15 +138,20 @@ for (const c of CASES) {
                width:16px; height:16px; background:#7a8b99; border-radius:2px; }
      </style></head>
      <body><span class="textAreaBtns"><i class="host"
-        ngbtooltip="Upload an Image" placement="${c.placement}"></i></span></body></html>`
+        ${c.bound ? '' : 'ngbtooltip="Upload an Image"'} placement="${c.placement}"></i></span></body></html>`
   );
 
   await page.addScriptTag({
-    content: MODULE + '\nwindow.__ngbTooltip = ngbTooltip;',
+    content:
+      MODULE + '\nwindow.__ngbTooltip = ngbTooltip;\nwindow.__ngbTooltipWith = ngbTooltipWith;',
     type: 'module'
   });
   await page.waitForFunction('window.__ngbTooltip !== undefined');
-  await page.evaluate(() => window.__ngbTooltip(document.querySelector('.host')));
+  await page.evaluate((bound) => {
+    const host = document.querySelector('.host');
+    if (bound) window.__ngbTooltipWith('Upload an Image')(host);
+    else window.__ngbTooltip(host);
+  }, Boolean(c.bound));
 
   /*
     Park the pointer off the host FIRST. Playwright's mouse position survives `setContent`, and every
@@ -166,6 +185,7 @@ for (const c of CASES) {
     };
     return {
       classes: [...bubble.classList],
+      hostHasAttribute: document.querySelector('.host').hasAttribute('ngbtooltip'),
       popperPlacement: bubble.getAttribute('data-popper-placement'),
       opacity: getComputedStyle(bubble).opacity,
       zIndex: getComputedStyle(bubble).zIndex,
@@ -191,6 +211,9 @@ for (const c of CASES) {
   if (!m) problems.push('no tooltip rendered at all');
   else {
     if (!m.classes.includes(c.cls)) problems.push(`missing ${c.cls} (got ${m.classes.join(' ')})`);
+    if (c.bound && m.hostHasAttribute) {
+      problems.push('a bound tooltip must not write an `ngbtooltip` attribute the reference lacks');
+    }
     if (!m.classes.includes('show')) problems.push('never reached the `show` state');
     if (m.opacity !== '0.9') problems.push(`settled opacity ${m.opacity}, reference is 0.9`);
     if (m.zIndex !== '1080') problems.push(`z-index ${m.zIndex}, reference is 1080`);
@@ -265,11 +288,11 @@ for (const c of CASES) {
     }
   }
 
-  await page.screenshot({ path: resolve(OUT, `${c.placement}.png`) });
+  await page.screenshot({ path: resolve(OUT, `${c.placement}${c.bound ? '-bound' : ''}.png`) });
   results.push({ ...c, ok: problems.length === 0, problems, measured: m });
   failures += problems.length ? 1 : 0;
   console.log(
-    `${problems.length ? 'FAIL' : 'ok  '}  placement=${c.placement.padEnd(10)} ` +
+    `${problems.length ? 'FAIL' : 'ok  '}  placement=${(c.placement + (c.bound ? ' (bound)' : '')).padEnd(18)} ` +
       `→ ${m?.classes.filter((x) => x.startsWith('bs-')).join(' ') ?? '(nothing)'}` +
       `${m ? `  gap=${m.gap}px  arrow=${m.arrow.width}×${m.arrow.height}` : ''}` +
       (problems.length ? `\n      ${problems.join('\n      ')}` : '')

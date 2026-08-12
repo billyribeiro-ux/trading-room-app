@@ -24,6 +24,40 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-12
 
+### 2026-08-12 11:52 EDT — The five tooltips the reference binds rather than writes
+
+Closing the loose end from the previous entry instead of reporting it. Checking which placements this
+app actually uses turned up `ModalHost.svelte:4207`:
+
+```svelte
+<span {...{ placement: 'top' }} class="created-at mr-2">{qaAlertTimestamp}</span>
+```
+
+`placement="top"` and nothing attached. Two more like it in `RoomMessage.svelte`. All three showed no
+tooltip; the reference shows one.
+
+**Why they were invisible.** Angular marks the start of the binding list in `TAttributes` with `3`,
+and a property binding sets no DOM attribute. So
+`["placement","top",1,"created-at","mx-2",3,"ngbTooltip","ngStyle"]` renders a host with `placement`
+and no `ngbtooltip` — and our attachment only ever read the attribute. Five of the room's tooltips are
+declared that way, all message timestamps.
+
+**`ngbTooltipWith(text)`** takes the value through the attachment. Deliberately not by writing an
+`ngbtooltip` attribute: that would show the right bubble on an element the reference never marks, and
+`verify:tooltips` now fails if a bound host grows one.
+
+**The value is Angular's `date:'short'`** — `xn("ngbTooltip", Ct(27, 24, e.msg.t, "short"))`, against
+a visible `h:mm a`. For en-US that is `M/d/yy, h:mm a`, which the existing `alertDateFormatter`
+already produces exactly. Reused rather than re-derived: a second formatter for the same shape is how
+two of them drift apart, and these three were hoisted into `message-formatters.ts` precisely to stop
+that.
+
+**Verified:** a sixth `verify:tooltips` case renders the attribute-less bound host in real Chromium —
+**6/6**. Four negative controls, all caught: the factory returning nothing, the factory writing the
+attribute, one timestamp host unwired, and the wrong formatter (time instead of `short`). Svelte MCP
+autofixer clean on both components (no issues). `svelte-check` 967 files, 0 errors; room suite 64
+files, **646 tests**; prettier clean.
+
 ### 2026-08-12 11:27 EDT — The placements rendered in a real browser, which found three bugs
 
 The previous entry shipped the placements with three limits named: no screenshot, an unexplained
