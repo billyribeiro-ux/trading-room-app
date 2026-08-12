@@ -22,7 +22,207 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ---
 
+## 2026-08-12
+
+### 08:58 — Eight changelog entries were reported as written and were not
+
+**No runtime impact.** Bookkeeping, and a failure of mine worth recording rather than quietly fixing.
+
+Every entry from 15:06 through 07:46 was missing from this file. I wrote them with a Python
+`str.replace(anchor, entry + anchor, 1)` against a heading I had transcribed slightly wrong — the
+14:55 heading reads "four defects in the collector fixed" and I anchored on "four collector defects
+fixed". `str.replace` is a **silent no-op** when the needle is absent, and the script printed "ok"
+unconditionally afterwards. Every later entry chained off the same missing anchor, so all eight
+vanished, and I reported each one as done.
+
+The same class as the failures already in this file: a check that cannot fail. `node --check` passing
+on `constdescription`, `indexOf` returning -1 into a `<` comparison, a smoke harness whose stub was
+the thing under test. A script that reports success without verifying its own effect is that pattern
+again, in a tool rather than in a test.
+
+All eight are now restored, with times taken from the **commit timestamps** rather than reconstructed
+from memory — `da82a50` 14:57 through `6007e69` 07:46 — and each names its commit. What was written
+in `TODO.md` at the time was correct throughout; only this file lost them.
+
+### 07:46 — The helper SHAPE is generated, and the last cause of item Y is located
+
+**No runtime impact.** Generator only. 701 tests / 64 files, `svelte-check` 0/0.
+
+The reference writes a helper THREE ways, counted across `evidence-dumps/login-page/manage`:
+**136** as `<br><label class="muted">`, **37** as `<br><label>`, **5** as a bare `<label>` with no
+`<br>`. The schema recorded the help TEXT and not the shape, so our renderer emitted the muted form
+for all 178 — a `muted` class on 42 helpers that have none, a `<br>` before 5 that have none.
+`helpShape` (`'muted' | 'plain' | 'bare' | null`) is now generated and reproduces those counts
+exactly.
+
+With the shape wired through, Settings still read 65 differing, and the cause is located: **DON'T
+TOUCH settings render their helper twice.** The `dontTouch()` snippet at `+page.svelte:813` and the
+generic settings loop both emit it, so a `group: 'dont-touch'` row shows `label.muted` AND `label`
+where the reference has one bare `label`. That is the whole of the remaining 65.
+
+Nothing half-applied: the evidence file, regenerated schema and renderer change were all reverted, so
+the suite is green and `schema:verify` is dead exactly as at HEAD.
+
 ## 2026-08-11
+
+### 19:22 — A generator bug fixed; my "two captures disagree" claim withdrawn
+
+**No runtime impact.** `0848e1f`.
+
+**The 19:16 claim that two captures of the manage page disagree about help text is WITHDRAWN.** They
+do not: `new-room/mising/file2`, `evidence-dumps/login-page/manage` and the uncompiled partial all
+carry exactly **141** `<label class="muted">`. The committed schema is simply stale, and saying
+otherwise put a fabricated conflict into the record. The uncompiled partial settled it, since it
+generates the captures — `evidence-page.manageSession.html:1026` carries the label verbatim.
+
+**The real defect:** the generator took a helper from inside a following `<div ng-show=…>`.
+`pairSecretKey` absorbed "Sample link you would need to use to add each user…", which labels the
+sample-link input inside that block. That one mis-attribution offset every node after it and drove
+the Settings side-by-side from a baseline of 16 to **1094 of 1507 differing**. Breaking on a
+conditional container gives `pairSecretKey: help: null` and drops it to **65**.
+
+### 19:16 — Item X closed: the self-serve pairing door, and a dead gate found
+
+**Runtime impact: yes.** `f91dda3`. 701 tests / 64 files.
+
+`GET /ptr_app/sessions/v2/addUser/<publicId>/?sec=…&email=…&name=…` exists. Path, parameters and the
+two literal placeholders are transcribed from `evidence-page.manageSession.html:1141`, gated at
+`:1138` by `ng-show="sess.hasAppPairLink && sess.pairSecretKey"` — an enabled room with no secret is
+unconfigured, not open.
+
+One divergence, forced by architecture: the **host**. The reference serves this from the room; ours
+is on the controller because the controller owns memberships. The path matches exactly.
+
+Said plainly, it is a room-scoped bearer secret in a URL — the reference's design. What is not
+reproduced is vagueness about its limits: it can only create a **plain member** through
+`inviteRoomUser`, the secret is compared in constant time, all four refusals return one 403 with one
+message, and an unknown room answers exactly as a wrong secret does. The secret's FORMAT is not
+invented — `sec=` came back empty in the capture, so no populated key has been observed and no
+length or alphabet is assumed. Negative controls: a naive `===` and a distinct 404 each fail.
+
+**And a gate was found dead.** `pnpm test` runs `schema:verify` first, and at HEAD it throws
+`ENOENT: evidence-dumps/login-page/manage` — a file that has never existed here. The chain has been
+failing at step one and the generated schema has been unverifiable.
+
+### 19:05 — Item W closed: the visit rows and their IP addresses left the page payload
+
+**Runtime impact: yes.** `a3870cb`. 691 tests / 63 files.
+
+The manage loader selected up to 5,000 `room_sessions` rows and returned them as `visits` so the
+browser could build a CSV — ~755 KB serialised into every load, every row carrying a visitor's **IP
+address and email**. `GET /account/rooms/<shortCode>/stats.csv` now produces it, behind the same
+`requireUser` + `requireOwnedRoom` gate, ownership checked before the rows are read,
+`cache-control: private, no-store`.
+
+The 5,000 cap is gone deliberately: it existed because an unbounded SELECT behind a PAGE LOAD is a
+slow-motion outage, which does not apply to a file somebody asked for. Silently truncating an export
+is worse than a slow one. `?limit=` is honoured and clamped.
+
+The format moved to `$lib/stats-csv.ts` rather than being copied, so the endpoint and its tests share
+one definition. **The existing format contract caught the move**, failing six cases; three were
+asserting source TEXT for things now structural and were rewritten to exercise the function and
+assert the OUTPUT. **The side-by-side contract caught a regression I introduced** — making Export an
+`<a>` made the page differ from the reference by one more node, since the reference's own markup is a
+`<button>`. It is a button again.
+
+### 18:55 — TODO.md reduced to what is actually open
+
+**No runtime impact.** `d33677a`.
+
+Eleven closed rows were still in the evidence-gap table marked CLOSED, breaking that file's own rule
+that closed items are REMOVED and their history lives here. The blocking table now holds one row.
+Gap 12 moved rather than closed — its evidence is complete but no `addUser` route existed, which is
+missing work rather than a missing fact.
+
+The section header now carries the lesson forward: four of the twelve were already answered by
+captures unread since 2026-08-01 while the rows claimed otherwise. Read what is in `new-room` and
+`new-room-control` before writing another collector.
+
+### 16:18 — Gap 4 implemented, gap 10 fully closed, the screen tab attributes fixed
+
+**Runtime impact: yes.** `f8632ef`. 678 tests / 62 files.
+
+**Gap 4 is working code, not just an answer.** The loader said "Picking one would be inventing the
+semantics" about three candidate columns. The bundle names one: `loadMobileUsers` keeps a user when
+`alerterAppTokens.length`, which is `pushTokensJson`. Both filters are live, `listRoomUsers` selects
+the column, and 7 contract cases pin it — including that it reads the column as JSON, since `'[]'` is
+a non-empty string and an empty list. **The upstream inversion is pinned against, not copied:**
+`loadNonMobileUsers` slices at 10,000 then keeps users who HAVE tokens.
+
+**Gap 10's `:hover` half closed, and never needed a rendered state.** All fifteen stylesheets are
+captured as FILES carrying **449 `:hover` rules**. The row's premise that they were unverified was
+false; what cannot be captured is the rendered STATE, which was never the thing to match.
+
+**`user.type` named.** The Role cell comment said the field "is not nameable from this evidence" — it
+was never unnameable, only unfetched. **"login" is withdrawn**: it appears in none of the five files
+carrying that row.
+
+**Screen tabs:** `data-bs-target` removed to match. `aria-selected` and `tabindex` are deliberate
+divergences under one rule — a captured value is reproduced unless reproducing it locks a real person
+out. Upstream all three tabs claim `aria-selected="true"` and the anchors have neither `href` nor
+`tabindex`, so they are keyboard-unreachable.
+
+### 16:07 — All twelve blocking gaps closed
+
+**No runtime impact.** `8cc7983`.
+
+**Gap 1:** a new room has no name on the client. `createNew` POSTs `cmd:"newSession"` with email and
+token and **no name field**, then goes straight to the manage page. The Settings capture's
+`editable-click` reading **"Room 3627"** was the server-generated default. Our required name input is
+a confirmed divergence. The error path also **logs the user out**.
+
+**Gap 2:** the original shows nothing on save. `saveSessField` returns the POST promise with no
+`.success` and no `.error`. `generateNewApiSecret` in the same slice chains
+`.success(… bootbox.alert(…))`, so when this app wants to confirm it says so.
+
+**Gap 3:** line 636 is the entire editor declaration — no toolbar config, no `disabled`. That
+attribute on 29 of 30 buttons is textAngular's own runtime state.
+
+**Gap 7:** `customMobileAppLaunchWord` replaces the deep-link scheme. `launchPTRApp` defaults to
+`protradingroomapp://` and substitutes the word, building `<scheme>?t=&s=&pc=`.
+
+Four gaps came from captures unread since 2026-08-01, four from the uncompiled manage view, four from
+the bundle. Not one needed a value invented.
+
+### 15:30 — The uncompiled manage view is in hand: gaps 4, 5, 6 and 8 closed
+
+**No runtime impact.** `be5a543`. Three scripts in sequence, each failure narrowing the next.
+
+`pull-app-bundle` fetched all three bundles — `vendor.min.js` 1,245,997 B, `janus3.js` 79,285 B,
+`app.min.js` 455,314 B — and hit six of seven targets. But `user.role==0` was absent from all of them
+and no `$templateCache` carried the role spans. **That absence was the finding:** this app does not
+inline its views. `pull-manage-partial` read the state verbatim — `templateUrl:
+Route.base("page.manageSession.html")`, a function call, so no literal path exists and every
+directory guess returned a 52-byte stub. `pull-template-cache` found it at
+`/public/app/views/page.manageSession.html` — **216,609 bytes**, committed as evidence.
+
+**Gap 5:** the token is `{{user.type}}`, at line 420. **"login" was never observed in any file in
+either folder** and that claim is withdrawn. **Gap 4:** two of three filter CLIENT-side on
+`alerterAppTokens`; Marketplace uses its own `userListMarketplace` command. **Gap 6:** the three
+branches are icons in the user row, not menu items. **Gap 8:** the two hidden items are **Batch User
+Invite** (`doBatchInvite()`) and a separator.
+
+### 15:06 — Four gaps were already captured; the TODO rows were stale
+
+**No runtime impact.** `023ad0b`.
+
+The owner said everything was already pulled and to read the dumps rather than search them. Correct:
+I had been trusting `TODO.md` rows instead of the files they describe, and asking for re-runs of
+captured work. `evidence-dumps/NEXT-STEP/gaps/`, captured 2026-08-01 on the same room the 2026-08-11
+run used, holds eleven states with per-node rects and computed styles plus all fifteen stylesheets.
+
+**Gap 9 closed, and the proof is arithmetic:** 207 `a.editable.editable-click` on the Settings tab
+against 256 with the disclosure open — a delta of **exactly 49**, the 49 `dont-touch` settings the row
+called unverified. **Gap 11 closed:** 1017 and 1265 nodes, neither truncated. **Gap 10 closed for the
+manage page:** two open dropdowns and an open permissions modal here, seventeen more in `ptr1.json`.
+**Gap 8 answered:** the menu captured open with 9 items at 199x25. **Gap 5 still open**, for a stated
+reason: that capture's user table is empty.
+
+**Why every collector missed it:** xeditable renders each setting as an anchor, not an input, so
+counting `input, select, textarea` finds almost none.
+
+**`ptr1`/`ptr2` are not room dumps** — `__meta__.url` says `#/page/manageSession/…` and
+`#/page/welcome`, `role: member`. They carry all fifteen stylesheets with full rule text.
 
 ### 14:55 — The manage collector ran; gap 12 closed, and four defects in the collector fixed
 
