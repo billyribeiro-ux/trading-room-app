@@ -262,6 +262,31 @@ Both variants use `class="room-sound-options"`, which makes them look interchang
 
 Copying the nav one across would render the wrong control with the right class name.
 
+### ALREADY-BUILT CHECK — done 2026-08-12, and how to redo it correctly
+
+**Before building anything, check `new-room` and `new-room-control`.** Work has been done in those
+repos before, and the standing rule allows pulling files FROM them INTO this one. Re-doing something
+that already works there, or replacing it, is the expensive mistake.
+
+For item U specifically this check was run and came back clean: none of `dropdownVolume`,
+`toggleTalkingPresenter`, `audioMutedFor` or `viewerOnlyMode` appears in either repo's `.svelte` or
+`.ts` files (58 and 60 files respectively). **So item U is genuinely unbuilt and is safe to build
+here.**
+
+**Use this method — the obvious one silently lies:**
+
+```bash
+find new-room -name "*.svelte" -not -path "*/node_modules/*" -print0 \
+  | xargs -0 grep -lE "yourPattern"
+```
+
+`grep -rl "pattern" new-room --include="*.svelte"` returns NOTHING in this environment, for every
+pattern, including ones that certainly match — this shell's `grep` is `ugrep` and the `--include`
+form does not read the files. It produces a confident empty result that looks exactly like "not
+found". **Always run a control first:** grep for a term that MUST exist (`script` in a `.svelte`
+tree) and confirm you get hits. The first run of this check reported "not built in either repo" on
+the strength of the broken form, and that conclusion was worthless.
+
 ### Where it goes
 
 `apps/room/src/lib/components/ScreenTabs.svelte:249` currently renders:
