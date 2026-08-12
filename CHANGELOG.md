@@ -24,6 +24,55 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-12
 
+### 2026-08-12 15:54 EDT — The gutter double-click does something now, and it found a bug on the way
+
+**Runtime impact: double-clicking the main gutter collapses the presentation area and restores it.**
+It previously did nothing at all.
+
+`gutterdblclickduration="400"` has shipped on `#mainAreaSplit` since the split was written —
+transcribed from const 8 (`app-room.compiled.js:1294-1304`) — while `hideShowPresentationArea` had
+**zero occurrences**. A control whose configuration ships and whose behaviour does not, which is this
+repository's own definition of dead scaffolding. The handler is `app-room.full.js:2693-2698`, bound
+to `gutterDblClick` on the OUTER split in both reference layouts (`render-helpers.js:1622-1623`
+desktop, `:1787-1788` mobile) — asserted as a count of 2, so a layout that stops binding it fails.
+
+**The mapping.** Upstream keeps `presAreaSize` + `chatAlertsSize` summing to 100; this room keeps one
+number, `mainSplit`, which is the chat/alerts side. So 100/0 collapsed is `mainSplit = 1` and 30/70
+restored is `0.3`. The asymmetry is the reference's and is kept: it restores to a fixed 70/30 rather
+than to whatever the user last dragged, so the second double-click is a reset as much as an undo.
+Nothing persists — upstream ends in `printSizes()`, which is a `console.log` and nothing else
+(`:2708-2712`), unlike `dragEnd` which does write. Persisting would let a transient toggle overwrite
+the geometry the user chose by dragging.
+
+**The 400ms window is implemented rather than delegated.** The browser's own `dblclick` threshold is
+the platform's, not this attribute's; honouring macOS's value while rendering a 400ms attribute would
+leave the attribute decorative in a second way. `beginSplit` calls `preventDefault()` on pointerdown,
+so native `click` is not reliable on this element either — the release is a click only if the pointer
+went down and up without `resizeFromPointer` running, which is what stops two quick DRAGS from
+toggling and throwing the resize away.
+
+**Extracted to `$lib/split-gutter`, and that is what caught the bug.** A two-click state machine whose
+entire content is timing cannot be driven from inside a 10,000-line component, so it follows
+`roster-gates.ts` / `files-gates.ts` out into a module. Writing the "restores to 70/30" case then
+failed for a reason that was not the test's: **the sentinel for "no click pending" was `0`, and
+`performance.now()` counts from page load** — a genuine first click at t=100ms sat 100ms from the
+sentinel, inside the window, so the room would have collapsed its presentation area on the FIRST
+SINGLE CLICK of any session, and again after every completed double-click. Now `-Infinity`, with a
+regression test that asserts the behaviour at small timestamps rather than asserting the constant.
+
+**Verified:** `split-gutter.test.ts` 12/12 — six of them a real click sequence at real timestamps
+(single click does nothing; second click collapses; fourth restores; three clicks are one
+double-click and a leftover; the 400ms boundary counts, 401 does not; two drags do not fire), and
+five pinning the handler, the binding count, the const-table 400 and the wiring into the room. Four
+negative controls, each red on exactly its own assertion then restored: restoring to the dragged size
+instead of 70/30, narrowing the window to 100ms, putting the sentinel back to `0`, and ignoring the
+drag flag. `svelte-check` 975 files, 0 errors, 0 warnings. `svelte-autofixer` clean. Prettier clean.
+27/27 across the three suites touching these files.
+
+**NOT verified:** no browser drove a real gutter. The state machine is exercised directly, and the
+wiring into `finishSplit` is asserted as source, but nothing clicked a live `.as-split-gutter` — the
+same environment gap as TODO row E.
+
 ### 2026-08-12 15:46 EDT — `hideChatAlerts` and `hidePresentation`: the two column gates, as one flag each
 
 **Runtime impact: two room settings that did nothing now remove a column each.** An owner who ticked

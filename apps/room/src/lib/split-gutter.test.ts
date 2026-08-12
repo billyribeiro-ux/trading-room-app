@@ -1,0 +1,171 @@
+import { readFileSync } from 'node:fs';
+import { describe, expect, it } from 'vitest';
+
+import {
+  GUTTER_DOUBLE_CLICK_MS,
+  PRESENTATION_COLLAPSED_SPLIT,
+  PRESENTATION_RESTORED_SPLIT,
+  NO_PENDING_CLICK,
+  gutterRelease,
+  togglePresentationSplit
+} from './split-gutter';
+
+const ROOM_FULL = readFileSync(
+  new URL('../../docs/source/components/app-room.full.js', import.meta.url),
+  'utf8'
+);
+const ROOM_HELPERS = readFileSync(
+  new URL('../../docs/source/components/app-room.render-helpers.js', import.meta.url),
+  'utf8'
+);
+const ROOM_COMPILED = readFileSync(
+  new URL('../../docs/source/components/app-room.compiled.js', import.meta.url),
+  'utf8'
+);
+const PAGE = readFileSync(new URL('../routes/+page.svelte', import.meta.url), 'utf8');
+const compact = (source: string) => source.replace(/\s+/g, '');
+
+/**
+ * A gutter, clicked.
+ *
+ * This is the point of extracting the state machine: the room can be driven here without a browser,
+ * so "collapse and restore" is an actual sequence of clicks at actual timestamps rather than an
+ * assertion that two constants exist.
+ */
+function clickGutter(
+  start: { mainSplit: number; lastClickAt: number },
+  { at, moved = false }: { at: number; moved?: boolean }
+) {
+  const release = gutterRelease(start.lastClickAt, at, moved);
+  return {
+    mainSplit: release.doubleClick ? togglePresentationSplit(start.mainSplit) : start.mainSplit,
+    lastClickAt: release.lastClickAt
+  };
+}
+
+describe('the gutter double-click collapses and restores the presentation area', () => {
+  it('does nothing on a single click', () => {
+    const room = { mainSplit: 0.4, lastClickAt: NO_PENDING_CLICK };
+    const after = clickGutter(room, { at: 5_000 });
+    expect(after.mainSplit).toBe(0.4);
+  });
+
+  it('collapses the presentation on the second click, and restores it on the fourth', () => {
+    /*
+      One continuous session, four clicks, real timestamps — the acceptance criterion for this item
+      in the only shape that can fail.
+    */
+    let room = { mainSplit: 0.4, lastClickAt: NO_PENDING_CLICK };
+
+    room = clickGutter(room, { at: 1_000 });
+    expect(room.mainSplit, 'one click is not a double-click').toBe(0.4);
+
+    room = clickGutter(room, { at: 1_150 });
+    expect(room.mainSplit, 'presAreaSize > 0, so it collapses to 0 / 100').toBe(
+      PRESENTATION_COLLAPSED_SPLIT
+    );
+
+    room = clickGutter(room, { at: 5_000 });
+    expect(room.mainSplit, 'still collapsed after one click').toBe(PRESENTATION_COLLAPSED_SPLIT);
+
+    room = clickGutter(room, { at: 5_200 });
+    expect(room.mainSplit, 'presAreaSize is 0, so it restores to 70 / 30').toBe(
+      PRESENTATION_RESTORED_SPLIT
+    );
+  });
+
+  it('restores to the reference’s 70/30 and not to the size the user had dragged', () => {
+    // Deliberate: upstream restores a fixed pair, so the second double-click is a reset.
+    const dragged = { mainSplit: 0.62, lastClickAt: NO_PENDING_CLICK };
+    const collapsed = clickGutter(clickGutter(dragged, { at: 100 }), { at: 200 });
+    const restored = clickGutter(clickGutter(collapsed, { at: 900 }), { at: 1_000 });
+    expect(restored.mainSplit).toBe(0.3);
+    expect(restored.mainSplit).not.toBe(0.62);
+  });
+
+  it('ignores clicks further apart than the reference’s 400ms', () => {
+    const room = { mainSplit: 0.4, lastClickAt: NO_PENDING_CLICK };
+    const first = clickGutter(room, { at: 1_000 });
+    const late = clickGutter(first, { at: 1_000 + GUTTER_DOUBLE_CLICK_MS + 1 });
+    expect(late.mainSplit).toBe(0.4);
+    // The boundary itself counts — `<=`, so exactly 400ms apart is a double-click.
+    const onTheBoundary = clickGutter(first, { at: 1_000 + GUTTER_DOUBLE_CLICK_MS });
+    expect(onTheBoundary.mainSplit).toBe(PRESENTATION_COLLAPSED_SPLIT);
+  });
+
+  it('does not treat the first click of the session as a double-click', () => {
+    /*
+      A REGRESSION, found by the "restores to 70/30" case above while this file was being written.
+
+      The sentinel for "no click pending" was `0`, and `performance.now()` counts from page load —
+      so a genuine first click at t=100ms was 100ms away from the sentinel, inside the 400ms window,
+      and the room collapsed its presentation area on a SINGLE click. The same collision returned
+      after every completed double-click, because that reset the timestamp to the sentinel too.
+
+      Anything but `-Infinity` here reopens it, which is why this asserts the behaviour at a
+      realistically small timestamp rather than asserting the constant.
+    */
+    const room = { mainSplit: 0.4, lastClickAt: NO_PENDING_CLICK };
+    expect(clickGutter(room, { at: 1 }).mainSplit).toBe(0.4);
+    expect(clickGutter(room, { at: 100 }).mainSplit).toBe(0.4);
+    expect(clickGutter(room, { at: GUTTER_DOUBLE_CLICK_MS }).mainSplit).toBe(0.4);
+  });
+
+  it('does not fire on two quick DRAGS, which would throw away the resize', () => {
+    const room = { mainSplit: 0.4, lastClickAt: NO_PENDING_CLICK };
+    const first = clickGutter(room, { at: 1_000, moved: true });
+    const second = clickGutter(first, { at: 1_100, moved: true });
+    expect(second.mainSplit).toBe(0.4);
+  });
+
+  it('treats three clicks as one double-click and a leftover', () => {
+    let room = { mainSplit: 0.4, lastClickAt: NO_PENDING_CLICK };
+    room = clickGutter(room, { at: 1_000 });
+    room = clickGutter(room, { at: 1_100 });
+    expect(room.mainSplit).toBe(PRESENTATION_COLLAPSED_SPLIT);
+    // The third click must not immediately re-toggle off the second one's timestamp.
+    room = clickGutter(room, { at: 1_200 });
+    expect(room.mainSplit).toBe(PRESENTATION_COLLAPSED_SPLIT);
+  });
+});
+
+describe('it is the reference’s handler, its number and its binding', () => {
+  it('matches hideShowPresentationArea', () => {
+    // `app-room.full.js:2693-2698`.
+    expect(compact(ROOM_FULL)).toContain(
+      'hideShowPresentationArea(){(this.presAreaSize>0?((this.presAreaSize=0),(this.chatAlertsSize=100)):((this.presAreaSize=70),(this.chatAlertsSize=30)),this.printSizes());}'
+    );
+  });
+
+  it('is bound to gutterDblClick on the outer split in BOTH layouts', () => {
+    // `render-helpers.js:1622-1623` (desktop `j4e`) and `:1787-1788` (mobile `K4e`).
+    const bindings = compact(ROOM_HELPERS).match(
+      /\('gutterDblClick',function\(\){return\(D\(e\),E\(g\(\)\.hideShowPresentationArea\(\)\)\);}\)/g
+    );
+    expect(bindings?.length, 'both splits bind it').toBe(2);
+  });
+
+  it('takes 400 from the const table rather than choosing it', () => {
+    // Const 8 of `app-room.compiled.js:1294-1304`.
+    expect(compact(ROOM_COMPILED)).toContain("'gutterDblClickDuration','400'");
+    expect(GUTTER_DOUBLE_CLICK_MS).toBe(400);
+    // And the room still renders the attribute the number came from.
+    expect(PAGE).toContain('gutterdblclickduration="400"');
+  });
+
+  it('is actually wired into the room, not just exported', () => {
+    /*
+      The defect being closed: the attribute shipped and `hideShowPresentationArea` had zero
+      occurrences. An export nothing calls would be the same defect wearing a test.
+    */
+    expect(PAGE).toContain("from '$lib/split-gutter'");
+    expect(PAGE).toContain('function hideShowPresentationArea()');
+    expect(PAGE).toContain('mainSplit = togglePresentationSplit(resolvedMainSplit)');
+    expect(PAGE).toContain('gutterRelease(lastGutterClickAt, performance.now(), splitMoved)');
+  });
+
+  it('does not persist, because printSizes only logs', () => {
+    // `:2708-2712` — a console.log. `dragEnd` writes; this does not.
+    expect(compact(ROOM_FULL)).toContain('printSizes(){console.log(');
+  });
+});

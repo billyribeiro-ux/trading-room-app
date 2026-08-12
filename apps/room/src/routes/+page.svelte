@@ -48,6 +48,7 @@
     sortRosterByNick
   } from '$lib/roster-gates';
   import { alertSoundButtonFor, filesSectionHidden } from '$lib/files-gates';
+  import { NO_PENDING_CLICK, gutterRelease, togglePresentationSplit } from '$lib/split-gutter';
   import EmojiPicker from '$lib/components/EmojiPicker.svelte';
   import GifConfirmDialog from '$lib/components/GifConfirmDialog.svelte';
   import GiphyPicker from '$lib/components/GiphyPicker.svelte';
@@ -1163,6 +1164,22 @@
   let splitTarget = $state<'main' | 'chat-alerts' | null>(null);
   let splitPointerAxis: 'x' | 'y' = 'x';
   let splitPointerOffset = 0;
+  /*
+    The two halves of `gutterDblClickDuration="400"`, which this room has shipped as an attribute
+    since the split was written and never acted on.
+
+    `splitMoved` is what separates a CLICK from a DRAG: `beginSplit` calls `preventDefault()` on
+    pointerdown, so counting native `click` events on the gutter is not reliable here, and counting
+    pointerdowns alone would fire the toggle on two quick drags. The gutter is a click only if the
+    pointer went down and came up without `resizeFromPointer` ever running.
+
+    `lastGutterClickAt` is a plain number rather than `$state`: nothing renders from it, and making
+    it reactive would invalidate on every click for no observer. It starts at `NO_PENDING_CLICK`
+    rather than 0 — `performance.now()` counts from page load, so 0 is a real timestamp and using it
+    as "nothing pending" collapsed the presentation on the first single click of the session.
+  */
+  let splitMoved = false;
+  let lastGutterClickAt = NO_PENDING_CLICK;
   // Seeded from the server-persisted sizes so the very first paint already has the user's pane
   // geometry. Leaving these null until onMount made SSR emit the default flex and hydration then
   // rewrite it, which is a layout shift the size of the whole room.
@@ -5361,6 +5378,8 @@
   }
 
   function resizeFromPointer(event: PointerEvent) {
+    // Any movement at all makes this a drag rather than a click — see `splitMoved` above.
+    splitMoved = true;
     if (splitTarget === 'main' && mainElement) {
       const rect = mainElement.getBoundingClientRect();
       const availableSize = Math.max(
@@ -5389,7 +5408,24 @@
     }
   }
 
+  /**
+   * `hideShowPresentationArea()` — `app-room.full.js:2693-2698`, bound to `gutterDblClick` on the
+   * outer split in both of the reference's layouts (`app-room.render-helpers.js:1622-1623` and
+   * `:1787-1788`).
+   *
+   * The decision itself is in `$lib/split-gutter`, with the citations and the reasoning, because a
+   * two-click state machine whose entire content is timing has to be drivable by a test.
+   *
+   * Deliberately NOT persisted: upstream this ends in `printSizes()`, a `console.log` and nothing
+   * else (`:2708-2712`), unlike `dragEnd` which does write. Persisting here would let a transient
+   * toggle overwrite the geometry the user actually chose by dragging.
+   */
+  function hideShowPresentationArea() {
+    mainSplit = togglePresentationSplit(resolvedMainSplit);
+  }
+
   function beginSplit(event: PointerEvent, target: 'main' | 'chat-alerts') {
+    splitMoved = false;
     splitTarget = target;
     splitPointerAxis =
       target === 'main' ? (roomSplitIsHorizontal ? 'x' : 'y') : roomSplitIsHorizontal ? 'y' : 'x';
@@ -5401,6 +5437,25 @@
   }
 
   function finishSplit() {
+    /*
+      A gutter that never moved is a CLICK, and two of them inside the 400ms window are the
+      reference's `gutterDblClick`. Only the main gutter carries it: upstream the binding is on the
+      OUTER split in both layouts (`render-helpers.js:1622-1623` and `:1787-1788`), never on the
+      nested chat/alerts one, and `hideShowPresentationArea` moves the outer pair by definition.
+
+      The counter resets on use rather than tracking a running pair, so three clicks are one
+      double-click and a leftover, not two overlapping ones.
+    */
+    if (splitTarget === 'main') {
+      const release = gutterRelease(lastGutterClickAt, performance.now(), splitMoved);
+      lastGutterClickAt = release.lastClickAt;
+      if (release.doubleClick) {
+        hideShowPresentationArea();
+        // The toggle IS the geometry change; there is no drag to persist and upstream persists none.
+        splitTarget = null;
+        return;
+      }
+    }
     if (splitTarget) persistSplitSizes(splitTarget);
     splitTarget = null;
   }
