@@ -24,6 +24,47 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-12
 
+### 10:00 — Item Y: four causes fixed, the fifth localised. Settings 1094 → 62
+
+**No runtime impact.** Generator and decoder only; every src-side change was reverted. 701 tests /
+64 files, `svelte-check` 0/0.
+
+Worked end to end. The Settings side-by-side against `new-room/mising/file2`, measured at each step:
+**baseline 16 → 1094 → 65 → 63 → 62.**
+
+**(1) A helper taken from inside a conditional block.** `pairSecretKey` absorbed "Sample link you
+would need to use to add each user…", which labels the sample-link input inside a
+`<div ng-show="sess.hasAppPairLink && sess.pairSecretKey">`. One mis-attribution offset every node
+after it. **1094 → 65.**
+
+**(2) The schema recorded help TEXT but not SHAPE.** The reference writes helpers **four** ways,
+counted by walking from each `saveSessField(` to its helper: **136** `<br><label class="muted">`,
+**37** `<br><label>`, **5** bare `<label>`, and **13** a plain TEXT NODE with no element at all. The
+fourth was invisible to a `<label>`-only scan. `helpShape` is now generated.
+
+**(3) `outline.mjs` truncated every text node at 160 characters.** Four helpers shipped cut off
+mid-sentence, and `room-settings-help.ts` carried a hand-written `CORRECTED` table restoring three of
+them — that table was a workaround for this cap, not for whitespace as its docblock said. The fourth,
+`chatTabsWithBadges` at 203 characters, nobody had noticed. Raised to 1000.
+
+**(4) `settingHelp()` consulted three hand-maintained tables** — `BARE`, `CLASSLESS`, `NO_BR`, 16
+names transcribed by hand — beside a generated file of 269 settings. A second source of truth, and it
+had already drifted: it held 3 of the 13 text-node helpers, so the other 10 rendered with a `muted`
+class and a `<br>` the reference does not have. **The replacement was verified before it was made:**
+all 9 `CLASSLESS` names generate `plain` and all 4 `NO_BR` names generate `bare`, so the derived
+shape reproduces the hand-written one exactly wherever the two overlap.
+
+**(5) Remaining: 62, all one insertion.** At `doNotAutoSoftReset` our render emits its helper —
+`label` + text — twice where the reference emits it once. Ruled out by reading: not a duplicate
+schema row (269 names, zero duplicates), not the two settings loops (their slices are disjoint —
+`apiSecret` at index 130, this setting at 206), not `helpCopy` (renders once), and the reference's own
+capture contains that string once. I have not found the second emitter and will not guess at it.
+
+**Nothing is half-applied.** The evidence file, the regenerated schema, the `settingHelp` rewire and
+the renderer change were all reverted, so the suite is green and `schema:verify` is dead exactly as at
+HEAD. Only the generator and decoder fixes are committed; they change nothing until the schema is
+regenerated, which has to be the same commit that resolves (5) and moves the baseline.
+
 ### 09:35 — The media reconnect toasts, read out of the reference's own bundle
 
 **Runtime impact: yes, in the room.** 604 tests / 62 files, `svelte-check` 0/0.

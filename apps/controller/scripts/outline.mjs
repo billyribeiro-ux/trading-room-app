@@ -38,7 +38,18 @@ let m;
 while ((m = re.exec(body))) {
   if (m[4] !== undefined) {
     const text = m[4].replace(/\s+/g, ' ').trim();
-    if (text) out.push('  '.repeat(depth) + '· ' + JSON.stringify(text.slice(0, 160)));
+    /*
+      1000, not 160.
+
+      The old cap truncated any text node past 160 characters, and the schema generator reads its
+      helper copy out of this file — so four settings shipped a helper cut off mid-sentence, and
+      `room-settings-help.ts` carried a hand-written `CORRECTED` table restoring three of them by
+      hand. The fourth, `chatTabsWithBadges`, was 203 characters and nobody had noticed.
+
+      A cap is still wanted: this decoder is read by people, and one pathological node should not
+      produce a megabyte line. 1000 clears the longest helper in the capture by five times over.
+    */
+    if (text) out.push('  '.repeat(depth) + '· ' + JSON.stringify(text.slice(0, 1000)));
     continue;
   }
   const [, close, tag, rawAttrs] = m;

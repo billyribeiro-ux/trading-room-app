@@ -278,6 +278,29 @@ for (let i = 0; i < lines.length; i++) {
       siblings, and `pairOKRedirect`'s `<label.muted>` two lines below is one of them.
     */
     if (/<div[^>]*\bng-(show|if)=/.test(lines[j])) break;
+    /*
+      A helper with NO ELEMENT AT ALL — the fourth shape, and the one that made three settings come
+      out `help: null` while a hand-maintained table in `room-settings-help.ts` carried their text.
+
+      The outline reads:
+
+          <a.editable … saveSessField('sendFcmAlertsNew') …>
+            · "No"
+          · "Use pub/sub for notifications"
+          <p.form-control-static>
+
+      The anchor's own text sits one level deeper; the helper is a bare text node at the SAME indent
+      as the anchor, a sibling of it inside the `<p>`. Indent is what separates them, so it is what
+      this tests — matching on the text alone would take the anchor's value as its own helper.
+
+      Counted: 3 settings, exactly the three the `BARE` table held.
+    */
+    const anchorIndent = lines[i].search(/\S/);
+    if (/^\s*·/.test(lines[j]) && lines[j].search(/\S/) <= anchorIndent) {
+      help = textOf(j);
+      helpShape = 'text';
+      break;
+    }
     if (/<label/.test(lines[j])) {
       help = textOf(j + 1);
       /*
@@ -446,7 +469,7 @@ export interface RoomSettingDef {
    * (\`<br><label>\`) and 5 \`bare\` (\`<label>\` with no \`<br>\`). Rendering one shape for all of
    * them put a class on 42 helpers that have none and a \`<br>\` before 5 that have none.
    */
-  readonly helpShape: 'muted' | 'plain' | 'bare' | null;
+  readonly helpShape: 'muted' | 'plain' | 'bare' | 'text' | null;
   /**
    * Value observed in the captured tenant. null = unset. Evidence, not a default.
    *
