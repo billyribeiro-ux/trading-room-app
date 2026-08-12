@@ -1,0 +1,282 @@
+{
+  "capturedAt": "2026-08-01T18:39:52.034Z",
+  "url": "https://protradingroom.com/ptrApp#/page/manageSession/6a6529b318781e20ed81947d",
+  "ua": "Mozilla/5.0 (Linux; Android 15; Pixel 9) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Mobile Safari/537.36",
+  "viewport": {
+    "w": 1989,
+    "h": 1265,
+    "dpr": 2
+  },
+  "title": "",
+  "head": "<head><meta http-equiv=\"origin-trial\" content=\"A7vZI3v+Gz7JfuRolKNM4Aff6zaGuT7X0mf3wtoZTnKv6497cVMnhy03KDqX7kBz/q/iidW7srW31oQbBt4VhgoAAACUeyJvcmlnaW4iOiJodHRwczovL3d3dy5nb29nbGUuY29tOjQ0MyIsImZlYXR1cmUiOiJEaXNhYmxlVGhpcmRQYXJ0eVN0b3JhZ2VQYXJ0aXRpb25pbmczIiwiZXhwaXJ5IjoxNzU3OTgwODAwLCJpc1N1YmRvbWFpbiI6dHJ1ZSwiaXNUaGlyZFBhcnR5Ijp0cnVlfQ==\"><meta http-equiv=\"origin-trial\" content=\"A7vZI3v+Gz7JfuRolKNM4Aff6zaGuT7X0mf3wtoZTnKv6497cVMnhy03KDqX7kBz/q/iidW7srW31oQbBt4VhgoAAACUeyJvcmlnaW4iOiJodHRwczovL3d3dy5nb29nbGUuY29tOjQ0MyIsImZlYXR1cmUiOiJEaXNhYmxlVGhpcmRQYXJ0eVN0b3JhZ2VQYXJ0aXRpb25pbmczIiwiZXhwaXJ5IjoxNzU3OTgwODAwLCJpc1N1YmRvbWFpbiI6dHJ1ZSwiaXNUaGlyZFBhcnR5Ijp0cnVlfQ==\"><meta http-equiv=\"origin-trial\" content=\"A7vZI3v+Gz7JfuRolKNM4Aff6zaGuT7X0mf3wtoZTnKv6497cVMnhy03KDqX7kBz/q/iidW7srW31oQbBt4VhgoAAACUeyJvcmlnaW4iOiJodHRwczovL3d3dy5nb29nbGUuY29tOjQ0MyIsImZlYXR1cmUiOiJEaXNhYmxlVGhpcmRQYXJ0eVN0b3JhZ2VQYXJ0aXRpb25pbmczIiwiZXhwaXJ5IjoxNzU3OTgwODAwLCJpc1N1YmRvbWFpbiI6dHJ1ZSwiaXNUaGlyZFBhcnR5Ijp0cnVlfQ==\"><style class=\"vjs-styles-defaults\">\n      .video-js {\n        width: 300px;\n        height: 150px;\n      }\n\n      .vjs-fluid {\n        padding-top: 56.25%\n      }\n    </style><style type=\"text/css\">@charset \"UTF-8\";[ng\\:cloak],[ng-cloak],[data-ng-cloak],[x-ng-cloak],.ng-cloak,.x-ng-cloak,.ng-hide:not(.ng-hide-animate){display:none !important;}ng\\:form{display:block;}</style>\n    <script type=\"text/javascript\" async=\"\" charset=\"utf-8\" src=\"https://www.gstatic.com/recaptcha/releases/A7KpaEASfhDcK0nXxgQEyyYv/recaptcha__en.js\" crossorigin=\"anonymous\" integrity=\"sha384-DMJucfgjcmtc4a8x9gFfPgwoWXK+1qozk7K/wTFGVtduYs3wg2BI8Z5lrJXZV+iE\"></script><script type=\"text/javascript\" async=\"\" charset=\"utf-8\" src=\"https://www.gstatic.com/recaptcha/releases/A7KpaEASfhDcK0nXxgQEyyYv/recaptcha__en.js\" crossorigin=\"anonymous\" integrity=\"sha384-DMJucfgjcmtc4a8x9gFfPgwoWXK+1qozk7K/wTFGVtduYs3wg2BI8Z5lrJXZV+iE\"></script><script type=\"text/javascript\" async=\"\" charset=\"utf-8\" src=\"https://www.gstatic.com/recaptcha/releases/A7KpaEASfhDcK0nXxgQEyyYv/recaptcha__en.js\" crossorigin=\"anonymous\" integrity=\"sha384-DMJucfgjcmtc4a8x9gFfPgwoWXK+1qozk7K/wTFGVtduYs3wg2BI8Z5lrJXZV+iE\"></script><script type=\"text/javascript\" id=\"www-widgetapi-script\" src=\"https://www.youtube.com/s/player/bed7a914/www-widgetapi.vflset/www-widgetapi.js\" async=\"\"></script><script src=\"https://www.youtube.com/iframe_api\"></script><script type=\"text/javascript\" async=\"\" src=\"https://www.google-analytics.com/analytics.js\"></script><script type=\"text/javascript\" async=\"\" src=\"https://www.googletagmanager.com/gtag/js?id=G-1EW807M702&amp;cx=c&amp;gtm=4e67t1\"></script><script src=\"https://cdnjs.cloudflare.com/ajax/libs/split.js/1.5.11/split.min.js\"></script>\n\n    <script async=\"\" src=\"https://www.googletagmanager.com/gtag/js?id=UA-111336437-1\"></script>\n    <script>\n      window.dataLayer = window.dataLayer || [];\n      function gtag() {\n        dataLayer.push(arguments);\n      }\n      gtag('js', new Date());\n\n      gtag('config', 'UA-111336437-1');\n    </script>\n\n    <title></title>\n\n    <link rel=\"stylesheet\" href=\"/public/app/css/bootstrap.min.css\">\n\n    <!-- videojs -->\n    <!--WAS <link href=\"//cdnjs.cloudflare.com/ajax/libs/video.js/5.16.0/alt/video-js-cdn.min.css\" rel=\"stylesheet\"> -->\n    <link href=\"//vjs.zencdn.net/7.3.0/video-js.min.css\" rel=\"stylesheet\">\n\n    <!-- color picker -->\n    <link rel=\"stylesheet\" href=\"/public/vendor/angularjs-color-picker/angularjs-color-picker.min.css\">\n    <link rel=\"stylesheet\" href=\"/public/vendor/angularjs-color-picker/angularjs-color-picker-bootstrap.min.css\">\n\n    <!--<link rel=\"stylesheet\" href=\"/public/vendor/emoji/css/emoji-picker.min.css\" />-->\n\n    <link rel=\"stylesheet\" href=\"/public/vendor/angular-xeditable/dist/css/xeditable.min.css\">\n    <link href=\"https://cdnjs.cloudflare.com/ajax/libs/angularjs-toaster/2.2.0/toaster.min.css\" rel=\"stylesheet\">\n\n    <link rel=\"stylesheet\" href=\"/public/vendor/textAngular/src/textAngular.css\">\n    <link rel=\"stylesheet\" href=\"/public/app/css/styles.css\">\n    <!--custom style -->\n    \n\n    <!-- hasPhoneValidation:  -->\n    \n  <link type=\"text/css\" rel=\"stylesheet\" href=\"/public/vendor/font-awesome/css/font-awesome.min.css\"><link type=\"text/css\" rel=\"stylesheet\" href=\"/public/vendor/feather/webfont/feather-webfont/feather.css\"><link type=\"text/css\" rel=\"stylesheet\" href=\"/public/vendor/animate.css/animate.min.css\"><style type=\"text/css\">.vjs-youtube .vjs-iframe-blocker { display: none; }.vjs-youtube.vjs-user-inactive .vjs-iframe-blocker { display: block; }.vjs-youtube .vjs-poster { background-size: cover; }.vjs-youtube-mobile .vjs-big-play-button { display: none; }</style></head>",
+  "angularVersion": {
+    "full": "1.3.15",
+    "major": 1,
+    "minor": 3,
+    "dot": 15,
+    "codeName": "locality-filtration"
+  },
+  "config": {
+    "NAME": "ptr-gaps",
+    "MAX_BYTES": 6291456,
+    "DOWNLOAD_GAP": 400,
+    "SETTLE": 120,
+    "OPEN_EDITOR": false,
+    "OPEN_BOOTBOX": false,
+    "LOAD_STATS": false
+  },
+  "captures": [
+    {
+      "index": 0,
+      "label": "baseline",
+      "elements": 1632
+    },
+    {
+      "index": 1,
+      "label": "tab:Users",
+      "elements": 1632
+    },
+    {
+      "index": 2,
+      "label": "tab:Text List",
+      "elements": 1632
+    },
+    {
+      "index": 3,
+      "label": "tab:Branding (Logo / Landing Page)",
+      "elements": 1632
+    },
+    {
+      "index": 4,
+      "label": "tab:SSO Setup",
+      "elements": 1632
+    },
+    {
+      "index": 5,
+      "label": "tab:User Stats",
+      "elements": 1632
+    },
+    {
+      "index": 6,
+      "label": "tab:Settings",
+      "elements": 1632
+    },
+    {
+      "index": 7,
+      "label": "settings:dont-touch-revealed",
+      "elements": 1632
+    },
+    {
+      "index": 8,
+      "label": "dropdown:0:User List Actions",
+      "elements": 1632
+    },
+    {
+      "index": 9,
+      "label": "dropdown:1:Actions With Selected",
+      "elements": 1632
+    },
+    {
+      "index": 10,
+      "label": "modal:permissions",
+      "elements": 1633
+    }
+  ],
+  "assets": [
+    {
+      "url": "https://protradingroom.com/public/images/ptr_logo.png",
+      "type": "image/png",
+      "bytes": 7197
+    },
+    {
+      "url": "https://protradingroom.com/app/img/ajax_loader.gif",
+      "type": "image/gif",
+      "bytes": 4178
+    }
+  ],
+  "stylesheets": [
+    {
+      "href": "",
+      "access": "ok",
+      "bytes": 78
+    },
+    {
+      "href": "",
+      "access": "ok",
+      "bytes": 169
+    },
+    {
+      "href": "https://protradingroom.com/public/app/css/bootstrap.min.css",
+      "access": "ok",
+      "bytes": 134118
+    },
+    {
+      "href": "https://vjs.zencdn.net/7.3.0/video-js.min.css",
+      "access": "refetched",
+      "bytes": 35998
+    },
+    {
+      "href": "https://protradingroom.com/public/vendor/angularjs-color-picker/angularjs-color-picker.min.css",
+      "access": "ok",
+      "bytes": 30377
+    },
+    {
+      "href": "https://protradingroom.com/public/vendor/angularjs-color-picker/angularjs-color-picker-bootstrap.min.css",
+      "access": "ok",
+      "bytes": 254
+    },
+    {
+      "href": "https://protradingroom.com/public/vendor/angular-xeditable/dist/css/xeditable.min.css",
+      "access": "ok",
+      "bytes": 2631
+    },
+    {
+      "href": "https://cdnjs.cloudflare.com/ajax/libs/angularjs-toaster/2.2.0/toaster.min.css",
+      "access": "refetched",
+      "bytes": 10964
+    },
+    {
+      "href": "https://protradingroom.com/public/vendor/textAngular/src/textAngular.css",
+      "access": "ok",
+      "bytes": 3412
+    },
+    {
+      "href": "https://protradingroom.com/public/app/css/styles.css",
+      "access": "ok",
+      "bytes": 194754
+    },
+    {
+      "href": "https://protradingroom.com/public/vendor/font-awesome/css/font-awesome.min.css",
+      "access": "ok",
+      "bytes": 24757
+    },
+    {
+      "href": "https://protradingroom.com/public/vendor/feather/webfont/feather-webfont/feather.css",
+      "access": "ok",
+      "bytes": 5946
+    },
+    {
+      "href": "https://protradingroom.com/public/vendor/animate.css/animate.min.css",
+      "access": "ok",
+      "bytes": 35556
+    },
+    {
+      "href": "",
+      "access": "ok",
+      "bytes": 235
+    },
+    {
+      "href": "",
+      "access": "ok",
+      "bytes": 24
+    }
+  ],
+  "media": [
+    {
+      "query": "print",
+      "matches": false
+    },
+    {
+      "query": "(min-width: 768px)",
+      "matches": true
+    },
+    {
+      "query": "(min-width: 992px)",
+      "matches": true
+    },
+    {
+      "query": "(min-width: 1200px)",
+      "matches": true
+    },
+    {
+      "query": "screen and (max-width: 767px)",
+      "matches": false
+    },
+    {
+      "query": "screen and (-webkit-min-device-pixel-ratio: 0)",
+      "matches": true
+    },
+    {
+      "query": "(max-device-width: 480px) and (orientation: landscape)",
+      "matches": false
+    },
+    {
+      "query": "(max-width: 767px)",
+      "matches": false
+    },
+    {
+      "query": "screen and (min-width: 768px)",
+      "matches": true
+    },
+    {
+      "query": "(transform-3d), (-webkit-transform-3d)",
+      "matches": true
+    },
+    {
+      "query": "(min-width: 768px) and (max-width: 991px)",
+      "matches": false
+    },
+    {
+      "query": "(min-width: 992px) and (max-width: 1199px)",
+      "matches": false
+    },
+    {
+      "query": "screen and (max-width: 750px)",
+      "matches": false
+    },
+    {
+      "query": "screen and (min-width: 750px)",
+      "matches": true
+    },
+    {
+      "query": "only screen and (min-width: 768px)",
+      "matches": true
+    },
+    {
+      "query": "only screen and (min-width: 480px)",
+      "matches": true
+    },
+    {
+      "query": "only screen and (max-width: 767px)",
+      "matches": false
+    },
+    {
+      "query": "only screen and (min-width: 992px)",
+      "matches": true
+    },
+    {
+      "query": "only screen and (max-width: 479px)",
+      "matches": false
+    },
+    {
+      "query": "only screen and (max-width: 991px)",
+      "matches": false
+    }
+  ],
+  "fonts": [
+    {
+      "family": "Glyphicons Halflings",
+      "weight": "normal",
+      "style": "normal",
+      "status": "unloaded"
+    },
+    {
+      "family": "VideoJS",
+      "weight": "400",
+      "style": "normal",
+      "status": "unloaded"
+    },
+    {
+      "family": "FontAwesome",
+      "weight": "normal",
+      "style": "normal",
+      "status": "loaded"
+    },
+    {
+      "family": "feather",
+      "weight": "normal",
+      "style": "normal",
+      "status": "unloaded"
+    }
+  ]
+}
