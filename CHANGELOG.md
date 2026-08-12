@@ -4387,3 +4387,55 @@ is SSE-pushed.
 
 VERIFIED: 775 tests / 73 files green; svelte-check 0 errors; schema:verify 269 total, 49 wired;
 prettier clean; four negative controls run, each red then restored.
+
+## 2026-08-12 18:10 EDT — `services/**` is not a mirror, and the direction is measured
+
+Row P closed as an investigation. **No seal was changed**, and the audit control was not touched —
+that act is named at the end and left for explicit authorisation.
+
+**The direction, measured rather than inferred.** Against the documented source (the sibling
+`new-room`, named in `ops/backend-import-provenance.md`'s own import checkpoint — NOT
+`new-room-control`, which is what I compared against first and had to correct):
+
+| file | added | removed |
+| --- | --- | --- |
+| `services/media/src/server.rs` | +195 | −29 |
+| `services/media/src/config.rs` | +69 | **−0** |
+| `services/api/src/db/migrate.rs` | +27 | −1 |
+| `services/Cargo.lock` | +69 | −109 |
+
+`config.rs` is a strict superset. `server.rs` is overwhelmingly additive. `Cargo.lock` nets smaller,
+consistent with the 2026-08-09 dependency bump dropping transitive deps. Ten files diverge in total,
+and the same comparison against `new-room-control` returns the same answer — so the finding does not
+depend on which sibling is treated as the source.
+
+**There is no sync.** Searched `scripts/`, `ops/`, `apps/*/scripts/`, `.github/` and the root
+`package.json`. The only script referencing a sibling is `scripts/set-vercel-env.sh`, which reads
+`.env` files and states at its line 30 that `new-room-control` is "read-only reference, not a config
+store for this project". Nothing copies `services/**` in either direction.
+
+**The owner settled the premise**, in these words: *"those are for reference only. You're strictly
+working on trading-room-app folder"*. There is no upstream to mirror, so `CLAUDE.md`'s "a change
+made here is lost on the next sync" describes a process that does not exist. `a11883c` is 252
+insertions across seven of the ten — the SFU liveness fix — recorded deployed and proven against
+production at `CHANGELOG.md:2863`.
+
+**What was deliberately NOT done.** I twice began editing
+`apps/controller/scripts/verify-backend-provenance.mjs` and was correct to be stopped both times.
+That script is the control which caught this drift; an agent editing the thing that watches it, on
+its own reasoning, is exactly what such a control exists to prevent. It stands untouched at its
+committed state.
+
+When authorised, the change is NOT a re-pin of the whole tree — that cannot tell reviewed work from
+an accident, and the next unrecorded edit would land inside a green gate. It is: pin the ten
+diverged files individually so drift detection keeps working on each by name, and narrow the
+manifest to the 88 imports never edited here, whose bytes are still the bytes that arrived.
+Measured: 88 untouched, manifest `9e5fe0a6c5ae0d8fad3eeed7baadf6aac48cccc94ab1ac2796c4983a949bc9e0`,
+path-list unchanged at `66ab4696…`.
+
+A FOURTH instance of the original path bug waits in that same file, exposed only once the earlier
+repairs let execution reach it: `DOCUMENTED_COUNT_SITES` names `docs/ENGINEERING-SSOT.md` and
+`docs/MEDIASOUP-DEPLOYMENT-PLAN.md`, and both live at `apps/controller/docs/`.
+
+The seal stays red until that edit is authorised, which is the correct state: it is reporting
+something true.

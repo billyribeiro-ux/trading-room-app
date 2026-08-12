@@ -364,3 +364,112 @@ added, removed or renamed — so only the content manifest moves:
 Recorded from an observed value, not an intended one: the hosted gate computed this
 exact hash and rejected the branch for it, and a local run reproduced it
 byte-for-byte before the constant was changed.
+
+## The tree has diverged from the import, and the direction is measured — 2026-08-12
+
+**No seal is changed by this section.** It records what was found; changing the seal is a separate
+decision and is not taken here.
+
+### How this surfaced
+
+The manifest hash above had never once been verified. `verify-backend-provenance.mjs` read every
+file through `new URL('../' + path, import.meta.url)`, which from `apps/controller/scripts/`
+resolves to `apps/controller/services/` — a directory that does not exist. The script died before
+reaching the manifest, so the gate had been failing at step 2 for an unrelated reason and the
+manifest check was never reached. Repairing the path made it report a mismatch on the first run it
+ever completed.
+
+### Ten imported files have been edited here
+
+`git diff --name-only e50a819..HEAD -- services`:
+
+`Cargo.lock`, `api/src/db/migrate.rs`, `media/Dockerfile`, `media/src/config.rs`, `grant.rs`,
+`main.rs`, `router_registry.rs`, `server.rs`, `session.rs`, `worker_pool.rs`.
+
+An eleventh, `api/migrations/0009_rename_runtime_roles.sql`, was authored here and is sealed
+separately as `LOCALLY_AUTHORED`. It is not part of this divergence.
+
+### The direction, measured against the documented source
+
+The source of record is the sibling **`new-room`** repository (see the import checkpoint above).
+Diffing our copies against it, per file, added versus removed:
+
+| file | added | removed |
+| --- | --- | --- |
+| `services/media/src/server.rs` | +195 | −29 |
+| `services/media/src/config.rs` | +69 | −0 |
+| `services/api/src/db/migrate.rs` | +27 | −1 |
+| `services/Cargo.lock` | +69 | −109 |
+
+`config.rs` is a strict superset of the source. `server.rs` is overwhelmingly additive. `Cargo.lock`
+nets smaller, which is consistent with the 2026-08-09 dependency bump (`8dd0306`) dropping
+transitive dependencies rather than with a regression.
+
+The same comparison against `new-room-control/services` gives the same answer, so the finding does
+not depend on which sibling is treated as the source.
+
+**This repository is ahead.** `a11883c` alone is 252 insertions across seven of those files — the
+SFU liveness fix — and `CHANGELOG.md:2863` records it deployed and proven against production with
+live log output.
+
+### There is no sync mechanism
+
+`CLAUDE.md` states that `services/**` is a mirror and that "a change made here is lost on the next
+sync". Searched for a sync: `scripts/`, `ops/`, `apps/*/scripts/`, `.github/`, and the root
+`package.json` scripts block. The only script that references the sibling repositories at all is
+`scripts/set-vercel-env.sh`, which READS `.env` files and states at its line 30 that
+`new-room-control` is "read-only reference, not a config store for this project". Nothing anywhere
+copies `services/**` in either direction.
+
+So the sync that would destroy this work does not exist, and the mirror framing does not describe
+this repository as it stands.
+
+### The sibling repositories are REFERENCE ONLY
+
+Owner directive, 2026-08-12, in these words:
+
+> those are for reference only. You're strictly working on trading-room-app folder
+
+That removes the premise of the mirror framing entirely. `new-room` and `new-room-control` are
+material to read, not an upstream to synchronise with — nothing is ever written back to them, and
+nothing is ever pulled from them into `services/**`. A tree cannot be a mirror of a repository that
+is never read from and never written to.
+
+Combined with the measurements above — this repository ahead on nine of ten files, one of them a
+production-proven fix, and no sync script anywhere — **`trading-room-app` is the authority for
+`services/**`.** That is not a judgement call made here; it is what the directive and the evidence
+jointly state.
+
+The import checkpoints above remain exactly what they were: a true historical record of what
+arrived, and from where. They are not rewritten. What changes is only the claim about the FUTURE —
+that these files are provisional and will be overwritten. They are not.
+
+### What still needs an explicit decision
+
+One act, and it is deliberately not taken here: **editing
+`apps/controller/scripts/verify-backend-provenance.mjs`.**
+
+That script is the audit control which caught this drift, and an agent editing the thing that
+watches it — however good the reasoning — is precisely the move such a control exists to prevent.
+It has been left untouched.
+
+The change it needs, when authorised, is NOT a re-pin of the whole tree. Re-pinning to whatever is
+present cannot distinguish reviewed work from an accident, and the next unrecorded edit would land
+inside a green gate. Instead:
+
+- pin the ten diverged files **individually**, by name and hash, so an unrecorded change to any one
+  of them still fails and fails naming the file;
+- narrow the manifest to the 88 imports that have never been edited, whose bytes are still the bytes
+  that arrived — so the seal keeps meaning "unchanged since import" rather than "whatever is here
+  today".
+
+Measured values for that change, should it be taken: 88 untouched imports, manifest SHA-256
+`9e5fe0a6c5ae0d8fad3eeed7baadf6aac48cccc94ab1ac2796c4983a949bc9e0`, path-list unchanged at
+`66ab4696…`.
+
+**A fourth instance of the original path bug is also waiting in that file**, exposed only once the
+earlier repairs let execution reach it: `DOCUMENTED_COUNT_SITES` names `docs/ENGINEERING-SSOT.md`
+and `docs/MEDIASOUP-DEPLOYMENT-PLAN.md`, and both actually live under `apps/controller/docs/`.
+
+Until that edit is authorised the seal stays red, and that remains the correct state: it is
+reporting something true.
