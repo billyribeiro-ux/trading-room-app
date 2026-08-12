@@ -4362,8 +4362,8 @@ Join/leave announcements, end to end. The subscriber map is the presence table, 
 events: one person with three tabs announces once on the first and once on the last.
 
 Tawk presenter support — and it carried a hazard. The reference hardcodes
-`https://embed.tawk.to/5aecb59f227d3d7edc24f7c2/default`, which is protradingroom OWN property.
-Copied verbatim, every presenter here would open a support chat into another company inbox and
+`https://embed.tawk.to/5aecb59f227d3d7edc24f7c2/default`, which is protradingroom's OWN property.
+Copied verbatim, every presenter here would open a support chat into another company's inbox and
 `setAttributes` would post their name and email into it. The property now comes from
 `PUBLIC_PTR_TAWK_PROPERTY_ID`; with none configured no script is injected and the control does not
 render.
@@ -4381,7 +4381,7 @@ in this work.
 
 **Deferred, each because the producer does not exist here (3).** `hideChat` — its only emitter is
 inside `changeChatMode`, a feature this room does not model, so the handler alone would be a
-listener nothing emits. `stopRecMsg` — sent by the reference own server on a recording pipeline we
+listener nothing emits. `stopRecMsg` — sent by the reference's own server on a recording pipeline we
 replaced client-side. `appVisibilityChange` — its roster half has no counterpart because this roster
 is SSE-pushed.
 
