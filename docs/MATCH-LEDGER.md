@@ -160,10 +160,33 @@ locate-then-read pattern. That finds every divergence the code declares. It woul
 undeclared one, so lines ~2,900–9,947 still need a linear read before `app-room` can be called
 closed in both directions.
 
+### ⚠ Which tree each finding was read against — a method error, recorded
+
+`audit/match-ledger` is branched from `main` (`f73ea57`), which **predates PR #3**. Proven on this
+checkout: `function showPrivateChat` has **0 occurrences**, and `privateChatOpen = true` still
+appears inline in `handleMessageAction` — both of which PR #3 changed.
+
+So:
+
+- **Lines 1–3,320 and divergences 1–10** were read while checked out on
+  `viewer-only-mode-and-volume-dropdown`, i.e. WITH PR #3's changes. Those stand.
+- **Anything read from line 3,320 onward on this branch is against the PRE-PR-#3 file** and must
+  not be recorded as a finding about current code.
+
+**Rule for the rest of this audit: check out `viewer-only-mode-and-volume-dropdown` (or whatever
+supersedes it) before reading our side.** The reference side is unaffected — the decoded tree is
+identical on every branch.
+
+This is logged rather than silently fixed because it is the exact failure this project has a
+standing rule about: a result that is about my tooling rather than about the app. Nothing in the
+Matched or Gaps tables above came from the wrong tree — every one of those was verified by
+occurrence count while on the viewer-only branch — but the next reader needs to know the trap
+exists.
+
 ### Still to do for `app-room`
 
-- Linear read of `+page.svelte` **3,320–9,947**, for divergences the code does not declare in the
-  vocabulary the locate pass searched for. Lines 1–3,320 are read.
+- Linear read of `+page.svelte` **3,320–9,947**, **on the viewer-only branch**, for divergences the
+  code does not declare in the vocabulary the locate pass searched for. Lines 1–3,320 are read.
 
 ---
 
