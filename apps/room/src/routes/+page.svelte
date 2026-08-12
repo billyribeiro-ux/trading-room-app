@@ -288,6 +288,19 @@
    * denied. Ours showed Archives to everybody unconditionally.
    */
   let roomEventsConnected = $state(false);
+  /**
+   * The "Conected" flash and its one-shot guard — `app-room.full.js:2035-2041`.
+   *
+   * `hasConnectedBefore` is a plain `let`, not `$state`: nothing renders from it, it only decides
+   * whether an `open` is a RE-connect, and making it reactive would buy a dependency and no redraw.
+   * `reconnectedFlash` is `$state` because the overlay's `display` follows it.
+   *
+   * The reference's misspelling — "Conected" — is in the markup and stays there.
+   */
+  let hasConnectedBefore = false;
+  let reconnectedFlash = $state(false);
+  /** `setTimeout(…, 3e3)`. */
+  const RECONNECTED_FLASH_MS = 3000;
   let rosterCount = $state<number | null>(null);
   /**
    * `globals.roster` - who is actually in the room, pushed by the hub.
@@ -6088,7 +6101,41 @@
 
     // The sidebar reports this, so it has to be observable and not just logged.
     source.addEventListener('open', () => {
+      /*
+        `subscribe('reconnectedSocket', …)` — `app-room.full.js:2035-2041`:
+
+          un('#connectedMsg').show(),
+          setTimeout(() => { un('#connectedMsg').hide() }, 3e3),
+          this.appService.loadSessionLogs()
+
+        `#connectedMsg` was rendered here as a static `display: none` div and nothing ever showed
+        it, so the room had the reassurance markup and never gave the reassurance. Its own scoped
+        rule is `#connectedMsg { display: none }` (`app-room.component.css`), which is why the
+        reference reaches for an inline `display` rather than a class — reproduced with a bound
+        style for the same reason.
+
+        RE-connect only, never the first. The event upstream is named `reconnectedSocket` and the
+        message reads "Conected", which is an answer to having been disconnected; firing it on the
+        first open of a fresh page would announce a recovery that never happened. `EventSource`
+        re-fires `open` on every retry, so the flag is what distinguishes them.
+
+        `loadSessionLogs()` is this room's `invalidate('room:data')` — the same "catch up on what
+        was missed" the reference does, through the identifier the five-second poll already uses.
+      */
+      const isReconnect = roomEventsConnected === false && hasConnectedBefore;
       roomEventsConnected = true;
+      hasConnectedBefore = true;
+
+      if (!isReconnect) return;
+      reconnectedFlash = true;
+      globalThis.setTimeout(() => {
+        reconnectedFlash = false;
+      }, RECONNECTED_FLASH_MS);
+      // `invalidate` directly rather than the poll's `refreshRoom`, which is scoped to `onMount`
+      // and does not exist yet when this subscription is created.
+      void invalidate('room:data').catch(() => {
+        // A catch-up that fails is not worth an error in the room; the poll retries in 5s.
+      });
     });
 
     source.addEventListener('error', () => {
@@ -10007,7 +10054,11 @@
         style="display: none;"
       ></audio>
     {/each}
-    <div id="connectedMsg" class="notConnectedOverlay animated fadeIn" style="display: none;">
+    <div
+      id="connectedMsg"
+      class="notConnectedOverlay animated fadeIn"
+      style={reconnectedFlash ? 'display: block;' : 'display: none;'}
+    >
       Conected<i class="fas fa-check"></i>
     </div>
     <ModalHost
