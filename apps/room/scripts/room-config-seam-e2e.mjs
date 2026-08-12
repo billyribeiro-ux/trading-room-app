@@ -229,16 +229,29 @@ try {
       `document.querySelector('.sidebar-menu')?.dispatchEvent(new MouseEvent('click', { bubbles: true }))`
     );
     await sleep(900);
-    return evaluate(`(() => {
+    return evaluate(
+      `(() => {
       const text = (selector) => document.querySelector(selector)?.textContent?.trim() ?? null;
       return {
         origin: location.origin,
         // The navbar headcount: rosterCount plus simUserCount.
         headcount: text('.users .ml-1'),
         // O(12, hideAppInfo ? -1 : 12) - the Powered by / version block.
-        appInfo: document.body.innerText.includes('Powered by:')
+        appInfo: document.body.innerText.includes('Powered by:'),
+        /*
+          The two COLUMNS of the main split, each gated by one flag:
+            O(1, e.hideChatAlerts ? -1 : 1)   app-room.render-helpers.js:1650
+            O(3, e.hidePresentation ? -1 : 3) app-room.render-helpers.js:1662
+          Neither gate has an ` ||
+        isPresenter` branch on our side, so the owner who clicks Launch
+          sees the same thing a member does - which is what makes them readable from this probe at
+          all (see the note below on the presenter-biased gates that broke an earlier version).
+        */
+        chatAlerts: document.querySelector('.alert-chat-box') !== null,
+        presentation: document.querySelector('.presentation-box') !== null
       };
-    })()`);
+    })()`
+    );
   };
 
   /*
@@ -523,8 +536,45 @@ try {
     await setSetting(manageePath, key, '');
   }
 
+  // ── the two column gates ──────────────────────────────────────────────────────────────────
+  console.log('\n9. hideChatAlerts and isChatOnlyRoom remove whole columns');
+  /*
+    The acceptance criterion for both in the shape it can actually be proven: flip the setting in
+    the controller, and watch a COLUMN leave the room's DOM.
+
+    Both are readable from this probe for the same reason `simUserCount` is and the roster badge is
+    not - neither gate carries an `|| isPresenter` branch here, so the owner account that clicked
+    Launch observes exactly what a member would.
+  */
+  const bothColumns = await readRoom();
+  check(
+    'a room with neither set renders both columns',
+    [bothColumns.chatAlerts, bothColumns.presentation],
+    [true, true]
+  );
+
+  await goto(`${CONTROL}${manageePath}`);
+  await setSetting(manageePath, 'hideChatAlerts', 'true');
+  const noChat = await readRoom();
+  check('hideChatAlerts removes the chat/alerts column', noChat.chatAlerts, false);
+  check('and leaves the presentation area alone', noChat.presentation, true);
+
+  await goto(`${CONTROL}${manageePath}`);
+  await setSetting(manageePath, 'hideChatAlerts', '');
+  check('clearing it brings the column back', (await readRoom()).chatAlerts, true);
+
+  await goto(`${CONTROL}${manageePath}`);
+  await setSetting(manageePath, 'isChatOnlyRoom', 'true');
+  const noPresentation = await readRoom();
+  check('isChatOnlyRoom removes the presentation column', noPresentation.presentation, false);
+  check('and leaves the chat/alerts column alone', noPresentation.chatAlerts, true);
+
+  await goto(`${CONTROL}${manageePath}`);
+  await setSetting(manageePath, 'isChatOnlyRoom', '');
+  check('clearing it brings the presentation back', (await readRoom()).presentation, true);
+
   // ── the room does not invent values ───────────────────────────────────────────────────────
-  console.log('\n9. the room never falls back');
+  console.log('\n10. the room never falls back');
   /*
     Asserted as source rather than by killing the controller mid-run: `readRoomConfig` has no
     catch around it in `load`, so an unreachable controller throws and the reader sees an error.

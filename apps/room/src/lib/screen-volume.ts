@@ -95,16 +95,30 @@ export function volumeIcon(audioVolume: number): VolumeIcon | null {
  * `i` is `n.$index` — the row's POSITION in `mediaService.talkingUsers`, not the user id. So the
  * ids are stable per row rather than per person, which is what the reference emits and what a
  * capture of it would show.
+ *
+ * ## `prefix`, and the collision it exists to avoid
+ *
+ * The reference builds these ids IDENTICALLY in both dropdowns —
+ * `app-presentationarea.render-helpers.js:370-371` and `app-room.render-helpers.js:1087-1088` are
+ * the same three `ei(…, 'talkingPresenter', i, '-donot-disturb')` calls. In viewer-only mode both
+ * dropdowns are in the document at once (the navbar's is ungated; the overlay's trigger renders
+ * only in viewer-only mode), so upstream every row id appears TWICE and every `<label for>` in the
+ * overlay resolves to the navbar's checkbox instead of its own.
+ *
+ * That is reproduced for the navbar copy, which keeps the captured ids exactly, and DIVERGED for
+ * the overlay copy, which takes a distinct prefix. The rule this repository already applies: a
+ * captured value is reproduced unless reproducing it locks a real person out — duplicate
+ * `id="dropdownMenuScreen"` costs a reader nothing and is kept, a duplicated form-control id makes
+ * the overlay's own checkboxes unclickable by their labels and is not. Recorded in `TODO.md` under
+ * decisions taken deliberately, beside the `aria-selected` and `tabindex` divergences in
+ * `ScreenTabs.svelte`.
  */
-export function presenterRowId(index: number): string {
-  return `talkingPresenter${index}-donot-disturb`;
+export function presenterRowId(index: number, prefix = 'talkingPresenter'): string {
+  return `${prefix}${index}-donot-disturb`;
 }
 
 /** `preferences.audioMutedFor[userID]` as the template reads it: a truthiness check. */
-export function isMutedFor(
-  preferences: PresenterAudioPreferences,
-  userID: number
-): boolean {
+export function isMutedFor(preferences: PresenterAudioPreferences, userID: number): boolean {
   return Boolean(preferences.audioMutedFor[userID]);
 }
 

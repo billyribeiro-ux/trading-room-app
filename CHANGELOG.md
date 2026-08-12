@@ -24,6 +24,503 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-12
 
+### 2026-08-12 16:29 EDT — A second pre-existing RED test, found by running a suite nobody had run
+
+**Runtime impact: none** — one assertion in `dump-contract.test.ts`.
+
+`f9e1890` replaced the wrapper ternary with `class="wrapper"` plus two `class:` directives, because
+it bound a SECOND class to the same element — `KAe = (t, n) => ({"push-wrapper": t, "mt-0": n})`
+(`app-room.full.js:5`, applied at `:4029-4039`), and two independent classes do not fit one
+`a ? b : c`. The assertion still demanded the ternary verbatim, so it went red at that commit and
+stayed red, because `f9e1890` reported `svelte-check` and prettier only.
+
+The same shape as the `individualVolumeControls` failure found earlier today: a suite that nothing
+ran between the change and now. What the assertion GUARDS is unchanged and still asserted — the
+wrapper always carries `wrapper`, and `push-wrapper` appears only with `sidebarOpen`. Negative
+control: binding `push-wrapper` to `true` turns it red; restored.
+
+### 2026-08-12 16:26 EDT — `isMobileScreen` and the `K4e` layout, and the CSS rule that was deleting it
+
+**Runtime impact: a phone gets the reference's room instead of a squeezed desktop one** — and the
+presentation area, which our own stylesheet had been hiding on every screen under 900px, comes back.
+
+**The threshold selects a TEMPLATE, not a class.** `isMobileScreen = window.innerWidth <= 601`
+(`app-room.full.js:1889`, `:2988`) drives `O(5, o.isMobileScreen ? 6 : 5)` (`:4061`), choosing
+between `j4e` and `K4e` (`app-room.render-helpers.js:1616-1664` and `:1783-1821`). 601, not 600: the
+scoped sheet's own media query beside it is `max-width: 600px`, so the two do not agree and the 1px
+seam is the reference's. Copied rather than tidied.
+
+**Four differences, every one read from the const table rather than inferred:**
+
+- **The child order reverses.** `K4e` node 1 is the presentation (`O(1, hidePresentation ? -1 : 1)`,
+  `:1815`), node 2 the chat/alerts. `j4e` is the other way round (`:1650`, `:1662`). Same two flags.
+- **Both splits are vertical as a STATIC attribute.** Const 224 is
+  `['minSize','0','direction','vertical','id','mainAreaSplit','gutterDblClickDuration','400',…]` and
+  const 228 is `['direction','vertical','minSize','0']`, where the desktop pair (consts 8 and 209)
+  *binds* direction from `directionRoom()`. So a phone is stacked whatever `roomSplitDir` says.
+- **No `dragEnd`.** `K4e` binds `gutterDblClick` and `dragStart` only, so a mobile drag is never
+  recorded — and is not recorded here.
+- **No `order` on either area.** Consts 225/226 carry `size` alone; const 227, the extra chat column
+  this room does not model, is the only mobile area with `order`.
+
+**That last one is why this reorders the DOM rather than restyling it.** Snippets, not a second copy:
+the two panes are ~1,625 lines, and a duplicated layout drifts the first time somebody edits the one
+they happen to be looking at.
+
+**A trap caught against const 228 rather than by eye.** The inner chat/alerts split is normally the
+*opposite* direction to the outer, so the obvious implementation reuses `splitIsHorizontal` — which
+would have put alerts BESIDE chat in a phone-width column. Const 228 says vertical outright, so
+`innerSplitIsVertical` is an OR, not a negation.
+
+**Mobile geometry is its own and is never written down.** `chatAlertsSizeMobile = 50` /
+`presAreaSizeMobile = 50` (`:1852-1853`) live in a separate field from the desktop 70/30
+(`:1848-1849`), so rotating a tablet does not destroy either.
+
+**Crossing the threshold refetches, once.** `onResize` debounces 500ms then re-emits
+`appHasFocusGetChatLog` and re-requests `getAlertsLog` page 0 (`:2990-2999`) — because the two
+templates hold different numbers of messages. It fires on the FLIP, not on every resize.
+`invalidate('room:data')` is all of it here: the load registers `depends('room:data')`
+(`+page.server.ts:124`) and returns alerts and messages together.
+
+**THE DEFECT THIS FOUND, and it was ours.** `src/app.css` carried
+`@media (max-width: 900px) { .vertical-gutter, .presentation-box { display: none } }`, unattributed,
+since `cbfb4b9`. It hid the presentation area on every screen under 900px — the exact pane `K4e`
+puts FIRST on a phone. It is not captured: the reference's own `max-width: 900px` block
+(`css/complete-app-styles.css:7855`, de-scoped twin at `captured-runtime-components.css:7196`)
+contains nothing but font sizes for the Files pane. The `.vertical-gutter` half was inert — that
+class has zero occurrences in `+page.svelte` — so the only thing the block ever did was the harm.
+**Found by rendering, not by reading:** the new harness measured `.presentation-box` as 0×0 with
+`display: none` at both 601px and 602px, which is why it exists.
+
+**Verified:** `scripts/verify-mobile-layout.mjs` renders 602, 601 and 600 in Chromium — 4/4, and it
+measures the geometry rather than the flag: desktop side-by-side (chat 236px + presentation 354px,
+shared top edge), mobile stacked full-width (presentation at y=49 h=370, chat at y=430). Three
+negative controls, each red then restored — drawing 601 with the desktop arrangement (which also
+tripped the 601-vs-602 distinctness check), drawing 602 with the mobile one, and **putting the 900px
+rule back, which failed all three widths**. `mobile-layout-contract.test.ts` 13/13 with four more
+controls: moving the threshold to 600, making the inner split the inverse of the outer, persisting a
+mobile drag, and refetching on every resize instead of the flip. `svelte-check` 978 files, 0 errors,
+0 warnings. `svelte-autofixer` clean. `verify:viewer-only` still 4/4 after the CSS removal. 91/91
+across the six room suites.
+
+**NOT carried, and stated rather than glossed:** `W4e` renders `app-chat` with no `openPrivateChat`
+binding (`app-room.render-helpers.js:1753`) while its extra-chat sibling keeps one (`:1769`). This
+room INLINES app-chat instead of composing it, so the parent/child binding distinction does not map —
+reproducing it would mean shipping a button that is knowingly dead on phones. Left alone deliberately.
+**Also not modelled:** `K4e` node 3, the extra chat column, and the bottom-layout axis
+(`isChatAlertsOnBottom` and its four sizes, `:1854-1859`) — `extraChatColumn` has zero occurrences in
+this room, a gap that predates this change.
+
+**NOT verified:** no browser drove the Svelte component itself at either width. The harness renders
+the arrangement and the contract test reads which arrangement the template picks; the room needs a
+controller this machine has no `.env` for — TODO row E.
+
+### 2026-08-12 16:01 EDT — `disableCopy` and push-to-talk: three host bindings that were never bound
+
+**Runtime impact: "Disable Copy?" now protects something.** An owner has been able to tick it on the
+Manage page all along; `disableCopy`, `contextmenu` and `noselect` each had **zero occurrences** in
+this room, so it protected nothing at all.
+
+**Three bindings, one rule.** `onKeyDown`, `onRightClick` and `onKeyUp`
+(`app-room.full.js:3011-3032`) are host-bound to `keydown`, `contextmenu` and `keyup`
+(`app-room.compiled.js:1260-1281`). The copy restriction carries the same two terms in all three
+places plus `ngAfterViewInit` (`:2227-2229`): `!isPresenter && sessData.disableCopy`. Right-click is
+suppressed, Ctrl+C / Ctrl+U / Ctrl+S and F12 are suppressed, and `document.body` gains `noselect`.
+
+**The presenter exemption is the point, not an oversight.** This restricts the AUDIENCE; the person
+running the room keeps their own clipboard. Asserted in both directions.
+
+**Two readings that would have been wrong, and are pinned so they cannot return.** `F12` is the
+second arm of an `||`, not a third Ctrl combination — reading it as `Ctrl+F12` would leave devtools
+open on the one key most people reach for. And the comparison is `e.key.toLowerCase()`, so Ctrl+Shift+C
+is caught; dropping the lowercase would let Shift through.
+
+**Push-to-talk's `!e.repeat` is load-bearing.** `preferences.pushToTalk && !e.repeat &&
+('ControlRight' === e.code || 17 == e.which) && micMuted && toggleMic()` (`:3012-3016`). keydown
+repeats while a key is held; without that term every repeat calls the mic toggle again, closing and
+reopening the producer many times a second for as long as somebody speaks. The legacy `which === 17`
+fallback is kept for the same reason it exists upstream — browsers that populate one and not the
+other.
+
+**`noselect` was checked, not assumed.** `.noselect { user-select: none; }` at
+`css/complete-app-styles.css:7017`, unscoped. A class with no rule behind it would have closed the
+keyboard path while leaving the text selectable by drag, which is this repository's standing example
+of dead scaffolding.
+
+**One declared divergence.** Upstream adds `noselect` once in `ngAfterViewInit` and never revisits
+it, because `isPresenter` cannot change in that component's lifetime. Here it can — `giveMicScreen`
+elevates a member mid-session — so it is an `$effect` with a teardown; a class added at mount would
+keep restricting somebody the room has just promoted.
+
+**Listener targets, stated as unresolved.** The reference registers the key events with one target
+resolver (`Cm`, shared with the window-only `onResize`) and `contextmenu` with another (`mE`).
+Neither symbol is defined anywhere in `docs/source/components/`, so which is `window` and which is
+`document` is NOT established. All three are bound on `window` here; `contextmenu` bubbles to both
+and the handler's only effect is `preventDefault`, so the distinction cannot change behaviour.
+
+**HONEST GAP: nothing writes `pushToTalk` yet.** The gate reads it correctly and will work the moment
+a control sets it, but the checkbox lives in `app-user-settings-modal` — the only other component in
+the decoded tree that mentions it — which is a separate component and a separate piece of work.
+Inventing a checkbox here would mean guessing its label and position.
+
+**Verified:** `room-key-gates.test.ts` 18/18 — behaviour driven directly, plus the handlers, the
+three event bindings and the wiring read out of the decoded component at runtime. Five negative
+controls, each red on exactly its own assertion then restored: dropping the presenter exemption,
+folding F12 into the Ctrl combination, dropping `!repeat`, dropping the legacy keyCode, and losing
+the case-insensitivity. Controller 56/56 across the settings chain; `schema:verify` green at 46
+wired, with the tripwire moved 45 → 46 and the schema regenerating to three changed lines.
+`svelte-check` 977 files, 0 errors, 0 warnings. `svelte-autofixer` clean. Prettier clean. 45/45
+across the four room suites touching these files.
+
+**NOT verified:** no browser pressed a key. The predicates are exercised directly and the wiring is
+asserted as source, but nothing dispatched a real `keydown` at a live room — the same environment gap
+as TODO row E.
+
+### 2026-08-12 15:54 EDT — The gutter double-click does something now, and it found a bug on the way
+
+**Runtime impact: double-clicking the main gutter collapses the presentation area and restores it.**
+It previously did nothing at all.
+
+`gutterdblclickduration="400"` has shipped on `#mainAreaSplit` since the split was written —
+transcribed from const 8 (`app-room.compiled.js:1294-1304`) — while `hideShowPresentationArea` had
+**zero occurrences**. A control whose configuration ships and whose behaviour does not, which is this
+repository's own definition of dead scaffolding. The handler is `app-room.full.js:2693-2698`, bound
+to `gutterDblClick` on the OUTER split in both reference layouts (`render-helpers.js:1622-1623`
+desktop, `:1787-1788` mobile) — asserted as a count of 2, so a layout that stops binding it fails.
+
+**The mapping.** Upstream keeps `presAreaSize` + `chatAlertsSize` summing to 100; this room keeps one
+number, `mainSplit`, which is the chat/alerts side. So 100/0 collapsed is `mainSplit = 1` and 30/70
+restored is `0.3`. The asymmetry is the reference's and is kept: it restores to a fixed 70/30 rather
+than to whatever the user last dragged, so the second double-click is a reset as much as an undo.
+Nothing persists — upstream ends in `printSizes()`, which is a `console.log` and nothing else
+(`:2708-2712`), unlike `dragEnd` which does write. Persisting would let a transient toggle overwrite
+the geometry the user chose by dragging.
+
+**The 400ms window is implemented rather than delegated.** The browser's own `dblclick` threshold is
+the platform's, not this attribute's; honouring macOS's value while rendering a 400ms attribute would
+leave the attribute decorative in a second way. `beginSplit` calls `preventDefault()` on pointerdown,
+so native `click` is not reliable on this element either — the release is a click only if the pointer
+went down and up without `resizeFromPointer` running, which is what stops two quick DRAGS from
+toggling and throwing the resize away.
+
+**Extracted to `$lib/split-gutter`, and that is what caught the bug.** A two-click state machine whose
+entire content is timing cannot be driven from inside a 10,000-line component, so it follows
+`roster-gates.ts` / `files-gates.ts` out into a module. Writing the "restores to 70/30" case then
+failed for a reason that was not the test's: **the sentinel for "no click pending" was `0`, and
+`performance.now()` counts from page load** — a genuine first click at t=100ms sat 100ms from the
+sentinel, inside the window, so the room would have collapsed its presentation area on the FIRST
+SINGLE CLICK of any session, and again after every completed double-click. Now `-Infinity`, with a
+regression test that asserts the behaviour at small timestamps rather than asserting the constant.
+
+**Verified:** `split-gutter.test.ts` 12/12 — six of them a real click sequence at real timestamps
+(single click does nothing; second click collapses; fourth restores; three clicks are one
+double-click and a leftover; the 400ms boundary counts, 401 does not; two drags do not fire), and
+five pinning the handler, the binding count, the const-table 400 and the wiring into the room. Four
+negative controls, each red on exactly its own assertion then restored: restoring to the dragged size
+instead of 70/30, narrowing the window to 100ms, putting the sentinel back to `0`, and ignoring the
+drag flag. `svelte-check` 975 files, 0 errors, 0 warnings. `svelte-autofixer` clean. Prettier clean.
+27/27 across the three suites touching these files.
+
+**NOT verified:** no browser drove a real gutter. The state machine is exercised directly, and the
+wiring into `finishSplit` is asserted as source, but nothing clicked a live `.as-split-gutter` — the
+same environment gap as TODO row E.
+
+### 2026-08-12 15:46 EDT — `hideChatAlerts` and `hidePresentation`: the two column gates, as one flag each
+
+**Runtime impact: two room settings that did nothing now remove a column each.** An owner who ticked
+"Hide Alerts/Chat Section?" or "Chat Only Room?" on the Manage page got a room that ignored both.
+
+**`hideChatAlerts` was three mechanisms and no setting.** Upstream it is ONE field with five writers
+(`app-room.full.js:1893-1902`, plus `detachChat` at `:2179-2181`) gating the whole chat/alerts column
+at `O(1, e.hideChatAlerts ? -1 : 1)` (`app-room.render-helpers.js:1650`) and the extra chat column
+beside it at `:1652-1660`. Here it was a hardcoded branch on `viewerOnlyMode`, a second branch on
+`chatAlertsDetached`, and nowhere at all for the room setting — which is precisely why the setting
+did nothing: there was no fourth branch, and adding one would have been a fourth copy of one
+decision. It is now one `$derived` flag with the three sources this room can resolve.
+
+**Two of the five are honest gaps, and are recorded as such rather than guessed.** `isPlayer` has
+zero occurrences here — upstream it is a stream-PLAYBACK global whose only other reader raises "The
+stream has ended" on `streamPlayerEnded` (`:2162-2165`), and this room has no such mode.
+`videoOnlyMode` is the `r` query parameter, the same gap `files-gates.ts` already records for
+`hideFiles`. `recordChat` was deliberately kept OFF the wire: it appears only inside that writer, so
+sending it would add a setting nothing can read.
+
+**`hidePresentation` was half-built under another name.** `{#if !chatOnlyMode}` on the presentation
+column has been there since `cbfb4b9`, so the brief's expectation that `?co=1` renders a presentation
+area was already false — that half was correct. What was missing is the SECOND term,
+`sessData.isChatOnlyRoom` (`full.js:1903-1904`, gate at `render-helpers.js:1662`), and the name the
+reference gives the pair. The `beforeunload` listener registered inside that same statement is now
+carried too: it posts `windowClosing` to `window.opener`, which is how the opener learns the popout
+closed and calls `reatachChat`. The `?.` on `window.opener` is a declared divergence — upstream
+`co=1` is only ever reached through `detachChat` so an opener always exists, while this room can be
+opened at `?co=1` by hand, where the reference's line would throw on every unload.
+
+**The reopen control moved to where the bootbox says it is.** Detaching used to leave a "Reopen here"
+panel inside the column; upstream it deletes the column and raises `reopenAlertsChatBtn`, whose
+control is a SIDEBAR item — `H(25, oPe, 5, 0, 'li', 19)` gated by `O(25, …)`
+(`render-helpers.js:312, 355`, markup `:76-87`), with its title, classes and icon read from consts
+19/22/38/39 (`compiled.js:1324, 1337, 1416, 1417`). It sits between Connectivity Check and General
+Settings because that is where node 25 sits. No separate `reopenAlertsChatBtn` field: here
+`hideChatAlerts` is derived and `chatAlertsDetached` IS the detach source, so a second flag could
+only disagree with it.
+
+**Wiring the two settings across the boundary touched four lists, by design.** `ROOM_CONSUMED` in the
+generator, `ROOM_VISIBLE_SETTINGS`, the `RoomSessionSettings` interface, and the verifier's own
+`EXPECTED_WIRED_SETTINGS` — the duplication is deliberate and documented, so drift shows up as a diff.
+The generator's `WIRED_SETTINGS.size` tripwire moved 43 → 45 and the schema regenerated to exactly
+three changed lines: the documented count and the two `wired` flags.
+
+**One pre-existing RED test found and fixed, and it was not mine.** `room-config-boundary.test.ts`
+asserts its `consumers` map equals `ROOM_VISIBLE_SETTINGS`; `individualVolumeControls` was added to
+the allow-list with the viewer-only work and never given an entry, so that assertion had been failing
+before this change. Verified against `HEAD` before touching it. Its consumer is real —
+`PresenterMuteRows.svelte:123` — and all three names now have entries.
+
+**Verified:** `chat-alerts-gates-contract.test.ts`, 13 assertions read out of the decoded component
+at RUNTIME, 13/13. Four negative controls, each red on exactly its own assertion and restored:
+unbinding the chat gate, dropping the setting from the derived flag, narrowing `hidePresentation`
+back to `chatOnlyMode`, and changing the sidebar item's title. Controller: 56/56 across the four
+tests that guard the settings chain. `schema:verify` green at 45 wired. `svelte-check` 972 files, 0
+errors, 0 warnings. `svelte-autofixer` clean. Prettier clean.
+
+**NOT verified, and recorded as TODO row E rather than glossed:** there is no RENDER behind these two
+gates. `room-config-seam-e2e.mjs` now carries the assertions — flip the setting, watch `.alert-chat-box`
+or `.presentation-box` leave the DOM — but it could not run: `apps/room/.env` does not exist,
+`ROOM_JWT_SECRET` is absent from the controller's `.env` too, and the probe's default `CONTROL` port
+5180 is a different project on this machine (the controller's dev port is 5173). Provisioning a
+shared secret is an owner decision, and inventing one to make a probe go green is the opposite of
+what the gate is for.
+
+### 2026-08-12 15:22 EDT — The navbar fix now has a render, and the harness can fail on it
+
+**Runtime impact: none** — tests and a harness only. It closes the verification gap `f9e1890` left
+open, which was the second of PR #3's two blockers.
+
+`f9e1890` gated the navbar and the sidebar on the three modes and bound `mt-0`, and shipped
+**verified by `svelte-check` and prettier only**. Its own commit message said so. The reason was
+this harness: `grep -c "room-sidebar\|mainAppNav\|mt-0"` over
+`scripts/verify-viewer-only-layout.mjs` returned **0**. It built a fixture containing the split,
+`#mainTabs` and the video, and never the two elements beside them — so `4/4` was green before the
+fix and green after it, measuring something real, but not the thing that was wrong.
+
+The fixture now renders the chrome, and four assertions measure it, each tied to the case's identity
+rather than to the flag that draws it:
+
+- the navbar is ABSENT in viewer-only and chat-only, PRESENT in the full room —
+  `O(4, videoOnlyMode || chatOnlyMode || viewerOnlyMode ? -1 : 4)` (`app-room.full.js:4043-4059`);
+- the sidebar the same, from `O(3, …)`, which is the same condition evaluated twice;
+- `.wrapper` computes `margin-top: 49px` in the full room and `0px` in both reduced ones —
+  `KAe = (t, n) => ({'push-wrapper': t, 'mt-0': n})` (`:4029-4039`) against
+  `app-room .wrapper { margin-top: 49px }`
+  (`src/lib/styles/captured-runtime-components.css:1099-1138`);
+- **nothing ends below the fold.** This is the defect itself: a `vh-100` split that starts 49px down
+  ends at 849 in an 800px window.
+
+Negative controls, all four red before being restored. Unbinding `mt-0` in the viewer-only case
+reports both halves at once — `.wrapper margin-top is 49px … expected 0px` and **`the split ends at
+849px in a 800px window — 49px of the room is off-screen`**, which is the pre-`f9e1890` state
+reproduced and measured. Keeping the chrome in chat-only reports the navbar and the sidebar
+separately. In the contract test, unbinding `mt-0` and replacing the `{#if}` with `{#if true}` each
+go red.
+
+The contract test also pins the harness itself now: it asserts that
+`verify-viewer-only-layout.mjs` mentions `mainAppNav`, `room-sidebar`, `wrapperMarginTop` and
+`splitBottom`, so a fixture that stops rendering the chrome fails in vitest rather than quietly
+returning to green-and-blind.
+
+**Verified:** 67 tests across the five contracts touching these files; `svelte-check` 972 files, 0
+errors; prettier clean; `verify:viewer-only` **4/4** with the chrome measured; four negative
+controls.
+
+### 2026-08-12 14:28 EDT — Review corrections: the viewer-only class was on two wrong elements
+
+**Runtime impact: yes.** Three class bindings moved, one added, one attribute determined not to
+belong.
+
+A review of the 13:45 entry re-derived each claim from the decoded files and found the placement of
+`viewer-only-screen-tab` wrong in both directions. `wSe`'s update block
+(`app-presentationarea.render-helpers.js:471-494`) walks `O(0,…)`, `m(2)`, `pt(…)`, `m(2)`,
+`O(4,…)` — an explicit index, which fixes the pointer independently of counting — then `m()` to node
+5, and node 5 is `d(5,'div',72)`. The const table agrees from the other side: **only const 72 carries
+a `3,'ngClass'` marker**, and Angular emits that marker exactly where a binding exists. So:
+
+- **removed** from `ul#screenTabs` (const 70 has no marker at all — the class had no upstream), and
+  with it the now-unused `viewerOnlyMode` prop on `ScreenTabs.svelte`;
+- **removed** from the screen pane (const 73's only `ngClass` is `Hr = {'show active': t}`);
+- **added** to `div#screensTabsContent` in `+page.svelte`, which is what const 72 is.
+
+**`H0e`'s other argument, wired.** The 13:45 work quoted the whole of
+`H0e = (t, n) => ({hidden: t, 'viewer-only-screen-video': n})` and bound only `n`. `t` is
+`!isConnected || (isPresentingThisScreen && !localpreview) || saveData`
+(`app-screenshare-view.compiled.js:338-343`): the first term is `stream === null` here and is now
+bound, with the component's own `.hidden { display: none }` (`:357`) added to `ScreenPane`'s scoped
+style block; the second is false by construction in this app; the third, `saveData`, is unmodelled
+and is now `TODO.md` W.
+
+**`controls` determined NOT to be a gap.** `z('controls', o.showControls)` sits on the line above,
+but `showControls` starts `!1` and its only writer is a click on that same `<video>`, which the same
+stylesheet gives `pointer-events: none`. The bar never appears upstream; omitting the attribute
+reproduces the behaviour. Recorded under decisions taken deliberately.
+
+**A comment corrected:** `PresenterMuteRows` said the navbar's `hr` was "inside the repeater". It is
+a SIBLING of it (`ht(0, _4e, …), T(2, 'hr')`), inside the gated block — one rule per dropdown, not
+one per row. The output was right; the sentence was not.
+
+**The two layouts now have a render.** `pnpm --filter room verify:viewer-only` — four checks in real
+Chromium at 1280×800: a full room (control, split 751px), chat-only (`vh-100` → exactly 800px),
+viewer-only (one split area, `ul#mainTabs` `display:none`, `#screensTabsContent` **max-height 760px
+against an 800px viewport — `calc(100vh - 40px)` computed live**, which confirms the const-72
+placement from the rendered side rather than from the const table), and the image check below.
+**4/4**, captures in `apps/room/evidence-viewer-only/`.
+
+**The limit of that, stated next to the number because anyone who reads it alone will be wrong: no
+capture of this product in viewer-only or chat-only mode exists, so what this proves is the
+reference's CSS taking effect on our elements, not a pixel diff against its output.** That is the
+honest ceiling for this item, not a gap to be closed later by trying harder — the evidence to close
+it does not exist. The same sentence is in the script's own header.
+
+**Which artifact carries which claim.** `measurements.json` proves the icon identity and the
+geometry: `iconClass` comes from the real module, `iconGlyph` is the codepoint on `::before`
+(U+F026 / U+F027 / U+F028) checked against the one Font Awesome's own stylesheet declares for that
+class, and the rects are the browser's. The PNGs prove a different thing — that the states render
+DIFFERENTLY FROM EACH OTHER — and that claim is now asserted rather than assumed.
+
+**Both harnesses were writing one file for several states and reporting green.** `volume-0`, `-5`,
+`-51` and `-100` were byte-identical, as were `full-room` and `chat-only`, while the JSON beside them
+recorded three different glyphs and a 49px difference. Two causes, both fixed rather than labelled:
+
+- every harness built its page with `page.setContent()`, which gives an opaque origin Chromium
+  refuses `file://` font fetches from, so every glyph painted as the same fallback box. All three
+  now serve over `http://127.0.0.1` through `scripts/lib/harness-server.mjs`, the faces load, and
+  the server records any font request that does not return 200 so a failure is a named network fact
+  rather than a disclaimer. `verify-tooltip-placements.mjs` had the same defect and got the same
+  fix; its six results are unchanged.
+- nothing compared the captures. Every capture is now hashed; the states that must differ are
+  asserted to differ, the layout cases are captured full-page AND element-bounded so a 49px change
+  in an unpainted box becomes a byte difference, and the pair that may legitimately match
+  (`full-room` vs `chat-only` full-page) is documented as such instead of demanded.
+
+Negative controls for both: forcing volume 5 to paint volume 0's glyph fails with
+`volume-0.png and volume-5.png are byte-identical`; rendering chat-only without `vh-100` fails with
+`full-room-split.png and chat-only-split.png are byte-identical`.
+
+**One assertion was withdrawn as wrong.** `document.fonts.check('900 16px "Font Awesome 5 Free"', …)`
+returns false for a face `document.fonts` reports as loaded and which visibly paints — an icon font
+has no glyph for the character the API tests by default, and passing the codepoint did not change
+its answer. It is recorded as a diagnostic; the assertions that replaced it are the loaded face, the
+codepoint, and the captures differing.
+
+**The layout harness's first version could not fail, and its own negative control found that.** Both
+the render and the expectation came from one `vh100` flag, so flipping the flag flipped the check.
+The expectation is now tied to the case's identity — `QB` gives `vh-100` to every reduced layout —
+and flipping the flag fails with `vh-100 is absent on viewer-only`.
+
+**Attribution note, recorded rather than rewritten:** commit `6a5053e`
+("v5.md and v4.md: forensic audit of the app version switches") also contains the first batch of this
+work — `screen-volume.ts`, `ScreenVolumeControl.svelte`, both test files and the `+page.svelte`
+changes — swept in from an uncommitted working tree by a concurrent session. The history is wrong
+and is being left alone: two sessions are pushing to `main`, and a force-push to fix an attribution
+line is the worse trade.
+
+### 2026-08-12 13:45 EDT — Viewer-only mode is real, and the navbar dropdown is complete
+
+**Runtime impact: yes**, in three places — the navbar volume dropdown, the background-music slider,
+and every screen pane in every room.
+
+Item U added `viewerOnlyMode` to this app. Reading the decoded tree for its OTHER consumers turned up
+seven bindings and two defects, all of them in code that already shipped.
+
+**Closed, each with its decoded citation:**
+
+| what | evidence | what it was |
+| --- | --- | --- |
+| the navbar dropdown had no per-presenter rows | `app-room.render-helpers.js:1224-1225, 1103-1106, 1436` | a member could mute the room but not one presenter |
+| its third icon was `fa-volume-mute` | `app-room.compiled.js:1696` is `fa-2x fa-volume-off`; and Font Awesome's own sheet declares `.fa-volume-off:before{content:"\f026"}` against `.fa-volume-mute:before{content:"\f6a9"}` | **not a near-miss class name — a different picture.** U+F6A9 is not U+F026, so every listener who dropped below 4 saw the wrong glyph, not a variant of the right one |
+| the background-music slider was gated on SoundCloud alone | `:1434` gates on `scPlaying \|\| mp3Playing \|\| roomState.ytURL` | dead for MP3 and YouTube — two of the three sources it controls |
+| its container carried `class="m-0"` | const 114 is `[2,'text-align','center']` — a `2` marker is STYLES | the class belongs to the `<p>`, which already had it; the centring was absent |
+| `viewer-only-screen-video` and `viewer-only-screen-tab` were STATIC classes | `app-screenshare-view.render-helpers.js:2`, `app-presentationarea.render-helpers.js:9` — both are `ngClass` bindings | viewer-only geometry (`max-height: 100% !important`, `height: 100% !important`) applied to EVERY room |
+| nothing applied `viewer-only-screen-zoom-controls` | `…render-helpers.js:10, 261` | the rule shipped and painted nothing; the trio sat 66px from where the reference puts it |
+| the main tab strip stayed visible in viewer-only mode | `app-presentationarea.compiled.js:3154-3155` | — |
+| chat and alerts stayed visible | `app-room.compiled.js:76-77` | — |
+| the private chat could still be opened | `app-room.compiled.js:855-861` | four call sites each set the flag; there is now one `showPrivateChat()` carrying the refusal |
+| the split kept its two-column height with one column | `app-room.render-helpers.js:11, 1639-1648` — `QB = (t) => ({'vh-100': t})` | `.vh-100` shipped in the sheet and was applied by nothing |
+
+The per-presenter row is now ONE component, `PresenterMuteRows.svelte`, rendered by both dropdowns —
+the two const tables are the same values in the same order (`app-presentationarea` 111-115,
+`app-room` 117/201-204), so it is one control that appears twice.
+
+**One deliberate divergence, recorded in `TODO.md`:** upstream both dropdowns give their rows the
+same ids, and in viewer-only mode both are in the document at once — so every `<label for>` in the
+overlay resolves to the navbar's checkbox. The navbar keeps the captured ids; the overlay takes a
+distinct prefix.
+
+**Three things checked and found already correct** (asked for, and worth recording so nobody looks
+again): `KB`/`HCe` both resolve to the single class `muted`; const 54 is
+`['fas','fa-closed-captioning']`, so the Subtitles icon was right; and the icon thresholds in the
+navbar are the same strict inequalities as the overlay's.
+
+**Verified:** 687 tests across 66 files (the whole room suite, because shared components changed);
+`svelte-check` 972 files, 0 errors; prettier clean; **six more negative controls run and each went
+red** — the icon reverted, `trailingRule` dropped, the background-music gate narrowed, the container
+class restored, the viewer-only classes made static again, and the `mainTabs` binding removed; and
+the render harness extended to **7/7**, including a screenshot of the navbar dropdown with two
+presenters talking that shows rows → slider → rows → slider → `hr` → the six checkboxes, in that
+order.
+
+### 2026-08-12 12:55 EDT — Item U built: the zoom-overlay volume dropdown, from the DECODED component
+
+**Runtime impact: yes.** A new control renders in the screen tab bar's `ms-auto` cluster when the
+room is entered with `?vo=1` or `?vo=2`, and one room setting now crosses from the controller.
+
+The reference's second `#dropdownVolume` — `btn btn-sm btn-dark`, consts 90-97 and 106-115 of
+`app-presentationarea` — with its master slider, its Mute/Unmute pair, and one row per talking
+presenter carrying a mute checkbox and (when the room enables it) a per-presenter volume slider.
+
+**Decoded, not reconstructed.** Every claim came from
+`apps/room/docs/source/components/app-presentationarea.{render-helpers,compiled}.js` and its
+`app-room` counterpart — line-numbered files that were already in the repository. No byte offsets
+were sliced out of the 2.9 MB bundle for any of it. The one exception is the `vo` parameter itself,
+which belongs to the app service rather than to a component and is inherited from the entry above.
+
+Built:
+
+- `apps/room/src/lib/screen-volume.ts` — the icon thresholds and both preference transitions, as
+  pure functions, so the render harness can run the REAL code in a browser.
+- `apps/room/src/lib/components/ScreenVolumeControl.svelte` — the markup.
+- `ScreenZoomControls.svelte` — a `volume` snippet slot, between the zoom trio and the dark buttons,
+  which is where `CSe` puts children [3] and [4].
+- `+page.svelte` — `viewerOnlyMode` from the `vo` parameter (the same idiom `co` and `dscreen`
+  already use), the two preference maps as `$state.raw`, the four handlers, persistence through
+  `savePreference`.
+- The controller: `individualVolumeControls` added to `ROOM_VISIBLE_SETTINGS` and to the room's
+  `RoomSessionSettings`, and to the generator's `ROOM_CONSUMED`. Schema regenerated: 43 wired,
+  `verify-room-settings-schema.mjs` green. The setting itself was always captured and stored
+  (`room-settings-schema.ts:254`, manage-page decode at
+  `apps/controller/docs/reference/parts/02-baseline-720-1439.md:2221`); what it lacked was transport
+  and a consumer, and both arrived together.
+
+**Four corrections to `HANDOFF.md`, all from reading the decoded tree:**
+
+1. The two `room-sound-options` are a subset and a superset — the NAVBAR one holds the presenter
+   rows *and* the six checkboxes, so ours (checkboxes only) is incomplete. Recorded as `TODO.md` V.
+2. `mute()`/`unmute()` differ between the two components; the overlay's pair does not touch
+   subtitles or background music.
+3. The navbar's third icon is `fa-volume-off`; ours renders `fa-volume-mute`. `TODO.md` V.
+4. `individualVolumeControls` was stored but unwired, not absent.
+
+**Verified:** 30 tests green (17 behaviour, 13 contract — the contract test parses the decoded const
+table with the repository's own tokenizer and takes each index from the render helper's call site);
+`pnpm --filter room check` 971 files, 0 errors; prettier clean; **six negative controls run and each
+went red** (`>50`→`>=50`, `<4`→`<=4`, `delete`→`= false`, the Mute/Muted swap inverted, the volume
+slot removed, and the same `>=50` against the render harness); and a REAL RENDER —
+`verify:screen-volume`, six volume values in Chromium, 6/6, PNGs in `apps/room/evidence-screen-volume/`,
+proving the trigger is EMPTY at exactly 50 and exactly 4 and that all four captured classes are
+painted by the sheets this app serves.
+
+**Not closed, and recorded rather than papered over:** per-presenter mute does not reach the SFU —
+this signalling wire has no `pauseConsumer` — so it is applied to the listener's own `<audio>`
+element. `TODO.md` V has the two ways to close it.
+
 ### 2026-08-12 13:05 EDT — The gate has a source, and `HANDOFF.md` is complete
 
 `viewerOnlyMode` is the **`vo`** URL query parameter. Bundle offset ~2595500:
@@ -3796,3 +4293,27 @@ tab strip scored 15/15 against an empty `<ul>`.
 neither yet fixed: the stats date `<input>` is created on click but never focused, so the picker does
 not open and the row sticks in edit state; and `for="statsFrom"`/`for="statsTo"` point at ids that
 exist only while editing, so the labels are orphaned at rest.
+
+## 2026-08-12 17:05 EDT — the provenance seal can run for the first time
+
+Three instances of one path bug, not one. `REPOSITORY_ROOT` was corrected earlier, but
+`verify-backend-provenance.mjs` still read every file with `new URL(`../${path}`, import.meta.url)`
+at two more sites (the manifest read and the documented-count read), which resolve to
+`apps/controller/` — a directory that has no `services/` and no `ops/`. Both are now addressed from
+`REPOSITORY_ROOT`. They were invisible because the file-count check threw first.
+
+The count is split rather than bumped. `LOCALLY_AUTHORED` names
+`services/api/migrations/0009_rename_runtime_roles.sql`, authored here on 2026-08-10 and never
+imported, and pins it by its own SHA-256 (`6acfec23…`). The imported seal stays at 98, so
+`ops/backend-import-provenance.md` still records only what was imported. TODO row Z refused to bump
+98 to 99 and that refusal was right; this is the half that was missing.
+
+VERIFIED: the count check passes (98 imported, 99 total, 1 locally authored) and the path-list
+SHA-256 passes — both for the first time.
+
+NOT GREEN, and deliberately not silenced: the manifest SHA-256 now differs
+(expected `4c303601…`, got `f1a8493f…`). That check has NEVER executed before, because the read it
+depends on pointed at a directory that does not exist. So the mismatch is either real content drift
+in an imported file or a pin that was computed at import time and never validated. Re-pinning it to
+make the gate green would destroy the first true signal this seal has ever produced. It needs a
+per-file diff against the source, which is TODO row P and the owner’s direction to move in.

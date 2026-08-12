@@ -1,0 +1,154 @@
+{
+  "viewport": {
+    "width": 1280,
+    "height": 800
+  },
+  "cases": [
+    {
+      "name": "full-room",
+      "vh100": false,
+      "chatColumn": true,
+      "viewerOnly": false,
+      "columns": 2,
+      "chrome": true,
+      "mtZero": false,
+      "ok": true,
+      "problems": [],
+      "measured": {
+        "split": {
+          "width": 1280,
+          "height": 751
+        },
+        "splitTop": 49,
+        "splitBottom": 800,
+        "navbarPresent": true,
+        "sidebarPresent": true,
+        "wrapperMarginTop": "49px",
+        "wrapperHasMtZero": false,
+        "presentation": {
+          "width": 761.39,
+          "height": 751
+        },
+        "chatColumn": {
+          "width": 507.59,
+          "height": 751
+        },
+        "areas": 2,
+        "hasVh100": false,
+        "mainTabsDisplay": "flex",
+        "screensContent": {
+          "width": 761.39,
+          "height": 678.5
+        },
+        "screensMaxHeight": "none",
+        "videoMaxHeight": "none"
+      },
+      "png": "full-room.png",
+      "splitPng": "full-room-split.png",
+      "digest": "ba6a30694dc641efb62e5e365ae339a846581992c314ad805184febd2c5a5192",
+      "splitDigest": "6dfca03e2b6773c16c8346fc5cfd2557f6fe1b521c1cf6ed941e90f70466bd6c"
+    },
+    {
+      "name": "chat-only",
+      "vh100": true,
+      "chatColumn": true,
+      "viewerOnly": false,
+      "columns": 2,
+      "chrome": false,
+      "mtZero": true,
+      "ok": true,
+      "problems": [],
+      "measured": {
+        "split": {
+          "width": 1280,
+          "height": 800
+        },
+        "splitTop": 0,
+        "splitBottom": 800,
+        "navbarPresent": false,
+        "sidebarPresent": false,
+        "wrapperMarginTop": "0px",
+        "wrapperHasMtZero": true,
+        "presentation": {
+          "width": 761.39,
+          "height": 800
+        },
+        "chatColumn": {
+          "width": 507.59,
+          "height": 800
+        },
+        "areas": 2,
+        "hasVh100": true,
+        "mainTabsDisplay": "flex",
+        "screensContent": {
+          "width": 761.39,
+          "height": 727.5
+        },
+        "screensMaxHeight": "none",
+        "videoMaxHeight": "none"
+      },
+      "png": "chat-only.png",
+      "splitPng": "chat-only-split.png",
+      "digest": "2570deb40a9b41bdbb9068191efe50a146735dfcd20a6352b59454454ec8468b",
+      "splitDigest": "2570deb40a9b41bdbb9068191efe50a146735dfcd20a6352b59454454ec8468b"
+    },
+    {
+      "name": "viewer-only",
+      "vh100": true,
+      "chatColumn": false,
+      "viewerOnly": true,
+      "columns": 1,
+      "chrome": false,
+      "mtZero": true,
+      "ok": true,
+      "problems": [],
+      "measured": {
+        "split": {
+          "width": 1280,
+          "height": 800
+        },
+        "splitTop": 0,
+        "splitBottom": 800,
+        "navbarPresent": false,
+        "sidebarPresent": false,
+        "wrapperMarginTop": "0px",
+        "wrapperHasMtZero": true,
+        "presentation": {
+          "width": 1273.39,
+          "height": 800
+        },
+        "chatColumn": null,
+        "areas": 1,
+        "hasVh100": true,
+        "mainTabsDisplay": "none",
+        "screensContent": {
+          "width": 1273.39,
+          "height": 760
+        },
+        "screensMaxHeight": "760px",
+        "videoMaxHeight": "100%"
+      },
+      "png": "viewer-only.png",
+      "splitPng": "viewer-only-split.png",
+      "digest": "8b5eb76001430db26a656a33412e86e9121e386cbb792483df67e4176b5ecd97",
+      "splitDigest": "8b5eb76001430db26a656a33412e86e9121e386cbb792483df67e4176b5ecd97"
+    },
+    {
+      "name": "image distinctness",
+      "ok": true,
+      "problems": [],
+      "measured": {
+        "split": {
+          "full-room": "6dfca03e2b6773c16c8346fc5cfd2557f6fe1b521c1cf6ed941e90f70466bd6c",
+          "chat-only": "2570deb40a9b41bdbb9068191efe50a146735dfcd20a6352b59454454ec8468b",
+          "viewer-only": "8b5eb76001430db26a656a33412e86e9121e386cbb792483df67e4176b5ecd97"
+        },
+        "page": {
+          "full-room": "ba6a30694dc641efb62e5e365ae339a846581992c314ad805184febd2c5a5192",
+          "chat-only": "2570deb40a9b41bdbb9068191efe50a146735dfcd20a6352b59454454ec8468b",
+          "viewer-only": "8b5eb76001430db26a656a33412e86e9121e386cbb792483df67e4176b5ecd97"
+        }
+      }
+    }
+  ]
+}

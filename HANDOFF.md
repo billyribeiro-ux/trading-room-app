@@ -41,7 +41,45 @@ Commit and push only when asked. `services/**` is a mirror — changes there are
 
 ---
 
-## ITEM U — the zoom-controls volume dropdown (NEXT; evidence complete, implementation outstanding)
+## ITEM U — the zoom-controls volume dropdown (**BUILT 2026-08-12**; read the corrections below)
+
+### STATUS — built, and what it is made of
+
+| file                                                | what it is                                                                |
+| --------------------------------------------------- | ------------------------------------------------------------------------- |
+| `apps/room/src/lib/screen-volume.ts`                | the arithmetic: icon thresholds, both preference transitions              |
+| `apps/room/src/lib/components/ScreenVolumeControl.svelte` | consts 90-97 and 106-115, attribute for attribute                   |
+| `apps/room/src/lib/components/ScreenZoomControls.svelte`  | gains a `volume` snippet slot, in the captured child order          |
+| `apps/room/src/routes/+page.svelte`                 | `viewerOnlyMode` (the `vo` parameter), the preference maps, the handlers  |
+| `apps/room/src/lib/screen-volume.test.ts`           | 17 behaviour tests                                                        |
+| `apps/room/src/lib/screen-volume-contract.test.ts`  | 13 tests whose expectations are READ from the decoded tree at runtime     |
+| `apps/room/scripts/verify-screen-volume.mjs`        | real Chromium, six volume values, exits non-zero on mismatch              |
+
+### FOUR CORRECTIONS — this document was wrong, and the decoded tree is what corrected it
+
+Everything below was found by reading `apps/room/docs/source/components/app-presentationarea.*` and
+`…/app-room.*` rather than the minified bundle. **Read those files, not byte offsets.** They are
+line-numbered, and every citation in this section is one you can open.
+
+1. **The two `room-sound-options` are a SUPERSET and a SUBSET, not different content.** This
+   document said the nav variant held "the sound checkboxes" and the overlay variant held the
+   presenter rows. The nav variant holds **both**: `app-room.render-helpers.js:1224-1226` renders
+   `b4e` — the identical per-presenter row plus a trailing `hr` — and *then* the six checkboxes at
+   `:1226-1279`. So `+page.svelte`'s navbar dropdown is INCOMPLETE: it is missing the presenter
+   rows. Recorded in `TODO.md`; not fixed under item U.
+2. **`mute()` / `unmute()` differ between the two components.** `app-presentationarea.compiled.js:923-933`
+   sets `doNotDisturbOn` and nothing else. `app-room.compiled.js:807-823` also sets
+   `preferences.subtitles` and drags the background music volume with it. Ours had only the second.
+3. **The navbar's third icon is `fa-volume-off`, not `fa-volume-mute`.** `app-room.compiled.js:1696`
+   is `[1,'fas','fa-2x','fa-volume-off']`; `+page.svelte:6835` renders `fa-volume-mute`. A
+   pre-existing one-word divergence in already-built code — recorded in `TODO.md`, not changed here.
+4. **`individualVolumeControls` was STORED but not TRANSPORTED.** The setting has always existed in
+   the controller (`room-settings-schema.ts:254`, the type at `:720`, and the manage page's own
+   editor at `apps/controller/docs/reference/parts/02-baseline-720-1439.md:2221` —
+   `sess.individualVolumeControls`, "Individual Volume Controls?", captured "No"). What did not
+   exist was any way for it to reach the room: it was `wired: false`, absent from
+   `ROOM_VISIBLE_SETTINGS`, and absent from `RoomSessionSettings`. This change added the transport
+   and the consumer together and regenerated the schema (43 wired, verifier green).
 
 ### What is already true
 
@@ -56,16 +94,23 @@ for weeks.
 Ours is genuinely the nav variant, not a near-miss: `fa-2x`, `fa-volume-mute` and `mainNavItem` each
 occur **exactly once** in the bundle, and `+page.svelte:6824` has all three.
 
-### The evidence file
+### The evidence files — the DECODED tree, not the bundle
 
-`apps/room/docs/source/main.d6d3c112b59b7d0d.js` (2,887,876 bytes). SHA-256 pinned by
-`dump-contract.test.ts` — never edit it.
+**Do not reconstruct any of this from byte offsets again.** It is already decoded, pretty-printed
+and line-numbered:
 
-- The owning component's `consts:[` begins at offset **1992433**, holds **286** entries, ends at
-  **2012092**.
-- The nested template functions are hoisted ABOVE it: read offsets **1920560–1923400**.
+| file                                                              | what is in it                                         |
+| ------------------------------------------------------------------ | ------------------------------------------------------ |
+| `apps/room/docs/source/components/app-presentationarea.render-helpers.js` | `lSe` 237-263, `cSe`/`dSe`/`uSe` 264-272, `hSe` 273-289, `pSe`/`fSe` 290-311, `mSe`/`gSe` 312-317, `_Se` 318-348, `bSe` 349-385, `vSe` 386-388, **`CSe` 395-459** |
+| `apps/room/docs/source/components/app-presentationarea.compiled.js`       | the const table at **1594-3027**, the handlers at **892-954**, the component's own CSS at **3290** |
+| `apps/room/docs/source/components/app-room.render-helpers.js`             | the NAVBAR copy: `u4e`/`h4e` 983-1004, `_4e`/`b4e` 1066-1106, the dropdown 1143-1288, its gates 1424-1460 |
+| `apps/room/docs/source/components/app-room.compiled.js`                   | the navbar's own handlers 775-823, its const table from 1285 |
+| `apps/room/docs/source/components/manifest.json`                         | which byte range each of the 51 components came from, with SHA-256 |
 
-Read those two regions with `Read`, or slice them with Python. Do not grep and conclude.
+The raw bundle is still SHA-256 pinned by `dump-contract.test.ts` and still must not be edited — but
+nothing in item U needed it. The ONE fact that is not in the decoded tree is the `vo` query
+parameter, because the parameter block belongs to the app service rather than to any component; it
+is quoted below from the bundle and is the only inherited claim in this section.
 
 ### The consts you need, by index
 
@@ -248,19 +293,33 @@ this.appService.setPreference("audioMutedFor",…
   `mediaSoupService.startListeningToPresenter` / `stopListeningToPresenter` — so this is not local UI
   state; it changes what the SFU sends.
 
-Remaining unknown, and it is a real one: `setPreference` and
-`startListeningToPresenter`/`stopListeningToPresenter` have not been read. Read them before wiring
-persistence or SFU calls.
+**RESOLVED 2026-08-12, one half built and one half recorded as a gap:**
 
-### The two `room-sound-options` are NOT the same content
+- **`setPreference`** — not read, and not needed. This app's equivalent is `savePreference` in
+  `+page.svelte`, which writes localStorage and POSTs `?/savePreference`; both handlers call it with
+  the same two keys the reference passes to `setPreference`.
+- **`startListeningToPresenter` / `stopListeningToPresenter`** — still unread, and now known to be
+  UNREPRODUCIBLE on this wire rather than merely unread. `Commands` in
+  `apps/room/src/lib/media/signalling.ts:322-404` is the whole command surface, and it has
+  `resumeConsumer`, `closeConsumer`, `pauseProducer` and `resumeProducer` — **no `pauseConsumer`**,
+  and `closeConsumer` cannot be undone without re-consuming from a `ProducerInfo` the page does not
+  retain. So per-presenter mute is applied to the listener's own `<audio id="msRemAudio-{userID}">`
+  element: the member hears the same thing, and the bandwidth saving is what is missing. `TODO.md`
+  carries it with the two options for closing it.
 
-Both variants use `class="room-sound-options"`, which makes them look interchangeable. They are not:
+### The two `room-sound-options` — CORRECTED 2026-08-12
 
-- **nav variant** — the sound checkboxes (alert / QA / chat / non-trade). **Already built**,
-  `+page.svelte:6904`.
-- **overlay variant** — one row per talking presenter (`bSe`), described above. **Not built.**
+Both variants use `class="room-sound-options"`, and the earlier text here said they held different
+content. Read against the decoded tree, they are a **subset and a superset**:
 
-Copying the nav one across would render the wrong control with the right class name.
+- **overlay variant** (`app-presentationarea.render-helpers.js:420-422`) — `d(14,'div',97)` with a
+  single child, `H(15, vSe, 2, 0)`: one row per talking presenter and nothing else.
+- **nav variant** (`app-room.render-helpers.js:1224-1279`) — `d(50,'div',116)` holding
+  `H(51, b4e, 3, 0, 'hr')` FIRST (the same presenter rows, plus a trailing `hr`, gated on
+  `talkingUsers.length > 0` at `:1436`) and THEN the six sound checkboxes.
+
+So copying the nav one across would render too much, and the nav one as built in this app renders
+too little — it has the six checkboxes and no presenter rows. That gap is `TODO.md`'s, not item U's.
 
 ### THE REFERENCE DECODE TREE — 45 pieces and 5 parts, mostly unopened
 
@@ -313,20 +372,50 @@ Only one child. The trigger and the menu are the two that are absent.
 `apps/room/src/lib/components/ScreenZoomControls.svelte` builds the zoom buttons (const 89) and
 documents the same const numbering in its header — read it first; it is the model to follow.
 
-### Definition of done
+### Definition of done — met 2026-08-12, item by item
 
-1. Markup matches the consts above attribute-for-attribute, in the same ORDER.
-2. A contract test that reads the BUNDLE for its expectations rather than transcribing them — the
-   pattern is `apps/room/src/lib/ngb-tooltip-placements-contract.test.ts`.
-3. **Negative controls run at least once**, and reported: change `>50` to `>=50` and watch it go red;
-   same for `<4`/`<=4`; same for the muted/unmuted span swap.
-4. **A real render.** Extend or copy `apps/room/scripts/verify-tooltip-placements.mjs` — it drives
-   real Chromium via `@playwright/test` resolved from `apps/controller`, strips types with Node's own
-   `stripTypeScriptTypes` (no bundler), loads `css/complete-app-styles.css`, and exits non-zero on
-   mismatch. Assert the icon at `audioVolume` = 0, 4, 5, 50, 51, 100.
-5. `pnpm --filter room check` clean, the changed tests green, prettier clean.
-6. Svelte MCP: `list-sections` → `get-documentation` → write → `svelte-autofixer` until clean.
-7. `CHANGELOG.md` gets a dated+timed entry; the `TODO.md` row is REMOVED, not struck through.
+1. **Markup matches the consts attribute-for-attribute, in the same order** — asserted by
+   `screen-volume-contract.test.ts`, which parses the const table with the repository's own
+   `scripts/lib/const-table.mjs` and takes each index from the render helper's own call site.
+2. **A contract test that READS its expectations** — it reads the four decoded component files at
+   runtime rather than the bundle, which is the change of source this document now insists on.
+3. **Negative controls run and reported** — five, each red, then restored: `>50`→`>=50`,
+   `<4`→`<=4`, `delete`→`= false`, the Mute/Muted span swap inverted, and the volume slot removed
+   from the cluster. A sixth was run against the RENDER harness (`>=50` → 5/6, failing at 50).
+4. **A real render** — `pnpm --filter room verify:screen-volume`: six volume values in real
+   Chromium, **6/6**, with PNGs in `apps/room/evidence-screen-volume/`. It loads all five sheets
+   `src/app.css` imports; loading only `complete-app-styles.css` reports four rules as missing and
+   is a harness bug, not a finding. The woff2 faces do not load over `file://`, so the glyphs are
+   fallback boxes — the layout and the branch selection are what the screenshots prove.
+5. `pnpm --filter room check` — **971 files, 0 errors, 0 warnings**. Changed tests green (30).
+   Prettier clean on every changed file.
+6. Svelte MCP used: `list-sections` → `get-documentation` → `svelte-autofixer` (clean on both
+   components).
+7. `CHANGELOG.md` entry added; the `TODO.md` row for item U removed.
+
+### What item U uncovered, and what closed it — 2026-08-12 13:45 EDT
+
+Item U put `viewerOnlyMode` in this app for the first time. Reading the decoded tree for its other
+consumers found seven bindings nothing drove and two defects in shipped code. All are now closed
+except the SFU half; the full table is in `CHANGELOG.md` at 13:45. The short version:
+
+- the navbar dropdown had no per-presenter rows (`app-room.render-helpers.js:1224-1225`), rendered
+  `fa-volume-mute` where const 107 is `fa-volume-off`, and gated its background-music slider on
+  SoundCloud alone where `:1434` gates on `scPlaying || mp3Playing || roomState.ytURL`;
+- `viewer-only-screen-video` and `viewer-only-screen-tab` were STATIC classes in `ScreenPane`, so
+  viewer-only geometry applied to every room, and `viewer-only-screen-zoom-controls` was applied by
+  nothing at all;
+- the main tab strip, the chat/alerts column and the private chat all ignored viewer-only mode.
+
+**Still open, and it is a wire limit rather than an oversight:** the SFU half of per-presenter mute.
+`TODO.md` V has the two ways to close it.
+
+**The pattern worth keeping.** Every one of those was found by opening
+`apps/room/docs/source/components/*` — the same decoded files item U was built from. Three of them
+(`viewer-only-*`) were CSS rules already shipping in `css/complete-app-styles.css` and applied by
+nothing, which is what a binding that was never ported looks like from the stylesheet's side: search
+the applied sheet for classes nothing renders, and the decoded `ngClass` helper tells you what was
+missing.
 
 ---
 

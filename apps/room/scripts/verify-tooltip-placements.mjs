@@ -23,6 +23,7 @@ import { createRequire, stripTypeScriptTypes } from 'node:module';
 import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { startHarnessServer } from './lib/harness-server.mjs';
 
 /*
   `@playwright/test` is already a devDependency of `apps/controller`, so it is resolved from there
@@ -122,6 +123,27 @@ const MODULE = stripTypeScriptTypes(SOURCE)
   .replace(/^import .*svelte\/attachments.*$/gm, '');
 const CSS = readFileSync(resolve(ROOT, 'css/complete-app-styles.css'), 'utf8');
 
+/*
+  A real HTTP origin instead of `page.setContent()`.
+
+  `setContent` gives the document an opaque origin, and Chromium refuses `file://` subresource
+  fetches from one — so every `@font-face` in the sheet silently failed and every measurement here
+  was taken under fallback fonts. This harness's own numbers did not move when that was fixed (the
+  tooltip's text is set in the sheet's own stack, whose faces this page does not load either way),
+  but the defect was in all three harnesses and leaving it in one is how it comes back.
+*/
+const server = await startHarnessServer({
+  mounts: {
+    '/webfonts': resolve(
+      createRequire(resolve(ROOT, 'package.json')).resolve(
+        '@fortawesome/fontawesome-free/css/all.min.css'
+      ),
+      '../../webfonts'
+    ),
+    '/room': ROOT
+  }
+});
+
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 900, height: 620 }, deviceScaleFactor: 2 });
 
@@ -129,7 +151,7 @@ const results = [];
 let failures = 0;
 
 for (const c of CASES) {
-  await page.setContent(
+  server.setHtml(
     `<!doctype html><html><head><meta charset="utf-8"><style>${CSS}</style>
      <style>
        body { margin:0; background:#2b3e50; height:620px;
@@ -140,6 +162,8 @@ for (const c of CASES) {
      <body><span class="textAreaBtns"><i class="host"
         ${c.bound ? '' : 'ngbtooltip="Upload an Image"'} placement="${c.placement}"></i></span></body></html>`
   );
+  await page.goto(`${server.origin}/index.html`, { waitUntil: 'networkidle' });
+  await page.evaluate(() => document.fonts.ready);
 
   await page.addScriptTag({
     content:
@@ -301,6 +325,7 @@ for (const c of CASES) {
 
 writeFileSync(resolve(OUT, 'measurements.json'), JSON.stringify({ cases: results }, null, 2));
 await browser.close();
+await server.close();
 console.log(`\n${results.length - failures}/${results.length} placements render correctly`);
 console.log(`screenshots + measurements: ${OUT}`);
 process.exit(failures ? 1 : 0);

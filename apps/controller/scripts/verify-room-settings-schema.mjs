@@ -13,9 +13,13 @@ const GENERATOR = resolve(SCRIPT_DIR, 'extract-manage-schema.mjs');
 const CANONICAL_SCHEMA = resolve(REPO_ROOT, 'src/lib/room-settings-schema.ts');
 
 /*
-  Eleven consumed by this repository's room-login page, twenty-seven by the room application through
+  Eleven consumed by this repository's room-login page, thirty by the room application through
   `internal/room-config/[code]`, and six by the WordPress SSO door at `(public)/sso/[code]`.
-  `allowUsersToChangeUsername` is on the first two lists, so the union is 43.
+  `allowUsersToChangeUsername` is on the first two lists, so the union is 46.
+
+  (Thirty and 46 since 2026-08-12: `hideChatAlerts`, `isChatOnlyRoom` and `disableCopy` reached the
+  room when it gained the gates that read them — the chat/alerts column, the presentation column,
+  and the copy/right-click restriction on non-presenters.)
   Kept as one flat list so a drift shows up as a diff here rather than as a category argument.
 
   (Two copies of this note used to sit here, one of them stale at "twelve". A count that appears
@@ -37,12 +41,14 @@ const EXPECTED_WIRED_SETTINGS = [
   'customMobileAppEnabled',
   'customMobileAppIOSUrl',
   'dingOnNewMessage',
+  'disableCopy',
   'disablePMForTrials',
   'freeTrialsGetApp',
   'hasBenzingaNews',
   'hasRequiredPhoneInLogin',
   'hideAppInfo',
   'hideAvatars',
+  'hideChatAlerts',
   'hideChatLog',
   'hideFiles',
   'hideMobileCredentials',
@@ -50,6 +56,7 @@ const EXPECTED_WIRED_SETTINGS = [
   'hideRecs',
   'hideWelcomeTo',
   'individualVolumeControls',
+  'isChatOnlyRoom',
   'loginErrorMsg',
   'loginErrorURL',
   'nickFilter',

@@ -1,0 +1,299 @@
+{
+  "cases": [
+    {
+      "audioVolume": 0,
+      "icon": "fa-volume-off",
+      "ok": true,
+      "problems": [],
+      "measured": {
+        "iconClass": "fas fa-volume-off",
+        "iconBox": {
+          "width": 7,
+          "height": 14
+        },
+        "fontsLoaded": [
+          "Font Awesome 5 Free 900"
+        ],
+        "iconGlyph": "U+F026",
+        "iconFontUsable": false,
+        "triggerWidth": "31px",
+        "triggerAfterDisplay": "none",
+        "menu": {
+          "display": "block",
+          "background": "rgb(17, 17, 17)",
+          "color": "rgb(204, 204, 204)",
+          "textAlign": "center",
+          "border": "1px"
+        },
+        "slider": {
+          "width": 129,
+          "height": 32
+        },
+        "sliderBackground": "rgb(17, 17, 17)",
+        "soundOptions": {
+          "textAlign": "left",
+          "paddingLeft": "30px"
+        },
+        "container": {
+          "opacity": "0.5",
+          "zIndex": "10"
+        }
+      },
+      "png": "volume-0.png",
+      "digest": "a6d98a8aa81cb11980773cfa933f548cadf596700c4b6e462fe884d3bf3a8ecf"
+    },
+    {
+      "audioVolume": 4,
+      "icon": null,
+      "ok": true,
+      "problems": [],
+      "measured": {
+        "iconClass": null,
+        "iconBox": null,
+        "fontsLoaded": [
+          "Font Awesome 5 Free 900"
+        ],
+        "iconGlyph": null,
+        "iconFontUsable": true,
+        "triggerWidth": "31px",
+        "triggerAfterDisplay": "none",
+        "menu": {
+          "display": "block",
+          "background": "rgb(17, 17, 17)",
+          "color": "rgb(204, 204, 204)",
+          "textAlign": "center",
+          "border": "1px"
+        },
+        "slider": {
+          "width": 129,
+          "height": 32
+        },
+        "sliderBackground": "rgb(17, 17, 17)",
+        "soundOptions": {
+          "textAlign": "left",
+          "paddingLeft": "30px"
+        },
+        "container": {
+          "opacity": "0.5",
+          "zIndex": "10"
+        }
+      },
+      "png": "volume-4.png",
+      "digest": "6bf283fac53b556cbc5366aca26c9b687e2c70b3173c0a54ab3bd633cd80f760"
+    },
+    {
+      "audioVolume": 5,
+      "icon": "fa-volume-down",
+      "ok": true,
+      "problems": [],
+      "measured": {
+        "iconClass": "fas fa-volume-down",
+        "iconBox": {
+          "width": 10.5,
+          "height": 14
+        },
+        "fontsLoaded": [
+          "Font Awesome 5 Free 900"
+        ],
+        "iconGlyph": "U+F027",
+        "iconFontUsable": false,
+        "triggerWidth": "31px",
+        "triggerAfterDisplay": "none",
+        "menu": {
+          "display": "block",
+          "background": "rgb(17, 17, 17)",
+          "color": "rgb(204, 204, 204)",
+          "textAlign": "center",
+          "border": "1px"
+        },
+        "slider": {
+          "width": 129,
+          "height": 32
+        },
+        "sliderBackground": "rgb(17, 17, 17)",
+        "soundOptions": {
+          "textAlign": "left",
+          "paddingLeft": "30px"
+        },
+        "container": {
+          "opacity": "0.5",
+          "zIndex": "10"
+        }
+      },
+      "png": "volume-5.png",
+      "digest": "d31b273b927ed65d5c9985633ec243bf0f1eb61b054cb870a43368589f22dc8d"
+    },
+    {
+      "audioVolume": 50,
+      "icon": null,
+      "ok": true,
+      "problems": [],
+      "measured": {
+        "iconClass": null,
+        "iconBox": null,
+        "fontsLoaded": [
+          "Font Awesome 5 Free 900"
+        ],
+        "iconGlyph": null,
+        "iconFontUsable": true,
+        "triggerWidth": "31px",
+        "triggerAfterDisplay": "none",
+        "menu": {
+          "display": "block",
+          "background": "rgb(17, 17, 17)",
+          "color": "rgb(204, 204, 204)",
+          "textAlign": "center",
+          "border": "1px"
+        },
+        "slider": {
+          "width": 129,
+          "height": 32
+        },
+        "sliderBackground": "rgb(17, 17, 17)",
+        "soundOptions": {
+          "textAlign": "left",
+          "paddingLeft": "30px"
+        },
+        "container": {
+          "opacity": "0.5",
+          "zIndex": "10"
+        }
+      },
+      "png": "volume-50.png",
+      "digest": "6bf283fac53b556cbc5366aca26c9b687e2c70b3173c0a54ab3bd633cd80f760"
+    },
+    {
+      "audioVolume": 51,
+      "icon": "fa-volume-up",
+      "ok": true,
+      "problems": [],
+      "measured": {
+        "iconClass": "fas fa-volume-up",
+        "iconBox": {
+          "width": 15.75,
+          "height": 14
+        },
+        "fontsLoaded": [
+          "Font Awesome 5 Free 900"
+        ],
+        "iconGlyph": "U+F028",
+        "iconFontUsable": false,
+        "triggerWidth": "31px",
+        "triggerAfterDisplay": "none",
+        "menu": {
+          "display": "block",
+          "background": "rgb(17, 17, 17)",
+          "color": "rgb(204, 204, 204)",
+          "textAlign": "center",
+          "border": "1px"
+        },
+        "slider": {
+          "width": 129,
+          "height": 32
+        },
+        "sliderBackground": "rgb(17, 17, 17)",
+        "soundOptions": {
+          "textAlign": "left",
+          "paddingLeft": "30px"
+        },
+        "container": {
+          "opacity": "0.5",
+          "zIndex": "10"
+        }
+      },
+      "png": "volume-51.png",
+      "digest": "0be277410a0e7a4a67f484f15bd0f4e11287f02dcc5249fcfb6f59f5e2197e39"
+    },
+    {
+      "audioVolume": 100,
+      "icon": "fa-volume-up",
+      "ok": true,
+      "problems": [],
+      "measured": {
+        "iconClass": "fas fa-volume-up",
+        "iconBox": {
+          "width": 15.75,
+          "height": 14
+        },
+        "fontsLoaded": [
+          "Font Awesome 5 Free 900"
+        ],
+        "iconGlyph": "U+F028",
+        "iconFontUsable": false,
+        "triggerWidth": "31px",
+        "triggerAfterDisplay": "none",
+        "menu": {
+          "display": "block",
+          "background": "rgb(17, 17, 17)",
+          "color": "rgb(204, 204, 204)",
+          "textAlign": "center",
+          "border": "1px"
+        },
+        "slider": {
+          "width": 129,
+          "height": 32
+        },
+        "sliderBackground": "rgb(17, 17, 17)",
+        "soundOptions": {
+          "textAlign": "left",
+          "paddingLeft": "30px"
+        },
+        "container": {
+          "opacity": "0.5",
+          "zIndex": "10"
+        }
+      },
+      "png": "volume-100.png",
+      "digest": "0be277410a0e7a4a67f484f15bd0f4e11287f02dcc5249fcfb6f59f5e2197e39"
+    },
+    {
+      "case": "navbar dropdown",
+      "ok": true,
+      "problems": [],
+      "measured": {
+        "order": [
+          "presenter-row",
+          "presenter-slider",
+          "presenter-row",
+          "presenter-slider",
+          "hr",
+          "checkbox:alert-donot-disturb",
+          "checkbox:qa-donot-disturb",
+          "checkbox:non-trade-donot-disturb",
+          "checkbox:chat-donot-disturb",
+          "checkbox:presentation-subtitles",
+          "checkbox:app-donot-disturb"
+        ],
+        "rowIds": [
+          "talkingPresenter0-donot-disturb",
+          "talkingPresenter1-donot-disturb",
+          "alert-donot-disturb",
+          "qa-donot-disturb",
+          "non-trade-donot-disturb",
+          "chat-donot-disturb",
+          "presentation-subtitles",
+          "app-donot-disturb"
+        ],
+        "mutedLabelColour": "rgb(171, 176, 181)",
+        "plainLabelColour": "rgb(204, 204, 204)",
+        "backgroundMusicAlign": "center"
+      },
+      "png": "navbar-dropdown.png",
+      "digest": "696c3949c1968194444e8157020e568eb10610196c4dcbbce76126607f51a36b"
+    },
+    {
+      "case": "image distinctness",
+      "ok": true,
+      "problems": [],
+      "measured": {
+        "volume-0.png": "a6d98a8aa81cb11980773cfa933f548cadf596700c4b6e462fe884d3bf3a8ecf",
+        "volume-4.png": "6bf283fac53b556cbc5366aca26c9b687e2c70b3173c0a54ab3bd633cd80f760",
+        "volume-5.png": "d31b273b927ed65d5c9985633ec243bf0f1eb61b054cb870a43368589f22dc8d",
+        "volume-50.png": "6bf283fac53b556cbc5366aca26c9b687e2c70b3173c0a54ab3bd633cd80f760",
+        "volume-51.png": "0be277410a0e7a4a67f484f15bd0f4e11287f02dcc5249fcfb6f59f5e2197e39",
+        "volume-100.png": "0be277410a0e7a4a67f484f15bd0f4e11287f02dcc5249fcfb6f59f5e2197e39",
+        "navbar-dropdown.png": "696c3949c1968194444e8157020e568eb10610196c4dcbbce76126607f51a36b"
+      }
+    }
+  ]
+}

@@ -25,6 +25,7 @@
     type Pan
   } from '$lib/screen-zoom';
   import ScreenVolumeControl from '$lib/components/ScreenVolumeControl.svelte';
+  import PresenterMuteRows from '$lib/components/PresenterMuteRows.svelte';
   import {
     adjustVolumeForPresenter,
     toggleTalkingPresenter,
@@ -47,6 +48,14 @@
     sortRosterByNick
   } from '$lib/roster-gates';
   import { alertSoundButtonFor, filesSectionHidden } from '$lib/files-gates';
+  import { NO_PENDING_CLICK, gutterRelease, togglePresentationSplit } from '$lib/split-gutter';
+  import {
+    pushToTalkShouldMute,
+    pushToTalkShouldUnmute,
+    shouldBlockContextMenu,
+    shouldBlockCopyKey,
+    shouldDisableSelection
+  } from '$lib/room-key-gates';
   import EmojiPicker from '$lib/components/EmojiPicker.svelte';
   import GifConfirmDialog from '$lib/components/GifConfirmDialog.svelte';
   import GiphyPicker from '$lib/components/GiphyPicker.svelte';
@@ -899,6 +908,47 @@
    */
   const individualVolumeControls = $derived(data.sessData?.individualVolumeControls === true);
   /**
+   * `hideChatAlerts` — ONE flag with five writers upstream, and the single gate on the whole
+   * chat/alerts column: `O(1, e.hideChatAlerts ? -1 : 1)` (`app-room.render-helpers.js:1650`),
+   * plus the extra chat column beside it at `:1652-1660`.
+   *
+   * The five writers, all in `ngOnInit` except the last (`app-room.full.js`):
+   *
+   *   :1893      `this.hideChatAlerts = sessData.hideChatAlerts`        — the room setting
+   *   :1894-1896 `isPlayer && isPresenter` forces it true
+   *   :1898-1900 `videoOnlyMode && (hideChatAlerts = !recordChat && videoOnlyMode)`
+   *   :1901-1902 `viewerOnlyMode && (hideChatAlerts = viewerOnlyMode)`
+   *   :2179-2181 the `detachChat` event sets it true, with `reopenAlertsChatBtn`
+   *
+   * THREE of the five are modelled here. The two that are not are honest gaps, not oversights:
+   *
+   * - `isPlayer` has ZERO occurrences in this room. Upstream it is a client global for a stream
+   *   PLAYBACK mode — the only other thing that reads it raises "The stream has ended. You can
+   *   close this page now." on `streamPlayerEnded` (`full.js:2162-2165`). This room has no such
+   *   mode, so there is nothing to read.
+   * - `videoOnlyMode` is the `r` query parameter, the recording-bot mode — the same gap
+   *   `files-gates.ts` already records for `hideFiles`. `recordChat` is deliberately not on the
+   *   wire either, because it appears ONLY inside that writer and would arrive with no reader.
+   *
+   * This replaces two unrelated mechanisms that each carried one writer: a hardcoded branch on
+   * `viewerOnlyMode` and a separate `chatAlertsDetached` branch. They were the same decision
+   * rendered twice, which is why the room setting an owner ticks did nothing at all.
+   */
+  const hideChatAlerts = $derived(
+    data.sessData?.hideChatAlerts === true || viewerOnlyMode || chatAlertsDetached
+  );
+  /**
+   * `hidePresentation` — `(chatOnlyMode || sessData.isChatOnlyRoom)` sets it, gating the
+   * presentation column at `O(3, e.hidePresentation ? -1 : 3)`
+   * (`app-room.render-helpers.js:1662`); the assignment is `app-room.full.js:1903-1904`.
+   *
+   * Both terms are modelled: `co=1` is one reader popping the chat into its own window, and
+   * `isChatOnlyRoom` is the owner declaring the room has no presentation area for anybody. Before
+   * this, `?co=1` rendered a presentation area the reference removes — a detached chat window
+   * carrying a second copy of the screens.
+   */
+  const hidePresentation = $derived(chatOnlyMode || data.sessData?.isChatOnlyRoom === true);
+  /**
    * `preferences.audioMutedFor` and `preferences.audioVolumeFor` — per-presenter audio, persisted.
    *
    * `$state.raw`, not `$state`: every transition in `$lib/screen-volume` REPLACES both maps, so a
@@ -1121,11 +1171,41 @@
   let splitTarget = $state<'main' | 'chat-alerts' | null>(null);
   let splitPointerAxis: 'x' | 'y' = 'x';
   let splitPointerOffset = 0;
+  /*
+    The two halves of `gutterDblClickDuration="400"`, which this room has shipped as an attribute
+    since the split was written and never acted on.
+
+    `splitMoved` is what separates a CLICK from a DRAG: `beginSplit` calls `preventDefault()` on
+    pointerdown, so counting native `click` events on the gutter is not reliable here, and counting
+    pointerdowns alone would fire the toggle on two quick drags. The gutter is a click only if the
+    pointer went down and came up without `resizeFromPointer` ever running.
+
+    `lastGutterClickAt` is a plain number rather than `$state`: nothing renders from it, and making
+    it reactive would invalidate on every click for no observer. It starts at `NO_PENDING_CLICK`
+    rather than 0 — `performance.now()` counts from page load, so 0 is a real timestamp and using it
+    as "nothing pending" collapsed the presentation on the first single click of the session.
+  */
+  let splitMoved = false;
+  let lastGutterClickAt = NO_PENDING_CLICK;
   // Seeded from the server-persisted sizes so the very first paint already has the user's pane
   // geometry. Leaving these null until onMount made SSR emit the default flex and hydration then
   // rewrite it, which is a layout shift the size of the whole room.
   let mainSplit = $state<number | null>(initialSplitSizes.mainSplit);
   let chatAlertsSplit = $state<number | null>(initialSplitSizes.chatAlertsSplit);
+  /**
+   * `chatAlertsSizeMobile` — 50, beside `presAreaSizeMobile` at 50 (`app-room.full.js:1852-1853`).
+   *
+   * A SEPARATE number from `mainSplit`, exactly as upstream keeps a separate field: the phone's
+   * 50/50 and the desktop's 70/30 (`:1848-1849`) do not overwrite each other, so rotating a tablet
+   * does not destroy the geometry the user dragged on either side of the threshold.
+   *
+   * Not seeded from the persisted sizes and never written to them, because `K4e`'s outer split
+   * binds `dragStart` and NO `dragEnd` (`app-room.render-helpers.js:1786-1791`) — the desktop `j4e`
+   * binds both (`:1620-1623`). Upstream therefore never records a mobile drag, and neither does
+   * this: the gutter moves, and the size is gone on reload.
+   */
+  const MOBILE_CHAT_ALERTS_SPLIT = 0.5;
+  let mobileSplit = $state(MOBILE_CHAT_ALERTS_SPLIT);
   let mainElement: HTMLElement | undefined;
   let alertChatElement: HTMLElement | undefined;
   let composerElement: HTMLTextAreaElement | undefined;
@@ -1145,7 +1225,148 @@
   let mutedUsers = $state<Record<string, ManagedChatUser>>({});
   let followedUsers = $state<Record<string, ManagedChatUser>>({});
   const roomSplitIsHorizontal = $derived(roomSplitDir === 'ltr' || roomSplitDir === 'rtl');
+  /**
+   * `isMobileScreen` — `window.innerWidth <= 601`, the threshold that selects an entirely different
+   * template upstream: `O(5, o.isMobileScreen ? 6 : 5)` (`app-room.full.js:4061`).
+   *
+   * Set at init (`:1889`, `this.isMobileScreen = this.onResizeChange = window.innerWidth <= 601`)
+   * and in `onResize` (`:2988`). Bound here instead of listened for, which is the same value by a
+   * shorter path — `bind:innerWidth` on `<svelte:window>` is reactive and needs no listener to
+   * remove.
+   *
+   * `601`, not 600 and not a breakpoint from the stylesheet: `<=` 601 means 602 is the first
+   * desktop width. The scoped sheet's own media query next to it is `max-width: 600px`
+   * (`app-room.component.css`), so the two do NOT agree and the 1px seam is the reference's. Copied
+   * rather than tidied — a room at exactly 601px takes the mobile TEMPLATE and the desktop CSS, and
+   * "fixing" that would be inventing a behaviour nobody has seen.
+   *
+   * SSR renders the desktop tree, because no server knows the viewport. The correction happens on
+   * hydration, and it is a real divergence in kind rather than in code: the reference is a
+   * client-rendered Angular app whose first paint already knows the width. Doing this with CSS
+   * `order` instead would avoid the correction and diverge on READING order, which is the thing
+   * `K4e` actually changes — see the render block below.
+   */
+  let windowWidth = $state(0);
+  const isMobileScreen = $derived(windowWidth > 0 && windowWidth <= 601);
+  /**
+   * The direction the two splits are ACTUALLY drawn in.
+   *
+   * On mobile both are hardcoded vertical, and that is a static attribute rather than a binding:
+   * const 224 is
+   * `['minSize','0','direction','vertical','id','mainAreaSplit','gutterDblClickDuration','400',3,'gutterDblClick','dragStart','ngClass']`
+   * and const 228 is `['direction','vertical','minSize','0']` (`app-room.compiled.js`). The desktop
+   * pair binds direction instead — const 8 ends `3,'direction','ngClass'` and const 209 is
+   * `['minSize','0',3,'dragEnd','direction']`, both fed by `directionRoom()`.
+   *
+   * So a phone gets a stacked room whatever `roomSplitDir` says, and the user's left/right
+   * preference simply does not apply at that width.
+   */
+  const splitIsHorizontal = $derived(roomSplitIsHorizontal && !isMobileScreen);
+  /**
+   * The INNER chat/alerts split's direction, which is NOT simply the inverse of the outer one.
+   *
+   * On desktop it is: a left/right room stacks alerts above chat, a top/bottom room puts them side
+   * by side, which is what `directionChatAlerts()` returns. On mobile BOTH splits are vertical —
+   * const 228 is `['direction','vertical','minSize','0']`, a static attribute, exactly like const
+   * 224 for the outer. So a phone stacks presentation, then alerts, then chat, all the way down.
+   *
+   * Writing this as `splitIsHorizontal` would have made the inner split HORIZONTAL on a phone,
+   * putting alerts and chat side by side in a column barely wide enough for one of them. Caught
+   * against const 228 rather than by looking at it.
+   */
+  const innerSplitIsVertical = $derived(roomSplitIsHorizontal || isMobileScreen);
+  /**
+   * The other half of `onResize`, and the half that is easy to miss: crossing the threshold REFETCHES
+   * (`app-room.full.js:2987-2999`).
+   *
+   * ```js
+   * this.isMobileScreen = e.target.innerWidth <= 601;
+   * this.appService.guiEventBus.emit('resizeChatView');
+   * if (this.isMobileScreen !== this.onResizeChange) {
+   *   clearTimeout(this.onResizeTimer);
+   *   this.onResizeTimer = setTimeout(() => {
+   *     this.appService.guiEventBus.emit('appHasFocusGetChatLog');
+   *     if (preferences.extraChatColumn) emit('appHasFocusGetChatLogExtraChatColumn');
+   *     this.appService.sendServerCommand('getAlertsLog', { page: 0 });
+   *     this.onResizeChange = this.isMobileScreen;
+   *   }, 500);
+   * }
+   * ```
+   *
+   * Why it exists: the two templates render different numbers of messages, so the log the room is
+   * holding is the wrong length the moment the layout changes. It fires on the FLIP and not on every
+   * resize — `onResizeChange` is the last threshold actually acted on, which is why dragging a
+   * window across 400px of desktop width costs nothing.
+   *
+   * `invalidate('room:data')` is all three commands at once here: the load registers
+   * `depends('room:data')` (`+page.server.ts:124`) and returns the alerts and the messages together,
+   * so there is no separate alerts request to make. The extra-chat emit has no counterpart because
+   * `extraChatColumn` has zero occurrences in this room — a pre-existing gap, not one opened here.
+   *
+   * `lastThresholdActedOn` is a PLAIN variable, not `$state`: nothing renders from it, and making it
+   * reactive would put a write to a tracked value inside the effect that reads it. It starts `null`
+   * to mean "never measured", which is how the first paint on a phone avoids a refetch it does not
+   * need — upstream gets the same effect from `isMobileScreen = onResizeChange = …` in one statement
+   * at init (`:1889`), so the two are equal before any resize can happen.
+   */
+  let lastThresholdActedOn: boolean | null = null;
+  let resizeRefetchTimer: ReturnType<typeof globalThis.setTimeout> | undefined;
+  const RESIZE_REFETCH_DELAY_MS = 500;
+
+  $effect(() => {
+    const mobile = isMobileScreen;
+    if (windowWidth === 0) return;
+    if (lastThresholdActedOn === null) {
+      lastThresholdActedOn = mobile;
+      return;
+    }
+    if (mobile === lastThresholdActedOn) return;
+    globalThis.clearTimeout(resizeRefetchTimer);
+    resizeRefetchTimer = globalThis.setTimeout(() => {
+      lastThresholdActedOn = mobile;
+      void invalidate('room:data');
+    }, RESIZE_REFETCH_DELAY_MS);
+    return () => globalThis.clearTimeout(resizeRefetchTimer);
+  });
   const isPresenter = $derived(data.user.role === 'staff' || data.user.role === 'admin');
+  /**
+   * `sessData.disableCopy` — "Disable Copy?", content protection for the AUDIENCE.
+   *
+   * Read the same way every other room setting here is. The presenter exemption is not applied at
+   * this line: it belongs to each gate, in `$lib/room-key-gates`, because all three bindings carry
+   * the same two terms and folding `!isPresenter` in here would hide that they are one rule.
+   */
+  const disableCopy = $derived(data.sessData?.disableCopy === true);
+  /**
+   * `preferences.pushToTalk` — a per-USER preference, not a room setting, so it is seeded from the
+   * persisted settings blob like every other preference rather than crossing the config boundary.
+   *
+   * HONEST GAP, stated because it is half a feature: nothing in this room WRITES it yet. Upstream
+   * the checkbox lives in `app-user-settings-modal` (the only other component in the decoded tree
+   * that mentions `pushToTalk`), which is a separate component and a separate piece of work. The
+   * gate below reads the preference correctly and will do the right thing the moment a control sets
+   * it; inventing a checkbox here would mean guessing at its label and position, which is the one
+   * thing this repository does not do.
+   */
+  const pushToTalk = $derived(loadedSettings.pushToTalk === true);
+  /*
+    `document.body.classList.add('noselect')` — `ngAfterViewInit`, `app-room.full.js:2227-2229`,
+    behind the same `!isPresenter && sessData.disableCopy` the keystroke and right-click gates use.
+
+    An `$effect` rather than a one-shot on mount, and that IS a divergence worth naming: upstream
+    this runs once in `ngAfterViewInit` and never again, because `isPresenter` cannot change in that
+    component's lifetime. Here it can — `giveMicScreen` elevates a member to presenter mid-session —
+    and a class added at mount would then keep restricting somebody the room has just promoted. The
+    teardown removes it for the same reason.
+
+    It touches `document.body`, which is outside this component, so it cleans up after itself rather
+    than leaving state behind on navigation.
+  */
+  $effect(() => {
+    if (!shouldDisableSelection({ disableCopy, isPresenter })) return;
+    document.body.classList.add('noselect');
+    return () => document.body.classList.remove('noselect');
+  });
 
   /**
    * `randomUser(e)`:
@@ -1366,36 +1587,60 @@
   const giphyApiKey = env.PUBLIC_PTR_GIPHY_API_KEY ?? '';
   const primaryIsFirst = $derived(roomSplitDir === 'ltr' || roomSplitDir === 'ttb');
   const defaultMainSplit = $derived(
-    roomSplitIsHorizontal ? DIRECT_EVIDENCE_CONTRACT.populatedRoom.primaryPercent / 100 : 0.5
+    splitIsHorizontal ? DIRECT_EVIDENCE_CONTRACT.populatedRoom.primaryPercent / 100 : 0.5
   );
-  const defaultChatAlertsSplit = $derived(roomSplitIsHorizontal ? 40.136530587668595 / 100 : 0.3);
-  const resolvedMainSplit = $derived(mainSplit ?? defaultMainSplit);
+  const defaultChatAlertsSplit = $derived(splitIsHorizontal ? 40.136530587668595 / 100 : 0.3);
+  /*
+    The captured flex strings below are a DESKTOP measurement — `DIRECT_EVIDENCE_CONTRACT` records
+    one rendered room, and that room was horizontal. Every branch that reaches for them therefore
+    tests `splitIsHorizontal` rather than `roomSplitIsHorizontal`, so the mobile layout takes the
+    computed branch instead of inheriting a width measured at a viewport it never has.
+  */
+  const resolvedMainSplit = $derived(isMobileScreen ? mobileSplit : (mainSplit ?? defaultMainSplit));
   const resolvedChatAlertsSplit = $derived(chatAlertsSplit ?? defaultChatAlertsSplit);
   const primaryColumn = $derived(
-    mainSplit === null && roomSplitIsHorizontal
+    mainSplit === null && splitIsHorizontal
       ? DIRECT_EVIDENCE_CONTRACT.populatedRoom.primaryFlex
       : `calc(${resolvedMainSplit * 100}% - ${resolvedMainSplit * DUMP_CONTRACT.baseline.splitGutterWidth}px)`
   );
   const presentationColumn = $derived(
-    mainSplit === null && roomSplitIsHorizontal
+    mainSplit === null && splitIsHorizontal
       ? DIRECT_EVIDENCE_CONTRACT.populatedRoom.presentationFlex
       : `calc(${(1 - resolvedMainSplit) * 100}% - ${(1 - resolvedMainSplit) * DUMP_CONTRACT.baseline.splitGutterWidth}px)`
   );
   const alertsRow = $derived(
-    chatAlertsSplit === null && roomSplitIsHorizontal
+    chatAlertsSplit === null && splitIsHorizontal
       ? DIRECT_EVIDENCE_CONTRACT.populatedRoom.alertsFlex
       : `calc(${resolvedChatAlertsSplit * 100}% - ${resolvedChatAlertsSplit * DUMP_CONTRACT.baseline.splitGutterWidth}px)`
   );
   const chatRow = $derived(
-    chatAlertsSplit === null && roomSplitIsHorizontal
+    chatAlertsSplit === null && splitIsHorizontal
       ? DIRECT_EVIDENCE_CONTRACT.populatedRoom.chatFlex
       : `calc(${(1 - resolvedChatAlertsSplit) * 100}% - ${(1 - resolvedChatAlertsSplit) * DUMP_CONTRACT.baseline.splitGutterWidth}px)`
   );
+  /*
+    `order` is dropped entirely on mobile, and that is read from the const table rather than chosen.
+
+    The desktop areas are placed by CSS order because `roomSplitDir` can reverse them without
+    touching the DOM. `K4e`'s areas carry no order at all — const 225 is
+    `['minSize','0',1,'presentation-box',3,'size']` and const 226 the same shape for
+    `alert-chat-box`; the ONLY mobile area with an order binding is const 227, the extra chat column
+    (`['minSize','0',1,'alert-chat-box',3,'size','order']`), which this room does not model.
+
+    So on a phone the DOM order is the layout, which is why the render block below emits the two
+    panes in a different sequence rather than restyling them. Leaving `order` on while reordering
+    the DOM would have produced a room that reads presentation-first to a screen reader and
+    chat-first to the eye.
+  */
   const primaryAreaStyle = $derived(
-    `order: ${primaryIsFirst ? 0 : 2}; flex: 0 0 ${primaryColumn};`
+    isMobileScreen
+      ? `flex: 0 0 ${primaryColumn};`
+      : `order: ${primaryIsFirst ? 0 : 2}; flex: 0 0 ${primaryColumn};`
   );
   const presentationAreaStyle = $derived(
-    `order: ${primaryIsFirst ? 2 : 0}; flex: 0 0 ${presentationColumn};`
+    isMobileScreen
+      ? `flex: 0 0 ${presentationColumn};`
+      : `order: ${primaryIsFirst ? 2 : 0}; flex: 0 0 ${presentationColumn};`
   );
   const alertsAreaStyle = $derived(`order: 0; flex: 0 0 ${alertsRow};`);
   const chatAreaStyle = $derived(`order: 2; flex: 0 0 ${chatRow};`);
@@ -1486,7 +1731,7 @@
     }
 
     selectRosterUser(user);
-    privateChatOpen = true;
+    showPrivateChat();
   }
   type MessageAction =
     | 'delete'
@@ -3407,7 +3652,7 @@
         bootboxAlert = 'Chatting with yourself again?';
         return;
       }
-      privateChatOpen = true;
+      showPrivateChat();
       // `PCfocusOnUser` - open straight onto that person's thread rather than the tab list.
       void switchChatToUser(item.senderId);
     }
@@ -3847,6 +4092,32 @@
    * reopening lands straight back in the last conversation, where the capture returns to
    * "No active chat".
    */
+  /**
+   * `showPrivateChat()` — the ONE door into the private-chat panel, and its refusal.
+   *
+   * `app-room.compiled.js:855-861`, verbatim in shape:
+   *
+   * ```js
+   * showPrivateChat(e = null, i = null) {
+   *   this.appService.globals.videoOnlyMode ||
+   *     this.appService.globals.viewerOnlyMode ||
+   *     (this.privChatInited || (…initPMDrag()), this.privChatVisible = !0, …)
+   * }
+   * ```
+   *
+   * A leading `a || b || (…)`: in video-only or viewer-only mode the panel does not open at all,
+   * silently. Four call sites in this file each set `privateChatOpen = true` on their own, so the
+   * guard has to live in one place or it is four places to forget it.
+   *
+   * `videoOnlyMode` is the `r` query parameter — the recording-bot mode — which this room does not
+   * model, the same honest gap `files-gates.ts` already records for `hideFiles`. The half that is
+   * modelled is enforced.
+   */
+  function showPrivateChat() {
+    if (viewerOnlyMode) return;
+    privateChatOpen = true;
+  }
+
   function closePrivateChatPanel() {
     privateChatOpen = false;
     currUser = null;
@@ -5293,6 +5564,8 @@
   }
 
   function resizeFromPointer(event: PointerEvent) {
+    // Any movement at all makes this a drag rather than a click — see `splitMoved` above.
+    splitMoved = true;
     if (splitTarget === 'main' && mainElement) {
       const rect = mainElement.getBoundingClientRect();
       const availableSize = Math.max(
@@ -5304,7 +5577,14 @@
         splitPointerAxis === 'x' ? event.clientX - rect.left : event.clientY - rect.top;
       const firstAreaSize = clamp(pointer - splitPointerOffset, 0, availableSize);
       const firstAreaFraction = firstAreaSize / availableSize;
-      mainSplit = primaryIsFirst ? firstAreaFraction : 1 - firstAreaFraction;
+      /*
+        Mobile drags move `mobileSplit`, never `mainSplit`, and the first pane is the PRESENTATION
+        there — so the fraction has to be inverted, because both numbers mean "the chat/alerts
+        share". `primaryIsFirst` is a `roomSplitDir` question and does not apply at this width; the
+        mobile order is fixed by `K4e`'s child sequence.
+      */
+      if (isMobileScreen) mobileSplit = 1 - firstAreaFraction;
+      else mainSplit = primaryIsFirst ? firstAreaFraction : 1 - firstAreaFraction;
     }
 
     if (splitTarget === 'chat-alerts' && alertChatElement) {
@@ -5321,10 +5601,34 @@
     }
   }
 
+  /**
+   * `hideShowPresentationArea()` — `app-room.full.js:2693-2698`, bound to `gutterDblClick` on the
+   * outer split in both of the reference's layouts (`app-room.render-helpers.js:1622-1623` and
+   * `:1787-1788`).
+   *
+   * The decision itself is in `$lib/split-gutter`, with the citations and the reasoning, because a
+   * two-click state machine whose entire content is timing has to be drivable by a test.
+   *
+   * Deliberately NOT persisted: upstream this ends in `printSizes()`, a `console.log` and nothing
+   * else (`:2708-2712`), unlike `dragEnd` which does write. Persisting here would let a transient
+   * toggle overwrite the geometry the user actually chose by dragging.
+   */
+  function hideShowPresentationArea() {
+    /*
+      `K4e` binds `gutterDblClick` to this same handler (`app-room.render-helpers.js:1787-1788`), so
+      the toggle exists on a phone too — and it has to move the number that layout is drawn from, or
+      it would silently rewrite the desktop geometry while the user is looking at the mobile one.
+    */
+    if (isMobileScreen) mobileSplit = togglePresentationSplit(resolvedMainSplit);
+    else mainSplit = togglePresentationSplit(resolvedMainSplit);
+  }
+
   function beginSplit(event: PointerEvent, target: 'main' | 'chat-alerts') {
+    splitMoved = false;
     splitTarget = target;
+    // The drag axis follows the direction actually drawn, which mobile forces to vertical.
     splitPointerAxis =
-      target === 'main' ? (roomSplitIsHorizontal ? 'x' : 'y') : roomSplitIsHorizontal ? 'y' : 'x';
+      target === 'main' ? (splitIsHorizontal ? 'x' : 'y') : innerSplitIsVertical ? 'y' : 'x';
     const gutter = event.currentTarget as HTMLElement;
     const gutterRect = gutter.getBoundingClientRect();
     splitPointerOffset =
@@ -5333,6 +5637,40 @@
   }
 
   function finishSplit() {
+    /*
+      A gutter that never moved is a CLICK, and two of them inside the 400ms window are the
+      reference's `gutterDblClick`. Only the main gutter carries it: upstream the binding is on the
+      OUTER split in both layouts (`render-helpers.js:1622-1623` and `:1787-1788`), never on the
+      nested chat/alerts one, and `hideShowPresentationArea` moves the outer pair by definition.
+
+      The counter resets on use rather than tracking a running pair, so three clicks are one
+      double-click and a leftover, not two overlapping ones.
+    */
+    if (splitTarget === 'main') {
+      const release = gutterRelease(lastGutterClickAt, performance.now(), splitMoved);
+      lastGutterClickAt = release.lastClickAt;
+      if (release.doubleClick) {
+        hideShowPresentationArea();
+        // The toggle IS the geometry change; there is no drag to persist and upstream persists none.
+        splitTarget = null;
+        return;
+      }
+    }
+    /*
+      A mobile drag of the MAIN split is never written down, because `K4e`'s outer split binds
+      `dragStart` and no `dragEnd` (`app-room.render-helpers.js:1786-1791`) where the desktop `j4e`
+      binds both (`:1620-1623`). `dragEnd` is the only thing that calls `resizeEndRoom` upstream, so
+      there is nothing to record.
+
+      The inner chat/alerts gutter is a separate question and keeps persisting: `W4e` drops its
+      `dragEnd` too, but our inner gutter writes the SAME `chatAlertsSizes` key the desktop layout
+      reads, and dropping the write would mean a phone silently reverting a size the user had set on
+      a laptop. That is a divergence, and it is here rather than silent.
+    */
+    if (splitTarget === 'main' && isMobileScreen) {
+      splitTarget = null;
+      return;
+    }
     if (splitTarget) persistSplitSizes(splitTarget);
     splitTarget = null;
   }
@@ -6516,6 +6854,7 @@
 
 
 <svelte:window
+  bind:innerWidth={windowWidth}
   onclick={(event) => {
     const target = event.target instanceof Element ? event.target : null;
     if (!target?.closest('.textAreaBtns, .popOverDiv')) {
@@ -6531,6 +6870,18 @@
   onpointerup={finishSplit}
   onpointercancel={finishSplit}
   onkeydown={(event) => {
+    /*
+      `onKeyDown` — `app-room.full.js:3011-3021`, bound as a host listener on `keydown`
+      (`app-room.compiled.js:1260-1266`). Two unrelated features that share the keyboard, in the
+      reference's own order: push-to-talk first, then the copy restriction.
+
+      Both predicates live in `$lib/room-key-gates` with their citations. They run before the
+      Escape handling below because that returns early on every other key, which is exactly how a
+      host binding added here would go unnoticed.
+    */
+    if (pushToTalkShouldUnmute(event, { pushToTalk, micMuted })) void toggleMicrophone();
+    if (shouldBlockCopyKey(event, { disableCopy, isPresenter })) event.preventDefault();
+
     if (event.key !== 'Escape') return;
     /*
       The emoji and GIF triggers carry ngbPopover's `autoclose: 'outside'`, and that mode
@@ -6547,6 +6898,60 @@
     else if (bootboxPrompt) bootboxPrompt = null;
     else if (bootboxAlert) bootboxAlert = null;
   }}
+  onkeyup={(event) => {
+    /*
+      `onKeyUp` — `app-room.full.js:3027-3032`, host-bound on `keyup`
+      (`app-room.compiled.js:1274-1280`). The release half of push-to-talk, and the ONLY thing on
+      that listener upstream: `disableCopy` has no keyup arm, because suppressing a keystroke has
+      to happen on the way down.
+    */
+    if (pushToTalkShouldMute(event, { pushToTalk, micMuted })) void toggleMicrophone();
+  }}
+  oncontextmenu={(event) => {
+    /*
+      `onRightClick` — `app-room.full.js:3022-3026`, host-bound on `contextmenu`
+      (`app-room.compiled.js:1267-1273`). Every right-click, not merely those over the presentation
+      area, and never the presenter's.
+
+      Bound on `window` rather than `document`: the reference uses a different target resolver here
+      than for the key events, and neither resolver is defined anywhere in the decoded tree, so
+      which is which is not established. `contextmenu` bubbles to both, and this handler's only
+      effect is `preventDefault`, so the distinction cannot change behaviour — see the note at the
+      top of `$lib/room-key-gates`.
+    */
+    if (shouldBlockContextMenu({ disableCopy, isPresenter })) event.preventDefault();
+  }}
+  onbeforeunload={() => {
+    /*
+      The other half of the `hidePresentation` block, registered in the same statement upstream:
+
+        (chatOnlyMode || sessData.isChatOnlyRoom) &&
+          ((this.hidePresentation = !0),
+           window.addEventListener('beforeunload', () => {
+             window.opener.postMessage('windowClosing', window.location.origin);
+           }))
+
+      (`app-room.full.js:1903-1907`.) It is how the opener learns the popout closed: the room that
+      detached the chat listens for exactly this message and calls `reatachChat` —
+      `window.addEventListener("message", o => "windowClosing" === o.data && emit("reatachChat"))`
+      (`:1692-1693`, transcribed in `detachAlerts` above). Without it, closing the detached window
+      leaves the opener believing the pair still lives elsewhere, and the column never comes back.
+
+      Gated on the MODE, not on `hidePresentation`: a room whose owner set `isChatOnlyRoom` is not a
+      popout and has no opener to notify. `chatOnlyMode` is the `co=1` that `detachAlerts` sets, so
+      it is the precise condition under which an opener exists.
+
+      The `window.opener` guard is OURS and is a declared divergence. The reference dereferences it
+      unconditionally, which is safe upstream only because `co=1` is reached exclusively through
+      `detachChat`. This room can also be opened at `?co=1` by hand — a member who bookmarks the
+      popout URL — and there `window.opener` is null, so the reference's line would throw a
+      TypeError on every unload. The origin argument is `window.location.origin`, matching the
+      reference exactly: the opener and the popout are the same origin, so this never posts
+      cross-origin.
+    */
+    if (!chatOnlyMode) return;
+    window.opener?.postMessage('windowClosing', window.location.origin);
+  }}
 />
 
 <app-root ng-version="17.3.12">
@@ -6562,7 +6967,26 @@
     class={theme === 'dark' ? 'darkTheme' : 'lightTheme'}
     class:detach-screen={detachedScreenId !== null}
   >
-    <div class={sidebarOpen ? 'wrapper push-wrapper' : 'wrapper'}>
+    <!--
+      `KAe = (t, n) => ({'push-wrapper': t, 'mt-0': n})`, bound as
+      `Kn(6, KAe, o.showSidebar, videoOnlyMode || chatOnlyMode || viewerOnlyMode)`
+      (`docs/source/components/app-room.full.js:4029-4039`, pure function at `:5`).
+
+      `mt-0` was never bound here, and it is not cosmetic. This component's own stylesheet sets
+      `.wrapper { margin-top: 49px }` and `.navbar { height: 49px }`
+      (`app-room.component.css`), so the 49px is space reserved FOR the navbar — and the navbar is
+      removed in these same three modes (see the gate on `mainNavigation` below). Without `mt-0`
+      the room keeps a 49px gap where a navbar used to be, and `vh-100` on the split then pushes
+      49px of content off the bottom of the window.
+
+      `videoOnlyMode` is the `r` query parameter, which this room does not model — the same honest
+      gap recorded for `hideFiles` in `files-gates.ts`. The two modes it does model are bound.
+    -->
+    <div
+      class="wrapper"
+      class:push-wrapper={sidebarOpen}
+      class:mt-0={chatOnlyMode || viewerOnlyMode}
+    >
       <div class="d-flex flex-column-reverse flex-sm-row room-container">
         {#snippet mainNavigation()}
           <nav class="navbar navbar-expand-md navbar-dark fixed-top mainAppNav" style="">
@@ -7020,12 +7444,21 @@
                     class="nav-link d-flex align-items-center"
                     onclick={() => (volumeOpen = !volumeOpen)}
                   >
+<!--
+                      Consts 105/106/107 of `app-room` — `['fas','fa-2x','fa-volume-up']`,
+                      `…fa-volume-down`, `…fa-volume-off` (`app-room.compiled.js:1694-1696`) — and
+                      the same three strict inequalities the overlay uses
+                      (`app-room.render-helpers.js:1424-1428`).
+
+                      The third one read `fa-volume-mute` here, which is in neither const table. One
+                      word, and it is the icon a muted listener looks at.
+                    -->
                     {#if volume > 50}
                       <i class="fas fa-2x fa-volume-up"></i>
                     {:else if volume < 50 && volume > 4}
                       <i class="fas fa-2x fa-volume-down"></i>
                     {:else if volume < 4}
-                      <i class="fas fa-2x fa-volume-mute"></i>
+                      <i class="fas fa-2x fa-volume-off"></i>
                     {/if}
                     <span class="ml-2 mainNavItem">Volume</span>
                   </a>
@@ -7072,8 +7505,26 @@
                       {volume > 0 ? 'Mute' : 'Unmute'}
                     </button>
                     <hr />
-                    {#if soundCloudPlaying}
-                      <div class="m-0">
+<!--
+                      TWO defects, both from `app-room.render-helpers.js:1005-1028` (`p4e`) and its
+                      gate at `:1434`.
+
+                      THE GATE was `soundCloudPlaying` alone. The reference is
+                      `O(48, e.scPlaying || e.mp3Playing || e.appService.globals.roomState.ytURL ? 48 : -1)`
+                      — three sources, of which this room already models all three: `soundCloudPlaying`,
+                      `mp3Playing` (set from the `playMP3ForAll` command) and `youtubeForAllUrl`
+                      (the room-wide YouTube overlay, this app's `roomState.ytURL`). So the slider was
+                      dead for two of the three things it controls: `setBackgroundVolume` reaches
+                      `#mp3player` and the YouTube overlay as well as SoundCloud, and neither could be
+                      turned down.
+
+                      THE CONTAINER is const 114, `[2, 'text-align', 'center']`
+                      (`app-room.compiled.js:1723`). A `2` marker is STYLES, not classes — so it is a
+                      `div` with `style="text-align: center"` and no class at all. `m-0` belongs to the
+                      `<p>` inside it (const 199, `[1,'m-0']`), which already has it.
+                    -->
+                    {#if soundCloudPlaying || mp3Playing || youtubeForAllUrl}
+                      <div style="text-align: center;">
                         <hr />
                         <p class="m-0">Background Music:</p>
                         <input
@@ -7095,6 +7546,28 @@
                     {/if}
                     <div class="dropdown-divider"></div>
                     <div class="room-sound-options">
+                      <!--
+                        THE ROWS COME FIRST, and this dropdown did not have them.
+
+                        `app-room.render-helpers.js:1224-1225` puts `H(51, b4e, 3, 0, 'hr')` at the
+                        head of `div.room-sound-options` (const 116), gated on
+                        `talkingUsers && talkingUsers.length > 0` (`:1436`), and `b4e` is
+                        `ht(0, _4e, 7, 14, null, null, qAe), T(2, 'hr')` — the same per-presenter
+                        row the screen overlay renders, plus a trailing rule, and only THEN the six
+                        sound checkboxes below.
+
+                        Without them a member could mute the room but not one presenter, which is
+                        the entire point of the control. Shared with the overlay so the two cannot
+                        drift; the `hr` is this copy's, not the overlay's.
+                      -->
+                      <PresenterMuteRows
+                        {talkingUsers}
+                        preferences={presenterAudio}
+                        {individualVolumeControls}
+                        trailingRule
+                        ontogglepresenter={toggleTalkingPresenterAudio}
+                        onpresentervolume={adjustPresenterVolume}
+                      />
                       <div class="my-1">
                         <input
                           type="checkbox"
@@ -7205,6 +7678,23 @@
           </nav>
         {/snippet}
 
+        <!--
+          Nodes 3 and 4 of the root template, and they carry the SAME gate:
+
+            O(3, videoOnlyMode || chatOnlyMode || viewerOnlyMode ? -1 : 3)   // _Pe  = the sidebar
+            O(4, videoOnlyMode || chatOnlyMode || viewerOnlyMode ? -1 : 4)   // A4e  = the navbar
+
+          (`docs/source/components/app-room.full.js:4043-4059`.) Both were rendered
+          unconditionally here, so a room entered with `?vo=1` or `?co=1` kept a full navbar and a
+          full sidebar that the reference removes entirely — and the `vh-100` on the split below
+          assumes they are gone. One `{#if}` covers both because upstream it is one condition
+          evaluated twice, not two decisions.
+
+          The gate is deliberately NOT `hideChatAlerts`: that flag hides the chat/alerts COLUMN and
+          has five sources of its own (`full.js:1893-1902`). This is the chrome, and it goes on the
+          mode alone.
+        -->
+        {#if !(chatOnlyMode || viewerOnlyMode)}
         <div class="room-sidebar">
           <div class="sidebar-wrapper">
             <nav class="navbar w-100 h-100">
@@ -7295,6 +7785,44 @@
                     <span class="pl-2">Connectivity Check</span>
                   </a>
                 </li>
+                <!--
+                  `O(25, e.reopenAlertsChatBtn ? 25 : -1)` (`app-room.render-helpers.js:355`),
+                  rendering `oPe` (`:76-87`) as `H(25, oPe, 5, 0, 'li', 19)` (`:312`) - which is
+                  why it sits HERE, between Connectivity Check and General Settings, rather than at
+                  the end of the list. Markup and classes from the const table: 19 is
+                  `[1, 'nav-item']`, 38 is
+                  `['title', 'Reopen Alerts / Chat', 1, 'nav-link', 'sidebar-item', 3, 'click']`,
+                  39 is `[1, 'fas', 'fa-window-restore']` and 22 is `[1, 'pl-2']`
+                  (`app-room.compiled.js:1324, 1416, 1417, 1337`).
+
+                  This is the control the detach bootbox promises when it says the chat can be
+                  reopened "from the side menu", and until now this room had no such item - the
+                  affordance was a button inside the column, which upstream is deleted the moment
+                  the chat detaches.
+
+                  Gated on `chatAlertsDetached` rather than a separate `reopenAlertsChatBtn`
+                  field. Upstream needs two variables because `hideChatAlerts` is a plain property
+                  that four other writers also set, so it cannot say WHY it is true; here
+                  `hideChatAlerts` is derived and `chatAlertsDetached` IS the detach source, so a
+                  second flag would be a copy that can only disagree. The reference sets both in
+                  one statement and clears both in `reopenAlertsChat` (`app-room.full.js:2179-2181`,
+                  `:3047-3053`), so they are never independent.
+                -->
+                {#if chatAlertsDetached}
+                  <li class="nav-item">
+                    <!-- svelte-ignore a11y_missing_attribute -->
+                    <!-- svelte-ignore a11y_click_events_have_key_events -->
+                    <!-- svelte-ignore a11y_no_static_element_interactions -->
+                    <a
+                      title="Reopen Alerts / Chat"
+                      class="nav-link sidebar-item"
+                      onclick={reopenAlertsChat}
+                    >
+                      <i class="fas fa-window-restore"></i>
+                      <span class="pl-2">Reopen Alerts / Chat</span>
+                    </a>
+                  </li>
+                {/if}
                 <li class="nav-item">
                   <!-- svelte-ignore a11y_missing_attribute -->
                   <!-- svelte-ignore a11y_click_events_have_key_events -->
@@ -7690,36 +8218,54 @@
           </div>
         </div>
         {@render mainNavigation()}
+        {/if}
 
+<!--
+          `z('ngClass', ut(5, QB, videoOnlyMode || chatOnlyMode || viewerOnlyMode))` with
+          `QB = (t) => ({'vh-100': t})` (`app-room.render-helpers.js:1639-1648, 11`).
+
+          It is the other half of hiding a column: with the chat and alerts gone the split has one
+          child, and `.vh-100 { height: 100vh !important }`
+          (`css/complete-app-styles.css:4992`) is what makes the screen fill the window instead of
+          keeping the height it had beside them.
+
+          `videoOnlyMode` is the `r` query parameter — the recording-bot mode — which this room does
+          not model; the same honest gap `files-gates.ts` already records for `hideFiles`. The two
+          modes this room does model are bound.
+        -->
         <as-split
           {@attach captureMainElement}
           minsize="0"
           id="mainAreaSplit"
           gutterdblclickduration="400"
-          class={roomSplitIsHorizontal
+          class={splitIsHorizontal
             ? 'as-horizontal as-percent as-init'
             : 'as-vertical as-percent as-init'}
           class:is-resizing={splitTarget !== null}
-          style={roomSplitIsHorizontal ? undefined : 'flex-direction: column;'}
+          class:vh-100={chatOnlyMode || viewerOnlyMode}
+          style={splitIsHorizontal ? undefined : 'flex-direction: column;'}
           dir="ltr"
         >
           <!--
-            `subscribe("detachChat", () => { this.hideChatAlerts = !0; this.reopenAlertsChatBtn = !0 })`
-            with `reatachChat` calling `reopenAlertsChat()`. While the pair lives in another window
-            this one hides it and offers it back - otherwise the reader has the same panel twice,
-            and the bootbox's promise that "you can reopen the chat in this window from the side
-            menu" points at a control that does not exist.
+            ONE gate on the whole chat/alerts column, because upstream it is one flag:
+            `O(1, e.hideChatAlerts ? -1 : 1)` (`app-room.render-helpers.js:1650`). Its five writers
+            and the two this room cannot model are documented on `hideChatAlerts` itself, in the
+            script above.
+
+            This used to be three branches - a hardcoded test on `viewerOnlyMode`, a detached
+            branch, and the column - which is the shape that let the room SETTING an owner ticks do
+            nothing at all: it had no branch of its own, and adding one would have been a fourth
+            copy of the same decision.
+
+            The detached case no longer renders a "Reopen here" panel here. Upstream, detaching
+            hides this column outright and raises `reopenAlertsChatBtn`, whose control is a SIDEBAR
+            item - `H(25, oPe, 5, 0, 'li', 19)` gated by `O(25, e.reopenAlertsChatBtn ? 25 : -1)`
+            (`app-room.render-helpers.js:312, 355`, markup at `:76-87`). That is what the bootbox
+            means by "you can reopen the chat in this window from the side menu", and the item is
+            now rendered there. Keeping a half-height panel in a column the reference deletes was
+            the divergence, not the fix.
           -->
-          {#if chatAlertsDetached}
-            <as-split-area minsize="0" class="alert-chat-box as-split-area" style={primaryAreaStyle}>
-              <div class="d-flex flex-column align-items-center justify-content-center h-100 p-3">
-                <p class="text-center mb-3">Chat and alerts are open in another window.</p>
-                <button type="button" class="btn btn-sm btn-secondary" onclick={reopenAlertsChat}>
-                  <i class="fas fa-window-restore"></i>&nbsp; Reopen here
-                </button>
-              </div>
-            </as-split-area>
-          {:else}
+          {#snippet chatAlertsPane()}
           <as-split-area
             minsize="0"
             class="alert-chat-box alert-chat-regular as-split-area"
@@ -7728,10 +8274,10 @@
             <as-split
               {@attach captureAlertChatElement}
               minsize="0"
-              class={roomSplitIsHorizontal
+              class={innerSplitIsVertical
                 ? 'as-percent as-vertical as-init'
                 : 'as-percent as-horizontal as-init'}
-              style={roomSplitIsHorizontal ? undefined : 'flex-direction: row;'}
+              style={innerSplitIsVertical ? undefined : 'flex-direction: row;'}
               dir="ltr"
             >
               <as-split-area minsize="0" class="alert-box as-split-area" style={alertsAreaStyle}>
@@ -8070,7 +8616,7 @@
                             <a
                               title="Open Private chat"
                               class="nav-link"
-                              onclick={() => (privateChatOpen = true)}
+                              onclick={showPrivateChat}
                             >
                               <i class="fas fa-comments"></i>
                             </a>
@@ -8294,7 +8840,7 @@
                 role="separator"
                 tabindex="0"
                 class="as-split-gutter"
-                aria-orientation={roomSplitIsHorizontal ? 'vertical' : 'horizontal'}
+                aria-orientation={innerSplitIsVertical ? 'vertical' : 'horizontal'}
                 aria-valuemin="0"
                 aria-valuenow={alertsPercent}
                 aria-valuetext={`${Math.round(alertsPercent)} percent`}
@@ -8305,14 +8851,20 @@
               </div>
             </as-split>
           </as-split-area>
-          {/if}
+          {/snippet}
 
           <!--
-            `co=1` is chat-only: the popout carries the alerts and chat, so the presentation area
-            is not rendered in it at all. Rendering it is what made "Detach Alerts" open a second
-            copy of the entire room instead of just the alerts.
+            `O(3, e.hidePresentation ? -1 : 3)` (`app-room.render-helpers.js:1662`), whose flag is
+            set by `(chatOnlyMode || sessData.isChatOnlyRoom)` (`app-room.full.js:1903-1904`).
+
+            The `co=1` half was already here and is unchanged in effect: the popout carries the
+            alerts and chat, so the presentation area is not rendered in it at all, which is what
+            stopped "Detach Alerts" opening a second copy of the entire room. What this adds is the
+            SECOND term - the room-wide "Chat Only Room?" setting - and the name upstream gives the
+            pair. They are one decision with two sources, and writing the mode alone meant an owner
+            could configure a chat-only room and still get a presentation area for every member.
           -->
-          {#if !chatOnlyMode}
+          {#snippet presentationPane()}
           <as-split-area
             minsize="0"
             class="presentation-box as-split-area"
@@ -8418,7 +8970,19 @@
                     ontranscript={openTranscriptPage}
                   />
                 {/if}
-                <ul id="mainTabs" class="nav nav-tabs mainTabset" role="tablist">
+<!--
+                  `z('hidden', o.appService.globals.viewerOnlyMode)` on this `ul`
+                  (`app-presentationarea.compiled.js:3154-3155`, and const 3 at `:1598` declares the
+                  `hidden` binding it feeds). Viewer-only mode is a room reduced to the screen: the
+                  whole main tab strip goes, which is also why `.viewer-only-screen-tab` sets
+                  `max-height: calc(-40px + 100vh)` — the 40px it reclaims is this strip.
+                -->
+                <ul
+                  id="mainTabs"
+                  class="nav nav-tabs mainTabset"
+                  role="tablist"
+                  hidden={viewerOnlyMode}
+                >
                   <li role="presentation" class="nav-item">
                     <a
                       id="screens-tab"
@@ -8674,6 +9238,7 @@
                         <ScreenZoomControls
                           variant="attached"
                           {showZoomCtrl}
+                          {viewerOnlyMode}
                           ontoggle={togglePanZoom}
                           volume={screenVolume}
                           oncapture={() => {
@@ -8689,12 +9254,35 @@
                         />
                       {/snippet}
                     </ScreenTabs>
-                    <div id="screensTabsContent" class="tab-content">
+<!--
+                      `viewer-only-screen-tab` lives HERE, on const 72, and nowhere else.
+
+                      `wSe`'s update block walks `O(0,…)`, `m(2)`, `pt(…)`, `m(2)`, `O(4,…)` — an
+                      explicit index, so the pointer is fixed — then `m()` to node 5, where
+                      `z('ngClass', ut(3, jCe, …viewerOnlyMode))` lands
+                      (`app-presentationarea.render-helpers.js:483-493`). Node 5 is
+                      `d(5,'div',72)` and const 72 is
+                      `['id','screensTabsContent',1,'tab-content',3,'ngClass']` — the only element in
+                      that block whose const carries a binding marker (`…compiled.js:2044`). The tab
+                      strip's const 70 has none, and the pane's const 73 binds `{'show active': …}`
+                      alone.
+
+                      `.viewer-only-screen-tab { padding-bottom: 5px; height: 100% !important;
+                      max-height: calc(-40px + 100vh) !important }`
+                      (`css/complete-app-styles.css:6978`) — the 40px it reclaims is `ul#mainTabs`,
+                      which is `hidden` in this mode.
+                    -->
+                    <div
+                      id="screensTabsContent"
+                      class="tab-content"
+                      class:viewer-only-screen-tab={viewerOnlyMode}
+                    >
                       {#each sharedScreens as screen (screen.id)}
                         <ScreenPane
                           id={screen.id}
                           stream={screenStreams.get(screen.id) ?? null}
                           active={screen.id === selectedScreenTab}
+                          {viewerOnlyMode}
                           {volume}
                           muted={volume === 0}
                           {showZoomCtrl}
@@ -9288,22 +9876,61 @@
               </div>
             </app-presentationarea>
           </as-split-area>
-          {/if}
+          {/snippet}
 
-          <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-          <div
-            role="separator"
-            tabindex="0"
-            class="as-split-gutter"
-            aria-orientation={roomSplitIsHorizontal ? 'horizontal' : 'vertical'}
-            aria-valuemin="0"
-            aria-valuenow={primaryPercent}
-            aria-valuetext={`${Math.round(primaryPercent)} percent`}
-            style="flex-basis: 11px; order: 1;"
-            onpointerdown={(event) => beginSplit(event, 'main')}
-          >
-            <div class="as-split-gutter-icon"></div>
-          </div>
+          {#snippet mainGutter()}
+            <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+            <div
+              role="separator"
+              tabindex="0"
+              class="as-split-gutter"
+              aria-orientation={splitIsHorizontal ? 'horizontal' : 'vertical'}
+              aria-valuemin="0"
+              aria-valuenow={primaryPercent}
+              aria-valuetext={`${Math.round(primaryPercent)} percent`}
+              style={isMobileScreen ? 'flex-basis: 11px;' : 'flex-basis: 11px; order: 1;'}
+              onpointerdown={(event) => beginSplit(event, 'main')}
+            >
+              <div class="as-split-gutter-icon"></div>
+            </div>
+          {/snippet}
+
+          <!--
+            `O(5, o.isMobileScreen ? 6 : 5)` — `app-room.full.js:4061`. The 601px threshold does not
+            restyle this layout, it selects a DIFFERENT ONE: `K4e`
+            (`app-room.render-helpers.js:1783-1821`) against the desktop `j4e` (`:1616-1664`).
+
+            What actually differs, read from those two functions and the const table rather than
+            inferred:
+
+              - the CHILD ORDER is reversed. `K4e` is presentation (`G4e`, node 1, gated
+                `O(1, hidePresentation ? -1 : 1)`), then chat/alerts (`W4e`, node 2,
+                `O(2, hideChatAlerts ? -1 : 2)`). `j4e` is chat/alerts (node 1), extra chat, then
+                presentation (node 3). The gates are the same two flags either way, which is why
+                they are written once here and read twice.
+              - the split is VERTICAL as a static attribute, not a binding — const 224 carries
+                `'direction','vertical'` where const 8 carries `3,'direction'`. Handled by
+                `splitIsHorizontal`.
+              - there is NO `dragEnd`, so a mobile drag is never recorded. Handled in `finishSplit`.
+              - the areas carry no `order`. Handled in `primaryAreaStyle` / `presentationAreaStyle`,
+                and it is why this block reorders the DOM instead of restyling it.
+
+            The gutter is a snippet for exactly that reason: on a phone it has to sit BETWEEN the two
+            panes in document order, because there is no `order` property left to place it with.
+
+            Snippets rather than a second copy of the markup: the two panes are ~1,625 lines, and a
+            duplicated layout is one that drifts the first time somebody edits the version they
+            happen to be looking at.
+          -->
+          {#if isMobileScreen}
+            {#if !hidePresentation}{@render presentationPane()}{/if}
+            {@render mainGutter()}
+            {#if !hideChatAlerts}{@render chatAlertsPane()}{/if}
+          {:else}
+            {#if !hideChatAlerts}{@render chatAlertsPane()}{/if}
+            {#if !hidePresentation}{@render presentationPane()}{/if}
+            {@render mainGutter()}
+          {/if}
         </as-split>
       </div>
     </div>
@@ -9388,7 +10015,7 @@
       onMentionUser={mentionUser}
       onPrivateChat={(user) => {
         selectedMessageUser = user;
-        privateChatOpen = true;
+        showPrivateChat();
       }}
       onFollowToggle={requestFollowToggle}
       onFollowStyleChange={applyFollowStyle}

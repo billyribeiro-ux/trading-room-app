@@ -223,7 +223,64 @@ export const ROOM_VISIBLE_SETTINGS = [
 
     This is also the only entry on this list the room may WRITE — see `ROOM_WRITABLE_SETTINGS`.
   */
-  'overwriteCashRegisterSound'
+  'overwriteCashRegisterSound',
+  /*
+    "Hide Alerts/Chat Section?" — "If enabled, the room will not have chat/alerts. Just media."
+
+    The FIRST of the five writers of `hideChatAlerts`, and the only one that is a setting:
+    `this.hideChatAlerts = this.appService.globals.sessData.hideChatAlerts`
+    (`app-room.full.js:1893`). The other four are runtime conditions the room computes for itself —
+    `isPlayer && isPresenter`, `videoOnlyMode && !recordChat`, `viewerOnlyMode`, and the `detachChat`
+    event. That one flag then gates the entire chat/alerts column, at
+    `O(1, e.hideChatAlerts ? -1 : 1)` (`app-room.render-helpers.js:1650`), and the extra chat column
+    beside it at `:1652-1660`.
+
+    Without it the room cannot resolve the gate at all, so an owner who ticks "Hide Alerts/Chat
+    Section?" on the Manage page gets a room that still renders the chat and alerts — the setting is
+    configurable and inert, which is the specific defect this repository calls dead scaffolding.
+
+    Not a credential and not a policy the room could infer: it is a per-room preference the owner
+    ticks, and the room is where the column is drawn.
+
+    `recordChat` is deliberately NOT added beside it. It appears only inside the `videoOnlyMode`
+    writer (`:1898-1900`), and `videoOnlyMode` is the `r` query parameter — the recording-bot mode —
+    which this room does not model, the same honest gap recorded above for `hideFiles`. Sending
+    `recordChat` would put a setting on the wire that nothing can read.
+  */
+  'hideChatAlerts',
+  /*
+    "Chat Only Room?" — "The room will be only text based chat/alerts, no audio/video".
+
+    The second term of `hidePresentation`:
+    `(chatOnlyMode || sessData.isChatOnlyRoom) && (this.hidePresentation = !0, …)`
+    (`app-room.full.js:1903-1904`), gating the presentation column at
+    `app-room.render-helpers.js:1662`. The first term is the `co` query parameter, which the room
+    already reads for itself; this one is the room-wide setting, and it is the half that cannot be
+    inferred from the URL.
+
+    The distinction matters: `?co=1` is one reader popping the chat out of one room, while
+    `isChatOnlyRoom` is the owner declaring that this room has no presentation area for anybody.
+    Without it a room configured as chat-only still renders a presentation area for every member.
+  */
+  'isChatOnlyRoom',
+  /*
+    "Disable Copy?" — "If enabled, it will disable right-click to prevent selecting and copying all
+    text".
+
+    Three host bindings on `app-room`, all three carrying the SAME two-term gate — the setting AND
+    `!isPresenter` (`app-room.full.js:3011-3026`, and `ngAfterViewInit` at `:2227-2229`):
+    `contextmenu` is suppressed, Ctrl+C / Ctrl+U / Ctrl+S and F12 are suppressed, and
+    `document.body` gains `noselect`.
+
+    A PRESENTER is exempt by construction, which is the part that makes this a content-protection
+    setting rather than a kiosk mode: the person running the room keeps their own clipboard.
+
+    Not a credential and not a policy the room could infer — it is a per-room preference the owner
+    ticks, and the room is the only place the keystrokes happen. It is also the plainest example of
+    what this list is for: the checkbox has existed on the Manage page all along, and until the
+    bindings landed, ticking it protected nothing.
+  */
+  'disableCopy'
 ] as const satisfies readonly (keyof RoomSettings)[];
 
 const ROOM_VISIBLE = new Set<string>(ROOM_VISIBLE_SETTINGS);

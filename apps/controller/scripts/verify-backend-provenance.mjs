@@ -34,6 +34,30 @@ const EXPECTED_FILE_COUNT = 98;
 const EXPECTED_PATH_LIST_SHA256 = '66ab4696e3d3685daaa5ba27e28137a1cc038a71a32fcf92d30bdd144f35ecef';
 const EXPECTED_MANIFEST_SHA256 = '4c3036011fe272a4264769358c9243804fb78246c2d0525ddaf67285ddb1815a';
 
+/*
+  Files under `services/**` that were AUTHORED HERE and never imported.
+
+  This seal answers one question: has anything we imported from the source drifted? A file written
+  in this repository is not an answer to that question, and folding it into the count would make
+  `ops/backend-import-provenance.md` — which records what was IMPORTED — claim an import that never
+  happened. That is the reason `TODO.md` row Z refused to bump 98 to 99, and the refusal was right;
+  what was missing was the other half, which is this list.
+
+  `0009_rename_runtime_roles.sql` was added 2026-08-10, deployed, and had a preflight defect found
+  and fixed in it, all while this verifier could not run. It is pinned below by its own hash, so it
+  is sealed — just not as an import.
+
+  A file only belongs here with a CHANGELOG entry saying it was authored in this repository. If you
+  are tempted to add an imported file to this list to make the gate green, the gate is telling the
+  truth and the list is not the place to argue with it.
+*/
+const LOCALLY_AUTHORED = new Map([
+  [
+    'services/api/migrations/0009_rename_runtime_roles.sql',
+    '6acfec233a6bfc81d0d82954e2147b3e32ccbc6a52095fb167734251ab0f1da4'
+  ]
+]);
+
 /**
  * Prose that quotes the seal's file count, and must therefore move with it.
  *
@@ -81,9 +105,35 @@ function listServicePaths() {
   return result.stdout.toString('utf8').split('\0').filter(Boolean).sort();
 }
 
-const paths = listServicePaths();
+const allPaths = listServicePaths();
+
+/*
+  Split before counting. The seal covers the IMPORTED tree; locally-authored files are sealed
+  separately below so that neither set can drift unnoticed and neither is mistaken for the other.
+*/
+const paths = allPaths.filter((relativePath) => !LOCALLY_AUTHORED.has(relativePath));
+const localPaths = allPaths.filter((relativePath) => LOCALLY_AUTHORED.has(relativePath));
+
+if (localPaths.length !== LOCALLY_AUTHORED.size) {
+  const missing = [...LOCALLY_AUTHORED.keys()].filter((p) => !localPaths.includes(p));
+  fail(
+    `locally-authored file(s) listed but not present: ${missing.join(', ')} — ` +
+      `remove them from LOCALLY_AUTHORED in the same change that deleted them`
+  );
+}
+
 if (paths.length !== EXPECTED_FILE_COUNT) {
-  fail(`file count changed: expected ${EXPECTED_FILE_COUNT}, got ${paths.length}`);
+  fail(
+    `imported file count changed: expected ${EXPECTED_FILE_COUNT}, got ${paths.length} ` +
+      `(${allPaths.length} total, ${localPaths.length} locally authored)`
+  );
+}
+
+for (const [relativePath, expected] of LOCALLY_AUTHORED) {
+  const actual = sha256(await readFile(`${REPOSITORY_ROOT}${relativePath}`));
+  if (actual !== expected) {
+    fail(`locally-authored file changed: ${relativePath} expected ${expected}, got ${actual}`);
+  }
 }
 
 for (const relativePath of paths) {
@@ -100,7 +150,7 @@ if (pathListSha256 !== EXPECTED_PATH_LIST_SHA256) {
 
 const manifestLines = await Promise.all(
   paths.map(async (relativePath) => {
-    const bytes = await readFile(new URL(`../${relativePath}`, import.meta.url));
+    const bytes = await readFile(`${REPOSITORY_ROOT}${relativePath}`);
     return `${sha256(bytes)}  ${relativePath}`;
   })
 );
@@ -122,7 +172,7 @@ const SEAL_COUNT_CLAIM =
 for (const site of DOCUMENTED_COUNT_SITES) {
   let prose;
   try {
-    prose = await readFile(new URL(`../${site}`, import.meta.url), 'utf8');
+    prose = await readFile(`${REPOSITORY_ROOT}${site}`, "utf8");
   } catch {
     fail(`documented-count site is missing: ${site}`);
   }
