@@ -24,6 +24,31 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-12
 
+### 2026-08-12 12:20 EDT — Item U's evidence gap closed by reading, not by a script
+
+No code yet. The row said the volume dropdown's trigger "has never rendered in any capture" and was
+one of the collapsed `<!---->` placeholders — the sort of thing that gets a console script. It did not
+need one. The trigger is in `main.d6d3c112b59b7d0d.js` in full, with its icons and its conditions.
+
+**Why it looked missing: there are TWO `#dropdownVolume` triggers.**
+
+- `[…1,"nav-link","d-flex","align-items-center"]` — the main nav. **Already built**, at
+  `+page.svelte:6824`, and correct: `fa-2x`, `fa-volume-mute` and the `mainNavItem` label each occur
+  exactly once in the bundle, so ours is that variant rather than a near-miss of the other.
+- `[…1,"btn","btn-sm","btn-dark"]` — the zoom-controls overlay. **Not built.**
+
+Its template is `hSe`: a `button` holding one of three icons picked by `audioVolume` — `>50` →
+`fa-volume-up`, `<50 && >4` → `fa-volume-down`, `<4` → `fa-volume-off`. **Every branch is a strict
+inequality, so at exactly 50 or exactly 4 no icon renders at all.** That is the reference's behaviour
+and it gets reproduced, not corrected — this is the class of thing that gets "tidied" into a bug by
+the next reader.
+
+The parent `CSe` puts three children in `div.zoom-controls-container.position-relative`: the zoom
+buttons, this button, then `div.dropdown-menu.volumeControl`. `ScreenTabs.svelte:249` renders the
+container and `{@render controls()}` only, so the button and the menu are exactly what is absent.
+
+Recorded now so the reading is not repeated. Implementation is the next step.
+
 ### 2026-08-12 12:02 EDT — `TODO.md` made to obey its own rule again
 
 No code. The file states at the top that it lists only what is still OPEN, and that closed items are
