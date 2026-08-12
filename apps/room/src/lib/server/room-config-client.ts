@@ -71,6 +71,14 @@ export interface RoomSessionSettings {
    */
   hideFiles?: boolean;
   /**
+   * "Individual Volume Controls?" — one volume slider per talking presenter.
+   *
+   * The reference gates const 115 on it inside `room-sound-options`, in BOTH copies of the volume
+   * dropdown (`app-presentationarea.render-helpers.js:383`,
+   * `app-room.render-helpers.js:1100`). Read by `ScreenVolumeControl.svelte`.
+   */
+  individualVolumeControls?: boolean;
+  /**
    * "Overwrite Cash Register Sound" — the url of the mp3 that replaces `chash.mp3` for alerts.
    *
    * Also the ONE setting this room writes back, through {@link writeRoomSetting}. `''` and `null`

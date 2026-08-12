@@ -156,6 +156,19 @@ export const ROOM_VISIBLE_SETTINGS = [
   'userToPresenterPM',
   'userUploads',
   /*
+    "Individual Volume Controls?" — "Individual volume controls for each Presenter".
+
+    The gate on the per-presenter slider inside the screen overlay's volume dropdown:
+    `O(6, o.appService.globals.sessData.individualVolumeControls ? 6 : -1)`
+    (`app-presentationarea.render-helpers.js:383`, and the identical gate on the navbar copy at
+    `app-room.render-helpers.js:1100`). Without it the room cannot resolve that gate, and the row's
+    volume slider is either always shown or never shown — both wrong for somebody.
+
+    Not a credential and not a policy the room could infer: it is a per-room preference the owner
+    ticks on the Manage page, and the room is where the sliders are drawn.
+  */
+  'individualVolumeControls',
+  /*
     Mobile App Info — `O(12, hideAppInfo ? -1 : 12)` around the button, and inside it
     `O(1, !ptrMobileAppEnabled && !customMobileAppEnabled || user.isFT && !freeTrialsGetApp ? -1 : 1)`.
     The two URLs replace the default store links when `customMobileAppEnabled`, and

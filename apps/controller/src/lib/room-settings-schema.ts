@@ -10,7 +10,7 @@
 // roomType has no captured value because its editor is absent from rendered evidence.
 //
 // `wired` is the honest bit: false means the controller can store the value but
-// nothing in the room reads it yet. 42 of 269 are wired today.
+// nothing in the room reads it yet. 43 of 269 are wired today.
 // Flip one to true ONLY when a consumer exists, so the UI can mark the rest
 // instead of pretending they do something.
 
@@ -251,7 +251,7 @@ export const ROOM_SETTINGS: readonly RoomSettingDef[] = [
   { name: "overlayUserIdOnScreenshare", section: "settings", type: "checkbox", label: "Overlay userID on screenshare?", help: "If enabled, it will overlay userID on screenshare", helpShape: "plain", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
   { name: "regUserCanPresent", section: "settings", type: "checkbox", label: "Auto give Mic/Screen to Users?", help: "If enabled, ALL regular users will have mic/screenshare in the room. ***** CAREFULL ******", helpShape: "plain", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
   { name: "dontStopRecOnMicMute", section: "settings", type: "checkbox", label: "Don't stop on mute?", help: "Don't auto stop the rec on mic mute", helpShape: "plain", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
-  { name: "individualVolumeControls", section: "settings", type: "checkbox", label: "Individual Volume Controls?", help: "Individual volume controls for each Presenter", helpShape: "plain", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
+  { name: "individualVolumeControls", section: "settings", type: "checkbox", label: "Individual Volume Controls?", help: "Individual volume controls for each Presenter", helpShape: "plain", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: true },
   { name: "remote_recording", section: "settings", type: "checkbox", label: "NEW recording procedure?", help: "new experimental serverside rec control, more reliable?", helpShape: "plain", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
   { name: "saveRecsToS3", section: "settings", type: "checkbox", label: "Save Recs to AWS S3", help: null, helpShape: null, helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
   { name: "s3KeyID", section: "settings", type: "text", label: "S3 Key ID/Name", help: null, helpShape: null, helpOutside: false, captured: null, capturedIsDisplayOnly: false, group: null, wired: false },
