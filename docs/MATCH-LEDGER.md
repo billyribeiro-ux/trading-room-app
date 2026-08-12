@@ -154,11 +154,17 @@ locate 1–9 — it is headed `DELIBERATE DEVIATION` — and was found only by t
 the concrete demonstration that the locate-then-read pass is not sufficient on its own, and why the
 remaining linear read below is real work rather than diligence theatre.
 
-**Method, stated precisely.** Lines 1–2,900 of `+page.svelte` were read linearly. The remainder was
-covered by locating declared-divergence markers and **reading each region**, which is the sanctioned
-locate-then-read pattern. That finds every divergence the code declares. It would **not** find an
-undeclared one, so lines ~2,900–9,947 still need a linear read before `app-room` can be called
-closed in both directions.
+| 11 | The mobile inner chat/alerts gutter still persists `chatAlertSizes` | `W4e` drops its `dragEnd` as `K4e` does | `:5659-5668` — our inner gutter writes the same key the desktop layout reads, so dropping it would mean a phone silently reverting a size set on a laptop |
+| 12 | `window.opener?.postMessage(...)` — an optional chain | Dereferences `window.opener` unconditionally | `:6944-6950` — safe upstream only because `co=1` is reached exclusively through `detachChat`. This room can be opened at `?co=1` by hand, where the reference's line throws a TypeError on every unload |
+| 13 | The Alert Filter button is not rendered | Declares it (const 38/44) gated on `sessData.modAlertFilterList` | `:8407-8434` — across BOTH captures of this toolbar it never appears; rendering it put two buttons on a wrapped second row the capture never produces. Its other entry point (`span.badge.filtered-text`) is recorded as open rather than substituted for |
+| 14 | `name="alert-search-term"` on the alert search input | Const 32 carries neither `id` nor `name` | `:8452-8469` — Chrome reports the same warning against the original. `name` rather than `id` because `id` is the half the capture uses elsewhere as a document-unique hook |
+| 15 | The VideoPlayer tab is gated on `isPresenter` alone | `O(25, (hideVideoPlayer && !isP) \|\| isP ? 25 : -1)` | `:9074-9087` — `hideVideoPlayer` is unmodelled. `isPresenter` reproduces both observed states, and the missing term is recorded rather than invented |
+| 16 | `type="button"` on the alert-sound buttons | Const 263 spells it `pe="button"` — a typo | `:9795-9803` — harmless where it stands (no enclosing form), but copied forward it plants a latent bug for anyone who later wraps the pane in one. The TITLE's misspelling *is* reproduced |
+
+**Method — and the reverse pass is now COMPLETE.** All 9,947 lines of `+page.svelte` were read
+linearly, to the end of the file. Divergences 1–9 were first surfaced by a marker search; 10–16 were
+found only by the linear read and carry no marker phrase that search would have matched. That is the
+measured cost of the shortcut: it would have missed seven of sixteen.
 
 ### ⚠ Which tree each finding was read against — a method error, recorded
 
@@ -183,10 +189,14 @@ Matched or Gaps tables above came from the wrong tree — every one of those was
 occurrence count while on the viewer-only branch — but the next reader needs to know the trap
 exists.
 
-### Still to do for `app-room`
+### `app-room` is CLOSED in both directions
 
-- Linear read of `+page.svelte` **3,320–9,947**, **on the viewer-only branch**, for divergences the
-  code does not declare in the vocabulary the locate pass searched for. Lines 1–3,320 are read.
+Reference side: all 8,231 lines. Our side: all 9,947 lines. 15 items matched, 24 gaps (13 now
+implemented on PR #3), 16 divergences — every one declared in the code with its reasoning.
+
+Nothing further is outstanding for this component. Next: `app-presentationarea`, then
+`app-screenshare-view` (both have anchored const mappings from the viewer-only work), then the
+remaining 49.
 
 ---
 
