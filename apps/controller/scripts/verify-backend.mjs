@@ -20,7 +20,19 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
-const REPOSITORY_ROOT = fileURLToPath(new URL('../', import.meta.url));
+/*
+  THREE levels up, not one.
+
+  `import.meta.url` is `apps/controller/scripts/…`, so `'../'` resolves to `apps/controller/` — the
+  APP root, not the repository root. Everything below is addressed `services/api/…`, which lives at
+  the repository root, so every one of those paths pointed at a directory that does not exist and
+  this verifier died on its first `scandir`.
+
+  It came from the sibling repository, where `services/` sits beside `scripts/` and `'../'` was
+  right. Moving it under `apps/controller/` invalidated the assumption without changing the name,
+  and because `pnpm test` runs this at step 2 the whole chain has been failing there ever since.
+*/
+const REPOSITORY_ROOT = fileURLToPath(new URL('../../../', import.meta.url));
 const SERVICES_DIRECTORY = path.join(REPOSITORY_ROOT, 'services');
 const SERVICES_MANIFEST = path.join(SERVICES_DIRECTORY, 'Cargo.toml');
 const FORENSICS_PATH = 'docs/reference/original-new-room-backend-forensics.md';
@@ -66,6 +78,22 @@ const REVIEWED_FORWARD_MIGRATIONS = Object.freeze([
   Object.freeze({
     path: 'services/api/migrations/0008_room_events_tenant_keys.sql',
     sha256: '5b724072b09ba21c43fb9db03e3cd2cfbb0bbb8343b3b719c21b82e1fde266d2'
+  }),
+  /*
+    Added 2026-08-10, pinned 2026-08-12 — and the gap between those two dates is the point.
+
+    This gate could not run at all: `REPOSITORY_ROOT` resolved to `apps/controller/` rather than the
+    repository root, so it died on `scandir` before reading a single migration. A migration was
+    therefore added to the chain, deployed, and had a preflight defect found and fixed in it, all
+    without the verifier that exists to pin exactly that ever executing.
+
+    It renames the runtime role, which is the highest-risk shape a migration in this repository can
+    have — `migrate.rs` requires that role by name BEFORE the chain runs, so getting it wrong locks
+    every later migrate and API start out of the database.
+  */
+  Object.freeze({
+    path: 'services/api/migrations/0009_rename_runtime_roles.sql',
+    sha256: '6acfec233a6bfc81d0d82954e2147b3e32ccbc6a52095fb167734251ab0f1da4'
   })
 ]);
 

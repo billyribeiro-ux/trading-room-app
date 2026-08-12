@@ -13,7 +13,19 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
-const REPOSITORY_ROOT = fileURLToPath(new URL('../', import.meta.url));
+/*
+  THREE levels up, not one.
+
+  `import.meta.url` is `apps/controller/scripts/…`, so `'../'` resolves to `apps/controller/` — the
+  APP root, not the repository root. Everything below is addressed `services/api/…`, which lives at
+  the repository root, so every one of those paths pointed at a directory that does not exist and
+  this verifier died on its first `scandir`.
+
+  It came from the sibling repository, where `services/` sits beside `scripts/` and `'../'` was
+  right. Moving it under `apps/controller/` invalidated the assumption without changing the name,
+  and because `pnpm test` runs this at step 2 the whole chain has been failing there ever since.
+*/
+const REPOSITORY_ROOT = fileURLToPath(new URL('../../../', import.meta.url));
 const POLICY_PATH = path.join(REPOSITORY_ROOT, 'ops', 'api-release-vulnerability-policy.json');
 const WORKFLOW_PATH = path.join(REPOSITORY_ROOT, '.github', 'workflows', 'backend-quality.yml');
 const DOCKERFILE_PATH = path.join(REPOSITORY_ROOT, 'services', 'api', 'Dockerfile');

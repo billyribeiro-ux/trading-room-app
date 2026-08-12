@@ -24,6 +24,39 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-12
 
+### 11:05 — The next two gates: a path bug in three verifiers, and an unpinned migration
+
+**No runtime impact.** Verifier fixes and one capture tracked. 715 tests / 65 files, room 604 / 62.
+
+With `schema:verify` alive, `pnpm test` moved on to failing at step 2. Diagnosed end to end.
+
+**Three verifiers could never run.** `verify-backend.mjs`, `verify-backend-provenance.mjs` and
+`verify-api-release-artifact.mjs` each compute
+`REPOSITORY_ROOT = fileURLToPath(new URL('../', import.meta.url))`. From `apps/controller/scripts/`
+that is the APP root. Every path they check is `services/api/…`, which lives at the **repository**
+root, so all three died on `scandir` before reading a file. They came from the sibling repository,
+where `services/` sits beside `scripts/` and `'../'` was correct; moving them under
+`apps/controller/` invalidated the assumption without changing the name. Now `'../../../'`.
+
+**With the path right, it immediately caught a real thing.** `0009_rename_runtime_roles.sql` was
+added 2026-08-10, deployed, and had a preflight defect found and fixed in it — all without ever being
+pinned, because the verifier that exists to pin exactly that could not execute. It is the
+highest-risk shape a migration here can have: it renames the runtime role `migrate.rs` requires by
+name BEFORE the chain runs. Now pinned by SHA-256, with the gap between the two dates written into
+the entry.
+
+**The third cause is the owner's, and is deliberately not silenced.** The gate now reports
+`file count changed: expected 98, got 99` — the real `services/**` divergence item P describes.
+`ops/backend-import-provenance.md` records what was IMPORTED from the source, and 0009 was authored
+here, so bumping the count to 99 would claim an import that never happened and hide the thing P
+exists for. The chain stays red at step 2, honestly now instead of on a path bug.
+
+**And `evidence:verify` (step 4) needs the full evidence tree.** It expects nine entries under
+`evidence-dumps/`; this repository has only the 216 KB `login-page/manage` that `schema:verify`
+needs, now tracked. The full tree is **45 MB** in `new-room-control/`. Pulling it is one command in
+the sanctioned direction, but committing 45 MB is not a call to make unilaterally at the end of a
+session — recorded as `TODO.md` item Z.
+
 ### 10:35 — Item Y CLOSED. Settings back to baseline, and a gate that never ran now runs
 
 **Runtime impact: yes, in the controller.** 715 tests / 65 files, room 604 / 62, `svelte-check` 0/0

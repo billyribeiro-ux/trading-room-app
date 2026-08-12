@@ -17,7 +17,19 @@ import { readFile } from 'node:fs/promises';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
-const REPOSITORY_ROOT = fileURLToPath(new URL('../', import.meta.url));
+/*
+  THREE levels up, not one.
+
+  `import.meta.url` is `apps/controller/scripts/…`, so `'../'` resolves to `apps/controller/` — the
+  APP root, not the repository root. Everything below is addressed `services/api/…`, which lives at
+  the repository root, so every one of those paths pointed at a directory that does not exist and
+  this verifier died on its first `scandir`.
+
+  It came from the sibling repository, where `services/` sits beside `scripts/` and `'../'` was
+  right. Moving it under `apps/controller/` invalidated the assumption without changing the name,
+  and because `pnpm test` runs this at step 2 the whole chain has been failing there ever since.
+*/
+const REPOSITORY_ROOT = fileURLToPath(new URL('../../../', import.meta.url));
 const EXPECTED_FILE_COUNT = 98;
 const EXPECTED_PATH_LIST_SHA256 = '66ab4696e3d3685daaa5ba27e28137a1cc038a71a32fcf92d30bdd144f35ecef';
 const EXPECTED_MANIFEST_SHA256 = '4c3036011fe272a4264769358c9243804fb78246c2d0525ddaf67285ddb1815a';
