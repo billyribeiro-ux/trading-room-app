@@ -13,9 +13,9 @@ const GENERATOR = resolve(SCRIPT_DIR, 'extract-manage-schema.mjs');
 const CANONICAL_SCHEMA = resolve(REPO_ROOT, 'src/lib/room-settings-schema.ts');
 
 /*
-  Eleven consumed by this repository's room-login page, twenty-six by the room application through
+  Eleven consumed by this repository's room-login page, twenty-seven by the room application through
   `internal/room-config/[code]`, and six by the WordPress SSO door at `(public)/sso/[code]`.
-  `allowUsersToChangeUsername` is on the first two lists, so the union is 42.
+  `allowUsersToChangeUsername` is on the first two lists, so the union is 43.
   Kept as one flat list so a drift shows up as a diff here rather than as a category argument.
 
   (Two copies of this note used to sit here, one of them stale at "twelve". A count that appears
@@ -49,6 +49,7 @@ const EXPECTED_WIRED_SETTINGS = [
   'hidePoweredBy',
   'hideRecs',
   'hideWelcomeTo',
+  'individualVolumeControls',
   'loginErrorMsg',
   'loginErrorURL',
   'nickFilter',

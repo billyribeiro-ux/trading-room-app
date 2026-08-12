@@ -101,6 +101,7 @@ const ROOM_CONSUMED = [
   'hideFiles',
   'hideMobileCredentials',
   'hideRecs',
+  'individualVolumeControls',
   'onlyPresentersVisibleToViewers',
   'overwriteCashRegisterSound',
   'ptrMobileAppEnabled',
@@ -430,7 +431,7 @@ if (defs.length !== EXPECTED_TOTAL_COUNT) {
 }
 
 const missingWiredSettings = [...WIRED_SETTINGS].filter((name) => !defs.some((definition) => definition.name === name));
-if (WIRED_SETTINGS.size !== 42 || missingWiredSettings.length > 0) {
+if (WIRED_SETTINGS.size !== 43 || missingWiredSettings.length > 0) {
   throw new Error(
     `wired-setting contract invalid: ${WIRED_SETTINGS.size} keys, missing ${missingWiredSettings.join(', ') || 'none'}`
   );

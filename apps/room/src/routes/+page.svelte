@@ -24,6 +24,13 @@
     zoomOut,
     type Pan
   } from '$lib/screen-zoom';
+  import ScreenVolumeControl from '$lib/components/ScreenVolumeControl.svelte';
+  import {
+    adjustVolumeForPresenter,
+    toggleTalkingPresenter,
+    type PresenterAudioPreferences,
+    type TalkingPresenter as PresenterAudioUser
+  } from '$lib/screen-volume';
   import {
     RANDOM_USER_MINIMUM,
     archivesAvailableTo,
@@ -862,6 +869,83 @@
   let previousVolume = $state(100);
   let muted = $state(false);
   let backgroundVolume = $state(70);
+  /**
+   * `appService.globals.viewerOnlyMode` — the `vo` query parameter, and the ONLY gate on the screen
+   * overlay's volume trigger (`ScreenVolumeControl.svelte`).
+   *
+   * Read the same way `chatOnlyMode` above reads `co` and `detachedScreenId` reads `dscreen`: this
+   * app's query parameters are its own, and the reference's parser assigns all three out of one
+   * block. `?vo=2` additionally sets `viewerOnlyModeLimited` upstream; nothing in this room reads
+   * that yet, so it is deliberately not modelled here rather than added as state with no consumer.
+   *
+   * PROVENANCE, stated because it is the one fact in this change that was not re-read this session:
+   * the `vo` -> `viewerOnlyMode` mapping comes from `HANDOFF.md`, which quotes it from the minified
+   * bundle at ~2595500. It is NOT in `docs/source/components/**` — that tree decodes the 51
+   * COMPONENTS, and the query-parameter block belongs to the app service. What IS re-read and cited
+   * is every consumer: `app-presentationarea.compiled.js:92`, `app-room.compiled.js:76,856`, and
+   * the two `ngClass` helpers `jCe`/`VCe` in `app-presentationarea.render-helpers.js:9-10`.
+   */
+  const viewerOnlyMode = $derived(
+    page.url.searchParams.get('vo') === '1' || page.url.searchParams.get('vo') === '2'
+  );
+  /**
+   * `sessData.individualVolumeControls` — "Individual Volume Controls?", the room setting that
+   * reveals the per-presenter slider inside the overlay's `room-sound-options`
+   * (`bSe`'s `O(6, …sessData.individualVolumeControls ? 6 : -1)`).
+   *
+   * It exists in the controller's schema (`room-settings-schema.ts`, "Individual volume controls
+   * for each Presenter") and had to be added to `ROOM_VISIBLE_SETTINGS` to reach this room; that
+   * change and its consumer land together.
+   */
+  const individualVolumeControls = $derived(data.sessData?.individualVolumeControls === true);
+  /**
+   * `preferences.audioMutedFor` and `preferences.audioVolumeFor` — per-presenter audio, persisted.
+   *
+   * `$state.raw`, not `$state`: every transition in `$lib/screen-volume` REPLACES both maps, so a
+   * deep proxy would cost a proxy per key and buy nothing.
+   *
+   * Seeded from the same stored settings every other preference here is seeded from. The reference
+   * persists exactly these two keys, through `setPreference('audioMutedFor', …)` and
+   * `setPreference('audioVolumeFor', …)`, on every toggle and every drag.
+   */
+  // The stored settings are the intentional one-time seed for editable client preference state.
+  // svelte-ignore state_referenced_locally
+  let presenterAudio = $state.raw<PresenterAudioPreferences>({
+    audioMutedFor: readPresenterMuteMap(loadedSettings.audioMutedFor),
+    audioVolumeFor: readPresenterVolumeMap(loadedSettings.audioVolumeFor)
+  });
+
+  /**
+   * `audioMutedFor` as it comes back from storage.
+   *
+   * Deliberately strict about the SHAPE rather than coercing: the stored value is a map of
+   * `{name}` objects, and an entry that is not one is dropped instead of being turned into a
+   * truthy placeholder that would mute a presenter nobody muted.
+   */
+  function readPresenterMuteMap(stored: unknown): Record<number, { name: string }> {
+    if (!stored || typeof stored !== 'object' || Array.isArray(stored)) return {};
+    const map: Record<number, { name: string }> = {};
+    for (const [key, value] of Object.entries(stored as Record<string, unknown>)) {
+      const userID = Number(key);
+      if (!Number.isFinite(userID)) continue;
+      if (value && typeof value === 'object' && typeof (value as { name?: unknown }).name === 'string') {
+        map[userID] = { name: (value as { name: string }).name };
+      }
+    }
+    return map;
+  }
+
+  /** `audioVolumeFor` as it comes back from storage — strings and numbers both, see `screen-volume.ts`. */
+  function readPresenterVolumeMap(stored: unknown): Record<number, string | number> {
+    if (!stored || typeof stored !== 'object' || Array.isArray(stored)) return {};
+    const map: Record<number, string | number> = {};
+    for (const [key, value] of Object.entries(stored as Record<string, unknown>)) {
+      const userID = Number(key);
+      if (!Number.isFinite(userID)) continue;
+      if (typeof value === 'string' || typeof value === 'number') map[userID] = value;
+    }
+    return map;
+  }
   let subtitles = $state(false);
   /**
    * Closed captions.
@@ -3498,6 +3582,92 @@
     }
 
     window.dispatchEvent(new CustomEvent('setYTVolume', { detail: nextVolume }));
+  }
+
+  /**
+   * `mute()` / `unmute()` as `app-presentationarea` defines them — the SCREEN OVERLAY's pair, which
+   * is NOT the navbar's.
+   *
+   * ```text
+   * mute()   { this.prevVolume = this.audioVolume; this.audioVolume = 0; this.adjustVol(null);
+   *            this.appService.globals.preferences.doNotDisturbOn = !0 }
+   * unmute() { this.audioVolume = this.prevVolume; this.adjustVol(null);
+   *            this.appService.globals.preferences.doNotDisturbOn = !1 }
+   * ```
+   * (`app-presentationarea.compiled.js:923-933`)
+   *
+   * `app-room`'s copy of the same two methods (`app-room.compiled.js:807-823`) additionally sets
+   * `preferences.subtitles` and drags the background music volume along with it. That is the
+   * NAVBAR's behaviour and it is what {@link toggleMute} already does; the overlay's is deliberately
+   * the shorter one, because the two components genuinely differ.
+   *
+   * One divergence, stated rather than hidden: `setMasterVolume` here also sets `subtitles = true`
+   * at zero, because it was written from `app-room`'s `adjustVol` — the only `adjustVol` this room
+   * had a caller for. `app-presentationarea`'s `adjustVol` has no such line. Splitting it would mean
+   * two master-volume paths over one `volume` state, which is worse than the one line of drift.
+   */
+  function muteScreenAudio() {
+    previousVolume = volume;
+    setMasterVolume(0);
+    doNotDisturbOn = true;
+  }
+
+  function unmuteScreenAudio() {
+    setMasterVolume(previousVolume);
+    doNotDisturbOn = false;
+  }
+
+  /**
+   * Applies one presenter's volume to their audio sink.
+   *
+   * `ii('[id^=msRemAudio-' + o + ']').prop('volume', a)` — the reference reaches for the element by
+   * the id prefix this room already emits (`msRemAudio-{userID}`, the hidden `<audio>` per remote
+   * microphone). Same selector, same 0–1 range.
+   */
+  function applyPresenterVolume(userID: number, level: number) {
+    if (typeof document === 'undefined') return;
+    document
+      .querySelectorAll<HTMLMediaElement>(`[id^="msRemAudio-${userID}"]`)
+      .forEach((element) => {
+        element.volume = level;
+      });
+  }
+
+  /**
+   * `toggleTalkingPresenter(user)` — the per-presenter mute checkbox.
+   *
+   * The state transition is in `$lib/screen-volume` and tested there. What is left here is the two
+   * effects the reference pairs with it:
+   *
+   * 1. **The persistence**, `setPreference('audioMutedFor'|'audioVolumeFor', …)`, which is this
+   *    room's `savePreference`.
+   * 2. **The SFU half** — and this is an HONEST GAP rather than a reproduction.
+   *    `mediaSoupService.startListeningToPresenter` / `stopListeningToPresenter` stop the server
+   *    SENDING that presenter's audio; this room's signalling wire has no equivalent command
+   *    (`Commands` in `src/lib/media/signalling.ts` carries `resumeConsumer`, `closeConsumer`,
+   *    `pauseProducer`, `resumeProducer` — nothing that pauses a consumer, and `closeConsumer`
+   *    cannot be undone without re-consuming from a `ProducerInfo` this page does not retain).
+   *    So the mute is applied where it can be applied honestly: the listener's own audio element.
+   *    The member hears exactly what the reference's member hears; the bandwidth saving is the part
+   *    that is missing, and `TODO.md` records it with the exact command that would close it.
+   */
+  function toggleTalkingPresenterAudio(user: PresenterAudioUser) {
+    const next = toggleTalkingPresenter(presenterAudio, user);
+    presenterAudio = next.preferences;
+    // Unmuting restores 100, muting drops to 0 — the reference writes both into `audioVolumeFor`,
+    // so the element follows the stored value rather than a second opinion about it.
+    applyPresenterVolume(user.userID, next.listen ? 1 : 0);
+    savePreference('audioMutedFor', next.preferences.audioMutedFor);
+    savePreference('audioVolumeFor', next.preferences.audioVolumeFor);
+  }
+
+  /** `adjustVolPres(event, user)` — the per-presenter slider. Same two effects as above. */
+  function adjustPresenterVolume(user: PresenterAudioUser, rawValue: string) {
+    const next = adjustVolumeForPresenter(presenterAudio, user, rawValue);
+    presenterAudio = next.preferences;
+    applyPresenterVolume(user.userID, next.elementVolume);
+    savePreference('audioMutedFor', next.preferences.audioMutedFor);
+    savePreference('audioVolumeFor', next.preferences.audioVolumeFor);
   }
 
   function toggleMute() {
@@ -6309,6 +6479,29 @@
   }
 </script>
 
+<!--
+  Children [3] and [4] of `div.zoom-controls-container` — the screen overlay's volume dropdown.
+
+  Declared here and passed into `ScreenZoomControls` so the ORDER stays with the component that
+  documents it (trio, volume, then the three dark buttons), while the state stays on this page,
+  which is where `app-presentationarea` keeps `audioVolume`, `preferences.audioMutedFor`,
+  `preferences.audioVolumeFor` and `mediaService.talkingUsers`.
+-->
+{#snippet screenVolume()}
+  <ScreenVolumeControl
+    {viewerOnlyMode}
+    audioVolume={volume}
+    {talkingUsers}
+    preferences={presenterAudio}
+    {individualVolumeControls}
+    onvolume={setMasterVolume}
+    onmute={muteScreenAudio}
+    onunmute={unmuteScreenAudio}
+    ontogglepresenter={toggleTalkingPresenterAudio}
+    onpresentervolume={adjustPresenterVolume}
+  />
+{/snippet}
+
 {#snippet bodySegmentsPrivate(text: string)}
   {#each text.split(/((?:http|https|ftp):\/\/[\w?=&.@/\-;#~%]+)/gi) as part, index (index)}
     {#if /^(?:http|https|ftp):\/\//i.test(part)}<!-- svelte-ignore a11y_click_events_have_key_events --><!-- svelte-ignore a11y_no_static_element_interactions --><a
@@ -8482,6 +8675,7 @@
                           variant="attached"
                           {showZoomCtrl}
                           ontoggle={togglePanZoom}
+                          volume={screenVolume}
                           oncapture={() => {
                             // The captured payload names the screen, and only that screen's view
                             // answers: `e.screenId !== this.muser._id` returns early.

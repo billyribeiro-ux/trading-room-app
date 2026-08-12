@@ -20,13 +20,20 @@
    *       <button class="btn btn-sm btn-warning" (click)="panZoomOut()">  <i class="icon fas fa-search-minus"></i>
    *       <button class="btn btn-sm btn-warning" (click)="panZoomReset()"><i class="icon fas fa-redo"></i>
    *     </div>
-   *     …volume dropdown…                                    <!-- consts 90-97, NOT built here -->
+   *     …volume dropdown…                                    <!-- consts 90-97, the `volume` snippet -->
    *     <button class="btn btn-sm btn-dark" (click)="togglePanZoom()">     <i class="icon fas fa-search"></i>
    *     <button class="btn btn-sm btn-dark" (click)="captureVideoImage()"> <i class="icon fas fa-camera"></i>
-   *     <button class="btn btn-sm btn-dark" (click)="fullScreenshare()">   <!-- NOT built here -->
+   *     <button class="btn btn-sm btn-dark" (click)="fullScreenshare()">   <i class="icon fas fa-expand"></i>
    *   </div>
    * </li>
    * ```
+   *
+   * The volume dropdown is `ScreenVolumeControl.svelte`, passed in as the {@link Props.volume}
+   * snippet rather than rendered here, because its state is the PAGE's: `audioVolume`, the
+   * preference maps and `talkingUsers` all live in `+page.svelte`, exactly as the reference keeps
+   * them on the component that owns `CSe`. What this component owns is the ORDER — children 2, 3
+   * and 4 of const 88 come before children 16, 18 and 20 — and that is why the slot is here and not
+   * beside the cluster in the page.
    *
    * Note the order: in the bar the gated trio comes FIRST and is `position-absolute`, so it floats
    * clear of the row rather than widening it. `app-presentationarea`'s own stylesheet places it at
@@ -55,12 +62,23 @@
    * twice - once with `fa-search`, once with `fa-camera` - while const 16 (`btn btn-sm btn-warning`)
    * is the gated trio.
    */
+  import type { Snippet } from 'svelte';
+
   type Props = {
     /**
      * Which captured arrangement to render. `attached` is the tab bar's `ms-auto` slot;
      * `detached` is the popped-out window's overlay.
      */
     variant: 'attached' | 'detached';
+    /**
+     * The volume dropdown — consts 90-97, children [3] and [4] of const 88.
+     *
+     * ATTACHED ONLY. `app-screenshare-view`'s detached cluster has no volume control of any kind:
+     * its const table runs `zoom-controls-container-detached`, the two dark buttons and the
+     * unclassed trio wrapper, and nothing else. Passing this snippet in the detached variant would
+     * render a control the reference does not have there, so the detached branch ignores it.
+     */
+    volume?: Snippet;
     /** Whether the three zoom buttons are showing. */
     showZoomCtrl: boolean;
     /** The magnifier. */
@@ -85,6 +103,7 @@
 
   let {
     variant,
+    volume,
     showZoomCtrl,
     ontoggle,
     oncapture,
@@ -165,6 +184,12 @@
       {@render zoomTrio()}
     </div>
   {/if}
+  <!--
+    Children [3] and [4] of const 88, and they come BEFORE the dark buttons at [16], [18] and [20].
+    `CSe`'s create block is the whole ordering:
+      d(1,'div',88), H(2, lSe, …'div',89)(3, hSe, …'button',90), d(4,'div',91)…, d(16,'button',98)…
+  -->
+  {@render volume?.()}
   {@render darkButtons()}
   <!--
     Const 98 again, with const 101 / 116 swapping on `isFullScreenshare`. The owner's capture of
