@@ -109,7 +109,21 @@ export type RoomEvent =
    */
   | {
       channel: 'roster';
-      data: { cmd: 'getRosterCount'; data: number } | { cmd: 'getRoster'; users: RosterUser[] };
+      data:
+        | { cmd: 'getRosterCount'; data: number }
+        | { cmd: 'getRoster'; users: RosterUser[] }
+        /**
+         * `onUserJoin` / `onUserLeave` — `app-room.full.js:2134-2155`.
+         *
+         * PERSON events, not connection events: the reference's roster is keyed on `userXrefID`
+         * and these flip a single entry's `online` flag rather than appending a row, so one person
+         * with three tabs announces once on the first and once on the last. `subscribeToRoom` is
+         * where that is decided, because the subscriber map is the presence table.
+         *
+         * The payload is the reference's `{nick, userXrefID}` in this room's own key: the id it
+         * already uses everywhere else, plus the name the message prints.
+         */
+        | { cmd: 'onUserJoin' | 'onUserLeave'; userId: number; nick: string };
     }
   /**
    * `/sess/{id}/cmdsAdmin/`, drained by `handleServerCmdAdmin` - which is one line:
@@ -223,13 +237,46 @@ export function subscribeToRoom(
     listeners = new Map();
     subscribers.set(room, listeners);
   }
+  /*
+    `onUserJoin` / `onUserLeave` — `app-room.full.js:2134-2155`, and the hub is the only thing that
+    can know. The reference's roster is keyed on `userXrefID` and these two flip a single entry's
+    `online` flag rather than appending a row, so they are PERSON events, not connection events.
+
+    That distinction is the whole implementation: one person with three tabs must announce once on
+    the first tab and once on the last. `heldBy` is asked BEFORE the set and AFTER the delete, so a
+    second tab opening is silent and a second tab closing is silent.
+
+    Anonymous listeners (`user === null`) announce nothing: there is no name to put in the message,
+    and the reference's payload is `{nick, userXrefID}`.
+  */
+  const alreadyHere = user !== null && heldBy(listeners, user.id);
   listeners.set(listener, user);
+  if (user !== null && !alreadyHere) {
+    publishToRoom(room, {
+      channel: 'roster',
+      data: { cmd: 'onUserJoin', userId: user.id, nick: user.displayName }
+    });
+  }
 
   return () => {
     listeners.delete(listener);
+    if (user !== null && !heldBy(listeners, user.id)) {
+      publishToRoom(room, {
+        channel: 'roster',
+        data: { cmd: 'onUserLeave', userId: user.id, nick: user.displayName }
+      });
+    }
     // Drop the room once nobody is listening, so an empty room costs nothing.
     if (listeners.size === 0) subscribers.delete(room);
   };
+}
+
+/** Whether any remaining listener in this room belongs to that person. */
+function heldBy(listeners: Map<Subscriber, RosterUser | null>, userId: number): boolean {
+  for (const held of listeners.values()) {
+    if (held?.id === userId) return true;
+  }
+  return false;
 }
 
 /**

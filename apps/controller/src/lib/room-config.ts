@@ -142,6 +142,22 @@ export const ROOM_VISIBLE_SETTINGS = [
   'hideRecs',
   'showArchivesToSpecificPresenters',
   'showArchivesToUsers',
+  /*
+    "Tawk Presenter Support?" — the gate on the navbar's support widget,
+    `O(30, isPresenter && sessData.tawkPresenterSupport ? 30 : -1)`
+    (`app-room.render-helpers.js:1417-1422`), which also decides whether the third-party script is
+    injected at all (`full.js:2224`, `:2274-2283`).
+
+    Presenter-only in effect, and the room enforces that a second time: a member never loads the
+    script, so the tawk.to request is not made in their browser.
+
+    The PROPERTY ID is deliberately not carried with it. The reference hardcodes its own
+    (`5aecb59f227d3d7edc24f7c2`), and reproducing that would open every presenter's support chat
+    into another company's inbox and post their name and email there. Ours comes from
+    `PUBLIC_PTR_TAWK_PROPERTY_ID`, and with none configured the feature stays off — see
+    `apps/room/src/lib/tawk-support.ts`.
+  */
+  'tawkPresenterSupport',
   // `canPostImages` in the composer, and `canPM` in the roster kebab.
   'disablePMForTrials',
   'userPM',
@@ -248,6 +264,26 @@ export const ROOM_VISIBLE_SETTINGS = [
     `recordChat` would put a setting on the wire that nothing can read.
   */
   'hideChatAlerts',
+  /*
+    The two ROOM halves of the join/leave announcements (`app-room.full.js:2134-2155`).
+
+    Each effect is gated twice, on a room setting AND a per-viewer preference:
+
+      sessData.userJoinAndLeavePopup && preferences.popupOnUserJoin  -> the toast
+      sessData.beepOnUserJoin        && preferences.beepOnUserJoin   -> the sound
+
+    The preferences already live in the room; these two do not, so both gates evaluated `undefined`
+    and a presenter was never told that anybody arrived or left however the room was configured.
+
+    `beepOnUserJoin` covers BOTH directions upstream — the leave beep reads the same room flag
+    (`:2151`) and only the viewer preference is per-direction. There is no `beepOnUserLeave` room
+    setting to send, and inventing one would put a key on the wire that the reference never reads.
+
+    Presenter-only in effect: the client refuses both for a member. Sending them to every room is
+    still correct, because whether a given reader is a presenter is not a property of the room.
+  */
+  'userJoinAndLeavePopup',
+  'beepOnUserJoin',
   /*
     "Chat Only Room?" — "The room will be only text based chat/alerts, no audio/video".
 

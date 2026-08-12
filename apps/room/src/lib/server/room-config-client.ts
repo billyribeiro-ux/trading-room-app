@@ -92,6 +92,31 @@ export interface RoomSessionSettings {
    */
   hideChatAlerts?: boolean;
   /**
+   * "User Join and Leave Popup?" — the room half of the join/leave TOAST
+   * (`app-room.full.js:2137-2138`, `:2148-2149`).
+   *
+   * Paired with the per-viewer `popupOnUserJoin` / `popupOnUserLeave`, so the owner turns the
+   * feature off for the room and a presenter can still turn it off for themselves. Presenter-only
+   * in effect — the client refuses it for a member.
+   */
+  /**
+   * "Tawk Presenter Support?" — the room half of the support widget
+   * (`app-room.render-helpers.js:1417-1422`, `full.js:2224`).
+   *
+   * The property id is NOT carried with it: the reference hardcodes its own, and reproducing that
+   * would post presenters' names and email addresses into another company's inbox. See
+   * `$lib/tawk-support`.
+   */
+  tawkPresenterSupport?: boolean;
+  userJoinAndLeavePopup?: boolean;
+  /**
+   * "Beep On User Join?" — the room half of the join/leave SOUND (`:2140-2143`, `:2151-2154`).
+   *
+   * Covers BOTH directions: the leave beep reads this same flag upstream and only the viewer
+   * preference is per-direction. There is no `beepOnUserLeave` room setting to carry.
+   */
+  beepOnUserJoin?: boolean;
+  /**
    * "Chat Only Room?" — the room-wide half of `hidePresentation`.
    *
    * `(chatOnlyMode || sessData.isChatOnlyRoom) && (this.hidePresentation = !0, …)`

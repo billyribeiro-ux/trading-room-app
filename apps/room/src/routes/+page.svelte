@@ -48,6 +48,12 @@
     sortRosterByNick
   } from '$lib/roster-gates';
   import { alertSoundButtonFor, filesSectionHidden } from '$lib/files-gates';
+  import {
+    MUTE_ALL_CONFIRM,
+    MUTE_STAGGER_MS,
+    nonAdminTalkingUsers
+  } from '$lib/mute-all-non-admins';
+  import { tawkAttributes, tawkScript, tawkSupportAvailable } from '$lib/tawk-support';
   import { NO_PENDING_CLICK, gutterRelease, togglePresentationSplit } from '$lib/split-gutter';
   import {
     pushToTalkShouldMute,
@@ -283,6 +289,19 @@
    * denied. Ours showed Archives to everybody unconditionally.
    */
   let roomEventsConnected = $state(false);
+  /**
+   * The "Conected" flash and its one-shot guard — `app-room.full.js:2035-2041`.
+   *
+   * `hasConnectedBefore` is a plain `let`, not `$state`: nothing renders from it, it only decides
+   * whether an `open` is a RE-connect, and making it reactive would buy a dependency and no redraw.
+   * `reconnectedFlash` is `$state` because the overlay's `display` follows it.
+   *
+   * The reference's misspelling — "Conected" — is in the markup and stays there.
+   */
+  let hasConnectedBefore = false;
+  let reconnectedFlash = $state(false);
+  /** `setTimeout(…, 3e3)`. */
+  const RECONNECTED_FLASH_MS = 3000;
   let rosterCount = $state<number | null>(null);
   /**
    * `globals.roster` - who is actually in the room, pushed by the hub.
@@ -628,6 +647,17 @@
    * `!doNotDisturbOn && preferences.recordingStartSound && ...`, so an unset preference would
    * silence a cue the room is meant to give everyone.
    */
+  /**
+   * The four per-viewer halves of the join/leave gates (`app-room.full.js:2137-2153`).
+   *
+   * Default ON, for the same reason `recordingStartSound` does: the reference's checks are
+   * `sessData.X && preferences.Y && …`, so an unset preference would silence a cue the ROOM has
+   * been configured to give. The room setting is the off switch; the preference is the override.
+   */
+  let popupOnUserJoin = $state(loadedSettings.popupOnUserJoin !== false);
+  let popupOnUserLeave = $state(loadedSettings.popupOnUserLeave !== false);
+  let beepOnUserJoin = $state(loadedSettings.beepOnUserJoin !== false);
+  let beepOnUserLeave = $state(loadedSettings.beepOnUserLeave !== false);
   let recordingStartSound = $state(loadedSettings.recordingStartSound !== false);
   let recordingStopSound = $state(loadedSettings.recordingStopSound !== false);
 
@@ -2255,6 +2285,147 @@
     };
   }
 
+  /**
+   * `muteAllNonAdmins()` — `app-room.full.js:2963-2986`, reached through
+   * `appEventBus.subscribe('muteAllNonAdmins', …)` (`:2219-2221`), which in this room is the
+   * session-control action of the same name.
+   *
+   * **This replaced a control that did the wrong thing quietly.** It read
+   * `muted = true; volume = 0` — so a presenter who asked the room to silence its non-admin
+   * speakers silenced their OWN speakers instead, and every one of those microphones stayed open
+   * for everybody else. The label and the effect were unrelated.
+   *
+   * The selection is `nonAdminTalkingUsers` in `$lib/mute-all-non-admins`, with the four properties
+   * that matter transcribed and tested there — chiefly that a talking user with no roster row is
+   * SKIPPED rather than assumed ordinary.
+   *
+   * **One mapping, stated because it is not a transcription.** Upstream sends its own
+   * `sendServerCommand('muteTalkingUser', muser)`. This room has no such command; it has
+   * `remotePresCommand` / `mutemic`, which is the same act addressed to one peer and is already
+   * carried out by that peer's own browser (`:5917`). The server re-checks that the caller is a
+   * presenter and that the subCmd is one of three (`+page.server.ts:1654-1670`), so authority is
+   * decided there rather than asserted here.
+   *
+   * The 100ms stagger is the reference's and is not cosmetic: this is one request per muted member.
+   */
+  function muteAllNonAdmins() {
+    // `if (!globals.user.isPresenter) return` — the first line of the method, before the dialog.
+    if (!isPresenter) return;
+    // `!e || 0 === e.length ||` — with nobody speaking the confirm never opens at all.
+    if (talkingUsers.length === 0) return;
+
+    bootboxConfirmation = {
+      message: MUTE_ALL_CONFIRM,
+      onconfirm: () => {
+        bootboxConfirmation = null;
+        const targets = nonAdminTalkingUsers(talkingUsers, rosterUsers);
+        // `0 !== r.length &&` — an empty selection sends nothing, which is the case where every
+        // open microphone belongs to a presenter.
+        targets.forEach((entry, index) => {
+          globalThis.setTimeout(() => {
+            const body = new FormData();
+            body.set('subCmd', 'mutemic');
+            body.set('targetUserId', String(entry.userID));
+            void fetch('?/presenterCommand', { method: 'POST', body });
+          }, MUTE_STAGGER_MS * index);
+        });
+      }
+    };
+  }
+
+  /**
+   * Tawk.to presenter support — `app-room.full.js:2224-2298`.
+   *
+   * The gates, the URL shape and the attribute fallbacks are in `$lib/tawk-support`, with the one
+   * DIVERGENCE stated there and tested: the property id is configuration, never the capture's
+   * literal, because copying `5aecb59f227d3d7edc24f7c2` would open every presenter's support chat
+   * into another company's inbox and post their name and email into it.
+   *
+   * `loadTawkSupport()` runs from `ngAfterViewInit` upstream — after the view exists, once — which
+   * is `onMount` here. `setTAWKAttributes()` then awaits the API and calls `hideWidget()`, so the
+   * widget is present and invisible until the navbar control is used; that is why the control is a
+   * toggle rather than a launcher.
+   */
+  const tawkAvailable = $derived(
+    tawkSupportAvailable(
+      { isPresenter },
+      data.sessData ?? {},
+      env.PUBLIC_PTR_TAWK_PROPERTY_ID
+    )
+  );
+  /** `this.tawkWidgetOpen` — attributes are set once, on the first open. */
+  let tawkWidgetOpen = false;
+
+  type TawkApi = {
+    toggleVisibility?: () => void;
+    hideWidget?: () => void;
+    setAttributes?: (
+      attributes: { name: string; email: string },
+      onerror: (error: unknown) => void
+    ) => void;
+  };
+
+  function tawkApi(): TawkApi | undefined {
+    return (window as Window & { Tawk_API?: TawkApi }).Tawk_API;
+  }
+
+  /**
+   * `loadTawkSupport()` + `setTAWKAttributes()`, in the order `ngAfterViewInit` runs them.
+   *
+   * `waitForTawkAPI()` upstream polls every 100ms until `window.Tawk_API` exists, then hides the
+   * widget. Reproduced with the script's own `load` event plus the same poll as a fallback, because
+   * the API object is created by the script rather than at load time.
+   */
+  function loadTawkSupport() {
+    const script = tawkScript(env.PUBLIC_PTR_TAWK_PROPERTY_ID);
+    if (!script) return () => {};
+
+    const element = document.createElement('script');
+    element.async = script.async;
+    element.src = script.src;
+    element.charset = script.charset;
+    element.setAttribute('crossorigin', script.crossorigin);
+    // `i.parentNode.insertBefore(e, i)` where `i` is the first existing script.
+    const first = document.getElementsByTagName('script')[0];
+    first?.parentNode?.insertBefore(element, first);
+
+    // `waitForTawkAPI()` — then `hideWidget()`, so it is invisible until the control is used.
+    let cancelled = false;
+    const waitForApi = () => {
+      if (cancelled) return;
+      const api = tawkApi();
+      if (api?.hideWidget) api.hideWidget();
+      else globalThis.setTimeout(waitForApi, 100);
+    };
+    waitForApi();
+
+    return () => {
+      cancelled = true;
+      element.remove();
+    };
+  }
+
+  /** `toggleTAWKSupport()` — visibility every time, attributes only on the first open. */
+  function toggleTAWKSupport() {
+    const api = tawkApi();
+    if (!api?.toggleVisibility) return;
+    api.toggleVisibility();
+    if (tawkWidgetOpen) return;
+    api.setAttributes?.(
+      tawkAttributes({
+        savedNick: typeof loadedSettings.savedNick === 'string' ? loadedSettings.savedNick : null,
+        nick: data.user.displayName,
+        name: data.user.displayName,
+        savedEmail: typeof loadedSettings.savedEmail === 'string' ? loadedSettings.savedEmail : null,
+        email: data.user.email
+      }),
+      (error) => {
+        if (error) console.error('Error setting Tawk.to attributes:', error);
+      }
+    );
+    tawkWidgetOpen = true;
+  }
+
   function requestModalConfirmation(message: string, onconfirm: () => void) {
     bootboxConfirmation = {
       message,
@@ -2426,8 +2597,7 @@
     }
 
     if (action === 'mute-all-non-admins') {
-      muted = true;
-      volume = 0;
+      muteAllNonAdmins();
       return;
     }
 
@@ -5927,10 +6097,69 @@
       */
       if (payload.channel === 'roster') {
         const roster = payload.data as
-          | { cmd?: string; data?: number; users?: typeof liveRoster }
+          | {
+              cmd?: string;
+              data?: number;
+              users?: typeof liveRoster;
+              /** `onUserJoin` / `onUserLeave` carry the person, not a count. */
+              userId?: number;
+              nick?: string;
+            }
           | undefined;
         if (roster?.cmd === 'getRosterCount' && typeof roster.data === 'number') {
           rosterCount = roster.data;
+        }
+        /*
+          `onUserJoin` / `onUserLeave` — `app-room.full.js:2134-2155`, verbatim in shape:
+
+            isPresenter && user.userXrefID !== i.userXrefID && (
+              sessData.userJoinAndLeavePopup && preferences.popupOnUserJoin
+                && alertsService.info(`${i.nick} logged in.`),
+              sessData.beepOnUserJoin && preferences.beepOnUserJoin
+                && !preferences.doNotDisturbOn && soundEffectsService.userJoin.play())
+
+          Four things about that are load-bearing:
+
+          * PRESENTER ONLY. A member is not told who came and went.
+          * NEVER YOURSELF — `user.userXrefID !== i.userXrefID`. Opening the room would otherwise
+            announce your own arrival to you.
+          * TWO GATES PER EFFECT, and they are different gates. The popup needs the ROOM setting
+            `userJoinAndLeavePopup` and the VIEWER preference `popupOnUserJoin`; the beep needs the
+            room's `beepOnUserJoin` and the viewer's `beepOnUserJoin`. An owner can turn the feature
+            off for the room, and a presenter can turn it off for themselves.
+          * `info` for a join, `warning` for a leave — the reference uses two different toast skins,
+            and the strings are "logged in." / "logged out." with the full stop.
+
+          THE QUIRK, reproduced: the LEAVE beep reads `sessData.beepOnUserJoin`, not a
+          `beepOnUserLeave` room setting. There is no such room setting upstream — only the viewer
+          preference is per-direction. Transcribed rather than tidied.
+        */
+        if (
+          (roster?.cmd === 'onUserJoin' || roster?.cmd === 'onUserLeave') &&
+          typeof roster.userId === 'number'
+        ) {
+          const joined = roster.cmd === 'onUserJoin';
+          if (!isPresenter || roster.userId === data.user.id) return;
+          const nick = typeof roster.nick === 'string' ? roster.nick : '';
+
+          if (
+            data.sessData?.userJoinAndLeavePopup &&
+            (joined ? popupOnUserJoin : popupOnUserLeave)
+          ) {
+            showToast({
+              kind: joined ? 'info' : 'warning',
+              message: `${nick} logged ${joined ? 'in' : 'out'}.`,
+              enableHtml: false
+            });
+          }
+          if (
+            data.sessData?.beepOnUserJoin &&
+            (joined ? beepOnUserJoin : beepOnUserLeave) &&
+            !doNotDisturbOn
+          ) {
+            playSoundEffect(joined ? 'userJoin' : 'userLeave');
+          }
+          return;
         }
         // `getRoster` -> `globals.roster`, which is what the sidebar list and
         // `checkUserOnlineStatus` both read in the capture.
@@ -6036,7 +6265,41 @@
 
     // The sidebar reports this, so it has to be observable and not just logged.
     source.addEventListener('open', () => {
+      /*
+        `subscribe('reconnectedSocket', …)` — `app-room.full.js:2035-2041`:
+
+          un('#connectedMsg').show(),
+          setTimeout(() => { un('#connectedMsg').hide() }, 3e3),
+          this.appService.loadSessionLogs()
+
+        `#connectedMsg` was rendered here as a static `display: none` div and nothing ever showed
+        it, so the room had the reassurance markup and never gave the reassurance. Its own scoped
+        rule is `#connectedMsg { display: none }` (`app-room.component.css`), which is why the
+        reference reaches for an inline `display` rather than a class — reproduced with a bound
+        style for the same reason.
+
+        RE-connect only, never the first. The event upstream is named `reconnectedSocket` and the
+        message reads "Conected", which is an answer to having been disconnected; firing it on the
+        first open of a fresh page would announce a recovery that never happened. `EventSource`
+        re-fires `open` on every retry, so the flag is what distinguishes them.
+
+        `loadSessionLogs()` is this room's `invalidate('room:data')` — the same "catch up on what
+        was missed" the reference does, through the identifier the five-second poll already uses.
+      */
+      const isReconnect = roomEventsConnected === false && hasConnectedBefore;
       roomEventsConnected = true;
+      hasConnectedBefore = true;
+
+      if (!isReconnect) return;
+      reconnectedFlash = true;
+      globalThis.setTimeout(() => {
+        reconnectedFlash = false;
+      }, RECONNECTED_FLASH_MS);
+      // `invalidate` directly rather than the poll's `refreshRoom`, which is scoped to `onMount`
+      // and does not exist yet when this subscription is created.
+      void invalidate('room:data').catch(() => {
+        // A catch-up that fails is not worth an error in the room; the poll retries in 5s.
+      });
     });
 
     source.addEventListener('error', () => {
@@ -6058,6 +6321,9 @@
     };
     const previousOpenImageModal = imageModalWindow.openImageModal;
     imageModalWindow.openImageModal = openImageModal;
+    // `ngAfterViewInit`: `sessData.tawkPresenterSupport && (loadTawkSupport(), setTAWKAttributes())`.
+    // Gated on `tawkAvailable`, which adds the configured-property term — with none, no script.
+    const stopTawk = tawkAvailable ? loadTawkSupport() : () => {};
     initializeSoundEffects();
     setSoundEffectsVolume(volume / 100);
     loadManagedUsers();
@@ -6379,6 +6645,10 @@
     return () => {
       stopRoomEvents();
       stopGeoLookup();
+      // The injected script goes with the component. Upstream never unmounts `app-room`, so it has
+      // no teardown to transcribe; leaving a third-party script attached to a dead component is
+      // ours to avoid.
+      stopTawk();
       endSpeechRecognition();
       mediaSignalling = null;
       /*
@@ -7664,6 +7934,32 @@
                     </div>
                   </div>
                 </li>
+                <!--
+                  `a4e` — `app-room.render-helpers.js:960-973`, gated at `:1417-1422`:
+                  `O(30, isPresenter && sessData.tawkPresenterSupport ? 30 : -1)`.
+
+                  Markup from the const table: 195 is
+                  `['title','TAWK Support',1,'nav-item',3,'click']`, 193 is
+                  `[1,'nav-link','d-flex','align-items-center']`, 196 is
+                  `[1,'fas','fa-2x','fa-question-circle']` and 108 is `[1,'ml-2','mainNavItem']`
+                  (`app-room.compiled.js:2050-2051, 2048, 1697`).
+
+                  `tawkAvailable` carries a THIRD term the reference does not have: a configured
+                  property id. See `$lib/tawk-support` — the reference's id is its own company's,
+                  and a room with none configured shows no control rather than a control that opens
+                  somebody else's support inbox.
+                -->
+                {#if tawkAvailable}
+                  <!-- svelte-ignore a11y_click_events_have_key_events -->
+                  <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+                  <li title="TAWK Support" class="nav-item" onclick={toggleTAWKSupport}>
+                    <!-- svelte-ignore a11y_missing_attribute -->
+                    <a class="nav-link d-flex align-items-center">
+                      <i class="fas fa-2x fa-question-circle"></i>
+                      <span class="ml-2 mainNavItem">TAWK Support</span>
+                    </a>
+                  </li>
+                {/if}
                 <li title="Reload" class="nav-item">
                   <!-- svelte-ignore a11y_missing_attribute -->
                   <!-- svelte-ignore a11y_click_events_have_key_events -->
@@ -9955,7 +10251,11 @@
         style="display: none;"
       ></audio>
     {/each}
-    <div id="connectedMsg" class="notConnectedOverlay animated fadeIn" style="display: none;">
+    <div
+      id="connectedMsg"
+      class="notConnectedOverlay animated fadeIn"
+      style={reconnectedFlash ? 'display: block;' : 'display: none;'}
+    >
       Conected<i class="fas fa-check"></i>
     </div>
     <ModalHost
