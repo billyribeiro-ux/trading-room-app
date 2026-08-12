@@ -6,3 +6,14 @@
 # without this the HTML report (hundreds of files) lands in the first commit after any e2e run.
 playwright-report/
 test-results/
+
+# The original NEXT-STEP captures are SENSITIVE and must never be committed.
+#
+# `scripts/verify-evidence-layout.mjs` asserts this exact line is present (`:49-54`) — the check
+# exists because the tree has to be on disk for the evidence gates to run while the raw captures
+# must not enter history. They are ~3.5MB DOM state dumps of the live Manage page: real session
+# content, not redacted fixtures.
+#
+# The pattern is `*.json` at that one level, deliberately narrow. It leaves the decoded, reviewed
+# artifacts beside them tracked, which is what the audit actually reads.
+evidence-dumps/NEXT-STEP/*.json
