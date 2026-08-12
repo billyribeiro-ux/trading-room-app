@@ -1,7 +1,7 @@
 /**
  * Renders the two reduced room layouts in real Chromium and measures what the browser draws.
  *
- * Three of the bindings added for viewer-only mode change GEOMETRY, and geometry is exactly what a
+ * Six of the bindings added for viewer-only mode change GEOMETRY, and geometry is exactly what a
  * unit test and a type checker cannot see:
  *
  * - `class:vh-100={chatOnlyMode || viewerOnlyMode}` on `as-split#mainAreaSplit`
@@ -66,7 +66,7 @@ const VIEWPORT = { width: 1280, height: 800 };
  * `full` is the control: both columns, no `vh-100`. Without it a measurement of the reduced layouts
  * says nothing — "the split is 800px tall" is only interesting if the unreduced one is not.
  */
-function shell({ vh100, chatColumn, viewerOnly }) {
+function shell({ vh100, chatColumn, viewerOnly, chrome, mtZero }) {
   const chat = chatColumn
     ? `<as-split-area minsize="0" class="alert-chat-box alert-chat-regular as-split-area"
           style="order: 0; flex: 0 0 calc(40% - 4.4px);">
@@ -74,10 +74,36 @@ function shell({ vh100, chatColumn, viewerOnly }) {
        </as-split-area>
        <div role="separator" class="as-split-gutter" style="flex-basis: 11px; order: 1;"></div>`
     : '';
+  /*
+    THE CHROME — the navbar and the sidebar, and the 49px they reserve.
+
+    Absent from this fixture until 2026-08-12, which is why `4/4` could not catch the defect
+    `f9e1890` fixes: the harness measured the split, `#mainTabs` and the video, and never the two
+    elements beside them. `grep -c "room-sidebar\\|mainAppNav\\|mt-0"` returned 0.
+
+    Upstream both are gated on ONE condition, evaluated twice
+    (`docs/source/components/app-room.full.js:4043-4059`):
+
+      O(3, videoOnlyMode || chatOnlyMode || viewerOnlyMode ? -1 : 3)   // the sidebar
+      O(4, videoOnlyMode || chatOnlyMode || viewerOnlyMode ? -1 : 4)   // the navbar
+
+    and the root div binds `KAe = (t, n) => ({'push-wrapper': t, 'mt-0': n})` with `n` as that same
+    flag (`:4029-4039`). The 49px is not decoration: `app-room .wrapper` carries
+    `margin-top: 49px` (`src/lib/styles/captured-runtime-components.css:1099-1138`) as space
+    reserved FOR the `fixed-top` navbar. Remove the navbar without `mt-0` and the gap stays — and a
+    `vh-100` split under a 49px gap ends 49px BELOW the window, which is the whole defect.
+  */
+  const navbarAndSidebar = chrome
+    ? `<div class="room-sidebar" style="width:0"></div>
+       <nav class="navbar navbar-expand-md navbar-dark fixed-top mainAppNav" style="height:49px;background:#1b2733">
+         <span class="users ml-1 mr-1 d-flex align-items-center"><i class="fas fa-user"></i></span>
+       </nav>`
+    : '';
   return `
   <app-room id="topRoomDiv" class="lightTheme">
-    <div class="wrapper">
+    <div class="wrapper${mtZero ? ' mt-0' : ''}">
       <div class="d-flex flex-column-reverse flex-sm-row room-container">
+        ${navbarAndSidebar}
         <as-split minsize="0" id="mainAreaSplit" class="as-horizontal as-percent as-init${vh100 ? ' vh-100' : ''}" dir="ltr">
           ${chat}
           <as-split-area minsize="0" class="presentation-box as-split-area"
@@ -116,10 +142,40 @@ function shell({ vh100, chatColumn, viewerOnly }) {
   </app-room>`;
 }
 
+/*
+  `chrome` and `mtZero` are the two halves of one upstream condition, so they move together: a room
+  that keeps its navbar keeps the 49px reserved for it, and a room that drops the navbar drops the
+  gap. Rendering them independently is exactly the state `f9e1890` fixed, and the negative controls
+  at the bottom of this file re-create each half on purpose.
+*/
 const CASES = [
-  { name: 'full-room', vh100: false, chatColumn: true, viewerOnly: false, columns: 2 },
-  { name: 'chat-only', vh100: true, chatColumn: true, viewerOnly: false, columns: 2 },
-  { name: 'viewer-only', vh100: true, chatColumn: false, viewerOnly: true, columns: 1 }
+  {
+    name: 'full-room',
+    vh100: false,
+    chatColumn: true,
+    viewerOnly: false,
+    columns: 2,
+    chrome: true,
+    mtZero: false
+  },
+  {
+    name: 'chat-only',
+    vh100: true,
+    chatColumn: true,
+    viewerOnly: false,
+    columns: 2,
+    chrome: false,
+    mtZero: true
+  },
+  {
+    name: 'viewer-only',
+    vh100: true,
+    chatColumn: false,
+    viewerOnly: true,
+    columns: 1,
+    chrome: false,
+    mtZero: true
+  }
 ];
 
 /*
@@ -165,8 +221,20 @@ for (const testCase of CASES) {
       return { width: +box.width.toFixed(2), height: +box.height.toFixed(2) };
     };
     const split = document.querySelector('#mainAreaSplit');
+    const splitBox = split.getBoundingClientRect();
     return {
       split: rect('#mainAreaSplit'),
+      /*
+        The defect, made measurable: where the split ENDS relative to the window. A `vh-100` split
+        that starts 49px down ends 49px below the fold, and every previous assertion here — height,
+        areas, max-height — passes while it does.
+      */
+      splitTop: +splitBox.top.toFixed(2),
+      splitBottom: +splitBox.bottom.toFixed(2),
+      navbarPresent: document.querySelector('.mainAppNav') !== null,
+      sidebarPresent: document.querySelector('.room-sidebar') !== null,
+      wrapperMarginTop: getComputedStyle(document.querySelector('.wrapper')).marginTop,
+      wrapperHasMtZero: document.querySelector('.wrapper').classList.contains('mt-0'),
       presentation: rect('.presentation-box'),
       chatColumn: rect('.alert-chat-box'),
       areas: split.querySelectorAll('as-split-area').length,
@@ -197,6 +265,40 @@ for (const testCase of CASES) {
     instead of 800px. That is what makes the number below evidence rather than a coincidence.
   */
   const mustBeReduced = testCase.name !== 'full-room';
+
+  /*
+    THE CHROME AND THE 49px, which is what `f9e1890` fixed and what this harness could not see.
+
+    Tied to the case's identity, not to the flags that render it — the same rule the `vh-100` check
+    below already learned: `O(3, …)` and `O(4, …)` remove the sidebar and the navbar in every
+    reduced mode, and `KAe`'s second argument turns the reserved 49px off in exactly those modes.
+  */
+  if (measured.navbarPresent === mustBeReduced) {
+    problems.push(
+      `the navbar is ${measured.navbarPresent ? 'present' : 'absent'} in ${testCase.name}; O(4, …) removes it in every reduced mode`
+    );
+  }
+  if (measured.sidebarPresent === mustBeReduced) {
+    problems.push(
+      `the sidebar is ${measured.sidebarPresent ? 'present' : 'absent'} in ${testCase.name}; O(3, …) carries the same gate`
+    );
+  }
+  const expectedMargin = mustBeReduced ? '0px' : '49px';
+  if (measured.wrapperMarginTop !== expectedMargin) {
+    problems.push(
+      `.wrapper margin-top is ${measured.wrapperMarginTop} in ${testCase.name}, expected ${expectedMargin} — the 49px is space reserved for a navbar that ${mustBeReduced ? 'is not there' : 'is'}`
+    );
+  }
+  /*
+    And the consequence, which is the reason any of it matters: nothing may end below the fold. A
+    `vh-100` split starting at a 49px offset ends at 849 in an 800px window, i.e. 49px of the room
+    is unreachable. This is the assertion the old fixture had no elements to make.
+  */
+  if (measured.splitBottom > viewportHeight + 0.5) {
+    problems.push(
+      `the split ends at ${measured.splitBottom}px in a ${viewportHeight}px window — ${(measured.splitBottom - viewportHeight).toFixed(0)}px of the room is off-screen`
+    );
+  }
   if (measured.hasVh100 !== mustBeReduced) {
     problems.push(
       `vh-100 is ${measured.hasVh100 ? 'present' : 'absent'} on ${testCase.name}; QB gives it to every reduced layout`

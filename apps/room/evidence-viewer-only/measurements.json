@@ -10,6 +10,8 @@
       "chatColumn": true,
       "viewerOnly": false,
       "columns": 2,
+      "chrome": true,
+      "mtZero": false,
       "ok": true,
       "problems": [],
       "measured": {
@@ -17,6 +19,12 @@
           "width": 1280,
           "height": 751
         },
+        "splitTop": 49,
+        "splitBottom": 800,
+        "navbarPresent": true,
+        "sidebarPresent": true,
+        "wrapperMarginTop": "49px",
+        "wrapperHasMtZero": false,
         "presentation": {
           "width": 761.39,
           "height": 751
@@ -37,7 +45,7 @@
       },
       "png": "full-room.png",
       "splitPng": "full-room-split.png",
-      "digest": "e79ca483feeda0178475d3725214aa41dc944fcd7a1655564737e3fe5e44b864",
+      "digest": "ba6a30694dc641efb62e5e365ae339a846581992c314ad805184febd2c5a5192",
       "splitDigest": "6dfca03e2b6773c16c8346fc5cfd2557f6fe1b521c1cf6ed941e90f70466bd6c"
     },
     {
@@ -46,6 +54,8 @@
       "chatColumn": true,
       "viewerOnly": false,
       "columns": 2,
+      "chrome": false,
+      "mtZero": true,
       "ok": true,
       "problems": [],
       "measured": {
@@ -53,6 +63,12 @@
           "width": 1280,
           "height": 800
         },
+        "splitTop": 0,
+        "splitBottom": 800,
+        "navbarPresent": false,
+        "sidebarPresent": false,
+        "wrapperMarginTop": "0px",
+        "wrapperHasMtZero": true,
         "presentation": {
           "width": 761.39,
           "height": 800
@@ -73,7 +89,7 @@
       },
       "png": "chat-only.png",
       "splitPng": "chat-only-split.png",
-      "digest": "e79ca483feeda0178475d3725214aa41dc944fcd7a1655564737e3fe5e44b864",
+      "digest": "2570deb40a9b41bdbb9068191efe50a146735dfcd20a6352b59454454ec8468b",
       "splitDigest": "2570deb40a9b41bdbb9068191efe50a146735dfcd20a6352b59454454ec8468b"
     },
     {
@@ -82,6 +98,8 @@
       "chatColumn": false,
       "viewerOnly": true,
       "columns": 1,
+      "chrome": false,
+      "mtZero": true,
       "ok": true,
       "problems": [],
       "measured": {
@@ -89,6 +107,12 @@
           "width": 1280,
           "height": 800
         },
+        "splitTop": 0,
+        "splitBottom": 800,
+        "navbarPresent": false,
+        "sidebarPresent": false,
+        "wrapperMarginTop": "0px",
+        "wrapperHasMtZero": true,
         "presentation": {
           "width": 1273.39,
           "height": 800
@@ -106,8 +130,8 @@
       },
       "png": "viewer-only.png",
       "splitPng": "viewer-only-split.png",
-      "digest": "83ba8832a0ce0e80ef7a803fd005ad0bd2f091e385bdd94380fb9d7bdc7035bf",
-      "splitDigest": "3ba64345d0ad378d0e0ae46ce9d3318f54c28c55e39e51c35164c341d9acd704"
+      "digest": "8b5eb76001430db26a656a33412e86e9121e386cbb792483df67e4176b5ecd97",
+      "splitDigest": "8b5eb76001430db26a656a33412e86e9121e386cbb792483df67e4176b5ecd97"
     },
     {
       "name": "image distinctness",
@@ -117,12 +141,12 @@
         "split": {
           "full-room": "6dfca03e2b6773c16c8346fc5cfd2557f6fe1b521c1cf6ed941e90f70466bd6c",
           "chat-only": "2570deb40a9b41bdbb9068191efe50a146735dfcd20a6352b59454454ec8468b",
-          "viewer-only": "3ba64345d0ad378d0e0ae46ce9d3318f54c28c55e39e51c35164c341d9acd704"
+          "viewer-only": "8b5eb76001430db26a656a33412e86e9121e386cbb792483df67e4176b5ecd97"
         },
         "page": {
-          "full-room": "e79ca483feeda0178475d3725214aa41dc944fcd7a1655564737e3fe5e44b864",
-          "chat-only": "e79ca483feeda0178475d3725214aa41dc944fcd7a1655564737e3fe5e44b864",
-          "viewer-only": "83ba8832a0ce0e80ef7a803fd005ad0bd2f091e385bdd94380fb9d7bdc7035bf"
+          "full-room": "ba6a30694dc641efb62e5e365ae339a846581992c314ad805184febd2c5a5192",
+          "chat-only": "2570deb40a9b41bdbb9068191efe50a146735dfcd20a6352b59454454ec8468b",
+          "viewer-only": "8b5eb76001430db26a656a33412e86e9121e386cbb792483df67e4176b5ecd97"
         }
       }
     }

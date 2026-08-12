@@ -478,6 +478,54 @@ describe('viewer-only mode drives every binding the reference gives it', () => {
     expect(PAGE).toContain('if (viewerOnlyMode) return;');
   });
 
+  it('removes the navbar and the sidebar, and reclaims the 49px they reserved', () => {
+    const ROOM_FULL = readFileSync(
+      new URL('../../docs/source/components/app-room.full.js', import.meta.url),
+      'utf8'
+    );
+    /*
+      Nodes 3 and 4 of the root template carry the SAME gate — one condition evaluated twice, which
+      is why one `{#if}` covers both here (`app-room.full.js:4043-4059`):
+
+        O(3, videoOnlyMode || chatOnlyMode || viewerOnlyMode ? -1 : 3)   // _Pe = the sidebar
+        O(4, videoOnlyMode || chatOnlyMode || viewerOnlyMode ? -1 : 4)   // A4e = the navbar
+
+      and the root div binds `KAe = (t, n) => ({'push-wrapper': t, 'mt-0': n})` with `n` as that same
+      flag (`:4029-4039`, the helper at `:5`).
+    */
+    const compact = ROOM_FULL.replace(/\s+/g, '');
+    expect(compact).toContain("KAe=(t,n)=>({'push-wrapper':t,'mt-0':n})");
+    expect(
+      compact.match(
+        /O\(\d,o\.appService\.globals\.videoOnlyMode\|\|o\.appService\.globals\.chatOnlyMode\|\|o\.appService\.globals\.viewerOnlyMode\?-1:\d\)/g
+      )?.length,
+      'the sidebar and the navbar carry the same gate, twice'
+    ).toBe(2);
+
+    // `mt-0` is not cosmetic: the 49px is space reserved for the `fixed-top` navbar.
+    const APPLIED = readFileSync(
+      new URL('../../src/lib/styles/captured-runtime-components.css', import.meta.url),
+      'utf8'
+    );
+    // The de-scoped rule's `:not(…)` guard is ~1kB of component names, so the assertion reads the
+    // block after the selector rather than trying to span it with one pattern.
+    const wrapperAt = APPLIED.indexOf('app-room\n  .wrapper:not(:root)');
+    expect(wrapperAt, 'the de-scoped app-room .wrapper rule must exist').toBeGreaterThan(-1);
+    expect(APPLIED.slice(wrapperAt, wrapperAt + 2500)).toContain('margin-top: 49px');
+
+    expect(pageMarkup).toContain('class:mt-0={chatOnlyMode || viewerOnlyMode}');
+    expect(pageMarkup).toContain('{#if !(chatOnlyMode || viewerOnlyMode)}');
+    // And the harness that measures the consequence must actually render those elements — it did
+    // not, which is why `4/4` could not catch the defect this pins.
+    const LAYOUT_HARNESS = readFileSync(
+      new URL('../../scripts/verify-viewer-only-layout.mjs', import.meta.url),
+      'utf8'
+    );
+    for (const token of ['mainAppNav', 'room-sidebar', 'wrapperMarginTop', 'splitBottom']) {
+      expect(LAYOUT_HARNESS, `the layout harness must measure ${token}`).toContain(token);
+    }
+  });
+
   it('gives the split the full viewport height, which is the other half of hiding a column', () => {
     // `QB = (t) => ({'vh-100': t})`, bound to videoOnly || chatOnly || viewerOnly.
     expect(ROOM_HELPERS).toContain("QB = (t) => ({ 'vh-100': t })");

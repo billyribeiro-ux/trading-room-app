@@ -24,6 +24,47 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-12
 
+### 2026-08-12 15:22 EDT — The navbar fix now has a render, and the harness can fail on it
+
+**Runtime impact: none** — tests and a harness only. It closes the verification gap `f9e1890` left
+open, which was the second of PR #3's two blockers.
+
+`f9e1890` gated the navbar and the sidebar on the three modes and bound `mt-0`, and shipped
+**verified by `svelte-check` and prettier only**. Its own commit message said so. The reason was
+this harness: `grep -c "room-sidebar\|mainAppNav\|mt-0"` over
+`scripts/verify-viewer-only-layout.mjs` returned **0**. It built a fixture containing the split,
+`#mainTabs` and the video, and never the two elements beside them — so `4/4` was green before the
+fix and green after it, measuring something real, but not the thing that was wrong.
+
+The fixture now renders the chrome, and four assertions measure it, each tied to the case's identity
+rather than to the flag that draws it:
+
+- the navbar is ABSENT in viewer-only and chat-only, PRESENT in the full room —
+  `O(4, videoOnlyMode || chatOnlyMode || viewerOnlyMode ? -1 : 4)` (`app-room.full.js:4043-4059`);
+- the sidebar the same, from `O(3, …)`, which is the same condition evaluated twice;
+- `.wrapper` computes `margin-top: 49px` in the full room and `0px` in both reduced ones —
+  `KAe = (t, n) => ({'push-wrapper': t, 'mt-0': n})` (`:4029-4039`) against
+  `app-room .wrapper { margin-top: 49px }`
+  (`src/lib/styles/captured-runtime-components.css:1099-1138`);
+- **nothing ends below the fold.** This is the defect itself: a `vh-100` split that starts 49px down
+  ends at 849 in an 800px window.
+
+Negative controls, all four red before being restored. Unbinding `mt-0` in the viewer-only case
+reports both halves at once — `.wrapper margin-top is 49px … expected 0px` and **`the split ends at
+849px in a 800px window — 49px of the room is off-screen`**, which is the pre-`f9e1890` state
+reproduced and measured. Keeping the chrome in chat-only reports the navbar and the sidebar
+separately. In the contract test, unbinding `mt-0` and replacing the `{#if}` with `{#if true}` each
+go red.
+
+The contract test also pins the harness itself now: it asserts that
+`verify-viewer-only-layout.mjs` mentions `mainAppNav`, `room-sidebar`, `wrapperMarginTop` and
+`splitBottom`, so a fixture that stops rendering the chrome fails in vitest rather than quietly
+returning to green-and-blind.
+
+**Verified:** 67 tests across the five contracts touching these files; `svelte-check` 972 files, 0
+errors; prettier clean; `verify:viewer-only` **4/4** with the chrome measured; four negative
+controls.
+
 ### 2026-08-12 14:28 EDT — Review corrections: the viewer-only class was on two wrong elements
 
 **Runtime impact: yes.** Three class bindings moved, one added, one attribute determined not to
