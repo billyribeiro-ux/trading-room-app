@@ -108,6 +108,19 @@ export const ngbTooltip: Attachment<Element> = (host) => {
   const text = host.getAttribute('ngbtooltip');
   if (!text) return;
 
+  /*
+    `triggers="manual"` means the component opens it by calling `.open()`, so nothing is bound to
+    hover. The reference sets it on the GIF control, and `main.d6d3c112b59b7d0d.js` shows `triggers`
+    is a real NgbTooltip input — its directive definition reads
+    `selectors:[["","ngbTooltip",""]],inputs:{…,placement:"placement",…,triggers:"triggers",…}`.
+
+    This is not a guess about which directive the attribute belongs to. Angular's TAttributes has no
+    per-directive grouping: every static attribute ahead of the `1` (classes) marker is set on the
+    element, so every directive on it that declares that input receives it. The live capture agrees —
+    hovering that control for 400ms produced no tooltip element at all.
+  */
+  if (host.getAttribute('triggers') === 'manual') return;
+
   const placement = host.getAttribute('placement') ?? '';
   const direction = CAPTURED_DIRECTIONS[placement];
   if (!direction) {

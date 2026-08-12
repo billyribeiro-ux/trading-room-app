@@ -97,7 +97,17 @@ writing a collector for anything below, read what is already in `new-room` and `
 
 | # | gap | read looking for it | blocks | written up |
 | --- | --- | --- | --- | --- |
-| 1 | **The rendered tooltip — two of the three parts are now settled from the bundle; one needs a run while sharing a screen.** The DOM shape, classes, attributes, insertion point and computed styles for `placement="left"` were captured 2026-08-11 and are implemented and pinned against `evidence-tooltips-presenter-2026-08-11.json`. **`Search for GIFs` — SOLVED, and it exposed a divergence.** `main.d6d3c112b59b7d0d.js` carries that element's const table verbatim: `["ngbTooltip","Search for GIFs","placement","top","placement","auto","container","body","autoClose","outside","popoverClass","popOverDiv","triggers","manual",…,"ngbPopover"]`. **Two `placement` entries:** `top` belongs to the ngbTooltip, `auto` to the ngbPopover, and `triggers: manual` sits in the POPOVER's group — so the tooltip is not manual-triggered after all, and the earlier reading was wrong. **Our markup collapses the two into a single `placement: 'auto'`**, so that tooltip carries no placement of its own and the attachment refuses to render it. Fixing the markup needs `top`, which has never been captured rendering — `bs-tooltip-top` is the obvious Bootstrap name and obvious is not evidence. **What remains, and it is one run:** paste `apps/room/scripts/collect-tooltips.js` **while sharing a screen**, which renders the `placement="bottom"` eye badge, and hover the GIF control to capture `top`. Two placements, one paste. **Third part:** that run left four tooltips on the page in the modal copies, so the collector's close events need widening first. | `evidence-tooltips-presenter-2026-08-11.json`; `docs/source/main.d6d3c112b59b7d0d.js` | the GIF tooltip renders nothing today | `CHANGELOG.md` 2026-08-12 |
+| 1 | **Closed 2026-08-12, and it closed by disproving its own premise.** A presenter run on the live room (`evidence-tooltips-presenter-2026-08-12.json`, 8 hosts, Bootstrap **5.3.3**) plus the bundle's directive definition settled all three parts. **(a) `triggers` is an NgbTooltip input**, not a popover-only one — `selectors:[["","ngbTooltip",""]],inputs:{…,triggers:"triggers",…}`. Angular's TAttributes has no per-directive grouping, so `triggers="manual"` on the GIF host reaches the tooltip, and the live hover confirmed it: every other host rendered within 33ms, that one rendered nothing. The earlier reading — *"triggers sits in the POPOVER's group, so the tooltip is not manual-triggered after all"* — was wrong. **(b) `placement="auto"` is correct and was never a collapse of ours.** The template declares `placement` twice (`"placement","top","placement","auto"`); one attribute survives into the DOM and it is the later one, so `top` is dead in the reference too. Our markup already matched the captured DOM byte for byte. **(c) The eye badge has no tooltip to capture.** The screen tabs use `tooltip="Unlock this screen?"` / `tooltip="This is the default screen…"` with `placement="bottom"` — and the bundle contains **no `[tooltip]` directive selector at all**. Inert attributes; the real hover text there is native `title="Lock this screen?"`. No run while sharing a screen could ever have captured it. **Fix shipped:** the attachment returns before binding when `triggers="manual"`. Pinned by `ngb-tooltip-triggers-contract.test.ts`. | `evidence-tooltips-presenter-2026-08-12.json`; `docs/source/main.d6d3c112b59b7d0d.js` | nothing | `CHANGELOG.md` 2026-08-12 |
+
+**Two directions render in the reference and have not been captured — neither is blocking.**
+Reading every `"placement",` entry in the bundle gives the room's whole inventory: `left` (composer
+icons — captured, implemented), `top` (the webinar-mode `fa-question-circle`, "Show only Moderators
+messages", and message `created-at` timestamps), `bottom` (the Welcome Mat badge on the notes tabs),
+`top-right` (the GIF control in the extra chat column, also `triggers="manual"`), and `auto`. We
+render none of the `top`/`bottom`/`top-right` hosts today, so the attachment's refusal is correct
+rather than a hole. If one of them is built, its direction class must be captured first — hovering
+the Welcome Mat badge gives `bottom` and the question-mark icon gives `top`, and **neither needs a
+screen share**. `bs-tooltip-top` is the obvious Bootstrap name and obvious is not evidence.
 
 ### Not an evidence gap — missing work, recorded so it is not lost
 
@@ -123,7 +133,7 @@ each one's failure narrowed the next:
 | `apps/controller/scripts/pull-app-bundle.js` | the application bundles, sliced around named targets. Works; fetched 1.78 MB across three files |
 | `apps/controller/scripts/pull-manage-partial.js` | reads a ui-router state verbatim when a view is not inlined |
 | `apps/controller/scripts/pull-template-cache.js` | takes a partial out of `$templateCache` when its `templateUrl` is a function call and no path can be guessed |
-| `apps/room/scripts/collect-tooltips.js` | the rendered tooltip. Run it **while sharing a screen** to also catch the `placement="bottom"` eye badge |
+| `apps/room/scripts/collect-tooltips.js` | the rendered tooltip. It queries `[ngbtooltip]`, which is right: the screen tabs' `tooltip=` attributes bind to no directive, so there is nothing there to catch |
 | `apps/controller/scripts/collect-manage-gaps.js` | v2, four defects fixed. Still the tool for a room whose user table has members in it |
 
 ---

@@ -90,3 +90,5 @@ new/
 # src/lib/ngb-tooltip.test.ts, which reads its expectations out of this file. It is evidence:
 # reformatting it changes the bytes the implementation is checked against.
 evidence-tooltips-presenter-2026-08-11.json
+
+evidence-tooltips-presenter-2026-08-12.json

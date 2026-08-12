@@ -24,6 +24,48 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-12
 
+### 14:40 — Gap 1 closed, by disproving all three things it asserted
+
+The presenter run on the live room arrived. Read alongside the bundle's own directive definition, it
+overturned every part of the gap as written — including two readings that were mine.
+
+**`triggers` is an NgbTooltip input.** The bundle:
+`selectors:[["","ngbTooltip",""]],inputs:{animation:"animation",autoClose:"autoClose",placement:"placement",popperOptions:"popperOptions",triggers:"triggers",…}`.
+Yesterday's note claimed `triggers:"manual"` sat "in the POPOVER's group" and so the tooltip was not
+manual-triggered. Angular's `TAttributes` has no per-directive grouping — every static attribute
+ahead of the `1` (classes) marker is set on the element, and every directive declaring that input
+receives it. The capture agrees without needing the argument: seven hosts rendered a tooltip within
+33ms, and the GIF control rendered nothing at all.
+
+**`placement="auto"` was never a defect of ours.** The template declares it twice —
+`["ngbTooltip","Search for GIFs","placement","top","placement","auto",…]`. One attribute reaches the
+DOM and it is the later one. The captured host is
+`placement="auto" container="body" autoclose="outside" popoverclass="popOverDiv" triggers="manual"`,
+which is what `+page.svelte` already emitted, attribute for attribute. `top` is dead in the reference
+too.
+
+**The eye badge has no tooltip to capture.** The `#screenTabs` region uses
+`tooltip="Unlock this screen?"` and `tooltip="This is the default screen users are taken to right
+now…"` with `placement="bottom"` — and the bundle contains **no `[tooltip]` directive selector**;
+`"","tooltip",""` appears zero times against exactly one `"","ngbTooltip",""`. Those are inert
+attributes. The hover text there comes from native `title="Lock this screen?"` /
+`title="Unlock this screen?"` beside `fa-eye`, which the OS draws. **The instruction to re-run while
+sharing a screen was futile and I had written it into `TODO.md` twice.**
+
+**Shipped:** `ngb-tooltip.ts` returns before binding anything when `triggers="manual"`, ahead of the
+placement lookup so a correct control no longer warns on every render.
+`ngb-tooltip-triggers-contract.test.ts` pins all of it — 12 cases reading the capture and the bundle
+rather than transcriptions. Both tooltip suites green, 31 tests; `svelte-check` 966 files, 0 errors.
+
+Also recorded, from reading every `"placement",` entry in the bundle: the room's full inventory is
+`left`, `top`, `bottom`, `top-right`, `auto`. We render no `top`/`bottom`/`top-right` host today, so
+the attachment's refusal covers nothing real — and if one is built, `bottom` is capturable by
+hovering the Welcome Mat badge and `top` by the webinar question-mark icon, neither needing a screen
+share.
+
+Capture saved as `apps/room/evidence-tooltips-presenter-2026-08-12.json` (Bootstrap 5.3.3, 8 hosts,
+60 native `title` attributes).
+
 ### 14:15 — The manage page's tooltip system, captured — and it proves the two generations again
 
 **No runtime impact.** One evidence file tracked.
