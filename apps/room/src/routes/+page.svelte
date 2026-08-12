@@ -2475,15 +2475,23 @@
     );
   }
 
-  function showToast(notice: Omit<ToastNotice, 'id'>, timeOut = 5_000) {
+  /**
+   * @param timeOut milliseconds, or **0 for a toast that never expires** — toastr's
+   *   `disableTimeOut: true`. The reconnect toasts below use it: a banner that says "reconnecting"
+   *   must not clear itself while the thing is still disconnected.
+   * @returns the id, so a sticky toast can be cleared by whatever raised it. `null` when the notice
+   *   was a duplicate and nothing was added.
+   */
+  function showToast(notice: Omit<ToastNotice, 'id'>, timeOut = 5_000): number | null {
     const duplicate = toasts.some(
       (toast) => toast.title === notice.title && toast.message === notice.message
     );
-    if (duplicate) return;
+    if (duplicate) return null;
 
     const id = ++toastSequence;
     toasts = [{ id, ...notice }, ...toasts];
-    scheduleToastRemoval(id, timeOut);
+    if (timeOut > 0) scheduleToastRemoval(id, timeOut);
+    return id;
   }
 
   /**
@@ -2501,8 +2509,55 @@
    * `.toast-success` is `rgb(81, 163, 81)` and `.toast-error` `rgb(189, 54, 47)`. Both messages are
    * passed with no title, exactly as the capture calls them.
    */
+  /**
+   * The two sticky reconnect toasts, read out of the reference's own room bundle.
+   *
+   * `docs/source/main.d6d3c112b59b7d0d.js`, in the mediasoup socket's `disconnect` handler:
+   *
+   *     i.reconnectToast || (i.reconnectToast = i.toastr.info(
+   *       'Reconnecting to media... <i class="fas fa-cog fa-spin ms-2"></i>', "Media",
+   *       { disableTimeOut: !0, tapToDismiss: !0, closeButton: !0, enableHtml: !0 }))
+   *
+   *     (i.liveMicTrack || i.liveCamTrack || i.liveScreenTrack) && !i.presenterReconnectToast && (
+   *       i.presenterReconnectToast = i.toastr.info(
+   *         "Reconnecting media (presenter)... re-sharing mic/cam/screen", "Presenter",
+   *         { disableTimeOut: !0, tapToDismiss: !1, closeButton: !1 }))
+   *
+   * These are DISTINCT from the `mediaServerConnected`/`mediaServerDisconnected` bus toasts already
+   * handled below — the reference raises both, and its bundle still carries "Connected to Media
+   * Server" and "Disconnected from Media Server" alongside these.
+   *
+   * `disableTimeOut` is why they are held by id: a banner that says "reconnecting" must not expire
+   * while the thing is still disconnected, so it is cleared by the event that makes it false rather
+   * than by a timer. The `||` guard is the reference's own — one at a time, however many redials
+   * the backoff runs.
+   *
+   * The presenter one is raised only when this peer holds a live track, and the reference makes it
+   * **undismissable** (`tapToDismiss: false, closeButton: false`) where the member one can be
+   * dismissed. That asymmetry is deliberate there and reproduced here: a presenter whose mic is
+   * being re-shared needs to know it, and the toast goes when the re-share finishes.
+   */
+  let reconnectToastId: number | null = null;
+  let presenterReconnectToastId: number | null = null;
+
   function mediaServerConnected(reconnected: boolean) {
     isMediaConnected = true;
+    /*
+      Cleared here, on the socket's `connect`, exactly where the reference clears them — inline in
+      that handler beside `emit("mediaServerConnected")` and `reproduceLocalTracksIfAny()`.
+
+      Its own `clearReconnectToasts()` method duplicates this body and is never called from
+      anywhere in the bundle; that is dead code upstream, not a second path, so there is nothing
+      else to reproduce.
+    */
+    if (reconnectToastId !== null) {
+      dismissToast(reconnectToastId);
+      reconnectToastId = null;
+    }
+    if (presenterReconnectToastId !== null) {
+      dismissToast(presenterReconnectToastId);
+      presenterReconnectToastId = null;
+    }
     // ALWAYS, not just on a redial. A toast that says "reconnecting..." is false the instant the
     // socket opens, and gating this on `reconnected` left the error on screen forever whenever the
     // first connect of a session happened to follow a failed one.
@@ -2530,6 +2585,40 @@
       message: 'Disconnected from Media Server... reconnecting...',
       enableHtml: false
     });
+
+    // The sticky pair, raised beside the bus toast exactly as the reference raises them.
+    if (reconnectToastId === null) {
+      reconnectToastId = showToast(
+        {
+          kind: 'info',
+          title: 'Media',
+          message: 'Reconnecting to media... <i class="fas fa-cog fa-spin ms-2"></i>',
+          enableHtml: true
+        },
+        0
+      );
+    }
+    // Only when this peer is actually producing something to re-share.
+    /*
+      The reference's `liveMicTrack || liveCamTrack || liveScreenTrack`, mapped onto what this room
+      actually holds: `localMicProducerId` is its `micProducer`, `webcamStream` its camera, and
+      `localScreenStreams` its screen shares. A mic that is MUTED still counts — muting pauses the
+      producer rather than closing it, so there is still a track to re-share.
+    */
+    const holdsLiveTrack = Boolean(
+      localMicProducerId || webcamStream || localScreenStreams.size > 0
+    );
+    if (holdsLiveTrack && presenterReconnectToastId === null) {
+      presenterReconnectToastId = showToast(
+        {
+          kind: 'info',
+          title: 'Presenter',
+          message: 'Reconnecting media (presenter)... re-sharing mic/cam/screen',
+          enableHtml: false
+        },
+        0
+      );
+    }
   }
 
   /**

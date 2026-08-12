@@ -24,6 +24,62 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-12
 
+### 09:35 — The media reconnect toasts, read out of the reference's own bundle
+
+**Runtime impact: yes, in the room.** 604 tests / 62 files, `svelte-check` 0/0.
+
+The owner supplied the rendered markup:
+
+```html
+<div class="toast-title" aria-label="Media"> Media </div>
+<div role="alert" class="toast-message">Reconnecting to media... <i class="fas fa-cog fa-spin ms-2"></i></div>
+```
+
+`docs/source/main.d6d3c112b59b7d0d.js` carries the call that produces it, in the mediasoup socket's
+`disconnect` handler — and a second one beside it that the markup alone would not have revealed:
+
+```js
+i.reconnectToast || (i.reconnectToast = i.toastr.info(
+  'Reconnecting to media... <i class="fas fa-cog fa-spin ms-2"></i>', "Media",
+  { disableTimeOut:!0, tapToDismiss:!0, closeButton:!0, enableHtml:!0 }))
+
+(i.liveMicTrack||i.liveCamTrack||i.liveScreenTrack) && !i.presenterReconnectToast && (
+  i.presenterReconnectToast = i.toastr.info(
+    "Reconnecting media (presenter)... re-sharing mic/cam/screen", "Presenter",
+    { disableTimeOut:!0, tapToDismiss:!1, closeButton:!1 }))
+```
+
+**They are ADDITIONS, not replacements.** The bundle still contains "Connected to Media Server" and
+"Disconnected from Media Server", which the room already raised from the older `alertService`
+capture, so the reference shows both and so do we.
+
+Four things came out of the bundle that the rendered markup could not have given:
+
+**`disableTimeOut`** — these never expire. `showToast` now takes `0` to mean that and returns the id
+so a sticky toast can be cleared by whatever raised it. A banner saying "reconnecting" must not clear
+itself while the thing is still disconnected, and the redial backoff climbs to one attempt every 30s.
+
+**The `||` guard** — one at a time, however many redials run. Without it every attempt stacks another.
+
+**The presenter toast is conditional and undismissable.** Raised only when this peer holds a live
+track, and with `tapToDismiss: !1, closeButton: !1` where the member's has both. That asymmetry is
+deliberate upstream: a presenter whose mic is being re-shared needs to know it, and it goes when the
+re-share finishes rather than when they click. Mapped onto what this room actually holds —
+`localMicProducerId`, `webcamStream`, `localScreenStreams` — and a muted mic still counts, because
+muting pauses the producer rather than closing it.
+
+**Where they are cleared.** Inline in the socket's `connect` handler, beside
+`emit("mediaServerConnected")`. The reference's own `clearReconnectToasts()` duplicates that body and
+is called from nowhere in the bundle — dead code upstream, so there is no second path to reproduce.
+
+Eleven contract cases, reading BOTH sides out of files so the test and the implementation are checked
+against the same bytes. Negative controls: making the toast expire, and raising the presenter one
+unconditionally, each fail their case.
+
+One thing to own: I first wrote `localMediaState.micTrack` — a name that does not exist in this
+codebase. `svelte-check` caught it immediately, and it is the exact failure mode this project
+forbids. The real three were found by reading rather than by guessing again.
+
 ### 08:58 — Eight changelog entries were reported as written and were not
 
 **No runtime impact.** Bookkeeping, and a failure of mine worth recording rather than quietly fixing.
