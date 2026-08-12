@@ -262,7 +262,25 @@ export const ROOM_VISIBLE_SETTINGS = [
     `isChatOnlyRoom` is the owner declaring that this room has no presentation area for anybody.
     Without it a room configured as chat-only still renders a presentation area for every member.
   */
-  'isChatOnlyRoom'
+  'isChatOnlyRoom',
+  /*
+    "Disable Copy?" — "If enabled, it will disable right-click to prevent selecting and copying all
+    text".
+
+    Three host bindings on `app-room`, all three carrying the SAME two-term gate — the setting AND
+    `!isPresenter` (`app-room.full.js:3011-3026`, and `ngAfterViewInit` at `:2227-2229`):
+    `contextmenu` is suppressed, Ctrl+C / Ctrl+U / Ctrl+S and F12 are suppressed, and
+    `document.body` gains `noselect`.
+
+    A PRESENTER is exempt by construction, which is the part that makes this a content-protection
+    setting rather than a kiosk mode: the person running the room keeps their own clipboard.
+
+    Not a credential and not a policy the room could infer — it is a per-room preference the owner
+    ticks, and the room is the only place the keystrokes happen. It is also the plainest example of
+    what this list is for: the checkbox has existed on the Manage page all along, and until the
+    bindings landed, ticking it protected nothing.
+  */
+  'disableCopy'
 ] as const satisfies readonly (keyof RoomSettings)[];
 
 const ROOM_VISIBLE = new Set<string>(ROOM_VISIBLE_SETTINGS);

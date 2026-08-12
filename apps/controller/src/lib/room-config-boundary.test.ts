@@ -220,7 +220,8 @@ describe('the allow-list itself', () => {
       */
       individualVolumeControls: 'PresenterMuteRows.svelte:123 — the per-presenter volume slider',
       hideChatAlerts: 'O(1, hideChatAlerts ? -1 : 1) — the chat/alerts column, one of five writers of that flag',
-      isChatOnlyRoom: 'O(3, hidePresentation ? -1 : 3) — the presentation column, with chatOnlyMode'
+      isChatOnlyRoom: 'O(3, hidePresentation ? -1 : 3) — the presentation column, with chatOnlyMode',
+      disableCopy: 'the contextmenu / Ctrl+C,U,S / F12 gate and body.noselect, for non-presenters only'
     };
     expect(Object.keys(consumers).sort()).toEqual([...ROOM_VISIBLE_SETTINGS].sort());
   });

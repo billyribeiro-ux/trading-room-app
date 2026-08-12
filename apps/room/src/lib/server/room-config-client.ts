@@ -102,6 +102,15 @@ export interface RoomSessionSettings {
    */
   isChatOnlyRoom?: boolean;
   /**
+   * "Disable Copy?" — content protection for NON-presenters only.
+   *
+   * Three host bindings carrying one two-term gate (`app-room.full.js:3011-3026`, `:2227-2229`):
+   * `contextmenu` suppressed, Ctrl+C / Ctrl+U / Ctrl+S and F12 suppressed, and `noselect` added to
+   * `document.body`. The presenter exemption is deliberate upstream and kept here — the person
+   * running the room is not restricted from their own screen.
+   */
+  disableCopy?: boolean;
+  /**
    * "Overwrite Cash Register Sound" — the url of the mp3 that replaces `chash.mp3` for alerts.
    *
    * Also the ONE setting this room writes back, through {@link writeRoomSetting}. `''` and `null`

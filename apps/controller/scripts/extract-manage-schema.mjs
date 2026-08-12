@@ -93,6 +93,7 @@ const ROOM_CONSUMED = [
   'customMobileAppEnabled',
   'customMobileAppIOSUrl',
   'dingOnNewMessage',
+  'disableCopy',
   'disablePMForTrials',
   'freeTrialsGetApp',
   'hasBenzingaNews',
@@ -433,10 +434,11 @@ if (defs.length !== EXPECTED_TOTAL_COUNT) {
 }
 
 const missingWiredSettings = [...WIRED_SETTINGS].filter((name) => !defs.some((definition) => definition.name === name));
-// 45 since 2026-08-12: `hideChatAlerts` and `isChatOnlyRoom` joined ROOM_CONSUMED when the room
-// gained the gates that read them. The literal is a tripwire, not a fact about the schema — it is
-// here so the wired set cannot grow by accident, which is why changing it is a deliberate edit.
-if (WIRED_SETTINGS.size !== 45 || missingWiredSettings.length > 0) {
+// 46 since 2026-08-12: `hideChatAlerts`, `isChatOnlyRoom` and `disableCopy` joined ROOM_CONSUMED
+// when the room gained the gates that read them. The literal is a tripwire, not a fact about the
+// schema — it is here so the wired set cannot grow by accident, which is why changing it is a
+// deliberate edit.
+if (WIRED_SETTINGS.size !== 46 || missingWiredSettings.length > 0) {
   throw new Error(
     `wired-setting contract invalid: ${WIRED_SETTINGS.size} keys, missing ${missingWiredSettings.join(', ') || 'none'}`
   );

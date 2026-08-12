@@ -49,6 +49,13 @@
   } from '$lib/roster-gates';
   import { alertSoundButtonFor, filesSectionHidden } from '$lib/files-gates';
   import { NO_PENDING_CLICK, gutterRelease, togglePresentationSplit } from '$lib/split-gutter';
+  import {
+    pushToTalkShouldMute,
+    pushToTalkShouldUnmute,
+    shouldBlockContextMenu,
+    shouldBlockCopyKey,
+    shouldDisableSelection
+  } from '$lib/room-key-gates';
   import EmojiPicker from '$lib/components/EmojiPicker.svelte';
   import GifConfirmDialog from '$lib/components/GifConfirmDialog.svelte';
   import GiphyPicker from '$lib/components/GiphyPicker.svelte';
@@ -1205,6 +1212,44 @@
   let followedUsers = $state<Record<string, ManagedChatUser>>({});
   const roomSplitIsHorizontal = $derived(roomSplitDir === 'ltr' || roomSplitDir === 'rtl');
   const isPresenter = $derived(data.user.role === 'staff' || data.user.role === 'admin');
+  /**
+   * `sessData.disableCopy` — "Disable Copy?", content protection for the AUDIENCE.
+   *
+   * Read the same way every other room setting here is. The presenter exemption is not applied at
+   * this line: it belongs to each gate, in `$lib/room-key-gates`, because all three bindings carry
+   * the same two terms and folding `!isPresenter` in here would hide that they are one rule.
+   */
+  const disableCopy = $derived(data.sessData?.disableCopy === true);
+  /**
+   * `preferences.pushToTalk` — a per-USER preference, not a room setting, so it is seeded from the
+   * persisted settings blob like every other preference rather than crossing the config boundary.
+   *
+   * HONEST GAP, stated because it is half a feature: nothing in this room WRITES it yet. Upstream
+   * the checkbox lives in `app-user-settings-modal` (the only other component in the decoded tree
+   * that mentions `pushToTalk`), which is a separate component and a separate piece of work. The
+   * gate below reads the preference correctly and will do the right thing the moment a control sets
+   * it; inventing a checkbox here would mean guessing at its label and position, which is the one
+   * thing this repository does not do.
+   */
+  const pushToTalk = $derived(loadedSettings.pushToTalk === true);
+  /*
+    `document.body.classList.add('noselect')` — `ngAfterViewInit`, `app-room.full.js:2227-2229`,
+    behind the same `!isPresenter && sessData.disableCopy` the keystroke and right-click gates use.
+
+    An `$effect` rather than a one-shot on mount, and that IS a divergence worth naming: upstream
+    this runs once in `ngAfterViewInit` and never again, because `isPresenter` cannot change in that
+    component's lifetime. Here it can — `giveMicScreen` elevates a member to presenter mid-session —
+    and a class added at mount would then keep restricting somebody the room has just promoted. The
+    teardown removes it for the same reason.
+
+    It touches `document.body`, which is outside this component, so it cleans up after itself rather
+    than leaving state behind on navigation.
+  */
+  $effect(() => {
+    if (!shouldDisableSelection({ disableCopy, isPresenter })) return;
+    document.body.classList.add('noselect');
+    return () => document.body.classList.remove('noselect');
+  });
 
   /**
    * `randomUser(e)`:
@@ -6654,6 +6699,18 @@
   onpointerup={finishSplit}
   onpointercancel={finishSplit}
   onkeydown={(event) => {
+    /*
+      `onKeyDown` — `app-room.full.js:3011-3021`, bound as a host listener on `keydown`
+      (`app-room.compiled.js:1260-1266`). Two unrelated features that share the keyboard, in the
+      reference's own order: push-to-talk first, then the copy restriction.
+
+      Both predicates live in `$lib/room-key-gates` with their citations. They run before the
+      Escape handling below because that returns early on every other key, which is exactly how a
+      host binding added here would go unnoticed.
+    */
+    if (pushToTalkShouldUnmute(event, { pushToTalk, micMuted })) void toggleMicrophone();
+    if (shouldBlockCopyKey(event, { disableCopy, isPresenter })) event.preventDefault();
+
     if (event.key !== 'Escape') return;
     /*
       The emoji and GIF triggers carry ngbPopover's `autoclose: 'outside'`, and that mode
@@ -6669,6 +6726,29 @@
     else if (bootboxConfirmation) bootboxConfirmation = null;
     else if (bootboxPrompt) bootboxPrompt = null;
     else if (bootboxAlert) bootboxAlert = null;
+  }}
+  onkeyup={(event) => {
+    /*
+      `onKeyUp` — `app-room.full.js:3027-3032`, host-bound on `keyup`
+      (`app-room.compiled.js:1274-1280`). The release half of push-to-talk, and the ONLY thing on
+      that listener upstream: `disableCopy` has no keyup arm, because suppressing a keystroke has
+      to happen on the way down.
+    */
+    if (pushToTalkShouldMute(event, { pushToTalk, micMuted })) void toggleMicrophone();
+  }}
+  oncontextmenu={(event) => {
+    /*
+      `onRightClick` — `app-room.full.js:3022-3026`, host-bound on `contextmenu`
+      (`app-room.compiled.js:1267-1273`). Every right-click, not merely those over the presentation
+      area, and never the presenter's.
+
+      Bound on `window` rather than `document`: the reference uses a different target resolver here
+      than for the key events, and neither resolver is defined anywhere in the decoded tree, so
+      which is which is not established. `contextmenu` bubbles to both, and this handler's only
+      effect is `preventDefault`, so the distinction cannot change behaviour — see the note at the
+      top of `$lib/room-key-gates`.
+    */
+    if (shouldBlockContextMenu({ disableCopy, isPresenter })) event.preventDefault();
   }}
   onbeforeunload={() => {
     /*

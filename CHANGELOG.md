@@ -24,6 +24,67 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-12
 
+### 2026-08-12 16:01 EDT — `disableCopy` and push-to-talk: three host bindings that were never bound
+
+**Runtime impact: "Disable Copy?" now protects something.** An owner has been able to tick it on the
+Manage page all along; `disableCopy`, `contextmenu` and `noselect` each had **zero occurrences** in
+this room, so it protected nothing at all.
+
+**Three bindings, one rule.** `onKeyDown`, `onRightClick` and `onKeyUp`
+(`app-room.full.js:3011-3032`) are host-bound to `keydown`, `contextmenu` and `keyup`
+(`app-room.compiled.js:1260-1281`). The copy restriction carries the same two terms in all three
+places plus `ngAfterViewInit` (`:2227-2229`): `!isPresenter && sessData.disableCopy`. Right-click is
+suppressed, Ctrl+C / Ctrl+U / Ctrl+S and F12 are suppressed, and `document.body` gains `noselect`.
+
+**The presenter exemption is the point, not an oversight.** This restricts the AUDIENCE; the person
+running the room keeps their own clipboard. Asserted in both directions.
+
+**Two readings that would have been wrong, and are pinned so they cannot return.** `F12` is the
+second arm of an `||`, not a third Ctrl combination — reading it as `Ctrl+F12` would leave devtools
+open on the one key most people reach for. And the comparison is `e.key.toLowerCase()`, so Ctrl+Shift+C
+is caught; dropping the lowercase would let Shift through.
+
+**Push-to-talk's `!e.repeat` is load-bearing.** `preferences.pushToTalk && !e.repeat &&
+('ControlRight' === e.code || 17 == e.which) && micMuted && toggleMic()` (`:3012-3016`). keydown
+repeats while a key is held; without that term every repeat calls the mic toggle again, closing and
+reopening the producer many times a second for as long as somebody speaks. The legacy `which === 17`
+fallback is kept for the same reason it exists upstream — browsers that populate one and not the
+other.
+
+**`noselect` was checked, not assumed.** `.noselect { user-select: none; }` at
+`css/complete-app-styles.css:7017`, unscoped. A class with no rule behind it would have closed the
+keyboard path while leaving the text selectable by drag, which is this repository's standing example
+of dead scaffolding.
+
+**One declared divergence.** Upstream adds `noselect` once in `ngAfterViewInit` and never revisits
+it, because `isPresenter` cannot change in that component's lifetime. Here it can — `giveMicScreen`
+elevates a member mid-session — so it is an `$effect` with a teardown; a class added at mount would
+keep restricting somebody the room has just promoted.
+
+**Listener targets, stated as unresolved.** The reference registers the key events with one target
+resolver (`Cm`, shared with the window-only `onResize`) and `contextmenu` with another (`mE`).
+Neither symbol is defined anywhere in `docs/source/components/`, so which is `window` and which is
+`document` is NOT established. All three are bound on `window` here; `contextmenu` bubbles to both
+and the handler's only effect is `preventDefault`, so the distinction cannot change behaviour.
+
+**HONEST GAP: nothing writes `pushToTalk` yet.** The gate reads it correctly and will work the moment
+a control sets it, but the checkbox lives in `app-user-settings-modal` — the only other component in
+the decoded tree that mentions it — which is a separate component and a separate piece of work.
+Inventing a checkbox here would mean guessing its label and position.
+
+**Verified:** `room-key-gates.test.ts` 18/18 — behaviour driven directly, plus the handlers, the
+three event bindings and the wiring read out of the decoded component at runtime. Five negative
+controls, each red on exactly its own assertion then restored: dropping the presenter exemption,
+folding F12 into the Ctrl combination, dropping `!repeat`, dropping the legacy keyCode, and losing
+the case-insensitivity. Controller 56/56 across the settings chain; `schema:verify` green at 46
+wired, with the tripwire moved 45 → 46 and the schema regenerating to three changed lines.
+`svelte-check` 977 files, 0 errors, 0 warnings. `svelte-autofixer` clean. Prettier clean. 45/45
+across the four room suites touching these files.
+
+**NOT verified:** no browser pressed a key. The predicates are exercised directly and the wiring is
+asserted as source, but nothing dispatched a real `keydown` at a live room — the same environment gap
+as TODO row E.
+
 ### 2026-08-12 15:54 EDT — The gutter double-click does something now, and it found a bug on the way
 
 **Runtime impact: double-clicking the main gutter collapses the presentation area and restores it.**
