@@ -79,6 +79,21 @@
      * render a control the reference does not have there, so the detached branch ignores it.
      */
     volume?: Snippet;
+    /**
+     * `viewerOnlyMode`, which moves the gated trio rather than hiding it.
+     *
+     * `lSe`'s update block is one line — `z('ngClass', ut(1, VCe, …globals.viewerOnlyMode))` with
+     * `VCe = (t) => ({'viewer-only-screen-zoom-controls': t})`
+     * (`app-presentationarea.render-helpers.js:10, 261`) — and the class it toggles is already in
+     * this app's stylesheet, painting nothing:
+     * `.viewer-only-screen-zoom-controls { top: 33px !important; left: -3px !important }`
+     * (`css/complete-app-styles.css:6979`). Without the binding the trio keeps `.zoom-controls`'
+     * `top:-33px; left:-33px` in viewer-only mode, i.e. 66px above where the reference puts it.
+     *
+     * ATTACHED ONLY, like the volume slot: `app-screenshare-view`'s detached trio wrapper carries no
+     * class at all.
+     */
+    viewerOnlyMode?: boolean;
     /** Whether the three zoom buttons are showing. */
     showZoomCtrl: boolean;
     /** The magnifier. */
@@ -104,6 +119,7 @@
   let {
     variant,
     volume,
+    viewerOnlyMode = false,
     showZoomCtrl,
     ontoggle,
     oncapture,
@@ -180,7 +196,10 @@
 
 {#if variant === 'attached'}
   {#if showZoomCtrl}
-    <div class="zoom-controls position-absolute">
+    <div
+      class="zoom-controls position-absolute"
+      class:viewer-only-screen-zoom-controls={viewerOnlyMode}
+    >
       {@render zoomTrio()}
     </div>
   {/if}

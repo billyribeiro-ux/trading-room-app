@@ -1,0 +1,130 @@
+{
+  "viewport": {
+    "width": 1280,
+    "height": 800
+  },
+  "cases": [
+    {
+      "name": "full-room",
+      "vh100": false,
+      "chatColumn": true,
+      "viewerOnly": false,
+      "columns": 2,
+      "ok": true,
+      "problems": [],
+      "measured": {
+        "split": {
+          "width": 1280,
+          "height": 751
+        },
+        "presentation": {
+          "width": 761.39,
+          "height": 751
+        },
+        "chatColumn": {
+          "width": 507.59,
+          "height": 751
+        },
+        "areas": 2,
+        "hasVh100": false,
+        "mainTabsDisplay": "flex",
+        "screensContent": {
+          "width": 761.39,
+          "height": 678.5
+        },
+        "screensMaxHeight": "none",
+        "videoMaxHeight": "none"
+      },
+      "png": "full-room.png",
+      "splitPng": "full-room-split.png",
+      "digest": "e79ca483feeda0178475d3725214aa41dc944fcd7a1655564737e3fe5e44b864",
+      "splitDigest": "6dfca03e2b6773c16c8346fc5cfd2557f6fe1b521c1cf6ed941e90f70466bd6c"
+    },
+    {
+      "name": "chat-only",
+      "vh100": true,
+      "chatColumn": true,
+      "viewerOnly": false,
+      "columns": 2,
+      "ok": true,
+      "problems": [],
+      "measured": {
+        "split": {
+          "width": 1280,
+          "height": 800
+        },
+        "presentation": {
+          "width": 761.39,
+          "height": 800
+        },
+        "chatColumn": {
+          "width": 507.59,
+          "height": 800
+        },
+        "areas": 2,
+        "hasVh100": true,
+        "mainTabsDisplay": "flex",
+        "screensContent": {
+          "width": 761.39,
+          "height": 727.5
+        },
+        "screensMaxHeight": "none",
+        "videoMaxHeight": "none"
+      },
+      "png": "chat-only.png",
+      "splitPng": "chat-only-split.png",
+      "digest": "e79ca483feeda0178475d3725214aa41dc944fcd7a1655564737e3fe5e44b864",
+      "splitDigest": "2570deb40a9b41bdbb9068191efe50a146735dfcd20a6352b59454454ec8468b"
+    },
+    {
+      "name": "viewer-only",
+      "vh100": true,
+      "chatColumn": false,
+      "viewerOnly": true,
+      "columns": 1,
+      "ok": true,
+      "problems": [],
+      "measured": {
+        "split": {
+          "width": 1280,
+          "height": 800
+        },
+        "presentation": {
+          "width": 1273.39,
+          "height": 800
+        },
+        "chatColumn": null,
+        "areas": 1,
+        "hasVh100": true,
+        "mainTabsDisplay": "none",
+        "screensContent": {
+          "width": 1273.39,
+          "height": 760
+        },
+        "screensMaxHeight": "760px",
+        "videoMaxHeight": "100%"
+      },
+      "png": "viewer-only.png",
+      "splitPng": "viewer-only-split.png",
+      "digest": "83ba8832a0ce0e80ef7a803fd005ad0bd2f091e385bdd94380fb9d7bdc7035bf",
+      "splitDigest": "3ba64345d0ad378d0e0ae46ce9d3318f54c28c55e39e51c35164c341d9acd704"
+    },
+    {
+      "name": "image distinctness",
+      "ok": true,
+      "problems": [],
+      "measured": {
+        "split": {
+          "full-room": "6dfca03e2b6773c16c8346fc5cfd2557f6fe1b521c1cf6ed941e90f70466bd6c",
+          "chat-only": "2570deb40a9b41bdbb9068191efe50a146735dfcd20a6352b59454454ec8468b",
+          "viewer-only": "3ba64345d0ad378d0e0ae46ce9d3318f54c28c55e39e51c35164c341d9acd704"
+        },
+        "page": {
+          "full-room": "e79ca483feeda0178475d3725214aa41dc944fcd7a1655564737e3fe5e44b864",
+          "chat-only": "e79ca483feeda0178475d3725214aa41dc944fcd7a1655564737e3fe5e44b864",
+          "viewer-only": "83ba8832a0ce0e80ef7a803fd005ad0bd2f091e385bdd94380fb9d7bdc7035bf"
+        }
+      }
+    }
+  ]
+}

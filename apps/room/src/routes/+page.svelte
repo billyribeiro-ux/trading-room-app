@@ -25,6 +25,7 @@
     type Pan
   } from '$lib/screen-zoom';
   import ScreenVolumeControl from '$lib/components/ScreenVolumeControl.svelte';
+  import PresenterMuteRows from '$lib/components/PresenterMuteRows.svelte';
   import {
     adjustVolumeForPresenter,
     toggleTalkingPresenter,
@@ -1486,7 +1487,7 @@
     }
 
     selectRosterUser(user);
-    privateChatOpen = true;
+    showPrivateChat();
   }
   type MessageAction =
     | 'delete'
@@ -3407,7 +3408,7 @@
         bootboxAlert = 'Chatting with yourself again?';
         return;
       }
-      privateChatOpen = true;
+      showPrivateChat();
       // `PCfocusOnUser` - open straight onto that person's thread rather than the tab list.
       void switchChatToUser(item.senderId);
     }
@@ -3847,6 +3848,32 @@
    * reopening lands straight back in the last conversation, where the capture returns to
    * "No active chat".
    */
+  /**
+   * `showPrivateChat()` — the ONE door into the private-chat panel, and its refusal.
+   *
+   * `app-room.compiled.js:855-861`, verbatim in shape:
+   *
+   * ```js
+   * showPrivateChat(e = null, i = null) {
+   *   this.appService.globals.videoOnlyMode ||
+   *     this.appService.globals.viewerOnlyMode ||
+   *     (this.privChatInited || (…initPMDrag()), this.privChatVisible = !0, …)
+   * }
+   * ```
+   *
+   * A leading `a || b || (…)`: in video-only or viewer-only mode the panel does not open at all,
+   * silently. Four call sites in this file each set `privateChatOpen = true` on their own, so the
+   * guard has to live in one place or it is four places to forget it.
+   *
+   * `videoOnlyMode` is the `r` query parameter — the recording-bot mode — which this room does not
+   * model, the same honest gap `files-gates.ts` already records for `hideFiles`. The half that is
+   * modelled is enforced.
+   */
+  function showPrivateChat() {
+    if (viewerOnlyMode) return;
+    privateChatOpen = true;
+  }
+
   function closePrivateChatPanel() {
     privateChatOpen = false;
     currUser = null;
@@ -7020,12 +7047,21 @@
                     class="nav-link d-flex align-items-center"
                     onclick={() => (volumeOpen = !volumeOpen)}
                   >
+<!--
+                      Consts 105/106/107 of `app-room` — `['fas','fa-2x','fa-volume-up']`,
+                      `…fa-volume-down`, `…fa-volume-off` (`app-room.compiled.js:1694-1696`) — and
+                      the same three strict inequalities the overlay uses
+                      (`app-room.render-helpers.js:1424-1428`).
+
+                      The third one read `fa-volume-mute` here, which is in neither const table. One
+                      word, and it is the icon a muted listener looks at.
+                    -->
                     {#if volume > 50}
                       <i class="fas fa-2x fa-volume-up"></i>
                     {:else if volume < 50 && volume > 4}
                       <i class="fas fa-2x fa-volume-down"></i>
                     {:else if volume < 4}
-                      <i class="fas fa-2x fa-volume-mute"></i>
+                      <i class="fas fa-2x fa-volume-off"></i>
                     {/if}
                     <span class="ml-2 mainNavItem">Volume</span>
                   </a>
@@ -7072,8 +7108,26 @@
                       {volume > 0 ? 'Mute' : 'Unmute'}
                     </button>
                     <hr />
-                    {#if soundCloudPlaying}
-                      <div class="m-0">
+<!--
+                      TWO defects, both from `app-room.render-helpers.js:1005-1028` (`p4e`) and its
+                      gate at `:1434`.
+
+                      THE GATE was `soundCloudPlaying` alone. The reference is
+                      `O(48, e.scPlaying || e.mp3Playing || e.appService.globals.roomState.ytURL ? 48 : -1)`
+                      — three sources, of which this room already models all three: `soundCloudPlaying`,
+                      `mp3Playing` (set from the `playMP3ForAll` command) and `youtubeForAllUrl`
+                      (the room-wide YouTube overlay, this app's `roomState.ytURL`). So the slider was
+                      dead for two of the three things it controls: `setBackgroundVolume` reaches
+                      `#mp3player` and the YouTube overlay as well as SoundCloud, and neither could be
+                      turned down.
+
+                      THE CONTAINER is const 114, `[2, 'text-align', 'center']`
+                      (`app-room.compiled.js:1723`). A `2` marker is STYLES, not classes — so it is a
+                      `div` with `style="text-align: center"` and no class at all. `m-0` belongs to the
+                      `<p>` inside it (const 199, `[1,'m-0']`), which already has it.
+                    -->
+                    {#if soundCloudPlaying || mp3Playing || youtubeForAllUrl}
+                      <div style="text-align: center;">
                         <hr />
                         <p class="m-0">Background Music:</p>
                         <input
@@ -7095,6 +7149,28 @@
                     {/if}
                     <div class="dropdown-divider"></div>
                     <div class="room-sound-options">
+                      <!--
+                        THE ROWS COME FIRST, and this dropdown did not have them.
+
+                        `app-room.render-helpers.js:1224-1225` puts `H(51, b4e, 3, 0, 'hr')` at the
+                        head of `div.room-sound-options` (const 116), gated on
+                        `talkingUsers && talkingUsers.length > 0` (`:1436`), and `b4e` is
+                        `ht(0, _4e, 7, 14, null, null, qAe), T(2, 'hr')` — the same per-presenter
+                        row the screen overlay renders, plus a trailing rule, and only THEN the six
+                        sound checkboxes below.
+
+                        Without them a member could mute the room but not one presenter, which is
+                        the entire point of the control. Shared with the overlay so the two cannot
+                        drift; the `hr` is this copy's, not the overlay's.
+                      -->
+                      <PresenterMuteRows
+                        {talkingUsers}
+                        preferences={presenterAudio}
+                        {individualVolumeControls}
+                        trailingRule
+                        ontogglepresenter={toggleTalkingPresenterAudio}
+                        onpresentervolume={adjustPresenterVolume}
+                      />
                       <div class="my-1">
                         <input
                           type="checkbox"
@@ -7691,6 +7767,19 @@
         </div>
         {@render mainNavigation()}
 
+<!--
+          `z('ngClass', ut(5, QB, videoOnlyMode || chatOnlyMode || viewerOnlyMode))` with
+          `QB = (t) => ({'vh-100': t})` (`app-room.render-helpers.js:1639-1648, 11`).
+
+          It is the other half of hiding a column: with the chat and alerts gone the split has one
+          child, and `.vh-100 { height: 100vh !important }`
+          (`css/complete-app-styles.css:4992`) is what makes the screen fill the window instead of
+          keeping the height it had beside them.
+
+          `videoOnlyMode` is the `r` query parameter — the recording-bot mode — which this room does
+          not model; the same honest gap `files-gates.ts` already records for `hideFiles`. The two
+          modes this room does model are bound.
+        -->
         <as-split
           {@attach captureMainElement}
           minsize="0"
@@ -7700,6 +7789,7 @@
             ? 'as-horizontal as-percent as-init'
             : 'as-vertical as-percent as-init'}
           class:is-resizing={splitTarget !== null}
+          class:vh-100={chatOnlyMode || viewerOnlyMode}
           style={roomSplitIsHorizontal ? undefined : 'flex-direction: column;'}
           dir="ltr"
         >
@@ -7710,7 +7800,23 @@
             and the bootbox's promise that "you can reopen the chat in this window from the side
             menu" points at a control that does not exist.
           -->
-          {#if chatAlertsDetached}
+<!--
+            `viewerOnlyMode` hides the chat and alerts entirely — `app-room.compiled.js:76-77`:
+
+              this.appService.globals.viewerOnlyMode &&
+                (this.hideChatAlerts = this.appService.globals.viewerOnlyMode)
+
+            and `hideChatAlerts` is what `j4e`'s `O(1, e.hideChatAlerts ? -1 : 1)` gates this whole
+            column on (`app-room.render-helpers.js:1650`). Rendered before the detached branch
+            because the reference's flag is set in `ngOnInit`, i.e. before any detach can happen.
+
+            No "Reopen here" button in this branch, deliberately: that control belongs to
+            `reopenAlertsChatBtn`, which only `detachChat` sets. There is nothing to reopen in
+            viewer-only mode — the room was entered that way.
+          -->
+          {#if viewerOnlyMode}
+            <!-- Nothing. The presentation area takes the full width below. -->
+          {:else if chatAlertsDetached}
             <as-split-area minsize="0" class="alert-chat-box as-split-area" style={primaryAreaStyle}>
               <div class="d-flex flex-column align-items-center justify-content-center h-100 p-3">
                 <p class="text-center mb-3">Chat and alerts are open in another window.</p>
@@ -8070,7 +8176,7 @@
                             <a
                               title="Open Private chat"
                               class="nav-link"
-                              onclick={() => (privateChatOpen = true)}
+                              onclick={showPrivateChat}
                             >
                               <i class="fas fa-comments"></i>
                             </a>
@@ -8418,7 +8524,19 @@
                     ontranscript={openTranscriptPage}
                   />
                 {/if}
-                <ul id="mainTabs" class="nav nav-tabs mainTabset" role="tablist">
+<!--
+                  `z('hidden', o.appService.globals.viewerOnlyMode)` on this `ul`
+                  (`app-presentationarea.compiled.js:3154-3155`, and const 3 at `:1598` declares the
+                  `hidden` binding it feeds). Viewer-only mode is a room reduced to the screen: the
+                  whole main tab strip goes, which is also why `.viewer-only-screen-tab` sets
+                  `max-height: calc(-40px + 100vh)` — the 40px it reclaims is this strip.
+                -->
+                <ul
+                  id="mainTabs"
+                  class="nav nav-tabs mainTabset"
+                  role="tablist"
+                  hidden={viewerOnlyMode}
+                >
                   <li role="presentation" class="nav-item">
                     <a
                       id="screens-tab"
@@ -8674,6 +8792,7 @@
                         <ScreenZoomControls
                           variant="attached"
                           {showZoomCtrl}
+                          {viewerOnlyMode}
                           ontoggle={togglePanZoom}
                           volume={screenVolume}
                           oncapture={() => {
@@ -8689,12 +8808,35 @@
                         />
                       {/snippet}
                     </ScreenTabs>
-                    <div id="screensTabsContent" class="tab-content">
+<!--
+                      `viewer-only-screen-tab` lives HERE, on const 72, and nowhere else.
+
+                      `wSe`'s update block walks `O(0,…)`, `m(2)`, `pt(…)`, `m(2)`, `O(4,…)` — an
+                      explicit index, so the pointer is fixed — then `m()` to node 5, where
+                      `z('ngClass', ut(3, jCe, …viewerOnlyMode))` lands
+                      (`app-presentationarea.render-helpers.js:483-493`). Node 5 is
+                      `d(5,'div',72)` and const 72 is
+                      `['id','screensTabsContent',1,'tab-content',3,'ngClass']` — the only element in
+                      that block whose const carries a binding marker (`…compiled.js:2044`). The tab
+                      strip's const 70 has none, and the pane's const 73 binds `{'show active': …}`
+                      alone.
+
+                      `.viewer-only-screen-tab { padding-bottom: 5px; height: 100% !important;
+                      max-height: calc(-40px + 100vh) !important }`
+                      (`css/complete-app-styles.css:6978`) — the 40px it reclaims is `ul#mainTabs`,
+                      which is `hidden` in this mode.
+                    -->
+                    <div
+                      id="screensTabsContent"
+                      class="tab-content"
+                      class:viewer-only-screen-tab={viewerOnlyMode}
+                    >
                       {#each sharedScreens as screen (screen.id)}
                         <ScreenPane
                           id={screen.id}
                           stream={screenStreams.get(screen.id) ?? null}
                           active={screen.id === selectedScreenTab}
+                          {viewerOnlyMode}
                           {volume}
                           muted={volume === 0}
                           {showZoomCtrl}
@@ -9388,7 +9530,7 @@
       onMentionUser={mentionUser}
       onPrivateChat={(user) => {
         selectedMessageUser = user;
-        privateChatOpen = true;
+        showPrivateChat();
       }}
       onFollowToggle={requestFollowToggle}
       onFollowStyleChange={applyFollowStyle}

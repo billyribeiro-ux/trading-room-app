@@ -62,6 +62,21 @@
     controls?: Snippet;
   };
 
+  /*
+    `viewer-only-screen-tab` does NOT belong on this `ul`, and briefly did.
+
+    `wSe`'s update block (`docs/source/components/app-presentationarea.render-helpers.js:483-493`)
+    walks: `O(0, …)` at node 0, `m(2)` to node 2, `pt(…)`, `m(2)` to node 4, `O(4, …)` — an explicit
+    index, so the pointer is fixed independently of counting — then `m()` to node 5, and THAT is
+    where `z('ngClass', ut(3, jCe, …viewerOnlyMode))` lands. Node 5 is `d(5, 'div', 72)`, i.e.
+    `div#screensTabsContent.tab-content`, which `+page.svelte` renders.
+
+    The const table agrees from the other side: const 70 — this element — is
+    `['id','screenTabs','role','tablist',1,'nav','nav-tabs','screens-tabs']` with NO `3,'ngClass'`
+    marker (`app-presentationarea.compiled.js:2042`), and Angular emits that marker only where a
+    binding exists. Const 72 has it. So this `ul` cannot carry the class upstream at all.
+  */
+
   let {
     screens,
     selectedScreenId = null,

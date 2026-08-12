@@ -49,10 +49,8 @@
    * `submit`, and this cluster is one `<form>` away from being a live defect. Nothing else is
    * changed — every class, attribute, order and text node is the reference's, spaces included.
    */
+  import PresenterMuteRows from '$lib/components/PresenterMuteRows.svelte';
   import {
-    isMutedFor,
-    presenterRowId,
-    presenterVolumeValue,
     volumeIcon,
     type PresenterAudioPreferences,
     type TalkingPresenter
@@ -102,7 +100,7 @@
   const icon = $derived(volumeIcon(audioVolume));
 
   /**
-   * Both range inputs are written through an attachment rather than `bind:value`, matching how the
+   * The master slider is written through an attachment rather than `bind:value`, matching how the
    * navbar's copy of this slider already works in `+page.svelte`: the value is owned by the page
    * (and by the stored preference), and a two-way binding would let the element's own default win
    * on the first paint before the preference arrives.
@@ -110,12 +108,6 @@
   function setRangeValue(value: number) {
     return (node: HTMLInputElement) => {
       node.value = String(value);
-    };
-  }
-
-  function setChecked(checked: boolean) {
-    return (node: HTMLInputElement) => {
-      node.checked = checked;
     };
   }
 </script>
@@ -193,49 +185,18 @@
     control under the right class name.
   -->
   <div class="room-sound-options">
-    {#if talkingUsers.length > 0}
-      {#each talkingUsers as user, index (user.userID)}
-        {@const muted = isMutedFor(preferences, user.userID)}
-        {@const rowId = presenterRowId(index)}
-        <div class="my-1">
-          <!--
-            Const 112, including the reference's `value="Presenter audiob"` typo. `checked` is bound
-            to the OBJECT at `audioMutedFor[userID]`, which the DOM coerces to a boolean.
-          -->
-          <input
-            type="checkbox"
-            value="Presenter audiob"
-            title="Presenter audio"
-            class="form-check-input"
-            name={rowId}
-            id={rowId}
-            {@attach setChecked(muted)}
-            onchange={() => ontogglepresenter(user)}
-          />
-          <!-- Const 113, with `ngClass` `{muted: audioMutedFor[userID]}`. -->
-          <label class="form-check-label" class:muted for={rowId}>
-            {#if !muted}<span>Mute</span>{/if}
-            {user.mediaValue.name}
-            {#if muted}<span>Muted</span>{/if}
-          </label>
-        </div>
-        <!-- Const 114 > const 115, gated on the room's `individualVolumeControls`. -->
-        {#if individualVolumeControls}
-          <div class="mx-2 text-center">
-            <input
-              audiovolslider=""
-              type="range"
-              min="0"
-              max="100"
-              title="Volume"
-              class="mx-auto py-1 volCtrl"
-              {@attach setRangeValue(presenterVolumeValue(preferences, user.userID))}
-              onchange={(event) => onpresentervolume(user, event.currentTarget.value)}
-              oninput={(event) => onpresentervolume(user, event.currentTarget.value)}
-            />
-          </div>
-        {/if}
-      {/each}
-    {/if}
+    <!--
+      The rows are `PresenterMuteRows`, shared with the navbar dropdown: `bSe` and `_4e` render the
+      same markup from the same const values, and the navbar copy adds a trailing `hr` this one does
+      not have.
+    -->
+    <PresenterMuteRows
+      {talkingUsers}
+      {preferences}
+      {individualVolumeControls}
+      idPrefix="screenTalkingPresenter"
+      {ontogglepresenter}
+      {onpresentervolume}
+    />
   </div>
 </div>

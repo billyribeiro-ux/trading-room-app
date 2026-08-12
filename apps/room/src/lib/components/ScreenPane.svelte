@@ -68,6 +68,17 @@
     pan: Pan;
     /** Is this window a detached screen popout? Renders the captured `-detached` cluster. */
     detached?: boolean;
+    /**
+     * `appService.globals.viewerOnlyMode` — the `vo` query parameter.
+     *
+     * Two captured `ngClass` bindings depend on it and BOTH were static classes here, so viewer-only
+     * geometry was applied to every room:
+     * `H0e = (t, n) => ({hidden: t, 'viewer-only-screen-video': n})` on the `<video>`
+     * (`docs/source/components/app-screenshare-view.render-helpers.js:2`, bound at
+     * `…compiled.js:335-345`) and `jCe = (t) => ({'viewer-only-screen-tab': t})` on the pane's
+     * strip (`app-presentationarea.render-helpers.js:9, 491`).
+     */
+    viewerOnlyMode?: boolean;
     /** Reports a drag upward; the parent owns the per-screen pan map. */
     onpan?: (x: number, y: number) => void;
     ontogglezoom?: () => void;
@@ -86,6 +97,7 @@
     zoomLevel,
     pan,
     detached = false,
+    viewerOnlyMode = false,
     onpan,
     ontogglezoom,
     onzoomin,
@@ -224,9 +236,24 @@
   `tab-pane fade` with `show active` on the selected one is the same pattern `#mainTabsContent`
   already uses for Screens/Notes/Files, and it is what `data-bs-target="#{id}"` on the tab drives.
 -->
+<!--
+  `viewer-only-screen-tab` does NOT belong on this pane, and it used to be here as a STATIC class.
+
+  `SSe` renders this element from const 73,
+  `['role','tabpanel',1,'tab-pane','fade',3,'ngClass','id']`, and its only `ngClass` is
+  `ut(5, Hr, i.selectedScreenShareTab == e._id)` with `Hr = (t) => ({'show active': t})`
+  (`app-presentationarea.render-helpers.js:8, 461-469`). There is no second class here in the
+  reference, conditional or otherwise.
+
+  The `viewer-only-screen-tab` binding lands on `div#screensTabsContent` — const 72, node 5 of
+  `wSe` — which `+page.svelte` renders. Written here it applied
+  `height: 100% !important; max-height: calc(-40px + 100vh) !important`
+  (`css/complete-app-styles.css:6978`) to every screen pane in every room; moved here conditionally
+  it would still be an element the reference never puts it on.
+-->
 <div
   {id}
-  class="tab-pane fade viewer-only-screen-tab"
+  class="tab-pane fade"
   class:show={active}
   class:active
   role="tabpanel"
@@ -256,9 +283,39 @@
         class="pan-element"
         style="transform: translate({pan.x}px, {pan.y}px) scale({scale}); transform-origin: center center;"
       >
+        <!--
+          `H0e = (t, n) => ({hidden: t, 'viewer-only-screen-video': n})`
+          (`docs/source/components/app-screenshare-view.render-helpers.js:2`), bound at
+          `…compiled.js:335-345` as
+
+            hidden:                    !o.isConnected
+                                       || (o.isPresentingThisScreen && !o.localpreview)
+                                       || o.mediaService.saveData
+            viewer-only-screen-video:  o.appService.globals.viewerOnlyMode
+
+          BOTH arguments, because wiring one of a two-argument function and quoting the whole of it
+          is how a gap gets sealed behind evidence that looks complete.
+
+          * `!isConnected` → `stream === null` here. The consumer is created before the picture
+            arrives, so without this a tab shows a black box instead of nothing.
+          * `isPresentingThisScreen && !localpreview` is FALSE by construction in this app: our own
+            screens render from the local capture (`addLocalScreen` in `+page.svelte`), i.e. we
+            always local-preview, so the term can never be true here. Not modelled, and it would be
+            dead if it were.
+          * `saveData` — "Video off to preserve data" — is not modelled anywhere in this room.
+            Recorded in `TODO.md` rather than invented.
+
+          `z('controls', o.showControls)` on the line above is NOT reproduced, and that is a
+          finding rather than an omission: `showControls` starts `!1` and its only writer is a click
+          handler ON THIS ELEMENT (`…compiled.js:302-305`), which the same component's own
+          `.webcamScreen { pointer-events: none }` (`:357`) makes unreachable. The attribute is
+          therefore false for the life of the component upstream, and no control bar ever appears.
+        -->
         <video
           id="webcamScreen-{id}"
-          class="webcamScreen viewer-only-screen-video"
+          class="webcamScreen"
+          class:hidden={stream === null}
+          class:viewer-only-screen-video={viewerOnlyMode}
           autoplay
           playsinline
           {@attach attachStream}
@@ -310,6 +367,16 @@
     object-fit: contain;
     vertical-align: top;
     pointer-events: none;
+  }
+
+  /*
+   * `.hidden { display: none }` — the other half of `H0e`, from the same component stylesheet
+   * (`docs/source/components/app-screenshare-view.compiled.js:357`). Scoped there too, which is why
+   * the four `.hidden` rules in the applied global sheet are all other components' copies and none
+   * of them reaches this element.
+   */
+  .hidden {
+    display: none;
   }
 
   /* `div.pan-zoom-frame, div.pan-element { height: inherit !important; width: 100% }` */
