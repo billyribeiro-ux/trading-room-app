@@ -14,6 +14,7 @@
     "start": "node build",
     "start:local": "ORIGIN=http://localhost:${PORT:-3000} node build",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+    "verify:tooltips": "node --no-warnings scripts/verify-tooltip-placements.mjs",
     "capture:analyze": "node scripts/analyze-capture.mjs",
     "capture:forensic": "node scripts/forensic-audit.mjs",
     "capture:emoji": "node scripts/render-emoji-state.mjs",

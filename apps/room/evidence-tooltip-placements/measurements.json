@@ -1,0 +1,315 @@
+{
+  "cases": [
+    {
+      "placement": "left",
+      "cls": "bs-tooltip-start",
+      "side": "left",
+      "border": "borderLeftColor",
+      "height": 29,
+      "ok": true,
+      "problems": [],
+      "measured": {
+        "classes": [
+          "tooltip",
+          "fade",
+          "bs-tooltip-start",
+          "show"
+        ],
+        "popperPlacement": "left",
+        "opacity": "0.9",
+        "zIndex": "1080",
+        "bubble": {
+          "left": 311.296875,
+          "top": 292.5,
+          "right": 436,
+          "bottom": 321.5,
+          "width": 124.703125,
+          "height": 29
+        },
+        "host": {
+          "left": 442,
+          "top": 299,
+          "right": 458,
+          "bottom": 315,
+          "width": 16,
+          "height": 16
+        },
+        "arrow": {
+          "left": 436,
+          "top": 300.5,
+          "right": 442.390625,
+          "bottom": 313.296875,
+          "width": 6.390625,
+          "height": 12.796875
+        },
+        "innerBg": "rgb(0, 0, 0)",
+        "innerColor": "rgb(255, 255, 255)",
+        "innerRadius": "6px",
+        "innerPadding": "4px 8px",
+        "innerMaxWidth": "200px",
+        "arrowBorders": {
+          "borderTopColor": "rgba(0, 0, 0, 0)",
+          "borderRightColor": "rgba(0, 0, 0, 0)",
+          "borderBottomColor": "rgba(0, 0, 0, 0)",
+          "borderLeftColor": "rgb(0, 0, 0)"
+        },
+        "arrowBorderWidth": "6px 0px 6px 6px",
+        "gap": 6,
+        "centres": {
+          "host": 307,
+          "bubble": 307,
+          "arrow": 306.8984375
+        }
+      }
+    },
+    {
+      "placement": "right",
+      "cls": "bs-tooltip-end",
+      "side": "right",
+      "border": "borderRightColor",
+      "height": 29,
+      "ok": true,
+      "problems": [],
+      "measured": {
+        "classes": [
+          "tooltip",
+          "fade",
+          "bs-tooltip-end",
+          "show"
+        ],
+        "popperPlacement": "right",
+        "opacity": "0.9",
+        "zIndex": "1080",
+        "bubble": {
+          "left": 463.796875,
+          "top": 292.5,
+          "right": 588.5,
+          "bottom": 321.5,
+          "width": 124.703125,
+          "height": 29
+        },
+        "host": {
+          "left": 442,
+          "top": 299,
+          "right": 458,
+          "bottom": 315,
+          "width": 16,
+          "height": 16
+        },
+        "arrow": {
+          "left": 457.40625,
+          "top": 300.5,
+          "right": 463.796875,
+          "bottom": 313.296875,
+          "width": 6.390625,
+          "height": 12.796875
+        },
+        "innerBg": "rgb(0, 0, 0)",
+        "innerColor": "rgb(255, 255, 255)",
+        "innerRadius": "6px",
+        "innerPadding": "4px 8px",
+        "innerMaxWidth": "200px",
+        "arrowBorders": {
+          "borderTopColor": "rgba(0, 0, 0, 0)",
+          "borderRightColor": "rgb(0, 0, 0)",
+          "borderBottomColor": "rgba(0, 0, 0, 0)",
+          "borderLeftColor": "rgba(0, 0, 0, 0)"
+        },
+        "arrowBorderWidth": "6px 6px 6px 0px",
+        "gap": 5.797,
+        "centres": {
+          "host": 307,
+          "bubble": 307,
+          "arrow": 306.8984375
+        }
+      }
+    },
+    {
+      "placement": "top",
+      "cls": "bs-tooltip-top",
+      "side": "top",
+      "border": "borderTopColor",
+      "height": 41.797,
+      "ok": true,
+      "problems": [],
+      "measured": {
+        "classes": [
+          "tooltip",
+          "fade",
+          "bs-tooltip-top",
+          "show"
+        ],
+        "popperPlacement": "top",
+        "opacity": "0.9",
+        "zIndex": "1080",
+        "bubble": {
+          "left": 387.796875,
+          "top": 251,
+          "right": 512.5,
+          "bottom": 292.78125,
+          "width": 124.703125,
+          "height": 41.78125
+        },
+        "host": {
+          "left": 442,
+          "top": 299,
+          "right": 458,
+          "bottom": 315,
+          "width": 16,
+          "height": 16
+        },
+        "arrow": {
+          "left": 443.796875,
+          "top": 292.78125,
+          "right": 456.59375,
+          "bottom": 299.171875,
+          "width": 12.796875,
+          "height": 6.390625
+        },
+        "innerBg": "rgb(0, 0, 0)",
+        "innerColor": "rgb(255, 255, 255)",
+        "innerRadius": "6px",
+        "innerPadding": "4px 8px",
+        "innerMaxWidth": "200px",
+        "arrowBorders": {
+          "borderTopColor": "rgb(0, 0, 0)",
+          "borderRightColor": "rgba(0, 0, 0, 0)",
+          "borderBottomColor": "rgba(0, 0, 0, 0)",
+          "borderLeftColor": "rgba(0, 0, 0, 0)"
+        },
+        "arrowBorderWidth": "6px 6px 0px",
+        "gap": 6.219,
+        "centres": {
+          "host": 450,
+          "bubble": 450.1484375,
+          "arrow": 450.1953125
+        }
+      }
+    },
+    {
+      "placement": "bottom",
+      "cls": "bs-tooltip-bottom",
+      "side": "bottom",
+      "border": "borderBottomColor",
+      "height": 41.797,
+      "ok": true,
+      "problems": [],
+      "measured": {
+        "classes": [
+          "tooltip",
+          "fade",
+          "bs-tooltip-bottom",
+          "show"
+        ],
+        "popperPlacement": "bottom",
+        "opacity": "0.9",
+        "zIndex": "1080",
+        "bubble": {
+          "left": 387.796875,
+          "top": 321,
+          "right": 512.5,
+          "bottom": 362.78125,
+          "width": 124.703125,
+          "height": 41.78125
+        },
+        "host": {
+          "left": 442,
+          "top": 299,
+          "right": 458,
+          "bottom": 315,
+          "width": 16,
+          "height": 16
+        },
+        "arrow": {
+          "left": 443.796875,
+          "top": 314.609375,
+          "right": 456.59375,
+          "bottom": 321,
+          "width": 12.796875,
+          "height": 6.390625
+        },
+        "innerBg": "rgb(0, 0, 0)",
+        "innerColor": "rgb(255, 255, 255)",
+        "innerRadius": "6px",
+        "innerPadding": "4px 8px",
+        "innerMaxWidth": "200px",
+        "arrowBorders": {
+          "borderTopColor": "rgba(0, 0, 0, 0)",
+          "borderRightColor": "rgba(0, 0, 0, 0)",
+          "borderBottomColor": "rgb(0, 0, 0)",
+          "borderLeftColor": "rgba(0, 0, 0, 0)"
+        },
+        "arrowBorderWidth": "0px 6px 6px",
+        "gap": 6,
+        "centres": {
+          "host": 450,
+          "bubble": 450.1484375,
+          "arrow": 450.1953125
+        }
+      }
+    },
+    {
+      "placement": "top-right",
+      "cls": "bs-tooltip-top",
+      "side": "top",
+      "border": "borderTopColor",
+      "height": 41.797,
+      "ok": true,
+      "problems": [],
+      "measured": {
+        "classes": [
+          "tooltip",
+          "fade",
+          "bs-tooltip-top",
+          "bs-tooltip-top-end",
+          "show"
+        ],
+        "popperPlacement": "top-end",
+        "opacity": "0.9",
+        "zIndex": "1080",
+        "bubble": {
+          "left": 333.296875,
+          "top": 251,
+          "right": 458,
+          "bottom": 292.78125,
+          "width": 124.703125,
+          "height": 41.78125
+        },
+        "host": {
+          "left": 442,
+          "top": 299,
+          "right": 458,
+          "bottom": 315,
+          "width": 16,
+          "height": 16
+        },
+        "arrow": {
+          "left": 443.796875,
+          "top": 292.78125,
+          "right": 456.59375,
+          "bottom": 299.171875,
+          "width": 12.796875,
+          "height": 6.390625
+        },
+        "innerBg": "rgb(0, 0, 0)",
+        "innerColor": "rgb(255, 255, 255)",
+        "innerRadius": "6px",
+        "innerPadding": "4px 8px",
+        "innerMaxWidth": "200px",
+        "arrowBorders": {
+          "borderTopColor": "rgb(0, 0, 0)",
+          "borderRightColor": "rgba(0, 0, 0, 0)",
+          "borderBottomColor": "rgba(0, 0, 0, 0)",
+          "borderLeftColor": "rgba(0, 0, 0, 0)"
+        },
+        "arrowBorderWidth": "6px 6px 0px",
+        "gap": 6.219,
+        "centres": {
+          "host": 450,
+          "bubble": 395.6484375,
+          "arrow": 450.1953125
+        }
+      }
+    }
+  ]
+}

@@ -2,7 +2,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { ngbTooltip, restingPosition } from './ngb-tooltip';
+import { ngbTooltip, restingPosition, roundToDevicePixels } from './ngb-tooltip';
 
 /**
  * Every placement the room uses, and the rules that paint each one.
@@ -182,7 +182,7 @@ describe('the 6px offset is the reference own, checked against the captured pixe
   });
 
   for (const t of rendered) {
-    it(`reproduces where the browser put "${t.label}"`, () => {
+    it(`reproduces where the browser put "${t.label}" — to the pixel`, () => {
       const box = (r: { x: number; y: number; w: number; h: number }) => ({
         left: r.x,
         top: r.y,
@@ -191,21 +191,44 @@ describe('the 6px offset is the reference own, checked against the captured pixe
         width: r.w,
         height: r.h
       });
-      const got = restingPosition(box(t.host.rect), box(t.tooltip.rect), 'left');
+      const dpr = CAPTURE.meta.viewport.dpr;
 
       /*
-        Vertically exact — within 0.02px on all three, which is what confirms the centring rule.
-        Horizontally there is a systematic 0.25px residual: our left edge lands 0.25px left of the
-        captured one, identically for all three. That is NOT explained here. It is small enough to be
-        Popper's `roundOffsets` at the capture's `devicePixelRatio: 2` combined with rects reported
-        to one decimal, and it is recorded as an unexplained residual rather than absorbed by
-        tuning OFFSET_DISTANCE to 5.75 — the bundle says 6, and fitting the constant to three
-        samples would be inventing a value the source contradicts.
+        The bubble's position BEFORE the transform, recovered from the capture: Popper anchors with
+        `inset: 0 0 auto auto` and then translates, so resting = final rect minus the transform it
+        applied.
       */
-      expect(Math.abs(got.top - t.tooltip.rect.y)).toBeLessThan(0.05);
-      expect(Math.abs(got.left - t.tooltip.rect.x)).toBeLessThan(0.5);
+      const [, tx, ty] = t.tooltip.attrs.style.match(/translate3d\((-?[\d.]+)px, (-?[\d.]+)px/)!;
+      const restingLeft = t.tooltip.rect.x - Number(tx);
+      const restingTop = t.tooltip.rect.y - Number(ty);
+
+      const want = restingPosition(box(t.host.rect), box(t.tooltip.rect), 'left');
+      const dx = roundToDevicePixels(want.left - restingLeft, dpr);
+      const dy = roundToDevicePixels(want.top - restingTop, dpr);
+
+      // The transform Popper actually wrote, and the rect the browser actually reported.
+      expect(dx).toBe(Number(tx));
+      expect(dy).toBe(Number(ty));
+      expect(restingLeft + dx).toBeCloseTo(t.tooltip.rect.x, 10);
+      expect(restingTop + dy).toBeCloseTo(t.tooltip.rect.y, 10);
     });
   }
+
+  it('the rounding is Math.round on the device pixel grid, halves toward +infinity', () => {
+    /*
+      THE detail that closes the residual. "Add Emojis" wants dx = -1305.75; at dpr 2 that is
+      -2611.5 half-pixels, and `Math.round` takes it to -2611, i.e. -1305.5 — which is the captured
+      transform. Rounding a half AWAY FROM ZERO, which most languages do, gives -1306 and misses by
+      half a pixel. Python's banker's rounding gives -1306 too; that is how this was nearly recorded
+      as still-unexplained.
+    */
+    expect(roundToDevicePixels(-1305.75, 2)).toBe(-1305.5);
+    expect(roundToDevicePixels(1173.49, 2)).toBe(1173.5);
+    expect(roundToDevicePixels(-1280.25, 2)).toBe(-1280);
+    // At dpr 1 it is whole pixels; the `|| 0` guards -0.
+    expect(roundToDevicePixels(10.4, 1)).toBe(10);
+    expect(Object.is(roundToDevicePixels(-0.2, 1), 0)).toBe(true);
+  });
 
   it('dropping the offset moves the bubble a visible distance, so this cannot pass at 0', () => {
     // The negative control, as an assertion: 6px is the whole gap the arrow reaches across.
@@ -239,5 +262,94 @@ describe('the 6px offset is the reference own, checked against the captured pixe
     expect(restingPosition(anchor, bubble, 'top-end').left).toBe(120 - 80);
     expect(restingPosition(anchor, bubble, 'left-start').top).toBe(100);
     expect(restingPosition(anchor, bubble, 'left-end').top).toBe(116 - 30);
+  });
+});
+
+describe('no tooltip in the room can flip, so not running Popper costs nothing', () => {
+  it('the reference passes its own fallback list, and flip honours it', () => {
+    /*
+      `RI` returns `{ placement: r.shift(), modifiers: [ …, { name: "flip", options: { fallbackPlacements: r } } ] }`.
+      `r` is the resolved candidate list, and `shift()` both takes the primary AND removes it — so
+      what `flip` receives is whatever is LEFT.
+    */
+    expect(
+      BUNDLE.includes('{enabled:!0,name:"flip",options:{fallbackPlacements:r}}'),
+      '{enabled:!0,name:"flip",options:{fallbackPlacements:r}}'
+    ).toBe(true);
+    // Inside flip: `J = l || (...)`, where `l` is `options.fallbackPlacements`.
+    expect(BUNDLE.includes('l=e.fallbackPlacements'), 'l=e.fallbackPlacements').toBe(true);
+    expect(BUNDLE.includes('J=l||(B!==M&&S?'), 'J=l||(B!==M&&S?').toBe(true);
+  });
+
+  it('a fixed placement leaves that list EMPTY, and an empty array is truthy', () => {
+    /*
+      THE point. `Coe["left"] = ["left"]`, so the candidate list is one long; `shift()` empties it.
+      `[] || fallback` evaluates to `[]` in JavaScript, so flip does not fall back to its own
+      defaults — it is handed no alternatives at all and the bubble stays where it was asked for.
+
+      Every placement the room writes on a tooltip is fixed: left, top, bottom, top-right. None of
+      them can flip, which is why positioning once from the measured rects is a match rather than an
+      approximation.
+    */
+    /*
+      Modelled rather than asserted as a literal, both because `[] || x` is statically always-truthy
+      (svelte-check says so) and because running the reference's own three steps is the actual claim:
+      look the placement up, `shift()` the primary off, hand what remains to flip.
+    */
+    const candidates = ['left']; // Coe['left'], LTR arm
+    const primary = candidates.shift(); // RI: `placement: r.shift()`
+    const fallbackPlacements = candidates; // RI: `options: { fallbackPlacements: r }`
+    expect(primary).toBe('left');
+    expect(fallbackPlacements).toEqual([]);
+
+    /*
+      flip reads `l = e.fallbackPlacements` and then `J = l || (…)`. The option is optional, so `l` is
+      `string[] | undefined` — which is why the `||` is meaningful rather than always-truthy. At
+      runtime it holds `[]`, and an empty array IS truthy, so `l` wins and flip is handed no
+      alternatives at all rather than falling back to its own defaults.
+    */
+    const asFlipOption = (v: string[]): string[] | undefined => v;
+    const l = asFlipOption(fallbackPlacements);
+    const J = l || ['flip-would-invent-this'];
+    expect(J).toBe(fallbackPlacements);
+    expect(J).toEqual([]);
+    // Unquoted keys in the minified literal, except the hyphenated ones. `includes` rather than
+    // `toContain` so a failure prints a boolean instead of 2.8MB of bundle.
+    for (const p of [
+      'left:["left"]',
+      'top:["top"]',
+      'bottom:["bottom"]',
+      '"top-right":["top-end"]'
+    ]) {
+      expect(BUNDLE.includes(p), p).toBe(true);
+    }
+  });
+
+  it('preventOverflow is disabled upstream by a no-op function', () => {
+    // The other modifier that would move a bubble. ng-bootstrap registers it and empties it.
+    expect(
+      BUNDLE.includes('{enabled:!0,name:"preventOverflow",phase:"main",fn:function(){}}'),
+      '{enabled:!0,name:"preventOverflow",phase:"main",fn:function(){}}'
+    ).toBe(true);
+  });
+
+  it('auto is the only placement with alternatives, and no tooltip renders with it', () => {
+    /*
+      `auto` expands to twelve, so its fallback list is eleven long and flip is live. The room writes
+      `auto` on exactly two hosts and neither shows a tooltip on hover: the GIF control is
+      `triggers="manual"`, and the emoji host carries `ngbPopover` with no `ngbTooltip` at all.
+    */
+    const emojiHost =
+      '["placement","auto","container","body","autoClose","outside","popoverClass","popOverDiv",1,"textAreaBtns",3,"click","ngbPopover"]';
+    expect(BUNDLE.includes(emojiHost), 'the emoji host carries ngbPopover and no ngbTooltip').toBe(
+      true
+    );
+    const autoHosts = CAPTURE.tooltips.filter(
+      (t: { host: { attrs: Record<string, string> } }) => t.host.attrs.placement === 'auto'
+    );
+    for (const t of autoHosts) {
+      expect(t.appeared, `${t.label} must not open on hover`).toBe(false);
+      expect(t.host.attrs.triggers).toBe('manual');
+    }
   });
 });

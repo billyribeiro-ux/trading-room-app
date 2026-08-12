@@ -262,21 +262,138 @@ export function restingPosition(
   };
 }
 
+/**
+ * Popper's `roundOffsetsByDPR`, which is why the captured transforms are all multiples of 0.5.
+ *
+ * From the bundle, with `Md = Math.round`:
+ *
+ * ```js
+ * function dne(t, n) {
+ *   var i = t.y, o = n.devicePixelRatio || 1;
+ *   return { x: Md(t.x * o) / o || 0, y: Md(i * o) / o || 0 };
+ * }
+ * ```
+ *
+ * This is the whole of the 0.25px residual that an earlier version of this file recorded as
+ * unexplained. The capture ran at `devicePixelRatio: 2`, so every translate is snapped to the half
+ * pixel: "Add Emojis" wants `dx = -1305.75` and gets `-1305.5`, landing 0.245px right of the exact
+ * geometry. Applying the same rounding reproduces all three captured transforms and all three final
+ * rects EXACTLY, on both axes — see `ngb-tooltip-placements-contract.test.ts`.
+ *
+ * `Math.round` and not `toFixed`: `Math.round(-2611.5)` is `-2611`, rounding a half toward positive
+ * infinity. That sign asymmetry is load-bearing — rounding half away from zero, which is what most
+ * languages do, gives `-1306` and misses the captured value by half a pixel.
+ */
+export function roundToDevicePixels(
+  value: number,
+  dpr: number = (typeof window !== 'undefined' && window.devicePixelRatio) || 1
+): number {
+  return Math.round(value * dpr) / dpr || 0;
+}
+
 function place(host: Element, bubble: HTMLElement, popperPlacement: string): void {
   bubble.style.position = 'absolute';
   bubble.style.inset = '0px 0px auto auto';
   bubble.style.margin = '0px';
   bubble.style.transform = 'none';
 
+  /*
+    The arrow leaves the flow BEFORE the bubble is measured. It is a block element whose height
+    Bootstrap sets but whose position Popper writes, so while it is still in flow it adds its own
+    12.797px to the bubble — and a bubble measured at 41.797px instead of 29px is then positioned
+    12.797px off, which is precisely the wrong-gap symptom this ordering caused on the first attempt.
+  */
+  const arrow = detachArrow(bubble, popperPlacement);
+
   const anchor = host.getBoundingClientRect();
   const resting = bubble.getBoundingClientRect();
   const target = restingPosition(anchor, resting, popperPlacement);
-  const targetLeft = target.left;
-  const targetTop = target.top;
 
-  const dx = Math.round((targetLeft - resting.left) * 10) / 10;
-  const dy = Math.round((targetTop - resting.top) * 10) / 10;
+  const dx = roundToDevicePixels(target.left - resting.left);
+  const dy = roundToDevicePixels(target.top - resting.top);
   bubble.style.transform = `translate3d(${dx}px, ${dy}px, 0px)`;
+
+  // The arrow is offset within the bubble's FINAL box, not the resting one it was measured at.
+  centreArrow(
+    arrow,
+    { left: target.left, top: target.top, width: resting.width, height: resting.height },
+    anchor,
+    popperPlacement
+  );
+}
+
+/**
+ * Takes the arrow OUT OF FLOW and centres it on the bubble's cross axis.
+ *
+ * Popper writes the arrow's position itself — `computeStyles` handles it with
+ * `{ offsets: modifiersData.arrow, position: "absolute", adaptive: !1, roundOffsets: l }` — and the
+ * captured arrow carries the result inline:
+ *
+ * ```html
+ * <div data-popper-arrow="" class="tooltip-arrow"
+ *      style="position: absolute; top: 0px; transform: translate3d(0px, 8px, 0px);">
+ * ```
+ *
+ * Bootstrap's own rules do NOT position it: `.tooltip .tooltip-arrow` sets only `display`, `width`
+ * and `height`, and the per-direction rules set one edge (`right: calc(-1 * arrow-height)` for
+ * `start`). Without the inline `position: absolute` the arrow stays a block in normal flow and adds
+ * its own height to the bubble — which is exactly what happened here: real Chromium rendered the
+ * bubble 41.797px tall against the capture's 29px, and 41.797 − 29 = 12.797 = the arrow's height.
+ *
+ * Every unit test passed while that was wrong, because jsdom reports all rects as zero. It took a
+ * screenshot to see it.
+ *
+ * The captured offset checks out: bubble 29px tall, arrow 12.797px, `(29 − 12.797) / 2 = 8.1`, and
+ * Popper's device-pixel rounding takes that to the captured `8`.
+ */
+function detachArrow(bubble: HTMLElement, popperPlacement: string): HTMLElement | null {
+  const arrow = bubble.querySelector<HTMLElement>('.tooltip-arrow');
+  if (!arrow) return null;
+  arrow.style.position = 'absolute';
+  // The edge the arrow is pinned to comes from the direction class; Popper only sets the axis it
+  // slides along, which is the one the bubble does not span.
+  if (popperPlacement.startsWith('left') || popperPlacement.startsWith('right')) {
+    arrow.style.top = '0px';
+  } else {
+    arrow.style.left = '0px';
+  }
+  return arrow;
+}
+
+/**
+ * Points the arrow at the HOST, clamped to stay within the bubble.
+ *
+ * Popper's `arrow` modifier centres it on the reference element and then clamps it to the popper's
+ * own length, which is not the same as centring it on the bubble: for a `-start` or `-end` variation
+ * the bubble is aligned to one of the host's edges rather than to its middle, and an arrow centred on
+ * the bubble then points at empty space beside the control. Real Chromium showed exactly that for
+ * `top-right` — arrow at x 395.7 against a host at x 450.
+ *
+ * For every placement with no variation the two rules agree, because the bubble is centred on the
+ * host, which is why the captured `left` example cannot distinguish them.
+ */
+function centreArrow(
+  arrow: HTMLElement | null,
+  bubble: { left: number; top: number; width: number; height: number },
+  anchor: Box,
+  popperPlacement: string
+): void {
+  if (!arrow) return;
+  const size = arrow.getBoundingClientRect();
+  const alongY = popperPlacement.startsWith('left') || popperPlacement.startsWith('right');
+
+  const start = alongY ? bubble.top : bubble.left;
+  const span = alongY ? bubble.height : bubble.width;
+  const arrowSpan = alongY ? size.height : size.width;
+  const anchorMiddle = alongY ? anchor.top + anchor.height / 2 : anchor.left + anchor.width / 2;
+
+  // Clamped so the arrow never overhangs its own bubble, which is Popper's `within(…)`.
+  const ideal = anchorMiddle - start - arrowSpan / 2;
+  const offset = roundToDevicePixels(Math.min(Math.max(ideal, 0), span - arrowSpan));
+
+  arrow.style.transform = alongY
+    ? `translate3d(0px, ${offset}px, 0px)`
+    : `translate3d(${offset}px, 0px, 0px)`;
 }
 
 /**

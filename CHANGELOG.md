@@ -24,6 +24,68 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-12
 
+### 2026-08-12 11:27 EDT — The placements rendered in a real browser, which found three bugs
+
+The previous entry shipped the placements with three limits named: no screenshot, an unexplained
+0.25px residual, and no collision handling. All three are closed, and rendering them found defects
+that 640 passing tests could not.
+
+**`pnpm --filter room verify:tooltips`** drives real Chromium at `deviceScaleFactor: 2`, hovers each
+placement and measures what is drawn — classes, settled opacity, z-index, arrow box, arrow border
+colour, the 6px gap, cross-axis alignment and bubble size. It runs the REAL `src/lib/ngb-tooltip.ts`
+(Node's own `stripTypeScriptTypes`, no bundler, no re-description) against the REAL
+`css/complete-app-styles.css`, and exits non-zero on any mismatch. **5/5 correct.** Screenshots and
+measurements in `apps/room/evidence-tooltip-placements/`.
+
+**Bug 1 — the arrow was never positioned.** Bootstrap sets its width, height and one edge; Popper
+writes `position: absolute` and the offset inline, which the capture shows plainly. Ours stayed a
+block in normal flow and added its own height to the bubble: Chromium rendered 41.797px against the
+capture's 29px, and 41.797 − 29 = 12.797 = the arrow. Invisible to every unit test, because jsdom
+reports all rects as zero.
+
+**Bug 2 — the arrow must point at the HOST, clamped to the bubble.** Centring it on the bubble is
+only right when the bubble is centred on the host. For a `-end` variation the bubble aligns to the
+host's trailing edge, and the arrow then points at empty space — Chromium put it at x 395.7 against a
+host at x 450. Popper's `arrow` modifier centres on the reference and clamps; ours now does too.
+
+**Bug 3 — my own assertion.** I asserted a flat 29px bubble height, which generalised the only
+direction ever captured. Top and bottom really are ~12.8px taller, in the original as much as here:
+the reference's own pinned sheet still carries the Bootstrap 4 block, and
+`.bs-tooltip-top{padding:.4rem 0}` lands on ng-bootstrap's element because both generations spell
+that direction `top` — while BS4's `left` never matches BS5's `start`. Verified present in
+`docs/source/styles.d622cb9ed2bbc221.css`.
+
+**The 0.25px residual is solved.** Popper's `roundOffsetsByDPR` — `Md(t.x*o)/o` with `Md=Math.round`
+— snaps the translate to the device pixel grid, and the capture ran at `devicePixelRatio: 2`.
+Applying it reproduces all three captured transforms and all three final rects **exactly**, on both
+axes. `Math.round`'s half-toward-`+∞` is load-bearing: `Math.round(-2611.5) = -2611` gives the
+captured `-1305.5`, while rounding half away from zero gives `-1306`. Python's banker's rounding also
+gives `-1306`, which is how this was nearly recorded as still-unexplained a second time.
+
+**Collision handling is not needed, and that is now proven rather than asserted.** `RI` hands flip
+`fallbackPlacements: r` after `r.shift()` has removed the primary, so for any fixed placement the
+list is EMPTY — and `[] || …` is `[]`, so flip gets no alternatives and never moves the bubble.
+`preventOverflow` is registered with `fn: function(){}`. Only `auto` has alternatives, and no tooltip
+renders with `auto`: the GIF control is `triggers="manual"`, the emoji host has `ngbPopover` and no
+`ngbTooltip`.
+
+**Negative controls, on the renderer:** arrow left in flow (0/5), arrow pinned to the bubble start
+(0/5), arrow centred on the bubble instead of the host (4/5 — only `top-right` can distinguish them,
+which is the point), bubble not translated on x (0/5) or y (0/5), offset 6→0 (0/5). Earlier, on the
+unit suite: the `top`→`start` rename applied too broadly, the variation class dropped, top/bottom
+swapped, centring replaced by edge alignment, and offset 6→**5.75**.
+
+**Two failures I caused and had to rule out before believing either.** Playwright's mouse position
+survives `setContent`, and every case centres the host at the same coordinates — so from the second
+case on, `hover()` moved nothing and dispatched no `mouseenter`, producing a confident
+"placement=top renders nothing" that was the harness. And I had put `position: relative` on the
+parent span, making it the containing block and starving the bubble of width until the label wrapped
+onto three lines; the reference's span is unpositioned, which the capture proves (resting left 1901.3
+in a 1989px viewport). Every numeric check passed through that one — only the screenshot showed it.
+
+**Verified:** `svelte-check` 967 files, 0 errors. Full room suite **64 files, 640 tests**. Prettier
+clean. `verify:tooltips` 5/5.
+
 ### 15:05 — Every tooltip placement the room uses, derived from the reference's own arithmetic
 
 The last entry closed gap 1 and recorded one thing rather than fixing it: `top`, `bottom` and
