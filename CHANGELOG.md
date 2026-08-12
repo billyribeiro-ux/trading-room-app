@@ -4293,3 +4293,27 @@ tab strip scored 15/15 against an empty `<ul>`.
 neither yet fixed: the stats date `<input>` is created on click but never focused, so the picker does
 not open and the row sticks in edit state; and `for="statsFrom"`/`for="statsTo"` point at ids that
 exist only while editing, so the labels are orphaned at rest.
+
+## 2026-08-12 17:05 EDT — the provenance seal can run for the first time
+
+Three instances of one path bug, not one. `REPOSITORY_ROOT` was corrected earlier, but
+`verify-backend-provenance.mjs` still read every file with `new URL(`../${path}`, import.meta.url)`
+at two more sites (the manifest read and the documented-count read), which resolve to
+`apps/controller/` — a directory that has no `services/` and no `ops/`. Both are now addressed from
+`REPOSITORY_ROOT`. They were invisible because the file-count check threw first.
+
+The count is split rather than bumped. `LOCALLY_AUTHORED` names
+`services/api/migrations/0009_rename_runtime_roles.sql`, authored here on 2026-08-10 and never
+imported, and pins it by its own SHA-256 (`6acfec23…`). The imported seal stays at 98, so
+`ops/backend-import-provenance.md` still records only what was imported. TODO row Z refused to bump
+98 to 99 and that refusal was right; this is the half that was missing.
+
+VERIFIED: the count check passes (98 imported, 99 total, 1 locally authored) and the path-list
+SHA-256 passes — both for the first time.
+
+NOT GREEN, and deliberately not silenced: the manifest SHA-256 now differs
+(expected `4c303601…`, got `f1a8493f…`). That check has NEVER executed before, because the read it
+depends on pointed at a directory that does not exist. So the mismatch is either real content drift
+in an imported file or a pin that was computed at import time and never validated. Re-pinning it to
+make the gate green would destroy the first true signal this seal has ever produced. It needs a
+per-file diff against the source, which is TODO row P and the owner’s direction to move in.
