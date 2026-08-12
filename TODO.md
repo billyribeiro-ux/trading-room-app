@@ -95,57 +95,12 @@ Four more came out of the uncompiled manage view once it was fetched from Angula
 `$templateCache`, and four from the application bundle. Not one needed a value invented. Before
 writing a collector for anything below, read what is already in `new-room` and `new-room-control`.
 
-| # | gap | read looking for it | blocks | written up |
-| --- | --- | --- | --- | --- |
-| 1 | **Closed 2026-08-12, and it closed by disproving its own premise.** A presenter run on the live room (`evidence-tooltips-presenter-2026-08-12.json`, 8 hosts, Bootstrap **5.3.3**) plus the bundle's directive definition settled all three parts. **(a) `triggers` is an NgbTooltip input**, not a popover-only one — `selectors:[["","ngbTooltip",""]],inputs:{…,triggers:"triggers",…}`. Angular's TAttributes has no per-directive grouping, so `triggers="manual"` on the GIF host reaches the tooltip, and the live hover confirmed it: every other host rendered within 33ms, that one rendered nothing. The earlier reading — *"triggers sits in the POPOVER's group, so the tooltip is not manual-triggered after all"* — was wrong. **(b) `placement="auto"` is correct and was never a collapse of ours.** The template declares `placement` twice (`"placement","top","placement","auto"`); one attribute survives into the DOM and it is the later one, so `top` is dead in the reference too. Our markup already matched the captured DOM byte for byte. **(c) The eye badge has no tooltip to capture.** The screen tabs use `tooltip="Unlock this screen?"` / `tooltip="This is the default screen…"` with `placement="bottom"` — and the bundle contains **no `[tooltip]` directive selector at all**. Inert attributes; the real hover text there is native `title="Lock this screen?"`. No run while sharing a screen could ever have captured it. **Fix shipped:** the attachment returns before binding when `triggers="manual"`. Pinned by `ngb-tooltip-triggers-contract.test.ts`. | `evidence-tooltips-presenter-2026-08-12.json`; `docs/source/main.d6d3c112b59b7d0d.js` | nothing | `CHANGELOG.md` 2026-08-12 |
+**There are no open evidence gaps blocking a feature.** The last one, gap 1 (the rendered tooltip),
+closed 2026-08-12 — see `CHANGELOG.md` at 11:27 and 11:52 EDT for what it was and what closed it,
+including the three defects that only surfaced once the thing was rendered in a real browser.
 
-**The room's full placement inventory is implemented, rendered and pinned — closed 2026-08-12 11:27 EDT.**
-Reading every `"placement",` entry in `main.d6d3c112b59b7d0d.js` gives the inventory: `left`, `top`,
-`bottom`, `top-right`, `auto`. All resolve, all render, and all five are verified in real Chromium by
-`pnpm --filter room verify:tooltips`, which measures what the browser draws and exits non-zero on a
-mismatch. Screenshots and measurements land in `apps/room/evidence-tooltip-placements/`.
-
-The mapping is not transcribed — the bundle ships it as code (`Coe`, `koe`, `baseClass:"bs-tooltip"`)
-and both are ported, so the 21 uncaptured directions are derived by the same arithmetic that produces
-the one the captures prove.
-
-**Three things the rendering found that unit tests could not**, because jsdom reports every rect as
-zero:
-
-1. **The arrow was never positioned.** Bootstrap sets its size and one edge; Popper writes
-   `position: absolute` and the offset inline. Ours stayed in normal flow and added its own 12.797px
-   to the bubble — 41.797px against the capture's 29px.
-2. **The arrow must point at the HOST, clamped to the bubble** — not at the bubble's centre. For a
-   `-end` variation the bubble aligns to the host's trailing edge, so the two differ and an arrow
-   centred on the bubble points at empty space. Only `top-right` can show this.
-3. **Top and bottom tooltips are genuinely ~12.8px taller than left ones**, in the original too. The
-   reference's own sheet still carries the Bootstrap 4 block, and `.bs-tooltip-top{padding:.4rem 0}`
-   lands on the element ng-bootstrap emits because BS4 and BS5 share those two names — but not
-   `left`, which BS5 renamed to `start`.
-
-**The 0.25px positional residual is solved**, not tolerated: Popper's `roundOffsetsByDPR` snaps the
-translate to the device pixel grid, and the capture ran at `devicePixelRatio: 2`. Applying the same
-rounding reproduces all three captured transforms and all three final rects EXACTLY, both axes. The
-half-toward-`+∞` behaviour of `Math.round` is load-bearing — rounding half away from zero misses by
-half a pixel.
-
-**The five tooltips the reference BINDS are wired too — 2026-08-12 11:52 EDT.** Angular marks
-bindings with `3` in `TAttributes`, and a property binding sets no attribute, so
-`["placement","top",1,"created-at","mx-2",3,"ngbTooltip","ngStyle"]` renders a host carrying
-`placement="top"` and no `ngbtooltip` at all. Three spans in this app carried exactly that and showed
-nothing: two in `RoomMessage.svelte`, one in `ModalHost.svelte`. `ngbTooltipWith(text)` takes the
-value through the attachment instead of writing an attribute the reference never sets. The bound
-value is `xn("ngbTooltip", Ct(27, 24, e.msg.t, "short"))` — Angular's `date:'short'`, which for en-US
-is `M/d/yy, h:mm a` and is exactly what the existing `alertDateFormatter` already produces, so it is
-reused rather than re-derived. Covered by a sixth case in `verify:tooltips`, which also fails if a
-bound host gains the attribute.
-
-**Popper's collision pass is not implemented, and does not need to be.** `RI` hands flip
-`fallbackPlacements: r` AFTER `r.shift()` has taken the primary, so for any fixed placement that list
-is empty; `[] || …` is `[]` in JavaScript, so flip receives no alternatives and never moves the
-bubble. `preventOverflow` is registered with `fn: function(){}` — a no-op. Only `auto` has
-alternatives, and no tooltip in the room renders with `auto`: the GIF control is `triggers="manual"`
-and the emoji host carries `ngbPopover` with no `ngbTooltip`.
+The rows below are not evidence gaps: they are work that is known, scoped and waiting on something
+other than a fact.
 
 ### Not an evidence gap — missing work, recorded so it is not lost
 
@@ -192,6 +147,14 @@ each one's failure narrowed the next:
 ## Not gaps — decisions taken deliberately
 
 Recorded so nobody "fixes" them back:
+
+- **Popper's collision pass is not reproduced, and does not need to be.** `RI` hands flip
+  `fallbackPlacements: r` AFTER `r.shift()` has taken the primary, so for any fixed placement that
+  list is empty — and `[] || …` is `[]` in JavaScript, so flip is handed no alternatives and never
+  moves the bubble. `preventOverflow` is registered upstream with `fn: function(){}`, a no-op. Only
+  `auto` has alternatives, and no tooltip in the room renders with `auto`: the GIF control is
+  `triggers="manual"` and the emoji host carries `ngbPopover` with no `ngbTooltip`. Pinned by
+  `ngb-tooltip-placements-contract.test.ts`.
 
 - **New Room is always visible.** The reference hides it behind five clicks on "Sessions"
   (`ng-show="showNewRoom>=5"`). Ours does not, by the owner's decision — an account at zero rooms

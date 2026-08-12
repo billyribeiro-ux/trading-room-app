@@ -24,6 +24,21 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-12
 
+### 2026-08-12 12:02 EDT — `TODO.md` made to obey its own rule again
+
+No code. The file states at the top that it lists only what is still OPEN, and that closed items are
+removed rather than struck through, "because a list that is mostly strikethrough is a list nobody
+reads to the bottom of". Three commits of tooltip work had left it doing the opposite: gap 1 sat in
+the gaps table with its own row reading "Closed 2026-08-12" and `blocks: nothing`, followed by five
+paragraphs of closed narrative.
+
+Removed. The gaps table is now empty and says so in one line, pointing at the two dated CHANGELOG
+entries that hold the history. The one finding in that narrative which is not history — that Popper's
+collision pass is deliberately not reproduced, and why it costs nothing — moved to "Not gaps —
+decisions taken deliberately", which is where a thing nobody should "fix" back belongs.
+
+What remains in `TODO.md` is eight rows, none of them evidence gaps: P, Q, R, S, U, Z, G, H.
+
 ### 2026-08-12 11:52 EDT — The five tooltips the reference binds rather than writes
 
 Closing the loose end from the previous entry instead of reporting it. Checking which placements this
