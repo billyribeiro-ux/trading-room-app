@@ -24,6 +24,31 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-12
 
+### 2026-08-12 13:05 EDT — The gate has a source, and `HANDOFF.md` is complete
+
+`viewerOnlyMode` is the **`vo`** URL query parameter. Bundle offset ~2595500:
+
+```text
+const s=new URLSearchParams(window.location.search), _=s.get("vo")
+_&&"1"===_&&(this.appService.globals.viewerOnlyMode=!0),
+_&&"2"===_&&(this.appService.globals.viewerOnlyMode=!0,this.appService.globals.viewerOnlyModeLimited=!0)
+```
+
+Default `!1`. `?vo=1` is viewer-only, `?vo=2` is viewer-only **limited**. Siblings recorded from the
+same block because they will be wanted: `r`→`videoOnlyMode`, `co`→`chatOnlyMode`, plus `id`, `tok`,
+`sl`, `forcedStream`, `dscreen`, `pw`, `email`, `name`, `dlf`, `kt`, `changePasswordUID`.
+`individualVolumeControls` is `sessData.individualVolumeControls`, two occurrences, both gating the
+per-user slider.
+
+`HANDOFF.md` gained a **START HERE** section naming the four state sources still unread —
+`audioMutedFor` (30 occurrences), `audioVolumeFor` (24), `toggleTalkingPresenter` (4),
+`adjustVolPres` (6). None is a gap; they are reads nobody has done, and saying so is what stops the
+next session treating an unread region as a missing fact.
+
+Two dead pointers were also found and fixed while verifying every reference in the brief:
+`services/SYNC-PROVENANCE.md` does not exist and was cited by `TODO.md` item P. Both now point at
+`ops/backend-import-provenance.md`.
+
 ### 2026-08-12 12:50 EDT — Item U: the trigger is GATED, and the state behind it does not exist here
 
 Started building it and stopped at the right place. Reading `CSe`'s update block — which the earlier
@@ -308,8 +333,13 @@ gap 1 — but it captured something no dump here contained, and it independently
 that had rested on `.panel` markup and stylesheet contents alone.
 
 ```html
-<div class="tooltip bottom ng-animate fade-add in-add fade fade-add-active in in-add-active"
-     tooltip-popup="" content="Account Settings" placement="bottom" is-open="isOpen">
+<div
+  class="tooltip bottom ng-animate fade-add in-add fade fade-add-active in in-add-active"
+  tooltip-popup=""
+  content="Account Settings"
+  placement="bottom"
+  is-open="isOpen"
+></div>
 ```
 
 `.tooltip` + a bare direction class + `.in` is **Bootstrap 3**, driven by AngularJS UI Bootstrap's
@@ -502,22 +532,28 @@ regenerated, which has to be the same commit that resolves (5) and moves the bas
 The owner supplied the rendered markup:
 
 ```html
-<div class="toast-title" aria-label="Media"> Media </div>
-<div role="alert" class="toast-message">Reconnecting to media... <i class="fas fa-cog fa-spin ms-2"></i></div>
+<div class="toast-title" aria-label="Media">Media</div>
+<div role="alert" class="toast-message">
+  Reconnecting to media... <i class="fas fa-cog fa-spin ms-2"></i>
+</div>
 ```
 
 `docs/source/main.d6d3c112b59b7d0d.js` carries the call that produces it, in the mediasoup socket's
 `disconnect` handler — and a second one beside it that the markup alone would not have revealed:
 
 ```js
-i.reconnectToast || (i.reconnectToast = i.toastr.info(
-  'Reconnecting to media... <i class="fas fa-cog fa-spin ms-2"></i>', "Media",
-  { disableTimeOut:!0, tapToDismiss:!0, closeButton:!0, enableHtml:!0 }))
-
-(i.liveMicTrack||i.liveCamTrack||i.liveScreenTrack) && !i.presenterReconnectToast && (
-  i.presenterReconnectToast = i.toastr.info(
-    "Reconnecting media (presenter)... re-sharing mic/cam/screen", "Presenter",
-    { disableTimeOut:!0, tapToDismiss:!1, closeButton:!1 }))
+i.reconnectToast ||
+  ((i.reconnectToast = i.toastr.info(
+    'Reconnecting to media... <i class="fas fa-cog fa-spin ms-2"></i>',
+    "Media",
+    { disableTimeOut: !0, tapToDismiss: !0, closeButton: !0, enableHtml: !0 },
+  ))(i.liveMicTrack || i.liveCamTrack || i.liveScreenTrack) &&
+    !i.presenterReconnectToast &&
+    (i.presenterReconnectToast = i.toastr.info(
+      "Reconnecting media (presenter)... re-sharing mic/cam/screen",
+      "Presenter",
+      { disableTimeOut: !0, tapToDismiss: !1, closeButton: !1 },
+    )));
 ```
 
 **They are ADDITIONS, not replacements.** The bundle still contains "Connected to Media Server" and
@@ -811,9 +847,9 @@ The owner supplied `new-room-control/css-modals`. Read as evidence, it answers a
 asked and that nothing in this repository recorded: **the product is built on two different
 Bootstrap generations, on two different surfaces.**
 
-| surface | generation | proof |
-| --- | --- | --- |
-| the room (Angular 2+) | **Bootstrap 5** | the live tooltip renders `tooltip fade show bs-tooltip-start` with `data-popper-placement`, which only 5 emits; its modals carry `modal fade show` + `aria-modal` and **zero** `modal fade in` |
+| surface                              | generation          | proof                                                                                                                                                                                                                           |
+| ------------------------------------ | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| the room (Angular 2+)                | **Bootstrap 5**     | the live tooltip renders `tooltip fade show bs-tooltip-start` with `data-popper-placement`, which only 5 emits; its modals carry `modal fade show` + `aria-modal` and **zero** `modal fade in`                                  |
 | account / manage / login (AngularJS) | **Bootstrap 3.3.7** | `div class="panel panel-default"` six times across `evidence-dumps/login-page/{login,logged-in-page,manage,complimentary}`, beside `ng-show`/`ng-hide`. `.panel` is Bootstrap 3 only — 4 replaced it with `.card`, 5 dropped it |
 
 `css-modals` is the source for the second surface: the Bootstrap 3.3.7 LESS tree, the compiled
@@ -857,11 +893,14 @@ FIRST — disproved all five decisions in a single run.
 What the live original actually renders, captured on `chat.protradingroom.com` as a presenter:
 
 ```html
-<ngb-tooltip-window role="tooltip" id="ngb-tooltip-9"
+<ngb-tooltip-window
+  role="tooltip"
+  id="ngb-tooltip-9"
   class="tooltip fade show bs-tooltip-start"
   data-popper-placement="left"
   style="position: absolute; inset: 0px 0px auto auto; margin: 0px;
-         transform: translate3d(-1255.5px, 1074.5px, 0px);">
+         transform: translate3d(-1255.5px, 1074.5px, 0px);"
+>
   <div data-popper-arrow="" class="tooltip-arrow"></div>
   <div class="tooltip-inner">Add Emojis</div>
 </ngb-tooltip-window>
@@ -1114,7 +1153,7 @@ as TODO W. And `RoomMessage` constructed three `Intl.DateTimeFormat` objects per
 which at most one is ever called — hoisted to `$lib/message-formatters`, where they are built once.
 
 **One critical finding is NOT fixed, deliberately.** `services/api/migrations/0009` renames the
-runtime role that `migrate.rs:41` hardcodes and the preflight requires to exist *before* migrations
+runtime role that `migrate.rs:41` hardcodes and the preflight requires to exist _before_ migrations
 run, so the first migrate succeeds and every run after it — including API startup — fails.
 `services/**` is a mirror and a change authored here is lost on the next sync, so it is written up
 in full as TODO V for the owner to author at the source.
@@ -1185,10 +1224,10 @@ written up as the owner's. **The evidence settled it instead**, which is the bet
 
 **What the capture actually does.** Two mechanisms, kept separate:
 
-| | mechanism | storage |
-| --- | --- | --- |
-| `#permissionsModal` → `saveCustomPerms()` | `changeUserPerms` with `hasMic`/`hasScreen`/`hasCam`/`hasAdminChat`/`canEditNotes` | **durable** |
-| `giveMicScreen` | sets client globals, re-joins asserting `isP` | **transient, client-asserted** |
+|                                           | mechanism                                                                          | storage                        |
+| ----------------------------------------- | ---------------------------------------------------------------------------------- | ------------------------------ |
+| `#permissionsModal` → `saveCustomPerms()` | `changeUserPerms` with `hasMic`/`hasScreen`/`hasCam`/`hasAdminChat`/`canEditNotes` | **durable**                    |
+| `giveMicScreen`                           | sets client globals, re-joins asserting `isP`                                      | **transient, client-asserted** |
 
 The first is already ours as the controller's `permissions_json`. The second works there because the
 browser re-joins computing `isP: isPresenter || hasCam || hasMic || hasScreen` **from its own
@@ -1202,19 +1241,19 @@ standing permissions.
 
 **The answer both the evidence and the security model allow:** keep it transient, and decide it on
 the server. `media_elevations` is written by the `giveMicScreen` action — already staff-gated, and
-it refuses a self-target — and read by `/api/media/grant` when it mints. The client is *told* over
+it refuses a self-target — and read by `/api/media/grant` when it mints. The client is _told_ over
 the `cmds` channel so it can restart its media; it never asserts anything.
 
 Three properties, each pinned by a test with a negative control:
 
-* **It widens `hasMic` and `hasScreen`, never `isPresenter`.** An elevation is "you may talk and
+- **It widens `hasMic` and `hasScreen`, never `isPresenter`.** An elevation is "you may talk and
   share", not "you are a presenter" — folding it into the presenter flag would hand the recipient
   every presenter-only server action (archives, polls, alerts) from a control labelled
   "Mic/Screenshare". Making that mistake fails the test.
-* **It is read from our database, never from the request.** If the grant ever took mic/screen from a
+- **It is read from our database, never from the request.** If the grant ever took mic/screen from a
   body or query parameter, any member could mint themselves a producer grant and the SFU would
   believe it.
-* **It expires.** The capture's dies with the browser's globals, so a reload silently takes the
+- **It expires.** The capture's dies with the browser's globals, so a reload silently takes the
   microphone back. Ours survives one deliberately — a member who refreshes mid-sentence should not
   lose the ability to speak — which is why it needs its own ceiling: twelve hours, and the expiry is
   compared in SQL so a drifted clock cannot honour a dead row.
@@ -1308,12 +1347,12 @@ has reported and which cannot be distinguished from a deliberate demotion.
 
 **Proven against a real PostgreSQL, all four cases**, on a scratch database built to the same shape:
 
-| case | before | after |
-| --- | --- | --- |
-| old room, owner unseated — the bug | `(none)` | **0** |
-| room created after 08-07 | `0` | `0`, no duplicate |
-| **owner deliberately at role 2** | `2` | **2 — untouched** |
-| `owner_email` capitalised differently | `(none)` | **0** |
+| case                                  | before   | after             |
+| ------------------------------------- | -------- | ----------------- |
+| old room, owner unseated — the bug    | `(none)` | **0**             |
+| room created after 08-07              | `0`      | `0`, no duplicate |
+| **owner deliberately at role 2**      | `2`      | **2 — untouched** |
+| `owner_email` capitalised differently | `(none)` | **0**             |
 
 Re-running left four membership rows in total, so it is idempotent — belt and braces, since
 `room_users_unique_idx` is unique on `(room_id, user_id)` and `ON CONFLICT DO NOTHING` would catch
@@ -1367,7 +1406,7 @@ Transcribed from `app-chat.compiled.js:112-137` rather than designed:
 ```
 
 **The naming is the reference's and it is genuinely confusing:** the sound file called `followed` is
-what the ROOM-WIDE ding plays, while an explicitly *followed* user gets `pling`. Swapping them is
+what the ROOM-WIDE ding plays, while an explicitly _followed_ user gets `pling`. Swapping them is
 the obvious mistake and nothing else would catch it, so a test pins the order.
 
 A followed user **outranks** the room setting — that branch short-circuits, so they are heard even
@@ -1518,12 +1557,12 @@ IMPLEMENTATION, and that distinction is the whole of this entry.
 So the browser chose both, at roughly 2.5 Mbps, and row 4's measurement says what that costs on
 realistic chart content (34 lines of 13px monospace, 120 animated candlesticks, 1080p30):
 
-| codec | cap 2 Mbps | cap 8 Mbps | cap 16 Mbps |
-| --- | ---: | ---: | ---: |
-| **VP9 (webm)** | 1429 | **3841** | **6414** |
-| AV1 (webm) | 1928 | 3778 | 3802 |
-| H.264 (mp4) | 1582 | 2033 | 1990 |
-| HEVC (mp4) | 1238 | 1723 | 1626 |
+| codec          | cap 2 Mbps | cap 8 Mbps | cap 16 Mbps |
+| -------------- | ---------: | ---------: | ----------: |
+| **VP9 (webm)** |       1429 |   **3841** |    **6414** |
+| AV1 (webm)     |       1928 |       3778 |        3802 |
+| H.264 (mp4)    |       1582 |       2033 |        1990 |
+| HEVC (mp4)     |       1238 |       1723 |        1626 |
 
 **Only VP9 keeps scaling.** Everything else saturates and ignores a higher cap, so for 1080p text a
 ~2 Mbps ceiling is a quality ceiling you cannot buy your way out of. The detail was available and
@@ -1535,13 +1574,13 @@ instruction was "the very best without sacrificing performance", so **quality wi
 VP9, then AV1, then VP8, and mp4 only when nothing better is supported — which on **Safari is
 immediately**, since it produces `video/mp4` natively. A Safari presenter therefore gets an MP4 with
 nothing special done, and a Chrome presenter gets the sharpest file the machine can make. Making MP4
-universal *without* losing ~1.8 Mbps of detail is server-side remux — row 10, needing the
+universal _without_ losing ~1.8 Mbps of detail is server-side remux — row 10, needing the
 transcoding workers the deployment plan defers. Demoting VP9 to avoid a conversion nobody has asked
 for yet would be the wrong trade, and it is recorded rather than quietly made.
 
 **8 Mbps, not 12, and that is the performance half of the instruction.** Row 4's own warning:
-*"not bandwidth-free for the presenter's CPU. A second 1080p encode competes with the live encoder,
-and on a loaded machine that can drop frames on the share members are watching."* The recording is
+_"not bandwidth-free for the presenter's CPU. A second 1080p encode competes with the live encoder,
+and on a loaded machine that can drop frames on the share members are watching."_ The recording is
 for the presenter; the live share is for everyone. So it takes the measured 3841 kbps at 8 Mbps and
 declines to chase the extra 2573 kbps a 16 Mbps cap would allow.
 
@@ -1596,7 +1635,7 @@ deliberately beyond the capture, so per-consumer layer choice already exists; an
 the settings schema with `wired: false` — the surfaces exist, the pipeline does not.
 
 **Item P is now blocked by definition rather than by preference.** It needs `services/**` promoted
-*to* `new-room-control`, and that direction is exactly the one the owner has prohibited. Recorded as
+_to_ `new-room-control`, and that direction is exactly the one the owner has prohibited. Recorded as
 an owner action.
 
 ### 12:21 — TODO item K CLOSED: the stats export writes all nine of the reference's columns
@@ -1617,7 +1656,7 @@ Six of them came from its per-visit `statXrefs` records, and this application ha
 arrived, when they left, or how long they stayed. So the export wrote three columns and the rest was
 recorded as an honest gap rather than filled with blanks that would claim we collect data we do not.
 
-**`room_sessions` records one row per ARRIVAL** — which is what an *xref* row plainly is. A member
+**`room_sessions` records one row per ARRIVAL** — which is what an _xref_ row plainly is. A member
 who enters four times in a day is four rows, and that is what makes Duration a real number rather
 than an average of nothing.
 
@@ -1655,8 +1694,8 @@ halves need it and SvelteKit refuses a `$lib/server` import from a component; du
 thresholds is how two files quietly disagree about what an hour is.
 
 **And the contract test had a hole worth naming.** `export-format-contract.test.ts` exists precisely
-because these formats were once invented — its own header says a `Last login` column *"the reference
-never had"* was the giveaway. It pinned filenames and CRLF and **not the stats header**, which is why
+because these formats were once invented — its own header says a `Last login` column _"the reference
+never had"_ was the giveaway. It pinned filenames and CRLF and **not the stats header**, which is why
 a three-column version survived until now. Four assertions added: both phone variants of the
 nine-column header, the absence of `Last login`, one row per visit rather than per person, and the
 `N/A` for an open one.
@@ -1694,7 +1733,7 @@ would look like protection and provide almost none. Migration 0006 adds
 `room_users.mobile_pair_attempts`, following the precedent `login-attempts.ts` already set.
 
 Failures are counted **only against a live code**. Incrementing on an expired or exhausted one would
-let anyone run the counter up on a member who is not currently pairing, so their *next* code would
+let anyone run the counter up on a member who is not currently pairing, so their _next_ code would
 start part-spent.
 
 Room and email are required alongside the PIN because the reference's own pair URL carries both —
@@ -1751,9 +1790,9 @@ ours was unreachable, and nothing in the UI would distinguish them. A result is 
 if it is about the infrastructure the user is actually trying to reach.
 
 The public servers survive as a **labelled fallback** for the window before the media socket has
-opened, when we have nothing of our own to offer. The modal now says which of the two ran — *"Tested
-against this room's own media servers"* or *"Tested against public STUN only … Join the room, then
-run it again"* — and only after a run, so it reports fact rather than intent. "STUN passed" is a
+opened, when we have nothing of our own to offer. The modal now says which of the two ran — _"Tested
+against this room's own media servers"_ or _"Tested against public STUN only … Join the room, then
+run it again"_ — and only after a run, so it reports fact rather than intent. "STUN passed" is a
 different claim in each case and a support conversation should not have to guess which one it is
 reading.
 
@@ -1802,12 +1841,12 @@ which serves both `media.tradingroom.app` and `chat.tradingroom.app`. Item **L**
 
 **Every rule came from a measured listener. Nothing was assumed.** `ss -tlnp` / `ss -ulnp` first:
 
-| bound publicly | rule |
-| --- | --- |
-| `sshd` :22 | `22/tcp` |
-| `caddy` :80 | `80/tcp` — also ACME renewals |
-| `caddy` :443 | `443/tcp` |
-| **`caddy` UDP :443** | **`443/udp`** |
+| bound publicly                                | rule                             |
+| --------------------------------------------- | -------------------------------- |
+| `sshd` :22                                    | `22/tcp`                         |
+| `caddy` :80                                   | `80/tcp` — also ACME renewals    |
+| `caddy` :443                                  | `443/tcp`                        |
+| **`caddy` UDP :443**                          | **`443/udp`**                    |
 | mediasoup RTC, `40000-40199` from `media.env` | `40000:40199/udp` **and** `/tcp` |
 
 **The UDP 443 rule is the one that would have been missed.** Caddy listens on UDP 443 for HTTP/3;
@@ -1818,7 +1857,7 @@ Everything else — the SFU's signalling on `127.0.0.1:4443`, the room on `127.0
 admin API on `127.0.0.1:2019`, resolved, chrony — is **loopback-bound**, so it needed no rule and is
 now unreachable regardless.
 
-**The Docker trap was checked rather than assumed.** When Docker *publishes* a port its DNAT chain
+**The Docker trap was checked rather than assumed.** When Docker _publishes_ a port its DNAT chain
 jumps ahead of ufw's INPUT rules and the firewall is decorative — a well-known way to believe a box
 is protected when it is not. Measured: the media container runs `NetworkMode=host` with `ports=[]`,
 and both `DOCKER-USER` and the nat `DOCKER` chain are empty. No bypass exists here, so ufw genuinely
@@ -1832,12 +1871,12 @@ minute past the original deadline.
 
 **Verified from outside, and the proof is a pair of ports:**
 
-| | before | after |
-| --- | --- | --- |
-| 22 / 80 / 443 | succeeded | succeeded |
-| **40000, 40199** (allowed) | refused | **refused** — still reaching the host; mediasoup binds on demand |
-| **40500** (outside the range) | refused | **dropped, no answer** |
-| **2019** (Caddy admin) | — | **dropped, no answer** |
+|                               | before    | after                                                            |
+| ----------------------------- | --------- | ---------------------------------------------------------------- |
+| 22 / 80 / 443                 | succeeded | succeeded                                                        |
+| **40000, 40199** (allowed)    | refused   | **refused** — still reaching the host; mediasoup binds on demand |
+| **40500** (outside the range) | refused   | **dropped, no answer**                                           |
+| **2019** (Caddy admin)        | —         | **dropped, no answer**                                           |
 
 "Refused" means the packet reached the host and nothing was listening; a timeout means the firewall
 ate it. That flip on 40500 — and only on 40500, while 40199 next door still answers — is what
@@ -1865,7 +1904,7 @@ silent failures:
 
 - **Truncation.** The previous collector stopped its node array at index 900 and cut every tab's
   `html` at 120,000 characters — 35.6% of the Settings pane unmeasured. This one has no cap, and
-  writes any limit it *does* hit into `gaps[]`, so a short capture can never again look complete.
+  writes any limit it _does_ hit into `gaps[]`, so a short capture can never again look complete.
 - **The DON'T TOUCH block.** The previous one "logged the step and serialised the wrong element",
   leaving 49 settings verified only against an older dump. This one counts fields **before and
   after** clicking the disclosure and refuses to serialise if nothing changed — an empty result is
@@ -2008,7 +2047,7 @@ loads the plugin with the three WordPress functions it touches at load time stub
 token through the plugin's **own** `tradingroom_sso_entitlements()` and `tradingroom_sso_mint()`.
 The result is committed as `golden-token.json` and pinned by four new tests: the bytes a real
 `hash_hmac` and a real `json_encode` produced are run through the verifier a customer's login will
-hit. Everything else in that file *describes* what PHP would emit; this is PHP emitting it.
+hit. Everything else in that file _describes_ what PHP would emit; this is PHP emitting it.
 
 **It caught the encoding hazard in the act.** The harness deliberately feeds the entitlement path a
 duplicate and a blank — `['gold-annual', 'gold-annual', '  ']` — and the minted payload reads
@@ -2062,7 +2101,7 @@ Fixed to 41 entries, and the note above it corrected. More usefully, `sso-bounda
 mirrored by one vitest can execute. Negative control: removing a single entry fails the new test;
 restoring it passes.
 
-That note already said *"a count that appears twice is a count that goes wrong once."* It appeared
+That note already said _"a count that appears twice is a count that goes wrong once."_ It appeared
 three times, and went wrong a third time. It now goes wrong loudly.
 
 **2. The room's format gate had regressed — 33 files.** It was closed green on 2026-08-04 by
@@ -2155,8 +2194,8 @@ before a customer uses it is item **Q** and a decision on the default expiry (`1
 `(public)/sso/[code]/+server.ts`, `sso-boundary.test.ts`, the generator and the generated schema.
 
 Phase 1 enforced one hour for every room. That is now the **default**, and a room owner narrows it
-with the setting the reference already provides: `tokenExpiresIn`, whose help reads *"A string like
-'1d', '1h', '12h" etc…"* and whose captured value in the reference tenant is exactly `"1d"`.
+with the setting the reference already provides: `tokenExpiresIn`, whose help reads _"A string like
+'1d', '1h', '12h" etc…"_ and whose captured value in the reference tenant is exactly `"1d"`.
 
 `resolveMaxTokenAge()` accepts `s`/`m`/`h`/`d`, bare digits as seconds, and tolerates spacing and
 case. **Every path returns a usable number** — this runs on the entry path, so a typo in a settings
@@ -2206,8 +2245,8 @@ as staff. `sso-boundary.test.ts` asserts the route calls `guestHandoffToken` and
 `siteHandoffToken`.
 
 **The entitlement semantics come from the reference's help text, and they are surprising.**
-`allowedProducts` and `allowedPerms` both read *"Either a product or membership, or both must
-match"* — an explicit disjunction. So configured filters are **OR-ed**: filling in a second family
+`allowedProducts` and `allowedPerms` both read _"Either a product or membership, or both must
+match"_ — an explicit disjunction. So configured filters are **OR-ed**: filling in a second family
 to be stricter actually **widens** access. That runs against the usual fail-closed instinct, and it
 is implemented as the evidence states rather than as instinct prefers, with the ambiguity named in
 the module docs: the same sentence is repeated verbatim on `allowedPerms`, where "a product or
@@ -2228,7 +2267,7 @@ protect and an early refusal avoids an HMAC per probe.
 Every refusal returns the same words. `loginErrorURL` (the customer's own "your subscription has
 lapsed" page) takes precedence, then `loginErrorMsg`, which the room-login page already uses — so
 both doors refuse consistently. Admissions are logged too, with the filter entry that opened the
-door: *"on what basis was this person let in"* is the question asked months later, and it cannot be
+door: _"on what basis was this person let in"_ is the question asked months later, and it cannot be
 answered from a log of failures only.
 
 **Wiring, and a generated file edited by hand — deliberately, and with a lock.** Five settings now
@@ -2246,7 +2285,7 @@ once, carefully" and "the generated file is now hand-maintained by accident".
 
 **One test was wrong and the code was right** — worth recording, because it is the failure mode the
 house rules name. The ordering test used `indexOf('evaluateEntitlement')` and failed; it had matched
-the *import* statements at the top of the file, where the entitlement module happens to be imported
+the _import_ statements at the top of the file, where the entitlement module happens to be imported
 before the token one. The route was correct throughout. Fixed by anchoring on call syntax, with the
 mistake written into the test so the next person does not repeat it.
 
@@ -2260,7 +2299,7 @@ read. `svelte-kit sync` was needed first — a new route has no `./$types` until
 `apps/controller/src/lib/server/sso-token.ts`, `sso-token.test.ts`.
 
 **The goal, in one line:** a customer running WordPress + WooCommerce (Simpler Trading is the worked
-example) embeds a room short code on their site, and *their* billing system decides whether a member
+example) embeds a room short code on their site, and _their_ billing system decides whether a member
 may enter — payment up to date or not.
 
 **The evidence this is built on, not inferred.** `room-settings-schema.ts:67`, the help text the
@@ -2273,8 +2312,8 @@ with `ssoHost`, `allowPWLoginWithSSO` and `tokenExpiresIn` (captured `"1d"`) bes
 owner's own shortcode carrying `key=''` and `mode='urlv3'` — a URL-borne JWT.
 
 **The architecture decision, and it removes most of the work.** Reading the room's `/session` route
-first paid for itself: *"The controller owns identity… Either way the controller mints a token and
-redirects here."* So WordPress SSO is a **third door on the controller**, beside owner-launch and
+first paid for itself: _"The controller owns identity… Either way the controller mints a token and
+redirects here."_ So WordPress SSO is a **third door on the controller**, beside owner-launch and
 guest-login — the customer's site redirects to us, we verify and evaluate entitlement, then mint the
 **existing** handoff through `room-handoff.ts`. Three consequences:
 
@@ -2354,6 +2393,7 @@ schema is regenerated — hand-editing the generated file would be undone by the
    `/health` moved `rooms:1,peers:2` → `rooms:2,peers:3` while it was connected and back to
    `rooms:1,peers:2` sixty seconds later. **The router was closed and the slot released**, which is
    the whole point: before today that socket would have been counted forever.
+
 5. **The live peers were NOT evicted.** The owner's two sockets stayed connected throughout the
    probe and are still connected now. That is the second test's property holding in production.
 
@@ -2390,16 +2430,16 @@ supported by anything I had measured.** What follows is what the box actually sa
 ```
 
 No `peer is producing` line for either, and no disconnect. The session before them
-(06:58:41–07:09:17) *did* produce audio and video and then disconnected cleanly — so the media path
+(06:58:41–07:09:17) _did_ produce audio and video and then disconnected cleanly — so the media path
 works and disconnect detection works when a socket closes properly.
 
 **The sockets — alive at the TCP layer, silent at the application layer.** `ss -tni` at 09:30:06Z,
 against the two client connections from `216.49.131.90`:
 
-| socket | `lastsnd`/`lastrcv` | connected at | `lastack` |
-| --- | --- | --- | --- |
-| `:5147` | **7,639,280 ms — 2h 07m 19s** | 07:22:47Z | 5.4 s |
-| `:5425` | **6,573,063 ms — 1h 49m 33s** | 07:40:33Z | 14.5 s |
+| socket  | `lastsnd`/`lastrcv`           | connected at | `lastack` |
+| ------- | ----------------------------- | ------------ | --------- |
+| `:5147` | **7,639,280 ms — 2h 07m 19s** | 07:22:47Z    | 5.4 s     |
+| `:5425` | **6,573,063 ms — 1h 49m 33s** | 07:40:33Z    | 14.5 s    |
 
 Both idle times match their connect timestamps **to the second**: not one application byte has
 crossed either socket since the moment it was established. `lastack` in seconds means the client's
@@ -2409,7 +2449,7 @@ abandoned socket are byte-for-byte identical to this service.
 
 **Why that is a defect and not a cosmetic stat.** Reading `serve_peer`, the loop selects on exactly
 three things — shutdown, notifications, inbound frames — and **no timer**. Every per-peer resource
-is RAII on that task: `LiveConnection` (which holds both the global `max_peers` slot *and* the
+is RAII on that task: `LiveConnection` (which holds both the global `max_peers` slot _and_ the
 per-identity count, capped at `MAX_CONNECTIONS_PER_VERIFIED_USER = 4`), `HubMembership`, and the
 `Session` holding the room's router. The task ends only when the socket produces an event. A client
 that disappears **without a clean close** — closed laptop, dropped network, killed browser process,
@@ -2466,13 +2506,13 @@ had been billing since 2026-08-02 no longer exists.
 
 **What was deleted,** read from the Lightsail API rather than inferred from anything:
 
-| | |
-| --- | --- |
-| Instance | `mediasoup-test-01`, us-east-1a, Ubuntu |
-| Bundle | `small_3_0` — **$12.00/month**, 2 vCPU, 2 GB RAM, 60 GB SSD, 3 TB transfer |
-| Created | 2026-08-02 12:54:31 -0400 — so **$12/month for 8 days** |
-| Static IP | `mediasoup-test-ip` = `34.195.170.147`, released |
-| Alarms | `mediasoup-cpu-high`, `mediasoup-status-check-failed`, both removed with it |
+|           |                                                                             |
+| --------- | --------------------------------------------------------------------------- |
+| Instance  | `mediasoup-test-01`, us-east-1a, Ubuntu                                     |
+| Bundle    | `small_3_0` — **$12.00/month**, 2 vCPU, 2 GB RAM, 60 GB SSD, 3 TB transfer  |
+| Created   | 2026-08-02 12:54:31 -0400 — so **$12/month for 8 days**                     |
+| Static IP | `mediasoup-test-ip` = `34.195.170.147`, released                            |
+| Alarms    | `mediasoup-cpu-high`, `mediasoup-status-check-failed`, both removed with it |
 
 `aws lightsail get-instances` now returns empty across all eleven regions, as do `get-static-ips`,
 `get-disks` and `get-instance-snapshots`. EC2, EBS and S3 were already empty everywhere.
@@ -2489,15 +2529,15 @@ while attached to a running instance and billed once it is not**, and `delete-in
 
 ---
 
-**Now the correction, and it is mine.** The 04:56 entry below says *"it is EC2 in us-east-1, not
-Lightsail — the owner was right that no Lightsail instance was ever deployed."* **That was wrong.**
+**Now the correction, and it is mine.** The 04:56 entry below says _"it is EC2 in us-east-1, not
+Lightsail — the owner was right that no Lightsail instance was ever deployed."_ **That was wrong.**
 `mediasoup-test-01` existed, in Lightsail, exactly as `MEDIASOUP-DEPLOYMENT-PLAN.md` had described
 it since Stage 1. The entry is left in place rather than rewritten, because it was read.
 
 Both pieces of evidence I used were read correctly and neither supports the conclusion I drew:
 
 - **`whois` → Amazon, and reverse DNS → `ec2-34-195-170-147.compute-1.amazonaws.com`.** Lightsail
-  instances *are* EC2 instances underneath, so a Lightsail IP carries exactly that rDNS form.
+  instances _are_ EC2 instances underneath, so a Lightsail IP carries exactly that rDNS form.
   **Reverse DNS establishes the vendor and the region. It cannot distinguish the product.**
 - **`aws ec2 describe-instances` empty in every region.** This felt like confirmation and was the
   opposite: **Lightsail resources never appear in the EC2 API**, so an empty EC2 sweep is precisely
@@ -2515,8 +2555,8 @@ mediasoup-test-01
 reporting a single failure", and "if it cannot be found, it does NOT get invented".** I inferred a
 product from a hostname format and then told the owner they were right, which is worse than being
 wrong quietly: it endorsed a conclusion with authority it had not earned. The honest answer at 04:56
-was *"the vendor is Amazon and the region is us-east-1; which product it is cannot be determined
-without account access."* The blocker was always account access, and that is what it stayed.
+was _"the vendor is Amazon and the region is us-east-1; which product it is cannot be determined
+without account access."_ The blocker was always account access, and that is what it stayed.
 
 What that means for the older record: the 2026-08-09 21:24 entry, which flagged "AWS Lightsail /
 `mediasoup-test-01` / still billing" as never verified from this repository, was **fair about
@@ -2567,11 +2607,11 @@ and to find anything else the account pays for, including a Cost Explorer query 
 **The TODO files now list only open work,** which is the convention the root `TODO.md` already
 stated and only the root file was following.
 
-| file | removed | added |
-| --- | --- | --- |
-| `TODO.md` | the four smoke-test rows — `M`/`M2` struck through **and** `M-orig`/`M2-orig`, all closed earlier today | item **O**, retiring the AWS SFU, with the identification evidence and the honest blocker |
-| `apps/room/TODO.md` | 11 resolved evidence-gap rows (15, 16, 17, 20, 21, 25, 26, 27, 28, 32, 33), the Files-pane section, and sections 3, 3d and 8 — **549 → 412 lines** | a pointer to the archive; gap 1 rewritten to state only its open half |
-| `docs/PROMPT-TODO-ITEMS.md` | item **I** (closed 09:57 yesterday) and the production `users` query that was owed (run 09:58) | "Two lessons that outlived their item", and **O** in the opening prompt as the owner's to run |
+| file                        | removed                                                                                                                                            | added                                                                                         |
+| --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `TODO.md`                   | the four smoke-test rows — `M`/`M2` struck through **and** `M-orig`/`M2-orig`, all closed earlier today                                            | item **O**, retiring the AWS SFU, with the identification evidence and the honest blocker     |
+| `apps/room/TODO.md`         | 11 resolved evidence-gap rows (15, 16, 17, 20, 21, 25, 26, 27, 28, 32, 33), the Files-pane section, and sections 3, 3d and 8 — **549 → 412 lines** | a pointer to the archive; gap 1 rewritten to state only its open half                         |
+| `docs/PROMPT-TODO-ITEMS.md` | item **I** (closed 09:57 yesterday) and the production `users` query that was owed (run 09:58)                                                     | "Two lessons that outlived their item", and **O** in the opening prompt as the owner's to run |
 
 **Moved, not deleted.** `CHANGELOG.md` begins on 2026-08-09 and every room entry removed here closed
 between 08-04 and 08-08, so deleting them would have erased the only record in the working tree.
@@ -2608,7 +2648,7 @@ dig +short -x 34.195.170.147  -> ec2-34-195-170-147.compute-1.amazonaws.com
 ```
 
 `ec2-….compute-1.amazonaws.com` is **EC2**'s own reverse-DNS form, and `compute-1` is **us-east-1**.
-So the vendor was right and the *service* was wrong: it is an EC2 instance, and the owner has no
+So the vendor was right and the _service_ was wrong: it is an EC2 instance, and the owner has no
 Lightsail instance to find because there never was one. "AWS Lightsail, instance `mediasoup-test-01`,
 us-east-1a, still billing" originated in `MEDIASOUP-DEPLOYMENT-PLAN.md`'s Stage 1 **plan** and was
 copied between documents until a plan read as a measurement. That is the same failure this changelog
@@ -2625,7 +2665,7 @@ The move to Hetzner (€1/TB) is unaffected and marginally better justified.
 sessions, no participants. It is fully orphaned from this system (verified 2026-08-09: no reference
 in `apps/`, `services/`, `ops/`, `scripts/`, any `.env`, or the Caddyfile), so nothing breaks when it
 stops. **Not yet retired**, and the blocker is access, not permission: `aws sts get-caller-identity`
-returns *"Your session has expired. Please reauthenticate using `aws login`"* (account
+returns _"Your session has expired. Please reauthenticate using `aws login`"_ (account
 `255248181057`, IAM user `trading-app-admin`), and `ssh root@34.195.170.147` is
 `Permission denied (publickey)`. `aws login` is an interactive browser sign-in and is the owner's to
 run. The exact `describe` → `stop` → `terminate` commands, including releasing the Elastic IP, are at
@@ -2749,7 +2789,7 @@ instead of the 2026-08-09 one it was rolled back to. Previous build kept as `bui
 into a five-line shim over `$app/env/private`:
 
 ```js
-import * as env from '../../app/env/private.js';
+import * as env from "../../app/env/private.js";
 export { env };
 ```
 
@@ -2764,14 +2804,14 @@ built server boots against a real environment, and nothing in the pipeline did t
 
 **Reproduced and fixed against a built server, same request either way:**
 
-| build | result |
-| --- | --- |
+| build                | result                                        |
+| -------------------- | --------------------------------------------- |
 | without `src/env.ts` | **500** + `ROOM_JWT_SECRET is not configured` |
-| with `src/env.ts` | **403**, and no such line |
+| with `src/env.ts`    | **403**, and no such line                     |
 
 **Confirmed in production after the deploy** — `GET /session?id=1001&jwtSite=bogus` returns **403**
 and the log reads `[session] handoff rejected { room: '1001', reason: 'malformed' }`. The token was
-*parsed and rejected*, which is only possible if the secret was read. **That request is now the
+_parsed and rejected_, which is only possible if the secret was read. **That request is now the
 room's smoke test**: it needs no valid token, and it distinguishes "secret readable" (403) from
 "Kit 3 env broken" (500) in one call. This deployment never had such a check.
 
@@ -2933,7 +2973,7 @@ The 12:44 entry recorded one honest gap: "a grant was never minted end to end fr
 doing it looked like it required reading `ROOM_JWT_SECRET` and forging a handoff token against
 production — which was refused, correctly. **That framing was wrong, and the narrower path proves
 strictly more.** A handoff token is the CONTROLLER's door; the media chain does not need it. What it
-needs is the media key, and that key can be used *in place* by the room's own code without ever
+needs is the media key, and that key can be used _in place_ by the room's own code without ever
 being read, printed or copied.
 
 Two steps, on the box, using the deployed build:
@@ -2944,8 +2984,8 @@ Two steps, on the box, using the deployed build:
 2. **The SFU answered `HTTP/1.1 101 Switching Protocols`** to that grant over
    `wss://media.tradingroom.app/ws`, through Caddy, with `Origin: https://chat.tradingroom.app`.
 
-The server's own log is the other half, and it shows the claims were not merely accepted but *acted
-on*:
+The server's own log is the other half, and it shows the claims were not merely accepted but _acted
+on_:
 
 ```
 room router created room=tra-1001 router=709669c1-88a8-428c-954e-d89bca709d2e
@@ -2960,9 +3000,9 @@ for the room, and it was torn down cleanly when the socket dropped. Health after
 
 **The A/B is what makes this conclusive.** Same endpoint, same Origin, minutes apart:
 
-| request | result |
-| --- | --- |
-| `/ws` with **no** grant | **400** — refused |
+| request                       | result                                            |
+| ----------------------------- | ------------------------------------------------- |
+| `/ws` with **no** grant       | **400** — refused                                 |
 | `/ws` with a **minted** grant | **101** — admitted, router created, role honoured |
 
 So every link is now evidenced: escaped PEM → deployed build parses it → grant signed with the
@@ -2995,15 +3035,15 @@ where I happened to look is not evidence of absence.**
 
 #### Every breaking change, and what each required
 
-| change | what it took |
-| --- | --- |
-| **`svelte.config.js` is removed** | Config moves into `sveltekit({…})`. The **`kit` namespace disappears** — `adapter`, `paths`, `preprocess` become siblings. |
-| **`experimental.explicitEnvironmentVariables` is gone** | It graduated. `src/env.ts` + `$app/env/*` is simply how it works; passing the old Kit 2.63 opt-in is a type error. |
-| **`$lib` is removed in favour of `#lib`** | Took Kit's own offered `alias: { $lib: 'src/lib' }`. Renaming several hundred imports inside a framework-major diff would make it unreviewable. Kit warns `config.alias` is itself deprecated — **`#lib` is a scheduled follow-up, not a resting place.** |
-| **`resolve()` takes ROUTE IDS, not pathnames** | 58 call sites. `resolve('/contact')` → `resolve('/(public)/contact')`; `` resolve(`/account/rooms/${code}/users?filter=x`) `` → `` `${resolve('/(app)/account/rooms/[id]/[[tab]]', { id: code, tab: 'users' })}?filter=x` ``. Query strings stay outside — `filter` is a query parameter, not a route parameter. |
-| **`asset()` paths lost their leading slash** | `asset('/ajax_loader.gif')` → `asset('ajax_loader.gif')`, matching Kit 3's `AssetPath()` union. |
-| **The generated tsconfig carries no `include` and `paths: {}`** | Both stated explicitly in each app's `tsconfig.json`. Without the include TypeScript checks *everything* under the project — that is the real story behind the "1238 errors" in the 12:25 entry, which were an artefact rather than defects. |
-| **The room's `$env/dynamic/*`** | Its declarations live in `.svelte-kit/ambient.d.ts`, which Kit 2's base included and Kit 3's does not. Listed explicitly. The controller needs none — it already uses `$app/env/*`. |
+| change                                                          | what it took                                                                                                                                                                                                                                                                                                   |
+| --------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`svelte.config.js` is removed**                               | Config moves into `sveltekit({…})`. The **`kit` namespace disappears** — `adapter`, `paths`, `preprocess` become siblings.                                                                                                                                                                                     |
+| **`experimental.explicitEnvironmentVariables` is gone**         | It graduated. `src/env.ts` + `$app/env/*` is simply how it works; passing the old Kit 2.63 opt-in is a type error.                                                                                                                                                                                             |
+| **`$lib` is removed in favour of `#lib`**                       | Took Kit's own offered `alias: { $lib: 'src/lib' }`. Renaming several hundred imports inside a framework-major diff would make it unreviewable. Kit warns `config.alias` is itself deprecated — **`#lib` is a scheduled follow-up, not a resting place.**                                                      |
+| **`resolve()` takes ROUTE IDS, not pathnames**                  | 58 call sites. `resolve('/contact')` → `resolve('/(public)/contact')`; ``resolve(`/account/rooms/${code}/users?filter=x`)`` → `` `${resolve('/(app)/account/rooms/[id]/[[tab]]', { id: code, tab: 'users' })}?filter=x` ``. Query strings stay outside — `filter` is a query parameter, not a route parameter. |
+| **`asset()` paths lost their leading slash**                    | `asset('/ajax_loader.gif')` → `asset('ajax_loader.gif')`, matching Kit 3's `AssetPath()` union.                                                                                                                                                                                                                |
+| **The generated tsconfig carries no `include` and `paths: {}`** | Both stated explicitly in each app's `tsconfig.json`. Without the include TypeScript checks _everything_ under the project — that is the real story behind the "1238 errors" in the 12:25 entry, which were an artefact rather than defects.                                                                   |
+| **The room's `$env/dynamic/*`**                                 | Its declarations live in `.svelte-kit/ambient.d.ts`, which Kit 2's base included and Kit 3's does not. Listed explicitly. The controller needs none — it already uses `$app/env/*`.                                                                                                                            |
 
 #### The trap worth knowing about
 
@@ -3026,7 +3066,6 @@ and repointed.
 **Verified:** controller `svelte-check` 0/0, 562 unit tests, **37 database tests**, `vite build` clean.
 Room `svelte-check` 0/0, 524 tests, build clean under both adapters.
 
-
 ### 12:44 — THE SFU IS LIVE on the Hetzner box. `media.tradingroom.app` answers for real
 
 **RUNTIME IMPACT: yes, the largest today.** That hostname served a 503 placeholder for its whole
@@ -3048,8 +3087,8 @@ the two-browser screen-share test, which needs a human at a keyboard.
   half in the room's `.env`, which was backed up first.
 - **`tradingroom-media.service` installed from `ops/`, enabled and started.** Its own log is the
   evidence: `configuration validated bind_address=127.0.0.1:4443 announced_address=87.99.154.155
-  rtc_ports=40000-40199 workers=1`, `admission grants are required; verifying against this public
-  key`, `mediasoup worker started`. Container reports `(healthy)`.
+rtc_ports=40000-40199 workers=1`, `admission grants are required; verifying against this public
+key`, `mediasoup worker started`. Container reports `(healthy)`.
 
 **The room needed a code fix before it could ever have worked**
 
@@ -3070,11 +3109,11 @@ and `/ws`**, returns **404 for everything else**, and sets HSTS, `X-Content-Type
 `Referrer-Policy` and `-Server`. A bare proxy forwards every path to the media process, which is a
 wider surface than it has endpoints for. Corrected to the ops contract, and verified:
 
-| probe | result |
-| --- | --- |
-| `GET /health` | **200**, `{"status":"ok","workers":1,"workerDeaths":0,"admission":"require-grant"}` |
-| `GET /` and `/anything` | **404** — not proxied, per the contract |
-| `GET /ws` upgrade, no grant | **400** — admission refused it, and the worker did not die (`workerDeaths: 0`) |
+| probe                       | result                                                                              |
+| --------------------------- | ----------------------------------------------------------------------------------- |
+| `GET /health`               | **200**, `{"status":"ok","workers":1,"workerDeaths":0,"admission":"require-grant"}` |
+| `GET /` and `/anything`     | **404** — not proxied, per the contract                                             |
+| `GET /ws` upgrade, no grant | **400** — admission refused it, and the worker did not die (`workerDeaths: 0`)      |
 
 The example's global options (`admin off`, `protocols h1 h2`) were deliberately NOT applied: this
 Caddyfile also serves `chat.tradingroom.app`, so a global block would change the room's site too.
@@ -3092,11 +3131,11 @@ on 40000-49999 "possibly absent" — and that a UDP-blocked client would then fa
 was the largest unknown left. Measured from OUTSIDE the box, which is the only place a cloud
 firewall is visible:
 
-| port | answer | meaning |
-| --- | --- | --- |
-| 443 | connects | control |
-| 40000, 40100, 40199 | **RST, immediately** | reachable; nothing is dropping packets |
-| 40500 (outside the range) | **RST, immediately** | reachable too |
+| port                      | answer               | meaning                                |
+| ------------------------- | -------------------- | -------------------------------------- |
+| 443                       | connects             | control                                |
+| 40000, 40100, 40199       | **RST, immediately** | reachable; nothing is dropping packets |
+| 40500 (outside the range) | **RST, immediately** | reachable too                          |
 
 A dropped packet times out; a refused one proves the SYN reached the host and the host answered.
 There is no listener because mediasoup binds an RTC port only when a transport is created. **So TCP
@@ -3132,13 +3171,13 @@ repeating it.
 
 #### The `next` tags are not uniformly newer — taking them blindly is a downgrade
 
-| package | `latest` | `next` | |
-| --- | --- | --- | --- |
-| `@sveltejs/kit` | 2.70.2 | **3.0.0-next.16** | ahead |
-| `@sveltejs/adapter-vercel` | 6.3.4 | **7.0.0-next.6** | ahead |
-| `@sveltejs/adapter-node` | 5.5.7 | **6.0.0-next.8** | ahead |
-| `svelte` | **5.56.8** | 5.0.0-next.272 | **`next` is 56 minors BEHIND** |
-| `@sveltejs/vite-plugin-svelte` | **7.3.0** | 7.0.0-next.1 | **`next` is behind** |
+| package                        | `latest`   | `next`            |                                |
+| ------------------------------ | ---------- | ----------------- | ------------------------------ |
+| `@sveltejs/kit`                | 2.70.2     | **3.0.0-next.16** | ahead                          |
+| `@sveltejs/adapter-vercel`     | 6.3.4      | **7.0.0-next.6**  | ahead                          |
+| `@sveltejs/adapter-node`       | 5.5.7      | **6.0.0-next.8**  | ahead                          |
+| `svelte`                       | **5.56.8** | 5.0.0-next.272    | **`next` is 56 minors BEHIND** |
+| `@sveltejs/vite-plugin-svelte` | **7.3.0**  | 7.0.0-next.1      | **`next` is behind**           |
 
 "Use @next" on the last two would have rolled Svelte back to a 5.0 prerelease.
 
@@ -3149,8 +3188,8 @@ Kit 3's peers are `vite ^8.0.12`, `svelte ^5.56.4`, `typescript ^6.0.0`,
 
 #### What was migrated, and it works
 
-- **`svelte.config.js` is removed in Kit 3.** It errors: *"svelte.config.js is no longer used. Please
-  pass configuration via the `sveltekit(...)` plugin in your Vite config."* Both apps were migrated —
+- **`svelte.config.js` is removed in Kit 3.** It errors: _"svelte.config.js is no longer used. Please
+  pass configuration via the `sveltekit(...)` plugin in your Vite config."_ Both apps were migrated —
   and note the shape: the **`kit` namespace disappears**, so `adapter`, `paths` and `preprocess` sit
   at the top level of `sveltekit({…})`. Per the docs that is "the only difference to the
   `svelte.config.js` layout".
@@ -3167,8 +3206,8 @@ Kit 3's peers are `vite ^8.0.12`, `svelte ^5.56.4`, `typescript ^6.0.0`,
 fails with `Argument of type '"/login"' is not assignable to parameter of type 'never'` — the route
 union is empty. Three findings, each checked rather than inferred:
 
-1. `svelte-kit sync` prints *"tsconfig.json should extend SvelteKit's built-in configuration:
-   `{ "extends": "$app/tsconfig" }"`* — **but Kit 3 ships no tsconfig to extend.** Searched the
+1. `svelte-kit sync` prints _"tsconfig.json should extend SvelteKit's built-in configuration:
+   `{ "extends": "$app/tsconfig" }"`_ — **but Kit 3 ships no tsconfig to extend.** Searched the
    installed package: there is none.
 2. Following that advice anyway produced **1238 errors across 111 files**, because the unresolvable
    `extends` silently discards the base's `include`, `exclude` and `paths` and drags `scripts/**`
@@ -3190,7 +3229,6 @@ and `pnpm-lock.yaml` restored to HEAD so **not one byte remains** of the attempt
 
 **Retry when** Kit 3 either ships `$app/tsconfig` or writes `types/index.d.ts` again. The two-file
 config migration above is done and takes ten minutes to redo.
-
 
 ### 12:15 — Dependencies taken to latest, with three deliberate exceptions (pushed to `main`)
 
@@ -3229,11 +3267,11 @@ peers allow**, so the repository was correct before and stays there.
 
 Bumping these would break the pixel match, which is the premise of the whole reproduction:
 
-| package | pinned | latest | why it stays |
-| --- | --- | --- | --- |
-| `font-awesome` | **4.3.0** | 4.7.0 | both captures request `fontawesome-webfont.woff2?v=4.3.0`. 4.7.0 redrew `fa-user` from 1408 units to 1280 — **10.219px against 9.289px** at the 13px the dropdown uses. |
-| `@fortawesome/fontawesome-free` | **5.8.1** | 7.3.1 | the room is FA5, where the gear measures 16px = 1em; FA4's cog is 0.857em and shrank that button to 24.719. |
-| `animate.css` | **3.7.2** | 4.1.1 | the reference loads 3.7.2 and the app uses its class names (`animated fadeInDown`). **v4 renames every class** to `animate__animated animate__fadeInDown`, and `account.css` transcribes 3.7.2's exact reduced-motion contract. |
+| package                         | pinned    | latest | why it stays                                                                                                                                                                                                                    |
+| ------------------------------- | --------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `font-awesome`                  | **4.3.0** | 4.7.0  | both captures request `fontawesome-webfont.woff2?v=4.3.0`. 4.7.0 redrew `fa-user` from 1408 units to 1280 — **10.219px against 9.289px** at the 13px the dropdown uses.                                                         |
+| `@fortawesome/fontawesome-free` | **5.8.1** | 7.3.1  | the room is FA5, where the gear measures 16px = 1em; FA4's cog is 0.857em and shrank that button to 24.719.                                                                                                                     |
+| `animate.css`                   | **3.7.2** | 4.1.1  | the reference loads 3.7.2 and the app uses its class names (`animated fadeInDown`). **v4 renames every class** to `animate__animated animate__fadeInDown`, and `account.css` transcribes 3.7.2's exact reduced-motion contract. |
 
 #### Rust
 
@@ -3252,7 +3290,7 @@ another session's live task and moving it underneath them would be reckless.
 #### Two defects found on the way, neither caused by this change
 
 - **The documented clippy gate is wrong for this workspace.** `cargo clippy --all-targets -- -D
-  warnings` fails with **46 errors on a clean tree**, because the test helpers
+warnings` fails with **46 errors on a clean tree**, because the test helpers
   (`raw_for_tests`, `identity_pool_for_tests`, `set_relay_ready_for_tests`) sit behind a
   deliberately non-default `testing` feature. Proven pre-existing by re-running it against the
   stashed original lockfile: same 46. The correct invocation is
@@ -3263,7 +3301,6 @@ another session's live task and moving it underneath them would be reckless.
 
 **Verified:** controller `svelte-check` 0/0, 51 files / 562 tests, `vite build` clean. Room
 `svelte-check` 0/0, 56 files / 523 tests. Rust check and clippy both exit 0.
-
 
 ### 11:23 — `pnpm check` was RED and nobody knew; plus the focus ring that would not let go
 
@@ -3326,13 +3363,13 @@ overturned one conclusion and corrected four formats.
 only, which is the failure the house rules exist to prevent, quoted in the same entry that committed
 it.
 
-| download | was | now, from the bundle |
-| --- | --- | --- |
-| Export Badges | `badges.json`, `application/json` | **`BadgesList.csv`**, `text/csv;charset=utf-8`, eleven fixed keys |
-| Users → Export | `room-<code>-users.csv`, 4 quoted columns incl. an invented `Last login` | `Participant_List_<uuid>.csv`, **unquoted**, `Name, Email[, Phone], Role` |
-| Stats → Export | `room-<code>-stats.csv`, `#/Nick/Email/Last login` | `Participant_Stats_<uuid>_<date>.csv`, **quoted** |
-| Monthly | `room-<code>-monthly.csv` | `Monthly_report_<uuid>_<range>.csv`, header `Month, Total Logins, ` — trailing comma is the reference's |
-| Export Settings | `room-<code>-settings.json` | `Settings_<uuid>.json`, `text/json;charset=utf-8` — **JSON confirmed correct** |
+| download        | was                                                                      | now, from the bundle                                                                                    |
+| --------------- | ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------- |
+| Export Badges   | `badges.json`, `application/json`                                        | **`BadgesList.csv`**, `text/csv;charset=utf-8`, eleven fixed keys                                       |
+| Users → Export  | `room-<code>-users.csv`, 4 quoted columns incl. an invented `Last login` | `Participant_List_<uuid>.csv`, **unquoted**, `Name, Email[, Phone], Role`                               |
+| Stats → Export  | `room-<code>-stats.csv`, `#/Nick/Email/Last login`                       | `Participant_Stats_<uuid>_<date>.csv`, **quoted**                                                       |
+| Monthly         | `room-<code>-monthly.csv`                                                | `Monthly_report_<uuid>_<range>.csv`, header `Month, Total Logins, ` — trailing comma is the reference's |
+| Export Settings | `room-<code>-settings.json`                                              | `Settings_<uuid>.json`, `text/json;charset=utf-8` — **JSON confirmed correct**                          |
 
 **Details that only a bundle read could give:** every CSV ends `\r\n` — except the badges one, which
 `convertToCSV` writes with `\n`. Headers carry a space after each comma — except the badges one,
@@ -3383,7 +3420,7 @@ what #91 computes, so the 2px padding and 1px border sit inside the bound.
 
 **Honest gap:** the overflow itself is not in any capture. Every rect in that file is `0×0` because
 the badge editor is `ng-show`-collapsed when captured, and a hidden element has no box. The authored
-style explains *why* it overflows; the owner's observation is the evidence *that* it does. No
+style explains _why_ it overflows; the owner's observation is the evidence _that_ it does. No
 number for how far it overruns exists, and none was invented.
 
 **Pinned in both directions** by a new case in `badge-editor-contract.test.ts`: `max-width: 100%`
@@ -3411,14 +3448,14 @@ vacuous. Breakpoint contract passes; 5/5 badge editor tests pass.
 Reported: clicking export badges downloads a `.json` and should download a `.csv`. Read against
 `must-match/important`, every export/download handler in the reference is:
 
-| capture line | handler | format |
-| --- | --- | --- |
-| 34 | `exportListToCSV()` | CSV |
-| 916 | `exportStatsToCSV(statsDate)` | CSV |
-| 919 | `downloadMontlyStats(…)` — the reference's own misspelling | CSV |
-| 985 | **`exportSettingsToJSON()`** | **JSON** |
-| 986 | `loadSettingsFromJSON()` | **inside an HTML comment — never renders** |
-| 91, 2081 | `removeBadgesForUsers()`, `openChatTabsWithBadgesEditor(…)` | not exports |
+| capture line | handler                                                     | format                                     |
+| ------------ | ----------------------------------------------------------- | ------------------------------------------ |
+| 34           | `exportListToCSV()`                                         | CSV                                        |
+| 916          | `exportStatsToCSV(statsDate)`                               | CSV                                        |
+| 919          | `downloadMontlyStats(…)` — the reference's own misspelling  | CSV                                        |
+| 985          | **`exportSettingsToJSON()`**                                | **JSON**                                   |
+| 986          | `loadSettingsFromJSON()`                                    | **inside an HTML comment — never renders** |
+| 91, 2081     | `removeBadgesForUsers()`, `openChatTabsWithBadgesEditor(…)` | not exports                                |
 
 **There is no "Export badges" control** — not in this app and not in the reference. The only JSON
 download anywhere is Export Settings, whose handler in the reference is literally named
@@ -3460,12 +3497,12 @@ pane is a place — not an option bolted onto a page, which is what `?tab=` read
 **Investigated end to end.** Every `searchParams` read in both applications, and every generated
 customer-facing URL:
 
-| kept as a query, and why | |
-| --- | --- |
-| `?q=`, `?filter=` | a search term and a filter over the collection a pane shows. This is what query strings are FOR; making them path segments would conflate a filter with a resource. |
-| `?token=` (verify-email, reset-password), `?secTok=` | one-time credentials, not resources. A path segment would make a secret look like a page. |
-| `?email=` on the three `/internal/*` endpoints | server-to-server lookup parameters, never seen by a customer. |
-| `?co=1` in the room | **transcribed evidence, not a choice.** The capture reads `const F = s.get("co")` into `globals.chatOnlyMode`; renaming it would break the original's detached chat popout. Checked before touching it. |
+| kept as a query, and why                             |                                                                                                                                                                                                         |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `?q=`, `?filter=`                                    | a search term and a filter over the collection a pane shows. This is what query strings are FOR; making them path segments would conflate a filter with a resource.                                     |
+| `?token=` (verify-email, reset-password), `?secTok=` | one-time credentials, not resources. A path segment would make a secret look like a page.                                                                                                               |
+| `?email=` on the three `/internal/*` endpoints       | server-to-server lookup parameters, never seen by a customer.                                                                                                                                           |
+| `?co=1` in the room                                  | **transcribed evidence, not a choice.** The capture reads `const F = s.get("co")` into `globals.chatOnlyMode`; renaming it would break the original's detached chat popout. Checked before touching it. |
 
 **Still outstanding, and it is the same offence:** the room's entry URL is
 `/session?id=3625&jwtSite=…`. `id` belongs in the path. It is NOT in this push because it spans two
@@ -3476,7 +3513,6 @@ Launch button. Sequenced separately and deliberately.
 **Verified before pushing:** `svelte-check` 0 errors, 3 warnings (unchanged). 50 files, 547 unit
 tests passing. All 37 database tests passing. Not verified in a browser — `pnpm test:e2e` now exists
 but has not been run.
-
 
 ### 10:31 — `TODO.md` now lists only open work (`ca1fe65`, pushed to `main`)
 
@@ -3505,7 +3541,6 @@ header now says so, so the next person does not "helpfully" restore the history.
 **What is left, and it is now the whole file:** evidence gaps **1–12**, and work items **C**
 (`push_tokens_json` has no writer), **G** (Neon under volume) and **H** (separate the media plane
 from the app tier). G and H are the owner's calls, recorded rather than queued.
-
 
 ### 10:28 — The e2e harness could not run at all; written, plus the manage-page spec (pushed to `main`)
 
@@ -3550,7 +3585,6 @@ starting anything. `svelte-check` 0 errors, 3 warnings (unchanged); 547 unit tes
 is the owner's explicit standing boundary, so it waits on their word rather than being assumed.
 Everything above is the harness being correct; none of it is the assertions having passed.
 
-
 ### 10:18 — Rooms are addressed by their short code, not the database id (pushed to `main`)
 
 **Runtime impact: yes, and it changes a URL.** `/account/rooms/1?tab=users` is now
@@ -3587,7 +3621,6 @@ so the cases stay about the DON'T TOUCH actions.
 The new cases can tell the two identifiers apart because the fixture's differ on purpose — **id 1,
 short code 3625**. A fixture whose id happened to equal its code would pass on either
 implementation. Mutation-checked: reverting one link to `${room.id}` turns two of them red.
-
 
 ### 10:12 — Both open manage-page audit defects fixed (pushed to `main`)
 
@@ -3632,7 +3665,6 @@ picker opening is asserted against a stub, not against Chromium. The two behavio
 prove — that the native calendar actually appears, and that blur now fires — are the reason the
 `showPicker` call is best-effort rather than assumed.
 
-
 ### 10:03 — This changelog started, and two comments corrected (`8c5dca3`, pushed to `main`)
 
 **No runtime impact** — documentation, one code comment and one test comment. Nothing about what the
@@ -3663,7 +3695,7 @@ the date of the new measurement rather than silently overwritten.
 **No runtime impact** — one read-only `SELECT`. Nothing was written to the database.
 
 `docs/EMAIL.md` §5 and `docs/PROMPT-TODO-ITEMS.md` both recorded a query that had to be re-run
-*after* `RESEND_API_KEY` and `MAIL_FROM` went live, because flipping them makes `verificationEnforced()`
+_after_ `RESEND_API_KEY` and `MAIL_FROM` went live, because flipping them makes `verificationEnforced()`
 true and gates any account with a NULL `email_verified_at` out of creating rooms.
 
 Result: **one row, and it is the safe one.** `id 1 | billy.ribeiro@icloud.com`, `created_at` and
@@ -3675,7 +3707,7 @@ requires `vercel env pull`, which would write every other production secret to d
 `DATABASE_URL` was already on disk at `~/Desktop/new-room-control/.env.vercel-pull`, which is where
 `scripts/set-vercel-env.sh` already reads it from.
 
-*This measurement expires with the next registration.*
+_This measurement expires with the next registration._
 
 ### 09:57 — TODO item I closed: the four unstyled public pages (`6e7a151`)
 
@@ -3703,7 +3735,7 @@ so on `/verify-email` "your address is confirmed" and "that link has expired" lo
 - **Checked, and it was an artifact:** the brief warned `contact`'s submit might be white-on-white
   because it computes `background: rgba(0,0,0,0)`. It is not. `.pub-root .button` sets
   `background-color: #4589e3` then `background: linear-gradient(...)`; the shorthand resets
-  background-*color* to transparent while setting background-*image* to the gradient.
+  background-_color_ to transparent while setting background-_image_ to the gradient.
 - Fixed two comments the change made false — in `forgot-password/+page.svelte` and
   `password-reset-pages.test.ts`, both of which still said the `pub-*` classes had no rule.
 
