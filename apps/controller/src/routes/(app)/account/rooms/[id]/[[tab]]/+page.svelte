@@ -2446,7 +2446,7 @@ Please click this link to attend: ______ unique link will be here_____
                       <!-- svelte-ignore a11y_label_has_associated_control -->
                       <label class="col-sm-2 control-label">{def.label ?? def.name}</label>
                       <Editable {def} value={settingValue(def.name)} markUnwired />
-                      {#if help}
+                      {#if help && !help.outside}
                         <!--
                           A `<label>`, because that is what the reference's helper copy IS:
                           `<br><label class="muted">If set, Presenters will need to enter the
@@ -2466,6 +2466,16 @@ Please click this link to attend: ______ unique link will be here_____
                         {@render helpCopy(help)}
                       {/if}
                     </p>
+                    <!--
+                      Three settings put their helper OUTSIDE the row's `<p>`, as a sibling — the
+                      outline proves it by indent, their helper sitting one level shallower than
+                      their own anchor. `pairOKRedirect`, `pairErrorRedirect` and
+                      `doNotAutoSoftReset`. It is generated as `helpOutside` rather than matched by
+                      name, so the next setting that does it is placed correctly instead of wrongly.
+                    -->
+                    {#if help?.outside}
+                      {@render helpCopy(help)}
+                    {/if}
                   {/each}
 
                   {#if apiSecretDef}
@@ -2540,24 +2550,35 @@ Please click this link to attend: ______ unique link will be here_____
                         {/if}
                       </label>
                       <Editable {def} value={settingValue(def.name)} markUnwired />
-                      {#if help}
+                      {#if help && !help.outside}
                         <!-- the reference's own helper copy again — see the loop above -->
                         {@render helpCopy(help)}
                       {/if}
                     </p>
+                    <!--
+                      Three settings put their helper OUTSIDE the row's `<p>`, as a sibling — the
+                      outline proves it by indent, their helper sitting one level shallower than
+                      their own anchor. `pairOKRedirect`, `pairErrorRedirect` and
+                      `doNotAutoSoftReset`. It is generated as `helpOutside` rather than matched by
+                      name, so the next setting that does it is placed correctly instead of wrongly.
+                    -->
+                    {#if help?.outside}
+                      {@render helpCopy(help)}
+                    {/if}
                     {#if def.name === 's3BucketFolderPath' || def.name === 'restreamToURLKey'}
                       <!-- a bare `<br>` BETWEEN two rows, not inside either: file2:2316 separates
                            the S3 block from Save Recs to Vimeo, file2:2366 the Restream block from
                            Custom Rec Params. Same furniture the DON'T TOUCH block already carries. -->
                       <br />
                     {/if}
-                    {#if def.name === 'doNotAutoSoftReset'}
-                      <!-- this row's copy is a SIBLING of its `<p>`, not a child of it, and has no
-                           `<br>` — file2:2450, sitting between `</p>` on 2449 and the next row's
-                           `<p>` on 2454. `help` cannot express that, so it is furniture here. -->
-                      <!-- svelte-ignore a11y_label_has_associated_control -->
-                      <label>Enable this to prevent media server soft reset each night...</label>
-                    {/if}
+                    <!--
+                      The literal `<label>` that used to sit here for `doNotAutoSoftReset` is gone.
+                      Its comment said "`help` cannot express that, so it is furniture here" — it
+                      can now: `helpOutside`, generated from the outline's indent, places this and
+                      the two `pair*Redirect` helpers outside their `<p>` without naming any of
+                      them. Keeping both rendered the helper TWICE, which was the last 62 of the
+                      Settings side-by-side.
+                    -->
                   {/each}
 
                   <hr />

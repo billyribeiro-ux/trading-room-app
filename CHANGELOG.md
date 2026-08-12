@@ -24,6 +24,51 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-12
 
+### 10:35 — Item Y CLOSED. Settings back to baseline, and a gate that never ran now runs
+
+**Runtime impact: yes, in the controller.** 715 tests / 65 files, room 604 / 62, `svelte-check` 0/0
+both, format clean, documented counts verified.
+
+`schema:verify` **passes for the first time.** It is the first step of `pnpm test` and had been
+throwing `ENOENT: evidence-dumps/login-page/manage` — a file that never existed here — so the chain
+failed at step one and the generated settings schema was unverifiable. The capture is now tracked,
+the generator runs, and the schema it produces matches byte for byte.
+
+Settings side-by-side, measured at every step: **1094 → 65 → 63 → 62 → 16**, its baseline. Users 2/2
+and User Stats 6/6 unchanged.
+
+**The fifth cause, found by looking rather than reasoning.** `+page.svelte` carried a hardcoded
+`<label>` for `doNotAutoSoftReset`, with a comment saying "`help` cannot express that, so it is
+furniture here". True when written; false once `helpShape` existed — the shape system rendered the
+helper and so did the literal, so it appeared **twice**. That was the whole of the remaining 62.
+
+Its comment named the missing property exactly: the helper is a **sibling of the row's `<p>`**, not
+a child. Indent proves it — the helper sits one level shallower than its own anchor — and counting
+across the capture finds **three** settings that do it, not one: `pairOKRedirect`,
+`pairErrorRedirect` and `doNotAutoSoftReset`. So it is generated as `helpOutside` rather than matched
+by name, and the next setting that does it is placed correctly instead of wrongly.
+
+**Four hand-maintained exceptions are gone.** `BARE`, `CLASSLESS` and `NO_BR` named 16 settings by
+hand beside a generated file of 269, and the page named a seventeenth. All four are deleted, and the
+replacement was **verified before it was made**: all 9 `CLASSLESS` names generate `plain`, all 4
+`NO_BR` names generate `bare`, and the placement flag finds exactly the three the outline puts
+outside. Every one of them had already drifted — the tables held 3 of the 11 text-node helpers, so
+the other 8 rendered with a class and a `<br>` the reference has none of.
+
+**One more defect found on the way in.** `webinarDate` carries `· "&nbsp;"` between its anchor and
+the next row — spacing, not a helper. Taking it produced `help: ""` with a shape, which renders an
+empty element. Whitespace-only text is no longer a helper, and the text-node count corrected from 13
+to **11**.
+
+`CORRECTED` stays, and is now honestly what its docblock says: three helpers whose TEXT the
+whitespace collapsing damages. It is no longer also a workaround for `outline.mjs` truncating at 160
+characters, because that cap is now 1000.
+
+`setting-help-shape-contract.test.ts` pins all of it in 14 cases — the four shape counts, the three
+outside settings by name, the mapping from each shape to its markup, that the tables and the
+hardcoded label are gone, and that the longest helper survives whole. Negative control: forcing
+`outside: false` fails two of them.
+
 ### 10:00 — Item Y: four causes fixed, the fifth localised. Settings 1094 → 62
 
 **No runtime impact.** Generator and decoder only; every src-side change was reverted. 701 tests /

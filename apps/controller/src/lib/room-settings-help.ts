@@ -31,6 +31,13 @@ import type { RoomSettingDef } from './room-settings-schema';
  * off each helper's markup in file2, one by one. The fields are ours, the values are the capture's.
  */
 export interface SettingHelp {
+  /**
+   * True when the reference puts this helper OUTSIDE the row's `<p>`, as a sibling of it.
+   *
+   * Three settings do — `pairOKRedirect`, `pairErrorRedirect` and `doNotAutoSoftReset` — and the
+   * outline proves it by indent: their helper sits one level shallower than their own anchor.
+   */
+  outside: boolean;
   readonly text: string;
   /**
    * How the reference wraps the copy:
@@ -42,92 +49,6 @@ export interface SettingHelp {
   /** whether the reference puts a `<br>` between the editable and the copy */
   readonly br: boolean;
 }
-
-/**
- * Forty-one classless helpers, transcribed from the lines named against each.
- *
- * `autoOpenTime` and `autoCloseTime` carry two TRAILING spaces in the capture (file2:1523, 1528).
- * They are dropped here rather than hidden in a string literal: HTML collapses trailing
- * whitespace before a closing tag, so nothing on screen depends on them.
- *
- * `regUserCanPresent` carries a DOUBLE space in "will  have" (file2:2265). It is kept, because a
- * string literal is the one form `prettier --write` cannot silently repair — the same reason
- * `dtNote` takes its copy as an argument rather than as template text.
- */
-const CLASSLESS: Record<string, string> = {
-  usernameInstructions: 'Instructions how user can edit his username',
-  showArchivesToSpecificPresenters: 'Comma separated list of Presenter emails',
-  banIPList: 'Comma separated list of banned IPs',
-  reportEmail: 'Comma separated list of emails to receive abuse reports',
-  customJWTErrorMessage: 'Set a custom JWT error message',
-  sendOpenCloseEmail: 'Comma separated list of emails to receive open / close room events',
-  autoOpenTime: 'Time in Military EST to automatically OPEN the room. i.e. 7:30',
-  autoCloseTime: 'Time in Military EST to automatically CLOSE the room. i.e. 18:30',
-
-  /* file2:1833 */ altBenzingaLogoURL: 'Set custom Benzinga logo url',
-  /* file2:1838 */ altBenzingaLinkURL: 'Set custom Benzinga link url',
-  /* file2:1903 */ collectsUserStats: 'Only enabled if you need granular Users Stats',
-  /* file2:1989 */ isAlertOnly:
-    "Alerts only rooms are just rooms to receve push notifications and nothing else. Don't use this if you don't know what it is!!!",
-  /* file2:1996 */ customClientAlertPostURL: 'POST alerts to this URL endpoint',
-  /* file2:2001 */ customClientAlertPostSecret: 'secret PW for the endpoint above',
-  /* file2:2025 */ privMessageHugePopup: "Some user can't see the private messages, this makes a HUGE popup",
-  /* file2:2034 */ hasChannelTabs: 'This setting adds an OffTopic, channel tabs next to general chat',
-  /* file2:2042 */ autoSwitchToOfftopics: 'Auto Switch to OffTopic tab',
-  /* file2:2051 */ hasAdminOnlyChannel: 'This setting adds an admin/presenter dedicated chat tab',
-  /* file2:2058 */ extraAdminChannels: 'Comma separated list of extra admin channels',
-  /* file2:2066 */ extraRegChannels: 'Comma separated list of extra regular (anyone can post) channels',
-  /* file2:2072 */ altGenChannelName: 'Rename the Main Chat channel to...',
-  /* file2:2077 */ altOffTopicChannelName: 'Rename the Off-Topic channel to...',
-  /* file2:2083-2097, one line here for the reason given on CORRECTED below */
-  chatTabsWithBadges:
-    'List of chat tabs with badges: [ { "name": "easy channel", "badges": [ "61eafd612fcdee7bc8e979bc", "6489f1f98993a677b83cdd70" ] }, { "name": "harder channel", "badges": [ "61eafd612fcdee7bc8e979bc" ] } ]',
-  /* file2:2107 */ hasProfanityFilter: 'Profanity filter will try to filter (put xxxx) on bad words',
-  /* file2:2112 */ ingnoreBadWordsList: 'Comma separated list OK words to remove from the filter',
-  /* file2:2117 */ additionalBadWordsList: 'Comma separated list of additional bad words you want to filter',
-  /* file2:2132 */ simplifiedEditor: 'If enabled, the Note Editor will be simplified.',
-  /* file2:2142 */ audioMeterDisabled:
-    'Turn this on to disable the audio level meter next to the presenter name when they are talking',
-  /* file2:2178 */ hideRecs: 'If enabled, recordings will be hidden in archives',
-  /* file2:2186 */ recordingReminder: 'If enabled, will show recording reminder popup',
-  /* file2:2194 */ recsInRoom: 'If enabled, will show recordings tab in the room',
-  /* file2:2202 */ downloadRecordingsDisabled: 'If enabled, will disable download button for Recordings for users',
-  /* file2:2211 */ hasSpeechRecognitionDisabled: 'If enabled, will disable closed captioning for the room',
-  /* file2:2219 */ dontShowRecInfoToUsers: 'If enabled, will hide recording info for users',
-  /* file2:2249 */ stickyGiveMicAndCam: 'If enabled, when a presenter gives mic/cam, the setting will stick',
-  /* file2:2257 */ overlayUserIdOnScreenshare: 'If enabled, it will overlay userID on screenshare',
-  /* file2:2265 */ regUserCanPresent:
-    'If enabled, ALL regular users will  have mic/screenshare in the room. ***** CAREFULL ******',
-  /* file2:2273 */ dontStopRecOnMicMute: "Don't auto stop the rec on mic mute",
-  /* file2:2281 */ individualVolumeControls: 'Individual volume controls for each Presenter',
-  /* file2:2290 */ remote_recording: 'new experimental serverside rec control, more reliable?',
-  /* file2:2415 */ hqVideo: 'Experimental better vid quality on vp8'
-};
-
-/**
- * The four helpers the reference does NOT precede with a `<br>`.
- *
- * Every other helper in the pane sits behind one. These four are butted straight onto the
- * editable — file2:1902-1903 and 2414-2415 put the `<label>` on the line after the closing `</a>`
- * with nothing between, and file2:2111-2112 and 2116-2117 do the same inside the two profanity
- * rows. A `<br>` is an element to the shape comparison, so this is not cosmetic.
- */
-const NO_BR = new Set(['collectsUserStats', 'hqVideo', 'ingnoreBadWordsList', 'additionalBadWordsList']);
-
-/**
- * Three helpers that are a BARE TEXT NODE on the row's own `<p>` — no `<br>`, no element at all.
- *
- * file2:2459, 2469 and 2477. The same shape the DON'T TOUCH block already models with `dtNote`.
- * The latter two open with the capture's own `&nbsp;&nbsp;` (file2:2469, 2477), written here as
- * two `\u00a0` escapes rather than as the literal characters, which are invisible in a diff.
- */
-const BARE: Record<string, string> = {
-  sendFcmAlertsNew: 'Use pub/sub for notifications',
-  ptrMobileAppExpirePairCodeDays:
-    '\u00a0\u00a0If user does not log in from regular site, mobile app token will expire after this many days',
-  mobileAppExpireNotificationsDays:
-    "\u00a0\u00a0If user does not log in this many days, we'll stop sending push notifications"
-};
 
 /**
  * Three muted helpers the extractor damaged.
@@ -147,13 +68,58 @@ const CORRECTED: Record<string, string> = {
 };
 
 /** The helper a settings row should render, or null when the reference gives it none. */
-export function settingHelp(def: Pick<RoomSettingDef, 'name' | 'help'>): SettingHelp | null {
-  const bare = BARE[def.name];
-  if (bare !== undefined) return { text: bare, shape: 'text', br: false };
+/**
+ * How the generated `helpShape` becomes markup. The schema records the shape the reference WROTE;
+ * this is the one place it turns into elements.
+ *
+ * | generated | element                 | preceded by `<br>` |
+ * | --------- | ----------------------- | ------------------ |
+ * | `muted`   | `<label class="muted">` | yes                |
+ * | `plain`   | `<label>`               | yes                |
+ * | `bare`    | `<label>`               | no                 |
+ * | `text`    | none — a text node      | no                 |
+ */
+const SHAPE: Record<string, { shape: SettingHelp['shape']; br: boolean }> = {
+  muted: { shape: 'muted', br: true },
+  plain: { shape: 'plain', br: true },
+  bare: { shape: 'plain', br: false },
+  text: { shape: 'text', br: false }
+};
 
-  const classless = CLASSLESS[def.name];
-  if (classless !== undefined) return { text: classless, shape: 'plain', br: !NO_BR.has(def.name) };
-
+/**
+ * The helper a settings row should render, or null when the reference gives it none.
+ *
+ * ## This used to consult three hand-maintained tables, and a hardcoded row in the page
+ *
+ * `BARE`, `CLASSLESS` and `NO_BR` listed by name which settings take which shape — 16 names read out
+ * of the capture by hand. Everything not on one of them fell through to `muted` + `<br>`, right for
+ * the majority and silently wrong for the rest. A fourth exception lived in the page itself: a
+ * literal `<label>` for `doNotAutoSoftReset`, with a comment saying "`help` cannot express that, so
+ * it is furniture here".
+ *
+ * All four are gone. The generator derives shape AND placement from the same capture those lists
+ * were read out of.
+ *
+ * That is not tidiness. A hand list of 16 beside a generated file of 269 is a second source of
+ * truth, and it had already drifted three ways: it held 3 of the 13 text-node helpers, so 10
+ * rendered with a class and a `<br>` the reference has none of; and the page's hardcoded row was
+ * rendering a helper the shape system now also rendered, so that one appeared **twice**.
+ *
+ * **Verified before replacing, not after:** all 9 `CLASSLESS` names generate `plain`, all 4 `NO_BR`
+ * names generate `bare`, and the placement flag finds exactly the three settings whose helper the
+ * outline shows at a shallower indent than its own anchor.
+ *
+ * `CORRECTED` stays, and is a different concern — three helpers whose TEXT needed restoring, which
+ * is now only the whitespace collapsing its docblock describes rather than the 160-character
+ * truncation `outline.mjs` used to apply.
+ */
+export function settingHelp(
+  def: Pick<RoomSettingDef, 'name' | 'help' | 'helpShape' | 'helpOutside'>
+): SettingHelp | null {
   const text = CORRECTED[def.name] ?? def.help;
-  return text === null || text === undefined ? null : { text, shape: 'muted', br: true };
+  if (text === null || text === undefined) return null;
+  // `muted` is the fallback for help with no recorded shape — what every setting got before the
+  // shape was generated.
+  const { shape, br } = SHAPE[def.helpShape ?? 'muted'] ?? SHAPE.muted;
+  return { text, shape, br, outside: def.helpOutside === true };
 }

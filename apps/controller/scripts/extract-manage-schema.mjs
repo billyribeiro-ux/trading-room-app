@@ -253,6 +253,8 @@ for (let i = 0; i < lines.length; i++) {
   let help = null;
   /** How the reference wrote it: 'muted' | 'plain' | 'bare'. Null when there is no helper. */
   let helpShape = null;
+  /** True when the helper is a sibling of the row's `<p>` rather than a child. */
+  let helpOutside = false;
   for (let j = i + 1; j < lines.length && j < i + 10; j++) {
     if (/<a\.editable|<label[^>]*\.control-label/.test(lines[j])) break;
     /*
@@ -297,12 +299,34 @@ for (let i = 0; i < lines.length; i++) {
     */
     const anchorIndent = lines[i].search(/\S/);
     if (/^\s*·/.test(lines[j]) && lines[j].search(/\S/) <= anchorIndent) {
-      help = textOf(j);
-      helpShape = 'text';
+      const text = textOf(j);
+      /*
+        `&nbsp;` is not a helper. `webinarDate` carries `· "&nbsp;"` between its anchor and the next
+        row — spacing, which decodes to a single space and trims to nothing. Taking it produced a
+        setting with `help: ""` and a shape, which is a helper that renders an empty element.
+      */
+      if (text && text.trim()) {
+        help = text;
+        helpShape = 'text';
+      }
       break;
     }
     if (/<label/.test(lines[j])) {
       help = textOf(j + 1);
+      /*
+        Whether the helper is a SIBLING of the row's `<p>` rather than a child of it.
+
+        Indent decides it: the anchor sits inside the `<p>`, so a helper at a SHALLOWER indent has
+        closed that paragraph and is furniture between two rows. Counted across the capture, exactly
+        one setting does this — `doNotAutoSoftReset`, whose label is at 22 against its anchor's 24,
+        while the other four bare-shaped helpers are at 24 like their anchors.
+
+        It was hardcoded in the page as a literal `<label>` with a comment saying "`help` cannot
+        express that, so it is furniture here". It can now, and one generated boolean is worth more
+        than a name-matched special case: the next setting that does this is picked up rather than
+        rendered in the wrong place.
+      */
+      helpOutside = lines[j].search(/\S/) < anchorIndent;
       /*
         The SHAPE, not just the text.
 
@@ -331,6 +355,7 @@ for (let i = 0; i < lines.length; i++) {
     label,
     help,
     helpShape,
+    helpOutside,
     captured,
     group: inDontTouch ? 'dont-touch' : null
   });
@@ -380,6 +405,9 @@ defs.push({
   type: 'select',
   label: 'Room Type',
   help: 'A webinar room adds a scheduled date and the reminder-email tools.',
+  helpShape: null,
+  // Hand-declared rows are not read from the outline, so placement is stated rather than derived.
+  helpOutside: false,
   captured: null,
   group: null
 });
@@ -391,6 +419,8 @@ defs.push({
   type: 'html',
   label: 'Login Landing Page Editor',
   help: null,
+  helpShape: null,
+  helpOutside: false,
   captured: null,
   group: null
 });
@@ -470,6 +500,8 @@ export interface RoomSettingDef {
    * them put a class on 42 helpers that have none and a \`<br>\` before 5 that have none.
    */
   readonly helpShape: 'muted' | 'plain' | 'bare' | 'text' | null;
+  /** True when the reference puts the helper OUTSIDE the row's \`<p>\`, as a sibling of it. */
+  readonly helpOutside: boolean;
   /**
    * Value observed in the captured tenant. null = unset. Evidence, not a default.
    *
@@ -493,7 +525,7 @@ export const ROOM_SETTINGS: readonly RoomSettingDef[] = [
 ${defs
   .map(
     (d) =>
-      `  { name: ${q(d.name)}, section: ${q(d.section)}, type: ${q(d.type)}, label: ${q(d.label)}, help: ${q(d.help)}, helpShape: ${q(d.helpShape)}, captured: ${q(d.captured)}, capturedIsDisplayOnly: ${d.type === 'select' || d.type === 'combodate' || d.type === 'date'}, group: ${q(d.group)}, wired: ${WIRED_SETTINGS.has(d.name)} }`
+      `  { name: ${q(d.name)}, section: ${q(d.section)}, type: ${q(d.type)}, label: ${q(d.label)}, help: ${q(d.help)}, helpShape: ${q(d.helpShape)}, helpOutside: ${d.helpOutside}, captured: ${q(d.captured)}, capturedIsDisplayOnly: ${d.type === 'select' || d.type === 'combodate' || d.type === 'date'}, group: ${q(d.group)}, wired: ${WIRED_SETTINGS.has(d.name)} }`
   )
   .join(',\n')}
 ];
