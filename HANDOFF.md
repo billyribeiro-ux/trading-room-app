@@ -155,6 +155,59 @@ Note the literal `" Volume "` — leading and trailing spaces.
 
 `vSe` repeats `bSe` over `mediaService.talkingUsers`.
 
+### THE GATES — read this before writing any markup
+
+`CSe`'s update block, verbatim from the bundle:
+
+```text
+m(2),O(2,e.showZoomCtrl?2:-1),
+m(),O(3,e.appService.globals.viewerOnlyMode?3:-1),
+m(6),je("ngModel",e.audioVolume),
+m(2),O(11,e.audioVolume>0?11:-1),
+m(),O(12,0==e.audioVolume?12:-1),
+m(3),O(15,e.mediaService.talkingUsers&&e.mediaService.talkingUsers.length>0?15:-1),
+m(6),O(21,e.isFullScreenshare?21:22)
+```
+
+Index 3 is `hSe`, the volume button. **It renders ONLY when `viewerOnlyMode` is true.** That single
+fact explains why this control "has never rendered in any capture" — no capture was taken in
+viewer-only mode. It is not missing markup; it is gated markup.
+
+- volume trigger (const 90) — `viewerOnlyMode`
+- Mute button (const 95/109) — `audioVolume > 0`
+- Unmute button (const 96/110) — `audioVolume === 0` (the reference writes `0 == e.audioVolume`)
+- the per-presenter list (const 97 contents) — `talkingUsers && talkingUsers.length > 0`
+- the range input (const 94) — `[(ngModel)]="audioVolume"`, `change`/`input` → `adjustVol($event)`
+
+### STATE THIS APP DOES NOT HAVE YET — add it before the markup, do not invent it
+
+Checked with a search across `apps/room/src`; each of these is absent except where noted:
+
+| needed                                    | status here                                                                                                                                                                                                                  |
+| ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `viewerOnlyMode`                          | **absent.** Appears only inside a comment in `ScreenZoomControls.svelte:18`. It gates the whole button, so it has to exist first and be sourced the same way the reference sources it (`appService.globals.viewerOnlyMode`). |
+| `individualVolumeControls`                | **absent.** A `sessData` room setting; gates the per-user slider (const 114/115). Confirm the field name against the room-settings schema before adding.                                                                     |
+| `audioMutedFor[userID]`                   | **absent.** Per-user mute preference; drives the checkbox `checked` and the Mute/Muted label swap.                                                                                                                           |
+| `audioVolumeFor[userID]`                  | **absent.** Per-user volume; the `ngModel` of the const 115 slider.                                                                                                                                                          |
+| `toggleTalkingPresenter(user)`            | **absent.** The checkbox `change` handler.                                                                                                                                                                                   |
+| `adjustVolPres(event, user)`              | **absent.** The per-user slider `change`/`input` handler.                                                                                                                                                                    |
+| `talkingUsers`                            | **present**, `+page.svelte:930`, with `userID` and `mediaValue.name`.                                                                                                                                                        |
+| `volume`, `setMasterVolume`, `toggleMute` | **present**, `+page.svelte:861`, `:3467`, `:3503`.                                                                                                                                                                           |
+
+**Do not fake any of the absent ones to make the markup render.** If a field's real name or source
+cannot be established from the bundle or the room-settings schema, that is a gap: report it, and
+write the console script.
+
+### The two `room-sound-options` are NOT the same content
+
+Both variants use `class="room-sound-options"`, which makes them look interchangeable. They are not:
+
+- **nav variant** — the sound checkboxes (alert / QA / chat / non-trade). **Already built**,
+  `+page.svelte:6904`.
+- **overlay variant** — one row per talking presenter (`bSe`), described above. **Not built.**
+
+Copying the nav one across would render the wrong control with the right class name.
+
 ### Where it goes
 
 `apps/room/src/lib/components/ScreenTabs.svelte:249` currently renders:

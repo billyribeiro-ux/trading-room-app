@@ -24,6 +24,42 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-12
 
+### 2026-08-12 12:50 EDT — Item U: the trigger is GATED, and the state behind it does not exist here
+
+Started building it and stopped at the right place. Reading `CSe`'s update block — which the earlier
+pass had not read, having stopped at the creation block — changes what item U actually is:
+
+```text
+m(),O(3,e.appService.globals.viewerOnlyMode?3:-1),
+```
+
+Index 3 is `hSe`, the volume button. **It renders only in viewer-only mode.** That one line explains
+the whole mystery: the control "has never rendered in any capture" because no capture was taken in
+viewer-only mode. It was never missing markup — it is gated markup, and a capture was never going to
+show it no matter how many were taken.
+
+The other gates, same block: Mute when `audioVolume > 0`, Unmute when `0 == audioVolume`, the
+per-presenter list when `talkingUsers.length > 0`.
+
+**Then the part that stopped the build.** The control needs six pieces of state, and five are absent
+from this app: `viewerOnlyMode` (present only inside a comment in `ScreenZoomControls.svelte:18`),
+`individualVolumeControls`, `audioMutedFor[userID]`, `audioVolumeFor[userID]`,
+`toggleTalkingPresenter()` and `adjustVolPres()`. Only `talkingUsers`, `volume`, `setMasterVolume`
+and `toggleMute` exist.
+
+So this is not "add a button to a container". It is a state-plumbing change with a component on top,
+and the honest thing was to write the finding down rather than start it with the context left and
+hand over something half-wired. **Nothing was faked to make the markup render**, which is the failure
+mode that rule exists to prevent.
+
+One more trap recorded while there: **the two `room-sound-options` are not the same content.** Both
+variants carry that class, so they look interchangeable. The nav one holds the sound checkboxes and
+is already built at `+page.svelte:6904`; the overlay one holds a row per talking presenter and is
+not. Copying the nav across would render the wrong control under the right class name.
+
+`HANDOFF.md` now carries the verbatim update block, all five gates, the state table with what is
+present and what is absent, and that trap.
+
 ### 2026-08-12 12:20 EDT — Item U's evidence gap closed by reading, not by a script
 
 No code yet. The row said the volume dropdown's trigger "has never rendered in any capture" and was
