@@ -4317,3 +4317,27 @@ depends on pointed at a directory that does not exist. So the mismatch is either
 in an imported file or a pin that was computed at import time and never validated. Re-pinning it to
 make the gate green would destroy the first true signal this seal has ever produced. It needs a
 per-file diff against the source, which is TODO row P and the owner’s direction to move in.
+
+## 2026-08-12 17:40 EDT — the manifest mismatch is real drift, and it is now enumerated
+
+The provenance seal's manifest SHA-256 failure was an open question four hours ago: real drift, or a
+pin computed at import time and never validated? It is REAL DRIFT, and the answer came from git
+rather than from an opinion.
+
+`git diff --name-only e50a819..HEAD -- services` lists ten IMPORTED files whose content has changed
+since the seal was taken: `Cargo.lock`, `api/src/db/migrate.rs`, `media/Dockerfile`,
+`media/src/config.rs`, `grant.rs`, `main.rs`, `router_registry.rs`, `server.rs`, `session.rs`,
+`worker_pool.rs`. `server.rs` alone is +196 lines. An eleventh, `0009_rename_runtime_roles.sql`, was
+authored here and is sealed separately as `LOCALLY_AUTHORED`; it is not part of this divergence.
+
+That matters beyond the gate. `CLAUDE.md` states `services/**` is a mirror and a change made here is
+lost on the next sync — so ten files of real work, the SFU liveness fix among them, exist only in
+this repository and a sync would destroy them.
+
+The seal stays red. It is reporting exactly what it exists to report, and re-pinning would erase the
+only record that these ten diverged. TODO row P now enumerates them and states the two honest ways
+to close it — push them back to the source and re-seal, or accept this repository as the authority
+for `services/**` and retire the import-provenance framing. That is a decision about where the
+backend lives, and it is the owner's.
+
+TODO rows Z and P both rewritten to the current state; Z's three original causes are closed.
