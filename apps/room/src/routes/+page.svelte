@@ -6589,7 +6589,26 @@
     class={theme === 'dark' ? 'darkTheme' : 'lightTheme'}
     class:detach-screen={detachedScreenId !== null}
   >
-    <div class={sidebarOpen ? 'wrapper push-wrapper' : 'wrapper'}>
+    <!--
+      `KAe = (t, n) => ({'push-wrapper': t, 'mt-0': n})`, bound as
+      `Kn(6, KAe, o.showSidebar, videoOnlyMode || chatOnlyMode || viewerOnlyMode)`
+      (`docs/source/components/app-room.full.js:4029-4039`, pure function at `:5`).
+
+      `mt-0` was never bound here, and it is not cosmetic. This component's own stylesheet sets
+      `.wrapper { margin-top: 49px }` and `.navbar { height: 49px }`
+      (`app-room.component.css`), so the 49px is space reserved FOR the navbar — and the navbar is
+      removed in these same three modes (see the gate on `mainNavigation` below). Without `mt-0`
+      the room keeps a 49px gap where a navbar used to be, and `vh-100` on the split then pushes
+      49px of content off the bottom of the window.
+
+      `videoOnlyMode` is the `r` query parameter, which this room does not model — the same honest
+      gap recorded for `hideFiles` in `files-gates.ts`. The two modes it does model are bound.
+    -->
+    <div
+      class="wrapper"
+      class:push-wrapper={sidebarOpen}
+      class:mt-0={chatOnlyMode || viewerOnlyMode}
+    >
       <div class="d-flex flex-column-reverse flex-sm-row room-container">
         {#snippet mainNavigation()}
           <nav class="navbar navbar-expand-md navbar-dark fixed-top mainAppNav" style="">
@@ -7281,6 +7300,23 @@
           </nav>
         {/snippet}
 
+        <!--
+          Nodes 3 and 4 of the root template, and they carry the SAME gate:
+
+            O(3, videoOnlyMode || chatOnlyMode || viewerOnlyMode ? -1 : 3)   // _Pe  = the sidebar
+            O(4, videoOnlyMode || chatOnlyMode || viewerOnlyMode ? -1 : 4)   // A4e  = the navbar
+
+          (`docs/source/components/app-room.full.js:4043-4059`.) Both were rendered
+          unconditionally here, so a room entered with `?vo=1` or `?co=1` kept a full navbar and a
+          full sidebar that the reference removes entirely — and the `vh-100` on the split below
+          assumes they are gone. One `{#if}` covers both because upstream it is one condition
+          evaluated twice, not two decisions.
+
+          The gate is deliberately NOT `hideChatAlerts`: that flag hides the chat/alerts COLUMN and
+          has five sources of its own (`full.js:1893-1902`). This is the chrome, and it goes on the
+          mode alone.
+        -->
+        {#if !(chatOnlyMode || viewerOnlyMode)}
         <div class="room-sidebar">
           <div class="sidebar-wrapper">
             <nav class="navbar w-100 h-100">
@@ -7766,6 +7802,7 @@
           </div>
         </div>
         {@render mainNavigation()}
+        {/if}
 
 <!--
           `z('ngClass', ut(5, QB, videoOnlyMode || chatOnlyMode || viewerOnlyMode))` with
