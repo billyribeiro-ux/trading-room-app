@@ -48,6 +48,11 @@
     sortRosterByNick
   } from '$lib/roster-gates';
   import { alertSoundButtonFor, filesSectionHidden } from '$lib/files-gates';
+  import {
+    MUTE_ALL_CONFIRM,
+    MUTE_STAGGER_MS,
+    nonAdminTalkingUsers
+  } from '$lib/mute-all-non-admins';
   import { NO_PENDING_CLICK, gutterRelease, togglePresentationSplit } from '$lib/split-gutter';
   import {
     pushToTalkShouldMute,
@@ -2255,6 +2260,54 @@
     };
   }
 
+  /**
+   * `muteAllNonAdmins()` — `app-room.full.js:2963-2986`, reached through
+   * `appEventBus.subscribe('muteAllNonAdmins', …)` (`:2219-2221`), which in this room is the
+   * session-control action of the same name.
+   *
+   * **This replaced a control that did the wrong thing quietly.** It read
+   * `muted = true; volume = 0` — so a presenter who asked the room to silence its non-admin
+   * speakers silenced their OWN speakers instead, and every one of those microphones stayed open
+   * for everybody else. The label and the effect were unrelated.
+   *
+   * The selection is `nonAdminTalkingUsers` in `$lib/mute-all-non-admins`, with the four properties
+   * that matter transcribed and tested there — chiefly that a talking user with no roster row is
+   * SKIPPED rather than assumed ordinary.
+   *
+   * **One mapping, stated because it is not a transcription.** Upstream sends its own
+   * `sendServerCommand('muteTalkingUser', muser)`. This room has no such command; it has
+   * `remotePresCommand` / `mutemic`, which is the same act addressed to one peer and is already
+   * carried out by that peer's own browser (`:5917`). The server re-checks that the caller is a
+   * presenter and that the subCmd is one of three (`+page.server.ts:1654-1670`), so authority is
+   * decided there rather than asserted here.
+   *
+   * The 100ms stagger is the reference's and is not cosmetic: this is one request per muted member.
+   */
+  function muteAllNonAdmins() {
+    // `if (!globals.user.isPresenter) return` — the first line of the method, before the dialog.
+    if (!isPresenter) return;
+    // `!e || 0 === e.length ||` — with nobody speaking the confirm never opens at all.
+    if (talkingUsers.length === 0) return;
+
+    bootboxConfirmation = {
+      message: MUTE_ALL_CONFIRM,
+      onconfirm: () => {
+        bootboxConfirmation = null;
+        const targets = nonAdminTalkingUsers(talkingUsers, rosterUsers);
+        // `0 !== r.length &&` — an empty selection sends nothing, which is the case where every
+        // open microphone belongs to a presenter.
+        targets.forEach((entry, index) => {
+          globalThis.setTimeout(() => {
+            const body = new FormData();
+            body.set('subCmd', 'mutemic');
+            body.set('targetUserId', String(entry.userID));
+            void fetch('?/presenterCommand', { method: 'POST', body });
+          }, MUTE_STAGGER_MS * index);
+        });
+      }
+    };
+  }
+
   function requestModalConfirmation(message: string, onconfirm: () => void) {
     bootboxConfirmation = {
       message,
@@ -2426,8 +2479,7 @@
     }
 
     if (action === 'mute-all-non-admins') {
-      muted = true;
-      volume = 0;
+      muteAllNonAdmins();
       return;
     }
 
