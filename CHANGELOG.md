@@ -24,6 +24,21 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-12
 
+### 2026-08-12 16:29 EDT — A second pre-existing RED test, found by running a suite nobody had run
+
+**Runtime impact: none** — one assertion in `dump-contract.test.ts`.
+
+`f9e1890` replaced the wrapper ternary with `class="wrapper"` plus two `class:` directives, because
+it bound a SECOND class to the same element — `KAe = (t, n) => ({"push-wrapper": t, "mt-0": n})`
+(`app-room.full.js:5`, applied at `:4029-4039`), and two independent classes do not fit one
+`a ? b : c`. The assertion still demanded the ternary verbatim, so it went red at that commit and
+stayed red, because `f9e1890` reported `svelte-check` and prettier only.
+
+The same shape as the `individualVolumeControls` failure found earlier today: a suite that nothing
+ran between the change and now. What the assertion GUARDS is unchanged and still asserted — the
+wrapper always carries `wrapper`, and `push-wrapper` appears only with `sidebarOpen`. Negative
+control: binding `push-wrapper` to `true` turns it red; restored.
+
 ### 2026-08-12 16:26 EDT — `isMobileScreen` and the `K4e` layout, and the CSS rule that was deleting it
 
 **Runtime impact: a phone gets the reference's room instead of a squeezed desktop one** — and the

@@ -437,7 +437,18 @@ describe('part 1 capture contract', () => {
     expect(compiledRoom).toContain('toggleSideBar()');
     expect(compiledRoom).toContain('this.showSidebar = !this.showSidebar');
     expect(pageSource).toContain('let sidebarOpen = $state(false);');
-    expect(pageSource).toContain("<div class={sidebarOpen ? 'wrapper push-wrapper' : 'wrapper'}>");
+    /*
+      The wrapper stopped being a ternary at `f9e1890`, which bound a SECOND class to the same
+      element — `KAe = (t, n) => ({'push-wrapper': t, 'mt-0': n})` (`app-room.full.js:5`, applied at
+      `:4029-4039`). Two independent classes do not fit one `a ? b : c`, so the element became
+      `class="wrapper"` plus two `class:` directives.
+
+      This assertion went red at that commit and stayed red until 2026-08-12, because `f9e1890`
+      reported `svelte-check` and prettier only. What it GUARDS is unchanged and is still asserted:
+      the wrapper always carries `wrapper`, and `push-wrapper` appears only with `sidebarOpen`.
+    */
+    expect(pageSource).toContain('class="wrapper"');
+    expect(pageSource).toContain('class:push-wrapper={sidebarOpen}');
     expect(pageSource).toContain('onclick={() => (sidebarOpen = !sidebarOpen)}');
     expect(pageSource).toContain("class={sidebarOpen ? 'fas fa-arrow-left' : 'fas fa-bars'}");
     expect(pageSource).toContain("const noSpeakerText = ' ( No one is speaking )';");
