@@ -4439,3 +4439,44 @@ repairs let execution reach it: `DOCUMENTED_COUNT_SITES` names `docs/ENGINEERING
 
 The seal stays red until that edit is authorised, which is the correct state: it is reporting
 something true.
+
+## 2026-08-12 18:40 EDT — the provenance seal passes for the first time, and `pnpm test` clears step 2
+
+Authorised and done. **The seal was not silenced** — it detects more than it did before.
+
+**The shape of the change.** Not a re-pin of the whole tree: a hash over whatever happens to be
+present cannot distinguish reviewed work from an accident, and the next unrecorded edit would land
+inside a green gate. Instead the ten diverged files are pinned INDIVIDUALLY in
+`DIVERGED_FROM_IMPORT`, and the manifest is narrowed to the 88 imports never edited here, whose
+bytes are still the bytes that arrived.
+
+**Three negative controls, each red then restored** — the seal now fails in all three directions:
+
+| control | result |
+| --- | --- |
+| corrupt a diverged file's pin | `diverged file changed: services/media/src/server.rs` — fails BY NAME |
+| append a byte to an untouched import | `manifest SHA-256 changed` |
+| add a new file under `services/` | `imported file count changed: expected 98, got 99` |
+
+Naming the file is the gain over the old behaviour: an opaque whole-tree mismatch told the next
+reader nothing about where to look, which is exactly how this sat undiagnosed.
+
+**Two more bugs found while doing it, both mine to fix and both instructive.**
+
+A comment I wrote contained `apps/*` followed by a slash, which closed the block comment early and
+broke the file. Same family as the template-syntax-in-a-comment rule this repository already
+carries: a comment is not inert, and prose containing delimiters is code.
+
+And the documented-count check conflated "missing" with "unreadable". It sent me hunting for
+`MEDIASOUP-DEPLOYMENT-PLAN.md`, which is present and 48,033 bytes — `readFile` was returning
+ETIMEDOUT because the working-tree copy is a cloud-storage placeholder that never materialised.
+`ls` sees the metadata; `read` blocks on a download that does not land. Now ENOENT fails, because a
+deleted documented site is a provenance fault, and anything else warns loudly, because refusing to
+verify 98 files over one undownloaded document is a false negative. Read from git's object store
+instead, the file's claim is `98-file current-tree` — correct.
+
+**`pnpm test` now clears step 2 for the first time**, and stops at step 3 on a genuinely different
+problem: `verify-api-release-artifact.mjs` expects `.github/workflows/backend-quality.yml`, which
+does not exist here. It exists at `new-room-control/.github/workflows/backend-quality.yml` — the
+verifier was imported without its subject. Pulling it is the sanctioned direction and is the next
+piece of work, recorded rather than folded into this one.

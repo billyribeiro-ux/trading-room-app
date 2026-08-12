@@ -1,0 +1,291 @@
+name: Backend quality
+
+on:
+  workflow_dispatch:
+  merge_group:
+    types:
+      - checks_requested
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backend-quality-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_INCREMENTAL: '0'
+  CARGO_TERM_COLOR: always
+
+jobs:
+  rust-postgres:
+    name: Rust and PostgreSQL security contracts
+    runs-on: ubuntu-24.04
+    # The PostgreSQL/Rust suite and the clean auditable Docker rebuild are both
+    # release gates. Keep one bounded job while allowing cold GitHub runners to
+    # compile the native graph without a false timeout.
+    timeout-minutes: 90
+
+    services:
+      postgres:
+        # Official PostgreSQL 17 multi-architecture image resolved on 2026-08-02.
+        image: postgres:17@sha256:a426e44bac0b759c95894d68e1a0ac03ecc20b619f498a91aae373bf06d8508d
+        env:
+          POSTGRES_USER: ptr_clone
+          POSTGRES_PASSWORD: ptr_clone_local_development_password
+          POSTGRES_DB: ptr_clone
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ptr_clone -d ptr_clone"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+      postgres-cross-cluster-control:
+        # Independent same-version, same-database-name negative control. The
+        # release attestor must reject owner/runtime URLs mixed across clusters.
+        image: postgres:17@sha256:a426e44bac0b759c95894d68e1a0ac03ecc20b619f498a91aae373bf06d8508d
+        env:
+          POSTGRES_USER: ptr_clone
+          POSTGRES_PASSWORD: ptr_clone_local_development_password
+          POSTGRES_DB: ptr_clone
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U ptr_clone -d ptr_clone"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    env:
+      MIGRATE_DATABASE_URL: postgres://ptr_clone:ptr_clone_local_development_password@127.0.0.1:5432/ptr_clone
+      # The decoded password contains both a quote and a backslash. This is a
+      # regression contract for safe psql binding in the role provisioner.
+      DATABASE_URL: postgres://ptr_clone_app:ptr_app_%27%5C_local@127.0.0.1:5432/ptr_clone
+
+    steps:
+      - name: Check out the immutable revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Needed to diff a pull request against its base. `0` rather than a
+          # guessed depth: a shallow clone silently produces an empty diff, which
+          # would skip this gate on a backend change — the one failure mode this
+          # step must not have.
+          fetch-depth: 0
+          persist-credentials: false
+
+      # This gate compiles the Rust workspace, stands up two PostgreSQL clusters
+      # and rebuilds the API image. It takes ~33 minutes, and it ran in full on
+      # every pull request — including ones that touch no backend file at all.
+      #
+      # That is not merely slow. It is the release gate for `services/**`, and a
+      # gate that always runs is a gate people learn to cancel; it also burns a
+      # half-hour of Actions minutes per frontend change.
+      #
+      # So the JOB always runs and always reports — branch protection requires
+      # this exact check name, and a path-filtered workflow would leave it
+      # permanently "expected" and block every PR forever. What is conditional is
+      # the WORK.
+      #
+      # Deliberately fail-open toward RUNNING: anything other than a pull request
+      # whose diff provably touches none of these paths runs the full gate. Push
+      # to main, merge_group and workflow_dispatch always run it, so nothing
+      # reaches the default branch or the merge queue unverified.
+      - name: Decide whether this revision touches the backend
+        id: scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" != "pull_request" ]; then
+            echo "reason=event ${{ github.event_name }} always runs the full gate" >> "$GITHUB_OUTPUT"
+            echo "backend=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git fetch --no-tags --depth=0 origin "${{ github.base_ref }}" >/dev/null 2>&1 || \
+            git fetch --no-tags origin "${{ github.base_ref }}"
+          base="$(git merge-base "origin/${{ github.base_ref }}" HEAD)"
+          changed="$(git diff --name-only "$base" HEAD)"
+          printf 'changed files:\n%s\n' "$changed"
+          # The workflow itself is in the list: a change to this file must be
+          # proved by the gate it defines, or it could disable itself.
+          if printf '%s\n' "$changed" | grep -qE '^(services/|ops/|scripts/verify-backend|scripts/verify-api-release-artifact|scripts/verify-rust-advisories|\.github/workflows/backend-quality\.yml)'; then
+            echo "reason=backend paths changed" >> "$GITHUB_OUTPUT"
+            echo "backend=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "reason=no backend path in the diff" >> "$GITHUB_OUTPUT"
+            echo "backend=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Report a skipped backend gate
+        if: steps.scope.outputs.backend != 'true'
+        shell: bash
+        run: |
+          echo "::notice title=Backend gate skipped::${{ steps.scope.outputs.reason }}. The full Rust and PostgreSQL suite runs on every merge_group, every push to main, and any pull request touching services/**, ops/**, the backend verifiers, or this workflow."
+
+      - name: Install the pinned Docker Buildx and BuildKit
+        if: steps.scope.outputs.backend == 'true'
+        uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5 # v4.1.0
+        with:
+          name: api-release-builder
+          version: v0.34.1
+          driver: docker-container
+          driver-opts: |
+            image=moby/buildkit:v0.31.2@sha256:2f5adac4ecd194d9f8c10b7b5d7bceb5186853db1b26e5abd3a657af0b7e26ec
+
+      - name: Install the repository-pinned Node runtime
+        if: steps.scope.outputs.backend == 'true'
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
+
+      - name: Activate the repository pnpm version
+        if: steps.scope.outputs.backend == 'true'
+        run: |
+          corepack enable
+          corepack prepare pnpm@11.18.0 --activate
+          test "$(pnpm --version)" = "11.18.0"
+
+      - name: Install and show the repository-pinned Rust toolchain
+        if: steps.scope.outputs.backend == 'true'
+        working-directory: services
+        run: rustup show
+
+      - name: Install the pinned Rust policy scanners
+        if: steps.scope.outputs.backend == 'true'
+        working-directory: services
+        run: |
+          cargo install --locked cargo-audit --version 0.22.1
+          cargo install --locked cargo-deny --version 0.19.4
+
+      - name: Reject vulnerabilities and unreviewed RustSec warnings
+        if: steps.scope.outputs.backend == 'true'
+        run: node scripts/verify-rust-advisories.mjs
+
+      - name: Enforce Rust licenses, bans, and source registries
+        if: steps.scope.outputs.backend == 'true'
+        run: pnpm backend:licenses
+
+      - name: Verify every migration byte and its forensic lineage
+        if: steps.scope.outputs.backend == 'true'
+        run: pnpm backend:migrations:verify
+
+      - name: Prove PostgreSQL 17 is ready
+        if: steps.scope.outputs.backend == 'true'
+        env:
+          PGPASSWORD: ptr_clone_local_development_password
+        run: |
+          test "$(psql -h 127.0.0.1 -U ptr_clone -d ptr_clone -Atc "SHOW server_version_num" | cut -c1-2)" = "17"
+
+      - name: Provision the fail-closed runtime role
+        if: steps.scope.outputs.backend == 'true'
+        env:
+          PGPASSWORD: ptr_clone_local_development_password
+          POSTGRES_USER: ptr_clone
+          POSTGRES_DB: ptr_clone
+          POSTGRES_APP_USER: ptr_clone_app
+          POSTGRES_APP_PASSWORD: "ptr_app_'\\_local"
+          PGHOST: 127.0.0.1
+        run: bash services/docker/postgres/10-provision-roles.sh
+
+      - name: Provision the independent cross-cluster negative control
+        if: steps.scope.outputs.backend == 'true'
+        env:
+          PGPASSWORD: ptr_clone_local_development_password
+          POSTGRES_USER: ptr_clone
+          POSTGRES_DB: ptr_clone
+          POSTGRES_APP_USER: ptr_clone_app
+          POSTGRES_APP_PASSWORD: "ptr_app_'\\_local"
+          PGHOST: 127.0.0.1
+          PGPORT: 5433
+        run: bash services/docker/postgres/10-provision-roles.sh
+
+      - name: Apply the immutable migration chain as database owner
+        if: steps.scope.outputs.backend == 'true'
+        working-directory: services
+        run: cargo run --locked --release --bin migrate
+
+      - name: Apply the same chain to the independent negative-control cluster
+        if: steps.scope.outputs.backend == 'true'
+        working-directory: services
+        env:
+          MIGRATE_DATABASE_URL: postgres://ptr_clone:ptr_clone_local_development_password@127.0.0.1:5433/ptr_clone
+        run: cargo run --locked --release --bin migrate
+
+      - name: Load the committed two-tenant fixture
+        if: steps.scope.outputs.backend == 'true'
+        env:
+          PGPASSWORD: ptr_clone_local_development_password
+        run: >-
+          psql -h 127.0.0.1 -U ptr_clone -d ptr_clone -v ON_ERROR_STOP=1
+          -f services/api/fixtures/seed.sql
+
+      - name: Verify formatting
+        if: steps.scope.outputs.backend == 'true'
+        working-directory: services
+        run: cargo fmt --all -- --check
+
+      - name: Reject every Clippy warning across all targets
+        if: steps.scope.outputs.backend == 'true'
+        working-directory: services
+        run: cargo clippy --locked --workspace --all-targets --features testing -- -D warnings
+
+      - name: Run all Rust tests against real row-level security
+        if: steps.scope.outputs.backend == 'true'
+        working-directory: services
+        run: cargo test --locked --workspace --features testing
+
+      - name: Emit the redacted PostgreSQL release attestation
+        if: steps.scope.outputs.backend == 'true'
+        run: |
+          umask 077
+          install -d -m 0700 "release-evidence/api-${GITHUB_SHA}"
+          cargo run --locked --manifest-path services/Cargo.toml \
+            -p tradingroom-api --bin postgres-release-attestation -- --format json \
+            > "release-evidence/api-${GITHUB_SHA}/postgres-release-attestation.json"
+          jq --exit-status \
+            '.attestation_version == 1 and .status == "pass"' \
+            "release-evidence/api-${GITHUB_SHA}/postgres-release-attestation.json" \
+            > /dev/null
+
+      - name: Reject cross-cluster owner and runtime URL mixing
+        if: steps.scope.outputs.backend == 'true'
+        env:
+          MIGRATE_DATABASE_URL: postgres://ptr_clone:ptr_clone_local_development_password@127.0.0.1:5432/ptr_clone
+          DATABASE_URL: postgres://ptr_clone_app:ptr_app_%27%5C_local@127.0.0.1:5433/ptr_clone
+        run: |
+          negative_stdout="${RUNNER_TEMP}/postgres-cross-cluster.stdout"
+          negative_stderr="${RUNNER_TEMP}/postgres-cross-cluster.stderr"
+          set +e
+          cargo run --locked --manifest-path services/Cargo.toml \
+            -p tradingroom-api --bin postgres-release-attestation -- --format json \
+            > "${negative_stdout}" 2> "${negative_stderr}"
+          negative_status=$?
+          set -e
+          test "${negative_status}" -ne 0
+          test ! -s "${negative_stdout}"
+          grep --fixed-strings '[target_cluster_mismatch]' "${negative_stderr}" > /dev/null
+
+      - name: Verify the release-artifact policy and immutable tool pins
+        if: steps.scope.outputs.backend == 'true'
+        run: pnpm backend:release:verify
+
+      - name: Build and attest the registry-credential-free API release artifact
+        if: steps.scope.outputs.backend == 'true'
+        run: bash scripts/build-api-release-evidence.sh
+
+      - name: Preserve API image, SBOM, and vulnerability evidence
+        # `always()` so the evidence survives a FAILING gate, which is when it is
+        # most worth reading — combined with the scope check rather than replaced
+        # by it, so a skipped gate does not upload an empty artifact.
+        if: always() && steps.scope.outputs.backend == 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: api-release-evidence-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: release-evidence/api-${{ github.sha }}/
+          if-no-files-found: warn
+          compression-level: 9
+          retention-days: 30
