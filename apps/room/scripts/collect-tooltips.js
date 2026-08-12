@@ -336,13 +336,42 @@
       record.hostWhileOpen = { attrs: attrsOf(host) };
     }
 
-    for (const type of CLOSE_EVENTS) fire(host, type);
-    await wait(150);
+    /*
+      Closing, and then PROVING it closed.
+
+      The 2026-08-11 run left four tooltips on the live page — the copies inside the message modals.
+      Firing the leave events once and waiting a fixed 150ms was not enough: `.tooltip` carries
+      `transition: opacity .15s linear`, so a fade that starts late is still on screen when the check
+      runs, and a host inside a hidden modal may not receive a pointer event at all.
+
+      So it retries, and if the element still will not go it removes the node it created — the page
+      is the owner's, and leaving a black bubble stuck over their room is not an acceptable cost of
+      observing it. Whether it had to do that is recorded, because a forced removal means the close
+      path itself is worth another look.
+    */
+    for (let attempt = 0; attempt < 4; attempt++) {
+      for (const type of CLOSE_EVENTS) fire(host, type);
+      // Also from the element the pointer would move TO, which is what really ends a hover.
+      try {
+        fire(document.body, 'pointerover');
+        fire(document.body, 'mouseover');
+      } catch {
+        /* body is always there; this is belt and braces */
+      }
+      await wait(250);
+      if (!liveTooltips().some((el) => !before.has(el))) break;
+    }
+
+    var strays = liveTooltips().filter((el) => !before.has(el));
+    if (strays.length) {
+      record.forciblyRemoved = strays.length;
+      for (const el of strays) el.remove();
+    }
     record.closedCleanly = !liveTooltips().some((el) => !before.has(el));
     if (!record.closedCleanly) {
       gap(
-        `tooltip left open: ${label}`,
-        'The tooltip did not disappear after the leave events. The page has been altered; reload before using it.'
+        `tooltip would not close on its own: ${label}`,
+        'Four rounds of leave events did not dismiss it, so the element this script created was removed directly. The page is NOT left altered, but the close path is worth a look — it is usually a host inside a hidden modal that never receives the pointer event.'
       );
     }
     return record;

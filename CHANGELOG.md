@@ -24,6 +24,50 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-12
 
+### 13:55 — Item U reduced to one line, gap 1 halved, and the collector no longer strands tooltips
+
+**No runtime impact.** One collector hardened; two rows reduced to what is genuinely open.
+715 / 65 controller, 604 / 62 room.
+
+**Item U: the background is closed with four independent confirmations.** Every `#screenTabs` node in
+`proroom-ULTIMATE-staff-2026-07-24…json` reads `background-color: rgb(17,17,17)` — across the
+`main-tab:Screens`, `Streams`, `Notes` and `Files` captures. Ours is `var(--notes-tabs-bg)` = `#111`,
+the variable the captured sheet keys `.screens-tabs` off by name.
+
+**And the height never needed the number.** All four captures are of an EMPTY bar — h=1, its own
+border, or h=0 when the pane is hidden — so the populated height is still underived. It does not
+matter: our sheet pins no height and uses `auto`, which reproduces both states because
+`.nav-tabs .nav-item { margin-bottom: -1px }` cancels the bar's own border once it has tabs, and
+`screen-tab-bar-contract.test.ts:87` fails if anybody pins one. **A derived 41.5 that nothing
+consumes is a note, not a gap.** U is now one line: the volume dropdown's trigger, which is a
+collapsed `<!---->` in every capture.
+
+**Gap 1: `Search for GIFs` is solved, and it exposed a divergence.** The room bundle carries that
+element's const table verbatim:
+
+```
+["ngbTooltip","Search for GIFs","placement","top","placement","auto","container","body",
+ "autoClose","outside","popoverClass","popOverDiv","triggers","manual",…,"ngbPopover"]
+```
+
+**Two `placement` entries.** `top` belongs to the ngbTooltip, `auto` to the ngbPopover — and
+`triggers: manual` sits in the POPOVER's group, so the tooltip is not manual-triggered and my earlier
+reading of that was wrong. Our markup collapses the two into a single `placement: 'auto'`, so that
+tooltip carries no placement of its own and the attachment refuses to render it. Fixing it needs
+`top`, which has never been captured rendering — `bs-tooltip-top` is the obvious name and obvious is
+not evidence.
+
+**The collector no longer leaves anything behind.** The 2026-08-11 run stranded four tooltips in the
+message-modal copies: one round of leave events and a fixed 150ms wait, against a `.tooltip` carrying
+`transition: opacity .15s linear` and hosts inside hidden modals that may never receive a pointer
+event. It now retries four times at 250ms, also fires the pointer onto `document.body` — which is
+what really ends a hover — and if an element still will not go, removes the node it created. The page
+is the owner's; leaving a black bubble stuck over their room is not an acceptable cost of observing
+it. Whether it had to force one is recorded, because that means the close path needs another look.
+
+One paste now closes both remaining tooltip placements: run it **while sharing a screen** for the
+`bottom` eye badge, and hover the GIF control for `top`.
+
 ### 11:05 — The next two gates: a path bug in three verifiers, and an unpinned migration
 
 **No runtime impact.** Verifier fixes and one capture tracked. 715 tests / 65 files, room 604 / 62.
