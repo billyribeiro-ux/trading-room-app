@@ -4341,3 +4341,49 @@ for `services/**` and retire the import-provenance framing. That is a decision a
 backend lives, and it is the owner's.
 
 TODO rows Z and P both rewritten to the current state; Z's three original causes are closed.
+
+## 2026-08-12 17:35 EDT — the app-room gap sweep: all 11 closed
+
+Every gap the ledger recorded for `app-room` is now resolved, and four of them turned out not to be
+gaps at all.
+
+**Implemented (4).**
+
+`muteAllNonAdmins` — it read `muted = true; volume = 0`, so a presenter asking the room to silence
+its non-admin speakers silenced their OWN speakers and left every one of those microphones open for
+everybody else. The label and the effect were unrelated. Now selects from `talkingUsers` with the
+roster as the authority on who is an admin, skipping anyone with no roster row rather than assuming
+them ordinary, and staggers the sends 100ms apart.
+
+The `#connectedMsg` reconnect flash — the markup shipped and nothing ever showed it. Flashes for 3s
+on a RE-connect only, never the first open.
+
+Join/leave announcements, end to end. The subscriber map is the presence table, so these are PERSON
+events: one person with three tabs announces once on the first and once on the last.
+
+Tawk presenter support — and it carried a hazard. The reference hardcodes
+`https://embed.tawk.to/5aecb59f227d3d7edc24f7c2/default`, which is protradingroom OWN property.
+Copied verbatim, every presenter here would open a support chat into another company inbox and
+`setAttributes` would post their name and email into it. The property now comes from
+`PUBLIC_PTR_TAWK_PROPERTY_ID`; with none configured no script is injected and the control does not
+render.
+
+**Closed by evidence, no code (2).** Both would have ADDED behaviour the reference does not have.
+`calculateDuplicates` has zero call sites — dead upstream. The `.alert-chat-box` hover targets
+`.mainTabset ul.nav-tabs`, and `mainTabset` sits on exactly one element in the decoded tree —
+`ul#mainTabs`, which IS the only `ul.nav-tabs` and has no `ul` descendants. The selector matches
+nothing.
+
+**Already implemented (2), and both were my own false negatives** from grepping `+page.svelte` alone
+when the code lives in `ModalHost.svelte`: `initPMDrag` and `pollModalCompHolder`. Recorded rather
+than quietly dropped, because it is the second time a scoped search has produced a wrong conclusion
+in this work.
+
+**Deferred, each because the producer does not exist here (3).** `hideChat` — its only emitter is
+inside `changeChatMode`, a feature this room does not model, so the handler alone would be a
+listener nothing emits. `stopRecMsg` — sent by the reference own server on a recording pipeline we
+replaced client-side. `appVisibilityChange` — its roster half has no counterpart because this roster
+is SSE-pushed.
+
+VERIFIED: 775 tests / 73 files green; svelte-check 0 errors; schema:verify 269 total, 49 wired;
+prettier clean; four negative controls run, each red then restored.
