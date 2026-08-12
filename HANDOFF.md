@@ -198,6 +198,24 @@ Checked with a search across `apps/room/src`; each of these is absent except whe
 cannot be established from the bundle or the room-settings schema, that is a gap: report it, and
 write the console script.
 
+### START HERE — the four sources still unread
+
+Two of the six were sourced 2026-08-12 and are cited in the table above (`viewerOnlyMode` → the `vo`
+query param; `individualVolumeControls` → `sessData`). **These four have NOT been read yet.** Each has
+a known occurrence count in `apps/room/docs/source/main.d6d3c112b59b7d0d.js`, so none of them is a
+gap — they are reads nobody has done:
+
+| symbol                   | occurrences | what to establish                                                  |
+| ------------------------ | ----------- | ------------------------------------------------------------------ |
+| `audioMutedFor`          | 30          | where the map lives, how a key is set, what writes it              |
+| `audioVolumeFor`         | 24          | same, plus its default for a user with no entry                    |
+| `toggleTalkingPresenter` | 4           | the handler body — what it toggles and what it emits               |
+| `adjustVolPres`          | 6           | the handler body — its arguments and what it applies the volume to |
+
+Do these first, in one pass, and record each with its offset in this file before writing any state.
+Reading them is roughly one Python slice each; guessing any of them re-opens the exact failure this
+document exists to prevent.
+
 ### The two `room-sound-options` are NOT the same content
 
 Both variants use `class="room-sound-options"`, which makes them look interchangeable. They are not:
