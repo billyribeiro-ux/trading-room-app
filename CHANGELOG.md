@@ -24,6 +24,82 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-12
 
+### 2026-08-12 16:26 EDT — `isMobileScreen` and the `K4e` layout, and the CSS rule that was deleting it
+
+**Runtime impact: a phone gets the reference's room instead of a squeezed desktop one** — and the
+presentation area, which our own stylesheet had been hiding on every screen under 900px, comes back.
+
+**The threshold selects a TEMPLATE, not a class.** `isMobileScreen = window.innerWidth <= 601`
+(`app-room.full.js:1889`, `:2988`) drives `O(5, o.isMobileScreen ? 6 : 5)` (`:4061`), choosing
+between `j4e` and `K4e` (`app-room.render-helpers.js:1616-1664` and `:1783-1821`). 601, not 600: the
+scoped sheet's own media query beside it is `max-width: 600px`, so the two do not agree and the 1px
+seam is the reference's. Copied rather than tidied.
+
+**Four differences, every one read from the const table rather than inferred:**
+
+- **The child order reverses.** `K4e` node 1 is the presentation (`O(1, hidePresentation ? -1 : 1)`,
+  `:1815`), node 2 the chat/alerts. `j4e` is the other way round (`:1650`, `:1662`). Same two flags.
+- **Both splits are vertical as a STATIC attribute.** Const 224 is
+  `['minSize','0','direction','vertical','id','mainAreaSplit','gutterDblClickDuration','400',…]` and
+  const 228 is `['direction','vertical','minSize','0']`, where the desktop pair (consts 8 and 209)
+  *binds* direction from `directionRoom()`. So a phone is stacked whatever `roomSplitDir` says.
+- **No `dragEnd`.** `K4e` binds `gutterDblClick` and `dragStart` only, so a mobile drag is never
+  recorded — and is not recorded here.
+- **No `order` on either area.** Consts 225/226 carry `size` alone; const 227, the extra chat column
+  this room does not model, is the only mobile area with `order`.
+
+**That last one is why this reorders the DOM rather than restyling it.** Snippets, not a second copy:
+the two panes are ~1,625 lines, and a duplicated layout drifts the first time somebody edits the one
+they happen to be looking at.
+
+**A trap caught against const 228 rather than by eye.** The inner chat/alerts split is normally the
+*opposite* direction to the outer, so the obvious implementation reuses `splitIsHorizontal` — which
+would have put alerts BESIDE chat in a phone-width column. Const 228 says vertical outright, so
+`innerSplitIsVertical` is an OR, not a negation.
+
+**Mobile geometry is its own and is never written down.** `chatAlertsSizeMobile = 50` /
+`presAreaSizeMobile = 50` (`:1852-1853`) live in a separate field from the desktop 70/30
+(`:1848-1849`), so rotating a tablet does not destroy either.
+
+**Crossing the threshold refetches, once.** `onResize` debounces 500ms then re-emits
+`appHasFocusGetChatLog` and re-requests `getAlertsLog` page 0 (`:2990-2999`) — because the two
+templates hold different numbers of messages. It fires on the FLIP, not on every resize.
+`invalidate('room:data')` is all of it here: the load registers `depends('room:data')`
+(`+page.server.ts:124`) and returns alerts and messages together.
+
+**THE DEFECT THIS FOUND, and it was ours.** `src/app.css` carried
+`@media (max-width: 900px) { .vertical-gutter, .presentation-box { display: none } }`, unattributed,
+since `cbfb4b9`. It hid the presentation area on every screen under 900px — the exact pane `K4e`
+puts FIRST on a phone. It is not captured: the reference's own `max-width: 900px` block
+(`css/complete-app-styles.css:7855`, de-scoped twin at `captured-runtime-components.css:7196`)
+contains nothing but font sizes for the Files pane. The `.vertical-gutter` half was inert — that
+class has zero occurrences in `+page.svelte` — so the only thing the block ever did was the harm.
+**Found by rendering, not by reading:** the new harness measured `.presentation-box` as 0×0 with
+`display: none` at both 601px and 602px, which is why it exists.
+
+**Verified:** `scripts/verify-mobile-layout.mjs` renders 602, 601 and 600 in Chromium — 4/4, and it
+measures the geometry rather than the flag: desktop side-by-side (chat 236px + presentation 354px,
+shared top edge), mobile stacked full-width (presentation at y=49 h=370, chat at y=430). Three
+negative controls, each red then restored — drawing 601 with the desktop arrangement (which also
+tripped the 601-vs-602 distinctness check), drawing 602 with the mobile one, and **putting the 900px
+rule back, which failed all three widths**. `mobile-layout-contract.test.ts` 13/13 with four more
+controls: moving the threshold to 600, making the inner split the inverse of the outer, persisting a
+mobile drag, and refetching on every resize instead of the flip. `svelte-check` 978 files, 0 errors,
+0 warnings. `svelte-autofixer` clean. `verify:viewer-only` still 4/4 after the CSS removal. 91/91
+across the six room suites.
+
+**NOT carried, and stated rather than glossed:** `W4e` renders `app-chat` with no `openPrivateChat`
+binding (`app-room.render-helpers.js:1753`) while its extra-chat sibling keeps one (`:1769`). This
+room INLINES app-chat instead of composing it, so the parent/child binding distinction does not map —
+reproducing it would mean shipping a button that is knowingly dead on phones. Left alone deliberately.
+**Also not modelled:** `K4e` node 3, the extra chat column, and the bottom-layout axis
+(`isChatAlertsOnBottom` and its four sizes, `:1854-1859`) — `extraChatColumn` has zero occurrences in
+this room, a gap that predates this change.
+
+**NOT verified:** no browser drove the Svelte component itself at either width. The harness renders
+the arrangement and the contract test reads which arrangement the template picks; the room needs a
+controller this machine has no `.env` for — TODO row E.
+
 ### 2026-08-12 16:01 EDT — `disableCopy` and push-to-talk: three host bindings that were never bound
 
 **Runtime impact: "Disable Copy?" now protects something.** An owner has been able to tick it on the

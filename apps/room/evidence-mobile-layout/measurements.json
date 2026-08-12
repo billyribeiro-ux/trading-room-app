@@ -1,0 +1,101 @@
+{
+  "cases": [
+    {
+      "name": "desktop-602",
+      "width": 602,
+      "mobile": false,
+      "ok": true,
+      "problems": [],
+      "measured": {
+        "innerWidth": 602,
+        "firstAreaClass": "alert-chat-box alert-chat-regular as-split-area",
+        "splitFlexDirection": "row",
+        "presentationOrder": "2",
+        "chatOrder": "0",
+        "innerSplitDirection": "column",
+        "presentation": {
+          "top": 49,
+          "left": 247.39,
+          "width": 354.59,
+          "height": 751
+        },
+        "chatAlerts": {
+          "top": 49,
+          "left": 0,
+          "width": 236.39,
+          "height": 751
+        }
+      },
+      "png": "desktop-602.png",
+      "digest": "f6784fd8e25a836e82cf3fcd86cd070a2862b2c3068dce76dbd31ca4bc71332e"
+    },
+    {
+      "name": "mobile-601",
+      "width": 601,
+      "mobile": true,
+      "ok": true,
+      "problems": [],
+      "measured": {
+        "innerWidth": 601,
+        "firstAreaClass": "presentation-box as-split-area",
+        "splitFlexDirection": "column",
+        "presentationOrder": "0",
+        "chatOrder": "0",
+        "innerSplitDirection": "column",
+        "presentation": {
+          "top": 49,
+          "left": 0,
+          "width": 601,
+          "height": 370
+        },
+        "chatAlerts": {
+          "top": 430,
+          "left": 0,
+          "width": 601,
+          "height": 370
+        }
+      },
+      "png": "mobile-601.png",
+      "digest": "9bcc370937c79368ac05f00b52aa5cf890545b5388bdd312b1ca7941692c8481"
+    },
+    {
+      "name": "mobile-600",
+      "width": 600,
+      "mobile": true,
+      "ok": true,
+      "problems": [],
+      "measured": {
+        "innerWidth": 600,
+        "firstAreaClass": "presentation-box as-split-area",
+        "splitFlexDirection": "column",
+        "presentationOrder": "0",
+        "chatOrder": "0",
+        "innerSplitDirection": "column",
+        "presentation": {
+          "top": 49,
+          "left": 0,
+          "width": 600,
+          "height": 370
+        },
+        "chatAlerts": {
+          "top": 430,
+          "left": 0,
+          "width": 600,
+          "height": 370
+        }
+      },
+      "png": "mobile-600.png",
+      "digest": "e3c7811bd55d5c562bcf31431ab383a43ccf56802baf79f908111c434a00c2fb"
+    },
+    {
+      "name": "threshold distinctness",
+      "ok": true,
+      "problems": [],
+      "measured": {
+        "desktop-602": "f6784fd8e25a836e82cf3fcd86cd070a2862b2c3068dce76dbd31ca4bc71332e",
+        "mobile-601": "9bcc370937c79368ac05f00b52aa5cf890545b5388bdd312b1ca7941692c8481",
+        "mobile-600": "e3c7811bd55d5c562bcf31431ab383a43ccf56802baf79f908111c434a00c2fb"
+      }
+    }
+  ]
+}

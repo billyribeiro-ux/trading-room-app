@@ -1192,6 +1192,20 @@
   // rewrite it, which is a layout shift the size of the whole room.
   let mainSplit = $state<number | null>(initialSplitSizes.mainSplit);
   let chatAlertsSplit = $state<number | null>(initialSplitSizes.chatAlertsSplit);
+  /**
+   * `chatAlertsSizeMobile` — 50, beside `presAreaSizeMobile` at 50 (`app-room.full.js:1852-1853`).
+   *
+   * A SEPARATE number from `mainSplit`, exactly as upstream keeps a separate field: the phone's
+   * 50/50 and the desktop's 70/30 (`:1848-1849`) do not overwrite each other, so rotating a tablet
+   * does not destroy the geometry the user dragged on either side of the threshold.
+   *
+   * Not seeded from the persisted sizes and never written to them, because `K4e`'s outer split
+   * binds `dragStart` and NO `dragEnd` (`app-room.render-helpers.js:1786-1791`) — the desktop `j4e`
+   * binds both (`:1620-1623`). Upstream therefore never records a mobile drag, and neither does
+   * this: the gutter moves, and the size is gone on reload.
+   */
+  const MOBILE_CHAT_ALERTS_SPLIT = 0.5;
+  let mobileSplit = $state(MOBILE_CHAT_ALERTS_SPLIT);
   let mainElement: HTMLElement | undefined;
   let alertChatElement: HTMLElement | undefined;
   let composerElement: HTMLTextAreaElement | undefined;
@@ -1211,6 +1225,109 @@
   let mutedUsers = $state<Record<string, ManagedChatUser>>({});
   let followedUsers = $state<Record<string, ManagedChatUser>>({});
   const roomSplitIsHorizontal = $derived(roomSplitDir === 'ltr' || roomSplitDir === 'rtl');
+  /**
+   * `isMobileScreen` — `window.innerWidth <= 601`, the threshold that selects an entirely different
+   * template upstream: `O(5, o.isMobileScreen ? 6 : 5)` (`app-room.full.js:4061`).
+   *
+   * Set at init (`:1889`, `this.isMobileScreen = this.onResizeChange = window.innerWidth <= 601`)
+   * and in `onResize` (`:2988`). Bound here instead of listened for, which is the same value by a
+   * shorter path — `bind:innerWidth` on `<svelte:window>` is reactive and needs no listener to
+   * remove.
+   *
+   * `601`, not 600 and not a breakpoint from the stylesheet: `<=` 601 means 602 is the first
+   * desktop width. The scoped sheet's own media query next to it is `max-width: 600px`
+   * (`app-room.component.css`), so the two do NOT agree and the 1px seam is the reference's. Copied
+   * rather than tidied — a room at exactly 601px takes the mobile TEMPLATE and the desktop CSS, and
+   * "fixing" that would be inventing a behaviour nobody has seen.
+   *
+   * SSR renders the desktop tree, because no server knows the viewport. The correction happens on
+   * hydration, and it is a real divergence in kind rather than in code: the reference is a
+   * client-rendered Angular app whose first paint already knows the width. Doing this with CSS
+   * `order` instead would avoid the correction and diverge on READING order, which is the thing
+   * `K4e` actually changes — see the render block below.
+   */
+  let windowWidth = $state(0);
+  const isMobileScreen = $derived(windowWidth > 0 && windowWidth <= 601);
+  /**
+   * The direction the two splits are ACTUALLY drawn in.
+   *
+   * On mobile both are hardcoded vertical, and that is a static attribute rather than a binding:
+   * const 224 is
+   * `['minSize','0','direction','vertical','id','mainAreaSplit','gutterDblClickDuration','400',3,'gutterDblClick','dragStart','ngClass']`
+   * and const 228 is `['direction','vertical','minSize','0']` (`app-room.compiled.js`). The desktop
+   * pair binds direction instead — const 8 ends `3,'direction','ngClass'` and const 209 is
+   * `['minSize','0',3,'dragEnd','direction']`, both fed by `directionRoom()`.
+   *
+   * So a phone gets a stacked room whatever `roomSplitDir` says, and the user's left/right
+   * preference simply does not apply at that width.
+   */
+  const splitIsHorizontal = $derived(roomSplitIsHorizontal && !isMobileScreen);
+  /**
+   * The INNER chat/alerts split's direction, which is NOT simply the inverse of the outer one.
+   *
+   * On desktop it is: a left/right room stacks alerts above chat, a top/bottom room puts them side
+   * by side, which is what `directionChatAlerts()` returns. On mobile BOTH splits are vertical —
+   * const 228 is `['direction','vertical','minSize','0']`, a static attribute, exactly like const
+   * 224 for the outer. So a phone stacks presentation, then alerts, then chat, all the way down.
+   *
+   * Writing this as `splitIsHorizontal` would have made the inner split HORIZONTAL on a phone,
+   * putting alerts and chat side by side in a column barely wide enough for one of them. Caught
+   * against const 228 rather than by looking at it.
+   */
+  const innerSplitIsVertical = $derived(roomSplitIsHorizontal || isMobileScreen);
+  /**
+   * The other half of `onResize`, and the half that is easy to miss: crossing the threshold REFETCHES
+   * (`app-room.full.js:2987-2999`).
+   *
+   * ```js
+   * this.isMobileScreen = e.target.innerWidth <= 601;
+   * this.appService.guiEventBus.emit('resizeChatView');
+   * if (this.isMobileScreen !== this.onResizeChange) {
+   *   clearTimeout(this.onResizeTimer);
+   *   this.onResizeTimer = setTimeout(() => {
+   *     this.appService.guiEventBus.emit('appHasFocusGetChatLog');
+   *     if (preferences.extraChatColumn) emit('appHasFocusGetChatLogExtraChatColumn');
+   *     this.appService.sendServerCommand('getAlertsLog', { page: 0 });
+   *     this.onResizeChange = this.isMobileScreen;
+   *   }, 500);
+   * }
+   * ```
+   *
+   * Why it exists: the two templates render different numbers of messages, so the log the room is
+   * holding is the wrong length the moment the layout changes. It fires on the FLIP and not on every
+   * resize — `onResizeChange` is the last threshold actually acted on, which is why dragging a
+   * window across 400px of desktop width costs nothing.
+   *
+   * `invalidate('room:data')` is all three commands at once here: the load registers
+   * `depends('room:data')` (`+page.server.ts:124`) and returns the alerts and the messages together,
+   * so there is no separate alerts request to make. The extra-chat emit has no counterpart because
+   * `extraChatColumn` has zero occurrences in this room — a pre-existing gap, not one opened here.
+   *
+   * `lastThresholdActedOn` is a PLAIN variable, not `$state`: nothing renders from it, and making it
+   * reactive would put a write to a tracked value inside the effect that reads it. It starts `null`
+   * to mean "never measured", which is how the first paint on a phone avoids a refetch it does not
+   * need — upstream gets the same effect from `isMobileScreen = onResizeChange = …` in one statement
+   * at init (`:1889`), so the two are equal before any resize can happen.
+   */
+  let lastThresholdActedOn: boolean | null = null;
+  let resizeRefetchTimer: ReturnType<typeof globalThis.setTimeout> | undefined;
+  const RESIZE_REFETCH_DELAY_MS = 500;
+
+  $effect(() => {
+    const mobile = isMobileScreen;
+    if (windowWidth === 0) return;
+    if (lastThresholdActedOn === null) {
+      lastThresholdActedOn = mobile;
+      return;
+    }
+    if (mobile === lastThresholdActedOn) return;
+    globalThis.clearTimeout(resizeRefetchTimer);
+    resizeRefetchTimer = globalThis.setTimeout(() => {
+      lastThresholdActedOn = mobile;
+      void invalidate('room:data');
+    }, RESIZE_REFETCH_DELAY_MS);
+    return () => globalThis.clearTimeout(resizeRefetchTimer);
+  });
   const isPresenter = $derived(data.user.role === 'staff' || data.user.role === 'admin');
   /**
    * `sessData.disableCopy` — "Disable Copy?", content protection for the AUDIENCE.
@@ -1470,36 +1587,60 @@
   const giphyApiKey = env.PUBLIC_PTR_GIPHY_API_KEY ?? '';
   const primaryIsFirst = $derived(roomSplitDir === 'ltr' || roomSplitDir === 'ttb');
   const defaultMainSplit = $derived(
-    roomSplitIsHorizontal ? DIRECT_EVIDENCE_CONTRACT.populatedRoom.primaryPercent / 100 : 0.5
+    splitIsHorizontal ? DIRECT_EVIDENCE_CONTRACT.populatedRoom.primaryPercent / 100 : 0.5
   );
-  const defaultChatAlertsSplit = $derived(roomSplitIsHorizontal ? 40.136530587668595 / 100 : 0.3);
-  const resolvedMainSplit = $derived(mainSplit ?? defaultMainSplit);
+  const defaultChatAlertsSplit = $derived(splitIsHorizontal ? 40.136530587668595 / 100 : 0.3);
+  /*
+    The captured flex strings below are a DESKTOP measurement — `DIRECT_EVIDENCE_CONTRACT` records
+    one rendered room, and that room was horizontal. Every branch that reaches for them therefore
+    tests `splitIsHorizontal` rather than `roomSplitIsHorizontal`, so the mobile layout takes the
+    computed branch instead of inheriting a width measured at a viewport it never has.
+  */
+  const resolvedMainSplit = $derived(isMobileScreen ? mobileSplit : (mainSplit ?? defaultMainSplit));
   const resolvedChatAlertsSplit = $derived(chatAlertsSplit ?? defaultChatAlertsSplit);
   const primaryColumn = $derived(
-    mainSplit === null && roomSplitIsHorizontal
+    mainSplit === null && splitIsHorizontal
       ? DIRECT_EVIDENCE_CONTRACT.populatedRoom.primaryFlex
       : `calc(${resolvedMainSplit * 100}% - ${resolvedMainSplit * DUMP_CONTRACT.baseline.splitGutterWidth}px)`
   );
   const presentationColumn = $derived(
-    mainSplit === null && roomSplitIsHorizontal
+    mainSplit === null && splitIsHorizontal
       ? DIRECT_EVIDENCE_CONTRACT.populatedRoom.presentationFlex
       : `calc(${(1 - resolvedMainSplit) * 100}% - ${(1 - resolvedMainSplit) * DUMP_CONTRACT.baseline.splitGutterWidth}px)`
   );
   const alertsRow = $derived(
-    chatAlertsSplit === null && roomSplitIsHorizontal
+    chatAlertsSplit === null && splitIsHorizontal
       ? DIRECT_EVIDENCE_CONTRACT.populatedRoom.alertsFlex
       : `calc(${resolvedChatAlertsSplit * 100}% - ${resolvedChatAlertsSplit * DUMP_CONTRACT.baseline.splitGutterWidth}px)`
   );
   const chatRow = $derived(
-    chatAlertsSplit === null && roomSplitIsHorizontal
+    chatAlertsSplit === null && splitIsHorizontal
       ? DIRECT_EVIDENCE_CONTRACT.populatedRoom.chatFlex
       : `calc(${(1 - resolvedChatAlertsSplit) * 100}% - ${(1 - resolvedChatAlertsSplit) * DUMP_CONTRACT.baseline.splitGutterWidth}px)`
   );
+  /*
+    `order` is dropped entirely on mobile, and that is read from the const table rather than chosen.
+
+    The desktop areas are placed by CSS order because `roomSplitDir` can reverse them without
+    touching the DOM. `K4e`'s areas carry no order at all — const 225 is
+    `['minSize','0',1,'presentation-box',3,'size']` and const 226 the same shape for
+    `alert-chat-box`; the ONLY mobile area with an order binding is const 227, the extra chat column
+    (`['minSize','0',1,'alert-chat-box',3,'size','order']`), which this room does not model.
+
+    So on a phone the DOM order is the layout, which is why the render block below emits the two
+    panes in a different sequence rather than restyling them. Leaving `order` on while reordering
+    the DOM would have produced a room that reads presentation-first to a screen reader and
+    chat-first to the eye.
+  */
   const primaryAreaStyle = $derived(
-    `order: ${primaryIsFirst ? 0 : 2}; flex: 0 0 ${primaryColumn};`
+    isMobileScreen
+      ? `flex: 0 0 ${primaryColumn};`
+      : `order: ${primaryIsFirst ? 0 : 2}; flex: 0 0 ${primaryColumn};`
   );
   const presentationAreaStyle = $derived(
-    `order: ${primaryIsFirst ? 2 : 0}; flex: 0 0 ${presentationColumn};`
+    isMobileScreen
+      ? `flex: 0 0 ${presentationColumn};`
+      : `order: ${primaryIsFirst ? 2 : 0}; flex: 0 0 ${presentationColumn};`
   );
   const alertsAreaStyle = $derived(`order: 0; flex: 0 0 ${alertsRow};`);
   const chatAreaStyle = $derived(`order: 2; flex: 0 0 ${chatRow};`);
@@ -5436,7 +5577,14 @@
         splitPointerAxis === 'x' ? event.clientX - rect.left : event.clientY - rect.top;
       const firstAreaSize = clamp(pointer - splitPointerOffset, 0, availableSize);
       const firstAreaFraction = firstAreaSize / availableSize;
-      mainSplit = primaryIsFirst ? firstAreaFraction : 1 - firstAreaFraction;
+      /*
+        Mobile drags move `mobileSplit`, never `mainSplit`, and the first pane is the PRESENTATION
+        there — so the fraction has to be inverted, because both numbers mean "the chat/alerts
+        share". `primaryIsFirst` is a `roomSplitDir` question and does not apply at this width; the
+        mobile order is fixed by `K4e`'s child sequence.
+      */
+      if (isMobileScreen) mobileSplit = 1 - firstAreaFraction;
+      else mainSplit = primaryIsFirst ? firstAreaFraction : 1 - firstAreaFraction;
     }
 
     if (splitTarget === 'chat-alerts' && alertChatElement) {
@@ -5466,14 +5614,21 @@
    * toggle overwrite the geometry the user actually chose by dragging.
    */
   function hideShowPresentationArea() {
-    mainSplit = togglePresentationSplit(resolvedMainSplit);
+    /*
+      `K4e` binds `gutterDblClick` to this same handler (`app-room.render-helpers.js:1787-1788`), so
+      the toggle exists on a phone too — and it has to move the number that layout is drawn from, or
+      it would silently rewrite the desktop geometry while the user is looking at the mobile one.
+    */
+    if (isMobileScreen) mobileSplit = togglePresentationSplit(resolvedMainSplit);
+    else mainSplit = togglePresentationSplit(resolvedMainSplit);
   }
 
   function beginSplit(event: PointerEvent, target: 'main' | 'chat-alerts') {
     splitMoved = false;
     splitTarget = target;
+    // The drag axis follows the direction actually drawn, which mobile forces to vertical.
     splitPointerAxis =
-      target === 'main' ? (roomSplitIsHorizontal ? 'x' : 'y') : roomSplitIsHorizontal ? 'y' : 'x';
+      target === 'main' ? (splitIsHorizontal ? 'x' : 'y') : innerSplitIsVertical ? 'y' : 'x';
     const gutter = event.currentTarget as HTMLElement;
     const gutterRect = gutter.getBoundingClientRect();
     splitPointerOffset =
@@ -5500,6 +5655,21 @@
         splitTarget = null;
         return;
       }
+    }
+    /*
+      A mobile drag of the MAIN split is never written down, because `K4e`'s outer split binds
+      `dragStart` and no `dragEnd` (`app-room.render-helpers.js:1786-1791`) where the desktop `j4e`
+      binds both (`:1620-1623`). `dragEnd` is the only thing that calls `resizeEndRoom` upstream, so
+      there is nothing to record.
+
+      The inner chat/alerts gutter is a separate question and keeps persisting: `W4e` drops its
+      `dragEnd` too, but our inner gutter writes the SAME `chatAlertsSizes` key the desktop layout
+      reads, and dropping the write would mean a phone silently reverting a size the user had set on
+      a laptop. That is a divergence, and it is here rather than silent.
+    */
+    if (splitTarget === 'main' && isMobileScreen) {
+      splitTarget = null;
+      return;
     }
     if (splitTarget) persistSplitSizes(splitTarget);
     splitTarget = null;
@@ -6684,6 +6854,7 @@
 
 
 <svelte:window
+  bind:innerWidth={windowWidth}
   onclick={(event) => {
     const target = event.target instanceof Element ? event.target : null;
     if (!target?.closest('.textAreaBtns, .popOverDiv')) {
@@ -8067,12 +8238,12 @@
           minsize="0"
           id="mainAreaSplit"
           gutterdblclickduration="400"
-          class={roomSplitIsHorizontal
+          class={splitIsHorizontal
             ? 'as-horizontal as-percent as-init'
             : 'as-vertical as-percent as-init'}
           class:is-resizing={splitTarget !== null}
           class:vh-100={chatOnlyMode || viewerOnlyMode}
-          style={roomSplitIsHorizontal ? undefined : 'flex-direction: column;'}
+          style={splitIsHorizontal ? undefined : 'flex-direction: column;'}
           dir="ltr"
         >
           <!--
@@ -8094,7 +8265,7 @@
             now rendered there. Keeping a half-height panel in a column the reference deletes was
             the divergence, not the fix.
           -->
-          {#if !hideChatAlerts}
+          {#snippet chatAlertsPane()}
           <as-split-area
             minsize="0"
             class="alert-chat-box alert-chat-regular as-split-area"
@@ -8103,10 +8274,10 @@
             <as-split
               {@attach captureAlertChatElement}
               minsize="0"
-              class={roomSplitIsHorizontal
+              class={innerSplitIsVertical
                 ? 'as-percent as-vertical as-init'
                 : 'as-percent as-horizontal as-init'}
-              style={roomSplitIsHorizontal ? undefined : 'flex-direction: row;'}
+              style={innerSplitIsVertical ? undefined : 'flex-direction: row;'}
               dir="ltr"
             >
               <as-split-area minsize="0" class="alert-box as-split-area" style={alertsAreaStyle}>
@@ -8669,7 +8840,7 @@
                 role="separator"
                 tabindex="0"
                 class="as-split-gutter"
-                aria-orientation={roomSplitIsHorizontal ? 'vertical' : 'horizontal'}
+                aria-orientation={innerSplitIsVertical ? 'vertical' : 'horizontal'}
                 aria-valuemin="0"
                 aria-valuenow={alertsPercent}
                 aria-valuetext={`${Math.round(alertsPercent)} percent`}
@@ -8680,7 +8851,7 @@
               </div>
             </as-split>
           </as-split-area>
-          {/if}
+          {/snippet}
 
           <!--
             `O(3, e.hidePresentation ? -1 : 3)` (`app-room.render-helpers.js:1662`), whose flag is
@@ -8693,7 +8864,7 @@
             pair. They are one decision with two sources, and writing the mode alone meant an owner
             could configure a chat-only room and still get a presentation area for every member.
           -->
-          {#if !hidePresentation}
+          {#snippet presentationPane()}
           <as-split-area
             minsize="0"
             class="presentation-box as-split-area"
@@ -9705,22 +9876,61 @@
               </div>
             </app-presentationarea>
           </as-split-area>
-          {/if}
+          {/snippet}
 
-          <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-          <div
-            role="separator"
-            tabindex="0"
-            class="as-split-gutter"
-            aria-orientation={roomSplitIsHorizontal ? 'horizontal' : 'vertical'}
-            aria-valuemin="0"
-            aria-valuenow={primaryPercent}
-            aria-valuetext={`${Math.round(primaryPercent)} percent`}
-            style="flex-basis: 11px; order: 1;"
-            onpointerdown={(event) => beginSplit(event, 'main')}
-          >
-            <div class="as-split-gutter-icon"></div>
-          </div>
+          {#snippet mainGutter()}
+            <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+            <div
+              role="separator"
+              tabindex="0"
+              class="as-split-gutter"
+              aria-orientation={splitIsHorizontal ? 'horizontal' : 'vertical'}
+              aria-valuemin="0"
+              aria-valuenow={primaryPercent}
+              aria-valuetext={`${Math.round(primaryPercent)} percent`}
+              style={isMobileScreen ? 'flex-basis: 11px;' : 'flex-basis: 11px; order: 1;'}
+              onpointerdown={(event) => beginSplit(event, 'main')}
+            >
+              <div class="as-split-gutter-icon"></div>
+            </div>
+          {/snippet}
+
+          <!--
+            `O(5, o.isMobileScreen ? 6 : 5)` — `app-room.full.js:4061`. The 601px threshold does not
+            restyle this layout, it selects a DIFFERENT ONE: `K4e`
+            (`app-room.render-helpers.js:1783-1821`) against the desktop `j4e` (`:1616-1664`).
+
+            What actually differs, read from those two functions and the const table rather than
+            inferred:
+
+              - the CHILD ORDER is reversed. `K4e` is presentation (`G4e`, node 1, gated
+                `O(1, hidePresentation ? -1 : 1)`), then chat/alerts (`W4e`, node 2,
+                `O(2, hideChatAlerts ? -1 : 2)`). `j4e` is chat/alerts (node 1), extra chat, then
+                presentation (node 3). The gates are the same two flags either way, which is why
+                they are written once here and read twice.
+              - the split is VERTICAL as a static attribute, not a binding — const 224 carries
+                `'direction','vertical'` where const 8 carries `3,'direction'`. Handled by
+                `splitIsHorizontal`.
+              - there is NO `dragEnd`, so a mobile drag is never recorded. Handled in `finishSplit`.
+              - the areas carry no `order`. Handled in `primaryAreaStyle` / `presentationAreaStyle`,
+                and it is why this block reorders the DOM instead of restyling it.
+
+            The gutter is a snippet for exactly that reason: on a phone it has to sit BETWEEN the two
+            panes in document order, because there is no `order` property left to place it with.
+
+            Snippets rather than a second copy of the markup: the two panes are ~1,625 lines, and a
+            duplicated layout is one that drifts the first time somebody edits the version they
+            happen to be looking at.
+          -->
+          {#if isMobileScreen}
+            {#if !hidePresentation}{@render presentationPane()}{/if}
+            {@render mainGutter()}
+            {#if !hideChatAlerts}{@render chatAlertsPane()}{/if}
+          {:else}
+            {#if !hideChatAlerts}{@render chatAlertsPane()}{/if}
+            {#if !hidePresentation}{@render presentationPane()}{/if}
+            {@render mainGutter()}
+          {/if}
         </as-split>
       </div>
     </div>

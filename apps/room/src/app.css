@@ -1559,12 +1559,29 @@ app-privchat.privChatHolder {
   animation: none;
 }
 
-@media (max-width: 900px) {
-  .vertical-gutter,
-  .presentation-box {
-    display: none;
-  }
-}
+/*
+  REMOVED 2026-08-12, and recorded here rather than silently deleted:
+
+      @media (max-width: 900px) { .vertical-gutter, .presentation-box { display: none } }
+
+  It was OURS, not captured. It arrived unattributed with `cbfb4b9` ("Start clean"), and it hid the
+  presentation area on every screen narrower than 900px.
+
+  It contradicts the reference twice over. The captured stylesheet HAS a
+  `@media only screen and (max-width: 900px)` block — `css/complete-app-styles.css:7855` and its
+  de-scoped twin at `src/lib/styles/captured-runtime-components.css:7196` — and both contain nothing
+  but font sizes for the Files pane (`.files-options button`, `.fileName`, `.fileCount`). Neither
+  mentions `.presentation-box`. And the mobile template makes the presentation the FIRST pane on a
+  phone: `K4e`'s node 1 is `G4e`, the presentation, gated `O(1, hidePresentation ? -1 : 1)`
+  (`app-room.render-helpers.js:1815`), where the desktop `j4e` has it last. So the reference's phone
+  layout leads with the screen share, and this rule deleted it.
+
+  It was found by rendering: `scripts/verify-mobile-layout.mjs` measured `.presentation-box` as
+  0x0 with `display: none` at 601px and 602px, which is also why that harness exists.
+
+  The `.vertical-gutter` half was inert — that class has ZERO occurrences in `+page.svelte`, so the
+  only thing this block ever did was the harm.
+*/
 
 /* Dump-owned global styles: Modal.svelte */
 .modal {

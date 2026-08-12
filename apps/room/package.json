@@ -17,6 +17,7 @@
     "verify:tooltips": "node --no-warnings scripts/verify-tooltip-placements.mjs",
     "verify:screen-volume": "node --no-warnings scripts/verify-screen-volume.mjs",
     "verify:viewer-only": "node --no-warnings scripts/verify-viewer-only-layout.mjs",
+    "verify:mobile-layout": "node --no-warnings scripts/verify-mobile-layout.mjs",
     "capture:analyze": "node scripts/analyze-capture.mjs",
     "capture:forensic": "node scripts/forensic-audit.mjs",
     "capture:emoji": "node scripts/render-emoji-state.mjs",
