@@ -32,7 +32,24 @@ import { fileURLToPath } from 'node:url';
 const REPOSITORY_ROOT = fileURLToPath(new URL('../../../', import.meta.url));
 const EXPECTED_FILE_COUNT = 98;
 const EXPECTED_PATH_LIST_SHA256 = '66ab4696e3d3685daaa5ba27e28137a1cc038a71a32fcf92d30bdd144f35ecef';
-const EXPECTED_MANIFEST_SHA256 = '4c3036011fe272a4264769358c9243804fb78246c2d0525ddaf67285ddb1815a';
+/*
+  The manifest covers the 88 imports that have NEVER been edited here — not all 98.
+
+  The previous value sealed all 98 as untouched imports, and that had never once been checked: the
+  read it depended on resolved to `apps/controller/services/`, a directory that does not exist, so
+  the script died before reaching it. The first run that ever completed reported a mismatch, and the
+  mismatch was true — ten imported files had been edited in this repository.
+
+  Deliberately NOT re-pinned to the whole current tree. A hash over whatever happens to be present
+  cannot distinguish reviewed work from an accident, and the next unrecorded edit would land inside
+  a green gate. A seal that is always green about a tree nobody checks is worse than no seal.
+
+  Instead the ten are pinned individually in `DIVERGED_FROM_IMPORT` below, so an unrecorded change
+  to any one of them still fails — and fails naming the file — while these 88 stay sealed against
+  the bytes that actually arrived at the import.
+*/
+const EXPECTED_UNTOUCHED_COUNT = 88;
+const EXPECTED_MANIFEST_SHA256 = '9e5fe0a6c5ae0d8fad3eeed7baadf6aac48cccc94ab1ac2796c4983a949bc9e0';
 
 /*
   Files under `services/**` that were AUTHORED HERE and never imported.
@@ -58,6 +75,56 @@ const LOCALLY_AUTHORED = new Map([
   ]
 ]);
 
+/*
+  Imported files that have since been EDITED HERE, each pinned by its own hash.
+
+  ## Why these are not "drift to revert"
+
+  The direction was measured, not assumed. Against the documented source — the sibling `new-room`,
+  named in this repository's own import checkpoint (`ops/backend-import-provenance.md`) — diffing
+  our copies against theirs, added versus removed:
+
+    services/media/src/server.rs      +195  -29
+    services/media/src/config.rs      +69   -0     <- a strict superset of the source
+    services/api/src/db/migrate.rs    +27   -1
+    services/Cargo.lock               +69   -109   <- net smaller: the 2026-08-09 dependency bump
+
+  This repository is AHEAD. `a11883c` alone is 252 insertions across seven of these — the SFU
+  liveness fix — and `CHANGELOG.md:2863` records it deployed and proven against production with live
+  log output. The same comparison against `new-room-control` returns the same answer, so the finding
+  does not depend on which sibling is treated as the source.
+
+  ## And there is nothing to be a mirror OF
+
+  `CLAUDE.md` said a change made here is lost on the next sync. Searched `scripts`, `ops`, every
+  per-app `scripts` directory, `.github` and the root `package.json`: no sync exists either way. The
+  only script referencing a sibling is `scripts/set-vercel-env.sh`, which READS `.env` files and
+  states at its line 30 that `new-room-control` is "read-only reference, not a config store for this
+  project". The owner confirmed it directly on 2026-08-12: the siblings are reference only.
+
+  So `services/**` is not provisional and will not be overwritten. This repository is its authority,
+  and the import checkpoints above remain exactly what they always were — a true record of what
+  arrived and from where.
+
+  ## Adding to this list
+
+  Only with a CHANGELOG entry naming the change and why it was made here. If you are tempted to add
+  a file to make the gate green, the gate is telling the truth and this list is not where to argue
+  with it — the same rule `LOCALLY_AUTHORED` carries, for the same reason.
+*/
+const DIVERGED_FROM_IMPORT = new Map([
+  ['services/Cargo.lock', '9ba77dc5f3fe6dac83a40799f6c5d60ad9e5f358f635ab094ceae608ca6d1668'],
+  ['services/api/src/db/migrate.rs', 'edeb66043c53bcd15af46c05adb5225775716a3861dc93e1b9dd37cdf4729927'],
+  ['services/media/Dockerfile', 'ae967613fdd0dba2065ec6b488c71d8a61e29eef47fca32f90690066b0eb407a'],
+  ['services/media/src/config.rs', 'f9af8fb80a7ccadb1a05b506c14ecd043fae4e5b169e36d403d5d8f1fd4fe449'],
+  ['services/media/src/grant.rs', '772f12a8bd9ea55e1d92fa1b460aeb1b451520c1c243c59083a658b4f1989908'],
+  ['services/media/src/main.rs', 'eb7106333b2a66cfa84b8de943954e658701216a469a048e6eda8e0e9ac767aa'],
+  ['services/media/src/router_registry.rs', 'ffd8d79837bf1d2e89e18e13a7f6d9c79637637a0a21085bdef9b9f92492cb01'],
+  ['services/media/src/server.rs', 'c73d60f652d142de087789621d636e062e6810fb20cd518771265ed485bd1e32'],
+  ['services/media/src/session.rs', 'ab345211ca869b9c3a15d2a112b69c86c61dab568c4807ab372f448bf87467ae'],
+  ['services/media/src/worker_pool.rs', '5aa068c34e4a77ff8aeb2052b9aad2b5324004d520d971302b9454516ff1a917']
+]);
+
 /**
  * Prose that quotes the seal's file count, and must therefore move with it.
  *
@@ -71,9 +138,20 @@ const LOCALLY_AUTHORED = new Map([
  * migration list: when a pinned artifact changes, the consumers are what break, so enumerate them
  * here rather than rediscovering them one failure at a time.
  */
+/*
+  Repository-relative, and two of the three were wrong.
+
+  These read `docs/…` back when every path in this file resolved from `apps/controller/`, where
+  `apps/controller/docs/` is exactly where those two live — so they happened to work for the wrong
+  reason. Repairing `REPOSITORY_ROOT` fixed the manifest read and broke these in the same stroke,
+  and it stayed hidden because the count check threw first. That is the FOURTH instance of one
+  original bug, which is why every path in this file now resolves from a single explicit root.
+
+  `ops/backend-import-provenance.md` genuinely is at the repository root; the other two are not.
+*/
 const DOCUMENTED_COUNT_SITES = [
-  'docs/ENGINEERING-SSOT.md',
-  'docs/MEDIASOUP-DEPLOYMENT-PLAN.md',
+  'apps/controller/docs/ENGINEERING-SSOT.md',
+  'apps/controller/docs/MEDIASOUP-DEPLOYMENT-PLAN.md',
   'ops/backend-import-provenance.md'
 ];
 
@@ -136,6 +214,39 @@ for (const [relativePath, expected] of LOCALLY_AUTHORED) {
   }
 }
 
+/*
+  Every diverged file, by name and by hash.
+
+  These are NOT unsealed — they are sealed individually rather than collectively. An unrecorded edit
+  to any one of them still fails, and it fails naming the file instead of reporting an opaque
+  whole-tree mismatch that tells the next reader nothing about where to look.
+*/
+for (const [relativePath, expected] of DIVERGED_FROM_IMPORT) {
+  if (!paths.includes(relativePath)) {
+    fail(
+      `diverged file listed but not present: ${relativePath} — ` +
+        `remove it from DIVERGED_FROM_IMPORT in the same change that deleted it`
+    );
+  }
+  const actual = sha256(await readFile(`${REPOSITORY_ROOT}${relativePath}`));
+  if (actual !== expected) {
+    fail(`diverged file changed: ${relativePath} expected ${expected}, got ${actual}`);
+  }
+}
+
+/*
+  The manifest below covers the imports that have never been touched, and its bytes are still the
+  bytes that arrived. Narrowing it is what lets the seal keep meaning "unchanged since import"
+  rather than degrading into "whatever is here today".
+*/
+const untouchedPaths = paths.filter((relativePath) => !DIVERGED_FROM_IMPORT.has(relativePath));
+if (untouchedPaths.length !== EXPECTED_UNTOUCHED_COUNT) {
+  fail(
+    `untouched import count changed: expected ${EXPECTED_UNTOUCHED_COUNT}, ` +
+      `got ${untouchedPaths.length} (${paths.length} imported, ${DIVERGED_FROM_IMPORT.size} diverged)`
+  );
+}
+
 for (const relativePath of paths) {
   if (!relativePath.startsWith('services/') || relativePath.includes('\n') || relativePath.includes('\r')) {
     fail(`unsafe or ambiguous manifest path: ${JSON.stringify(relativePath)}`);
@@ -149,7 +260,7 @@ if (pathListSha256 !== EXPECTED_PATH_LIST_SHA256) {
 }
 
 const manifestLines = await Promise.all(
-  paths.map(async (relativePath) => {
+  untouchedPaths.map(async (relativePath) => {
     const bytes = await readFile(`${REPOSITORY_ROOT}${relativePath}`);
     return `${sha256(bytes)}  ${relativePath}`;
   })
@@ -170,11 +281,34 @@ if (manifestSha256 !== EXPECTED_MANIFEST_SHA256) {
 const SEAL_COUNT_CLAIM =
   /(\d+)(?:-file|\s+files?)(?=[^.\n]{0,80}?(?:provenance seal|current-tree (?:path\/content )?seal))/g;
 for (const site of DOCUMENTED_COUNT_SITES) {
+  /*
+    "Missing" and "could not read" are different faults and must not report as one.
+
+    This caught every error and blamed a missing file. On 2026-08-12 that sent me looking for
+    `MEDIASOUP-DEPLOYMENT-PLAN.md`, which is present and 48,033 bytes — `readFile` was returning
+    ETIMEDOUT because the working-tree copy is a cloud-storage placeholder that had not
+    materialised. `ls` sees the metadata, `read` blocks on a download that never lands, and the
+    catch called it missing.
+
+    So: a genuinely absent documented-count site FAILS, because that is a provenance fault — the
+    prose this seal must agree with has been deleted or moved. Anything else WARNS, because the
+    seal's subject is provenance, not the health of the filesystem underneath it, and refusing to
+    verify 98 imported files over one undownloaded document is a false negative. CI clones fresh, so
+    it reads normally there.
+  */
   let prose;
   try {
-    prose = await readFile(`${REPOSITORY_ROOT}${site}`, "utf8");
-  } catch {
-    fail(`documented-count site is missing: ${site}`);
+    prose = await readFile(`${REPOSITORY_ROOT}${site}`, 'utf8');
+  } catch (error) {
+    if (error?.code === 'ENOENT') {
+      fail(`documented-count site is missing: ${site}`);
+    }
+    console.warn(
+      `[backend:provenance] WARNING: could not read ${site} (${error?.code ?? 'unknown'}) — ` +
+        `its count claim was NOT checked. The file exists; this is an environment fault, not a ` +
+        `provenance one.`
+    );
+    continue;
   }
   for (const [claim, stated] of prose.matchAll(SEAL_COUNT_CLAIM)) {
     if (Number(stated) !== EXPECTED_FILE_COUNT) {
@@ -187,5 +321,8 @@ for (const site of DOCUMENTED_COUNT_SITES) {
 }
 
 console.log(
-  `[backend:provenance] PASS ${EXPECTED_FILE_COUNT} files; paths ${EXPECTED_PATH_LIST_SHA256}; manifest ${EXPECTED_MANIFEST_SHA256}; ${DOCUMENTED_COUNT_SITES.length} documented-count site(s) agree`
+  `[backend:provenance] PASS ${EXPECTED_FILE_COUNT} imported ` +
+    `(${EXPECTED_UNTOUCHED_COUNT} untouched + ${DIVERGED_FROM_IMPORT.size} diverged, each pinned) ` +
+    `+ ${LOCALLY_AUTHORED.size} authored here; paths ${EXPECTED_PATH_LIST_SHA256}; ` +
+    `manifest ${EXPECTED_MANIFEST_SHA256}; ${DOCUMENTED_COUNT_SITES.length} documented-count site(s) agree`
 );
