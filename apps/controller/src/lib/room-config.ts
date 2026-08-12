@@ -249,6 +249,26 @@ export const ROOM_VISIBLE_SETTINGS = [
   */
   'hideChatAlerts',
   /*
+    The two ROOM halves of the join/leave announcements (`app-room.full.js:2134-2155`).
+
+    Each effect is gated twice, on a room setting AND a per-viewer preference:
+
+      sessData.userJoinAndLeavePopup && preferences.popupOnUserJoin  -> the toast
+      sessData.beepOnUserJoin        && preferences.beepOnUserJoin   -> the sound
+
+    The preferences already live in the room; these two do not, so both gates evaluated `undefined`
+    and a presenter was never told that anybody arrived or left however the room was configured.
+
+    `beepOnUserJoin` covers BOTH directions upstream — the leave beep reads the same room flag
+    (`:2151`) and only the viewer preference is per-direction. There is no `beepOnUserLeave` room
+    setting to send, and inventing one would put a key on the wire that the reference never reads.
+
+    Presenter-only in effect: the client refuses both for a member. Sending them to every room is
+    still correct, because whether a given reader is a presenter is not a property of the room.
+  */
+  'userJoinAndLeavePopup',
+  'beepOnUserJoin',
+  /*
     "Chat Only Room?" — "The room will be only text based chat/alerts, no audio/video".
 
     The second term of `hidePresentation`:

@@ -10,7 +10,7 @@
 // roomType has no captured value because its editor is absent from rendered evidence.
 //
 // `wired` is the honest bit: false means the controller can store the value but
-// nothing in the room reads it yet. 46 of 269 are wired today.
+// nothing in the room reads it yet. 48 of 269 are wired today.
 // Flip one to true ONLY when a consumer exists, so the UI can mark the rest
 // instead of pretending they do something.
 
@@ -106,8 +106,8 @@ export const ROOM_SETTINGS: readonly RoomSettingDef[] = [
   { name: "userPM", section: "settings", type: "checkbox", label: "User PMs?", help: "If enabled, users can Private msg each other", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: true },
   { name: "enablePrivateMessageHistory", section: "settings", type: "checkbox", label: "Enable Private Message History?", help: "If enabled, can load users private message history", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
   { name: "dingOnNewMessage", section: "settings", type: "checkbox", label: "Sound alert when a new message is posted?", help: "If enabled, it will play a sound when a new message is posted", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: true },
-  { name: "beepOnUserJoin", section: "settings", type: "checkbox", label: "Sound when the user joins/leaves?", help: "If enabled, moderators will hear a sound when users join/leave", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
-  { name: "userJoinAndLeavePopup", section: "settings", type: "checkbox", label: "Popup alert when the user joins/leaves?", help: "If enabled, moderators will get a popup when users join/leave", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
+  { name: "beepOnUserJoin", section: "settings", type: "checkbox", label: "Sound when the user joins/leaves?", help: "If enabled, moderators will hear a sound when users join/leave", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: true },
+  { name: "userJoinAndLeavePopup", section: "settings", type: "checkbox", label: "Popup alert when the user joins/leaves?", help: "If enabled, moderators will get a popup when users join/leave", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: true },
   { name: "hideAvatars", section: "settings", type: "checkbox", label: "Hide User Avatars?", help: "If enabled, user avatars will be hidden", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: true },
   { name: "hideAppInfo", section: "settings", type: "checkbox", label: "Hide Mobile App Info?", help: "If enabled, mobile app info wiil be hidden", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: true },
   { name: "alwaysShowRoster", section: "settings", type: "checkbox", label: "Always Show User Roster?", help: "If enabled, user roster will always be visible", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },

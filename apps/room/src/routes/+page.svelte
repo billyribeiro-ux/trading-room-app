@@ -646,6 +646,17 @@
    * `!doNotDisturbOn && preferences.recordingStartSound && ...`, so an unset preference would
    * silence a cue the room is meant to give everyone.
    */
+  /**
+   * The four per-viewer halves of the join/leave gates (`app-room.full.js:2137-2153`).
+   *
+   * Default ON, for the same reason `recordingStartSound` does: the reference's checks are
+   * `sessData.X && preferences.Y && …`, so an unset preference would silence a cue the ROOM has
+   * been configured to give. The room setting is the off switch; the preference is the override.
+   */
+  let popupOnUserJoin = $state(loadedSettings.popupOnUserJoin !== false);
+  let popupOnUserLeave = $state(loadedSettings.popupOnUserLeave !== false);
+  let beepOnUserJoin = $state(loadedSettings.beepOnUserJoin !== false);
+  let beepOnUserLeave = $state(loadedSettings.beepOnUserLeave !== false);
   let recordingStartSound = $state(loadedSettings.recordingStartSound !== false);
   let recordingStopSound = $state(loadedSettings.recordingStopSound !== false);
 
@@ -5992,10 +6003,69 @@
       */
       if (payload.channel === 'roster') {
         const roster = payload.data as
-          | { cmd?: string; data?: number; users?: typeof liveRoster }
+          | {
+              cmd?: string;
+              data?: number;
+              users?: typeof liveRoster;
+              /** `onUserJoin` / `onUserLeave` carry the person, not a count. */
+              userId?: number;
+              nick?: string;
+            }
           | undefined;
         if (roster?.cmd === 'getRosterCount' && typeof roster.data === 'number') {
           rosterCount = roster.data;
+        }
+        /*
+          `onUserJoin` / `onUserLeave` — `app-room.full.js:2134-2155`, verbatim in shape:
+
+            isPresenter && user.userXrefID !== i.userXrefID && (
+              sessData.userJoinAndLeavePopup && preferences.popupOnUserJoin
+                && alertsService.info(`${i.nick} logged in.`),
+              sessData.beepOnUserJoin && preferences.beepOnUserJoin
+                && !preferences.doNotDisturbOn && soundEffectsService.userJoin.play())
+
+          Four things about that are load-bearing:
+
+          * PRESENTER ONLY. A member is not told who came and went.
+          * NEVER YOURSELF — `user.userXrefID !== i.userXrefID`. Opening the room would otherwise
+            announce your own arrival to you.
+          * TWO GATES PER EFFECT, and they are different gates. The popup needs the ROOM setting
+            `userJoinAndLeavePopup` and the VIEWER preference `popupOnUserJoin`; the beep needs the
+            room's `beepOnUserJoin` and the viewer's `beepOnUserJoin`. An owner can turn the feature
+            off for the room, and a presenter can turn it off for themselves.
+          * `info` for a join, `warning` for a leave — the reference uses two different toast skins,
+            and the strings are "logged in." / "logged out." with the full stop.
+
+          THE QUIRK, reproduced: the LEAVE beep reads `sessData.beepOnUserJoin`, not a
+          `beepOnUserLeave` room setting. There is no such room setting upstream — only the viewer
+          preference is per-direction. Transcribed rather than tidied.
+        */
+        if (
+          (roster?.cmd === 'onUserJoin' || roster?.cmd === 'onUserLeave') &&
+          typeof roster.userId === 'number'
+        ) {
+          const joined = roster.cmd === 'onUserJoin';
+          if (!isPresenter || roster.userId === data.user.id) return;
+          const nick = typeof roster.nick === 'string' ? roster.nick : '';
+
+          if (
+            data.sessData?.userJoinAndLeavePopup &&
+            (joined ? popupOnUserJoin : popupOnUserLeave)
+          ) {
+            showToast({
+              kind: joined ? 'info' : 'warning',
+              message: `${nick} logged ${joined ? 'in' : 'out'}.`,
+              enableHtml: false
+            });
+          }
+          if (
+            data.sessData?.beepOnUserJoin &&
+            (joined ? beepOnUserJoin : beepOnUserLeave) &&
+            !doNotDisturbOn
+          ) {
+            playSoundEffect(joined ? 'userJoin' : 'userLeave');
+          }
+          return;
         }
         // `getRoster` -> `globals.roster`, which is what the sidebar list and
         // `checkUserOnlineStatus` both read in the capture.

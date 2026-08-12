@@ -96,6 +96,7 @@ const ROOM_CONSUMED = [
   'disableCopy',
   'disablePMForTrials',
   'freeTrialsGetApp',
+  'beepOnUserJoin',
   'hasBenzingaNews',
   'hideAppInfo',
   'hideChatAlerts',
@@ -104,6 +105,7 @@ const ROOM_CONSUMED = [
   'hideMobileCredentials',
   'hideRecs',
   'individualVolumeControls',
+  'userJoinAndLeavePopup',
   'isChatOnlyRoom',
   'onlyPresentersVisibleToViewers',
   'overwriteCashRegisterSound',
@@ -434,11 +436,18 @@ if (defs.length !== EXPECTED_TOTAL_COUNT) {
 }
 
 const missingWiredSettings = [...WIRED_SETTINGS].filter((name) => !defs.some((definition) => definition.name === name));
-// 46 since 2026-08-12: `hideChatAlerts`, `isChatOnlyRoom` and `disableCopy` joined ROOM_CONSUMED
-// when the room gained the gates that read them. The literal is a tripwire, not a fact about the
-// schema — it is here so the wired set cannot grow by accident, which is why changing it is a
-// deliberate edit.
-if (WIRED_SETTINGS.size !== 46 || missingWiredSettings.length > 0) {
+// 48 since 2026-08-12: `userJoinAndLeavePopup` and `beepOnUserJoin` joined ROOM_CONSUMED when the
+// room gained the join/leave announcements that read them (`app-room.full.js:2134-2155`). Each
+// effect there is gated twice — a room setting AND a per-viewer preference — and only the
+// preferences existed here, so both gates evaluated `undefined` and a presenter was never told
+// that anybody arrived or left, however the room was configured.
+//
+// Earlier at 46: `hideChatAlerts`, `isChatOnlyRoom` and `disableCopy` joined when the room gained
+// the gates that read them.
+//
+// The literal is a tripwire, not a fact about the schema — it is here so the wired set cannot grow
+// by accident, which is why changing it is a deliberate edit.
+if (WIRED_SETTINGS.size !== 48 || missingWiredSettings.length > 0) {
   throw new Error(
     `wired-setting contract invalid: ${WIRED_SETTINGS.size} keys, missing ${missingWiredSettings.join(', ') || 'none'}`
   );
