@@ -10,7 +10,7 @@
 // roomType has no captured value because its editor is absent from rendered evidence.
 //
 // `wired` is the honest bit: false means the controller can store the value but
-// nothing in the room reads it yet. 43 of 269 are wired today.
+// nothing in the room reads it yet. 45 of 269 are wired today.
 // Flip one to true ONLY when a consumer exists, so the UI can mark the rest
 // instead of pretending they do something.
 
@@ -133,7 +133,7 @@ export const ROOM_SETTINGS: readonly RoomSettingDef[] = [
   { name: "pairSecretKey", section: "settings", type: "textarea", label: "Pair Secret Key", help: null, helpShape: null, helpOutside: false, captured: null, capturedIsDisplayOnly: false, group: null, wired: false },
   { name: "pairOKRedirect", section: "settings", type: "textarea", label: "Pair OK Redirect", help: "Where to send users if the pairing succeeds", helpShape: "muted", helpOutside: true, captured: null, capturedIsDisplayOnly: false, group: null, wired: false },
   { name: "pairErrorRedirect", section: "settings", type: "textarea", label: "Pair ERROR Redirect", help: "Where to send users if the pairing fails", helpShape: "muted", helpOutside: true, captured: null, capturedIsDisplayOnly: false, group: null, wired: false },
-  { name: "hideChatAlerts", section: "settings", type: "checkbox", label: "Hide Alerts/Chat Section?", help: "If enabled, the room will not have chat/alerts. Just media.", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
+  { name: "hideChatAlerts", section: "settings", type: "checkbox", label: "Hide Alerts/Chat Section?", help: "If enabled, the room will not have chat/alerts. Just media.", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: true },
   { name: "hasSwingTradeAlerts", section: "settings", type: "checkbox", label: "Enable Swing Trade Alerts Tab?", help: "If enabled, the room will have swing alerts tab.", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
   { name: "hasDayTradeAlerts", section: "settings", type: "checkbox", label: "Enable Day Trade Alerts Tab?", help: "If enabled, the room will have day trade alerts tab.", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
   { name: "usersPublicReply", section: "settings", type: "checkbox", label: "User Public Reply?", help: "If enabled, regular user will be able to do reply", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
@@ -160,7 +160,7 @@ export const ROOM_SETTINGS: readonly RoomSettingDef[] = [
   { name: "alertSoundOff", section: "settings", type: "checkbox", label: "Alerts Sound Off?", help: "Turn off alert cash register sound by default. Members can always turn it on", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
   { name: "styckyNonTradeAlert", section: "settings", type: "checkbox", label: "Sticky Non-Trade Alerts?", help: "If enabled, the non-trade alert checkbox in the alert entry will be ON by default", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
   { name: "fileAccessCaseByCase", section: "settings", type: "checkbox", label: "Shared Files Access Case/Case?", help: "Allow access to the shared drive on a case/case basis", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
-  { name: "isChatOnlyRoom", section: "settings", type: "checkbox", label: "Chat Only Room?", help: "The room will be only text based chat/alerts, no audio/video", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
+  { name: "isChatOnlyRoom", section: "settings", type: "checkbox", label: "Chat Only Room?", help: "The room will be only text based chat/alerts, no audio/video", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: true },
   { name: "chatAutoClear", section: "settings", type: "checkbox", label: "Auto Clear Chat?", help: "Chat will clear at 11:45PM EST / 10:45PM Central.", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
   { name: "alertsAutoClear", section: "settings", type: "checkbox", label: "Auto Clear Alerts?", help: "Alerts will clear at 11:45PM EST / 10:45PM Central.", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
   { name: "chatAutoClearSpecialHour", section: "settings", type: "textarea", label: "Overwrite Clear Hour:", help: "Overwrite the default 12am clearing time with this hour instead: Enter a number only, example: \"3\" for 3:00AM est. ALL TIMES ARE EST'", helpShape: "muted", helpOutside: false, captured: null, capturedIsDisplayOnly: false, group: null, wired: false },

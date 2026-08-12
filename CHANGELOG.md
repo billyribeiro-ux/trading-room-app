@@ -24,6 +24,72 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-12
 
+### 2026-08-12 15:46 EDT — `hideChatAlerts` and `hidePresentation`: the two column gates, as one flag each
+
+**Runtime impact: two room settings that did nothing now remove a column each.** An owner who ticked
+"Hide Alerts/Chat Section?" or "Chat Only Room?" on the Manage page got a room that ignored both.
+
+**`hideChatAlerts` was three mechanisms and no setting.** Upstream it is ONE field with five writers
+(`app-room.full.js:1893-1902`, plus `detachChat` at `:2179-2181`) gating the whole chat/alerts column
+at `O(1, e.hideChatAlerts ? -1 : 1)` (`app-room.render-helpers.js:1650`) and the extra chat column
+beside it at `:1652-1660`. Here it was a hardcoded branch on `viewerOnlyMode`, a second branch on
+`chatAlertsDetached`, and nowhere at all for the room setting — which is precisely why the setting
+did nothing: there was no fourth branch, and adding one would have been a fourth copy of one
+decision. It is now one `$derived` flag with the three sources this room can resolve.
+
+**Two of the five are honest gaps, and are recorded as such rather than guessed.** `isPlayer` has
+zero occurrences here — upstream it is a stream-PLAYBACK global whose only other reader raises "The
+stream has ended" on `streamPlayerEnded` (`:2162-2165`), and this room has no such mode.
+`videoOnlyMode` is the `r` query parameter, the same gap `files-gates.ts` already records for
+`hideFiles`. `recordChat` was deliberately kept OFF the wire: it appears only inside that writer, so
+sending it would add a setting nothing can read.
+
+**`hidePresentation` was half-built under another name.** `{#if !chatOnlyMode}` on the presentation
+column has been there since `cbfb4b9`, so the brief's expectation that `?co=1` renders a presentation
+area was already false — that half was correct. What was missing is the SECOND term,
+`sessData.isChatOnlyRoom` (`full.js:1903-1904`, gate at `render-helpers.js:1662`), and the name the
+reference gives the pair. The `beforeunload` listener registered inside that same statement is now
+carried too: it posts `windowClosing` to `window.opener`, which is how the opener learns the popout
+closed and calls `reatachChat`. The `?.` on `window.opener` is a declared divergence — upstream
+`co=1` is only ever reached through `detachChat` so an opener always exists, while this room can be
+opened at `?co=1` by hand, where the reference's line would throw on every unload.
+
+**The reopen control moved to where the bootbox says it is.** Detaching used to leave a "Reopen here"
+panel inside the column; upstream it deletes the column and raises `reopenAlertsChatBtn`, whose
+control is a SIDEBAR item — `H(25, oPe, 5, 0, 'li', 19)` gated by `O(25, …)`
+(`render-helpers.js:312, 355`, markup `:76-87`), with its title, classes and icon read from consts
+19/22/38/39 (`compiled.js:1324, 1337, 1416, 1417`). It sits between Connectivity Check and General
+Settings because that is where node 25 sits. No separate `reopenAlertsChatBtn` field: here
+`hideChatAlerts` is derived and `chatAlertsDetached` IS the detach source, so a second flag could
+only disagree with it.
+
+**Wiring the two settings across the boundary touched four lists, by design.** `ROOM_CONSUMED` in the
+generator, `ROOM_VISIBLE_SETTINGS`, the `RoomSessionSettings` interface, and the verifier's own
+`EXPECTED_WIRED_SETTINGS` — the duplication is deliberate and documented, so drift shows up as a diff.
+The generator's `WIRED_SETTINGS.size` tripwire moved 43 → 45 and the schema regenerated to exactly
+three changed lines: the documented count and the two `wired` flags.
+
+**One pre-existing RED test found and fixed, and it was not mine.** `room-config-boundary.test.ts`
+asserts its `consumers` map equals `ROOM_VISIBLE_SETTINGS`; `individualVolumeControls` was added to
+the allow-list with the viewer-only work and never given an entry, so that assertion had been failing
+before this change. Verified against `HEAD` before touching it. Its consumer is real —
+`PresenterMuteRows.svelte:123` — and all three names now have entries.
+
+**Verified:** `chat-alerts-gates-contract.test.ts`, 13 assertions read out of the decoded component
+at RUNTIME, 13/13. Four negative controls, each red on exactly its own assertion and restored:
+unbinding the chat gate, dropping the setting from the derived flag, narrowing `hidePresentation`
+back to `chatOnlyMode`, and changing the sidebar item's title. Controller: 56/56 across the four
+tests that guard the settings chain. `schema:verify` green at 45 wired. `svelte-check` 972 files, 0
+errors, 0 warnings. `svelte-autofixer` clean. Prettier clean.
+
+**NOT verified, and recorded as TODO row E rather than glossed:** there is no RENDER behind these two
+gates. `room-config-seam-e2e.mjs` now carries the assertions — flip the setting, watch `.alert-chat-box`
+or `.presentation-box` leave the DOM — but it could not run: `apps/room/.env` does not exist,
+`ROOM_JWT_SECRET` is absent from the controller's `.env` too, and the probe's default `CONTROL` port
+5180 is a different project on this machine (the controller's dev port is 5173). Provisioning a
+shared secret is an owner decision, and inventing one to make a probe go green is the opposite of
+what the gate is for.
+
 ### 2026-08-12 15:22 EDT — The navbar fix now has a render, and the harness can fail on it
 
 **Runtime impact: none** — tests and a harness only. It closes the verification gap `f9e1890` left

@@ -208,7 +208,19 @@ describe('the allow-list itself', () => {
       userPM: 'canPM in the roster kebab',
       userToPresenterPM: 'canPM in the roster kebab',
       disablePMForTrials: 'canPM in the roster kebab',
-      dingOnNewMessage: 'the chat ding — `app-chat.compiled.js:135`, played on an incoming message from somebody else'
+      dingOnNewMessage: 'the chat ding — `app-chat.compiled.js:135`, played on an incoming message from somebody else',
+      /*
+        Verified in the room before being written here, as the note above requires.
+
+        `individualVolumeControls` was added to the allow-list with the viewer-only work and never
+        given an entry, which left this assertion RED — the map and the list disagreed by one name.
+        It was not caught because nothing ran this file between then and 2026-08-12. Its consumer is
+        real: the prop reaches `PresenterMuteRows.svelte:40`, and `:123` is the gate that reveals
+        each presenter's own slider (const 114 > 115 / 203 > 204).
+      */
+      individualVolumeControls: 'PresenterMuteRows.svelte:123 — the per-presenter volume slider',
+      hideChatAlerts: 'O(1, hideChatAlerts ? -1 : 1) — the chat/alerts column, one of five writers of that flag',
+      isChatOnlyRoom: 'O(3, hidePresentation ? -1 : 3) — the presentation column, with chatOnlyMode'
     };
     expect(Object.keys(consumers).sort()).toEqual([...ROOM_VISIBLE_SETTINGS].sort());
   });

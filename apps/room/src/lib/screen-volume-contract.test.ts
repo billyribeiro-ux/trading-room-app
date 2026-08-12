@@ -467,7 +467,19 @@ describe('viewer-only mode drives every binding the reference gives it', () => {
     expect(ROOM_COMPILED.replace(/\s+/g, '')).toContain(
       'this.appService.globals.viewerOnlyMode&&(this.hideChatAlerts=this.appService.globals.viewerOnlyMode)'
     );
-    expect(PAGE).toContain('{#if viewerOnlyMode}');
+    /*
+      This used to assert a branch keyed on `viewerOnlyMode` itself. That was the right expectation
+      for the wrong mechanism: upstream `viewerOnlyMode` is ONE OF FIVE writers of `hideChatAlerts`
+      (`app-room.full.js:1893-1902`, `:2179-2181`), and the column is gated on the flag, never on
+      any single writer — `O(1, e.hideChatAlerts ? -1 : 1)`. Keying a branch on the mode is what
+      left the room SETTING with nowhere to be read.
+
+      So what viewer-only owes this column is that it FEEDS the flag, which is what is asserted
+      here. The gate itself, the other four writers and the two this room cannot model are covered
+      by `chat-alerts-gates-contract.test.ts`.
+    */
+    expect(PAGE).toContain('|| viewerOnlyMode || chatAlertsDetached');
+    expect(PAGE).toContain('{#if !hideChatAlerts}');
   });
 
   it('refuses to open the private chat', () => {

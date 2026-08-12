@@ -79,6 +79,29 @@ export interface RoomSessionSettings {
    */
   individualVolumeControls?: boolean;
   /**
+   * "Hide Alerts/Chat Section?" — the room-wide half of `hideChatAlerts`.
+   *
+   * Upstream that flag has five writers and this is the only one that is a setting
+   * (`app-room.full.js:1893`); the rest are runtime conditions the room computes. It gates the whole
+   * chat/alerts column at `O(1, e.hideChatAlerts ? -1 : 1)`
+   * (`app-room.render-helpers.js:1650`) and the extra chat column at `:1652-1660`.
+   *
+   * `recordChat` is deliberately absent beside it: it appears only inside the `videoOnlyMode`
+   * writer, and `videoOnlyMode` is the `r` query parameter this room does not model — the same
+   * honest gap recorded for {@link hideFiles}.
+   */
+  hideChatAlerts?: boolean;
+  /**
+   * "Chat Only Room?" — the room-wide half of `hidePresentation`.
+   *
+   * `(chatOnlyMode || sessData.isChatOnlyRoom) && (this.hidePresentation = !0, …)`
+   * (`app-room.full.js:1903-1904`), gating the presentation column at
+   * `app-room.render-helpers.js:1662`. The other half is the `co` query parameter, which the room
+   * reads for itself — `?co=1` is one reader popping the chat out, while this is the owner
+   * declaring the room has no presentation area for anybody.
+   */
+  isChatOnlyRoom?: boolean;
+  /**
    * "Overwrite Cash Register Sound" — the url of the mp3 that replaces `chash.mp3` for alerts.
    *
    * Also the ONE setting this room writes back, through {@link writeRoomSetting}. `''` and `null`
