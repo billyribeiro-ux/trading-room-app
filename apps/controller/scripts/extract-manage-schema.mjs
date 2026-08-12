@@ -251,6 +251,8 @@ for (let i = 0; i < lines.length; i++) {
     between one field and the next.
   */
   let help = null;
+  /** How the reference wrote it: 'muted' | 'plain' | 'bare'. Null when there is no helper. */
+  let helpShape = null;
   for (let j = i + 1; j < lines.length && j < i + 10; j++) {
     if (/<a\.editable|<label[^>]*\.control-label/.test(lines[j])) break;
     /*
@@ -278,6 +280,23 @@ for (let i = 0; i < lines.length; i++) {
     if (/<div[^>]*\bng-(show|if)=/.test(lines[j])) break;
     if (/<label/.test(lines[j])) {
       help = textOf(j + 1);
+      /*
+        The SHAPE, not just the text.
+
+        The reference writes a helper three ways, counted across this capture:
+
+            136  <br> then <label class="muted">
+             37  <br> then <label>
+              5  <label> with no <br>
+
+        Recording only the text made our renderer emit the muted form for all 178, which put a
+        `class="muted"` on 42 helpers that do not have one and a `<br>` before 5 that do not. That
+        is a node-for-node divergence in the Settings pane and it is what `manage-sections-sbs`
+        measures, so the shape is part of the contract rather than a detail.
+      */
+      const muted = /<label[\w.-]*\.muted/.test(lines[j]);
+      const precededByBr = lines[j - 1].trim() === '<br>';
+      helpShape = muted ? 'muted' : precededByBr ? 'plain' : 'bare';
       break;
     }
   }
@@ -288,6 +307,7 @@ for (let i = 0; i < lines.length; i++) {
     type,
     label,
     help,
+    helpShape,
     captured,
     group: inDontTouch ? 'dont-touch' : null
   });
@@ -420,6 +440,14 @@ export interface RoomSettingDef {
   /** Helper copy shown under the field. */
   readonly help: string | null;
   /**
+   * How the reference WRITES that helper, which differs per field and is part of the match.
+   *
+   * Counted across the capture: 136 \`muted\` (\`<br><label class="muted">\`), 37 \`plain\`
+   * (\`<br><label>\`) and 5 \`bare\` (\`<label>\` with no \`<br>\`). Rendering one shape for all of
+   * them put a class on 42 helpers that have none and a \`<br>\` before 5 that have none.
+   */
+  readonly helpShape: 'muted' | 'plain' | 'bare' | null;
+  /**
    * Value observed in the captured tenant. null = unset. Evidence, not a default.
    *
    * For every type EXCEPT select and combodate this is also the stored value.
@@ -442,7 +470,7 @@ export const ROOM_SETTINGS: readonly RoomSettingDef[] = [
 ${defs
   .map(
     (d) =>
-      `  { name: ${q(d.name)}, section: ${q(d.section)}, type: ${q(d.type)}, label: ${q(d.label)}, help: ${q(d.help)}, captured: ${q(d.captured)}, capturedIsDisplayOnly: ${d.type === 'select' || d.type === 'combodate' || d.type === 'date'}, group: ${q(d.group)}, wired: ${WIRED_SETTINGS.has(d.name)} }`
+      `  { name: ${q(d.name)}, section: ${q(d.section)}, type: ${q(d.type)}, label: ${q(d.label)}, help: ${q(d.help)}, helpShape: ${q(d.helpShape)}, captured: ${q(d.captured)}, capturedIsDisplayOnly: ${d.type === 'select' || d.type === 'combodate' || d.type === 'date'}, group: ${q(d.group)}, wired: ${WIRED_SETTINGS.has(d.name)} }`
   )
   .join(',\n')}
 ];
