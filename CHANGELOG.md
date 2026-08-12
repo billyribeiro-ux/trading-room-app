@@ -127,7 +127,7 @@ seven bindings and two defects, all of them in code that already shipped.
 | what | evidence | what it was |
 | --- | --- | --- |
 | the navbar dropdown had no per-presenter rows | `app-room.render-helpers.js:1224-1225, 1103-1106, 1436` | a member could mute the room but not one presenter |
-| its third icon was `fa-volume-mute` | `app-room.compiled.js:1696` is `fa-2x fa-volume-off` | one word, in the icon a muted listener looks at |
+| its third icon was `fa-volume-mute` | `app-room.compiled.js:1696` is `fa-2x fa-volume-off`; and Font Awesome's own sheet declares `.fa-volume-off:before{content:"\f026"}` against `.fa-volume-mute:before{content:"\f6a9"}` | **not a near-miss class name — a different picture.** U+F6A9 is not U+F026, so every listener who dropped below 4 saw the wrong glyph, not a variant of the right one |
 | the background-music slider was gated on SoundCloud alone | `:1434` gates on `scPlaying \|\| mp3Playing \|\| roomState.ytURL` | dead for MP3 and YouTube — two of the three sources it controls |
 | its container carried `class="m-0"` | const 114 is `[2,'text-align','center']` — a `2` marker is STYLES | the class belongs to the `<p>`, which already had it; the centring was absent |
 | `viewer-only-screen-video` and `viewer-only-screen-tab` were STATIC classes | `app-screenshare-view.render-helpers.js:2`, `app-presentationarea.render-helpers.js:9` — both are `ngClass` bindings | viewer-only geometry (`max-height: 100% !important`, `height: 100% !important`) applied to EVERY room |
