@@ -11,7 +11,7 @@ import type { Attachment } from 'svelte/attachments';
  * ## Every value below is READ from a capture of the live original
  *
  * `evidence-tooltips-presenter-2026-08-11.json`, collected by `scripts/collect-tooltips.js` on
- * `chat.protradingroom.com` as a presenter. `ngb-tooltip-contract.test.ts` asserts this
+ * `chat.protradingroom.com` as a presenter. `ngb-tooltip.test.ts` asserts this
  * implementation against **that file**, not against this comment, so the two cannot drift.
  *
  * The captured element, verbatim:
@@ -37,30 +37,162 @@ import type { Attachment } from 'svelte/attachments';
  *
  * ## What is deliberately NOT handled, because it was not captured
  *
- * **Only `placement="left"` is implemented.** The run captured `left`, and only `left`: it maps to
- * `bs-tooltip-start`, with `data-popper-placement="left"` keeping the physical name. Bootstrap 5
- * renamed the logical directions, so `right` is presumably `end` and `top`/`bottom` presumably keep
- * their names — **presumably is not evidence**, and no capture shows them. The screen-tab eye badge
- * (`placement="bottom"`) never rendered during the run because no screen was being shared, so there
- * was no badge to hover.
+ * **Every placement now resolves, and none of it is guessed.** The direction class is no longer a
+ * one-entry table of what was captured; it is the reference's own arithmetic, ported from
+ * `main.d6d3c112b59b7d0d.js` — the `Coe` placement table and the `koe` class function, called with
+ * the `baseClass: "bs-tooltip"` the tooltip's own `createPopper` passes. `left` → `bs-tooltip-start`
+ * is the branch the captures prove, and running the reference's code means the other 21 placements
+ * are produced by the same arithmetic rather than typed out from memory.
  *
- * All nine wired sites use `placement="left"`, so nothing is missing today. Anything else refuses to
- * render and says why, rather than emitting a guessed class that no rule may paint. See `TODO.md`
- * gap 10a.
+ * That the resulting classes are painted is checked separately and directly: the pinned
+ * `styles.d622cb9ed2bbc221.css` and our own `complete-app-styles.css` both carry
+ * `.bs-tooltip-top`, `.bs-tooltip-bottom`, `.bs-tooltip-start` and `.bs-tooltip-end` arrow rules, and
+ * `ngb-tooltip-placements-contract.test.ts` fails if one goes missing.
  *
- * **Which CSS rules paint it is also unproven from that run** — all eight stylesheets were
- * CORS-blocked, and the collector recorded that as an error rather than as an empty result. The
- * class names here are what the live DOM carried; that they are styled by our pinned
- * `complete-app-styles.css` is asserted separately by the contract test against our own sheet.
+ * **What is NOT reproduced:** Popper's collision handling. The reference passes a fallback list and
+ * flips the bubble when it would overflow; we position once from the measured rects. So `auto`
+ * resolves to the head of the reference's own expansion order rather than to whatever fits, and a
+ * fixed placement stays where it was asked for. Every host we render today is a fixed placement.
+ *
+ * The collector could not read the live sheets — all eight were CORS-blocked, and it recorded that
+ * as an error rather than as an empty result — so the rules are read from the pinned reference sheet
+ * and from our own, and the contract test fails if either stops carrying them.
  */
 
 /**
- * The captured mapping, and the ONLY one.
+ * ng-bootstrap's `placement` → Popper placement table, transcribed from `main.d6d3c112b59b7d0d.js`.
  *
- * Keyed by the `placement` attribute; the value is what the live tooltip carried in its class list.
- * A placement that is not a key here has never been observed and is refused rather than guessed.
+ * The bundle ships it as `Coe`, each entry a two-element array — LTR arm first, RTL arm second, read
+ * by `Soe(t, n) { const [e, i] = Coe[t]; return n && i || e }` where `n` is `isRTL()`. The room's
+ * `<html>` carries no `dir`, so `isRTL()` is false and the LTR arm is the one that runs; only that
+ * arm is transcribed here, and `resolveDirection` refuses anything absent from it.
  */
-const CAPTURED_DIRECTIONS: Record<string, string> = { left: 'bs-tooltip-start' };
+const POPPER_PLACEMENT: Record<string, string> = {
+  top: 'top',
+  bottom: 'bottom',
+  start: 'left',
+  left: 'left',
+  end: 'right',
+  right: 'right',
+  'top-start': 'top-start',
+  'top-left': 'top-start',
+  'top-end': 'top-end',
+  'top-right': 'top-end',
+  'bottom-start': 'bottom-start',
+  'bottom-left': 'bottom-start',
+  'bottom-end': 'bottom-end',
+  'bottom-right': 'bottom-end',
+  'start-top': 'left-start',
+  'left-top': 'left-start',
+  'start-bottom': 'left-end',
+  'left-bottom': 'left-end',
+  'end-top': 'right-start',
+  'right-top': 'right-start',
+  'end-bottom': 'right-end',
+  'right-bottom': 'right-end'
+};
+
+/**
+ * What `placement="auto"` expands to, in order — the array `RI` splices in ahead of resolving.
+ *
+ * The reference hands the whole list to Popper, which picks the first that fits and flips on
+ * collision. We do not run Popper, so ONLY THE HEAD of this list is read — `resolveDirection` takes
+ * `AUTO_ORDER[0]`, which is where Popper starts before any collision pass.
+ *
+ * The remaining eleven are kept because they are the evidence for that head: written out, `'top'` is
+ * a bare literal nobody can check; written as the reference's own ordered list, and pinned against
+ * the bundle by `ngb-tooltip-placements-contract.test.ts`, it is a citation. They are also the
+ * fallback order any future collision handling would need.
+ */
+const AUTO_ORDER = [
+  'top',
+  'bottom',
+  'start',
+  'end',
+  'top-start',
+  'top-end',
+  'bottom-start',
+  'bottom-end',
+  'start-top',
+  'start-bottom',
+  'end-top',
+  'end-bottom'
+];
+
+/** `baseClass: "bs-tooltip"` at the tooltip's `createPopper` call; popovers pass `"bs-popover"`. */
+const BASE_CLASS = 'bs-tooltip';
+
+/**
+ * The reference's `koe(baseClass, popperPlacement)`, which is what writes the direction class.
+ *
+ * Verbatim from the bundle, with the minified regexes named:
+ *
+ * ```js
+ * function koe(t, n) {
+ *   let [e, i] = n.split("-");
+ *   const o = e.replace(/^left/, "start").replace(/^right/, "end");
+ *   let s = [o];
+ *   if (i) {
+ *     let r = i;
+ *     ("left" === e || "right" === e) && (r = r.replace(/^start/, "top").replace(/^end/, "bottom")),
+ *       s.push(`${o}-${r}`);
+ *   }
+ *   return t && (s = s.map((r) => `${t}-${r}`)), s.join(" ");
+ * }
+ * ```
+ *
+ * Ported rather than reduced to a lookup table on purpose: a table would have to enumerate 22
+ * placements by hand, and the one that matters — `left` → `bs-tooltip-start` — is the one branch the
+ * 2026-08-11 and 2026-08-12 captures actually prove. Running the reference's own arithmetic means the
+ * other 21 are derived by the same code that produced the verified one, instead of typed out.
+ *
+ * The physical→logical rename is the whole point of the function: Popper keeps `left`/`right`,
+ * Bootstrap 5 wants `start`/`end`, and the capture carries both at once —
+ * `data-popper-placement="left"` beside `class="… bs-tooltip-start"`.
+ */
+function bootstrapClasses(popperPlacement: string): string {
+  const [base, variation] = popperPlacement.split('-');
+  const logical = base.replace(/^left/, 'start').replace(/^right/, 'end');
+  const names = [logical];
+  if (variation) {
+    // A left/right bubble varies along the vertical axis, so its `start`/`end` mean top/bottom.
+    const along =
+      base === 'left' || base === 'right'
+        ? variation.replace(/^start/, 'top').replace(/^end/, 'bottom')
+        : variation;
+    names.push(`${logical}-${along}`);
+  }
+  return names.map((n) => `${BASE_CLASS}-${n}`).join(' ');
+}
+
+/**
+ * The `placement` attribute as written in the markup → what Popper resolves it to, and the classes.
+ *
+ * Returns `null` for a placement the reference itself has no entry for, which is refused rather than
+ * guessed.
+ */
+function resolveDirection(placement: string): { popper: string; classes: string } | null {
+  // `RI` splices the auto list in at the position `auto` occupied and then `shift()`s the head.
+  const requested = placement === 'auto' ? AUTO_ORDER[0] : placement;
+  const popper = POPPER_PLACEMENT[requested];
+  if (!popper) return null;
+  return { popper, classes: bootstrapClasses(popper) };
+}
+
+/**
+ * Popper's `offset` distance for tooltips, from the bundle's own call.
+ *
+ * The tooltip builds its options with `updatePopperOptions: s => this.popperOptions(k_([0, 6])(s))`,
+ * against the popover's `k_([0, 8])`; `k_` pushes Popper's `offset` modifier with that `[skidding,
+ * distance]` pair. So the bubble sits 6px off the host along the placement axis, and the arrow —
+ * which overhangs by `--bs-tooltip-arrow-height`, `.4rem` = 6.4px — reaches back across the gap to
+ * touch it.
+ *
+ * The 2026-08-11 capture agrees: the bubble's right edge is 683.5 and the host's left edge 689.25, a
+ * gap of 5.75px against rects reported to one decimal at `devicePixelRatio: 2`. The previous
+ * implementation placed the two edges flush, which no capture supports.
+ */
+const OFFSET_DISTANCE = 6;
 
 /**
  * `ngb-tooltip-9` in the capture — a per-page counter, not a random or time-based id.
@@ -78,7 +210,59 @@ let nextId = 1;
  * block, then translate. The offsets are measured rather than computed from the containing block's
  * geometry, because measuring is exact whatever the borders, scroll and zoom happen to be.
  */
-function place(host: Element, bubble: HTMLElement, placement: string): void {
+/** The minimum a rect needs for the geometry below; `DOMRect` satisfies it. */
+export interface Box {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+  width: number;
+  height: number;
+}
+
+/**
+ * Where the bubble's top-left corner belongs, given the host's box and the bubble's own size.
+ *
+ * Exported and pure so it can be checked against the captured pixels rather than by reading this
+ * file's source. jsdom reports every rect as zero, so a test that mounts a tooltip cannot measure
+ * anything — which is how a version of this shipped with the 6px offset dropped and a green suite.
+ */
+export function restingPosition(
+  anchor: Box,
+  bubble: Box,
+  popperPlacement: string
+): { left: number; top: number } {
+  const [base, variation] = popperPlacement.split('-');
+
+  if (base === 'left' || base === 'right') {
+    return {
+      left:
+        base === 'left'
+          ? anchor.left - bubble.width - OFFSET_DISTANCE
+          : anchor.right + OFFSET_DISTANCE,
+      top:
+        variation === 'start'
+          ? anchor.top
+          : variation === 'end'
+            ? anchor.bottom - bubble.height
+            : anchor.top + (anchor.height - bubble.height) / 2
+    };
+  }
+  return {
+    top:
+      base === 'top'
+        ? anchor.top - bubble.height - OFFSET_DISTANCE
+        : anchor.bottom + OFFSET_DISTANCE,
+    left:
+      variation === 'start'
+        ? anchor.left
+        : variation === 'end'
+          ? anchor.right - bubble.width
+          : anchor.left + (anchor.width - bubble.width) / 2
+  };
+}
+
+function place(host: Element, bubble: HTMLElement, popperPlacement: string): void {
   bubble.style.position = 'absolute';
   bubble.style.inset = '0px 0px auto auto';
   bubble.style.margin = '0px';
@@ -86,16 +270,13 @@ function place(host: Element, bubble: HTMLElement, placement: string): void {
 
   const anchor = host.getBoundingClientRect();
   const resting = bubble.getBoundingClientRect();
-
-  // `left`: the bubble's right edge meets the host's left edge, vertically centred on it. This is
-  // the only placement the capture contains, and the only one this function is asked for.
-  const targetLeft = anchor.left - resting.width;
-  const targetTop = anchor.top + (anchor.height - resting.height) / 2;
+  const target = restingPosition(anchor, resting, popperPlacement);
+  const targetLeft = target.left;
+  const targetTop = target.top;
 
   const dx = Math.round((targetLeft - resting.left) * 10) / 10;
   const dy = Math.round((targetTop - resting.top) * 10) / 10;
   bubble.style.transform = `translate3d(${dx}px, ${dy}px, 0px)`;
-  void placement;
 }
 
 /**
@@ -122,16 +303,21 @@ export const ngbTooltip: Attachment<Element> = (host) => {
   if (host.getAttribute('triggers') === 'manual') return;
 
   const placement = host.getAttribute('placement') ?? '';
-  const direction = CAPTURED_DIRECTIONS[placement];
-  if (!direction) {
-    // Refused, not guessed. Bootstrap 5's logical names are a convention we have not observed here,
-    // and a class no rule paints is an invisible element that ships and nobody checks.
+  const resolved = resolveDirection(placement);
+  if (!resolved) {
+    /*
+      Still refused, not guessed — but the bar has moved. `resolveDirection` runs the reference's own
+      table and class arithmetic, so every placement the reference can express now resolves here. What
+      reaches this branch is a placement `Coe` has no entry for, which the reference could not render
+      either.
+    */
     console.warn(
-      `[ngb-tooltip] placement="${placement}" has never been captured, so no tooltip is rendered ` +
-        `for "${text}". Only "left" is evidenced. See TODO.md gap 10a.`
+      `[ngb-tooltip] placement="${placement}" is not one ng-bootstrap resolves, so no tooltip is ` +
+        `rendered for "${text}".`
     );
     return;
   }
+  const { popper, classes: direction } = resolved;
 
   let bubble: HTMLElement | null = null;
   let id = '';
@@ -145,7 +331,14 @@ export const ngbTooltip: Attachment<Element> = (host) => {
     bubble.setAttribute('role', 'tooltip');
     id = `ngb-tooltip-${nextId++}`;
     bubble.id = id;
-    bubble.setAttribute('data-popper-placement', placement);
+    /*
+      The RESOLVED placement, not the attribute as written. Popper writes this itself —
+      `n.attributes.popper = { "data-popper-placement": n.placement }` — so it carries the physical
+      name it settled on. For `left` the two coincide, which is why the capture shows
+      `placement="left"` beside `data-popper-placement="left"`; for `top-right` they do not, and this
+      attribute reads `top-end`.
+    */
+    bubble.setAttribute('data-popper-placement', popper);
     // `fade` WITHOUT `show` first: `.tooltip` is `opacity: 0` and `.tooltip.fade` is
     // `transition: opacity .15s linear`, so adding both in one frame would jump straight to 0.9 with
     // no transition. The capture caught this element mid-fade at `opacity: 0.099804`, which is the
@@ -168,7 +361,7 @@ export const ngbTooltip: Attachment<Element> = (host) => {
     host.parentElement.appendChild(bubble);
     host.setAttribute('aria-describedby', id);
 
-    place(host, bubble, placement);
+    place(host, bubble, popper);
     // Forces the style to settle before `show` flips the opacity, so the transition actually runs.
     void bubble.offsetHeight;
     bubble.classList.add('show');

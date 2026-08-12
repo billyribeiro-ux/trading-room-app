@@ -24,6 +24,67 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-12
 
+### 15:05 — Every tooltip placement the room uses, derived from the reference's own arithmetic
+
+The last entry closed gap 1 and recorded one thing rather than fixing it: `top`, `bottom` and
+`top-right` render in the reference and refused to render here. "We don't render those hosts today"
+was a reason to defer, not a reason to leave a hole. Closed now, and the evidence for it turned out
+to be sitting in two files I had not opened.
+
+**The mapping is code in the bundle, not a guess.** ng-bootstrap ships the placement table (`Coe`)
+and the class function (`koe`):
+
+```js
+function koe(t,n){let[e,i]=n.split("-");
+  const o=e.replace(/^left/,"start").replace(/^right/,"end");
+  …return t&&(s=s.map(r=>`${t}-${r}`)),s.join(" ")}
+```
+
+with `baseClass:"bs-tooltip"` at the tooltip's own `createPopper` call (`bs-popover` for popovers).
+Both are **ported**, not reduced to a hand-typed table of 22 rows. `left` → `bs-tooltip-start` is the
+branch two captures prove, and running the reference's arithmetic means the other 21 are produced by
+the same code that produces the verified one. `top-right` → `top-end` → `bs-tooltip-top
+bs-tooltip-top-end`, and `data-popper-placement` now carries the RESOLVED placement, which is what
+Popper writes.
+
+**The classes are painted — read, not assumed.** The pinned `styles.d622cb9ed2bbc221.css` and our
+shipped `complete-app-styles.css` both carry arrow rules for all four directions with the matching
+`border-*-color`. Every computed value in the capture is explained by them: arrow `left:-1px`,
+`border-width` `.4rem 0 .4rem .4rem`, `border-radius` 6px, `opacity .9`, `z-index 1080`.
+
+**A real defect fell out.** The bundle passes `k_([0,6])` — a 6px offset between host and bubble —
+and `place()` placed the edges flush. The captured rects agree: 5.75px of gap. Positioning is now a
+pure exported `restingPosition()`, checked against all three captured tooltips at the pixels the
+browser reported — **vertical within 0.02px, horizontal within 0.25px**. The 0.25px residual is
+recorded as unexplained rather than absorbed by tuning the constant to 5.75; the bundle says 6, and
+fitting it to three samples would be inventing a value the source contradicts.
+
+**Negative controls, six of them, all caught:** the `top`→`start` rename applied too broadly (3
+fail), offset 6→0 (5), the variation class dropped (1), offset 6→**5.75** (1), top/bottom swapped
+(1), centring replaced by top-edge alignment (3). The 5.75 case is the one that matters — it proves
+the geometry test distinguishes the real constant from a fitted one.
+
+That mutant round is also why `restingPosition` is exported and pure. The first version of the offset
+test read the implementation's source text for the right expressions, and **survived offset 6→0**.
+jsdom reports every rect as zero, so mounting a tooltip and measuring proves nothing; handing the
+captured rects to a pure function is what makes the check real.
+
+Two stale comments fixed in the same file while re-reading the diff: a reference to a
+`ngb-tooltip-contract.test.ts` that does not exist, and a "see `place()` for what that costs" pointing
+at a function that no longer discusses it.
+
+**Verified:** `svelte-check` 967 files, 0 errors. Full room suite **64 files, 635 tests, all green**.
+
+**A note on the environment, because it cost an hour and was not the code.** Midway through, three
+unrelated packages started failing identically — `picomatch.scan`, `tough-cookie`'s exports, and
+jsdom's generated interfaces all came back as empty or partial modules. It reproduced in plain
+`node`, independent of vitest. The machine had booted ten minutes earlier under load. Clearing the
+three `.vite` caches and a forced re-link settled it; jsdom then constructed 6/6. Several of my own
+diagnostic probes along the way were malformed — a `chdir` before a script-relative require, a
+guessed `tough-cookie` path, a bracket-matcher that ran to EOF on minified JS — and each made an
+intact package look corrupt. All were re-run properly before anything was concluded, and nothing was
+reported as broken on the strength of them.
+
 ### 14:40 — Gap 1 closed, by disproving all three things it asserted
 
 The presenter run on the live room arrived. Read alongside the bundle's own directive definition, it

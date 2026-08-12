@@ -99,15 +99,30 @@ writing a collector for anything below, read what is already in `new-room` and `
 | --- | --- | --- | --- | --- |
 | 1 | **Closed 2026-08-12, and it closed by disproving its own premise.** A presenter run on the live room (`evidence-tooltips-presenter-2026-08-12.json`, 8 hosts, Bootstrap **5.3.3**) plus the bundle's directive definition settled all three parts. **(a) `triggers` is an NgbTooltip input**, not a popover-only one — `selectors:[["","ngbTooltip",""]],inputs:{…,triggers:"triggers",…}`. Angular's TAttributes has no per-directive grouping, so `triggers="manual"` on the GIF host reaches the tooltip, and the live hover confirmed it: every other host rendered within 33ms, that one rendered nothing. The earlier reading — *"triggers sits in the POPOVER's group, so the tooltip is not manual-triggered after all"* — was wrong. **(b) `placement="auto"` is correct and was never a collapse of ours.** The template declares `placement` twice (`"placement","top","placement","auto"`); one attribute survives into the DOM and it is the later one, so `top` is dead in the reference too. Our markup already matched the captured DOM byte for byte. **(c) The eye badge has no tooltip to capture.** The screen tabs use `tooltip="Unlock this screen?"` / `tooltip="This is the default screen…"` with `placement="bottom"` — and the bundle contains **no `[tooltip]` directive selector at all**. Inert attributes; the real hover text there is native `title="Lock this screen?"`. No run while sharing a screen could ever have captured it. **Fix shipped:** the attachment returns before binding when `triggers="manual"`. Pinned by `ngb-tooltip-triggers-contract.test.ts`. | `evidence-tooltips-presenter-2026-08-12.json`; `docs/source/main.d6d3c112b59b7d0d.js` | nothing | `CHANGELOG.md` 2026-08-12 |
 
-**Two directions render in the reference and have not been captured — neither is blocking.**
-Reading every `"placement",` entry in the bundle gives the room's whole inventory: `left` (composer
-icons — captured, implemented), `top` (the webinar-mode `fa-question-circle`, "Show only Moderators
-messages", and message `created-at` timestamps), `bottom` (the Welcome Mat badge on the notes tabs),
-`top-right` (the GIF control in the extra chat column, also `triggers="manual"`), and `auto`. We
-render none of the `top`/`bottom`/`top-right` hosts today, so the attachment's refusal is correct
-rather than a hole. If one of them is built, its direction class must be captured first — hovering
-the Welcome Mat badge gives `bottom` and the question-mark icon gives `top`, and **neither needs a
-screen share**. `bs-tooltip-top` is the obvious Bootstrap name and obvious is not evidence.
+**The room's full placement inventory is implemented and pinned.** Reading every `"placement",`
+entry in `main.d6d3c112b59b7d0d.js` gives it: `left` (composer icons), `top` (the webinar-mode
+`fa-question-circle`, "Show only Moderators messages", message `created-at` timestamps), `bottom`
+(the Welcome Mat badge on the notes tabs), `top-right` (the extra chat column's GIF control) and
+`auto`. All of them now resolve.
+
+None of it was guessed. The bundle ships the mapping as code — the `Coe` placement table and the
+`koe` class function, called with `baseClass: "bs-tooltip"` — and both are ported rather than
+transcribed, so the 21 uncaptured directions are derived by the same arithmetic that produces the one
+the captures prove (`left` → `bs-tooltip-start`). The classes are painted: `styles.d622cb9ed2bbc221.css`
+and our `complete-app-styles.css` both carry `.bs-tooltip-top/-bottom/-start/-end` arrow rules with
+the matching `border-*-color`.
+
+The same read found a real defect: the bundle passes `k_([0,6])`, a 6px offset between host and
+bubble, and `place()` put the edges flush. The captured rects agree — 5.75px of gap, not zero.
+Positioning is now a pure `restingPosition()` checked against all three captured tooltips: vertical
+within 0.02px, horizontal within 0.25px. That residual is recorded and NOT absorbed by tuning the
+constant to 5.75 — the bundle says 6, and fitting a constant to three samples would be inventing a
+value the source contradicts. A negative control at 5.75 fails the suite, which is what makes that
+statement checkable.
+
+**Not reproduced, deliberately:** Popper's collision/flip pass. `auto` resolves to the head of the
+reference's own expansion order rather than to whatever fits. Every host we render today is a fixed
+placement.
 
 ### Not an evidence gap — missing work, recorded so it is not lost
 

@@ -197,21 +197,26 @@ describe('the classes we emit are ones the reference stylesheet actually paints'
   });
 });
 
-describe('placements that were never captured are refused, not guessed', () => {
-  it('renders nothing for a placement with no evidence, and says why', () => {
+describe('placements ng-bootstrap cannot resolve are refused, not guessed', () => {
+  it('renders nothing for a placement with no mapping, and says why', () => {
     /*
-      THE test for the rule that was broken. Bootstrap 5 renamed left/right to start/end, so `right`
-      is PRESUMABLY `end` and top/bottom presumably keep their names — presumably is not evidence.
-      The capture contains `left` and only `left`; the screen-tab eye badge (`placement="bottom"`)
-      never rendered during the run because no screen was being shared.
+      This test used to assert that `bottom` rendered nothing, because the capture contains `left`
+      and only `left`. That was the right rule applied to an incomplete reading of the evidence: the
+      direction class is not something a capture has to supply one example of at a time. The bundle
+      ships the mapping as code — the `Coe` table and `koe` — and porting it derives every direction
+      from the same arithmetic that produces the one branch the capture proves.
+
+      So `bottom` now renders `bs-tooltip-bottom`, asserted in
+      `ngb-tooltip-placements-contract.test.ts` alongside the stylesheet rules that paint it. What is
+      refused is what the REFERENCE cannot resolve either — a placement absent from its own table.
     */
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const { host } = mount('Some future control', 'bottom');
+    const { host } = mount('Some future control', 'sideways');
     enter(host);
 
-    expect(bubble(), 'an unevidenced placement must render nothing').toBeNull();
+    expect(bubble(), 'an unresolvable placement must render nothing').toBeNull();
     expect(warn).toHaveBeenCalled();
-    expect(String(warn.mock.calls[0][0])).toContain('never been captured');
+    expect(String(warn.mock.calls[0][0])).toContain('not one ng-bootstrap resolves');
     warn.mockRestore();
   });
 

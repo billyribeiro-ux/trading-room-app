@@ -11,7 +11,9 @@ import { describe, expect, it } from 'vitest';
 
 const cwd = process.cwd();
 const BUNDLE = readFileSync(resolve(cwd, 'docs/source/main.d6d3c112b59b7d0d.js'), 'utf8');
-const CAPTURE = JSON.parse(readFileSync(resolve(cwd, 'evidence-tooltips-presenter-2026-08-12.json'), 'utf8'));
+const CAPTURE = JSON.parse(
+  readFileSync(resolve(cwd, 'evidence-tooltips-presenter-2026-08-12.json'), 'utf8')
+);
 const IMPL = readFileSync(resolve(cwd, 'src/lib/ngb-tooltip.ts'), 'utf8');
 
 const gif = CAPTURE.tooltips.find((t: { label: string }) => t.label === 'Search for GIFs');
@@ -65,8 +67,12 @@ describe('the GIF control never opens on hover, in the reference or here', () =>
 
   it('our attachment returns before binding anything', () => {
     expect(IMPL).toContain("if (host.getAttribute('triggers') === 'manual') return;");
-    // Ahead of the placement lookup, or `auto` warns on every render for a control that is correct.
-    expect(IMPL.indexOf("=== 'manual'")).toBeLessThan(IMPL.indexOf('CAPTURED_DIRECTIONS[placement]'));
+    // Ahead of the direction resolution, so a manual control never reaches it at all.
+    const guard = IMPL.indexOf("=== 'manual'");
+    const resolve = IMPL.indexOf('resolveDirection(placement)');
+    expect(guard).toBeGreaterThan(-1);
+    expect(resolve).toBeGreaterThan(-1);
+    expect(guard).toBeLessThan(resolve);
   });
 });
 
@@ -85,11 +91,18 @@ describe('placement="auto" on that host is what the reference renders, not a col
 
 describe('left is still the only direction observed rendering', () => {
   it('every tooltip that appeared used it', () => {
+    /*
+      Still true, and still the point: `left` → `bs-tooltip-start` is the single branch a capture
+      proves, and it is what validates the port of `koe` that derives the other 21. That the port
+      reproduces it is asserted behaviourally in `ngb-tooltip-placements-contract.test.ts`; here we
+      only pin what the evidence itself contains.
+    */
     const seen = new Set(
-      CAPTURE.tooltips.filter((t: { appeared: boolean }) => t.appeared).map((t: { generation: { directionClass: string } }) => t.generation.directionClass)
+      CAPTURE.tooltips
+        .filter((t: { appeared: boolean }) => t.appeared)
+        .map((t: { generation: { directionClass: string } }) => t.generation.directionClass)
     );
     expect([...seen]).toEqual(['bs-tooltip-start']);
-    expect(IMPL).toContain("{ left: 'bs-tooltip-start' }");
   });
 
   it('and it is inserted beside the host, never into body', () => {
