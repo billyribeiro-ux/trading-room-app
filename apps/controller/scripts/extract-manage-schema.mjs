@@ -114,6 +114,7 @@ const ROOM_CONSUMED = [
   'rosterVisibleToViewers',
   'showArchivesToSpecificPresenters',
   'showArchivesToUsers',
+  'tawkPresenterSupport',
   'simUserCount',
   'userPM',
   'userToPresenterPM',
@@ -436,6 +437,11 @@ if (defs.length !== EXPECTED_TOTAL_COUNT) {
 }
 
 const missingWiredSettings = [...WIRED_SETTINGS].filter((name) => !defs.some((definition) => definition.name === name));
+// 49 since 2026-08-12: `tawkPresenterSupport` joined when the room gained the presenter
+// support widget that reads it. Its property id is NOT the capture's - see
+// `apps/room/src/lib/tawk-support.ts` for why copying `5aecb59f227d3d7edc24f7c2` would post every
+// presenter's name and email into another company's inbox.
+//
 // 48 since 2026-08-12: `userJoinAndLeavePopup` and `beepOnUserJoin` joined ROOM_CONSUMED when the
 // room gained the join/leave announcements that read them (`app-room.full.js:2134-2155`). Each
 // effect there is gated twice — a room setting AND a per-viewer preference — and only the
@@ -447,7 +453,7 @@ const missingWiredSettings = [...WIRED_SETTINGS].filter((name) => !defs.some((de
 //
 // The literal is a tripwire, not a fact about the schema — it is here so the wired set cannot grow
 // by accident, which is why changing it is a deliberate edit.
-if (WIRED_SETTINGS.size !== 48 || missingWiredSettings.length > 0) {
+if (WIRED_SETTINGS.size !== 49 || missingWiredSettings.length > 0) {
   throw new Error(
     `wired-setting contract invalid: ${WIRED_SETTINGS.size} keys, missing ${missingWiredSettings.join(', ') || 'none'}`
   );

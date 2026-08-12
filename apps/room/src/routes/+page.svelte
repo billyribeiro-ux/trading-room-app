@@ -53,6 +53,7 @@
     MUTE_STAGGER_MS,
     nonAdminTalkingUsers
   } from '$lib/mute-all-non-admins';
+  import { tawkAttributes, tawkScript, tawkSupportAvailable } from '$lib/tawk-support';
   import { NO_PENDING_CLICK, gutterRelease, togglePresentationSplit } from '$lib/split-gutter';
   import {
     pushToTalkShouldMute,
@@ -2330,6 +2331,99 @@
         });
       }
     };
+  }
+
+  /**
+   * Tawk.to presenter support — `app-room.full.js:2224-2298`.
+   *
+   * The gates, the URL shape and the attribute fallbacks are in `$lib/tawk-support`, with the one
+   * DIVERGENCE stated there and tested: the property id is configuration, never the capture's
+   * literal, because copying `5aecb59f227d3d7edc24f7c2` would open every presenter's support chat
+   * into another company's inbox and post their name and email into it.
+   *
+   * `loadTawkSupport()` runs from `ngAfterViewInit` upstream — after the view exists, once — which
+   * is `onMount` here. `setTAWKAttributes()` then awaits the API and calls `hideWidget()`, so the
+   * widget is present and invisible until the navbar control is used; that is why the control is a
+   * toggle rather than a launcher.
+   */
+  const tawkAvailable = $derived(
+    tawkSupportAvailable(
+      { isPresenter },
+      data.sessData ?? {},
+      env.PUBLIC_PTR_TAWK_PROPERTY_ID
+    )
+  );
+  /** `this.tawkWidgetOpen` — attributes are set once, on the first open. */
+  let tawkWidgetOpen = false;
+
+  type TawkApi = {
+    toggleVisibility?: () => void;
+    hideWidget?: () => void;
+    setAttributes?: (
+      attributes: { name: string; email: string },
+      onerror: (error: unknown) => void
+    ) => void;
+  };
+
+  function tawkApi(): TawkApi | undefined {
+    return (window as Window & { Tawk_API?: TawkApi }).Tawk_API;
+  }
+
+  /**
+   * `loadTawkSupport()` + `setTAWKAttributes()`, in the order `ngAfterViewInit` runs them.
+   *
+   * `waitForTawkAPI()` upstream polls every 100ms until `window.Tawk_API` exists, then hides the
+   * widget. Reproduced with the script's own `load` event plus the same poll as a fallback, because
+   * the API object is created by the script rather than at load time.
+   */
+  function loadTawkSupport() {
+    const script = tawkScript(env.PUBLIC_PTR_TAWK_PROPERTY_ID);
+    if (!script) return () => {};
+
+    const element = document.createElement('script');
+    element.async = script.async;
+    element.src = script.src;
+    element.charset = script.charset;
+    element.setAttribute('crossorigin', script.crossorigin);
+    // `i.parentNode.insertBefore(e, i)` where `i` is the first existing script.
+    const first = document.getElementsByTagName('script')[0];
+    first?.parentNode?.insertBefore(element, first);
+
+    // `waitForTawkAPI()` — then `hideWidget()`, so it is invisible until the control is used.
+    let cancelled = false;
+    const waitForApi = () => {
+      if (cancelled) return;
+      const api = tawkApi();
+      if (api?.hideWidget) api.hideWidget();
+      else globalThis.setTimeout(waitForApi, 100);
+    };
+    waitForApi();
+
+    return () => {
+      cancelled = true;
+      element.remove();
+    };
+  }
+
+  /** `toggleTAWKSupport()` — visibility every time, attributes only on the first open. */
+  function toggleTAWKSupport() {
+    const api = tawkApi();
+    if (!api?.toggleVisibility) return;
+    api.toggleVisibility();
+    if (tawkWidgetOpen) return;
+    api.setAttributes?.(
+      tawkAttributes({
+        savedNick: typeof loadedSettings.savedNick === 'string' ? loadedSettings.savedNick : null,
+        nick: data.user.displayName,
+        name: data.user.displayName,
+        savedEmail: typeof loadedSettings.savedEmail === 'string' ? loadedSettings.savedEmail : null,
+        email: data.user.email
+      }),
+      (error) => {
+        if (error) console.error('Error setting Tawk.to attributes:', error);
+      }
+    );
+    tawkWidgetOpen = true;
   }
 
   function requestModalConfirmation(message: string, onconfirm: () => void) {
@@ -6227,6 +6321,9 @@
     };
     const previousOpenImageModal = imageModalWindow.openImageModal;
     imageModalWindow.openImageModal = openImageModal;
+    // `ngAfterViewInit`: `sessData.tawkPresenterSupport && (loadTawkSupport(), setTAWKAttributes())`.
+    // Gated on `tawkAvailable`, which adds the configured-property term — with none, no script.
+    const stopTawk = tawkAvailable ? loadTawkSupport() : () => {};
     initializeSoundEffects();
     setSoundEffectsVolume(volume / 100);
     loadManagedUsers();
@@ -6548,6 +6645,10 @@
     return () => {
       stopRoomEvents();
       stopGeoLookup();
+      // The injected script goes with the component. Upstream never unmounts `app-room`, so it has
+      // no teardown to transcribe; leaving a third-party script attached to a dead component is
+      // ours to avoid.
+      stopTawk();
       endSpeechRecognition();
       mediaSignalling = null;
       /*
@@ -7833,6 +7934,32 @@
                     </div>
                   </div>
                 </li>
+                <!--
+                  `a4e` — `app-room.render-helpers.js:960-973`, gated at `:1417-1422`:
+                  `O(30, isPresenter && sessData.tawkPresenterSupport ? 30 : -1)`.
+
+                  Markup from the const table: 195 is
+                  `['title','TAWK Support',1,'nav-item',3,'click']`, 193 is
+                  `[1,'nav-link','d-flex','align-items-center']`, 196 is
+                  `[1,'fas','fa-2x','fa-question-circle']` and 108 is `[1,'ml-2','mainNavItem']`
+                  (`app-room.compiled.js:2050-2051, 2048, 1697`).
+
+                  `tawkAvailable` carries a THIRD term the reference does not have: a configured
+                  property id. See `$lib/tawk-support` — the reference's id is its own company's,
+                  and a room with none configured shows no control rather than a control that opens
+                  somebody else's support inbox.
+                -->
+                {#if tawkAvailable}
+                  <!-- svelte-ignore a11y_click_events_have_key_events -->
+                  <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+                  <li title="TAWK Support" class="nav-item" onclick={toggleTAWKSupport}>
+                    <!-- svelte-ignore a11y_missing_attribute -->
+                    <a class="nav-link d-flex align-items-center">
+                      <i class="fas fa-2x fa-question-circle"></i>
+                      <span class="ml-2 mainNavItem">TAWK Support</span>
+                    </a>
+                  </li>
+                {/if}
                 <li title="Reload" class="nav-item">
                   <!-- svelte-ignore a11y_missing_attribute -->
                   <!-- svelte-ignore a11y_click_events_have_key_events -->

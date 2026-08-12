@@ -10,7 +10,7 @@
 // roomType has no captured value because its editor is absent from rendered evidence.
 //
 // `wired` is the honest bit: false means the controller can store the value but
-// nothing in the room reads it yet. 48 of 269 are wired today.
+// nothing in the room reads it yet. 49 of 269 are wired today.
 // Flip one to true ONLY when a consumer exists, so the UI can mark the rest
 // instead of pretending they do something.
 
@@ -116,7 +116,7 @@ export const ROOM_SETTINGS: readonly RoomSettingDef[] = [
   { name: "disableEditingUsername", section: "settings", type: "checkbox", label: "Disable Editing Username", help: "If enabled, it will disable the editing of the username in the login form for regular users", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
   { name: "usernameInstructions", section: "settings", type: "textarea", label: "Username Instructions", help: "Instructions how user can edit his username", helpShape: "plain", helpOutside: false, captured: null, capturedIsDisplayOnly: false, group: null, wired: true },
   { name: "forgotRoomPassword", section: "settings", type: "checkbox", label: "Forgot room password?", help: "If enabled, can change room login password on the login page", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
-  { name: "tawkPresenterSupport", section: "settings", type: "checkbox", label: "Tawk Presenter Support?", help: "If enabled, tawk presenter support will be visible in the room", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
+  { name: "tawkPresenterSupport", section: "settings", type: "checkbox", label: "Tawk Presenter Support?", help: "If enabled, tawk presenter support will be visible in the room", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: true },
   { name: "userToPresenterPM", section: "settings", type: "checkbox", label: "User PM presenters?", help: "If enabled, users can Private msg presenters", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: true },
   { name: "playChatMessageSoundFor", section: "settings", type: "textarea", label: "Chat Message Sound For Emails:", help: "Coma separated list of emails to play sound on the new chat message", helpShape: "muted", helpOutside: false, captured: null, capturedIsDisplayOnly: false, group: null, wired: false },
   { name: "alertsChatOnBottom", section: "settings", type: "checkbox", label: "Alerts/Chat on bottom?", help: "If enabled, the alerts and chat will be bellow the screenshare area", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },

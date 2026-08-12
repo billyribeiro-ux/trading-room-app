@@ -69,6 +69,7 @@ const EXPECTED_WIRED_SETTINGS = [
   'rosterVisibleToViewers',
   'showArchivesToSpecificPresenters',
   'showArchivesToUsers',
+  'tawkPresenterSupport',
   'showPasswordField',
   'simUserCount',
   'ssoJWTSecret',
