@@ -24,6 +24,39 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-12
 
+### 14:15 — The manage page's tooltip system, captured — and it proves the two generations again
+
+**No runtime impact.** One evidence file tracked.
+
+The owner ran `collect-tooltips.js` on the MANAGE page rather than the room, so it does not close
+gap 1 — but it captured something no dump here contained, and it independently confirms a finding
+that had rested on `.panel` markup and stylesheet contents alone.
+
+```html
+<div class="tooltip bottom ng-animate fade-add in-add fade fade-add-active in in-add-active"
+     tooltip-popup="" content="Account Settings" placement="bottom" is-open="isOpen">
+```
+
+`.tooltip` + a bare direction class + `.in` is **Bootstrap 3**, driven by AngularJS UI Bootstrap's
+`tooltip="…"` / `tooltip-placement="…"` attributes — visible on the host, `<a class="icon fa fa-cog"
+tooltip-placement="bottom" tooltip="Account Settings">`. It is inserted as a sibling inside the
+host's `<li>`.
+
+The room renders `<ngb-tooltip-window class="tooltip fade show bs-tooltip-start"
+data-popper-placement="left">` — Bootstrap 5 via ng-bootstrap, with `.show` rather than `.in` and a
+`bs-tooltip-*` direction rather than a bare one.
+
+**Two surfaces, two tooltip systems, sharing only the word `tooltip`.** That is the third independent
+line of evidence for the two-Bootstrap-generations finding, after the `.panel` markup and the
+`bootstrap.min.css` rule set, and the first from rendered DOM on both sides. Saved as
+`apps/controller/evidence-tooltips-manage-2026-08-12.json`.
+
+Two honest notes the run itself recorded: it was signed in as a **member**, so presenter-only
+controls were absent; and 29 elements on that page use a native `title` attribute, which the OS draws
+and no script can capture.
+
+Gap 1 still needs the same one paste, on `chat.protradingroom.com` **while sharing a screen**.
+
 ### 13:55 — Item U reduced to one line, gap 1 halved, and the collector no longer strands tooltips
 
 **No runtime impact.** One collector hardened; two rows reduced to what is genuinely open.

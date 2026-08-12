@@ -25,3 +25,7 @@ pnpm-lock.yaml
 evidence-manage-gaps-2026-08-11.json
 evidence-bootstrap-3.3.7.css
 evidence-page.manageSession.html
+
+# The manage page's own tooltip system, captured 2026-08-12. Evidence: reformatting changes the
+# bytes any contract test reads it for.
+evidence-tooltips-manage-2026-08-12.json

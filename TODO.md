@@ -40,6 +40,16 @@ rather than inside a row.
 | **The room** (`chat.protradingroom.com`, Angular 2+) | **Bootstrap 5** | the live tooltip renders `class="tooltip fade show bs-tooltip-start"` with `data-popper-placement` — a spelling only Bootstrap 5 emits (`apps/room/evidence-tooltips-presenter-2026-08-11.json`); its modal captures carry `modal fade show` and `aria-modal`, and **zero** `modal fade in` |
 | **Account / manage / login** (AngularJS) | **Bootstrap 3.3.7** | `div class="panel panel-default"` appears six times across `evidence-dumps/login-page/{login,logged-in-page,manage,complimentary}`, beside `ng-show`/`ng-hide`. `.panel` is a Bootstrap **3** component — 4 replaced it with `.card`, 5 dropped it entirely — so that markup cannot be either |
 
+**Confirmed again 2026-08-12, by RENDERED tooltips from both surfaces.** The manage page renders
+`<div class="tooltip bottom … fade … in" tooltip-popup="" content="Account Settings"
+placement="bottom" is-open="isOpen">` — Bootstrap 3's `.tooltip.<direction>` + `.in`, driven by
+AngularJS UI Bootstrap's `tooltip="…"`/`tooltip-placement="…"` directives, inserted as a sibling
+inside the host's `<li>`. The room renders `<ngb-tooltip-window class="tooltip fade show
+bs-tooltip-start" data-popper-placement="left">` — Bootstrap 5 via ng-bootstrap. Two surfaces, two
+tooltip systems, neither sharing a class name with the other. Captured in
+`apps/controller/evidence-tooltips-manage-2026-08-12.json` and
+`apps/room/evidence-tooltips-presenter-2026-08-11.json`.
+
 `new-room-control/css-modals` is the source for the SECOND surface: the Bootstrap 3.3.7 LESS tree,
 the compiled `bootstrap.css` (now pinned here as `apps/controller/evidence-bootstrap-3.3.7.css`),
 and a `styes.css` whose header reads **"Naut - Bootstrap Admin Theme + AngularJS"** — the theme the

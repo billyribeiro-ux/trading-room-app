@@ -1,0 +1,909 @@
+{
+  "meta": {
+    "startedAt": "2026-08-12T14:08:36.143Z",
+    "url": "https://protradingroom.com/ptrApp#/page/manageSession/6a6529b318781e20ed81947d",
+    "title": "",
+    "userAgent": "Mozilla/5.0 (Linux; Android 15; Pixel 9) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Mobile Safari/537.36",
+    "viewport": {
+      "w": 980,
+      "h": 1766,
+      "dpr": 2
+    },
+    "themeClass": "footer-hidden",
+    "libraries": {
+      "angularVersion": null,
+      "hasNgbTooltipElement": false,
+      "bootstrapGlobal": "undefined",
+      "bootstrapVersion": null,
+      "jQueryTooltip": "function"
+    }
+  },
+  "role": {
+    "uploadImage": false,
+    "playYouTube": false,
+    "searchGifs": false,
+    "screenTabs": false,
+    "postAlert": false,
+    "detected": "member"
+  },
+  "steps": [
+    {
+      "at": "2026-08-12T14:08:36.143Z",
+      "step": "role detected",
+      "detail": "member"
+    },
+    {
+      "at": "2026-08-12T14:08:36.144Z",
+      "step": "tooltipped elements found",
+      "detail": "2"
+    },
+    {
+      "at": "2026-08-12T14:08:36.144Z",
+      "step": "hovering",
+      "detail": "Account Settings"
+    },
+    {
+      "at": "2026-08-12T14:08:36.678Z",
+      "step": "hovering",
+      "detail": "Logout"
+    }
+  ],
+  "tooltips": [
+    {
+      "label": "Account Settings",
+      "host": {
+        "tag": "A",
+        "className": "icon fa  fa-cog",
+        "attrs": {
+          "href": "#/page/welcome",
+          "ui-sref": "page.welcome",
+          "style": "color: #FFFFFF",
+          "class": "icon fa  fa-cog",
+          "tooltip-placement": "bottom",
+          "tooltip": "Account Settings"
+        },
+        "rect": {
+          "x": 829.57,
+          "y": 0,
+          "w": 96.43,
+          "h": 50
+        },
+        "style": {
+          "position": "relative",
+          "display": "block",
+          "zIndex": "auto",
+          "opacity": "1",
+          "visibility": "visible",
+          "top": "0px",
+          "left": "0px",
+          "right": "0px",
+          "bottom": "0px",
+          "transform": "matrix(1, 0, 0, 1, 0, 0)",
+          "margin": "0px",
+          "padding": "15px",
+          "maxWidth": "none",
+          "width": "96.4297px",
+          "height": "50px",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "color": "rgb(255, 255, 255)",
+          "borderRadius": "0px",
+          "borderWidth": "0px",
+          "borderStyle": "none",
+          "borderTopColor": "rgb(255, 255, 255)",
+          "borderRightColor": "rgb(255, 255, 255)",
+          "borderBottomColor": "rgb(255, 255, 255)",
+          "borderLeftColor": "rgb(255, 255, 255)",
+          "fontFamily": "FontAwesome",
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "lineHeight": "20px",
+          "textAlign": "start",
+          "whiteSpace": "normal",
+          "pointerEvents": "auto",
+          "transition": "all",
+          "animation": "none",
+          "boxShadow": "none"
+        },
+        "outerHTML": "<a href=\"#/page/welcome\" ui-sref=\"page.welcome\" style=\"color: #FFFFFF\" class=\"icon fa  fa-cog\" tooltip-placement=\"bottom\" tooltip=\"Account Settings\">&nbsp; Account</a>"
+      },
+      "appeared": true,
+      "appearedAfterMs": 29,
+      "tooltip": {
+        "tag": "DIV",
+        "className": "tooltip bottom ng-animate fade-add in-add fade fade-add-active in in-add-active",
+        "attrs": {
+          "class": "tooltip bottom ng-animate fade-add in-add fade fade-add-active in in-add-active",
+          "ng-class": "{ in: isOpen(), fade: animation() }",
+          "tooltip-popup": "",
+          "title": "",
+          "content": "Account Settings",
+          "placement": "bottom",
+          "animation": "animation",
+          "is-open": "isOpen",
+          "style": "top: 50px; left: 0.214844px; display: block;"
+        },
+        "rect": {
+          "x": 829.78,
+          "y": 53,
+          "w": 96.22,
+          "h": 50.28
+        },
+        "style": {
+          "position": "absolute",
+          "display": "block",
+          "zIndex": "1070",
+          "opacity": "0.198648",
+          "visibility": "visible",
+          "top": "50px",
+          "left": "0.214844px",
+          "right": "0px",
+          "bottom": "-53.2812px",
+          "transform": "none",
+          "margin": "3px 0px 0px",
+          "padding": "5px 0px",
+          "maxWidth": "none",
+          "width": "96.2188px",
+          "height": "50.2812px",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "color": "rgb(51, 51, 51)",
+          "borderRadius": "0px",
+          "borderWidth": "0px",
+          "borderStyle": "none",
+          "borderTopColor": "rgb(51, 51, 51)",
+          "borderRightColor": "rgb(51, 51, 51)",
+          "borderBottomColor": "rgb(51, 51, 51)",
+          "borderLeftColor": "rgb(51, 51, 51)",
+          "fontFamily": "\"Helvetica Neue\", Helvetica, Arial, sans-serif",
+          "fontSize": "12px",
+          "fontWeight": "400",
+          "lineHeight": "17.1429px",
+          "textAlign": "start",
+          "whiteSpace": "normal",
+          "pointerEvents": "auto",
+          "transition": "opacity 0.15s linear",
+          "animation": "none",
+          "boxShadow": "none"
+        },
+        "outerHTML": "<div class=\"tooltip bottom ng-animate fade-add in-add fade fade-add-active in in-add-active\" ng-class=\"{ in: isOpen(), fade: animation() }\" tooltip-popup=\"\" title=\"\" content=\"Account Settings\" placement=\"bottom\" animation=\"animation\" is-open=\"isOpen\" style=\"top: 50px; left: 0.214844px; display: block;\">\n  <div class=\"tooltip-arrow\"></div>\n  <div class=\"tooltip-inner ng-binding\" ng-bind=\"content\">Account Settings</div>\n</div>"
+      },
+      "parts": {
+        "inner": {
+          "tag": "DIV",
+          "className": "tooltip-inner ng-binding",
+          "attrs": {
+            "class": "tooltip-inner ng-binding",
+            "ng-bind": "content"
+          },
+          "rect": {
+            "x": 829.78,
+            "y": 58,
+            "w": 96.22,
+            "h": 40.28
+          },
+          "style": {
+            "position": "static",
+            "display": "block",
+            "zIndex": "auto",
+            "opacity": "1",
+            "visibility": "visible",
+            "top": "auto",
+            "left": "auto",
+            "right": "auto",
+            "bottom": "auto",
+            "transform": "none",
+            "margin": "0px",
+            "padding": "3px 8px",
+            "maxWidth": "200px",
+            "width": "96.2188px",
+            "height": "40.2812px",
+            "backgroundColor": "rgb(0, 0, 0)",
+            "color": "rgb(255, 255, 255)",
+            "borderRadius": "4px",
+            "borderWidth": "0px",
+            "borderStyle": "none",
+            "borderTopColor": "rgb(255, 255, 255)",
+            "borderRightColor": "rgb(255, 255, 255)",
+            "borderBottomColor": "rgb(255, 255, 255)",
+            "borderLeftColor": "rgb(255, 255, 255)",
+            "fontFamily": "\"Helvetica Neue\", Helvetica, Arial, sans-serif",
+            "fontSize": "12px",
+            "fontWeight": "400",
+            "lineHeight": "17.1429px",
+            "textAlign": "center",
+            "whiteSpace": "normal",
+            "pointerEvents": "auto",
+            "transition": "all",
+            "animation": "none",
+            "boxShadow": "none"
+          },
+          "outerHTML": "<div class=\"tooltip-inner ng-binding\" ng-bind=\"content\">Account Settings</div>"
+        },
+        "arrowBs4": null,
+        "arrowBs5": {
+          "tag": "DIV",
+          "className": "tooltip-arrow",
+          "attrs": {
+            "class": "tooltip-arrow"
+          },
+          "rect": {
+            "x": 872.89,
+            "y": 53,
+            "w": 10,
+            "h": 5
+          },
+          "style": {
+            "position": "absolute",
+            "display": "block",
+            "zIndex": "auto",
+            "opacity": "1",
+            "visibility": "visible",
+            "top": "0px",
+            "left": "48.1094px",
+            "right": "43.1094px",
+            "bottom": "45.2812px",
+            "transform": "none",
+            "margin": "0px 0px 0px -5px",
+            "padding": "0px",
+            "maxWidth": "none",
+            "width": "10px",
+            "height": "5px",
+            "backgroundColor": "rgba(0, 0, 0, 0)",
+            "color": "rgb(51, 51, 51)",
+            "borderRadius": "0px",
+            "borderWidth": "0px 5px 5px",
+            "borderStyle": "solid",
+            "borderTopColor": "rgba(0, 0, 0, 0)",
+            "borderRightColor": "rgba(0, 0, 0, 0)",
+            "borderBottomColor": "rgb(0, 0, 0)",
+            "borderLeftColor": "rgba(0, 0, 0, 0)",
+            "fontFamily": "\"Helvetica Neue\", Helvetica, Arial, sans-serif",
+            "fontSize": "12px",
+            "fontWeight": "400",
+            "lineHeight": "17.1429px",
+            "textAlign": "start",
+            "whiteSpace": "normal",
+            "pointerEvents": "auto",
+            "transition": "all",
+            "animation": "none",
+            "boxShadow": "none"
+          },
+          "outerHTML": "<div class=\"tooltip-arrow\"></div>"
+        },
+        "arrowBefore": {
+          "position": "static",
+          "display": "inline",
+          "zIndex": "auto",
+          "opacity": "1",
+          "visibility": "visible",
+          "top": "auto",
+          "left": "auto",
+          "right": "auto",
+          "bottom": "auto",
+          "transform": "none",
+          "margin": "0px",
+          "padding": "0px",
+          "maxWidth": "none",
+          "width": "auto",
+          "height": "auto",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "color": "rgb(51, 51, 51)",
+          "borderRadius": "0px",
+          "borderWidth": "0px",
+          "borderStyle": "none",
+          "borderTopColor": "rgb(51, 51, 51)",
+          "borderRightColor": "rgb(51, 51, 51)",
+          "borderBottomColor": "rgb(51, 51, 51)",
+          "borderLeftColor": "rgb(51, 51, 51)",
+          "fontFamily": "\"Helvetica Neue\", Helvetica, Arial, sans-serif",
+          "fontSize": "12px",
+          "fontWeight": "400",
+          "lineHeight": "17.1429px",
+          "textAlign": "start",
+          "whiteSpace": "normal",
+          "pointerEvents": "auto",
+          "transition": "all",
+          "animation": "none",
+          "boxShadow": "none",
+          "content": "none"
+        }
+      },
+      "insertedInto": {
+        "parentTag": "LI",
+        "parentClass": "",
+        "parentId": null,
+        "isDirectChildOfBody": false,
+        "isSiblingOfHost": true
+      },
+      "generation": {
+        "arrowSpelling": "tooltip-arrow (Bootstrap 5)",
+        "placementAttribute": "neither present",
+        "placementAttributeValue": null,
+        "directionClass": null,
+        "usesLogicalDirections": false,
+        "allClasses": [
+          "tooltip",
+          "bottom",
+          "ng-animate",
+          "fade-add",
+          "in-add",
+          "fade",
+          "fade-add-active",
+          "in",
+          "in-add-active"
+        ]
+      },
+      "hostWhileOpen": {
+        "attrs": {
+          "href": "#/page/welcome",
+          "ui-sref": "page.welcome",
+          "style": "color: #FFFFFF",
+          "class": "icon fa  fa-cog",
+          "tooltip-placement": "bottom",
+          "tooltip": "Account Settings"
+        }
+      },
+      "closedCleanly": true
+    },
+    {
+      "label": "Logout",
+      "host": {
+        "tag": "A",
+        "className": "icon fa fa-2x fa-power-off",
+        "attrs": {
+          "href": "",
+          "ng-click": "doLogout()",
+          "style": "color: #FFFFFF",
+          "class": "icon fa fa-2x fa-power-off",
+          "tooltip-placement": "bottom",
+          "tooltip": "Logout"
+        },
+        "rect": {
+          "x": 926,
+          "y": 0,
+          "w": 54,
+          "h": 50
+        },
+        "style": {
+          "position": "relative",
+          "display": "block",
+          "zIndex": "auto",
+          "opacity": "1",
+          "visibility": "visible",
+          "top": "0px",
+          "left": "0px",
+          "right": "0px",
+          "bottom": "0px",
+          "transform": "matrix(1, 0, 0, 1, 0, 0)",
+          "margin": "0px",
+          "padding": "15px",
+          "maxWidth": "none",
+          "width": "54px",
+          "height": "50px",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "color": "rgb(255, 255, 255)",
+          "borderRadius": "0px",
+          "borderWidth": "0px",
+          "borderStyle": "none",
+          "borderTopColor": "rgb(255, 255, 255)",
+          "borderRightColor": "rgb(255, 255, 255)",
+          "borderBottomColor": "rgb(255, 255, 255)",
+          "borderLeftColor": "rgb(255, 255, 255)",
+          "fontFamily": "FontAwesome",
+          "fontSize": "28px",
+          "fontWeight": "400",
+          "lineHeight": "20px",
+          "textAlign": "start",
+          "whiteSpace": "normal",
+          "pointerEvents": "auto",
+          "transition": "all",
+          "animation": "none",
+          "boxShadow": "none"
+        },
+        "outerHTML": "<a href=\"\" ng-click=\"doLogout()\" style=\"color: #FFFFFF\" class=\"icon fa fa-2x fa-power-off\" tooltip-placement=\"bottom\" tooltip=\"Logout\"></a>"
+      },
+      "appeared": true,
+      "appearedAfterMs": 27,
+      "tooltip": {
+        "tag": "DIV",
+        "className": "tooltip bottom ng-animate fade-add in-add fade fade-add-active in in-add-active",
+        "attrs": {
+          "class": "tooltip bottom ng-animate fade-add in-add fade fade-add-active in in-add-active",
+          "ng-class": "{ in: isOpen(), fade: animation() }",
+          "tooltip-popup": "",
+          "title": "",
+          "content": "Logout",
+          "placement": "bottom",
+          "animation": "animation",
+          "is-open": "isOpen",
+          "style": "top: 50px; left: 0px; display: block;"
+        },
+        "rect": {
+          "x": 926,
+          "y": 53,
+          "w": 53.79,
+          "h": 33.14
+        },
+        "style": {
+          "position": "absolute",
+          "display": "block",
+          "zIndex": "1070",
+          "opacity": "0.100254",
+          "visibility": "visible",
+          "top": "50px",
+          "left": "0px",
+          "right": "0.210938px",
+          "bottom": "-36.1406px",
+          "transform": "none",
+          "margin": "3px 0px 0px",
+          "padding": "5px 0px",
+          "maxWidth": "none",
+          "width": "53.7891px",
+          "height": "33.1406px",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "color": "rgb(51, 51, 51)",
+          "borderRadius": "0px",
+          "borderWidth": "0px",
+          "borderStyle": "none",
+          "borderTopColor": "rgb(51, 51, 51)",
+          "borderRightColor": "rgb(51, 51, 51)",
+          "borderBottomColor": "rgb(51, 51, 51)",
+          "borderLeftColor": "rgb(51, 51, 51)",
+          "fontFamily": "\"Helvetica Neue\", Helvetica, Arial, sans-serif",
+          "fontSize": "12px",
+          "fontWeight": "400",
+          "lineHeight": "17.1429px",
+          "textAlign": "start",
+          "whiteSpace": "normal",
+          "pointerEvents": "auto",
+          "transition": "opacity 0.15s linear",
+          "animation": "none",
+          "boxShadow": "none"
+        },
+        "outerHTML": "<div class=\"tooltip bottom ng-animate fade-add in-add fade fade-add-active in in-add-active\" ng-class=\"{ in: isOpen(), fade: animation() }\" tooltip-popup=\"\" title=\"\" content=\"Logout\" placement=\"bottom\" animation=\"animation\" is-open=\"isOpen\" style=\"top: 50px; left: 0px; display: block;\">\n  <div class=\"tooltip-arrow\"></div>\n  <div class=\"tooltip-inner ng-binding\" ng-bind=\"content\">Logout</div>\n</div>"
+      },
+      "parts": {
+        "inner": {
+          "tag": "DIV",
+          "className": "tooltip-inner ng-binding",
+          "attrs": {
+            "class": "tooltip-inner ng-binding",
+            "ng-bind": "content"
+          },
+          "rect": {
+            "x": 926,
+            "y": 58,
+            "w": 53.79,
+            "h": 23.14
+          },
+          "style": {
+            "position": "static",
+            "display": "block",
+            "zIndex": "auto",
+            "opacity": "1",
+            "visibility": "visible",
+            "top": "auto",
+            "left": "auto",
+            "right": "auto",
+            "bottom": "auto",
+            "transform": "none",
+            "margin": "0px",
+            "padding": "3px 8px",
+            "maxWidth": "200px",
+            "width": "53.7891px",
+            "height": "23.1406px",
+            "backgroundColor": "rgb(0, 0, 0)",
+            "color": "rgb(255, 255, 255)",
+            "borderRadius": "4px",
+            "borderWidth": "0px",
+            "borderStyle": "none",
+            "borderTopColor": "rgb(255, 255, 255)",
+            "borderRightColor": "rgb(255, 255, 255)",
+            "borderBottomColor": "rgb(255, 255, 255)",
+            "borderLeftColor": "rgb(255, 255, 255)",
+            "fontFamily": "\"Helvetica Neue\", Helvetica, Arial, sans-serif",
+            "fontSize": "12px",
+            "fontWeight": "400",
+            "lineHeight": "17.1429px",
+            "textAlign": "center",
+            "whiteSpace": "normal",
+            "pointerEvents": "auto",
+            "transition": "all",
+            "animation": "none",
+            "boxShadow": "none"
+          },
+          "outerHTML": "<div class=\"tooltip-inner ng-binding\" ng-bind=\"content\">Logout</div>"
+        },
+        "arrowBs4": null,
+        "arrowBs5": {
+          "tag": "DIV",
+          "className": "tooltip-arrow",
+          "attrs": {
+            "class": "tooltip-arrow"
+          },
+          "rect": {
+            "x": 947.89,
+            "y": 53,
+            "w": 10,
+            "h": 5
+          },
+          "style": {
+            "position": "absolute",
+            "display": "block",
+            "zIndex": "auto",
+            "opacity": "1",
+            "visibility": "visible",
+            "top": "0px",
+            "left": "26.8906px",
+            "right": "21.8984px",
+            "bottom": "28.1406px",
+            "transform": "none",
+            "margin": "0px 0px 0px -5px",
+            "padding": "0px",
+            "maxWidth": "none",
+            "width": "10px",
+            "height": "5px",
+            "backgroundColor": "rgba(0, 0, 0, 0)",
+            "color": "rgb(51, 51, 51)",
+            "borderRadius": "0px",
+            "borderWidth": "0px 5px 5px",
+            "borderStyle": "solid",
+            "borderTopColor": "rgba(0, 0, 0, 0)",
+            "borderRightColor": "rgba(0, 0, 0, 0)",
+            "borderBottomColor": "rgb(0, 0, 0)",
+            "borderLeftColor": "rgba(0, 0, 0, 0)",
+            "fontFamily": "\"Helvetica Neue\", Helvetica, Arial, sans-serif",
+            "fontSize": "12px",
+            "fontWeight": "400",
+            "lineHeight": "17.1429px",
+            "textAlign": "start",
+            "whiteSpace": "normal",
+            "pointerEvents": "auto",
+            "transition": "all",
+            "animation": "none",
+            "boxShadow": "none"
+          },
+          "outerHTML": "<div class=\"tooltip-arrow\"></div>"
+        },
+        "arrowBefore": {
+          "position": "static",
+          "display": "inline",
+          "zIndex": "auto",
+          "opacity": "1",
+          "visibility": "visible",
+          "top": "auto",
+          "left": "auto",
+          "right": "auto",
+          "bottom": "auto",
+          "transform": "none",
+          "margin": "0px",
+          "padding": "0px",
+          "maxWidth": "none",
+          "width": "auto",
+          "height": "auto",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "color": "rgb(51, 51, 51)",
+          "borderRadius": "0px",
+          "borderWidth": "0px",
+          "borderStyle": "none",
+          "borderTopColor": "rgb(51, 51, 51)",
+          "borderRightColor": "rgb(51, 51, 51)",
+          "borderBottomColor": "rgb(51, 51, 51)",
+          "borderLeftColor": "rgb(51, 51, 51)",
+          "fontFamily": "\"Helvetica Neue\", Helvetica, Arial, sans-serif",
+          "fontSize": "12px",
+          "fontWeight": "400",
+          "lineHeight": "17.1429px",
+          "textAlign": "start",
+          "whiteSpace": "normal",
+          "pointerEvents": "auto",
+          "transition": "all",
+          "animation": "none",
+          "boxShadow": "none",
+          "content": "none"
+        }
+      },
+      "insertedInto": {
+        "parentTag": "LI",
+        "parentClass": "",
+        "parentId": null,
+        "isDirectChildOfBody": false,
+        "isSiblingOfHost": true
+      },
+      "generation": {
+        "arrowSpelling": "tooltip-arrow (Bootstrap 5)",
+        "placementAttribute": "neither present",
+        "placementAttributeValue": null,
+        "directionClass": null,
+        "usesLogicalDirections": false,
+        "allClasses": [
+          "tooltip",
+          "bottom",
+          "ng-animate",
+          "fade-add",
+          "in-add",
+          "fade",
+          "fade-add-active",
+          "in",
+          "in-add-active"
+        ]
+      },
+      "hostWhileOpen": {
+        "attrs": {
+          "href": "",
+          "ng-click": "doLogout()",
+          "style": "color: #FFFFFF",
+          "class": "icon fa fa-2x fa-power-off",
+          "tooltip-placement": "bottom",
+          "tooltip": "Logout"
+        }
+      },
+      "closedCleanly": true
+    }
+  ],
+  "stylesheet": {
+    "tooltip": [
+      {
+        "href": "https://vjs.zencdn.net/7.3.0/video-js.min.css",
+        "error": "CORS — cannot read"
+      },
+      {
+        "href": "https://cdnjs.cloudflare.com/ajax/libs/angularjs-toaster/2.2.0/toaster.min.css",
+        "error": "CORS — cannot read"
+      }
+    ],
+    "bsTooltip": [
+      {
+        "href": "https://vjs.zencdn.net/7.3.0/video-js.min.css",
+        "error": "CORS — cannot read"
+      },
+      {
+        "href": "https://cdnjs.cloudflare.com/ajax/libs/angularjs-toaster/2.2.0/toaster.min.css",
+        "error": "CORS — cannot read"
+      }
+    ],
+    "arrowBs4": [
+      {
+        "href": "https://vjs.zencdn.net/7.3.0/video-js.min.css",
+        "error": "CORS — cannot read"
+      },
+      {
+        "href": "https://cdnjs.cloudflare.com/ajax/libs/angularjs-toaster/2.2.0/toaster.min.css",
+        "error": "CORS — cannot read"
+      }
+    ],
+    "arrowBs5": [
+      {
+        "href": "https://vjs.zencdn.net/7.3.0/video-js.min.css",
+        "error": "CORS — cannot read"
+      },
+      {
+        "href": "https://cdnjs.cloudflare.com/ajax/libs/angularjs-toaster/2.2.0/toaster.min.css",
+        "error": "CORS — cannot read"
+      }
+    ],
+    "logicalDirections": [
+      {
+        "href": "https://vjs.zencdn.net/7.3.0/video-js.min.css",
+        "error": "CORS — cannot read"
+      },
+      {
+        "href": "https://cdnjs.cloudflare.com/ajax/libs/angularjs-toaster/2.2.0/toaster.min.css",
+        "error": "CORS — cannot read"
+      },
+      {
+        "href": "https://vjs.zencdn.net/7.3.0/video-js.min.css",
+        "error": "CORS — cannot read"
+      },
+      {
+        "href": "https://cdnjs.cloudflare.com/ajax/libs/angularjs-toaster/2.2.0/toaster.min.css",
+        "error": "CORS — cannot read"
+      }
+    ],
+    "physicalDirections": [
+      {
+        "href": "https://vjs.zencdn.net/7.3.0/video-js.min.css",
+        "error": "CORS — cannot read"
+      },
+      {
+        "href": "https://cdnjs.cloudflare.com/ajax/libs/angularjs-toaster/2.2.0/toaster.min.css",
+        "error": "CORS — cannot read"
+      },
+      {
+        "href": "https://vjs.zencdn.net/7.3.0/video-js.min.css",
+        "error": "CORS — cannot read"
+      },
+      {
+        "href": "https://cdnjs.cloudflare.com/ajax/libs/angularjs-toaster/2.2.0/toaster.min.css",
+        "error": "CORS — cannot read"
+      }
+    ],
+    "variables": {
+      "--bs-tooltip-zindex": null,
+      "--bs-tooltip-bg": null,
+      "--bs-tooltip-color": null,
+      "--bs-tooltip-opacity": null,
+      "--bs-tooltip-max-width": null,
+      "--bs-tooltip-padding-x": null,
+      "--bs-tooltip-padding-y": null,
+      "--bs-tooltip-font-size": null,
+      "--bs-tooltip-border-radius": null,
+      "--bs-tooltip-arrow-width": null,
+      "--bs-tooltip-arrow-height": null
+    }
+  },
+  "native": [
+    {
+      "title": "Heading 1",
+      "tag": "BUTTON",
+      "className": "btn btn-default ng-scope"
+    },
+    {
+      "title": "Heading 2",
+      "tag": "BUTTON",
+      "className": "btn btn-default ng-scope"
+    },
+    {
+      "title": "Heading 3",
+      "tag": "BUTTON",
+      "className": "btn btn-default ng-scope"
+    },
+    {
+      "title": "Heading 4",
+      "tag": "BUTTON",
+      "className": "btn btn-default ng-scope"
+    },
+    {
+      "title": "Heading 5",
+      "tag": "BUTTON",
+      "className": "btn btn-default ng-scope"
+    },
+    {
+      "title": "Heading 6",
+      "tag": "BUTTON",
+      "className": "btn btn-default ng-scope"
+    },
+    {
+      "title": "Paragraph",
+      "tag": "BUTTON",
+      "className": "btn btn-default ng-scope"
+    },
+    {
+      "title": "Preformatted text",
+      "tag": "BUTTON",
+      "className": "btn btn-default ng-scope"
+    },
+    {
+      "title": "Quote/unquote selection or paragraph",
+      "tag": "BUTTON",
+      "className": "btn btn-default ng-scope"
+    },
+    {
+      "title": "Bold",
+      "tag": "BUTTON",
+      "className": "btn btn-default ng-scope"
+    },
+    {
+      "title": "Italic",
+      "tag": "BUTTON",
+      "className": "btn btn-default ng-scope"
+    },
+    {
+      "title": "Underline",
+      "tag": "BUTTON",
+      "className": "btn btn-default ng-scope"
+    },
+    {
+      "title": "Strikethrough",
+      "tag": "BUTTON",
+      "className": "btn btn-default ng-scope"
+    },
+    {
+      "title": "Unordered List",
+      "tag": "BUTTON",
+      "className": "btn btn-default ng-scope"
+    },
+    {
+      "title": "Ordered List",
+      "tag": "BUTTON",
+      "className": "btn btn-default ng-scope"
+    },
+    {
+      "title": "Redo",
+      "tag": "BUTTON",
+      "className": "btn btn-default ng-scope"
+    },
+    {
+      "title": "Undo",
+      "tag": "BUTTON",
+      "className": "btn btn-default ng-scope"
+    },
+    {
+      "title": "Clear formatting",
+      "tag": "BUTTON",
+      "className": "btn btn-default ng-scope"
+    },
+    {
+      "title": "Align text left",
+      "tag": "BUTTON",
+      "className": "btn btn-default ng-scope"
+    },
+    {
+      "title": "Center",
+      "tag": "BUTTON",
+      "className": "btn btn-default ng-scope"
+    },
+    {
+      "title": "Align text right",
+      "tag": "BUTTON",
+      "className": "btn btn-default ng-scope"
+    },
+    {
+      "title": "Justify text",
+      "tag": "BUTTON",
+      "className": "btn btn-default ng-scope"
+    },
+    {
+      "title": "Increase indent",
+      "tag": "BUTTON",
+      "className": "btn btn-default ng-scope"
+    },
+    {
+      "title": "Decrease indent",
+      "tag": "BUTTON",
+      "className": "btn btn-default ng-scope"
+    },
+    {
+      "title": "Toggle html / Rich Text",
+      "tag": "BUTTON",
+      "className": "btn btn-default ng-scope"
+    },
+    {
+      "title": "Insert image",
+      "tag": "BUTTON",
+      "className": "btn btn-default ng-scope"
+    },
+    {
+      "title": "Insert / edit link",
+      "tag": "BUTTON",
+      "className": "btn btn-default ng-scope"
+    },
+    {
+      "title": "Insert video",
+      "tag": "BUTTON",
+      "className": "btn btn-default ng-scope"
+    },
+    {
+      "title": "Configure Chat Tabs",
+      "tag": "I",
+      "className": "fa fa-gear ms-2 cursor-pointer"
+    }
+  ],
+  "gaps": [
+    {
+      "what": "presenter-only tooltips",
+      "why": "Signed in as a member, so \"Play YouTube For All\" and the screen-tab gear are not on the page. Run this again as a presenter to capture those."
+    },
+    {
+      "what": "title= tooltips are the browser own",
+      "why": "29 elements use a native title attribute. The OS draws those and no script can capture their appearance — the text is recorded, the rendering is not ours to match."
+    }
+  ],
+  "verdict": {
+    "arrowSpelling": [
+      "tooltip-arrow (Bootstrap 5)"
+    ],
+    "placementAttribute": [
+      "neither present"
+    ],
+    "directionClasses": [
+      null
+    ],
+    "insertedIntoBody": [
+      false
+    ],
+    "openDelaysMs": [
+      29,
+      27
+    ]
+  }
+}
