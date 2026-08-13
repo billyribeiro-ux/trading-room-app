@@ -24,6 +24,49 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-13
 
+### 2026-08-13 15:12 EDT — API keys can be restricted to specific ROOMS, not just to commands
+
+**Runtime impact: YES** — a third restriction dimension on API keys, and the padlock now counts it.
+
+Owner ruling, restated: the original files are the decision, and nothing needs asking. Applied to the
+two remaining "decision" items on the account page.
+
+**T5-8 — `restrictToSessions` was genuinely missing, and it is not the same axis as `scopes`.**
+`restrictToEndpoints` was already ours under the name `scopes` — which COMMANDS a key may call.
+Sessions say which ROOMS it may call them against. A key scoped to `sessions/list` with no room
+restriction still enumerates every room on the account, so having one axis and calling the feature
+"restrictions" was protection that read as more than it was.
+
+The evidence is `page.welcome.html:1339`: the "Restricted" padlock is gated on
+`(k.restrictToSessions && k.restrictToSessions.length) || (k.restrictToEndpoints && …)`. The field
+exists, it is a list, and non-empty means restricted.
+
+Added as `restrictions.sessions`, a list of room SHORT CODES. **Empty means every room** — the
+reference's own sense for all three lists, and the reason every key written before this field parses
+as `[]` and keeps working. A default of "no rooms" would have silently revoked every existing key,
+which is what the negative control checks.
+
+Server-side the posted codes are filtered against the ACCOUNT's own rooms rather than stored as
+posted: a key restricted to somebody else's short code is not a restriction, it is a typo that reads
+as one. Same deny-by-default reasoning the IP list already gets. The editor offers checkboxes over
+the account's rooms instead of a free-text field, because a typed code that matches nothing narrows
+to nothing while looking deliberate.
+
+**Honest gap kept rather than papered over:** `manageApiKeyRestrictions(k)` drives the reference's
+editor and its shape is in no capture. The FIELD and its semantics are evidence; the widget follows
+our own established pattern for `ips` and `scopes`, and the code says so.
+
+**T5-9 — the API secret in plain text — we already match, deliberately.** `page.welcome.html:1341` is
+`<td>{{k.apiSecret}}</td>` and ours renders `{key.secret}` with that citation already in the
+component. The two states the reference has no equivalent for — a legacy hash-only row, and one
+encrypted under a retired `API_KEY_ENCRYPTION_KEY` — render distinct honest messages pointing at
+`regen secret`, rather than a fake masked credential.
+
+**Verified:** `svelte-check` 1492 files / 0 errors; 843 tests across 78 files, 9 new. Two negative
+controls run — sessions defaulting to "no rooms", and posted codes trusted without an ownership check
+— each red on the right assertion. Autofixer clean. Register **55 CLOSED, 13 OPEN, 13 parked, 81
+total**, tally test-checked.
+
 ### 2026-08-13 14:59 EDT — Four more closed; two were already built and one comment was wrong about it
 
 **Runtime impact: none** — one corrected comment and two new test files.

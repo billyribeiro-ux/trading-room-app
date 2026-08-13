@@ -1103,7 +1103,11 @@
                          capture only because that key happens to be unrestricted — without it, a
                          key that can call one command from one IP looks identical to one that can
                          call everything from anywhere. -->
-                    {#if key.restrictions.ips.length > 0 || key.restrictions.scopes.length > 0}
+                    <!-- `sessions` counts toward the padlock as well: the reference's own gate is
+                         `(k.restrictToSessions && k.restrictToSessions.length) ||
+                          (k.restrictToEndpoints && k.restrictToEndpoints.length)`, so a key narrowed
+                         to one ROOM is restricted even if it may call every command. -->
+                    {#if key.restrictions.ips.length > 0 || key.restrictions.scopes.length > 0 || key.restrictions.sessions.length > 0}
                       <i class="fa fa-lock acc-text-warning" title="Restricted"></i>
                     {/if}
                   </td>
@@ -1208,6 +1212,33 @@
                     IPv4 addresses or CIDR blocks, comma separated. Leave blank to allow any.
                   </span>
                 </div>
+
+                <!--
+                  `restrictToSessions` — which ROOMS this key may act on.
+
+                  A checkbox per room rather than a free-text list: the valid values are exactly the
+                  account's own short codes, they are on this same page, and a typed code that does
+                  not match one is a restriction that silently narrows to nothing. The server filters
+                  against the account's rooms regardless — this just stops an operator having to be
+                  right by hand.
+
+                  Empty means every room, which is the reference's sense for all three lists.
+                -->
+                <fieldset class="acc-field">
+                  <legend>Allowed rooms</legend>
+                  <span class="acc-hint">Leave all unticked to allow every room on the account.</span>
+                  {#each data.rooms as room (room.id)}
+                    <label class="acc-scope">
+                      <input
+                        type="checkbox"
+                        name="sessions"
+                        value={room.shortCode}
+                        checked={key.restrictions.sessions.includes(room.shortCode)}
+                      />
+                      {room.shortCode}{room.name ? ` — ${room.name}` : ''}
+                    </label>
+                  {/each}
+                </fieldset>
 
                 <fieldset class="acc-field">
                   <legend>Allowed commands</legend>
