@@ -212,6 +212,20 @@ than left open.
 
 ---
 
+### A mistake I made twice today — check for it before trusting any "not built" note
+
+**T2-18** and **T5-25** were both recorded as unbuilt features. Both were built. Each time I grepped
+ONE component file for a marker string, found nothing, and concluded the feature was absent — without
+checking the server actions, the route tree or the test suite. T2-18's console is wired to three real
+form actions; T5-25's endpoint has ten green tests.
+
+`~/CLAUDE.md` already states the rule this breaks: **locating with a tool is fine, CONCLUDING from a
+tool's output is not.** A grep that returns nothing is evidence about the grep.
+
+**Before acting on any "not built" line in the register**, check all four: the component, the route
+tree (`src/routes/**`), the form actions in the matching `+page.server.ts`, and `src/lib/**` tests.
+A register that claims a built feature is missing sends the next person to write code twice.
+
 ### Also unfinished, and NOT blocked — the largest remaining piece of real work
 
 `page.manageSession.html` is read through **:1162 of 2,718**, plus targeted regions at :1876-1903,

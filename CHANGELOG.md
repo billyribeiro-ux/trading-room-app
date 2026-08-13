@@ -24,6 +24,46 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-13
 
+### 2026-08-13 16:32 EDT — I reported a built feature as missing, for the second time today
+
+**Runtime impact: none** — a register correction. No code changed.
+
+Continued the read into the non-settings structure of `page.manageSession.html:1163-2718`. The
+significant one is the **DON'T TOUCH block** at `:2286`, and reading it exposed a mistake of mine
+rather than a gap in the app.
+
+`<h3>DON'T <span ng-click="donttouchShow=!donttouchShow">TOUCH</span> These below…</h3>` — the word
+TOUCH is a toggle, and `<p ng-hide="donttouchShow">Settings...</p>` is what shows while it is
+collapsed. Ours has both, as `dontTouchShown`.
+
+**Then T2-18.** Two hours ago I closed it with "Not built: all three handlers are operations against
+media-relay infrastructure for which this repository holds no endpoint." **That is wrong.** The whole
+console is built: the `showAdServer` disclosure (revealed by clicking the helper text, one-way,
+exactly as the reference), the amber `applyRepeaterToAccount` button, and both `addServerTxt` /
+`removeServerTxt` inputs with their buttons — `+page.svelte:3071-3123`, wired to three real form
+actions at `+page.server.ts:1144`, `:1154` and `:1178`.
+
+`applyRepeaterToAccount` even carries its own recorded honest gap, which is better reasoning than my
+closure had: it writes `media_relays` ONLY, because what the button's "server" half writes is not
+evidenced, and guessing it also meant `clusterID` would silently overwrite the cluster of every room
+on the account.
+
+**This is the second time today, and both came from the same mistake.** T5-25 was reported as "not
+built at all" when its endpoint existed with ten green tests. Both times I grepped ONE component file
+for a marker string, found nothing, and concluded the feature was absent — without checking the
+server actions, the route tree, or the test suite.
+
+The rule I should have been applying is already written in `~/CLAUDE.md`: **locating with a tool is
+fine, CONCLUDING from a tool's output is not.** A grep that returns nothing is evidence about the
+grep. Both entries are corrected in place, naming the error, because a register that says "not built"
+about built features sends the next person to write code that already exists.
+
+Also read in this pass, and worth keeping: `swapCLusterIDs()` is misspelled in the reference (capital
+L), its button label contains a literal `<-->`, and both cluster buttons are `<div>` elements nested
+INSIDE a `<p>` — invalid HTML that the browser resolves by closing the paragraph early.
+
+**Verified:** no code changed; 860 tests across 81 files still green.
+
 ### 2026-08-13 16:13 EDT — 1,500 lines of settings rows closed by proof instead of by reading
 
 **Runtime impact: none** — one new test.
