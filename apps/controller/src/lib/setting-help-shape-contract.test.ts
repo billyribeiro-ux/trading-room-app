@@ -30,13 +30,22 @@ describe('the four shapes are what the capture contains', () => {
     /*
       Counted by walking from each `saveSessField(` to its helper. If the generator regresses these
       move, and a count is the one thing a shape bug cannot hide behind.
+
+      `text` went 11 -> 9 on 2026-08-13, and that is a CORRECTION rather than a regression. Two of
+      the eleven were helpers the extractor had taken from outside the row: `hidePoweredBy` adopted
+      the linked-rooms SECTION INTRODUCTION that follows an `<hr>`, and `streamingThreads` — the last
+      row in the pane — adopted the permissions modal's close-button `×`, the scan having run out of
+      the panel entirely. Neither row has a helper at all. See `settings-help-shape.test.ts`, which
+      pins both as null and asserts neither string can reattach to any row.
+
+      This assertion is doing exactly its job here: the fix moved a count, and the count objected.
     */
     const counts: Record<string, number> = {};
     for (const d of ROOM_SETTINGS) {
       if (!d.helpShape) continue;
       counts[d.helpShape] = (counts[d.helpShape] ?? 0) + 1;
     }
-    expect(counts).toEqual({ muted: 136, plain: 37, bare: 5, text: 11 });
+    expect(counts).toEqual({ muted: 136, plain: 37, bare: 5, text: 9 });
   });
 
   it('gives every setting with help a shape, and none without one', () => {

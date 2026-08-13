@@ -24,6 +24,48 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-13
 
+### 2026-08-13 17:11 EDT — Two settings were showing helper text that belonged to something else
+
+**Runtime impact: YES** — two rows in the Settings pane stop rendering text that was never theirs.
+
+Reading the `helpShape: 'text'` rows at `:2238`, `:2248` and `:2256` — helpers written as a bare text
+node with no `<label>` — sent me to check all eleven of them. **Nine matched. Two were wrong, and
+both were showing an operator text that belongs to something else entirely:**
+
+- **`hidePoweredBy`** carried *"For pushing alerts and streams to other rooms, you can use the
+  following settings. You need the other rooms ID and the API Secret…"*. That is the SECTION
+  INTRODUCTION for the linked-rooms block, which sits after an `<hr>` and belongs to the group. So a
+  toggle that hides a footer credit was captioned with a paragraph about relaying alerts between
+  rooms.
+- **`streamingThreads`** carried `×`. It is the LAST row in the pane, and the extractor's scan ran
+  out of the panel, past the footer, into the permissions MODAL, and took its close button.
+
+Both rows genuinely have **no helper at all**. The extractor scanned forward from a row's anchor and
+never stopped at the row's own paragraph — and an indent outline has no closing tags, so nothing else
+stopped it either.
+
+Three break conditions added: an `<hr>`, a new `<p>`, and any element shallower than the row's own
+paragraph. The last is `< anchorIndent - 2` and NOT `< anchorIndent`, deliberately — a `helpOutside`
+helper is a SIBLING of the `<p>` at exactly that indent, and a stricter test would have dropped
+`doNotAutoSoftReset`, the one row that shape exists for. It is asserted.
+
+**A bug of mine that a suppressed error hid.** The first attempt put the new comparison BEFORE
+`const anchorIndent` was declared — a temporal dead zone that throws. I had run the generator as
+`node … >/dev/null 2>&1`, so it failed silently and left the previous output in place, and I read
+that stale file as evidence the fix had not worked. Re-running with stderr visible showed it
+immediately. **Suppressing a generator's output is how a failed regeneration reads as a successful
+one.**
+
+**An existing test caught the change, which is what it is for.** `setting-help-shape-contract` pins
+the shape counts, and `text` moved 11 → 9. It objected exactly as designed; the count is corrected
+with the reason recorded beside it, rather than the assertion being loosened.
+
+Regeneration remains deterministic across two runs, the schema verifier still reports 268 + 1 = 269
+with 49 wired, and both earlier proofs — 267 names covered, 175 shapes matching — still hold.
+
+**Verified:** `svelte-check` 1501 files / 0 errors; 877 tests across 82 files, 5 new. Two negative
+controls run — each stolen string reattached to its row — both red on the right assertion.
+
 ### 2026-08-13 16:44 EDT — A comment that was true when written, and stopped being true when we fetched more evidence
 
 **Runtime impact: none** — one corrected comment and two new assertions.

@@ -212,6 +212,15 @@ than left open.
 
 ---
 
+### NEVER run a generator with its output suppressed
+
+`node scripts/extract-manage-schema.mjs >/dev/null 2>&1` hid a ReferenceError on 2026-08-13. The
+script threw, wrote nothing, and left the PREVIOUS output in place — which I then read as evidence
+that the fix had not worked. Re-running with stderr visible showed the bug in one line.
+
+**A failed regeneration is indistinguishable from a successful one when the file already exists.**
+Run generators with stderr visible, and check the file's mtime or diff if in doubt.
+
 ### A comment can expire when the EVIDENCE grows, not just when the code changes
 
 `+page.svelte` said `ms-2` and `cursor-pointer` "have no rule in any stylesheet this repo holds".

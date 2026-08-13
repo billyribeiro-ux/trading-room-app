@@ -101,3 +101,50 @@ describe('help-label shapes match the reference row for row', () => {
     expect(outside).toContain('pairErrorRedirect');
   });
 });
+
+describe('two rows that have NO helper, and used to be given someone else’s', () => {
+  /*
+    The extractor scanned forward from a row's anchor for a helper and did not stop at the row's own
+    paragraph. Two settings whose `<p>` closes with nothing in it therefore adopted whatever came
+    next:
+
+      hidePoweredBy     took "For pushing alerts and streams to other rooms…" — the SECTION
+                        INTRODUCTION for the linked-rooms block that follows an `<hr>`. An operator
+                        saw a paragraph about relaying alerts under a toggle that hides a footer
+                        credit.
+      streamingThreads  is the LAST row in the pane. The scan ran out of the panel, through the
+                        footer, into the permissions MODAL, and took its close button's `×`.
+
+    An indent outline has no closing tags, so nothing else stopped it. Both now break on `<hr>`, on a
+    new `<p>`, and on any element shallower than the row's own paragraph.
+  */
+  it('hidePoweredBy has no helper', () => {
+    const def = ROOM_SETTINGS.find((d) => d.name === 'hidePoweredBy');
+    expect(def?.help).toBeNull();
+    expect(def?.helpShape).toBeNull();
+  });
+
+  it('streamingThreads has no helper', () => {
+    const def = ROOM_SETTINGS.find((d) => d.name === 'streamingThreads');
+    expect(def?.help).toBeNull();
+    expect(def?.helpShape).toBeNull();
+  });
+
+  it('and NO row anywhere carries the linked-rooms section intro as its help', () => {
+    /* The text is real and belongs to the group heading, not to any single setting. If it reappears
+       attached to a row, the boundary has regressed. */
+    const stolen = ROOM_SETTINGS.filter((d) => d.help?.startsWith('For pushing alerts and streams'));
+    expect(stolen.map((d) => d.name)).toEqual([]);
+  });
+
+  it('nor a modal close button’s ×', () => {
+    expect(ROOM_SETTINGS.filter((d) => d.help === '×').map((d) => d.name)).toEqual([]);
+  });
+
+  it('the helpOutside shape the boundary had to preserve still works', () => {
+    /* `doNotAutoSoftReset`'s helper is a SIBLING of its `<p>`, one indent shallower than its anchor.
+       A stricter boundary would have dropped it, which is why the test is `< anchorIndent - 2`. */
+    const def = ROOM_SETTINGS.find((d) => d.name === 'doNotAutoSoftReset');
+    expect(def?.help).toContain('prevent media server soft reset');
+  });
+});
