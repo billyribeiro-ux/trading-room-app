@@ -73,7 +73,11 @@ assert.doesNotMatch(emailInput, /\svalue=/);
 assert.match(emailInput, /disabled=\{!!known\}/);
 assert.match(component, /src=\{uploadedAvatar \?\? known\?\.gravatar/);
 assert.match(component, /class="auth-nick">@\{known\.name\}<\/div>/);
-assert.match(component, /const EMPTY_AVATAR = asset\('\/default-avatar\.jpg'\)/);
+/*
+  NO LEADING SLASH — the same SvelteKit 3 `asset()` migration that had stale expectations in
+  verify-home-contract.mjs. All 6 `asset()` call sites in `src` are written without one.
+*/
+assert.match(component, /const EMPTY_AVATAR = asset\('default-avatar\.jpg'\)/);
 assert.match(component, /src=\{uploadedAvatar \?\? known\?\.gravatar \?\? EMPTY_AVATAR\}/);
 assert.match(component, /onerror=\{useEmptyAvatar\}/);
 assert.match(component, /placeholder: 'user@example\.com'/);

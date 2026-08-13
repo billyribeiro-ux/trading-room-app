@@ -73,28 +73,33 @@ exists so it cannot silently stop agreeing, and a 1px drift fails it.
 those is on the AngularJS surface, and their styling questions now have a source instead of a
 sampled computed style.
 
-## The full gate has FIVE pre-existing RED steps (measured 2026-08-13)
+## The full gate: FOUR of five red steps fixed 2026-08-13; ONE remains
 
-`pnpm --filter controller test` does not pass, and did not pass before this session either. Measured
-by stashing all working-tree changes and re-running: the same five fail at `HEAD`.
+`pnpm --filter controller test` had five failing steps, all pre-existing (proven by stashing every
+change and re-running at `HEAD`). Four are now green. **Every one was a stale verifier, not broken
+source** — the code was right in all four cases.
 
-| step | state | note |
-|---|---|---|
-| `privacy:verify` | RED | 9 violations: raw emails in the public contact/privacy/terms pages, a captured owner display name in four files, a raw Gravatar identifier in `src/lib/server/gravatar.ts` |
-| `account:contract` | RED | not yet diagnosed |
-| `home:contract` | RED | `HomeFooter.svelte` missing the terms link and the contact link |
-| `fonts:verify` | RED | not yet diagnosed |
-| `room-login:contract` | RED | not yet diagnosed |
+| step | cause |
+|---|---|
+| `home:contract` | SvelteKit 3 migration (`ff948db`) changed `resolve()`/`asset()` shapes. Route ids include the route group (`/(public)/privacy`); `asset()` takes no leading slash. |
+| `room-login:contract` | the same `asset()` leading-slash expectation |
+| `account:contract` | route moved to `rooms/[id]/[[tab]]/` (died ENOENT before asserting anything); API-key decrypt refactored; an unbounded `[\s\S]*?` crossed an action boundary; a regex matched markup quoted inside a CODE COMMENT |
+| `fonts:verify` | workspace files read from the package root not the repo root; `pnpm` pin 11.18.0 vs actual 11.21.0; `better-sqlite3: false` asserted when the repo has had `true` since its first commit |
 
-Everything else passes: `schema:verify`, `backend:migrations:verify`, `backend:release:verify`,
-`evidence:verify`, `breakpoints:verify`, `manage:styles`, and the unit suite (734 tests, 66 files).
-`svelte-check` is clean.
+### STILL RED: `privacy:verify` — 10 violations, all pre-existing
 
-**Why this matters more than the individual failures.** `main` auto-deploys, so a push is a
-production release, and the gate is the only thing standing between a change and production. Five
-red steps means nobody has been able to read a green result for some time — which is exactly how
-the two RED unit tests fixed on 2026-08-13 survived: they were invisible behind an already-failing
-chain. Getting this back to green is worth more than any single gap in the register.
+Not mechanical; each category needs a decision.
+
+| # | files | violation | likely resolution |
+|---|---|---|---|
+| 3 | `(public)/{contact,privacy,terms}/+page.svelte` | raw email | The business's OWN published contact address. Probably an allowance in the verifier, not a redaction — a privacy page with no contact route is worse. |
+| 4 | `manage-row-actions-render.test.ts`, `manage-user-row-sbs.test.ts`, `user-row-contract.test.ts`, `rooms/[id]/[[tab]]/+page.svelte` | captured owner display name | Real PII from the reference capture sitting in our source. Replace with a neutral fixture name. |
+| 2 | `export-format-contract.test.ts`, `room-sessions-fk-contract.test.ts` | raw email | Test fixtures — move to a reserved domain. |
+| 1 | `src/lib/server/gravatar.ts` | raw Gravatar identifier | An MD5 of a real address, carried from the capture. |
+
+**Why this is worth doing rather than suppressing.** `main` auto-deploys, so the gate is the only
+thing between a change and production — and while it was red nobody could read a green result, which
+is exactly how two RED unit tests survived unnoticed until 2026-08-13.
 
 ---
 
