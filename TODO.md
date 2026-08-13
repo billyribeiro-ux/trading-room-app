@@ -126,7 +126,15 @@ Every gap from the full read of `apps/controller/evidence-dumps/` now lives ther
 five tiers. **That file is the tracker — this section is only the index to it.** Do not record a
 gap's status in both places; one of them will go stale.
 
-As of 2026-08-13 15:10 EDT: **42 CLOSED, 23 OPEN, 14 parked/won't-fix, 78 total.**
+As of 2026-08-13 15:25 EDT: **42 CLOSED, 24 OPEN, 14 parked/won't-fix, 79 total.**
+
+Read `page.manageSession.html` through :1162. The settings rows in that stretch are all covered —
+proven by machine, see below — but one NON-settings structure is missing entirely:
+
+- **T5-25 — the app-pair SAMPLE URL block** (`:1138-1142`). A label and a readonly input showing
+  the exact URL an integrator posts to add each user. None of it is rendered by us. It embeds the
+  room's pairing secret in displayed, copyable text, which puts it in the SAME decision family as
+  T5-24 — so it is recorded, not built.
 
 **The settings surface of `page.manageSession.html` is now proven complete by machine.** Every live
 `saveSessField('x')` and `editable-*="sess.x"` in that template — 267 names — is present in our

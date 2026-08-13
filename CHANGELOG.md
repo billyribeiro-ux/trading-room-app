@@ -24,6 +24,29 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-13
 
+### 2026-08-13 15:25 EDT — Read through :1162; one non-settings structure found missing
+
+**Runtime impact: none** — documentation only.
+
+Continued reading `page.manageSession.html` to :1162. That stretch is almost entirely settings rows,
+and the machine proof from the previous entry already covers all of them — so the value in reading it
+was the things that are NOT settings rows.
+
+One is missing outright. **T5-25 — the app-pair SAMPLE URL block** (`:1138-1142`), gated
+`ng-show="sess.hasAppPairLink && sess.pairSecretKey"`: a label reading "Sample link you would need to
+use to add each user: (replace email/name with the real user email/name" — the reference's own
+unclosed parenthesis — above a readonly input holding the exact URL an integrator posts to add each
+user. Checked our page for `pairURLLink`, `Sample link`, `ptr_app/sessions`, `pairSecretKey` and
+`addUser`: none present.
+
+Not built, because that URL embeds the room's pairing secret in displayed, copyable text — the same
+decision family as T5-24, and the same reason. The `pairSecretKey` SETTING is already in our schema
+and editable; what is missing is the derived sample link.
+
+**Two credential-bearing controls now wait on one decision.** T5-24 (the WordPress shortcode) and
+T5-25 (this) both match the original only by rendering a secret the room owns. Both are recorded with
+the exact markup, so either can be built in minutes once the call is made. Neither was worked around.
+
 ### 2026-08-13 15:10 EDT — The settings schema is proven complete against the source it was never built from
 
 **Runtime impact: none** — one new test file and documentation.
