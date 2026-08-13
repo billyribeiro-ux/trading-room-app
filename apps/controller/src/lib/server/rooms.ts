@@ -544,6 +544,62 @@ export async function setUserRestrictPm(roomId: number, roomUserId: number, rest
   return changed.length;
 }
 
+/**
+ * `manageMobileApp(id, name, index, 'enable'|'disable')` and
+ * `manageFileAccess(id, name, index, 'enable'|'disable')` — the two per-member grants.
+ *
+ * ## Why these exist, and why they had to land with the icons
+ *
+ * `page.manageSession.html:545-551` and `:592-598` put four items at the bottom of the row menu,
+ * each behind `ng-if` on the ROOM's own case-by-case setting. They are the only way the reference
+ * writes `hasMobileApp` and `hasFileAccess` — the two columns whose icons this row now renders.
+ *
+ * Without them the icons are unreachable: a column nothing can set, driving an indicator that can
+ * therefore never light up. That is the "control whose only effect is its own presence" this
+ * project has a rule against, just inverted — an indicator with no cause.
+ *
+ * ## One function, not two
+ *
+ * The two grants differ only in which column they write. Splitting them would duplicate the
+ * ownership scoping, and the scoping is the part that must not drift: both `UPDATE`s are keyed on
+ * `roomId` AND `roomUserId`, so a member id belonging to another tenant's room matches zero rows and
+ * changes nothing. The column is chosen from a static map, never from the caller's string — the same
+ * discipline the Prometheus-label rule exists for.
+ */
+const MEMBER_GRANT_COLUMNS = {
+  'mobile-app': 'hasMobileApp',
+  'file-access': 'hasFileAccess'
+} as const;
+
+export type MemberGrant = keyof typeof MEMBER_GRANT_COLUMNS;
+
+export function isMemberGrant(value: unknown): value is MemberGrant {
+  return typeof value === 'string' && Object.hasOwn(MEMBER_GRANT_COLUMNS, value);
+}
+
+export async function setMemberGrant(
+  roomId: number,
+  roomUserId: number,
+  grant: MemberGrant,
+  granted: boolean
+) {
+  /*
+    The column NAME comes from the static map and from nowhere else, so the `SET` clause cannot be
+    steered by a request body. `isMemberGrant` is the only way to obtain a `MemberGrant`, and this
+    second check is not redundant with it — it is what makes the function safe to call from anywhere
+    rather than safe only from the one action that happens to validate first today.
+  */
+  const column = MEMBER_GRANT_COLUMNS[grant];
+  if (!column) throw new Error(`unknown member grant: ${String(grant)}`);
+
+  const changed = await getDb()
+    .update(roomUsers)
+    .set({ [column]: granted })
+    .where(and(eq(roomUsers.id, roomUserId), eq(roomUsers.roomId, roomId)))
+    .returning({ id: roomUsers.id });
+  return changed.length;
+}
+
 /** `setNoteUser(…)` — the free-text note shown under Last Login */
 export async function setUserNote(roomId: number, roomUserId: number, note: string) {
   const changed = await getDb()

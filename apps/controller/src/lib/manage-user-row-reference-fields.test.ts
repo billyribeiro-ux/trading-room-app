@@ -72,7 +72,7 @@ const baseMember = {
 type Member = typeof baseMember;
 
 /** The row's `<td>`, rendered with one member and the given room settings. */
-function renderCell(member: Partial<Member>, settings: Record<string, unknown> = {}): string {
+function renderCell(member: Partial<Member>, settings: Record<string, unknown> = {}, wholeRow = false): string {
   const body = render(Page as never, {
     props: {
       data: {
@@ -117,9 +117,15 @@ function renderCell(member: Partial<Member>, settings: Record<string, unknown> =
     Split on the closing tag rather than parsing: `<td>` cannot nest, so index 1 is exactly the
     cell that follows the `{{$index}}` one.
   */
+  if (wholeRow) return row;
   const cells = row.split('</td>');
   expect(cells.length, 'the row must have more than one cell').toBeGreaterThan(1);
   return cells[1];
+}
+
+/** The WHOLE row, for assertions about the Actions cell rather than the identity cell. */
+function renderRow(member: Partial<Member>, settings: Record<string, unknown> = {}): string {
+  return renderCell(member, settings, true);
 }
 
 /**
@@ -308,5 +314,72 @@ describe('the Stripe / marketplace block — page.manageSession.html:365-389', (
     const html = renderCell(paid);
     expect(html).not.toContain('fa-info-circle');
     expect(html).not.toContain('Details');
+  });
+});
+
+describe('the two per-member grants — page.manageSession.html:545-551 and :592-598', () => {
+  /*
+    The four menu items that WRITE `hasMobileApp` and `hasFileAccess`.
+
+    They matter more than their size suggests: without them the two columns have no writer, so the
+    folder and large-phone icons above can never light up. An indicator with no cause is the same
+    defect as a control with no effect, and it is the one this row would have shipped had the icons
+    landed on their own.
+  */
+  it('offers the mobile pair only when the room is mobile case-by-case', () => {
+    const on = renderRow({}, { ptrMobileAppCaseByCaseEnabled: true });
+    expect(on).toContain('Enable Mobile App');
+    expect(on).toContain('Disable Mobile App');
+    expect(on).toContain('value="mobile-app"');
+
+    const off = renderRow({}, {});
+    expect(off).not.toContain('Enable Mobile App');
+    expect(off).not.toContain('Disable Mobile App');
+  });
+
+  it('offers the files pair only when the room is file case-by-case', () => {
+    const on = renderRow({}, { fileAccessCaseByCase: true });
+    expect(on).toContain('Enable Files');
+    expect(on).toContain('Disable Files');
+    expect(on).toContain('value="file-access"');
+
+    const off = renderRow({}, {});
+    expect(off).not.toContain('Enable Files');
+    expect(off).not.toContain('Disable Files');
+  });
+
+  it('posts opposite `granted` values for the enable and disable halves', () => {
+    /*
+      The failure this catches is two buttons that both grant — different labels, identical effect,
+      which renders and passes a smoke test. Both hidden inputs are asserted, per grant.
+    */
+    for (const [setting, grant] of [
+      ['ptrMobileAppCaseByCaseEnabled', 'mobile-app'],
+      ['fileAccessCaseByCase', 'file-access']
+    ]) {
+      const html = renderRow({}, { [setting]: true });
+      const posts = html.split(`value="${grant}"`).length - 1;
+      expect(posts, grant).toBe(2);
+      expect(html, grant).toContain('name="granted" value="on"');
+      expect(html, grant).toContain('name="granted" value=""');
+    }
+  });
+
+  it('paints only the DISABLE glyph red, which is all that tells the pair apart', () => {
+    const mobile = renderRow({}, { ptrMobileAppCaseByCaseEnabled: true });
+    expect(mobile).toContain('fa fa-mobile mg-red');
+    const files = renderRow({}, { fileAccessCaseByCase: true });
+    expect(files).toContain('fa fa-folder mg-red');
+    /* SOLID `fa-folder` in the menu, OUTLINE `fa-folder-o` in the row icon. Two glyphs, kept as two. */
+    expect(files).not.toContain('fa fa-folder-o mg-red');
+  });
+
+  it('gates the divider on the same setting, so neither submenu ends on a trailing rule', () => {
+    const before = renderRow({}, {}).split('class="divider"').length - 1;
+    const withBoth = renderRow({}, {
+      ptrMobileAppCaseByCaseEnabled: true,
+      fileAccessCaseByCase: true
+    }).split('class="divider"').length - 1;
+    expect(withBoth).toBe(before + 2);
   });
 });

@@ -24,6 +24,42 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-13
 
+### 2026-08-13 12:05 EDT — The two per-member grants: the writers the new icons had no way to reach
+
+**Runtime impact: YES.** One new form action, one new server function, four menu items.
+
+The previous entry added `hasFileAccess` and `hasMobileApp` and rendered their icons. Nothing could
+set them. A column with no writer driving an indicator that can therefore never light up is the same
+defect as a control whose only effect is its own presence, inverted — and it would have shipped as
+"done" because the icons render, the tests pass and the row looks right.
+
+`page.manageSession.html:545-551` and `:592-598` are the reference's four items, each behind `ng-if`
+on the ROOM's own case-by-case setting, at the bottom of the App-and-Notifications submenu and at the
+very end of the row menu respectively. The dividers are gated on the same condition, so a room
+without case-by-case does not end either menu on a trailing rule.
+
+**The room setting is deliberately NOT re-checked in the action.** It decides whether the control is
+OFFERED, not whether a grant is legitimate. A room that turns case-by-case off has not withdrawn the
+grants it already made — it has stopped consulting them, which is exactly what the row's icons do.
+Re-checking server-side would silently refuse a legitimate write whenever an owner toggled the
+setting off and back on. What IS enforced there is tenancy: `ownedRoomId` throws unless the account
+owns the room, and the `UPDATE` is keyed on both ids, so a member id from another tenant's room
+matches zero rows.
+
+The column name comes from a static map and never from the request body — the same discipline the
+Prometheus-label rule exists for — and an unknown grant fails loud with a 400 rather than defaulting
+to one of the two.
+
+Glyph detail worth keeping: the menu uses SOLID `fa-folder`, the row icon uses the OUTLINE
+`fa-folder-o`. Two different glyphs in the reference, kept as two here, with a test that would catch
+them being collapsed.
+
+**Verified:** `svelte-check` 1481 files / 0 errors; 763 tests across 68 files in `src/lib`, including
+5 new. **Three more negative controls run** — removing the case-by-case gate, making both buttons
+grant, and emitting the divider unconditionally — each goes red on exactly the assertion that should
+catch it, green again on revert. Svelte MCP autofixer clean.
+
+
 ### 2026-08-13 11:58 EDT — The user row's eleven missing fields: four conditional icons, the Discord handle, and the whole Stripe block
 
 **Runtime impact: YES.** A migration, a wider `SELECT`, three new render paths on the manage user

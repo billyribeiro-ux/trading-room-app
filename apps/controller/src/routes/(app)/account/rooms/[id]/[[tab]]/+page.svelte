@@ -1879,6 +1879,38 @@ Please click this link to attend: ______ unique link will be here_____
                                           <button type="submit"><i class="fa fa-mobile"></i><i class="fa fa-reload"></i>&nbsp;&nbsp;Reset Mobile Notifs</button>
                                         </form>
                                       </li>
+                                     <!--
+                                       `manageMobileApp(user._id, user.userName, $index, 'enable'|'disable')` —
+                                       page.manageSession.html:545-551. The divider is gated on the SAME `ng-if`,
+                                       so a room without case-by-case ends this submenu at Reset rather than on a
+                                       trailing rule.
+
+                                       These write `hasMobileApp`, which drives the large phone icon at the top of
+                                       this row. Until they existed the column had no writer and the icon had no
+                                       cause — an indicator that could never light up.
+
+                                       Disable carries a RED glyph in the reference and Enable does not, which is
+                                       the only thing telling the two apart at a glance.
+                                     -->
+                                     {#if mobileAppCaseByCase}
+                                       <li class="divider" role="separator"></li>
+                                       <li>
+                                         <form method="POST" action="?/setMemberGrant" use:enhance={save}>
+                                           <input type="hidden" name="roomUserId" value={member.id} />
+                                           <input type="hidden" name="grant" value="mobile-app" />
+                                           <input type="hidden" name="granted" value="on" />
+                                           <button type="submit"><i class="fa fa-mobile" aria-hidden="true"></i>&nbsp;&nbsp;Enable Mobile App</button>
+                                         </form>
+                                       </li>
+                                       <li>
+                                         <form method="POST" action="?/setMemberGrant" use:enhance={save}>
+                                           <input type="hidden" name="roomUserId" value={member.id} />
+                                           <input type="hidden" name="grant" value="mobile-app" />
+                                           <input type="hidden" name="granted" value="" />
+                                           <button type="submit"><i class="fa fa-mobile mg-red" aria-hidden="true"></i>&nbsp;&nbsp;Disable Mobile App</button>
+                                         </form>
+                                       </li>
+                                     {/if}
                                     </ul>
                                 </li>
                                 <li class="dropdown-submenu" class:open={openSubmenu === 'badges'}>
@@ -1943,6 +1975,37 @@ Please click this link to attend: ______ unique link will be here_____
                                     </button>
                                   </form>
                                 </li>
+                                <!--
+                                  `manageFileAccess(user._id, user.userName, $index, 'enable'|'disable')` —
+                                  page.manageSession.html:592-598, the LAST two items in the reference's row
+                                  menu, after Pause / Pending. Divider gated on the same `ng-if`.
+
+                                  These write `hasFileAccess`, which drives the folder icon at the top of the
+                                  row. Same reasoning as the mobile pair above: without a writer the icon has
+                                  no cause.
+
+                                  The glyph is `fa-folder`, SOLID — not the `fa-folder-o` outline the row's
+                                  icon uses. Two different glyphs in the reference, kept as two here.
+                                -->
+                                {#if fileAccessCaseByCase}
+                                  <li class="divider" role="separator"></li>
+                                  <li>
+                                    <form method="POST" action="?/setMemberGrant" use:enhance={save}>
+                                      <input type="hidden" name="roomUserId" value={member.id} />
+                                      <input type="hidden" name="grant" value="file-access" />
+                                      <input type="hidden" name="granted" value="on" />
+                                      <button type="submit"><i class="fa fa-folder" aria-hidden="true"></i>&nbsp;&nbsp;Enable Files</button>
+                                    </form>
+                                  </li>
+                                  <li>
+                                    <form method="POST" action="?/setMemberGrant" use:enhance={save}>
+                                      <input type="hidden" name="roomUserId" value={member.id} />
+                                      <input type="hidden" name="grant" value="file-access" />
+                                      <input type="hidden" name="granted" value="" />
+                                      <button type="submit"><i class="fa fa-folder mg-red" aria-hidden="true"></i>&nbsp;&nbsp;Disable Files</button>
+                                    </form>
+                                  </li>
+                                {/if}
                               </ul>
                             </div>
                           {/if}

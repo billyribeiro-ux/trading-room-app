@@ -15,6 +15,8 @@ import {
   listRoomUsers,
   readPermissions,
   readPushTokens,
+  isMemberGrant,
+  setMemberGrant,
   readSettings,
   savePermissions,
   saveSetting,
@@ -655,6 +657,32 @@ export const actions: Actions = {
     const form = await request.formData();
     const roomUserId = Number(form.get('roomUserId'));
     return { restrictPm: await setUserRestrictPm(roomId, roomUserId, form.get('restrict') === 'on') };
+  },
+
+  /**
+   * `manageMobileApp(…)` and `manageFileAccess(…)` — the two per-member grants at the bottom of the
+   * row menu, each behind the room's own case-by-case setting.
+   *
+   * The room setting is NOT re-checked here on purpose, and that is a deliberate split rather than
+   * an omission. It decides whether the CONTROL is offered — it is `ng-if` on the menu item in the
+   * reference and `{#if}` on ours — not whether the grant is legitimate. A room that turns
+   * case-by-case off has not withdrawn the grants it already made; it has stopped consulting them,
+   * which is exactly what the row's icons do. Re-checking here would silently refuse a legitimate
+   * write whenever an owner toggled the setting off and back on.
+   *
+   * What IS enforced here is tenancy: `ownedRoomId` throws unless this account owns the room, and
+   * the UPDATE is keyed on both ids, so a member belonging to someone else's room matches zero rows.
+   */
+  setMemberGrant: async ({ request, params, locals }) => {
+    const roomId = await ownedRoomId(locals, params.id);
+    const form = await request.formData();
+    const roomUserId = Number(form.get('roomUserId'));
+    const grant = form.get('grant');
+    /* Fails loud on an unknown grant rather than defaulting to one of them. */
+    if (!isMemberGrant(grant)) return fail(400, { message: 'Unknown grant.' });
+    const changed = await setMemberGrant(roomId, roomUserId, grant, form.get('granted') === 'on');
+    if (changed === 0) return fail(404, { message: 'No such member.' });
+    return { grant: changed };
   },
 
   /** `setNoteUser(…)` */
