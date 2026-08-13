@@ -24,6 +24,47 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-13
 
+### 2026-08-13 17:56 EDT — `page.welcome.html` is fully read, and its emoji picker is built
+
+**Runtime impact: YES** — the badge editor's emoji button now opens a picker, and its two submit
+labels change as you type.
+
+**T5-29 — the emoji button had nothing behind it.** `page.welcome.html:436` renders
+`<button id="emoji-picker">`, and `:476-1147` inlines 678 lines of Intercom picker markup: a search
+box and six groups holding 635 emoji. Ours rendered the button and nothing else — a control whose
+only effect is its own presence, which this project forbids.
+
+Generated rather than transcribed. 635 emoji is not something to retype, and the spans are written
+two different ways in the source — run together as `</span\n><span`, and one per line. **My first
+extraction matched 9 of 635** because its pattern was line-anchored, which is exactly the sort of
+quiet shortfall a hand transcription produces. The generator now asserts the six group titles AND the
+635 total at generation time and throws otherwise: a picker missing a category looks complete to
+anyone who does not know what is absent.
+
+Two deviations, both stated in the component. A `<button>` per emoji rather than the reference's
+`<span>` — a span with a click handler is unreachable by keyboard and invisible to a screen reader,
+and this is a grid of 635; the class is unchanged so the reference's own stylesheet still applies.
+And the open/close toggle is ours, because the reference's button carries no handler in the template
+at all: Intercom's script binds it, and that script is not in the capture.
+
+**T5-30 — the badge submit labels are variables, and ours were constants.** `:456` and `:464` are
+`Add {{badges.text}}` and `Save Edit for {{badges.text}}`; the label changes as you type — "Add VIP".
+Ours read the literal "Add New Badge" and "Save Edit for New Badge". That is **the capture read as
+source**: the text field happened to contain "New Badge" when the page was captured, so a variable
+was transcribed as a fixed phrase. The same trap as the four `ng-show="false"` icons and the Select
+All label — a rendered value standing in for the expression that produced it. Third instance of it
+today.
+
+**`page.welcome.html` is now fully accounted for**, all 1,424 lines. `:1-325` is a single `<style>`
+block — the picker's CSS reset, no markup at all. `:476-1147` is the picker widget: **656
+`intercom-` classes, ZERO `ng-` attributes, ZERO `{{ }}` bindings**. The rest was already read. T5-7
+now names only `page.manageSession.html`'s non-settings structure.
+
+**Verified:** `svelte-check` 1506 files / 0 errors; 901 tests across 85 files, 13 new. Three negative
+controls run — the label frozen back to the captured phrase, the button made inert again, and a group
+dropped from the generated data — each red on the right assertion. Generation deterministic across
+two runs. Register **59 CLOSED, 14 OPEN, 13 parked, 86 total**, tally test-checked.
+
 ### 2026-08-13 17:46 EDT — An empty column, and an appearance inherited from the wrong neighbours
 
 **Runtime impact: YES** — the Extra Admin Users table fills a column that was blank and restores an

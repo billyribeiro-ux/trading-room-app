@@ -45,7 +45,8 @@
     "backend:licenses": "cargo deny --manifest-path services/Cargo.toml --locked --all-features check licenses bans sources",
     "test:db": "vitest run --config vitest.db.config.ts",
     "manage:styles": "node scripts/verify-manage-styles.mjs",
-    "api-post-routes:extract": "node scripts/extract-api-post-routes.mjs"
+    "api-post-routes:extract": "node scripts/extract-api-post-routes.mjs",
+    "emoji:extract": "node scripts/extract-emoji-picker.mjs"
   },
   "dependencies": {
     "@fortawesome/fontawesome-free": "5.8.1",

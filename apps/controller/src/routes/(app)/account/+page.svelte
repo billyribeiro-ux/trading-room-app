@@ -69,6 +69,7 @@
   import type { SubmitFunction } from '@sveltejs/kit';
   import type { PageProps } from './$types';
   import PasswordReveal from '$lib/components/PasswordReveal.svelte';
+  import EmojiPicker from '$lib/components/EmojiPicker.svelte';
 
   let { data, form }: PageProps = $props();
 
@@ -112,6 +113,9 @@
   let badgeBk = $state('#ffcc00');
   let badgeFg = $state('#ffffff');
   let badgeText = $state('');
+  /** Whether the emoji picker is open. Ours — the reference's button is bound by a script that is
+      not in the capture, so the open/close mechanism is not evidenced; the PICKER is. */
+  let showEmojiPicker = $state(false);
   /** `badges.name`. Bound now because edit mode has to prefill it. */
   let badgeName = $state('');
 
@@ -767,9 +771,34 @@
                 bind:value={badgeText}
                 aria-label="Badge Text"
               />
-              <button class="acc-btn acc-btn-default acc-btn-sm" type="button" id="emoji-picker" aria-label="Emoji">
+              <!--
+                `#emoji-picker` — page.welcome.html:436. The reference inlines 678 lines of picker
+                markup behind this button. Ours rendered the button and NOTHING behind it, which is
+                a control whose only effect is its own presence.
+
+                `aria-expanded` and the toggle are ours: the reference's button carries no handler
+                in the template at all — Intercom's own script binds it, and that script is not in
+                the capture. What IS evidenced is the picker's markup, its six groups and its 635
+                emoji, all generated from the template into `content/emoji-picker.ts`.
+              -->
+              <button
+                class="acc-btn acc-btn-default acc-btn-sm"
+                type="button"
+                id="emoji-picker"
+                aria-label="Emoji"
+                aria-expanded={showEmojiPicker}
+                onclick={() => (showEmojiPicker = !showEmojiPicker)}
+              >
                 <i class="fa fa-smile-o fa-1x"></i>
               </button>
+              {#if showEmojiPicker}
+                <EmojiPicker
+                  onpick={(char) => {
+                    badgeText += char;
+                    showEmojiPicker = false;
+                  }}
+                />
+              {/if}
             </div>
             <hr />
             <div class="acc-badge-row">
@@ -794,10 +823,21 @@
               <button
                 class="acc-btn acc-btn-primary acc-pull-right"
                 type="submit"
-                formaction="?/updateBadge">Save Edit for New Badge</button
+                formaction="?/updateBadge">Save Edit for {badgeText}</button
               >
             {:else}
-              <button class="acc-btn acc-btn-warning acc-pull-right" type="submit">Add New Badge</button>
+              <!--
+                `Add {{badges.text}}` and `Save Edit for {{badges.text}}` — page.welcome.html:456
+                and :464. BOTH labels INTERPOLATE the badge's own text, so they change as you type:
+                "Add VIP", "Save Edit for VIP".
+
+                Ours had them as the literal strings "Add New Badge" and "Save Edit for New Badge".
+                That is almost certainly the capture read as source: the badge text field happened
+                to contain "New Badge" when the page was captured, so the rendered label read
+                "Save Edit for New Badge" — and a fixed phrase was transcribed from what was really
+                a variable. The same trap as the four `ng-show="false"` icons.
+              -->
+              <button class="acc-btn acc-btn-warning acc-pull-right" type="submit">Add {badgeText}</button>
             {/if}
             <button class="acc-btn acc-btn-default acc-pull-right" type="button" onclick={closeBadgeEditor}
               >Close</button

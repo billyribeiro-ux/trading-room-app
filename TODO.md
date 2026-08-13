@@ -126,7 +126,7 @@ Every gap from the full read of `apps/controller/evidence-dumps/` now lives ther
 five tiers. **That file is the tracker — this section is only the index to it.** Do not record a
 gap's status in both places; one of them will go stale.
 
-As of 2026-08-13 17:32 EDT: **57 CLOSED, 14 OPEN, 13 parked/won't-fix, 84 total.**
+As of 2026-08-13 17:56 EDT: **59 CLOSED, 14 OPEN, 13 parked/won't-fix, 86 total.**
 
 **Everything closable by READING is closed.** The twelve that remain need something no source file
 can give. Each is written out below with the exact next action, because "blocked" without an
