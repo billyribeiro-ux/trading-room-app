@@ -73,7 +73,7 @@ function shapeOf(html: string, hiddenBy: 'ng-hide' | 'hidden'): string[] {
 /** The owner, matching the captured row: role 0, no permissions, nothing set. */
 const ownerRow = {
   id: 1,
-  displayName: 'Billy Ribeiro',
+  displayName: 'Ada Lovelace',
   email: 'billy@example.com',
   role: 0,
   banned: false,

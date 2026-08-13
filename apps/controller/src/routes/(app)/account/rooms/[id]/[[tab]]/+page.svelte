@@ -1429,7 +1429,7 @@ Please click this link to attend: ______ unique link will be here_____
                             <i class="fa fa-hdd-o mg-red" aria-hidden="true" title="Denied Archives Access"></i>
                           {/if}
                           <!--
-                            The name follows the avatar IMMEDIATELY — `<img …>Billy Ribeiro`, no
+                            The name follows the avatar IMMEDIATELY — `<img …><the owner's display name>`, no
                             element between them. The Discord line and the TRIAL badge come AFTER the
                             name, not before it, which is where ours had put them.
                           -->

@@ -86,16 +86,28 @@ source** — the code was right in all four cases.
 | `account:contract` | route moved to `rooms/[id]/[[tab]]/` (died ENOENT before asserting anything); API-key decrypt refactored; an unbounded `[\s\S]*?` crossed an action boundary; a regex matched markup quoted inside a CODE COMMENT |
 | `fonts:verify` | workspace files read from the package root not the repo root; `pnpm` pin 11.18.0 vs actual 11.21.0; `better-sqlite3: false` asserted when the repo has had `true` since its first commit |
 
-### STILL RED: `privacy:verify` — 10 violations, all pre-existing
+### `privacy:verify` — ALL 10 CLEARED 2026-08-13
 
-Not mechanical; each category needs a decision.
+| # | what | resolution |
+|---|---|---|
+| 3 | `(public)/{contact,privacy,terms}` raw email | `support@tradingroom.app` is the product's OWN published role address — `BRAND = 'tradingroom.app'` (`content/home.ts:15`), with `chat.`/`media.`/`mail.` subdomains through the deploy docs. Allowlisted as a single ROLE ADDRESS, not a domain: allowing all of `tradingroom.app` would let a personal address on our own domain through. |
+| 2 | `export-format-contract`, `room-sessions-fk-contract` fixture emails | `d@x.com` / `o@x.com` → reserved domain. `x.com` is a live domain. The fk-contract one sits inside a transcript of a real psql run, so the substitution is ANNOTATED rather than made silently. |
+| 4 | captured owner display name | → the suite's existing neutral fixture `Ada Lovelace`. One site was `'Ada Lovelace'.replace('Ada Lovelace', '<name>')` — a no-op string dance whose only purpose was smuggling the name past this check; removed. The two remaining sites are COMMENTS describing what the capture renders, so they now describe the name rather than reproduce it. |
+| 1 | `server/gravatar.ts` raw Gravatar identifier | → `[GRAVATAR_MD5_A]`, the placeholder the captured evidence already uses. It was a real member's MD5 — a stable cross-site identifier, which is precisely what that module's own docblock warns about. Reproducing it to illustrate a URL shape was the one thing the module tells you not to do. |
 
-| # | files | violation | likely resolution |
-|---|---|---|---|
-| 3 | `(public)/{contact,privacy,terms}/+page.svelte` | raw email | The business's OWN published contact address. Probably an allowance in the verifier, not a redaction — a privacy page with no contact route is worse. |
-| 4 | `manage-row-actions-render.test.ts`, `manage-user-row-sbs.test.ts`, `user-row-contract.test.ts`, `rooms/[id]/[[tab]]/+page.svelte` | captured owner display name | Real PII from the reference capture sitting in our source. Replace with a neutral fixture name. |
-| 2 | `export-format-contract.test.ts`, `room-sessions-fk-contract.test.ts` | raw email | Test fixtures — move to a reserved domain. |
-| 1 | `src/lib/server/gravatar.ts` | raw Gravatar identifier | An MD5 of a real address, carried from the capture. |
+Negative-controlled: restoring the raw identifier turns `privacy:verify` red again.
+
+### STILL RED: `runtime:http` — a SIXTH pre-existing failure, revealed by fixing the other five
+
+The gate chain short-circuits, so this was invisible until `privacy:verify` passed. **Confirmed
+pre-existing** by stashing every change and re-running.
+
+Not an environment gap: `scripts/verify-public-preview-http.mjs` needs PostgreSQL on
+`localhost:5432` and it IS reachable here. The assertion that fails is
+`/contact form is disabled during this public preview/i`, and the input it matched against is the
+CONTENT OF `account.css` — i.e. the fetch for the contact page came back as a stylesheet. That is a
+routing or build problem, not a stale expectation, and it deserves a proper investigation rather
+than a guess.
 
 **Why this is worth doing rather than suppressing.** `main` auto-deploys, so the gate is the only
 thing between a change and production — and while it was red nobody could read a green result, which

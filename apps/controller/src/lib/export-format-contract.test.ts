@@ -93,7 +93,7 @@ describe('the participant stats header, which is now nine columns', () => {
       [
         {
           displayName: 'Dana',
-          email: 'd@x.com',
+          email: 'd@example.com',
           ip: '203.0.113.1',
           isMobile: false,
           browser: 'Chrome',
@@ -102,7 +102,7 @@ describe('the participant stats header, which is now nine columns', () => {
         },
         {
           displayName: 'Dana',
-          email: 'd@x.com',
+          email: 'd@example.com',
           ip: '203.0.113.1',
           isMobile: false,
           browser: 'Chrome',

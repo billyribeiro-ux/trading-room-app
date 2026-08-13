@@ -89,8 +89,14 @@ function html(users: ReturnType<typeof member>[]) {
 
 describe('the row Actions button', () => {
   it('is ABSENT on the owner row — which is why an owner-only room shows none', () => {
-    const body = html([member({ role: 0, displayName: 'Billy Ribeiro' })]);
-    expect(body).toContain('Ada Lovelace'.replace('Ada Lovelace', 'Billy Ribeiro'));
+    const body = html([member({ role: 0, displayName: 'Ada Lovelace' })]);
+    /*
+      Was `'Ada Lovelace'.replace('Ada Lovelace', '<captured owner name>')` — a no-op string dance
+      whose only effect was to smuggle the captured owner's real name past `privacy:verify`. The
+      fixture name is arbitrary to this assertion, which is about the Actions button being ABSENT on
+      an owner row, so it now uses the neutral fixture the rest of the suite uses.
+    */
+    expect(body).toContain('Ada Lovelace');
     expect(body).not.toContain('dropdown-menu-right');
   });
 
@@ -101,7 +107,7 @@ describe('the row Actions button', () => {
   });
 
   it('shows exactly one menu in a room with one owner and one participant', () => {
-    const body = html([member({ id: 1, role: 0, displayName: 'Billy Ribeiro' }), member({ id: 2, role: 2 })]);
+    const body = html([member({ id: 1, role: 0, displayName: 'Ada Lovelace' }), member({ id: 2, role: 2 })]);
     expect(body.split('dropdown-menu-right').length - 1).toBe(1);
   });
 });
