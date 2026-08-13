@@ -24,6 +24,38 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-13
 
+### 2026-08-13 18:01 EDT — Four of five permission labels had been tidied into English
+
+**Runtime impact: YES** — five labels in the permissions modal, plus its missing header and footer.
+
+Read the tail of `page.manageSession.html`, `:2601-2719`. The settings rows there are already
+covered by the two machine proofs; the modal at `:2685-2715` is not, and it had drifted.
+
+**The labels.** The reference reads `Microphone`, **`Screenshare`**, **`WebCam`**, **`AdminChat`**,
+**`CanEditNotes`**. Ours had `Screen share`, `Camera`, `Admin chat`, `Edit notes` — four of five
+rewritten into ordinary English.
+
+`CanEditNotes` is a property name shown to an operator. It reads oddly, and it is exactly what the
+reference does. This is the kind of change that looks like an improvement right up until a support
+conversation about "the AdminChat box" cannot be followed, because the product does not use that
+word anywhere.
+
+**The structure.** `:2688-2691` wraps the title in `modal-header` beside a `×` dismiss button, and
+`:2709` wraps the buttons in `modal-footer text-right`. Ours had a bare `<h4>` and a private
+`.actions` div — so **the dismiss control the reference puts top-right did not exist**, and two
+Bootstrap classes were reimplemented under private names.
+
+Same for the rows: each is `<label class="d-block">`, a class `styles.css` defines and `manage.css`
+already carried, while the component used a private `.perm` duplicating the identical rule. Both
+private classes are gone.
+
+The contract test also asserts every `PERMISSION_KEYS` entry HAS a label — an unlabelled key falls
+back to its raw name, which would ship `hasMic` to an operator as visible text.
+
+**Verified:** `svelte-check` 1507 files / 0 errors; 909 tests across 86 files, 8 new. Two negative
+controls run — a label tidied back to English, and the dismiss button removed — each red on the right
+assertion. Register **60 CLOSED, 14 OPEN, 13 parked, 87 total**, tally test-checked.
+
 ### 2026-08-13 17:56 EDT — `page.welcome.html` is fully read, and its emoji picker is built
 
 **Runtime impact: YES** — the badge editor's emoji button now opens a picker, and its two submit
