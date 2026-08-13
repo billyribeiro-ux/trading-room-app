@@ -24,6 +24,44 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-13
 
+### 2026-08-13 17:23 EDT — The "failed-login error state" is a CAPTCHA, and we already had it
+
+**Runtime impact: none** — a register correction. No code changed.
+
+Finished the DON'T TOUCH block (the linked-rooms section intro is correctly a standalone paragraph
+now that it is no longer stolen by `hidePoweredBy`, and `linkedRoomRecordings` is already transcribed
+with its bare `<p>` and the layout consequence noted), then moved to `page.welcome.html` below
+`:360`.
+
+**T2-22 has been mis-described in the register all along.** It asked for the "failed-login error
+state" and I had it filed as needing a browser. `page.welcome.html:1397` is:
+
+    <div class="form-group has-feedback" ng-show="failedLoginCount >= 3">
+      <div class="g-recaptcha" data-sitekey="…"></div>
+    </div>
+
+with `<script src="https://www.google.com/recaptcha/api.js">` at `:1424`. **What appears after three
+failures is a CAPTCHA — a brute-force control — not a message.** There is no error text anywhere in
+that form. A capture would have shown a captcha appearing and left anyone to wonder what the "error
+state" was.
+
+**Ours already matches**, and matches for the right reasons: `(public)/login/+page.svelte:89` gates
+`<Recaptcha />` on `failedLoginCount >= 3`, backed by a `login_attempts` table and server-side
+`verifyRecaptcha`. That was built without this line of the template being read.
+
+The whole form is now readable as well — `ng-submit="submitLogin()"`, the `signup.email` /
+`signup.pass` models, `fa-envelope` and `fa-lock` feedback spans, the "Forgot your password?" link,
+`btn btn-block btn-info mb`, and a `loggingIn` spinner reading "Logging In, please wait...".
+
+So T2-22 drops to **geometry only**, which `collect-rendered-states.js` already covers.
+
+**Third time today that reading beat an assumption about what needed a capture.** The others were
+T2-18 and T5-25, both reported as unbuilt when they were built. The common thread is different here:
+those were my grep habit; this one was a register entry written from a capture, describing a control
+by what it looked like rather than by what it is.
+
+**Verified:** no code changed; 877 tests across 82 files still green.
+
 ### 2026-08-13 17:11 EDT — Two settings were showing helper text that belonged to something else
 
 **Runtime impact: YES** — two rows in the Settings pane stop rendering text that was never theirs.
