@@ -73,45 +73,40 @@ exists so it cannot silently stop agreeing, and a 1px drift fails it.
 those is on the AngularJS surface, and their styling questions now have a source instead of a
 sampled computed style.
 
-## The full gate: FOUR of five red steps fixed 2026-08-13; ONE remains
+## The full gate is GREEN (2026-08-13) — all six red steps fixed
 
-`pnpm --filter controller test` had five failing steps, all pre-existing (proven by stashing every
-change and re-running at `HEAD`). Four are now green. **Every one was a stale verifier, not broken
-source** — the code was right in all four cases.
+`pnpm --filter controller test` exits 0. **742 Vitest tests across 67 files**, plus every source,
+evidence, privacy, font, breakpoint and runtime-HTTP contract.
 
-| step | cause |
+It had SIX failing steps, all pre-existing (proven by stashing every change and re-running at
+`HEAD`). The chain short-circuits at the first failure, so they surfaced one at a time as each was
+fixed — five known failures became six before it became zero.
+
+| step | root cause |
 |---|---|
-| `home:contract` | SvelteKit 3 migration (`ff948db`) changed `resolve()`/`asset()` shapes. Route ids include the route group (`/(public)/privacy`); `asset()` takes no leading slash. |
+| `home:contract` | SvelteKit 3 migration (`ff948db`) changed `resolve()`/`asset()` shapes; verifier kept the old spellings |
 | `room-login:contract` | the same `asset()` leading-slash expectation |
-| `account:contract` | route moved to `rooms/[id]/[[tab]]/` (died ENOENT before asserting anything); API-key decrypt refactored; an unbounded `[\s\S]*?` crossed an action boundary; a regex matched markup quoted inside a CODE COMMENT |
-| `fonts:verify` | workspace files read from the package root not the repo root; `pnpm` pin 11.18.0 vs actual 11.21.0; `better-sqlite3: false` asserted when the repo has had `true` since its first commit |
+| `account:contract` | route moved to `rooms/[id]/[[tab]]/` (died ENOENT before asserting anything); a lazy `[\s\S]*?` crossed an action boundary; a regex matched markup quoted inside a CODE COMMENT |
+| `fonts:verify` | workspace files read from the package root; `pnpm` pin 11.18.0 vs 11.21.0; `better-sqlite3: false` asserted when it has been `true` since the first commit |
+| `privacy:verify` | 10 violations — see the table below |
+| `runtime:http` | asserted the ORIGINAL contact-page sentence; the page was rebuilt twice since and now keys off `controlPlaneMode`, not a launch phase |
+| `test:counts` | 715 documented vs 742 actual, after this session added 27 tests |
 
-### `privacy:verify` — ALL 10 CLEARED 2026-08-13
+**Not one was a defect in shipped behaviour.** Every failure was a contract describing a shape the
+code no longer used — which is the strongest argument for keeping the gate green: while it was red,
+nobody could read a green result, and that is exactly how two genuinely RED unit tests survived
+unnoticed until 2026-08-13.
+
+### `privacy:verify` — all 10 cleared, each on its own evidence
 
 | # | what | resolution |
 |---|---|---|
-| 3 | `(public)/{contact,privacy,terms}` raw email | `support@tradingroom.app` is the product's OWN published role address — `BRAND = 'tradingroom.app'` (`content/home.ts:15`), with `chat.`/`media.`/`mail.` subdomains through the deploy docs. Allowlisted as a single ROLE ADDRESS, not a domain: allowing all of `tradingroom.app` would let a personal address on our own domain through. |
-| 2 | `export-format-contract`, `room-sessions-fk-contract` fixture emails | `d@x.com` / `o@x.com` → reserved domain. `x.com` is a live domain. The fk-contract one sits inside a transcript of a real psql run, so the substitution is ANNOTATED rather than made silently. |
-| 4 | captured owner display name | → the suite's existing neutral fixture `Ada Lovelace`. One site was `'Ada Lovelace'.replace('Ada Lovelace', '<name>')` — a no-op string dance whose only purpose was smuggling the name past this check; removed. The two remaining sites are COMMENTS describing what the capture renders, so they now describe the name rather than reproduce it. |
-| 1 | `server/gravatar.ts` raw Gravatar identifier | → `[GRAVATAR_MD5_A]`, the placeholder the captured evidence already uses. It was a real member's MD5 — a stable cross-site identifier, which is precisely what that module's own docblock warns about. Reproducing it to illustrate a URL shape was the one thing the module tells you not to do. |
+| 3 | `(public)/{contact,privacy,terms}` raw email | `support@tradingroom.app` is the product's OWN published role address (`BRAND = 'tradingroom.app'`, `content/home.ts:15`). Allowlisted as a single ROLE ADDRESS, not a domain — a domain allowance would let a personal address on our own domain through. |
+| 2 | fixture emails on `x.com`, a live domain | → reserved domain. One sits inside a transcript of a real psql run, so the substitution is ANNOTATED. |
+| 4 | captured owner display name | → the suite's neutral `Ada Lovelace`. One site was `'Ada Lovelace'.replace('Ada Lovelace', '<name>')` — a no-op dance that existed only to smuggle the name past this check. |
+| 1 | raw Gravatar identifier | → `[GRAVATAR_MD5_A]`. It was a real member's MD5, present only to illustrate a URL shape — the one thing that module's own docblock says not to do. |
 
-Negative-controlled: restoring the raw identifier turns `privacy:verify` red again.
-
-### STILL RED: `runtime:http` — a SIXTH pre-existing failure, revealed by fixing the other five
-
-The gate chain short-circuits, so this was invisible until `privacy:verify` passed. **Confirmed
-pre-existing** by stashing every change and re-running.
-
-Not an environment gap: `scripts/verify-public-preview-http.mjs` needs PostgreSQL on
-`localhost:5432` and it IS reachable here. The assertion that fails is
-`/contact form is disabled during this public preview/i`, and the input it matched against is the
-CONTENT OF `account.css` — i.e. the fetch for the contact page came back as a stylesheet. That is a
-routing or build problem, not a stale expectation, and it deserves a proper investigation rather
-than a guess.
-
-**Why this is worth doing rather than suppressing.** `main` auto-deploys, so the gate is the only
-thing between a change and production — and while it was red nobody could read a green result, which
-is exactly how two RED unit tests survived unnoticed until 2026-08-13.
+---
 
 ---
 

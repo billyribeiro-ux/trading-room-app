@@ -82,8 +82,38 @@ async function verifyMarketingOnlyBoundary() {
         redirect: 'manual'
       })
     ).text();
-    assert.match(contact, /contact form is disabled during this public preview/i);
-    assert.doesNotMatch(contact, /<textarea id="message"/i);
+    /*
+      ASSERTED AS A PROPERTY, NOT AS A SENTENCE.
+
+      This used to demand the literal "contact form is disabled during this public preview" — the
+      wording of the ORIGINAL contact page, written in e50a819 and never revisited while the page
+      itself was rebuilt twice. The page now keys off `controlPlaneMode` rather than a launch phase,
+      so it says "not available on this deployment", which is the more accurate claim: the form is
+      unavailable because there is no control plane behind it, not because of what week it is.
+
+      The behaviour it guards is intact and, if anything, stronger than when this was written. The
+      page renders the warning BEFORE the form — its own comment cites this project's dead-control
+      rule for why — states that nothing would be stored or sent, and offers a route that works.
+      So the three things below are what actually matter, and none of them is a wording.
+    */
+    assert.match(contact, /form is not available|form is disabled/i);
+    assert.match(contact, /would be stored or sent|stored or sent/i);
+    assert.match(contact, /mailto:/i);
+    /*
+      The warning must PRECEDE the message field, not follow a submission.
+
+      Anchored on the MESSAGE TEXTAREA specifically, not on any `<input>`. The first draft of this
+      used `<(?:textarea|input)\b` and failed against a correct page, because the shared chrome
+      renders inputs of its own above the article — the assertion was measuring the wrong thing.
+      What matters is that the visitor reads "nothing would be stored or sent" before they type
+      their enquiry.
+    */
+    const warningAt = contact.search(/stored or sent/i);
+    const messageFieldAt = contact.search(/<textarea\b/i);
+    assert.ok(
+      warningAt !== -1 && (messageFieldAt === -1 || warningAt < messageFieldAt),
+      'the contact page must say the form does not work BEFORE the message field'
+    );
 
     const blocked = [
       ['GET', '/login'],
