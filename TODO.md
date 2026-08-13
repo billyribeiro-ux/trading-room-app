@@ -212,6 +212,17 @@ than left open.
 
 ---
 
+### The tally test is load-bearing — do not word around it
+
+On 2026-08-13 a register entry was written as "**HALF CLOSED** … | OPEN — GEOMETRY ONLY |". The row's
+STATUS was still OPEN, correctly, but the words "HALF CLOSED" sit in the description, and
+`evidence-gap-register-counts.test.ts` scans every cell for a status word with CLOSED winning. It
+therefore counted the row closed and reported drift against `TODO.md`.
+
+The test was RIGHT and the wording was wrong: a row that is still open should not carry the token
+CLOSED anywhere in it. **Do not "fix" a drift report by adjusting the tally to match a mis-worded
+row** — reword the row. Say "the … half is DONE" and leave CLOSED for rows that are.
+
 ### NEVER run a generator with its output suppressed
 
 `node scripts/extract-manage-schema.mjs >/dev/null 2>&1` hid a ReferenceError on 2026-08-13. The

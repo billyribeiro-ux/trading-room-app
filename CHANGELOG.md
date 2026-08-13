@@ -60,7 +60,18 @@ T2-18 and T5-25, both reported as unbuilt when they were built. The common threa
 those were my grep habit; this one was a register entry written from a capture, describing a control
 by what it looked like rather than by what it is.
 
-**Verified:** no code changed; 877 tests across 82 files still green.
+**The tally test caught me, and I pushed before reading it.** Wording the entry "**HALF CLOSED** …"
+put the token CLOSED in a row whose status is still OPEN, and
+`evidence-gap-register-counts.test.ts` — which scans every cell, CLOSED winning — counted it closed
+and reported drift. The test was right and the wording was wrong; the row is reworded rather than the
+tally adjusted, because adjusting the count to match a mis-worded row is exactly the hand-maintenance
+that test exists to stop. Recorded in `TODO.md`.
+
+I also committed `beed72d` while that assertion was red — the test ran, I read the commit output
+instead of the test output, and pushed. Fixed in the next commit rather than amended, so the sequence
+stays visible.
+
+**Verified:** no code changed; 877 tests across 82 files green, tally test included.
 
 ### 2026-08-13 17:11 EDT — Two settings were showing helper text that belonged to something else
 
