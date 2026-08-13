@@ -135,6 +135,31 @@ Reading source rather than rendered DOM surfaced features no capture ever showed
 
 ---
 
+## The user-row field gap, quantified (2026-08-13) — the spec for T5-13/T5-14
+
+Measured, not estimated: every `user.*` reference in `page.manageSession.html:346-603` against
+`src/lib/server/db/schema.ts` + `src/lib/server/rooms.ts`.
+
+**39 fields referenced · 24 present · 15 absent.** Two of the 15 (`fcmTokens`, `fcmUnreged`) occur
+ONLY inside a commented-out block in the reference, so **13 are real**.
+
+| group | fields | drives | decision |
+|---|---|---|---|
+| Stripe / marketplace | `isMarketPlaceUser`, `stripeSubscriptionStatus`, `stripeLastPaidAt`, `stripeCurrentPeriodEnd`, `stripeLastPaymentFailureAt`, `stripeLastPaidAmount`, `stripeLastPaidCurrency` | the six-label subscription block, `getStripeStatusClass()`, `formatStripeAmount()` | **T5-1 — owner decision pending.** In scope or not? |
+| Mobile / FCM | `hasMobileApp`, `alerterAppFCMUserOff` | 3 of the 4 dead icons | build |
+| File access | `hasFileAccess` | the 4th dead icon, with `sess.fileAccessCaseByCase` | build |
+| Row detail | `discordUsername`, `pw`, `restrictPMUser` | the Discord line, the "PW set" marker, "User PMs disabled" | build |
+| NOT NEEDED | `fcmTokens`, `fcmUnreged` | commented out in the reference | skip |
+
+**Do it as ONE forward-only migration.** Three migrations as each icon surfaces is how a schema
+becomes archaeology. The two `sess.*` gates (`fileAccessCaseByCase`, `ptrMobileAppCaseByCaseEnabled`)
+already exist in the settings schema — only the per-member columns are missing.
+
+`money.ts` already exists and handles the zero-decimal currencies the reference gets wrong, so
+`formatStripeAmount`'s 100x bug will not be inherited if the Stripe group is built.
+
+---
+
 ## Tier 4 — won't fix
 
 | id | gap | reason |
