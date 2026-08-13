@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { render } from 'svelte/server';
 import Page from '../routes/(app)/account/rooms/[id]/[[tab]]/+page.svelte';
@@ -487,5 +488,61 @@ describe('the member’s badges on the row — page.manageSession.html:391-396',
     expect(stripe).toBeGreaterThan(-1);
     expect(badges).toBeGreaterThan(stripe);
     expect(trial).toBeGreaterThan(badges);
+  });
+});
+
+describe('the APPROVE button’s `btn-small` — page.manageSession.html:415', () => {
+  /*
+    `class="btn btn-small btn-warning"`. `btn-small` is the BOOTSTRAP 2 spelling; Bootstrap 3 renamed
+    it to `btn-sm`. So it is INERT — the button renders at default size.
+
+    Proven, not assumed: `.btn-small` is absent from `evidence-bootstrap-3.3.7.css` (which does carry
+    `.btn-sm` and `.btn-xs`), absent from `evidence-dumps/TIER1-fetched/styles.css`, and absent from
+    `theme.css`. Three stylesheets, all three read for the name.
+
+    This test exists because the obvious "fix" is wrong. Changing `btn-small` to `btn-sm` would make
+    the button VISIBLY SMALLER than the reference — `.btn-sm` has real padding, font-size, line-height
+    and border-radius rules. A tidy-up that looks like a typo correction is a rendering regression.
+  */
+  /* `${cwd}/…` rather than a relative URL, matching `manage-panel-bootstrap3-contract.test.ts`:
+     the sheet sits at the app root, two levels above this file, and vitest runs from the app root. */
+  const BOOTSTRAP3 = readFileSync(`${process.cwd()}/evidence-bootstrap-3.3.7.css`, 'utf8');
+
+  it('is a class Bootstrap 3 does not define, which is why it is safe to keep', () => {
+    expect(BOOTSTRAP3).not.toContain('.btn-small');
+    /* The control: the sheet really is Bootstrap 3, and really does define the class someone would
+       "correct" it to. Without this, the assertion above would also pass on an empty file. */
+    expect(BOOTSTRAP3).toContain('.btn-sm');
+    expect(BOOTSTRAP3).toContain('.btn-xs');
+  });
+
+  it('is rendered on the APPROVE button, spelled the reference’s way', () => {
+    const html = renderRow({ inviteStatus: 'pending' });
+    expect(html).toContain('class="btn btn-small btn-warning"');
+    /* If this ever becomes btn-sm, the button shrinks and stops matching. */
+    expect(html).not.toContain('btn-sm btn-warning');
+  });
+
+  it('shows APPROVE only for a pending member', () => {
+    expect(renderRow({ inviteStatus: 'pending' })).toContain('APPROVE');
+    expect(renderRow({ inviteStatus: 'approved' })).not.toContain('APPROVE');
+  });
+
+  it('renders the label without the reference’s leading space, and that is correct', () => {
+    /*
+      The reference's markup is `> APPROVE</button>` — a leading space inside the button. Ours emits
+      `>APPROVE<`, because the Svelte compiler trims leading whitespace in an element.
+
+      NOT a defect, and deliberately NOT "fixed". A leading space at the start of a line box is
+      collapsed away by HTML, so the two render identically. The only way to force it into the output
+      is `&nbsp;`, which does NOT collapse — that would add a real gap the reference does not have,
+      turning a cosmetic non-difference into a visible one.
+
+      Asserted in this direction so the next person who notices the diff finds the reason here
+      instead of "correcting" it.
+    */
+    const html = renderRow({ inviteStatus: 'pending' });
+    expect(html).toContain('>APPROVE<');
+    expect(html).not.toContain('>&nbsp;APPROVE<');
   });
 });

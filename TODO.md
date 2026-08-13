@@ -126,7 +126,11 @@ Every gap from the full read of `apps/controller/evidence-dumps/` now lives ther
 five tiers. **That file is the tracker — this section is only the index to it.** Do not record a
 gap's status in both places; one of them will go stale.
 
-As of 2026-08-13: **30 CLOSED, 25 OPEN, 14 parked/won't-fix, 69 total.**
+As of 2026-08-13 12:52 EDT: **32 CLOSED, 23 OPEN, 14 parked/won't-fix, 69 total.**
+
+Closed since the last count: **T5-6** (`btn-small` on APPROVE is inert — proven absent from all three
+stylesheets, and pinned so nobody "corrects" it to `btn-sm` and shrinks the button) and **T5-14**
+(`mobilePairCode` on the user row — the entry was stale when it was written; it was already rendered).
 
 The total GREW from 56 to 68 because reading the uncompiled templates keeps surfacing features no
 DOM capture ever rendered — a new **Tier 5**. Three need a decision from the owner, not more

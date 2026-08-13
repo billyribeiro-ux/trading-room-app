@@ -24,6 +24,45 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-13
 
+### 2026-08-13 12:52 EDT — Two register items closed by READING: `btn-small` is inert, and `mobilePairCode` was never missing
+
+**Runtime impact: none** — six tests and three documents. No markup changed.
+
+**T5-6 — `btn-small` on the APPROVE button.** `class="btn btn-small btn-warning"`
+(`page.manageSession.html:415`). `btn-small` is the BOOTSTRAP 2 spelling; Bootstrap 3 renamed it to
+`btn-sm`. Confirmed inert by reading three stylesheets for the name: absent from
+`evidence-bootstrap-3.3.7.css`, absent from `TIER1-fetched/styles.css` (218 KB), absent from
+`theme.css` (233 KB). The sheet that lacks it DOES carry `.btn-sm` and `.btn-xs`, which is the control
+— without that check the assertion would also pass against an empty file.
+
+Now pinned, because **the obvious fix is a regression**. Changing `btn-small` to `btn-sm` would make
+the button visibly smaller than the reference: `.btn-sm` has real padding, font-size, line-height and
+border-radius rules. A tidy-up that looks like a typo correction changes the rendering, and the
+negative control for that is on record.
+
+**T5-14 — `mobilePairCode` "is not surfaced on the user row".** It was stale when it was written; the
+row has rendered it since the App PIN work. Verified by reading every occurrence of `showPins` in the
+template rather than searching for a class name: it appears exactly TWICE — `ng-init="showPins=true;"`
+on the table (:334) and the read on the row (:397) — and nothing anywhere sets it false. So rendering
+on `mobilePairCode` alone is behaviourally identical to the reference's `showPins && mobilePairCode`.
+
+**A whitespace difference found and deliberately NOT fixed.** The reference's markup is
+`> APPROVE</button>`, with a leading space; ours emits `>APPROVE<` because the Svelte compiler trims
+leading whitespace in an element. That is not a defect: a leading space at the start of a line box is
+collapsed by HTML, so the two render identically. The only way to force it into the output is
+`&nbsp;`, which does NOT collapse — it would add a real gap the reference does not have, turning a
+cosmetic non-difference into a visible one. The test asserts the trimmed form and carries the reason,
+so the next person who spots the diff finds the answer instead of "correcting" it.
+
+**Also confirmed rather than assumed:** every `updateUser` opcode in the row menu was diffed against
+the template. All fourteen call sites match in code, label and order, including the two archives items
+gated on opposite states of `denyArchivesAccess`.
+
+**Verified:** 36 tests in `manage-user-row-reference-fields.test.ts`, 6 new. Two more negative controls
+run — `btn-small` changed to `btn-sm`, and APPROVE shown regardless of invite status — each red on the
+right assertion, green on revert.
+
+
 ### 2026-08-13 12:38 EDT — The member's badges, on the row where the reference paints them
 
 **Runtime impact: YES.** A new block in the user row's identity cell, and three CSS rules.
