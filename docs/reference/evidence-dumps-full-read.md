@@ -164,7 +164,7 @@ topnav a.icon           color rgb(255,255,255); FontAwesome; padding 15px; .fa-2
   368-line delta table, `docs/reference/rects-deltas.txt`, against a stated page default.
 => ALL 11 rects-*.json FILES READ.
 
-#### The two derived tables are IN THE REPOSITORY, and why that matters (2026-08-13 15:55 EDT)
+#### The two derived tables are IN THE REPOSITORY, and why that matters (2026-08-13 14:15 EDT)
 
 Both tables lived in `/tmp` until today, which meant this proof was one reboot away from being an
 unverifiable assertion — the exact shape of claim PR #12 was opened to revert. They are now committed
@@ -1451,7 +1451,7 @@ is inherited by anything that copies `gravatar-src-once` verbatim.
 
 ---
 
-## PART 4 — the four small `views/` templates, read END TO END (2026-08-13 13:05 EDT)
+## PART 4 — the four small `views/` templates, read END TO END (2026-08-13 12:31 EDT)
 
 All four are short enough to read whole, and all four were read whole. Together they are 255 lines
 off T5-7. Nothing below is from a search.
