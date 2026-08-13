@@ -13,13 +13,21 @@ const GENERATOR = resolve(SCRIPT_DIR, 'extract-manage-schema.mjs');
 const CANONICAL_SCHEMA = resolve(REPO_ROOT, 'src/lib/room-settings-schema.ts');
 
 /*
-  Eleven consumed by this repository's room-login page, thirty by the room application through
-  `internal/room-config/[code]`, and six by the WordPress SSO door at `(public)/sso/[code]`.
-  `allowUsersToChangeUsername` is on the first two lists, so the union is 46.
+  Eleven consumed by this repository's room-login page, THIRTY-THREE by the room application
+  through `internal/room-config/[code]`, and six by the WordPress SSO door at `(public)/sso/[code]`.
+  `allowUsersToChangeUsername` is on the first two lists, so the union is 49.
 
-  (Thirty and 46 since 2026-08-12: `hideChatAlerts`, `isChatOnlyRoom` and `disableCopy` reached the
+  (Thirty and 46 as of 2026-08-12: `hideChatAlerts`, `isChatOnlyRoom` and `disableCopy` reached the
   room when it gained the gates that read them — the chat/alerts column, the presentation column,
   and the copy/right-click restriction on non-presenters.)
+
+  (Thirty-three and 49 since 2026-08-13: `beepOnUserJoin`, `userJoinAndLeavePopup` and
+  `tawkPresenterSupport` reached the room with the join/leave notification and Tawk support work.
+  They were added to `ROOM_CONSUMED` and to `ROOM_VISIBLE_SETTINGS` at the time, but not to this
+  note and not to the `consumers` map in `src/lib/room-config-boundary.test.ts` — so BOTH of those
+  assertions sat RED until 2026-08-13, when the whole `src/lib` suite was run rather than just the
+  tests touching the change in hand. Adding a setting is FOUR edits, not two: the two lists, this
+  note, and the map that says why.)
   Kept as one flat list so a drift shows up as a diff here rather than as a category argument.
 
   (Two copies of this note used to sit here, one of them stale at "twelve". A count that appears

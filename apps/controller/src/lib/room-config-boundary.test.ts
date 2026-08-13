@@ -221,7 +221,26 @@ describe('the allow-list itself', () => {
       individualVolumeControls: 'PresenterMuteRows.svelte:123 — the per-presenter volume slider',
       hideChatAlerts: 'O(1, hideChatAlerts ? -1 : 1) — the chat/alerts column, one of five writers of that flag',
       isChatOnlyRoom: 'O(3, hidePresentation ? -1 : 3) — the presentation column, with chatOnlyMode',
-      disableCopy: 'the contextmenu / Ctrl+C,U,S / F12 gate and body.noselect, for non-presenters only'
+      disableCopy: 'the contextmenu / Ctrl+C,U,S / F12 gate and body.noselect, for non-presenters only',
+      /*
+        THE SAME DRIFT AS `individualVolumeControls` ABOVE, three more times, and for the same
+        reason: these three crossed the boundary when the join/leave and Tawk work landed, and
+        nobody added them here. This assertion was RED before the settings-schema drift was even
+        looked at — found 2026-08-13 by running the whole `src/lib` suite rather than the tests
+        touching the change in hand.
+
+        The lesson the `individualVolumeControls` note already recorded, now with a third data
+        point: adding a name to `ROOM_VISIBLE_SETTINGS` and to `ROOM_CONSUMED` is TWO of the three
+        places. This map is the third, and it is the only one that has to say WHY.
+
+        Each verified in the room before being written here, as the note above requires.
+      */
+      beepOnUserJoin:
+        '+page.svelte:6118 — the join/leave beep, gated TWICE: `sessData.beepOnUserJoin && preferences.beepOnUserJoin`, so the owner and the viewer must both allow it',
+      userJoinAndLeavePopup:
+        '+page.svelte — the join/leave toast, the second of the two independent join/leave notifications',
+      tawkPresenterSupport:
+        'tawkSupportAvailable() in $lib/tawk-support — the navbar support item, which also requires presenter AND a configured PUBLIC_PTR_TAWK_PROPERTY_ID'
     };
     expect(Object.keys(consumers).sort()).toEqual([...ROOM_VISIBLE_SETTINGS].sort());
   });

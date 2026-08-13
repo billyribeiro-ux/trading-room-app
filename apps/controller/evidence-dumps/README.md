@@ -15,6 +15,7 @@ updated consumers, and verification results are recorded in
 |---|---|
 | `COPY/` | Saved controller and room-login page sources |
 | `NEXT-STEP/` | Capture-gap outputs and decoded reference assets |
+| `TIER1-fetched/` | Static artifacts fetched read-only 2026-08-13 — bundles, raw stylesheets, webfont, API markdown, and the AngularJS `templateUrl` partials under `views/`. Closes Tier 1 of `docs/reference/evidence-gap-register.md`. |
 | `account-page/` | Authenticated account and badge-prompt evidence |
 | `home-page/` | Original public home-page source |
 | `login-page/` | Public, authenticated, API, launch, and manage-page sources |

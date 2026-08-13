@@ -455,9 +455,13 @@
 
 /* ── editable ─────────────────────────────────────────────────────────────── */
 /* angular-xeditable renders each value as a dashed-underline link; an unset one gets
-   `.editable-empty`, which is italic and near-black — NOT red. This comment said red, which is the
-   invented colour the rule 40 lines down was corrected away from; it survived the fix and would
-   have talked the next reader back into it. */
+   `.editable-empty`, which is italic and, AT REST, near-black — not red. This comment once said
+   red flatly, which is the invented resting colour the rule below was corrected away from; it
+   survived that fix and would have talked the next reader back into it.
+
+   "Not red" is true only of the resting state, and saying it unqualified was the next trap: the red
+   is real, it just belongs to :hover/:focus. Both halves are derived from the captured stylesheets
+   at the rules below, which cite their file and line. */
 /* inline, so the dashed rule under it costs no line height — see Editable.svelte */
 /*
   The TEXT is near-black; only the UNDERLINE is blue.
@@ -484,28 +488,69 @@
   cursor: pointer;
 }
 /*
-  HONEST GAP: the capture is entirely in the resting state — no node was ever hovered — so the
-  hover colours are NOT evidence. Darkening the underline alone keeps the resting measurement
-  intact and leaves the text where the capture puts it; if a hover capture ever lands, this rule is
-  the one to correct.
+  NOT a gap. This rule used to say the hover colours "are NOT evidence" because the DOM capture is
+  entirely at rest, and it invented rgb(35,82,124) on that basis. The computed capture is only half
+  the evidence: the reference's own STYLESHEETS are captured too, and they state hover outright.
+
+  Read end to end, the two rules that decide it are
+
+      sheet-6.css:15   (xeditable.min.css)
+        .editable-click:hover, a.editable-click:hover {
+          text-decoration: none; color: rgb(42,100,150); border-bottom-color: rgb(42,100,150); }
+
+      sheet-9.css:1193 (protradingroom.com/public/app/css/styles.css — the app's own sheet)
+        .editable-click, a.editable-click { color: rgb(10,10,10); }
+
+  styles.css is what drags the RESTING text to near-black: same specificity (0,1,1) as xeditable's,
+  later sheet, so it wins. It cannot touch hover, because `a.editable-click:hover` is (0,2,1) and
+  beats it. So hover moves BOTH the text and the rule to rgb(42,100,150) — the text does not stay
+  near-black, which is what the invented rule had it do.
+
+  `:focus` is deliberately NOT grouped here: sheet-6:15 names `:hover` only, so a focused non-empty
+  field measures exactly like a resting one.
 */
-.mg-root .editable-click:hover,
-.mg-root .editable-click:focus {
-  border-bottom-color: rgb(35, 82, 124);
+.mg-root .editable-click:hover {
+  color: rgb(42, 100, 150);
+  border-bottom-color: rgb(42, 100, 150);
   text-decoration: none;
 }
 /*
-  An unset field renders the word "empty" in italics — and in the SAME near-black, not red.
+  An unset field renders the word "empty" in italics — and, AT REST, in the SAME near-black, not red.
 
   Measured across all 115 `.editable-empty` nodes in the capture, every one identical:
   rgb(10,10,10) | border rgb(66,139,202) | italic. The rgb(217,83,79) here was invented; it made
   ~115 unset fields on the Settings tab look like validation errors.
+
+  At rest xeditable's own red LOSES: sheet-6.css:16 sets color rgb(221,17,68) on `a.editable-empty`
+  (0,1,1), and sheet-9.css:1193 ties on specificity from a later sheet. That is why the capture
+  paints near-black, and why the red below only appears once the field is hovered or focused.
 */
-.mg-root .editable-empty,
-.mg-root .editable-empty:hover,
-.mg-root .editable-empty:focus {
+.mg-root .editable-empty {
   font-style: italic;
   color: rgb(10, 10, 10);
+  border-bottom-color: rgb(66, 139, 202);
+}
+/*
+  ON HOVER AND FOCUS an unset field DOES go red, and this is where xeditable wins back.
+
+      sheet-6.css:16   .editable-empty:hover, .editable-empty:focus,
+                       a.editable-empty:hover, a.editable-empty:focus {
+                         font-style: italic; color: rgb(221,17,68); text-decoration: none; }
+
+  `a.editable-empty:hover` is (0,2,1), so it beats styles.css's (0,1,1) near-black. Against
+  sheet-6:15's `a.editable-click:hover` it is an exact specificity tie broken by source order —
+  line 16 comes after line 15 — so the TEXT is the red, not the hover blue.
+
+  The UNDERLINE is a different answer from the text: line 16 never sets border-bottom-color, so on
+  hover the rule still comes from line 15 (rgb(42,100,150)), while on focus — which line 15 does not
+  name — it falls back to the resting rgb(66,139,202). Hence the two selectors are split.
+*/
+.mg-root .editable-empty:hover {
+  color: rgb(221, 17, 68);
+  border-bottom-color: rgb(42, 100, 150);
+}
+.mg-root .editable-empty:focus {
+  color: rgb(221, 17, 68);
   border-bottom-color: rgb(66, 139, 202);
 }
 /* the inline editor that opens in place of the link */
@@ -1217,6 +1262,21 @@
   color: rgb(10, 10, 10);
   background: none;
   vertical-align: baseline;
+}
+/*
+  ...and the same hover, for the same reason. The reference's two date fields are not a special
+  case: read on the User Stats capture they are
+  `<a href="#" editable-date="statsDate" class="ng-scope ng-binding editable editable-click">`,
+  i.e. ordinary `.editable-click` anchors, so sheet-6.css:15 moves them to rgb(42,100,150) on hover
+  exactly like every other editable.
+
+  It needs restating here only because OURS is an `<input class="mg-date">` rather than an anchor,
+  so the `.editable-click:hover` rule above cannot reach it. Without this the two stats dates would
+  be the only editables on the page that stay near-black under the cursor.
+*/
+.mg-root .mg-date:hover {
+  color: rgb(42, 100, 150);
+  border-bottom-color: rgb(42, 100, 150);
 }
 /* a <form> is block-level; these two wrap single buttons that must sit on one
    line, so the form is reduced to a wrapper */
