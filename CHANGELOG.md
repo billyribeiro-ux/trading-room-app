@@ -24,6 +24,73 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-13
 
+### 2026-08-13 11:58 EDT — The user row's eleven missing fields: four conditional icons, the Discord handle, and the whole Stripe block
+
+**Runtime impact: YES.** A migration, a wider `SELECT`, three new render paths on the manage user
+row, and one field REMOVED from what the browser receives.
+
+Migration `0010-user-row-reference-fields` adds eleven columns to `room_users`. It was written as
+thirteen. Two of those already existed here under our own names — the reference's `user.pw` is our
+`has_password`, its `user.restrictPMUser` is our `restrict_pm_user`, differing only in case — and a
+string diff of field names cannot see a rename. Both were dropped before it shipped. `IF NOT EXISTS`
+would have made them harmless no-ops, but a migration that lists columns it does not create lies
+about what the schema gained.
+
+**Why none of this was visible before.** All three of these features were invisible to a DOM capture,
+each for a different reason, and each was previously "resolved" by reasoning from the render:
+
+1. **The four icons** — `ng-show="{{sess.fileAccessCaseByCase && user.hasFileAccess}}"` and three
+   siblings. `{{expr}}` renders the STRING `"false"` when the expression is false, and the captured
+   room had both case-by-case settings off with no users loaded. Our comment read `ng-show="false"`
+   as a literal and hardcoded all four `hidden`. A conditional that never fired is indistinguishable
+   in a render from markup that can never fire; only the source separates them.
+2. **The Discord line** — the reference gates on `user.discordUserId` and prints
+   `{{user.discordUsername}}`. Ours printed the id in both positions, so a linked member would have
+   shown a numeric snowflake where the reference shows their name. Both columns are needed and
+   neither substitutes.
+3. **The Stripe block** — `ng-if="user.isMarketPlaceUser"`. `ng-if` REMOVES the element, so it left
+   nothing behind at all. No capture could ever have contained it.
+
+**The money.** `stripeLastPaidAmount` is `BIGINT`, minor units, and renders only through
+`$lib/money`. The reference's own `formatStripeAmount` divides by 100 unconditionally, so a ¥4,999
+charge renders "49.99 JPY" — a hundredfold understatement on all sixteen Stripe zero-decimal
+currencies. A test asserts the row does not route around `formatMoney` and reintroduce it.
+
+**One field stopped being sent to the browser.** `pushTokensJson` holds FCM/APNs device tokens. The
+page needs one fact from it — is the count above zero, for the third icon — so the loader computes
+`pushTokenCount` and strips the raw column from the payload. Stripped after the filters rather than
+by rewriting them: `mobile-filter-contract.test.ts` pins those two expressions verbatim because the
+predicate they encode was read out of the reference's bundle.
+
+**An existing test had pinned the bug.** `manage-row-actions-render.test.ts` asserted the four icons
+are always present and always carry `hidden` — the old wrong reading, written as a contract. It has
+now been wrong about these icons twice in opposite directions, both times from treating a render as
+the source. Rewritten to assert what it can actually see, with that history recorded in it.
+
+**Honest gap, recorded as T5-15.** The Stripe block's sixth child is a "Details" link calling
+`openStripeDetails(user)`. That handler is in no capture, not in the template, and not among the
+handlers transcribed out of `app.min.js`. The link is NOT rendered, and a test asserts its absence so
+it cannot be closed by invention — when the evidence arrives, that test fails and names the work.
+
+`.stripe-mini` and `.mb-xs` have NO CSS rule. Checked by reading both `TIER1-fetched/styles.css`
+(218 KB) and `theme.css` (233 KB) end to end, not by searching for the names. The block's 4px gap is
+an inline style in the reference; it is one class in `manage.css` here, with that provenance in the
+comment. The five `.label-*` classes ARE real Bootstrap 3.3.7 rules, confirmed the same way.
+
+**Verified:** `svelte-check` 1481 files / 0 errors. 83 tests across the 10 files touching this change,
+all green, including 18 new ones. **Four negative controls run** — printing the Discord id again,
+dividing the amount by 100, removing a gate from an icon, and restoring the Details link — each goes
+red on exactly the assertion that should catch it, and the file returns to green when reverted.
+`backend:migrations:verify`, `privacy:verify`, `evidence:verify` and the room-settings schema
+verifier all PASS. The Svelte MCP autofixer returns clean on the changed markup.
+
+**A note on `wired`.** `fileAccessCaseByCase` and `ptrMobileAppCaseByCaseEnabled` stay `wired: false`
+in `room-settings-schema.ts` even though this page now reads them. `wired` there means "something in
+the ROOM reads it" — the union of the room-login page, `internal/room-config/[code]`, and the SSO
+door. This is the controller's own admin table, which renders all 269 settings by definition.
+Flipping either would assert to the next reader that the room honours it, which it does not.
+
+
 ### 2026-08-13 — The full gate has five PRE-EXISTING red steps; evidence seal updated for TIER1-fetched
 
 **Runtime impact: none** — a verifier's expected-directory list, an archive-map row, and docs.

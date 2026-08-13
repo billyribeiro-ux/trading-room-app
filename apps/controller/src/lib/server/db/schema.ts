@@ -1,4 +1,4 @@
-import { boolean, index, integer, pgTable, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core';
+import { bigint, boolean, index, integer, pgTable, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core';
 
 /**
  * The controller's data model, mirroring the two tiers the reference exposes:
@@ -343,6 +343,66 @@ export const roomUsers = pgTable(
      * look like protection and provide almost none. Reset on success.
      */
     mobilePairAttempts: integer('mobile_pair_attempts').notNull().default(0),
+    /*
+      The eleven fields the reference's user row reads and we did not carry. Added by migration
+      `0010-user-row-reference-fields`, which explains the column choices; this is the type side.
+
+      Measured, not guessed: every `user.*` reference in
+      `evidence-dumps/TIER1-fetched/views/page.manageSession.html:346-603` diffed against this
+      table on 2026-08-13 — 39 referenced, 24 already here, 15 absent, of which two occur only in a
+      commented-out block.
+
+      CORRECTED WHILE WRITING THIS: that measurement said thirteen. It was a STRING diff, and two of
+      the thirteen already existed here under our own names — the reference's `user.pw` is our
+      `hasPassword` (:326) and its `user.restrictPMUser` is our `restrictPmUser` (:323, differing
+      only in case). Name-based diffing cannot see a rename. **Eleven are real**, and only those
+      eleven are below; migration `0010` was corrected to match.
+    */
+
+    /** `{{sess.fileAccessCaseByCase && user.hasFileAccess}}` — the folder icon. */
+    hasFileAccess: boolean('has_file_access').notNull().default(false),
+    /** `{{sess.ptrMobileAppCaseByCaseEnabled && user.hasMobileApp}}` — the large mobile icon. */
+    hasMobileApp: boolean('has_mobile_app').notNull().default(false),
+    /**
+     * The member turned their OWN push notifications off. TRUE suppresses, and the reference
+     * paints that icon red.
+     *
+     * Named negatively because that is the reference's name and its stored sense. Renaming it to
+     * `...FcmUserOn` would read better and would silently invert every row the first time anyone
+     * synced from the reference.
+     */
+    alerterAppFcmUserOff: boolean('alerter_app_fcm_user_off').notNull().default(false),
+    /** The Discord handle, shown in red under the name. Distinct from the numeric `discordUserId`. */
+    discordUsername: text('discord_username'),
+
+    /*
+      Marketplace / Stripe.
+
+      NULLABLE on purpose, unlike the booleans above: "never subscribed" and "subscribed but no
+      payment recorded yet" are different facts, and a NOT NULL default would collapse them into
+      one. `isMarketplaceUser` is the gate the reference uses (`ng-if="user.isMarketPlaceUser"`),
+      so it stays non-null.
+    */
+    isMarketplaceUser: boolean('is_marketplace_user').notNull().default(false),
+    stripeSubscriptionStatus: text('stripe_subscription_status'),
+    stripeLastPaidAt: timestamp('stripe_last_paid_at', { withTimezone: true }),
+    stripeCurrentPeriodEnd: timestamp('stripe_current_period_end', { withTimezone: true }),
+    stripeLastPaymentFailureAt: timestamp('stripe_last_payment_failure_at', { withTimezone: true }),
+    /**
+     * Money in MINOR UNITS, `bigint` end to end — never `i32`, never a float.
+     *
+     * `mode: 'number'` is safe here and everywhere this repository handles money: JavaScript
+     * integers are exact to 2^53, which is ninety trillion dollars in cents. `money.ts` throws
+     * above `Number.MAX_SAFE_INTEGER` rather than printing a wrong number.
+     *
+     * Render it through `formatMoney(amount, currency)` and nothing else. The reference's own
+     * formatter divides by 100 unconditionally and so shows every zero-decimal currency — JPY, KRW,
+     * VND and thirteen more — a hundredfold low.
+     */
+    stripeLastPaidAmount: bigint('stripe_last_paid_amount', { mode: 'number' }),
+    /** Decides the scale for the amount above. Without it the amount cannot be rendered correctly. */
+    stripeLastPaidCurrency: text('stripe_last_paid_currency'),
+
     /** push registrations, as a JSON array of { token, platform, addedAt } */
     pushTokensJson: text('push_tokens_json').notNull().default('[]'),
     /** 'active' | 'paused' | 'unsubscribed' — PAUSE / RESUME / Remove Mobile Notifs */

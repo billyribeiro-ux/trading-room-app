@@ -112,45 +112,48 @@ describe('the row Actions button', () => {
   });
 });
 
-describe('the four ng-show="false" icons', () => {
+describe('the four conditional icons', () => {
   /*
-    `must-match/match:6-9` — they ARE in the reference's DOM, unconditionally hidden:
+    `must-match/match:6-9` shows all four in the reference's DOM carrying `ng-hide`:
 
-      <i ng-show="false" class="fa fa-folder-o fa-2x ng-hide" aria-hidden="true">
-      <i ng-show="false" class="fa fa-mobile fa-2x ng-hide" aria-hidden="true">
-      <i ng-show="false" class="fa fa-mobile ng-hide" aria-hidden="true">
-      <i ng-show="false" class="fa fa-mobile ng-hide" style="color: red" aria-hidden="true">
+      i ng-show="false" class="fa fa-folder-o fa-2x ng-hide" aria-hidden="true"
+      i ng-show="false" class="fa fa-mobile fa-2x ng-hide" aria-hidden="true"
+      i ng-show="false" class="fa fa-mobile ng-hide" aria-hidden="true"
+      i ng-show="false" class="fa fa-mobile ng-hide" style="color: red" aria-hidden="true"
 
-    This file previously asserted the opposite — that they must NOT reach the DOM — because
-    transcribing them had put a folder and two phones on screen on every row. `hidden` is only a
-    UA-stylesheet `display: none` and Font Awesome's `.fa { display: inline-block }` outranked it.
+    THIS FILE HAS NOW BEEN WRONG ABOUT THESE ICONS TWICE, in opposite directions, and both times the
+    error came from treating a render as the source.
 
-    That cause is gone: `manage.css` line 393 gives `.mg-root [hidden]` a `display: none !important`,
-    which is what Angular's own `.ng-hide` carries. So they are back, and what has to be pinned is
-    both halves — present in the markup, and provably not rendering. The second half cannot be
-    asserted from an SSR string, so it is measured in Chromium against the real stylesheet; the
-    string assertions here guard the markup only, and say so rather than implying more.
+    Round one asserted they must NOT reach the DOM at all, because transcribing them had put a
+    folder and two phones on every row — `hidden` is only a UA-stylesheet `display: none` and Font
+    Awesome's `.fa { display: inline-block }` outranked it.
+
+    Round two, after `manage.css` fixed that with `.mg-root [hidden] { display: none !important }`,
+    asserted they are ALWAYS present and ALWAYS carry `hidden` — reading `ng-show="false"` in the
+    capture as a literal.
+
+    It is not a literal. `evidence-dumps/TIER1-fetched/views/page.manageSession.html:351-354` shows
+    all four INTERPOLATE, e.g. `ng-show="{{sess.fileAccessCaseByCase && user.hasFileAccess}}"`.
+    `{{expr}}` rendered the STRING "false" because the captured room had both case-by-case settings
+    off and no users loaded. A conditional that never fired is indistinguishable in a render from
+    markup that can never fire; only the source separates them.
+
+    So the icons are conditional, and the assertions that they are unconditionally present had to
+    go — they pinned a bug. What is left here is the CSS rule, which is still load-bearing for the
+    other `hidden` elements in this page. Their real behaviour is covered gate by gate, in both
+    states, in `manage-user-row-reference-fields.test.ts`.
   */
-  it('are present, matching the reference DOM', () => {
-    const body = html([member({ role: 2 })]);
-    expect(body).toContain('fa-folder-o');
-    expect(body).toContain('fa-mobile fa-2x');
-  });
-
-  it('carry the `hidden` attribute that `.mg-root [hidden]` acts on', () => {
-    const body = html([member({ role: 2 })]);
-    // each of the four must be hidden — a bare `fa-folder-o` with no `hidden` is the old defect
-    for (const icon of ['fa-folder-o fa-2x', 'fa-mobile fa-2x']) {
-      const at = body.indexOf(icon);
-      expect(at, `${icon} must be in the row`).toBeGreaterThan(-1);
-      const tag = body.slice(body.lastIndexOf('<', at), body.indexOf('>', at) + 1);
-      expect(tag, `${icon} must be hidden`).toContain('hidden');
-    }
-  });
-
-  it('keeps the rule that makes them invisible', () => {
-    // if this rule is ever weakened, the icons come back on screen and nothing else would notice
+  it('keeps the rule that makes any `hidden` icon invisible under Font Awesome', () => {
+    // if this rule is ever weakened, hidden icons come back on screen and nothing else would notice
     const css = readFileSync(new URL('../manage.css', import.meta.url), 'utf8');
     expect(css).toMatch(/\.mg-root \[hidden\]\s*\{\s*display:\s*none\s*!important/);
+  });
+
+  it('renders none of the four for a member with no flags and a room with no case-by-case', () => {
+    /* The captured room's exact state, which is why the capture shows four hidden icons. Ours emits
+       nothing at all, which paints identically and is what `manage-user-row-sbs` compares. */
+    const body = html([member({ role: 2 })]);
+    expect(body).not.toContain('fa-folder-o fa-2x');
+    expect(body).not.toContain('fa-mobile fa-2x');
   });
 });

@@ -126,17 +126,25 @@ Every gap from the full read of `apps/controller/evidence-dumps/` now lives ther
 five tiers. **That file is the tracker — this section is only the index to it.** Do not record a
 gap's status in both places; one of them will go stale.
 
-As of 2026-08-13: **28 CLOSED, 26 OPEN, 14 parked/won't-fix, 68 total.**
+As of 2026-08-13: **30 CLOSED, 25 OPEN, 14 parked/won't-fix, 69 total.**
 
 The total GREW from 56 to 68 because reading the uncompiled templates keeps surfacing features no
 DOM capture ever rendered — a new **Tier 5**. Three need a decision from the owner, not more
 reading:
 
-- **T5-1 — an entire Stripe/marketplace subscription block on the user row.** In scope or not?
-- **T5-3 — `formatStripeAmount()`.** If it divides by 100 in JS floating point, that is exactly the
-  defect our i64-cents rule exists to prevent. Read before copying anything from it.
 - **T5-9 — the API secret is rendered in plain text** in the account-page table, and the documented
   API auth also puts `apiSecret` in the URL query string. Two inherited exposure paths.
+
+T5-1 and T5-3 were on this list and are now closed. The Stripe/marketplace block was ruled in scope
+and is built (2026-08-13), rendering through `$lib/money` rather than the reference's formatter —
+which divides by 100 unconditionally and so shows every zero-decimal currency a hundredfold low.
+
+**One genuinely missing thing came out of building it — T5-15.** The reference's Stripe block ends
+with a "Details" link whose handler is `openStripeDetails(user)`. That handler is in no capture, not
+in `views/page.manageSession.html`, and not among the handlers transcribed out of `app.min.js`. The
+link is deliberately NOT rendered, its absence is asserted by a test so it cannot be closed by
+accident, and capturing it needs a console run on a live room that actually has a marketplace
+member.
 
 Reading source also proved a gap can close as **dead markup**: the cloned-room indicator is an empty
 span in the SOURCE, so there was never anything to find (T2-9).

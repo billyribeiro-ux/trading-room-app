@@ -2,9 +2,15 @@ import { describe, expect, it } from 'vitest';
 import { formatMoney, minorUnitDigits } from './money';
 
 /**
- * The reference's own money formatter, transcribed VERBATIM from the live bundle
- * (`evidence-dumps/TIER1-fetched/app.min.js` @183815) and de-minified without changing a single
- * operation. It is here as a NEGATIVE CONTROL: several tests assert that our output differs from
+ * The reference's own money formatter, transcribed VERBATIM from the live bundle at
+ * `app.min.js` offset 183815 and de-minified without changing a single operation.
+ *
+ * The bundle is NOT in this repository — 1.7 MB of third-party minified code was read, transcribed
+ * and then dropped. The transcription is `docs/reference/evidence-dumps-full-read.md:1373`, and
+ * `evidence-dumps/TIER1-fetched/README.md` carries the URL, byte count and SHA-256 so the read can
+ * be reproduced rather than taken on trust. (This docblock cited the bundle by a path inside
+ * `TIER1-fetched/` that never existed — corrected here, because a citation that cannot be followed
+ * is indistinguishable from one that was invented.) It is here as a NEGATIVE CONTROL: several tests assert that our output differs from
  * it, and cite the reason. If someone later "simplifies" `money.ts` toward this shape, those tests
  * go red and name the bug they are reintroducing.
  */

@@ -1500,3 +1500,19 @@
   font-weight: 700;
   margin: 0 0 10px;
 }
+
+/*
+  The Stripe block's 4px top gap.
+
+  The reference carries it as an INLINE style on the div — `style="margin-top:4px;"`
+  (page.manageSession.html:366) — because its two classes, `.stripe-mini` and `.mb-xs`, have no rule
+  anywhere: neither `TIER1-fetched/styles.css` nor `theme.css` defines either, which was checked by
+  reading both rather than assumed from their names.
+
+  Lifted out of the markup into this one class so the value is in the stylesheet with the reason
+  attached, rather than repeated inline where the next reader has to guess whether 4px was captured
+  or invented. It is captured.
+*/
+.mg-root .mg-stripe-mini {
+  margin-top: 4px;
+}
