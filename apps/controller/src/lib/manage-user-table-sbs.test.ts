@@ -87,6 +87,7 @@ function ourTable() {
         landingHtml: '',
         users: USERS,
         unsupportedFilter: null,
+        visits: [],
         stats: [],
         links: { room: '', vanity: '', unique: '', registration: '', appPair: '', logo: null },
         badges: [],

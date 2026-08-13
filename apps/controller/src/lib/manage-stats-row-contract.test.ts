@@ -53,8 +53,10 @@ describe('dates on the manage page never render in the reader’s locale', () =>
     expect(SOURCE).not.toContain('toLocaleTimeString');
   });
 
-  it('routes the stats timestamp through formatLastLogin', () => {
-    expect(SOURCE).toContain('formatLastLogin(row.lastLoginAt)');
+  it('routes BOTH stats timestamps through formatLastLogin', () => {
+    /* The row is now one per ARRIVAL, so there are two stamps rather than one: In and Out. */
+    expect(SOURCE).toContain('formatLastLogin(row.joinedAt)');
+    expect(SOURCE).toContain('formatLastLogin(row.leftAt)');
   });
 
   it('routes the App PIN expiry and the token list through it too', () => {
@@ -69,7 +71,8 @@ describe('dates on the manage page never render in the reader’s locale', () =>
 describe('the stats row index is zero-based, as ngRepeat’s $index is', () => {
   it('renders the raw index, not index + 1', () => {
     expect(RAW).toContain('{#each visibleStats as row, i (row.id)}');
-    expect(SOURCE).toMatch(/\{#each visibleStats as row, i \(row\.id\)\}\s*<tr>\s*<td>\{i\}<\/td>/);
+    /* `<tr hidden={…}>` since T5-12 — the online filter hides rather than removes. */
+    expect(SOURCE).toMatch(/\{#each visibleStats as row, i \(row\.id\)\}\s*<tr hidden=\{[^}]*\}>\s*<td>\{i\}<\/td>/);
   });
 
   it('does not reintroduce the 1-based form', () => {

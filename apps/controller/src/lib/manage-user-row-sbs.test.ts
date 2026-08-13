@@ -115,6 +115,7 @@ function ourRow(): string {
         landingHtml: '',
         users: [ownerRow],
         unsupportedFilter: null,
+        visits: [],
         stats: [],
         links: { room: '', vanity: '', unique: '', registration: '', appPair: '', logo: null },
         badges: [],

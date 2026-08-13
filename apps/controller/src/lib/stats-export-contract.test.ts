@@ -20,22 +20,61 @@ const ENDPOINT = readFileSync(`${cwd}/src/routes/(app)/account/rooms/[id]/stats.
 const LOADER = readFileSync(`${cwd}/src/routes/(app)/account/rooms/[id]/[[tab]]/+page.server.ts`, 'utf8');
 const strip = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
 
-describe('the addresses are gone from the page payload', () => {
-  it('the loader no longer returns visits', () => {
-    /*
-      THE test for this whole change. `visits` was the only path by which an IP address reached the
-      browser, and a `visits:` key reappearing in the returned object is the regression.
-    */
-    const code = strip(LOADER);
-    const at = code.indexOf('return {');
-    expect(at, 'the loader must still return a payload').toBeGreaterThan(-1);
-    expect(code.slice(at)).not.toMatch(/^\s*visits\s*:/m);
+describe('visit rows reach the page ONLY on the Stats tab, and bounded', () => {
+  /*
+    ## This block used to assert the opposite, and the reversal is deliberate
+
+    `visits` was removed from this payload on 2026-08-11 after two reviews: ~755 KB of rows on every
+    load, each carrying a visitor's IP and email, on tabs that had nothing to do with either. These
+    assertions pinned that removal.
+
+    The owner ruled on 2026-08-13 that the rebuild matches the original, and the original's User
+    Stats table renders an IP, an `ip-api.com` lookup link, a browser and a duration per ARRIVAL
+    (`page.manageSession.html:739-754`). A table without them is not that table.
+
+    So what is pinned now is the SHAPE the review earned, which survives the reversal intact:
+    the rows load on ONE tab, they are BOUNDED, and the export still reads independently at request
+    time. Five sixths of the original cost came from refetching on the other five tabs, and that is
+    still gone.
+
+    ## A hole this rewrite closes
+
+    The old "the loader no longer returns visits" assertion matched `/^\s*visits\s*:/m`. It passed
+    against a payload that returns `visits` — because the key is written in SHORTHAND, `visits,`, and
+    the regex required a colon. It was the tab guard below that actually caught the change. A test
+    keyed on one of two equivalent spellings is a test that fails open.
+  */
+  const code = strip(LOADER);
+
+  it('selects room_sessions behind a tab guard, not on every load', () => {
+    const at = code.indexOf('.from(roomSessions)');
+    expect(at, 'the Stats tab needs the arrival rows').toBeGreaterThan(-1);
+    /* The guard sits immediately above the query, in the same expression. */
+    const before = code.slice(Math.max(0, at - 600), at);
+    expect(before).toContain("tab === 'stats'");
   });
 
-  it('the loader does not select roomSessions at all any more', () => {
-    const code = strip(LOADER);
-    // `stats` is computed from members, not visits; nothing on this page needs the session table.
-    expect(code).not.toContain('.from(roomSessions)');
+  it('bounds that query, because it sits behind a PAGE LOAD', () => {
+    /* An unbounded SELECT that grows with usage is a slow-motion outage. Newest first, so the cap
+       drops the oldest history rather than today's. */
+    const at = code.indexOf('.from(roomSessions)');
+    const after = code.slice(at, at + 400);
+    expect(after).toContain('.limit(5000)');
+    expect(after).toContain('desc(roomSessions.joinedAt)');
+  });
+
+  it('returns the rows under BOTH possible spellings of the key, so neither can hide it', () => {
+    /* Whichever way it is written, it is in the payload and that is the fact worth stating. */
+    const at = code.indexOf('return {');
+    expect(at, 'the loader must still return a payload').toBeGreaterThan(-1);
+    expect(code.slice(at)).toMatch(/^\s*visits\s*[,:]/m);
+  });
+
+  it('does NOT build the CSV from that capped array', () => {
+    /* The export must never be a truncated copy of whatever the page happened to load. `stats.csv`
+       reads at request time, uncapped, behind the same ownership gate. */
+    expect(strip(ENDPOINT)).toContain('.from(roomSessions)');
+    expect(strip(ENDPOINT)).not.toContain('.limit(5000)');
   });
 });
 

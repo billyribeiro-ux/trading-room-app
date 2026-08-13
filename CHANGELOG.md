@@ -24,6 +24,54 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-13
 
+### 2026-08-13 14:55 EDT — The User Stats table renders arrivals, as the original does
+
+**Runtime impact: YES.** The Stats tab now loads `room_sessions` and renders the reference's row.
+
+Owner ruling: match the original. `page.manageSession.html:739-754` renders one row per ARRIVAL —
+`statXrefs` — and ours rendered one row per PERSON, which could never match: `In`/`Out`, IP, browser
+and duration are properties of a VISIT and a member row carries none of them.
+
+Every cell is now the reference's: zero-based `$index`; avatar, name and the TRIAL badge; email with
+`IP: <a href="http://ip-api.com/#…" >… (lookup)</a>`, a mobile-or-desktop glyph and the browser;
+`In:` and `Out` in `MM/dd/yyyy @ h:mma`; and `duration / 3600` to two decimals.
+
+**The item-W privacy shape survives the reversal intact.** Those rows were removed on 2026-08-11
+after two reviews — ~755 KB per load, on every tab, each row carrying a visitor's IP and email. What
+that review earned is kept: the rows load on the **Stats tab only**, **capped at 5,000**, newest
+first, and `stats.csv` still reads **uncapped at request time** so an export is never a truncated
+copy of what the page happened to hold. Five sixths of the original cost came from refetching on the
+other five tabs; that is still gone.
+
+**The TRIAL badge needed a LEFT join, and the direction matters.** `room_sessions` has no trial
+column — a visit is not a membership — so it comes from `room_users`. LEFT, because `roomUserId` is
+null for a guest who satisfied the room's login without ever having a membership row here. `false`
+for them is the honest answer, not a missing one.
+
+**Two of our own notes were wrong, both for the same reason.** A block declared "Show Online Users
+Only" and "Show Mobile Only?" unsupported. `filterOnline` was recorded as "passed to NOTHING in the
+reference" — it is in the repeat's `ng-hide` (:739), an attribute the capture rendered as `ng-hide=""`
+on rows that happened not to be hidden. `showMobileStat` was recorded as blocked by an ambiguity that
+belongs to the USERS tab; these are `room_sessions` rows and `is_mobile` is one explicit column. All
+four checkboxes filter now, and the "not applied" notice they justified is gone with them.
+
+**The monthly roll-up was counting the wrong thing.** It counted each member's last login, so a room
+of 40 members who each visited daily reported 40 logins for the month instead of about 1,200. It
+counts arrivals now, which is what "Total Logins" means and what `statXrefsMontly` rolls up.
+
+**A negative control stayed GREEN and exposed a hole in my own test.** Rendering `Out` for an
+in-progress visit did not fail, because the assertion looked for a specific date string and
+`formatLastLogin(null)` yields an epoch date — absent for the wrong reason. It asserts the word "Out"
+now. A second one, in `stats-export-contract`, had been passing for a different wrong reason: it
+matched `/^\s*visits\s*:/m` and the payload key is written in SHORTHAND, `visits,`. A test keyed on
+one of two equivalent spellings fails open.
+
+**Verified:** `svelte-check` 1486 files / 0 errors; 805 tests across 72 files, 10 new. **Four negative
+controls run** — the online filter switched to an `{#if}`, `Out` rendered for an open visit, duration
+left in seconds, and the TRIAL badge dropped — each red on the right assertion, green on revert.
+Migrations, privacy, evidence-layout and room-settings verifiers all PASS. Autofixer clean.
+
+
 ### 2026-08-13 14:25 EDT — Five more gaps closed by reading, and a defect found in the reference itself
 
 **Runtime impact: none** — one new test file and documentation. No markup changed.

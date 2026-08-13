@@ -98,6 +98,7 @@ function renderCell(member: Partial<Member>, settings: Record<string, unknown> =
         landingHtml: '',
         users: [{ ...baseMember, ...member }],
         unsupportedFilter: null,
+        visits: [],
         stats: [],
         links: { room: '', vanity: '', unique: '', registration: '', appPair: '', logo: null },
         badges: accountBadges,

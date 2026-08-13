@@ -167,11 +167,18 @@
   /** the monthly roll-up, computed here from real logins — never invented */
   let monthly = $state<{ month: string; logins: number }[]>([]);
 
+  /*
+    `loadMontlyStats(...)` — the reference's spelling, "Montly", throughout its own scope.
+
+    Counted per ARRIVAL now rather than per member's last login, which is what "Total Logins"
+    actually means and what the reference's own `statXrefsMontly` rolls up: its source is `statXrefs`,
+    one row per entry. Counting last-logins gave each member at most one, so a room with 40 members
+    who each visited daily reported 40 logins for the month instead of ~1,200.
+  */
   function loadMonthly() {
     const byMonth: Record<string, number> = {};
     for (const row of visibleStats) {
-      if (!row.lastLoginAt) continue;
-      const key = new Date(row.lastLoginAt).toISOString().slice(0, 7);
+      const key = new Date(row.joinedAt).toISOString().slice(0, 7);
       byMonth[key] = (byMonth[key] ?? 0) + 1;
     }
     monthly = Object.entries(byMonth)
@@ -196,7 +203,20 @@
   let statsMobileOnly = $state(false);
   let statsDedupe = $state(false);
   let statsReversed = $state(false);
-  let statsLoaded = $state(false);
+  /*
+    The committed date range. `statsFrom`/`statsTo` are what the date fields hold as they are edited;
+    these are what the table filters on, and `applyStatsRange` is what moves one to the other.
+
+    Separated because the reference's dates do NOT filter as you type — they are arguments to
+    `loadStats(...)`, applied when the button is pressed. A range that filtered per keystroke would
+    also re-run the whole derivation on every character of a half-typed year.
+  */
+  let statsRangeFrom = $state('');
+  let statsRangeTo = $state('');
+  function applyStatsRange() {
+    statsRangeFrom = statsFrom;
+    statsRangeTo = statsTo;
+  }
   let logoInput: HTMLInputElement | null = null;
   // Writable derived drafts follow a different room after client navigation,
   // while user input owns each draft until its server seed actually changes.
@@ -207,18 +227,42 @@
   const permissionsTarget = $derived(data.users.find((u) => u.id === permissionsFor) ?? null);
 
 
+  /*
+    The User Stats rows — ONE PER ARRIVAL, which is what the reference's `statXrefs` is.
+
+    This derived from `data.stats`, one row per PERSON, until 2026-08-13. That could never render the
+    reference's table: `In`/`Out`, IP, browser and a duration are properties of a VISIT, and a member
+    row has none of them. `data.visits` is `room_sessions`, loaded on this tab only and capped.
+
+    ## Which filters remove rows and which merely hide them — this is not a detail
+
+    `page.manageSession.html:739` is
+        ng-repeat="userStat in statXrefs | filter: uSearchStat "
+        ng-hide="filterOnline && !userStat.isOnline"
+
+    The search REMOVES rows. "Show Online Users Only" does NOT — it is a per-row `ng-hide`, so the
+    rows are still in the table, still counted by `table-striped`'s `nth-of-type`, and the banding
+    goes visibly irregular when it is on. That is the reference's behaviour, it is recorded as T5-12,
+    and it is reproduced here rather than quietly improved: `hiddenByOnline` marks them and the
+    markup gives them `hidden`, which `.mg-root [hidden]` renders `display: none !important` — the
+    same thing Angular's `.ng-hide` does.
+
+    The other three checkboxes are arguments to `loadStats(...)` in the reference, so they filter
+    SERVER-side on reload. Ours applies them here, live, which spares a round trip and produces the
+    same set. Stated rather than silent, because it is a deliberate difference.
+  */
   const visibleStats = $derived.by(() => {
-    let rows = data.stats.filter((r) => {
-      if (!r.lastLoginAt) return false;
-      const at = new Date(r.lastLoginAt);
-      if (statsFrom && at < new Date(statsFrom)) return false;
+    let rows = data.visits.filter((r) => {
+      const at = new Date(r.joinedAt);
+      if (statsRangeFrom && at < new Date(statsRangeFrom)) return false;
       // an end date means the whole of that day, not midnight at its start
-      if (statsTo && at > new Date(new Date(statsTo).getTime() + 86_400_000 - 1)) return false;
+      if (statsRangeTo && at > new Date(new Date(statsRangeTo).getTime() + 86_400_000 - 1)) return false;
       return true;
     });
     const q = statsSearch.trim().toLowerCase();
     if (q) rows = rows.filter((r) => r.displayName.toLowerCase().includes(q) || r.email.toLowerCase().includes(q));
-    if (statsTrialsOnly) rows = rows.filter(isRoomTrial);
+    if (statsTrialsOnly) rows = rows.filter((r) => r.isFreeTrial === true);
+    if (statsMobileOnly) rows = rows.filter((r) => r.isMobile);
     if (statsDedupe) {
       const seen: string[] = [];
       rows = rows.filter((r) => {
@@ -229,6 +273,16 @@
     }
     return statsReversed ? [...rows].reverse() : rows;
   });
+
+  /** `ng-hide="filterOnline && !userStat.isOnline"`. A visit is online while it has no `leftAt`. */
+  const hiddenByOnline = (leftAt: unknown) => statsOnlineOnly && leftAt !== null;
+
+  /** `{{userStat.duration / 3600 | number: 2}}` — seconds to hours, two decimals. */
+  function visitDurationHours(joinedAt: string | Date, leftAt: string | Date | null): string {
+    if (leftAt === null) return '';
+    const seconds = (new Date(leftAt).getTime() - new Date(joinedAt).getTime()) / 1000;
+    return (seconds / 3600).toFixed(2);
+  }
 
   /**
    * What a stats date anchor prints.
@@ -255,28 +309,23 @@
 
 
   /*
-    Two of the four Stats checkboxes CANNOT filter, and say so rather than silently doing nothing.
+    ALL FOUR Stats checkboxes now filter. This block used to declare two of them unsupported, and
+    BOTH halves of that were wrong — each because it was reasoned from a DOM capture instead of the
+    source.
 
-    `statsOnlineOnly` and `statsMobileOnly` were bound to inputs and read by nothing — the exact
-    "control whose only effect is on itself" this project forbids. The two are not the same case:
+    - `filterOnline` was recorded as "passed to NOTHING in the reference … it appears in neither
+      `loadStats(...)` nor the repeat's only filter expression". Both of those are true and the
+      conclusion is still false: it appears in the repeat's `ng-hide`
+      (`page.manageSession.html:739`, `ng-hide="filterOnline && !userStat.isOnline"`). An attribute
+      the capture rendered as `ng-hide=""` on rows that happened not to be hidden.
+    - `showMobileStat` was recorded as blocked because "mobile" was ambiguous across three
+      `room_users` columns. That ambiguity is real and belongs to the USERS tab. These are
+      `room_sessions` rows, and `is_mobile` is one explicit column on them — no ambiguity to
+      resolve.
 
-    - `showMobileStat` IS a real filter in the reference: it is the sixth argument to
-      `loadStats(...)` (file2:915). But the predicate behind "mobile" is an evidence gap already
-      recorded for the Users tab, where `room_users` has three columns that could each plausibly
-      mean it and picking one would be inventing the semantics.
-    - `filterOnline` is passed to NOTHING in the reference. It appears in neither `loadStats(...)`
-      nor the repeat's only filter expression (`| filter: uSearchStat`, file2:975). On this evidence
-      it does nothing there either — but "the reference is also broken" is not a reason to ship a
-      dead control silently.
-
-    Same mechanism the Users tab already uses for its unsupported filters: the control stays, and
-    the reason is on screen.
+    `unsupportedStatsFilters` is gone with them. It was the honest thing to render while the
+    controls could not work; leaving it now would print a warning about filters that do.
   */
-  const unsupportedStatsFilters = $derived(
-    [statsOnlineOnly ? 'Show Online Users Only' : null, statsMobileOnly ? 'Show Mobile Only?' : null].filter(
-      (name): name is string => name !== null
-    )
-  );
 
   const bySection = $derived.by(() => {
     const grouped: Record<string, RoomSettingDef[]> = {};
@@ -2472,7 +2521,14 @@ Please click this link to attend: ______ unique link will be here_____
                         <span class="muted">Choose an end date</span>
                       </p>
                     </div>
-                    <button class="btn btn-md btn-info" type="button" onclick={() => (statsLoaded = true)}>
+                    <!--
+                      `loadStats(statsDate, statsDateEnd, uSearchStat, filterFT, remDupes, showMobileStat)`
+                      — in the reference this posts and repopulates `statXrefs`. Ours already holds
+                      the rows and every one of those six arguments is applied live, so the button
+                      re-applies the date range rather than fetching. It is not a no-op: `statsFrom`
+                      and `statsTo` are typed into date fields, and this is what commits them.
+                    -->
+                    <button class="btn btn-md btn-info" type="button" onclick={applyStatsRange}>
                       <i class="fa fa-user-plus" aria-hidden="true"></i> Load Stats
                     </button>
                     <!-- Export sits between Load Stats and the monthly buttons: the reference's
@@ -2544,18 +2600,11 @@ Please click this link to attend: ______ unique link will be here_____
                         &nbsp;Remove duplicates?
                       </label>
                       <!--
-                        The two filters that cannot filter say so, rather than sitting there
-                        pretending. Same mechanism the Users tab uses for Mobile / Marketplace:
-                        the control stays where the reference puts it, and the reason is on screen
-                        instead of the operator wondering why the table did not change.
+                        The "not applied" notice that used to sit here is GONE, because all four
+                        checkboxes now filter. It was honest while two of them could not — the
+                        reference has no such notice, and rendering one was a deliberate divergence
+                        with a reason. The reason expired when the reading closed it.
                       -->
-                      {#if unsupportedStatsFilters.length > 0}
-                        <p class="ta-notice">
-                          {unsupportedStatsFilters.join(' and ')}
-                          {unsupportedStatsFilters.length === 1 ? 'is' : 'are'} not applied — the room
-                          does not record what they filter on.
-                        </p>
-                      {/if}
                     </div>
                   </div>
                 </div>
@@ -2588,14 +2637,38 @@ Please click this link to attend: ______ unique link will be here_____
                 first time because only two of the three captured fieldsets were read, and both of
                 those happened to be last children.
               -->
-              {#if !statsLoaded}
+              <!--
+                The reference gates on the ROWS, not on a "loaded" flag:
+
+                  <h3 ng-hide="statXrefs.length>0 || statXrefsMontly.length>0">No results to show. …
+                  <table ng-show="!loadingUsersStats && statXrefs.length>0">
+
+                `statsLoaded` used to stand in for that, because our rows arrived only when the
+                button was pressed. They now arrive WITH the page — the loader selects them on this
+                tab — so the flag would keep a table full of real rows hidden behind a click the
+                reference never required for data it already had.
+
+                The empty-state paragraph below the heading is ours and is kept: the reference shows
+                the same heading whether the room has no visits or the chosen range has none, and
+                which of those it is matters to whoever is looking.
+              -->
+              {#if visibleStats.length === 0}
                 <h3>No results to show. Select a date above...</h3>
-                {:else if visibleStats.length === 0}
-                  <h3>No results to show. Select a date above...</h3>
+                <!--
+                  The heading ALONE by default, because that is all the reference shows
+                  (`ng-hide="statXrefs.length>0 || statXrefsMontly.length>0"`) and it is what the
+                  capture holds. `manage-sections-sbs` compares this pane element for element.
+
+                  The extra line appears only once a range has been COMMITTED and came back empty —
+                  the one case where "no results" is ambiguous between "this room has no visits" and
+                  "your dates excluded them all", and the reference shows the same heading for both.
+                -->
+                {#if statsRangeFrom || statsRangeTo}
                   <p class="muted">
                     Nothing was recorded in that range. Logins come from the room's own
                     sessions — no rows are invented to fill the table.
                   </p>
+                {/if}
                 {:else}
                   <table class="table table-striped">
                     <thead>
@@ -2607,33 +2680,70 @@ Please click this link to attend: ______ unique link will be here_____
                     </thead>
                     <tbody>
                       <!--
-                        `{{$index}}` — ZERO-based, as ngRepeat's is, and as our own user row already
-                        renders. This column was `{i + 1}`, so the stats table numbered from 1 while
-                        the user table two tabs away numbered from 0.
+                        THE ARRIVAL ROW — `page.manageSession.html:739-754`, cell for cell.
 
-                        The timestamp is `{{userStat.inTime | date:'MM/dd/yyyy @ h:mma'}}`
-                        (page.manageSession.html:748) — the format `formatLastLogin` implements. It
-                        was `toLocaleString()`, which renders the VISITOR's locale: an owner in
-                        London saw `07/08/2026, 17:05` for the same instant, day and month swapped
-                        and no meridiem. That is the exact defect `last-login-format.ts` was written
-                        to fix, still live here two tabs away from the fix.
+                        `{{$index}}` is ZERO-based, as ngRepeat's is and as our user row already
+                        rendered it. Every stamp is `date:'MM/dd/yyyy @ h:mma'`, which is what
+                        `formatLastLogin` implements — never `toLocaleString`, which renders the
+                        READER's locale and swaps day and month for an owner abroad.
 
-                        Duration stays `—` and the Email / IP cell stays plain. The reference renders
-                        `In:`/`Out` from an ARRIVAL row plus IP, browser and
-                        `{{userStat.duration / 3600 | number: 2}}`, and this table is built from
-                        member rows, which carry none of that. The arrival rows exist
-                        (`roomSessions`) but were deliberately taken OUT of this payload after two
-                        reviews — 5,000 rows each carrying a visitor's IP and email in the page HTML,
-                        `TODO.md` item W. Putting them back is the owner's call, not a silent one,
-                        and it is recorded as T5-22 rather than done here.
+                        `hidden` rather than removed for the online filter: the reference's
+                        `ng-hide="filterOnline && !userStat.isOnline"` leaves the row in the table,
+                        so `table-striped` keeps counting it and the banding goes irregular when the
+                        filter is on. Reproduced deliberately — T5-12 — because it is the original's
+                        behaviour, and `.mg-root [hidden]` is `display: none !important`, exactly
+                        what `.ng-hide` carries.
+
+                        The IP lookup is the reference's own `http://ip-api.com/#<ip>` in a new tab.
+                        Two deliberate deviations, both stated: `rel="noopener noreferrer"`, which
+                        this page already adds to its other `target="_blank"` anchor and which
+                        changes nothing visible; and nothing else. The scheme stays `http` because
+                        that is the href in the source.
+
+                        `Out` renders only for a CLOSED visit — `ng-hide="userStat.isOnline"`, and a
+                        visit is online while `leftAt` is null. Duration likewise: an open visit has
+                        no duration yet, and the reference prints an empty cell rather than a running
+                        total.
                       -->
                       {#each visibleStats as row, i (row.id)}
-                        <tr>
+                        <tr hidden={hiddenByOnline(row.leftAt)}>
                           <td>{i}</td>
-                          <td>{row.displayName}</td>
-                          <td>{row.email}</td>
-                          <td>{row.lastLoginAt ? formatLastLogin(row.lastLoginAt) : '—'}</td>
-                          <td>—</td>
+                          <td>
+                            <img
+                              class="thumb24"
+                              src={avatarPlaceholder}
+                              alt=""
+                              width="24"
+                              height="24"
+                            />{row.displayName}
+                            {#if row.isFreeTrial}
+                              <span class="badge badge-danger-chat mg-trial"> TRIAL </span>
+                            {/if}
+                          </td>
+                          <td>
+                            {row.email}
+                            <br />
+                            IP: <a
+                              href={`http://ip-api.com/#${row.ip ?? ''}`}
+                              target="_blank"
+                              rel="noopener noreferrer">{row.ip ?? ''} (lookup)</a
+                            >
+                            <br />
+                            {#if row.isMobile}
+                              <i class="fa fa-mobile" aria-hidden="true"></i>
+                            {:else}
+                              <i class="fa fa-desktop" aria-hidden="true"></i>
+                            {/if}&nbsp;
+                            {row.browser ?? ''}
+                          </td>
+                          <td>
+                            In: {formatLastLogin(row.joinedAt)}
+                            <br />
+                            {#if row.leftAt !== null}
+                              <span>Out {formatLastLogin(row.leftAt)}</span>
+                            {/if}
+                          </td>
+                          <td>{visitDurationHours(row.joinedAt, row.leftAt)}</td>
                         </tr>
                       {/each}
                     </tbody>

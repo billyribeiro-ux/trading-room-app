@@ -121,6 +121,7 @@ function renderPage(over: {
         users: over.users ?? [member],
         rosterCount: over.rosterCount ?? 1,
         unsupportedFilter: null,
+        visits: [],
         stats: [],
         links: { room: '', vanity: '', unique: '', registration: '', appPair: '', logo: null },
         badges: [],

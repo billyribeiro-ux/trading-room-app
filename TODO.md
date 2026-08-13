@@ -126,7 +126,13 @@ Every gap from the full read of `apps/controller/evidence-dumps/` now lives ther
 five tiers. **That file is the tracker — this section is only the index to it.** Do not record a
 gap's status in both places; one of them will go stale.
 
-As of 2026-08-13 14:25 EDT: **41 CLOSED, 24 OPEN, 14 parked/won't-fix, 78 total.**
+As of 2026-08-13 14:55 EDT: **42 CLOSED, 23 OPEN, 14 parked/won't-fix, 78 total.**
+
+**T5-22 closed by owner ruling: match the original.** The User Stats table renders one row per
+ARRIVAL with IP, lookup link, browser, In/Out and duration. What the 2026-08-11 privacy review
+earned survives intact — the rows load on the Stats tab ONLY, capped at 5,000, newest first, and
+the uncapped export still reads at request time. Five sixths of that review's cost came from
+refetching on the other five tabs, and that is still gone.
 
 Five more closed by reading `page.manageSession.html:773-912` — **T2-12** (webinar Date row and the
 email preview), **T2-13** (SEVEN password rows, not three), **T2-16** (the App Pair Link value really
