@@ -2927,8 +2927,16 @@ Please click this link to attend: ______ unique link will be here_____
                     ></form>
                   {/if}
 
+                  <!--
+                    `href="/public/html/api-docs.html?src=/public/html/POST_ROUTE_API_DOCUMENTATION.md"`
+                    — page.manageSession.html:1695. The reference serves TWO documents through one
+                    viewer, and this button opens the POST ROUTES one. Ours pointed at
+                    `/account/api-docs`, which is the OTHER document — the Sessions API reference the
+                    account page's "API Docs" button opens. A button whose label named a document it
+                    did not open.
+                  -->
                   <p class="form-control-static">
-                    <a class="btn btn-default" target="_blank" rel="noopener noreferrer" href={resolve('/(app)/account/api-docs')}>
+                    <a class="btn btn-default" target="_blank" rel="noopener noreferrer" href={resolve('/(app)/account/api-post-routes')}>
                       API POST Routes Docs
                     </a>
                   </p>

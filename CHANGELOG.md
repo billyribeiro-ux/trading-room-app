@@ -24,6 +24,52 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-13
 
+### 2026-08-13 16:39 EDT — The "API POST Routes Docs" button opened the wrong document
+
+**Runtime impact: YES** — a new documentation route, and the manage button now opens the document its
+label names.
+
+Reading `page.manageSession.html:1686-1696` turned up something no screenshot would show. The
+reference serves **two** documentation pages through one viewer:
+
+    account page   api-docs.html?src=/public/html/API_Documentation.md          "API Docs"
+    manage tab     api-docs.html?src=/public/html/POST_ROUTE_API_DOCUMENTATION.md
+                                                                  "API POST Routes Docs"
+
+**Both of ours pointed at `/account/api-docs`.** So the button labelled "API POST Routes Docs" opened
+the Sessions API reference. It rendered fine, the page looked complete, and the only thing wrong was
+that it was the other document — which is exactly the class of defect that survives review.
+
+We already had the right file: `TIER1-fetched/api-post-routes.md`, 20,699 bytes, fetched as T1-5 and
+SHA-pinned. It was captured hours ago and never wired to anything.
+
+**Generated, not transcribed.** `scripts/extract-api-post-routes.mjs` converts the markdown into
+`content/api-post-routes.ts`, following the pattern `extract-manage-schema.mjs` already sets: the
+evidence stays the single source of truth and the script is the only thing that transforms it.
+Retyping 729 lines by hand is how an endpoint name drifts out of step with the API it documents —
+which is the reasoning already written at the top of `api-docs.ts`.
+
+**The converter fails loud.** I surveyed the document's constructs BEFORE writing it — h1-h4,
+paragraphs, bullets, ordered lists, tables, fenced code, bold, inline code, and no links, italics,
+images or blockquotes. It handles exactly those and THROWS on anything else. A converter that
+silently skips what it does not understand produces a document that looks complete and is not, which
+is the same failure as the button it is fixing.
+
+Output verified against the survey rather than against itself: 1 h1, 12 h2, 51 h3, 11 h4, 37 code
+blocks, 2 tables — every count taken from the source before the converter existed.
+
+**A test assertion of mine was wrong again.** I asserted the output contains `&lt;`, reasoning that a
+729-line API document is full of angle brackets. It has **zero** `<` and `>`, and exactly one `&` —
+in "Logging & Analytics". Asserting a construct the document does not contain is a test that can only
+fail or be deleted, and neither tells you anything about escaping. It now asserts the measured
+property: the one ampersand arrives as `&amp;`, and the escaper is not a no-op that merely looks
+right on this input.
+
+**Verified:** `svelte-check` 1501 files / 0 errors; 870 tests across 82 files, 10 new. Two negative
+controls run — the button repointed at the old route, and the generated file made stale — each red on
+the right assertion. Generation is deterministic across two runs. Register **57 CLOSED, 12 OPEN, 13
+parked, 82 total**, tally test-checked.
+
 ### 2026-08-13 16:32 EDT — I reported a built feature as missing, for the second time today
 
 **Runtime impact: none** — a register correction. No code changed.
