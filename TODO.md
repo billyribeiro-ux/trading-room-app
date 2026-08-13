@@ -126,7 +126,20 @@ Every gap from the full read of `apps/controller/evidence-dumps/` now lives ther
 five tiers. **That file is the tracker — this section is only the index to it.** Do not record a
 gap's status in both places; one of them will go stale.
 
-As of 2026-08-13 14:55 EDT: **42 CLOSED, 23 OPEN, 14 parked/won't-fix, 78 total.**
+As of 2026-08-13 15:10 EDT: **42 CLOSED, 23 OPEN, 14 parked/won't-fix, 78 total.**
+
+**The settings surface of `page.manageSession.html` is now proven complete by machine.** Every live
+`saveSessField('x')` and `editable-*="sess.x"` in that template — 267 names — is present in our
+269-setting schema, with ZERO missing. The schema was extracted from a DOM capture and had never
+been compared against the source it was not built from; it holds exactly. Pinned by
+`settings-schema-covers-template.test.ts`, with a negative control run.
+
+**T5-24 is BLOCKED on one word from you.** The reference's WordPress shortcode row prints the
+room's live JWT signing secret. Ours prints an empty key, which makes the shortcode unusable:
+paste it into WordPress and every SSO handoff fails because the plugin signs with nothing.
+Matching the original means rendering a real credential on the Settings tab, and the safety
+classifier refused the edit because "match the original" never specifically named this secret.
+It needs your explicit go-ahead, naming it.
 
 **T5-22 closed by owner ruling: match the original.** The User Stats table renders one row per
 ARRIVAL with IP, lookup link, browser, In/Out and duration. What the 2026-08-11 privacy review

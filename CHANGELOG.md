@@ -24,6 +24,41 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-13
 
+### 2026-08-13 15:10 EDT — The settings schema is proven complete against the source it was never built from
+
+**Runtime impact: none** — one new test file and documentation.
+
+`room-settings-schema.ts` was extracted from a DOM CAPTURE of the manage page. Every surprise this
+session has come from the difference between a capture and the SOURCE: four icons whose `ng-show`
+interpolated, a Stripe block behind an `ng-if`, a Select All label with a second span. So the
+extraction had never been checked against the thing most likely to contradict it.
+
+It holds exactly. Every live `saveSessField('x')` and `editable-*="sess.x"` in
+`page.manageSession.html` — **267 names — is present in our 269, with ZERO missing.** The two extras
+reconcile: `description` is live but bound by `ng-model` on the textAngular editor, so neither
+spelling catches it; `roomType` is the one documented product deviation, whose row is commented out
+in the reference. 267 + 2 = 269.
+
+**Eight names are absent from our schema and none of them is a gap** — `chatAutoClearTime`,
+`customRoomURL`, `linkedStreamsToSession`, `media_server_audio`, `relay_to_repeaters`,
+`relay_user_max`, `useV4`, `webinarTZ`. All eight appear ONLY inside commented-out markup, the same
+situation as `fcmTokens`/`fcmUnreged` on the user row. Counting them would have sent the next person
+implementing eight settings nothing renders. They are named individually in the test rather than
+absorbed into a count, so a ninth — or one of these being switched back on in a re-fetch — is visible.
+
+The test also asserts the extracted set is 267 before comparing, because a regex that stops matching
+would make every other assertion pass while comparing two empty sets.
+
+**T5-24 is blocked and needs an explicit decision.** The reference's WordPress shortcode row prints
+the room's own signing key, and unlike the JWT rows above it, that row is ungated. Ours prints an
+empty value there, which makes the shortcode **unusable**: pasted into WordPress, the plugin signs
+with nothing and every SSO handoff fails. Matching the original means rendering that value on the
+Settings tab. The safety classifier refused the edit, correctly — the "match the original" ruling was
+general and never named this field. Not worked around. It needs a go-ahead that names it.
+
+**Verified:** `svelte-check` 1487 files / 0 errors; 810 tests across 73 files, 5 new. One negative
+control run — a real setting removed from the schema turns two assertions red.
+
 ### 2026-08-13 14:55 EDT — The User Stats table renders arrivals, as the original does
 
 **Runtime impact: YES.** The Stats tab now loads `room_sessions` and renders the reference's row.
