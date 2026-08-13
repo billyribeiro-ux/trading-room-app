@@ -24,7 +24,87 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-13
 
-### 2026-08-13 15:25 EDT — Read through :1162; one non-settings structure found missing
+### 2026-08-13 14:40 EDT — Every timestamp I wrote today was wrong, and so were all four gap counts
+
+**Runtime impact: none** — documentation and one new test.
+
+Asked to make sure the records were up to date and stamped, I audited them instead of appending to
+them. Two things were wrong, both mine, and both are the kind that look fine until somebody checks.
+
+**Every one of today's thirteen entries carried an estimated time.** This file's own rule is that
+each time "is either a git commit timestamp or a measurement taken at that moment — none is
+estimated". I estimated all of them. Twelve were wrong by 3 to 100 minutes, and the four most recent
+were stamped in the FUTURE — up to 15:55 EDT on a file being written at 14:36. Corrected against
+`git log --date=format-local`, entry by entry:
+
+    15:55 -> 14:15   15:25 -> 14:01   15:10 -> 13:59   14:55 -> 13:42
+    14:25 -> 13:16   14:05 -> 13:13   13:40 -> 12:48   13:05 -> 12:31
+    12:52 -> 12:27   12:38 -> 12:24   12:22 -> 12:15   11:58 -> 12:01
+
+Only one — 12:05 — was already right, and that was luck. The same estimates had been copied into
+`TODO.md`, the gap register and the full-read doc; 16 further stamps corrected there.
+
+**All four numbers in the TODO tally were wrong.** It read "42 CLOSED, 24 OPEN, 14 parked, 79 total"
+against an actual **46 / 22 / 13 / 81**. Not one of them was right. They had been maintained by hand,
+adjusted from memory each time an item closed — the precise failure both documents warn about in
+their own words: two places recording the same thing is how one of them goes stale.
+
+**Counting them correctly took three attempts, which is the point.** The register's rows do not share
+a shape: Tier 0 puts status in the third cell, Tiers 1/2/5 in the last, several rows contain a
+literal `\|` inside a code span that shreds a naive split, and **Tier 4 rows carry no status word at
+all** because their section heading is "Tier 4 — won't fix". The first parse reported 26 open and 14
+unclassified; the second, 22 open and 5 unclassified; only the third, which reads the Tier 4 heading
+as the status, classifies all 81.
+
+`evidence-gap-register-counts.test.ts` now recounts on every run and asserts `TODO.md` states exactly
+those numbers. It also asserts no row is left unclassified — an unclassified row is a silent
+undercount, and that is what hid the Tier 4 five — and that the row count is above 70, because a
+regex that stopped matching would report zeros that agree with a TODO line also saying zero.
+
+**Verified:** 4 new tests; one negative control run — a tally off by one turns it red. `svelte-check`
+1489 files / 0 errors, 821 tests across 75 files.
+
+### 2026-08-13 14:15 EDT — The rects completion proof stops depending on /tmp
+
+**Runtime impact: none** — two evidence tables committed, their citations corrected, one new test.
+
+`evidence-dumps-full-read.md` claims all 11 `rects-*.json` captures were read, and backs it with a
+deduplication argument resting on two derived tables. **Both lived in `/tmp`.** A proof whose evidence
+is one reboot from disappearing is an assertion — and an assertion about unread evidence is exactly
+what PR #12 was opened to revert. That PR was closed unmerged on 2026-08-12 with "reading the 41
+files instead of reverting them, which is the better resolution of the same rule". This is the other
+half of that bargain: the reading is recorded AND it stays checkable.
+
+`docs/reference/rects-vocab.txt` (69 lines) and `docs/reference/rects-deltas.txt` (368 lines) are now
+committed **byte for byte**, with no header added to either — precisely so their digests stay
+meaningful. Both were read in full before committing.
+
+**Every number the prose depends on reconciles against the files as committed.** The vocabulary table
+is exactly 69 property lines. The delta table is 4 header lines plus 182 bindings at 2 lines each =
+368. `rects-completion-proof.test.ts` pins the digests, both counts, the per-line shape of the
+vocabulary table, and that the doc cites repository paths rather than `/tmp`.
+
+**The proof's LIMITS are now written down, and a test keeps them written down.** It is a
+deduplication argument, not a line-by-line pass over 3,483 element records, and the dedup keys decide
+what "distinct" means. Element ORDER and parent/child nesting collapse under those keys — so the
+tables establish the design vocabulary and the style bindings, and say nothing about document
+structure. Where structure matters, the source templates are the evidence. Somebody will otherwise
+cite this proof for something it does not support, so the test fails if the caveat is edited out.
+
+**PR #12, for the record.** It was never blocked: `mergeable: MERGEABLE`, `mergeStateStatus: CLEAN`,
+not a draft, no failing check. Opened 23:41:57Z, Vercel preview green at 23:42:00Z, closed by the
+owner at 23:42:10Z — thirteen seconds — unmerged and deliberately. The commit it would have reverted,
+`d6b0b3f`, is still in `main`; the evidence tree is intact and `evidence:verify` passes.
+
+Of the 42 files under `NEXT-STEP/gaps/`, 32 are cited by name in the read record; the other 10 are the
+`rects-*.json` captures covered by the proof above. Two derived tables in `/tmp` were the only thing
+standing between that and a durable record.
+
+**Verified:** `svelte-check` 1488 files / 0 errors; 817 tests across 74 files, 7 new. Two negative
+controls run — a line deleted from the delta table, and the caveat edited out of the doc — each red
+on the right assertion, green on revert. Privacy and evidence-layout verifiers PASS.
+
+### 2026-08-13 14:01 EDT — Read through :1162; one non-settings structure found missing
 
 **Runtime impact: none** — documentation only.
 
@@ -47,7 +127,7 @@ and editable; what is missing is the derived sample link.
 T5-25 (this) both match the original only by rendering a secret the room owns. Both are recorded with
 the exact markup, so either can be built in minutes once the call is made. Neither was worked around.
 
-### 2026-08-13 15:10 EDT — The settings schema is proven complete against the source it was never built from
+### 2026-08-13 13:59 EDT — The settings schema is proven complete against the source it was never built from
 
 **Runtime impact: none** — one new test file and documentation.
 
@@ -82,7 +162,7 @@ general and never named this field. Not worked around. It needs a go-ahead that 
 **Verified:** `svelte-check` 1487 files / 0 errors; 810 tests across 73 files, 5 new. One negative
 control run — a real setting removed from the schema turns two assertions red.
 
-### 2026-08-13 14:55 EDT — The User Stats table renders arrivals, as the original does
+### 2026-08-13 13:42 EDT — The User Stats table renders arrivals, as the original does
 
 **Runtime impact: YES.** The Stats tab now loads `room_sessions` and renders the reference's row.
 
@@ -130,7 +210,7 @@ left in seconds, and the TRIAL badge dropped — each red on the right assertion
 Migrations, privacy, evidence-layout and room-settings verifiers all PASS. Autofixer clean.
 
 
-### 2026-08-13 14:25 EDT — Five more gaps closed by reading, and a defect found in the reference itself
+### 2026-08-13 13:16 EDT — Five more gaps closed by reading, and a defect found in the reference itself
 
 **Runtime impact: none** — one new test file and documentation. No markup changed.
 
@@ -182,7 +262,7 @@ to anyone who can see the Settings tab. Same family as T5-9, and the same decisi
 **Verified:** `svelte-check` 1485 files / 0 errors; 793 tests across 71 files, 4 new.
 
 
-### 2026-08-13 14:05 EDT — Four gaps closed by reading; three live locale bugs and an off-by-one fixed
+### 2026-08-13 13:13 EDT — Four gaps closed by reading; three live locale bugs and an off-by-one fixed
 
 **Runtime impact: YES** — four date renderings and one index on the manage page.
 
@@ -237,7 +317,7 @@ and the index back to 1-based — each red on the right assertion, green on reve
 and room-settings verifiers PASS.
 
 
-### 2026-08-13 13:40 EDT — Reading the manage header found a button that destroyed configuration
+### 2026-08-13 12:48 EDT — Reading the manage header found a button that destroyed configuration
 
 **Runtime impact: YES.** A migration, a schema column, a fixed form action, and two corrected numbers
 in the panel title.
@@ -292,7 +372,7 @@ the Select All label back to one-sided — each red on the right assertion, gree
 `backend:migrations:verify` and `privacy:verify` PASS. Collector smoke test still green.
 
 
-### 2026-08-13 13:05 EDT — Four templates read end to end; two whole pages found missing
+### 2026-08-13 12:31 EDT — Four templates read end to end; two whole pages found missing
 
 **Runtime impact: none** — evidence documents only. No code changed, deliberately.
 
@@ -338,7 +418,7 @@ opened and read, and the two "not built" claims are the result of searching both
 distinct identifiers.
 
 
-### 2026-08-13 12:52 EDT — Two register items closed by READING: `btn-small` is inert, and `mobilePairCode` was never missing
+### 2026-08-13 12:27 EDT — Two register items closed by READING: `btn-small` is inert, and `mobilePairCode` was never missing
 
 **Runtime impact: none** — six tests and three documents. No markup changed.
 
@@ -377,7 +457,7 @@ run — `btn-small` changed to `btn-sm`, and APPROVE shown regardless of invite 
 right assertion, green on revert.
 
 
-### 2026-08-13 12:38 EDT — The member's badges, on the row where the reference paints them
+### 2026-08-13 12:24 EDT — The member's badges, on the row where the reference paints them
 
 **Runtime impact: YES.** A new block in the user row's identity cell, and three CSS rules.
 
@@ -421,7 +501,7 @@ the TRIAL span — each goes red on exactly the assertion that should catch it, 
 Privacy, evidence-layout and room-settings verifiers PASS. Svelte MCP autofixer clean.
 
 
-### 2026-08-13 12:22 EDT — The T5-15 collector, and a hole it found in a guard already run on production
+### 2026-08-13 12:15 EDT — The T5-15 collector, and a hole it found in a guard already run on production
 
 **Runtime impact: none** — two console scripts, a smoke test, and docs. Nothing the site serves.
 
@@ -509,7 +589,7 @@ grant, and emitting the divider unconditionally — each goes red on exactly the
 catch it, green again on revert. Svelte MCP autofixer clean.
 
 
-### 2026-08-13 11:58 EDT — The user row's eleven missing fields: four conditional icons, the Discord handle, and the whole Stripe block
+### 2026-08-13 12:01 EDT — The user row's eleven missing fields: four conditional icons, the Discord handle, and the whole Stripe block
 
 **Runtime impact: YES.** A migration, a wider `SELECT`, three new render paths on the manage user
 row, and one field REMOVED from what the browser receives.

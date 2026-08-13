@@ -100,7 +100,7 @@ Element counts: baseline 124, tab_Users 124, and up to 1265 (settings_dont-touch
 Distinct computed-style strings: 428. Distinct identity+rect+text lines: 2445.
 Distinct (property,value) pairs across ALL 11 files: 778, in 69 property lines — ALL READ.
 
-### THE COMPLETE DESIGN VOCABULARY (read from /tmp/rects-vocab.txt, every value)
+### THE COMPLETE DESIGN VOCABULARY (read from docs/reference/rects-vocab.txt, every value)
 font-family: ONLY 2 in the entire capture —
   "Helvetica Neue", Helvetica, Arial, sans-serif   and   FontAwesome
   => no custom webfont anywhere on this page.
@@ -158,10 +158,42 @@ topnav a.icon           color rgb(255,255,255); FontAwesome; padding 15px; .fa-2
 ### rects-*.json COMPLETION PROOF
 - All 2445 distinct identity+rect+text lines: verified 0 of them are absent from the state
   renders I read line-by-line (checked by tag+rect+text key). So every element identity was read.
-- All 778 distinct (property,value) pairs: read in the 69-line vocabulary table.
+- All 778 distinct (property,value) pairs: read in the 69-line vocabulary table,
+  `docs/reference/rects-vocab.txt`.
 - All 182 distinct (tag+class -> non-geometry computed style) bindings: read in the
-  368-line delta table (/tmp/rects-deltas.txt), against a stated page default.
+  368-line delta table, `docs/reference/rects-deltas.txt`, against a stated page default.
 => ALL 11 rects-*.json FILES READ.
+
+#### The two derived tables are IN THE REPOSITORY, and why that matters (2026-08-13 14:15 EDT)
+
+Both tables lived in `/tmp` until today, which meant this proof was one reboot away from being an
+unverifiable assertion — the exact shape of claim PR #12 was opened to revert. They are now committed
+verbatim, byte for byte, with no header added so their digests stay meaningful:
+
+    rects-vocab.txt    69 lines   6a241dcaa97cb43f…
+    rects-deltas.txt  368 lines   87364da557266184…
+
+Every count above reconciles against the files as committed: the vocabulary table is exactly 69
+property lines, and the delta table is 4 header lines plus 182 bindings at 2 lines each = 368.
+
+#### What this proof DOES and DOES NOT cover — read this before relying on it
+
+It is a DEDUPLICATION argument, not a line-by-line pass over 3,483 element records. Its force comes
+from the keys: every distinct element identity (tag+rect+text), every distinct (property,value) pair,
+and every distinct (tag+class -> computed style) binding was read.
+
+That is sound for the design vocabulary and the style bindings, and it is a far stronger claim than
+"read one file and infer the rest". But the keys decide what "distinct" means, and two things fall
+outside them:
+
+- **Element ORDER**, and **parent/child nesting**. Two elements identical in tag, class, rect and text
+  collapse to one row, so the tables say nothing about the sequence they appear in or what contains
+  what.
+- Anything varying ONLY in a dimension not in a key.
+
+So: the rects captures are fully read for what they are usually consulted for — colours, spacing,
+fonts, component tokens. Document STRUCTURE is not established by these tables, and where structure
+matters the source templates under `TIER1-fetched/views/` are the evidence, not these.
 
 More component tokens (from the delta table):
 .modal-content   padding 20px; border 1px solid rgba(0,0,0,0.2); radius 6px;
@@ -1419,7 +1451,7 @@ is inherited by anything that copies `gravatar-src-once` verbatim.
 
 ---
 
-## PART 4 — the four small `views/` templates, read END TO END (2026-08-13 13:05 EDT)
+## PART 4 — the four small `views/` templates, read END TO END (2026-08-13 12:31 EDT)
 
 All four are short enough to read whole, and all four were read whole. Together they are 255 lines
 off T5-7. Nothing below is from a search.
