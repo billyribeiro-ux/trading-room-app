@@ -24,6 +24,58 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-13
 
+### 2026-08-13 12:22 EDT — The T5-15 collector, and a hole it found in a guard already run on production
+
+**Runtime impact: none** — two console scripts, a smoke test, and docs. Nothing the site serves.
+
+`apps/controller/scripts/collect-stripe-details.js` closes T5-15: what does the Stripe block's
+"Details" link open? The obvious approach is to find a marketplace member and click it. This does not
+do that. The manage page is AngularJS 1.3 with **debug info enabled** — the captures carry 324
+`ng-scope` classes — so `String(scope.openStripeDetails)` returns the handler's OWN SOURCE. That is
+better evidence than a screenshot: it names the template, the fields and the modal library, it works
+on a room with zero marketplace members, and it needs no clicks at all. The script then follows any
+`templateUrl` that source names. Capturing the rendered block and modal is corroboration, not the
+finding, and runs only if the page happens to have a marketplace member.
+
+It captures `getStripeStatusClass` and `formatStripeAmount` too, deliberately. Those were transcribed
+by hand out of the minified bundle and are already in the full-read doc — so they are the CONTROL. If
+the script's copies match, the transcription method is validated and `openStripeDetails`, read the
+same way, can be trusted. If they differ, the transcription is wrong and that is the more urgent
+finding.
+
+**Personal data is redacted to its SHAPE before it is written.** A marketplace member is a paying
+customer: emails, `cus_`/`sub_`/`pi_` Stripe ids and long digit runs become `«email 21 chars»` and
+`«cus_id 22 chars»`. Not a blanket placeholder — an honest gap has to stay distinguishable from an
+empty value, and shape is what a rebuild needs.
+
+**THE FINDING: `collect-manage-gaps.js`'s click guard did not work, and it has already been run on
+production.** Its denylist is `\b(delete|remove|upload|…)\b`, and `\bdelete\b` does NOT match
+`deleteParticipant` — the `\b` after `delete` needs a non-word character and finds `P`. Every handler
+in this codebase is camelCase, so `sendWelcomeEmail`, `removeBadgesForUsers` and `deleteApiKey` were
+all invisible to it. It never fired by luck rather than by design: that script only clicks tabs and
+disclosure toggles, so it never reached one.
+
+Found because the new script's smoke test EXERCISES the guard rather than describing it — it runs the
+collector a second time against a Details link named `openStripeDetailsAndSendReceipt` and asserts the
+click is refused. The first run of that assertion failed, which is the negative control arriving on
+its own.
+
+Fixed in both by splitting camelCase before the denylist reads the text, which preserves the original
+anti-false-positive intent: `banUser` becomes `ban User` and matches, `banner` stays `banner` and does
+not.
+
+**Audited the other four collectors rather than assuming.** `collect-manage-states.js`,
+`collect-export-controls.js` and `apps/room/scripts/ptr-collect.js` were already safe — they use
+unanchored patterns or `String.includes`, which match inside an identifier. `collect-everything.js`
+had a NARROWER version of the same hole: four of its words carry a trailing `\b` (`play\b`, `post\b`,
+`ban\b`, `pay\b`), deliberately, to stop `ban` matching `banner` — and those four also missed
+`banUser`, `payInvoice`, `postMessage` and `playStream`. Hardened the same way, with the fix proven on
+all six strings including the two that must NOT match.
+
+**Verified:** both smoke tests pass; `node --check` on all three modified scripts. The camelCase fix
+has its negative control on record — the assertion failed before it and passes after.
+
+
 ### 2026-08-13 12:05 EDT — The two per-member grants: the writers the new icons had no way to reach
 
 **Runtime impact: YES.** One new form action, one new server function, four menu items.

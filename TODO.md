@@ -142,9 +142,14 @@ which divides by 100 unconditionally and so shows every zero-decimal currency a 
 **One genuinely missing thing came out of building it — T5-15.** The reference's Stripe block ends
 with a "Details" link whose handler is `openStripeDetails(user)`. That handler is in no capture, not
 in `views/page.manageSession.html`, and not among the handlers transcribed out of `app.min.js`. The
-link is deliberately NOT rendered, its absence is asserted by a test so it cannot be closed by
-accident, and capturing it needs a console run on a live room that actually has a marketplace
-member.
+link is deliberately NOT rendered and its absence is asserted by a test so it cannot be closed by
+accident.
+
+**The script to close it is written and smoke-tested:** `apps/controller/scripts/collect-stripe-details.js`.
+Paste it into the Chrome console on the live manage page and it downloads the JSON by itself. It does
+NOT need a marketplace member and does NOT click anything — the manage page is AngularJS with debug
+info enabled, so it reads `String(scope.openStripeDetails)` off the scope chain and then fetches
+whatever template that source names. Everything else it does is corroboration.
 
 Reading source also proved a gap can close as **dead markup**: the cloned-room indicator is an empty
 span in the SOURCE, so there was never anything to find (T2-9).
