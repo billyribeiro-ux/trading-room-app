@@ -1416,3 +1416,93 @@ otherwise `md5(src)` is applied.
 user's email is MD5-hashed in the browser and sent to gravatar.com** on every render of the users
 table and the stats table. That is a third-party data flow the captures never made visible, and it
 is inherited by anything that copies `gravatar-src-once` verbatim.
+
+---
+
+## PART 4 — the four small `views/` templates, read END TO END (2026-08-13 13:05 EDT)
+
+All four are short enough to read whole, and all four were read whole. Together they are 255 lines
+off T5-7. Nothing below is from a search.
+
+### `views/page.stats.html` — 100 lines. The CHART page, not the manage stats table.
+
+Almost the entire file is commented out: a "Realtime" panel with a flot chart and an update-interval
+input (:7-24), and a Bar/Pie row (:71-96). What actually renders is four things:
+
+1. `panel-title` "Historical" followed by THREE `&nbsp;` and a bare `<select>`.
+2. **That select is doubly inert, and both halves are the reference's own bugs.** It has no
+   `ng-model`, so nothing reads it — and all FOUR options carry `value="hourly"`:
+   `<option value="hourly">Hourly</option>` … `Daily` … `Weekly` … `Monthly`. Even if something read
+   it, every choice submits the same value. Do not "fix" either half when rebuilding; record it.
+3. `<flot dataset="userStatsData" options="userStatsDataOptions">` — EMPTY in the template. The
+   chart is built at runtime by the flot directive, so the dataset shape is not in this file.
+4. The download control:
+   `<a ng-href="/users/v1/sessions/stats/{{sessionID}}/{{tok}}" button class="btn btn-oval btn-info" download="{{sessionID}}.json">Download</a>`
+   Note the stray bare `button` attribute on an anchor — meaningless, and present in the source.
+   The endpoint returns **JSON**, named `{{sessionID}}.json`. Ours exports **CSV** from
+   `account/rooms/[id]/stats.csv` — a different route and a different format.
+
+`.btn-oval` IS a real rule (`styles.css`:41810), shared with `.btn-pill-left`:
+`border-top-left-radius: 50px; border-bottom-left-radius: 50px; padding-left: 18px`.
+
+### `views/users.html` — 37 lines. The room ROSTER, `UsersCtrl`.
+
+`<container-fh>` custom element wrapping the `l-table-fixed` / `l-cell` / `l-table` layout scaffold.
+Heading `<div class="p bt">Participants</div>`. One `<ul ng-repeat="user in roster" class="list-block">`
+— note the repeat is on the `<ul>`, so each roster entry gets its OWN list, not one list of items.
+
+Per entry: a `.point-pin` wrapper holding an avatar `<img class="media-object img-circle thumb40">`
+with `ng-src="{{::user.avatar || 'app/img/user/user.png' }}"` and `alt="Image"`, plus a sibling
+`<div class="point point-success point-lg">` — the online dot. Then `.media-body` with
+`{{::user.nick}}` and `<small class="text-muted">{{::user.tagline || 'Trader'}}</small>`.
+
+**`::` one-time bindings throughout** — avatar, nick and tagline never update after first render.
+`'Trader'` is the tagline default and `app/img/user/user.png` the avatar default.
+
+### `views/page.recordings.html` — 27 lines. `LoginCtrl`, container at `width: 70%`.
+
+Empty state: `<li ng-hide="recs.length>0">No Recordings...</li>` — a BARE `<li>` with **no**
+`list-group-item` class, unlike the populated rows. Three dots, capital N and R.
+
+Populated row: `<li class="list-group-item" ng-hide="recs.length==0" ng-repeat="rec in recs">`. The
+`ng-hide` is redundant beside the `ng-repeat` — an empty array renders nothing regardless — but it is
+there.
+
+- `<h4>` with `fa-file-video-o`, then `{{::rec.created | date:'MM/dd/yyyy @ h:mma' }}` — **the exact
+  format our `formatLastLogin` already implements** — then `fa-clock-o` and
+  `{{(rec.length/60000) | number:2}} Minutes`. So `rec.length` is MILLISECONDS, shown to two decimals.
+- `<video ng-src="{{rec.vidPath}}" controls type="{{rec.contentType}}" width="640">` — `type` on the
+  `<video>` element itself, which is not valid HTML (it belongs on a `<source>`), and `width` with NO
+  height.
+- Download: `<a ng-href="{{::rec.vidPath}}" target="_blank" download="{{rec.name}}" class="btn btn-default">`
+  with `fa-cloud-download`.
+- **A DEAD CONTROL IN THE REFERENCE:** `<a href="" class="btn btn-default"><i class="fa fa-share"></i> Share</a>`
+  — no `ng-click`, no `ng-href`, no handler of any kind. It renders and does nothing. Worth stating
+  because this project's own rule forbids shipping one, so a faithful rebuild has to choose: match the
+  reference and ship a dead button, or omit it. **Recommend omitting it and recording why** — the
+  same call already made for the Stripe "Details" link, and for the same reason.
+
+### `views/page.avatars.html` — 17 lines. `AvatarsCtrl`.
+
+`ng-repeat="avatar in avatars"` over `col-md-1` cells, each an `<a class="avatarChooser" ng-click="selectAvatar(avatar)">`
+wrapping `<img ng-src="{{::avatar}}" alt="Image" class="thumb80">`. Heading
+`<div class="p bt center">Choose The Avatar you want to use</div>` then an `<hr/>`.
+
+Rules, all real, all from `styles.css`:
+- `.avatarChooser` — `transition: all 0.25s ease` and its four vendor prefixes. **A transition with
+  no `:hover` rule in the same file**, so nothing visibly transitions; kept as a finding rather than
+  "corrected".
+- `.thumb80` — `width/height/line-height: 80px !important`
+- `.thumb40` — `width/height/line-height: 40px !important`
+- `.list-block` — `padding-left: 0; list-style: none`
+
+### What these four close, and what they open
+
+They close 255 lines of T5-7 and confirm `.btn-oval`, `.avatarChooser`, `.thumb80`, `.thumb40` and
+`.list-block` as real captured rules.
+
+**They open T5-16 and T5-17: two PAGES that neither of our apps has.** Checked both — `apps/controller`
+and `apps/room` — for `Recordings`, `avatarChooser` and `selectAvatar`. Neither implements either page.
+Not built here, deliberately: `recs` and `avatars` come from controller endpoints for which this
+repository holds no contract, and inventing a data source to make a page render is precisely what the
+evidence rules forbid.

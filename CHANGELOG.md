@@ -24,6 +24,52 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-13
 
+### 2026-08-13 13:05 EDT — Four templates read end to end; two whole pages found missing
+
+**Runtime impact: none** — evidence documents only. No code changed, deliberately.
+
+Read whole, line by line, not searched: `page.stats.html` (100 lines), `users.html` (37),
+`page.recordings.html` (27), `page.avatars.html` (17). 181 lines off T5-7, which now stands at four of
+six templates fully read. The write-up is PART 4 of `docs/reference/evidence-dumps-full-read.md`.
+
+**Two whole PAGES are missing from both apps.** `apps/controller` AND `apps/room` were both checked
+for `Recordings`, `avatarChooser` and `selectAvatar`. Neither implements either page.
+
+- **T5-16 — Recordings.** A `list-group` of records: `fa-file-video-o`, `{{rec.created | date:'MM/dd/yyyy @ h:mma'}}`
+  — the exact format `formatLastLogin` already implements — `{{(rec.length/60000) | number:2}} Minutes`,
+  so `length` is milliseconds, a `<video controls width="640">` with `type` on the video element
+  itself (not valid HTML) and no height, and a Download anchor. The empty state is a BARE `<li>` with
+  no `list-group-item` class, unlike the populated rows.
+- **T5-17 — Avatars.** `ng-repeat` over `col-md-1` cells, each an `<a class="avatarChooser">` around an
+  `<img class="thumb80">`. `.avatarChooser` is a `transition: all 0.25s ease` with **no `:hover` rule
+  anywhere in the file**, so nothing visibly transitions. Kept as a finding rather than corrected.
+
+**Neither is built, and that is the point.** `recs` and `avatars` come from controller endpoints this
+repository holds no contract for. Inventing a data source to make a page render is exactly what these
+rules forbid, so both are recorded with everything read and nothing guessed.
+
+**T5-18 — a DEAD CONTROL in the reference itself.** `page.recordings.html:21` is
+`<a href="" class="btn btn-default"><i class="fa fa-share"></i> Share</a>` — no `ng-click`, no
+`ng-href`, no handler at all. It renders and does nothing. This repository forbids shipping a control
+whose only effect is its own presence, so a faithful rebuild has to choose. Recommendation on the
+record: omit it and say why, the same call already taken for the Stripe Details link.
+
+**T5-19 — the stats period `<select>` is doubly inert, and both halves are the reference's bugs.** No
+`ng-model`, so nothing reads it; and all four options carry `value="hourly"` — Hourly, Daily, Weekly
+and Monthly all submit the same value. Recorded so nobody "corrects" it. Also from that page: its
+download endpoint returns **JSON** (`/users/v1/sessions/stats/{{sessionID}}/{{tok}}`, named
+`{{sessionID}}.json`) where ours exports **CSV** from `account/rooms/[id]/stats.csv` — a different
+route and a different format.
+
+Confirmed real rules while reading: `.btn-oval` (shared with `.btn-pill-left`), `.avatarChooser`,
+`.thumb80`, `.thumb40`, `.list-block`. **None added to `manage.css`** — nothing consumes them yet, and
+this repository does not carry CSS with no consumer.
+
+**Verified:** no code changed, so nothing to test. The claims above are citations into files that were
+opened and read, and the two "not built" claims are the result of searching both apps for three
+distinct identifiers.
+
+
 ### 2026-08-13 12:52 EDT — Two register items closed by READING: `btn-small` is inert, and `mobilePairCode` was never missing
 
 **Runtime impact: none** — six tests and three documents. No markup changed.

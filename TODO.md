@@ -126,7 +126,23 @@ Every gap from the full read of `apps/controller/evidence-dumps/` now lives ther
 five tiers. **That file is the tracker — this section is only the index to it.** Do not record a
 gap's status in both places; one of them will go stale.
 
-As of 2026-08-13 12:52 EDT: **32 CLOSED, 23 OPEN, 14 parked/won't-fix, 69 total.**
+As of 2026-08-13 13:05 EDT: **32 CLOSED, 27 OPEN, 14 parked/won't-fix, 73 total.**
+
+The total GREW again, and for the same reason it grew before: reading templates end to end keeps
+surfacing things no capture ever rendered. Four small `views/` templates were read whole today —
+`page.stats.html`, `users.html`, `page.recordings.html`, `page.avatars.html`, 181 lines — and they
+opened four gaps, two of which are whole PAGES neither of our apps has:
+
+- **T5-16 — the Recordings page.** Not in `apps/controller`, not in `apps/room`. Checked both.
+- **T5-17 — the Avatars page.** Same.
+- **T5-18 — a DEAD CONTROL in the reference**: the recordings "Share" button has no handler of any
+  kind. Needs a decision, because this repository forbids shipping one.
+- **T5-19 — the stats period `<select>`** has no `ng-model` and all four options carry
+  `value="hourly"`. Recorded so nobody "fixes" it.
+
+Neither page is built. `recs` and `avatars` come from controller endpoints this repository holds no
+contract for, and inventing a data source to make a page render is exactly what the evidence rules
+forbid. The full write-up is PART 4 of `docs/reference/evidence-dumps-full-read.md`.
 
 Closed since the last count: **T5-6** (`btn-small` on APPROVE is inert — proven absent from all three
 stylesheets, and pinned so nobody "corrects" it to `btn-sm` and shrinks the button) and **T5-14**
