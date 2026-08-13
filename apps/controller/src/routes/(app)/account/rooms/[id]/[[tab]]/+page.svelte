@@ -1576,6 +1576,53 @@ Please click this link to attend: ______ unique link will be here_____
                               {/if}
                             </div>
                           {/if}
+                          <!--
+                            THE MEMBER'S BADGES — page.manageSession.html:391-396.
+
+                            Sits between the Stripe block and the TRIAL span, which is where the
+                            reference puts it. Ours rendered badges only inside the row menu, so an
+                            operator could assign one and never see it on the row.
+
+                            **Iterated over the ACCOUNT's badge list, filtered by membership** —
+                            `ng-repeat="b in badgesList" ng-if="user.badges.includes(b._id)"`. That
+                            ordering is the reference's and it is the right one: every row shows its
+                            badges in the same order, so a column of rows is scannable. Iterating
+                            `member.badges` instead would order them by whenever each was assigned,
+                            which differs per member and looks like noise.
+
+                            Both loops are small — an account's badge list and one member's
+                            assignments — so the nested `includes` is bounded by the badge count, not
+                            by the member count.
+
+                            The two leading `&nbsp;` are INSIDE the outer div and before the first
+                            badge, which is what separates the block from the name preceding it.
+                            There is no CSS margin doing that job.
+
+                            Colours come from the data and are therefore inline, as they are in the
+                            reference. The only static declaration on the inner div is
+                            `margin-right: 2px`, which is `mg-row-badge` here so the value lives in
+                            the stylesheet with its provenance rather than being repeated per row.
+
+                            Text form OR image form, never both: the reference uses `ng-hide` on the
+                            span and `ng-show` on the img with the same predicate, so exactly one
+                            paints. `alt` is the image URL itself — its own choice, kept, because a
+                            badge image has no other text and inventing one would be inventing.
+                          -->
+                          {#if data.badges.length > 0 && member.badges.length > 0}
+                            <div class="mg-row-badges">
+                              &nbsp;&nbsp;{#each data.badges as badge (badge.id)}{#if member.badges.includes(badge.id)}<div
+                                    class="label mg-row-badge"
+                                    style:background-color={badge.backgroundColor}
+                                    style:color={badge.textColor}
+                                  >
+                                    {#if badge.imageUrl}
+                                      <img class="user-badge-img" src={badge.imageUrl} alt={badge.imageUrl} />
+                                    {:else}
+                                      <span>{badge.label}</span>
+                                    {/if}
+                                  </div>{/if}{/each}
+                            </div>
+                          {/if}
                           <!-- `.badge.badge-danger-chat` — RED. `.badge-danger` is a Bootstrap 4
                                name on a Bootstrap 3 sheet and has no rule at all, so this rendered
                                in the plain grey `.badge` fill. The label is spaced ` TRIAL `. -->

@@ -72,6 +72,18 @@ const baseMember = {
 type Member = typeof baseMember;
 
 /** The row's `<td>`, rendered with one member and the given room settings. */
+/**
+ * The ACCOUNT's badge list, which is what the reference iterates (`ng-repeat="b in badgesList"`).
+ *
+ * Deliberately NOT in id order relative to what a member is assigned: the ordering assertion below
+ * only means something if the account list and the member's list disagree about sequence.
+ */
+const accountBadges = [
+  { id: 10, label: 'VIP', backgroundColor: '#003366', textColor: '#ffffff', imageUrl: null as string | null },
+  { id: 20, label: 'Mentor', backgroundColor: '#8a2be2', textColor: '#f0f0f0', imageUrl: null as string | null },
+  { id: 30, label: 'Sponsor', backgroundColor: '#111111', textColor: '#ffff00', imageUrl: 'data:image/png;base64,AAAA' }
+];
+
 function renderCell(member: Partial<Member>, settings: Record<string, unknown> = {}, wholeRow = false): string {
   const body = render(Page as never, {
     props: {
@@ -87,7 +99,7 @@ function renderCell(member: Partial<Member>, settings: Record<string, unknown> =
         unsupportedFilter: null,
         stats: [],
         links: { room: '', vanity: '', unique: '', registration: '', appPair: '', logo: null },
-        badges: [],
+        badges: accountBadges,
         schema: ROOM_SETTINGS,
         fieldByName: Object.fromEntries(ROOM_SETTINGS.map((d) => [d.name, d])),
         featureReadiness: {},
@@ -381,5 +393,99 @@ describe('the two per-member grants — page.manageSession.html:545-551 and :592
       fileAccessCaseByCase: true
     }).split('class="divider"').length - 1;
     expect(withBoth).toBe(before + 2);
+  });
+});
+
+describe('the member’s badges on the row — page.manageSession.html:391-396', () => {
+  /*
+    Ours rendered badges only inside the row menu, so an operator could assign one and never see it.
+    The reference paints them in the identity cell, between the Stripe block and the TRIAL span.
+  */
+  it('renders nothing when the member has none, even though the account has three', () => {
+    const html = renderCell({ badges: [] });
+    expect(html).not.toContain('mg-row-badges');
+    expect(html).not.toContain('VIP');
+  });
+
+  it('renders only the badges this member actually has', () => {
+    const html = renderCell({ badges: [10] });
+    expect(html).toContain('mg-row-badges');
+    expect(html).toContain('VIP');
+    /* The negative half: an account badge the member does NOT hold must not appear. */
+    expect(html).not.toContain('Mentor');
+    expect(html).not.toContain('Sponsor');
+  });
+
+  it('orders by the ACCOUNT list, not by the order the member was assigned them', () => {
+    /*
+      `ng-repeat="b in badgesList" ng-if="user.badges.includes(b._id)"` — the outer loop is the
+      account's list. Assigning 20 before 10 must still render VIP (10) first, so a column of rows
+      is scannable. A row that iterated `member.badges` would render Mentor first and pass a test
+      that only checked both are present.
+    */
+    const html = renderCell({ badges: [20, 10] });
+    expect(html.indexOf('VIP')).toBeGreaterThan(-1);
+    expect(html.indexOf('Mentor')).toBeGreaterThan(-1);
+    expect(html.indexOf('VIP')).toBeLessThan(html.indexOf('Mentor'));
+  });
+
+  it('carries each badge’s own colours inline, because they come from the data', () => {
+    const html = renderCell({ badges: [10, 20] });
+    expect(html).toContain('background-color: #003366');
+    expect(html).toContain('color: #ffffff');
+    expect(html).toContain('background-color: #8a2be2');
+    expect(html).toContain('color: #f0f0f0');
+  });
+
+  it('renders the IMAGE form for an image badge and suppresses its text', () => {
+    const html = renderCell({ badges: [30] });
+    expect(html).toContain('class="user-badge-img"');
+    expect(html).toContain('data:image/png;base64,AAAA');
+    /* `ng-hide` on the span with the same predicate as `ng-show` on the img: exactly one paints. */
+    expect(html).not.toContain('>Sponsor<');
+  });
+
+  it('renders the TEXT form when there is no image, and no img element at all', () => {
+    const html = renderCell({ badges: [10] });
+    expect(html).toContain('>VIP<');
+    expect(html).not.toContain('user-badge-img');
+  });
+
+  it('uses the image URL as the alt text, which is the reference’s own choice', () => {
+    /* A badge image has no other text. Inventing alt copy would be inventing. */
+    const html = renderCell({ badges: [30] });
+    expect(html).toContain('alt="data:image/png;base64,AAAA"');
+  });
+
+  it('leads with two NON-BREAKING spaces, inside the block and before the first badge', () => {
+    /*
+      Nothing in CSS separates this block from the name before it — these two characters do.
+
+      Asserted on the CODEPOINT, not on the entity text. Svelte decodes `&nbsp;` in the template and
+      emits U+00A0, so a test matching the literal string `&nbsp;` fails against correct output —
+      and, worse, a test matching `\s*` passes against two ORDINARY spaces, which collapse in HTML
+      and would silently remove the gap. U+00A0 is the whole point of the markup.
+    */
+    const html = renderCell({ badges: [10] });
+    const at = html.indexOf('mg-row-badges');
+    const after = html.slice(html.indexOf('>', at) + 1);
+    expect(after.slice(0, 2)).toBe('\u00a0\u00a0');
+    expect(after.charCodeAt(0)).toBe(0x00a0);
+    expect(after.charCodeAt(1)).toBe(0x00a0);
+  });
+
+  it('sits between the Stripe block and the TRIAL span, where the reference puts it', () => {
+    const html = renderCell({
+      badges: [10],
+      isFreeTrial: true,
+      isMarketplaceUser: true,
+      stripeSubscriptionStatus: 'active'
+    });
+    const stripe = html.indexOf('stripe-mini');
+    const badges = html.indexOf('mg-row-badges');
+    const trial = html.indexOf('badge-danger-chat');
+    expect(stripe).toBeGreaterThan(-1);
+    expect(badges).toBeGreaterThan(stripe);
+    expect(trial).toBeGreaterThan(badges);
   });
 });

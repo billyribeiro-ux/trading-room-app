@@ -24,6 +24,50 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-13
 
+### 2026-08-13 12:38 EDT — The member's badges, on the row where the reference paints them
+
+**Runtime impact: YES.** A new block in the user row's identity cell, and three CSS rules.
+
+`page.manageSession.html:391-396`. Ours rendered badges only inside the row menu, so an operator
+could assign one and never see it. The reference paints them in the identity cell, between the Stripe
+block and the TRIAL span.
+
+**The ordering is the part worth getting right.** The reference iterates the ACCOUNT's badge list and
+filters by membership — `ng-repeat="b in badgesList" ng-if="user.badges.includes(b._id)"` — not the
+member's own array. That means every row shows its badges in the same sequence, so a column of rows
+is scannable. Iterating `member.badges` instead would order them by whenever each was assigned, which
+differs per member and reads as noise. A test asserts the order with an account list and a member
+list that deliberately DISAGREE about sequence, because a test where they agree proves nothing.
+
+Text form OR image form, never both: the reference puts `ng-hide` on the span and `ng-show` on the
+img with the same predicate. `alt` is the image URL itself — its own choice, kept, because a badge
+image has no other text and inventing alt copy would be inventing.
+
+`.user-badge-img` is copied byte for byte out of `evidence-dumps/TIER1-fetched/styles.css`, including
+the commented-out `max-width` that ships in the original. **No `width`/`height` attributes on that
+image**, which is a deliberate deviation from this project's no-layout-shift rule and is stated in
+the stylesheet rather than left to be noticed: the reference carries none, badge images are stored as
+data URLs so there is no network round trip to shift on, the height is pinned at 20px by that rule,
+and a fixed attribute pair would distort every badge that is not exactly that aspect.
+
+**A test of mine was wrong before the code was.** The two leading `&nbsp;` are what separates the
+block from the name before it — nothing in CSS does that job. My first assertion looked for the
+literal string `&nbsp;`, which fails against correct output because Svelte decodes the entity and
+emits U+00A0. Worse, the obvious repair — matching `\s*` — passes against two ORDINARY spaces, which
+collapse in HTML and would silently remove the gap. It now asserts the codepoint.
+
+**Also verified, not assumed:** every `updateUser` opcode in the row menu was diffed against the
+template. All fourteen call sites match in code, label and order, including the two archives items
+that are gated on opposite states of `denyArchivesAccess`. Nothing to change — recorded so the next
+person does not re-check it.
+
+**Verified:** `svelte-check` 1481 files / 0 errors; 772 tests across 68 files in `src/lib`, 9 new.
+**Four more negative controls run** — iterating the member's list instead of the account's, dropping
+the image/text exclusion, using ordinary spaces instead of non-breaking, and moving the block after
+the TRIAL span — each goes red on exactly the assertion that should catch it, green on revert.
+Privacy, evidence-layout and room-settings verifiers PASS. Svelte MCP autofixer clean.
+
+
 ### 2026-08-13 12:22 EDT — The T5-15 collector, and a hole it found in a guard already run on production
 
 **Runtime impact: none** — two console scripts, a smoke test, and docs. Nothing the site serves.
