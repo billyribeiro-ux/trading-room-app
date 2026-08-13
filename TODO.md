@@ -126,7 +126,16 @@ Every gap from the full read of `apps/controller/evidence-dumps/` now lives ther
 five tiers. **That file is the tracker — this section is only the index to it.** Do not record a
 gap's status in both places; one of them will go stale.
 
-As of 2026-08-13 15:25 EDT: **42 CLOSED, 24 OPEN, 14 parked/won't-fix, 79 total.**
+As of 2026-08-13 15:55 EDT: **42 CLOSED, 24 OPEN, 14 parked/won't-fix, 79 total.**
+
+**The `rects-*.json` completion proof no longer depends on `/tmp`.** Its two derived tables —
+`docs/reference/rects-vocab.txt` (69 lines) and `docs/reference/rects-deltas.txt` (368 lines) — are
+committed byte for byte, digests pinned by `rects-completion-proof.test.ts`. Every count the prose
+rests on reconciles: 4 header lines + 182 bindings x 2 = 368.
+
+Its LIMITS are now written down and test-guarded: it is a deduplication argument, so element ORDER
+and nesting collapse under the keys. It establishes the design vocabulary and the style bindings,
+NOT document structure — for that the source templates are the evidence.
 
 Read `page.manageSession.html` through :1162. The settings rows in that stretch are all covered —
 proven by machine, see below — but one NON-settings structure is missing entirely:

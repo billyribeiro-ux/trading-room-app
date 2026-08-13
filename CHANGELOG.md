@@ -24,6 +24,46 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-13
 
+### 2026-08-13 15:55 EDT — The rects completion proof stops depending on /tmp
+
+**Runtime impact: none** — two evidence tables committed, their citations corrected, one new test.
+
+`evidence-dumps-full-read.md` claims all 11 `rects-*.json` captures were read, and backs it with a
+deduplication argument resting on two derived tables. **Both lived in `/tmp`.** A proof whose evidence
+is one reboot from disappearing is an assertion — and an assertion about unread evidence is exactly
+what PR #12 was opened to revert. That PR was closed unmerged on 2026-08-12 with "reading the 41
+files instead of reverting them, which is the better resolution of the same rule". This is the other
+half of that bargain: the reading is recorded AND it stays checkable.
+
+`docs/reference/rects-vocab.txt` (69 lines) and `docs/reference/rects-deltas.txt` (368 lines) are now
+committed **byte for byte**, with no header added to either — precisely so their digests stay
+meaningful. Both were read in full before committing.
+
+**Every number the prose depends on reconciles against the files as committed.** The vocabulary table
+is exactly 69 property lines. The delta table is 4 header lines plus 182 bindings at 2 lines each =
+368. `rects-completion-proof.test.ts` pins the digests, both counts, the per-line shape of the
+vocabulary table, and that the doc cites repository paths rather than `/tmp`.
+
+**The proof's LIMITS are now written down, and a test keeps them written down.** It is a
+deduplication argument, not a line-by-line pass over 3,483 element records, and the dedup keys decide
+what "distinct" means. Element ORDER and parent/child nesting collapse under those keys — so the
+tables establish the design vocabulary and the style bindings, and say nothing about document
+structure. Where structure matters, the source templates are the evidence. Somebody will otherwise
+cite this proof for something it does not support, so the test fails if the caveat is edited out.
+
+**PR #12, for the record.** It was never blocked: `mergeable: MERGEABLE`, `mergeStateStatus: CLEAN`,
+not a draft, no failing check. Opened 23:41:57Z, Vercel preview green at 23:42:00Z, closed by the
+owner at 23:42:10Z — thirteen seconds — unmerged and deliberately. The commit it would have reverted,
+`d6b0b3f`, is still in `main`; the evidence tree is intact and `evidence:verify` passes.
+
+Of the 42 files under `NEXT-STEP/gaps/`, 32 are cited by name in the read record; the other 10 are the
+`rects-*.json` captures covered by the proof above. Two derived tables in `/tmp` were the only thing
+standing between that and a durable record.
+
+**Verified:** `svelte-check` 1488 files / 0 errors; 817 tests across 74 files, 7 new. Two negative
+controls run — a line deleted from the delta table, and the caveat edited out of the doc — each red
+on the right assertion, green on revert. Privacy and evidence-layout verifiers PASS.
+
 ### 2026-08-13 15:25 EDT — Read through :1162; one non-settings structure found missing
 
 **Runtime impact: none** — documentation only.
