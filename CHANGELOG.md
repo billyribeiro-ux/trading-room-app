@@ -24,6 +24,51 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-13
 
+### 2026-08-13 14:59 EDT — Four more closed; two were already built and one comment was wrong about it
+
+**Runtime impact: none** — one corrected comment and two new test files.
+
+Second pass of quick wins. Four gaps close, and the interesting part is that **two of them were
+already implemented** — the register had gone stale, and reading the template turned capture-based
+reasoning into proof.
+
+- **T2-23 — the sorted-state icon. There isn't one, and that IS the finding.**
+  `page.welcome.html:351-358`: both sortable headers carry a literal
+  `<div class="icon fa fa-sort-alpha-asc"></div>` with **no `ng-class`**. The glyph never changes —
+  it reads "ascending" whether the table is sorted ascending, descending or not at all. Ours already
+  renders the same static icon, reasoned from two captures; the template now proves it. A rebuild
+  must not add a toggling icon.
+- **T5-11 — the `showNewRoom` easter egg, now read end to end.** `ng-init="showNewRoom=0"` on the
+  outer div; the counter increments by clicking the word **Sessions**; ONE click reveals the per-row
+  id/ownerID line, FIVE reveal the New Room button. Ours reproduces the counter and the one-click
+  reveal, and shows New Room always — an owner-decided divergence already documented in the
+  component, because an account at zero rooms would otherwise have no Manage, no Launch and no
+  visible way back.
+- **T2-17 — the profanity sub-rows.** Already gated. The template adds two details worth keeping: the
+  setting is spelled **`ingnoreBadWordsList`**, the reference's own typo, which we keep because
+  correcting it would orphan every stored value; and both sub-row helps are bare `<label>` with no
+  `class="muted"`, captured in the schema as `helpShape: "bare"`.
+- **T2-18 — the ad-server block is another EASTER EGG.** Revealed by clicking the muted help text
+  under Repeater List. It exposes `applyRepeaterToAccount()`, plus add/remove server inputs calling
+  `addLiveServer()` / `removeLiveServer()`. **Not built** — all three are operations against
+  media-relay infrastructure this repository has no endpoint for. The markup is recorded in full so
+  it can be built the day they exist.
+
+**A comment of ours was wrong, and it was wrong in the direction that hides things.** The profanity
+gating note claimed those were "the only two `ng-show` rows anywhere in the settings list". Written
+from the capture — where most gated rows were hidden and therefore invisible. The template has
+**fourteen gated wrappers over nine distinct expressions**, ten of which wrap a named setting.
+
+All ten turn out to be handled: seven by `authModeGated`, two by `profanityGated`, and `webinarDate`
+by `hidden={!isWebinar}` in the header block. So the code was right and only the note was wrong —
+but a note that under-counts is how the eleventh gets missed. `settings-row-gates.test.ts` now
+extracts all ten from the template, asserts each is handled, asserts both maps are actually consulted
+when rendering, and asserts we keep the `ingnoreBadWordsList` spelling.
+
+**Verified:** `svelte-check` 1491 files / 0 errors; 834 tests across 77 files, 7 new. Two negative
+controls run — the profanity gate removed, and the gate maps stopped being consulted — each red on
+the right assertion. Register **53 CLOSED, 15 OPEN, 13 parked, 81 total**, tally test-checked.
+
 ### 2026-08-13 14:53 EDT — Quick wins: three gaps closed, and the account page had the same capacity bug
 
 **Runtime impact: YES** — one corrected column on the account page's room list.

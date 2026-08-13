@@ -377,9 +377,15 @@
     reference room has the filter off, so the reference contributes NOTHING for either row while
     ours rendered two complete rows an operator of that room could never have seen.
 
-    HONEST GAP: no visibility field is recorded in the generated schema, and these are the only two
-    `ng-show` rows anywhere in the settings list, so — like `authModeGated` above — this is our own
-    plumbing, hand-written and keyed by name. Only the CONDITION is evidence.
+    HONEST GAP: no visibility field is recorded in the generated schema, so — like `authModeGated`
+    above — this is our own plumbing, hand-written and keyed by name. Only the CONDITION is evidence.
+
+    This note used to claim these were "the only two `ng-show` rows anywhere in the settings list".
+    That was written from the capture and is wrong: the template has FOURTEEN gated wrappers over
+    nine distinct expressions, ten of which wrap a named setting. Seven of those ten are the
+    authMode rows in the map above, two are these, and the tenth is `webinarDate`, gated by
+    `hidden={!isWebinar}` in the header block. `settings-row-gates.test.ts` extracts all ten from the
+    template and fails if a new one appears — which is what the old wording would have hidden.
   */
   const profanityGated: Record<string, () => boolean> = {
     ingnoreBadWordsList: () => !!settingValue('hasProfanityFilter'),
