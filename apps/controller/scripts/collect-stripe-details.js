@@ -326,7 +326,15 @@
         'openStripeModal',
         'showStripeDetails',
         'stripeDetails',
-        'loadMarketplaceUsers'
+        'loadMarketplaceUsers',
+        /*
+          Added 2026-08-13 for T5-21. `page.manageSession.html:178-182` shows a "Batch User Invite"
+          menu item gated on `sess.authMode === 'unamePW'`, calling `doBatchInvite()`. The item is
+          captured; the prompt it opens is not in any template or capture. Same read, same trip.
+        */
+        'doBatchInvite',
+        'actionsWithEmailList',
+        'canCloneDblClick'
       ];
 
       for (const name of WANTED) {

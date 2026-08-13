@@ -24,6 +24,61 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-13
 
+### 2026-08-13 13:40 EDT — Reading the manage header found a button that destroyed configuration
+
+**Runtime impact: YES.** A migration, a schema column, a fixed form action, and two corrected numbers
+in the panel title.
+
+Read `page.manageSession.html:1-340` line by line. Line 10 renders the panel title:
+
+    Current …: {{sess.current_capacity}} / Max … {{sess.recordedMaxCapacity}}
+
+next to a `resetMaxCount()` button. **Two different fields**, and the reset clears the second. The
+reference's own API documentation — carried in this repository at `$lib/content/api-docs.ts:127-130`,
+transcribed from the original — lists **three**: `current_capacity` 25, `current_max` 100,
+`recordedMaxCapacity` 150. The mark EXCEEDING the limit in the reference's own example is what
+settles that it is a recorded observation rather than configuration.
+
+**We had all three collapsed into one `max_users` column, and it produced two live bugs.**
+
+**Bug 1 — "Reset Counts" destroyed the room's configured capacity limit.** `resetMaxCount` set
+`maxUsers` to 0, and `maxUsers` is the value `internal/room-config/[code]:127` ships to the room. A
+button labelled "Reset Counts" was wiping configuration. Nothing enforces `maxUsers` in the room
+today — it crosses the boundary as a typed field and is not read — which is the only reason this
+never caused an incident, and is exactly why it is fixed before enforcement lands rather than after.
+Migration `0011` adds `recorded_max_capacity`; the reset now clears that.
+
+**Bug 2 — "Current" was the FILTERED list.** It read `data.users.length`, which is what survives the
+search box and the seven list filters. Typing a name into search made a room-occupancy readout say 1.
+It now reads `rosterCount`, counted with `count(*)` before any filter — a count rather than a second
+unbounded SELECT to call `.length` on, which is the shape this repository asks about at 10,000 rows.
+
+**A comment of ours was wrong, in the now-familiar way.** The Select All label carried a note saying
+the reference "drops the words once every row is checked, leaving a bare checkbox". The template
+(:258) has TWO spans — `Select All` and `Unselect All` — on the same label. The note was read off a
+capture taken with nothing selected, where the second `ng-if` had removed its span and left nothing
+to see. Third time a capture has hidden a conditional this session.
+
+**A negative control that did not go red, and what was done about it.** Reverting the Select All fix
+left all 780 tests green — nothing guarded it. `allSelected` is client state that SSR always renders
+false, so a render-based test would pass just as happily against the broken version. The guard is now
+on the component SOURCE, following the pattern `mobile-filter-contract` already uses, and reverting
+the fix now goes red.
+
+**Two honest gaps opened rather than filled.** T5-20: nothing writes `recorded_max_capacity`, because
+a high-water mark needs live occupancy and the controller receives no occupancy signal. NOT faked
+with the roster size — the number who ever registered is not the number ever simultaneously present,
+and rendering one as the other is an invented value that looks right. T5-21: "Batch User Invite"
+(`:178-183`, gated on `authMode === 'unamePW'`) is not built; the item, icon, position and gate are
+captured, the prompt it opens is not. `collect-stripe-details.js` now reads `doBatchInvite`,
+`actionsWithEmailList` and `canCloneDblClick` off the scope, so one console run captures all three.
+
+**Verified:** `svelte-check` 1483 files / 0 errors; 783 tests across 69 files, 11 new. **Three more
+negative controls run** — Current back to the filtered length, Max back to the configured limit, and
+the Select All label back to one-sided — each red on the right assertion, green on revert.
+`backend:migrations:verify` and `privacy:verify` PASS. Collector smoke test still green.
+
+
 ### 2026-08-13 13:05 EDT — Four templates read end to end; two whole pages found missing
 
 **Runtime impact: none** — evidence documents only. No code changed, deliberately.

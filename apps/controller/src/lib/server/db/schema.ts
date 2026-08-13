@@ -173,7 +173,30 @@ export const rooms = pgTable(
     name: text('name').notNull(),
     /** "open" / "closed" — the reference's State column. */
     state: text('state').notNull().default('closed'),
+    /**
+     * The CONFIGURED capacity limit — the reference's `current_max`
+     * (`src/lib/content/api-docs.ts:128`). Shipped to the room by
+     * `internal/room-config/[code]` and shown as the denominator on the account page.
+     *
+     * NOT the high-water mark, and NOT what "Reset Counts" clears. Those are
+     * `recordedMaxCapacity` below. The three were one column until 2026-08-13, which meant the
+     * reset button destroyed this value.
+     */
     maxUsers: integer('max_users').notNull().default(0),
+    /**
+     * The peak simultaneous occupancy ever observed — the reference's `recordedMaxCapacity`.
+     *
+     * This is what the panel title's "Max" reads and what `resetMaxCount()` clears. The reference's
+     * own API example has it at 150 against a `current_max` of 100, which is only coherent for a
+     * recorded observation rather than a limit.
+     *
+     * NOTHING WRITES IT YET. A high-water mark needs live occupancy and the controller receives no
+     * occupancy signal — only the room service knows who is connected. Recorded as T5-20 rather than
+     * faked by substituting the roster size: the number of people who ever registered is not the
+     * number ever simultaneously present, and rendering one as the other is an invented value that
+     * looks right. See migration `0011-recorded-max-capacity`.
+     */
+    recordedMaxCapacity: integer('recorded_max_capacity').notNull().default(0),
     /**
      * The Text List tab. In the reference this is a raw <textarea id="textListTxt">
      * with no ng-model and its own saveTextList() handler — it is not a sess.*

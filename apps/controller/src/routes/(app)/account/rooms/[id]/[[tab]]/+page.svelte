@@ -880,9 +880,25 @@
     <div class="panel-heading">
       <div class="panel-title">
         <span>Manage Room id: {data.room.shortCode}&nbsp;&nbsp;( {data.room.publicId} )</span>
+        <!--
+          `Current: {{sess.current_capacity}} / Max {{sess.recordedMaxCapacity}}` — two DIFFERENT
+          fields, and the reference's own API documentation (`$lib/content/api-docs.ts:127-130`)
+          proves it carries three: `current_capacity` 25, `current_max` 100,
+          `recordedMaxCapacity` 150. The mark exceeding the limit in its own example is what settles
+          that the mark is a recorded observation, not configuration.
+
+          BOTH numbers here were wrong until 2026-08-13:
+
+          - "Current" was `data.users.length`, which is the list AFTER the search box and the seven
+            filters. Typing a name into search made the room's occupancy readout say 1. It is now
+            `rosterCount`, counted with `count(*)` before any filter is applied.
+          - "Max" was `maxUsers`, the CONFIGURED limit — and `resetMaxCount` set that to zero, so
+            "Reset Counts" destroyed the value shipped to the room. It is now
+            `recordedMaxCapacity`, which is what the reset clears.
+        -->
         <span class="text-muted">
-          Current <i class="icon fa fa-user"></i>: {data.users.length} / Max
-          <i class="icon fa fa-user"></i> {data.room.maxUsers}
+          Current <i class="icon fa fa-user"></i>: {data.rosterCount} / Max
+          <i class="icon fa fa-user"></i> {data.room.recordedMaxCapacity}
         </span>
         <form
           method="POST"
@@ -1273,9 +1289,19 @@ Please click this link to attend: ______ unique link will be here_____
                     <div class="checkbox">
                       <label>
                         <input id="select-all-members" type="checkbox" checked={allSelected} onchange={toggleSelectAll} />
-                        <!-- `ng-if="!checkedAllUsers"` — the reference drops the words
-                             once every row is checked, leaving a bare checkbox -->
-                        {#if !allSelected}<span>Select All</span>{/if}
+                        <!--
+                          TWO spans, not one — `page.manageSession.html:258`:
+
+                            <span ng-if="!checkedAllUsers">Select All</span>
+                            <span ng-if="checkedAllUsers">Unselect All</span>
+
+                          The comment that used to sit here said the reference "drops the words once
+                          every row is checked, leaving a bare checkbox". That was read off a capture
+                          taken with nothing selected, where the second `ng-if` had removed its span
+                          and left nothing to see. The label TOGGLES; it does not disappear. Same
+                          mistake as the four `ng-show="false"` icons, and only the source shows it.
+                        -->
+                        {#if allSelected}<span>Unselect All</span>{:else}<span>Select All</span>{/if}
                       </label>
                       <label class="checkbox-apply-to-all-rooms">
                         <input id="apply-to-all-rooms" type="checkbox" bind:checked={applyToAllRooms} />

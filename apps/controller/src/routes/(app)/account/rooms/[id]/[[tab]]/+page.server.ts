@@ -1,10 +1,10 @@
 import { error, fail, redirect } from '@sveltejs/kit';
 import { randomBytes } from 'node:crypto';
-import { desc, eq } from 'drizzle-orm';
+import { count, desc, eq } from 'drizzle-orm';
 import { PUBLIC_SITE_ORIGIN } from '$app/env/public';
 import { ROOM_BASE_URL, ROOM_JWT_SECRET } from '$app/env/private';
 import { getDb } from '$lib/server/db';
-import { badges, roomSessions, rooms } from '$lib/server/db/schema';
+import { badges, roomSessions, roomUsers, rooms } from '$lib/server/db/schema';
 import { requireOwnedRoom, requireUser } from '$lib/server/auth';
 import {
   MANY_OPCODES,
@@ -278,6 +278,25 @@ export const load: PageServerLoad = async ({ params, locals, url }) => {
   */
   const members = users.map(({ pushTokensJson: _deviceTokens, ...member }) => member);
 
+  /*
+    THE ROSTER SIZE, UNFILTERED — and it must be counted before any filter, which is why it is a
+    separate query rather than `members.length`.
+
+    The panel title renders `Current: N / Max M`. `members` above has already been through the search
+    box and the seven list filters, so using its length meant that searching for one person made the
+    header read "Current: 1" — a room-occupancy readout that changed depending on what you had typed
+    into a search box.
+
+    `count(*)` rather than re-selecting the rows: the page needs the number, not the members, and an
+    unbounded second SELECT of every row in a large room to call `.length` on it is the shape this
+    repository asks about at 10,000 rows.
+  */
+  const [rosterRow] = await getDb()
+    .select({ n: count() })
+    .from(roomUsers)
+    .where(eq(roomUsers.roomId, room.id));
+  const rosterCount = rosterRow?.n ?? 0;
+
   return {
     room,
     /** the reference's `ng-href` on Launch — the whole handoff URL, resolved at page load */
@@ -294,6 +313,8 @@ export const load: PageServerLoad = async ({ params, locals, url }) => {
     // branded for the reviewed client-side HTML sink.
     landingHtml: sanitizeHtml(String(settings.description ?? '')),
     users: members,
+    /** the whole roster, for the panel title — NOT `users.length`, which is filtered */
+    rosterCount,
     /** a filter the menu offers but this loader cannot honour — shown, never silently ignored */
     unsupportedFilter,
     /** the User Stats table — real logins only, never invented rows */
@@ -450,9 +471,20 @@ function failFor(e: unknown) {
 
 export const actions: Actions = {
   /** `resetMaxCount()` — clears the room's high-water mark, not its members. */
+  /**
+   * `resetMaxCount()` — clears the occupancy HIGH-WATER MARK.
+   *
+   * It used to set `maxUsers` to 0, and `maxUsers` is the CONFIGURED capacity limit that
+   * `internal/room-config/[code]` ships to the room. So a button labelled "Reset Counts" destroyed
+   * configuration. The reference's own API documentation separates the two — `current_max` 100
+   * against `recordedMaxCapacity` 150 in the same example — and the reset belongs to the second.
+   *
+   * Nothing enforces `maxUsers` in the room today, which is the only reason this never caused an
+   * incident, and is exactly why it is fixed before enforcement lands rather than after.
+   */
   resetMaxCount: async ({ params, locals }) => {
     const roomId = await ownedRoomId(locals, params.id);
-    await getDb().update(rooms).set({ maxUsers: 0 }).where(eq(rooms.id, roomId));
+    await getDb().update(rooms).set({ recordedMaxCapacity: 0 }).where(eq(rooms.id, roomId));
     return { resetCounts: true };
   },
 

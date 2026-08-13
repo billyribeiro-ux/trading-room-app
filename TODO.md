@@ -126,7 +126,15 @@ Every gap from the full read of `apps/controller/evidence-dumps/` now lives ther
 five tiers. **That file is the tracker — this section is only the index to it.** Do not record a
 gap's status in both places; one of them will go stale.
 
-As of 2026-08-13 13:05 EDT: **32 CLOSED, 27 OPEN, 14 parked/won't-fix, 73 total.**
+As of 2026-08-13 13:40 EDT: **32 CLOSED, 29 OPEN, 14 parked/won't-fix, 75 total.**
+
+Two more opened while reading `page.manageSession.html:1-340`, and both come out of a REAL BUG that
+reading found:
+
+- **T5-20 — nothing writes `recorded_max_capacity`.** The column and the reader exist; the writer
+  needs live occupancy, which only the room service knows. Not faked with the roster size.
+- **T5-21 — "Batch User Invite" is not built.** The menu item, icon, position and gate are all
+  captured; the prompt it opens is not. The collector now reads `doBatchInvite` off the scope.
 
 The total GREW again, and for the same reason it grew before: reading templates end to end keeps
 surfacing things no capture ever rendered. Four small `views/` templates were read whole today —
