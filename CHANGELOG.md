@@ -24,6 +24,49 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-13
 
+### 2026-08-13 14:53 EDT — Quick wins: three gaps closed, and the account page had the same capacity bug
+
+**Runtime impact: YES** — one corrected column on the account page's room list.
+
+**The account page had the bug I fixed on the manage header two hours ago.**
+`page.welcome.html:376` renders `{{s.current_capacity}} / {{s.recordedMaxCapacity }}` — the SAME pair
+as the manage panel title. Ours read `{room.userCount} / {room.maxUsers}`, so the denominator was the
+CONFIGURED capacity limit where the reference shows the high-water mark. Fixed to
+`recordedMaxCapacity`. Finding one instance of a defect and not looking for its siblings is how the
+second one ships.
+
+The NUMERATOR is now stated as the substitution it is, in BOTH places rather than only here:
+`current_capacity` is live occupancy, the controller receives no occupancy signal, and `userCount` /
+`rosterCount` is the roster size — the closest fact this server holds. Not the same number. The
+manage header's comment claimed the fix without admitting that half, which was a quieter version of
+the same problem.
+
+**T5-5 — `updateUser` code 12 — CLOSED.** It appears NOWHERE in `page.manageSession.html`, not in
+live markup and not in commented-out markup either. That distinction matters: eight settings keys in
+that same file exist only inside comments, so "absent from live markup" would have left open a
+switched-off row that once sent a 12. There is none. The live sets are `updateUser` [1-11,13,14] and
+`updateManyUsers` [1-6,10], and our two maps are exactly those.
+
+Whether the REFERENCE's server accepts a 12 is unanswerable from anything in this repository and is
+not our server. What is answerable is that ours refuses it, because the map IS the allow-list —
+asserted, along with the two enums staying distinct: 10 is "Hide Pers User Data" to `updateUser` and
+"Remove All" to `updateManyUsers`, and routing one through the other would delete nobody and hide
+everybody's data.
+
+**T5-10 — `s.ownerdID` — CLOSED, confirmed as the reference's bug.** `page.welcome.html:368` labels
+the field `ownerID:` and binds `s.ownerdID`, a stray `d`, so it renders permanently EMPTY. Two more
+details in the same line: `<muted>` is a non-standard element, and the closing parenthesis sits
+OUTSIDE `</muted>` while the opening one is inside. The whole line is behind a click-counter reveal
+(T5-11), which is why a permanently-empty field was never noticed. Not reproduced — we do not render
+the line.
+
+**T5-19 — the stats period select — CLOSED as recorded.** Both halves of that defect are already
+pinned by `reference-defects-not-reproduced.test.ts`; nothing further until there is a page to build.
+
+**Verified:** `svelte-check` 1490 files / 0 errors; 827 tests across 76 files, 6 new. One negative
+control run — adding code 12 to `USER_OPCODES` turns two assertions red. Register now **49 CLOSED,
+19 OPEN, 13 parked, 81 total**, and that tally is checked by a test rather than asserted.
+
 ### 2026-08-13 14:40 EDT — Every timestamp I wrote today was wrong, and so were all four gap counts
 
 **Runtime impact: none** — documentation and one new test.

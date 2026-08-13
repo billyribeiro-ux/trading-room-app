@@ -941,6 +941,11 @@
           - "Current" was `data.users.length`, which is the list AFTER the search box and the seven
             filters. Typing a name into search made the room's occupancy readout say 1. It is now
             `rosterCount`, counted with `count(*)` before any filter is applied.
+
+            `rosterCount` is still a SUBSTITUTION and is stated as one: `current_capacity` is LIVE
+            occupancy, and this server receives no occupancy signal — only the room service knows who
+            is connected. The roster size is the closest fact the controller holds. The account
+            page's room list makes the same substitution, so the two agree. T5-20.
           - "Max" was `maxUsers`, the CONFIGURED limit — and `resetMaxCount` set that to zero, so
             "Reset Counts" destroyed the value shipped to the room. It is now
             `recordedMaxCapacity`, which is what the reset clears.

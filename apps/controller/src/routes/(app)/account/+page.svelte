@@ -581,7 +581,25 @@
                   <div class="acc-label acc-label-orange">{room.state}</div>
                 {/if}
               </td>
-              <td class="acc-td-center"><div class="acc-muted">{room.userCount} / {room.maxUsers}</div></td>
+              <!--
+                `{{s.current_capacity}} / {{s.recordedMaxCapacity }}` — page.welcome.html:376. The
+                SAME pair the manage panel title uses, and the same two fields our manage header had
+                wrong until 2026-08-13.
+
+                The DENOMINATOR was `maxUsers`, the CONFIGURED capacity limit. The reference's is
+                `recordedMaxCapacity`, the high-water mark — a different fact, proven by its own API
+                documentation listing `current_max` 100 beside `recordedMaxCapacity` 150. Fixed.
+
+                The NUMERATOR is an honest substitution, stated rather than hidden: the reference's
+                `current_capacity` is LIVE occupancy, and the controller receives no occupancy signal
+                — only the room service knows who is connected. `userCount` is the ROSTER size, which
+                is the closest fact this server actually holds. It is not the same number, and the
+                same substitution is made on the manage panel title so the two pages at least agree.
+                Recorded as T5-20 along with the missing writer.
+              -->
+              <td class="acc-td-center">
+                <div class="acc-muted">{room.userCount} / {room.recordedMaxCapacity}</div>
+              </td>
               <td>
                 <!-- The reference's `ng-href`: the whole handoff URL, resolved server-side at
                      page load. `resolve()` cannot be used because this is a runtime string that is
