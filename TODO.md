@@ -126,7 +126,19 @@ Every gap from the full read of `apps/controller/evidence-dumps/` now lives ther
 five tiers. **That file is the tracker — this section is only the index to it.** Do not record a
 gap's status in both places; one of them will go stale.
 
-As of 2026-08-13 15:25 EDT: **56 CLOSED, 12 OPEN, 13 parked/won't-fix, 81 total.**
+As of 2026-08-13 16:00 EDT: **56 CLOSED, 12 OPEN, 13 parked/won't-fix, 81 total.**
+
+**Everything closable by READING is closed.** The twelve that remain each need something a source
+file cannot give, and every one now has a route:
+
+- **5 need a live console run, and all five have a smoke-tested script ready.**
+  `collect-rendered-states.js` covers T2-7, T2-20 and T2-22; `collect-stripe-details.js` covers
+  T5-15 and T5-21. Both download by themselves, click nothing, submit nothing, and redact PII.
+- **2 need one sentence naming a field** — T5-24, T5-25.
+- **3 need infrastructure that does not exist yet** — T5-16 and T5-17 need endpoints for `recs`
+  and `avatars`; T5-20 needs the room to report occupancy.
+- **2 need a re-fetch** — T1-9 and T1-10 both soft-404 on the live server, so the assets are not
+  deployed at the paths the page references.
 
 **These four numbers were all wrong until now** — the line read 42/24/14/79. They were carried
 forward by hand and adjusted by memory as items closed, which is the failure this file warns about

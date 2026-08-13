@@ -24,6 +24,43 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-13
 
+### 2026-08-13 16:00 EDT — One collector for the last three rendered-state gaps
+
+**Runtime impact: none** — a console script and its smoke test.
+
+Every gap that could be closed by reading is closed. The five that remain need something a source
+file cannot provide, and three of those are the same KIND of thing: a state that exists only once a
+browser has laid the page out or a person has done something. `collect-rendered-states.js` covers all
+three in one run.
+
+- **T2-7** measures every `tbody > tr`, recording the `nth-of-type` index AND whether the row is
+  hidden — because hidden rows keep their position, which is why a filtered table bands irregularly
+  and is not a bug (T5-12). It captures the `:hover` and stripe RULES that match, **by stripping the
+  pseudo-class before testing the selector**: a synthetic MouseEvent does not trigger `:hover`, so an
+  unstripped `el.matches()` returns false and the rule actually governing the hover is silently
+  missed. Row TEXT is deliberately not captured — a room's rows are full of real names and a geometry
+  capture has no use for them, which the smoke test now pins so nobody "improves" it.
+- **T2-20** reads fifteen dialog handlers off the Angular `$parent` chain; their source names the
+  template and the buttons. It opens nothing — it snapshots what YOU open during a 120-second watch.
+- **T2-22** captures the login form's geometry with zero clicks and nothing typed. **It does not
+  force the failed-login state.** Reaching that means submitting wrong credentials, and a script
+  doing that on a production site could lock an account. The watcher captures an error only if you
+  trigger one, and records its absence as a gap otherwise.
+
+The click guard applies the word list to camelCase-SPLIT text, because `\bdelete\b` does not match
+`deleteParticipant` — the hole found in `collect-manage-gaps.js` earlier today, which had been live
+for every previous run. Proven on five real handler names, including two that must NOT be denied.
+
+**Three of my own test assertions were wrong before the collector was.** The `:nth-of-type` stripe
+rule failed because my stub compares selector strings exactly where a browser evaluates them. The
+"thin table" check asserted a gap IS recorded at four rows, when four is exactly the register's bar
+and must not gap — that assertion would only have passed if the threshold were wrong. And the
+redaction check looked for an email in output that never contains row text. Each was a fixture bug
+dressed as a finding, which is the failure mode these scripts exist to avoid.
+
+**Verified:** all three collector smoke tests pass; `node --check` on the new script; 856 tests across
+80 files still green.
+
 ### 2026-08-13 15:54 EDT — A duplicated CSS rule where the WRONG copy was winning
 
 **Runtime impact: YES** — the striping and hover rules on the account page now use Bootstrap's own
