@@ -24,6 +24,47 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-13
 
+### 2026-08-13 16:13 EDT — 1,500 lines of settings rows closed by proof instead of by reading
+
+**Runtime impact: none** — one new test.
+
+Resumed the template read at `:1163`. What is there is what is there for most of the remaining
+1,500 lines: settings rows, one after another, varying only in name, label and helper. Reading them
+individually is exactly how a difference in row 180 gets missed after 179 identical ones — so they
+are now covered by a machine check instead.
+
+The reference writes its helper copy three ways, and they render differently:
+
+    muted   <br><label class="muted">…   grey, rgb(119,119,119)
+    plain   <br><label>…                 inherited colour, own line
+    bare    <label>…                     inherited colour, NO line break
+
+`settings-help-shape.test.ts` compares all 175 comparable rows against the extractor's own rule and
+**all 175 agree.** Together with the earlier name check — 267 live names, zero missing — the settings
+rows of `page.manageSession.html` are now closed by proof rather than by eyeballing.
+
+**The first version of this check was wrong, and it reported 52 mismatches.** It collapsed `plain`
+and `bare` into one bucket, because it only looked for `class="muted"`, and it stopped scanning at
+`</p>`, so it missed every row whose helper sits OUTSIDE the paragraph as a sibling — which is what
+`helpOutside` records, and what `pairOKRedirect` and `pairErrorRedirect` do.
+
+Every one of those 52 was the check's own fault. **The schema was right about all 267.** That is
+worth stating plainly: a new check disagreeing with existing data is not automatically the one that
+is correct, and the instinct to "fix" the data to match a fresh script is how good evidence gets
+destroyed. The corrected check reads the extractor's rule and applies it.
+
+The test also asserts all three shapes are actually USED, so an extractor that stopped distinguishing
+them and labelled everything `muted` fails rather than passing against a template read the same wrong
+way.
+
+**Still genuinely unread:** the NON-settings structure of `page.manageSession.html`, and
+`page.welcome.html` below `:360`. That is where the findings have been — the conditional icons, the
+Stripe block, the Logout Webhook row binding the wrong field — and it is what I am continuing on.
+
+**Verified:** `svelte-check` 1495 files / 0 errors; 860 tests across 81 files, 4 new. Two negative
+controls run — one row's shape flipped, and `helpOutside` cleared on a pair row — each red on the
+right assertion.
+
 ### 2026-08-13 16:00 EDT — One collector for the last three rendered-state gaps
 
 **Runtime impact: none** — a console script and its smoke test.
