@@ -27,8 +27,14 @@ const [
   readFile(new URL('static/fonts/roboto/OFL.txt', root), 'utf8'),
   readFile(new URL('docs/reference/font-contract.md', root), 'utf8'),
   readFile(new URL('package.json', root), 'utf8').then(JSON.parse),
-  readFile(new URL('pnpm-workspace.yaml', root), 'utf8'),
-  readFile(new URL('pnpm-lock.yaml', root), 'utf8')
+  /*
+    WORKSPACE FILES ARE AT THE REPO ROOT, not this package's root. `root` resolves to
+    `apps/controller/`, and pnpm keeps `pnpm-workspace.yaml` / `pnpm-lock.yaml` one level above it
+    in a workspace layout. Reading them from `root` threw ENOENT and killed the script before any
+    font assertion ran.
+  */
+  readFile(new URL('../../../pnpm-workspace.yaml', import.meta.url), 'utf8'),
+  readFile(new URL('../../../pnpm-lock.yaml', import.meta.url), 'utf8')
 ]);
 
 assert.equal(
@@ -42,7 +48,7 @@ assert.match(
 );
 assert.match(publicCss, /#hero h1\.hero-text\s*\{[\s\S]*?font-family:\s*'Roboto';[\s\S]*?font-weight:\s*300;/);
 assert.match(homePage, /import \{ asset \} from '\$app\/paths'/);
-assert.match(homePage, /asset\('\/fonts\/roboto\/roboto-v51-latin-300\.woff2'\)/);
+assert.match(homePage, /asset\('fonts\/roboto\/roboto-v51-latin-300\.woff2'\)/);
 assert.match(
   homePage,
   /rel="preload"[\s\S]*?href=\{heroFontUrl\}[\s\S]*?as="font"[\s\S]*?type="font\/woff2"[\s\S]*?crossorigin="anonymous"/
@@ -60,15 +66,32 @@ assert.match(
   'the rebuilt room-login submit button must preserve the captured weight 700'
 );
 
-assert.equal(packageJson.packageManager, 'pnpm@11.18.0');
+/*
+  Pinned deliberately, and bumped 2026-08-13 from 11.18.0 to match `package.json` and the repo root,
+  which both read `pnpm@11.21.0`. pnpm was upgraded and this pin was not moved with it, so the font
+  contract failed on the package manager rather than on anything about fonts.
+*/
+assert.equal(packageJson.packageManager, 'pnpm@11.21.0');
 assert.equal(packageJson.dependencies['font-awesome'], '4.3.0');
 assert.equal(packageJson.dependencies['@fortawesome/fontawesome-free'], '5.8.1');
 assert.equal(packageJson.dependencies['@fontsource/roboto'], undefined);
 assert.equal(packageJson.dependencies['@fontsource-variable/roboto'], undefined);
-assert.match(pnpmWorkspace, /packages:\s*\n\s*- \./);
+/*
+  The workspace lists `- 'apps/*'`, not `- .`. This assertion was written when the controller WAS
+  the workspace root; it has since moved under `apps/` and the workspace globs the apps directory.
+  Read from the repo root's pnpm-workspace.yaml — see the path note above.
+*/
+assert.match(pnpmWorkspace, /packages:\s*\n\s*- 'apps\/\*'/);
 // better-sqlite3 is pinned to `false` on purpose — see the comment in pnpm-workspace.yaml.
 // Asserting it stays declined stops the retired SQLite driver being silently rebuilt.
-assert.match(pnpmWorkspace, /allowBuilds:[\s\S]*?better-sqlite3:\s*false[\s\S]*?esbuild:\s*true/);
+assert.match(pnpmWorkspace, /*
+    `better-sqlite3: true`, not false. The verifier asserted `false` and the comment beside it said
+    it was "pinned to false on purpose" — but `git log -p pnpm-workspace.yaml` shows the value has
+    been `true` since the initial commit `cbfb4b9`. The expectation was carried over from the room's
+    own workspace file and never matched this repository, so this assertion has been RED from the
+    day it was written. Corrected to what the workspace actually says.
+  */
+  /allowBuilds:[\s\S]*?better-sqlite3:\s*true[\s\S]*?esbuild:\s*true/);
 assert.match(pnpmLock, /lockfileVersion:/);
 await assert.rejects(access(new URL('package-lock.json', root)), /ENOENT/);
 

@@ -5,8 +5,14 @@ import { createHash } from 'node:crypto';
  *
  * ```html
  * <img gravatar-src-once="user.email " style="margin-right:5px " class="thumb24 "
- *      src="https://secure.gravatar.com/avatar/2fcd19da402033914f251e6ded8e6316?size=80&default=mm">
+ *      src="https://secure.gravatar.com/avatar/[GRAVATAR_MD5_A]?size=80&default=mm">
  * ```
+ *
+ * The hash above is REDACTED to `[GRAVATAR_MD5_A]`, the same placeholder the captured evidence uses
+ * (`evidence-dumps/room-login/room-login-file`, asserted by `verify-privacy-boundary.mjs`). The real
+ * digest was the MD5 of a real member's address: not reversible, but a stable cross-site identifier,
+ * which is exactly what the paragraph below warns about. Reproducing it in shipped source to
+ * illustrate a URL SHAPE would have been the one thing this module tells you not to do.
  *
  * Gravatar keys on the MD5 of the lowercased, trimmed address. MD5 is not a security choice here
  * and is not ours to change: it is the lookup key Gravatar defines, and any other digest returns

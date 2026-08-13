@@ -17,10 +17,15 @@ import { MIGRATIONS } from './migrations/index.js';
       DELETE FROM rooms       -> ERROR: violates foreign key constraint
                                  "room_users_room_id_fkey" on table "room_users"
 
+  (The fixture address below is written on a reserved domain. The run used a synthetic `@x.com`
+  address; `x.com` is a live domain, so it is substituted here rather than left in the tree. The
+  substitution is noted rather than made silently — an edited transcript that does not say it was
+  edited is no longer evidence of anything.)
+
   After 0009, on the same rows:
 
       DELETE FROM room_users  -> DELETE 1, and the visit SURVIVES as
-                                 room_user_id=NULL display_name=Owner email=o@x.com
+                                 room_user_id=NULL display_name=Owner email=o@example.com
       DELETE FROM rooms       -> DELETE 1, and the visits are gone
 
   The two actions differ deliberately, and 0007's own docblock is the authority for it: a removed

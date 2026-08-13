@@ -23,8 +23,14 @@ const [
   readFile(new URL('../evidence-dumps/account-page/upload-image-badge-prompt.html', import.meta.url), 'utf8'),
   readFile(new URL('../src/routes/(app)/account/+page.svelte', import.meta.url), 'utf8'),
   readFile(new URL('../src/routes/(app)/account/+page.server.ts', import.meta.url), 'utf8'),
-  readFile(new URL('../src/routes/(app)/account/rooms/[id]/+page.svelte', import.meta.url), 'utf8'),
-  readFile(new URL('../src/routes/(app)/account/rooms/[id]/+page.server.ts', import.meta.url), 'utf8'),
+  /*
+    `[[tab]]` — the room detail route gained an OPTIONAL tab segment, so the files moved from
+    `rooms/[id]/` down into `rooms/[id]/[[tab]]/`. This verifier still pointed at the old location
+    and died with ENOENT before asserting anything at all, which is worse than a failed assertion:
+    it made the whole account contract unverifiable while looking like a broken build.
+  */
+  readFile(new URL('../src/routes/(app)/account/rooms/[id]/[[tab]]/+page.svelte', import.meta.url), 'utf8'),
+  readFile(new URL('../src/routes/(app)/account/rooms/[id]/[[tab]]/+page.server.ts', import.meta.url), 'utf8'),
   readFile(new URL('../src/lib/features.ts', import.meta.url), 'utf8'),
   readFile(new URL('../src/lib/server/account-entitlements.ts', import.meta.url), 'utf8'),
   readFile(new URL('../src/lib/components/AppNavbar.svelte', import.meta.url), 'utf8'),
@@ -66,11 +72,25 @@ assert.doesNotMatch(page, /••••|lastFour/);
 assert.match(page, /\{#if key\.secret\}[\s\S]*?\{key\.secret\}[\s\S]*?Secret unavailable — regen secret/);
 assert.doesNotMatch(pageServer, /lastFour:\s*apiKeys\.lastFour/);
 assert.match(pageServer, /secretCiphertext:\s*encryptApiKeySecret/);
-assert.match(pageServer, /secret:\s*k\.secretCiphertext[\s\S]*?decryptApiKeySecret/);
+/*
+  WHAT THIS GUARDS: the secret handed to the client is the DECRYPTED value, never the stored
+  ciphertext.
+
+  The old shape mapped `secret: k.secretCiphertext` and decrypted further down, so the assertion
+  looked for those two in that order. The code now decrypts inline —
+  `secret: decryptApiKeySecret(ciphertext, { accountId, keyId }, apiKeyEncryptionMaster())` — inside
+  a helper that returns `{ secret, undecryptable }` and downgrades a failed decrypt to
+  `secret: null` rather than leaking the envelope. That satisfies the same intent more directly, so
+  the assertion is rewritten to the intent instead of to the old spelling.
+
+  The companion `doesNotMatch` below still forbids the ciphertext reaching the client.
+*/
+assert.match(pageServer, /secret:\s*decryptApiKeySecret\(/);
+assert.doesNotMatch(pageServer, /secret:\s*k?\.?secretCiphertext\b/);
 assert.doesNotMatch(pageServer, /return \{ keyId: id, secret \}/);
 assert.match(schema, /secretCiphertext:\s*text\('secret_ciphertext'\)/);
 assert.match(ddl, /secret_ciphertext TEXT/);
-assert.match(page, /href=\{resolve\('\/account\/api-docs'\)\}[\s\S]*?target="_blank"[\s\S]*?API Docs/);
+assert.match(page, /href=\{resolve\('\/\(app\)\/account\/api-docs'\)\}[\s\S]*?target="_blank"[\s\S]*?API Docs/);
 assert.match(page, /&nbsp; \| &nbsp;/);
 assert.match(page, /<th>_id<\/th><th>secret<\/th><th class="acc-th-center">Actions<\/th>/);
 /*
@@ -89,7 +109,37 @@ assert.match(css, /\.acc-table-responsive\s*\{\s*overflow:\s*auto/);
 assert.match(page, /bootbox\.prompt\('Enter the badge name \(\*optional\):', 'OK', 'text'\)/);
 assert.match(page, /action="\?\/uploadImageBadge"[\s\S]*?use:enhance=\{saveImageBadge\}/);
 assert.match(page, /saveImageBadge:[\s\S]*?formData\.set\('label', imageLabel\)/);
-assert.doesNotMatch(pageServer, /uploadImageBadge:[\s\S]*?if \(!label\)/);
+/*
+  BOUNDED TO THE ACTION BODY, deliberately.
+
+  What this guards is real: the reference's own prompt reads "Enter the badge name (*optional):", so
+  an IMAGE badge must not require a label. `createBadge` and `updateBadge` DO require one, and both
+  contain `if (!label) return fail(400, …)`.
+
+  The previous spelling was `/uploadImageBadge:[\s\S]*?if \(!label\)/`, and `[\s\S]*?` does not stop
+  at the action boundary — it matched `uploadImageBadge:` at line 268 and then ran forward to the
+  `if (!label)` inside `updateBadge` at line 326. The assertion failed against CORRECT code, which
+  is the worst kind of failure: it sends the next reader to fix something that is not broken.
+
+  `[^]*?` bounded by the next `\n  <name>: async` keeps it inside the one action.
+*/
+{
+  /*
+    Sliced, not regexed. A lazy `[\s\S]*?` does NOT stop at the action boundary — it will happily
+    cross into the next action and match there, which is how the previous two spellings of this
+    assertion both failed against correct code. Taking the substring is unambiguous.
+  */
+  const start = pageServer.indexOf('uploadImageBadge: async');
+  assert.notEqual(start, -1, 'uploadImageBadge action not found in the account page server');
+  const rest = pageServer.slice(start + 'uploadImageBadge: async'.length);
+  const nextAction = rest.search(/\n {2}\w+: async/);
+  const body = nextAction === -1 ? rest : rest.slice(0, nextAction);
+  assert.doesNotMatch(
+    body,
+    /if \(!label\)/,
+    'an IMAGE badge must not require a label — the reference prompt reads "Enter the badge name (*optional):". `createBadge` and `updateBadge` DO require one; this action must not.'
+  );
+}
 assert.match(bootboxState, /inputType:\s*'text' \| 'textarea'/);
 assert.match(
   bootboxComponent,
@@ -139,8 +189,26 @@ assert.match(
   /\.acc-tooltip\.tooltip\.bottom \.tooltip-arrow\s*\{[^}]*border-width:\s*0 5px 5px[^}]*border-bottom-color:\s*rgb\(0, 0, 0\)/s
 );
 
+/*
+  COMMENTS ARE STRIPPED FIRST, and that is the whole point of this helper rather than a bare regex.
+
+  Scanning the raw source matched `<input type="color">` inside a JSDoc comment at
+  `+page.svelte:106`, which explains WHY the colour value lives in state ("`<input type="color">`
+  cannot hold an rgba value"). The two real colour inputs at :720 and :731 both carry `name=` and
+  were never the problem — the contract failed on prose that merely quotes markup.
+
+  That is the same trap this repository already records for template syntax in comments: a comment
+  is prose to a human and markup to any parser reading the file.
+*/
+function stripComments(source) {
+  return source
+    .replace(/<!--[\s\S]*?-->/g, '') // HTML / Svelte comments
+    .replace(/\/\*[\s\S]*?\*\//g, '') // block comments, incl. JSDoc
+    .replace(/(^|[^:])\/\/[^\n]*/g, '$1'); // line comments, without eating https://
+}
+
 function controlsWithoutBrowserIdentity(source) {
-  return [...source.matchAll(/<(input|select|textarea)\b[\s\S]*?>/g)]
+  return [...stripComments(source).matchAll(/<(input|select|textarea)\b[\s\S]*?>/g)]
     .map((match) => match[0])
     .filter((control) => !/(?:^|\s)(?:id|name)\s*=|\{name\}/.test(control));
 }

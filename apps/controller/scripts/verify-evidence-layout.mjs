@@ -5,6 +5,22 @@ const evidenceRoot = new URL('../evidence-dumps/', import.meta.url);
 const expectedDirectories = [
   'COPY',
   'NEXT-STEP',
+  /*
+    Added 2026-08-13. Static artifacts fetched read-only over HTTPS from protradingroom.com —
+    `app.min.js`, `vendor.min.js`, the raw `styles.css`, the public-site stylesheets, the Font
+    Awesome webfont, the API markdown, and the eight AngularJS `templateUrl` partials under
+    `views/`.
+
+    It is a capture set like the others and belongs under the same seal, which is why it is listed
+    here rather than excluded: this assertion is what stops an undocumented directory appearing in
+    the evidence tree, and silencing it for a directory I had just added would defeat the point.
+
+    Its own `README.md` carries byte counts and SHA-256 prefixes per file, and names the three
+    targets that came back as SOFT 404s — this server answers missing files with HTTP **200** and a
+    52-byte "this is not the page you are looking for" body, so absence there is recorded rather
+    than inferred.
+  */
+  'TIER1-fetched',
   'account-page',
   'home-page',
   'login-page',

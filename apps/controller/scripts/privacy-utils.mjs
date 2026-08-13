@@ -59,7 +59,27 @@ function containsDecodedIdentity(candidate) {
   return false;
 }
 
+/*
+  The product's OWN published role addresses.
+
+  These are not personal data and never were: `support@tradingroom.app` is the address a user is
+  told to write to, and it has to appear on the contact, privacy and terms pages — a privacy policy
+  with no contact route is worse than the "violation" this check was reporting. It tripped only
+  because `isSafeTestEmail` knew about RFC 2606 reserved domains and nothing else.
+
+  DELIBERATELY A ROLE-ADDRESS ALLOWLIST, NOT A DOMAIN ONE. Allowing all of `tradingroom.app` would
+  let a personal address on our own domain through — exactly the leak this verifier exists to stop.
+  Every occurrence in `src` today is this one address (4 of 4, measured), so the list stays at one
+  entry until a second published role address genuinely exists.
+
+  `tradingroom.app` is the product domain on hard evidence: `BRAND = 'tradingroom.app'` in
+  `src/lib/content/home.ts:15`, with `chat.` / `media.` / `mail.` subdomains through the deployment
+  docs. It is NOT the captured reference domain, which is protradingroom.com.
+*/
+const PUBLISHED_ROLE_ADDRESSES = new Set(['support@tradingroom.app']);
+
 function isSafeTestEmail(candidate) {
+  if (PUBLISHED_ROLE_ADDRESSES.has(candidate.toLowerCase())) return true;
   const domain = candidate.slice(candidate.lastIndexOf('@') + 1).toLowerCase();
   return (
     domain === 'example.com' ||

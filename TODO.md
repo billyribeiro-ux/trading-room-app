@@ -73,6 +73,43 @@ exists so it cannot silently stop agreeing, and a 1px drift fails it.
 those is on the AngularJS surface, and their styling questions now have a source instead of a
 sampled computed style.
 
+## The full gate is GREEN (2026-08-13) — all six red steps fixed
+
+`pnpm --filter controller test` exits 0. **742 Vitest tests across 67 files**, plus every source,
+evidence, privacy, font, breakpoint and runtime-HTTP contract.
+
+It had SIX failing steps, all pre-existing (proven by stashing every change and re-running at
+`HEAD`). The chain short-circuits at the first failure, so they surfaced one at a time as each was
+fixed — five known failures became six before it became zero.
+
+| step | root cause |
+|---|---|
+| `home:contract` | SvelteKit 3 migration (`ff948db`) changed `resolve()`/`asset()` shapes; verifier kept the old spellings |
+| `room-login:contract` | the same `asset()` leading-slash expectation |
+| `account:contract` | route moved to `rooms/[id]/[[tab]]/` (died ENOENT before asserting anything); a lazy `[\s\S]*?` crossed an action boundary; a regex matched markup quoted inside a CODE COMMENT |
+| `fonts:verify` | workspace files read from the package root; `pnpm` pin 11.18.0 vs 11.21.0; `better-sqlite3: false` asserted when it has been `true` since the first commit |
+| `privacy:verify` | 10 violations — see the table below |
+| `runtime:http` | asserted the ORIGINAL contact-page sentence; the page was rebuilt twice since and now keys off `controlPlaneMode`, not a launch phase |
+| `test:counts` | 715 documented vs 742 actual, after this session added 27 tests |
+
+**Not one was a defect in shipped behaviour.** Every failure was a contract describing a shape the
+code no longer used — which is the strongest argument for keeping the gate green: while it was red,
+nobody could read a green result, and that is exactly how two genuinely RED unit tests survived
+unnoticed until 2026-08-13.
+
+### `privacy:verify` — all 10 cleared, each on its own evidence
+
+| # | what | resolution |
+|---|---|---|
+| 3 | `(public)/{contact,privacy,terms}` raw email | `support@tradingroom.app` is the product's OWN published role address (`BRAND = 'tradingroom.app'`, `content/home.ts:15`). Allowlisted as a single ROLE ADDRESS, not a domain — a domain allowance would let a personal address on our own domain through. |
+| 2 | fixture emails on `x.com`, a live domain | → reserved domain. One sits inside a transcript of a real psql run, so the substitution is ANNOTATED. |
+| 4 | captured owner display name | → the suite's neutral `Ada Lovelace`. One site was `'Ada Lovelace'.replace('Ada Lovelace', '<name>')` — a no-op dance that existed only to smuggle the name past this check. |
+| 1 | raw Gravatar identifier | → `[GRAVATAR_MD5_A]`. It was a real member's MD5, present only to illustrate a URL shape — the one thing that module's own docblock says not to do. |
+
+---
+
+---
+
 ## Evidence gaps — the index
 
 Full write-ups live in the documents linked. Nothing below has been filled in with a plausible
@@ -82,6 +119,102 @@ value; each is a thing that was looked for and not found.
 they are removed, and their history lives in `CHANGELOG.md`, dated and timed, with the commit that
 closed each one. Two places recording the same thing is how one of them goes stale, and a list that
 is mostly strikethrough is a list nobody reads to the bottom of.
+
+### THE REGISTER: `docs/reference/evidence-gap-register.md`
+
+Every gap from the full read of `apps/controller/evidence-dumps/` now lives there with a status, in
+five tiers. **That file is the tracker — this section is only the index to it.** Do not record a
+gap's status in both places; one of them will go stale.
+
+As of 2026-08-13: **30 CLOSED, 25 OPEN, 14 parked/won't-fix, 69 total.**
+
+The total GREW from 56 to 68 because reading the uncompiled templates keeps surfacing features no
+DOM capture ever rendered — a new **Tier 5**. Three need a decision from the owner, not more
+reading:
+
+- **T5-9 — the API secret is rendered in plain text** in the account-page table, and the documented
+  API auth also puts `apiSecret` in the URL query string. Two inherited exposure paths.
+
+T5-1 and T5-3 were on this list and are now closed. The Stripe/marketplace block was ruled in scope
+and is built (2026-08-13), rendering through `$lib/money` rather than the reference's formatter —
+which divides by 100 unconditionally and so shows every zero-decimal currency a hundredfold low.
+
+**One genuinely missing thing came out of building it — T5-15.** The reference's Stripe block ends
+with a "Details" link whose handler is `openStripeDetails(user)`. That handler is in no capture, not
+in `views/page.manageSession.html`, and not among the handlers transcribed out of `app.min.js`. The
+link is deliberately NOT rendered, its absence is asserted by a test so it cannot be closed by
+accident, and capturing it needs a console run on a live room that actually has a marketplace
+member.
+
+Reading source also proved a gap can close as **dead markup**: the cloned-room indicator is an empty
+span in the SOURCE, so there was never anything to find (T2-9).
+
+- **Tier 0 (7) — all CLOSED.** Local work, no capture. The four "codepoints unreadable" gaps were
+  not really gaps: 951 codepoints decoded straight out of the sheets' own bytes. And `sheet-2.css`
+  is proven to be stock **Bootstrap 3.3.7 with zero customisation** — which also retired the
+  `.eot`/`.svg` `@font-face` question and the whole prefix/precision cluster as Chrome
+  re-serialisation artifacts.
+- **Tier 1 (7 closed, 2 open) — RUN 2026-08-13.** Artifacts in
+  `apps/controller/evidence-dumps/TIER1-fetched/`. `app.min.js` turned out to contain NO templates;
+  AngularJS loads 42 `.html` partials by `templateUrl`, and fetching those gave the uncompiled
+  source for **every `ngRepeat` in the product**. Still open: public-site images, and the Angular-17
+  room build assets (they soft-404 at `protradingroom.com/` — served from the room's own origin).
+- **Tier 2 (8 closed, 15 open) — the MARKUP question is settled; only geometry remains.** Every row
+  template is now in hand, so no seeding is needed for markup. What still needs a capture run is
+  rendered geometry (striping, hover) and the config-gated panes — re-run the collector with
+  `OPEN_EDITOR: true`, `OPEN_BOOTBOX: true`, `LOAD_STATS: true`; all three were `false`, which is
+  why those panes came back empty.
+
+**Beware the soft-404.** This server answers missing files with HTTP **200** and the body
+`<h3>this is not the page you are looking for...</h3>`. Any fetch tooling must check the bytes, not
+`res.ok` and not `Content-Type`. `ptr-fetch-static.js` now guards for it; it did not at first, and
+would have recorded three 404 pages as successful captures.
+- **Tier 3 (11 parked) — API wire contract.** Needs one authenticated GET each. Parked unless we
+  reimplement their Sessions API; note their auth puts `apiSecret` in the URL query string.
+- **Tier 4 (5 won't-fix)** — reasons recorded in the register.
+
+The one gap below is kept here in full because it is the largest single blocker and its cause is
+worth stating where people will read it.
+
+### The Manage page's USER ROW markup is not in `NEXT-STEP/gaps`, and cannot be
+
+**What is missing.** Every per-user control on the Manage → Users table: the five `<td>`s under
+`# | Name / Email | Last Login/Notes | Role / Status | Actions`, whatever the Actions column holds,
+how Role/Status is rendered, and whatever `ng-init="showPins=true;"` gates.
+
+**Why it is not there, on evidence.** `rawHtml.html:430-443` is the table, and its `<tbody>`
+contains exactly one thing:
+
+    442    <!-- ngRepeat: user in xrefs -->
+
+AngularJS 1.3.15 (version from `meta.json`) replaces an `ngRepeat` template with a comment
+placeholder and re-inserts clones per item. The room was captured with **zero** users loaded — the
+Users pane shows `Loading...` and `Load / Reload Users` was never clicked — so no clone was ever
+made and the template markup exists only inside the compiled bundle. This is not a collector
+oversight that a re-read can fix; the markup was never in the DOM.
+
+**Everything already read looking for it.** All 11 `state-*.json` captures (every one of the
+1,632/1,633 nodes, with attributes, flags, rects and text); all 11 `rects-*.json` (all 2,445
+distinct identity lines, all 778 distinct property/value pairs, all 182 class→style bindings);
+`rawHtml.html` head + body 49-153, 355-449, 2488-2592, all 166 comment lines, all 11 `{{ }}`
+expressions; `meta.json`; `stylesheets.json`; and `sheet-{0,1,4,5,6,7,8,9,10,11,13,14}.css`.
+
+**The same gap, same cause, for four more regions:**
+`<!-- ngRepeat: userStat in statXrefs | filter: uSearchStat -->` (`rawHtml.html:571` — the filter
+expression is recoverable, the row is not), `<!-- ngRepeat: montlyStat in statXrefsMontly -->`
+(:553), `<!-- ngIf: sess.authMode === 'unamePW' -->` (:294, :295), and
+`<!-- ngIf: completeUserList && completeUserList.length>0 -->` (:361).
+
+**What it blocks.** Any claim to a verified match on the Users table body, the User Stats table
+body, the monthly-report table, and the two `unamePW` login fields. Our
+`manage-user-row-sbs.test.ts` / `user-row-contract.test.ts` are built on the OTHER captures, not on
+this one, and must not be described as pinned to `NEXT-STEP`.
+
+**How to fetch it.** Needs a new capture, not a re-read: open the Manage page on a room that has
+users, click **Load / Reload Users**, and re-run the collector with `LOAD_STATS: true` (it ran with
+`LOAD_STATS: false`, per `meta.json` `config`). `scripts/ptr-collect.js` is the reference
+implementation to copy; the denylist must keep it off every destructive row action — the Actions
+menu alone carries Remove All, BAN, MUTE and Remove Free Trials.
 
 ### Blocking a feature
 

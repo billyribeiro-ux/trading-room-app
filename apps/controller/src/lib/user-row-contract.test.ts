@@ -74,7 +74,7 @@ describe('cell placement', () => {
 
   it('puts the name IMMEDIATELY after the avatar, before Discord and TRIAL', () => {
     /*
-      The rendered row is `<img …>Billy Ribeiro` with no element between them, and the Discord line
+      The rendered row is `<img …><the owner's display name>` with no element between them, and the Discord line
       and TRIAL badge follow the NAME. Ours emitted both of those first, so the name appeared after
       them. Established from the owner's own copy of the cell, which outranks any reconstruction.
     */

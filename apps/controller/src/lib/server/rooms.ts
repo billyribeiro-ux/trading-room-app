@@ -266,8 +266,40 @@ export function listRoomUsers(roomId: number) {
       notificationsState: roomUsers.notificationsState,
       inviteStatus: roomUsers.inviteStatus,
       discordUserId: roomUsers.discordUserId,
+      /*
+        The row renders `{{user.discordUsername}}` INSIDE `ng-show="user.discordUserId"`
+        (page.manageSession.html:362-364) — the id is the gate, the handle is the text. Ours
+        printed the id in both places, so a member with a Discord link showed a numeric snowflake
+        where the reference shows their name. Both columns are needed; neither substitutes.
+      */
+      discordUsername: roomUsers.discordUsername,
       phone: roomUsers.phone,
-      lastLoginAt: roomUsers.lastLoginAt
+      lastLoginAt: roomUsers.lastLoginAt,
+      /*
+        The per-member icon flags, each read straight off `user.*` in the reference's own ng-show
+        (page.manageSession.html:351-354). Both mobile icons are driven by the ROOM's
+        `ptrMobileAppCaseByCaseEnabled`, which is why the row cannot decide on its own which of the
+        two to show — the page reads the setting and picks.
+      */
+      hasFileAccess: roomUsers.hasFileAccess,
+      hasMobileApp: roomUsers.hasMobileApp,
+      alerterAppFcmUserOff: roomUsers.alerterAppFcmUserOff,
+      /*
+        Stripe. Selected unconditionally because `isMarketplaceUser` is the reference's own gate
+        (`ng-if="user.isMarketPlaceUser"`) and it is a column on this same row — one read, no
+        second round trip, and the gate travels with the data it gates.
+
+        `stripeLastPaidAmount` is minor units and MUST be rendered through `formatMoney` with its
+        companion currency. Anything that divides it by 100 unconditionally is a 100x error on
+        every zero-decimal currency; see `$lib/money`.
+      */
+      isMarketplaceUser: roomUsers.isMarketplaceUser,
+      stripeSubscriptionStatus: roomUsers.stripeSubscriptionStatus,
+      stripeLastPaidAt: roomUsers.stripeLastPaidAt,
+      stripeCurrentPeriodEnd: roomUsers.stripeCurrentPeriodEnd,
+      stripeLastPaymentFailureAt: roomUsers.stripeLastPaymentFailureAt,
+      stripeLastPaidAmount: roomUsers.stripeLastPaidAmount,
+      stripeLastPaidCurrency: roomUsers.stripeLastPaidCurrency
     })
     .from(roomUsers)
     .innerJoin(users, eq(users.id, roomUsers.userId))

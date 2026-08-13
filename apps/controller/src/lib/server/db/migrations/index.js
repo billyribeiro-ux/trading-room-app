@@ -8,6 +8,7 @@ import { sql as mobilePairAttempts } from './0006-mobile-pair-attempts.js';
 import { sql as roomSessions } from './0007-room-sessions.js';
 import { sql as backfillOwnerMemberships } from './0008-backfill-owner-memberships.js';
 import { sql as roomSessionsFkActions } from './0009-room-sessions-fk-actions.js';
+import { sql as userRowReferenceFields } from './0010-user-row-reference-fields.js';
 
 /**
  * Versioned, forward-only, apply-exactly-once migrations.
@@ -107,6 +108,11 @@ export const MIGRATIONS = [
     version: 9,
     name: 'room_sessions_fk_actions',
     sql: roomSessionsFkActions
+  },
+  {
+    version: 10,
+    name: 'user_row_reference_fields',
+    sql: userRowReferenceFields
   }
 ];
 

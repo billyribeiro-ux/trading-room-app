@@ -6,7 +6,9 @@
   import ToastHost from '$lib/components/ToastHost.svelte';
   import { toast } from '$lib/toast.svelte';
   import Editable from '$lib/components/Editable.svelte';
-  import { formatLastLogin } from '$lib/last-login-format';
+  import { formatLastLogin, formatShortDate } from '$lib/last-login-format';
+  import { formatMoney } from '$lib/money';
+  import { stripeStatusClass } from '$lib/stripe-status';
   import { focusDateField } from '$lib/focus-date-field';
   import { editableText, isBlank, isEditableEmpty } from '$lib/editable-display';
   import PermissionsModal from '$lib/components/PermissionsModal.svelte';
@@ -422,6 +424,22 @@
 
   const settingValue = (name: string) =>
     (data.settings as Record<string, string | number | boolean | null>)[name];
+
+  /*
+    The two ROOM settings that gate the row's four conditional icons
+    (page.manageSession.html:351-354). Derived once per settings change rather than read inside the
+    member loop: `settingValue` is an index into an object, so doing it per row is a lookup per row
+    per render for a value that is the same for every row in the table.
+
+    These stay `wired: false` in `room-settings-schema.ts`, and that is not an oversight. `wired`
+    there means "something IN THE ROOM reads it" — the union of the room-login page, the room app's
+    `internal/room-config/[code]`, and the SSO door. This is the controller's own admin table, which
+    renders and stores all 269 settings by definition. Flipping either one would put it in
+    `EXPECTED_WIRED_SETTINGS` and assert to the next reader that the room honours it, which it does
+    not yet.
+  */
+  const fileAccessCaseByCase = $derived(Boolean(settingValue('fileAccessCaseByCase')));
+  const mobileAppCaseByCase = $derived(Boolean(settingValue('ptrMobileAppCaseByCaseEnabled')));
 
   /**
    * Exactly the reference's set. "Admin" is not a role of its own — it is role 1
@@ -1392,26 +1410,56 @@ Please click this link to attend: ______ unique link will be here_____
                               <i ng-show="false" class="fa fa-mobile ng-hide" aria-hidden="true">
                               <i ng-show="false" class="fa fa-mobile ng-hide" style="color: red" aria-hidden="true">
 
-                            `ng-show="false"` is a literal, not an expression over data: these are
-                            unconditionally hidden in the reference too. They are in the DOM and
-                            never visible.
+                            CORRECTED 2026-08-13 — THE ABOVE READING IS WRONG, and it was wrong in a
+                            way only the SOURCE could show. The DOM capture renders `ng-show="false"`,
+                            from which this comment concluded "a literal, not an expression over
+                            data". The uncompiled template
+                            (`evidence-dumps/TIER1-fetched/views/page.manageSession.html:351-354`)
+                            says otherwise — each one INTERPOLATES:
 
-                            They were deleted once. Marked `hidden`, they had rendered anyway — a
-                            folder and two phones sat between the checkbox and the avatar on every
-                            row — because the HTML `hidden` attribute is only a UA-stylesheet
-                            `display: none` and Font Awesome's `.fa { display: inline-block }`
-                            outranks it. That is now fixed at the source: `manage.css` line 393
-                            gives `.mg-root [hidden]` a `display: none !important`, which is exactly
-                            what Angular's own `.ng-hide` carries. So the reason for deleting them
-                            no longer holds, and the DOM matches the reference again.
+                              ng-show="{{sess.fileAccessCaseByCase && user.hasFileAccess}}"
+                              ng-show="{{sess.ptrMobileAppCaseByCaseEnabled && user.hasMobileApp}}"
+                              ng-show="{{!sess.ptrMobileAppCaseByCaseEnabled && user.alerterAppTokens.length >0}}"
+                              ng-show="{{!sess.ptrMobileAppCaseByCaseEnabled && user.alerterAppFCMUserOff}}"
 
-                            Verified by measurement, not by reading the cascade: each of these
-                            computes `display: none` inside `.mg-root`.
+                            `{{expr}}` evaluated to the STRING "false" because the captured room had
+                            both case-by-case settings off and zero users loaded. So these are
+                            conditional icons that this room happened never to show — not dead
+                            markup.
+
+                            WIRED 2026-08-13, closing that gap. Migration `0010` added
+                            `hasFileAccess`, `hasMobileApp` and `alerterAppFcmUserOff` to the member;
+                            `alerterAppTokens` was already here as `pushTokensJson`, surfaced by the
+                            loader as `pushTokenCount` so the raw device tokens never leave the
+                            server.
+
+                            The two mobile icons are mutually exclusive BY CONSTRUCTION, not by
+                            coincidence: one requires `ptrMobileAppCaseByCaseEnabled` and the other
+                            two require its negation. A room with case-by-case ON shows the large
+                            `fa-2x` phone for members granted the app; a room with it OFF shows the
+                            small phone for members who have registered a device, and a RED small
+                            phone for members who have switched their own notifications off. Both
+                            small ones can show at once, which is the reference's behaviour and is
+                            meaningful — registered, but silenced.
+
+                            The `hidden` attribute is gone from all four because they are now
+                            conditional. `manage.css` still gives `.mg-root [hidden]` a
+                            `display: none !important`, which stays: it was added because Font
+                            Awesome's `.fa { display: inline-block }` outranks the UA stylesheet's
+                            `[hidden]` rule, and other `hidden` icons in this file still rely on it.
                           -->
-                          <i class="fa fa-folder-o fa-2x" aria-hidden="true" hidden></i>
-                          <i class="fa fa-mobile fa-2x" aria-hidden="true" hidden></i>
-                          <i class="fa fa-mobile" aria-hidden="true" hidden></i>
-                          <i class="fa fa-mobile mg-red" aria-hidden="true" hidden></i>
+                          {#if fileAccessCaseByCase && member.hasFileAccess}
+                            <i class="fa fa-folder-o fa-2x" aria-hidden="true"></i>
+                          {/if}
+                          {#if mobileAppCaseByCase && member.hasMobileApp}
+                            <i class="fa fa-mobile fa-2x" aria-hidden="true"></i>
+                          {/if}
+                          {#if !mobileAppCaseByCase && member.pushTokenCount > 0}
+                            <i class="fa fa-mobile" aria-hidden="true"></i>
+                          {/if}
+                          {#if !mobileAppCaseByCase && member.alerterAppFcmUserOff}
+                            <i class="fa fa-mobile mg-red" aria-hidden="true"></i>
+                          {/if}
                           <!--
                             The permission icons, in the reference's order, with NO title attribute.
 
@@ -1429,7 +1477,7 @@ Please click this link to attend: ______ unique link will be here_____
                             <i class="fa fa-hdd-o mg-red" aria-hidden="true" title="Denied Archives Access"></i>
                           {/if}
                           <!--
-                            The name follows the avatar IMMEDIATELY — `<img …>Billy Ribeiro`, no
+                            The name follows the avatar IMMEDIATELY — `<img …><the owner's display name>`, no
                             element between them. The Discord line and the TRIAL badge come AFTER the
                             name, not before it, which is where ours had put them.
                           -->
@@ -1440,10 +1488,93 @@ Please click this link to attend: ______ unique link will be here_____
                             width="24"
                             height="24"
                           />{member.displayName}
-                          <!-- `ng-show="user.discordUserId"`. Written by the Discord
-                               integration, which is not built — see docs/OUTSTANDING.md. -->
+                          <!--
+                            `<div ng-show="user.discordUserId">Discord Username: {{user.discordUsername}}</div>`
+                            — page.manageSession.html:362-364. The ID is the GATE; the HANDLE is the
+                            text. This rendered the id in both positions, so a linked member showed a
+                            numeric snowflake where the reference shows their name. Two columns, and
+                            neither substitutes for the other.
+
+                            Still written by the Discord integration, which is not built — see
+                            docs/OUTSTANDING.md. Both columns stay null until it is.
+                          -->
                           {#if member.discordUserId}
-                            <div class="mg-discord">Discord Username: {member.discordUserId}</div>
+                            <div class="mg-discord">Discord Username: {member.discordUsername}</div>
+                          {/if}
+                          <!--
+                            THE STRIPE / MARKETPLACE BLOCK — page.manageSession.html:365-389, behind
+                            a marker comment in the reference reading "stripe data here".
+
+                            This feature appears in NO DOM capture. The captured room has no
+                            marketplace members, so `ng-if="user.isMarketPlaceUser"` removed the
+                            whole div before it ever reached the DOM — `ng-if`, unlike `ng-show`,
+                            leaves nothing behind to find. It exists only in the template, which is
+                            the second thing in this row that reading the source found and reading
+                            the render could not.
+
+                            `.stripe-mini` and `.mb-xs` HAVE NO CSS RULE. Not assumed — both
+                            `evidence-dumps/TIER1-fetched/styles.css` (218 KB, the app's own sheet)
+                            and `theme.css` (233 KB) were read for each, and neither defines either.
+                            The 4px gap comes from the inline style, which is why that is inline here
+                            too. They are kept because they are in the reference's markup and this
+                            table is a match target; they are inert there and inert here.
+
+                            The `.label-*` classes ARE real: Bootstrap 3.3.7 defines all five
+                            (`evidence-bootstrap-3.3.7.css`, `.label-default` #777 through
+                            `.label-danger`). `stripeStatusClass()` picks between them exactly as the
+                            reference's `getStripeStatusClass` does.
+
+                            HONEST GAP — the "Details" link is deliberately NOT here. The reference
+                            ends the block with an anchor carrying an empty href, the classes
+                            `label label-info`, a `fa-info-circle` icon, the text "Details", and an
+                            ng-click of `openStripeDetails(user)`; nothing in the evidence says what
+                            that opens. `openStripeDetails` is
+                            not in the template, not in any capture, and not among the handlers
+                            transcribed out of `app.min.js` in
+                            `docs/reference/evidence-dumps-full-read.md`. Rendering the anchor with
+                            an invented modal behind it, or with no behaviour at all, would be a
+                            control whose only effect is its own presence. Recorded in `TODO.md`
+                            under Evidence gaps instead, with the console script that would fetch it.
+
+                            Every amount goes through `formatMoney`, never a bare `/100` — the
+                            reference's own formatter divides unconditionally and renders JPY, KRW,
+                            VND and thirteen more a hundredfold low. `money.test.ts` keeps that
+                            implementation as a negative control so nobody restores it.
+                          -->
+                          {#if member.isMarketplaceUser}
+                            <div class="stripe-mini mb-xs mg-stripe-mini">
+                              <span
+                                class="label {stripeStatusClass(member.stripeSubscriptionStatus)}"
+                                title="Subscription Status"
+                              >
+                                <i class="fa fa-credit-card"></i>
+                                {member.stripeSubscriptionStatus || 'stripe'}
+                              </span>
+                              {#if member.stripeLastPaidAt}
+                                <span class="label label-default" title="Last Paid At">
+                                  <i class="fa fa-calendar-check-o"></i>
+                                  {formatShortDate(member.stripeLastPaidAt)}
+                                </span>
+                              {/if}
+                              {#if member.stripeCurrentPeriodEnd}
+                                <span class="label label-default" title="Next Billing">
+                                  <i class="fa fa-clock-o"></i>
+                                  {formatShortDate(member.stripeCurrentPeriodEnd)}
+                                </span>
+                              {/if}
+                              {#if member.stripeLastPaymentFailureAt}
+                                <span class="label label-danger" title="Last Payment Failure">
+                                  <i class="fa fa-exclamation-triangle"></i>
+                                  {formatShortDate(member.stripeLastPaymentFailureAt)}
+                                </span>
+                              {/if}
+                              {#if member.stripeLastPaidAmount}
+                                <span class="label label-default" title="Last Paid Amount">
+                                  <i class="fa fa-usd"></i>
+                                  {formatMoney(member.stripeLastPaidAmount, member.stripeLastPaidCurrency ?? undefined)}
+                                </span>
+                              {/if}
+                            </div>
                           {/if}
                           <!-- `.badge.badge-danger-chat` — RED. `.badge-danger` is a Bootstrap 4
                                name on a Bootstrap 3 sheet and has no rule at all, so this rendered

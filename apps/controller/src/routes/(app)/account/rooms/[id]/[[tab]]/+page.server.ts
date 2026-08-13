@@ -194,7 +194,18 @@ export const load: PageServerLoad = async ({ params, locals, url }) => {
      * The `<img class="thumb24">` element itself IS rendered, so the row's shape matches the
      * capture; what differs is the src, which falls back to the local placeholder.
      */
-    avatarUrl: null as string | null
+    avatarUrl: null as string | null,
+    /*
+      The third of the row's four conditional icons is
+      `ng-show="{{!sess.ptrMobileAppCaseByCaseEnabled && user.alerterAppTokens.length >0}}"`
+      (page.manageSession.html:353), so the page needs to know whether this member has any push
+      tokens — not what they are.
+
+      Counted HERE rather than in the component because `readPushTokens` lives in `$lib/server` and
+      a component cannot import it. The count is the whole of what the icon needs, which is why the
+      raw column is stripped from the payload further down — see the note above the `members` map.
+    */
+    pushTokenCount: readPushTokens(u.pushTokensJson).length
   }));
   if (q) {
     users = users.filter((u) => u.displayName.toLowerCase().includes(q) || u.email.toLowerCase().includes(q));
@@ -249,6 +260,22 @@ export const load: PageServerLoad = async ({ params, locals, url }) => {
 
   const publicId = room.publicId ?? String(room.id);
 
+  /*
+    Every member's device registrations are dropped BEFORE the payload leaves the server.
+
+    `pushTokensJson` holds FCM/APNs tokens — a per-device credential, and the closest thing this row
+    has to one. The page needs exactly one fact from it: whether the count is above zero, for the
+    third of the row's four conditional icons. `pushTokenCount` above answers that, so the raw list
+    has no consumer on the client and shipping it would be handing out credentials to answer a
+    yes/no question.
+
+    Stripped HERE, after the filters, rather than by changing the map: `mobile-filter-contract.ts`
+    pins the two filter expressions verbatim because the predicate they encode was read out of the
+    reference's own bundle, and rewriting them to use the count would edit the thing that test
+    exists to protect. The filters keep reading the column server-side; the client never sees it.
+  */
+  const members = users.map(({ pushTokensJson: _deviceTokens, ...member }) => member);
+
   return {
     room,
     /** the reference's `ng-href` on Launch — the whole handoff URL, resolved at page load */
@@ -264,11 +291,11 @@ export const load: PageServerLoad = async ({ params, locals, url }) => {
     // Re-sanitize persisted HTML at the read boundary. This is the only value
     // branded for the reviewed client-side HTML sink.
     landingHtml: sanitizeHtml(String(settings.description ?? '')),
-    users,
+    users: members,
     /** a filter the menu offers but this loader cannot honour — shown, never silently ignored */
     unsupportedFilter,
     /** the User Stats table — real logins only, never invented rows */
-    stats: users.filter((u) => u.lastLoginAt).sort((a, b) => Number(b.lastLoginAt) - Number(a.lastLoginAt)),
+    stats: members.filter((u) => u.lastLoginAt).sort((a, b) => Number(b.lastLoginAt) - Number(a.lastLoginAt)),
     /**
      * One row per ARRIVAL, which is what the reference's `statXrefs` is and what its CSV exports.
      *

@@ -165,7 +165,13 @@ requireText(
   files.page,
   sources.page,
   'the exact self-hosted hero font asset',
-  "const heroFontUrl = asset('/fonts/roboto/roboto-v51-latin-300.woff2');"
+  /*
+    NO LEADING SLASH. SvelteKit 3's `asset()` takes a path relative to the assets base, and the
+    codebase is unanimous: all 6 `asset()` call sites are written without one. This assertion had
+    `/fonts/...` and went RED when `ff948db` ("Adopt SvelteKit 3 next") migrated the call shapes and
+    left the verifier behind.
+  */
+  "const heroFontUrl = asset('fonts/roboto/roboto-v51-latin-300.woff2');"
 );
 requirePattern(
   files.page,
@@ -306,9 +312,19 @@ requirePattern(files.consent, sources.consent, 'the client-only stored-consent r
 /* The links must live in the footer itself; the copyright line lives in the deck the footer
    renders. Testing a combined blob let either side silently lose its half. */
 for (const [claim, pattern] of [
-  ['the privacy link', /resolve\('\/privacy'\)/],
-  ['the terms link', /resolve\('\/terms'\)/],
-  ['the contact link', /resolve\('\/contact'\)/],
+  /*
+    ROUTE IDS INCLUDE THE ROUTE GROUP. These pages live at `src/routes/(public)/{privacy,terms,
+    contact}` and there are no ungrouped variants, so `/(public)/privacy` IS the route id — that is
+    what SvelteKit 3's typed `resolve()` accepts, and `resolve('/privacy')` would not type-check.
+    All 41 `resolve()` call sites in `src` carry their group.
+
+    These three matched the pre-group shape and went RED for the same reason as the font assertion
+    above: `ff948db` migrated the source and this file was not updated with it. The links were never
+    missing — the contract was describing a shape the framework no longer uses.
+  */
+  ['the privacy link', /resolve\('\/\(public\)\/privacy'\)/],
+  ['the terms link', /resolve\('\/\(public\)\/terms'\)/],
+  ['the contact link', /resolve\('\/\(public\)\/contact'\)/],
   ['the rendered copyright line', /\{FOOTER\.copyright\}/]
 ]) {
   if (!pattern.test(sources.footer)) failures.push(`${files.footer}: missing ${claim}`);
