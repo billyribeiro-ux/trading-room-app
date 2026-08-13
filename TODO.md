@@ -126,7 +126,22 @@ Every gap from the full read of `apps/controller/evidence-dumps/` now lives ther
 five tiers. **That file is the tracker — this section is only the index to it.** Do not record a
 gap's status in both places; one of them will go stale.
 
-As of 2026-08-13 14:05 EDT: **36 CLOSED, 26 OPEN, 14 parked/won't-fix, 76 total.**
+As of 2026-08-13 14:25 EDT: **41 CLOSED, 24 OPEN, 14 parked/won't-fix, 78 total.**
+
+Five more closed by reading `page.manageSession.html:773-912` — **T2-12** (webinar Date row and the
+email preview), **T2-13** (SEVEN password rows, not three), **T2-16** (the App Pair Link value really
+is a bare prefix), **T2-21** (the header buttons, including a double-click easter egg that unlocks
+Clone), and **T5-23** recorded below.
+
+**T5-23 — a real defect in the REFERENCE, not carried.** Its Logout Webhook row edits the LOGIN
+webhook: `editable-textarea="sess.login_webhook_url"` under a label, a display and a save target
+that all say logout. Opening that row and saving without editing copies one over the other. It
+cannot happen here — our settings rows bind one identifier — and `reference-defects-not-reproduced.test.ts`
+pins both that fact and that the defect is still in the evidence, so the citation cannot rot.
+
+**T5-24 needs your decision.** The WordPress shortcode row renders the room's JWT signing secret in
+plain text, and unlike the JWT rows above it, it is UNGATED — so a room on any auth mode displays
+its secret to anyone who can see the Settings tab. Same family as T5-9.
 
 Four closed by reading `page.manageSession.html:634-780` — **T2-11** (the JWT rows live in the
 SETTINGS tab, not their own), **T2-14** (the SSO tab is exactly one row, SSO Host), **T2-19** (the

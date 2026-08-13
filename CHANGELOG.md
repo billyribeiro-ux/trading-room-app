@@ -24,6 +24,58 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-13
 
+### 2026-08-13 14:25 EDT — Five more gaps closed by reading, and a defect found in the reference itself
+
+**Runtime impact: none** — one new test file and documentation. No markup changed.
+
+Read `page.manageSession.html:773-912`, the Settings tab's first hundred rows. Five register items
+close outright:
+
+- **T2-12 — the webinar Date row.** `editable-combodate`, `e-data-format="DD-MM-YYYY h:mm a"` against
+  a `data-format` of `DD-MM-YYYY +-HH:mm`, displaying `MM/dd/yyyy @ hh:mm a` — `hh`, zero-padded, and
+  the only place on the page that differs from the `h:mma` used everywhere else. Its note sits in a
+  NON-STANDARD `<muted>` element. The send handler is misspelled `sendWeminarEmailReminder`.
+- **T2-13 — SEVEN password rows, not the three we had recorded.** `webinarPW`, `webinarPW2`,
+  `webinarPW3`, `webinarPWFreeTrial`, plus `deleteAlertPW`, `allRoomsWelcomeMatPW` and
+  `needPasswordForUserNotes`. The Free Trial row alone carries an extra `authMode=='unamePW'` in its
+  gate AND is the one `<p>` on the page with no `form-control-static` class.
+- **T2-16 — the App Pair Link.** Its value really is `https://{{hostname}}/room/`, a bare prefix with
+  no id. That was not a capture artifact; it is what the source emits.
+- **T2-21 — the header buttons.** Clone Room has THREE conditions, the third being a click counter
+  unlocked by `ng-dblclick="canCloneDblClick()"` on the room-id span — an easter egg. Delete Room is
+  clones only.
+- **T5-23** — below.
+
+**All 25 settings keys in that region are present in our 269-setting schema.** Checked by name, one
+at a time, not assumed. The extraction is holding up against the source it was never built from.
+
+**T5-23 — A REAL DEFECT IN THE REFERENCE, and the most interesting thing in this read.** Line 854:
+
+    <label>Logout Webhook URL</label>
+    <a onaftersave="saveSessField('logout_webhook_url')"
+       editable-textarea="sess.login_webhook_url"
+       e-label="Logout Webhook URL:">{{ sess.logout_webhook_url || 'empty' }}</a>
+
+Three references to a webhook field, and one of them is the wrong one. The label says logout, the
+display says logout, the save target says logout — but the editor BINDS the login webhook. Open that
+row to check it, save without editing, and you have copied your login webhook over your logout
+webhook. It reads correctly until you use it.
+
+It cannot occur here: our settings rows render `<Editable {def} value={settingValue(def.name)}>` in a
+loop over the schema, so label, value and save target are one identifier and there is no second one
+to get wrong. A new file, `reference-defects-not-reproduced.test.ts`, pins that — and also asserts
+the defect is still present IN the evidence, so if the reference is ever re-fetched and fixed
+upstream, the test fails and tells the reader to go and look rather than leaving a fictional citation
+behind. That guard matters more than the assertion it protects.
+
+**T5-24 opened, needs a decision.** The WordPress shortcode row prints
+`key='{{sess.ssoJWTSecret}}'` — the room's JWT signing secret — in plain text, and unlike the JWT
+rows immediately above it, that row is UNGATED. A room on any auth mode displays its signing secret
+to anyone who can see the Settings tab. Same family as T5-9, and the same decision.
+
+**Verified:** `svelte-check` 1485 files / 0 errors; 793 tests across 71 files, 4 new.
+
+
 ### 2026-08-13 14:05 EDT — Four gaps closed by reading; three live locale bugs and an off-by-one fixed
 
 **Runtime impact: YES** — four date renderings and one index on the manage page.
