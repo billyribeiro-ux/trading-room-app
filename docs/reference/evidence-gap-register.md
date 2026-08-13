@@ -129,6 +129,8 @@ Reading source rather than rendered DOM surfaced features no capture ever showed
 | T5-9 | The API secret is rendered in PLAIN TEXT in the account page table (`page.welcome.html:1341`). Decide whether our rebuild reproduces that or masks it. | OPEN — DECISION NEEDED |
 | T5-10 | `s.ownerdID` (`page.welcome.html:368`) — the label reads `ownerID:` but the binding has a stray `d`. It rendered a real value, so the MODEL property is genuinely `ownerdID`. Do not "correct" it. | OPEN |
 | T5-11 | `showNewRoom>=5` gates the **New Room** button (`page.welcome.html:396`) — a click-counter easter egg, not a permission. Confirm what increments it. | OPEN |
+| T5-13 | **FOUR CONDITIONAL ICONS ARE HARDCODED HIDDEN IN OUR USER ROW.** `page.manageSession.html:351-354` shows they interpolate — `{{sess.fileAccessCaseByCase && user.hasFileAccess}}`, `{{sess.ptrMobileAppCaseByCaseEnabled && user.hasMobileApp}}`, `{{!…CaseByCase && user.alerterAppTokens.length >0}}`, `{{!…CaseByCase && user.alerterAppFCMUserOff}}`. The DOM capture showed `ng-show="false"` only because that room had both settings off and no users, and our comment concluded they were dead markup. Needs `hasFileAccess`, `hasMobileApp`, `alerterAppTokens`, `alerterAppFCMUserOff` on the member — schema, loader and render. | OPEN — REAL FEATURE GAP |
+| T5-14 | `mobilePairCode` exists in our schema (`db/schema.ts:334`) but is not surfaced on the user row. The reference shows it behind `ng-show="showPins && user.mobilePairCode"` — which is what `ng-init="showPins=true;"` on the table is for. | OPEN |
 | T5-12 | Stats rows use a per-row `ng-hide="filterOnline && !userStat.isOnline"`, so `table-striped` counts hidden rows — same trap as archived rooms. | OPEN |
 
 ---
@@ -154,8 +156,8 @@ Reading source rather than rendered DOM surfaced features no capture ever showed
 | T2 | 8 | 15 | 0 | 23 |
 | T3 | 1 | 0 | 10 | 11 |
 | T4 | 0 | 0 | 5 | 5 |
-| T5 | 3 | 9 | 0 | 12 |
-| **total** | **31** | **23** | **14** | **68** |
+| T5 | 3 | 11 | 0 | 14 |
+| **total** | **31** | **25** | **14** | **70** |
 
 ### Acted on, not just recorded (2026-08-13)
 - **T5-3 → `src/lib/money.ts` + 20 tests.** The zero-decimal 100× bug is now un-introducible: the

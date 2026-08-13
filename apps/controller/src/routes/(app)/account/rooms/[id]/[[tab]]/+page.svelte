@@ -1392,9 +1392,35 @@ Please click this link to attend: ______ unique link will be here_____
                               <i ng-show="false" class="fa fa-mobile ng-hide" aria-hidden="true">
                               <i ng-show="false" class="fa fa-mobile ng-hide" style="color: red" aria-hidden="true">
 
-                            `ng-show="false"` is a literal, not an expression over data: these are
-                            unconditionally hidden in the reference too. They are in the DOM and
-                            never visible.
+                            CORRECTED 2026-08-13 — THE ABOVE READING IS WRONG, and it was wrong in a
+                            way only the SOURCE could show. The DOM capture renders `ng-show="false"`,
+                            from which this comment concluded "a literal, not an expression over
+                            data". The uncompiled template
+                            (`evidence-dumps/TIER1-fetched/views/page.manageSession.html:351-354`)
+                            says otherwise — each one INTERPOLATES:
+
+                              ng-show="{{sess.fileAccessCaseByCase && user.hasFileAccess}}"
+                              ng-show="{{sess.ptrMobileAppCaseByCaseEnabled && user.hasMobileApp}}"
+                              ng-show="{{!sess.ptrMobileAppCaseByCaseEnabled && user.alerterAppTokens.length >0}}"
+                              ng-show="{{!sess.ptrMobileAppCaseByCaseEnabled && user.alerterAppFCMUserOff}}"
+
+                            `{{expr}}` evaluated to the STRING "false" because the captured room had
+                            both case-by-case settings off and zero users loaded. So these are
+                            conditional icons that this room happened never to show — not dead
+                            markup.
+
+                            THEY ARE THEREFORE A REAL FUNCTIONAL GAP HERE, not a match. Ours are
+                            hardcoded `hidden`, so they can never appear. Making them work needs
+                            `hasFileAccess`, `hasMobileApp`, `alerterAppTokens` and
+                            `alerterAppFCMUserOff` on the member — none of which our model carries
+                            yet (`server/rooms.ts:91` has only hasMic/hasScreen/hasCam/hasAdminChat/
+                            canEditNotes, plus denyArchivesAccess). Tracked as T5-13 in
+                            `docs/reference/evidence-gap-register.md`.
+
+                            Left `hidden` deliberately in the meantime: an icon wired to a field that
+                            does not exist would be a control whose only effect is its own presence,
+                            which this project has a rule against. The markup stays so the DOM
+                            matches; the behaviour is recorded as missing rather than faked.
 
                             They were deleted once. Marked `hidden`, they had rendered anyway — a
                             folder and two phones sat between the checkbox and the avatar on every
