@@ -24,6 +24,46 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-13
 
+### 2026-08-13 17:32 EDT — `badges.dark_theme` is an ID, and our column is a boolean
+
+**Runtime impact: none** — a schema note corrected with proof, and two gaps opened. No column changed
+yet, deliberately.
+
+Read the badges table in `page.welcome.html:1148-1218`. It settles a question the schema itself said
+could not be settled.
+
+`schema.ts` recorded `dark_theme` as an honest gap and named the exact thing that would resolve it:
+*"if that markup is captured later and shows an id, that is a new migration, not a rewrite."* The
+account capture's badges `<tbody>` was EMPTY, so the row markup was not in this repository at all.
+
+**It is now, and it shows an id.** `:1191-1211` renders the Dark Theme cell as a nested repeat over
+the badge list filtered by `ng-if="roomBadge._id === b.darkTheme"`, drawing that badge's own chip
+inline with its `bkcolor` and `color`. **A boolean cannot be compared to an `_id`.** `dark_theme`
+holds the id of another badge — the dark-theme VARIANT of this one — exactly as the
+`.dark-theme-badge-id` class name had hinted.
+
+**Not migrated yet, and that is the point.** The STORAGE is proven and so is the DISPLAY. The control
+that SETS it is not: `addBadgeDarkTheme(b._id, b.text, b.imgURL, b.darkTheme)` hands back the current
+value, which is the shape of a picker, and no picker is in any capture. Adding an id column now
+leaves a column nothing can write — the identical defect already recorded as T5-20, and the one this
+project keeps finding. Tracked as **T5-27** with the migration written out: a nullable
+`dark_theme_badge_id INTEGER REFERENCES badges(id)`, the boolean kept as superseded since migrations
+are forward-only, and true→null the only honest backfill because the flag never held WHICH badge.
+
+**T5-28 — a third double-click easter egg.** `:1161` is
+`<th ng-dblclick="showBadgeID=!showBadgeID;">Badge</th>` with `ng-init="showBadgeID=false"` on the
+wrapper: double-clicking the Badge column header reveals every row's `_id`. The others found today
+were `canCloneDblClick()` on the manage room-id span and the click-counter on the word "Sessions".
+Three so far, all revealing internal ids — a habit of this codebase rather than a one-off.
+
+Two more details from the same row: the chip takes `ng-class="{'label-badge-img': …imgURL}"` when it
+has an image, which is what `.label-badge-img { padding: 0 !important }` exists for; and the name
+span renders `{{[b.name]}}` — an ARRAY interpolation, so AngularJS prints `["Name"]`, brackets and
+quotes included. **That is the reference's own bug and must not be reproduced.**
+
+**Verified:** `svelte-check` 1501 files / 0 errors; 877 tests across 82 files green. Register **57
+CLOSED, 14 OPEN, 13 parked, 84 total**, tally test-checked.
+
 ### 2026-08-13 17:23 EDT — The "failed-login error state" is a CAPTCHA, and we already had it
 
 **Runtime impact: none** — a register correction. No code changed.
