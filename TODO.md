@@ -1,4 +1,9 @@
-# TODO — the repository index
+# TODO — what is still left to do
+
+Stripped 2026-08-13 18:26 EDT to exactly that. Everything historical moved out: finished work lives
+in `CHANGELOG.md`, and the process rules earned along the way live in
+`docs/reference/working-rules.md`. If a section here is not something somebody still has to DO, it
+does not belong.
 
 This is the root index. Anything recorded per-app stays where it is; this file points at it, so
 there is one place to look rather than four.
@@ -21,6 +26,7 @@ will fetch it. A gap recorded in only one app's document is a gap the next perso
 | `docs/EMAIL.md`                                         | transactional sending vs mailbox hosting, what is built, the DNS records, and the verification trap                                                                                                                                         |
 | `docs/MOBILE-APP.md`                                    | the phone/tablet app — decoded server surface, proposed endpoint contract, security constraints, the white-label question                                                                                                                   |
 | `apps/controller/docs/OUTSTANDING.md`                   | the controller's own gap register, §1–§7                                                                                                                                                                                                    |
+| `docs/reference/working-rules.md`                       | **how to work on this repository** — eight rules, each earned by a specific failure on 2026-08-13. Read before trusting any "not built" or "no such rule" note. |
 | `apps/controller/docs/MEDIASOUP-DEPLOYMENT-PLAN.md`     | the SFU deployment ladder — **Stage 2+ superseded**, see `NEXT-SESSION.md` §4c                                                                                                                                                              |
 | `apps/controller/docs/decisions/`                       | ADRs. 0003 is the one that matters for topology                                                                                                                                                                                             |
 | `apps/room/TODO.md`                                     | the room's own list                                                                                                                                                                                                                         |
@@ -73,43 +79,6 @@ exists so it cannot silently stop agreeing, and a 1px drift fails it.
 those is on the AngularJS surface, and their styling questions now have a source instead of a
 sampled computed style.
 
-## The full gate is GREEN (2026-08-13) — all six red steps fixed
-
-`pnpm --filter controller test` exits 0. **742 Vitest tests across 67 files**, plus every source,
-evidence, privacy, font, breakpoint and runtime-HTTP contract.
-
-It had SIX failing steps, all pre-existing (proven by stashing every change and re-running at
-`HEAD`). The chain short-circuits at the first failure, so they surfaced one at a time as each was
-fixed — five known failures became six before it became zero.
-
-| step | root cause |
-|---|---|
-| `home:contract` | SvelteKit 3 migration (`ff948db`) changed `resolve()`/`asset()` shapes; verifier kept the old spellings |
-| `room-login:contract` | the same `asset()` leading-slash expectation |
-| `account:contract` | route moved to `rooms/[id]/[[tab]]/` (died ENOENT before asserting anything); a lazy `[\s\S]*?` crossed an action boundary; a regex matched markup quoted inside a CODE COMMENT |
-| `fonts:verify` | workspace files read from the package root; `pnpm` pin 11.18.0 vs 11.21.0; `better-sqlite3: false` asserted when it has been `true` since the first commit |
-| `privacy:verify` | 10 violations — see the table below |
-| `runtime:http` | asserted the ORIGINAL contact-page sentence; the page was rebuilt twice since and now keys off `controlPlaneMode`, not a launch phase |
-| `test:counts` | 715 documented vs 742 actual, after this session added 27 tests |
-
-**Not one was a defect in shipped behaviour.** Every failure was a contract describing a shape the
-code no longer used — which is the strongest argument for keeping the gate green: while it was red,
-nobody could read a green result, and that is exactly how two genuinely RED unit tests survived
-unnoticed until 2026-08-13.
-
-### `privacy:verify` — all 10 cleared, each on its own evidence
-
-| # | what | resolution |
-|---|---|---|
-| 3 | `(public)/{contact,privacy,terms}` raw email | `support@tradingroom.app` is the product's OWN published role address (`BRAND = 'tradingroom.app'`, `content/home.ts:15`). Allowlisted as a single ROLE ADDRESS, not a domain — a domain allowance would let a personal address on our own domain through. |
-| 2 | fixture emails on `x.com`, a live domain | → reserved domain. One sits inside a transcript of a real psql run, so the substitution is ANNOTATED. |
-| 4 | captured owner display name | → the suite's neutral `Ada Lovelace`. One site was `'Ada Lovelace'.replace('Ada Lovelace', '<name>')` — a no-op dance that existed only to smuggle the name past this check. |
-| 1 | raw Gravatar identifier | → `[GRAVATAR_MD5_A]`. It was a real member's MD5, present only to illustrate a URL shape — the one thing that module's own docblock says not to do. |
-
----
-
----
-
 ## Evidence gaps — the index
 
 Full write-ups live in the documents linked. Nothing below has been filled in with a plausible
@@ -134,409 +103,98 @@ instruction is just a note that something is unfinished.
 
 ---
 
-### HANDOFF — the twelve I could not finish, and exactly what each needs
+### HANDOFF — the FOURTEEN still open, and exactly what each needs
 
-Recorded 2026-08-13 16:05 EDT. Every item says WHO does the next step and WHAT it is. Nothing here
-is waiting on more reading; the templates are exhausted for these.
+Rewritten 2026-08-13 18:21 EDT. It said twelve when the template read was still running; two more
+were opened by finishing it. Every item says WHO does the next step and WHAT it is. **No item here
+is waiting on more reading — the templates are exhausted.**
 
 #### A. Five need a browser on the live site. Both scripts are written and smoke-tested.
 
-**Do this:** open protradingroom.com in Chrome, open DevTools → Console, paste the file's whole
-contents, press Enter. Each downloads by itself. Neither clicks a mutating control, submits a form,
-or sends anything, and both redact emails / long digit runs / Stripe ids to their SHAPE before
-writing. Then drop the JSON into `apps/controller/evidence-dumps/` and say it is there.
+Paste the file's whole contents into Chrome's console. Each downloads by itself. Neither clicks a
+mutating control, submits a form, or sends anything, and both redact emails / long digit runs /
+Stripe ids to their SHAPE before writing. Drop the JSON into `apps/controller/evidence-dumps/`.
 
-| gap | script | where to be when you paste it |
+| gap | script | where to be |
 | --- | --- | --- |
-| **T5-15** `openStripeDetails` — what the Stripe "Details" link opens | `apps/controller/scripts/collect-stripe-details.js` | any room's **manage** page. Needs NO marketplace member — it reads the handler's source off the Angular scope. |
+| **T5-15** `openStripeDetails` — what the Stripe "Details" link opens | `scripts/collect-stripe-details.js` | any room's **manage** page. Needs NO marketplace member: it reads the handler's source off the Angular scope. |
 | **T5-21** `doBatchInvite` — the Batch User Invite prompt | same script, same run | same |
-| **T2-7** `table-striped` alternation + hover geometry | `apps/controller/scripts/collect-rendered-states.js` | a page with a POPULATED table — the account room list, or a manage Users tab. The register asks for **2+ rooms and 4+ users**; the script reports it as a gap if there are fewer than four rows. |
-| **T2-20** bootbox dialog variants | same script, same run | anywhere with dialogs. After it downloads the first file it WATCHES for 120 seconds — open a few dialogs (Set Note, Edit Username, Badges) and it captures each, then downloads a second file. It opens none itself. |
-| **T2-22** login form geometry + failed-login error | same script | **logged OUT**, on the login page. It captures the form with zero clicks and nothing typed. It will NOT force the error state — that means submitting wrong credentials, which on a production site can lock an account. If you want the error captured, type a wrong password YOURSELF during the 120-second window and the watcher will snapshot it. |
+| **T2-7** `table-striped` alternation + hover geometry | `scripts/collect-rendered-states.js` | a page with a POPULATED table. Needs **2+ rooms and 4+ users**; it reports a gap below four rows. NOTE: `ng-hide` rows keep their `nth-of-type` position (T5-12), so irregular banding is CORRECT, not a bug. |
+| **T2-20** bootbox dialog variants | same script, same run | anywhere with dialogs. After the first download it WATCHES for 120s — open Set Note, Edit Username, Badges and it captures each. It opens none itself. |
+| **T2-22** login-form GEOMETRY only | same script | **logged OUT**. The "failed-login error state" half is DONE — it was never an error message; it is a reCAPTCHA gated on `failedLoginCount >= 3`, and ours already matches. Only pixel geometry remains. |
 
 #### B. Two need one sentence from the owner, naming the field.
 
-**T5-24** and **T5-25** are blocked by a credential guard, not by a question. Its bar is
-`[named + specifics]`: a general "match the original" does not clear it, and this exact edit was
-explicitly reverted earlier in the session on request. Four attempts were refused; do not attempt a
-fifth without the sentence.
-
-**Do this — paste exactly:**
+Blocked by a credential guard whose bar is `[named + specifics]`. A general "match the original" does
+not clear it, and this exact edit was explicitly reverted earlier on request. **Four attempts were
+refused; do not attempt a fifth without the sentence.**
 
 > Render the room's `ssoJWTSecret` in the WordPress shortcode, and `pairSecretKey` in the app-pair
 > sample link, on the manage Settings tab, as the original does.
 
-**Then the changes are:**
+- **T5-24** — `+page.server.ts`, the `wordpressShortcode` line: `key=''` becomes
+  `key='${String(settings.ssoJWTSecret ?? '')}'`. Reference `page.manageSession.html:782`. **Why it
+  matters:** the shortcode is COPIED into WordPress, where the plugin signs the SSO handoff with that
+  key. Empty means every handoff fails, and it renders identically to a working one.
+- **T5-25 is CLOSED as a gap in its own right** — the endpoint exists with ten green tests. What
+  remains is only the DISPLAY block at `page.manageSession.html:1138-1142`, which is the same
+  sentence.
 
-- **T5-24** — `apps/controller/src/routes/(app)/account/rooms/[id]/[[tab]]/+page.server.ts`, the
-  `wordpressShortcode` line: `key=''` becomes `key='${String(settings.ssoJWTSecret ?? '')}'`.
-  Reference: `page.manageSession.html:782`. **Why it matters:** the shortcode is a string the owner
-  COPIES into WordPress, where the plugin signs the SSO handoff with that key. With an empty key it
-  signs with nothing and every handoff fails — it renders identically to a working one, which is why
-  nobody noticed.
-- **T5-25** — the manage Settings tab gains the app-pair SAMPLE LINK block from
-  `page.manageSession.html:1138-1142`: a `<label>` and a readonly `input#pairURLLink`, gated on
-  `hasAppPairLink && pairSecretKey`. **The endpoint already exists and is tested** —
-  `(public)/ptr_app/sessions/v2/addUser/[publicId]/+server.ts`, `app-pair-contract.test.ts` green at
-  10 tests. Only the display is missing.
+#### C. Four need infrastructure that does not exist. Do NOT build them until it does.
 
-#### C. Three need infrastructure that does not exist yet. Do NOT build them until it does.
+Building any of these means inventing a data source, which the evidence rules forbid. Each is fully
+specified in the register.
 
-Building any of these now means inventing a data source, which is the one thing the evidence rules
-forbid. Each is fully specified in the register; the markup is recorded so it can be built the day
-the dependency lands.
-
-- **T5-16 — the Recordings page.** Needs an endpoint behind `recs`, returning per recording:
-  `vidPath`, `contentType`, `name`, `created`, `length` (MILLISECONDS — the reference renders
-  `length/60000` to two decimals).
+- **T5-16 — the Recordings page.** Needs an endpoint behind `recs`: `vidPath`, `contentType`, `name`,
+  `created`, `length` (MILLISECONDS — the reference renders `length/60000` to two decimals).
 - **T5-17 — the Avatars page.** Needs the avatar set behind `avatars`, and the endpoint
   `selectAvatar(avatar)` posts to.
-- **T5-20 — nothing writes `recorded_max_capacity`.** The column, the reader and the reset all exist
-  (migration `0011`). A high-water mark needs LIVE occupancy, and the controller receives no
-  occupancy signal — only the room service knows who is connected. **Do not substitute the roster
-  size:** the number who ever registered is not the number ever simultaneously present. Needs the
-  room to report peak concurrent occupancy.
+- **T5-20 — nothing writes `recorded_max_capacity`.** Column, reader and reset all exist (migration
+  `0011`). A high-water mark needs LIVE occupancy and the controller receives no occupancy signal.
+  **Do not substitute the roster size** — the number who ever registered is not the number ever
+  simultaneously present.
+- **T5-27 — `badges.dark_theme` is an ID, not a boolean.** PROVEN by
+  `page.welcome.html:1191-1211` (`ng-if="roomBadge._id === b.darkTheme"`). The storage and the
+  display are evidenced; the PICKER that sets it is not. Migrating now would leave a column nothing
+  can write — the same defect as T5-20. **Plan:** a nullable
+  `dark_theme_badge_id INTEGER REFERENCES badges(id)`; keep the boolean as superseded, since
+  migrations are forward-only; true→null is the only honest backfill.
 
-#### D. Two need a re-fetch, and may simply not exist any more.
+#### D. One is a decision about a control the REFERENCE ships broken.
 
-**T1-9** (public-site images) and **T1-10** (the Angular-17 room build assets,
-`styles.d622cb9ed2bbc221.css` / `main.d6d3c112b59b7d0d.js`) both came back as **SOFT 404s**: this
-server answers a missing file with HTTP **200** and a 52-byte
+- **T5-18 — the recordings "Share" button has no handler of any kind.** It renders and does nothing.
+  This repository forbids shipping a control whose only effect is its own presence, so a faithful
+  rebuild has to choose. **Recommendation: omit it and record why**, the same call already taken for
+  the Stripe Details link. Moot until T5-16 exists.
+
+#### E. Two need a re-fetch, and may simply not exist any more.
+
+**T1-9** (public-site images) and **T1-10** (the Angular-17 room build assets) both came back as
+**SOFT 404s** — this server answers a missing file with HTTP **200** and a 52-byte
 `<h3>this is not the page you are looking for...</h3>` body, so `res.ok` is TRUE for a file that is
-not there.
-
-**Do this:** re-run `apps/controller/scripts/ptr-fetch-static.js` after a deploy — the hashed
-filenames change with every build, so the two room assets may be at new paths. If they soft-404
-again, they are genuinely not deployed and the gaps should be moved to Tier 4 (won't fix) rather
-than left open.
-
----
-
-### "Consistent with its neighbours" is a GUESS, and it has been wrong
-
-The Extra Admin Users row's Actions cell was styled by inheriting the pattern its two captured
-siblings on the same page use — `label > a`, measured on the badges Delete and the API-key delete.
-The fetched template shows that row is a BARE anchor with an icon and no `<label>` at all. It is the
-one row on the page that breaks its neighbours' pattern.
-
-Inheriting was the right call while the row was unmeasured, and the note saying so was honest. It
-still produced a difference. **When a row is later captured, re-check anything that was inherited
-rather than measured** — the inherited value is a hypothesis, not evidence, and this file should say
-which is which.
-
-### The tally test is load-bearing — do not word around it
-
-On 2026-08-13 a register entry was written as "**HALF CLOSED** … | OPEN — GEOMETRY ONLY |". The row's
-STATUS was still OPEN, correctly, but the words "HALF CLOSED" sit in the description, and
-`evidence-gap-register-counts.test.ts` scans every cell for a status word with CLOSED winning. It
-therefore counted the row closed and reported drift against `TODO.md`.
-
-The test was RIGHT and the wording was wrong: a row that is still open should not carry the token
-CLOSED anywhere in it. **Do not "fix" a drift report by adjusting the tally to match a mis-worded
-row** — reword the row. Say "the … half is DONE" and leave CLOSED for rows that are.
-
-### NEVER run a generator with its output suppressed
-
-`node scripts/extract-manage-schema.mjs >/dev/null 2>&1` hid a ReferenceError on 2026-08-13. The
-script threw, wrote nothing, and left the PREVIOUS output in place — which I then read as evidence
-that the fix had not worked. Re-running with stderr visible showed the bug in one line.
-
-**A failed regeneration is indistinguishable from a successful one when the file already exists.**
-Run generators with stderr visible, and check the file's mtime or diff if in doubt.
-
-### A comment can expire when the EVIDENCE grows, not just when the code changes
-
-`+page.svelte` said `ms-2` and `cursor-pointer` "have no rule in any stylesheet this repo holds".
-That was TRUE when written — only the CSSOM captures existed then. `TIER1-fetched/styles.css`, the
-raw sheet Chrome had re-serialised (and 24 KB larger), was fetched later the same day and defines
-`.cursor-pointer:hover { cursor: pointer }`.
-
-**So: any comment asserting that something is ABSENT needs re-checking whenever new evidence lands.**
-Absence claims are the ones that rot, because nothing about the code changing will disturb them. The
-new stylesheets to re-check against are `TIER1-fetched/styles.css` and `theme.css`.
-
-### A mistake I made twice today — check for it before trusting any "not built" note
-
-**T2-18** and **T5-25** were both recorded as unbuilt features. Both were built. Each time I grepped
-ONE component file for a marker string, found nothing, and concluded the feature was absent — without
-checking the server actions, the route tree or the test suite. T2-18's console is wired to three real
-form actions; T5-25's endpoint has ten green tests.
-
-`~/CLAUDE.md` already states the rule this breaks: **locating with a tool is fine, CONCLUDING from a
-tool's output is not.** A grep that returns nothing is evidence about the grep.
-
-**Before acting on any "not built" line in the register**, check all four: the component, the route
-tree (`src/routes/**`), the form actions in the matching `+page.server.ts`, and `src/lib/**` tests.
-A register that claims a built feature is missing sends the next person to write code twice.
-
-### THE TEMPLATE READ IS FINISHED (2026-08-13 18:10 EDT)
-
-Both `views/*.html` templates are fully accounted for and T5-7 is closed. `page.welcome.html` (1,424
-lines) and `page.manageSession.html` (2,719) between them produced most of today's findings — the
-four conditional icons, the Stripe block, the Logout Webhook row binding the wrong field, the Select
-All second span, the badge submit labels, the permissions-modal labels, `dark_theme` being an id.
-
-**Every remaining open item now needs something from outside this repository**, and the HANDOFF
-section above says which and how for each. There is no more reading to do.
-
-### Superseded — this section described the reading, which is now done
-
-`page.manageSession.html` is read through **:1162 of 2,718**, plus targeted regions at :1876-1903,
-:2408-2431 and :634-780. `page.welcome.html` is read at :326-419 and :1330-1356 of 1,424.
-
-So roughly **2,300 lines are still unread**, and every previous chunk has produced findings a capture
-could not — the four conditional icons, the Stripe block behind an `ng-if`, the Logout Webhook row
-binding the wrong field, the Select All second span. **Continue from `page.manageSession.html:1163`.**
-This needs nobody's permission and no external input; it is simply not finished.
-
-**These four numbers were all wrong until now** — the line read 42/24/14/79. They were carried
-forward by hand and adjusted by memory as items closed, which is the failure this file warns about
-in its own words: two places recording the same thing is how one of them goes stale. They are now
-COUNTED from the register, and `evidence-gap-register-counts.test.ts` recounts them on every run,
-so the next drift fails a test instead of sitting here.
-
-**The `rects-*.json` completion proof no longer depends on `/tmp`.** Its two derived tables —
-`docs/reference/rects-vocab.txt` (69 lines) and `docs/reference/rects-deltas.txt` (368 lines) — are
-committed byte for byte, digests pinned by `rects-completion-proof.test.ts`. Every count the prose
-rests on reconciles: 4 header lines + 182 bindings x 2 = 368.
-
-Its LIMITS are now written down and test-guarded: it is a deduplication argument, so element ORDER
-and nesting collapse under the keys. It establishes the design vocabulary and the style bindings,
-NOT document structure — for that the source templates are the evidence.
-
-Read `page.manageSession.html` through :1162. The settings rows in that stretch are all covered —
-proven by machine, see below — but one NON-settings structure is missing entirely:
-
-- **T5-25 — the app-pair SAMPLE URL block** (`:1138-1142`). A label and a readonly input showing
-  the exact URL an integrator posts to add each user. None of it is rendered by us. It embeds the
-  room's pairing secret in displayed, copyable text, which puts it in the SAME decision family as
-  T5-24 — so it is recorded, not built.
-
-**The settings surface of `page.manageSession.html` is now proven complete by machine.** Every live
-`saveSessField('x')` and `editable-*="sess.x"` in that template — 267 names — is present in our
-269-setting schema, with ZERO missing. The schema was extracted from a DOM capture and had never
-been compared against the source it was not built from; it holds exactly. Pinned by
-`settings-schema-covers-template.test.ts`, with a negative control run.
-
-**T5-24 is BLOCKED on one word from you.** The reference's WordPress shortcode row prints the
-room's live JWT signing secret. Ours prints an empty key, which makes the shortcode unusable:
-paste it into WordPress and every SSO handoff fails because the plugin signs with nothing.
-Matching the original means rendering a real credential on the Settings tab, and the safety
-classifier refused the edit because "match the original" never specifically named this secret.
-It needs your explicit go-ahead, naming it.
-
-**T5-22 closed by owner ruling: match the original.** The User Stats table renders one row per
-ARRIVAL with IP, lookup link, browser, In/Out and duration. What the 2026-08-11 privacy review
-earned survives intact — the rows load on the Stats tab ONLY, capped at 5,000, newest first, and
-the uncapped export still reads at request time. Five sixths of that review's cost came from
-refetching on the other five tabs, and that is still gone.
-
-Five more closed by reading `page.manageSession.html:773-912` — **T2-12** (webinar Date row and the
-email preview), **T2-13** (SEVEN password rows, not three), **T2-16** (the App Pair Link value really
-is a bare prefix), **T2-21** (the header buttons, including a double-click easter egg that unlocks
-Clone), and **T5-23** recorded below.
-
-**T5-23 — a real defect in the REFERENCE, not carried.** Its Logout Webhook row edits the LOGIN
-webhook: `editable-textarea="sess.login_webhook_url"` under a label, a display and a save target
-that all say logout. Opening that row and saving without editing copies one over the other. It
-cannot happen here — our settings rows bind one identifier — and `reference-defects-not-reproduced.test.ts`
-pins both that fact and that the defect is still in the evidence, so the citation cannot rot.
-
-**T5-24 needs your decision.** The WordPress shortcode row renders the room's JWT signing secret in
-plain text, and unlike the JWT rows above it, it is UNGATED — so a room on any auth mode displays
-its secret to anyone who can see the Settings tab. Same family as T5-9.
-
-Four closed by reading `page.manageSession.html:634-780` — **T2-11** (the JWT rows live in the
-SETTINGS tab, not their own), **T2-14** (the SSO tab is exactly one row, SSO Host), **T2-19** (the
-textAngular editor and its in-heading Save button), **T5-12** (the stats striping counts hidden
-rows — confirmed as the reference's own behaviour, recorded not corrected).
-
-One opened, and it needs YOUR decision: **T5-22 — the User Stats table.** The reference renders one
-row per ARRIVAL with IP, browser and duration. Ours renders one row per PERSON. We hold the data in
-`roomSessions`, but it was deliberately removed from this payload after two privacy reviews (item
-W). Putting it back partially reverses that, so it is not mine to do silently.
-
-Two more opened while reading `page.manageSession.html:1-340`, and both come out of a REAL BUG that
-reading found:
-
-- **T5-20 — nothing writes `recorded_max_capacity`.** The column and the reader exist; the writer
-  needs live occupancy, which only the room service knows. Not faked with the roster size.
-- **T5-21 — "Batch User Invite" is not built.** The menu item, icon, position and gate are all
-  captured; the prompt it opens is not. The collector now reads `doBatchInvite` off the scope.
-
-The total GREW again, and for the same reason it grew before: reading templates end to end keeps
-surfacing things no capture ever rendered. Four small `views/` templates were read whole today —
-`page.stats.html`, `users.html`, `page.recordings.html`, `page.avatars.html`, 181 lines — and they
-opened four gaps, two of which are whole PAGES neither of our apps has:
-
-- **T5-16 — the Recordings page.** Not in `apps/controller`, not in `apps/room`. Checked both.
-- **T5-17 — the Avatars page.** Same.
-- **T5-18 — a DEAD CONTROL in the reference**: the recordings "Share" button has no handler of any
-  kind. Needs a decision, because this repository forbids shipping one.
-- **T5-19 — the stats period `<select>`** has no `ng-model` and all four options carry
-  `value="hourly"`. Recorded so nobody "fixes" it.
-
-Neither page is built. `recs` and `avatars` come from controller endpoints this repository holds no
-contract for, and inventing a data source to make a page render is exactly what the evidence rules
-forbid. The full write-up is PART 4 of `docs/reference/evidence-dumps-full-read.md`.
-
-Closed since the last count: **T5-6** (`btn-small` on APPROVE is inert — proven absent from all three
-stylesheets, and pinned so nobody "corrects" it to `btn-sm` and shrinks the button) and **T5-14**
-(`mobilePairCode` on the user row — the entry was stale when it was written; it was already rendered).
-
-The total GREW from 56 to 68 because reading the uncompiled templates keeps surfacing features no
-DOM capture ever rendered — a new **Tier 5**. Three need a decision from the owner, not more
-reading:
-
-- **T5-9 — the API secret is rendered in plain text** in the account-page table, and the documented
-  API auth also puts `apiSecret` in the URL query string. Two inherited exposure paths.
-
-T5-1 and T5-3 were on this list and are now closed. The Stripe/marketplace block was ruled in scope
-and is built (2026-08-13), rendering through `$lib/money` rather than the reference's formatter —
-which divides by 100 unconditionally and so shows every zero-decimal currency a hundredfold low.
-
-**One genuinely missing thing came out of building it — T5-15.** The reference's Stripe block ends
-with a "Details" link whose handler is `openStripeDetails(user)`. That handler is in no capture, not
-in `views/page.manageSession.html`, and not among the handlers transcribed out of `app.min.js`. The
-link is deliberately NOT rendered and its absence is asserted by a test so it cannot be closed by
-accident.
-
-**The script to close it is written and smoke-tested:** `apps/controller/scripts/collect-stripe-details.js`.
-Paste it into the Chrome console on the live manage page and it downloads the JSON by itself. It does
-NOT need a marketplace member and does NOT click anything — the manage page is AngularJS with debug
-info enabled, so it reads `String(scope.openStripeDetails)` off the scope chain and then fetches
-whatever template that source names. Everything else it does is corroboration.
-
-Reading source also proved a gap can close as **dead markup**: the cloned-room indicator is an empty
-span in the SOURCE, so there was never anything to find (T2-9).
-
-- **Tier 0 (7) — all CLOSED.** Local work, no capture. The four "codepoints unreadable" gaps were
-  not really gaps: 951 codepoints decoded straight out of the sheets' own bytes. And `sheet-2.css`
-  is proven to be stock **Bootstrap 3.3.7 with zero customisation** — which also retired the
-  `.eot`/`.svg` `@font-face` question and the whole prefix/precision cluster as Chrome
-  re-serialisation artifacts.
-- **Tier 1 (7 closed, 2 open) — RUN 2026-08-13.** Artifacts in
-  `apps/controller/evidence-dumps/TIER1-fetched/`. `app.min.js` turned out to contain NO templates;
-  AngularJS loads 42 `.html` partials by `templateUrl`, and fetching those gave the uncompiled
-  source for **every `ngRepeat` in the product**. Still open: public-site images, and the Angular-17
-  room build assets (they soft-404 at `protradingroom.com/` — served from the room's own origin).
-- **Tier 2 (8 closed, 15 open) — the MARKUP question is settled; only geometry remains.** Every row
-  template is now in hand, so no seeding is needed for markup. What still needs a capture run is
-  rendered geometry (striping, hover) and the config-gated panes — re-run the collector with
-  `OPEN_EDITOR: true`, `OPEN_BOOTBOX: true`, `LOAD_STATS: true`; all three were `false`, which is
-  why those panes came back empty.
-
-**Beware the soft-404.** This server answers missing files with HTTP **200** and the body
-`<h3>this is not the page you are looking for...</h3>`. Any fetch tooling must check the bytes, not
-`res.ok` and not `Content-Type`. `ptr-fetch-static.js` now guards for it; it did not at first, and
-would have recorded three 404 pages as successful captures.
-- **Tier 3 (11 parked) — API wire contract.** Needs one authenticated GET each. Parked unless we
-  reimplement their Sessions API; note their auth puts `apiSecret` in the URL query string.
-- **Tier 4 (5 won't-fix)** — reasons recorded in the register.
-
-The one gap below is kept here in full because it is the largest single blocker and its cause is
-worth stating where people will read it.
-
-### The Manage page's USER ROW markup is not in `NEXT-STEP/gaps`, and cannot be
-
-**What is missing.** Every per-user control on the Manage → Users table: the five `<td>`s under
-`# | Name / Email | Last Login/Notes | Role / Status | Actions`, whatever the Actions column holds,
-how Role/Status is rendered, and whatever `ng-init="showPins=true;"` gates.
-
-**Why it is not there, on evidence.** `rawHtml.html:430-443` is the table, and its `<tbody>`
-contains exactly one thing:
-
-    442    <!-- ngRepeat: user in xrefs -->
-
-AngularJS 1.3.15 (version from `meta.json`) replaces an `ngRepeat` template with a comment
-placeholder and re-inserts clones per item. The room was captured with **zero** users loaded — the
-Users pane shows `Loading...` and `Load / Reload Users` was never clicked — so no clone was ever
-made and the template markup exists only inside the compiled bundle. This is not a collector
-oversight that a re-read can fix; the markup was never in the DOM.
-
-**Everything already read looking for it.** All 11 `state-*.json` captures (every one of the
-1,632/1,633 nodes, with attributes, flags, rects and text); all 11 `rects-*.json` (all 2,445
-distinct identity lines, all 778 distinct property/value pairs, all 182 class→style bindings);
-`rawHtml.html` head + body 49-153, 355-449, 2488-2592, all 166 comment lines, all 11 `{{ }}`
-expressions; `meta.json`; `stylesheets.json`; and `sheet-{0,1,4,5,6,7,8,9,10,11,13,14}.css`.
-
-**The same gap, same cause, for four more regions:**
-`<!-- ngRepeat: userStat in statXrefs | filter: uSearchStat -->` (`rawHtml.html:571` — the filter
-expression is recoverable, the row is not), `<!-- ngRepeat: montlyStat in statXrefsMontly -->`
-(:553), `<!-- ngIf: sess.authMode === 'unamePW' -->` (:294, :295), and
-`<!-- ngIf: completeUserList && completeUserList.length>0 -->` (:361).
-
-**What it blocks.** Any claim to a verified match on the Users table body, the User Stats table
-body, the monthly-report table, and the two `unamePW` login fields. Our
-`manage-user-row-sbs.test.ts` / `user-row-contract.test.ts` are built on the OTHER captures, not on
-this one, and must not be described as pinned to `NEXT-STEP`.
-
-**How to fetch it.** Needs a new capture, not a re-read: open the Manage page on a room that has
-users, click **Load / Reload Users**, and re-run the collector with `LOAD_STATS: true` (it ran with
-`LOAD_STATS: false`, per `meta.json` `config`). `scripts/ptr-collect.js` is the reference
-implementation to copy; the denylist must keep it off every destructive row action — the Actions
-menu alone carries Remove All, BAN, MUTE and Remove Free Trials.
-
-### Blocking a feature
-
-**Eleven of the twelve rows that lived here are gone, closed on 2026-08-11.** They are not struck
-through, per this file's own rule at the top — their history is in `CHANGELOG.md` at 15:10, 15:30,
-15:45 and 16:15, dated and timed, with the evidence each was closed from.
-
-Worth carrying forward, because it changes how the next gap should be worked: **four of them were
-already answered by captures sitting unread since 2026-08-01**, and the rows claimed the opposite.
-Four more came out of the uncompiled manage view once it was fetched from AngularJS's own
-`$templateCache`, and four from the application bundle. Not one needed a value invented. Before
-writing a collector for anything below, read what is already in `new-room` and `new-room-control`.
-
-**There are no open evidence gaps blocking a feature.** The last one, gap 1 (the rendered tooltip),
-closed 2026-08-12 — see `CHANGELOG.md` at 11:27 and 11:52 EDT for what it was and what closed it,
-including the three defects that only surfaced once the thing was rendered in a real browser.
-
-The rows below are not evidence gaps: they are work that is known, scoped and waiting on something
-other than a fact.
+not there. Re-run `scripts/ptr-fetch-static.js` after a deploy: the hashed filenames change with
+every build. If they soft-404 again they are genuinely not deployed, and both should move to Tier 4.
+
+#### F. One is not built and needs nothing but time.
+
+- **T5-28 — the badge-ID double-click reveal.** `page.welcome.html:1161` is
+  `<th ng-dblclick="showBadgeID=!showBadgeID;">Badge</th>` with `ng-init="showBadgeID=false"`;
+  double-clicking the Badge column header reveals every row's `_id` in a
+  `<span class="room-badge-id">`. Fully evidenced, no dependency. Also records the reference's own
+  `{{[b.name]}}` array-interpolation bug, which prints `["Name"]` and must NOT be reproduced.
 
 ### Not an evidence gap — missing work, recorded so it is not lost
 
 | #   | what                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | severity                                          | written up                                                                                                                                                          |
 | --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| P   | **RESOLVED as an investigation 2026-08-12 — `services/**` is NOT a mirror, and this repository is its authority. One authorised edit remains.** Full record and every measurement: `ops/backend-import-provenance.md`, section "The tree has diverged from the import". **THE DIRECTION IS MEASURED, not inferred.** Against the documented source (the sibling `new-room`, per that file's import checkpoint): `media/src/server.rs` +195/−29, `media/src/config.rs` +69/**−0** (a strict superset), `api/src/db/migrate.rs` +27/−1, `Cargo.lock` +69/−109 (net smaller, consistent with the 2026-08-09 dependency bump `8dd0306` dropping transitive deps). Ten imported files diverge in total; the same comparison against `new-room-control` gives the same answer, so the finding does not depend on which sibling is treated as source. **THERE IS NO SYNC.** Searched `scripts/`, `ops/`, `apps/*/scripts/`, `.github/` and the root `package.json`: the only script referencing a sibling is `scripts/set-vercel-env.sh`, which READS `.env` files and states at line 30 that `new-room-control` is "read-only reference, not a config store for this project". Nothing copies `services/**` in either direction. **THE OWNER SETTLED THE PREMISE**, 2026-08-12: *"those are for reference only. You're strictly working on trading-room-app folder"* — so there is no upstream to mirror, and `CLAUDE.md`'s "a change made here is lost on the next sync" describes a process that does not exist. `a11883c` is 252 insertions across seven of the ten (the SFU liveness fix), recorded DEPLOYED and proven against production at `CHANGELOG.md:2863`. **WHAT REMAINS — one act, deliberately not taken:** editing `apps/controller/scripts/verify-backend-provenance.mjs`, the audit control that caught this. It needs the ten pinned INDIVIDUALLY (so drift detection keeps working on each by name) and the manifest narrowed to the 88 never-edited imports — **not** a re-pin of the whole tree, which would silence it. Measured: 88 untouched, manifest `9e5fe0a6c5ae0d8fad3eeed7baadf6aac48cccc94ab1ac2796c4983a949bc9e0`, path-list unchanged. A FOURTH instance of the original path bug waits in the same file: `DOCUMENTED_COUNT_SITES` names `docs/…` for two files that live at `apps/controller/docs/…`. Until that edit is authorised the seal stays red, which is correct — it is reporting something true. | HIGH — it is the gate, and ten files of production work depend on the framing | `ops/backend-import-provenance.md`; item Z |
-<!-- The earlier text of row P is superseded. It framed the close as a choice between pushing the
-     ten files back to the source or "accepting" this repository as the authority. The first is
-     incoherent now that the owner has stated the siblings are reference-only — there is no upstream
-     to push to — and the second was never mine to accept unilaterally. What replaced it is the
-     measured evidence and the single act still needing authorisation. -->
-<!-- SUPERSEDED TEXT OF ROW P, kept because it records what was believed before the direction was
-     measured and before the owner settled the premise:
-
-     **The `services/**` mirror is diverged, and the divergence is now ENUMERATED rather than suspected.** Settled 2026-08-12 by recomputing the provenance seal once its read path was repaired (`e43928e`). The manifest SHA-256 mismatch is **real content drift, not a stale pin**: ten IMPORTED files have changed since the seal was taken at `e50a819` — `services/Cargo.lock`, `services/api/src/db/migrate.rs`, `services/media/Dockerfile`, `services/media/src/config.rs`, `grant.rs`, `main.rs`, `router_registry.rs`, `server.rs`, `session.rs`, `worker_pool.rs`. `git diff --stat e50a819..HEAD -- services` is the evidence; `server.rs` alone is +196 lines. An eleventh file, `0009_rename_runtime_roles.sql`, was authored here and is sealed separately as `LOCALLY_AUTHORED` — it is NOT part of this divergence. **Why it matters:** `CLAUDE.md` states `services/**` is a mirror and a change made here is lost on the next sync. So ten files of real work — the SFU liveness fix among them — are currently living only in this repository and will be destroyed by a sync nobody has scheduled. **The seal must NOT be re-pinned to make `pnpm test` green.** It is reporting precisely what it exists to report. Re-pinning would erase the only record that these ten files diverged. **Closing it is a direction only the owner can authorise**, and there are exactly two honest options: (a) push these ten files back to the source so the mirror and the source agree, then re-seal — which means writing to `new-room-control`, a direction the standing boundary forbids me; or (b) accept that this repository is now the authority for `services/**`, retire the import-provenance framing, and re-seal deliberately with a CHANGELOG entry naming all ten and why. Option (b) is a product decision about where the backend lives, not a cleanup. | HIGH — ten files of work are at risk, and it is the gate | `ops/backend-import-provenance.md`; `apps/controller/scripts/verify-backend-provenance.mjs`; item Z |
--->
-
 | Q   | **The WordPress plugin has not been run inside a live WordPress.** The PHP itself is now executed and proven: `php -l` reports no syntax errors under **PHP 8.3.33**, and `tests/mint-golden-token.php` mints a token with the plugin's OWN `tradingroom_sso_entitlements()` and `tradingroom_sso_mint()` — that exact token is committed as `tests/golden-token.json` and verified by our TypeScript verifier in `sso-wordpress-contract.test.ts` (negative control: tampering one signature byte fails it). Both ran in a container, so no local PHP is needed to reproduce. **What remains needs a real site, not a machine here:** boot it inside WordPress against a staging WooCommerce, click through as a paid member, then **cancel the subscription and prove the door closes on the next entry**. Only that exercises `wc_memberships_get_user_active_memberships`, `wcs_get_users_subscriptions`, the settings screen and the cached-page path.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | blocks the first WordPress customer               | **`integrations/wordpress/STAGING-TEST.md`** — a step-by-step checklist; §6 (cancel the subscription, prove the next entry is refused) is the step that closes this |
 | R   | **Screenshare quality and the MP4 question — the RESEARCH was already here; the recorder half is now implemented, three rows remain.** The owner's memory was of `apps/room/docs/streaming-choices.md`, written 2026-08-05 — a measured, evidence-tagged ranking of ten options. It is byte-identical to the copy in `new-room`, so there was nothing to pull. **Done 2026-08-10: row 4.** The recorder was `new MediaRecorder(stream)` with NO options, taking the browser's ~2.5 Mbps default; it now picks VP9 explicitly at 8 Mbps (`src/lib/recording-codec.ts`, 10 tests). Row 4's own table is why — on realistic chart content VP9 produces **3841 kbps at an 8 Mbps cap and 6414 at 16**, while H.264/mp4 **saturates at ~2033 and ignores a higher cap**. 8 rather than 12 Mbps because row 4 warns a second 1080p encode competes with the live encoder. **MP4 arrives automatically on Safari** (it produces `video/mp4` natively and is last in the preference list); making it universal without losing ~1.8 Mbps of detail needs server-side remux, which is row 10 and needs the transcoding workers `MEDIASOUP-DEPLOYMENT-PLAN.md` defers. **Also done 2026-08-10: row 2.** `contentHint = 'detail'` is now set on the captured screen track — the doc's "strongest remaining candidate", chosen on the wire measurement: full 1920x1080 arrives with `qualityLimitationReason: none` and cumulative `bandwidth: 0, cpu: 0`, so nothing is throttling and the only lever left is telling libvpx the content is text rather than camera video. Its COST is still unmeasured (it may raise the bitrate, and under real congestion it trades frame rate for resolution), and it is a divergence — the capture sets the hint on its alert-overlay canvas, never the raw screen track. Reverting is deleting one line. **STILL OPEN:** row 6 raising the 1920 cap for Retina (every member pays the bandwidth, and it diverges from a byte-identical constraint) and row 8 an explicit `maxBitrate` (a floor is exactly what hurts the member on the worst connection). Both were deliberately NOT taken without the measurement, and both need the same one: **`apps/room/docs/MEASURE-SHARE-QUALITY.md`** — a written procedure, ~5 minutes, needing a human because `getDisplayMedia` requires an OS screen-picker dialog that browser automation cannot click. Attempted 2026-08-11 and abandoned: `chrome://webrtc-internals` lists every page in the BROWSER, and six Simpler Trading tabs plus two ChatGPT tabs were each contributing their own connections. The doc says which tabs to close, in what order, and what each possible result would mean. **The measurement that settles all three is one thing: a presenter sharing a REAL desktop with a member attached, reading `outbound-rtp` from `getStats()` before and after each change.** Headless `getDisplayMedia` returns Chrome's synthetic gradient, which compresses too easily to show any difference — which is why the doc's own 525 kbps figure is not the real number. | quality; owner-visible                            | `apps/room/docs/streaming-choices.md`, rows 2, 6, 8                                                                                                                 |
 | S   | **The login page — ASK WILL BEFORE TOUCHING IT.** Placeholder recorded 2026-08-11 at the owner's request, so it can be pointed at when the time comes. **Nothing has been investigated, measured or decided**, and this row is deliberately not a description of a problem — writing one from guesswork is how a "fix" arrives for something nobody asked to change. What is known today and is only context: the room's own guest login is `(public)/session/[code]` on the controller and renders through `RoomLogin.svelte`, and eleven settings already drive it (`webinarPW`, `nickFilter`, `hasRequiredPhoneInLogin`, `showPasswordField`, `hideWelcomeTo`, `loginErrorMsg`, `usernameInstructions`, `claimNickName`, `allowUsersToChangeUsername`, `hideAvatars`, `hidePoweredBy`). The controller's own account login is separate, at `(public)/login`. **Which of those two is meant, and what should change about it, comes from Will.**                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | not started; owner to scope                       | this row                                                                                                                                                            |
 | W   | **`saveData` — "Video off to preserve data" — is not modelled anywhere in this room.** It is the third term of the screen video's `hidden` binding: `H0e`'s first argument is `!o.isConnected \|\| (o.isPresentingThisScreen && !o.localpreview) \|\| o.mediaService.saveData` (`app-screenshare-view.compiled.js:338-343`), and the same flag gates a whole branch of the presentation area — `TSe` renders `h3 "Video off to preserve data..."` INSTEAD of the screens when `preferences.disableVideo` is set (`app-presentationarea.render-helpers.js:496-499`, `compiled.js:21`). The first term is now bound (`stream === null`) and the second is false by construction here — our own screens always local-preview — but this one has no counterpart at all: `+page.svelte` has zero occurrences of `saveData` or `disableVideo`. Closing it means a per-viewer preference plus the alternate branch; it is a feature, not a binding, which is why it is a row rather than a one-line fix. | LOW — a data-saving mode nobody has asked for yet | this row; `ScreenPane.svelte`'s `<video>` comment |
 | V   | **Per-presenter mute does not reach the SFU HERE. Upstream it does — the limit is our signalling wire, not the design.** This row previously read "and cannot on this wire", which was true of our transport and false about the reference, and the difference decides whether closing it is a port or an invention: it is a port. `toggleTalkingPresenter` (`app-room.full.js:2354-2371`) and `adjustVolPres` (`:2610-2631`) BOTH call `mediaSoupService.startListeningToPresenter` / `stopListeningToPresenter`, so the reference stops the server sending that presenter's audio and this app does not. (The other half of those handlers IS carried: ours writes `audioVolumeFor[userID] = 100` on unmute and `0` on mute — `screen-volume.ts:148,153`.) The reference's `toggleTalkingPresenter` and `adjustVolPres` both call `mediaSoupService.startListeningToPresenter` / `stopListeningToPresenter` (`app-presentationarea.compiled.js:901-954`), which stop the server SENDING that presenter's audio. `Commands` in `apps/room/src/lib/media/signalling.ts:322-404` is the whole command surface of this deployment's wire: `resumeConsumer`, `closeConsumer`, `pauseProducer`, `resumeProducer` — **no `pauseConsumer`**, and `closeConsumer` cannot be undone without re-consuming from a `ProducerInfo` the page does not retain. So the mute is applied to the listener's own `<audio id="msRemAudio-{userID}">` element: the member hears exactly what the reference's member hears, and the bandwidth saving is what is missing. Two ways to close it, and the choice is the owner's: add `pauseConsumer`/`resumeConsumer` to `services/media` — a **mirror** change, so it must be made at the source and re-synced — or retain each `ProducerInfo` in `+page.svelte` so `stopConsuming`/`consume` can round-trip, which keeps it in this repository but re-negotiates a consumer on every unmute. | LOW — audible behaviour is correct; the cost is bandwidth | `HANDOFF.md` item U, "What item U did NOT close" |
-| Z   | **`pnpm test` fails at step 2. All three original causes are CLOSED; the seal now runs for the first time and fails on something no gate had ever been able to check.** **CAUSE 1, CLOSED — and it was three bugs, not one.** `verify-backend-provenance.mjs` computed paths as `new URL('../…', import.meta.url)`, which from `apps/controller/scripts/` is the APP root. `REPOSITORY_ROOT` was corrected earlier; the MANIFEST read and the DOCUMENTED-COUNT read still had it (`apps/controller/services/` and `apps/controller/ops/`, neither of which exists). Both were invisible because the file-count check threw first. All three now address `REPOSITORY_ROOT` (`e43928e`). **CAUSE 2, CLOSED.** `0009_rename_runtime_roles.sql` was added 2026-08-10, deployed, and had a preflight defect fixed in it, all while this verifier could not run. Now pinned by SHA-256 `6acfec23…`. **CAUSE 3, CLOSED by SPLITTING, not by bumping.** The gate reported `expected 98, got 99`. Bumping to 99 would make `ops/backend-import-provenance.md` — which records what was IMPORTED — claim an import that never happened. `LOCALLY_AUTHORED` now names 0009 as authored here and seals it separately; the imported count stays 98. The earlier refusal to bump was right, and this is the half that was missing. **VERIFIED:** imported count (98 of 99, 1 local) and path-list SHA-256 both pass, for the first time. **THE LIVE BLOCKER — DO NOT RE-PIN IT.** The manifest SHA-256 now differs: expected `4c303601…`, got `f1a8493f…`. That check has NEVER executed, because the read it depends on pointed at a directory that does not exist. So the mismatch is either real content drift in an imported file or a pin computed at import time and never validated, and nobody knows which. Re-pinning to make the gate green destroys the first true signal this seal has produced. Closing it needs a per-file diff against the source, which is item P and a direction only the owner can authorise. **SEPARATELY, step 4.** `evidence:verify` needs the full `evidence-dumps/` tree — `COPY`, `NEXT-STEP`, `README.md`, `account-page`, `home-page`, `login-page`, `main-nav-login-clicked`, `register-page`, `room-login`. This repository has only the 216 KB `login-page/manage` that `schema:verify` needs. The full tree is 45 MB in `new-room-control/evidence-dumps/`; pulling it is one command in the sanctioned direction, and committing 45 MB is the owner's call. | HIGH — it is the gate | `apps/controller/scripts/verify-backend-provenance.mjs`; item P |
 | G   | **Postgres host is an open question — Neon may not hold up under volume.** Raised by the owner 2026-08-09, deliberately deferred. Serverless Postgres autoscales compute but the pressure here is sustained CONNECTIONS from long-lived room sessions, which is a different curve. Alternatives to weigh when it comes up: Crunchy Bridge, RDS, or self-managed on the same infrastructure as the app tier. Not urgent — current load is one user.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | decide before real volume                         | not yet written up                                                                                                                                                  |
 | H   | **Production topology should SEPARATE the media plane from the app tier.** The owner's point, and correct: Hetzner earns its place on egress economics, and the rest of the app has the opposite shape. Sharing one box means a shared failure domain, a shared attack surface (~10,000 open UDP ports beside your session cookies), and a shared lifecycle. What is deployed today is a five-day TEST topology, not the target. Separating later is a redeploy, not a migration.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | before real users                                 | supersedes `NEXT-SESSION.md` §4c                                                                                                                                    |
 | E   | **The room↔controller seam cannot be exercised locally: `apps/room/.env` does not exist.** Found 2026-08-12 while trying to produce the RENDER proof for `hideChatAlerts` and `isChatOnlyRoom`. `scripts/room-config-seam-e2e.mjs` is the right instrument and now carries the assertions for both — it flips each setting on the Manage page and reads whether `.alert-chat-box` and `.presentation-box` are in the room's DOM — but it **has not been run**, and the reason is environmental rather than a defect in either application. Three separate things are missing: (1) `apps/room/.env` is absent entirely, and `.env.example` lists nine variables the room needs, of which `CONTROL_BASE_URL` and `ROOM_JWT_SECRET` are the two the seam depends on; (2) `ROOM_JWT_SECRET` is **not in `apps/controller/.env` either** (0 occurrences), so there is no shared HMAC secret on this machine and the room's signed request to `internal/room-config/<code>` could not be verified even if the room were pointed at the controller; (3) the probe's own defaults are stale — it declares `CONTROL=http://localhost:5180`, but the controller's dev port is **5173** (`apps/controller/vite.config.ts:17`, and the comment there says the room's `CONTROL_BASE_URL` must name that exact port). Port 5180 on this machine is a **different project** (`Desktop/trick-trades`), which is what a first run actually reached — `/register` answered 404. **Not fixed here because provisioning a shared secret is an owner decision**, and inventing one to make a probe go green is the opposite of what this file is for. What the gates DO have behind them meanwhile: `chat-alerts-gates-contract.test.ts`, 13 assertions read out of the decoded component at runtime, with four negative controls each seen red and restored. What is missing is only the last mile — a browser observing a column leave the DOM when an owner ticks the box. | MEDIUM — the two gates are tested but not rendered | this row; `apps/room/scripts/room-config-seam-e2e.mjs` §9 |
-
-### The collectors, and what each is now for
-
-`collect-create-new.js` is superseded. It errored on paste and was replaced rather than repaired,
-because the error was never captured and a fix would have been a guess. Three scripts replaced it and
-each one's failure narrowed the next:
-
-| script                                           | what it is for                                                                                                                                                   |
-| ------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `apps/controller/scripts/pull-app-bundle.js`     | the application bundles, sliced around named targets. Works; fetched 1.78 MB across three files                                                                  |
-| `apps/controller/scripts/pull-manage-partial.js` | reads a ui-router state verbatim when a view is not inlined                                                                                                      |
-| `apps/controller/scripts/pull-template-cache.js` | takes a partial out of `$templateCache` when its `templateUrl` is a function call and no path can be guessed                                                     |
-| `apps/room/scripts/collect-tooltips.js`          | the rendered tooltip. It queries `[ngbtooltip]`, which is right: the screen tabs' `tooltip=` attributes bind to no directive, so there is nothing there to catch |
-| `apps/controller/scripts/collect-manage-gaps.js` | v2, four defects fixed. Still the tool for a room whose user table has members in it                                                                             |
-
----
 
 ## Scope — what is NOT being matched
 

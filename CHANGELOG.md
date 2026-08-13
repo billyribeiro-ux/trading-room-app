@@ -24,6 +24,44 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-13
 
+### 2026-08-13 18:26 EDT — `TODO.md` stripped to what is actually left, and the full gate is green again
+
+**Runtime impact: none** — documentation, plus four documented counts corrected.
+
+**The full gate was RED and I had not run it.** `pnpm test` exits 0 now; it did not before this
+entry. `verify-documented-test-counts.mjs` was failing on
+`docs/ENGINEERING-SSOT.md (section 11) documents 742 Vitest tests but the suite runs 917` — I added
+tests all day and never updated the documents that record the total. **Four sites** carried 742:
+`ENGINEERING-SSOT.md`, `PRODUCTION-CUTOVER-PLAN.md`, and two separate rows in
+`SVELTE-CONFORMANCE-AUDIT.md`. All four now read 917, and the audit table's file count 67 → 87.
+
+That verifier existing is why this took ten minutes rather than being discovered by someone else in a
+month. It is also a reminder that "909 tests green" — which I have been reporting all day from
+`vitest run src/lib` — is not the same as "the gate is green".
+
+**`TODO.md` is now only what is left to do**, per the owner's instruction. 546 lines → 254. Removed:
+the "full gate is GREEN" section (historical, and stale at 742/67), "THE TEMPLATE READ IS FINISHED"
+(historical), a 158-line section explicitly headed "Superseded", a 40-line entry about the user-row
+markup not being in `NEXT-STEP/gaps` (obsolete — we fetched the template), "Blocking a feature"
+(eleven of twelve rows already closed), and the collectors' history. Two work rows went with them:
+**P**, resolved on 2026-08-12 and carrying two superseded comment blocks, and **Z**, which said
+`pnpm test` fails — it does not, as of this entry.
+
+**The eight process rules moved to `docs/reference/working-rules.md` rather than being deleted.**
+They are not to-do items, and a rule buried in a changelog entry is unfindable. Each names the
+failure that earned it: a grep proving absence twice, an absence claim that expired when the evidence
+grew, a generator run with stderr suppressed, a check that was wrong when it disagreed with the data,
+wording that fooled the tally test, an appearance inherited from the wrong neighbours, a rendered
+value transcribed as a constant four separate times, and three negative controls that passed for the
+wrong reason.
+
+**I deleted those rules by accident first.** Rewriting the HANDOFF section replaced the span they
+lived in. Caught by grepping for them before committing; restored from the changelog entries that had
+recorded each one. Which is the argument for writing them down twice.
+
+**Every timestamp in this file was audited**, not assumed: all 31 of today's entries sit within two
+minutes of a real commit, and none is in the future. The tally line is test-checked.
+
 ### 2026-08-13 18:03 EDT — T5-7 closed: both reference templates are fully accounted for
 
 **Runtime impact: none** — the accounting, and a closed register entry.
