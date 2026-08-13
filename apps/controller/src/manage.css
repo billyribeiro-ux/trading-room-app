@@ -1516,3 +1516,35 @@
 .mg-root .mg-stripe-mini {
   margin-top: 4px;
 }
+
+/*
+  The member's badges on the user row — page.manageSession.html:391-395.
+
+  `display: inline-block` and `margin-right: 2px` are INLINE styles in the reference, on markup whose
+  other two declarations (background and text colour) come from the badge record and therefore have
+  to stay inline. Only these two are static, so only these two are lifted here.
+
+  `.user-badge-img` is NOT ours — it is the reference's own rule, copied byte for byte from
+  `evidence-dumps/TIER1-fetched/styles.css`, including the commented-out `max-width` that ships in
+  the original. It is what bounds the image: `height: 100%` of the label with a 20px ceiling.
+
+  No `width`/`height` attributes on that `<img>`, which is a deliberate deviation from this project's
+  no-layout-shift rule and is worth stating. The reference carries none, badge images are stored as
+  data URLs so there is no network round trip to shift on, and the height is pinned by the rule
+  below — a fixed attribute pair would distort every badge that is not exactly that aspect.
+*/
+.mg-root .mg-row-badges {
+  display: inline-block;
+}
+
+.mg-root .mg-row-badge {
+  margin-right: 2px;
+}
+
+.mg-root .user-badge-img {
+  width: auto;
+  height: 100%;
+  /* max-width: 15px; */
+  max-height: 20px;
+  margin: 0 4px;
+}

@@ -24,6 +24,491 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-13
 
+### 2026-08-13 15:25 EDT — Read through :1162; one non-settings structure found missing
+
+**Runtime impact: none** — documentation only.
+
+Continued reading `page.manageSession.html` to :1162. That stretch is almost entirely settings rows,
+and the machine proof from the previous entry already covers all of them — so the value in reading it
+was the things that are NOT settings rows.
+
+One is missing outright. **T5-25 — the app-pair SAMPLE URL block** (`:1138-1142`), gated
+`ng-show="sess.hasAppPairLink && sess.pairSecretKey"`: a label reading "Sample link you would need to
+use to add each user: (replace email/name with the real user email/name" — the reference's own
+unclosed parenthesis — above a readonly input holding the exact URL an integrator posts to add each
+user. Checked our page for `pairURLLink`, `Sample link`, `ptr_app/sessions`, `pairSecretKey` and
+`addUser`: none present.
+
+Not built, because that URL embeds the room's pairing secret in displayed, copyable text — the same
+decision family as T5-24, and the same reason. The `pairSecretKey` SETTING is already in our schema
+and editable; what is missing is the derived sample link.
+
+**Two credential-bearing controls now wait on one decision.** T5-24 (the WordPress shortcode) and
+T5-25 (this) both match the original only by rendering a secret the room owns. Both are recorded with
+the exact markup, so either can be built in minutes once the call is made. Neither was worked around.
+
+### 2026-08-13 15:10 EDT — The settings schema is proven complete against the source it was never built from
+
+**Runtime impact: none** — one new test file and documentation.
+
+`room-settings-schema.ts` was extracted from a DOM CAPTURE of the manage page. Every surprise this
+session has come from the difference between a capture and the SOURCE: four icons whose `ng-show`
+interpolated, a Stripe block behind an `ng-if`, a Select All label with a second span. So the
+extraction had never been checked against the thing most likely to contradict it.
+
+It holds exactly. Every live `saveSessField('x')` and `editable-*="sess.x"` in
+`page.manageSession.html` — **267 names — is present in our 269, with ZERO missing.** The two extras
+reconcile: `description` is live but bound by `ng-model` on the textAngular editor, so neither
+spelling catches it; `roomType` is the one documented product deviation, whose row is commented out
+in the reference. 267 + 2 = 269.
+
+**Eight names are absent from our schema and none of them is a gap** — `chatAutoClearTime`,
+`customRoomURL`, `linkedStreamsToSession`, `media_server_audio`, `relay_to_repeaters`,
+`relay_user_max`, `useV4`, `webinarTZ`. All eight appear ONLY inside commented-out markup, the same
+situation as `fcmTokens`/`fcmUnreged` on the user row. Counting them would have sent the next person
+implementing eight settings nothing renders. They are named individually in the test rather than
+absorbed into a count, so a ninth — or one of these being switched back on in a re-fetch — is visible.
+
+The test also asserts the extracted set is 267 before comparing, because a regex that stops matching
+would make every other assertion pass while comparing two empty sets.
+
+**T5-24 is blocked and needs an explicit decision.** The reference's WordPress shortcode row prints
+the room's own signing key, and unlike the JWT rows above it, that row is ungated. Ours prints an
+empty value there, which makes the shortcode **unusable**: pasted into WordPress, the plugin signs
+with nothing and every SSO handoff fails. Matching the original means rendering that value on the
+Settings tab. The safety classifier refused the edit, correctly — the "match the original" ruling was
+general and never named this field. Not worked around. It needs a go-ahead that names it.
+
+**Verified:** `svelte-check` 1487 files / 0 errors; 810 tests across 73 files, 5 new. One negative
+control run — a real setting removed from the schema turns two assertions red.
+
+### 2026-08-13 14:55 EDT — The User Stats table renders arrivals, as the original does
+
+**Runtime impact: YES.** The Stats tab now loads `room_sessions` and renders the reference's row.
+
+Owner ruling: match the original. `page.manageSession.html:739-754` renders one row per ARRIVAL —
+`statXrefs` — and ours rendered one row per PERSON, which could never match: `In`/`Out`, IP, browser
+and duration are properties of a VISIT and a member row carries none of them.
+
+Every cell is now the reference's: zero-based `$index`; avatar, name and the TRIAL badge; email with
+`IP: <a href="http://ip-api.com/#…" >… (lookup)</a>`, a mobile-or-desktop glyph and the browser;
+`In:` and `Out` in `MM/dd/yyyy @ h:mma`; and `duration / 3600` to two decimals.
+
+**The item-W privacy shape survives the reversal intact.** Those rows were removed on 2026-08-11
+after two reviews — ~755 KB per load, on every tab, each row carrying a visitor's IP and email. What
+that review earned is kept: the rows load on the **Stats tab only**, **capped at 5,000**, newest
+first, and `stats.csv` still reads **uncapped at request time** so an export is never a truncated
+copy of what the page happened to hold. Five sixths of the original cost came from refetching on the
+other five tabs; that is still gone.
+
+**The TRIAL badge needed a LEFT join, and the direction matters.** `room_sessions` has no trial
+column — a visit is not a membership — so it comes from `room_users`. LEFT, because `roomUserId` is
+null for a guest who satisfied the room's login without ever having a membership row here. `false`
+for them is the honest answer, not a missing one.
+
+**Two of our own notes were wrong, both for the same reason.** A block declared "Show Online Users
+Only" and "Show Mobile Only?" unsupported. `filterOnline` was recorded as "passed to NOTHING in the
+reference" — it is in the repeat's `ng-hide` (:739), an attribute the capture rendered as `ng-hide=""`
+on rows that happened not to be hidden. `showMobileStat` was recorded as blocked by an ambiguity that
+belongs to the USERS tab; these are `room_sessions` rows and `is_mobile` is one explicit column. All
+four checkboxes filter now, and the "not applied" notice they justified is gone with them.
+
+**The monthly roll-up was counting the wrong thing.** It counted each member's last login, so a room
+of 40 members who each visited daily reported 40 logins for the month instead of about 1,200. It
+counts arrivals now, which is what "Total Logins" means and what `statXrefsMontly` rolls up.
+
+**A negative control stayed GREEN and exposed a hole in my own test.** Rendering `Out` for an
+in-progress visit did not fail, because the assertion looked for a specific date string and
+`formatLastLogin(null)` yields an epoch date — absent for the wrong reason. It asserts the word "Out"
+now. A second one, in `stats-export-contract`, had been passing for a different wrong reason: it
+matched `/^\s*visits\s*:/m` and the payload key is written in SHORTHAND, `visits,`. A test keyed on
+one of two equivalent spellings fails open.
+
+**Verified:** `svelte-check` 1486 files / 0 errors; 805 tests across 72 files, 10 new. **Four negative
+controls run** — the online filter switched to an `{#if}`, `Out` rendered for an open visit, duration
+left in seconds, and the TRIAL badge dropped — each red on the right assertion, green on revert.
+Migrations, privacy, evidence-layout and room-settings verifiers all PASS. Autofixer clean.
+
+
+### 2026-08-13 14:25 EDT — Five more gaps closed by reading, and a defect found in the reference itself
+
+**Runtime impact: none** — one new test file and documentation. No markup changed.
+
+Read `page.manageSession.html:773-912`, the Settings tab's first hundred rows. Five register items
+close outright:
+
+- **T2-12 — the webinar Date row.** `editable-combodate`, `e-data-format="DD-MM-YYYY h:mm a"` against
+  a `data-format` of `DD-MM-YYYY +-HH:mm`, displaying `MM/dd/yyyy @ hh:mm a` — `hh`, zero-padded, and
+  the only place on the page that differs from the `h:mma` used everywhere else. Its note sits in a
+  NON-STANDARD `<muted>` element. The send handler is misspelled `sendWeminarEmailReminder`.
+- **T2-13 — SEVEN password rows, not the three we had recorded.** `webinarPW`, `webinarPW2`,
+  `webinarPW3`, `webinarPWFreeTrial`, plus `deleteAlertPW`, `allRoomsWelcomeMatPW` and
+  `needPasswordForUserNotes`. The Free Trial row alone carries an extra `authMode=='unamePW'` in its
+  gate AND is the one `<p>` on the page with no `form-control-static` class.
+- **T2-16 — the App Pair Link.** Its value really is `https://{{hostname}}/room/`, a bare prefix with
+  no id. That was not a capture artifact; it is what the source emits.
+- **T2-21 — the header buttons.** Clone Room has THREE conditions, the third being a click counter
+  unlocked by `ng-dblclick="canCloneDblClick()"` on the room-id span — an easter egg. Delete Room is
+  clones only.
+- **T5-23** — below.
+
+**All 25 settings keys in that region are present in our 269-setting schema.** Checked by name, one
+at a time, not assumed. The extraction is holding up against the source it was never built from.
+
+**T5-23 — A REAL DEFECT IN THE REFERENCE, and the most interesting thing in this read.** Line 854:
+
+    <label>Logout Webhook URL</label>
+    <a onaftersave="saveSessField('logout_webhook_url')"
+       editable-textarea="sess.login_webhook_url"
+       e-label="Logout Webhook URL:">{{ sess.logout_webhook_url || 'empty' }}</a>
+
+Three references to a webhook field, and one of them is the wrong one. The label says logout, the
+display says logout, the save target says logout — but the editor BINDS the login webhook. Open that
+row to check it, save without editing, and you have copied your login webhook over your logout
+webhook. It reads correctly until you use it.
+
+It cannot occur here: our settings rows render `<Editable {def} value={settingValue(def.name)}>` in a
+loop over the schema, so label, value and save target are one identifier and there is no second one
+to get wrong. A new file, `reference-defects-not-reproduced.test.ts`, pins that — and also asserts
+the defect is still present IN the evidence, so if the reference is ever re-fetched and fixed
+upstream, the test fails and tells the reader to go and look rather than leaving a fictional citation
+behind. That guard matters more than the assertion it protects.
+
+**T5-24 opened, needs a decision.** The WordPress shortcode row prints
+`key='{{sess.ssoJWTSecret}}'` — the room's JWT signing secret — in plain text, and unlike the JWT
+rows immediately above it, that row is UNGATED. A room on any auth mode displays its signing secret
+to anyone who can see the Settings tab. Same family as T5-9, and the same decision.
+
+**Verified:** `svelte-check` 1485 files / 0 errors; 793 tests across 71 files, 4 new.
+
+
+### 2026-08-13 14:05 EDT — Four gaps closed by reading; three live locale bugs and an off-by-one fixed
+
+**Runtime impact: YES** — four date renderings and one index on the manage page.
+
+Read `page.manageSession.html:634-780`. It closes four register items outright, because they were
+opened when we had only DOM captures and the template carries the markup those captures never showed:
+
+- **T2-11 — the JWT rows.** Both live in the SETTINGS tab, not a tab of their own, gated
+  `ng-show="sess.authMode=='jwt'"`. JWT Secret Key is an `editable-textarea` with `e-label="Secret:"`,
+  and its muted help carries two typos that are the reference's own — "WordPRess" and "hard to getss"
+  — which must not be corrected.
+- **T2-14 — the SSO Setup tab.** `heading="SSO Setup "` with a trailing space, `form-horizontal`, and
+  exactly ONE row: SSO Host. Ours renders the `sso-setup` section, whose sole member is `ssoHost`
+  labelled "SSO Host". A match, verified rather than assumed.
+- **T2-19 — the textAngular editor.** The Save button sits INSIDE the `<h3>`, `pull-right`. The editor
+  is `<div text-angular="" ng-model="sess.description" name="wysiswyg-editor">` — the reference's own
+  misspelling of "wysiwyg", in the name attribute.
+- **T5-12 — the stats striping.** Confirmed: the online filter is a per-row `ng-hide`, so hidden rows
+  keep their `nth-of-type` positions and the striping counts them. Turning on "Show Online Users
+  Only" produces visibly irregular banding in the original. Recorded, not corrected.
+
+**Three live locale bugs, in a table two tabs away from the fix for them.** `last-login-format.ts`
+exists because `toLocaleString()` renders the VISITOR's locale — an owner in London saw
+`07/08/2026, 17:05` for the same instant, day and month swapped and no meridiem. Three call sites
+were still doing exactly that: the stats timestamp, the App PIN expiry and the push-token list. The
+stats one has captured evidence (`date:'MM/dd/yyyy @ h:mma'`, :748); the other two do not, and their
+format is stated in the code as INHERITED from this page's other stamps rather than captured — which
+is what this repository's rule prescribes when no value was captured.
+
+The guard is a whole-file ban on `toLocaleString`, not a per-site assertion. Pinning only the one
+site with reference evidence is how the other two survived the first fix.
+
+**An off-by-one between two tables.** `{{$index}}` in ngRepeat is zero-based and our user row already
+rendered it that way, but the stats row was `{i + 1}` — so one table numbered from 1 while the other,
+two tabs away, numbered from 0.
+
+**A test of mine went red on its own documentation, and that was the right failure.** The
+`toLocaleString` ban tripped on the comments explaining why it is banned. The fix is to strip
+comments before asserting, not to loosen the assertion — a test that cannot tell code from prose
+either blocks the explanation or gets weakened until it catches nothing.
+
+**One gap opened that is NOT mine to close: T5-22.** The reference's stats row renders one ARRIVAL per
+row with IP, a `ip-api.com` lookup link, browser and `duration / 3600`. Ours renders one row per
+person. We hold every field in `roomSessions` — but those rows were deliberately taken OUT of this
+payload after two reviews on 2026-08-11: 5,000 rows each carrying a visitor's IP and email in the
+page HTML, `TODO.md` item W, which is why the export moved to `stats.csv`. Rendering the reference's
+row puts those addresses back into a page payload. That partially reverses a reviewed privacy
+decision and is the owner's call, so it is recorded rather than done.
+
+**Verified:** `svelte-check` 1484 files / 0 errors; 789 tests across 70 files, 6 new. **Three more
+negative controls run** — the stats stamp back to `toLocaleString`, only one of the three sites fixed,
+and the index back to 1-based — each red on the right assertion, green on revert. Migrations, privacy
+and room-settings verifiers PASS.
+
+
+### 2026-08-13 13:40 EDT — Reading the manage header found a button that destroyed configuration
+
+**Runtime impact: YES.** A migration, a schema column, a fixed form action, and two corrected numbers
+in the panel title.
+
+Read `page.manageSession.html:1-340` line by line. Line 10 renders the panel title:
+
+    Current …: {{sess.current_capacity}} / Max … {{sess.recordedMaxCapacity}}
+
+next to a `resetMaxCount()` button. **Two different fields**, and the reset clears the second. The
+reference's own API documentation — carried in this repository at `$lib/content/api-docs.ts:127-130`,
+transcribed from the original — lists **three**: `current_capacity` 25, `current_max` 100,
+`recordedMaxCapacity` 150. The mark EXCEEDING the limit in the reference's own example is what
+settles that it is a recorded observation rather than configuration.
+
+**We had all three collapsed into one `max_users` column, and it produced two live bugs.**
+
+**Bug 1 — "Reset Counts" destroyed the room's configured capacity limit.** `resetMaxCount` set
+`maxUsers` to 0, and `maxUsers` is the value `internal/room-config/[code]:127` ships to the room. A
+button labelled "Reset Counts" was wiping configuration. Nothing enforces `maxUsers` in the room
+today — it crosses the boundary as a typed field and is not read — which is the only reason this
+never caused an incident, and is exactly why it is fixed before enforcement lands rather than after.
+Migration `0011` adds `recorded_max_capacity`; the reset now clears that.
+
+**Bug 2 — "Current" was the FILTERED list.** It read `data.users.length`, which is what survives the
+search box and the seven list filters. Typing a name into search made a room-occupancy readout say 1.
+It now reads `rosterCount`, counted with `count(*)` before any filter — a count rather than a second
+unbounded SELECT to call `.length` on, which is the shape this repository asks about at 10,000 rows.
+
+**A comment of ours was wrong, in the now-familiar way.** The Select All label carried a note saying
+the reference "drops the words once every row is checked, leaving a bare checkbox". The template
+(:258) has TWO spans — `Select All` and `Unselect All` — on the same label. The note was read off a
+capture taken with nothing selected, where the second `ng-if` had removed its span and left nothing
+to see. Third time a capture has hidden a conditional this session.
+
+**A negative control that did not go red, and what was done about it.** Reverting the Select All fix
+left all 780 tests green — nothing guarded it. `allSelected` is client state that SSR always renders
+false, so a render-based test would pass just as happily against the broken version. The guard is now
+on the component SOURCE, following the pattern `mobile-filter-contract` already uses, and reverting
+the fix now goes red.
+
+**Two honest gaps opened rather than filled.** T5-20: nothing writes `recorded_max_capacity`, because
+a high-water mark needs live occupancy and the controller receives no occupancy signal. NOT faked
+with the roster size — the number who ever registered is not the number ever simultaneously present,
+and rendering one as the other is an invented value that looks right. T5-21: "Batch User Invite"
+(`:178-183`, gated on `authMode === 'unamePW'`) is not built; the item, icon, position and gate are
+captured, the prompt it opens is not. `collect-stripe-details.js` now reads `doBatchInvite`,
+`actionsWithEmailList` and `canCloneDblClick` off the scope, so one console run captures all three.
+
+**Verified:** `svelte-check` 1483 files / 0 errors; 783 tests across 69 files, 11 new. **Three more
+negative controls run** — Current back to the filtered length, Max back to the configured limit, and
+the Select All label back to one-sided — each red on the right assertion, green on revert.
+`backend:migrations:verify` and `privacy:verify` PASS. Collector smoke test still green.
+
+
+### 2026-08-13 13:05 EDT — Four templates read end to end; two whole pages found missing
+
+**Runtime impact: none** — evidence documents only. No code changed, deliberately.
+
+Read whole, line by line, not searched: `page.stats.html` (100 lines), `users.html` (37),
+`page.recordings.html` (27), `page.avatars.html` (17). 181 lines off T5-7, which now stands at four of
+six templates fully read. The write-up is PART 4 of `docs/reference/evidence-dumps-full-read.md`.
+
+**Two whole PAGES are missing from both apps.** `apps/controller` AND `apps/room` were both checked
+for `Recordings`, `avatarChooser` and `selectAvatar`. Neither implements either page.
+
+- **T5-16 — Recordings.** A `list-group` of records: `fa-file-video-o`, `{{rec.created | date:'MM/dd/yyyy @ h:mma'}}`
+  — the exact format `formatLastLogin` already implements — `{{(rec.length/60000) | number:2}} Minutes`,
+  so `length` is milliseconds, a `<video controls width="640">` with `type` on the video element
+  itself (not valid HTML) and no height, and a Download anchor. The empty state is a BARE `<li>` with
+  no `list-group-item` class, unlike the populated rows.
+- **T5-17 — Avatars.** `ng-repeat` over `col-md-1` cells, each an `<a class="avatarChooser">` around an
+  `<img class="thumb80">`. `.avatarChooser` is a `transition: all 0.25s ease` with **no `:hover` rule
+  anywhere in the file**, so nothing visibly transitions. Kept as a finding rather than corrected.
+
+**Neither is built, and that is the point.** `recs` and `avatars` come from controller endpoints this
+repository holds no contract for. Inventing a data source to make a page render is exactly what these
+rules forbid, so both are recorded with everything read and nothing guessed.
+
+**T5-18 — a DEAD CONTROL in the reference itself.** `page.recordings.html:21` is
+`<a href="" class="btn btn-default"><i class="fa fa-share"></i> Share</a>` — no `ng-click`, no
+`ng-href`, no handler at all. It renders and does nothing. This repository forbids shipping a control
+whose only effect is its own presence, so a faithful rebuild has to choose. Recommendation on the
+record: omit it and say why, the same call already taken for the Stripe Details link.
+
+**T5-19 — the stats period `<select>` is doubly inert, and both halves are the reference's bugs.** No
+`ng-model`, so nothing reads it; and all four options carry `value="hourly"` — Hourly, Daily, Weekly
+and Monthly all submit the same value. Recorded so nobody "corrects" it. Also from that page: its
+download endpoint returns **JSON** (`/users/v1/sessions/stats/{{sessionID}}/{{tok}}`, named
+`{{sessionID}}.json`) where ours exports **CSV** from `account/rooms/[id]/stats.csv` — a different
+route and a different format.
+
+Confirmed real rules while reading: `.btn-oval` (shared with `.btn-pill-left`), `.avatarChooser`,
+`.thumb80`, `.thumb40`, `.list-block`. **None added to `manage.css`** — nothing consumes them yet, and
+this repository does not carry CSS with no consumer.
+
+**Verified:** no code changed, so nothing to test. The claims above are citations into files that were
+opened and read, and the two "not built" claims are the result of searching both apps for three
+distinct identifiers.
+
+
+### 2026-08-13 12:52 EDT — Two register items closed by READING: `btn-small` is inert, and `mobilePairCode` was never missing
+
+**Runtime impact: none** — six tests and three documents. No markup changed.
+
+**T5-6 — `btn-small` on the APPROVE button.** `class="btn btn-small btn-warning"`
+(`page.manageSession.html:415`). `btn-small` is the BOOTSTRAP 2 spelling; Bootstrap 3 renamed it to
+`btn-sm`. Confirmed inert by reading three stylesheets for the name: absent from
+`evidence-bootstrap-3.3.7.css`, absent from `TIER1-fetched/styles.css` (218 KB), absent from
+`theme.css` (233 KB). The sheet that lacks it DOES carry `.btn-sm` and `.btn-xs`, which is the control
+— without that check the assertion would also pass against an empty file.
+
+Now pinned, because **the obvious fix is a regression**. Changing `btn-small` to `btn-sm` would make
+the button visibly smaller than the reference: `.btn-sm` has real padding, font-size, line-height and
+border-radius rules. A tidy-up that looks like a typo correction changes the rendering, and the
+negative control for that is on record.
+
+**T5-14 — `mobilePairCode` "is not surfaced on the user row".** It was stale when it was written; the
+row has rendered it since the App PIN work. Verified by reading every occurrence of `showPins` in the
+template rather than searching for a class name: it appears exactly TWICE — `ng-init="showPins=true;"`
+on the table (:334) and the read on the row (:397) — and nothing anywhere sets it false. So rendering
+on `mobilePairCode` alone is behaviourally identical to the reference's `showPins && mobilePairCode`.
+
+**A whitespace difference found and deliberately NOT fixed.** The reference's markup is
+`> APPROVE</button>`, with a leading space; ours emits `>APPROVE<` because the Svelte compiler trims
+leading whitespace in an element. That is not a defect: a leading space at the start of a line box is
+collapsed by HTML, so the two render identically. The only way to force it into the output is
+`&nbsp;`, which does NOT collapse — it would add a real gap the reference does not have, turning a
+cosmetic non-difference into a visible one. The test asserts the trimmed form and carries the reason,
+so the next person who spots the diff finds the answer instead of "correcting" it.
+
+**Also confirmed rather than assumed:** every `updateUser` opcode in the row menu was diffed against
+the template. All fourteen call sites match in code, label and order, including the two archives items
+gated on opposite states of `denyArchivesAccess`.
+
+**Verified:** 36 tests in `manage-user-row-reference-fields.test.ts`, 6 new. Two more negative controls
+run — `btn-small` changed to `btn-sm`, and APPROVE shown regardless of invite status — each red on the
+right assertion, green on revert.
+
+
+### 2026-08-13 12:38 EDT — The member's badges, on the row where the reference paints them
+
+**Runtime impact: YES.** A new block in the user row's identity cell, and three CSS rules.
+
+`page.manageSession.html:391-396`. Ours rendered badges only inside the row menu, so an operator
+could assign one and never see it. The reference paints them in the identity cell, between the Stripe
+block and the TRIAL span.
+
+**The ordering is the part worth getting right.** The reference iterates the ACCOUNT's badge list and
+filters by membership — `ng-repeat="b in badgesList" ng-if="user.badges.includes(b._id)"` — not the
+member's own array. That means every row shows its badges in the same sequence, so a column of rows
+is scannable. Iterating `member.badges` instead would order them by whenever each was assigned, which
+differs per member and reads as noise. A test asserts the order with an account list and a member
+list that deliberately DISAGREE about sequence, because a test where they agree proves nothing.
+
+Text form OR image form, never both: the reference puts `ng-hide` on the span and `ng-show` on the
+img with the same predicate. `alt` is the image URL itself — its own choice, kept, because a badge
+image has no other text and inventing alt copy would be inventing.
+
+`.user-badge-img` is copied byte for byte out of `evidence-dumps/TIER1-fetched/styles.css`, including
+the commented-out `max-width` that ships in the original. **No `width`/`height` attributes on that
+image**, which is a deliberate deviation from this project's no-layout-shift rule and is stated in
+the stylesheet rather than left to be noticed: the reference carries none, badge images are stored as
+data URLs so there is no network round trip to shift on, the height is pinned at 20px by that rule,
+and a fixed attribute pair would distort every badge that is not exactly that aspect.
+
+**A test of mine was wrong before the code was.** The two leading `&nbsp;` are what separates the
+block from the name before it — nothing in CSS does that job. My first assertion looked for the
+literal string `&nbsp;`, which fails against correct output because Svelte decodes the entity and
+emits U+00A0. Worse, the obvious repair — matching `\s*` — passes against two ORDINARY spaces, which
+collapse in HTML and would silently remove the gap. It now asserts the codepoint.
+
+**Also verified, not assumed:** every `updateUser` opcode in the row menu was diffed against the
+template. All fourteen call sites match in code, label and order, including the two archives items
+that are gated on opposite states of `denyArchivesAccess`. Nothing to change — recorded so the next
+person does not re-check it.
+
+**Verified:** `svelte-check` 1481 files / 0 errors; 772 tests across 68 files in `src/lib`, 9 new.
+**Four more negative controls run** — iterating the member's list instead of the account's, dropping
+the image/text exclusion, using ordinary spaces instead of non-breaking, and moving the block after
+the TRIAL span — each goes red on exactly the assertion that should catch it, green on revert.
+Privacy, evidence-layout and room-settings verifiers PASS. Svelte MCP autofixer clean.
+
+
+### 2026-08-13 12:22 EDT — The T5-15 collector, and a hole it found in a guard already run on production
+
+**Runtime impact: none** — two console scripts, a smoke test, and docs. Nothing the site serves.
+
+`apps/controller/scripts/collect-stripe-details.js` closes T5-15: what does the Stripe block's
+"Details" link open? The obvious approach is to find a marketplace member and click it. This does not
+do that. The manage page is AngularJS 1.3 with **debug info enabled** — the captures carry 324
+`ng-scope` classes — so `String(scope.openStripeDetails)` returns the handler's OWN SOURCE. That is
+better evidence than a screenshot: it names the template, the fields and the modal library, it works
+on a room with zero marketplace members, and it needs no clicks at all. The script then follows any
+`templateUrl` that source names. Capturing the rendered block and modal is corroboration, not the
+finding, and runs only if the page happens to have a marketplace member.
+
+It captures `getStripeStatusClass` and `formatStripeAmount` too, deliberately. Those were transcribed
+by hand out of the minified bundle and are already in the full-read doc — so they are the CONTROL. If
+the script's copies match, the transcription method is validated and `openStripeDetails`, read the
+same way, can be trusted. If they differ, the transcription is wrong and that is the more urgent
+finding.
+
+**Personal data is redacted to its SHAPE before it is written.** A marketplace member is a paying
+customer: emails, `cus_`/`sub_`/`pi_` Stripe ids and long digit runs become `«email 21 chars»` and
+`«cus_id 22 chars»`. Not a blanket placeholder — an honest gap has to stay distinguishable from an
+empty value, and shape is what a rebuild needs.
+
+**THE FINDING: `collect-manage-gaps.js`'s click guard did not work, and it has already been run on
+production.** Its denylist is `\b(delete|remove|upload|…)\b`, and `\bdelete\b` does NOT match
+`deleteParticipant` — the `\b` after `delete` needs a non-word character and finds `P`. Every handler
+in this codebase is camelCase, so `sendWelcomeEmail`, `removeBadgesForUsers` and `deleteApiKey` were
+all invisible to it. It never fired by luck rather than by design: that script only clicks tabs and
+disclosure toggles, so it never reached one.
+
+Found because the new script's smoke test EXERCISES the guard rather than describing it — it runs the
+collector a second time against a Details link named `openStripeDetailsAndSendReceipt` and asserts the
+click is refused. The first run of that assertion failed, which is the negative control arriving on
+its own.
+
+Fixed in both by splitting camelCase before the denylist reads the text, which preserves the original
+anti-false-positive intent: `banUser` becomes `ban User` and matches, `banner` stays `banner` and does
+not.
+
+**Audited the other four collectors rather than assuming.** `collect-manage-states.js`,
+`collect-export-controls.js` and `apps/room/scripts/ptr-collect.js` were already safe — they use
+unanchored patterns or `String.includes`, which match inside an identifier. `collect-everything.js`
+had a NARROWER version of the same hole: four of its words carry a trailing `\b` (`play\b`, `post\b`,
+`ban\b`, `pay\b`), deliberately, to stop `ban` matching `banner` — and those four also missed
+`banUser`, `payInvoice`, `postMessage` and `playStream`. Hardened the same way, with the fix proven on
+all six strings including the two that must NOT match.
+
+**Verified:** both smoke tests pass; `node --check` on all three modified scripts. The camelCase fix
+has its negative control on record — the assertion failed before it and passes after.
+
+
+### 2026-08-13 12:05 EDT — The two per-member grants: the writers the new icons had no way to reach
+
+**Runtime impact: YES.** One new form action, one new server function, four menu items.
+
+The previous entry added `hasFileAccess` and `hasMobileApp` and rendered their icons. Nothing could
+set them. A column with no writer driving an indicator that can therefore never light up is the same
+defect as a control whose only effect is its own presence, inverted — and it would have shipped as
+"done" because the icons render, the tests pass and the row looks right.
+
+`page.manageSession.html:545-551` and `:592-598` are the reference's four items, each behind `ng-if`
+on the ROOM's own case-by-case setting, at the bottom of the App-and-Notifications submenu and at the
+very end of the row menu respectively. The dividers are gated on the same condition, so a room
+without case-by-case does not end either menu on a trailing rule.
+
+**The room setting is deliberately NOT re-checked in the action.** It decides whether the control is
+OFFERED, not whether a grant is legitimate. A room that turns case-by-case off has not withdrawn the
+grants it already made — it has stopped consulting them, which is exactly what the row's icons do.
+Re-checking server-side would silently refuse a legitimate write whenever an owner toggled the
+setting off and back on. What IS enforced there is tenancy: `ownedRoomId` throws unless the account
+owns the room, and the `UPDATE` is keyed on both ids, so a member id from another tenant's room
+matches zero rows.
+
+The column name comes from a static map and never from the request body — the same discipline the
+Prometheus-label rule exists for — and an unknown grant fails loud with a 400 rather than defaulting
+to one of the two.
+
+Glyph detail worth keeping: the menu uses SOLID `fa-folder`, the row icon uses the OUTLINE
+`fa-folder-o`. Two different glyphs in the reference, kept as two here, with a test that would catch
+them being collapsed.
+
+**Verified:** `svelte-check` 1481 files / 0 errors; 763 tests across 68 files in `src/lib`, including
+5 new. **Three more negative controls run** — removing the case-by-case gate, making both buttons
+grant, and emitting the divider unconditionally — each goes red on exactly the assertion that should
+catch it, green again on revert. Svelte MCP autofixer clean.
+
+
 ### 2026-08-13 11:58 EDT — The user row's eleven missing fields: four conditional icons, the Discord handle, and the whole Stripe block
 
 **Runtime impact: YES.** A migration, a wider `SELECT`, three new render paths on the manage user

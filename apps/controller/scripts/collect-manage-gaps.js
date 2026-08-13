@@ -107,16 +107,35 @@
     return /\bdropdown-toggle\b/.test(cls);
   }
 
+  /**
+   * Splits camelCase so the word denylist can see inside an identifier.
+   *
+   * ADDED 2026-08-13, and it is a REAL HOLE that existed every time this script was run before:
+   * `\bdelete\b` does NOT match `deleteParticipant`. The `\b` after `delete` needs a non-word
+   * character and finds `P`, so the pattern fails — and every handler in this codebase is camelCase.
+   * `sendWelcomeEmail`, `removeBadgesForUsers` and `deleteApiKey` were all invisible to the guard.
+   *
+   * The reason it never fired is luck rather than design: this script only ever clicks tabs and
+   * disclosure toggles, so it never reached one. Found while writing `collect-stripe-details.js`,
+   * whose smoke test exercises the guard directly instead of describing it.
+   *
+   * Same family as every other regex mistake recorded here — a pattern written against text nobody
+   * controls. The denylist has to be applied to the WORDS, not to the identifier.
+   */
+  const splitCamel = (s) => String(s).replace(/([a-z0-9])([A-Z])/g, '$1 $2');
+
   function safeClick(element, why) {
     if (!element) return false;
-    const description = [
-      element.textContent || '',
-      element.getAttribute('title') || '',
-      element.getAttribute('aria-label') || '',
-      element.getAttribute('ng-click') || '',
-      element.id || '',
-      element.className || ''
-    ].join(' ');
+    const description = splitCamel(
+      [
+        element.textContent || '',
+        element.getAttribute('title') || '',
+        element.getAttribute('aria-label') || '',
+        element.getAttribute('ng-click') || '',
+        element.id || '',
+        element.className || ''
+      ].join(' ')
+    );
     // An `ng-click` naming a handler is a real action whatever the element looks like, so the
     // capability exemption never applies to one.
     const hasHandler = !!(element.getAttribute('ng-click') || '').trim();

@@ -126,7 +126,87 @@ Every gap from the full read of `apps/controller/evidence-dumps/` now lives ther
 five tiers. **That file is the tracker — this section is only the index to it.** Do not record a
 gap's status in both places; one of them will go stale.
 
-As of 2026-08-13: **30 CLOSED, 25 OPEN, 14 parked/won't-fix, 69 total.**
+As of 2026-08-13 15:25 EDT: **42 CLOSED, 24 OPEN, 14 parked/won't-fix, 79 total.**
+
+Read `page.manageSession.html` through :1162. The settings rows in that stretch are all covered —
+proven by machine, see below — but one NON-settings structure is missing entirely:
+
+- **T5-25 — the app-pair SAMPLE URL block** (`:1138-1142`). A label and a readonly input showing
+  the exact URL an integrator posts to add each user. None of it is rendered by us. It embeds the
+  room's pairing secret in displayed, copyable text, which puts it in the SAME decision family as
+  T5-24 — so it is recorded, not built.
+
+**The settings surface of `page.manageSession.html` is now proven complete by machine.** Every live
+`saveSessField('x')` and `editable-*="sess.x"` in that template — 267 names — is present in our
+269-setting schema, with ZERO missing. The schema was extracted from a DOM capture and had never
+been compared against the source it was not built from; it holds exactly. Pinned by
+`settings-schema-covers-template.test.ts`, with a negative control run.
+
+**T5-24 is BLOCKED on one word from you.** The reference's WordPress shortcode row prints the
+room's live JWT signing secret. Ours prints an empty key, which makes the shortcode unusable:
+paste it into WordPress and every SSO handoff fails because the plugin signs with nothing.
+Matching the original means rendering a real credential on the Settings tab, and the safety
+classifier refused the edit because "match the original" never specifically named this secret.
+It needs your explicit go-ahead, naming it.
+
+**T5-22 closed by owner ruling: match the original.** The User Stats table renders one row per
+ARRIVAL with IP, lookup link, browser, In/Out and duration. What the 2026-08-11 privacy review
+earned survives intact — the rows load on the Stats tab ONLY, capped at 5,000, newest first, and
+the uncapped export still reads at request time. Five sixths of that review's cost came from
+refetching on the other five tabs, and that is still gone.
+
+Five more closed by reading `page.manageSession.html:773-912` — **T2-12** (webinar Date row and the
+email preview), **T2-13** (SEVEN password rows, not three), **T2-16** (the App Pair Link value really
+is a bare prefix), **T2-21** (the header buttons, including a double-click easter egg that unlocks
+Clone), and **T5-23** recorded below.
+
+**T5-23 — a real defect in the REFERENCE, not carried.** Its Logout Webhook row edits the LOGIN
+webhook: `editable-textarea="sess.login_webhook_url"` under a label, a display and a save target
+that all say logout. Opening that row and saving without editing copies one over the other. It
+cannot happen here — our settings rows bind one identifier — and `reference-defects-not-reproduced.test.ts`
+pins both that fact and that the defect is still in the evidence, so the citation cannot rot.
+
+**T5-24 needs your decision.** The WordPress shortcode row renders the room's JWT signing secret in
+plain text, and unlike the JWT rows above it, it is UNGATED — so a room on any auth mode displays
+its secret to anyone who can see the Settings tab. Same family as T5-9.
+
+Four closed by reading `page.manageSession.html:634-780` — **T2-11** (the JWT rows live in the
+SETTINGS tab, not their own), **T2-14** (the SSO tab is exactly one row, SSO Host), **T2-19** (the
+textAngular editor and its in-heading Save button), **T5-12** (the stats striping counts hidden
+rows — confirmed as the reference's own behaviour, recorded not corrected).
+
+One opened, and it needs YOUR decision: **T5-22 — the User Stats table.** The reference renders one
+row per ARRIVAL with IP, browser and duration. Ours renders one row per PERSON. We hold the data in
+`roomSessions`, but it was deliberately removed from this payload after two privacy reviews (item
+W). Putting it back partially reverses that, so it is not mine to do silently.
+
+Two more opened while reading `page.manageSession.html:1-340`, and both come out of a REAL BUG that
+reading found:
+
+- **T5-20 — nothing writes `recorded_max_capacity`.** The column and the reader exist; the writer
+  needs live occupancy, which only the room service knows. Not faked with the roster size.
+- **T5-21 — "Batch User Invite" is not built.** The menu item, icon, position and gate are all
+  captured; the prompt it opens is not. The collector now reads `doBatchInvite` off the scope.
+
+The total GREW again, and for the same reason it grew before: reading templates end to end keeps
+surfacing things no capture ever rendered. Four small `views/` templates were read whole today —
+`page.stats.html`, `users.html`, `page.recordings.html`, `page.avatars.html`, 181 lines — and they
+opened four gaps, two of which are whole PAGES neither of our apps has:
+
+- **T5-16 — the Recordings page.** Not in `apps/controller`, not in `apps/room`. Checked both.
+- **T5-17 — the Avatars page.** Same.
+- **T5-18 — a DEAD CONTROL in the reference**: the recordings "Share" button has no handler of any
+  kind. Needs a decision, because this repository forbids shipping one.
+- **T5-19 — the stats period `<select>`** has no `ng-model` and all four options carry
+  `value="hourly"`. Recorded so nobody "fixes" it.
+
+Neither page is built. `recs` and `avatars` come from controller endpoints this repository holds no
+contract for, and inventing a data source to make a page render is exactly what the evidence rules
+forbid. The full write-up is PART 4 of `docs/reference/evidence-dumps-full-read.md`.
+
+Closed since the last count: **T5-6** (`btn-small` on APPROVE is inert — proven absent from all three
+stylesheets, and pinned so nobody "corrects" it to `btn-sm` and shrinks the button) and **T5-14**
+(`mobilePairCode` on the user row — the entry was stale when it was written; it was already rendered).
 
 The total GREW from 56 to 68 because reading the uncompiled templates keeps surfacing features no
 DOM capture ever rendered — a new **Tier 5**. Three need a decision from the owner, not more
@@ -142,9 +222,14 @@ which divides by 100 unconditionally and so shows every zero-decimal currency a 
 **One genuinely missing thing came out of building it — T5-15.** The reference's Stripe block ends
 with a "Details" link whose handler is `openStripeDetails(user)`. That handler is in no capture, not
 in `views/page.manageSession.html`, and not among the handlers transcribed out of `app.min.js`. The
-link is deliberately NOT rendered, its absence is asserted by a test so it cannot be closed by
-accident, and capturing it needs a console run on a live room that actually has a marketplace
-member.
+link is deliberately NOT rendered and its absence is asserted by a test so it cannot be closed by
+accident.
+
+**The script to close it is written and smoke-tested:** `apps/controller/scripts/collect-stripe-details.js`.
+Paste it into the Chrome console on the live manage page and it downloads the JSON by itself. It does
+NOT need a marketplace member and does NOT click anything — the manage page is AngularJS with debug
+info enabled, so it reads `String(scope.openStripeDetails)` off the scope chain and then fetches
+whatever template that source names. Everything else it does is corroboration.
 
 Reading source also proved a gap can close as **dead markup**: the cloned-room indicator is an empty
 span in the SOURCE, so there was never anything to find (T2-9).

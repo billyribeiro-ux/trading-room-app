@@ -174,19 +174,38 @@
   const FORBIDDEN =
     /delete|upload|remove|play\b|stop|send|save|submit|post\b|kick|ban\b|mute|reset|clone|archive|invite|logout|pay\b|purchase|charge/i;
 
+  /*
+    Splits camelCase before the guard reads the text.
+
+    ADDED 2026-08-13. Four words above carry a trailing `\b` — `play\b`, `post\b`, `ban\b`,
+    `pay\b` — which is there on purpose, to stop `ban` matching `banner`. The side effect is that
+    they also miss `banUser`, `payInvoice` and `postMessage`, because there is no word boundary
+    between `n` and `U`. Every handler in this codebase is camelCase, so those four were the ones
+    most likely to be attached to something that mutates.
+
+    Splitting keeps both properties: `banUser` becomes `ban User` and matches; `banner` stays
+    `banner` and does not. The other words here are unanchored and were never affected.
+
+    Found while writing `collect-stripe-details.js`, whose smoke test exercises the guard rather
+    than describing it. The same class of bug — a regex written against text nobody controls.
+  */
+  const splitCamel = (s) => String(s).replace(/([a-z0-9])([A-Z])/g, '$1 $2');
+
   function safe(el) {
     if (!el) return false;
     if (el.tagName === 'BUTTON' && (el.getAttribute('type') ?? 'submit') === 'submit' && el.form) return false;
     if (el.tagName === 'INPUT' && /submit|image|reset/i.test(el.type || '')) return false;
-    const text = [
-      el.textContent,
-      el.className,
-      el.id,
-      el.getAttribute('ng-click'),
-      el.getAttribute('title'),
-      el.getAttribute('aria-label'),
-      el.getAttribute('href')
-    ].join(' ');
+    const text = splitCamel(
+      [
+        el.textContent,
+        el.className,
+        el.id,
+        el.getAttribute('ng-click'),
+        el.getAttribute('title'),
+        el.getAttribute('aria-label'),
+        el.getAttribute('href')
+      ].join(' ')
+    );
     return !FORBIDDEN.test(text);
   }
   function click(el, why) {

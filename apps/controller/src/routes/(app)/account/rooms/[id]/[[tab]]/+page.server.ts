@@ -1,10 +1,10 @@
 import { error, fail, redirect } from '@sveltejs/kit';
 import { randomBytes } from 'node:crypto';
-import { desc, eq } from 'drizzle-orm';
+import { count, desc, eq } from 'drizzle-orm';
 import { PUBLIC_SITE_ORIGIN } from '$app/env/public';
 import { ROOM_BASE_URL, ROOM_JWT_SECRET } from '$app/env/private';
 import { getDb } from '$lib/server/db';
-import { badges, roomSessions, rooms } from '$lib/server/db/schema';
+import { badges, roomSessions, roomUsers, rooms } from '$lib/server/db/schema';
 import { requireOwnedRoom, requireUser } from '$lib/server/auth';
 import {
   MANY_OPCODES,
@@ -15,6 +15,8 @@ import {
   listRoomUsers,
   readPermissions,
   readPushTokens,
+  isMemberGrant,
+  setMemberGrant,
   readSettings,
   savePermissions,
   saveSetting,
@@ -276,6 +278,81 @@ export const load: PageServerLoad = async ({ params, locals, url }) => {
   */
   const members = users.map(({ pushTokensJson: _deviceTokens, ...member }) => member);
 
+  /*
+    THE ROSTER SIZE, UNFILTERED — and it must be counted before any filter, which is why it is a
+    separate query rather than `members.length`.
+
+    The panel title renders `Current: N / Max M`. `members` above has already been through the search
+    box and the seven list filters, so using its length meant that searching for one person made the
+    header read "Current: 1" — a room-occupancy readout that changed depending on what you had typed
+    into a search box.
+
+    `count(*)` rather than re-selecting the rows: the page needs the number, not the members, and an
+    unbounded second SELECT of every row in a large room to call `.length` on it is the shape this
+    repository asks about at 10,000 rows.
+  */
+  const [rosterRow] = await getDb()
+    .select({ n: count() })
+    .from(roomUsers)
+    .where(eq(roomUsers.roomId, room.id));
+  const rosterCount = rosterRow?.n ?? 0;
+
+    /*
+    `visits` — one row per ARRIVAL, which is what the reference's `statXrefs` is.
+
+    ## It was removed, and it is back by an explicit decision
+
+    This was taken out on 2026-08-11 after two reviews flagged the same line: ~755 KB of serialised
+    rows on EVERY load (the tab links are same-route anchors, so clicking through six tabs refetched
+    it six times), each row carrying a visitor's IP address and email. That removal was right about
+    the cost and the exposure.
+
+    The owner's ruling on 2026-08-13 is to match the original, and the original's User Stats table
+    renders exactly this: IP with an `ip-api.com` lookup link, browser, In/Out stamps and a duration
+    (`page.manageSession.html:739-754`). A stats table without them is not the reference's table.
+
+    ## What is kept from that review, and why it is not a reversal of it
+
+    **Gated on the Stats tab.** The five-sixths of the cost that came from refetching on Branding,
+    Settings, Text List, SSO and Marketplace is still gone — those tabs carry no visit rows at all.
+    **Bounded at 5,000**, newest first, because an unbounded SELECT behind a PAGE LOAD is a
+    slow-motion outage and the cap drops the oldest history rather than today's.
+    **The CSV export still reads at request time** (`stats.csv`), uncapped, and remains the way to
+    get everything.
+
+    So the exposure is now: the room's own owner, on the tab whose entire purpose is this data,
+    seeing at most 5,000 rows. That is the reference's behaviour and the decision is recorded.
+  */
+  const visits =
+    tab === 'stats'
+      ? await getDb()
+          .select({
+            id: roomSessions.id,
+            displayName: roomSessions.displayName,
+            email: roomSessions.email,
+            ip: roomSessions.ip,
+            isMobile: roomSessions.isMobile,
+            browser: roomSessions.browser,
+            joinedAt: roomSessions.joinedAt,
+            leftAt: roomSessions.leftAt,
+            /*
+              The reference's stat row renders `ng-show="userStat.isFreeTrial"` for its TRIAL badge
+              (`page.manageSession.html:741`), so its `statXrefs` carry trial status. `room_sessions`
+              does not — a visit is not a membership — so it is joined from the membership.
+
+              A LEFT join, because `roomUserId` is null for a GUEST: somebody who satisfied the
+              room's own login without ever having a membership row here. `false` for them is the
+              honest answer, not a missing one — a guest is not on a free trial.
+            */
+            isFreeTrial: roomUsers.isFreeTrial
+          })
+          .from(roomSessions)
+          .leftJoin(roomUsers, eq(roomUsers.id, roomSessions.roomUserId))
+          .where(eq(roomSessions.roomId, room.id))
+          .orderBy(desc(roomSessions.joinedAt))
+          .limit(5000)
+      : [];
+
   return {
     room,
     /** the reference's `ng-href` on Launch — the whole handoff URL, resolved at page load */
@@ -292,34 +369,18 @@ export const load: PageServerLoad = async ({ params, locals, url }) => {
     // branded for the reviewed client-side HTML sink.
     landingHtml: sanitizeHtml(String(settings.description ?? '')),
     users: members,
+    /** the whole roster, for the panel title — NOT `users.length`, which is filtered */
+    rosterCount,
     /** a filter the menu offers but this loader cannot honour — shown, never silently ignored */
     unsupportedFilter,
+    /** one row per ARRIVAL, Stats tab only, newest first, capped — see the note above */
+    visits,
     /** the User Stats table — real logins only, never invented rows */
     stats: members.filter((u) => u.lastLoginAt).sort((a, b) => Number(b.lastLoginAt) - Number(a.lastLoginAt)),
-    /**
-     * One row per ARRIVAL, which is what the reference's `statXrefs` is and what its CSV exports.
-     *
-     * `stats` above is one row per PERSON, keyed on `lastLoginAt`, and it stays — the User Stats
-     * table renders it. This is the different question the export needed answering: who was here,
-     * from when to when, from where. `TODO.md` item K.
-     *
-     * Bounded at 5,000. A busy room accumulates a row per entry indefinitely, and an unbounded
-     * SELECT behind a page load is a slow-motion outage; newest first, so the cap drops the oldest
-     * history rather than today's. If a room ever needs more than that in one export, the answer is
-     * a date range on the query and not a larger number.
-     */
     /*
-      `visits` is GONE from this payload, and that is the whole point of `TODO.md` item W.
-
-      It used to be selected here — 5,000 rows, each carrying a visitor's IP ADDRESS and email — so
-      that the browser could build a CSV from them. Two reviews on 2026-08-11 flagged the same line
-      independently: ~755 KB of serialised rows per load, and personal data travelling in the HTML
-      of a page about branding colours. Gating it on the Stats tab removed five sixths of that; this
-      removes the rest.
-
-      The export is now `GET /account/rooms/<shortCode>/stats.csv`, which reads the rows at the
-      moment somebody asks for the file, behind the same `requireOwnedRoom` gate as this page. Those
-      addresses no longer enter a page payload at any point, on any tab.
+      The CSV is NOT built from `visits`, and that is still item W's point. `stats.csv` reads the
+      rows at the moment somebody asks for the file, uncapped, behind the same `requireOwnedRoom`
+      gate — so an export is never a truncated copy of whatever this page happened to load.
     */
     links: {
       room: `${ORIGIN}/u/${publicId}`,
@@ -448,9 +509,20 @@ function failFor(e: unknown) {
 
 export const actions: Actions = {
   /** `resetMaxCount()` — clears the room's high-water mark, not its members. */
+  /**
+   * `resetMaxCount()` — clears the occupancy HIGH-WATER MARK.
+   *
+   * It used to set `maxUsers` to 0, and `maxUsers` is the CONFIGURED capacity limit that
+   * `internal/room-config/[code]` ships to the room. So a button labelled "Reset Counts" destroyed
+   * configuration. The reference's own API documentation separates the two — `current_max` 100
+   * against `recordedMaxCapacity` 150 in the same example — and the reset belongs to the second.
+   *
+   * Nothing enforces `maxUsers` in the room today, which is the only reason this never caused an
+   * incident, and is exactly why it is fixed before enforcement lands rather than after.
+   */
   resetMaxCount: async ({ params, locals }) => {
     const roomId = await ownedRoomId(locals, params.id);
-    await getDb().update(rooms).set({ maxUsers: 0 }).where(eq(rooms.id, roomId));
+    await getDb().update(rooms).set({ recordedMaxCapacity: 0 }).where(eq(rooms.id, roomId));
     return { resetCounts: true };
   },
 
@@ -655,6 +727,32 @@ export const actions: Actions = {
     const form = await request.formData();
     const roomUserId = Number(form.get('roomUserId'));
     return { restrictPm: await setUserRestrictPm(roomId, roomUserId, form.get('restrict') === 'on') };
+  },
+
+  /**
+   * `manageMobileApp(…)` and `manageFileAccess(…)` — the two per-member grants at the bottom of the
+   * row menu, each behind the room's own case-by-case setting.
+   *
+   * The room setting is NOT re-checked here on purpose, and that is a deliberate split rather than
+   * an omission. It decides whether the CONTROL is offered — it is `ng-if` on the menu item in the
+   * reference and `{#if}` on ours — not whether the grant is legitimate. A room that turns
+   * case-by-case off has not withdrawn the grants it already made; it has stopped consulting them,
+   * which is exactly what the row's icons do. Re-checking here would silently refuse a legitimate
+   * write whenever an owner toggled the setting off and back on.
+   *
+   * What IS enforced here is tenancy: `ownedRoomId` throws unless this account owns the room, and
+   * the UPDATE is keyed on both ids, so a member belonging to someone else's room matches zero rows.
+   */
+  setMemberGrant: async ({ request, params, locals }) => {
+    const roomId = await ownedRoomId(locals, params.id);
+    const form = await request.formData();
+    const roomUserId = Number(form.get('roomUserId'));
+    const grant = form.get('grant');
+    /* Fails loud on an unknown grant rather than defaulting to one of them. */
+    if (!isMemberGrant(grant)) return fail(400, { message: 'Unknown grant.' });
+    const changed = await setMemberGrant(roomId, roomUserId, grant, form.get('granted') === 'on');
+    if (changed === 0) return fail(404, { message: 'No such member.' });
+    return { grant: changed };
   },
 
   /** `setNoteUser(…)` */

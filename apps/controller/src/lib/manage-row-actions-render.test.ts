@@ -72,6 +72,7 @@ function html(users: ReturnType<typeof member>[]) {
         landingHtml: '',
         users,
         unsupportedFilter: null,
+        visits: [],
         stats: [],
         links: { room: '', vanity: '', unique: '', registration: '', appPair: '', logo: null },
         badges: [],
