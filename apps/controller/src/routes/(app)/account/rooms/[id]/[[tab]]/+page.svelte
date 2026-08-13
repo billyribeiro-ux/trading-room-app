@@ -2961,9 +2961,23 @@ Please click this link to attend: ______ unique link will be here_____
                             `ng-click="openChatTabsWithBadgesEditor(sess.chatTabsWithBadges)"` off
                             this `<i>`, and that editor never rendered anywhere in the capture. The
                             markup is transcribed; the handler is not invented, so the icon here is
-                            an icon and nothing else. `ms-2` and `cursor-pointer` likewise have no
-                            rule in any stylesheet this repo holds — they are the capture's class
-                            list, carried across, not classes we style.
+                            an icon and nothing else.
+
+                            The two utility classes are NOT equivalent, and an earlier version of
+                            this note had them wrong. Corrected 2026-08-13 after the raw stylesheet
+                            was fetched:
+
+                              `cursor-pointer`  IS a real rule — `evidence-dumps/TIER1-fetched/
+                                                styles.css` defines `.cursor-pointer:hover { cursor:
+                                                pointer }`. Scoped to `:hover`, which is unusual and
+                                                works, since a cursor only matters while hovering.
+                              `ms-2`            has NO rule in any stylesheet this repo holds. It is
+                                                a Bootstrap 5 spacing utility on a Bootstrap 3 page —
+                                                inert, like `btn-small` on the APPROVE button.
+
+                            The note claiming neither had a rule was true when written: only the
+                            CSSOM captures existed then, and `styles.css` — the raw sheet Chrome had
+                            re-serialised — was fetched later.
                           -->
                           <i class="fa fa-gear ms-2 cursor-pointer" title="Configure Chat Tabs"
                           ></i> Chat Tabs With Badges:

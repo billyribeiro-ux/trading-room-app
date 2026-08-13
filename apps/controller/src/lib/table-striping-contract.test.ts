@@ -85,3 +85,27 @@ describe('manage.css keeps Bootstrap’s own selector', () => {
     expect(strip(MANAGE)).toContain('.mg-root .table-striped > tbody > tr:nth-of-type(odd)');
   });
 });
+
+describe('the two utility classes on the Chat Tabs gear icon', () => {
+  /*
+    `<i class="fa fa-gear ms-2 cursor-pointer">` — page.manageSession.html:1860.
+
+    A comment in `+page.svelte` used to say NEITHER class had a rule. That was true when it was
+    written, because only the CSSOM captures existed then. The RAW stylesheet was fetched later and
+    defines one of them. Pinned here so the corrected claim cannot rot back.
+  */
+  const STYLES = readFileSync(`${cwd}/evidence-dumps/TIER1-fetched/styles.css`, 'utf8');
+
+  it('cursor-pointer IS a real rule, scoped to :hover', () => {
+    expect(STYLES).toContain('.cursor-pointer:hover {\n  cursor: pointer;\n}');
+  });
+
+  it('ms-2 has no rule in any stylesheet this repo holds', () => {
+    /* A Bootstrap 5 spacing utility on a Bootstrap 3 page — inert, like `btn-small` on APPROVE. */
+    for (const css of [STYLES, BOOTSTRAP3, ACCOUNT, MANAGE]) {
+      expect(css).not.toMatch(/\.ms-2\b/);
+    }
+    /* And the theme sheet, which is the other place a utility could hide. */
+    expect(readFileSync(`${cwd}/evidence-dumps/TIER1-fetched/theme.css`, 'utf8')).not.toMatch(/\.ms-2\b/);
+  });
+});

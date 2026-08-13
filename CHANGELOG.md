@@ -24,6 +24,40 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-13
 
+### 2026-08-13 16:44 EDT — A comment that was true when written, and stopped being true when we fetched more evidence
+
+**Runtime impact: none** — one corrected comment and two new assertions.
+
+Read the three JSON-example blocks at `:1481`, `:1650` and `:1862`. They are multi-line help strings
+inside a `<label>`, which HTML collapses to one wrapped line — so the reference renders them the same
+way we do. Compared ours against the template after collapsing whitespace exactly as a browser would:
+**`alertLabels` and `subscriptionPlans` match character for character.**
+
+The third, `chatTabsWithBadges`, uses a `plain` label rather than a muted one, which is why a
+muted-only search missed it — and which the help-shape proof from earlier already covers.
+
+**Its row carries a control our generic settings loop would never have produced.** `:1860` puts a
+GEAR ICON inside the row's label, with `ng-click="openChatTabsWithBadgesEditor(…)"` — a per-setting
+editor launcher. Ours already renders it, with the handler correctly NOT invented, since that editor
+appears in no capture. That reasoning was already right.
+
+**What was wrong was a factual claim in the same comment.** It said `ms-2` and `cursor-pointer`
+"likewise have no rule in any stylesheet this repo holds". `styles.css` defines
+`.cursor-pointer:hover { cursor: pointer }` — scoped to `:hover`, which is unusual and works, since a
+cursor only matters while hovering.
+
+**The note was TRUE when it was written.** Only the CSSOM captures existed then; `styles.css` — the
+raw sheet, 24 KB larger than Chrome's re-serialisation of it — was fetched later the same day. This
+is a different failure from the ones earlier today: not a careless claim, but a correct one that
+expired when the evidence base grew underneath it. Worth naming, because it means **a comment citing
+absence needs re-checking whenever new evidence lands**, not just when the code changes.
+
+`ms-2` genuinely has no rule anywhere — a Bootstrap 5 spacing utility on a Bootstrap 3 page, inert
+exactly like `btn-small` on the APPROVE button. Both claims are now pinned by tests, so the corrected
+version cannot rot back.
+
+**Verified:** `svelte-check` 1501 files / 0 errors; 872 tests across 82 files, 2 new.
+
 ### 2026-08-13 16:39 EDT — The "API POST Routes Docs" button opened the wrong document
 
 **Runtime impact: YES** — a new documentation route, and the manage button now opens the document its

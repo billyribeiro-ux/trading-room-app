@@ -212,6 +212,17 @@ than left open.
 
 ---
 
+### A comment can expire when the EVIDENCE grows, not just when the code changes
+
+`+page.svelte` said `ms-2` and `cursor-pointer` "have no rule in any stylesheet this repo holds".
+That was TRUE when written — only the CSSOM captures existed then. `TIER1-fetched/styles.css`, the
+raw sheet Chrome had re-serialised (and 24 KB larger), was fetched later the same day and defines
+`.cursor-pointer:hover { cursor: pointer }`.
+
+**So: any comment asserting that something is ABSENT needs re-checking whenever new evidence lands.**
+Absence claims are the ones that rot, because nothing about the code changing will disturb them. The
+new stylesheets to re-check against are `TIER1-fetched/styles.css` and `theme.css`.
+
 ### A mistake I made twice today — check for it before trusting any "not built" note
 
 **T2-18** and **T5-25** were both recorded as unbuilt features. Both were built. Each time I grepped
