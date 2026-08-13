@@ -2015,3 +2015,17 @@ body.modal-open {
   color: rgb(119, 119, 119);
   font-size: 12px;
 }
+
+/*
+  `.text-danger` — Bootstrap 3.3.7's own value, `color: #a94442`.
+
+  Used by exactly one thing on this page: the `fa-remove` icon in the Extra Admin Users row's
+  Remove link (`page.welcome.html:1296`). Read from `evidence-bootstrap-3.3.7.css`, not chosen — it
+  is a muted brick red rather than a pure one, and picking a plausible red is how a colour that
+  looks right ships next to one that is right.
+*/
+/* UNSCOPED, like the other 264 rules in this file. `.acc-root` does not exist on the account page —
+   that is the manage page's wrapper (`.mg-root`), and a rule scoped to it would never have matched. */
+.acc-text-danger {
+  color: rgb(169, 68, 66);
+}

@@ -212,6 +212,18 @@ than left open.
 
 ---
 
+### "Consistent with its neighbours" is a GUESS, and it has been wrong
+
+The Extra Admin Users row's Actions cell was styled by inheriting the pattern its two captured
+siblings on the same page use — `label > a`, measured on the badges Delete and the API-key delete.
+The fetched template shows that row is a BARE anchor with an icon and no `<label>` at all. It is the
+one row on the page that breaks its neighbours' pattern.
+
+Inheriting was the right call while the row was unmeasured, and the note saying so was honest. It
+still produced a difference. **When a row is later captured, re-check anything that was inherited
+rather than measured** — the inherited value is a hypothesis, not evidence, and this file should say
+which is which.
+
 ### The tally test is load-bearing — do not word around it
 
 On 2026-08-13 a register entry was written as "**HALF CLOSED** … | OPEN — GEOMETRY ONLY |". The row's

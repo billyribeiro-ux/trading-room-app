@@ -139,7 +139,15 @@ export const load: PageServerLoad = async ({ locals, setHeaders }) => {
     })),
     badges: await getDb().select().from(badges).where(eq(badges.accountId, accountId)),
     admins: await getDb()
-      .select({ id: adminUsers.id, name: adminUsers.name, email: adminUsers.email })
+      /* `createdAt` feeds the Added column — `{{au.created | date:'short'}}` in the reference
+         (page.welcome.html:1294). It was omitted, so that column rendered an em dash on every row.
+         The password hash is still never selected. */
+      .select({
+        id: adminUsers.id,
+        name: adminUsers.name,
+        email: adminUsers.email,
+        createdAt: adminUsers.createdAt
+      })
       .from(adminUsers)
       .where(eq(adminUsers.accountId, accountId)),
     // Never select the verification hash or encrypted envelope into a page

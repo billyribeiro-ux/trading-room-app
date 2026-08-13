@@ -62,6 +62,7 @@
 </script>
 
 <script lang="ts">
+  import { formatShortDateTime } from '$lib/last-login-format';
   import { enhance } from '$app/forms';
   import { resolve } from '$app/paths';
   import { bootbox } from '$lib/bootbox.svelte';
@@ -1027,21 +1028,32 @@
                 <tr>
                   <td>{admin.name}</td>
                   <td>{admin.email}</td>
-                  <td>—</td>
+                  <!-- `{{au.created | date:'short'}}` — page.welcome.html:1294. This was an em
+                       dash: the loader never selected `createdAt`, so the column the reference
+                       fills was permanently empty. -->
+                  <td>{admin.createdAt ? formatShortDateTime(admin.createdAt) : ''}</td>
                   <td class="acc-td-center">
                     <!-- The exact bootbox copy the reference pops:
                          `Remove admin user "…"? This cannot be undone.`
 
-                         HONEST GAP on the appearance: the reference's admin table
-                         is EMPTY in the capture ("No admin users added yet",
-                         #794/#795), so no admin Actions cell was ever measured.
-                         This INHERITS the pattern its two captured siblings on the
-                         same page use for row actions — `label > a` at
-                         rgb(51,122,183), 14px/20, weight 700, measured on the
-                         badges Delete (#757/#758) and the API-key delete
-                         (#822/#823). It is not a captured value; the red
-                         `btn-danger` button it replaces was not one either, and
-                         `btn-danger` appears nowhere in the capture at all. -->
+                         THE GAP THIS NOTE RECORDED IS CLOSED (2026-08-13). It said the
+                         admin table is EMPTY in the capture — true — so no Actions cell
+                         was ever measured, and the appearance was INHERITED from the
+                         badges Delete and API-key delete rows, which wrap their link in
+                         a `<label>`.
+
+                         The fetched template settles it, and the inherited pattern was
+                         WRONG. `page.welcome.html:1296` is a BARE anchor with an icon,
+                         with no `<label>` wrapper at all:
+
+                           <a href="" ng-click="removeAdminUser(au._id, au.name)">
+                             <i class="fa fa-remove text-danger"></i> Remove </a>
+
+                         So this row is the one on the page that does NOT follow its
+                         siblings. The icon is restored here; the `<label>` was never
+                         emitted by us, so nothing had to be removed. Inheriting from
+                         siblings was the right call while the row was unmeasured, and
+                         it is worth recording that it still produced a difference. -->
                     <span class="acc-row-action"
                       ><form
                         method="POST"
@@ -1051,7 +1063,9 @@
                         )}
                       >
                         <input type="hidden" name="id" value={admin.id} />
-                        <button class="acc-link" type="submit">Remove</button>
+                        <button class="acc-link" type="submit"
+                          ><i class="fa fa-remove acc-text-danger" aria-hidden="true"></i> Remove</button
+                        >
                       </form></span
                     >
                   </td>

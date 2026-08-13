@@ -24,6 +24,47 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-13
 
+### 2026-08-13 17:46 EDT — An empty column, and an appearance inherited from the wrong neighbours
+
+**Runtime impact: YES** — the Extra Admin Users table fills a column that was blank and restores an
+icon it never had.
+
+Read the admin-users block at `page.welcome.html:1220-1305`. The reference's admin table is EMPTY in
+the capture — "No admin users added yet" — so no populated row was ever measured, and two
+consequences had been carried since:
+
+**The Added column rendered an em dash on every row.** The loader never selected `createdAt`, so a
+column the reference fills was permanently blank. Now selected and rendered — and the password hash
+is still never selected into a page payload, which a test asserts.
+
+**Its format is `date:'short'`, which is unlike every other stamp on these pages.** `M/d/yy h:mm a`:
+month and day NOT zero-padded, year in TWO digits, and a SPACE before the meridiem. Confusing it with
+`formatLastLogin` (`MM/dd/yyyy @ h:mma`) would be invisible until a single-digit month. Added as
+`formatShortDateTime`, assembled explicitly for the same reason its siblings are — `toLocaleString`
+gets close and then renders the visitor's locale.
+
+**The Actions cell was INHERITED from the wrong neighbours.** With the row unmeasured, its appearance
+was taken from the two captured siblings on the same page — the badges Delete and the API-key delete
+— which wrap their link in a `<label>`. The template shows this row does NOT: `:1296` is a BARE
+anchor carrying `<i class="fa fa-remove text-danger"></i>`. **This row is the one on the page that
+breaks the pattern its neighbours set.**
+
+Inheriting was the right call while nothing had been measured, and the note saying so was honest. It
+still produced a difference, which is worth recording: "consistent with its neighbours" is a guess,
+and it was wrong here.
+
+The colour is Bootstrap 3.3.7's own `#a94442`, read from `evidence-bootstrap-3.3.7.css` rather than
+chosen — a muted brick red, not a pure one.
+
+**And I nearly shipped a rule that could never match.** I scoped it `.acc-root .acc-text-danger` by
+analogy with the manage page's `.mg-root`. `acc-root` appears NOWHERE on the account page, and the
+other 264 rules in that stylesheet are unscoped. Caught by checking rather than assuming, and pinned
+by a test that asserts the rule is unscoped and that `acc-root` appears nowhere in the component.
+
+**Verified:** `svelte-check` 1501 files / 0 errors; 877 tests across 82 files, 11 new. Three negative
+controls run — the column back to an em dash, the icon dropped, and the rule rescoped to the
+non-existent wrapper — each red on the right assertion.
+
 ### 2026-08-13 17:32 EDT — `badges.dark_theme` is an ID, and our column is a boolean
 
 **Runtime impact: none** — a schema note corrected with proof, and two gaps opened. No column changed
