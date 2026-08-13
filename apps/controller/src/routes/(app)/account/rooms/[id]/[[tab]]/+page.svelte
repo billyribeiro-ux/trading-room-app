@@ -2091,7 +2091,11 @@ Please click this link to attend: ______ unique link will be here_____
                 {#if form && 'pairCode' in form}
                   <p class="mg-rowform" role="status">
                     App PIN <strong>{form.pairCode}</strong> — expires
-                    {new Date(String(form.pairCodeExpiresAt)).toLocaleString()}
+                    <!-- `formatLastLogin`, INHERITED from this page's other stamps rather than
+                         captured: the reference shows this inside a bootbox whose format is in no
+                         capture we hold. What is not inherited is the reason — `toLocaleString()`
+                         renders the reader's locale, so an owner abroad reads a swapped date. -->
+                    {formatLastLogin(String(form.pairCodeExpiresAt))}
                   </p>
                 {/if}
                 {#if form && 'tokens' in form}
@@ -2103,7 +2107,8 @@ Please click this link to attend: ______ unique link will be here_____
                       <!-- last six only: a push token is a credential for sending
                            to that device -->
                       {#each appTokens as t (t.lastSix)}
-                        <div>{t.platform} …{t.lastSix} — added {new Date(t.addedAt).toLocaleString()}</div>
+                        <!-- same inherited format, same reason -->
+                        <div>{t.platform} …{t.lastSix} — added {formatLastLogin(t.addedAt)}</div>
                       {/each}
                     {/if}
                   </div>
@@ -2601,12 +2606,33 @@ Please click this link to attend: ______ unique link will be here_____
                       </tr>
                     </thead>
                     <tbody>
+                      <!--
+                        `{{$index}}` — ZERO-based, as ngRepeat's is, and as our own user row already
+                        renders. This column was `{i + 1}`, so the stats table numbered from 1 while
+                        the user table two tabs away numbered from 0.
+
+                        The timestamp is `{{userStat.inTime | date:'MM/dd/yyyy @ h:mma'}}`
+                        (page.manageSession.html:748) — the format `formatLastLogin` implements. It
+                        was `toLocaleString()`, which renders the VISITOR's locale: an owner in
+                        London saw `07/08/2026, 17:05` for the same instant, day and month swapped
+                        and no meridiem. That is the exact defect `last-login-format.ts` was written
+                        to fix, still live here two tabs away from the fix.
+
+                        Duration stays `—` and the Email / IP cell stays plain. The reference renders
+                        `In:`/`Out` from an ARRIVAL row plus IP, browser and
+                        `{{userStat.duration / 3600 | number: 2}}`, and this table is built from
+                        member rows, which carry none of that. The arrival rows exist
+                        (`roomSessions`) but were deliberately taken OUT of this payload after two
+                        reviews — 5,000 rows each carrying a visitor's IP and email in the page HTML,
+                        `TODO.md` item W. Putting them back is the owner's call, not a silent one,
+                        and it is recorded as T5-22 rather than done here.
+                      -->
                       {#each visibleStats as row, i (row.id)}
                         <tr>
-                          <td>{i + 1}</td>
+                          <td>{i}</td>
                           <td>{row.displayName}</td>
                           <td>{row.email}</td>
-                          <td>{row.lastLoginAt ? new Date(row.lastLoginAt).toLocaleString() : '—'}</td>
+                          <td>{row.lastLoginAt ? formatLastLogin(row.lastLoginAt) : '—'}</td>
                           <td>—</td>
                         </tr>
                       {/each}

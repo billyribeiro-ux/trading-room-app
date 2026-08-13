@@ -126,7 +126,17 @@ Every gap from the full read of `apps/controller/evidence-dumps/` now lives ther
 five tiers. **That file is the tracker — this section is only the index to it.** Do not record a
 gap's status in both places; one of them will go stale.
 
-As of 2026-08-13 13:40 EDT: **32 CLOSED, 29 OPEN, 14 parked/won't-fix, 75 total.**
+As of 2026-08-13 14:05 EDT: **36 CLOSED, 26 OPEN, 14 parked/won't-fix, 76 total.**
+
+Four closed by reading `page.manageSession.html:634-780` — **T2-11** (the JWT rows live in the
+SETTINGS tab, not their own), **T2-14** (the SSO tab is exactly one row, SSO Host), **T2-19** (the
+textAngular editor and its in-heading Save button), **T5-12** (the stats striping counts hidden
+rows — confirmed as the reference's own behaviour, recorded not corrected).
+
+One opened, and it needs YOUR decision: **T5-22 — the User Stats table.** The reference renders one
+row per ARRIVAL with IP, browser and duration. Ours renders one row per PERSON. We hold the data in
+`roomSessions`, but it was deliberately removed from this payload after two privacy reviews (item
+W). Putting it back partially reverses that, so it is not mine to do silently.
 
 Two more opened while reading `page.manageSession.html:1-340`, and both come out of a REAL BUG that
 reading found:

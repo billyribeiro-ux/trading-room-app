@@ -24,6 +24,61 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-13
 
+### 2026-08-13 14:05 EDT — Four gaps closed by reading; three live locale bugs and an off-by-one fixed
+
+**Runtime impact: YES** — four date renderings and one index on the manage page.
+
+Read `page.manageSession.html:634-780`. It closes four register items outright, because they were
+opened when we had only DOM captures and the template carries the markup those captures never showed:
+
+- **T2-11 — the JWT rows.** Both live in the SETTINGS tab, not a tab of their own, gated
+  `ng-show="sess.authMode=='jwt'"`. JWT Secret Key is an `editable-textarea` with `e-label="Secret:"`,
+  and its muted help carries two typos that are the reference's own — "WordPRess" and "hard to getss"
+  — which must not be corrected.
+- **T2-14 — the SSO Setup tab.** `heading="SSO Setup "` with a trailing space, `form-horizontal`, and
+  exactly ONE row: SSO Host. Ours renders the `sso-setup` section, whose sole member is `ssoHost`
+  labelled "SSO Host". A match, verified rather than assumed.
+- **T2-19 — the textAngular editor.** The Save button sits INSIDE the `<h3>`, `pull-right`. The editor
+  is `<div text-angular="" ng-model="sess.description" name="wysiswyg-editor">` — the reference's own
+  misspelling of "wysiwyg", in the name attribute.
+- **T5-12 — the stats striping.** Confirmed: the online filter is a per-row `ng-hide`, so hidden rows
+  keep their `nth-of-type` positions and the striping counts them. Turning on "Show Online Users
+  Only" produces visibly irregular banding in the original. Recorded, not corrected.
+
+**Three live locale bugs, in a table two tabs away from the fix for them.** `last-login-format.ts`
+exists because `toLocaleString()` renders the VISITOR's locale — an owner in London saw
+`07/08/2026, 17:05` for the same instant, day and month swapped and no meridiem. Three call sites
+were still doing exactly that: the stats timestamp, the App PIN expiry and the push-token list. The
+stats one has captured evidence (`date:'MM/dd/yyyy @ h:mma'`, :748); the other two do not, and their
+format is stated in the code as INHERITED from this page's other stamps rather than captured — which
+is what this repository's rule prescribes when no value was captured.
+
+The guard is a whole-file ban on `toLocaleString`, not a per-site assertion. Pinning only the one
+site with reference evidence is how the other two survived the first fix.
+
+**An off-by-one between two tables.** `{{$index}}` in ngRepeat is zero-based and our user row already
+rendered it that way, but the stats row was `{i + 1}` — so one table numbered from 1 while the other,
+two tabs away, numbered from 0.
+
+**A test of mine went red on its own documentation, and that was the right failure.** The
+`toLocaleString` ban tripped on the comments explaining why it is banned. The fix is to strip
+comments before asserting, not to loosen the assertion — a test that cannot tell code from prose
+either blocks the explanation or gets weakened until it catches nothing.
+
+**One gap opened that is NOT mine to close: T5-22.** The reference's stats row renders one ARRIVAL per
+row with IP, a `ip-api.com` lookup link, browser and `duration / 3600`. Ours renders one row per
+person. We hold every field in `roomSessions` — but those rows were deliberately taken OUT of this
+payload after two reviews on 2026-08-11: 5,000 rows each carrying a visitor's IP and email in the
+page HTML, `TODO.md` item W, which is why the export moved to `stats.csv`. Rendering the reference's
+row puts those addresses back into a page payload. That partially reverses a reviewed privacy
+decision and is the owner's call, so it is recorded rather than done.
+
+**Verified:** `svelte-check` 1484 files / 0 errors; 789 tests across 70 files, 6 new. **Three more
+negative controls run** — the stats stamp back to `toLocaleString`, only one of the three sites fixed,
+and the index back to 1-based — each red on the right assertion, green on revert. Migrations, privacy
+and room-settings verifiers PASS.
+
+
 ### 2026-08-13 13:40 EDT — Reading the manage header found a button that destroyed configuration
 
 **Runtime impact: YES.** A migration, a schema column, a fixed form action, and two corrected numbers
