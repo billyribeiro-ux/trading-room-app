@@ -24,6 +24,46 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-13
 
+### 2026-08-13 18:03 EDT — T5-7 closed: both reference templates are fully accounted for
+
+**Runtime impact: none** — the accounting, and a closed register entry.
+
+`page.manageSession.html` is 2,719 lines. Here is every one of them:
+
+    292    blank
+     70    commented-out — markup the reference does not render
+    965    settings rows      covered by TWO machine proofs
+     46    JSON-example lines compared character for character
+     33    prose / attribute  read INDIVIDUALLY, each implemented or recorded
+  1,313    markup             the containers of the above
+
+The two proofs are `settings-schema-covers-template.test.ts` — all 267 live setting names present,
+zero missing — and `settings-help-shape.test.ts` — all 175 comparable help shapes matching the
+extractor's own rule. Those cover the 965 rows that make up most of the file's length, and cover them
+better than reading would: a difference in row 180 is exactly what 179 identical predecessors hide.
+
+The 33 prose lines were enumerated and checked one at a time. Every one is a line read earlier today:
+the email-preview template, the `*** INACTIVE USER ***` span, the Actions dropdown's `on-toggle`, the
+IP lookup link, the v3/v5 warnings, the mobile-app notes.
+
+**The honest limit of this claim, stated rather than glossed:** the 1,313 markup lines were not each
+read in isolation. They are the `<div>`, `<p>`, `<td>` and `<tr>` containers of the blocks above, and
+every block has been opened and read. That is a weaker claim than "every line individually" and it is
+the true one.
+
+With `page.welcome.html` completed at 17:56, **T5-7 is closed and the template read is finished.**
+Between them those two files produced most of today's findings — the four conditional icons, the
+Stripe block behind an `ng-if`, the Logout Webhook row binding the wrong field, the Select All second
+span, the badge submit labels frozen from a capture, the permissions-modal labels, and `dark_theme`
+turning out to be an id.
+
+**Every remaining open item now needs something from outside this repository** — a browser on the
+live site, a decision, infrastructure that does not exist, or a re-fetch. The HANDOFF section of
+`TODO.md` says which and how for each. There is no more reading to do.
+
+**Verified:** 909 tests across 86 files green; tally test-checked at **60 CLOSED, 14 OPEN, 13 parked,
+87 total**.
+
 ### 2026-08-13 18:01 EDT — Four of five permission labels had been tidied into English
 
 **Runtime impact: YES** — five labels in the permissions modal, plus its missing header and footer.

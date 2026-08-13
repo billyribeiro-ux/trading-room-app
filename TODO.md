@@ -126,7 +126,7 @@ Every gap from the full read of `apps/controller/evidence-dumps/` now lives ther
 five tiers. **That file is the tracker — this section is only the index to it.** Do not record a
 gap's status in both places; one of them will go stale.
 
-As of 2026-08-13 18:01 EDT: **60 CLOSED, 14 OPEN, 13 parked/won't-fix, 87 total.**
+As of 2026-08-13 18:10 EDT: **60 CLOSED, 14 OPEN, 13 parked/won't-fix, 87 total.**
 
 **Everything closable by READING is closed.** The twelve that remain need something no source file
 can give. Each is written out below with the exact next action, because "blocked" without an
@@ -269,7 +269,17 @@ tool's output is not.** A grep that returns nothing is evidence about the grep.
 tree (`src/routes/**`), the form actions in the matching `+page.server.ts`, and `src/lib/**` tests.
 A register that claims a built feature is missing sends the next person to write code twice.
 
-### Also unfinished, and NOT blocked — the largest remaining piece of real work
+### THE TEMPLATE READ IS FINISHED (2026-08-13 18:10 EDT)
+
+Both `views/*.html` templates are fully accounted for and T5-7 is closed. `page.welcome.html` (1,424
+lines) and `page.manageSession.html` (2,719) between them produced most of today's findings — the
+four conditional icons, the Stripe block, the Logout Webhook row binding the wrong field, the Select
+All second span, the badge submit labels, the permissions-modal labels, `dark_theme` being an id.
+
+**Every remaining open item now needs something from outside this repository**, and the HANDOFF
+section above says which and how for each. There is no more reading to do.
+
+### Superseded — this section described the reading, which is now done
 
 `page.manageSession.html` is read through **:1162 of 2,718**, plus targeted regions at :1876-1903,
 :2408-2431 and :634-780. `page.welcome.html` is read at :326-419 and :1330-1356 of 1,424.
