@@ -24,6 +24,46 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-13
 
+### 2026-08-13 15:54 EDT — A duplicated CSS rule where the WRONG copy was winning
+
+**Runtime impact: YES** — the striping and hover rules on the account page now use Bootstrap's own
+selector and property.
+
+Went looking at T2-7 (`table-striped` alternation and hover) and found something the register did not
+anticipate: **`account.css` defined both rules TWICE.**
+
+The two copies computed to identical specificity — one class, two types, one pseudo-class — so
+neither won on weight and SOURCE ORDER decided. The later copy took effect, and it differed from the
+earlier one in two ways, both wrong against Bootstrap 3.3.7:
+
+- `.acc-table tbody tr` — a DESCENDANT combinator, where Bootstrap uses a CHILD one:
+  `.table-striped > tbody > tr:nth-of-type(odd)`. The loose form also stripes the rows of any table
+  nested inside an `.acc-table`.
+- `background:` — the SHORTHAND, where Bootstrap sets `background-color`. The shorthand additionally
+  resets background-image, -position, -repeat and -size.
+
+**Both colours were identical, which is exactly why nothing looked wrong.** A reader checking this
+found the correct rule first, at the `.table-striped` comment, and had no reason to keep scrolling
+400 lines to the copy that was actually in force.
+
+Deleted, with the reasoning left in its place. `table-striping-contract.test.ts` reads Bootstrap
+3.3.7 for the rules it is matching, then asserts ours uses the child combinator, sets the longhand,
+carries `#f9f9f9` / `#f5f5f5`, and — the assertion that matters — **defines each rule exactly once**.
+
+**T2-7 is NOT closed, and I want to be precise about why.** Its actual gap is rendered GEOMETRY:
+which rows stripe in a live render with 2+ rooms and 4+ users, and the computed hover values. That
+needs a capture. The rule-level defect above was found while investigating it, not in place of it.
+Worth remembering when that capture arrives: `ng-hide` rows keep their `nth-of-type` positions
+(T5-12), so a filtered table bands irregularly BY DESIGN and an irregular capture is not a bug.
+
+**A correction to my last message.** I listed T2-7, T2-20 and T2-22 as "actionable now". They are
+not — all three are rendered-state gaps needing captures: T2-7 wants a populated table, T2-20 wants
+`OPEN_BOOTBOX: true`, T2-22 wants a LOGGED-OUT page plus a failed-login error. Reading the register
+rows properly is what showed that.
+
+**Verified:** `svelte-check` 1494 files / 0 errors; 856 tests across 80 files, 7 new. One negative
+control run — the duplicate restored — turns two assertions red.
+
 ### 2026-08-13 15:49 EDT — The Text List tab showed on rooms that could not send a text
 
 **Runtime impact: YES** — two tabs now honour the reference's per-room condition, not just our

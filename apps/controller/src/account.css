@@ -848,12 +848,23 @@ html {
 .acc-table td:last-child {
   border-right: 0;
 }
-.acc-table tbody tr:nth-of-type(odd) {
-  background: rgb(249, 249, 249);
-}
-.acc-table tbody tr:hover {
-  background: rgb(245, 245, 245);
-}
+/*
+  The striping and hover rules used to be repeated HERE, and this copy is the one that won.
+
+  Both pairs compute to the same specificity — one class, two types, one pseudo-class — so source
+  order decided, and the later copy took effect. It differed from the earlier one in two ways, both
+  wrong against Bootstrap 3.3.7:
+
+    `.acc-table tbody tr`   descendant, where Bootstrap is `.table-striped > tbody > tr` — a CHILD
+                            combinator. The loose form also stripes rows of any table nested inside
+                            an `.acc-table`, which the reference's never would.
+    `background:`           the SHORTHAND, where Bootstrap sets `background-color`. The shorthand
+                            also resets background-image, -position, -repeat and -size, so it
+                            silently clears anything a row had.
+
+  The colours were identical, which is why nothing looked wrong. Deleted; the correct pair at the
+  `.table-striped` / `.table-hover` comments above is now the only definition.
+*/
 /* `.text-center { text-align: center !important }` in styles.css — the
    !important is load-bearing, because `.table > thead > tr > th` sets `left`.
    Scoping these under .acc-table gives the same outcome without one: the
