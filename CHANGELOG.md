@@ -24,6 +24,47 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-13
 
+### 2026-08-13 15:49 EDT — The Text List tab showed on rooms that could not send a text
+
+**Runtime impact: YES** — two tabs now honour the reference's per-room condition, not just our
+entitlement.
+
+**T2-15.** The pane's MARKUP was already right — `div.form-vertical`, a right-floated `btn btn-info`
+carrying `fa-save` and " Save List" FIRST, then a bare unstyled `textarea#textListTxt` at `rows="40"`
+with no `ng-model`, and a long note explaining why the 806px height is arithmetic rather than a
+length. Nothing to change there.
+
+What was wrong was the tab's GATE. The reference has a per-room condition on it —
+`ng-show="sess.twillioApiToken"` (`:609`) — and ours had only our account entitlement. So the tab
+appeared on every room an entitled account owned, **including rooms with no Twilio credentials**,
+offering a Save button that posts an SMS list which cannot be sent. The reference hides it precisely
+because there is nothing behind it.
+
+Both conditional tabs now check both things: the entitlement (ours — may this ACCOUNT use the
+capability, a layer the single-tenant reference has no equivalent for) and the reference's own
+per-room condition.
+
+**The SSO gate is a LITERAL comparison, and that is deliberate.** `isSsoMode` treats `'jwt'` and
+`'sso'` as one mode, which is right everywhere else it is used — the reference's codebase spells the
+single concept both ways. It is wrong here: the tab's condition is literally `authMode=='sso'`, and a
+JWT room is routed elsewhere on purpose. The SSO Setup tab holds ONE row, SSO Host; the JWT rows
+(`ssoJWTSecret`, `tokenExpiresIn`, `allowPWLoginWithSSO`) live in SETTINGS behind `authMode=='jwt'`.
+Widening the gate would show a jwt room a tab with one field it does not use.
+
+`tab-strip-conditions.test.ts` pins both conditions against the template, asserts we do not widen the
+SSO one through `isSsoMode`, and asserts these are the ONLY two conditional tabs — so a third gaining
+an `ng-show` fails here rather than being silently ungated.
+
+**T5-24 and T5-25 remain blocked, and I have stopped attempting them.** Four refusals. The guard
+requires the instruction to NAME the field, and it is right that a general "carry on" does not — this
+exact edit was explicitly reverted earlier in the session on request. Deciding it myself does not
+satisfy a permission classifier that needs the owner's own words. One sentence naming `ssoJWTSecret`
+and `pairSecretKey` clears both in a single pass.
+
+**Verified:** `svelte-check` 1492 files / 0 errors; 849 tests across 79 files, 6 new. Two negative
+controls run — Text List back to entitlement-only, and the SSO gate widened to `isSsoMode` — each red
+on the right assertion. Register **56 CLOSED, 12 OPEN, 13 parked, 81 total**, tally test-checked.
+
 ### 2026-08-13 15:12 EDT — API keys can be restricted to specific ROOMS, not just to commands
 
 **Runtime impact: YES** — a third restriction dimension on API keys, and the padlock now counts it.

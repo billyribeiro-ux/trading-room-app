@@ -139,11 +139,37 @@ export const load: PageServerLoad = async ({ params, locals, url }) => {
     label,
     /** whether it appears in `ul.nav.nav-tabs` at all — see the note on Marketplace above */
     strip,
+    /*
+      TWO gates, and they answer different questions.
+
+      `features[…]` is OURS: may this ACCOUNT use the capability at all. The reference has no such
+      layer — it is a single-tenant view of one customer's rooms.
+
+      The second is the REFERENCE's own condition on the tab, per room:
+
+        Text List   ng-show="sess.twillioApiToken"   (page.manageSession.html:609)
+        SSO Setup   ng-show="sess.authMode=='sso'"   (:641)
+
+      Only the SSO one was implemented. Text List showed on every room the account was entitled to,
+      including rooms with no Twilio credentials — a tab whose Save button posts to an SMS list that
+      cannot be sent. The reference hides it precisely because there is nothing behind it.
+
+      Marketplace is entitlement-only: it is not in the reference's strip at all (see above), so
+      there is no per-room condition to honour.
+
+      NOT `isSsoMode` for the SSO tab, deliberately. That helper treats `'jwt'` and `'sso'` as one
+      mode, which is right where it is used — the reference's own codebase spells the single concept
+      both ways. It is NOT right here: the tab's condition is literally `authMode=='sso'`, and the
+      reference routes a JWT room elsewhere on purpose. Its SSO Setup tab holds one row, SSO Host,
+      while the JWT rows (`ssoJWTSecret`, `tokenExpiresIn`, `allowPWLoginWithSSO`) live in SETTINGS
+      behind `authMode=='jwt'`. Widening this gate would show a jwt room a tab with one field it does
+      not use, and hide nothing it needs.
+    */
     visible:
       id === 'text-list'
-        ? features['text-list']
+        ? features['text-list'] && Boolean(settings.twillioApiToken)
         : id === 'sso'
-          ? features.sso
+          ? features.sso && settings.authMode === 'sso'
           : id === 'marketplace'
             ? features.marketplace
             : true
