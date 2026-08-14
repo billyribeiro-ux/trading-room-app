@@ -60,6 +60,16 @@
       | 'webinar-tools';
     chatStyle: FollowChatStyle;
     doNotDisturbOn: boolean;
+    /**
+     * `mediaService.saveData` — the AV settings modal's "Disable Video (saves bandwidth)" switch.
+     *
+     * Owned by the page, not by this component, because the thing it controls is the media layer:
+     * upstream `callScreenOfUserWEBRTC` refuses to create the consumer at all while it is set
+     * (`main.d6d3c112b59b7d0d.js` byte 1132193), so no screen stream is requested. Until 2026-08-14
+     * this was a local `avVideoDisabled` that only changed its own label — the same dead-control
+     * shape as `app-disable-video`, and the fifth such found in two days.
+     */
+    saveData: boolean;
     alertSoundOn: boolean;
     nonTradeSound: boolean;
     alertPopup: boolean;
@@ -76,6 +86,7 @@
     onTheme: (theme: Theme) => void;
     onPreferenceChange: (key: string, value: unknown) => void;
     onDoNotDisturbChange: (enabled: boolean) => void;
+    onSaveDataChange: (enabled: boolean) => void;
     onPlayYoutube: (url: string) => void;
     onPostAlert: (submission: PostAlertSubmission) => Promise<boolean>;
     onPastePostAlert: (submission: PastedImageSubmission) => Promise<boolean>;
@@ -170,6 +181,7 @@
     sessionControlInitialTab,
     chatStyle: initialChatStyle,
     doNotDisturbOn,
+    saveData,
     alertSoundOn,
     nonTradeSound,
     alertPopup,
@@ -186,6 +198,7 @@
     onTheme,
     onPreferenceChange,
     onDoNotDisturbChange,
+    onSaveDataChange,
     onPlayYoutube,
     onPostAlert,
     onPastePostAlert,
@@ -294,7 +307,6 @@
   }
 
   let pollPanelHost = $state<HTMLElement | undefined>();
-  let avVideoDisabled = $state(false);
   let userInfoTab = $state<'info' | 'system' | 'options' | 'notes'>('info');
   let userMuteMenuOpen = $state(false);
   let userPermissions = $state({
@@ -1205,6 +1217,17 @@
       'presenter-push-to-talk': 'pushToTalk',
       'presenter-speech-recognition': 'doSpeechReco',
       'app-speech-reco-overlay': 'showSpeechRecoOverlay',
+      'chat-always-scroll': 'alwaysScrollToBottom',
+      'presenter-follow-my-screens': 'makeUsersFollowMyScreens',
+      'chat-gif-donot-disturb': 'chatGif',
+      'chat-badges-donot-disturb': 'chatBadges',
+      'chat-popup-donot-disturb': 'chatPopup',
+      'chat-mem-clear': 'trimChatLogs',
+      /* The presenter tab's own Do-not-disturb pair. SECOND controls for preferences that
+         already have live consumers — the reference wires them to `alertSoundOnChange()` and
+         `chatSoundOnChange()`, the very same handlers its main tab uses. */
+      'presenter-alert-donot-disturb': 'alertSoundOn',
+      'presenter-chat-donot-disturb': 'chatSoundOn',
       'app-disable-video': 'disableVideo'
     };
     /*
@@ -3406,20 +3429,28 @@
             <li class="nav-item">
               <!-- svelte-ignore a11y_no_static_element_interactions -->
               <!-- svelte-ignore a11y_missing_attribute -->
+              <!--
+                The title FLIPS here and is static upstream — const 13 of `app-av-settings-modal`
+                is `["title","Disable Video",1,"nav-link",3,"click"]`, so the reference still reads
+                "Disable Video" while video is already off. A tooltip that contradicts its own
+                label is an upstream slip, and reproducing it would only mislead a screen reader.
+                Same call already taken for `aria-selected` in `ScreenTabs.svelte`: a captured value
+                is reproduced unless reproducing it makes the control worse to use.
+              -->
               <a
-                title={avVideoDisabled ? 'Enable Video' : 'Disable Video'}
+                title={saveData ? 'Enable Video' : 'Disable Video'}
                 class="nav-link"
-                onclick={() => (avVideoDisabled = !avVideoDisabled)}
+                onclick={() => onSaveDataChange(!saveData)}
                 onkeydown={(event) => {
                   if (event.key === 'Enter' || event.key === ' ') {
-                    avVideoDisabled = !avVideoDisabled;
+                    onSaveDataChange(!saveData);
                   }
                 }}
               >
                 <i class="fas fa-desktop"></i>
                 <span class="pl-2">
-                  {avVideoDisabled ? 'Enable Video ' : 'Disable Video'}
-                  {#if !avVideoDisabled}
+                  {saveData ? 'Enable Video ' : 'Disable Video'}
+                  {#if !saveData}
                     <span class="saves-bandwidth">(saves bandwidth)</span>
                   {/if}
                 </span>

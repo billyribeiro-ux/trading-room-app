@@ -78,6 +78,54 @@ const WIRES = [
     preference: 'showSpeechRecoOverlay',
     handler: 'showSpeechRecoOverlayOnChange',
     assignment: "if (key === 'showSpeechRecoOverlay') {"
+  },
+  {
+    id: 'chat-always-scroll',
+    preference: 'alwaysScrollToBottom',
+    handler: 'chatAlwaysScrollToBottomChange',
+    assignment: "if (key === 'alwaysScrollToBottom') alwaysScrollToBottom = value;"
+  },
+  {
+    id: 'presenter-follow-my-screens',
+    preference: 'makeUsersFollowMyScreens',
+    handler: 'makeUsersFollowMyScreensOnChange',
+    assignment: "if (key === 'makeUsersFollowMyScreens') makeUsersFollowMyScreens = value;"
+  },
+  {
+    id: 'chat-gif-donot-disturb',
+    preference: 'chatGif',
+    handler: 'chatGifOnChange',
+    assignment: "if (key === 'chatGif') chatGif = value;"
+  },
+  {
+    id: 'presenter-alert-donot-disturb',
+    preference: 'alertSoundOn',
+    handler: 'alertSoundOnChange',
+    assignment: "if (key === 'alertSoundOn') {"
+  },
+  {
+    id: 'presenter-chat-donot-disturb',
+    preference: 'chatSoundOn',
+    handler: 'chatSoundOnChange',
+    assignment: "if (key === 'chatSoundOn') {"
+  },
+  {
+    id: 'chat-badges-donot-disturb',
+    preference: 'chatBadges',
+    handler: 'chatBadgesOnChange',
+    assignment: "if (key === 'chatBadges') chatBadges = value;"
+  },
+  {
+    id: 'chat-popup-donot-disturb',
+    preference: 'chatPopup',
+    handler: 'chatPopupChange',
+    assignment: "if (key === 'chatPopup') chatPopup = value;"
+  },
+  {
+    id: 'chat-mem-clear',
+    preference: 'trimChatLogs',
+    handler: 'reduceChatLogMemoryChange',
+    assignment: "if (key === 'trimChatLogs') trimChatLogs = value;"
   }
 ] as const;
 
@@ -132,10 +180,15 @@ describe('the wire has no silent break points', () => {
 
   it('the four counts the CHANGELOG states are the ones in the source', () => {
     /*
-      26 reach the handler, 1 returns early, 12 are mapped, 13 are unmapped with no consumer — and
-      the dead list is 19, which answers a DIFFERENT question: every id that could have been
+      26 reach the handler, 1 returns early, **20 are mapped, 5 are unmapped** with no consumer —
+      and the dead list is 19, which answers a DIFFERENT question: every id that could have been
       written as junk, i.e. the 26 minus the 6 mapped before this work minus the early-returning
-      one.
+      one. The dead list does NOT shrink as wires are added: `chat-always-scroll` is mapped now, but
+      the junk it wrote under its element id before that is still in people's blobs.
+
+      Was 12/13, then 13/12 when `chat-always-scroll` landed, now 14/11 with
+      `presenter-follow-my-screens`. This assertion has gone red on every one of those and been
+      updated deliberately each time, which is the point of pinning it.
 
       Pinned because I gave two wrong counts writing this up — fifteen, then fourteen — by counting
       `app-disable-video`, which was already reaching `savePreference` by its raw id, and
@@ -147,8 +200,8 @@ describe('the wire has no silent break points', () => {
     const mapped = (table.match(/': '/g) ?? []).length;
 
     expect(reaching).toBe(26);
-    expect(mapped).toBe(12);
-    expect(reaching - 1 - mapped).toBe(13);
+    expect(mapped).toBe(20);
+    expect(reaching - 1 - mapped).toBe(5);
     expect(DEAD_PREFERENCE_KEYS).toHaveLength(reaching - 1 - 6);
   });
 
@@ -241,6 +294,72 @@ describe('the wire has no silent break points', () => {
   it('both controls for the overlay stay in agreement', () => {
     // The modal is the second control; without this the navbar checkbox would contradict it.
     expect(pageCode).toContain("soundChecks['presentation-subtitles'] = value;");
+  });
+
+  it('alwaysScrollToBottom defaults OFF, and only the CHAT scroller takes it', () => {
+    /*
+      Both halves of this were found by running the negative controls and watching them PASS.
+      Neither was caught by anything, and each is a defect that renders perfectly.
+
+      1. THE DEFAULT. `=== true`, not `!== false`. The preferences blob ships
+         `alwaysScrollToBottom:!1` (`main.d6d3c112b59b7d0d.js` byte 979602), so seeding it on would
+         drag every viewer who has never touched the checkbox out of the history they are reading.
+         Note this is the OPPOSITE comparison to `showSpeechRecoOverlay`, where `=== true` was the
+         bug — the reference's own default decides which is right, and there is no house style to
+         fall back on.
+
+      2. THE SCOPE. The subscriber lives on the component that owns `this.channel`, `this.msgs`,
+         `this.searchTerm` and `chatLog[o.c]` — the chat scroller. The alerts scroller shares
+         `shouldAutoScrollForMessage`, and passing the override there would yank a reader out of the
+         alert history they were scrolled into, from a checkbox whose label says "chat".
+    */
+    expect(pageCode).toContain(
+      'let alwaysScrollToBottom = $state(loadedSettings.alwaysScrollToBottom === true);'
+    );
+    expect(pageCode).not.toContain(
+      'let alwaysScrollToBottom = $state(loadedSettings.alwaysScrollToBottom !== false);'
+    );
+
+    const alerts = /shouldAutoScrollForMessage\(\s*alertsScrollingUp[\s\S]{0,140}?\)/.exec(
+      pageCode
+    )?.[0];
+    expect(alerts, 'the alerts scroller call must be findable').toBeTruthy();
+    expect(alerts, 'the alerts scroller must NOT take the chat override').not.toContain(
+      'alwaysScrollToBottom'
+    );
+  });
+
+  it('small-image-preview stays UNWIRED, because its class has no rule anywhere', () => {
+    /*
+      Closed by evidence on 2026-08-14 with no code, which is a real outcome and not a deferral.
+
+      `smallImagePreview` applies exactly one thing upstream:
+      `B1e = t => ({'chat-uploaded-img-sm': t})`, bound as
+      `ngClass(ut(12, B1e, preferences.smallImagePreview && preferences.defaultImagePreview))`
+      on the chat log container (`app-chat.full.js:5`).
+
+      `chat-uploaded-img-sm` has NO RULE in any of the 52 stylesheets this repository holds — 46
+      component sheets, the shipped `styles.d622cb9ed2bbc221.css`, and our own. It appears in four
+      files and every one is a JavaScript class-map. The search was proved against
+      `chat-gif-muted`, a class we know is styled, which it finds in the CSS immediately.
+
+      The nearest real rule targets a DIFFERENT class and a different mechanism:
+      `.alert-chat-box-sm .chat-uploaded-img .uploaded-img { max-height: 50px !important }` — driven
+      by a size mode on an ancestor, not by this preference.
+
+      So the checkbox toggles a class that styles nothing, upstream as well as here. Wiring it would
+      ship "a `.flipped` class with no CSS", which this repository forbids by name, and inventing the
+      rule would be worse. Asserted so that neither happens by accident.
+    */
+    expect(pageCode).not.toContain('chat-uploaded-img-sm');
+    /*
+      Scoped to the MAPPING TABLE. The first version of this asserted the id was absent from the
+      whole component and failed on `settingChecks`, where it correctly appears as a default — the
+      checkbox still renders and still remembers its own position, it simply persists nothing.
+    */
+    const table = /const preferenceKeyByInputId[\s\S]*?\n    \};/.exec(modalCode)?.[0] ?? '';
+    expect(table, 'the mapping table must be findable').not.toBe('');
+    expect(table).not.toContain('small-image-preview');
   });
 
   it('the consumers the wires feed are still there', () => {

@@ -124,3 +124,47 @@ Not aspirational — it has caught real holes:
   because it matched `visits\s*:` and the key was written in shorthand.
 
 **Change the thing the test guards and watch it go red. If it does not, the test is decoration.**
+
+---
+
+## 9. Push freely. Do NOT merge until the work is done
+
+Owner instruction, 2026-08-14: **"push but not merge."**
+
+It was first written here as "do not push", which was a misreading of the sentence before it
+("do not push anything that triggers the backend CI until we're all done") and was corrected within
+the hour. The distinction matters in both directions: **pushing is how the work is backed up and how
+the PR stays honest about its own contents**, so holding pushes back has a real cost and buys
+nothing. What waits is the merge.
+
+**So: push as often as is useful. Merge only when the branch is complete.**
+
+The mechanics still matter, but they argue for something narrower than not pushing:
+
+- `backend-quality.yml` declares `concurrency: backend-quality-${{ github.ref }}` with
+  `cancel-in-progress: true`. A second push **cancels the run in flight** and starts a new one. It
+  does not queue, and it does not resume. Every push throws away whatever the previous run had
+  already proved. Watched happen on 2026-08-14: run `31799962473` was cancelled mid-flight by a
+  docs-only push and replaced by `31800376616`.
+- The job compiles the Rust workspace, stands up two PostgreSQL clusters and rebuilds the API
+  image. Its own header puts it at **~33 minutes**, with a 90-minute timeout.
+- **On a branch whose diff already contains `backend-quality.yml`, choosing "safe" files does not
+  help.** The scope step decides from the diff against the base, not from the last commit, and a
+  change to that workflow is deliberately treated as a backend path so the gate proves changes to
+  itself. So once the workflow is in the branch, a one-line README push runs the full 33 minutes.
+- Any event that is not a `pull_request` — a push to `main`, a `merge_group`, a
+  `workflow_dispatch` — skips the scope check entirely and always runs the full gate.
+
+**What follows from that is about MERGING, not pushing.** Because each push cancels and restarts the
+gate, a green check is only ever evidence about the commit that produced it. On a branch still being
+worked, the green you are looking at was very likely earned by an earlier HEAD and then thrown away
+by the next push. **So the only green worth merging on is the one from the FINAL push**, after the
+work is complete — which is the real content of "push but not merge".
+
+Two corollaries, both already learned the hard way:
+
+- **Merging and pushing are separate acts, never one command** (`CLAUDE.md` says this too): the push
+  invalidates the green checks you were about to merge on.
+- Do not batch pushes to save CI minutes at the cost of unbacked-up work. The minutes are worth less
+  than the work, and `cancel-in-progress` means an obsolete run stops the moment it is obsolete —
+  the runner is not billed for the 33 minutes it never spends.

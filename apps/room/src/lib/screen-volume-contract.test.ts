@@ -592,13 +592,24 @@ describe('viewer-only mode drives every binding the reference gives it', () => {
   it('binds BOTH arguments of H0e, not just the one that was interesting', () => {
     /*
       `hidden: !o.isConnected || (o.isPresentingThisScreen && !o.localpreview) || o.mediaService.saveData`
-      (`app-screenshare-view.compiled.js:338-343`). `!isConnected` is `stream === null` here; the
-      second term is false by construction in this app; `saveData` is unmodelled, and is in TODO.md.
+      (`app-screenshare-view.compiled.js:338-343`). Term by term:
+
+        * `!isConnected` -> `stream === null`.
+        * `isPresentingThisScreen && !localpreview` is FALSE by construction here — our own screens
+          always local-preview — so modelling it would add a term that can never be true.
+        * `saveData` was unmodelled when this test was written, and the comment said so. It is
+          modelled now: the writer was found in the bundle on 2026-08-14
+          (`toggleDisableVideo(){this.saveData=!this.saveData}`, byte 1136736) and the AV settings
+          modal's control drives it.
+
+      So the assertion moved from one term to two, which is the binding getting MORE faithful rather
+      than the test being loosened — and it is written as an exact string so a fourth term, or a
+      dropped one, fails here.
     */
     expect(SHARE_COMPILED.replace(/\s+/g, '')).toContain(
       '!o.isConnected||(o.isPresentingThisScreen&&!o.localpreview)||o.mediaService.saveData'
     );
-    expect(stripComments(PANE)).toContain('class:hidden={stream === null}');
+    expect(stripComments(PANE)).toContain('class:hidden={stream === null || saveData}');
     // The class needs a rule, and this component's copy is scoped — hence its own style block.
     expect(PANE).toMatch(/\.hidden\s*\{\s*display:\s*none;/);
   });

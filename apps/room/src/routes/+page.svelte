@@ -71,6 +71,9 @@
   import NotesPane from '$lib/components/notes/NotesPane.svelte';
   import { resolveNoteSurfaceGates } from '$lib/components/notes/note-gates';
   import RoomMessage from '$lib/components/RoomMessage.svelte';
+  import type { MessageBadge } from '$lib/types';
+  import { isMentionOf } from '$lib/mention';
+  import { trimChatLog } from '$lib/room-scroller';
   import ToastHost from '$lib/components/ToastHost.svelte';
   import VideoPlayer from '$lib/components/VideoPlayer.svelte';
   import YoutubePlayerOverlay from '$lib/components/YoutubePlayerOverlay.svelte';
@@ -569,15 +572,41 @@
     popout.close();
   }
 
+  /**
+   * A tab the USER clicked, as opposed to `selectScreenTabOfId`, which is every programmatic path.
+   *
+   * That split is the reference's `i` parameter made structural: `onScreenShareTabChange(e, i = !0)`
+   * broadcasts only when `i`, and callers pass false when the change came from a command. Keeping
+   * two functions instead of a boolean means a new programmatic caller cannot accidentally opt into
+   * broadcasting by forgetting an argument.
+   */
+  function selectScreenTabByUser(screenId: string) {
+    selectedScreenTab = screenId;
+    if (isPresenter && makeUsersFollowMyScreens) bringEveryoneToScreen(screenId);
+  }
+
   function toggleLockScreen(screenId: string) {
     lockedScreenId = lockedScreenId === screenId ? null : screenId;
   }
 
   function bringEveryoneToScreen(screenId: string) {
-    // Presenter-only. Forcing it for everyone else needs the media signalling channel, which is
-    // not wired yet; locally it at least moves this presenter to the screen they chose.
+    /*
+      `bringFocusToScreen(e) { e && this.appService.sendServerAdminCommand("focusOnScreen", {id: e}) }`.
+      This used to move only the presenter, with a comment saying the broadcast "needs the media
+      signalling channel, which is not wired yet". It does not need that channel: the reference
+      sends a SERVER command, and the room already carries server commands on the `cmds` channel —
+      the same one `remotePresCommand` uses.
+
+      The local move stays and happens FIRST, so the presenter's own view responds to their click
+      without waiting for a round trip. The server re-checks that the caller is a presenter and
+      scopes the broadcast to their room, so authority is decided there rather than here.
+    */
     forcedScreenId = screenId;
     selectedScreenTab = screenId;
+    if (!isPresenter) return;
+    const body = new FormData();
+    body.set('screenId', screenId);
+    void fetch('?/focusOnScreen', { method: 'POST', body });
   }
 
   function stopSharedScreen(screenId: string) {
@@ -659,6 +688,164 @@
   let popupOnUserLeave = $state(loadedSettings.popupOnUserLeave !== false);
   let beepOnUserJoin = $state(loadedSettings.beepOnUserJoin !== false);
   let beepOnUserLeave = $state(loadedSettings.beepOnUserLeave !== false);
+  /**
+   * `preferences.alwaysScrollToBottom` — the chat's "always scroll to bottom" override.
+   *
+   * `=== true`, not `!== false`, and the difference is the reference's own default: the preferences
+   * blob ships `alwaysScrollToBottom:!1` (`main.d6d3c112b59b7d0d.js` byte 979602). Seeding it ON for
+   * anyone who has never touched the checkbox would drag a reader out of the history they are
+   * scrolled up into — the opposite of the mistake made with `showSpeechRecoOverlay`, where
+   * `=== true` wrongly disabled a feature that defaults ON. The default decides which comparison is
+   * correct; neither is a house style.
+   *
+   * PERSISTED, unlike `saveData`: `chatAlwaysScrollToBottomChange` calls
+   * `setPreference('alwaysScrollToBottom', …)` (byte 2246247).
+   */
+  /**
+   * `preferences.makeUsersFollowMyScreens` — when this presenter changes screen tab, take the room
+   * with them.
+   *
+   * `i && globals.isPresenter && preferences.makeUsersFollowMyScreens && this.bringFocusToScreen(…)`
+   * at the end of `onScreenShareTabChange` (`main.d6d3c112b59b7d0d.js` byte 1967413). `i` defaults
+   * true and is passed false for programmatic changes, which is the loop guard: receiving a focus
+   * command must not send one back.
+   *
+   * `=== true` — the blob ships `makeUsersFollowMyScreens:!1` (byte 980006). A presenter who has
+   * never touched it should not be dragging the room around by clicking their own tabs.
+   */
+  /**
+   * `preferences.chatGif` — whether inline gifs play or show a click-to-reveal placeholder.
+   *
+   * `!== false`, because the blob ships `chatGif:!0`. A viewer who has never touched the checkbox
+   * gets gifs, which is what the reference does; `=== true` would mute them for everybody.
+   */
+  /**
+   * `sessData.presenterMsgsOnTheRight` — a ROOM setting, not a viewer preference.
+   *
+   * `RoomMessage.svelte` has carried both consumers since it was written and neither was ever fed:
+   * `messageBodyClass` adds `presenter-msg-right`, and the reaction row takes
+   * `presenter-reactions-right`. Owner-configurable at
+   * `page.manageSession.html:1108`.
+   *
+   * It is also the FIRST term of the reference's chat-badge gate —
+   * `preferences.chatBadges && !sessData.presenterMsgsOnTheRight && sessData.enableBadges && …` —
+   * so with it on, badges are suppressed regardless of the other three. That coupling is upstream's
+   * and is reproduced by `visibleBadges`.
+   */
+  const presenterMessagesOnTheRight = $derived(data.sessData?.presenterMsgsOnTheRight === true);
+
+  /**
+   * The other three terms of the reference's chat-badge gate:
+   *
+   * ```js
+   * preferences.chatBadges && !sessData.presenterMsgsOnTheRight && sessData.enableBadges &&
+   *   msg.b && msg.b.length && (!sessData.showBadgesToPresentersOnly || globals.isPresenter)
+   * ```
+   *
+   * `enableBadges` is the owner's master switch and is `=== true`: a room that has never been
+   * configured shows no badges, which is what an absent setting means everywhere else in this
+   * payload — the controller omits unset values rather than sending null.
+   *
+   * `showBadgesToPresentersOnly` narrows them to presenters. `disableStarYears` gates the
+   * membership-star, whose `item.membershipYears` still has no supply, so it is passed for the
+   * component's own gate and is expected to change nothing until that lands — recorded rather than
+   * left to look like an oversight.
+   */
+  const enableBadges = $derived(data.sessData?.enableBadges === true);
+  const showBadgesToPresentersOnly = $derived(data.sessData?.showBadgesToPresentersOnly === true);
+  const disableStarYears = $derived(data.sessData?.disableStarYears === true);
+
+  /**
+   * A sender's badges, resolved the way `app-st-message.full.js` byte 28120 resolves them.
+   *
+   * ```js
+   * for (let o = 0; o < this.msg.b.length; o++) {
+   *   let r = sessData.badgesH[this.msg.b[o]];
+   *   r && r.darkTheme && 'darkTheme' === preferences.theme && (r = sessData.badgesH[r.darkTheme]);
+   *   r && (this.badges += r.imgURL ? '<img …>' : '<span class="badge …">' + r.text + '</span>');
+   * }
+   * ```
+   *
+   * Three things carried across exactly:
+   *
+   * * **The dark-theme swap is a LOOKUP, not a flag.** `r.darkTheme` holds the id of a variant
+   *   badge and the whole definition is replaced with it. This is the render-site proof of T5-27,
+   *   which had been established from the manage page alone.
+   * * **An id with no definition renders nothing.** `r &&` — a badge deleted from the account while
+   *   still assigned to a member is skipped, not drawn as a blank chip.
+   * * **A missing variant falls back to the original.** `badgesH[r.darkTheme]` can itself be
+   *   undefined if the variant was deleted; upstream would then render nothing, so the `?? badge`
+   *   here is a deliberate divergence — losing a badge because its DARK variant was deleted is a
+   *   worse outcome than showing the light one.
+   *
+   * Returns `[]` rather than undefined so `RoomMessage`'s own gate chain does the deciding; this
+   * function answers "which badges", never "should badges show".
+   */
+  function badgesForSender(emailHash: string | null | undefined): MessageBadge[] {
+    if (!emailHash) return [];
+    const ids = data.badges?.byEmailHash?.[emailHash];
+    if (!ids?.length) return [];
+    const definitions = data.badges?.definitions ?? {};
+    const resolved: MessageBadge[] = [];
+    for (const id of ids) {
+      const badge = definitions[String(id)];
+      if (!badge) continue;
+      const variant =
+        theme === 'dark' && typeof badge.darkTheme === 'number'
+          ? (definitions[String(badge.darkTheme)] ?? badge)
+          : badge;
+      resolved.push({
+        text: variant.text,
+        color: variant.color,
+        backgroundColor: variant.backgroundColor,
+        imageUrl: variant.imageUrl
+      });
+    }
+    return resolved;
+  }
+  /**
+   * `preferences.chatBadges` — the VIEWER's half of the badge gate, distinct from the owner's
+   * `enableBadges`. Ships `!0`, so `!== false`.
+   */
+  /**
+   * `preferences.chatPopup` — a toast and a browser notification when somebody mentions you.
+   *
+   * `!doNotDisturbOn && chatPopup` upstream, sitting beside the sound in the same block:
+   * `doNotDisturbOn || (chatSoundOn && pling.play(), chatPopup && (alertService.info(…), new
+   * Notification(…)))` (`main.d6d3c112b59b7d0d.js` byte 1431308). The sound half has been here since
+   * the SSE handler was written; this is the other half.
+   *
+   * `!== false`, because the blob ships it on with its siblings and a viewer who has never opened
+   * the settings modal should be told when they are addressed by name.
+   */
+  /**
+   * `preferences.trimChatLogs` — "Reduce chat log memory", the settings modal's own label.
+   *
+   * `!== false`: the blob ships it ON, and it is the safer default in a room this one cannot bound
+   * — see the note on `visibleChatMessages`. Upstream trims one message per arrival; ours caps the
+   * derived view, which reaches the same steady state and also bounds the DOM.
+   */
+  let trimChatLogs = $state(loadedSettings.trimChatLogs !== false);
+  let chatPopup = $state(loadedSettings.chatPopup !== false);
+
+  /**
+   * The id of the last chat message already considered for a popup — an OPAQUE key, never a number.
+   *
+   * `id-opacity-contract.test.ts` caught the first version of this doing `Math.max(highest,
+   * item.id)`, and it was right to: the room-to-API cutover swaps SQLite's numeric ids for uuids,
+   * and that is a server-side change ONLY while no client does arithmetic on one. `Math.max` over a
+   * uuid is not a type error, it is `NaN` at runtime. So the marker is compared with `===` and
+   * everything else is done by POSITION in the server's own ordering.
+   *
+   * `undefined` means "nothing considered yet". Not `$state`: nothing renders from it, and making
+   * it reactive would invalidate the effect that writes it.
+   */
+  let lastPopupChatId: (typeof data.messages)[number]['id'] | undefined;
+  let popupSeeded = false;
+  let chatBadges = $state(loadedSettings.chatBadges !== false);
+  let chatGif = $state(loadedSettings.chatGif !== false);
+  let makeUsersFollowMyScreens = $state(loadedSettings.makeUsersFollowMyScreens === true);
+  let alwaysScrollToBottom = $state(loadedSettings.alwaysScrollToBottom === true);
   let recordingStartSound = $state(loadedSettings.recordingStartSound !== false);
   let recordingStopSound = $state(loadedSettings.recordingStopSound !== false);
 
@@ -2101,10 +2288,75 @@
     if (alertsDetachedWindow && !alertsDetachedWindow.closed) alertsDetachedWindow.close();
     alertsDetachedWindow = null;
   }
+  /**
+   * The mention popup — `chatPopup`'s half of the reference's notification block.
+   *
+   * Driven off `data.messages` rather than off the SSE payload, and that is a deliberate security
+   * choice rather than convenience. The chat event carries only `senderId`, `senderEmailHash` and
+   * the CHANNEL — never the text — because `room` is a chat channel and can be an admin one; a
+   * payload carrying message bodies would put admin chat on every subscriber's wire. The refetched
+   * `data.messages` has already been filtered by the server for THIS viewer, so reading the text
+   * from there cannot show anybody something they were not already entitled to see.
+   *
+   * An `$effect` because this IS a side effect — a toast and an OS notification — not a derivation.
+   * The marker it writes is bookkeeping, not rendered state.
+   *
+   * `lastPopupChatId` starts at -1 and is seeded on the FIRST pass without announcing anything, so
+   * arriving in a room with fifty unread mentions is silent. Only messages that appear afterwards
+   * pop.
+   */
+  $effect(() => {
+    const messages = data.messages;
+    if (!popupSeeded) {
+      popupSeeded = true;
+      lastPopupChatId = messages.at(-1)?.id;
+      return;
+    }
+    /*
+      Everything AFTER the marker, by position in the server's own ordering. If the marker is gone
+      — trimmed from the log, or the tab changed — `indexOf` gives -1 and `slice(0)` would announce
+      the whole list, so that case seeds again instead.
+    */
+    const seenAt = messages.findIndex((item) => item.id === lastPopupChatId);
+    if (lastPopupChatId !== undefined && seenAt === -1) {
+      lastPopupChatId = messages.at(-1)?.id;
+      return;
+    }
+    const fresh = messages.slice(seenAt + 1);
+    if (fresh.length === 0) return;
+    lastPopupChatId = messages.at(-1)?.id;
+
+    // `doNotDisturbOn ||` — the outer gate on the whole block, sound and popup alike.
+    if (doNotDisturbOn || !chatPopup) return;
+
+    for (const item of fresh) {
+      // Your own message is never a mention of you, whatever it says.
+      if (item.senderId === data.user.id) continue;
+      if (!isMentionOf(item.body, data.user.displayName, item.isAdmin === true)) continue;
+
+      const title = `Mention from @${item.senderName ?? 'Unknown'}`;
+      /*  — the reference passes the body as the
+         toast TEXT and the title second, and enables HTML because chat bodies carry markup. */
+      showToast({ kind: 'info', title, message: item.body, enableHtml: true });
+      requestAlertBrowserNotification(title, item.body, null, item.senderEmailHash ?? '');
+    }
+  });
+
   const visibleChatMessages = $derived(
-    data.messages
+    trimChatLog(data.messages, trimChatLogs)
       .filter((item) => item.room === chatTab && !isEvidenceMessageHidden(item))
       .map(withEvidenceState)
+      /*
+        `msg.b` — the sender's badges, attached here rather than stored on the row.
+
+        Upstream they ride on the message itself, because that server owns both the chat log and
+        the badge assignments. Ours do not: badges live in the controller and messages in the room's
+        own database, so they are joined at render time on `senderEmailHash`, which every message
+        already carries. A member given a badge mid-session sees it on their NEXT message upstream
+        and on ALL of them here — a divergence in our favour, and the alternative would be
+        denormalising controller state into room rows that then go stale.
+      */
+      .map((item) => ({ ...item, badges: badgesForSender(item.senderEmailHash) }))
   );
 
   function forceAlertsToBottom(scroller: HTMLElement) {
@@ -2168,7 +2420,12 @@
       isInitialView ||
       didSwitchChannel ||
       (isNewMessage &&
-        shouldAutoScrollForMessage(chatScrollingUp, newestMessage?.senderId, data.user.id))
+        shouldAutoScrollForMessage(
+          chatScrollingUp,
+          newestMessage?.senderId,
+          data.user.id,
+          alwaysScrollToBottom
+        ))
     ) {
       chatScrollingUp = false;
       void tick().then(() => {
@@ -2945,6 +3202,12 @@
       if (key === 'recordingStopSound') recordingStopSound = value;
       if (key === 'pushToTalk') pushToTalk = value;
       if (key === 'doSpeechReco') doSpeechReco = value;
+      if (key === 'alwaysScrollToBottom') alwaysScrollToBottom = value;
+      if (key === 'makeUsersFollowMyScreens') makeUsersFollowMyScreens = value;
+      if (key === 'chatGif') chatGif = value;
+      if (key === 'chatBadges') chatBadges = value;
+      if (key === 'chatPopup') chatPopup = value;
+      if (key === 'trimChatLogs') trimChatLogs = value;
       /*
         Both halves, because this preference has TWO controls: the navbar's
         `presentation-subtitles` checkbox and the settings modal's `app-speech-reco-overlay`. The
@@ -3231,6 +3494,65 @@
    * immediately, and the stream is filled in when it arrives - a tab with no picture is honest,
    * a picture with no tab is unreachable.
    */
+  /**
+   * `mediaService.saveData` — "Disable Video (saves bandwidth)", from the AV settings modal.
+   *
+   * DISTINCT from `videoDisabled` above, which is `preferences.disableVideo` from the USER settings
+   * modal and swaps the screens and streams panes for a message. Both exist upstream, each with its
+   * own control, and the original row in `TODO.md` conflated them. This one is the media-layer
+   * switch, and it does something the pane preference does not: upstream
+   * `callScreenOfUserWEBRTC` opens with
+   * `this.saveData ? P("callScreenOfUserWEBRTC saveData on.. nop...") : (…)`
+   * (`main.d6d3c112b59b7d0d.js` byte 1132193), so **the consumer is never created and no screen
+   * stream is requested at all**. The `Video Disabled` h3 and the hidden `<video>` are only what the
+   * viewer sees; the bandwidth saving is that nothing is fetched.
+   *
+   * Not persisted, matching the reference: the writer is
+   * `toggleDisableVideo(){this.saveData=!this.saveData}` (byte 1136736) on the media service, which
+   * calls no `setPreference`. It lasts the session.
+   */
+  let saveData = $state(false);
+
+  /**
+   * Screens whose stream was NOT fetched because `saveData` was on when they arrived.
+   *
+   * The reference re-consumes by a different route — selecting a tab calls
+   * `startWatchScreenOf` -> `mediaService.startWatchingScreenOf`, so turning video back on and
+   * clicking a tab re-requests it. This room consumes on producer ARRIVAL instead, so without
+   * keeping the `ProducerInfo` a viewer who re-enabled video would see nothing until the presenter
+   * happened to restart their share.
+   *
+   * A plain `Map`, not `SvelteMap`: nothing renders from it. It is bounded by the number of screens
+   * in the room, and every entry is removed the moment it is consumed.
+   */
+  const deferredScreens = new Map<string, ProducerInfo>();
+
+  /**
+   * The one place `saveData` changes, so the re-consume cannot be forgotten at a second call site.
+   *
+   * Turning it ON does NOT tear down consumers that already exist, and that is the reference's
+   * behaviour rather than an oversight on our part: `saveData` is read in exactly three places
+   * upstream — `callScreenOfUserWEBRTC`, the `hidden` class and the `Video Disabled` h3 — and none
+   * of them closes a consumer. So a screen already being watched keeps arriving and is hidden,
+   * while screens that arrive AFTER the switch are never fetched. Stating it plainly because it
+   * looks like a bug until you have read all three sites.
+   */
+  async function setSaveData(enabled: boolean) {
+    saveData = enabled;
+    if (enabled || deferredScreens.size === 0) return;
+    /* `sessionReady` resolves to void — it is a barrier, not a handle. The session lives in
+       `mediaSession`, which `restartMediaSession` sets to null while it rebuilds, so it is read
+       AFTER the await rather than before. */
+    await sessionReady;
+    const session = mediaSession;
+    if (!session) return;
+    for (const [producerId, info] of [...deferredScreens]) {
+      deferredScreens.delete(producerId);
+      const remote = await session.consume(info);
+      if (remote) screenStreams.set(producerId, remote.stream);
+    }
+  }
+
   async function addRemoteScreen(session: MediaSession, info: ProducerInfo) {
     const share = info.appData as { share?: unknown; screenName?: unknown } | null;
     if (info.kind !== 'video' || share?.share !== true) return;
@@ -3269,6 +3591,20 @@
     // starts talking has one - and without it a member sitting on Notes never learns a screen
     // exists. `selectScreenTabOfId` honours the lock, so a forced screen still cannot be stolen.
     selectScreenTabOfId(info.producerId);
+
+    /*
+      The gate, and it sits AFTER the tab is added on purpose. Upstream `saveData` stops
+      `callScreenOfUserWEBRTC` from creating the consumer, but the screenshare view still renders —
+      that is where the `Video Disabled` h3 lives — so the tab must exist for there to be anything
+      to show. Skipping the tab as well would hide the fact that a presenter is sharing at all,
+      which is not what the switch says it does.
+
+      The `ProducerInfo` is kept so re-enabling can fetch it; see `setSaveData`.
+    */
+    if (saveData) {
+      deferredScreens.set(info.producerId, info);
+      return;
+    }
 
     const remote = await session.consume(info);
     // `consume` returns null when this producer is already being consumed, which is the dedupe the
@@ -6051,6 +6387,8 @@
               give?: boolean;
               /** `playMP3ForAll`'s payload: `{url}`. Room-wide, so it carries no target. */
               url?: string;
+              /** `focusOnScreen` — the producer id of the screen to move to. */
+              screenId?: string;
             }
           | undefined;
 
@@ -6177,6 +6515,20 @@
         if (command?.cmd === 'stopMp3ForAll') {
           mp3Url = null;
           mp3Playing = false;
+          return;
+        }
+
+        if (command?.cmd === 'focusOnScreen') {
+          /*
+            A presenter pulled the room to a screen. `selectScreenTabOfId` rather than assigning
+            `selectedScreenTab`, because it HONOURS THE LOCK — a member who has locked a screen is
+            not dragged off it, which is the same rule `addRemoteScreen` relies on.
+
+            No re-broadcast from here. Upstream that guard is the `i` parameter of
+            `onScreenShareTabChange(e, i = !0)`, which callers pass false for programmatic changes;
+            here the equivalent is simply that only the user-initiated tab click broadcasts.
+          */
+          if (typeof command.screenId === 'string') selectScreenTabOfId(command.screenId);
           return;
         }
 
@@ -8931,6 +9283,12 @@
                           <RoomMessage
                             {item}
                             kind="alert"
+                            {chatGif}
+                            {presenterMessagesOnTheRight}
+                            {chatBadges}
+                            {enableBadges}
+                            {showBadgesToPresentersOnly}
+                            {disableStarYears}
                             currentUserId={data.user.id}
                             currentUserEmailHash={data.user.emailHash}
                             currentUserName={data.user.displayName}
@@ -9057,6 +9415,12 @@
                           <RoomMessage
                             {item}
                             kind="chat"
+                            {chatGif}
+                            {presenterMessagesOnTheRight}
+                            {chatBadges}
+                            {enableBadges}
+                            {showBadgesToPresentersOnly}
+                            {disableStarYears}
                             currentUserId={data.user.id}
                             currentUserEmailHash={data.user.emailHash}
                             currentUserName={data.user.displayName}
@@ -9629,7 +9993,7 @@
                       {forcedScreenId}
                       {lockedScreenId}
                       {isPresenter}
-                      onselect={(id) => (selectedScreenTab = id)}
+                      onselect={selectScreenTabByUser}
                       ondetach={detachScreen}
                       ontogglelock={toggleLockScreen}
                       onbringeveryone={bringEveryoneToScreen}
@@ -9697,6 +10061,7 @@
                           {zoomLevel}
                           pan={screenPans.get(screen.id) ?? NEUTRAL_PAN}
                           detached={detachedScreenId !== null}
+                          {saveData}
                           onpan={(x, y) => screenPans.set(screen.id, { x, y })}
                           ontogglezoom={togglePanZoom}
                           onzoomin={panZoomIn}
@@ -10407,6 +10772,8 @@
       onAlertTab={(tab) => (alertTab = tab)}
       onTheme={setTheme}
       onPreferenceChange={savePreference}
+      {saveData}
+      onSaveDataChange={setSaveData}
       onDoNotDisturbChange={(enabled) => (doNotDisturbOn = enabled)}
       onPlayYoutube={playYoutubeForAll}
       onPostAlert={postAlert}

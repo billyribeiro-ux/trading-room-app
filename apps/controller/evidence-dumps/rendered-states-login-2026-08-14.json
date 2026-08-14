@@ -1,0 +1,929 @@
+{
+ "tool": "collect-rendered-states.js",
+ "closes": "T2-7 (striping/hover), T2-20 (bootbox variants), T2-22 (login form + error state)",
+ "capturedAt": "2026-08-14T13:13:19.625Z",
+ "pageUrl": "https://protradingroom.com/ptrApp#/page/welcome",
+ "userAgent": "Mozilla/5.0 (Linux; Android 15; Pixel 9) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Mobile Safari/537.36",
+ "viewport": {
+  "w": 1989,
+  "h": 1265,
+  "dpr": 2
+ },
+ "role": "LOGGED OUT (or a login page) — which is what T2-22 needs",
+ "striping": [
+  {
+   "tableClass": "table table-striped table-bordered table-hover",
+   "tableRect": {
+    "x": 0,
+    "y": 0,
+    "w": 0,
+    "h": 0
+   },
+   "rowCount": 1,
+   "rows": [
+    {
+     "index": 0,
+     "nthOfType": 1,
+     "odd": true,
+     "hidden": false,
+     "backgroundColor": "rgb(249, 249, 249)",
+     "height": 0
+    }
+   ],
+   "hoverRules": [
+    {
+     "selector": ".table-hover > tbody > tr:hover",
+     "css": "background-color: rgb(245, 245, 245);",
+     "href": "https://protradingroom.com/public/app/css/bootstrap.min.css"
+    }
+   ],
+   "stripeRules": [
+    {
+     "selector": ".table-striped > tbody > tr:nth-of-type(2n+1)",
+     "css": "background-color: rgb(249, 249, 249);",
+     "href": "https://protradingroom.com/public/app/css/bootstrap.min.css"
+    }
+   ]
+  },
+  {
+   "tableClass": "table table-striped table-bordered table-hover",
+   "tableRect": {
+    "x": 0,
+    "y": 0,
+    "w": 0,
+    "h": 0
+   },
+   "rowCount": 1,
+   "rows": [
+    {
+     "index": 0,
+     "nthOfType": 1,
+     "odd": true,
+     "hidden": false,
+     "backgroundColor": "rgb(249, 249, 249)",
+     "height": 0
+    }
+   ],
+   "hoverRules": [
+    {
+     "selector": ".table-hover > tbody > tr:hover",
+     "css": "background-color: rgb(245, 245, 245);",
+     "href": "https://protradingroom.com/public/app/css/bootstrap.min.css"
+    }
+   ],
+   "stripeRules": [
+    {
+     "selector": ".table-striped > tbody > tr:nth-of-type(2n+1)",
+     "css": "background-color: rgb(249, 249, 249);",
+     "href": "https://protradingroom.com/public/app/css/bootstrap.min.css"
+    }
+   ]
+  },
+  {
+   "tableClass": "table table-striped table-bordered table-hover",
+   "tableRect": {
+    "x": 0,
+    "y": 0,
+    "w": 0,
+    "h": 0
+   },
+   "rowCount": 1,
+   "rows": [
+    {
+     "index": 0,
+     "nthOfType": 1,
+     "odd": true,
+     "hidden": false,
+     "backgroundColor": "rgb(249, 249, 249)",
+     "height": 0
+    }
+   ],
+   "hoverRules": [
+    {
+     "selector": ".table-hover > tbody > tr:hover",
+     "css": "background-color: rgb(245, 245, 245);",
+     "href": "https://protradingroom.com/public/app/css/bootstrap.min.css"
+    }
+   ],
+   "stripeRules": [
+    {
+     "selector": ".table-striped > tbody > tr:nth-of-type(2n+1)",
+     "css": "background-color: rgb(249, 249, 249);",
+     "href": "https://protradingroom.com/public/app/css/bootstrap.min.css"
+    }
+   ]
+  },
+  {
+   "tableClass": "table table-striped table-bordered table-hover",
+   "tableRect": {
+    "x": 0,
+    "y": 0,
+    "w": 0,
+    "h": 0
+   },
+   "rowCount": 2,
+   "rows": [
+    {
+     "index": 0,
+     "nthOfType": 1,
+     "odd": true,
+     "hidden": false,
+     "backgroundColor": "rgb(249, 249, 249)",
+     "height": 0
+    },
+    {
+     "index": 1,
+     "nthOfType": 2,
+     "odd": false,
+     "hidden": true,
+     "backgroundColor": "rgba(0, 0, 0, 0)",
+     "height": 0
+    }
+   ],
+   "hoverRules": [
+    {
+     "selector": ".table-hover > tbody > tr:hover",
+     "css": "background-color: rgb(245, 245, 245);",
+     "href": "https://protradingroom.com/public/app/css/bootstrap.min.css"
+    }
+   ],
+   "stripeRules": [
+    {
+     "selector": ".table-striped > tbody > tr:nth-of-type(2n+1)",
+     "css": "background-color: rgb(249, 249, 249);",
+     "href": "https://protradingroom.com/public/app/css/bootstrap.min.css"
+    }
+   ]
+  }
+ ],
+ "bootbox": {
+  "handlers": {
+   "manageBadges": {
+    "found": true,
+    "scopeId": 4,
+    "scopeDepth": 0,
+    "source": "function(badgesList,userBadgesList,xrefID,uname,uemail){if(!badgesList)return void bootbox.alert(\"Sorry, there are no Badges defined for this room yet...\");var f=\"<h4>Manage Badges for  \"+uname+\" (\"+uemail+\")</h4><hr/>             <form id='badgesForm' action=''><div class='form-group'> \";userBadgesList||(userBadgesList=[]);for(var i=0;i<badgesList.length;i++){var b=badgesList[i],hasIt=userBadgesList.includes(b._id);f+=b.hasOwnProperty(\"imgURL\")&&b.imgURL?'<input type=\"checkbox\" name=\"editBadgesArr\" value=\"'+b._id+'\" '+(hasIt?'checked=\"checked\" />':\"/>\")+'                  <div class=\"label\"><img class=\"user-badge-img\" src=\"'+b.imgURL+'\" alt=\"'+b.imgURL+'\"/></div><br/>':'<input type=\"checkbox\" name=\"editBadgesArr\" value=\"'+b._id+'\" '+(hasIt?'checked=\"checked\" />':\"/>\")+'                  <div class=\"label\" style=\"background-color: '+b.bkcolor+\"; color: \"+b.color+'\">'+b.text+\"</div><br/>\"}f+='<hr/>Add badges to all rooms? <input type=\"checkbox\" id=\"manageBadgeAllRoomsChk\" /></div></form>',bootbox.confirm(f,function(result){if(result){var badges=[];$.each($(\"input[name='editBadgesArr']:checked\"),function(){badges.push($(this).val())});var newUserBadgeArr=badges,allRooms=$(\"#manageBadgeAllRoomsChk\").is(\":checked\");lg(\"Badges are now: \"+newUserBadgeArr.toString()+\". All Rooms: \"+allRooms);var args=$scope.makeReqTokenForCmd(\"updateUserXref\");args&&(args.sessionID=$scope.sessionID,args.xrefID=xrefID,args.newBadges=newUserBadgeArr,args.allRooms=allRooms,$http.post(appVars.globals.APIURL+\"/users/v1/sessions\",args).success(function(data){data.success&&$scope.loadUsers()}))}})}"
+   },
+   "updateManyUsersBadgePrompt": {
+    "found": true,
+    "scopeId": 4,
+    "scopeDepth": 0,
+    "source": "function(cmd){bootbox.prompt({title:\"Enter badge id to \"+cmd,inputType:\"text\",callback:function(result){$scope.updateManyUsersBadge(result,cmd)}})}"
+   },
+   "setNoteUser": {
+    "found": true,
+    "scopeId": 4,
+    "scopeDepth": 0,
+    "source": "function(xrefid,name,$index){bootbox.prompt({title:\"Set a note for this user, put nothing here to clear\",inputType:\"text\",callback:function(result){var args=$scope.makeReqTokenForCmd(\"updateUserXref\");args&&(args.sessionID=$scope.sessionID,args.xrefID=xrefid,result||(result=\"_EMPTY_\"),args.note=result,$http.post(appVars.globals.APIURL+\"/users/v1/sessions\",args).success(function(data){data.success&&$scope.loadUsers()}))}})}"
+   },
+   "editUsername": {
+    "found": true,
+    "scopeId": 4,
+    "scopeDepth": 0,
+    "source": "function(xrefid,currentName){bootbox.prompt({title:\"Edit username for: <b>\"+currentName+\"</b>\",inputType:\"text\",value:currentName,callback:function(newName){if(null!==newName){if(newName=newName.trim(),!newName)return void bootbox.alert(\"Username cannot be empty.\");if(newName!==currentName){var args=$scope.makeReqTokenForCmd(\"editUsername\");args&&(args.sessionID=$scope.sessionID,args.xrefID=xrefid,args.newUsername=newName,$http.post(appVars.globals.APIURL+\"/users/v1/sessions\",args).success(function(data){data.success&&$scope.loadUsers()}))}}}})}"
+   },
+   "setUserPW": {
+    "found": true,
+    "scopeId": 4,
+    "scopeDepth": 0,
+    "source": "function(xrefid,name,$index){bootbox.confirm(\"<h4>Set password for  \"+name+\"</h4><hr/>                     <form id='unamePWForm' action='' onsubmit='return false'><div class='form-group'>                         Password &nbsp;&nbsp;<input type='text' name='pw' id='unamePWTxt' /><br/>                        email credentials to user? &nbsp;<input type='checkbox' name='pw' id='unamePWEmailChk' checked='checked' />                     </div></form>\",function(result){if(result){var doEmail=$(\"#unamePWEmailChk\").is(\":checked\"),pw=$(\"#unamePWTxt\").val(),args=$scope.makeReqTokenForCmd(\"updateUserXref\");args&&(args.sessionID=$scope.sessionID,args.xrefID=xrefid,args.newPW=pw,args.emailOut=doEmail,$http.post(appVars.globals.APIURL+\"/users/v1/sessions\",args).success(function(data){data.success&&$scope.loadUsers()}))}})}"
+   },
+   "doInvite": {
+    "found": true,
+    "scopeId": 4,
+    "scopeDepth": 0,
+    "source": "function(mode){$scope.invite={email:\"\",name:\"\",role:\"\",pw:\"\",sendEmail:!0,persons:[]},mode||(mode=\"webinar\"),$scope.inviteModalInstance=$modal.open({templateUrl:\"app/views/cached/inviteModal.html\",scope:$scope,resolve:{mode:function(){return mode},sessionID:function(){return $scope.sessionID},token:function(){return $localstorage.get(\"tokenSite\")}}}),$scope.inviteModalInstance.result.then(function(){},function(){})}"
+   },
+   "doBatchInvite": {
+    "found": true,
+    "scopeId": 4,
+    "scopeDepth": 0,
+    "source": "function(){bootbox.prompt({title:\"Enter comma separate email list\",inputType:\"textarea\",callback:function(emailList){if(emailList&&(console.log(emailList),$scope.batchEmailsList=emailList.trim().toLowerCase().replace(/\\s/g,\"\").split(\",\"),console.log($scope.batchEmailsList),$scope.batchEmailsList.length>0)){var args=$scope.makeReqTokenForCmd(\"inviteBatchUsers\");if(args.batchEmailsList=$scope.batchEmailsList,args.roomID=$scope.roomID,args.inviteHost=window.location.origin,args.emailHost=window.location.hostname,args.sessionID=$scope.sessionID,!args)return;$http.post(appVars.globals.APIURL+\"/users/v1/sessions\",args).success(function(data){console.log(\"inviteBatchUsers data: \",data),data.success&&$scope.loadUsers()})}}})}"
+   },
+   "setPermissions": {
+    "found": true,
+    "scopeId": 4,
+    "scopeDepth": 0,
+    "source": "function(user){$scope.userPermissions=user,console.log(\"setPermissions for user: \",$scope.userPermissions)}"
+   },
+   "manageApiKeyRestrictions": {
+    "found": true,
+    "scopeId": 4,
+    "scopeDepth": 0,
+    "source": "function(apiKey){$scope.fetchAllStatsEndpoints(function(endpoints){var container=$(\"<div>\"),sessHeader=$(\"<h5>\").text(\"Restrict to Sessions (leave none selected for no restriction)\"),sessList=$('<div class=\"list-group\" style=\"max-height: 260px; overflow-y: auto;\">'),sessionItems=($scope.login.sessions||[]).map(function(s){return{id:String(s._id||s.id||s.uuid),label:(s.name||s.uuid||s._id)+\" (\"+(s.uuid||s._id)+\")\"}}),preSelSessions=(apiKey.restrictToSessions||[]).map(function(v){return String(v)});sessionItems.forEach(function(item){var row=$('<label class=\"list-group-item\">'),cb=$('<input type=\"checkbox\" style=\"margin-right:6px;\">').prop(\"checked\",preSelSessions.indexOf(item.id)!==-1);row.append(cb).append(document.createTextNode(item.label)),row.data(\"id\",item.id),sessList.append(row)});var epHeader=$(\"<h5>\").text(\"Restrict to Endpoints (leave none selected for no restriction)\"),epList=$('<div class=\"list-group\" style=\"max-height: 260px; overflow-y: auto;\">'),preSelEndpoints=apiKey.restrictToEndpoints||[];endpoints.forEach(function(ep){var row=$('<label class=\"list-group-item\">'),cb=$('<input type=\"checkbox\" style=\"margin-right:6px;\">').prop(\"checked\",preSelEndpoints.indexOf(ep)!==-1);row.append(cb).append(document.createTextNode(ep)),row.data(\"id\",ep),epList.append(row)}),container.append(sessHeader,sessList,$(\"<hr/>\"),epHeader,epList),bootbox.dialog({title:\"Manage API Key Restrictions\",message:container,size:\"large\",buttons:{clear:{label:\"Clear All\",className:\"btn-warning\",callback:function(){try{sessList.find(\"input[type=checkbox]\").prop(\"checked\",!1),epList.find(\"input[type=checkbox]\").prop(\"checked\",!1)}catch(e){}saveApiRestrictions(apiKey._id,[],[],function(){$scope.listApiKeys()})}},cancel:{label:\"Cancel\"},save:{label:\"Save\",className:\"btn-success\",callback:function(){var selSessions=[];sessList.find(\"label\").each(function(){var lbl=$(this),checked=lbl.find(\"input[type=checkbox]\").is(\":checked\");checked&&selSessions.push(String(lbl.data(\"id\")))});var selEndpoints=[];epList.find(\"label\").each(function(){var lbl=$(this),checked=lbl.find(\"input[type=checkbox]\").is(\":checked\");checked&&selEndpoints.push(String(lbl.data(\"id\")))}),saveApiRestrictions(apiKey._id,selSessions,selEndpoints,function(){$scope.listApiKeys()})}}}})})}"
+   },
+   "openStripeDetails": {
+    "found": true,
+    "scopeId": 4,
+    "scopeDepth": 0,
+    "source": "function(user){function addRow(label,value){void 0!==value&&null!==value&&\"\"!==value&&rows.push('<tr><th style=\"width:220px;\">'+label+\"</th><td>\"+value+\"</td></tr>\")}function fmtDate(d){try{var dt=new Date(d);if(!isNaN(dt.getTime()))return dt.toLocaleString()}catch(e){}return\"\"+d}if(user)try{var rows=[];addRow(\"Membership ID\",user.stripeMembershipId),addRow(\"Subscription ID\",user.stripeSubscriptionId),addRow(\"Customer ID\",user.stripeCustomerId),addRow(\"Checkout Session ID\",user.stripeCheckoutSessionId),addRow(\"Subscription Status\",user.stripeSubscriptionStatus),addRow(\"Last Invoice ID\",user.stripeLastInvoiceId),addRow(\"Last Paid At\",user.stripeLastPaidAt?fmtDate(user.stripeLastPaidAt):\"\"),addRow(\"Last Paid Amount\",$scope.formatStripeAmount(user.stripeLastPaidAmount,user.stripeLastPaidCurrency)),addRow(\"Last Paid Currency\",user.stripeLastPaidCurrency),addRow(\"Last Payment Failure At\",user.stripeLastPaymentFailureAt?fmtDate(user.stripeLastPaymentFailureAt):\"\"),addRow(\"Last Failure Reason\",user.stripeLastFailureReason),addRow(\"Current Period End\",user.stripeCurrentPeriodEnd?fmtDate(user.stripeCurrentPeriodEnd):\"\"),addRow(\"Cancel At\",user.stripeCancelAt?fmtDate(user.stripeCancelAt):\"\"),addRow(\"Canceled At\",user.stripeCanceledAt?fmtDate(user.stripeCanceledAt):\"\"),addRow(\"Welcome Email Sent\",user.stripeWelcomeEmailSent),addRow(\"Welcome Email Sent At\",user.stripeWelcomeEmailSentAt?fmtDate(user.stripeWelcomeEmailSentAt):\"\"),addRow(\"Stripe Data Updated\",user.stripeDataUpdated?fmtDate(user.stripeDataUpdated):\"\");var tableHtml='<div class=\"table-responsive\"><table class=\"table table-condensed table-striped\">'+rows.join(\"\")+\"</table></div>\";bootbox.dialog({title:\"Stripe Details - \"+(user.userName||user.email||\"\"),message:tableHtml,buttons:{ok:{label:\"Close\",className:\"btn-primary\"}}})}catch(e){try{bootbox.alert(\"Unable to render Stripe details\")}catch(ee){}}}"
+   },
+   "showAlerterAppTokens": {
+    "found": true,
+    "scopeId": 4,
+    "scopeDepth": 0,
+    "source": "function(name,tokens){var tok=tokens||[],appTokens=JSON.stringify(tok);bootbox.alert(\"Mobile App Tokens for \"+name+\": \"+appTokens)}"
+   },
+   "getFCMTokens": {
+    "found": true,
+    "scopeId": 4,
+    "scopeDepth": 0,
+    "source": "function(xrefid,name,$index){var args=$scope.makeReqTokenForCmd(\"getFCMTokens\");args&&(args.sessionID=$scope.sessionID,args.xrefID=xrefid,$http.post(appVars.globals.APIURL+\"/users/v1/sessions\",args).success(function(data){data.success?(console.log(\"getFCMTokens OK for, data:\",data),bootbox.alert(\"Get FCM Tokens OK for: \"+name+\"\\nFCM Tokens:\"+JSON.stringify(data.fcmTokens))):bootbox.alert(\"ERROR: getFCMTokens failed. Error:\"+JSON.stringify(data.msg))}))}"
+   },
+   "manageMarketplaceSession": {
+    "found": true,
+    "scopeId": 4,
+    "scopeDepth": 0,
+    "source": "function(sessID,session){var baseUrl=\"/ptr_app/mp/v2\",api_url=appVars.globals.APIURL+baseUrl;$http.get(api_url+\"/marketplaces/\"+sessID,{headers:{Authorization:\"Bearer \"+chatModel.jwtTokenSite}}).success(function(response){if(console.log(\"getMarketPlacesForSession list:\",response),response&&0!==response.length){console.log(\"Marketplace already exists for session:\",response);var mpId=response[0]._id,url=appVars.globals.APIURL+\"/mp/room-dashboard/\"+mpId;window.open(url,\"_blank\")}else{var mp={sessionID:sessID,title:session?session.name:\"Untitled\",logoURL:session?session.logoURL:\"\",published:!1,locked:!1,featured:!1,hidden:!1,tagline:\"\",description:\"\",images:[],tags:[],memberships:[]};$http.post(api_url+\"/\",mp,{headers:{Authorization:\"Bearer \"+chatModel.jwtTokenSite}}).success(function(mpResponse){console.log(\"POST createMarketplaceEntry created:\",mpResponse);var mpId=mpResponse._id,url=appVars.globals.APIURL+\"/mp/room-dashboard/\"+mpId;window.open(url,\"_blank\")}).error(function(err){console.error(\"Error creating marketplace entry:\",err),bootbox.alert(\"Failed to create marketplace entry\")})}}).error(function(err){console.error(\"Error fetching marketplace entries:\",err),bootbox.alert(\"Failed to fetch marketplace entries\")})}"
+   },
+   "setCustomRoomURL": {
+    "found": true,
+    "scopeId": 4,
+    "scopeDepth": 0,
+    "source": "function(){bootbox.prompt(\"Enter your desired name. (Only letters and numbers allowed. No spaces or special characters allowed, as this is a URL)\",function(res){try{var cname=res.trim().replace(/[^a-z0-9]/gi,\"\"),args=$scope.makeReqTokenForCmd(\"changeCustomURL\");args.sessionID=$scope.sessionID,args.cname=cname,$http.post(appVars.globals.APIURL+\"/users/v1/sessions\",args).success(function(data){console.log(\"sessions rc=\"+JSON.stringify(data)),data.success?$scope.sess.customCname=cname:bootbox.alert(data.msg)}).error(function(err){})}catch(ee){console.error(ee)}})}"
+   },
+   "createNew": {
+    "found": true,
+    "scopeId": 4,
+    "scopeDepth": 0,
+    "source": "function(){appVars.createNew=!0,$http.post(appVars.globals.APIURL+\"/users/v1/users.json\",{cmd:\"newSession\",email:chatModel.email,token:chatModel.jwtTokenSite,demoRoom:!0}).success(function(data){lg(\"newSession data:\"+JSON.stringify(data)),$scope.roomID=__roomID=data.uuid,$state.go(\"page.manageSession\",{sessionID:data._id})}).error(function(err){bootbox.alert(\"Something went wrong, please try again...\"),$scope.doLogout()})}"
+   }
+  },
+  "templatesFetched": [],
+  "observed": [],
+  "scopesSearched": 9
+ },
+ "login": {
+  "form": {
+   "tag": "form",
+   "id": null,
+   "class": "ng-valid ng-valid-email ng-dirty ng-valid-parse",
+   "text": "Forgot your password?\n                \n              \n\n              \n                \n              \n\n              \n                Login\n              \n            \n          \n          \n          ",
+   "attrs": {
+    "role": "form",
+    "class": "ng-valid ng-valid-email ng-dirty ng-valid-parse",
+    "ng-submit": "submitLogin()"
+   },
+   "rect": {
+    "x": 440.5,
+    "y": 146,
+    "w": 1108,
+    "h": 192
+   },
+   "computed": {
+    "display": "block",
+    "position": "static",
+    "width": "1108px",
+    "height": "192px",
+    "margin": "0px",
+    "padding": "0px",
+    "border": "0px none rgb(51, 51, 51)",
+    "border-top": "0px none rgb(51, 51, 51)",
+    "border-bottom": "0px none rgb(51, 51, 51)",
+    "font-family": "\"Helvetica Neue\", Helvetica, Arial, sans-serif",
+    "font-size": "14px",
+    "font-weight": "400",
+    "line-height": "20px",
+    "color": "rgb(51, 51, 51)",
+    "background-color": "rgba(0, 0, 0, 0)",
+    "background-image": "none",
+    "text-align": "start",
+    "box-shadow": "none",
+    "border-radius": "0px",
+    "z-index": "auto",
+    "opacity": "1",
+    "visibility": "visible"
+   },
+   "rules": [
+    {
+     "selector": "*",
+     "css": "box-sizing: border-box;",
+     "href": "https://protradingroom.com/public/app/css/bootstrap.min.css"
+    }
+   ]
+  },
+  "fields": [
+   {
+    "tag": "input",
+    "id": "exampleInputEmail1",
+    "class": "form-control ng-pristine ng-untouched ng-valid ng-valid-email",
+    "text": "",
+    "attrs": {
+     "id": "exampleInputEmail1",
+     "type": "email",
+     "placeholder": "Your email",
+     "autocomplete": "off",
+     "class": "form-control ng-pristine ng-untouched ng-valid ng-valid-email",
+     "ng-model": "signup.email",
+     "autocorrect": "off"
+    },
+    "rect": {
+     "x": 440.5,
+     "y": 146,
+     "w": 539,
+     "h": 34
+    },
+    "computed": {
+     "display": "block",
+     "position": "static",
+     "width": "539px",
+     "height": "34px",
+     "margin": "0px",
+     "padding": "6px 42.5px 6px 18px",
+     "border": "1px solid rgb(219, 217, 217)",
+     "border-top": "1px solid rgb(219, 217, 217)",
+     "border-bottom": "1px solid rgb(219, 217, 217)",
+     "font-family": "\"Helvetica Neue\", Helvetica, Arial, sans-serif",
+     "font-size": "14px",
+     "font-weight": "400",
+     "line-height": "20px",
+     "color": "rgb(85, 85, 85)",
+     "background-color": "rgb(255, 255, 255)",
+     "background-image": "none",
+     "text-align": "start",
+     "box-shadow": "rgb(0, 0, 0) 0px 0px 0px 0px",
+     "border-radius": "4px",
+     "z-index": "auto",
+     "opacity": "1",
+     "visibility": "visible"
+    },
+    "rules": [
+     {
+      "selector": "button, input, optgroup, select, textarea",
+      "css": "margin: 0px; font: inherit; color: inherit;",
+      "href": "https://protradingroom.com/public/app/css/bootstrap.min.css"
+     },
+     {
+      "selector": "input",
+      "css": "line-height: normal;",
+      "href": "https://protradingroom.com/public/app/css/bootstrap.min.css"
+     },
+     {
+      "selector": "*",
+      "css": "box-sizing: border-box;",
+      "href": "https://protradingroom.com/public/app/css/bootstrap.min.css"
+     },
+     {
+      "selector": "button, input, select, textarea",
+      "css": "font-family: inherit; font-size: inherit; line-height: inherit;",
+      "href": "https://protradingroom.com/public/app/css/bootstrap.min.css"
+     },
+     {
+      "selector": ".form-control",
+      "css": "display: block; width: 100%; height: 34px; padding: 6px 12px; font-size: 14px; line-height: 1.42857; color: rgb(85, 85, 85); background-color: rgb(255, 255, 255); background-image: none; border: 1px solid rgb(204, 204, 204); border-radius: 4px; box-shadow: rgba(0, 0, 0, 0.075) 0px 1px 1px inset; transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;",
+      "href": "https://protradingroom.com/public/app/css/bootstrap.min.css"
+     },
+     {
+      "selector": ".form-control:focus",
+      "css": "border-color: rgb(102, 175, 233); outline: 0px; box-shadow: rgba(0, 0, 0, 0.075) 0px 1px 1px inset, rgba(102, 175, 233, 0.6) 0px 0px 8px;",
+      "href": "https://protradingroom.com/public/app/css/bootstrap.min.css"
+     },
+     {
+      "selector": ".has-feedback .form-control",
+      "css": "padding-right: 42.5px;",
+      "href": "https://protradingroom.com/public/app/css/bootstrap.min.css"
+     },
+     {
+      "selector": ".form-control",
+      "css": "padding-left: 18px; padding-right: 18px; box-shadow: rgb(0, 0, 0) 0px 0px 0px !important;",
+      "href": "https://protradingroom.com/public/app/css/styles.css"
+     },
+     {
+      "selector": ".form-control, .input-group-addon",
+      "css": "border-color: rgb(219, 217, 217);",
+      "href": "https://protradingroom.com/public/app/css/styles.css"
+     },
+     {
+      "selector": "input[type=\"text\"], input[type=\"email\"], input[type=\"search\"], input[type=\"password\"], input[type=\"url\"], input[type=\"number\"]",
+      "css": "appearance: none;",
+      "href": "https://protradingroom.com/public/app/css/styles.css"
+     },
+     {
+      "selector": ".form-control",
+      "css": "padding-left: 18px; padding-right: 18px; box-shadow: rgb(0, 0, 0) 0px 0px 0px !important;",
+      "href": "https://protradingroom.com/public/app/css/styles.css"
+     },
+     {
+      "selector": ".form-control, .input-group-addon",
+      "css": "border-color: rgb(219, 217, 217);",
+      "href": "https://protradingroom.com/public/app/css/styles.css"
+     },
+     {
+      "selector": "input[type=\"text\"], input[type=\"email\"], input[type=\"search\"], input[type=\"password\"], input[type=\"url\"], input[type=\"number\"]",
+      "css": "appearance: none;",
+      "href": "https://protradingroom.com/public/app/css/styles.css"
+     }
+    ]
+   },
+   {
+    "tag": "input",
+    "id": "exampleInputPassword1",
+    "class": "form-control ng-valid ng-dirty ng-valid-parse ng-touched",
+    "text": "",
+    "attrs": {
+     "id": "exampleInputPassword1",
+     "type": "password",
+     "placeholder": "Your password",
+     "class": "form-control ng-valid ng-dirty ng-valid-parse ng-touched",
+     "ng-model": "signup.pass"
+    },
+    "rect": {
+     "x": 440.5,
+     "y": 210,
+     "w": 539,
+     "h": 34
+    },
+    "computed": {
+     "display": "block",
+     "position": "static",
+     "width": "539px",
+     "height": "34px",
+     "margin": "0px",
+     "padding": "6px 42.5px 6px 18px",
+     "border": "1px solid rgb(219, 217, 217)",
+     "border-top": "1px solid rgb(219, 217, 217)",
+     "border-bottom": "1px solid rgb(219, 217, 217)",
+     "font-family": "\"Helvetica Neue\", Helvetica, Arial, sans-serif",
+     "font-size": "14px",
+     "font-weight": "400",
+     "line-height": "20px",
+     "color": "rgb(0, 0, 0)",
+     "background-color": "rgb(232, 240, 254)",
+     "background-image": "none",
+     "text-align": "start",
+     "box-shadow": "rgb(0, 0, 0) 0px 0px 0px 0px",
+     "border-radius": "4px",
+     "z-index": "auto",
+     "opacity": "1",
+     "visibility": "visible"
+    },
+    "rules": [
+     {
+      "selector": "button, input, optgroup, select, textarea",
+      "css": "margin: 0px; font: inherit; color: inherit;",
+      "href": "https://protradingroom.com/public/app/css/bootstrap.min.css"
+     },
+     {
+      "selector": "input",
+      "css": "line-height: normal;",
+      "href": "https://protradingroom.com/public/app/css/bootstrap.min.css"
+     },
+     {
+      "selector": "*",
+      "css": "box-sizing: border-box;",
+      "href": "https://protradingroom.com/public/app/css/bootstrap.min.css"
+     },
+     {
+      "selector": "button, input, select, textarea",
+      "css": "font-family: inherit; font-size: inherit; line-height: inherit;",
+      "href": "https://protradingroom.com/public/app/css/bootstrap.min.css"
+     },
+     {
+      "selector": ".form-control",
+      "css": "display: block; width: 100%; height: 34px; padding: 6px 12px; font-size: 14px; line-height: 1.42857; color: rgb(85, 85, 85); background-color: rgb(255, 255, 255); background-image: none; border: 1px solid rgb(204, 204, 204); border-radius: 4px; box-shadow: rgba(0, 0, 0, 0.075) 0px 1px 1px inset; transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;",
+      "href": "https://protradingroom.com/public/app/css/bootstrap.min.css"
+     },
+     {
+      "selector": ".form-control:focus",
+      "css": "border-color: rgb(102, 175, 233); outline: 0px; box-shadow: rgba(0, 0, 0, 0.075) 0px 1px 1px inset, rgba(102, 175, 233, 0.6) 0px 0px 8px;",
+      "href": "https://protradingroom.com/public/app/css/bootstrap.min.css"
+     },
+     {
+      "selector": ".has-feedback .form-control",
+      "css": "padding-right: 42.5px;",
+      "href": "https://protradingroom.com/public/app/css/bootstrap.min.css"
+     },
+     {
+      "selector": ".form-control",
+      "css": "padding-left: 18px; padding-right: 18px; box-shadow: rgb(0, 0, 0) 0px 0px 0px !important;",
+      "href": "https://protradingroom.com/public/app/css/styles.css"
+     },
+     {
+      "selector": ".form-control, .input-group-addon",
+      "css": "border-color: rgb(219, 217, 217);",
+      "href": "https://protradingroom.com/public/app/css/styles.css"
+     },
+     {
+      "selector": "input[type=\"text\"], input[type=\"email\"], input[type=\"search\"], input[type=\"password\"], input[type=\"url\"], input[type=\"number\"]",
+      "css": "appearance: none;",
+      "href": "https://protradingroom.com/public/app/css/styles.css"
+     },
+     {
+      "selector": ".form-control",
+      "css": "padding-left: 18px; padding-right: 18px; box-shadow: rgb(0, 0, 0) 0px 0px 0px !important;",
+      "href": "https://protradingroom.com/public/app/css/styles.css"
+     },
+     {
+      "selector": ".form-control, .input-group-addon",
+      "css": "border-color: rgb(219, 217, 217);",
+      "href": "https://protradingroom.com/public/app/css/styles.css"
+     },
+     {
+      "selector": "input[type=\"text\"], input[type=\"email\"], input[type=\"search\"], input[type=\"password\"], input[type=\"url\"], input[type=\"number\"]",
+      "css": "appearance: none;",
+      "href": "https://protradingroom.com/public/app/css/styles.css"
+     }
+    ]
+   },
+   {
+    "tag": "a",
+    "id": null,
+    "class": "text-muted",
+    "text": "Forgot your password?",
+    "attrs": {
+     "ui-sref": "page.forgot-password",
+     "class": "text-muted",
+     "href": "#/page/forgot-password"
+    },
+    "rect": {
+     "x": 834.4453125,
+     "y": 255.5,
+     "w": 145.0546875,
+     "h": 16.5
+    },
+    "computed": {
+     "display": "inline",
+     "position": "static",
+     "width": "auto",
+     "height": "auto",
+     "margin": "0px",
+     "padding": "0px",
+     "border": "0px none rgb(119, 119, 119)",
+     "border-top": "0px none rgb(119, 119, 119)",
+     "border-bottom": "0px none rgb(119, 119, 119)",
+     "font-family": "\"Helvetica Neue\", Helvetica, Arial, sans-serif",
+     "font-size": "14px",
+     "font-weight": "400",
+     "line-height": "20px",
+     "color": "rgb(119, 119, 119)",
+     "background-color": "rgba(0, 0, 0, 0)",
+     "background-image": "none",
+     "text-align": "right",
+     "box-shadow": "none",
+     "border-radius": "0px",
+     "z-index": "auto",
+     "opacity": "1",
+     "visibility": "visible"
+    },
+    "rules": [
+     {
+      "selector": "a",
+      "css": "background-color: transparent;",
+      "href": "https://protradingroom.com/public/app/css/bootstrap.min.css"
+     },
+     {
+      "selector": "a:active, a:hover",
+      "css": "outline: 0px;",
+      "href": "https://protradingroom.com/public/app/css/bootstrap.min.css"
+     },
+     {
+      "selector": "*",
+      "css": "box-sizing: border-box;",
+      "href": "https://protradingroom.com/public/app/css/bootstrap.min.css"
+     },
+     {
+      "selector": "a",
+      "css": "color: rgb(51, 122, 183); text-decoration: none;",
+      "href": "https://protradingroom.com/public/app/css/bootstrap.min.css"
+     },
+     {
+      "selector": "a:focus, a:hover",
+      "css": "color: rgb(35, 82, 124); text-decoration: underline;",
+      "href": "https://protradingroom.com/public/app/css/bootstrap.min.css"
+     },
+     {
+      "selector": "a:focus",
+      "css": "outline: -webkit-focus-ring-color auto 5px; outline-offset: -2px;",
+      "href": "https://protradingroom.com/public/app/css/bootstrap.min.css"
+     },
+     {
+      "selector": ".text-muted",
+      "css": "color: rgb(119, 119, 119);",
+      "href": "https://protradingroom.com/public/app/css/bootstrap.min.css"
+     },
+     {
+      "selector": "[ui-sref], [data-ui-sref]",
+      "css": "cursor: pointer;",
+      "href": "https://protradingroom.com/public/app/css/styles.css"
+     },
+     {
+      "selector": "a",
+      "css": "outline: none !important;",
+      "href": "https://protradingroom.com/public/app/css/styles.css"
+     },
+     {
+      "selector": "a:hover, a:focus",
+      "css": "text-decoration: none;",
+      "href": "https://protradingroom.com/public/app/css/styles.css"
+     },
+     {
+      "selector": "[ui-sref], [data-ui-sref]",
+      "css": "cursor: pointer;",
+      "href": "https://protradingroom.com/public/app/css/styles.css"
+     },
+     {
+      "selector": "a",
+      "css": "outline: none !important;",
+      "href": "https://protradingroom.com/public/app/css/styles.css"
+     },
+     {
+      "selector": "a:hover, a:focus",
+      "css": "text-decoration: none;",
+      "href": "https://protradingroom.com/public/app/css/styles.css"
+     }
+    ]
+   },
+   {
+    "tag": "textarea",
+    "id": "g-recaptcha-response",
+    "class": "g-recaptcha-response",
+    "text": "",
+    "attrs": {
+     "id": "g-recaptcha-response",
+     "name": "g-recaptcha-response",
+     "class": "g-recaptcha-response",
+     "style": "width: 250px; height: 40px; border: 1px solid rgb(193, 193, 193); margin: 10px 25px; padding: 0px; resize: none; display: none;"
+    },
+    "rect": {
+     "x": 0,
+     "y": 0,
+     "w": 0,
+     "h": 0
+    },
+    "computed": {
+     "display": "none",
+     "position": "static",
+     "width": "250px",
+     "height": "40px",
+     "margin": "10px 25px",
+     "padding": "0px",
+     "border": "1px solid rgb(193, 193, 193)",
+     "border-top": "1px solid rgb(193, 193, 193)",
+     "border-bottom": "1px solid rgb(193, 193, 193)",
+     "font-family": "\"Helvetica Neue\", Helvetica, Arial, sans-serif",
+     "font-size": "14px",
+     "font-weight": "400",
+     "line-height": "20px",
+     "color": "rgb(51, 51, 51)",
+     "background-color": "rgb(255, 255, 255)",
+     "background-image": "none",
+     "text-align": "start",
+     "box-shadow": "none",
+     "border-radius": "0px",
+     "z-index": "auto",
+     "opacity": "1",
+     "visibility": "visible"
+    },
+    "rules": [
+     {
+      "selector": "button, input, optgroup, select, textarea",
+      "css": "margin: 0px; font: inherit; color: inherit;",
+      "href": "https://protradingroom.com/public/app/css/bootstrap.min.css"
+     },
+     {
+      "selector": "textarea",
+      "css": "overflow: auto;",
+      "href": "https://protradingroom.com/public/app/css/bootstrap.min.css"
+     },
+     {
+      "selector": "*",
+      "css": "box-sizing: border-box;",
+      "href": "https://protradingroom.com/public/app/css/bootstrap.min.css"
+     },
+     {
+      "selector": "button, input, select, textarea",
+      "css": "font-family: inherit; font-size: inherit; line-height: inherit;",
+      "href": "https://protradingroom.com/public/app/css/bootstrap.min.css"
+     }
+    ]
+   },
+   {
+    "tag": "button",
+    "id": null,
+    "class": "btn btn-block btn-info mb",
+    "text": "Login",
+    "attrs": {
+     "type": "submit",
+     "class": "btn btn-block btn-info mb"
+    },
+    "rect": {
+     "x": 440.5,
+     "y": 289,
+     "w": 539,
+     "h": 34
+    },
+    "computed": {
+     "display": "block",
+     "position": "static",
+     "width": "539px",
+     "height": "34px",
+     "margin": "0px 0px 10px",
+     "padding": "6px 12px",
+     "border": "1px solid rgb(70, 184, 218)",
+     "border-top": "1px solid rgb(70, 184, 218)",
+     "border-bottom": "1px solid rgb(70, 184, 218)",
+     "font-family": "\"Helvetica Neue\", Helvetica, Arial, sans-serif",
+     "font-size": "14px",
+     "font-weight": "400",
+     "line-height": "20px",
+     "color": "rgb(255, 255, 255)",
+     "background-color": "rgb(91, 192, 222)",
+     "background-image": "none",
+     "text-align": "center",
+     "box-shadow": "none",
+     "border-radius": "4px",
+     "z-index": "auto",
+     "opacity": "1",
+     "visibility": "visible"
+    },
+    "rules": [
+     {
+      "selector": "button, input, optgroup, select, textarea",
+      "css": "margin: 0px; font: inherit; color: inherit;",
+      "href": "https://protradingroom.com/public/app/css/bootstrap.min.css"
+     },
+     {
+      "selector": "button",
+      "css": "overflow: visible;",
+      "href": "https://protradingroom.com/public/app/css/bootstrap.min.css"
+     },
+     {
+      "selector": "button, select",
+      "css": "text-transform: none;",
+      "href": "https://protradingroom.com/public/app/css/bootstrap.min.css"
+     },
+     {
+      "selector": "button, html input[type=\"button\"], input[type=\"reset\"], input[type=\"submit\"]",
+      "css": "appearance: button; cursor: pointer;",
+      "href": "https://protradingroom.com/public/app/css/bootstrap.min.css"
+     },
+     {
+      "selector": "*",
+      "css": "box-sizing: border-box;",
+      "href": "https://protradingroom.com/public/app/css/bootstrap.min.css"
+     },
+     {
+      "selector": "button, input, select, textarea",
+      "css": "font-family: inherit; font-size: inherit; line-height: inherit;",
+      "href": "https://protradingroom.com/public/app/css/bootstrap.min.css"
+     },
+     {
+      "selector": ".btn",
+      "css": "display: inline-block; padding: 6px 12px; margin-bottom: 0px; font-size: 14px; font-weight: 400; line-height: 1.42857; text-align: center; white-space: nowrap; vertical-align: middle; touch-action: manipulation; cursor: pointer; user-select: none; background-image: none; border: 1px solid transparent; border-radius: 4px;",
+      "href": "https://protradingroom.com/public/app/css/bootstrap.min.css"
+     },
+     {
+      "selector": ".btn.active.focus, .btn.active:focus, .btn.focus, .btn:active.focus, .btn:active:focus, .btn:focus",
+      "css": "outline: -webkit-focus-ring-color auto 5px; outline-offset: -2px;",
+      "href": "https://protradingroom.com/public/app/css/bootstrap.min.css"
+     },
+     {
+      "selector": ".btn.focus, .btn:focus, .btn:hover",
+      "css": "color: rgb(51, 51, 51); text-decoration: none;",
+      "href": "https://protradingroom.com/public/app/css/bootstrap.min.css"
+     },
+     {
+      "selector": ".btn.active, .btn:active",
+      "css": "background-image: none; outline: 0px; box-shadow: rgba(0, 0, 0, 0.125) 0px 3px 5px inset;",
+      "href": "https://protradingroom.com/public/app/css/bootstrap.min.css"
+     },
+     {
+      "selector": ".btn-info",
+      "css": "color: rgb(255, 255, 255); background-color: rgb(91, 192, 222); border-color: rgb(70, 184, 218);",
+      "href": "https://protradingroom.com/public/app/css/bootstrap.min.css"
+     },
+     {
+      "selector": ".btn-info.focus, .btn-info:focus",
+      "css": "color: rgb(255, 255, 255); background-color: rgb(49, 176, 213); border-color: rgb(27, 109, 133);",
+      "href": "https://protradingroom.com/public/app/css/bootstrap.min.css"
+     },
+     {
+      "selector": ".btn-info:hover",
+      "css": "color: rgb(255, 255, 255); background-color: rgb(49, 176, 213); border-color: rgb(38, 154, 188);",
+      "href": "https://protradingroom.com/public/app/css/bootstrap.min.css"
+     },
+     {
+      "selector": ".btn-info.active, .btn-info:active, .open > .dropdown-toggle.btn-info",
+      "css": "color: rgb(255, 255, 255); background-color: rgb(49, 176, 213); border-color: rgb(38, 154, 188);",
+      "href": "https://protradingroom.com/public/app/css/bootstrap.min.css"
+     },
+     {
+      "selector": ".btn-info.active.focus, .btn-info.active:focus, .btn-info.active:hover, .btn-info:active.focus, .btn-info:active:focus, .btn-info:active:hover, .open > .dropdown-toggle.btn-info.focus, .open > .dropdown-toggle.btn-info:focus, .open > .dropdown-toggle.btn-info:hover",
+      "css": "color: rgb(255, 255, 255); background-color: rgb(38, 154, 188); border-color: rgb(27, 109, 133);",
+      "href": "https://protradingroom.com/public/app/css/bootstrap.min.css"
+     },
+     {
+      "selector": ".btn-info.active, .btn-info:active, .open > .dropdown-toggle.btn-info",
+      "css": "background-image: none;",
+      "href": "https://protradingroom.com/public/app/css/bootstrap.min.css"
+     },
+     {
+      "selector": ".btn-block",
+      "css": "display: block; width: 100%;",
+      "href": "https://protradingroom.com/public/app/css/bootstrap.min.css"
+     },
+     {
+      "selector": ".btn",
+      "css": "appearance: none; outline: none !important;",
+      "href": "https://protradingroom.com/public/app/css/styles.css"
+     },
+     {
+      "selector": ".btn:active, .btn.active, .btn:hover, .btn:focus",
+      "css": "box-shadow: rgba(0, 0, 0, 0.23) 0px 3px 10px, rgba(0, 0, 0, 0.16) 0px 3px 10px;",
+      "href": "https://protradingroom.com/public/app/css/styles.css"
+     },
+     {
+      "selector": ".mb, .mv",
+      "css": "margin-bottom: 10px !important;",
+      "href": "https://protradingroom.com/public/app/css/styles.css"
+     },
+     {
+      "selector": ".btn",
+      "css": "appearance: none; outline: none !important;",
+      "href": "https://protradingroom.com/public/app/css/styles.css"
+     },
+     {
+      "selector": ".btn:active, .btn.active, .btn:hover, .btn:focus",
+      "css": "box-shadow: rgba(0, 0, 0, 0.23) 0px 3px 10px, rgba(0, 0, 0, 0.16) 0px 3px 10px;",
+      "href": "https://protradingroom.com/public/app/css/styles.css"
+     },
+     {
+      "selector": ".mb, .mv",
+      "css": "margin-bottom: 10px !important;",
+      "href": "https://protradingroom.com/public/app/css/styles.css"
+     }
+    ]
+   },
+   {
+    "tag": "label",
+    "id": null,
+    "class": null,
+    "text": "Logging In, please wait...",
+    "attrs": {},
+    "rect": {
+     "x": 0,
+     "y": 0,
+     "w": 0,
+     "h": 0
+    },
+    "computed": {
+     "display": "inline-block",
+     "position": "static",
+     "width": "auto",
+     "height": "auto",
+     "margin": "0px 0px 5px",
+     "padding": "0px",
+     "border": "0px none rgb(51, 51, 51)",
+     "border-top": "0px none rgb(51, 51, 51)",
+     "border-bottom": "0px none rgb(51, 51, 51)",
+     "font-family": "\"Helvetica Neue\", Helvetica, Arial, sans-serif",
+     "font-size": "14px",
+     "font-weight": "700",
+     "line-height": "20px",
+     "color": "rgb(51, 51, 51)",
+     "background-color": "rgba(0, 0, 0, 0)",
+     "background-image": "none",
+     "text-align": "center",
+     "box-shadow": "none",
+     "border-radius": "0px",
+     "z-index": "auto",
+     "opacity": "1",
+     "visibility": "visible"
+    },
+    "rules": [
+     {
+      "selector": "*",
+      "css": "box-sizing: border-box;",
+      "href": "https://protradingroom.com/public/app/css/bootstrap.min.css"
+     },
+     {
+      "selector": "label",
+      "css": "display: inline-block; max-width: 100%; margin-bottom: 5px; font-weight: 700;",
+      "href": "https://protradingroom.com/public/app/css/bootstrap.min.css"
+     }
+    ]
+   }
+  ]
+ },
+ "observedErrors": [],
+ "refusedClicks": [],
+ "gaps": [
+  {
+   "what": "The failed-login ERROR state is not captured — reaching it means submitting wrong credentials.",
+   "whereILooked": [
+    "the form as it stands, logged out"
+   ],
+   "blocks": "the ERROR half of T2-22. The watcher below will capture it if YOU trigger one in the next two minutes."
+  }
+ ],
+ "notes": [
+  "Login form captured. NOTHING was typed and NOTHING was submitted.",
+  "30 stylesheet(s) unreadable (cross-origin) during rule matching."
+ ],
+ "summary": {
+  "stripedTables": 4,
+  "bootboxHandlers": 15,
+  "loginFormCaptured": true,
+  "gaps": 1
+ }
+}

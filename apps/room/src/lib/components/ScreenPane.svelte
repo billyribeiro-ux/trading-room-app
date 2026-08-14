@@ -79,6 +79,14 @@
      * strip (`app-presentationarea.render-helpers.js:9, 491`).
      */
     viewerOnlyMode?: boolean;
+    /**
+     * `mediaService.saveData` — the third term of the `<video>`'s `hidden` binding, and the gate on
+     * the `Video Disabled` h3. Set from the AV settings modal; while it is on, `+page.svelte` never
+     * consumes the producer, so `stream` is null here anyway — the class is bound to BOTH because
+     * the reference binds both, and a screen already being watched when the switch is thrown keeps
+     * its stream and is hidden rather than torn down.
+     */
+    saveData?: boolean;
     /** Reports a drag upward; the parent owns the per-screen pan map. */
     onpan?: (x: number, y: number) => void;
     ontogglezoom?: () => void;
@@ -98,6 +106,7 @@
     pan,
     detached = false,
     viewerOnlyMode = false,
+    saveData = false,
     onpan,
     ontogglezoom,
     onzoomin,
@@ -302,17 +311,16 @@
             screens render from the local capture (`addLocalScreen` in `+page.svelte`), i.e. we
             always local-preview, so the term can never be true here. Not modelled, and it would be
             dead if it were.
-          * `mediaService.saveData` is still not modelled, and the reason is narrower than it used
-            to read here. The VIEWER-FACING half of "Video off to preserve data" now exists — it is
-            `preferences.disableVideo`, and `+page.svelte` gates the whole screens pane on it, so
-            this component never mounts while it is on. `saveData` is a different symbol: it lives
-            on the media service, every site in the decoded component tree READS it
-            (`app-screenshare-view.compiled.js:313,342`, `app-av-settings-modal.compiled.js:239`),
-            and no writer for it appears anywhere in that tree — the service itself is inside the
-            minified `main.d6d3c112b59b7d0d.js`, so whether anything sets it is genuinely
-            uncaptured rather than known to be nothing. Note also that
-            `app-presentationarea.full.js:2217` declares its OWN `this.saveData = !1`, which is a
-            separate field that file never reads again; the two are easy to mistake for each other.
+          * `mediaService.saveData` is now BOUND, and this comment twice said it could not be. It
+            said "not modelled", then "the writer is uncaptured" — both wrong, and wrong for a
+            structural reason worth keeping: the search had been the decoded COMPONENTS, and a
+            service is not a component, so no component decode could ever have held it. Read out of
+            the bundle directly: `toggleDisableVideo(){this.saveData=!this.saveData}` at
+            `main.d6d3c112b59b7d0d.js` byte 1136736, called from an `<a>` in the AV settings modal
+            at byte 2292763. DISTINCT from `preferences.disableVideo`, which is the USER settings
+            modal's pane preference; both exist upstream with their own control. Note also that
+            `app-presentationarea.full.js:2217` declares its OWN `this.saveData = !1`, a third
+            symbol that file never reads again — the three are easy to mistake for each other.
 
           `z('controls', o.showControls)` on the line above is NOT reproduced, and that is a
           finding rather than an omission: `showControls` starts `!1` and its only writer is a click
@@ -320,10 +328,19 @@
           `.webcamScreen { pointer-events: none }` (`:357`) makes unreachable. The attribute is
           therefore false for the life of the component upstream, and no control bar ever appears.
         -->
+        <!--
+          `Video Disabled` — `G0e` at `app-screenshare-view.render-helpers.js`, rendered by
+          `O(2, o.mediaService.saveData ? 2 : -1)` (`…compiled.js:313`). Class order is `mt-4
+          text-center`, which is const 1 of that component and is NOT the order the presentation
+          area uses for its own h3 (const 23 is `text-center mt-4`). Reproduced as captured.
+        -->
+        {#if saveData}
+          <h3 class="mt-4 text-center">Video Disabled</h3>
+        {/if}
         <video
           id="webcamScreen-{id}"
           class="webcamScreen"
-          class:hidden={stream === null}
+          class:hidden={stream === null || saveData}
           class:viewer-only-screen-video={viewerOnlyMode}
           autoplay
           playsinline

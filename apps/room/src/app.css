@@ -1300,6 +1300,21 @@ app-privchat.privChatHolder {
   Gated on the attributes being present: without a known intrinsic width the old shrink-to-fit
   behaviour is kept rather than over-reserving a narrow image.
 */
+/*
+  `.chat-gif-muted` — the placeholder shown in place of a gif when `preferences.chatGif` is off.
+  Both rules verbatim from the shipped `styles.d622cb9ed2bbc221.css`; the `:hover` half is what
+  makes it read as clickable, since the element carries no button semantics upstream.
+*/
+.chat-gif-muted {
+  text-align: center;
+  width: 100%;
+  font-style: italic;
+}
+.chat-gif-muted:hover {
+  cursor: pointer;
+  opacity: 0.8;
+}
+
 .img-container:has(> .uploaded-img[width][height]) {
   width: min(100%, calc(min(var(--upload-intrinsic-width, 300px), 300px) + 6px));
 }

@@ -9,6 +9,21 @@ dist/
 target/
 *.log
 
+# Test-run OUTPUT. Both are written by `pnpm --filter controller test:unit`
+# (`vitest run --coverage --reporter=json --outputFile=.vitest-report.json`) and nothing in this
+# repository reads either of them.
+#
+# 136 files of `apps/controller/coverage/` were tracked until 2026-08-14, and the cost was not disk.
+# Every gate run rewrote all of them, so the working tree was permanently dirty and each one got
+# swept into whatever commit came next — including six commits of unrelated room work on that day.
+# This repository's own rule is to re-read your `git diff` like a senior reviewer before saying
+# done, and a diff with 136 files of regenerated HTML in it is a diff nobody reads to the bottom of.
+# `apps/room` never tracked its equivalents, so this aligns the controller with the standard that
+# already existed rather than inventing one. `vite.config.ts` had already reached the same
+# conclusion for its watcher.
+coverage/
+.vitest-report.json
+
 # Local database and scratch state
 .data/
 *.sqlite

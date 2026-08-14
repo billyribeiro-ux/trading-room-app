@@ -1,3 +1,4 @@
+import type { MessageBadge } from '$lib/types';
 /**
  * Reading this room's own configuration from the controller.
  *
@@ -29,6 +30,21 @@ import { controlPlaneOrigin, mobilePinUrl, roomConfigUrl, roomSettingUrl } from 
  * off — a newly created room has no settings row at all.
  */
 export interface RoomSessionSettings {
+  /**
+   * Presenter messages align right, and their reactions with them. Two consumers in
+   * `RoomMessage.svelte` — `presenter-msg-right` on the body and `presenter-reactions-right` on the
+   * reaction row — both of which existed unfed until 2026-08-14.
+   *
+   * Also the first term of the reference's chat-badge gate, so with it ON badges are suppressed
+   * regardless of the other three gates. That coupling is upstream's, not ours.
+   */
+  presenterMsgsOnTheRight?: boolean;
+  /** The owner's master switch for chat badges — the second term of the reference's gate chain. */
+  enableBadges?: boolean;
+  /** Narrows badges to presenters. The fourth term. */
+  showBadgesToPresentersOnly?: boolean;
+  /** Hides the membership-star. Its `item.membershipYears` supply does not exist yet. */
+  disableStarYears?: boolean;
   rosterVisibleToViewers?: boolean;
   onlyPresentersVisibleToViewers?: boolean;
   rosterCountVisibleToViewers?: boolean;
@@ -167,7 +183,23 @@ export interface RoomMembership {
   };
 }
 
+/**
+ * The account's badges, and who wears which — the two halves `app-st-message.full.js` uses as
+ * `sessData.badgesH` and `msg.b`.
+ *
+ * Keyed by **md5(email)** rather than by a user id, because the two databases share no key space.
+ * It is the same hash `hashEmail()` computes here and that every message already carries as
+ * `senderEmailHash`, so a sender resolves without the room ever receiving an address.
+ *
+ * `byEmailHash` holds only members who HAVE badges; a room where nobody does sends `{}`.
+ */
+export interface RoomBadges {
+  definitions: Record<string, MessageBadge & { darkTheme?: number }>;
+  byEmailHash: Record<string, number[]>;
+}
+
 export interface RoomConfig {
+  badges?: RoomBadges;
   room: {
     shortCode: string;
     name: string;

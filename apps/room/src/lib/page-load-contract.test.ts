@@ -134,6 +134,7 @@ describe('page load contract', () => {
         "activePoll",
         "alertQuestions",
         "alerts",
+        "badges",
         "canEditNotes",
         "connectedUsers",
         "files",

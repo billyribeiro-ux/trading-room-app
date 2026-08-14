@@ -24,6 +24,900 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-14
 
+### 2026-08-14 11:36 EDT — rich text editor specified; row X's wiring work is finished
+
+**No code. The last of the four determinations, and the row's wiring is now complete.**
+
+`presenter-enable-rte` is a new component and, more importantly, a **security surface**. Its whole
+configuration is captured, and it is much smaller than "a rich text editor" suggests:
+
+```js
+rteConfig = {
+  placeholder: 'Type your message here...', minHeight: 200,
+  toolbar: [['font', ['bold', 'italic', 'underline', 'clear']], ['color', ['forecolor']]],
+  popover: { air: [] }, dialogsInBody: true, disableResizeEditor: true
+}
+```
+
+**Five controls.** It is a MODAL (`#rteModal`) in a standalone `app-rich-text-editor`, opened by
+`doRTEModal` / `doRTEModalEdit`, gated on all three of `sessData.enableRTE && preferences.enableRTE
+&& isPresenter`. `retriveRTEContent()` treats `""`, `"<p><br></p>"`, `"<br>"` and `"<p></p>"` as
+empty — the four ways an editor reports "nothing typed".
+
+**summernote is the reference's implementation, not the requirement.** A jQuery plugin has no place
+in a Svelte 5 app, and five commands are portable without one. What makes this a feature rather than
+a wire is not the editor: **it posts HTML into chat**, so it belongs on the sanitisation path by
+design rather than bolted onto it afterwards. The room setting already exists here
+(`room-settings-schema.ts:176`) and is deliberately not yet room-visible, for the same reason the
+badge settings were held back — no consumer yet.
+
+---
+
+**Row X: the wiring is done.** It began as thirteen "checkboxes with no consumer in this room".
+
+| outcome | count | |
+| --- | --- | --- |
+| **wired and working** | **8** | recording start/stop sound, push-to-talk, speech recognition, speech-reco overlay, always-scroll, follow-my-screens, gifs, badges, popups, trim, and both presenter DND boxes |
+| **closed by evidence, no code** | **1** | `small-image-preview` — its class has no rule in 52 stylesheets |
+| **specified, blocked on infrastructure** | **3** | recording preview (server-side recording), extra chat column (a second channel + pagination), RTE (a component + sanitisation design) |
+| **parked, deliberately** | **1** | `visibility-change-enabled` — item AA: gating our SSE roster on it makes a hidden tab poll forever |
+
+**Nearly 40% of that list was wrong when I wrote it**, and always in the direction of "this is
+bigger than it is". Five had consumers already built — one implemented verbatim under a different
+name, one behind a mechanism the code's own comment described incorrectly, two that were duplicate
+controls for preferences that already worked. The habit that found them: **search for what the
+preference DOES, never for its name.**
+
+Each of the four that remain now carries the byte offset or stylesheet count that settles it, so the
+next session builds or defers on evidence rather than re-deriving what I already read.
+
+### 2026-08-14 11:31 EDT — recording preview specified and blocked on server-side recording
+
+**No code. A determination, made from the whole component rather than from its name.**
+
+We hold all of `app-rec-preview` — 158 lines plus its own stylesheet, a 350x260 draggable
+`.recsHolderScreen` fixed bottom-right with a 700x520 `-lg` variant, and the two strings it renders:
+"Recording paused." and " Recording Preview. (DELAYED UPTO 20s) ".
+
+**That heading explains the mechanism, and the mechanism is the blocker.** It is not a live video
+element. It is an `<img>` whose `src` is re-set every 1000ms to
+`${sessData.recPreviewLocation}?${Date.now()}` — a cache-busted poll of a snapshot somebody else
+generates. The delay is the snapshot pipeline's, not a UI choice.
+
+**`recPreviewLocation` is not a setting an owner can fill in.** It starts as `""` and the SERVER
+pushes it at runtime: `case "setRecPreview": globals.sessData.recPreviewLocation = i.url` (bundle
+byte 1023774). It appears in no manage-page template and in none of the 269 settings — I checked
+both before concluding.
+
+So the chain is: server-side recording produces snapshots, the server announces where, the client
+polls. **This room records client-side with `MediaRecorder`** — a declared divergence already
+recorded in item R — so nothing produces a snapshot and no `setRecPreview` ever arrives. Its two
+other gates, `isPresenter` and `!videoOnlyMode`, are moot beside that.
+
+Same blocker as item AC (`stopRecMsg`, the recording Notification the server never sends), and the
+same resolution: it closes when server-side recording exists, which the deployment plan defers.
+
+**Worth stating plainly: this one could have been faked convincingly.** Our recorder holds a live
+`MediaStream`, so a "recording preview" showing that stream would look right in a screenshot and be
+a different feature — no delay, no snapshot, no server. The component's own heading is what rules
+that out, and the row now carries the byte offset rather than my summary of it.
+
+Row X down to four items, all features. Room suite unchanged at 921 / 82.
+
+### 2026-08-14 11:27 EDT — small-image-preview closed by evidence: its class styles nothing
+
+**No code, and that is the finding.** The checkbox does nothing upstream either.
+
+`smallImagePreview` applies exactly one thing: `B1e = t => ({'chat-uploaded-img-sm': t})`, bound as
+`ngClass(ut(12, B1e, preferences.smallImagePreview && preferences.defaultImagePreview))` on the chat
+log container (`app-chat.full.js:5`).
+
+**`chat-uploaded-img-sm` has no rule in any of the 52 stylesheets this repository holds** — 46
+component sheets, the shipped `styles.d622cb9ed2bbc221.css`, and our own three. It appears in four
+files and every one of them is a JavaScript class-map. The search was proved against
+`chat-gif-muted`, a class known to be styled, which it finds in CSS immediately — so the absence is
+about the class, not about the search.
+
+The nearest real rule targets a **different class and a different mechanism**:
+
+```css
+.alert-chat-box-sm .chat-uploaded-img .uploaded-img { max-height: 50px !important }
+```
+
+driven by a size mode on an ancestor, not by this preference. There IS a small-image behaviour in
+the reference; this checkbox is not what turns it on.
+
+**So it stays unwired, deliberately.** Wiring it would ship "a `.flipped` class with no CSS", which
+this repository forbids by name, and inventing the rule would be worse — a colour picked because it
+looked right is the failure that rule exists for. Pinned by an assertion, with a negative control
+that wires it and goes red, so neither happens by accident later.
+
+**One correction on the way.** That assertion first checked the id was absent from the whole
+component and failed on `settingChecks`, where it correctly appears as a default — the checkbox
+still renders and still remembers its own position, it simply persists nothing. Scoped to the
+mapping table.
+
+This is the third item closed by evidence rather than by code, after `calculateDuplicates` (zero
+call sites) and the `.alert-chat-box` hover (a selector matching nothing). Room X down to four.
+
+**Verified:** room suite 920 tests / 82 files, `svelte-check` 0 errors.
+
+### 2026-08-14 11:21 EDT — chat-log trimming, and an unbounded read it exposed
+
+**Runtime impact: the chat view is bounded at 300 messages when the preference is on.** Eleventh
+wire.
+
+`trimLogSize = 300`, read from the reference's own globals beside `chatLogPageSize = 50`
+(`main.d6d3c112b59b7d0d.js` byte 977456). It trims ONE message per arrival —
+`trimChatLogs && chatLog[c].length > trimLogSize && chatLog[c].shift()` — so the log settles at the
+cap rather than being cut in bulk, and it is always the oldest that goes. `trimChatLog` reproduces
+that end state with `slice(-300)`, returning the SAME array when nothing is trimmed so a quiet room
+does not invalidate a derived value on every message.
+
+**And it exposed something bigger, which is recorded rather than half-fixed.** Wiring it meant
+reading how messages reach the client, and they arrive **unbounded**: `+page.server.ts:362-366`
+selects every message in the room, ordered ascending, with no `LIMIT` — and every SSE event calls
+`invalidateAll()`. A room with 50,000 messages re-reads and re-serialises all of them on **every
+chat message**. That is exactly what `CLAUDE.md` names: "an unbounded SELECT that grows with usage…
+what does this cost at 10,000 rows, and what bounds it?"
+
+**The trim added today does NOT fix that**, and saying so matters more than the feature does. It
+bounds the DOM, not the query — it is the reference's client-side behaviour and nothing else. The
+reference bounds the READ separately, with `chatLogPageSize = 50`, `getChatLog({channel, page})` and
+`loadMoreLogs`, so the server never sends more than a page. Written up as TODO row Z, marked HIGH at
+scale, with the explicit warning that **adding `.limit(300)` alone would be worse than the bug**:
+history would silently vanish with no way to reach it. Closing it means porting the pagination.
+
+**Verified:** 4 new tests on the helper, including that it does nothing when the preference is off —
+the opt-OUT path, since it ships ON. Negative control: ignore the preference and trim always, which
+goes red on exactly that case. Room suite 920 tests / 82 files, `svelte-check` 0 errors. Counts 19 ->
+20 mapped, 6 -> 5 unmapped. Row X down to five.
+
+### 2026-08-14 11:16 EDT — mention popups, and one shared mention rule that was wrong in three ways
+
+**Runtime impact: being mentioned now raises a toast and an OS notification.** Tenth wire closed.
+
+Both halves already existed — `showToast`, and `requestAlertBrowserNotification` built for alerts,
+already matching the reference's `granted || default` and its gravatar fallback. The sound half of
+the reference's block has been in the SSE handler since it was written; this is the popup half of
+the same statement.
+
+**The security decision is the interesting part, and it is the opposite of the obvious one.** The
+reference gets `e.txt` and `e.n` from the socket event, so the natural port is to add the body and
+sender name to our chat payload. **That would have broadcast admin chat to every subscriber**: our
+event carries `senderId`, `senderEmailHash` and the CHANNEL, and `room` is a chat channel that can
+be an admin one. So the popup reads from the refetched `data.messages`, which the server has
+already filtered for this viewer — nobody is shown anything they were not entitled to see, and the
+wire keeps its minimal shape. Asserted, with a negative control that adds `body` back and goes red.
+
+**The mention rule was wrong in three ways, and is now one shared function.** `RoomMessage` had
+`item.body.includes('@' + currentUserName)`. The reference's `isMention` is:
+
+```js
+isMention(e) {
+  this.myname || (this.myname = this.globals.user.name.toLowerCase());
+  let i = e.txt.toLowerCase();
+  return -1 != i.indexOf(`@${this.myname} `) || (-1 != i.indexOf('@all ') && e.isA)
+}
+```
+
+* **Case-insensitive.** `@Bob` never highlighted for bob.
+* **A trailing SPACE is required.** `@bobby` always pinged bob, and `@bob` ending a message —
+  which looks like a bug and is deliberate — should not ping at all. Reproduced exactly, with the
+  end-of-message case as its own test so nobody "fixes" it back.
+* **`@all ` counts, from an admin only.** A presenter addressing the room highlighted for NOBODY.
+
+`$lib/mention` now holds it once, with 8 tests, and both the highlight and the popup call it. Two
+copies of a rule this fiddly is how one of them drifts.
+
+**A repository contract caught me, and it was right.** `id-opacity-contract.test.ts` failed on my
+first marker, which did `Math.max(highest, item.id)`. Ids must stay opaque because the room-to-API
+cutover swaps SQLite's numbers for uuids — and `Math.max` over a uuid is not a type error, it is
+`NaN` at runtime. The marker now uses equality and POSITION only, and re-seeds rather than
+re-announcing if the message it remembers has been trimmed away.
+
+**It stays silent on the backlog.** Arriving in a room with fifty unread mentions gives fifty OS
+notifications if the marker is not seeded on the first pass — the behaviour that would make the
+feature worse than not having it. Its own test, and its own negative control.
+
+**Verified:** 20 new tests (12 contract + 8 for the rule). Four negative controls — the body added
+to the wire, the do-not-disturb gate dropped, the backlog announced, and your own messages
+announced — each red on the right assertion and green on restore. **Full gate exit 0**: room 912
+tests / 82 files, controller 937 / 90. Row X down to six.
+
+### 2026-08-14 10:59 EDT — chat badges render: the supply built across both apps
+
+**Runtime impact: badges appear on chat messages. They had never once been visible.**
+
+`RoomMessage.svelte` was always a faithful port — the four-term gate chain and both markup branches
+match the reference exactly. It showed nothing because it was unfed at three levels, and all three
+are closed:
+
+| level | what was missing | what it is now |
+| --- | --- | --- |
+| controller | badges never crossed `internal/room-config` | definitions + a hash-keyed assignment map |
+| room load | no field for them | passed through, defaulting to empty |
+| page | `item.badges` never populated | joined onto every message by `senderEmailHash` |
+
+**The join is by md5(email), and that is a design decision rather than a convenience.** Upstream one
+server owns both the chat log and the badge assignments, so it stamps `msg.b` onto each row. Ours
+live in different databases with no shared key space — the endpoint's own comment says so. The map
+crosses keyed by the same hash `hashEmail()` computes and every message already carries as
+`senderEmailHash`, so **the room never receives an address**. This response is serialised into SSR
+HTML on every load; a member list of raw emails crossing that boundary is exactly what the settings
+allow-list exists to prevent, and people deserve the same rule. Only members WITH badges are sent,
+so the payload is bounded by assignments rather than roster size.
+
+**The dark-theme swap is T5-27 proven at the render site.** `r.darkTheme` holds the ID of a variant
+badge and the whole definition is replaced with it — established from the manage page months ago,
+now corroborated in the renderer. Our column is still the superseded boolean, so the controller
+sends `darkTheme` only when it is a NUMBER: `true` names no badge, and that lookup could only fail.
+One deliberate divergence: if the variant id names a badge that has been deleted, upstream renders
+nothing and we fall back to the light one. Losing a badge because its dark variant was deleted is
+the worse outcome.
+
+**The three gate settings earned their place, in that order.** `enableBadges`,
+`showBadgesToPresentersOnly` and `disableStarYears` were deliberately held out of
+`ROOM_VISIBLE_SETTINGS` while `item.badges` was empty — the list's rule is that every entry has a
+consumer, and a gate with nothing to gate is not one. They went in with the supply, in the same
+change, with all FOUR edits the repository names.
+
+**Three guards fired, and each was right.**
+
+- The allow-list refused them until the room consumed them.
+- The generator's wired-count tripwire threw at 53 against an expected 50.
+- **`evidence:verify` caught five capture files added hours earlier.** The seal on `evidence-dumps/`
+  pins its exact contents, and I had been running per-app suites rather than the full gate, so it
+  had been red across several pushes. Registered now, with each file's provenance and why it holds
+  no customer data — and the verifier improved rather than loosened: it asserted every entry was a
+  DIRECTORY, so files get their own list and their own `isFile()` assertion. Both still fail closed.
+
+**My own comment broke a parser, twice.** `room-config-boundary.test.ts` reads `ROOM_CONSUMED` with
+a regex that stops at the first closing bracket, and I wrote a path containing brackets inside the
+array — the list silently read as ONE entry. The fix's first draft explained the hazard and QUOTED
+the regex, putting the brackets straight back. Describe it, never quote it. Same family as the rule
+about template syntax in comments: prose to a human, a terminator to a parser.
+
+**Verified:** 13 new tests. Four negative controls — the map keyed by raw email, `darkTheme` sent
+unconditionally, an unknown badge id drawn as a blank chip, and the join removed — each red on the
+right assertion and green on restore. **Full gate exit 0**: room 888 tests / 80 files, controller
+937 / 90, schema regenerated (269 total, 53 wired) with the generator run output-visible, both
+`svelte-check`s clean.
+
+### 2026-08-14 10:41 EDT — presenter messages can align right; the badge supply is specified
+
+**Runtime impact: a manage-page setting that did nothing now does what it says.**
+
+`RoomMessage.svelte` has carried BOTH consumers of `presenterMsgsOnTheRight` since it was written —
+`presenter-msg-right` on the message body, `presenter-reactions-right` on the reaction row — and
+neither was ever fed. The prop defaulted `false`, the page passed nothing, and the owner's setting
+did nothing however the room was configured. Same shape as the eight dead controls, found while
+auditing them.
+
+**Adding it took the FOUR edits the repository already names.** `verify-room-settings-schema.mjs`
+says it outright — "Adding a setting is FOUR edits, not two: the two lists, this note, and the map
+that says why" — because on 2026-08-13 two of them were forgotten and both assertions sat red until
+somebody ran the whole suite. All four were made here, plus a fifth the note does not mention: the
+room actually reading it.
+
+**Two guards did their jobs, and one gap was found.**
+
+- The controller refused the change three times over until the room consumed it —
+  `room-config-boundary.test.ts` fails if an allow-list entry has no consumer, and the generator's
+  wired-count tripwire threw at 50 keys against an expected 49. Both are designed to make this a
+  deliberate act, and both worked.
+- **The room half was unguarded.** Removing the prop from both call sites left all 866 room tests
+  green. `presenter-messages-right-contract.test.ts` closes that, and the negative control now goes
+  red.
+
+**The three neighbouring badge settings are deliberately still OUT**, and that is the interesting
+part. `enableBadges`, `showBadgesToPresentersOnly` and `disableStarYears` all exist in the schema
+and all sit one manage-page block away. They stay out because `ROOM_VISIBLE_SETTINGS` states its own
+rule — every entry has a consumer in the room today — and nothing populates `item.badges` or
+`item.membershipYears`. Sending them would be a value crossing a trust boundary for nothing, which
+is precisely what that list exists to prevent. **The tempting move was to add all four while I was
+in the file.**
+
+**And the badge supply is now fully specified**, from `app-st-message.full.js` byte 28120: each
+message carries `msg.b`, an array of badge ids; the session data carries `badgesH`, a hash of id ->
+definition; the component walks the ids, and when a badge's `darkTheme` is set and the viewer's
+theme is dark it **swaps in the badge whose id that field holds** — which independently corroborates
+T5-27 at the render site rather than from the manage page alone. The controller already holds both
+halves (`badges` table, `roomUsers.badgesJson`); none of it crosses the internal endpoint. Written
+up as TODO row Y with all three missing levels, so the next session builds rather than re-discovers.
+
+**Verified:** 5 new tests; controller 937 / 90 files with the schema regenerated (268 extracted + 1
+reviewed deviation = 269, 50 wired) and the generator run with output VISIBLE; room 871 / 79 files;
+`svelte-check` 0 errors; prettier clean. Negative controls: dropping the prop from both call sites,
+and adding `enableBadges` to the allow-list — the first red on the new test, the second red on three
+separate boundary assertions.
+
+### 2026-08-14 10:20 EDT — row X finished: 13 checkboxes settled, 5 wired, 8 are features
+
+**Every one of the thirteen has been settled by evidence.** Not "looked at" — each has a specific
+locator that decides it, recorded in row X so nobody repeats the search.
+
+**Two more wires closed here**, and they were hiding in plain sight: the presenter tab's
+Do-not-disturb pair. The reference binds them to `alertSoundOnChange()` and `chatSoundOnChange()` —
+**the same handlers its main tab uses** (`app-user-settings-modal.full.js` @16827, inputs 177 and
+179). They are second controls for `alertSoundOn` / `chatSoundOn`, both of which already have live
+consumers here. Two mapping rows, nothing else.
+
+**The final tally for row X:**
+
+| wired (5) | why it was possible |
+| --- | --- |
+| `chat-always-scroll` | the consumer was already in `room-scroller.ts` |
+| `presenter-follow-my-screens` | needed a `focusOnScreen` server command — which also fixed "Bring everyone here", a menu item that had never brought anyone |
+| `chat-gif-donot-disturb` | the muted-gif placeholder, captured in two halves |
+| `presenter-alert-donot-disturb` | second control for `alertSoundOn` |
+| `presenter-chat-donot-disturb` | second control for `chatSoundOn` |
+
+| feature / parked (8) | what settles it |
+| --- | --- |
+| `extra-chat-column` | 42 reference sites — a second channel with its own log, search, pagination |
+| `chat-badges-donot-disturb` | unfed at three levels; **badges never render for anyone** |
+| `small-image-preview` | seeded from a room setting we do not carry |
+| `chat-mem-clear` | no chat-log trim exists; the only `.slice(-N)` is caption history |
+| `app-recording-preview-window` | we hold the captured CSS and no component |
+| `presenter-enable-rte` | needs summernote AND `sessData.enableRTE`; we have the webfonts, no editor |
+| `chat-popup-donot-disturb` | a toast plus a browser `Notification`; no "Message from" exists here |
+| `visibility-change-enabled` | **parked** — item AA: gating our SSE roster on it makes a hidden tab poll forever |
+
+**What the exercise was actually worth.** The row began as "thirteen checkboxes with no consumer in
+this room". Five had consumers — one already implemented verbatim under a different name, one behind
+a mechanism the code's own comment had described wrongly, and two that were simply duplicate
+controls for preferences that already worked. **Nearly 40% of a list I had written myself was wrong
+in the direction of "this is bigger than it is."** The habit that found them was not clever: search
+for what the preference DOES, never for its name.
+
+And the most valuable single finding came from a checkbox I could NOT close — chat badges never
+render, which no amount of wiring would have fixed and which nobody had noticed because the
+component implements it perfectly.
+
+**Verified:** the pinned counts moved 15 -> 17 mapped, 10 -> 8 unmapped and were updated
+deliberately, as on every wire. Negative control: dropping one of the two new mappings goes red on
+both the wire assertion and the count. Room suite **866 tests / 78 files**, `svelte-check` 0 errors,
+prettier clean.
+
+### 2026-08-14 10:13 EDT — muted gifs; and the discovery that chat badges never render at all
+
+**Runtime impact: the gif checkbox works.** Eighth dead control. But the bigger finding is one I was
+not looking for.
+
+**CHAT BADGES NEVER RENDER, FOR ANYONE.** `RoomMessage.svelte` implements the whole thing —
+`visibleBadges`, the image-badge branch, the coloured-label branch, `user-badge` classes — and it is
+unfed at **three** levels:
+
+1. `MessageBadge` is declared in `lib/types.ts` and referenced only by `RoomMessage.svelte`. Nothing
+   populates `item.badges`: not `room-events.ts`, not `private-chat.ts`, not the page server.
+2. The four gate props — `chatBadges`, `enableBadges`, `showBadgesToPresentersOnly`,
+   `presenterMessagesOnTheRight` — all default `false`, and the chat call site passes **none** of
+   them. Its thirteen props were read one by one.
+3. The room settings behind them are not carried by `room-config-client.ts` or the page server.
+
+So `visibleBadges` is permanently `[]`. This is not a dead control — it is a **built feature with no
+supply**, and wiring only the checkbox would have changed nothing while looking like progress.
+Recorded in row X with all three levels, because the next person to see the checkbox will otherwise
+reach for the same one-line fix.
+
+**What DID close: `chat-gif-donot-disturb`.** Both halves captured, neither guessed:
+
+- MARKUP from the `urlwrapImg` pipe (byte 1326105) — when the preference is off and the URL is a
+  `.gif`, a `chat-gif-muted` placeholder is emitted and the image container takes `d-none`. The
+  `<img>` is **hidden, not omitted**, which is why revealing needs no refetch.
+- BEHAVIOUR from `deployed-index.html`, the only place `showChatGif` exists and not in any bundle: a
+  toggle carrying both labels, `gif muted, click to show` and `click to hide`.
+- CSS verbatim from the shipped stylesheet, including the `:hover` that is the only thing making a
+  `<div>` read as clickable.
+
+**Reproduced as component state, not as a jQuery sibling walk.** `showChatGif` resolves the image
+with `el.next()`, which stops being true the instant anything is inserted between placeholder and
+image. Keyed by URL rather than by the captured `gif_${id}`, because that id is derived from the
+MESSAGE — two gifs in one message would collide upstream. The id is still rendered for fidelity, and
+nothing here resolves through it.
+
+**It mutes gifs ONLY.** `.png` is never touched. That single term has its own negative control,
+because dropping it would mute every inline image the moment somebody unticks a box labelled "gif".
+
+**Four more investigated and confirmed as genuine features**, with the evidence recorded so nobody
+repeats the search: `extra-chat-column` (42 reference sites — a second channel with its own log,
+search and pagination), `chat-badges-donot-disturb` (above), `small-image-preview` (seeded from a
+room setting we do not carry), `chat-mem-clear` (no chat-log trim exists; the only `.slice(-N)` in
+the room is caption history).
+
+**Verified:** 9 new tests, three negative controls — mute every image, drop the image instead of
+hiding it, default the preference off — each red on the right assertion and green on restore. Room
+suite **858 tests / 78 files**, `svelte-check` 0 errors, prettier clean. Counts 14 -> 15 mapped,
+11 -> 10 unmapped. Row X down to ten.
+
+### 2026-08-14 10:01 EDT — "Bring everyone here" now brings everyone
+
+**Runtime impact: a presenter can move the room to a screen. The menu item existed and moved nobody.**
+
+Seventh dead control, and the first that needed a **server command** rather than a wire.
+
+`bringEveryoneToScreen` set `forcedScreenId` locally under this comment:
+
+> Presenter-only. Forcing it for everyone else needs the media signalling channel, which is not
+> wired yet; locally it at least moves this presenter to the screen they chose.
+
+**Honest, and wrong about the mechanism — therefore wrong about the blocker.** The reference does not
+use the media channel:
+`bringFocusToScreen(e) { e && this.appService.sendServerAdminCommand("focusOnScreen", {id: e}) }`.
+It is a SERVER command, and this room has carried server commands on the `cmds` channel since
+`remotePresCommand` was built. Nothing was missing except the action.
+
+**The authority lives on the server, and that is the one assertion here that is not about fidelity.**
+A client that asked every other client to change screens, and was believed, is the shape of the
+2026-08-07 privilege escalation. The role is read from the session; `requireRoomShortCode` scopes the
+broadcast so a presenter of one room cannot move another. Both have negative controls — deleting the
+403 and taking the room from the request each go red.
+
+**A separate action, not another `presenterCommand` subCmd.** That was the tempting move and it would
+have meant loosening a real check: `presenterCommand` validates `Number.isInteger(targetUserId)`
+because every command it carries names a PERSON. This one names a SCREEN. Two payload shapes, two
+validations — asserted, so nobody merges them later.
+
+**The loop guard is structural rather than a boolean.** Upstream it is the `i` parameter of
+`onScreenShareTabChange(e, i = !0)`, passed false for programmatic changes. Here
+`selectScreenTabByUser` is the only path that broadcasts and `selectScreenTabOfId` — every
+programmatic caller, including the one that receives this very command — does not. A boolean would
+let a future caller opt into broadcasting by forgetting an argument. The negative control that makes
+the programmatic path broadcast goes red.
+
+**Receiving honours the lock.** The handler calls `selectScreenTabOfId`, which respects
+`lockedScreenId`, so a member who deliberately locked a screen is not dragged off it.
+
+**And the preference:** `presenter-follow-my-screens` -> `makeUsersFollowMyScreens`, seeded `=== true`
+because the blob ships `makeUsersFollowMyScreens:!1` (byte 980006) — a presenter who has never
+touched it should not be moving the room by clicking their own tabs.
+
+**Verified:** 10 new tests, three negative controls (403 deleted, room taken from the request,
+programmatic path broadcasting) each red on the right assertion and green on restore. Room suite
+**845 tests / 77 files**, `svelte-check` 0 errors, prettier clean. The pinned counts went red again
+and were updated deliberately: 13 mapped -> 14, 12 unmapped -> 11. Row X down to eleven.
+
+### 2026-08-14 09:49 EDT — chat "always scroll to bottom" wired; two of my own tests were decoration
+
+**Runtime impact: the chat checkbox now works.** Sixth dead control repaired.
+
+**It was not a feature after all**, which is the lesson worth keeping from this one. Row X listed
+`chat-always-scroll` among twelve checkboxes whose preference "has no consumer in this room" — and
+`shouldAutoScrollForMessage` in `room-scroller.ts` already implemented the reference's guard
+verbatim:
+
+```
+(!this.isScrollingUp || o.uid == this.appService.globals.user.uid) && (…scrollToBottom(!0))
+```
+
+`alwaysScrollToBottom` is the viewer's override of **exactly that guard** — a separate
+`appEventBus.subscribe('alwaysScrollToBottom', …)` at byte 1413501, fired from `chatMsg` when the
+message is on the channel being viewed (byte 1430890). Two subscribers, one outcome, so it folded in
+as a third term and the whole wire was one parameter. **Check the concept, not the preference name**
+— searching for `alwaysScrollToBottom` finds nothing here; searching for what it DOES finds the
+function that already existed.
+
+**Chat only.** The subscriber sits on the component that also owns `this.channel`, `this.msgs`,
+`this.searchTerm` and `chatLog[o.c]`. The alerts scroller shares the same function and must not take
+the override, or a checkbox labelled "chat" would yank a reader out of alert history.
+
+**Then the negative controls found two of my own tests were decoration.** Three were run; only the
+first went red:
+
+| control | result | what it meant |
+| --- | --- | --- |
+| ignore the override parameter | **red** ✅ | the wire is guarded |
+| seed it `!== false` instead of `=== true` | **passed** ❌ | nothing checked the default |
+| pass the override to the ALERTS scroller too | **passed** ❌ | nothing checked the scope |
+
+Both gaps are now assertions, and both were re-run red afterwards. The default one matters
+disproportionately: `=== true` is correct here because the reference ships
+`alwaysScrollToBottom:!1` (byte 979602) — **the OPPOSITE comparison to `showSpeechRecoOverlay`**,
+where `=== true` was itself the bug. There is no house style; the reference's own default decides
+each case, and the only way to be sure is to read the defaults blob.
+
+**The pinned counts moved and said so.** `settings-preference-wiring-contract.test.ts` went red on
+`mapped` 12 -> 13 and `unmapped` 13 -> 12, which is what pinning them was for. The dead-key list
+stays at 19 deliberately: `chat-always-scroll` is mapped now, but the junk it wrote under its element
+id before today is still sitting in people's blobs.
+
+**Verified:** room suite **831 tests / 76 files**, `svelte-check` 0 errors, prettier clean. Row X
+down to twelve.
+
+### 2026-08-14 09:33 EDT — item W built: the switch that stops the stream, not just hides it
+
+**Runtime impact: a member on cellular can now stop screen video being FETCHED.** The control
+existed and did nothing.
+
+**Fifth dead control in two days.** `ModalHost.svelte` already rendered the AV settings modal's
+"Disable Video (saves bandwidth)" link, backed by `let avVideoDisabled = $state(false)` that was read
+only by its own title and label. Zero occurrences in `+page.svelte`. Rule 1 caught it before a line
+was written — the plan had said "build the control", and the control was already there.
+
+**What `saveData` actually is, and why a lazier port would have been worthless.** It is not a
+visibility toggle. Upstream `callScreenOfUserWEBRTC` opens with
+`this.saveData ? P("callScreenOfUserWEBRTC saveData on.. nop...") : (…)`
+(`main.d6d3c112b59b7d0d.js` byte 1132193), so **the consumer is never created and no screen stream
+is requested**. The `Video Disabled` h3 and the hidden `<video>` are only what the viewer sees. A
+port that bound the class and stopped there would look identical on screen and save nothing — which
+is why the test that guards the consume gate is labelled "THE POINT".
+
+**Where it landed:**
+
+- `ModalHost` gives up ownership: `saveData` is a prop, `onSaveDataChange` the callback, matching
+  the `doNotDisturbOn` convention already in that component.
+- `+page.svelte` owns the flag, unpersisted — the writer is
+  `toggleDisableVideo(){this.saveData=!this.saveData}` (byte 1136736) and it calls no
+  `setPreference`, so it lasts the session.
+- `addRemoteScreen` gates the consume **after** the tab is added, deliberately: upstream the
+  screenshare view still renders, and that is where the message lives. Skipping the tab would hide
+  that a presenter is sharing at all, which is not what the switch claims to do.
+- Skipped producers are retained in `deferredScreens` and fetched when video is re-enabled. The
+  reference re-consumes by another route — selecting a tab calls `startWatchingScreenOf` — which
+  this room has no equivalent of, because it consumes on producer ARRIVAL. Without the retention, a
+  viewer who turned video back on would see nothing until the presenter restarted their share. Item
+  V records the same retention problem for per-presenter mute.
+- `ScreenPane` renders `<h3 class="mt-4 text-center">Video Disabled</h3>` — const 1 of
+  `app-screenshare-view`, whose class order is the OPPOSITE of the presentation area's const 23
+  (`text-center mt-4`). Two h3s, two orders; the wrong one would have been a silent mismatch.
+
+**Reproduced faithfully, including something that looks like a bug:** turning it ON does not tear
+down consumers that already exist. `saveData` is read in exactly three places upstream and none of
+them closes a consumer, so a screen already being watched keeps arriving and is merely hidden.
+Stated in the code rather than silently "improved", because it reads as an oversight until you have
+checked all three sites.
+
+**One deliberate divergence:** the reference's `title` is static — const 13 is
+`["title","Disable Video",…]` — so upstream the tooltip still says "Disable Video" while video is
+already off. Ours flips. A tooltip contradicting its own label is an upstream slip, and reproducing
+it would only mislead a screen reader; same call already taken for `aria-selected` in `ScreenTabs`.
+
+**An existing test went red and was right to.** `screen-volume-contract.test.ts` pinned
+`class:hidden={stream === null}` with a comment saying `saveData` was unmodelled. It is modelled
+now, so the assertion moved to two terms — the binding getting more faithful, not the test getting
+looser.
+
+**My own check was wrong first, for the fourth time today.** The positional test searched the whole
+file for `session.consume(info)` and found the one in `setSaveData`, which is defined ABOVE
+`addRemoteScreen`. Scoped to the function body now, with the reason written beside it.
+
+**Verified:** 10 new tests. Four negative controls — the consume gate deleted while leaving the h3
+and class intact (the silent-failure shape), the modal reverted to owning its flag, `saveData`
+dropped from the hidden binding, and the re-consume removed — each red on the right assertion, green
+on restore. Room suite **825 tests / 76 files**, `svelte-check` 0 errors, `svelte-autofixer` clean on
+`ScreenPane` with zero suggestions, prettier clean. TODO row W removed rather than struck through.
+
+### 2026-08-14 09:24 EDT — docs squared away before Tier 1 starts
+
+Bookkeeping, recorded because the next entry will be a feature and the state it starts from should
+be written down rather than remembered.
+
+**Corrected:** both files were stamped `09:22` for the Tier 0 entry when `date` measured `09:21`.
+One minute, and it is still an estimate rather than a measurement — the failure this repository has
+already paid for once, when all thirteen of a day's entries carried guessed times.
+
+**TODO row P now states fact instead of "was running when written".** PR #19 is OPEN, MERGEABLE, 34
+commits; Vercel has deployed and passed twice; the backend gate is still `pending` and has been
+restarted by every push. That restart is not a fault — `cancel-in-progress: true` means **only the
+final push's run is worth reading**, which is the whole content of the owner's "push but not merge".
+
+**TODO row W marked IN PROGRESS.** The `saveData` port is the active work: a flag in the media
+layer, the nav control in the AV settings modal, and `startWatchingScreenOf` refusing while it is on
+— so no screen stream is requested at all, which is where the bandwidth saving actually lives.
+
+State at the start of Tier 1: register **67 closed, 6 open, 14 parked, 87 total**; controller 937
+tests / 90 files; room 815 / 75; sections A and E of the handoff empty; none of the six open items
+blocked on me.
+
+### 2026-08-14 09:21 EDT — Tier 0 finished: T1-9 closed, T1-10 parked, register 67/6/14
+
+The static fetcher ran clean once its denylist bug was out of the way: **17/22 fetched, 5 honest
+soft-404s.** That completes the browser work entirely — **section A and section E of the handoff are
+both empty**, and nothing left in the register can be closed from this machine.
+
+**T1-9 — CLOSED, 8/8.** All eight public-site images fetched with content and SHA-256.
+
+**T1-10 — PARKED to Tier 4.** Both room build assets soft-404'd a second time: HTTP **200** with the
+52-byte `<h3>this is not the page you are looking for...</h3>` body, so `res.ok` is TRUE for a file
+that is not there. That second confirmation is exactly the condition the row set for parking it.
+**Nothing is blocked by it** — the room's real bundle has been in this repository all along at
+`apps/room/docs/source/`, decoded into 194 component files. It is the same bundle that unblocked
+item W an hour earlier.
+
+**T1-6 confirmed independently.** Its three glyphicon fonts soft-404 too, which is what its existing
+"CLOSED AS NOT-DEPLOYED" status already claimed — now corroborated by a second run rather than
+resting on one.
+
+**The capture is NOT committed, deliberately.** `.gitignore:49` matches `ptr-*.json`, and the rule
+above it is emphatic: live captures stay out, findings come to `docs/` with a citation. So a
+metadata manifest went in instead — `evidence-dumps/static-asset-manifest-2026-08-14.json`, **7.7 KB
+in place of 4.2 MB** — carrying url, bytes, contentType and sha256 for all 22, which identifies every
+file byte-for-byte on any re-fetch. No asset body is stored.
+
+That also avoids committing **1.28 MB of base64 for three marketing screenshots**
+(`ptr_descrived_perspective.png`, `user_comments.png`, `ss3.png`) which `TODO.md` puts explicitly
+outside the match: they are photographs of the ORIGINAL's interface and will be retaken against this
+product. Fetching them was free; storing them would not have been.
+
+**Tier 0 scoreboard — six gaps closed and one parked, from one browser session:** T5-15, T5-21,
+T2-20, T2-7, T2-22, T1-9 closed; T1-10 parked. Register 61 -> **67 closed, 6 open, 14 parked, 87
+total**. Every one of the six that remain needs infrastructure that does not exist or a decision that
+is the owner's.
+
+### 2026-08-14 09:15 EDT — T2-22 closed; the login-detector fix proved itself on the next run
+
+`evidence-dumps/rendered-states-login-2026-08-14.json`, captured logged out. **66 closed, 8 open.**
+
+The form is `ng-submit="submitLogin()"` — not `addAdminUser()`, which is what the previous run
+mislabelled. The detector rewritten forty minutes earlier rejected the admin form and accepted this
+one, on the same page path, which is as clean a proof as a fix gets.
+
+**Geometry, which is all T2-22 ever wanted:**
+
+| element | size | at | notes |
+| --- | --- | --- | --- |
+| form | 1108x192 | (440.5, 146) | padding 0 |
+| email / password inputs | **539x34** each | y=146, y=210 | `padding: 6px 42.5px 6px 18px` — asymmetric, room for an icon; `1px solid rgb(219,217,217)`, radius 4px; a 30px gap under the 34px field |
+| "Forgot your password?" | 145.05x16.5 | (834.45, 255.5) | right edge = 979.5, exactly the inputs' right edge — aligned to the FIELD, not the form |
+| submit button | **539x34** | (440.5, 289) | full width, `1px solid rgb(70,184,218)`, radius 4px |
+| `<textarea>`, `<label>"Logging In, please wait..."` | 0x0 | — | present but only rendered during submit |
+
+The error-state half was already closed and stays closed: it is a reCAPTCHA gated on
+`failedLoginCount >= 3`, never an error message, and ours matches.
+
+**Section A of the handoff is now empty.** Five gaps closed by one browser session — T5-15, T5-21,
+T2-20, T2-7, T2-22 — and the only browser work left in the whole register is T1-9/T1-10, whose
+fetcher aborted twice on a denylist bug and has not yet been re-run with the fix.
+
+**Three collector defects in one session, and the pattern is worth naming.** Not one of them threw.
+Each returned a well-formed result that was wrong: 0/15 handlers, an abort before any request, and a
+correctly-measured form under the wrong name. A tool that fails loudly costs a minute. A tool that
+fails plausibly costs a conclusion — and the third would have closed T2-22 against the Add Admin User
+form if the JSON had not been read line by line.
+
+### 2026-08-14 09:06 EDT — browser session: four gaps closed, three script defects found
+
+The owner ran the collectors against the live site. **T5-15, T5-21, T2-20 and T2-7 are closed**;
+the register moves 61 -> 65 closed, 13 -> 9 open. Captures are in `evidence-dumps/`.
+
+**Every one of the three failures in that session was OUR script, not the site.** That is the
+headline, because each returned a plausible-looking result rather than an error.
+
+| # | what it reported | what was true |
+| --- | --- | --- |
+| 1 | `0/15` bootbox handlers found | the scope walk anchored on the FIRST `.ng-scope` in document order — the root — then climbed `$parent` AWAY from the controller. `collect-stripe-details.js` had captured two of those same handlers on that same page three minutes earlier, which is the contradiction that exposed it. Now collects every distinct scope from deep anchors: **0 -> 15 across 311 scopes** |
+| 2 | `ABORTED before any request` | `path.includes('post')` matched `POST_ROUTE_API_DOCUMENTATION.md` — a document naming HTTP POST *routes*. The whole static fetch aborted on a filename. Static document extensions are now exempt from the verb list; `deleteUser`, `kick` and `upload` still abort, and that is asserted |
+| 3 | `loginFormCaptured: true` | it had captured the **Add Admin User** form — `ng-submit="addAdminUser()"`, models `adminUser.name/.email/.password`, buttons "Add Admin User" and "Cancel" — because the fallback was "any form with a password field". **The capture was accurate and the LABEL was false**, which is worse than capturing nothing: it would have closed T2-22 on the wrong form |
+
+The third is the one worth remembering. A wrong value that renders is worse than a missing one — and
+a correctly-measured artefact under the wrong name is the same defect wearing evidence.
+
+**What the session actually closed:**
+
+- **T5-15** — `openStripeDetails` source in full: a `bootbox.dialog`, 17 rows in fixed order, each
+  omitted when its value is empty, one "Close" button. Its `fmtDate` is `toLocaleString()`, i.e.
+  LOCALE-SENSITIVE, unlike the fixed formats this repo hand-assembles — a decision to take
+  deliberately rather than copy.
+- **T5-21** — `doBatchInvite`: `bootbox.prompt` titled `"Enter comma separate email list"`. That
+  typo is the reference's own; `actionsWithEmailList` two entries away spells it correctly.
+- **T2-20** — 15/15 handler sources, each carrying the dialog's exact title, input type and buttons.
+  The source is stronger evidence than an observed dialog, which is one evaluation of it.
+- **T2-7** — closed by TWO independent derivations agreeing. READ: `evidence-bootstrap-3.3.7.css`
+  gives `nth-of-type(odd)` -> `#f9f9f9`, hover -> `#f5f5f5`, cells `8px`; the app's `styles.css`
+  overrides only the header padding (`20px !important`) and neither app sheet touches striping.
+  RENDERED: the live capture pulled the rule verbatim off the site's own `bootstrap.min.css` as
+  `nth-of-type(2n+1)` with rows measuring `rgb(249,249,249)` / transparent / `rgb(249,249,249)`.
+  **Three rows sufficed where the register asked for four** — odd/even/odd is the whole pattern. And
+  `hoverRules` was empty because that table has no `.table-hover`, exactly as the template says.
+  **Ours already matches**: `manage.css:868`, `account.css:412`, hover at `account.css:416`, and no
+  row-hover rule in `manage.css` — correctly.
+
+**Still open from Tier 0:** T2-22 (needs a genuinely logged-OUT run) and T1-9/T1-10 (needs the fixed
+static fetcher). The owner's instinct that "we already have the CSS" was right for T2-7 and is why
+it closed without a fourth row.
+
+### 2026-08-14 08:36 EDT — item W unblocked: the writer was in the bundle all along
+
+No product code changed. This is a research result that moves an item from "cannot be built
+honestly" to "buildable", and it corrects a claim I wrote six hours earlier.
+
+Row W said `mediaService.saveData` had no captured writer. That was true of the decoded
+**components** and I generalised it into "uncaptured", which was wrong for a structural reason:
+**the media service is a service, not a component**, so no amount of component decoding would ever
+have contained it. `extract-component-source.mjs` takes an Angular selector; a service has none.
+The bundle itself was in this repository the whole time.
+
+Read straight out of `main.d6d3c112b59b7d0d.js`:
+
+| byte | what |
+| --- | --- |
+| 1114733 | the media-service constructor: `this.saveData=!1`, beside `isScreenSharing`, `presenterTalking`, `currPresenter` |
+| 1136736 | **the writer** — `toggleDisableVideo(){this.saveData=!this.saveData}` |
+| 2292763 | its only caller — an `<a>` in `nav > ul > li` in the **AV settings modal**, `x("click", …toggleDisableVideo())`, icon const 14, spans `txe`/`nxe` |
+| 1132193 | `callScreenOfUserWEBRTC(e,i=!1){ e&&null!=e ? this.saveData ? P("callScreenOfUserWEBRTC saveData on.. nop...") : (…)` |
+
+**That last one is the finding.** `saveData` does not hide a video — it stops the consumer being
+created, so no screen stream is ever requested. The h3 and the `hidden` class are only what the
+viewer sees; the bandwidth saving is that nothing is fetched.
+
+**And it is a DIFFERENT feature from the one shipped this morning.** `preferences.disableVideo` is a
+per-viewer pane preference, set from the user-settings modal, that swaps the screens and streams
+panes for a message. `saveData` is a media-layer switch, set from the AV settings modal, that
+refuses the WebRTC consumer. Both exist upstream, both have their own control, and only the first is
+built here. Conflating them is what the original row did.
+
+**The lesson is rule 2 with a new edge.** An absence claim expires when the evidence base grows —
+but this one was never true in the first place, because the search space was chosen by the shape of
+a tool rather than by where the thing lives. "Not in the decoded components" is a fact about the
+decoder. Recorded in row W with the byte offsets so the next reader starts from the evidence rather
+than from my summary of it.
+
+### 2026-08-14 08:28 EDT — working rule 9: push freely, do not merge until done
+
+Owner instruction: **"push but not merge."**
+
+Recorded first as "do not push", which was my misreading of the sentence before it — "do not push
+anything that triggers the backend CI until we're all done" — and corrected within the hour, before
+the wrong version was ever acted on twice. The correction matters in both directions: **pushing is
+how work is backed up and how the PR stays honest about its own contents**, so withholding pushes
+costs something and buys nothing. What waits is the merge.
+
+Written into `docs/reference/working-rules.md` as rule 9 with the mechanics, because a rule with no
+recorded why gets undone.
+
+The mechanics are worse than "CI is slow", and I measured them rather than assuming:
+
+- `backend-quality.yml` sets `concurrency: backend-quality-${{ github.ref }}` with
+  `cancel-in-progress: true`. A second push **cancels the run in flight** and starts over — it does
+  not queue and it does not resume. Observed directly: run `31799962473` was cancelled mid-flight by
+  the docs-only push above and replaced by `31800376616`. Everything the first run had already
+  proved was discarded.
+- The job compiles the Rust workspace, stands up two PostgreSQL clusters and rebuilds the API image.
+  Its own header puts it at ~33 minutes.
+- **Choosing "safe" files does not avoid it on this branch.** The scope step reads the diff against
+  the BASE, not the last commit, and this branch's diff contains `backend-quality.yml` — which is
+  deliberately a backend path, so that a change to the gate is proved by the gate. A one-line README
+  push here runs the full 33 minutes.
+- Any event that is not a `pull_request` skips the scope check entirely and always runs the gate.
+
+**What follows is about MERGING, not pushing.** Since each push cancels and restarts the gate, a
+green check is only ever evidence about the commit that produced it — on a branch still being worked,
+the green on screen was probably earned by an earlier HEAD and then discarded. **So the only green
+worth merging on is the one from the FINAL push.** That is the real content of "push but not merge",
+and it is why merging and pushing must stay separate acts: the push invalidates the checks you were
+about to merge on.
+
+The corollary I had wrong: do NOT hoard commits locally to save CI minutes. The minutes are worth
+less than unbacked-up work, and `cancel-in-progress` stops an obsolete run the moment it is obsolete
+— the runner is never billed for the 33 minutes it does not spend.
+
+### 2026-08-14 08:20 EDT — PR #19 opened: 29 commits proposed to main
+
+Bookkeeping rather than a change — no file in the product moved. Recorded because the branch had
+been accumulating finished work with nowhere to land, and because the verification state at the
+moment of proposal is worth pinning.
+
+[#19](https://github.com/billyribeiro-ux/trading-room-app/pull/19) carries the whole of
+`fix/green-the-gate`: the evidence-gap work (register at 61 closed / 13 open / 13 parked / 87
+total), the four dead controls repaired today, the corepack fix, and the artifact untracking.
+
+**Verified locally immediately before the push**, which is the standing rule — the full gate runs
+once, right before a push, not after every edit:
+
+| | |
+| --- | --- |
+| controller | 937 tests / 90 files |
+| room | 815 tests / 75 files |
+| documented totals | verified across 4 sites |
+| `svelte-check` | 0 errors, 0 warnings |
+| `svelte-autofixer` | no issues |
+| prettier | clean |
+
+**Not claimed: that CI is green.** Vercel has deployed and passed. The backend gate was still
+running when this was written. It runs in FULL rather than skipping, because the diff touches
+`.github/workflows/backend-quality.yml` and the scope step deliberately treats that as a backend
+path — a change to the gate must be proved by the gate. Which is the right shape here, since the
+corepack repair is exactly what that job exercises first.
+
+Tracked as `TODO.md` row P, with the next action written out: read the run, then merge — **merging
+and pushing as separate acts**, because a push invalidates the green checks you were about to merge.
+
+### 2026-08-14 08:19 EDT — 137 files of test output stopped being tracked
+
+**Runtime impact: none. Review impact: every future diff is readable.**
+
+`apps/controller/coverage/` (136 files) and `.vitest-report.json` were tracked. The cost was never
+disk. Both are rewritten by every `test:unit` run — `vitest run --coverage --reporter=json
+--outputFile=.vitest-report.json` — so the working tree was permanently dirty and each file was
+swept into whatever commit came next. That happened six times today, on commits about the room.
+
+**It defeats the rule this repository leans on hardest.** "Re-read your own `git diff` like a senior
+reviewer before saying done" is not possible against a diff carrying 136 files of regenerated HTML.
+The one real change in it is precisely the change that goes unreviewed.
+
+**This aligns the controller with a standard that already existed** rather than inventing one:
+`apps/room` never tracked its equivalents, and `vite.config.ts:60` had already reached the same
+conclusion for the file watcher, calling `coverage/` output "written by the test run". Nothing in
+this repository reads either path — the search for a consumer came back empty, which is what makes
+untracking safe rather than merely tidy.
+
+Untracked with `git rm --cached`, so both are still on disk and still regenerated; only the tracking
+is gone.
+
+**Guarded, because untracking without ignoring lasts until the next `git add -A`** — which is how
+the directory arrived in the first place. `tracked-artifacts.test.ts` asserts that no tracked path
+has a `coverage`, `node_modules`, `.svelte-kit` or `.vitest-report.json` component, AND that each is
+in `.gitignore`. Both halves or neither.
+
+**The first version of that guard was wrong and is worth recording.** It asked git for `*coverage*`
+and failed on `apps/room/scripts/audit-behavior-coverage.mjs` — a hand-written source file whose
+name contains the word. The check, not the repository. It now matches whole path SEGMENTS, and the
+file it wrongly flagged is now a permanent assertion: if the match is ever loosened back to a
+substring, that test goes red instead of an honest source file. This is the same lesson as the
+`corepack install` assertion satisfied by a comment, twice in one session: **a check must be proven
+right before its failure is believed.**
+
+**Verified:** 7 tests. Two negative controls — one coverage file force-added back, and the ignore
+rule deleted — each red on the right assertion, green on restore. Runtime evidence rather than
+reasoning: a full gate was run afterwards and `git status` showed only the five intended changes,
+where before it showed 137. Documented counts 930 -> 937 across four sites. Full gate exit 0: room
+815 / 75 files, controller 937 / 90 files.
+
+### 2026-08-14 08:13 EDT — CI: the pnpm version was written twice and the copies disagreed
+
+**Runtime impact: none. CI impact: the backend gate could not pass at all.**
+
+The push made the backend job run, and it died on its second step:
+
+```
+Preparing pnpm@11.18.0 for immediate activation...
+! Corepack is about to download https://registry.npmjs.org/pnpm/-/pnpm-11.21.0.tgz
+Error: Process completed with exit code 1.
+```
+
+**Not caused by this branch, and worth saying plainly.** `package.json` moved to `pnpm@11.21.0` on
+2026-08-09 (`8dd0306`). The workflow was written with `corepack prepare pnpm@11.18.0 --activate` on
+2026-08-12 (`b561772`) — three days later, against a number that was already stale. No commit on
+this branch touched `package.json` or `.github/`; the push only triggered it, because the scope step
+forces `backend=true` for any event that is not a pull request.
+
+**Why the two lines in that log look unrelated but are the same bug.** `--activate` sets corepack's
+DEFAULT. Inside a project directory the pnpm shim ignores the default and resolves `packageManager`.
+So the runner activated one version and `pnpm --version` immediately went looking for the other.
+Corepack asks before downloading a package manager, a runner has no TTY, and the question is an
+`exit 1`.
+
+**Suppressing the prompt alone would have been the wrong fix** — it would have moved the failure one
+line down, onto `test "$(pnpm --version)" = "11.18.0"`, comparing against a number the shim was
+never going to print. That step could not have passed in any circumstance.
+
+**The fix is that the version is now written once.** `corepack install` with no argument installs
+exactly what `package.json` pins; the step then reads the same field back and fails loudly if what
+it got differs. `COREPACK_ENABLE_DOWNLOAD_PROMPT` is set because a runner has no TTY — it does not
+weaken the pin, which is still verified.
+
+**A guard, because this will otherwise recur on the next bump.**
+`ci-package-manager-pin.test.ts` asserts that no workflow contains a pnpm version literal — not even
+in a comment, which is why the comment explaining all this names no number — and that all three
+`packageManager` fields agree, since corepack resolves the NEAREST one and a drifted app would
+silently run a different pnpm. It deliberately does NOT assert which version, because that would
+make the test a fifth place the number lives.
+
+**Two of my own mistakes, both caught before pushing.** The first draft of the workflow comment
+quoted the stale version, so the guard failed on my own prose — correctly. And the assertion
+`toContain('corepack install')` passed against a workflow with that command DELETED, because the
+comment above it contains the words; the negative control found it, and comment lines are now
+stripped before that assertion. An assertion satisfied by prose about the code is not an assertion
+about the code — the same lesson as the h3 that had to be proved to read markup rather than my own
+comment.
+
+**Verified:** 5 tests, four negative controls — a version literal reintroduced, a manifest made to
+disagree, `corepack install` deleted, and the prompt suppression removed — each red on the right
+assertion, green on restore. The workflow was parsed with a real YAML parser to prove it still
+loads, and the extraction command was run for real rather than assumed: it prints `11.21.0`, which
+matches the local pnpm. Documented counts moved 925 -> 930 across four sites. Full gate exit 0.
+
 ### 2026-08-14 07:54 EDT — the element-id fallback is gone, and what it wrote is being removed
 
 **Runtime impact: nothing user-visible changes. Nineteen junk keys stop being written, and the ones

@@ -1,6 +1,7 @@
 <script lang="ts">
   import EmojiPicker from '$lib/components/EmojiPicker.svelte';
   import type { EmojiDumpEntry } from '$lib/emoji-data';
+  import { isMentionOf } from '$lib/mention';
   import { calculateMessageMenuPosition } from '$lib/message-menu-position';
   import { ngbTooltipWith } from '$lib/ngb-tooltip';
   import {
@@ -113,6 +114,14 @@
     enableEditAlerts?: boolean;
     hideAvatars?: boolean;
     presenterMessagesOnTheRight?: boolean;
+    /**
+     * `preferences.chatGif` — whether an inline `.gif` plays, or shows a click-to-reveal placeholder.
+     *
+     * Default TRUE, matching the reference's blob (`chatGif:!0`). It is passed into the
+     * `urlwrapImg` pipe as its second argument (`main.d6d3c112b59b7d0d.js` byte 1326105), and gates
+     * ONLY `.gif` — a `.png` is never muted.
+     */
+    chatGif?: boolean;
     chatBadges?: boolean;
     enableBadges?: boolean;
     showBadgesToPresentersOnly?: boolean;
@@ -153,6 +162,7 @@
     enableEditAlerts = false,
     hideAvatars = false,
     presenterMessagesOnTheRight = false,
+    chatGif = true,
     chatBadges = false,
     enableBadges = false,
     showBadgesToPresentersOnly = false,
@@ -291,7 +301,13 @@
     );
   });
   const stockStyle = $derived(effectiveStyle ? `color: ${effectiveStyle.tickerColor};` : undefined);
-  const isMention = $derived(Boolean(currentUserName) && item.body.includes(`@${currentUserName}`));
+  /*
+    The shared rule, not a second copy. This was `item.body.includes('@' + currentUserName)` —
+    case-sensitive, no trailing space and blind to `@all`, so `@Bob` never highlighted for bob,
+    `@bobby` always did, and a presenter addressing the room with `@all ` highlighted for nobody.
+    See `$lib/mention` for the reference's own three terms.
+  */
+  const isMention = $derived(isMentionOf(item.body, currentUserName, isAdminMessage));
   const isQuestion = $derived(
     item.evidenceQuestion ??
       (kind === 'chat' && item.body.includes('?') && followedStyle === undefined)
@@ -323,6 +339,25 @@
    * the real room links today.
    */
   const CAPTURED_URL = /((http|https|ftp):\/\/[\w?=&.@\/-;#~%-]+(?![\w\s?&.@\/;#~%"=-]*>))/gi;
+
+  /**
+   * Which muted gifs this viewer has clicked open, keyed by the segment's URL.
+   *
+   * Upstream this is DOM state: `showChatGif(id)` looks the placeholder up with jQuery and toggles
+   * `d-none` on its next sibling (`deployed-index.html`). Held as component state here instead,
+   * because the captured function depends on `el.next()` being the image — a structural assumption
+   * that breaks the moment anything is inserted between them.
+   *
+   * Keyed by URL rather than by the `gif_${id}` the reference builds: that id is derived from the
+   * MESSAGE, so a message containing two gifs would give both the same id upstream. The id is still
+   * rendered for fidelity, but nothing here resolves anything through it.
+   */
+  let revealedGifs = $state<Record<string, boolean>>({});
+
+  /** `!i && -1 !== r.indexOf('.gif')` — the muting applies to gifs only, case-insensitively. */
+  function isMutedGif(url: string) {
+    return !chatGif && url.toLowerCase().includes('.gif');
+  }
 
   /** `urlwrapImg` renders these inline instead of as an anchor. */
   const IMAGE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.gif', '.jfif'];
@@ -494,8 +529,16 @@
         rel="noreferrer"
         class="linkColor"
         onclick={(event) => event.stopPropagation()}>{segment.text}</a
-      >{:else if segment.kind === 'image' && segment.url}<!-- svelte-ignore a11y_no_static_element_interactions --><!-- svelte-ignore a11y_click_events_have_key_events --><div
+      >{:else if segment.kind === 'image' && segment.url}{#if isMutedGif(segment.url)}<!-- svelte-ignore a11y_no_static_element_interactions --><!-- svelte-ignore a11y_click_events_have_key_events --><div
+        class="chat-gif-muted"
+        id="gif_{item.id}"
+        onclick={() =>
+          (revealedGifs = { ...revealedGifs, [segment.url!]: !revealedGifs[segment.url!] })}
+      >
+        {revealedGifs[segment.url] ? 'click to hide' : 'gif muted, click to show'}
+      </div>{/if}<!-- svelte-ignore a11y_no_static_element_interactions --><!-- svelte-ignore a11y_click_events_have_key_events --><div
         class="img-container"
+        class:d-none={isMutedGif(segment.url) && !revealedGifs[segment.url]}
         onclick={(event) => runAction('image', event)}
       >
         <!-- svelte-ignore a11y_missing_attribute -->

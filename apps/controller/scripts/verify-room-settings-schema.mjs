@@ -13,13 +13,26 @@ const GENERATOR = resolve(SCRIPT_DIR, 'extract-manage-schema.mjs');
 const CANONICAL_SCHEMA = resolve(REPO_ROOT, 'src/lib/room-settings-schema.ts');
 
 /*
-  Eleven consumed by this repository's room-login page, THIRTY-THREE by the room application
+  Eleven consumed by this repository's room-login page, THIRTY-SEVEN by the room application
   through `internal/room-config/[code]`, and six by the WordPress SSO door at `(public)/sso/[code]`.
-  `allowUsersToChangeUsername` is on the first two lists, so the union is 49.
+  `allowUsersToChangeUsername` is on the first two lists, so the union is 53.
 
   (Thirty and 46 as of 2026-08-12: `hideChatAlerts`, `isChatOnlyRoom` and `disableCopy` reached the
   room when it gained the gates that read them — the chat/alerts column, the presentation column,
   and the copy/right-click restriction on non-presenters.)
+
+  (Thirty-seven and 53 since 2026-08-14: `enableBadges`, `showBadgesToPresentersOnly` and
+  `disableStarYears` reached the room in the same change that gave chat badges a SUPPLY. They had
+  been held out on purpose while `item.badges` was empty, because `ROOM_VISIBLE_SETTINGS` requires a
+  consumer and a gate with nothing to gate is not one.)
+
+  (Thirty-four and 50 since 2026-08-14: `presenterMsgsOnTheRight` reached the room when
+  `RoomMessage.svelte` was finally fed the two consumers it had carried unused since it was written
+  — `presenter-msg-right` and `presenter-reactions-right`. All FOUR edits were made in the same
+  change this time, which is what the paragraph below was written to prevent being forgotten.
+  Its three manage-page neighbours — `enableBadges`, `showBadgesToPresentersOnly`,
+  `disableStarYears` — are deliberately NOT here: nothing populates `item.badges` or
+  `item.membershipYears`, so they would cross the boundary for nothing.)
 
   (Thirty-three and 49 since 2026-08-13: `beepOnUserJoin`, `userJoinAndLeavePopup` and
   `tawkPresenterSupport` reached the room with the join/leave notification and Tawk support work.
@@ -38,6 +51,10 @@ const CANONICAL_SCHEMA = resolve(REPO_ROOT, 'src/lib/room-settings-schema.ts');
   `sso-boundary.test.ts` now reads this list too, so the next omission fails in vitest instead.)
 */
 const EXPECTED_WIRED_SETTINGS = [
+  'presenterMsgsOnTheRight',
+  'enableBadges',
+  'showBadgesToPresentersOnly',
+  'disableStarYears',
   'allowUsersToChangeUsername',
   'allowedMemberships',
   'allowedPerms',

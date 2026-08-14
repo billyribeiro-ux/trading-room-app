@@ -77,6 +77,12 @@ export type RoomEvent =
         url?: string;
         recName?: string;
         /**
+         * `focusOnScreen`'s payload — the producer id of the screen a presenter is pulling the room
+         * to. `sendServerAdminCommand("focusOnScreen", {id: e})` upstream; named `screenId` here
+         * because `id` alone on a union this wide says nothing about what it identifies.
+         */
+        screenId?: string;
+        /**
          * `giveMicScreen`'s payload.
          *
          * A top-level command of its own in the capture, not a `remotePresCommand` subCmd:
