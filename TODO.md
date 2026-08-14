@@ -108,7 +108,35 @@ no client-side MediaMTX connection to reproduce — the service keeps a list and
   upstream carrying no payload. `mtxStartStream`/`mtxStopStream` carry the stream under `muser`.
   Validated by `isMtxStream` at the wire boundary — a deliberate divergence, because upstream pushes
   `i.muser` in unchecked and two of its fields are interpolated into a playlist URL.
-- ⬜ `/internal/media-hook` — the last piece. See the note below on hooks versus reconciliation.
+- ✅ `/internal/media-hook` **and the reconcile** — BUILT 2026-08-14. **Hooks for latency,
+  reconciliation for truth.** The hook is a `curl` MediaMTX spawns, with no retry and no delivery
+  guarantee, reaching only the instance it lands on; `mtx-reconciler.ts` polls `/v3/paths/list` per
+  room from every process, which is instance-independent. Polling is a STATED DIVERGENCE — the
+  reference does not poll, because a SocketCluster socket has delivery semantics a spawned shell
+  command does not.
+  - It emits **deltas, never the full list on a timer**: `applySessionMediaState` moves the
+    selection to `list[0]` every time it runs, so a repeated full-list apply would drag every
+    viewer's tab back to the first stream every five seconds. Both halves are asserted.
+  - `available`, **never the deprecated `ready`** — from the project's own `api/openapi.yaml`.
+  - `MEDIA_HOOK_SECRET` is separate from `ROOM_JWT_SECRET` on purpose: it ends up in a media host's
+    config file. `MEDIA_API_URL` is MediaMTX's control API, `127.0.0.1:9997` and localhost-only.
+  - The ingest doc had the hook POSTing to the CONTROLLER, which was wrong — the SSE fan-out is in
+    the ROOM. Corrected.
+
+**What remains before OBS ingest is end-to-end: a MediaMTX host.** Every piece of room and controller
+code is now built and tested. What cannot be produced without the host is a real encoder publishing
+and a real viewer watching — see the note above on `STREAM_SERVER_MTX`.
+
+**Known limitation, inherited and not introduced.** `publishToRoom` is process-local, so a hook
+reaches only one instance's subscribers, and the room defaults to the Vercel adapter. Every existing
+realtime feature has this, `focusOnScreen` included. The reconcile is what keeps the stream list
+correct regardless; the durable fix is TODO entry 5 (PostgreSQL `room_events`, already listened on by
+`services/api`).
+
+**Two dead files found on the way, not yet removed:** `apps/room/svelte.config 2.js` and
+`apps/controller/svelte.config 2.js` are tracked in git and read by nothing — Kit 3 takes its
+configuration through the Vite plugin, which both `vite.config.ts` files say in their own comments.
+The room's real adapter selection lives there. Deleting them is a separate, trivial change.
 
 **The "not ours to author" blocker this row used to claim was WRONG, and it is retracted.** The
 `muser` shape is fully determined by the bundle: `_id` (identity, tab id `${_id}-tab`, pane id, and

@@ -24,6 +24,74 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-14
 
+### 2026-08-14 19:30 EDT — hooks for latency, reconciliation for truth: the MediaMTX half closes
+
+**Runtime impact: yes.** A new route reachable without a cookie, a per-room polling timer on the SSE
+connection, and two new environment variables. On `feat/extra-chat-column`.
+
+**The architecture, and why it is not just the hook.** `/internal/media-hook` is what MediaMTX calls
+from `runOnAvailable` / `runOnUnavailable`. Those are shell commands it spawns — a `curl` with no
+retry, no ordering and no delivery guarantee — and `room-events.ts` says of its own SSE hub that it
+"does not survive a restart and does not span instances", while the room defaults to the Vercel
+adapter. So a hook can be lost outright, or land on an instance holding none of the viewers.
+
+That limitation is INHERITED, not introduced: every existing realtime feature has it, `focusOnScreen`
+included, and the durable fix is the one `TODO.md` already names (PostgreSQL `room_events`, which
+`services/api` already listens on). What makes the stream list correct meanwhile is the reconcile —
+every process polls MediaMTX's own `/v3/paths/list` for its own subscribers, which is
+instance-independent by construction. **The hook is the fast path; the poll is the correct one.**
+
+**The trap that would have shipped a worse bug than the one being fixed.** The obvious reconcile
+re-sends the full list, and the full list is what `getSessionMTXMediaState` carries. But
+`applySessionMediaState` moves the selection to `list[0]` every time it runs — correct for the
+reference, which sends it exactly twice (init and soft reset), and catastrophic on a five-second
+timer, where it would drag every viewer's tab back to the first stream on every tick. So the
+reconcile emits `mtxStartStream`/`mtxStopStream` deltas instead, and `mtx-reconcile.test.ts` asserts
+both halves: the yank when the naive version is used, and the viewer staying put when it is not.
+
+**Evidence, fetched rather than remembered.** MediaMTX's hooks page confirms thirteen hooks and that
+`runOnReady`/`runOnNotReady` are gone, and it surfaced something the earlier doc missed — the regex
+capture groups `G1, G2, …` are available alongside `MTX_PATH`. The `/v3/paths/list` schema came from
+the project's own `api/openapi.yaml`, which settled a field this would otherwise have got wrong:
+**`ready` and `readyTime` are DEPRECATED**, and the live pair is `available`/`availableTime` — the
+same rename as the hooks. A test asserts a path with `ready: true` and no `available` is ignored.
+
+**Corrections to the ingest doc, one of them substantive.** The hook was documented as POSTing to
+the CONTROLLER. That was wrong: the thing a hook must reach is the SSE fan-out, which lives in the
+room, and the controller has no way to push to a room's connected members — so a hook delivered
+there had nowhere to go. Also added: the `Authorization` bearer, `api: yes` for the reconcile, and
+the capture-group finding.
+
+**`MEDIA_HOOK_SECRET` is deliberately not `ROOM_JWT_SECRET`.** This value is written into a shell
+command in `mediamtx.yml`, so it lives in a media host's config file and process table; the room's
+session signer does not belong there. Unset means the route refuses everything — the correct closed
+state, costing latency rather than correctness.
+
+**Two failure rules, each with a test that fails when the rule is removed.** A control API that
+cannot be reached returns `null`, which is NOT an empty list: publishing stops on a blip would clear
+every viewer's tabs and interrupt playback, a self-inflicted outage from a dropped packet. And
+pagination follows `pageCount` rather than reading the first 100 paths and stopping, because a silent
+cap reads as "covered everything" right up until it does not.
+
+**A test of mine that was passing for the wrong reason, found by its own negative control.** Patching
+the bearer comparison to `return true` left all twelve media-hook tests GREEN. Every refusal case
+presented a bearer of the wrong LENGTH, so `secretMatches` returned early and `timingSafeEqual` was
+never reached — the suite was asserting that the route rejects strings of the wrong size, which is
+not the property anybody cares about. A same-length wrong bearer now covers it, and the negative
+control fails exactly that test.
+
+**`PUBLIC_PATHS` is now pinned.** It is the room's entire cookie-less surface and nothing asserted
+its contents, so a third entry could have been added in any diff unnoticed. Both current members
+authenticate by their own means, and the test says so where a reader will find it.
+
+**Verified.** Room 1196/1196 across 98 files (from 1092/93 at the session start); controller 963/963;
+`svelte-check` 0/0 on both apps; `schema:verify` 58 wired. Three negative controls run and reverted:
+the bearer comparison, the null-is-not-empty rule (both failure tests caught it), and the earlier
+room-scoping one. **Running the FULL controller suite rather than the tests I predicted found a real
+drift** — a prose count in `verify-room-settings-schema.mjs` still said 56; the same thing happened
+in the room, where two files mocking the config client were not in the predicted set. The full gate
+still has not been run; it runs once before the merge.
+
 ### 2026-08-14 19:14 EDT — the `#streams` pane goes live: the tab, the commands, and the token
 
 **Runtime impact: yes.** The Streams main tab can now open, in rooms whose owner has ticked "Use

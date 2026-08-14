@@ -63,6 +63,37 @@ export const variables = defineEnvVars({
       'HS256 secret shared with the controller. It verifies the handoff token on /session and signs the room-config request. Must be byte-identical on both sides or every Launch link is rejected.',
     schema: optionalText
   },
+  /*
+    The bearer MediaMTX presents on `/internal/media-hook`.
+
+    A SEPARATE secret from `ROOM_JWT_SECRET`, deliberately. That one is the controller↔room signing
+    key and it verifies handoff tokens — the thing that decides who a person is. This one is handed
+    to a third-party media server and then written into a `runOnAvailable` shell command in
+    `mediamtx.yml`, where it will sit in a config file, in that host's process table, and in
+    whatever provisioning tool wrote it. Reusing the identity key there would put the room's session
+    signer on a media box for no reason.
+
+    Unset means the hook route refuses everything, which is the correct closed state: without a
+    secret there is no way to tell MediaMTX apart from anyone else who found the URL, and the
+    reconcile already keeps the stream list correct without it.
+  */
+  MEDIA_HOOK_SECRET: {
+    description:
+      'Bearer token MediaMTX presents on /internal/media-hook, set in the runOnAvailable/runOnUnavailable commands in mediamtx.yml. Unset means the hook is refused and the room relies on reconciliation alone.',
+    schema: optionalText
+  },
+  /*
+    The control API MediaMTX exposes, which the reconcile polls for the true stream list.
+
+    `api: yes` in `mediamtx.yml` and `127.0.0.1:9997` by default, localhost-only unless configured
+    otherwise — so in a real deployment this is an internal address, not the public media host.
+    Unset means no reconcile runs and the room depends on hooks alone.
+  */
+  MEDIA_API_URL: {
+    description:
+      "Origin of MediaMTX's control API, e.g. http://127.0.0.1:9997. Polled for /v3/paths/list to reconcile the room's stream list. Unset means no reconciliation.",
+    schema: optionalUrl
+  },
   MEDIA_WS_URL: {
     description:
       "The SFU's signalling socket, handed to the browser by /api/media/grant. wss:// in production; the grant rides the query string.",

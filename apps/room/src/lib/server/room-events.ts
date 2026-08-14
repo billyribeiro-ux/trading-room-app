@@ -99,6 +99,21 @@ export type RoomEvent =
          * `e.give`.
          */
         give?: boolean;
+        /**
+         * `mtxStartStream` / `mtxStopStream` — one MediaMTX stream going live or stopping.
+         *
+         * `muser` is the reference's own payload key: `case "mtxStartStream":
+         * this.appEventBus.emit("mtxStartStream", i.muser)` (bundle byte 1010826). Typed `unknown`
+         * on purpose — the page validates it with `isMtxStream` before it can reach a playlist URL,
+         * and a type here that promised the shape would make that guard look optional.
+         */
+        muser?: unknown;
+        /**
+         * `getSessionMTXMediaState`'s full list. NOTE the name: MTX in the MIDDLE is the WIRE
+         * command, while `getSessionMediaStateMTX` with MTX at the END is an internal bus event
+         * upstream that carries no payload at all. Validated at the page, same as `muser`.
+         */
+        data?: unknown;
       };
     }
   /**

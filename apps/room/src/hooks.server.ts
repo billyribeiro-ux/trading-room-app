@@ -4,13 +4,20 @@ import { resolveConnectedIdentity } from '$lib/server/connection';
 /**
  * Routes reachable without a session. Everything else requires one.
  *
- * `/session` is the handoff receiver, and it is the only one: the controller owns identity, so the
- * room's own email-and-password login was a second way in that the reference has no equivalent
- * for. It is gone. `/session` is public in the sense that it is reachable without a cookie, not in
- * the sense that it is unauthenticated — it refuses everything but a signed, unexpired, unspent
- * token from the controller.
+ * `/session` is the handoff receiver: the controller owns identity, so the room's own
+ * email-and-password login was a second way in that the reference has no equivalent for. It is gone.
+ *
+ * `/internal/media-hook` is MediaMTX reporting that a stream went live or stopped. It has no cookie
+ * because it is a `curl` spawned by a media server, not a browser.
+ *
+ * **Both are public in the sense that they are reachable without a cookie, and neither is
+ * unauthenticated.** `/session` refuses everything but a signed, unexpired, unspent token from the
+ * controller; `/internal/media-hook` refuses everything but a constant-time bearer match against
+ * `MEDIA_HOOK_SECRET`, and refuses everything outright when that is unset. Adding a path here moves
+ * the authentication decision INTO that route — it does not remove it, and a route added here
+ * without its own check is an open door.
  */
-const PUBLIC_PATHS = new Set(['/session']);
+const PUBLIC_PATHS = new Set(['/session', '/internal/media-hook']);
 
 export const handle: Handle = async ({ event, resolve }) => {
   const connection = resolveConnectedIdentity(event.cookies);
