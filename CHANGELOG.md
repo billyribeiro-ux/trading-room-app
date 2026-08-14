@@ -24,6 +24,42 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-14
 
+### 2026-08-14 08:36 EDT — item W unblocked: the writer was in the bundle all along
+
+No product code changed. This is a research result that moves an item from "cannot be built
+honestly" to "buildable", and it corrects a claim I wrote six hours earlier.
+
+Row W said `mediaService.saveData` had no captured writer. That was true of the decoded
+**components** and I generalised it into "uncaptured", which was wrong for a structural reason:
+**the media service is a service, not a component**, so no amount of component decoding would ever
+have contained it. `extract-component-source.mjs` takes an Angular selector; a service has none.
+The bundle itself was in this repository the whole time.
+
+Read straight out of `main.d6d3c112b59b7d0d.js`:
+
+| byte | what |
+| --- | --- |
+| 1114733 | the media-service constructor: `this.saveData=!1`, beside `isScreenSharing`, `presenterTalking`, `currPresenter` |
+| 1136736 | **the writer** — `toggleDisableVideo(){this.saveData=!this.saveData}` |
+| 2292763 | its only caller — an `<a>` in `nav > ul > li` in the **AV settings modal**, `x("click", …toggleDisableVideo())`, icon const 14, spans `txe`/`nxe` |
+| 1132193 | `callScreenOfUserWEBRTC(e,i=!1){ e&&null!=e ? this.saveData ? P("callScreenOfUserWEBRTC saveData on.. nop...") : (…)` |
+
+**That last one is the finding.** `saveData` does not hide a video — it stops the consumer being
+created, so no screen stream is ever requested. The h3 and the `hidden` class are only what the
+viewer sees; the bandwidth saving is that nothing is fetched.
+
+**And it is a DIFFERENT feature from the one shipped this morning.** `preferences.disableVideo` is a
+per-viewer pane preference, set from the user-settings modal, that swaps the screens and streams
+panes for a message. `saveData` is a media-layer switch, set from the AV settings modal, that
+refuses the WebRTC consumer. Both exist upstream, both have their own control, and only the first is
+built here. Conflating them is what the original row did.
+
+**The lesson is rule 2 with a new edge.** An absence claim expires when the evidence base grows —
+but this one was never true in the first place, because the search space was chosen by the shape of
+a tool rather than by where the thing lives. "Not in the decoded components" is a fact about the
+decoder. Recorded in row W with the byte offsets so the next reader starts from the evidence rather
+than from my summary of it.
+
 ### 2026-08-14 08:28 EDT — working rule 9: push freely, do not merge until done
 
 Owner instruction: **"push but not merge."**
