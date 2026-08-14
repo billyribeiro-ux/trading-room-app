@@ -1,5 +1,12 @@
 <script lang="ts">
   import { deserialize } from '$app/forms';
+  import { formatChatMutedTill } from '$lib/message-formatters';
+  import {
+    chatComposerEnabled,
+    isChatMode,
+    isWebinarMode,
+    webinarMessageVisible
+  } from '$lib/chat-mode';
   import {
     CHAT_PAGE_ARRIVAL_NUDGE,
     CHAT_PAGE_REQUEST_NUDGE,
@@ -1899,6 +1906,35 @@
    * who reaches it can finish.
    */
   const canUseRTE = $derived(data.sessData?.enableRTE === true && enableRTE && isPresenter);
+  /**
+   * The room's chat mode — `g` group, `p` webinar, `d` disabled.
+   *
+   * DERIVED from the load, with no local copy. The `changeChatMode` broadcast makes this page
+   * invalidate rather than assigning a mode itself, which is a deliberate departure from the rule
+   * two hundred lines below that the command channel "does not refetch — it ACTS". That rule is
+   * right for a command: `mutemic` is an instruction a browser carries out, and there is nothing to
+   * re-read. A chat mode is not an instruction, it is room STATE that is stored in `room_state` and
+   * read by the load — so a local copy would be a second source of truth that could disagree with
+   * the row, and the client's copy would be the one nobody could audit.
+   *
+   * The cost is one extra load on a rare presenter action. The benefit is that a tab which missed
+   * the broadcast, or received a forged one, converges on the row rather than diverging from it.
+   */
+  const chatMode = $derived(isChatMode(data.chatMode) ? data.chatMode : 'g');
+
+  /** `this.webinarMode = 'p' == e`. */
+  const webinarMode = $derived(isWebinarMode(chatMode));
+
+  /**
+   * Whether this viewer may type at all — the two reasons the reference replaces the composer with
+   * its `Chat Disabled` block, in one place.
+   *
+   * `'d' != chatMode` is the room's rule and applies to everyone; the mute is this viewer's own.
+   * The mute was enforced on the server long before it was ever shown, which is why a muted member
+   * used to press send and watch nothing happen at all.
+   */
+  const selfMutedUntil = $derived(data.chatMutedTill ? new Date(data.chatMutedTill) : null);
+  const chatEnabled = $derived(chatComposerEnabled(chatMode) && selfMutedUntil === null);
   const giphyApiKey = env.PUBLIC_PTR_GIPHY_API_KEY ?? '';
   const primaryIsFirst = $derived(roomSplitDir === 'ltr' || roomSplitDir === 'ttb');
   const defaultMainSplit = $derived(
@@ -2439,6 +2475,34 @@
       trimChatLogs
     )
       .filter((item) => item.room === chatTab && !isEvidenceMessageHidden(item))
+      /*
+        WEBINAR MODE. Upstream applies this as messages ARRIVE, dropping them before they ever reach
+        the log; applied here as a view filter instead, because this room re-reads its log from the
+        server on every invalidate and a drop-on-arrival would be undone by the next load.
+
+        The rule is the reference's, term for term — see `webinarMessageVisible`, including the
+        asymmetry that a message containing an `@` is dropped even when it is an admin message.
+
+        `isMention` is computed with the SAME rule the highlight and the popup use, rather than the
+        loose `indexOf('@')` upstream tests separately: one mention rule, in `$lib/mention`.
+      */
+      .filter((item) =>
+        !webinarMode
+          ? true
+          : webinarMessageVisible(
+              {
+                isAdmin: item.isAdmin === true,
+                senderId: item.senderId,
+                body: item.body,
+                isMention: isMentionOf(item.body, data.user.displayName, item.isAdmin === true)
+              },
+              {
+                id: data.user.id,
+                isPresenter,
+                hasAdminChat: data.user.hasAdminChat === true
+              }
+            )
+      )
       .map(withEvidenceState)
       /*
         `msg.b` — the sender's badges, attached here rather than stored on the row.
@@ -6271,6 +6335,22 @@
       .trim();
   }
 
+  /**
+   * `sendServerAdminCommand('changeChatMode', {mode})` — presenter-only, and re-checked there.
+   *
+   * No optimistic update. The mode is room state, so the answer that matters is the row the server
+   * wrote; `invalidateAll()` re-reads it, and the same broadcast reaches every other tab in the
+   * room. Assuming success here would show this presenter a mode nobody else had.
+   */
+  async function changeChatMode(mode: string) {
+    const body = new FormData();
+    body.set('mode', mode);
+    const response = await fetch('?/changeChatMode', { method: 'POST', body });
+    const result = deserialize<{ mode?: string }, { message?: string }>(await response.text());
+    if (result.type !== 'success') return;
+    await invalidateAll();
+  }
+
   function openImageUpload() {
     emojiOpen = false;
     giphyOpen = false;
@@ -6919,6 +6999,16 @@
           return;
         }
 
+        if (command?.cmd === 'changeChatMode') {
+          /*
+            The one command on this channel that refetches instead of acting, and the reason is in
+            the note on `chatMode` above: it is room STATE, held in `room_state` and read by the
+            load, so the row stays the only authority. The broadcast carries the new mode as well,
+            and it is deliberately NOT read here — trusting it would put room policy in the gift of
+            whatever arrives on a socket.
+          */
+          void invalidateAll();
+        }
         if (command?.cmd === 'focusOnScreen') {
           /*
             A presenter pulled the room to a screen. `selectScreenTabOfId` rather than assigning
@@ -9849,6 +9939,51 @@
                       </div>
                     </app-roomscroller>
 
+                    <!--
+                      `O(21, o.webinarMode ? 21 : -1)` —
+                      `<div class="px-1 webinarMode"> Webinar Mode <span …><i …></i></span><i></i></div>`,
+                      with the tooltip verbatim from const 56.
+                    -->
+                    {#if webinarMode}
+                      <div class="px-1 webinarMode">
+                        Webinar Mode
+                        <span
+                          {...{
+                            placement: 'top',
+                            ngbtooltip:
+                              'In webinar mode users only see their own chat messages, while Presenters see everyones messages...'
+                          } as Record<string, string>}
+                          {@attach ngbTooltip}
+                          class="ml-2"
+                        >
+                          <i class="fas fa-question-circle"></i>
+                        </span>
+                      </div>
+                    {/if}
+                    <!--
+                      `O(23, o.isConnected && o.chatEnabled ? 23 : 24)` — the composer, or the
+                      captured Chat Disabled block. Two reasons reach the same block: the room is in
+                      mode `d`, which applies to everyone, and this viewer is muted, which does not.
+
+                      The mute half was ENFORCED here long before it was ever shown — `sendMessage`
+                      refuses while a live row exists — so a muted member typed, pressed send, and
+                      watched nothing happen with no explanation anywhere.
+                    -->
+                    {#if !chatEnabled}
+                      <div class="chatDisabled d-flex align-items-center">
+                        <h5 class="pl-3">
+                          <i class="fas fa-lock"></i> Chat Disabled
+                          <!--
+                            `H(4, u0e, 3, 4, 'span')` under `O(4, e.chatMutedTill ? 4 : -1)` — the
+                            span appears only when the viewer is muted, which is what distinguishes
+                            "the room turned chat off" from "you personally cannot post".
+                          -->
+                          {#if selfMutedUntil}
+                            <span> till {formatChatMutedTill(selfMutedUntil)}</span>
+                          {/if}
+                        </h5>
+                      </div>
+                    {:else}
                     <div id="textAreaHolder" class="d-flex align-items-center textSendDiv">
                       <div class="flex-fill d-flex mx-0" {@attach observeComposerWidth}>
                         <div class="px-0 flex-fill">
@@ -10019,6 +10154,7 @@
                         </div>
                       </div>
                     </div>
+                    {/if}
                   </div>
                 </app-chat>
               </as-split-area>
@@ -11178,6 +11314,8 @@
       {isLimitedPresenter}
       canEditUsername={Boolean(data.sessData?.allowUsersToChangeUsername)}
       alerts={data.alerts}
+      {chatMode}
+      onChatModeChange={(mode) => void changeChatMode(mode)}
       {canUseRTE}
       {rteDraft}
       {rteIsEditing}

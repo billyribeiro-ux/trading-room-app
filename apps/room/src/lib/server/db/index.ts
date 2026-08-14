@@ -179,6 +179,11 @@ export function ensureDatabase() {
     );
     CREATE INDEX IF NOT EXISTS chat_mutes_target_expires_idx
       ON chat_mutes(target_user_id, expires_at);
+    CREATE TABLE IF NOT EXISTS room_state (
+      room_short_code TEXT PRIMARY KEY,
+      chat_mode TEXT NOT NULL DEFAULT 'g',
+      updated_at INTEGER NOT NULL
+    );
     CREATE TABLE IF NOT EXISTS sessions (
       id TEXT PRIMARY KEY,
       user_id INTEGER NOT NULL REFERENCES users(id),

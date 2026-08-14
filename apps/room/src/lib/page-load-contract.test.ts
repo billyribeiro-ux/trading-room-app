@@ -136,6 +136,8 @@ describe('page load contract', () => {
         "alerts",
         "badges",
         "canEditNotes",
+        "chatMode",
+        "chatMutedTill",
         "connectedUsers",
         "files",
         "lockedSettings",

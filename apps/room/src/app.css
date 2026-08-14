@@ -3139,3 +3139,22 @@ th {
   color: var(--tabs-color);
   text-align: center;
 }
+
+/*
+  `app-chat.full.js` component styles, verbatim:
+    .chatDisabled { height:40px; min-height:40px; width:100%; background-color:#fff; color:#000 }
+    .webinarMode  { background-color:#fff; color:#000; width:100% }
+*/
+.chatDisabled {
+  height: 40px;
+  min-height: 40px;
+  width: 100%;
+  background-color: #fff;
+  color: #000;
+}
+
+.webinarMode {
+  background-color: #fff;
+  color: #000;
+  width: 100%;
+}

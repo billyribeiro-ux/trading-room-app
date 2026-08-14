@@ -43,3 +43,27 @@ export const chatTimeFormatter = new Intl.DateTimeFormat('en-US', {
   hour: '2-digit',
   minute: '2-digit'
 });
+
+/**
+ * `chatMutedTill`, in the reference's own format.
+ *
+ * ```js
+ * Ne(' till ', Ct(2, 1, e.chatMutedTill, 'EEE @ h:mm a'), '')
+ * ```
+ *
+ * Angular's `EEE @ h:mm a` is short weekday, a literal ` @ `, then 12-hour time with minutes and
+ * AM/PM. `Intl` cannot express the literal in one pattern — asking for weekday and time together
+ * yields "Wed, 3:45 PM", with a comma where the capture has an at-sign — so the two parts are
+ * formatted separately and joined. Composed rather than hand-rolled: the weekday name and the
+ * 12-hour clock still come from `Intl`, which is what knows them.
+ */
+const mutedTillWeekday = new Intl.DateTimeFormat('en-US', { weekday: 'short' });
+const mutedTillTime = new Intl.DateTimeFormat('en-US', {
+  hour: 'numeric',
+  minute: '2-digit',
+  hour12: true
+});
+
+export function formatChatMutedTill(value: Date): string {
+  return `${mutedTillWeekday.format(value)} @ ${mutedTillTime.format(value)}`;
+}

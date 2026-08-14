@@ -563,3 +563,24 @@ export type Note = typeof notes.$inferSelect;
 export type NoteVersion = typeof noteVersions.$inferSelect;
 export type ChatMute = typeof chatMutes.$inferSelect;
 export type Session = typeof sessions.$inferSelect;
+
+/**
+ * Room-level state a PRESENTER changes at runtime, as opposed to what the owner configures on the
+ * Manage page.
+ *
+ * `chatMode` is the first and, today, the only such value. Upstream keeps it on the session record
+ * and the client reads it as `sessData.chatMode`; here the room owns its own database, so it lives
+ * in a row keyed by the room. It has to PERSIST rather than merely broadcast — unlike the recording
+ * state, which is genuinely momentary — because a member who joins after the presenter disabled
+ * chat must find it disabled.
+ */
+export const roomState = sqliteTable('room_state', {
+  /** One row per room. The short code is the key, so a room cannot hold two states. */
+  roomShortCode: text('room_short_code').primaryKey(),
+  /**
+   * `g` group chat, `p` webinar mode, `d` disabled — the reference's own three letters, from
+   * `changeChatMode(e, i)` and the `'p' == e` / `'d' != e` tests that read them back.
+   */
+  chatMode: text('chat_mode').notNull().default('g'),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull()
+});

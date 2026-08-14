@@ -35,6 +35,7 @@ import {
   loadNewestChatPages
 } from '$lib/server/chat-log';
 import { loadAlertPage } from '$lib/server/alert-log';
+import { isChatMode, type ChatMode } from '$lib/chat-mode';
 import { parseReactions } from '$lib/server/reactions';
 import { readRoomConfig, requestMobilePin, writeRoomSetting } from '$lib/server/room-config-client';
 import { alertSoundCommandValue } from '$lib/files-gates';
@@ -81,6 +82,7 @@ import {
   alerts,
   capturedItemOverrides,
   chatMutes,
+  roomState,
   hiddenRoomItems,
   messages,
   pollAnswers,
@@ -523,6 +525,38 @@ export const load: PageServerLoad = async ({ depends, locals, request, cookies }
     alerts: [...capturedRoom.alerts.filter(isVisible).map(withOverrides), ...alertRows].map(
       withQuestionState
     ),
+    /*
+      The room's chat mode, and whether THIS viewer is muted — the two reasons the reference shows
+      its `Chat Disabled` block, both read on the server.
+
+      `chatMode` is room state, so it comes from the row rather than from anything the client says.
+      Absent means `g`: a room whose presenter has never touched the control has group chat, which
+      is the reference's default too.
+
+      The mute was already ENFORCED here — `sendMessage` refuses while a row is live — and was
+      never exposed, so a muted member typed, pressed send, and watched nothing happen. Upstream
+      carries it on the session token as `chatMuted` / `chatMutedTill` precisely so the composer can
+      say so. Only the viewer's OWN mute crosses; who else is muted is none of their business.
+    */
+    chatMode:
+      db
+        .select({ chatMode: roomState.chatMode })
+        .from(roomState)
+        .where(eq(roomState.roomShortCode, requireRoomShortCode(locals)))
+        .get()?.chatMode ?? 'g',
+    chatMutedTill:
+      db
+        .select({ expiresAt: chatMutes.expiresAt })
+        .from(chatMutes)
+        .where(
+          and(
+            eq(chatMutes.roomShortCode, requireRoomShortCode(locals)),
+            eq(chatMutes.targetUserId, requireUser(locals).id),
+            gt(chatMutes.expiresAt, new Date())
+          )
+        )
+        .orderBy(desc(chatMutes.expiresAt))
+        .get()?.expiresAt ?? null,
     alertQuestions: questionRows,
     files: db
       .select()
@@ -1698,6 +1732,53 @@ export const actions: Actions = {
       data: { cmd, recName: recName || undefined }
     });
     return { success: true };
+  },
+
+  /**
+   * `sendServerAdminCommand('changeChatMode', {mode})` — a PRESENTER act that changes the room.
+   *
+   * ```js
+   * changeChatMode(e, i) {
+   *   if (sessData.chatMode == e) return;
+   *   let o = '"Group Chat"?';
+   *   'p' == e ? (o = '"Webinar Mode"?') : 'd' == e && (o = '"Disabled"?');
+   *   bootbox.confirm('Are you sure you want to change the chat mode to ' + o, s => {
+   *     s && this.appService.sendServerAdminCommand('changeChatMode', {mode: e});
+   *   });
+   * }
+   * ```
+   *
+   * PERSISTED, unlike the recording state next to it. Recording is momentary and a late joiner has
+   * missed nothing by not hearing it; a disabled chat is a standing fact about the room, and a
+   * member who arrives afterwards has to find it disabled. Broadcast as well, so the tabs that are
+   * already open change without waiting for a reload.
+   *
+   * Presenter-gated on the SERVER from the session's own role. The radio is presenter-only in the
+   * modal too, and a hidden control is not an authorization check.
+   */
+  changeChatMode: async ({ request, locals }) => {
+    ensureDatabase();
+    const user = requireUser(locals);
+    if (!isPresenterRole(user.role)) return fail(403, { message: 'Presenters only.' });
+
+    const data = await request.formData();
+    const mode = String(data.get('mode') ?? '');
+    // Deny by default: three letters, and anything else is refused rather than stored.
+    if (!isChatMode(mode)) return fail(400, { message: 'Unknown chat mode.' });
+
+    const roomShortCode = requireRoomShortCode(locals);
+    db.insert(roomState)
+      .values({ roomShortCode, chatMode: mode, updatedAt: new Date() })
+      /* One row per room, so a second change UPDATES rather than appending a second opinion about
+         what the mode is. The conflict target is the primary key. */
+      .onConflictDoUpdate({
+        target: roomState.roomShortCode,
+        set: { chatMode: mode, updatedAt: new Date() }
+      })
+      .run();
+
+    publishToRoom(roomShortCode, { channel: 'cmds', data: { cmd: 'changeChatMode', mode } });
+    return { success: true, mode };
   },
 
   /**

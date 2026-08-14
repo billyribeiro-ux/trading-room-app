@@ -24,6 +24,71 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-14
 
+### 2026-08-14 13:21 EDT — The chat mode control does something now, and a muted member is told
+
+**Runtime impact: yes.** A presenter can disable the room's chat, or put it into webinar mode, and it
+takes effect for everyone. Before today the control did nothing at all for anybody.
+
+**The defect, and it is the purest example of the class this repository hunts.** The settings modal
+has had a three-way radio — Group Chat, Webinar Mode, Disabled — since it was built. It wrote
+`onPreferenceChange('chatMode', mode)`, confirmed itself with a dialog, persisted the value, and
+**nothing in this room ever read `chatMode`**. A control whose only effect is changing its own label.
+
+It was also modelled at the wrong LEVEL, which is why the fix is a table rather than a mapping row.
+Upstream reads `sessData.chatMode` — ROOM state — and the control is
+`sendServerAdminCommand('changeChatMode', {mode})`, a presenter act that changes the room for
+everyone. A per-user preference could not have expressed that even if something had read it.
+
+**`TODO.md` row AB was wrong in both halves.** It recorded this as "the producer is not modelled, so
+the listener would be dead". The producer existed; the consumer did not. And the behaviour is fully
+specified in the bundle rather than absent from it.
+
+**Room state, persisted and broadcast.** A `room_state` row per room, upserted so a second change
+cannot append a second opinion. Persisted unlike the recording state beside it — recording is
+momentary and a late joiner has missed nothing, whereas a disabled chat is a standing fact and
+somebody arriving afterwards has to find it disabled. The broadcast makes the page **refetch** rather
+than assign a mode, which is a deliberate exception to the rule that the command channel "does not
+refetch — it ACTS": that rule is right for `mutemic`, an instruction with nothing to re-read, and
+wrong for state. Trusting the payload would put room policy in the gift of whatever arrives on a
+socket.
+
+**`d` — disabled.** The composer is replaced by the captured block:
+`<div class="chatDisabled d-flex align-items-center"><h5 class="pl-3"><i class="fas fa-lock"></i>
+Chat Disabled …`, with its two component styles copied verbatim.
+
+**And a MUTED member finally learns why.** The same block carries ` till EEE @ h:mm a` when the
+viewer has a live mute. That mute has been enforced in `sendMessage` since it was written and was
+never exposed, so a muted member typed, pressed send, and watched nothing happen with no explanation
+anywhere. Only the viewer's OWN mute crosses; who else is muted is none of their business. The suffix
+is the capture's format, composed from two `Intl` formatters because `Intl` cannot express the
+literal ` @ ` in one pattern.
+
+**`p` — webinar mode**, banner and filter both, because a banner without the filter would be a
+promise the room breaks. The rule is transcribed from the arrival handler rather than from the
+tooltip, and it is stricter than the tooltip suggests in one direction and looser in another: admin
+messages survive, your own always survive, and **a message containing an `@` is dropped even when it
+is an admin message** — the second clause has no `isA` guard. That asymmetry looks like an oversight
+upstream and is reproduced deliberately, because deciding it was meant otherwise would be inventing a
+rule.
+
+**A test of mine asserted the opposite of the evidence and the code was right.** I expected a mention
+to pierce webinar mode. It does not: clause one drops any non-admin message from somebody else
+whether or not it mentions you, and the mention escape lives only in clause two, which is reached
+solely by messages that already survived clause one. Corrected, with the reasoning recorded.
+
+**Two negative controls stayed GREEN and both were my harness, not the tests.** Replacing the first
+occurrence of a string in `+page.server.ts` hit `recordingState`'s presenter check rather than the new
+action's, and the first `invalidateAll()` in `+page.svelte` rather than the one in the handler. Re-run
+scoped to each region, both went red. Same family as the over-broad assertion caught at 13:01 — when
+two call sites carry identical lines, neither an assertion nor a control may be written file-wide.
+
+**Verified:** `svelte-check` 0 errors 0 warnings; room **1036/89**, up from 1011/87; controller
+937/90. **Twelve negative controls run and each went red**: filtering presenters, dropping either
+clause of the webinar rule, never disabling the composer, letting any member change the room mode,
+storing an arbitrary mode string, a composer that is never disabled, trusting the broadcast over the
+row, reverting to the dead preference, and a radio seeded from a local guess. **Not run:** the full
+gate.
+
 ### 2026-08-14 13:01 EDT — The alerts log is paged too, and the chat nudge was wrong
 
 **Runtime impact: yes.** The alerts read was the same unbounded `.all()` the chat read had been —

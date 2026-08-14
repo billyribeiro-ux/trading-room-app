@@ -77,6 +77,15 @@ export type RoomEvent =
         url?: string;
         recName?: string;
         /**
+         * `changeChatMode`'s payload — `g`, `p` or `d`.
+         *
+         * The row in `room_state` is the authority; this rides along so that tabs already open
+         * change without waiting for a reload, exactly as `recName` rides with `startRec`. A
+         * listener that trusted this instead of the row would be trusting the client with room
+         * policy, which is why the load reads the row on every navigation regardless.
+         */
+        mode?: string;
+        /**
          * `focusOnScreen`'s payload — the producer id of the screen a presenter is pulling the room
          * to. `sendServerAdminCommand("focusOnScreen", {id: e})` upstream; named `screenId` here
          * because `id` alone on a union this wide says nothing about what it identifies.

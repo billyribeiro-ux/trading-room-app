@@ -183,6 +183,10 @@
     rteDraft?: string;
     /** `Save` when editing an existing message, `Send` otherwise — the reference's two labels. */
     rteIsEditing?: boolean;
+    /** The room's chat mode — `g`, `p` or `d` — read from `room_state` by the page load. */
+    chatMode?: string;
+    /** `changeChatMode` — a presenter act that changes the room for everyone. */
+    onChatModeChange: (mode: string) => void;
     onRteDraftChange: (html: string) => void;
     onRteSend: () => void;
   }
@@ -253,6 +257,8 @@
     canUseRTE = false,
     rteDraft = '',
     rteIsEditing = false,
+    chatMode = 'g',
+    onChatModeChange,
     onRteDraftChange,
     onRteSend
   }: Props = $props();
@@ -401,7 +407,13 @@
     | 'webinar-tools'
   >('reset-session');
   let streamingControlTab = $state<'stream-player' | 'obs-streaming' | 'restream'>('obs-streaming');
-  let groupChatMode = $state('g');
+  /*
+    The room's chat mode, from `room_state` via the page load — NOT local state.
+
+    It was `$state('g')`, seeded to group chat on every open regardless of the room, so the radio
+    could show "Group Chat" in a room whose chat was disabled.
+  */
+  const groupChatMode = $derived(chatMode);
   let echoCancellation = $state(false);
   let noiseSuppression = $state(false);
   let autoGainControl = $state(false);
@@ -1272,9 +1284,20 @@
     if (preferenceKey) onPreferenceChange(preferenceKey, input.checked);
   }
 
+  /*
+    `sendServerAdminCommand('changeChatMode', {mode})`.
+
+    This used to be `onPreferenceChange('chatMode', mode)` — a per-user preference that nothing in
+    the room ever read. The control confirmed itself with a dialog, persisted a value, and changed
+    nothing for anybody. It was also the wrong LEVEL: upstream reads `sessData.chatMode`, so the
+    mode belongs to the ROOM and a presenter changes it for everyone. A preference could not have
+    expressed that even if something had read it.
+
+    No local assignment either. `groupChatMode` is a prop now, fed from the row the server just
+    wrote, so the radio shows what the room IS rather than what this browser last clicked.
+  */
   function applyGroupChatMode(mode: string) {
-    groupChatMode = mode;
-    onPreferenceChange('chatMode', mode);
+    onChatModeChange(mode);
   }
 
   function requestSettingsChatMode(mode: string) {
