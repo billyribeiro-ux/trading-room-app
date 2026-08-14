@@ -24,6 +24,37 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-14
 
+### 2026-08-14 08:20 EDT — PR #19 opened: 29 commits proposed to main
+
+Bookkeeping rather than a change — no file in the product moved. Recorded because the branch had
+been accumulating finished work with nowhere to land, and because the verification state at the
+moment of proposal is worth pinning.
+
+[#19](https://github.com/billyribeiro-ux/trading-room-app/pull/19) carries the whole of
+`fix/green-the-gate`: the evidence-gap work (register at 61 closed / 13 open / 13 parked / 87
+total), the four dead controls repaired today, the corepack fix, and the artifact untracking.
+
+**Verified locally immediately before the push**, which is the standing rule — the full gate runs
+once, right before a push, not after every edit:
+
+| | |
+| --- | --- |
+| controller | 937 tests / 90 files |
+| room | 815 tests / 75 files |
+| documented totals | verified across 4 sites |
+| `svelte-check` | 0 errors, 0 warnings |
+| `svelte-autofixer` | no issues |
+| prettier | clean |
+
+**Not claimed: that CI is green.** Vercel has deployed and passed. The backend gate was still
+running when this was written. It runs in FULL rather than skipping, because the diff touches
+`.github/workflows/backend-quality.yml` and the scope step deliberately treats that as a backend
+path — a change to the gate must be proved by the gate. Which is the right shape here, since the
+corepack repair is exactly what that job exercises first.
+
+Tracked as `TODO.md` row P, with the next action written out: read the run, then merge — **merging
+and pushing as separate acts**, because a push invalidates the green checks you were about to merge.
+
 ### 2026-08-14 08:19 EDT — 137 files of test output stopped being tracked
 
 **Runtime impact: none. Review impact: every future diff is readable.**
