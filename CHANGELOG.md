@@ -24,6 +24,39 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-14
 
+### 2026-08-14 11:32 EDT — recording preview specified and blocked on server-side recording
+
+**No code. A determination, made from the whole component rather than from its name.**
+
+We hold all of `app-rec-preview` — 158 lines plus its own stylesheet, a 350x260 draggable
+`.recsHolderScreen` fixed bottom-right with a 700x520 `-lg` variant, and the two strings it renders:
+"Recording paused." and " Recording Preview. (DELAYED UPTO 20s) ".
+
+**That heading explains the mechanism, and the mechanism is the blocker.** It is not a live video
+element. It is an `<img>` whose `src` is re-set every 1000ms to
+`${sessData.recPreviewLocation}?${Date.now()}` — a cache-busted poll of a snapshot somebody else
+generates. The delay is the snapshot pipeline's, not a UI choice.
+
+**`recPreviewLocation` is not a setting an owner can fill in.** It starts as `""` and the SERVER
+pushes it at runtime: `case "setRecPreview": globals.sessData.recPreviewLocation = i.url` (bundle
+byte 1023774). It appears in no manage-page template and in none of the 269 settings — I checked
+both before concluding.
+
+So the chain is: server-side recording produces snapshots, the server announces where, the client
+polls. **This room records client-side with `MediaRecorder`** — a declared divergence already
+recorded in item R — so nothing produces a snapshot and no `setRecPreview` ever arrives. Its two
+other gates, `isPresenter` and `!videoOnlyMode`, are moot beside that.
+
+Same blocker as item AC (`stopRecMsg`, the recording Notification the server never sends), and the
+same resolution: it closes when server-side recording exists, which the deployment plan defers.
+
+**Worth stating plainly: this one could have been faked convincingly.** Our recorder holds a live
+`MediaStream`, so a "recording preview" showing that stream would look right in a screenshot and be
+a different feature — no delay, no snapshot, no server. The component's own heading is what rules
+that out, and the row now carries the byte offset rather than my summary of it.
+
+Row X down to four items, all features. Room suite unchanged at 921 / 82.
+
 ### 2026-08-14 11:27 EDT — small-image-preview closed by evidence: its class styles nothing
 
 **No code, and that is the finding.** The checkbox does nothing upstream either.
