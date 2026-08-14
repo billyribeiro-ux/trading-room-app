@@ -32,7 +32,7 @@ this deployment does not have.
 | **X** | `app-recording-preview-window` — `setRecPreview` comes from the MediaMTX path | a MediaMTX cluster |
 | **AC** | `stopRecMsg` — the same producer, the same path | a MediaMTX cluster |
 
-| **AD** | **OBS / XSplit ingest — the owner requires browser AND external-encoder streaming, and the panel is a stub.** | an ingest endpoint |
+| **AD** | **OBS / XSplit ingest — contract COMPLETE in `apps/room/docs/OBS-XSPLIT-INGEST.md`, nothing built.** | a MediaMTX host at `streamServerMTX` |
 
 **Row AD, established 2026-08-14 16:2x.** The owner's requirement is that a presenter can stream from
 the BROWSER (works today, mediasoup) and from **OBS / XSplit** (does not). The reference's panel is at
@@ -45,13 +45,25 @@ cross-link ("you can re-stream this incoming stream to another rtmp destination,
 instruction blocks are switched by `O(1, e.useMTX ? -1 : 1)` — **`useMediaMTX` is exactly what turns
 OBS ingest from RTMP into WHIP**, which is the tie between this row and X/AC/R row 10.
 
-**The two paths, and they are not equal work.** WHIP is an HTTP POST of an SDP offer answered with an
-SDP answer, which maps directly onto a mediasoup `WebRtcTransport` + `Producer` — implementable in
-`services/media`, which is import-governed but explicitly permits authored divergence (the provenance
-ledger already counts "10 diverged + 1 authored here"). RTMP is a different stack entirely and needs
-MediaMTX or equivalent. So: **WHIP-only is buildable with what is deployed; RTMP requires MediaMTX,
-and MediaMTX would serve both.** That is the decision, and it is the same one X, AC and R row 10 wait
-on.
+**THE CONTRACT IS NOW COMPLETE — `apps/room/docs/OBS-XSPLIT-INGEST.md`, every value read at a cited
+byte offset.** The URLs are not guesses: `http://{streamServerMTX}:8889/room__{sessionID}__{name}/whip`
+and `rtmp://{streamServerMTX}/room__{sessionID}__{name}`, with the key from
+`invokeAdminCmd('getRTMPToken') -> {rtmpToken}` and `name` sanitised by
+`replace(/[^a-zA-Z0-9_-]/g,'_')` and THEN `encodeURIComponent` (byte 2157950, 2169850).
+**`streamServerMTX` is a DIFFERENT global from `streamServer`** — MediaMTX is its own host in the
+reference too, which is the separate media tier row H argues for.
+
+**Latency decides the protocol split, so it is not arbitrary.** WHIP is WebRTC end to end, sub-second,
+native in OBS since v30 — that is the quality path and the reason `useMediaMTX` exists. RTMP is TCP
+with buffering, but ingesting H.264 and republishing over WebRTC WITHOUT transcoding stays near a
+second, and XSplit is RTMP-centric so that path is what makes XSplit work at all. MediaMTX serves both
+and does not transcode when codecs align — one server answers both halves of the requirement.
+
+**What is blocked is not code.** A MediaMTX host at `streamServerMTX` with 8889 (WHIP/WHEP) and 1935
+(RTMP) reachable, TLS in front, and its `runOnReady`/`runOnNotReady` hooks pointed at the controller so
+`mtxStartStream`/`mtxStopStream` can be broadcast. Everything in the spec is buildable the day that
+host exists, and none of it should be built before — a panel handing a presenter a link to nowhere is
+the dead control this repository refuses to ship.
 
 **One decision unblocks X, AC and R's row 10, and it is not "build server-side recording".** Established
 2026-08-14 from the bundle: the reference hands recording to **MediaMTX**, an off-the-shelf media
