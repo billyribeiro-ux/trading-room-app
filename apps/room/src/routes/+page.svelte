@@ -5002,6 +5002,17 @@
       .querySelectorAll<HTMLMediaElement>(`[id^="msRemAudio-${userID}"]`)
       .forEach((element) => {
         element.volume = level;
+        /*
+          `s.pause()` on the way down, and playing again on the way up — the other half of
+          `stopListeningToPresenter`, which this room set volume for and never paused.
+
+          Audibly the two are the same; the difference is that a paused element stops DECODING,
+          which is the saving upstream actually makes. `play()` returns a promise that rejects if
+          the element is removed mid-call, so the rejection is swallowed deliberately: a muted
+          presenter leaving while you unmute them is not an error anybody can act on.
+        */
+        if (level === 0) element.pause();
+        else if (element.paused) void element.play().catch(() => {});
       });
   }
 
@@ -5013,15 +5024,29 @@
    *
    * 1. **The persistence**, `setPreference('audioMutedFor'|'audioVolumeFor', …)`, which is this
    *    room's `savePreference`.
-   * 2. **The SFU half** — and this is an HONEST GAP rather than a reproduction.
-   *    `mediaSoupService.startListeningToPresenter` / `stopListeningToPresenter` stop the server
-   *    SENDING that presenter's audio; this room's signalling wire has no equivalent command
-   *    (`Commands` in `src/lib/media/signalling.ts` carries `resumeConsumer`, `closeConsumer`,
-   *    `pauseProducer`, `resumeProducer` — nothing that pauses a consumer, and `closeConsumer`
-   *    cannot be undone without re-consuming from a `ProducerInfo` this page does not retain).
-   *    So the mute is applied where it can be applied honestly: the listener's own audio element.
-   *    The member hears exactly what the reference's member hears; the bandwidth saving is the part
-   *    that is missing, and `TODO.md` records it with the exact command that would close it.
+   * 2. **Pausing the listener's own audio element** — which is ALL the reference does, and this
+   *    comment said the opposite for weeks.
+   *
+   *    It used to read that `stopListeningToPresenter` stops the server SENDING that presenter's
+   *    audio, that our wire has no equivalent command, and that "the bandwidth saving is the part
+   *    that is missing". Reading the function settles it — there is no such saving to miss:
+   *
+   *    ```js
+   *    stopListeningToPresenter(e) {
+   *      if (this.globals.chatOnlyMode) return;
+   *      let s = document.getElementById("msRemAudio-" + e.userID);
+   *      s && (s.pause(), s.currentTime = 0);
+   *    }
+   *    ```
+   *
+   *    No socket, no command, no consumer. It pauses the same hidden `<audio>` element this room
+   *    already reaches for, so upstream's consumer keeps receiving exactly as ours does. The claim
+   *    came from reading the two CALLERS — which do call `startListeningToPresenter` — and assuming
+   *    the pair was symmetric. `startListeningToPresenter` does reach the SFU: it consumes. `stop`
+   *    does not.
+   *
+   *    `currentTime = 0` is deliberately not reproduced: an element backed by a live `MediaStream`
+   *    is not seekable, so the assignment does nothing upstream and can throw here.
    */
   function toggleTalkingPresenterAudio(user: PresenterAudioUser) {
     const next = toggleTalkingPresenter(presenterAudio, user);

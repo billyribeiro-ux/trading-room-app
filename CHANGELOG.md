@@ -24,6 +24,50 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-14
 
+### 2026-08-14 14:18 EDT — Row V closed by evidence: the "missing bandwidth saving" was never there
+
+**Runtime impact: small and real** — a muted presenter's audio element is now PAUSED rather than
+merely turned down.
+
+**Row V's premise was wrong, and so was a long comment in `+page.svelte` that repeated it.** Both
+said that `mediaSoupService.stopListeningToPresenter` "stops the server SENDING that presenter's
+audio", that this room's signalling wire has no equivalent command, and that "the bandwidth saving is
+the part that is missing". Reading the function settles it:
+
+```js
+stopListeningToPresenter(e) {
+  if (this.globals.chatOnlyMode) return;
+  let s = document.getElementById("msRemAudio-" + e.userID);
+  s && (s.pause(), s.currentTime = 0);
+}
+```
+
+No socket, no command, no consumer. It pauses the same hidden `<audio>` element this room already
+reaches for. There is no saving to miss, and the two options the row offered the owner — add
+`pauseConsumer` to the SFU mirror, or retain every `ProducerInfo` so `closeConsumer` can round-trip —
+were both solutions to a problem upstream does not solve either.
+
+**How the wrong claim survived**: it was derived from the two CALLERS. `toggleTalkingPresenter` and
+`adjustVolPres` do call `startListeningToPresenter`, and that one DOES reach the SFU — it consumes.
+The pair was assumed symmetric. It is not, and the asymmetry is the whole finding. `services/media`'s
+own source says the same thing from the other side: "the bundle contains no `pauseConsumer` command
+and no client-side `consumer.resume()` anywhere".
+
+**One genuine fidelity gap did fall out of it, in the opposite direction.** This room set
+`volume = 0` and never paused. Audibly identical; the difference is that a paused element stops
+DECODING, which is the saving upstream actually makes. It pauses on mute and plays on unmute now.
+`currentTime = 0` is deliberately not reproduced — an element backed by a live `MediaStream` is not
+seekable, so the assignment does nothing upstream and can throw here.
+
+**This is the third TODO row whose premise did not survive being read** — T2-18's family, then AB
+("the producer is not modelled": it was; the consumer was not), now V. All three were closed by
+reading the evidence rather than by writing code, and in two of the three the row had been steering
+work toward building something that already existed or was never needed.
+
+**Verified:** `svelte-check` 0 errors 0 warnings; room **1075 tests across 91 files**, unchanged in
+count because this closes a row rather than adding a feature. **Not run:** the full gate on this
+branch.
+
 ### 2026-08-14 14:12 EDT — Register cleared to what is genuinely blocked; TODO pruned
 
 **Runtime impact: none.** Bookkeeping, recorded because the register had stopped telling the truth
@@ -90,8 +134,11 @@ no `setRecPreview` ever arrives. Building it would ship a component that cannot 
 frame locally would invent a mechanism the reference does not have — its own heading says "DELAYED
 UPTO 20s" precisely because the snapshot is made server-side.
 
-**Verified:** `svelte-check` 0 errors 0 warnings; room **1066 tests across 90 files**, up from
-1062/90. **Five negative controls run and each went red**: letting a hidden tab keep refetching,
+**Verified:** `svelte-check` 0 errors 0 warnings; room **1075 tests across 91 files**, up from
+1062/90. (This entry first said 1066/90 — the number was read before `visibility-change-contract.test.ts`
+was added, so it undercounted by that file's nine tests. Corrected 14:18 rather than left to be
+found by the next person who runs the suite.) **Five negative controls run and each went red**:
+letting a hidden tab keep refetching,
 refetching on every return even when nothing arrived, leaking the visibilitychange listener, cutting
 the preference wire, and inheriting the reference's ON default. **Not run:** the full gate on this
 branch.
