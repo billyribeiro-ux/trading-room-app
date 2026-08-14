@@ -1057,7 +1057,29 @@
     }
     return map;
   }
-  let subtitles = $state(false);
+  /**
+   * This viewer's caption-overlay preference — `preferences.showSpeechRecoOverlay`.
+   *
+   * `$state(false)` before, seeded from nothing, and that was the whole bug: the navbar's
+   * `presentation-subtitles` checkbox seeds and renders from
+   * `soundChecks['presentation-subtitles']`, persists through `savePreference`, and **never touched
+   * this**. Two comments in this file asserted it was "already wired". It was not — the only
+   * writers were `toggleMute`, `setMasterVolume` and the overlay's own close button. So the
+   * checkbox read "on" by default while the overlay was off, and ticking it did nothing at all.
+   *
+   * `!== false` reproduces the reference's gate exactly:
+   * `isSpeechRecoOverlayEnabled() { const e = …preferences.showSpeechRecoOverlay; return null == e
+   * || !!e }` (`app-presentationarea.full.js:2409-2412`) — absent, null and true all enable it, and
+   * only an explicit `false` turns it off. The same expression already seeds the checkbox at the
+   * `soundChecks` declaration below, which is where that reasoning was first written down; it
+   * simply never reached the state the overlay reads.
+   *
+   * Defaulting ON is safe rather than noisy, because the overlay carries its OWN second gate:
+   * `SpeechRecoOverlay.svelte:86` renders nothing at all unless there is a current caption or a
+   * non-empty history. Two gates, both of which must be open — which is what the comment at the
+   * render site already claimed.
+   */
+  let subtitles = $state(loadedSettings.showSpeechRecoOverlay !== false);
   /**
    * Closed captions.
    *
@@ -2922,6 +2944,17 @@
       if (key === 'recordingStopSound') recordingStopSound = value;
       if (key === 'pushToTalk') pushToTalk = value;
       if (key === 'doSpeechReco') doSpeechReco = value;
+      /*
+        Both halves, because this preference has TWO controls: the navbar's
+        `presentation-subtitles` checkbox and the settings modal's `app-speech-reco-overlay`. The
+        navbar one sets `soundChecks` itself before calling here, so that line is redundant for it
+        and load-bearing for the modal — without it, changing the setting from the modal would open
+        the overlay while the navbar checkbox went on reading "off".
+      */
+      if (key === 'showSpeechRecoOverlay') {
+        subtitles = value;
+        soundChecks['presentation-subtitles'] = value;
+      }
     }
     if (typeof localStorage !== 'undefined') {
       localStorage.setItem(key, JSON.stringify(value));

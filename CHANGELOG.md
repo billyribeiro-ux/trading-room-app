@@ -24,6 +24,46 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-14
 
+### 2026-08-14 07:37 EDT — the caption overlay was gated on a flag nothing set
+
+**Runtime impact: captions can now be switched on.** The subtitles checkbox had never opened the
+overlay for anybody.
+
+This was the item the previous entry named as "worth doing next", and tracing it found a bigger
+defect than the mapping row it was filed under. `subtitles` — the state the overlay renders on —
+was `$state(false)`, **seeded from nothing**. The navbar's `presentation-subtitles` checkbox seeds
+and renders from `soundChecks['presentation-subtitles']`, which IS read from the stored preference,
+and persists correctly through `savePreference`. The two were never connected. The only writers of
+`subtitles` were `toggleMute`, `setMasterVolume` and the overlay's own close button.
+
+So the checkbox read **"on" by default while the overlay was off**, and ticking it changed neither.
+Two comments in the file asserted it was "already wired" — one of them at the render site, one
+above the declaration. Both were false, and both are now true.
+
+Worse, the `soundChecks` seed carries a comment explaining that `=== true` was wrong there because
+"the overlay stayed disabled and captions never appeared however well the rest of the pipeline
+worked". That fix was correct and landed on the checkbox only; the state the overlay actually reads
+kept its `false`. **A fix whose reasoning was right and whose reach was one variable short** — which
+is the argument for tracing a consumer rather than stopping at the control.
+
+**The gate is the reference's, not a guess:**
+`isSpeechRecoOverlayEnabled() { const e = …preferences.showSpeechRecoOverlay; return null == e ||
+!!e }` (`app-presentationarea.full.js:2409-2412`). Absent and null both enable; only an explicit
+`false` disables. `!== false` reproduces it exactly, and `=== true` has its own negative control.
+
+**Defaulting ON is safe rather than noisy**, and that was checked before changing it:
+`SpeechRecoOverlay.svelte:86` carries a second gate and renders nothing at all without a current
+caption or a non-empty history. Two gates, both of which must be open — which is what the render
+site's comment already described.
+
+The settings modal's `app-speech-reco-overlay` is the same preference's second control and is now
+mapped too, with `soundChecks` kept in agreement so the navbar checkbox cannot end up contradicting
+the modal.
+
+**Verified:** 25 tests (6 new). Two negative controls on the seed alone — reverted to
+`$state(false)`, and narrowed to `=== true` — each red, green on restore. Room suite 811 tests / 75
+files, `svelte-check` 0 errors, prettier clean.
+
 ### 2026-08-14 07:33 EDT — four settings checkboxes that saved correctly and did nothing
 
 **Runtime impact: real, and member-visible.** Turning off "Start recording sound" now stops the

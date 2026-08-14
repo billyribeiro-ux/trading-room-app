@@ -69,6 +69,12 @@ const WIRES = [
     preference: 'doSpeechReco',
     handler: 'speechRecoCCOnChange',
     assignment: "if (key === 'doSpeechReco') doSpeechReco = value;"
+  },
+  {
+    id: 'app-speech-reco-overlay',
+    preference: 'showSpeechRecoOverlay',
+    handler: 'showSpeechRecoOverlayOnChange',
+    assignment: "if (key === 'showSpeechRecoOverlay') {"
   }
 ] as const;
 
@@ -122,6 +128,27 @@ describe('the wire has no silent break points', () => {
     */
     expect(pageCode).toContain('let pushToTalk = $state(loadedSettings.pushToTalk === true);');
     expect(pageCode).not.toContain('$derived(loadedSettings.pushToTalk');
+  });
+
+  it('the caption overlay is seeded from the preference, not from false', () => {
+    /*
+      The bug this replaced: `subtitles` was `$state(false)` seeded from nothing, while the navbar
+      checkbox seeded and rendered from `soundChecks['presentation-subtitles']`. The checkbox read
+      "on" by default and the overlay was off, and ticking it changed neither.
+
+      `!== false` is the reference's own gate — `isSpeechRecoOverlayEnabled()` is
+      `null == e || !!e` (`app-presentationarea.full.js:2409-2412`), so absent and null both enable.
+      `=== true` here would silently disable captions for every viewer who has never touched the
+      checkbox, which is the exact defect the `soundChecks` seed was fixed for once already.
+    */
+    expect(pageCode).toContain(
+      'let subtitles = $state(loadedSettings.showSpeechRecoOverlay !== false);'
+    );
+  });
+
+  it('both controls for the overlay stay in agreement', () => {
+    // The modal is the second control; without this the navbar checkbox would contradict it.
+    expect(pageCode).toContain("soundChecks['presentation-subtitles'] = value;");
   });
 
   it('the consumers the wires feed are still there', () => {

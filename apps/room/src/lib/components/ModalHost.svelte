@@ -1203,7 +1203,8 @@
       'app-recording-start-sound': 'recordingStartSound',
       'app-recording-stop-sound': 'recordingStopSound',
       'presenter-push-to-talk': 'pushToTalk',
-      'presenter-speech-recognition': 'doSpeechReco'
+      'presenter-speech-recognition': 'doSpeechReco',
+      'app-speech-reco-overlay': 'showSpeechRecoOverlay'
     };
     onPreferenceChange(preferenceKeyByInputId[input.id] ?? input.id, input.checked);
   }
