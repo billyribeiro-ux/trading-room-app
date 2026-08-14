@@ -384,7 +384,23 @@ export const load: PageServerLoad = async ({ depends, locals, request, cookies }
       senderRole: users.role
     })
     .from(alertQuestions)
+    /*
+      SCOPED TO THIS ROOM — added 2026-08-14, and it was a cross-tenant leak until then.
+
+      `alert_questions` is the one room-owned table with NO `room_short_code` column: it reaches its
+      room through `alert_id`, which the delete path already documents ("`alertQuestions` reaches
+      its room through `alertId`"). This read had no filter of any kind, so every browser in every
+      room received every alert question in the deployment — question bodies, and the name, avatar
+      and role of whoever asked — serialised into the SSR HTML and into the `__sveltekit` payload.
+      What the client chose to RENDER was never the point; the data had already crossed.
+
+      Joining through `alerts` applies the room the same way every other read here does. The
+      alternative — adding `room_short_code` to the table — would denormalise a fact this schema
+      already derives, and would need a backfill that this join makes unnecessary.
+    */
+    .innerJoin(alerts, eq(alerts.id, alertQuestions.alertId))
     .innerJoin(users, eq(alertQuestions.senderId, users.id))
+    .where(eq(alerts.roomShortCode, requireRoomShortCode(locals)))
     .orderBy(asc(alertQuestions.createdAt), asc(alertQuestions.id))
     .all()
     .map(({ senderEmail, ...question }) => ({
@@ -1030,7 +1046,23 @@ export const actions: Actions = {
             alertId,
             requireRoomShortCode(locals)
           )?.senderId ?? null);
-    const isAnswer = alertAuthorId !== null && alertAuthorId === requireUser(locals).id;
+    /*
+      THE ALERT MUST BE IN THIS ROOM — added 2026-08-14, and it was a cross-tenant WRITE until then.
+
+      The lookup above is correctly scoped, but its answer was only ever used to decide `isAnswer`.
+      A miss produced `null`, `isAnswer` went false, and the insert below ran anyway with whatever
+      `alertId` the form carried — so a member of one room could attach a question to another room's
+      alert, and that room's Q&A thread would display it. `alert_questions` has no room column of
+      its own, so nothing downstream could catch it either.
+
+      `null` here means exactly one thing: no alert with that id exists in THIS room. `senderId` is
+      `notNull`, so a found row always answers; and `capturedRoomItem` is given the room too, so a
+      captured alert that is hidden or belongs elsewhere is a miss as well. Refusing on `null` is
+      therefore the whole check, and it fails closed.
+    */
+    if (alertAuthorId === null) return fail(404, { message: 'Alert not found.' });
+
+    const isAnswer = alertAuthorId === requireUser(locals).id;
     const now = new Date();
 
     const stored = db.transaction((transaction) => {

@@ -24,6 +24,44 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-14
 
+### 2026-08-14 12:47 EDT — SECURITY: alert questions crossed rooms, in both directions
+
+**Runtime impact: yes, and this is a tenancy fix rather than a feature.** Two independent holes in
+the same table, found while reading the alerts query to page it. Both are closed, and both have a
+test that goes red when the fix is reverted.
+
+**`alert_questions` is the one room-owned table with no `room_short_code` column.** It reaches its
+room through `alert_id` — the delete path already says so in a comment. That is a legitimate design;
+what was missing is that every read and write had to apply it, and two did not.
+
+**The READ: every room received every room's questions.** The load selected `alert_questions` with
+no WHERE clause of any kind, and handed the result to the page as `alertQuestions`. So question
+bodies, and the name, avatar and role of whoever asked them, were serialised into the SSR HTML and
+the `__sveltekit` payload of every other room in the deployment. What the client chose to RENDER was
+never the point — the data had already crossed, and it reaches any cache in front of the room and
+any HAR attached to a support ticket. It is scoped now by joining through `alerts`, which is how the
+row reaches its room; adding a column would denormalise a fact the schema already derives and would
+need a backfill this join makes unnecessary.
+
+**The WRITE: a member of one room could inject a question into another room's alert.** `askQuestion`
+looked the alert up correctly scoped — and used the answer ONLY to decide whether the asker was the
+alert's author. A miss returned `null`, `isAnswer` went false, and the insert ran anyway with
+whatever `alertId` the form carried. The row landed against a foreign alert, and that room's Q&A
+thread would display it. `null` there means exactly one thing — no alert with that id exists in this
+room — because `senderId` is `notNull` and `capturedRoomItem` is given the room too, so refusing on
+`null` is the whole check and it fails closed.
+
+**Both tests assert the hard direction.** The read is pinned in `room-isolation-contract.test.ts`,
+which exists for precisely this class and whose own note warns that emptiness from being refused is
+a test passing for the wrong reason — so it also asserts the question IS visible in the room that
+owns it. The write is pinned in `message-alert-action-contract.test.ts` on the ROWS rather than the
+return value, because an action that refuses politely and inserts anyway is the exact shape of the
+bug.
+
+**Verified:** `svelte-check` 0 errors 0 warnings; room **1003/87**. Two negative controls run, each
+red: removing the room scope from the questions read, and restoring the write path's missing refusal.
+**Not run:** the full gate.
+
 ### 2026-08-14 12:43 EDT — The chat log read is bounded, and its history is still reachable
 
 **Runtime impact: yes, and it is the largest performance change made to this room.** The page load

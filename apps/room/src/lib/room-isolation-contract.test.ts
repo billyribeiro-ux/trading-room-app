@@ -2,6 +2,7 @@ import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { and, eq } from 'drizzle-orm';
 import { db, ensureDatabase } from '$lib/server/db';
 import {
+  alertQuestions,
   alerts,
   messages,
   notes,
@@ -110,11 +111,26 @@ beforeAll(() => {
       createdAt: now
     })
     .run();
-  db.insert(alerts)
+  const otherRoomAlert = db
+    .insert(alerts)
     .values({
       roomShortCode: OTHER_ROOM,
       senderId: probe.id,
       body: 'another room’s alert',
+      createdAt: now
+    })
+    .returning()
+    .get();
+  /*
+    A question on that alert. `alert_questions` is the ONE room-owned table with no
+    `room_short_code` column — it reaches its room through `alert_id` — which is exactly why its
+    read had no filter until 2026-08-14 and every room received every room's questions.
+  */
+  db.insert(alertQuestions)
+    .values({
+      alertId: otherRoomAlert.id,
+      senderId: probe.id,
+      body: 'another room’s question',
       createdAt: now
     })
     .run();
@@ -177,10 +193,30 @@ describe('a room created a moment ago', () => {
 
     expect(data.messages, 'chat').toEqual([]);
     expect(data.alerts, 'alerts').toEqual([]);
+    expect(data.alertQuestions, 'alert questions').toEqual([]);
     expect(data.notes, 'notes').toEqual([]);
     expect(data.files, 'files').toEqual([]);
     expect(data.savedPolls, 'saved polls').toEqual([]);
     expect(data.activePoll, 'active poll').toBeNull();
+  });
+
+  it('and the alert questions really were scoped, not merely absent', async () => {
+    /*
+      The direction this file warns about: emptiness that comes from being refused rather than from
+      scoping is a test passing for the wrong reason. The question inserted in `beforeAll` must be
+      visible in the room that OWNS it, or the assertion above proves nothing.
+
+      This was a live cross-tenant leak until 2026-08-14. `alert_questions` has no room column, and
+      the load selected the table with no WHERE at all — so question bodies, and the name, avatar
+      and role of whoever asked, were serialised into every other room's SSR HTML. It is scoped now
+      by joining through `alerts`, which is how the row reaches its room.
+    */
+    const owner = await pageDataFor(OTHER_ROOM);
+    /* Annotated rather than inferred: `load`'s return reaches here through the `as unknown as`
+       cast this file already uses to build its event, so the element type does not survive. The
+       annotation states exactly the field this assertion depends on. */
+    const bodies = owner.alertQuestions.map((question: { body: string }) => question.body);
+    expect(bodies).toContain('another room’s question');
   });
 
   it('renders none of the capture fixture, which is match material and not content', async () => {
