@@ -24,6 +24,42 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-14
 
+### 2026-08-14 13:52 EDT — The extra column's last two gaps: mention routing, and hideChat
+
+**Runtime impact: yes.** Both gaps recorded at 13:45 are closed, so the second chat column is
+complete rather than mostly built.
+
+**Mentions now reach the column you are actually in.** The rule is upstream's, both terms:
+`preferences.extraChatColumn && (this.extraChatMsg || 'textAreaTxtExtra' === globals.chatInputFocus)`.
+The first term covers clicking a name inside the extra column. The second is the one that is easy to
+miss and the reason the flag exists at all: clicking a name in the MAIN log while you are composing
+in the extra column has to insert where you are typing, not where you clicked. Both composers report
+focus now, because without that the flag never moves and the second term is dead.
+
+**`hideChat` — the pane collapses for non-presenters while chat is disabled.** `chatSize = 0`,
+`alertSize = 100`, emitted only for everyone who is not a presenter: the presenter turned chat off
+and still has to read it. Restored to the size it was when the mode returns.
+
+**The extra column is hidden by a RUNTIME override, and that detail is the whole point.** Upstream
+assigns `preferences.extraChatColumn = !1` directly and never calls `setPreference` on that path,
+remembering the old value in `extraChatColumnWasEnabled`. Persisting it instead would have silently
+destroyed the viewer's own setting the first time any presenter disabled chat — they would turn chat
+back on and find their second column gone for good. The contract asserts the collapse writes no
+preference at all.
+
+**One thing deliberately NOT reproduced.** `app-extra-chat` subscribes to `doUserInfo` and clears
+`#textAreaTxtExtra` whenever any user-info modal opens — throwing away whatever the viewer had typed,
+for no reason the capture states. The ROUTING is reproduced; the clear is not, and the reason is
+recorded where the decision was made rather than in a commit nobody will find.
+
+**Verified:** `svelte-check` 0 errors 0 warnings; room **1062 tests across 90 files**, up from
+1055/90. **Seven negative controls run and each went red**: dropping the focus term from the mention
+router, stopping the extra column reporting its own rows, removing the focus report, collapsing the
+presenter's pane too, not collapsing chat to zero, letting the extra column survive the collapse, and
+persisting the hide instead of overriding it. Two earlier assertions were re-pointed deliberately —
+the render gate is `extraChatColumnVisible` now, not the raw preference, precisely because the
+collapse must not persist. **Not run:** the full gate on this branch.
+
 ### 2026-08-14 13:45 EDT — The extra chat column, as a second component rather than a refactor
 
 **Runtime impact: yes.** Ticking "Extra Chat Column" in the settings modal now adds a second chat

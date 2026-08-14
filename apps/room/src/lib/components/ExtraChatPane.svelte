@@ -83,6 +83,8 @@
     openMenuKey: string | null;
     onmenutoggle: (key: string | null) => void;
     onaction: (action: MessageAction, message: RoomMessageItem, event?: MessageActionEvent) => void;
+    /** `onTextareaFocus(e, 'textAreaTxtExtra')` — reports which composer the viewer is in. */
+    onfocus: () => void;
     onsend: () => void;
     onscroll: (scroller: HTMLElement) => void;
     onscrollerready: (scroller: HTMLElement | undefined) => void;
@@ -123,6 +125,7 @@
     openMenuKey,
     onmenutoggle,
     onaction,
+    onfocus,
     onsend,
     onscroll,
     onscrollerready,
@@ -324,6 +327,7 @@
               placeholder="Type your message here.."
               class="txt-area form-control border-0"
               bind:value={composer}
+              {onfocus}
               onkeydown={submitOnEnter}></textarea>
           </div>
           <div

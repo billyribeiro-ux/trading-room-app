@@ -67,11 +67,11 @@ describe('K4e reverses the child order, which is why the DOM is reordered', () =
     const source = compact(PAGE);
     // Mobile: presentation, gutter, chat/alerts.
     expect(source).toContain(
-      '{#ifisMobileScreen}{#if!hidePresentation}{@renderpresentationPane()}{/if}{@rendermainGutter()}{#if!hideChatAlerts}{@renderchatAlertsPane()}{/if}{#if!hideChatAlerts&&extraChatColumn}{@renderextraChatPane()}{/if}'
+      '{#ifisMobileScreen}{#if!hidePresentation}{@renderpresentationPane()}{/if}{@rendermainGutter()}{#if!hideChatAlerts}{@renderchatAlertsPane()}{/if}{#if!hideChatAlerts&&extraChatColumnVisible}{@renderextraChatPane()}{/if}'
     );
     // Desktop: chat/alerts, the extra column, presentation, gutter.
     expect(source).toContain(
-      '{:else}{#if!hideChatAlerts}{@renderchatAlertsPane()}{/if}{#if!hideChatAlerts&&extraChatColumn}{@renderextraChatPane()}{/if}{#if!hidePresentation}{@renderpresentationPane()}{/if}{@rendermainGutter()}{/if}'
+      '{:else}{#if!hideChatAlerts}{@renderchatAlertsPane()}{/if}{#if!hideChatAlerts&&extraChatColumnVisible}{@renderextraChatPane()}{/if}{#if!hidePresentation}{@renderpresentationPane()}{/if}{@rendermainGutter()}{/if}'
     );
     /*
       THE THIRD AREA, added 2026-08-14. `K4e` renders three `as-split-area` children and gates the

@@ -2042,6 +2042,60 @@
     order puts it after that column, which is what `orderChatAlerts()` resolves to when the extra
     column is present.
   */
+  /**
+   * `hideChat` — the chat pane collapses for NON-presenters while the room's chat mode is `d`.
+   *
+   * ```js
+   * guiEventBus.subscribe('changeChatMode', e => { …
+   *   setTimeout(() => { guiEventBus.emit('resizeChatView');
+   *     this.isPresenter || guiEventBus.emit('hideChat', 'd' == e); }, 1e3) })
+   *
+   * guiEventBus.subscribe('hideChat', i => {
+   *   if (i) { this.chatSize = 0; this.alertSize = 100;
+   *     preferences.extraChatColumn && (preferences.extraChatColumn = !1,
+   *                                     this.extraChatColumnWasEnabled = !0) }
+   *   else { this.extraChatColumnWasEnabled && (preferences.extraChatColumn = !0, …)
+   *          … restore alertSize/chatSize from localStorage … } })
+   * ```
+   *
+   * A presenter keeps their pane: they are the one who turned chat off and still has to read it.
+   *
+   * The extra column is turned off WITHOUT persisting — upstream assigns
+   * `preferences.extraChatColumn` directly and never calls `setPreference` on this path, so the
+   * viewer's own setting is remembered and restored rather than overwritten. Reproduced with a
+   * runtime override for exactly that reason.
+   *
+   * Sizes are restored from what they were rather than from `localStorage` keys: upstream reads
+   * `chatAlertSizes` or `chatAlertSizes-bottom` depending on split direction because its sizes live
+   * in those keys, and ours live in `chatAlertsSplit`. Same outcome, one source of truth.
+   */
+  let chatCollapsedByMode = $state(false);
+  let splitBeforeCollapse: number | null = null;
+  let extraChatColumnWasEnabled = false;
+
+  $effect(() => {
+    const shouldHide = !isPresenter && chatMode === 'd';
+    if (shouldHide === chatCollapsedByMode) return;
+    if (shouldHide) {
+      splitBeforeCollapse = chatAlertsSplit;
+      extraChatColumnWasEnabled = extraChatColumn;
+      // `chatSize = 0; alertSize = 100` — the alerts pane takes the whole column.
+      chatAlertsSplit = 1;
+      chatCollapsedByMode = true;
+      return;
+    }
+    chatAlertsSplit = splitBeforeCollapse;
+    chatCollapsedByMode = false;
+  });
+
+  /**
+   * Whether the second column is on screen.
+   *
+   * `extraChatColumn` is the viewer's preference; this is that preference AND the collapse, so the
+   * setting survives being hidden — `extraChatColumnWasEnabled` in the capture.
+   */
+  const extraChatColumnVisible = $derived(extraChatColumn && !chatCollapsedByMode);
+
   const extraChatAreaStyle = $derived(
     isMobileScreen
       ? `flex: 0 0 ${primaryColumn};`
@@ -4548,7 +4602,31 @@
     return false;
   }
 
-  function mentionUser(name: string) {
+  /**
+   * `doMention` / `doMentionExtra` — the SAME insert, into whichever composer is the target.
+   *
+   * ```js
+   * doMention(e) {
+   *   guiEventBus.emit(
+   *     this.isQAMsg ? "doQAMention"
+   *     : preferences.extraChatColumn && (this.extraChatMsg || "textAreaTxtExtra" === globals.chatInputFocus)
+   *       ? "doMentionExtra" : "doMention", e)
+   * }
+   * ```
+   *
+   * Two ways to reach the extra column, and both matter: the message you clicked was IN that column
+   * (`extraChatMsg`, true for every row it renders), or you were last typing there
+   * (`chatInputFocus`). Without the second, clicking a name in the main log while composing in the
+   * extra column would insert into the pane you are not looking at.
+   *
+   * The extra column's insert is upstream's own, and it differs by a space:
+   * `i.length ? val(i + ' @' + e + ' ') : val('@' + e + ' ')`.
+   */
+  function mentionUser(name: string, toExtraColumn = false) {
+    if (toExtraColumn) {
+      extraComposer += `${extraComposer ? ' ' : ''}@${name} `;
+      return;
+    }
     composer += `${composer ? ' ' : ''}@${name} `;
     requestAnimationFrame(() => {
       composerElement?.focus();
@@ -4556,11 +4634,18 @@
     });
   }
 
+  /** Which composer a mention belongs in, given where the click came from. */
+  function mentionTargetIsExtraColumn(fromExtraColumn: boolean) {
+    return extraChatColumn && (fromExtraColumn || chatInputFocus === 'textAreaTxtExtra');
+  }
+
   function handleMessageAction(
     kind: 'alert' | 'chat',
     action: MessageAction,
     item: MessageActionItem,
-    payload?: MouseEvent | MessageReactionPayload
+    payload?: MouseEvent | MessageReactionPayload,
+    /** True when the click came from the extra chat column — upstream's `extraChatMsg`. */
+    fromExtraColumn = false
   ) {
     if (action !== 'reaction') messageMenuId = null;
     selectedMessage = item;
@@ -4576,7 +4661,9 @@
     };
 
     if (action === 'user') openModal('user');
-    if (action === 'mention') mentionUser(item.senderName);
+    if (action === 'mention'){
+      mentionUser(item.senderName, mentionTargetIsExtraColumn(fromExtraColumn));
+    }
     if (action === 'reply') openModal('reply');
     if (action === 'report') openModal('report');
     if (action === 'question') {
@@ -10082,6 +10169,7 @@
                             class="txt-area form-control border-0"
                             {@attach captureComposerElement}
                             bind:value={composer}
+                            onfocus={() => (chatInputFocus = 'textAreaTxt')}
                             oninput={(event) => autoExpandComposer(event.currentTarget)}
                             onkeydown={(event) => {
                               if (event.key === 'Enter' && !event.shiftKey) {
@@ -11344,7 +11432,8 @@
                 openMenuKey={messageMenuId}
                 onmenutoggle={(key) => (messageMenuId = key)}
                 onaction={(action, message, event) =>
-                  handleMessageAction('chat', action, message, event)}
+                  handleMessageAction('chat', action, message, event, true)}
+                onfocus={() => (chatInputFocus = 'textAreaTxtExtra')}
                 onsend={() => void sendExtraComposerMessage()}
                 onscroll={(scroller) => trackExtraChatScroll(scroller)}
                 onscrollerready={(scroller) => (extraChatScroller = scroller)}
@@ -11406,10 +11495,10 @@
             {#if !hidePresentation}{@render presentationPane()}{/if}
             {@render mainGutter()}
             {#if !hideChatAlerts}{@render chatAlertsPane()}{/if}
-            {#if !hideChatAlerts && extraChatColumn}{@render extraChatPane()}{/if}
+            {#if !hideChatAlerts && extraChatColumnVisible}{@render extraChatPane()}{/if}
           {:else}
             {#if !hideChatAlerts}{@render chatAlertsPane()}{/if}
-            {#if !hideChatAlerts && extraChatColumn}{@render extraChatPane()}{/if}
+            {#if !hideChatAlerts && extraChatColumnVisible}{@render extraChatPane()}{/if}
             {#if !hidePresentation}{@render presentationPane()}{/if}
             {@render mainGutter()}
           {/if}

@@ -51,8 +51,17 @@ describe('the preference', () => {
 
 describe('the column is its own split area', () => {
   it('gated exactly as K4e gates index 3', () => {
-    // `O(3, !e.hideChatAlerts && e.appService.globals.preferences.extraChatColumn ? 3 : -1)`
-    expect(pageCode).toContain('{#if !hideChatAlerts && extraChatColumn}{@render extraChatPane()}');
+    /*
+      `O(3, !e.hideChatAlerts && e.appService.globals.preferences.extraChatColumn ? 3 : -1)`.
+
+      The gate reads `extraChatColumnVisible` rather than the preference directly, because
+      `hideChat` turns the column off WITHOUT persisting — see the collapse below. That is upstream's
+      shape too: it assigns `preferences.extraChatColumn` at runtime and remembers the old value in
+      `extraChatColumnWasEnabled`.
+    */
+    expect(pageCode).toContain(
+      '{#if !hideChatAlerts && extraChatColumnVisible}{@render extraChatPane()}'
+    );
   });
 
   it('and it is an area, not a pane nested inside the chat column', () => {
@@ -153,6 +162,70 @@ describe('both columns share one pipeline, and that is the point', () => {
     );
     expect(pageCode).toContain("form.set('room', room);");
     expect(pageCode).toContain('if (await sendMessageBody(body, undefined, extraChatTab))');
+  });
+});
+
+describe('mentions reach the column you are in', () => {
+  it('routes on BOTH terms the reference uses', () => {
+    /*
+      `preferences.extraChatColumn && (this.extraChatMsg || 'textAreaTxtExtra' === chatInputFocus)`.
+
+      Two ways in, and the second is the one that is easy to miss: clicking a name in the MAIN log
+      while composing in the extra column has to insert where you are typing, not where you clicked.
+    */
+    expect(pageCode).toContain('function mentionTargetIsExtraColumn(fromExtraColumn: boolean) {');
+    expect(pageCode).toContain(
+      "return extraChatColumn && (fromExtraColumn || chatInputFocus === 'textAreaTxtExtra');"
+    );
+  });
+
+  it('the extra column reports that its rows are ITS rows', () => {
+    // `extraChatMsg` is true for every row that component renders.
+    expect(pageCode).toContain("handleMessageAction('chat', action, message, event, true)");
+  });
+
+  it('and both composers report focus, or the flag would never move', () => {
+    expect(pageCode).toContain("onfocus={() => (chatInputFocus = 'textAreaTxt')}");
+    expect(pageCode).toContain("onfocus={() => (chatInputFocus = 'textAreaTxtExtra')}");
+  });
+
+  it('the insert goes into the composer that was chosen', () => {
+    expect(pageCode).toContain('function mentionUser(name: string, toExtraColumn = false) {');
+    expect(pageCode).toContain("extraComposer += `${extraComposer ? ' ' : ''}@${name} `;");
+  });
+});
+
+describe('hideChat — the pane collapses for non-presenters while chat is disabled', () => {
+  it('presenters keep their pane', () => {
+    // `this.isPresenter || guiEventBus.emit('hideChat', 'd' == e)` — emitted only for everyone else.
+    expect(pageCode).toContain("const shouldHide = !isPresenter && chatMode === 'd';");
+  });
+
+  it('chat goes to 0 and alerts take the column', () => {
+    // `this.chatSize = 0; this.alertSize = 100`.
+    expect(pageCode).toContain('chatAlertsSplit = 1;');
+    expect(pageCode).toContain('splitBeforeCollapse = chatAlertsSplit;');
+    expect(pageCode).toContain('chatAlertsSplit = splitBeforeCollapse;');
+  });
+
+  it('the extra column is hidden WITHOUT overwriting the viewer’s setting', () => {
+    /*
+      `preferences.extraChatColumn = !1` with no `setPreference` call — a runtime override that is
+      remembered in `extraChatColumnWasEnabled` and restored. Persisting it would silently turn the
+      column off for good the first time a presenter disabled chat.
+    */
+    expect(pageCode).toContain('extraChatColumnWasEnabled = extraChatColumn;');
+    expect(pageCode).toContain(
+      'const extraChatColumnVisible = $derived(extraChatColumn && !chatCollapsedByMode);'
+    );
+    expect(pageCode).toContain(
+      '{#if !hideChatAlerts && extraChatColumnVisible}{@render extraChatPane()}'
+    );
+    // The collapse must never write the preference.
+    const from = pageCode.indexOf("const shouldHide = !isPresenter && chatMode === 'd';");
+    const effect = pageCode.slice(from, pageCode.indexOf('});', from));
+    expect(effect).not.toContain('savePreference');
+    expect(effect).not.toContain('onPreferenceChange');
   });
 });
 
