@@ -1402,14 +1402,21 @@
    * `preferences.pushToTalk` — a per-USER preference, not a room setting, so it is seeded from the
    * persisted settings blob like every other preference rather than crossing the config boundary.
    *
-   * HONEST GAP, stated because it is half a feature: nothing in this room WRITES it yet. Upstream
-   * the checkbox lives in `app-user-settings-modal` (the only other component in the decoded tree
-   * that mentions `pushToTalk`), which is a separate component and a separate piece of work. The
-   * gate below reads the preference correctly and will do the right thing the moment a control sets
-   * it; inventing a checkbox here would mean guessing at its label and position, which is the one
-   * thing this repository does not do.
+   * This USED to read "HONEST GAP: nothing in this room WRITES it yet", and that claim expired
+   * without anything here changing — the failure mode working-rule 2 exists for. The control was
+   * already built: `ModalHost.svelte` renders it as `id="presenter-push-to-talk"`. What was missing
+   * was one row in that component's id-to-preference table, so the checkbox persisted itself under
+   * its own element id and this gate never saw it. The old comment's own words were right about
+   * what to do — it "will do the right thing the moment a control sets it" — and now one does.
+   *
+   * `$state` rather than `$derived`, and the difference is not cosmetic. `loadedSettings` is a
+   * plain object, deliberately (`svelte-ignore state_referenced_locally` where it is built), so
+   * `savePreference` mutating it notifies nothing: a `$derived` over it would hold its
+   * page-load value until some unrelated dependency happened to change, and push-to-talk would
+   * start working only after a reload. Seeded from the same blob, then assigned by
+   * `savePreference`, which is what every other live preference on this page does.
    */
-  const pushToTalk = $derived(loadedSettings.pushToTalk === true);
+  let pushToTalk = $state(loadedSettings.pushToTalk === true);
   /*
     `document.body.classList.add('noselect')` — `ngAfterViewInit`, `app-room.full.js:2227-2229`,
     behind the same `!isPresenter && sessData.disableCopy` the keystroke and right-click gates use.
@@ -2903,6 +2910,18 @@
         blank the screens pane for every viewer who has video ON, which is all of them by default.
       */
       if (key === 'app-disable-video') videoDisabled = !value;
+      /*
+        Four preferences whose CONSUMER already existed and whose control never reached it. The
+        modal writes them under their reference names (see the mapping table in
+        `ModalHost.svelte`); these lines are the other half, because persisting a preference does
+        not move the state this page already read it into. Without them the setting would take
+        effect only after a reload — which is how `recordingStartSound` behaved: the checkbox
+        flipped, the POST succeeded, and the sound still played.
+      */
+      if (key === 'recordingStartSound') recordingStartSound = value;
+      if (key === 'recordingStopSound') recordingStopSound = value;
+      if (key === 'pushToTalk') pushToTalk = value;
+      if (key === 'doSpeechReco') doSpeechReco = value;
     }
     if (typeof localStorage !== 'undefined') {
       localStorage.setItem(key, JSON.stringify(value));

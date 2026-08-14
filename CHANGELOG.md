@@ -24,6 +24,56 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-14
 
+### 2026-08-14 07:33 EDT — four settings checkboxes that saved correctly and did nothing
+
+**Runtime impact: real, and member-visible.** Turning off "Start recording sound" now stops the
+sound. It did not before.
+
+Fixing item W raised the obvious question — is `app-disable-video` the only checkbox with no
+consumer? It was not. `updateSettingCheck` reports every checkbox as
+`onPreferenceChange(preferenceKeyByInputId[input.id] ?? input.id, checked)`, and **that fallback is
+the bug**: an id missing from the table is still persisted, under the ELEMENT ID. The room reads
+preferences by the reference's names, so the write and the read never meet — and nothing fails. The
+label flips, the POST returns 200, the value is durable across reloads, and the behaviour never
+changes. There is no error to find, which is why this survived.
+
+**Four had a live consumer sitting unreached**, and each is now wired id -> preference -> state:
+
+| checkbox | preference | what it controls |
+| --- | --- | --- |
+| `app-recording-start-sound` | `recordingStartSound` | the recording-start cue |
+| `app-recording-stop-sound` | `recordingStopSound` | the recording-stop cue |
+| `presenter-push-to-talk` | `pushToTalk` | the space-bar mic behaviour |
+| `presenter-speech-recognition` | `doSpeechReco` | whether recognition runs at all |
+
+Every preference name is read out of the reference's own `setPreference` call
+(`recordingStartSoundOnChange` :1106, `recordingStopSoundOnChange` :1114, `pushToTalkOnChange`
+:1023, `speechRecoCCOnChange` :990) rather than inferred from the element id — the test asserts that
+at runtime, so a name typed from memory fails.
+
+**A third expired absence claim, and this one was explicit about it.** The comment above
+`pushToTalk` read "HONEST GAP: nothing in this room WRITES it yet … inventing a checkbox here would
+mean guessing at its label and position". The checkbox already existed, in `ModalHost.svelte`, as
+`presenter-push-to-talk`. Working-rule 2 says absence claims rot without the code changing; that is
+now three in two days (`ms-2`/`cursor-pointer`, `saveData`, this).
+
+**`pushToTalk` also had to stop being `$derived`.** `loadedSettings` is a plain object seeded once,
+so `savePreference` mutating it notifies nothing — a derived over it would have kept its page-load
+value and push-to-talk would have started working only after a reload. That is the worse outcome:
+half-fixed, and it looks tested.
+
+**Not mapped, deliberately:** fifteen ids whose preference has no consumer in this room. Mapping
+those would move the junk key rather than remove it — each is a feature, not a wire. They are listed
+in `TODO.md` row X with the reference name for each, including the one worth doing next
+(`app-speech-reco-overlay`, which does have a consumer but whose sibling control needs tracing
+first).
+
+**Verified:** `settings-preference-wiring-contract.test.ts`, 19 tests, the preference names pinned
+against the decoded component at runtime. Two negative controls: one mapping row deleted — which
+reproduces the original bug exactly — and `pushToTalk` reverted to `$derived`. Each red on its own
+assertion, green on restore. Room suite 805 tests / 75 files, `svelte-check` 0 errors,
+`svelte-autofixer` no issues, prettier clean.
+
 ### 2026-08-14 07:24 EDT — item W: the "Video off to preserve data" checkbox had no consumer
 
 **Runtime impact: a settings checkbox that did nothing now blanks the screens pane.**
