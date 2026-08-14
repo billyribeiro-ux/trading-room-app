@@ -662,6 +662,37 @@
   let recordingStopSound = $state(loadedSettings.recordingStopSound !== false);
 
   /**
+   * `preferences.disableVideo` - the viewer's own "turn the video off to preserve data" switch.
+   *
+   * The CHECKBOX has been in the settings modal since it was built (`ModalHost.svelte:2652`,
+   * `id="app-disable-video"`). Nothing read it. `settingChecks['app-disable-video']` is written at
+   * `ModalHost.svelte:1172` and was read only by its own label two lines below itself, which made
+   * it a control whose only effect was changing its own words - the thing this repository
+   * forbids. This state is the missing consumer.
+   *
+   * Upstream the flag swaps the ENTIRE screens pane for one line of text.
+   * `app-presentationarea.render-helpers.js:496-499` - `TSe` renders `eSe` when the flag is set
+   * and `wSe` otherwise, and `wSe` is the "No one is presenting right now..." h3, `ul#screenTabs`
+   * and `div#screensTabsContent` together. The message is `eSe` at `:126-128`:
+   * `<h3 class="text-center mt-4">Video off to preserve data...</h3>`, its class being const 23 at
+   * `app-presentationarea.full.js:3907`.
+   *
+   * INVERTED relative to the checkbox, which is checked when video is ENABLED: the reference binds
+   * `checked: !preferences.disableVideo` (`app-user-settings-modal.full.js:3070`) and labels it
+   * "Enabled" / "Disabled" (`XEe` / `JEe`, `:293-298`). The modal's own default is
+   * `'app-disable-video': true`, so both halves start at "video on" without being wired together.
+   *
+   * NOT restored from a saved preference, and that is deliberate rather than an omission.
+   * `disableVideoChange()` (`app-user-settings-modal.full.js:1223-1226`) is the ONE handler in that
+   * neighbourhood that does not call `appService.setPreference` - `beepOnUserLeaveChange`,
+   * `popupOnUserLeaveChange` and `smallImagePreviewOnChange` (`:1197-1221`) all do. Upstream the
+   * switch lasts for the session and a reload comes back with video on. Matching that is also the
+   * kinder default: a member who turned the screens off on a phone last month should not open the
+   * room today to an empty pane and no idea why.
+   */
+  let videoDisabled = $state(false);
+
+  /**
    * The ROOM's recording state - `globals.roomState.isRecording` / `isRecordingPaused` / `recName`.
    *
    * Distinct from `recording`, which is this browser's own `MediaRecorder`. The `[ REC ]` badge is
@@ -2863,6 +2894,15 @@
         chatSoundOn = value;
         soundChecks['chat-donot-disturb'] = value;
       }
+      /*
+        INVERTED, and the inversion is the whole point: the modal reports whether the box is
+        TICKED, and a ticked box means video is enabled. `ModalHost.svelte:1172` sends
+        `input.checked` under the input's own id, and its label reads "Enabled" when checked -
+        matching the reference's `checked: !preferences.disableVideo`
+        (`app-user-settings-modal.full.js:3070`). Storing `value` here rather than `!value` would
+        blank the screens pane for every viewer who has video ON, which is all of them by default.
+      */
+      if (key === 'app-disable-video') videoDisabled = !value;
     }
     if (typeof localStorage !== 'undefined') {
       localStorage.setItem(key, JSON.stringify(value));
@@ -9482,6 +9522,18 @@
                     aria-labelledby="screens-tab"
                   >
                     <!--
+                      The viewer's own "off to preserve data" switch, and it replaces the WHOLE
+                      pane rather than hiding the videos inside it. `TSe`
+                      (`app-presentationarea.render-helpers.js:496-499`) chooses between `eSe` -
+                      this one h3 - and `wSe`, and `wSe` is the empty-room h3, `ul#screenTabs` and
+                      `div#screensTabsContent` together, so nothing below survives the switch.
+                      That is the point: a tab strip with no video under it would still be
+                      requesting streams.
+                    -->
+                    {#if videoDisabled}
+                      <h3 class="text-center mt-4">Video off to preserve data...</h3>
+                    {:else}
+                    <!--
                       `screenSharingUsers` is an array and each presenter holds a Map of screens, so
                       N sharers x M screens each all land here as sibling tabs - the captured bar
                       carried three at once, all belonging to a single presenter.
@@ -9593,6 +9645,7 @@
                         />
                       {/each}
                     </div>
+                    {/if}
                   </div>
                   <div
                     id="streams"

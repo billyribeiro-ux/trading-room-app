@@ -24,6 +24,66 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-14
 
+### 2026-08-14 07:24 EDT — item W: the "Video off to preserve data" checkbox had no consumer
+
+**Runtime impact: a settings checkbox that did nothing now blanks the screens pane.**
+
+The switch has been in the settings modal all along — `ModalHost.svelte:2652`,
+`id="app-disable-video"`, with a handler, its own state and a `savePreference` POST. It was still
+**dead**: `settingChecks['app-disable-video']` is written at `ModalHost.svelte:1172` and was read
+only by its own label two lines below itself, so ticking it changed the word "Enabled" to
+"Disabled" and nothing else. A control whose only effect is changing its own label is precisely
+what `CLAUDE.md` forbids, and it survived because it *looks* wired. Only following the key to a
+consumer shows there was none.
+
+**This is also the fourth time in two days a note claimed something was missing that was partly
+built.** Item W read "`+page.svelte` has zero occurrences of `saveData` or `disableVideo`" — true,
+and useless, because the checkbox is in `ModalHost.svelte`. Same failure as T2-18, T5-25 and T5-28:
+one file grepped, conclusion drawn. Rule 1 of `docs/reference/working-rules.md` caught it this time
+before any code was written.
+
+**What the reference does, read rather than assumed.** `TSe`
+(`app-presentationarea.render-helpers.js:496-499`) picks `eSe` when the flag is set and `wSe`
+otherwise, and `wSe` is the "No one is presenting right now..." h3, `ul#screenTabs` and
+`div#screensTabsContent` **together** — so the flag replaces the entire pane, not just the videos.
+That is the point of a data-saving switch: a tab strip with nothing under it would still be pulling
+streams. The message is `<h3 class="text-center mt-4">Video off to preserve data...</h3>` (`eSe` at
+`:126-128`, class from const 23 at `app-presentationarea.full.js:3907`).
+
+**Two corrections to the row, both from reading:**
+
+- Item W cited `:496-499` for the message text. `TSe` is at those lines but holds no text; the
+  string is in `eSe` (`:127`) and again in `DSe` (`:501`), two copies for two template slots.
+- **`saveData` and `disableVideo` are different symbols**, which the row treated as one.
+  `preferences.disableVideo` has a writer — `disableVideoChange()`. `mediaService.saveData` is read
+  at three sites in the decoded tree and written at none, and the service is inside the minified
+  bundle, so its writer is *uncaptured*, not absent. `app-presentationarea.full.js:2217` declares a
+  third, unrelated `this.saveData` it never reads again. Only the first was buildable, and only the
+  first was built.
+
+**Deliberately not persisted.** `disableVideoChange()` (`app-user-settings-modal.full.js:1223-1226`)
+is the one handler in that neighbourhood that does **not** call `setPreference` — its three
+neighbours at `:1197-1221` all do. So the switch lasts the session and a reload comes back with
+video on, which is also the kinder default: a member who turned the screens off on a phone last
+month should not open the room today to an empty pane and no idea why. The modal's own default
+(`'app-disable-video': true`) already agreed with that, so both halves start at "video on".
+
+**The inversion is the whole risk.** The modal reports whether the box is *ticked*, and ticked means
+video is ON, matching the reference's `checked: !preferences.disableVideo`. Storing it uninverted
+would blank the pane for every viewer who has video enabled — that is, all of them — and would read
+as "the room is broken" rather than as a preference bug. It has its own assertion and its own
+negative control.
+
+**Verified:** `disable-video-gate-contract.test.ts`, 11 tests, half pinned against the decoded
+component at runtime (const table parsed with the repository's own tokenizer) and half against our
+source. Two negative controls run: the inversion removed, and the message rendered as a sibling
+*above* an untouched pane — the one wrong shape a reader would never spot, since the message shows
+and the screens keep streaming underneath. Each went red on its own assertion and green on restore.
+Room suite 786 tests / 74 files, `svelte-check` 0 errors, `svelte-autofixer` no issues, prettier
+clean. `ScreenPane.svelte`'s comment claiming `saveData` "is not modelled anywhere in this room"
+was corrected in the same change, per working-rule 2: an absence claim expires when the evidence
+grows.
+
 ### 2026-08-14 07:06 EDT — T5-28 was already built; what was missing was a test
 
 **Runtime impact: none** — one new test file. No markup changed.
