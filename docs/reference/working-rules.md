@@ -127,12 +127,19 @@ Not aspirational — it has caught real holes:
 
 ---
 
-## 9. Do not push again until the work is finished — the backend gate restarts from zero
+## 9. Push freely. Do NOT merge until the work is done
 
-Owner instruction, 2026-08-14, in these words: **"from now on do not push anything that triggers the
-backend CI until we're all done to avoid time delays."**
+Owner instruction, 2026-08-14: **"push but not merge."**
 
-The mechanics that make it matter, and they are worse than "CI is slow":
+It was first written here as "do not push", which was a misreading of the sentence before it
+("do not push anything that triggers the backend CI until we're all done") and was corrected within
+the hour. The distinction matters in both directions: **pushing is how the work is backed up and how
+the PR stays honest about its own contents**, so holding pushes back has a real cost and buys
+nothing. What waits is the merge.
+
+**So: push as often as is useful. Merge only when the branch is complete.**
+
+The mechanics still matter, but they argue for something narrower than not pushing:
 
 - `backend-quality.yml` declares `concurrency: backend-quality-${{ github.ref }}` with
   `cancel-in-progress: true`. A second push **cancels the run in flight** and starts a new one. It
@@ -148,8 +155,16 @@ The mechanics that make it matter, and they are worse than "CI is slow":
 - Any event that is not a `pull_request` — a push to `main`, a `merge_group`, a
   `workflow_dispatch` — skips the scope check entirely and always runs the full gate.
 
-**So: accumulate commits locally and push once, when the work is actually done.** Committing is free
-and loses nothing; pushing is the expensive act. This is the same argument as the batching rule in
-`CLAUDE.md`, sharpened by having measured what a push actually costs here.
+**What follows from that is about MERGING, not pushing.** Because each push cancels and restarts the
+gate, a green check is only ever evidence about the commit that produced it. On a branch still being
+worked, the green you are looking at was very likely earned by an earlier HEAD and then thrown away
+by the next push. **So the only green worth merging on is the one from the FINAL push**, after the
+work is complete — which is the real content of "push but not merge".
 
-The exception is an explicit instruction to push now, which overrides this.
+Two corollaries, both already learned the hard way:
+
+- **Merging and pushing are separate acts, never one command** (`CLAUDE.md` says this too): the push
+  invalidates the green checks you were about to merge on.
+- Do not batch pushes to save CI minutes at the cost of unbacked-up work. The minutes are worth less
+  than the work, and `cancel-in-progress` means an obsolete run stops the moment it is obsolete —
+  the runner is not billed for the 33 minutes it never spends.

@@ -24,12 +24,18 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-14
 
-### 2026-08-14 08:28 EDT — working rule 9: stop pushing mid-work
+### 2026-08-14 08:28 EDT — working rule 9: push freely, do not merge until done
 
-Owner instruction, in these words: **"from now on do not push anything that triggers the backend CI
-until we're all done to avoid time delays."** Written into
-`docs/reference/working-rules.md` as rule 9, with the mechanics, because a rule with no recorded why
-gets undone.
+Owner instruction: **"push but not merge."**
+
+Recorded first as "do not push", which was my misreading of the sentence before it — "do not push
+anything that triggers the backend CI until we're all done" — and corrected within the hour, before
+the wrong version was ever acted on twice. The correction matters in both directions: **pushing is
+how work is backed up and how the PR stays honest about its own contents**, so withholding pushes
+costs something and buys nothing. What waits is the merge.
+
+Written into `docs/reference/working-rules.md` as rule 9 with the mechanics, because a rule with no
+recorded why gets undone.
 
 The mechanics are worse than "CI is slow", and I measured them rather than assuming:
 
@@ -46,10 +52,16 @@ The mechanics are worse than "CI is slow", and I measured them rather than assum
   push here runs the full 33 minutes.
 - Any event that is not a `pull_request` skips the scope check entirely and always runs the gate.
 
-So: commit freely, push once. Committing is free and loses nothing; **pushing is the expensive act.**
-An explicit "push now" overrides this.
+**What follows is about MERGING, not pushing.** Since each push cancels and restarts the gate, a
+green check is only ever evidence about the commit that produced it — on a branch still being worked,
+the green on screen was probably earned by an earlier HEAD and then discarded. **So the only green
+worth merging on is the one from the FINAL push.** That is the real content of "push but not merge",
+and it is why merging and pushing must stay separate acts: the push invalidates the checks you were
+about to merge on.
 
-**This entry is committed and deliberately not pushed**, which is the rule applying to itself.
+The corollary I had wrong: do NOT hoard commits locally to save CI minutes. The minutes are worth
+less than unbacked-up work, and `cancel-in-progress` stops an obsolete run the moment it is obsolete
+— the runner is never billed for the 33 minutes it does not spend.
 
 ### 2026-08-14 08:20 EDT — PR #19 opened: 29 commits proposed to main
 
