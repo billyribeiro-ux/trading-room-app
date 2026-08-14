@@ -26,6 +26,7 @@
   } from '$lib/screen-zoom';
   import ScreenVolumeControl from '$lib/components/ScreenVolumeControl.svelte';
   import PresenterMuteRows from '$lib/components/PresenterMuteRows.svelte';
+  import { DEAD_PREFERENCE_KEYS } from '$lib/dead-preference-keys';
   import {
     adjustVolumeForPresenter,
     toggleTalkingPresenter,
@@ -2925,13 +2926,13 @@
       }
       /*
         INVERTED, and the inversion is the whole point: the modal reports whether the box is
-        TICKED, and a ticked box means video is enabled. `ModalHost.svelte:1172` sends
-        `input.checked` under the input's own id, and its label reads "Enabled" when checked -
+        TICKED, and a ticked box means video is enabled. `updateSettingCheck` sends `input.checked`
+        under the reference's own preference name, and the label reads "Enabled" when checked -
         matching the reference's `checked: !preferences.disableVideo`
         (`app-user-settings-modal.full.js:3070`). Storing `value` here rather than `!value` would
         blank the screens pane for every viewer who has video ON, which is all of them by default.
       */
-      if (key === 'app-disable-video') videoDisabled = !value;
+      if (key === 'disableVideo') videoDisabled = !value;
       /*
         Four preferences whose CONSUMER already existed and whose control never reached it. The
         modal writes them under their reference names (see the mapping table in
@@ -2958,6 +2959,13 @@
     }
     if (typeof localStorage !== 'undefined') {
       localStorage.setItem(key, JSON.stringify(value));
+      /*
+        The same nineteen dead keys are in localStorage too, and the server's prune cannot reach
+        them: `savePreference` writes both stores, so the element-id fallback left a copy in each.
+        Removed here on the next preference change of any kind, which is the same converge-on-use
+        rule the server side uses — no startup pass, nothing to run, and idempotent once clean.
+      */
+      for (const dead of DEAD_PREFERENCE_KEYS) localStorage.removeItem(dead);
     }
     const body = new FormData();
     body.set('key', key);

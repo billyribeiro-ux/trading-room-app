@@ -1204,9 +1204,24 @@
       'app-recording-stop-sound': 'recordingStopSound',
       'presenter-push-to-talk': 'pushToTalk',
       'presenter-speech-recognition': 'doSpeechReco',
-      'app-speech-reco-overlay': 'showSpeechRecoOverlay'
+      'app-speech-reco-overlay': 'showSpeechRecoOverlay',
+      'app-disable-video': 'disableVideo'
     };
-    onPreferenceChange(preferenceKeyByInputId[input.id] ?? input.id, input.checked);
+    /*
+      NO FALLBACK. This used to be `preferenceKeyByInputId[input.id] ?? input.id`, and that `??` is
+      what wrote nineteen element ids into every user's settings blob as if they were preferences.
+
+      An id with no entry above now persists NOTHING, which is the honest outcome: its checkbox has
+      no consumer in this room, so there is nothing for a stored value to restore. Writing it
+      anyway produced a key that looked like a working setting, survived reloads, and changed
+      nothing — the failure mode that hid four real defects.
+
+      Adding a checkbox therefore now means adding its preference name here as a deliberate step.
+      That is the point: the mapping is the declaration that a control HAS a consumer, and a
+      missing row fails loudly at review instead of quietly at runtime.
+    */
+    const preferenceKey = preferenceKeyByInputId[input.id];
+    if (preferenceKey) onPreferenceChange(preferenceKey, input.checked);
   }
 
   function applyGroupChatMode(mode: string) {

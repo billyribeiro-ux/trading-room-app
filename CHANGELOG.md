@@ -24,6 +24,66 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-14
 
+### 2026-08-14 07:54 EDT — the element-id fallback is gone, and what it wrote is being removed
+
+**Runtime impact: nothing user-visible changes. Nineteen junk keys stop being written, and the ones
+already written are deleted.**
+
+The previous three entries each fixed one symptom of the same line:
+
+```
+onPreferenceChange(preferenceKeyByInputId[input.id] ?? input.id, input.checked)
+```
+
+Twenty-five checkboxes reach that handler and the table had six rows, so **nineteen HTML element ids
+were persisted as if they were preferences** — into the settings blob AND into localStorage, because
+`savePreference` writes both. Nothing ever read them. Each one looked like a working setting: the
+label flipped, the POST returned 200, the value survived a reload, and the behaviour never changed.
+
+**The `??` is now gone.** An unmapped id persists nothing, guarded by `if (preferenceKey)` — the
+same shape `updateSoundCheck` next door has always had. That makes the mapping table the
+*declaration that a control has a consumer*, so a missing row now fails at review instead of quietly
+at runtime.
+
+**One catch found while doing it, and it would have been a live regression.** `app-disable-video`
+was reaching `savePreference` by its raw element id — it only worked *because* of the fallback. It
+now maps to `disableVideo`, which is the reference's own name for it
+(`app-user-settings-modal.full.js:1223-1226`). Removing the fallback without spotting that would
+have silently broken the screens gate built two hours ago.
+
+**Removing the write does not remove what was written.** Every account that has opened the settings
+modal is carrying some of these. `dead-preference-keys.ts` names all nineteen; the server prunes the
+blob it is already parsing and rewriting, and the page prunes localStorage. Both converge on the
+next preference change of any kind — no migration, no startup pass, no downtime, and idempotent, so
+a clean account pays nothing.
+
+**A deny-list, not an allow-list, and that is the deliberate choice.** An allow-list of valid names
+is tidier and would silently delete the next preference somebody adds without updating it — a
+setting that quietly stops sticking. The blob legitimately holds keys this module has no business
+knowing (`audioMutedFor`, `chatStyle`, `roomSplitDir`, `savedNick`, split sizes). Nothing is removed
+unless it is named, and every name was established by reading every occurrence of that id in `src/`.
+
+**`pm-window-layout` is deliberately NOT on the list**, and it looks exactly like one that should
+be. It has its own handler and has always persisted under `pmLogsOnRight`, a real name — deleting it
+would throw away a genuine preference. Its absence is asserted, not assumed. That also corrects the
+count in the previous entry: fourteen was one too many, because `pm-window-layout` never went
+through the fallback at all.
+
+**Verified:** 27 tests in the wiring contract, including a sweep proving all 26 ids that reach the
+handler are mapped, listed as dead, or the early-returning one — so a new checkbox added without a
+mapping row fails here. Three negative controls: the fallback restored, one key dropped from the
+dead list, and the server prune deleted. Each red on the right assertion, green on restore.
+
+**One of my own checks was wrong first and is worth recording.** The sweep initially keyed on
+`class="form-check-input"` and reported `follow-chat-text-color` — a colour picker on a different
+handler. That was the check, not the app. It now keys on `onchange={updateSettingCheck}`, which is
+the actual criterion. Two contract tests also went red on this change and both were correct to:
+they pinned the old behaviour, and one carried a note saying removing the fallback *should* trip it
+rather than pass silently.
+
+Room suite 814 tests / 75 files, `svelte-check` 0 errors, `svelte-autofixer` no issues, prettier
+clean.
+
 ### 2026-08-14 07:37 EDT — the caption overlay was gated on a flag nothing set
 
 **Runtime impact: captions can now be switched on.** The subtitles checkbox had never opened the

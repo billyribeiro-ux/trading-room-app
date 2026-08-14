@@ -144,7 +144,18 @@ describe('ours: the flag reaches the markup', () => {
       of them by default — a defect that would look like "the room is broken", not like a
       preference bug.
     */
-    expect(pageMarkup).toContain("if (key === 'app-disable-video') videoDisabled = !value;");
+    expect(pageMarkup).toContain("if (key === 'disableVideo') videoDisabled = !value;");
+  });
+
+  it('persists under the reference name, not the element id', () => {
+    /*
+      `disableVideo` is what the reference calls it (`app-user-settings-modal.full.js:1223-1226`).
+      This keyed off `app-disable-video` when it was first built, because the modal's old
+      `?? input.id` fallback sent the element id — the same fallback that wrote nineteen dead keys
+      into every settings blob. With the fallback gone an unmapped id sends nothing at all, so this
+      mapping row is now what keeps the gate connected.
+    */
+    expect(stripComments(MODAL)).toContain("'app-disable-video': 'disableVideo'");
   });
 
   it('both halves start at "video on" without being wired to each other', () => {

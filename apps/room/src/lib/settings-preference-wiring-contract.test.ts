@@ -1,6 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
+import { DEAD_PREFERENCE_KEYS, pruneDeadPreferenceKeys } from './dead-preference-keys';
+
 /*
   The settings modal's checkboxes, and whether each one REACHES the thing it claims to control.
 
@@ -34,6 +36,7 @@ const SETTINGS = readFileSync(
 );
 const PAGE = readFileSync(new URL('../routes/+page.svelte', import.meta.url), 'utf8');
 const MODAL = readFileSync(new URL('./components/ModalHost.svelte', import.meta.url), 'utf8');
+const SERVER = readFileSync(new URL('../routes/+page.server.ts', import.meta.url), 'utf8');
 
 const stripComments = (source: string) =>
   source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/<!--[\s\S]*?-->/g, '');
@@ -109,14 +112,81 @@ describe.each(WIRES)(
 );
 
 describe('the wire has no silent break points', () => {
-  it('the fallback that caused this is still the thing being guarded', () => {
+  it('there is no element-id fallback: an unmapped checkbox persists NOTHING', () => {
     /*
-      If someone later removes `?? input.id`, unmapped checkboxes stop persisting rather than
-      persisting somewhere useless. That would be a defensible change — but it would also make
-      every assertion above pass for a different reason, so it should be a deliberate edit that
-      trips this test, not a silent one.
+      This assertion used to say the opposite — that `?? input.id` was still there — with a note
+      that removing it should be a deliberate edit that trips this test rather than a silent one.
+      It was removed deliberately, and it did trip.
+
+      The `??` is what wrote nineteen HTML ids into every user's settings blob as if they were
+      preferences. An unmapped id now persists nothing, which is honest: its checkbox has no
+      consumer, so there is nothing for a stored value to restore. The guard is `if (preferenceKey)`
+      — the same shape `updateSoundCheck` has always used.
     */
-    expect(modalCode).toContain('preferenceKeyByInputId[input.id] ?? input.id');
+    expect(modalCode).not.toContain('?? input.id');
+    expect(modalCode).toContain('const preferenceKey = preferenceKeyByInputId[input.id];');
+    expect(modalCode).toContain(
+      'if (preferenceKey) onPreferenceChange(preferenceKey, input.checked);'
+    );
+  });
+
+  it('every dead key is gone from both stores, and pm-window-layout is not mistaken for one', () => {
+    /*
+      Removing the WRITE does not remove what was written. The server prunes the blob it is already
+      rewriting, and the page prunes localStorage, because `savePreference` wrote to both.
+
+      `pm-window-layout` looks exactly like one of these and is not: it has its own handler and has
+      always persisted under `pmLogsOnRight`. Deleting it would throw away a real preference, so its
+      absence from the list is asserted rather than assumed.
+    */
+    expect(DEAD_PREFERENCE_KEYS).not.toContain('pm-window-layout');
+    expect(DEAD_PREFERENCE_KEYS).toContain('app-disable-video');
+    expect(DEAD_PREFERENCE_KEYS).toHaveLength(19);
+
+    expect(SERVER).toContain('pruneDeadPreferenceKeys(settings);');
+    expect(pageCode).toContain(
+      'for (const dead of DEAD_PREFERENCE_KEYS) localStorage.removeItem(dead);'
+    );
+
+    /*
+      Every id that REACHES the handler is either mapped, dead, or the early-returning one.
+
+      Keyed on `onchange={updateSettingCheck}` and not on `class="form-check-input"`: the first
+      attempt at this used the class and reported `follow-chat-text-color`, which is a colour
+      picker on a different handler entirely. That was the check being wrong, not the app — the
+      failure this repository's rules put ahead of reporting anything.
+    */
+    const ids = MODAL.split('onchange={updateSettingCheck}')
+      .slice(0, -1)
+      .map((before) => [...before.matchAll(/id="([a-z-]+)"/g)].pop()?.[1]);
+    expect(ids, 'every checkbox on the handler must resolve to an id').not.toContain(undefined);
+    for (const name of ids) {
+      if (!name || name === 'settings-app-donot-disturb') continue;
+      const mapped = modalCode.includes(`'${name}': '`);
+      const dead = DEAD_PREFERENCE_KEYS.includes(name);
+      const ownHandler = name === 'pm-window-layout';
+      expect(mapped || dead || ownHandler, `${name} is neither mapped nor listed as dead`).toBe(
+        true
+      );
+    }
+  });
+
+  it('the prune is idempotent and leaves real preferences alone', () => {
+    const settings: Record<string, unknown> = {
+      recordingStartSound: false,
+      'app-recording-start-sound': true,
+      'chat-gif-donot-disturb': false,
+      pmLogsOnRight: true,
+      audioVolumeFor: { 7: 40 }
+    };
+    expect(pruneDeadPreferenceKeys(settings)).toBe(2);
+    expect(settings).toEqual({
+      recordingStartSound: false,
+      pmLogsOnRight: true,
+      audioVolumeFor: { 7: 40 }
+    });
+    // Second pass removes nothing, so a converged account pays no write.
+    expect(pruneDeadPreferenceKeys(settings)).toBe(0);
   });
 
   it('pushToTalk is $state, because $derived over loadedSettings would not react', () => {
