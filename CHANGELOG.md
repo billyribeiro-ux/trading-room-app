@@ -24,7 +24,29 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-14
 
-### 2026-08-14 09:22 EDT — Tier 0 finished: T1-9 closed, T1-10 parked, register 67/6/14
+### 2026-08-14 09:24 EDT — docs squared away before Tier 1 starts
+
+Bookkeeping, recorded because the next entry will be a feature and the state it starts from should
+be written down rather than remembered.
+
+**Corrected:** both files were stamped `09:22` for the Tier 0 entry when `date` measured `09:21`.
+One minute, and it is still an estimate rather than a measurement — the failure this repository has
+already paid for once, when all thirteen of a day's entries carried guessed times.
+
+**TODO row P now states fact instead of "was running when written".** PR #19 is OPEN, MERGEABLE, 34
+commits; Vercel has deployed and passed twice; the backend gate is still `pending` and has been
+restarted by every push. That restart is not a fault — `cancel-in-progress: true` means **only the
+final push's run is worth reading**, which is the whole content of the owner's "push but not merge".
+
+**TODO row W marked IN PROGRESS.** The `saveData` port is the active work: a flag in the media
+layer, the nav control in the AV settings modal, and `startWatchingScreenOf` refusing while it is on
+— so no screen stream is requested at all, which is where the bandwidth saving actually lives.
+
+State at the start of Tier 1: register **67 closed, 6 open, 14 parked, 87 total**; controller 937
+tests / 90 files; room 815 / 75; sections A and E of the handoff empty; none of the six open items
+blocked on me.
+
+### 2026-08-14 09:21 EDT — Tier 0 finished: T1-9 closed, T1-10 parked, register 67/6/14
 
 The static fetcher ran clean once its denylist bug was out of the way: **17/22 fetched, 5 honest
 soft-404s.** That completes the browser work entirely — **section A and section E of the handoff are
