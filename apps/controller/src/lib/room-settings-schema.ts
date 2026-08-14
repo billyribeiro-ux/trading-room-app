@@ -10,7 +10,7 @@
 // roomType has no captured value because its editor is absent from rendered evidence.
 //
 // `wired` is the honest bit: false means the controller can store the value but
-// nothing in the room reads it yet. 54 of 269 are wired today.
+// nothing in the room reads it yet. 56 of 269 are wired today.
 // Flip one to true ONLY when a consumer exists, so the UI can mark the rest
 // instead of pretending they do something.
 
@@ -113,7 +113,7 @@ export const ROOM_SETTINGS: readonly RoomSettingDef[] = [
   { name: "alwaysShowRoster", section: "settings", type: "checkbox", label: "Always Show User Roster?", help: "If enabled, user roster will always be visible", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
   { name: "showOnlyUsernames", section: "settings", type: "checkbox", label: "Show Only Usernames in Roster?", help: "If enabled, for regular users it will show only their usernames in roster?", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
   { name: "allowUsersToChangeUsername", section: "settings", type: "checkbox", label: "Allow Users to Change their Usernames?", help: "If enabled, for regular users it will allow them to change their usernames.", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: true },
-  { name: "disableEditingUsername", section: "settings", type: "checkbox", label: "Disable Editing Username", help: "If enabled, it will disable the editing of the username in the login form for regular users", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
+  { name: "disableEditingUsername", section: "settings", type: "checkbox", label: "Disable Editing Username", help: "If enabled, it will disable the editing of the username in the login form for regular users", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: true },
   { name: "usernameInstructions", section: "settings", type: "textarea", label: "Username Instructions", help: "Instructions how user can edit his username", helpShape: "plain", helpOutside: false, captured: null, capturedIsDisplayOnly: false, group: null, wired: true },
   { name: "forgotRoomPassword", section: "settings", type: "checkbox", label: "Forgot room password?", help: "If enabled, can change room login password on the login page", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
   { name: "tawkPresenterSupport", section: "settings", type: "checkbox", label: "Tawk Presenter Support?", help: "If enabled, tawk presenter support will be visible in the room", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: true },
@@ -284,7 +284,7 @@ export const ROOM_SETTINGS: readonly RoomSettingDef[] = [
   { name: "sendFcmAlertsNew", section: "settings", type: "checkbox", label: "New FCM Method?", help: "Use pub/sub for notifications", helpShape: "text", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
   { name: "ptrMobileAppExpirePairCodeDays", section: "settings", type: "number", label: "PTR app exp days", help: "If user does not log in from regular site, mobile app token will expire after this many days", helpShape: "text", helpOutside: false, captured: 7, capturedIsDisplayOnly: false, group: null, wired: false },
   { name: "mobileAppExpireNotificationsDays", section: "settings", type: "number", label: "Push expire days", help: "If user does not log in this many days, we'll stop sending push notifications", helpShape: "text", helpOutside: false, captured: 14, capturedIsDisplayOnly: false, group: null, wired: false },
-  { name: "customEnterDisclosure", section: "settings", type: "textarea", label: "Custom Legal Disclosure", help: "If set, Users will need to agree to thisDisclosure to enter.", helpShape: "muted", helpOutside: false, captured: null, capturedIsDisplayOnly: false, group: null, wired: false },
+  { name: "customEnterDisclosure", section: "settings", type: "textarea", label: "Custom Legal Disclosure", help: "If set, Users will need to agree to thisDisclosure to enter.", helpShape: "muted", helpOutside: false, captured: null, capturedIsDisplayOnly: false, group: null, wired: true },
   { name: "customUserInfoURL", section: "settings", type: "text", label: "Custom User Info Page", help: null, helpShape: null, helpOutside: false, captured: null, capturedIsDisplayOnly: false, group: null, wired: false },
   { name: "stAppScheduleID", section: "settings", type: "text", label: "Scheudle ID (GCal)", help: null, helpShape: null, helpOutside: false, captured: null, capturedIsDisplayOnly: false, group: null, wired: false },
   { name: "invalidTokens", section: "settings", type: "textarea", label: "Invalid Tokens", help: "Comma separated list of invalid JWT tokens.", helpShape: "muted", helpOutside: false, captured: null, capturedIsDisplayOnly: false, group: null, wired: false },

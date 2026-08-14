@@ -20,7 +20,13 @@ import type { MessageBadge } from '$lib/types';
  */
 import { createHmac } from 'node:crypto';
 import { env as privateEnv } from '$env/dynamic/private';
-import { controlPlaneOrigin, mobilePinUrl, roomConfigUrl, roomSettingUrl } from './control-plane';
+import {
+  controlPlaneOrigin,
+  mobilePinUrl,
+  roomConfigUrl,
+  roomEntryUrl,
+  roomSettingUrl
+} from './control-plane';
 
 /**
  * What the controller will send. Named here so a reader can see the surface at a glance.
@@ -52,6 +58,25 @@ export interface RoomSessionSettings {
    * is not among the 25 keys in its default preferences object either.
    */
   enableRTE?: boolean;
+  /*
+    The five the room's own login page reads, each at the byte offset named beside it in the decoded
+    bundle. Added 2026-08-14 with that page.
+
+    `webinarPW` is deliberately NOT here and never will be: it appears nowhere in the reference's
+    bundle either — its `loginToRoom()` posts the typed password to its own server. Ours asks the
+    controller through `decideRoomEntryRemotely` for the same reason, and
+    `room-config-boundary.test.ts` forbids every credential-shaped name from crossing at all.
+  */
+  /** `showPresenter = sessData.showPasswordField` — whether the field is drawn. Byte 1189804. */
+  showPasswordField?: boolean;
+  /** The help text under the name field. Byte 1189881. */
+  usernameInstructions?: string;
+  /** Whether a phone number is collected AND required. Byte 1189964. */
+  hasRequiredPhoneInLogin?: boolean;
+  /** The disclosure dialog shown before entry. Byte 1190048. */
+  customEnterDisclosure?: string;
+  /** `'a' !== perms && sessData.disableEditingUsername` — a presenter may always rename. Byte 1192694. */
+  disableEditingUsername?: boolean;
   rosterVisibleToViewers?: boolean;
   onlyPresentersVisibleToViewers?: boolean;
   rosterCountVisibleToViewers?: boolean;
@@ -409,4 +434,66 @@ export async function writeRoomSetting(
   }
 
   if (!response.ok) throw new RoomConfigUnavailable(`the controller answered ${response.status}`);
+}
+
+/** What the controller answers when asked whether an attempt may enter. */
+export type RoomEntryDecision =
+  | { ok: true; asFreeTrial: boolean }
+  | { ok: false; reason: string; message: string; redirectTo: string | null };
+
+/**
+ * Asks the controller whether this attempt may enter — `decideRoomEntry`, run where the credentials
+ * live.
+ *
+ * The room cannot answer this itself and should not want to. `webinarPW` and `banIPList` are
+ * credential-shaped, so `room-config-boundary.test.ts` forbids them from `ROOM_VISIBLE_SETTINGS`,
+ * and the room serialises its config into SSR HTML — a password sent here would reach the browser,
+ * every cache in front of the room, and any HAR on a support ticket.
+ *
+ * The reference splits it the same way for the password: `loginToRoom()` builds `{cver, nick,
+ * email}`, adds `i.pw` when one was typed, and posts it. `webinarPW` appears NOWHERE in its bundle.
+ *
+ * ## Fails CLOSED
+ *
+ * A controller that cannot be reached means the room cannot know whether this person may enter, and
+ * "cannot know" is not "yes". The one thing it must never do is admit somebody because a network
+ * call timed out.
+ */
+export async function decideRoomEntryRemotely(
+  shortCode: string,
+  attempt: {
+    name: string;
+    email: string;
+    phone: string;
+    password: string;
+    secretToken: string;
+    agreedToDisclosure: boolean;
+    remoteIp: string;
+  }
+): Promise<RoomEntryDecision> {
+  const secret = privateEnv.ROOM_JWT_SECRET;
+  if (!secret) throw new RoomConfigUnavailable('ROOM_JWT_SECRET is not configured');
+
+  const base = roomEntryUrl(shortCode);
+  if (!base) throw new RoomConfigUnavailable('CONTROL_BASE_URL is not configured');
+
+  let response: Response;
+  try {
+    response = await fetch(base, {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${configReadToken(secret, shortCode)}`,
+        'content-type': 'application/json'
+      },
+      body: JSON.stringify(attempt),
+      signal: AbortSignal.timeout(TIMEOUT_MS)
+    });
+  } catch (cause) {
+    throw new RoomConfigUnavailable(`the entry check failed or timed out after ${TIMEOUT_MS}ms`, {
+      cause
+    });
+  }
+
+  if (!response.ok) throw new RoomConfigUnavailable(`the controller answered ${response.status}`);
+  return (await response.json()) as RoomEntryDecision;
 }

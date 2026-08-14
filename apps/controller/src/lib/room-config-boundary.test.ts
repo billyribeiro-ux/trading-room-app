@@ -185,6 +185,16 @@ describe('the allow-list itself', () => {
         preferences.enableRTE && isPresenter` — so this name is only one term of it, exactly as
         `beepOnUserJoin` is one term of the join beep.
       */
+      /*
+        The room's own login page, added 2026-08-14. Each is read from `sessData` in the decoded
+        bundle — offsets in the note on `ROOM_VISIBLE_SETTINGS` — so each has a consumer in the
+        room today, which is this list's rule.
+      */
+      showPasswordField: 'app-session-login — whether the password field is shown at all',
+      usernameInstructions: 'app-session-login — the help text under the name field',
+      hasRequiredPhoneInLogin: 'app-session-login — whether a phone number is collected and required',
+      customEnterDisclosure: 'app-session-login — the disclosure dialog shown before entry',
+      disableEditingUsername: 'app-session-login — whether a non-presenter may change their name',
       enableRTE:
         '+page.svelte `canUseRTE` — the composer rich-text button, the editor, and the send, all three',
       presenterMsgsOnTheRight:

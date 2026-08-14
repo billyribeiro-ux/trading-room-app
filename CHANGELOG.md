@@ -24,6 +24,131 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-14
 
+### 2026-08-14 15:44 EDT — The backend gate was passing without running
+
+**Runtime impact: none in the product; large in what CI actually proves.** Four verifiers that had
+never executed now execute, and three real defects fell out of the first run.
+
+**How it hid.** The scope step reads: any event that is not a `pull_request` runs the full gate, and
+a pull request runs it only when the diff touches `services/`, `ops/`, the backend verifiers or the
+workflow itself. No PR of mine touched those paths, so `backend=false`, every step was SKIPPED, and
+the job reported SUCCESS. **PR #19, #20 and #21 were all merged on a green that was a skip.** The
+first push to `main` set `backend=true`, the steps ran, and the first one died instantly.
+
+**Defect 1 — the steps invoked scripts that are not where the workflow said.** `node
+scripts/verify-rust-advisories.mjs` at the repository root, when it lives in
+`apps/controller/scripts/`; `pnpm backend:licenses`, `backend:migrations:verify` and
+`backend:release:verify` at the root, where no such package scripts exist. All four now run by path,
+and `cargo deny` runs from `services/` — its `--manifest-path services/Cargo.toml` is written
+relative to the repository root and resolves to `apps/controller/services/…` from its own package,
+so that script was broken from either direction.
+
+**Defect 2 — `verify-rust-advisories.mjs` computed the wrong repository root.** `new URL('../')` from
+`apps/controller/scripts/` is `apps/controller/`, so it looked for `apps/controller/services/Cargo.lock`.
+Its sibling `verify-api-release-artifact.mjs` already carries the fix and the reason — "THREE levels
+up, not one" — because `pnpm test` runs that one and it was caught. Nothing ran this one.
+
+**Defect 3 — the confinement check misfired on target-gated crates.** It asked `cargo tree --invert`
+without `--target all`, so `instant@0.1.13` — reachable only through `fastrand` on wasm — returned an
+EMPTY tree on a Linux runner, and an empty tree does not contain the string `mediasoup`. The check
+therefore reported that a confined crate had escaped its graph: the opposite of the truth, and a
+failure no upgrade could have fixed. Its sibling loop already passed `--target all`.
+
+**And then the gate did its job.** With those fixed it found a genuine unreviewed advisory:
+**RUSTSEC-2026-0253, `lru 0.8.1`** — a use-after-free when the `Drop` of a stored KEY panics during
+`LruCache::pop()`, patched in `>=0.18.2`. Reviewed rather than silenced: `cargo tree --invert` puts
+it at `lru → mediasoup 0.24.3 → tradingroom-media`, nothing in this workspace constructs an
+`LruCache`, and the pin belongs to mediasoup — which we DEPEND on (`mediasoup = "0.24"`) and did not
+fork. `services/**` is a mirror here, so even the bump has to be made at the source. It is added to
+`EXPECTED_MEDIA_TRANSITIVES`, which re-proves that confinement on every run, so the exception dies
+the moment anything else depends on `lru`.
+
+**One contract had to move with the fix.** `verify-api-release-artifact.mjs` pins the workflow's
+text and required the literal `run: pnpm backend:release:verify`. That pin exists so the workflow
+really runs the verifier, not so it runs it under one name — so it now pins the path invocation.
+
+**A suggested fix was declined, on evidence.** The proposal was to create a missing `.node-version`.
+It is not missing: it is tracked, contains `24.19.0`, is present on `origin/main`, and the failing
+run's own log prints `Node.js v24.19.0` — which is that file, read successfully. Creating it would
+have changed nothing and hidden the real MODULE_NOT_FOUND underneath.
+
+**Verified:** every one of the four verifiers run from the repository root — advisories PASS (1
+reviewed vulnerability proved absent from the build graph, 6 reviewed mediasoup warnings), migration
+integrity PASS (9 pinned migrations), provenance PASS (98 imported + 1 authored, 3 documented-count
+sites agree), release-artifact contract PASS; `cargo deny` **bans ok, licenses ok, sources ok**. Full
+gate `pnpm -r test` **exit 0** — room 1087/92, controller 937/90.
+
+### 2026-08-14 15:38 EDT — One login form in the product, and a guest carries no authority
+
+**Runtime impact: yes.** The controller's guest door hands over to the room instead of asking the
+same questions first, so a visitor meets ONE form — the room's — which is what the reference has.
+
+**The reference has exactly one login form and it lives in the room.** `/session?id=<uuid>` renders
+`app-session-login`, which collects the name, the email, the phone and the room password. This
+application grew its own copy while the room had none; once the room got its page back this morning,
+a guest met two forms for one entry. `/session/[code]` now redirects to the room with the short code
+and NO token — a guest has authenticated with nothing at that door, so signing a credential for them
+would invent an authority rather than pass one on.
+
+**The security rule that made this safe to do.** The room reads MEMBERSHIP by email, so a guest
+typing the owner's address would have inherited the owner's role — the 2026-08-07 escalation in a new
+coat. `verifyEntry` now looks a membership up ONLY for an email a signed handoff verified;
+a tokenless arrival gets `membership = null` and `roomRoleFor(null)` is `member`. A verified token may
+carry authority; a typed email may not. `guestHandoffToken` already stated the rule for the other
+door, and it holds here.
+
+**A present-but-invalid token is not a guest.** Treating a broken credential as "no credential" would
+turn an expired or forged token into an ordinary arrival that still gets in, so a token that fails
+verification is still a 403.
+
+**Verified:** `svelte-check` 0 errors 0 warnings; room **1087 tests across 92 files**. **Six negative
+controls run, each red**: letting a typed email inherit a membership, treating a forged token as a
+guest, failing OPEN when the controller is unreachable, ignoring the room's own error page,
+paraphrasing the reference's refusal wording, and the controller no longer handing over. The wording
+control had to be re-run against the CODE — the first attempt patched the transcribed comment, which
+`stripComments` removes.
+
+### 2026-08-14 15:31 EDT — The room has its login page back, and the dumps settled the argument
+
+**Runtime impact: yes.** Clicking Launch no longer drops you straight into the room. `/session` is a
+page now: it verifies the handoff, prefills your name and email from the token, locks the email, and
+waits for `Login` — which is what the reference does and never auto-submits.
+
+**The A/B question I put to the owner should never have been asked.** I framed "where is the room
+password checked" as a design decision between shipping `webinarPW` to the room or validating it
+server-side. The bundle answers it: **`webinarPW` appears nowhere in the room's 2.9 MB of code.**
+`loginToRoom()` builds `{cver, nick, email}`, adds `i.pw` when one was typed, and posts it — the
+reference's own SERVER decides. There was no choice to make; there was a file to read.
+
+**So the entry check went where the credentials already are.** `internal/room-entry/[code]` runs the
+SAME `decideRoomEntry` the guest door calls — `isLocked`, `banIPList`, `nickFilter`, the three room
+passwords, the free-trial password, `secTok` and the disclosure — so there is one entry decision in
+this product rather than two that drift. The room asks and fails CLOSED: a controller that cannot be
+reached means the room cannot know whether somebody may enter, and "cannot know" is not "yes".
+
+**The five settings that drive the page now cross**, by the four-edit process, each with the byte
+offset where the bundle reads it: `showPasswordField` (1189804), `usernameInstructions` (1189881),
+`hasRequiredPhoneInLogin` (1189964), `customEnterDisclosure` (1190048), `disableEditingUsername`
+(1192694). 56 wired, up from 54 — three were already on the login list, so the union moved by two
+while `ROOM_CONSUMED` moved by five, and the tripwire caught my first attempt at three.
+
+**One deliberate narrowing, named rather than silent.** `banIPList` DOES cross to the reference's
+room and is checked in its browser (`doLoginCheck`, byte 1194680). Ours checks it server-side only:
+a ban list in a browser hands every banned address to every visitor, and the server decision is
+authoritative either way.
+
+**The apostrophe rule was broken for the third time.** `ROOM'S` and `repository's` inside the
+`ROOM_CONSUMED` comment turned the whole 43-name list into punctuation again, exactly as the note
+above it warns. The note now says so in its own words: two characters, no exceptions.
+
+**HONEST GAP, and it is the next unit.** A guest now meets TWO forms — the controller's
+`/session/[code]` and this one — where the reference has one, in the room. The controller's guest
+door should become a token-minting step so the room owns the form, which needs no new evidence, only
+the work.
+
+**Verified:** full gate `pnpm -r test` **exit 0** — room **1075 tests across 91 files**, controller
+**937 across 90**, documented totals verified, zero failures. `svelte-check` 0 errors 0 warnings.
+
 ### 2026-08-14 15:11 EDT — PR #20 merged; PR #21 opened with the eight commits since
 
 **Runtime impact: yes — #20 is now on `main`**, which auto-deploys. It carries the five features that

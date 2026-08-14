@@ -13,9 +13,19 @@ const GENERATOR = resolve(SCRIPT_DIR, 'extract-manage-schema.mjs');
 const CANONICAL_SCHEMA = resolve(REPO_ROOT, 'src/lib/room-settings-schema.ts');
 
 /*
-  Eleven consumed by this repository's room-login page, THIRTY-EIGHT by the room application
+  Eleven consumed by this repository's room-login page, FORTY-THREE by the room application
   through `internal/room-config/[code]`, and six by the WordPress SSO door at `(public)/sso/[code]`.
-  `allowUsersToChangeUsername` is on the first two lists, so the union is 54.
+  `allowUsersToChangeUsername` is on the first two lists, and so now are `showPasswordField`,
+  `usernameInstructions` and `hasRequiredPhoneInLogin`, so the union is 56.
+
+  (Forty-three and 56 since 2026-08-14: the room gained its OWN login page — the reference always
+  renders `app-session-login` and never auto-submits — and the five settings that drive it now
+  cross: `showPasswordField`, `usernameInstructions`, `hasRequiredPhoneInLogin`,
+  `customEnterDisclosure`, `disableEditingUsername`. Three were already on the login list, so the
+  union moved by two while ROOM_CONSUMED moved by five. `webinarPW` is NOT among them and that is
+  evidence, not caution: it appears nowhere in the room bundle, because the reference posts the
+  typed password to its server. `banIPList` is not among them either, and that one IS a deliberate
+  narrowing — the reference ships it and checks it in the browser.)
 
   (Thirty and 46 as of 2026-08-12: `hideChatAlerts`, `isChatOnlyRoom` and `disableCopy` reached the
   room when it gained the gates that read them — the chat/alerts column, the presentation column,
@@ -61,6 +71,8 @@ const EXPECTED_WIRED_SETTINGS = [
   'showBadgesToPresentersOnly',
   'disableStarYears',
   'enableRTE',
+  'customEnterDisclosure',
+  'disableEditingUsername',
   'allowUsersToChangeUsername',
   'allowedMemberships',
   'allowedPerms',

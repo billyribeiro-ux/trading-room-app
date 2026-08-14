@@ -6,6 +6,7 @@ import { rooms } from '$lib/server/db/schema';
 import { readSettings } from '$lib/server/rooms';
 import { resolveRoomConfig } from '$lib/room-config';
 import { decideRoomEntry, type RoomEntrySettings } from '$lib/room-entry';
+import { ROOM_BASE_URL } from '$app/env/private';
 import type { Actions, PageServerLoad } from './$types';
 
 const IDENTITY = 'room_identity';
@@ -35,6 +36,30 @@ function readRoomIdentity(raw: string | undefined): RoomIdentity | null {
 export const load: PageServerLoad = async ({ params, cookies, locals }) => {
   const [room] = await getDb().select().from(rooms).where(eq(rooms.shortCode, params.code)).limit(1);
   if (!room) error(404, 'Room not found');
+
+  /*
+    THE ROOM OWNS THE FORM. This door hands over rather than asking the same questions first.
+
+    The reference has exactly ONE login form and it lives in the room: `/session?id=<uuid>` renders
+    `app-session-login`, which collects the name, the email, the phone and the room password. This
+    application grew its own copy while the room had none, and once the room got its page back
+    (2026-08-14) a guest met TWO forms for one entry — ours and then the room's.
+
+    So a configured deployment sends them to the room, with the room short code and no token: a
+    guest has not authenticated with anything here, and minting a credential for somebody who has
+    answered no questions would be inventing an authority rather than passing one on. The room
+    collects the answers and asks `internal/room-entry` — which runs `decideRoomEntry`, the same
+    function this file's action calls — so the rules are enforced in one place either way.
+
+    When `ROOM_BASE_URL` is blank this repository IS the room, so the form below still renders. That
+    is the same fallback `launch/[id]` uses, and it is why the action underneath is kept rather than
+    deleted.
+  */
+  if (ROOM_BASE_URL?.trim()) {
+    const target = new URL('/session', ROOM_BASE_URL);
+    target.searchParams.set('id', room.shortCode);
+    redirect(303, target.toString());
+  }
 
   // The screen the guest sees is decided by the room's settings, exactly as the
   // reference does it — resolveRoomConfig applies policy/default precedence.

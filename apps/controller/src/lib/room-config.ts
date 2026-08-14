@@ -170,6 +170,39 @@ export const ROOM_VISIBLE_SETTINGS = [
     presenter's own preference and their role, and neither is the owner's to decide.
   */
   'enableRTE',
+  /*
+    The five settings the room's own LOGIN PAGE is driven by, each read from `sessData` in the
+    decoded bundle at the byte offset named beside it. Added 2026-08-14 with that page.
+
+    `app-session-login` is not a second identity system — the signed handoff still decides who
+    somebody is. These five decide what the page SHOWS and which of the room's own entry rules it
+    collects, and every one is read there:
+
+      showPasswordField        1189804   `showPresenter = sessData.showPasswordField`
+      usernameInstructions     1189881
+      hasRequiredPhoneInLogin  1189964
+      customEnterDisclosure    1190048
+      disableEditingUsername   1192694   `'a' !== perms && sessData.disableEditingUsername`
+
+    NOT here, and the distinction is the whole reason this list exists:
+
+      `webinarPW`  — appears NOWHERE in the room bundle. The reference's room never holds the room
+                     password: `loginToRoom()` builds `{cver, nick, email}`, adds `i.pw` when one
+                     was typed, and its SERVER decides. Ours does the same through
+                     `internal/room-entry/[code]`, so the credential stays in the controller.
+      `banIPList`  — the reference DOES send this one and checks it in the browser
+                     (`doLoginCheck`, byte 1194680). We deliberately do not: a client-side ban list
+                     is a courtesy check that also hands every banned address to every visitor, and
+                     the server-side decision is the authoritative one either way. Narrower than
+                     the reference, and named rather than silent.
+
+    Both are `credentialShaped`, which `room-config-boundary.test.ts` forbids from this list.
+  */
+  'showPasswordField',
+  'usernameInstructions',
+  'hasRequiredPhoneInLogin',
+  'customEnterDisclosure',
+  'disableEditingUsername',
   // The sidebar's roster gates — `O(44)`, the per-row gate, and `O(6)` for the count badge.
   'onlyPresentersVisibleToViewers',
   'rosterCountVisibleToViewers',
