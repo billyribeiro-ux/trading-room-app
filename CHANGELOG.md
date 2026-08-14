@@ -24,6 +24,37 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-14
 
+### 2026-08-14 09:15 EDT — T2-22 closed; the login-detector fix proved itself on the next run
+
+`evidence-dumps/rendered-states-login-2026-08-14.json`, captured logged out. **66 closed, 8 open.**
+
+The form is `ng-submit="submitLogin()"` — not `addAdminUser()`, which is what the previous run
+mislabelled. The detector rewritten forty minutes earlier rejected the admin form and accepted this
+one, on the same page path, which is as clean a proof as a fix gets.
+
+**Geometry, which is all T2-22 ever wanted:**
+
+| element | size | at | notes |
+| --- | --- | --- | --- |
+| form | 1108x192 | (440.5, 146) | padding 0 |
+| email / password inputs | **539x34** each | y=146, y=210 | `padding: 6px 42.5px 6px 18px` — asymmetric, room for an icon; `1px solid rgb(219,217,217)`, radius 4px; a 30px gap under the 34px field |
+| "Forgot your password?" | 145.05x16.5 | (834.45, 255.5) | right edge = 979.5, exactly the inputs' right edge — aligned to the FIELD, not the form |
+| submit button | **539x34** | (440.5, 289) | full width, `1px solid rgb(70,184,218)`, radius 4px |
+| `<textarea>`, `<label>"Logging In, please wait..."` | 0x0 | — | present but only rendered during submit |
+
+The error-state half was already closed and stays closed: it is a reCAPTCHA gated on
+`failedLoginCount >= 3`, never an error message, and ours matches.
+
+**Section A of the handoff is now empty.** Five gaps closed by one browser session — T5-15, T5-21,
+T2-20, T2-7, T2-22 — and the only browser work left in the whole register is T1-9/T1-10, whose
+fetcher aborted twice on a denylist bug and has not yet been re-run with the fix.
+
+**Three collector defects in one session, and the pattern is worth naming.** Not one of them threw.
+Each returned a well-formed result that was wrong: 0/15 handlers, an abort before any request, and a
+correctly-measured form under the wrong name. A tool that fails loudly costs a minute. A tool that
+fails plausibly costs a conclusion — and the third would have closed T2-22 against the Add Admin User
+form if the JSON had not been read line by line.
+
 ### 2026-08-14 09:06 EDT — browser session: four gaps closed, three script defects found
 
 The owner ran the collectors against the live site. **T5-15, T5-21, T2-20 and T2-7 are closed**;
