@@ -896,6 +896,67 @@
   let chatInputFocus = $state('textAreaTxt');
 
   /**
+   * `preferences.visibilityChangeEnabled`, and `globals.appHasFocus` — pause chat work while the
+   * tab is hidden, catch up when it comes back.
+   *
+   * ```js
+   * document.hidden
+   *   ? (globals.appHasFocus = !1, unloadRoster())
+   *   : (globals.appHasFocus = !0, …, guiEventBus.emit('appHasFocusGetChatLog'),
+   *      preferences.extraChatColumn && guiEventBus.emit('appHasFocusGetChatLogExtraChatColumn'))
+   * ```
+   *
+   * ## Why this matters MORE here than upstream
+   *
+   * Upstream a hidden tab merely stops appending to an in-memory array. This room re-reads its chat
+   * log from the server on every SSE event, so a hidden tab was doing a full page load per message
+   * posted in the room. That is the cost this removes.
+   *
+   * ## The ROSTER half is deliberately not reproduced
+   *
+   * `unloadRoster()` / `loadRoster()` gate a five-second POLL. This roster is SSE-pushed, so gating
+   * it the same way would make a hidden tab hold a stale roster for anyone who has not opted in —
+   * strictly worse than doing nothing. Recorded in item AA before this was built and still true.
+   *
+   * ## Mentions are never paused
+   *
+   * `visibilityChangeEnabled && !appHasFocus ? te.isMention && emit('chatMsg', te) : push(...)` —
+   * the hidden branch still surfaces a mention. A feature that silences the one message addressed
+   * to you by name is not a saving.
+   */
+  let visibilityChangeEnabled = $state(loadedSettings.visibilityChangeEnabled === true);
+  let appHasFocus = $state(true);
+  /** Set while hidden, so the catch-up only runs when something was actually missed. */
+  let missedChatWhileHidden = false;
+
+  /**
+   * The `visibilitychange` listener — `globals.appHasFocus`, and the catch-up on the way back.
+   *
+   * An attachment on `<svelte:document>` would be tidier, but this listener has to exist whether or
+   * not any element is mounted, and it must be removed on teardown: a detached listener holding a
+   * closure over `data` is how a single-page app leaks a page.
+   *
+   * The catch-up is `appHasFocusGetChatLog`, and it fires ONCE rather than replaying what was
+   * missed, because the load already returns the newest page per channel — the room re-reads itself
+   * and is current, which is exactly what upstream's `getChatLog` on that event does.
+   */
+  $effect(() => {
+    if (typeof document === 'undefined') return;
+    const onVisibilityChange = () => {
+      if (document.hidden) {
+        appHasFocus = false;
+        return;
+      }
+      appHasFocus = true;
+      if (!missedChatWhileHidden) return;
+      missedChatWhileHidden = false;
+      void invalidateAll();
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', onVisibilityChange);
+  });
+
+  /**
    * `preferences.disableVideo` - the viewer's own "turn the video off to preserve data" switch.
    *
    * The CHECKBOX has been in the settings modal since it was built (`ModalHost.svelte:2652`,
@@ -3604,6 +3665,7 @@
       if (key === 'trimChatLogs') trimChatLogs = value;
       if (key === 'enableRTE') enableRTE = value;
       if (key === 'extraChatColumn') extraChatColumn = value;
+      if (key === 'visibilityChangeEnabled') visibilityChangeEnabled = value;
       /*
         Both halves, because this preference has TWO controls: the navbar's
         `presentation-subtitles` checkbox and the settings modal's `app-speech-reco-overlay`. The
@@ -7374,6 +7436,18 @@
         const followStyle = senderHash ? followedUsers[senderHash]?.followChatStyle : undefined;
         if (followStyle?.playSound) playSoundEffect('pling');
         else if (data.sessData?.dingOnNewMessage) playSoundEffect('followed');
+      }
+
+      /*
+        `visibilityChangeEnabled && !appHasFocus` — do not re-read the room for a hidden tab.
+
+        The MENTION path above has already run, so the one message addressed to you by name still
+        reaches you; what is skipped is the full refetch. `missedChatWhileHidden` records that there
+        is something to catch up on, so returning to a tab where nothing happened costs nothing.
+      */
+      if (visibilityChangeEnabled && !appHasFocus) {
+        missedChatWhileHidden = true;
+        return;
       }
 
       void invalidateAll();

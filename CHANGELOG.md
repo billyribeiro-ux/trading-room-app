@@ -24,6 +24,49 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-14
 
+### 2026-08-14 14:00 EDT — A hidden tab stops re-reading the room
+
+**Runtime impact: yes, for anyone who turns it on.** `visibilityChangeEnabled` was one of the dead
+element ids. It is wired now, and it does the thing that matters most in THIS room rather than the
+thing it does upstream.
+
+**Item AA deferred this, and AA was right about the half it was talking about.** Upstream's handler
+does two things. The ROSTER half — `unloadRoster()` / `loadRoster()` — gates a five-second poll;
+ours is SSE-pushed, so reproducing it would leave a hidden tab holding a stale roster for anyone who
+had not opted in, which is worse than doing nothing. That half is still deliberately absent, and the
+contract asserts its absence rather than leaving it to memory.
+
+**The CHAT half is the reverse, and it is worth more here than upstream.** There, a hidden tab stops
+appending to an array. Here, the room re-reads its entire chat log from the server on every SSE
+event — so a hidden tab was doing a full page load for every message anybody posted in the room.
+That refetch is now skipped while the tab is hidden, and a single catch-up runs on return
+(`appHasFocusGetChatLog`), only when something actually arrived.
+
+**Mentions are never paused**, because upstream's hidden branch keeps them:
+`visibilityChangeEnabled && !appHasFocus ? te.isMention && emit('chatMsg', te) : push(...)`. The gate
+sits AFTER the mention path, and the contract asserts that ordering — a feature that silences the one
+message addressed to you by name is not a saving.
+
+**Defaults OFF, and that is a stated divergence.** The reference ships `visibilityChangeEnabled:!0`.
+Inheriting that would mean a viewer who never asked for it silently stops receiving until they look
+at the tab — acceptable when the cost is an array append, not when it is a network read.
+
+**The last row-X item is BLOCKED, and now proven rather than assumed.**
+`app-recording-preview-window` polls `${sessData.recPreviewLocation}?${Date.now()}` every second, and
+`recPreviewLocation` is written by the SERVER on the command channel — `case "setRecPreview"` at
+bundle byte 1023704. The component's own gate is
+`videoOnlyMode || !isPresenter || !recPreviewLocation || !recPreviewWindow` → do nothing. This room
+records client-side with `MediaRecorder`, a divergence declared in item R, so no snapshot exists and
+no `setRecPreview` ever arrives. Building it would ship a component that cannot run; generating the
+frame locally would invent a mechanism the reference does not have — its own heading says "DELAYED
+UPTO 20s" precisely because the snapshot is made server-side.
+
+**Verified:** `svelte-check` 0 errors 0 warnings; room **1066 tests across 90 files**, up from
+1062/90. **Five negative controls run and each went red**: letting a hidden tab keep refetching,
+refetching on every return even when nothing arrived, leaking the visibilitychange listener, cutting
+the preference wire, and inheriting the reference's ON default. **Not run:** the full gate on this
+branch.
+
 ### 2026-08-14 13:52 EDT — The extra column's last two gaps: mention routing, and hideChat
 
 **Runtime impact: yes.** Both gaps recorded at 13:45 are closed, so the second chat column is

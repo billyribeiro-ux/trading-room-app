@@ -1260,6 +1260,10 @@
          `extraChatColumn`. It also fires `getChatLog {channel:'offTopic', page:0, extraChat:true}`
          on the way ON; this room needs no such fetch, because its page load already sends page 0 of
          EVERY rendered channel — see `loadNewestChatPages`. */
+      /* `visibilityChangeEnabledChange()` persists `visibilityChangeEnabled` and emits
+         `appVisibilityChange`. Only the CHAT half of that feature is reproduced — see the note on
+         the preference in `+page.svelte` for why the roster half would be worse than nothing here. */
+      'visibility-change-enabled': 'visibilityChangeEnabled',
       'extra-chat-column': 'extraChatColumn',
       /* `enableRTEOnChange()` at `app-user-settings-modal.full.js:1031-1035` persists `enableRTE`,
          read from that handler rather than inferred from the id. The checkbox has rendered since
