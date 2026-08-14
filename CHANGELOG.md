@@ -24,6 +24,52 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-14
 
+### 2026-08-14 16:12 EDT — X, AC and R row 10 are one decision, and it is not "build a recorder"
+
+**Runtime impact: none.** Three rows re-characterised from the bundle, because all three named their
+blocker wrongly and that wrong name made the work look bigger and vaguer than it is.
+
+**Every recording row said "server-side recording", which reads as something to be BUILT.** It is
+not. The reference publishes to **MediaMTX** over **WHIP** and lets that server do the recording:
+
+```js
+this.useMTX = this.globals.sessData.useMediaMTX;      // byte 1115350
+```
+
+and the manage page carries three settings for it, all inside the reference's own **`dont-touch`**
+group — `useMediaMTX` ("Use MediaMTX?"), `mediaMTXClusterID` ("MediaMTX ClusterID") and
+`backupMediaMTXClustterID`, whose typo is upstream's. A ClusterID *and a backup ClusterID* mean a
+managed media tier with its own identity, not a process running beside the SFU.
+
+**The wire is one conversation, and that is why the three rows are one decision.** The presenter asks
+with `startRecMtx {streams}` or `stopRecMtx`; the SERVER answers on the command channel with
+`startRec`, `stopRec`, `pauseRec`, `resumeRec`, `setRecPreview {url}` and `stopRecMsg {data}`. Row X
+wants `setRecPreview`, row AC wants `stopRecMsg`, and row R's row 10 wants the server-side remux —
+all three arrive together the moment a cluster exists, and none of them can arrive before.
+
+**And a claim that has been in the register for days is wrong: client-side recording is not our
+divergence.** `startRecFromMuser` branches (byte 2524230):
+
+```js
+this.mtxService.mtxStreams.length > 0
+  ? sendServerAdminCommand('startRecMtx', {streams: this.mtxService.mtxStreams})
+  : this.mediaService.startRecForMuser(null)
+```
+
+Upstream records in the BROWSER too, whenever no MTX stream exists. So this room's `MediaRecorder`
+reproduces a real upstream path rather than departing from one, and row R's description of it as "a
+declared divergence" has been overstating the gap.
+
+**Also checked, and it is why the scale changed:** `services/media` creates only `WebRtcTransport` —
+no `PlainTransport`, no `DirectTransport`, no recording scaffolding of any kind. Had the blocker
+really been "build a recorder", it would have started from zero inside an import-governed tree. It
+does not: MediaMTX is off-the-shelf, and what is missing is a deployment.
+
+**What this leaves the owner:** one infrastructure decision — stand up a MediaMTX cluster (primary
+and backup) and add the client-side WHIP publish — which closes X, AC and R row 10 together. It is
+the same tier row H is about, and `MEDIASOUP-DEPLOYMENT-PLAN.md` defers it under "recording/
+transcoding workers and recording storage".
+
 ### 2026-08-14 15:44 EDT — The backend gate was passing without running
 
 **Runtime impact: none in the product; large in what CI actually proves.** Four verifiers that had
