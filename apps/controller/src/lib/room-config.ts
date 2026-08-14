@@ -154,6 +154,22 @@ export const ROOM_VISIBLE_SETTINGS = [
   'enableBadges',
   'showBadgesToPresentersOnly',
   'disableStarYears',
+  /*
+    "Enable Rich Text Editor?" — "If enabled, Presenter will be able to format their messages using
+    the rich text editor".
+
+    The owner's term in a THREE-way gate the room resolves as
+    `sessData.enableRTE && preferences.enableRTE && isPresenter`. That expression is not inferred:
+    it appears three times in the decoded bundle — on the composer button that opens the editor
+    (byte 1426967), inside `loadRTE`, which will not construct the editor without it, and inside
+    `retriveRTEContent`, which returns an empty string so a crafted click cannot post through a
+    disabled editor either.
+
+    Not a credential and not something the room could infer: it is a per-room policy the owner ticks
+    on the Manage page, and the room is where the toolbar is drawn. The other two terms are the
+    presenter's own preference and their role, and neither is the owner's to decide.
+  */
+  'enableRTE',
   // The sidebar's roster gates — `O(44)`, the per-row gate, and `O(6)` for the count badge.
   'onlyPresentersVisibleToViewers',
   'rosterCountVisibleToViewers',

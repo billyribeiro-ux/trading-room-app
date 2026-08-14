@@ -270,6 +270,39 @@ describe('askQuestion', () => {
     return db.select().from(alerts).all()[0];
   }
 
+  it('refuses an alert that belongs to another room, and writes nothing', async () => {
+    /*
+      A CROSS-TENANT WRITE, live until 2026-08-14.
+
+      The author lookup was always scoped to the room, but its answer was only ever used to decide
+      `isAnswer`. A miss produced `null`, `isAnswer` went false, and the insert ran anyway with
+      whatever `alertId` the form carried — so a member of one room could attach a question to
+      another room's alert thread, and that room would display it. `alert_questions` has no room
+      column of its own, so nothing downstream could catch it either.
+
+      Asserted on the ROWS, not just the return value: an action that refuses politely and inserts
+      anyway is the exact shape of the bug.
+    */
+    const foreign = db
+      .insert(alerts)
+      .values({
+        roomShortCode: '9999',
+        senderId: presenter.id,
+        body: 'an alert in somebody else’s room',
+        createdAt: new Date()
+      })
+      .returning()
+      .get();
+
+    const before = db.select().from(alertQuestions).all().length;
+    const result = await actions.askQuestion(
+      event(member, { body: 'let me in', alertId: String(foreign.id) })
+    );
+
+    expect(result).toMatchObject({ status: 404 });
+    expect(db.select().from(alertQuestions).all().length, 'no row was written').toBe(before);
+  });
+
   it('records the question and keeps the alert’s counters in step', async () => {
     const alert = await alertBy(presenter);
 

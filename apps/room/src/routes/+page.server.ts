@@ -1,6 +1,7 @@
 import { fail, redirect } from '@sveltejs/kit';
 import { createHash } from 'node:crypto';
 import { and, asc, desc, eq, gt, isNull } from 'drizzle-orm';
+import { isEmptyChatHtml, sanitizeChatHtml } from '$lib/server/chat-html';
 import { pruneDeadPreferenceKeys } from '$lib/dead-preference-keys';
 import { calculatePollTotals, parsePollChoices } from '$lib/poll-behavior';
 import {
@@ -27,6 +28,15 @@ import {
   noCapturedRoomItems
 } from '$lib/server/captured-room';
 import { hashEmail, publicSessionHandle } from '$lib/server/connection';
+import {
+  MAX_CHAT_LOG_PAGE,
+  isChatChannel,
+  loadChatPage,
+  loadNewestChatPages
+} from '$lib/server/chat-log';
+import { loadAlertPage } from '$lib/server/alert-log';
+import { isChatMode, type ChatMode } from '$lib/chat-mode';
+import { parseReactions } from '$lib/server/reactions';
 import { readRoomConfig, requestMobilePin, writeRoomSetting } from '$lib/server/room-config-client';
 import { alertSoundCommandValue } from '$lib/files-gates';
 import { memberDeniedArchives } from '$lib/roster-gates';
@@ -72,6 +82,7 @@ import {
   alerts,
   capturedItemOverrides,
   chatMutes,
+  roomState,
   hiddenRoomItems,
   messages,
   pollAnswers,
@@ -92,29 +103,6 @@ import type { ActivePoll, MessageReactions } from '$lib/types';
 const MAX_MESSAGE_BODY = 4_000;
 const MAX_ALERT_BODY = 8_000;
 import type { Actions, PageServerLoad } from './$types';
-
-function parseReactions(value: string): MessageReactions {
-  try {
-    const parsed: unknown = JSON.parse(value);
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
-
-    return Object.fromEntries(
-      Object.entries(parsed).filter(
-        ([key, reaction]) =>
-          key.length > 0 &&
-          reaction !== null &&
-          typeof reaction === 'object' &&
-          'emoji' in reaction &&
-          typeof reaction.emoji === 'string' &&
-          'clickedBy' in reaction &&
-          Array.isArray(reaction.clickedBy) &&
-          reaction.clickedBy.every((emailHash: unknown) => typeof emailHash === 'string')
-      )
-    ) as MessageReactions;
-  } catch {
-    return {};
-  }
-}
 
 export const load: PageServerLoad = async ({ depends, locals, request, cookies }) => {
   ensureDatabase();
@@ -338,71 +326,25 @@ export const load: PageServerLoad = async ({ depends, locals, request, cookies }
     };
   }
 
-  const messageRows = db
-    .select({
-      id: messages.id,
-      room: messages.room,
-      senderId: messages.senderId,
-      body: messages.body,
-      isAdmin: messages.isAdmin,
-      backgroundColor: messages.backgroundColor,
-      fontColor: messages.fontColor,
-      answered: messages.answered,
-      replyToMessageId: messages.replyToMessageId,
-      replyToName: messages.replyToName,
-      replyToBody: messages.replyToBody,
-      reactionsJson: messages.reactionsJson,
-      createdAt: messages.createdAt,
-      senderName: users.displayName,
-      senderEmail: users.email,
-      senderAvatarUrl: users.avatarUrl,
-      senderRole: users.role,
-      senderStatus: users.status
-    })
-    .from(messages)
-    .innerJoin(users, eq(messages.senderId, users.id))
-    // `/sess/${sessionID}/chat/…` — this room's chat, not the deployment's.
-    .where(eq(messages.roomShortCode, requireRoomShortCode(locals)))
-    .orderBy(asc(messages.createdAt))
-    .all()
-    .map(({ senderEmail, reactionsJson, ...message }) => ({
-      ...message,
-      reactions: parseReactions(reactionsJson),
-      senderEmailHash: hashEmail(senderEmail)
-    }));
+  /*
+    THE NEWEST PAGE PER CHANNEL, not the whole log.
 
-  const alertRows = db
-    .select({
-      id: alerts.id,
-      senderId: alerts.senderId,
-      kind: alerts.kind,
-      body: alerts.body,
-      targetUrl: alerts.targetUrl,
-      nonTrade: alerts.nonTrade,
-      isAdmin: alerts.isAdmin,
-      backgroundColor: alerts.backgroundColor,
-      fontColor: alerts.fontColor,
-      questionCount: alerts.questionCount,
-      questionAnswered: alerts.questionAnswered,
-      reactionsJson: alerts.reactionsJson,
-      createdAt: alerts.createdAt,
-      senderName: users.displayName,
-      senderEmail: users.email,
-      senderAvatarUrl: users.avatarUrl,
-      senderRole: users.role,
-      senderStatus: users.status
-    })
-    .from(alerts)
-    .innerJoin(users, eq(alerts.senderId, users.id))
-    // `/sess/${sessionID}/alerts/` — this room's alerts.
-    .where(eq(alerts.roomShortCode, requireRoomShortCode(locals)))
-    .orderBy(asc(alerts.createdAt))
-    .all()
-    .map(({ senderEmail, reactionsJson, ...alert }) => ({
-      ...alert,
-      reactions: parseReactions(reactionsJson),
-      senderEmailHash: hashEmail(senderEmail)
-    }));
+    This selected every row in `messages` for the room until 2026-08-14 — no LIMIT, `.all()` — and
+    every SSE event calls `invalidateAll()`, so a room with 50,000 messages re-read and
+    re-serialised all of them each time anybody said anything. Older pages are fetched on demand by
+    `loadOlderChatMessages` and held in client state, so nothing became unreachable; see
+    `$lib/server/chat-log.ts` for why a bare LIMIT would have been worse than the bug.
+  */
+  const messageRows = loadNewestChatPages(requireRoomShortCode(locals));
+
+  /*
+    THE NEWEST PAGE, not every alert the room has ever posted.
+
+    The same defect the chat log had and the same cure — see `$lib/server/alert-log.ts`. Older
+    pages come from `loadOlderAlerts` and are held in client state, so an `invalidateAll()` cannot
+    throw away what a reader scrolled back to.
+  */
+  const alertRows = loadAlertPage(requireRoomShortCode(locals));
 
   const questionRows = db
     .select({
@@ -421,7 +363,23 @@ export const load: PageServerLoad = async ({ depends, locals, request, cookies }
       senderRole: users.role
     })
     .from(alertQuestions)
+    /*
+      SCOPED TO THIS ROOM — added 2026-08-14, and it was a cross-tenant leak until then.
+
+      `alert_questions` is the one room-owned table with NO `room_short_code` column: it reaches its
+      room through `alert_id`, which the delete path already documents ("`alertQuestions` reaches
+      its room through `alertId`"). This read had no filter of any kind, so every browser in every
+      room received every alert question in the deployment — question bodies, and the name, avatar
+      and role of whoever asked — serialised into the SSR HTML and into the `__sveltekit` payload.
+      What the client chose to RENDER was never the point; the data had already crossed.
+
+      Joining through `alerts` applies the room the same way every other read here does. The
+      alternative — adding `room_short_code` to the table — would denormalise a fact this schema
+      already derives, and would need a backfill that this join makes unnecessary.
+    */
+    .innerJoin(alerts, eq(alerts.id, alertQuestions.alertId))
     .innerJoin(users, eq(alertQuestions.senderId, users.id))
+    .where(eq(alerts.roomShortCode, requireRoomShortCode(locals)))
     .orderBy(asc(alertQuestions.createdAt), asc(alertQuestions.id))
     .all()
     .map(({ senderEmail, ...question }) => ({
@@ -567,6 +525,38 @@ export const load: PageServerLoad = async ({ depends, locals, request, cookies }
     alerts: [...capturedRoom.alerts.filter(isVisible).map(withOverrides), ...alertRows].map(
       withQuestionState
     ),
+    /*
+      The room's chat mode, and whether THIS viewer is muted — the two reasons the reference shows
+      its `Chat Disabled` block, both read on the server.
+
+      `chatMode` is room state, so it comes from the row rather than from anything the client says.
+      Absent means `g`: a room whose presenter has never touched the control has group chat, which
+      is the reference's default too.
+
+      The mute was already ENFORCED here — `sendMessage` refuses while a row is live — and was
+      never exposed, so a muted member typed, pressed send, and watched nothing happen. Upstream
+      carries it on the session token as `chatMuted` / `chatMutedTill` precisely so the composer can
+      say so. Only the viewer's OWN mute crosses; who else is muted is none of their business.
+    */
+    chatMode:
+      db
+        .select({ chatMode: roomState.chatMode })
+        .from(roomState)
+        .where(eq(roomState.roomShortCode, requireRoomShortCode(locals)))
+        .get()?.chatMode ?? 'g',
+    chatMutedTill:
+      db
+        .select({ expiresAt: chatMutes.expiresAt })
+        .from(chatMutes)
+        .where(
+          and(
+            eq(chatMutes.roomShortCode, requireRoomShortCode(locals)),
+            eq(chatMutes.targetUserId, requireUser(locals).id),
+            gt(chatMutes.expiresAt, new Date())
+          )
+        )
+        .orderBy(desc(chatMutes.expiresAt))
+        .get()?.expiresAt ?? null,
     alertQuestions: questionRows,
     files: db
       .select()
@@ -852,8 +842,31 @@ export const actions: Actions = {
     }
 
     const data = await request.formData();
-    const body = String(data.get('body') ?? '').trim();
     const room = String(data.get('room') ?? 'main');
+
+    /*
+      RICH TEXT, when the editor sent it.
+
+      `bodyHtml` arrives only from the RTE modal. It is sanitised HERE, on the server, and the
+      sanitised value is what is stored — never the submitted one. A client-side sanitiser is a
+      convenience for the person typing; it is not a control, because the request can be made
+      without the client.
+
+      `body` is then derived from the sanitised HTML with its tags stripped, so every existing
+      reader keeps working: the plain-text segment renderer, the mention rule, the popup, search,
+      and any client that never learns this column exists. Two representations of one message, and
+      the HTML one is never the only copy.
+    */
+    const submittedHtml = String(data.get('bodyHtml') ?? '').trim();
+    const sanitizedHtml = submittedHtml ? sanitizeChatHtml(submittedHtml) : '';
+    const bodyHtml = sanitizedHtml && !isEmptyChatHtml(sanitizedHtml) ? sanitizedHtml : null;
+
+    const body = bodyHtml
+      ? bodyHtml
+          .replace(/<[^>]*>/g, '')
+          .replace(/&nbsp;/g, ' ')
+          .trim()
+      : String(data.get('body') ?? '').trim();
 
     if (!body) return fail(400, { message: 'A message is required.' });
     if (body.length > MAX_MESSAGE_BODY) {
@@ -894,6 +907,7 @@ export const actions: Actions = {
         room,
         senderId: requireUser(locals).id,
         body,
+        bodyHtml,
         isAdmin: isPresenterRole(requireUser(locals).role),
         createdAt: new Date()
       })
@@ -1043,7 +1057,23 @@ export const actions: Actions = {
             alertId,
             requireRoomShortCode(locals)
           )?.senderId ?? null);
-    const isAnswer = alertAuthorId !== null && alertAuthorId === requireUser(locals).id;
+    /*
+      THE ALERT MUST BE IN THIS ROOM — added 2026-08-14, and it was a cross-tenant WRITE until then.
+
+      The lookup above is correctly scoped, but its answer was only ever used to decide `isAnswer`.
+      A miss produced `null`, `isAnswer` went false, and the insert below ran anyway with whatever
+      `alertId` the form carried — so a member of one room could attach a question to another room's
+      alert, and that room's Q&A thread would display it. `alert_questions` has no room column of
+      its own, so nothing downstream could catch it either.
+
+      `null` here means exactly one thing: no alert with that id exists in THIS room. `senderId` is
+      `notNull`, so a found row always answers; and `capturedRoomItem` is given the room too, so a
+      captured alert that is hidden or belongs elsewhere is a miss as well. Refusing on `null` is
+      therefore the whole check, and it fails closed.
+    */
+    if (alertAuthorId === null) return fail(404, { message: 'Alert not found.' });
+
+    const isAnswer = alertAuthorId === requireUser(locals).id;
     const now = new Date();
 
     const stored = db.transaction((transaction) => {
@@ -1574,6 +1604,80 @@ export const actions: Actions = {
     };
   },
 
+  /**
+   * `getChatLog {channel, page}` — one page of older history for the main chat log.
+   *
+   * The reference's own command, minus the socket. Its client asks for page N when the reader
+   * scrolls near the top, and the server answers with that page and nothing else; an EMPTY answer
+   * is what tells the client to stop asking (`0 == o.length && (this.hasMoreData = !1)`).
+   *
+   * ## The channel is validated, not trusted
+   *
+   * `isChatChannel` is an allow-list of the two channels this room renders. Without it the field
+   * would be an arbitrary string reaching a WHERE clause — parameterised, so not injectable, but it
+   * would let a caller enumerate whether messages exist under any label they cared to guess. Deny
+   * by default costs one line.
+   *
+   * ## Scoped like every other read here
+   *
+   * `requireRoomShortCode(locals)` — the room comes from the session, never from the request. A
+   * `roomShortCode` field on this form would be the 2026-08-07 privilege escalation again, in a
+   * new place.
+   */
+  loadOlderChatMessages: async ({ request, locals }) => {
+    ensureDatabase();
+    requireUser(locals);
+
+    const data = await request.formData();
+    const channel = String(data.get('channel') ?? '');
+    if (!isChatChannel(channel)) return fail(400, { message: 'No such channel.' });
+
+    /*
+      Page 0 is the newest page and the page load already sent it, so asking for it here would
+      duplicate what the client holds rather than reach further back. Bounded at the top too: a
+      caller cannot ask for page 10,000,000 and make SQLite count its way there, which is what an
+      unvalidated OFFSET is.
+    */
+    const page = Number(data.get('page') ?? 0);
+    if (!Number.isInteger(page) || page < 1 || page > MAX_CHAT_LOG_PAGE) {
+      return fail(400, { message: 'No such page.' });
+    }
+
+    return {
+      success: true,
+      channel,
+      page,
+      messages: loadChatPage(requireRoomShortCode(locals), channel, page)
+    };
+  },
+
+  /**
+   * `getAlertsLog {page}` — one page of older alerts.
+   *
+   * The sibling of `loadOlderChatMessages`, minus the channel: alerts are one stream per room, so
+   * upstream's command carries a page and nothing else. An EMPTY answer is what stops the client
+   * asking, and the arrival handler that reads it is literally the same component for both log
+   * types, switched on `logType`.
+   */
+  loadOlderAlerts: async ({ request, locals }) => {
+    ensureDatabase();
+    requireUser(locals);
+
+    const data = await request.formData();
+    /* Page 0 is the newest page and the load already sent it; the upper bound caps the OFFSET
+       walk, which is a scan. Same reasoning as the chat action, same constant. */
+    const page = Number(data.get('page') ?? 0);
+    if (!Number.isInteger(page) || page < 1 || page > MAX_CHAT_LOG_PAGE) {
+      return fail(400, { message: 'No such page.' });
+    }
+
+    return {
+      success: true,
+      page,
+      alerts: loadAlertPage(requireRoomShortCode(locals), page)
+    };
+  },
+
   /** `deletePeerPCLog {peerID}` - the whole conversation, both directions. */
   deletePrivateChatLog: async ({ request, locals }) => {
     ensureDatabase();
@@ -1628,6 +1732,53 @@ export const actions: Actions = {
       data: { cmd, recName: recName || undefined }
     });
     return { success: true };
+  },
+
+  /**
+   * `sendServerAdminCommand('changeChatMode', {mode})` — a PRESENTER act that changes the room.
+   *
+   * ```js
+   * changeChatMode(e, i) {
+   *   if (sessData.chatMode == e) return;
+   *   let o = '"Group Chat"?';
+   *   'p' == e ? (o = '"Webinar Mode"?') : 'd' == e && (o = '"Disabled"?');
+   *   bootbox.confirm('Are you sure you want to change the chat mode to ' + o, s => {
+   *     s && this.appService.sendServerAdminCommand('changeChatMode', {mode: e});
+   *   });
+   * }
+   * ```
+   *
+   * PERSISTED, unlike the recording state next to it. Recording is momentary and a late joiner has
+   * missed nothing by not hearing it; a disabled chat is a standing fact about the room, and a
+   * member who arrives afterwards has to find it disabled. Broadcast as well, so the tabs that are
+   * already open change without waiting for a reload.
+   *
+   * Presenter-gated on the SERVER from the session's own role. The radio is presenter-only in the
+   * modal too, and a hidden control is not an authorization check.
+   */
+  changeChatMode: async ({ request, locals }) => {
+    ensureDatabase();
+    const user = requireUser(locals);
+    if (!isPresenterRole(user.role)) return fail(403, { message: 'Presenters only.' });
+
+    const data = await request.formData();
+    const mode = String(data.get('mode') ?? '');
+    // Deny by default: three letters, and anything else is refused rather than stored.
+    if (!isChatMode(mode)) return fail(400, { message: 'Unknown chat mode.' });
+
+    const roomShortCode = requireRoomShortCode(locals);
+    db.insert(roomState)
+      .values({ roomShortCode, chatMode: mode, updatedAt: new Date() })
+      /* One row per room, so a second change UPDATES rather than appending a second opinion about
+         what the mode is. The conflict target is the primary key. */
+      .onConflictDoUpdate({
+        target: roomState.roomShortCode,
+        set: { chatMode: mode, updatedAt: new Date() }
+      })
+      .run();
+
+    publishToRoom(roomShortCode, { channel: 'cmds', data: { cmd: 'changeChatMode', mode } });
+    return { success: true, mode };
   },
 
   /**
@@ -2143,7 +2294,32 @@ export const actions: Actions = {
     }
 
     if (operation === 'edit') {
-      const newBody = String(data.get('newBody') ?? '').trim();
+      /*
+        RICH TEXT on the edit path — `editChatMessage` with `newMsg` set to the editor's content.
+
+        Sanitised here and derived here, exactly as the post path above does it, and for the same
+        reason: the submitted value is never what gets stored.
+
+        CHAT ONLY. The reference's rich edit branch is inside `if ("chat" === this.logType)`, the
+        alerts table has no such column, and an alert edited through the presenter's prompt is
+        plain text. Reading the field for an alert would be accepting input nothing can store.
+
+        AND IT ALWAYS REWRITES BOTH COLUMNS. A chat edit sets `body_html` to the sanitised HTML or
+        to NULL — never "leave whatever was there". Otherwise editing a rich message through the
+        PLAIN prompt (which is what happens when the owner has since turned the editor off) would
+        write a new `body` and leave the old markup behind, and the renderer picks the column: the
+        message would keep displaying the sentence it no longer says.
+      */
+      const submittedHtml = kind === 'chat' ? String(data.get('newBodyHtml') ?? '').trim() : '';
+      const sanitizedHtml = submittedHtml ? sanitizeChatHtml(submittedHtml) : '';
+      const newBodyHtml = sanitizedHtml && !isEmptyChatHtml(sanitizedHtml) ? sanitizedHtml : null;
+
+      const newBody = newBodyHtml
+        ? newBodyHtml
+            .replace(/<[^>]*>/g, '')
+            .replace(/&nbsp;/g, ' ')
+            .trim()
+        : String(data.get('newBody') ?? '').trim();
       if (!newBody) return fail(400, { message: 'A message is required.' });
 
       // Captured items, under the same rules the real branches apply below: an alert is
@@ -2185,7 +2361,7 @@ export const actions: Actions = {
       const isOwner = message.senderId === requireUser(locals).id;
       if (!isOwner && (!isPresenter || message.isAdmin)) return fail(403);
       db.update(messages)
-        .set({ body: newBody })
+        .set({ body: newBody, bodyHtml: newBodyHtml })
         .where(and(eq(messages.roomShortCode, requireRoomShortCode(locals)), eq(messages.id, id)))
         .run();
       return { success: true };

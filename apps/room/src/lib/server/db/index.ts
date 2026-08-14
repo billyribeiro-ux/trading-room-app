@@ -41,6 +41,7 @@ export function ensureDatabase() {
       reply_to_name TEXT,
       reply_to_body TEXT,
       reactions_json TEXT NOT NULL DEFAULT '{}',
+      body_html TEXT,
       created_at INTEGER NOT NULL
     );
     CREATE TABLE IF NOT EXISTS alerts (
@@ -178,6 +179,11 @@ export function ensureDatabase() {
     );
     CREATE INDEX IF NOT EXISTS chat_mutes_target_expires_idx
       ON chat_mutes(target_user_id, expires_at);
+    CREATE TABLE IF NOT EXISTS room_state (
+      room_short_code TEXT PRIMARY KEY,
+      chat_mode TEXT NOT NULL DEFAULT 'g',
+      updated_at INTEGER NOT NULL
+    );
     CREATE TABLE IF NOT EXISTS sessions (
       id TEXT PRIMARY KEY,
       user_id INTEGER NOT NULL REFERENCES users(id),
@@ -265,6 +271,22 @@ export function ensureDatabase() {
   }
   if (!messageColumns.has('reply_to_body')) {
     sqlite.exec('ALTER TABLE messages ADD COLUMN reply_to_body TEXT');
+  }
+  /*
+    `body_html` — a message written with the rich text editor, sanitised on the way in.
+
+    NULLABLE, and that is the design rather than a convenience. A message is EITHER plain text or
+    RTE HTML, and which one it is has to be a fact the row carries — not something the renderer
+    guesses from whether the body happens to contain angle brackets. Somebody typing `<b>` into the
+    ordinary composer must render as the characters they typed.
+
+    So: plain messages leave this null and keep rendering through the existing segment parser; RTE
+    messages fill it and render as sanitised HTML. `body` is still written either way, holding the
+    text with tags stripped, so search, notifications and any client that never learns about this
+    column keep working.
+  */
+  if (!messageColumns.has('body_html')) {
+    sqlite.exec('ALTER TABLE messages ADD COLUMN body_html TEXT');
   }
   if (!messageColumns.has('reactions_json')) {
     sqlite.exec("ALTER TABLE messages ADD COLUMN reactions_json TEXT NOT NULL DEFAULT '{}'");
@@ -355,6 +377,30 @@ export function ensureDatabase() {
     }
     sqlite.exec(`CREATE INDEX IF NOT EXISTS ${table}_room_idx ON ${table}(room_short_code)`);
   }
+
+  /*
+    The chat log's paging index.
+
+    `loadChatPage` filters on (room_short_code, room) and orders by (created_at DESC, id DESC). The
+    single-column `messages_room_idx` above narrows to the room and then leaves SQLite to sort what
+    is left on every page request — which is the whole channel, every time, exactly the cost the
+    paging was added to remove. This index answers the WHERE and supplies the ORDER BY in one
+    ordered walk, so a page read touches the fifty rows it returns plus the offset it skips.
+
+    Column order is the query's: equality columns first, then the sort. `id` is last so the tie
+    break is served from the index rather than by a sort of the ties.
+  */
+  sqlite.exec(
+    `CREATE INDEX IF NOT EXISTS messages_channel_paging_idx
+       ON messages(room_short_code, room, created_at DESC, id DESC)`
+  );
+
+  /* The alerts log's paging index, for the same reason and in the same shape. Alerts have no
+     channel, so the room is the only equality column. */
+  sqlite.exec(
+    `CREATE INDEX IF NOT EXISTS alerts_paging_idx
+       ON alerts(room_short_code, created_at DESC, id DESC)`
+  );
 
   /*
     The two captured-item tables need the room in their PRIMARY KEY, not beside it: the same

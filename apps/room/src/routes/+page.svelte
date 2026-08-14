@@ -1,5 +1,18 @@
 <script lang="ts">
   import { deserialize } from '$app/forms';
+  import { formatChatMutedTill } from '$lib/message-formatters';
+  import {
+    chatComposerEnabled,
+    isChatMode,
+    isWebinarMode,
+    webinarMessageVisible
+  } from '$lib/chat-mode';
+  import {
+    CHAT_PAGE_ARRIVAL_NUDGE,
+    CHAT_PAGE_REQUEST_NUDGE,
+    mergeOlderChatMessages,
+    shouldLoadOlderMessages
+  } from '$lib/chat-paging';
   import { chooseRecordingOptions } from '$lib/recording-codec';
   import { page } from '$app/state';
   import { panelDragResize, readPanelBounds } from '$lib/panel-drag';
@@ -848,6 +861,15 @@
   let alwaysScrollToBottom = $state(loadedSettings.alwaysScrollToBottom === true);
   let recordingStartSound = $state(loadedSettings.recordingStartSound !== false);
   let recordingStopSound = $state(loadedSettings.recordingStopSound !== false);
+  /**
+   * `preferences.enableRTE` — the presenter's own half of the rich text editor gate.
+   *
+   * Defaults OFF, and that polarity is read rather than chosen: the reference's default preferences
+   * object lists twenty-five keys and `enableRTE` is not one of them, so a fresh account evaluates
+   * the gate on `undefined`. Its neighbours here that DO appear in that object are written to match
+   * it — `pushToTalk:!1` and `makeUsersFollowMyScreens:!1` are both `=== true` for the same reason.
+   */
+  let enableRTE = $state(loadedSettings.enableRTE === true);
 
   /**
    * `preferences.disableVideo` - the viewer's own "turn the video off to preserve data" switch.
@@ -1862,6 +1884,57 @@
    * implementation disagreed.
    */
   const canPostImages = $derived(isPresenter || data.sessData?.userUploads === true);
+  /**
+   * The chat rich text editor's gate — the two extra flags the comment above refers to.
+   *
+   * `sessData.enableRTE && preferences.enableRTE && isPresenter`, which is the reference's own
+   * expression and appears THREE times in it: on the composer button
+   * (`O(5, …enableRTE && …enableRTE && …isPresenter ? 5 : -1)`), inside `loadRTE()`, which will not
+   * construct the editor without it, and inside `retriveRTEContent()`, which returns an empty
+   * string so a click that reached the send anyway cannot post through a disabled editor. All
+   * three consumers here read THIS, so the three cannot disagree.
+   *
+   * ## One deliberate narrowing, and it is a narrowing
+   *
+   * The reference's EDIT entry point asks a different question —
+   * `sessData.enableRTE && preferences.enableRTE && containsHtml(msg.txt)`, with no presenter term.
+   * A member who owns a rich message therefore gets the editor opened for them, types into it,
+   * presses Save, and `retriveRTEContent()` refuses because THAT check does require presenter: the
+   * editor reports "Empty message. Please type a message..." and their edit is lost. Reproducing a
+   * control that cannot ever complete is not reproducing a feature, so the edit branch below asks
+   * this same full question. Strictly fewer people reach the editor than upstream, and everyone
+   * who reaches it can finish.
+   */
+  const canUseRTE = $derived(data.sessData?.enableRTE === true && enableRTE && isPresenter);
+  /**
+   * The room's chat mode — `g` group, `p` webinar, `d` disabled.
+   *
+   * DERIVED from the load, with no local copy. The `changeChatMode` broadcast makes this page
+   * invalidate rather than assigning a mode itself, which is a deliberate departure from the rule
+   * two hundred lines below that the command channel "does not refetch — it ACTS". That rule is
+   * right for a command: `mutemic` is an instruction a browser carries out, and there is nothing to
+   * re-read. A chat mode is not an instruction, it is room STATE that is stored in `room_state` and
+   * read by the load — so a local copy would be a second source of truth that could disagree with
+   * the row, and the client's copy would be the one nobody could audit.
+   *
+   * The cost is one extra load on a rare presenter action. The benefit is that a tab which missed
+   * the broadcast, or received a forged one, converges on the row rather than diverging from it.
+   */
+  const chatMode = $derived(isChatMode(data.chatMode) ? data.chatMode : 'g');
+
+  /** `this.webinarMode = 'p' == e`. */
+  const webinarMode = $derived(isWebinarMode(chatMode));
+
+  /**
+   * Whether this viewer may type at all — the two reasons the reference replaces the composer with
+   * its `Chat Disabled` block, in one place.
+   *
+   * `'d' != chatMode` is the room's rule and applies to everyone; the mute is this viewer's own.
+   * The mute was enforced on the server long before it was ever shown, which is why a muted member
+   * used to press send and watch nothing happen at all.
+   */
+  const selfMutedUntil = $derived(data.chatMutedTill ? new Date(data.chatMutedTill) : null);
+  const chatEnabled = $derived(chatComposerEnabled(chatMode) && selfMutedUntil === null);
   const giphyApiKey = env.PUBLIC_PTR_GIPHY_API_KEY ?? '';
   const primaryIsFirst = $derived(roomSplitDir === 'ltr' || roomSplitDir === 'ttb');
   const defaultMainSplit = $derived(
@@ -2041,6 +2114,8 @@
     senderRole?: string;
     senderStatus?: string;
     body: string;
+    /** Set when the message was written with the rich text editor. Its presence IS the fact. */
+    bodyHtml?: string | null;
     targetUrl?: string | null;
     nonTrade?: boolean;
     isAdmin?: boolean;
@@ -2113,8 +2188,25 @@
   // it does not survive a reload.
   const unreadQaAlertIds = new SvelteSet<number>();
 
+  /*
+    The alerts log pages too, and shares this machinery deliberately: upstream renders ONE roomlog
+    component for both, switched on `logType`, so the trigger, the guards, the terminator and both
+    nudges are the same code there and are the same code here. What differs is only that alerts have
+    no channel — `getAlertsLog {page}` against `getChatLog {channel, page}`.
+  */
+  /** Older alert pages, oldest-first. */
+  let olderAlerts = $state.raw<(typeof data.alerts)[number][]>([]);
+  let alertsPage = $state.raw(0);
+  let alertsHasMoreData = $state(true);
+  let alertsLoadingMore = $state(false);
+  /*
+    The live tail from the load, with whatever older pages the reader has scrolled back to in front
+    of it — the same two-lifetime split the chat log uses, and for the same reason: `data.alerts` is
+    replaced by every `invalidateAll()`, so older pages held there would be discarded by one new
+    alert.
+  */
   const visibleAlerts = $derived(
-    data.alerts
+    mergeOlderChatMessages(olderAlerts, data.alerts)
       .filter((item) => !isEvidenceMessageHidden(item))
       .map(withEvidenceState)
       .filter((item) => matchesAlertSearch(item))
@@ -2342,9 +2434,75 @@
     }
   });
 
+  /**
+   * Older pages, oldest-first, keyed by channel.
+   *
+   * `$state.raw`: these arrays are only ever REPLACED, never mutated in place, so a deep proxy over
+   * every message row would cost a proxy read per field on every render and buy nothing.
+   */
+  let olderChatMessages = $state.raw<Record<string, (typeof data.messages)[number][]>>({});
+  /** `this.currPage`, per channel. Page 0 is what the load already sent. */
+  let chatPage = $state.raw<Record<string, number>>({});
+
+  /**
+   * `this.hasMoreData`, PER CHANNEL — cleared when a page comes back empty, re-armed at the bottom.
+   *
+   * Per channel because the reference's state lives on the roomlog COMPONENT, and it renders one
+   * per channel; a single shared flag here meant that reaching the start of `main` also stopped
+   * `off-topic` from ever paging, however much history it had. Absent means true: a channel nobody
+   * has paged yet has more data until it says otherwise.
+   */
+  let chatHasMoreData = $state.raw<Record<string, boolean>>({});
+  /** `this.loadingMore` — one request at a time. */
+  let chatLoadingMore = $state(false);
+
+  /*
+    The live tail from the load, with whatever older pages the reader has scrolled back to in front
+    of it.
+
+    The two halves have different lifetimes on purpose: `data.messages` is replaced by every
+    `invalidateAll()`, which is every SSE event, while `olderChatMessages` survives them. Merging
+    rather than concatenating because offset paging over a live tail can hand the boundary row back
+    twice — see `mergeOlderChatMessages`, which matches on identity and never on order.
+
+    The trim runs AFTER the merge, so `trimChatLogs` still caps what is held at the reference's 300
+    however far back somebody paged. Trimming first would let the cap be exceeded by exactly the
+    pages this feature adds.
+  */
   const visibleChatMessages = $derived(
-    trimChatLog(data.messages, trimChatLogs)
+    trimChatLog(
+      mergeOlderChatMessages(olderChatMessages[chatTab] ?? [], data.messages),
+      trimChatLogs
+    )
       .filter((item) => item.room === chatTab && !isEvidenceMessageHidden(item))
+      /*
+        WEBINAR MODE. Upstream applies this as messages ARRIVE, dropping them before they ever reach
+        the log; applied here as a view filter instead, because this room re-reads its log from the
+        server on every invalidate and a drop-on-arrival would be undone by the next load.
+
+        The rule is the reference's, term for term — see `webinarMessageVisible`, including the
+        asymmetry that a message containing an `@` is dropped even when it is an admin message.
+
+        `isMention` is computed with the SAME rule the highlight and the popup use, rather than the
+        loose `indexOf('@')` upstream tests separately: one mention rule, in `$lib/mention`.
+      */
+      .filter((item) =>
+        !webinarMode
+          ? true
+          : webinarMessageVisible(
+              {
+                isAdmin: item.isAdmin === true,
+                senderId: item.senderId,
+                body: item.body,
+                isMention: isMentionOf(item.body, data.user.displayName, item.isAdmin === true)
+              },
+              {
+                id: data.user.id,
+                isPresenter,
+                hasAdminChat: data.user.hasAdminChat === true
+              }
+            )
+      )
       .map(withEvidenceState)
       /*
         `msg.b` — the sender's badges, attached here rather than stored on the row.
@@ -2370,11 +2528,146 @@
   }
 
   function trackAlertsScroll(event: Event) {
-    alertsScrollingUp = isRoomScrollerReadingHistory(event.currentTarget as HTMLElement);
+    const scroller = event.currentTarget as HTMLElement;
+    alertsScrollingUp = isRoomScrollerReadingHistory(scroller);
+    // Back at the bottom, so paging is armed again — `hasMoreData = !0` on the way down.
+    if (!alertsScrollingUp) alertsHasMoreData = true;
+    if (
+      !shouldLoadOlderMessages({
+        scrollTop: scroller.scrollTop,
+        messageCount: visibleAlerts.length,
+        /* REAL here, unlike the chat log: the alerts pane has a live search field, and
+           `matchesAlertSearch` filters the rendered list by it. Upstream refuses to page while a
+           term is set because a filtered log is not a paged one — asking for page 2 of a filter the
+           server knows nothing about would interleave unfiltered history into a filtered view. */
+        searchTerm: alertSearch,
+        hasMoreData: alertsHasMoreData,
+        loadingMore: alertsLoadingMore
+      })
+    ) {
+      return;
+    }
+    scroller.scrollTop += CHAT_PAGE_REQUEST_NUDGE;
+    void loadOlderAlerts(scroller);
+  }
+
+  /** `loadMoreLogs({type: 'alerts', page})` -> `getAlertsLog {page}`. */
+  async function loadOlderAlerts(scroller: HTMLElement) {
+    alertsLoadingMore = true;
+    const page = alertsPage + 1;
+
+    const body = new FormData();
+    body.set('page', String(page));
+    const response = await fetch('?/loadOlderAlerts', { method: 'POST', body });
+    const result = deserialize<
+      { page?: number; alerts?: (typeof data.alerts)[number][] },
+      { message?: string }
+    >(await response.text());
+
+    alertsLoadingMore = false;
+    if (result.type !== 'success' || !result.data?.alerts) return;
+
+    const incoming = result.data.alerts;
+    if (incoming.length === 0) {
+      alertsHasMoreData = false;
+      return;
+    }
+
+    alertsPage = page;
+    olderAlerts = mergeOlderChatMessages(incoming, olderAlerts);
+    scroller.scrollTop += CHAT_PAGE_ARRIVAL_NUDGE;
   }
 
   function trackChatScroll(event: Event) {
-    chatScrollingUp = isRoomScrollerReadingHistory(event.currentTarget as HTMLElement);
+    const scroller = event.currentTarget as HTMLElement;
+    chatScrollingUp = isRoomScrollerReadingHistory(scroller);
+    /*
+      Back at the bottom, so paging is armed again: `hasMoreData = !0` on the way down is the
+      reference's own reset, and without it a reader who once hit the end of the history could never
+      page again in that session even after the log had grown.
+    */
+    if (!chatScrollingUp) chatHasMoreData = { ...chatHasMoreData, [chatTab]: true };
+    maybeLoadOlderMessages(scroller);
+  }
+
+  /*
+    ── Older chat history ───────────────────────────────────────────────────────────────────────
+    The page load sends the NEWEST page per channel. Everything before that is fetched here, one
+    page at a time, and held in client state so an `invalidateAll()` — which every SSE event
+    triggers — refreshes the live tail without throwing away what the reader scrolled back to.
+  */
+
+  function maybeLoadOlderMessages(scroller: HTMLElement) {
+    if (
+      !shouldLoadOlderMessages({
+        scrollTop: scroller.scrollTop,
+        messageCount: visibleChatMessages.length,
+        /*
+          Always empty HERE, and deliberately not invented. The reference's roomlog component has
+          its own `searchTerm` that filters the live log in place, and refuses to page while one is
+          set — a filtered log is not a paged one. This room has no such filter: its chat search is
+          the `chat-logs` archive modal, a separate view over its own query. The rule is kept whole
+          in `shouldLoadOlderMessages` because it is the reference's, and this call site passes the
+          only honest value it has.
+        */
+        searchTerm: '',
+        hasMoreData: chatHasMoreData[chatTab] ?? true,
+        loadingMore: chatLoadingMore
+      })
+    ) {
+      return;
+    }
+    /*
+      `+30` the instant the request goes out, before any answer — upstream applies it synchronously
+      after the emit, in the scroll handler itself. It moves the reader off the trigger zone so a
+      continuing gesture is not fighting the threshold while the fetch is in flight.
+    */
+    scroller.scrollTop += CHAT_PAGE_REQUEST_NUDGE;
+    void loadOlderChatMessages(chatTab, scroller);
+  }
+
+  /**
+   * `loadMoreLogs({type: 'chat', channel, page})` — one page older, appended in front.
+   *
+   * The empty answer is the terminator, exactly as upstream reads it
+   * (`0 == o.length && (this.hasMoreData = !1)`): the server does not say how much history is left
+   * and does not need to, because running out is something you discover by asking once too often.
+   */
+  async function loadOlderChatMessages(channel: ChatTab, scroller: HTMLElement) {
+    chatLoadingMore = true;
+    const page = (chatPage[channel] ?? 0) + 1;
+
+    const body = new FormData();
+    body.set('channel', channel);
+    body.set('page', String(page));
+    const response = await fetch('?/loadOlderChatMessages', { method: 'POST', body });
+    const result = deserialize<
+      { channel?: string; page?: number; messages?: (typeof data.messages)[number][] },
+      { message?: string }
+    >(await response.text());
+
+    chatLoadingMore = false;
+    if (result.type !== 'success' || !result.data?.messages) return;
+
+    const incoming = result.data.messages;
+    if (incoming.length === 0) {
+      chatHasMoreData = { ...chatHasMoreData, [channel]: false };
+      return;
+    }
+
+    chatPage = { ...chatPage, [channel]: page };
+    olderChatMessages = {
+      ...olderChatMessages,
+      [channel]: mergeOlderChatMessages(incoming, olderChatMessages[channel] ?? [])
+    };
+    /*
+      The SECOND nudge. The reference does two and they are not duplicates: `+30` the instant the
+      request goes out, which is above, and `+1` when a page greater than zero arrives, which is
+      here. Prepending fifty rows leaves the browser free to keep `scrollTop` pointing at what is
+      now different content, and one pixel is the smallest scroll that makes it recompute the
+      anchor without visibly moving the reader.
+    */
+    scroller.scrollTop += CHAT_PAGE_ARRIVAL_NUDGE;
   }
 
   $effect(() => {
@@ -3208,6 +3501,7 @@
       if (key === 'chatBadges') chatBadges = value;
       if (key === 'chatPopup') chatPopup = value;
       if (key === 'trimChatLogs') trimChatLogs = value;
+      if (key === 'enableRTE') enableRTE = value;
       /*
         Both halves, because this preference has TWO controls: the navbar's
         `presentation-subtitles` checkbox and the settings modal's `app-speech-reco-overlay`. The
@@ -4124,12 +4418,25 @@
     return succeeded;
   }
 
-  async function editMessage(kind: 'alert' | 'chat', item: MessageActionItem, newBody: string) {
+  /**
+   * @param newBodyHtml Rich text from the editor, when the edit was made with it.
+   *
+   * `editChatMessage` with `newMsg` set to the editor's content, which is what the reference sends
+   * from `sendMessage()` while `isEditing`. As on the post path, the server sanitises it and
+   * derives the plain body itself.
+   */
+  async function editMessage(
+    kind: 'alert' | 'chat',
+    item: MessageActionItem,
+    newBody: string,
+    newBodyHtml?: string
+  ) {
     const form = new FormData();
     form.set('kind', kind);
     form.set('id', String(item.id));
     form.set('operation', 'edit');
     form.set('newBody', newBody);
+    if (newBodyHtml) form.set('newBodyHtml', newBodyHtml);
     const response = await fetch('?/messageAction', { method: 'POST', body: form });
     // As in runMessageOperation: a refused action answers 200 with the failure in the body, so the
     // status alone cannot tell an edit that was applied from one that was rejected.
@@ -4333,6 +4640,32 @@
       });
     }
     if (action === 'edit') {
+      /*
+        ```js
+        editMessage() {
+          if ("chat" === this.logType) {
+            if (sessData.enableRTE && preferences.enableRTE && containsHtml(this.msg.txt))
+              return void guiEventBus.emit("doRTEModalEdit", {msg: this.msg});
+            bootbox.prompt({title: "Edit chat message:", inputType: "textarea", …})
+        ```
+
+        A rich message is edited richly; everything else keeps the plain prompt below, which is the
+        reference's own fallback and was already built here.
+
+        THE ONE DIFFERENCE, and it is the column. Upstream asks `containsHtml(msg.txt)` — it sniffs
+        the stored text for markup, because a message there is one string and nothing records how
+        it was written. This room records it: `bodyHtml` is a nullable column, set only by the
+        sanitiser on the way in. So somebody who TYPED a less-than in the plain composer gets the
+        plain prompt and sees the characters they typed, rather than an editor that treats their
+        sentence as tags. Same rule the renderer follows, for the same reason.
+      */
+      if (kind === 'chat' && canUseRTE && item.bodyHtml) {
+        rteIsEditing = true;
+        rteEditTarget = item;
+        rteDraft = item.bodyHtml;
+        openModal('rich-text');
+        return;
+      }
       bootboxPrompt = {
         title: kind === 'chat' ? 'Edit chat message:' : `Edit alert by ${item.senderName}:`,
         value: item.body,
@@ -5854,12 +6187,21 @@
     if (await sendMessageBody(body)) composer = '';
   }
 
-  async function sendMessageBody(body: string) {
+  /**
+   * @param bodyHtml Rich text from the editor, when the message was written with it.
+   *
+   * Sent as a SEPARATE field rather than folded into `body`, because which kind of message this is
+   * has to be a fact the row carries — see `chat-rich-text-contract.test.ts`. The server sanitises
+   * it and derives its own `body` from the result, so what arrives here as plain text is the
+   * optimistic copy and never the stored one.
+   */
+  async function sendMessageBody(body: string, bodyHtml?: string) {
     const trimmedBody = body.trim();
     if (!trimmedBody) return false;
 
     const form = new FormData();
     form.set('body', trimmedBody);
+    if (bodyHtml) form.set('bodyHtml', bodyHtml);
     form.set('room', chatTab);
     const response = await fetch('?/sendMessage', { method: 'POST', body: form });
 
@@ -5868,6 +6210,145 @@
       return true;
     }
     return false;
+  }
+
+  /* ── The chat rich text editor ────────────────────────────────────────────────────────────────
+     The editor lives in `ModalHost`; its session lives here, because the composer hands work to it
+     and the send hands work back to the same code path an ordinary message uses. */
+
+  /** The message being composed in the editor, as HTML. */
+  let rteDraft = $state('');
+  /** `Save` rather than `Send`, and an edit rather than a post. */
+  let rteIsEditing = $state(false);
+  /**
+   * The message being edited, when editing. Null for a new message.
+   *
+   * `$state.raw`, not `$state`: this is a message row that is only ever REPLACED, never mutated
+   * field by field, so a deep proxy over it would cost a proxy read on every property access and
+   * buy nothing. Reassignment still triggers, which is the only reactivity this needs.
+   */
+  let rteEditTarget = $state.raw<MessageActionItem | null>(null);
+
+  /**
+   * Text typed in the plain composer, as HTML for the editor.
+   *
+   * The reference hands its composer's value straight to `summernote('code', …)`, which parses it
+   * as markup. Ours escapes it, and that is not a deviation from the feature: `#textAreaTxt` is a
+   * `<textarea>`, so its value is TEXT, and rendering text as markup is a category error whoever
+   * typed it. Somebody who types a less-than and switches to the editor should see the character
+   * they typed, exactly as `chat-rich-text-contract` requires of the renderer.
+   *
+   * The escaping is the platform's — assign to `textContent`, read back `innerHTML` — rather than a
+   * hand-rolled replace over three characters that always turns out to be four.
+   */
+  function textToEditorHtml(text: string) {
+    const holder = document.createElement('div');
+    holder.textContent = text;
+    return holder.innerHTML;
+  }
+
+  /**
+   * `openRTEModal()` — the composer's `fa-font` button.
+   *
+   * ```js
+   * openRTEModal() {
+   *   this.appService.guiEventBus.emit("doRTEModal", {
+   *     channel: this.channel, txt: $("#textAreaTxt")?.val()?.toString()?.trim() || "" });
+   *   $("#textAreaTxt")?.val("");
+   * }
+   * ```
+   *
+   * Both halves are load-bearing: the composer's text comes WITH you into the editor, and the
+   * composer is left empty so the same words cannot be sent twice from two places.
+   */
+  function openRTEModal() {
+    emojiOpen = false;
+    giphyOpen = false;
+    rteIsEditing = false;
+    rteEditTarget = null;
+    rteDraft = textToEditorHtml(composer.trim());
+    composer = '';
+    openModal('rich-text');
+  }
+
+  /**
+   * The editor's Send / Save.
+   *
+   * ```js
+   * sendMessage() {
+   *   let e = this.retriveRTEContent();
+   *   if (!e || "" === e.trim()) return P("Empty message. Please type a message..."), !1;
+   *   this.isEditing ? (sendServerCommand("editChatMessage", {msgID: this.msg._id, newMsg: e}), …)
+   *                  : (sendGrpChat(this.channel, e),
+   *                     guiEventBus.emit("scrollChatLogToBottom", {force:!0, repeat:!1}));
+   *   this.destroyRTE(); $("#rteModal").modal("hide");
+   * }
+   * ```
+   *
+   * `retriveRTEContent()` is the gate asked a second time, and it is reproduced rather than
+   * skipped: with the gate shut it returns an empty string, so this refuses in the same words.
+   *
+   * THE EMPTINESS TEST IS THE SERVER'S, not the reference's. Upstream compares against four
+   * literal strings, so `<b></b>` — formatting with nothing in it, which is what you get by
+   * pressing Bold and then Send — passes, and is then refused by the server with a 400 the modal
+   * has nowhere to show. Asking the same question `isEmptyChatHtml` asks (tags stripped, `&nbsp;`
+   * treated as the space it looks like) means the person is TOLD, in the reference's own words,
+   * rather than left in front of a button that appears to do nothing.
+   */
+  async function sendRTEMessage() {
+    const html = canUseRTE ? rteDraft.trim() : '';
+    const text = stripHtmlToText(html);
+    if (!text) {
+      bootboxAlert = 'Empty message. Please type a message...';
+      return;
+    }
+    const target = rteEditTarget;
+    const succeeded = target
+      ? await editMessage('chat', target, text, html)
+      : await sendMessageBody(text, html);
+    if (!succeeded) return;
+    rteDraft = '';
+    rteIsEditing = false;
+    rteEditTarget = null;
+    modal = null;
+    /*
+      NOT scrolled here, and the omission is the point. The reference follows its send with
+      `scrollChatLogToBottom {force:!0}`; this room reaches the same place through the autoscroll
+      effect above, whose `shouldAutoScrollForMessage` returns true when
+      `senderId === connectedUserId` — your own message always wins, whatever you were reading.
+      Adding a second scroll would be a duplicate writer of somebody else's scroll position, which
+      is how the alerts scroller went wrong once already.
+    */
+  }
+
+  /**
+   * The plain-text twin of a rich message, for every reader that never learns about `body_html`.
+   *
+   * The mention rule, the chat popup, the log search and the copy-to-clipboard all read `body`. The
+   * server derives it the same way and its derivation is the authoritative one — this is the
+   * optimistic copy, so the two must agree, and `chat-rich-text-contract` pins the server's.
+   */
+  function stripHtmlToText(html: string) {
+    return html
+      .replace(/<[^>]*>/g, '')
+      .replace(/&nbsp;/g, ' ')
+      .trim();
+  }
+
+  /**
+   * `sendServerAdminCommand('changeChatMode', {mode})` — presenter-only, and re-checked there.
+   *
+   * No optimistic update. The mode is room state, so the answer that matters is the row the server
+   * wrote; `invalidateAll()` re-reads it, and the same broadcast reaches every other tab in the
+   * room. Assuming success here would show this presenter a mode nobody else had.
+   */
+  async function changeChatMode(mode: string) {
+    const body = new FormData();
+    body.set('mode', mode);
+    const response = await fetch('?/changeChatMode', { method: 'POST', body });
+    const result = deserialize<{ mode?: string }, { message?: string }>(await response.text());
+    if (result.type !== 'success') return;
+    await invalidateAll();
   }
 
   function openImageUpload() {
@@ -6518,6 +6999,16 @@
           return;
         }
 
+        if (command?.cmd === 'changeChatMode') {
+          /*
+            The one command on this channel that refetches instead of acting, and the reason is in
+            the note on `chatMode` above: it is room STATE, held in `room_state` and read by the
+            load, so the row stays the only authority. The broadcast carries the new mode as well,
+            and it is deliberately NOT read here — trusting it would put room policy in the gift of
+            whatever arrives on a socket.
+          */
+          void invalidateAll();
+        }
         if (command?.cmd === 'focusOnScreen') {
           /*
             A presenter pulled the room to a screen. `selectScreenTabOfId` rather than assigning
@@ -9448,6 +9939,51 @@
                       </div>
                     </app-roomscroller>
 
+                    <!--
+                      `O(21, o.webinarMode ? 21 : -1)` —
+                      `<div class="px-1 webinarMode"> Webinar Mode <span …><i …></i></span><i></i></div>`,
+                      with the tooltip verbatim from const 56.
+                    -->
+                    {#if webinarMode}
+                      <div class="px-1 webinarMode">
+                        Webinar Mode
+                        <span
+                          {...{
+                            placement: 'top',
+                            ngbtooltip:
+                              'In webinar mode users only see their own chat messages, while Presenters see everyones messages...'
+                          } as Record<string, string>}
+                          {@attach ngbTooltip}
+                          class="ml-2"
+                        >
+                          <i class="fas fa-question-circle"></i>
+                        </span>
+                      </div>
+                    {/if}
+                    <!--
+                      `O(23, o.isConnected && o.chatEnabled ? 23 : 24)` — the composer, or the
+                      captured Chat Disabled block. Two reasons reach the same block: the room is in
+                      mode `d`, which applies to everyone, and this viewer is muted, which does not.
+
+                      The mute half was ENFORCED here long before it was ever shown — `sendMessage`
+                      refuses while a live row exists — so a muted member typed, pressed send, and
+                      watched nothing happen with no explanation anywhere.
+                    -->
+                    {#if !chatEnabled}
+                      <div class="chatDisabled d-flex align-items-center">
+                        <h5 class="pl-3">
+                          <i class="fas fa-lock"></i> Chat Disabled
+                          <!--
+                            `H(4, u0e, 3, 4, 'span')` under `O(4, e.chatMutedTill ? 4 : -1)` — the
+                            span appears only when the viewer is muted, which is what distinguishes
+                            "the room turned chat off" from "you personally cannot post".
+                          -->
+                          {#if selfMutedUntil}
+                            <span> till {formatChatMutedTill(selfMutedUntil)}</span>
+                          {/if}
+                        </h5>
+                      </div>
+                    {:else}
                     <div id="textAreaHolder" class="d-flex align-items-center textSendDiv">
                       <div class="flex-fill d-flex mx-0" {@attach observeComposerWidth}>
                         <div class="px-0 flex-fill">
@@ -9568,6 +10104,33 @@
                                 />
                               {/if}
                             {/if}
+                            <!--
+                              The fifth and last button in this group, and it is fifth in the
+                              capture too: the const block resolves them in order as
+                              `O(2, canPostImages …)`, `O(3, isPresenter …)`, `O(4, canPostImages …)`,
+                              then `O(5, …enableRTE && …enableRTE && …isPresenter ? 5 : -1)`.
+                              Its own two consts are `class="textAreaBtns"` with a click, and
+                              `ngbTooltip="Rich Text Editor" placement="left" class="fas fa-font"`.
+
+                              Only this composer has it. The reference puts `openRTEModal()` on
+                              exactly two components — this one and the extra chat column, which
+                              this room does not have yet — and none on private chat, so the PM
+                              composer deliberately goes without.
+                            -->
+                            {#if canUseRTE}
+                              <!-- svelte-ignore a11y_click_events_have_key_events -->
+                              <!-- svelte-ignore a11y_no_static_element_interactions -->
+                              <span class="textAreaBtns" onclick={openRTEModal}>
+                                <i
+                                  {...{
+                                    ngbtooltip: 'Rich Text Editor',
+                                    placement: 'left'
+                                  } as Record<string, string>}
+                                  {@attach ngbTooltip}
+                                  class="fas fa-font"
+                                ></i>
+                              </span>
+                            {/if}
                           </div>
                           <!-- svelte-ignore a11y_click_events_have_key_events -->
                           <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -9591,6 +10154,7 @@
                         </div>
                       </div>
                     </div>
+                    {/if}
                   </div>
                 </app-chat>
               </as-split-area>
@@ -10750,6 +11314,13 @@
       {isLimitedPresenter}
       canEditUsername={Boolean(data.sessData?.allowUsersToChangeUsername)}
       alerts={data.alerts}
+      {chatMode}
+      onChatModeChange={(mode) => void changeChatMode(mode)}
+      {canUseRTE}
+      {rteDraft}
+      {rteIsEditing}
+      onRteDraftChange={(html) => (rteDraft = html)}
+      onRteSend={() => void sendRTEMessage()}
       {settingsTab}
       {alertTab}
       {theme}

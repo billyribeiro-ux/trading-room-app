@@ -24,6 +24,428 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-14
 
+### 2026-08-14 13:30 EDT — The full gate, run once, at the end: exit 0
+
+**Runtime impact: none.** This entry records evidence, not a change.
+
+Five pieces of work landed today — the rich text editor, chat log paging, the alert-question tenancy
+fix, alerts paging, and the chat mode control — each verified with the tests covering it and each
+with its negative controls run. **The full gate had not run once**, which is correct while work is in
+flight and not correct at the end of it: the gate is what a merge decision rests on.
+
+`pnpm -r test`, **exit 0**. Room **1036 tests across 89 files**; controller **937 across 90**, with
+`verify-documented-test-counts.mjs` confirming the documented totals at all four sites. The chain
+underneath is thirteen controller verifiers plus coverage before a single unit test runs —
+`schema:verify`, `backend:migrations:verify`, `backend:release:verify`, `evidence:verify`,
+`privacy:verify`, `breakpoints:verify`, `manage:styles`, `account:contract`, `home:contract`,
+`fonts:verify`, `room-login:contract`, `runtime:http` — and the room's own `privacy:verify` and
+`schema:verify`. No Rust compile: that lives in `backend:check` and `quality`, not in `test`.
+
+On GitHub, PR #20: **Rust and PostgreSQL security contracts SUCCESS**, Vercel SUCCESS,
+`mergeable: MERGEABLE`.
+
+**What is deliberately NOT in this PR.** `extra-chat-column` is the one remaining buildable item and
+it is a real refactor — roughly 300 lines of chat-pane markup turned into a snippet instantiated
+twice, per-pane state for the tab, composer, scroller and pickers, and updates to however many of
+the **37 contract tests that read `+page.svelte` source text** assert on the strings it moves.
+Pushing that onto a PR that is green and ready would invalidate the very checks the merge rests on,
+which is what rule 9 of `working-rules.md` is for. It gets its own PR once this one is merged.
+
+**Also repaired today, outside any feature:** two corrupt git refs literally named
+`fix/green-the-gate 2` — the macOS duplicate-file artifact — sat in `.git/refs/heads` and
+`.git/refs/remotes/origin` and broke `git fetch` with "did not send all necessary objects". Both
+pointed at `dc659e8`, which was verified to be an ancestor of HEAD before either was removed, so
+nothing unique was lost.
+
+### 2026-08-14 13:21 EDT — The chat mode control does something now, and a muted member is told
+
+**Runtime impact: yes.** A presenter can disable the room's chat, or put it into webinar mode, and it
+takes effect for everyone. Before today the control did nothing at all for anybody.
+
+**The defect, and it is the purest example of the class this repository hunts.** The settings modal
+has had a three-way radio — Group Chat, Webinar Mode, Disabled — since it was built. It wrote
+`onPreferenceChange('chatMode', mode)`, confirmed itself with a dialog, persisted the value, and
+**nothing in this room ever read `chatMode`**. A control whose only effect is changing its own label.
+
+It was also modelled at the wrong LEVEL, which is why the fix is a table rather than a mapping row.
+Upstream reads `sessData.chatMode` — ROOM state — and the control is
+`sendServerAdminCommand('changeChatMode', {mode})`, a presenter act that changes the room for
+everyone. A per-user preference could not have expressed that even if something had read it.
+
+**`TODO.md` row AB was wrong in both halves.** It recorded this as "the producer is not modelled, so
+the listener would be dead". The producer existed; the consumer did not. And the behaviour is fully
+specified in the bundle rather than absent from it.
+
+**Room state, persisted and broadcast.** A `room_state` row per room, upserted so a second change
+cannot append a second opinion. Persisted unlike the recording state beside it — recording is
+momentary and a late joiner has missed nothing, whereas a disabled chat is a standing fact and
+somebody arriving afterwards has to find it disabled. The broadcast makes the page **refetch** rather
+than assign a mode, which is a deliberate exception to the rule that the command channel "does not
+refetch — it ACTS": that rule is right for `mutemic`, an instruction with nothing to re-read, and
+wrong for state. Trusting the payload would put room policy in the gift of whatever arrives on a
+socket.
+
+**`d` — disabled.** The composer is replaced by the captured block:
+`<div class="chatDisabled d-flex align-items-center"><h5 class="pl-3"><i class="fas fa-lock"></i>
+Chat Disabled …`, with its two component styles copied verbatim.
+
+**And a MUTED member finally learns why.** The same block carries ` till EEE @ h:mm a` when the
+viewer has a live mute. That mute has been enforced in `sendMessage` since it was written and was
+never exposed, so a muted member typed, pressed send, and watched nothing happen with no explanation
+anywhere. Only the viewer's OWN mute crosses; who else is muted is none of their business. The suffix
+is the capture's format, composed from two `Intl` formatters because `Intl` cannot express the
+literal ` @ ` in one pattern.
+
+**`p` — webinar mode**, banner and filter both, because a banner without the filter would be a
+promise the room breaks. The rule is transcribed from the arrival handler rather than from the
+tooltip, and it is stricter than the tooltip suggests in one direction and looser in another: admin
+messages survive, your own always survive, and **a message containing an `@` is dropped even when it
+is an admin message** — the second clause has no `isA` guard. That asymmetry looks like an oversight
+upstream and is reproduced deliberately, because deciding it was meant otherwise would be inventing a
+rule.
+
+**A test of mine asserted the opposite of the evidence and the code was right.** I expected a mention
+to pierce webinar mode. It does not: clause one drops any non-admin message from somebody else
+whether or not it mentions you, and the mention escape lives only in clause two, which is reached
+solely by messages that already survived clause one. Corrected, with the reasoning recorded.
+
+**Two negative controls stayed GREEN and both were my harness, not the tests.** Replacing the first
+occurrence of a string in `+page.server.ts` hit `recordingState`'s presenter check rather than the new
+action's, and the first `invalidateAll()` in `+page.svelte` rather than the one in the handler. Re-run
+scoped to each region, both went red. Same family as the over-broad assertion caught at 13:01 — when
+two call sites carry identical lines, neither an assertion nor a control may be written file-wide.
+
+**Verified:** `svelte-check` 0 errors 0 warnings; room **1036/89**, up from 1011/87; controller
+937/90. **Twelve negative controls run and each went red**: filtering presenters, dropping either
+clause of the webinar rule, never disabling the composer, letting any member change the room mode,
+storing an arbitrary mode string, a composer that is never disabled, trusting the broadcast over the
+row, reverting to the dead preference, and a radio seeded from a local guess. **Not run:** the full
+gate.
+
+### 2026-08-14 13:01 EDT — The alerts log is paged too, and the chat nudge was wrong
+
+**Runtime impact: yes.** The alerts read was the same unbounded `.all()` the chat read had been —
+every alert row for the room, re-read and re-serialised on every `invalidateAll()`, which is every
+SSE event. It serves fifty now, with the rest on demand.
+
+**The page size is the CHAT constant, and that is upstream's doing, not a shortcut.** There is no
+`alertLogPageSize` anywhere in the bundle. `trimAlertsLog` splices the alerts log down to
+`globals.chatLogPageSize`, and the handler that receives a page is literally the same component for
+both logs, switched on `logType`. So `alert-log.ts` imports `CHAT_LOG_PAGE_SIZE` rather than
+declaring a second fifty that could quietly become a different number.
+
+**Shared machinery, for the same reason.** `shouldLoadOlderMessages` and `mergeOlderChatMessages`
+serve both logs, because upstream's trigger, its two guards, its empty-page terminator and both its
+nudges are one implementation there. The only real difference is the wire: `getAlertsLog {page}` has
+no channel, because alerts are one stream per room.
+
+**A CORRECTION to what shipped at 12:43.** Reading the arrival handler whole, to port the alerts
+branch, showed that the reference nudges the scroller **twice** and that the two are not duplicates:
+`scrollTop + 30` synchronously after the request goes out, in the scroll handler, and
+`scrollTop + 1` when a page greater than zero arrives. The 30 moves the reader off the trigger zone
+so a continuing gesture is not fighting the threshold mid-flight; the 1 makes the browser recompute
+its scroll anchor after fifty rows are prepended, without visibly moving anybody. The chat
+implementation had applied 30 on ARRIVAL and nothing at request time — one nudge doing neither job.
+Both logs now do both, and `CHAT_PAGE_SCROLL_NUDGE` is split into `CHAT_PAGE_REQUEST_NUDGE` and
+`CHAT_PAGE_ARRIVAL_NUDGE` so the two cannot be confused again.
+
+**The alerts search term is a real gate, where chat's was vacuous.** The chat pane has no live
+filter, so its call site passes `''` and says so in a comment. The alerts pane does —
+`matchesAlertSearch` filters the rendered list — so upstream's refusal to page while a term is set
+is load-bearing here: asking for page 2 of a filter the server knows nothing about would interleave
+unfiltered history into a filtered view.
+
+**A test defect found by a negative control that stayed GREEN.** `page 0 is refused` asserted
+`toContain` over the whole server file. Once the alerts action landed carrying the identical guard,
+deleting the guard from the CHAT action left the assertion passing — the other action satisfied it.
+Both are now sliced apart by their own boundaries and each goes red on its own. This is the third
+time an over-broad assertion has been caught here, and the first time the catch came from a control
+that did not go red rather than from a failure.
+
+**Verified:** `svelte-check` 0 errors 0 warnings; room **1011/87**, up from 1003/87. **Ten negative
+controls run**: unbounding the alerts read, declaring a second page-size constant, dropping the
+alerts index, discarding older alert pages on invalidate, paging while a search filter is active,
+never re-arming, losing one of the two nudges, and each action's page guard independently. **Not
+run:** the full gate; no `EXPLAIN ANALYZE`, for the same reason as the chat entry — no dataset here
+large enough for the measurement to mean anything.
+
+### 2026-08-14 12:47 EDT — SECURITY: alert questions crossed rooms, in both directions
+
+**Runtime impact: yes, and this is a tenancy fix rather than a feature.** Two independent holes in
+the same table, found while reading the alerts query to page it. Both are closed, and both have a
+test that goes red when the fix is reverted.
+
+**`alert_questions` is the one room-owned table with no `room_short_code` column.** It reaches its
+room through `alert_id` — the delete path already says so in a comment. That is a legitimate design;
+what was missing is that every read and write had to apply it, and two did not.
+
+**The READ: every room received every room's questions.** The load selected `alert_questions` with
+no WHERE clause of any kind, and handed the result to the page as `alertQuestions`. So question
+bodies, and the name, avatar and role of whoever asked them, were serialised into the SSR HTML and
+the `__sveltekit` payload of every other room in the deployment. What the client chose to RENDER was
+never the point — the data had already crossed, and it reaches any cache in front of the room and
+any HAR attached to a support ticket. It is scoped now by joining through `alerts`, which is how the
+row reaches its room; adding a column would denormalise a fact the schema already derives and would
+need a backfill this join makes unnecessary.
+
+**The WRITE: a member of one room could inject a question into another room's alert.** `askQuestion`
+looked the alert up correctly scoped — and used the answer ONLY to decide whether the asker was the
+alert's author. A miss returned `null`, `isAnswer` went false, and the insert ran anyway with
+whatever `alertId` the form carried. The row landed against a foreign alert, and that room's Q&A
+thread would display it. `null` there means exactly one thing — no alert with that id exists in this
+room — because `senderId` is `notNull` and `capturedRoomItem` is given the room too, so refusing on
+`null` is the whole check and it fails closed.
+
+**Both tests assert the hard direction.** The read is pinned in `room-isolation-contract.test.ts`,
+which exists for precisely this class and whose own note warns that emptiness from being refused is
+a test passing for the wrong reason — so it also asserts the question IS visible in the room that
+owns it. The write is pinned in `message-alert-action-contract.test.ts` on the ROWS rather than the
+return value, because an action that refuses politely and inserts anyway is the exact shape of the
+bug.
+
+**Verified:** `svelte-check` 0 errors 0 warnings; room **1003/87**. Two negative controls run, each
+red: removing the room scope from the questions read, and restoring the write path's missing refusal.
+**Not run:** the full gate.
+
+### 2026-08-14 12:43 EDT — The chat log read is bounded, and its history is still reachable
+
+**Runtime impact: yes, and it is the largest performance change made to this room.** The page load
+selected every row in `messages` for the room — no LIMIT, `.all()` — and every SSE event calls
+`invalidateAll()`. A room with 50,000 messages re-read and re-serialised all 50,000 every time
+anybody said anything. It now reads fifty per channel.
+
+**Why this was a feature and not a limit clause.** `.limit(300)` alone would have been WORSE than
+the bug: history older than 300 messages would have silently become unreachable, with nothing
+anywhere to say so. The reference pages, so this pages — `chatLogPageSize = 50` at byte 977432, from
+the same globals object as `trimLogSize = 300`. Those two numbers are different mechanisms sitting
+side by side, and the code now says so: 50 bounds what the server sends per request, 300 bounds what
+the client keeps once `preferences.trimChatLogs` is on.
+
+**Per channel, because upstream pages per channel.** It sends `getChatLog {channel, page}` once for
+`main` and again for `offTopic`. A single global page of fifty would leave `off-topic` empty in any
+room where `main` is busy, however much history it had.
+
+**The design that makes it work.** Older pages are held in CLIENT state, not in `data`. That is the
+whole point: `data.messages` is replaced by every `invalidateAll()`, so older pages living there
+would be discarded by one new chat message — the reader would be thrown back to the bottom every
+time somebody typed. They are merged at render instead, and merged by IDENTITY rather than by
+position, because offset paging over a live tail can hand the boundary row back twice. Upstream
+shows that duplicate; here it costs one `Set`, and the match is `Set.has` — equality only, never
+`<` or `Math.max`, so it survives ids becoming uuids.
+
+**The trigger is upstream's whole condition**, not a paraphrase: `scrollTop < 100`, more than 15
+messages, no active search, plus the `hasMoreData` and `loadingMore` guards, and the `scrollTop +=
+30` nudge afterwards. Each term has its own test, because each one is the entire rule for somebody —
+the threshold for a reader mid-scroll, the message floor for a nearly-empty room, `loadingMore` for
+a trackpad emitting forty scroll events a second. An EMPTY page is the terminator
+(`0 == o.length && (this.hasMoreData = !1)`); the server never says how much is left, because
+running out is something you discover by asking once too often.
+
+**Two bugs of my own, both caught by re-reading the diff and both now tested.** `hasMoreData` was
+one flag shared across channels, so a reader who reached the start of `main` could not page
+`off-topic` for the rest of the session — upstream keeps that state on the roomlog component, and it
+renders one per channel. And the trim has to run AFTER the merge: trimming `data.messages` first and
+then prepending older pages lets the held log exceed `trimLogSize` by exactly the pages this feature
+adds, which would quietly break the preference for the readers most likely to have it on.
+
+**A composite index, because the paging would otherwise have moved the cost rather than removed it.**
+`messages(room_short_code, room, created_at DESC, id DESC)` answers the WHERE and supplies the ORDER
+BY in one ordered walk. The existing single-column room index narrowed to the room and left SQLite
+to sort the whole channel on every page request.
+
+**`MAX_CHAT_LOG_PAGE = 2000`** bounds the OFFSET scan. `OFFSET n` makes SQLite walk and discard n
+rows, so an unvalidated page number turns one HTTP request into a full table scan. It is a DoS
+bound, not a product limit — no legitimate client reaches it, because the reader stops at the first
+empty page. The channel is an allow-list for the same reason, and the room comes from the session
+rather than the form, which is the 2026-08-07 escalation not being reintroduced in a new place.
+
+**`parseReactions` moved** out of `+page.server.ts` into `$lib/server/reactions.ts`: the paged read
+needs it for messages and the route still needs it for alerts and captured-item overrides, and two
+copies of a validator is how one of them stops matching the data.
+
+**HONEST GAP, and it is the same defect: `alerts` is still unbounded.** `+page.server.ts` selects
+every alert row for the room, `orderBy(asc(alerts.createdAt))`, `.all()`, re-read on every
+invalidate. Upstream pages it identically — `getAlertsLog {page}`, `loadMoreLogs {type: 'alerts',
+page}`, `trimAlertsLog` beside `trimChatLog` — so the machinery to copy is the machinery just
+written. Recorded in row Z as the next unit rather than left for somebody to find.
+
+**Verified:** `svelte-check` 0 errors 0 warnings; room **1001/87**, up from 974/85. **Twelve negative
+controls run and each went red**: removing the LIMIT, dropping the per-channel WHERE, dropping the
+index, removing the channel allow-list, allowing page 0 and an unbounded offset, throwing older pages
+away on every invalidate, never re-arming at the bottom, ignoring the empty-page terminator, paging
+only at the very top edge, removing the dedupe, and dropping each of the two guards — plus a
+thirteenth for the shared-flag bug. **Not run:** the full gate, and no `EXPLAIN ANALYZE` — the index
+is asserted at the schema level, not measured, because this room's SQLite has no dataset large
+enough for the measurement to mean anything.
+
+### 2026-08-14 12:28 EDT — RTE steps 3 and 4: the editor, both entry points, and the gate
+
+**Runtime impact: YES.** A presenter in a room whose owner has ticked "Enable Rich Text Editor?",
+and who has ticked "Enable RTE" in their own settings, now gets a `fa-font` button in the chat
+composer that opens a working editor. Everyone else sees exactly what they saw before.
+
+Steps 3 and 4 landed together on purpose. Step 3 alone would have shipped a component behind a gate
+whose inputs did not exist — dead code at every commit — and this repository's rule is that nothing
+exists without a consumer.
+
+**The gate, resolved once.** `sessData.enableRTE && preferences.enableRTE && isPresenter` is the
+reference's own expression and appears three times in the decoded bundle: on the composer button
+(the fifth conditional in the same const block that resolves the image, YouTube and GIF buttons,
+byte 1426967), inside `loadRTE()`, which refuses to construct the editor at all, and inside
+`retriveRTEContent()`, which returns an empty string so a send that was somehow reached reads
+nothing out. Three consumers is three chances to disagree, so the room derives `canUseRTE` once and
+all three read it.
+
+**Step 4, the four settings edits, all in the same change** — `ROOM_CONSUMED`,
+`ROOM_VISIBLE_SETTINGS`, the verifier's own note, and the `consumers` map. 54 wired, up from 53; the
+generator's count tripwire fired exactly as designed and was raised deliberately. The preference
+wire `presenter-enable-rte` → `enableRTE` is joined too: that checkbox has rendered since the
+presenter tab was built and its value went nowhere, so it was the twenty-first row in
+`preferenceKeyByInputId` and the fourteenth wire repaired. Its element id stays on
+`DEAD_PREFERENCE_KEYS`, because the junk it wrote under that id before today is still in people's
+blobs.
+
+**Default OFF, and read rather than chosen.** `enableRTE` is not among the twenty-five keys in the
+reference's default preferences object (byte 979500ff, where `pushToTalk:!1` and
+`makeUsersFollowMyScreens:!1` are), so a fresh account evaluates the gate on `undefined`. `!== false`
+would have handed every presenter a toolbar upstream does not give them.
+
+**The component.** `RichTextEditor.svelte` — the five captured controls and no sixth, the captured
+placeholder and the captured 200px minimum. `bind:innerHTML` on a contenteditable region, which is
+the documented Svelte binding, rather than jQuery plus summernote; `execCommand` for the five
+commands, with the reasoning for that written down where the next person will look. It draws no
+Close and no Send, because the capture puts those in `modal-footer` and the `#rteModal` shell
+already had them — `Save` when editing, `Send` otherwise, from `O(14, o.isEditing ? 14 : 15)`.
+
+**Both entry points.** The composer button carries the composer's text in and leaves the composer
+empty, both halves of `openRTEModal()`. That text is ESCAPED on the way in: `#textAreaTxt` is a
+textarea, so its value is text, and upstream handing it to `summernote('code', …)` parses it as
+markup. The edit path routes to the editor when the message HAS a `body_html` — a column read, not
+the `containsHtml(msg.txt)` sniff upstream uses, and the same rule the renderer already follows.
+
+**Two deliberate narrowings, each recorded in the code that makes them.** Upstream's edit branch
+omits the presenter term while `retriveRTEContent()` still requires it, so a member who owns a rich
+message gets an editor, types, presses Save, and is told their message is empty; ours asks the full
+gate, so strictly fewer people reach the editor and everyone who reaches it can finish. And the
+emptiness test is the SERVER's rule rather than upstream's four literal strings, because `<b></b>`
+— Bold, then Send — passes those, is refused by the server with a 400, and leaves the modal with
+nothing to display.
+
+**The server edit path now rewrites BOTH columns.** A chat edit sets `body_html` to the sanitised
+HTML or to NULL, never "leave whatever was there": editing a rich message through the plain prompt,
+which is what happens once an owner turns the editor off, would otherwise write a new `body` and
+leave the old markup behind, and the renderer picks the column — the message would go on displaying
+a sentence it no longer says. Chat only; the alerts table has no such column and upstream's rich
+edit branch is chat-only too.
+
+**Found by re-reading the diff, not by a test — and now it has a test.** `Modal` renders its
+children whether it is open or not; it hides with `inert` plus `display: none`. Gating the editor on
+`canUseRTE` alone mounted it at page load, ran its focus attachment into a hidden container, and
+meant it would NOT focus on the open that matters, because the attachment had already run. It is
+gated on `name === 'rich-text'` as well, which is also the exact shape of `destroyRTE()` replacing
+the host with an empty div of the same id on every close.
+
+**A comment broke a contract for the third time, in a new way.** The note in `ROOM_CONSUMED` forbids
+a square bracket anywhere inside that array, because the boundary test reads the list with a regex
+that stops at the first closing bracket. The new entry used an APOSTROPHE — "the OWNER's term" —
+and `matchAll(/'([^']+)'/g)` read it as the start of a string literal, turning all thirty-eight
+names into punctuation. Same family, different character. The rule in that file is now two
+characters wide.
+
+**Verified:** `svelte-check` 0 errors 0 warnings; `svelte-autofixer` clean on the new component and
+on both new markup regions; room `chat-rte-gate-contract` (20), `settings-preference-wiring-contract`
+(78), `chat-rich-text-contract`, `chat-html` — 115 passing; controller `room-config-boundary` and
+`sso-boundary` 32 passing; `verify-room-settings-schema.mjs` green at 54 wired. **Eight negative
+controls run and each went red**: dropping `isPresenter` from the gate, flipping the preference
+default ON, un-narrowing the edit branch to upstream's polarity, letting the server edit leave stale
+markup, cutting the preference wire again, losing the `Save` label, swapping a captured control for
+one the config does not have, and mounting the editor for the whole session instead of per open.
+**Not run:** the full gate, and `room-config-seam-e2e.mjs`, which needs a live controller.
+
+### 2026-08-14 11:52 EDT — RTE step 2: the column, the server control, and the render branch
+
+**Runtime impact: still none — no editor sends `bodyHtml` yet.** The path it will use is now built
+and proved end to end.
+
+**A message is EITHER plain or rich, and the ROW says which.** `body_html` is nullable, added
+idempotently behind a `PRAGMA table_info` guard exactly like the nine columns before it. The
+alternative — sniffing `body` for angle brackets — would render somebody who TYPED `<b>hello</b>`
+in the ordinary composer as bold, which is a different message from the one they sent. That is
+asserted, not just intended.
+
+**The server is the control.** It sanitises what was submitted and stores only the result; the
+submitted value is never written. `body` is then derived from the sanitised HTML with its tags
+stripped, so there is never an HTML-only message — the mention rule, the popup, search and any
+client that never learns this column exists all keep working unchanged. Negative controls store the
+submitted value and drop the derivation; both go red.
+
+**Two sanitisers, asserted to agree.** The browser pass is not belt-and-braces: it covers rows
+written when the allow-list said something else, which is the case `notes-repository` already
+learned and re-sanitises historical rows for. A test reads the tag list out of BOTH files and
+compares them, because two lists that are supposed to agree are exactly the pair that drifts —
+letting the browser allow `<a>` goes red on two assertions.
+
+**The existing no-raw-html rule is kept, not overridden.** `message-links-contract.test.ts` asserts
+message bodies never use Svelte's raw-html tag, and it still passes: markup reaches the DOM through
+an attachment that sanitises first. There is no path where an unfiltered string is trusted.
+
+**Three of my own mistakes, all caught by the repository's own contracts.**
+
+1. My COMMENT contained the raw-html literal — written to explain that I was not using it. That
+   contract reads source text and cannot tell prose from code. **Third time today** a comment of
+   mine tripped a parser, after brackets inside `ROOM_CONSUMED` and then quoting the regex that
+   warned about them.
+2. A test asserted string equality against the sanitiser's output and failed on a space:
+   `sanitize-html` re-serialises `color: #ff0000` as `color:#ff0000`. Asserted by structure now —
+   the input-equality version was testing the library's whitespace habits, not our policy.
+3. Another banned `item.body.includes` outright and failed on the question-mark rule, which is
+   correct and unrelated. Scoped to sniffing for a tag character.
+
+**Verified:** 13 new contract tests plus the 16 from step 1. Three negative controls, each red on
+the right assertion. **Full gate exit 0**: room 950 tests / 84 files, controller 937 / 90.
+
+**Remaining:** (3) the modal, five controls, `Save` when editing and `Send` otherwise; (4) the four
+settings edits and the `enableRTE` preference wire.
+
+### 2026-08-14 11:40 EDT — RTE step 1: the chat sanitiser, deny-by-default
+
+**Runtime impact: none yet — nothing calls it.** This is the foundation the rest of the editor sits
+on, and it is the piece that decides whether the feature is safe, so it is built and proved first.
+
+`lib/server/chat-html.ts`: `sanitizeChatHtml` and `isEmptyChatHtml`, 16 tests.
+
+**It is NOT `sanitizeNoteHtml`, and that was the decision.** Reusing the note allow-list would have
+been one import — and it carries tables, headings, images, **iframes**, links and six style
+properties, because a note is a document. A chat message written with this editor is a line of text
+with five controls on it. Reusing that list would have let anyone who can post by hand put an
+`<iframe>` into the chat log of a multi-tenant fintech room.
+
+So the list is the smallest set the captured toolbar can produce — `b`, `strong`, `i`, `em`, `u`,
+`span[style=color]`, `p`, `br` — and every exclusion has its own test: script, event handlers,
+iframes, author-supplied links and images, background-color, font-size, position, and a `url(...)`
+in a colour.
+
+**`a` and `img` are absent on purpose, and it is not an oversight.** Links and inline images DO
+appear in chat — the RENDERER produces them from plain text. An author-supplied `<a href>` is a
+different thing: it can point somewhere its visible text does not say.
+
+**`<font>` was in the first draft and came out.** Legacy browsers emit `<font color>` for a
+forecolor, so allowing it looked like prudence — but `sanitize-html` cannot value-check a plain
+attribute the way it checks a style, so the regex written to guard it was **dead code**, which this
+repository forbids. And we are not using summernote: our editor will emit `<span style="color">`, so
+allowing `<font>` would permit a tag nothing here produces. The text still survives; only the tag
+goes.
+
+**`isEmptyChatHtml` reproduces the reference's four empties** — `''`, `'<p><br></p>'`, `'<br>'`,
+`'<p></p>'` — the ways an editor reports "nothing typed" depending on how it got there. It runs
+AFTER sanitising, so a message whose every tag was disallowed cannot post as an empty bubble.
+
+**Remaining, in order:** (2) a nullable `bodyHtml` column, so an RTE message is explicit rather than
+sniffed from tags; (3) the modal itself, five controls, `Save` when editing and `Send` otherwise;
+(4) the four settings edits and the `enableRTE` preference wire.
+
+**Verified:** room 937 tests / 83 files, `svelte-check` 0 errors, prettier clean.
+
 ### 2026-08-14 11:36 EDT — rich text editor specified; row X's wiring work is finished
 
 **No code. The last of the four determinations, and the row's wiring is now complete.**
