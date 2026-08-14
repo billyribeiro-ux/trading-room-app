@@ -24,6 +24,44 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-14
 
+### 2026-08-14 14:54 EDT — The room login page: an invention caught, and a real blocker found
+
+**Runtime impact: none.** Nothing shipped. This records a correction to my own work and a constraint
+that has to be settled before the page can be built.
+
+**The goal is clear and confirmed:** match the original, which always renders `app-session-login` and
+never auto-submits — `doLoginCheck()` has exactly four callers, every one a click or submit binding.
+Ours redirects straight into the room, which is the divergence that was reported.
+
+**I invented something and then caught it.** A first draft of the entry action compared the submitted
+password to the room's `webinarPW`. That comparison does not exist anywhere in the capture.
+`loginToRoom()` builds `{cver, nick, email}`, adds `i.pw` when a password was typed, and sends it —
+the reference's own SERVER decides, and that server is not in the bundle. The only client-side rule
+is `e.pw || 'pw' != e.authMode || e.appService.globals.passedToken`, so a password is REQUIRED only
+when `authMode == 'pw'` and no token was passed. On the launch path a token is always present, so it
+is never demanded. The draft was deleted rather than patched.
+
+**Then the real blocker, and it is why the page cannot simply be written.** Every setting that DRIVES
+that page was checked against `ROOM_VISIBLE_SETTINGS`, and all seven are absent:
+`showPasswordField`, `usernameInstructions`, `hasRequiredPhoneInLogin`, `disableEditingUsername`,
+`customEnterDisclosure`, `webinarPW`, `banIPList`. Building the page today would produce a form with
+every one of its features permanently off — the dead scaffolding this repository exists to refuse.
+
+**Five can be added** by the usual four edits. **Two cannot.** `webinarPW` and `banIPList` match the
+`credentialShaped` pattern that `room-config-boundary.test.ts` asserts no room-visible setting may
+match — `PW$`, and `banIPList` by name. That test is not an obstacle to route around: the room
+serialises its config into SSR HTML and into the `__sveltekit` payload, so a room-visible setting
+reaches the browser, any cache in front of it, and any HAR on a support ticket.
+
+**Upstream does not have this problem, and that is the whole conflict.** Its room and its site are
+one system, so it can hold the room password in the browser and compare there. This reconstruction
+split them deliberately. The behaviour can still be matched — the room's SERVER asking the controller
+to validate — but that has no counterpart in the capture and is therefore a design decision rather
+than a transcription. It needs the owner, which is what row S has said since 2026-08-11.
+
+**Verified:** working tree clean, room **1075 tests across 91 files**, `svelte-check` 0 errors — the
+half-built file was removed rather than left behind.
+
 ### 2026-08-14 14:38 EDT — Confirmed from evidence: what "Launch" actually does
 
 **Runtime impact: none.** A question answered from the captures, recorded so the owner conversation
