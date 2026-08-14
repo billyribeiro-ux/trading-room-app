@@ -24,6 +24,46 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-14
 
+### 2026-08-14 14:38 EDT — Confirmed from evidence: what "Launch" actually does
+
+**Runtime impact: none.** A question answered from the captures, recorded so the owner conversation
+on row S starts from facts rather than recollection.
+
+**The question:** launching a room from the main website leads to a login page where you type your
+username and password again. Confirmed, with one correction worth having.
+
+**The Launch button, captured verbatim** at
+`evidence-dumps/TIER1-fetched/views/page.manageSession.html:11`, and again on `page.welcome.html:379`:
+
+```html
+<a ng-href="/session?id={{sess.uuid}}&jwtSite={{tokSite}}" target="_blank"
+   class="btn btn-sm pull-right btn-info mr"><i class="icon fa fa-external-link"></i>&nbsp;Launch </a>
+```
+
+**`jwtSite` appears nowhere in the room's 2.9 MB bundle**, so `/session` is the MAIN site's route. It
+validates the site JWT and hands off to the room; the room's own URL surface is
+`id`, `tok`, `pw`, `email`, `name`, `dlf`, `vo`, `co`, `sl`, `dscreen`, `changePasswordUID`
+(byte 2595200ff).
+
+**There IS always a login page, and nothing auto-submits.** The room renders `app-session-login`, and
+`doLoginCheck()` has exactly FOUR callers — all click or submit bindings, at
+`app-session-login.full.js:408, 451, 908, 948`. The button reads `Login`.
+
+**But the retyping is narrower than "username and password again".** On the token path the form is
+PREFILLED: name from `savedNick` or the token's `name`, email from the token's `email`, and
+`this.email && e && (this.readOnlyEmail = !0)` makes the email read-only. So a member normally
+retypes nothing — they press Login.
+
+**A password is only demanded when the room asks for one.** The field is gated on
+`showPresenter || 'pw' == authMode || 'webinarRoom' === authMode` (`:362`, `:1013`), where
+`showPresenter = sessData.showPasswordField` — the manage-page checkbox "Show password field?", whose
+help text is "Show password field on the login page". Default `authMode` is `"reg"`.
+
+**HONEST GAP:** what `/session` does internally is server-side on protradingroom.com and is in no
+capture held here, so whether it ALWAYS mints a token — or sometimes drops the member at the room
+bare, which is when they WOULD retype everything — cannot be proven from this evidence. That is the
+one part of the answer that needs Will rather than a file.
+
 ### 2026-08-14 14:18 EDT — Row V closed by evidence: the "missing bandwidth saving" was never there
 
 **Runtime impact: small and real** — a muted presenter's audio element is now PAUSED rather than
