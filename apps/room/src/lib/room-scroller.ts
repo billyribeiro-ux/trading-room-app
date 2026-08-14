@@ -1,3 +1,27 @@
+/**
+ * `globals.trimLogSize` — the cap `preferences.trimChatLogs` keeps the chat log under.
+ *
+ * 300, read from the reference's own globals (`main.d6d3c112b59b7d0d.js` byte 977456, beside
+ * `chatLogPageSize = 50`). It trims one message per arrival —
+ * `trimChatLogs && chatLog[c].length > trimLogSize && chatLog[c].shift()` — so the log settles at
+ * the cap rather than being cut in bulk, and it is always the OLDEST that goes.
+ */
+export const TRIM_LOG_SIZE = 300;
+
+/**
+ * The chat log, trimmed the way the reference trims it.
+ *
+ * Kept here beside the scroller because the two are the same concern: what the reader can reach.
+ * Returns the SAME array when nothing is trimmed, so a derived value that depends on it does not
+ * invalidate on every message in a quiet room.
+ */
+export function trimChatLog<T>(messages: readonly T[], enabled: boolean): readonly T[] {
+  if (!enabled || messages.length <= TRIM_LOG_SIZE) return messages;
+  /* `shift()` drops from the FRONT — the oldest. `slice(-n)` keeps the newest n, which is the same
+     end state without mutating an array the caller owns. */
+  return messages.slice(-TRIM_LOG_SIZE);
+}
+
 export const ROOM_SCROLLER_BOTTOM_TOLERANCE_PX = 20;
 export const ROOM_SCROLLER_REPEAT_DELAY_MS = 200;
 

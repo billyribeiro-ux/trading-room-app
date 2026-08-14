@@ -73,6 +73,7 @@
   import RoomMessage from '$lib/components/RoomMessage.svelte';
   import type { MessageBadge } from '$lib/types';
   import { isMentionOf } from '$lib/mention';
+  import { trimChatLog } from '$lib/room-scroller';
   import ToastHost from '$lib/components/ToastHost.svelte';
   import VideoPlayer from '$lib/components/VideoPlayer.svelte';
   import YoutubePlayerOverlay from '$lib/components/YoutubePlayerOverlay.svelte';
@@ -817,6 +818,14 @@
    * `!== false`, because the blob ships it on with its siblings and a viewer who has never opened
    * the settings modal should be told when they are addressed by name.
    */
+  /**
+   * `preferences.trimChatLogs` — "Reduce chat log memory", the settings modal's own label.
+   *
+   * `!== false`: the blob ships it ON, and it is the safer default in a room this one cannot bound
+   * — see the note on `visibleChatMessages`. Upstream trims one message per arrival; ours caps the
+   * derived view, which reaches the same steady state and also bounds the DOM.
+   */
+  let trimChatLogs = $state(loadedSettings.trimChatLogs !== false);
   let chatPopup = $state(loadedSettings.chatPopup !== false);
 
   /**
@@ -2334,7 +2343,7 @@
   });
 
   const visibleChatMessages = $derived(
-    data.messages
+    trimChatLog(data.messages, trimChatLogs)
       .filter((item) => item.room === chatTab && !isEvidenceMessageHidden(item))
       .map(withEvidenceState)
       /*
@@ -3198,6 +3207,7 @@
       if (key === 'chatGif') chatGif = value;
       if (key === 'chatBadges') chatBadges = value;
       if (key === 'chatPopup') chatPopup = value;
+      if (key === 'trimChatLogs') trimChatLogs = value;
       /*
         Both halves, because this preference has TWO controls: the navbar's
         `presentation-subtitles` checkbox and the settings modal's `app-speech-reco-overlay`. The

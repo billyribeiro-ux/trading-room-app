@@ -120,6 +120,12 @@ const WIRES = [
     preference: 'chatPopup',
     handler: 'chatPopupChange',
     assignment: "if (key === 'chatPopup') chatPopup = value;"
+  },
+  {
+    id: 'chat-mem-clear',
+    preference: 'trimChatLogs',
+    handler: 'reduceChatLogMemoryChange',
+    assignment: "if (key === 'trimChatLogs') trimChatLogs = value;"
   }
 ] as const;
 
@@ -174,7 +180,7 @@ describe('the wire has no silent break points', () => {
 
   it('the four counts the CHANGELOG states are the ones in the source', () => {
     /*
-      26 reach the handler, 1 returns early, **19 are mapped, 6 are unmapped** with no consumer —
+      26 reach the handler, 1 returns early, **20 are mapped, 5 are unmapped** with no consumer —
       and the dead list is 19, which answers a DIFFERENT question: every id that could have been
       written as junk, i.e. the 26 minus the 6 mapped before this work minus the early-returning
       one. The dead list does NOT shrink as wires are added: `chat-always-scroll` is mapped now, but
@@ -194,8 +200,8 @@ describe('the wire has no silent break points', () => {
     const mapped = (table.match(/': '/g) ?? []).length;
 
     expect(reaching).toBe(26);
-    expect(mapped).toBe(19);
-    expect(reaching - 1 - mapped).toBe(6);
+    expect(mapped).toBe(20);
+    expect(reaching - 1 - mapped).toBe(5);
     expect(DEAD_PREFERENCE_KEYS).toHaveLength(reaching - 1 - 6);
   });
 

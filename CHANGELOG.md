@@ -24,6 +24,37 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-14
 
+### 2026-08-14 11:21 EDT — chat-log trimming, and an unbounded read it exposed
+
+**Runtime impact: the chat view is bounded at 300 messages when the preference is on.** Eleventh
+wire.
+
+`trimLogSize = 300`, read from the reference's own globals beside `chatLogPageSize = 50`
+(`main.d6d3c112b59b7d0d.js` byte 977456). It trims ONE message per arrival —
+`trimChatLogs && chatLog[c].length > trimLogSize && chatLog[c].shift()` — so the log settles at the
+cap rather than being cut in bulk, and it is always the oldest that goes. `trimChatLog` reproduces
+that end state with `slice(-300)`, returning the SAME array when nothing is trimmed so a quiet room
+does not invalidate a derived value on every message.
+
+**And it exposed something bigger, which is recorded rather than half-fixed.** Wiring it meant
+reading how messages reach the client, and they arrive **unbounded**: `+page.server.ts:362-366`
+selects every message in the room, ordered ascending, with no `LIMIT` — and every SSE event calls
+`invalidateAll()`. A room with 50,000 messages re-reads and re-serialises all of them on **every
+chat message**. That is exactly what `CLAUDE.md` names: "an unbounded SELECT that grows with usage…
+what does this cost at 10,000 rows, and what bounds it?"
+
+**The trim added today does NOT fix that**, and saying so matters more than the feature does. It
+bounds the DOM, not the query — it is the reference's client-side behaviour and nothing else. The
+reference bounds the READ separately, with `chatLogPageSize = 50`, `getChatLog({channel, page})` and
+`loadMoreLogs`, so the server never sends more than a page. Written up as TODO row Z, marked HIGH at
+scale, with the explicit warning that **adding `.limit(300)` alone would be worse than the bug**:
+history would silently vanish with no way to reach it. Closing it means porting the pagination.
+
+**Verified:** 4 new tests on the helper, including that it does nothing when the preference is off —
+the opt-OUT path, since it ships ON. Negative control: ignore the preference and trim always, which
+goes red on exactly that case. Room suite 920 tests / 82 files, `svelte-check` 0 errors. Counts 19 ->
+20 mapped, 6 -> 5 unmapped. Row X down to five.
+
 ### 2026-08-14 11:16 EDT — mention popups, and one shared mention rule that was wrong in three ways
 
 **Runtime impact: being mentioned now raises a toast and an OS notification.** Tenth wire closed.
