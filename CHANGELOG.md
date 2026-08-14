@@ -24,6 +24,54 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-14
 
+### 2026-08-14 10:41 EDT — presenter messages can align right; the badge supply is specified
+
+**Runtime impact: a manage-page setting that did nothing now does what it says.**
+
+`RoomMessage.svelte` has carried BOTH consumers of `presenterMsgsOnTheRight` since it was written —
+`presenter-msg-right` on the message body, `presenter-reactions-right` on the reaction row — and
+neither was ever fed. The prop defaulted `false`, the page passed nothing, and the owner's setting
+did nothing however the room was configured. Same shape as the eight dead controls, found while
+auditing them.
+
+**Adding it took the FOUR edits the repository already names.** `verify-room-settings-schema.mjs`
+says it outright — "Adding a setting is FOUR edits, not two: the two lists, this note, and the map
+that says why" — because on 2026-08-13 two of them were forgotten and both assertions sat red until
+somebody ran the whole suite. All four were made here, plus a fifth the note does not mention: the
+room actually reading it.
+
+**Two guards did their jobs, and one gap was found.**
+
+- The controller refused the change three times over until the room consumed it —
+  `room-config-boundary.test.ts` fails if an allow-list entry has no consumer, and the generator's
+  wired-count tripwire threw at 50 keys against an expected 49. Both are designed to make this a
+  deliberate act, and both worked.
+- **The room half was unguarded.** Removing the prop from both call sites left all 866 room tests
+  green. `presenter-messages-right-contract.test.ts` closes that, and the negative control now goes
+  red.
+
+**The three neighbouring badge settings are deliberately still OUT**, and that is the interesting
+part. `enableBadges`, `showBadgesToPresentersOnly` and `disableStarYears` all exist in the schema
+and all sit one manage-page block away. They stay out because `ROOM_VISIBLE_SETTINGS` states its own
+rule — every entry has a consumer in the room today — and nothing populates `item.badges` or
+`item.membershipYears`. Sending them would be a value crossing a trust boundary for nothing, which
+is precisely what that list exists to prevent. **The tempting move was to add all four while I was
+in the file.**
+
+**And the badge supply is now fully specified**, from `app-st-message.full.js` byte 28120: each
+message carries `msg.b`, an array of badge ids; the session data carries `badgesH`, a hash of id ->
+definition; the component walks the ids, and when a badge's `darkTheme` is set and the viewer's
+theme is dark it **swaps in the badge whose id that field holds** — which independently corroborates
+T5-27 at the render site rather than from the manage page alone. The controller already holds both
+halves (`badges` table, `roomUsers.badgesJson`); none of it crosses the internal endpoint. Written
+up as TODO row Y with all three missing levels, so the next session builds rather than re-discovers.
+
+**Verified:** 5 new tests; controller 937 / 90 files with the schema regenerated (268 extracted + 1
+reviewed deviation = 269, 50 wired) and the generator run with output VISIBLE; room 871 / 79 files;
+`svelte-check` 0 errors; prettier clean. Negative controls: dropping the prop from both call sites,
+and adding `enableBadges` to the allow-list — the first red on the new test, the second red on three
+separate boundary assertions.
+
 ### 2026-08-14 10:20 EDT — row X finished: 13 checkboxes settled, 5 wired, 8 are features
 
 **Every one of the thirteen has been settled by evidence.** Not "looked at" — each has a specific

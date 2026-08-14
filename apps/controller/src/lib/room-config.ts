@@ -131,6 +131,21 @@ export function resolveRoomConfig(room: Partial<RoomSettings>, user: UserPrefere
  *
  */
 export const ROOM_VISIBLE_SETTINGS = [
+  /*
+    `presenterMsgsOnTheRight` — presenter messages align right, and their reactions with them.
+
+    TWO consumers in `RoomMessage.svelte`, which is why it earns a place on a list whose rule is
+    that every entry has one: `messageBodyClass` adds `presenter-msg-right`, and the reaction row
+    takes `presenter-reactions-right`. Owner-configurable at
+    `evidence-dumps/TIER1-fetched/views/page.manageSession.html:1108`.
+
+    Its three neighbours on that page — `enableBadges`, `showBadgesToPresentersOnly` and
+    `disableStarYears` — are deliberately NOT here yet. Each gates chat badges or star years, and
+    neither renders: nothing populates `item.badges` or `item.membershipYears`, so sending those
+    three would be exactly what the note below forbids, a value crossing a trust boundary for
+    nothing. They belong here the day their supply exists, not before.
+  */
+  'presenterMsgsOnTheRight',
   // The sidebar's roster gates — `O(44)`, the per-row gate, and `O(6)` for the count badge.
   'onlyPresentersVisibleToViewers',
   'rosterCountVisibleToViewers',

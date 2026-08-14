@@ -86,6 +86,12 @@ const LOGIN_CONSUMED = [
  * generated file does not exist yet.
  */
 const ROOM_CONSUMED = [
+  /* Two consumers in `RoomMessage.svelte`: `presenter-msg-right` on the body and
+     `presenter-reactions-right` on the reaction row. Added 2026-08-14 when the room began
+     reading it; its three manage-page neighbours (`enableBadges`,
+     `showBadgesToPresentersOnly`, `disableStarYears`) stay out until badges and star years
+     have a supply. */
+  'presenterMsgsOnTheRight',
   'allowUsersToChangeUsername',
   'altBenzingaLinkURL',
   'altBenzingaLogoURL',
@@ -475,6 +481,14 @@ if (defs.length !== EXPECTED_TOTAL_COUNT) {
 }
 
 const missingWiredSettings = [...WIRED_SETTINGS].filter((name) => !defs.some((definition) => definition.name === name));
+// 50 since 2026-08-14: `presenterMsgsOnTheRight` joined when the room began reading it. Both its
+// consumers had existed in `RoomMessage.svelte` since that component was written and neither was
+// ever fed — `presenter-msg-right` on the message body and `presenter-reactions-right` on the
+// reaction row — so the owner's setting did nothing however the room was configured. Its three
+// neighbours on the same manage-page block (`enableBadges`, `showBadgesToPresentersOnly`,
+// `disableStarYears`) are deliberately still OUT: nothing populates `item.badges` or
+// `item.membershipYears`, so sending them would put values across a trust boundary for nothing.
+//
 // 49 since 2026-08-12: `tawkPresenterSupport` joined when the room gained the presenter
 // support widget that reads it. Its property id is NOT the capture's - see
 // `apps/room/src/lib/tawk-support.ts` for why copying `5aecb59f227d3d7edc24f7c2` would post every
@@ -491,7 +505,7 @@ const missingWiredSettings = [...WIRED_SETTINGS].filter((name) => !defs.some((de
 //
 // The literal is a tripwire, not a fact about the schema — it is here so the wired set cannot grow
 // by accident, which is why changing it is a deliberate edit.
-if (WIRED_SETTINGS.size !== 49 || missingWiredSettings.length > 0) {
+if (WIRED_SETTINGS.size !== 50 || missingWiredSettings.length > 0) {
   throw new Error(
     `wired-setting contract invalid: ${WIRED_SETTINGS.size} keys, missing ${missingWiredSettings.join(', ') || 'none'}`
   );

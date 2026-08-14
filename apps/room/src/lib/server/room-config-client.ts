@@ -29,6 +29,15 @@ import { controlPlaneOrigin, mobilePinUrl, roomConfigUrl, roomSettingUrl } from 
  * off — a newly created room has no settings row at all.
  */
 export interface RoomSessionSettings {
+  /**
+   * Presenter messages align right, and their reactions with them. Two consumers in
+   * `RoomMessage.svelte` — `presenter-msg-right` on the body and `presenter-reactions-right` on the
+   * reaction row — both of which existed unfed until 2026-08-14.
+   *
+   * Also the first term of the reference's chat-badge gate, so with it ON badges are suppressed
+   * regardless of the other three gates. That coupling is upstream's, not ours.
+   */
+  presenterMsgsOnTheRight?: boolean;
   rosterVisibleToViewers?: boolean;
   onlyPresentersVisibleToViewers?: boolean;
   rosterCountVisibleToViewers?: boolean;

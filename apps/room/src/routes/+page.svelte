@@ -716,6 +716,20 @@
    * `!== false`, because the blob ships `chatGif:!0`. A viewer who has never touched the checkbox
    * gets gifs, which is what the reference does; `=== true` would mute them for everybody.
    */
+  /**
+   * `sessData.presenterMsgsOnTheRight` — a ROOM setting, not a viewer preference.
+   *
+   * `RoomMessage.svelte` has carried both consumers since it was written and neither was ever fed:
+   * `messageBodyClass` adds `presenter-msg-right`, and the reaction row takes
+   * `presenter-reactions-right`. Owner-configurable at
+   * `page.manageSession.html:1108`.
+   *
+   * It is also the FIRST term of the reference's chat-badge gate —
+   * `preferences.chatBadges && !sessData.presenterMsgsOnTheRight && sessData.enableBadges && …` —
+   * so with it on, badges are suppressed regardless of the other three. That coupling is upstream's
+   * and is reproduced by `visibleBadges`.
+   */
+  const presenterMessagesOnTheRight = $derived(data.sessData?.presenterMsgsOnTheRight === true);
   let chatGif = $state(loadedSettings.chatGif !== false);
   let makeUsersFollowMyScreens = $state(loadedSettings.makeUsersFollowMyScreens === true);
   let alwaysScrollToBottom = $state(loadedSettings.alwaysScrollToBottom === true);
@@ -9089,6 +9103,7 @@
                             {item}
                             kind="alert"
                             {chatGif}
+                            {presenterMessagesOnTheRight}
                             currentUserId={data.user.id}
                             currentUserEmailHash={data.user.emailHash}
                             currentUserName={data.user.displayName}
@@ -9216,6 +9231,7 @@
                             {item}
                             kind="chat"
                             {chatGif}
+                            {presenterMessagesOnTheRight}
                             currentUserId={data.user.id}
                             currentUserEmailHash={data.user.emailHash}
                             currentUserName={data.user.displayName}
