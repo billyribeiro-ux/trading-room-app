@@ -2001,6 +2001,24 @@ span.chat-stars {
   cursor: pointer;
 }
 
+/*
+  The reference's restream cross-link is a clickable `<strong>`; ours is a `<button>` carrying the
+  same three classes, because a mouse-only control inside a paragraph is not reachable by keyboard
+  and Svelte refuses `role="button"` on a `<strong>`.
+
+  This strips the button chrome so the two render identically: the captured rule above still
+  supplies the hover underline and pointer, `fw-bold` the weight `<strong>` used to give it, and
+  `text-primary` the colour. `all: unset` is deliberately NOT used — it would also drop the
+  inherited colour and weight those two classes are setting.
+*/
+#session-control-modal button.restream-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  vertical-align: baseline;
+}
+
 #mutedUsersModal .modal-dialog,
 #followedUsersModal .modal-dialog {
   overflow-y: initial !important;

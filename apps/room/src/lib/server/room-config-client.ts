@@ -25,8 +25,16 @@ import {
   mobilePinUrl,
   roomConfigUrl,
   roomEntryUrl,
-  roomSettingUrl
+  roomSettingUrl,
+  streamIngestUrl
 } from './control-plane';
+/*
+  The ingest-key shape lives in the PURE `$lib/stream-ingest` so the panel can name it too — a
+  component importing `$lib/server` is refused by SvelteKit's server-only boundary. Re-exported here
+  because this is the module that fetches it, and a caller should not have to know both places.
+*/
+import type { StreamIngestKey } from '$lib/stream-ingest';
+export type { StreamIngestKey } from '$lib/stream-ingest';
 
 /**
  * What the controller will send. Named here so a reader can see the surface at a glance.
@@ -434,6 +442,84 @@ export async function writeRoomSetting(
   }
 
   if (!response.ok) throw new RoomConfigUnavailable(`the controller answered ${response.status}`);
+}
+
+/**
+ * The controller refused: this member may not publish into this room.
+ *
+ * Distinct from {@link RoomConfigUnavailable} because the two need opposite handling — this one is
+ * a correct answer to a question that was allowed to be asked, and retrying will not change it.
+ */
+export class StreamIngestForbidden extends Error {
+  constructor() {
+    super('This member is not permitted to publish into this room.');
+    this.name = 'StreamIngestForbidden';
+  }
+}
+
+/**
+ * `getRTMPToken` — mint this presenter a fresh publish credential for OBS or XSplit.
+ *
+ * Not cached, and for the same reason `requestMobilePin` is not: the controller ROTATES on every
+ * call, so a cached answer would hand back a key that had already been replaced. That is the
+ * reference's behaviour too — `getNewToken()` and the panel's first render call the identical
+ * command.
+ *
+ * The room asks and the controller decides. It sends only who is asking; whether that person may
+ * publish is re-derived there from `room_users`, because a room asserting its own user's authority
+ * is the escalation this codebase already had once.
+ */
+export async function requestStreamIngestKey(
+  shortCode: string,
+  memberEmail: string
+): Promise<StreamIngestKey> {
+  const secret = privateEnv.ROOM_JWT_SECRET;
+  if (!secret) throw new RoomConfigUnavailable('ROOM_JWT_SECRET is not configured');
+
+  const base = streamIngestUrl(shortCode);
+  if (!base) throw new RoomConfigUnavailable('CONTROL_BASE_URL is not configured');
+
+  let response: Response;
+  try {
+    response = await fetch(base, {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${configReadToken(secret, shortCode)}`,
+        'content-type': 'application/json'
+      },
+      body: JSON.stringify({ email: memberEmail }),
+      signal: AbortSignal.timeout(TIMEOUT_MS)
+    });
+  } catch (cause) {
+    throw new RoomConfigUnavailable(
+      `the stream-key request failed or timed out after ${TIMEOUT_MS}ms`,
+      {
+        cause
+      }
+    );
+  }
+
+  /*
+    A REFUSAL is not an outage, and collapsing the two would be a real bug: a participant who is not
+    allowed to publish would be told the controller is down, and the room would log an error for
+    something working exactly as designed.
+  */
+  if (response.status === 403) throw new StreamIngestForbidden();
+  if (!response.ok) throw new RoomConfigUnavailable(`the controller answered ${response.status}`);
+
+  const payload = (await response.json()) as Partial<StreamIngestKey>;
+  if (typeof payload.rtmpToken !== 'string' || !payload.rtmpToken) {
+    throw new RoomConfigUnavailable('the controller returned no stream key');
+  }
+  if (typeof payload.ingestPath !== 'string' || !payload.ingestPath) {
+    throw new RoomConfigUnavailable('the controller returned no ingest path');
+  }
+  return {
+    rtmpToken: payload.rtmpToken,
+    ingestPath: payload.ingestPath,
+    streamServerMTX: typeof payload.streamServerMTX === 'string' ? payload.streamServerMTX : '',
+    configured: payload.configured === true
+  };
 }
 
 /** What the controller answers when asked whether an attempt may enter. */

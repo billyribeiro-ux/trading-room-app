@@ -3261,6 +3261,17 @@
       return;
     }
 
+    /*
+      The reference raises `alertService.success("Copied to clipboard.")` from all three of its
+      copy buttons (`main.d6d3c112b59b7d0d.js` bytes 2168500-2169300). `alertService` is
+      ngx-toastr, which is what `ToastHost` reproduces — so this is the same transient success
+      toast, not a modal.
+    */
+    if (action === 'copied-to-clipboard') {
+      showToast({ kind: 'success', message: 'Copied to clipboard.', enableHtml: false });
+      return;
+    }
+
     if (action === 'session-refresh-roster') {
       void invalidateAll();
       bootboxAlert =
@@ -11704,6 +11715,7 @@
       onFollowStyleChange={applyFollowStyle}
       onMuteToggle={requestMuteToggle}
       onUserAction={handleUserAction}
+      streamingType={typeof loadedSettings.streamingType === 'string' ? loadedSettings.streamingType : ''}
       onManagedUserRemoval={requestManagedUserRemoval}
       onManagedUserInfo={openManagedUserInfo}
       currentUser={data.user}

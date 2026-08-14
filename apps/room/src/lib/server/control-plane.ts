@@ -99,3 +99,17 @@ export function roomSettingUrl(shortCode: string): string | null {
   const origin = controlPlaneOrigin();
   return origin ? `${origin}/internal/room-setting/${encodeURIComponent(shortCode)}` : null;
 }
+
+/**
+ * `getRTMPToken`: `POST {control}/internal/stream-ingest/{shortCode}`.
+ *
+ * The reference reaches this over its admin command channel
+ * (`main.d6d3c112b59b7d0d.js` byte 2169850); here it is an authenticated server-to-server call for
+ * the same reason the mobile pin is. What comes back is a live publish credential for this room, so
+ * it is asked for when a presenter opens the OBS panel or presses "New Link" — never as part of the
+ * page load, and never cached.
+ */
+export function streamIngestUrl(shortCode: string): string | null {
+  const origin = controlPlaneOrigin();
+  return origin ? `${origin}/internal/stream-ingest/${encodeURIComponent(shortCode)}` : null;
+}
