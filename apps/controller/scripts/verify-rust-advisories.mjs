@@ -14,21 +14,62 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
-const REPOSITORY_ROOT = fileURLToPath(new URL('../', import.meta.url));
+/*
+  THREE levels up, not one — the same correction `verify-api-release-artifact.mjs` already carries,
+  and for the same reason.
+
+  `import.meta.url` is `apps/controller/scripts/…`, so `'../'` resolves to `apps/controller/`, and
+  every path below is addressed `services/…`, which lives at the REPOSITORY root. This looked for
+  `apps/controller/services/Cargo.lock` — a directory that does not exist.
+
+  It came from the sibling repository, where `services/` sits beside `scripts/` and `'../'` was
+  right. Moving it under `apps/controller/` invalidated the assumption without changing the name.
+  Its sibling was corrected when `pnpm test` started running it; this one was not, because nothing
+  ran it at all: the workflow step invoking it was itself pointing at a path that does not exist,
+  and the gate that would have caught either only runs on a push to `main`.
+*/
+const REPOSITORY_ROOT = fileURLToPath(new URL('../../../', import.meta.url));
 const LOCKFILE = path.join(REPOSITORY_ROOT, 'services', 'Cargo.lock');
 const SERVICES_DIRECTORY = path.join(REPOSITORY_ROOT, 'services');
 
+/**
+ * Reviewed informational advisories, as exact kind/advisory/package/version tuples.
+ *
+ * RUSTSEC-2026-0253 (lru 0.8.1, "Potential use-after-free due to lack of panic safety in
+ * `LruCache::pop()`", 2026-05-12, patched `>=0.18.2`) — reviewed 2026-08-14, the first time this
+ * verifier ever ran. The unsoundness needs one specific thing to happen: the `Drop` implementation
+ * of a stored KEY must PANIC during `pop()`, which skips `detach()` and leaves a dangling node in
+ * the internal list for a later eviction to dereference.
+ *
+ * Not reachable from here, and not remediable here either:
+ *
+ *   * `cargo tree --invert lru@0.8.1` is `lru -> mediasoup 0.24.3 -> tradingroom-media`. Nothing in
+ *     this workspace constructs an `LruCache`; the caches are mediasoup's own internals, keyed on
+ *     its identifiers. `EXPECTED_MEDIA_TRANSITIVES` below re-proves that confinement on every run,
+ *     so this exception dies the moment anything else starts depending on `lru`.
+ *   * The patch is `>=0.18.2` against a pin of `0.8.x` held by `mediasoup 0.24.3`. Only a mediasoup
+ *     release can move it.
+ *   * `services/**` is a MIRROR in this repository — a `Cargo.lock` edited here is lost on the next
+ *     sync — so even the version bump has to be made at the source rather than in this tree.
+ */
 const EXPECTED_WARNINGS = Object.freeze(
   [
     'unmaintained:RUSTSEC-2024-0375:atty@0.2.14',
     'unmaintained:RUSTSEC-2024-0384:instant@0.1.13',
     'unmaintained:RUSTSEC-2024-0436:paste@0.1.18',
     'unsound:RUSTSEC-2021-0145:atty@0.2.14',
-    'unsound:RUSTSEC-2026-0097:rand@0.7.3'
+    'unsound:RUSTSEC-2026-0097:rand@0.7.3',
+    'unsound:RUSTSEC-2026-0253:lru@0.8.1'
   ].sort()
 );
 
-const EXPECTED_MEDIA_TRANSITIVES = Object.freeze(['atty@0.2.14', 'instant@0.1.13', 'paste@0.1.18', 'rand@0.7.3']);
+const EXPECTED_MEDIA_TRANSITIVES = Object.freeze([
+  'atty@0.2.14',
+  'instant@0.1.13',
+  'lru@0.8.1',
+  'paste@0.1.18',
+  'rand@0.7.3'
+]);
 
 /**
  * Reviewed RustSec vulnerabilities, as exact advisory/package/version tuples.
@@ -114,6 +155,19 @@ if (JSON.stringify(actualWarnings) !== JSON.stringify(EXPECTED_WARNINGS)) {
   );
 }
 
+/*
+  `--target all`, for the same reason the EXPECTED_UNBUILT loop below already passes it.
+
+  Without it `cargo tree --invert` only walks edges enabled for the HOST target, and a crate reached
+  through a target-gated dependency prints nothing at all. `instant@0.1.13` is exactly that: its
+  chain is `instant -> fastrand -> futures-lite -> mediasoup`, and `fastrand 1.9.0` depends on it
+  only on wasm. On a Linux runner the inverted tree came back EMPTY, and an empty tree does not
+  contain the string `mediasoup`, so this check reported that a confined crate had escaped its
+  graph — the opposite of the truth, and a failure that no upgrade could have fixed.
+
+  It was never noticed because this verifier had never run: the workflow step invoking it pointed at
+  a path that does not exist, and that step only runs on a push to `main`.
+*/
 for (const packageId of EXPECTED_MEDIA_TRANSITIVES) {
   const tree = run(
     'cargo',
@@ -125,7 +179,9 @@ for (const packageId of EXPECTED_MEDIA_TRANSITIVES) {
       '--invert',
       packageId,
       '--edges',
-      'normal,build'
+      'normal,build',
+      '--target',
+      'all'
     ],
     { cwd: SERVICES_DIRECTORY }
   );

@@ -112,7 +112,12 @@ jobs:
           printf 'changed files:\n%s\n' "$changed"
           # The workflow itself is in the list: a change to this file must be
           # proved by the gate it defines, or it could disable itself.
-          if printf '%s\n' "$changed" | grep -qE '^(services/|ops/|scripts/verify-backend|scripts/verify-api-release-artifact|scripts/verify-rust-advisories|\.github/workflows/backend-quality\.yml)'; then
+          # The verifier paths are `apps/controller/scripts/…`. They were written as
+          # `scripts/…`, which is where they live in the sibling repository this gate
+          # came from — so a change to any of the three matched NOTHING and skipped the
+          # very gate that proves it. `scripts/build-api-release-evidence.sh` is the one
+          # that genuinely sits at the root, and it is listed separately.
+          if printf '%s\n' "$changed" | grep -qE '^(services/|ops/|apps/controller/scripts/verify-backend|apps/controller/scripts/verify-api-release-artifact|apps/controller/scripts/verify-rust-advisories|scripts/build-api-release-evidence\.sh|\.github/workflows/backend-quality\.yml)'; then
             echo "reason=backend paths changed" >> "$GITHUB_OUTPUT"
             echo "backend=true" >> "$GITHUB_OUTPUT"
           else
@@ -187,17 +192,29 @@ jobs:
           cargo install --locked cargo-audit --version 0.22.1
           cargo install --locked cargo-deny --version 0.19.4
 
+      # The four steps below invoke the verifiers by PATH rather than through
+      # `pnpm backend:*`. Those package scripts live in `apps/controller`, and the
+      # repository root defines none of them, so every one of these ran as
+      # `MODULE_NOT_FOUND` or "no such script" the first time this gate executed.
+      # The scripts themselves resolve their own paths from `import.meta.url`, so
+      # they are correct from any working directory.
       - name: Reject vulnerabilities and unreviewed RustSec warnings
         if: steps.scope.outputs.backend == 'true'
-        run: node scripts/verify-rust-advisories.mjs
+        run: node apps/controller/scripts/verify-rust-advisories.mjs
 
+      # `cargo deny` from `services/` rather than `pnpm backend:licenses`, whose
+      # `--manifest-path services/Cargo.toml` is relative to the repository root
+      # and resolves to `apps/controller/services/…` when run from its own package.
       - name: Enforce Rust licenses, bans, and source registries
         if: steps.scope.outputs.backend == 'true'
-        run: pnpm backend:licenses
+        working-directory: services
+        run: cargo deny --locked --all-features check licenses bans sources
 
       - name: Verify every migration byte and its forensic lineage
         if: steps.scope.outputs.backend == 'true'
-        run: pnpm backend:migrations:verify
+        run: |
+          node apps/controller/scripts/verify-backend.mjs --migrations-only
+          node apps/controller/scripts/verify-backend-provenance.mjs
 
       - name: Prove PostgreSQL 17 is ready
         if: steps.scope.outputs.backend == 'true'
@@ -297,7 +314,7 @@ jobs:
 
       - name: Verify the release-artifact policy and immutable tool pins
         if: steps.scope.outputs.backend == 'true'
-        run: pnpm backend:release:verify
+        run: node apps/controller/scripts/verify-api-release-artifact.mjs --verify-contract
 
       - name: Build and attest the registry-credential-free API release artifact
         if: steps.scope.outputs.backend == 'true'

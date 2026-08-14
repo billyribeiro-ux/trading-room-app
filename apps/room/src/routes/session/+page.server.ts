@@ -74,6 +74,25 @@ type Prefill = {
  * Shared by `load` and the action, because a POST is a fresh request that may carry anything: the
  * submit re-runs every one of these rather than trusting a form that says it already passed them.
  */
+/**
+ * Who is arriving, and on what authority.
+ *
+ * TWO arrivals, and the difference between them is the whole security model of this page:
+ *
+ *   **With a token** — the controller signed it, so the identity is VERIFIED. The membership is
+ *   read for that email and the role comes from it, which is how a presenter gets presenter
+ *   authority.
+ *
+ *   **Without one** — the reference's ordinary public arrival: `/session?id=<uuid>` renders the
+ *   login form and the visitor types their own name and email. That identity is SELF-DECLARED, and
+ *   it is never used to look up a membership. A guest who typed the owner's address would otherwise
+ *   inherit the owner's role, which is the 2026-08-07 escalation in a new coat. `guestHandoffToken`
+ *   already states the rule for the other door — "a guest is not an owner and must not inherit an
+ *   owner's authority just because both arrive on the same URL" — and it holds here too.
+ *
+ * So: a verified token may carry authority; a typed email may not. Both may enter, if the room's
+ * own rules let them, and those rules are checked by the controller.
+ */
 async function verifyEntry(request: Request, token: string | null, shortCode: string | undefined) {
   // `$env/dynamic/private`, not `process.env` — SvelteKit never copies `.env` into the latter.
   const secret = privateEnv.ROOM_JWT_SECRET;
@@ -83,19 +102,32 @@ async function verifyEntry(request: Request, token: string | null, shortCode: st
     error(500, 'This room is not configured to accept sign-ins.');
   }
 
-  const verified = verifyHandoffToken(secret, token);
-  if (!verified.ok) {
-    // One message for every rejection; which check failed is for the log, not the caller.
-    console.warn('[session] handoff rejected', { room: shortCode, reason: verified.reason });
-    error(403, 'This sign-in link is not valid. Open the room from your account page again.');
+  /*
+    A PRESENT token must be valid. Absent is a guest; present-and-broken is somebody holding an
+    expired or forged credential, and telling them apart matters — the second is not a guest.
+  */
+  let claims: { name: string; email: string } | null = null;
+  if (token) {
+    const verified = verifyHandoffToken(secret, token);
+    if (!verified.ok) {
+      // One message for every rejection; which check failed is for the log, not the caller.
+      console.warn('[session] handoff rejected', { room: shortCode, reason: verified.reason });
+      error(403, 'This sign-in link is not valid. Open the room from your account page again.');
+    }
+    claims = verified.claims;
   }
 
   let roomConfig: RoomConfig | null = null;
   let membership: RoomMembership | null = null;
   if (shortCode) {
     try {
-      roomConfig = await readRoomConfig(request, shortCode, verified.claims.email);
-      membership = roomConfig.member;
+      /*
+        The membership lookup is by the VERIFIED email only. A guest is read with no email at all,
+        so the controller answers with the room's settings and no membership — which is exactly the
+        authority a self-declared identity should carry: none.
+      */
+      roomConfig = await readRoomConfig(request, shortCode, claims?.email ?? '');
+      membership = claims ? roomConfig.member : null;
     } catch (cause) {
       // Fail CLOSED. `roomRoleFor(null)` is `member`, the safe answer to "cannot tell".
       console.error('[session] could not read the membership; entering as a member', cause);
@@ -103,10 +135,7 @@ async function verifyEntry(request: Request, token: string | null, shortCode: st
   }
 
   if (isBannedFromRoom(membership)) {
-    console.warn('[session] refused a banned member', {
-      room: shortCode,
-      email: verified.claims.email
-    });
+    console.warn('[session] refused a banned member', { room: shortCode, email: claims?.email });
     error(403, 'You do not have access to this room.');
   }
 
@@ -115,7 +144,7 @@ async function verifyEntry(request: Request, token: string | null, shortCode: st
     error(403, 'This room is closed.');
   }
 
-  return { claims: verified.claims, roomConfig, membership };
+  return { claims, roomConfig, membership };
 }
 
 export const load: PageServerLoad = async ({ url, request }) => {
@@ -141,9 +170,11 @@ export const load: PageServerLoad = async ({ url, request }) => {
   const prefill: Prefill = {
     token: token ?? '',
     shortCode: shortCode ?? '',
-    name: (url.searchParams.get('name') ?? claims.name ?? '').trim(),
-    email: (url.searchParams.get('email') ?? claims.email ?? '').trim(),
-    readOnlyEmail: Boolean(claims.email),
+    name: (url.searchParams.get('name') ?? claims?.name ?? '').trim(),
+    email: (url.searchParams.get('email') ?? claims?.email ?? '').trim(),
+    /* `this.email && e && (readOnlyEmail = !0)` — only a TOKEN locks the field. A guest types
+       their own, which is the reference's ordinary public arrival. */
+    readOnlyEmail: Boolean(claims?.email),
     /*
       `'a' !== decodedPassedToken.perms && sessData.disableEditingUsername`. `'a'` is the presenter
       permission and that is not a guess — `loginToRoom` sets `isPresenter: 'a' === o.perms` from
@@ -158,7 +189,7 @@ export const load: PageServerLoad = async ({ url, request }) => {
     disableLoginForm: url.searchParams.get('dlf') === '1',
     roomTitle: roomConfig?.room.name ?? '',
     // The same derivation the roster uses, so the face here is the face in the room.
-    avatarUrl: `https://www.gravatar.com/avatar/${hashEmail(claims.email)}?d=mm`
+    avatarUrl: claims ? `https://www.gravatar.com/avatar/${hashEmail(claims.email)}?d=mm` : ''
   };
 
   return prefill;
@@ -180,22 +211,37 @@ export const actions: Actions = {
     const phone = String(form.get('phone') ?? '').trim();
 
     /*
+      WHOSE EMAIL THIS IS, and it decides everything below.
+
+      A verified token supplies it. Without one the visitor typed it, which is the reference's
+      ordinary public arrival and is fine for IDENTIFYING somebody in a chat room — and useless for
+      authorising them. The two are kept apart deliberately: `claims` is the only thing that may
+      produce a membership, and `roomRoleFor(null)` is `member`.
+    */
+    const email =
+      claims?.email ??
+      String(form.get('email') ?? '')
+        .trim()
+        .toLowerCase();
+    if (!email || !name) return fail(400, { message: 'Please fill in your name and email...' });
+
+    /*
       THE DECISION IS THE CONTROLLER'S, and there is exactly one of it.
 
       `decideRoomEntry` already covers `isLocked`, `banIPList`, `nickFilter`, the three room
       passwords, the free-trial password, `secTok` and `customEnterDisclosure`, and the guest door
       calls the same function. Re-implementing any of it here is how two doors end up disagreeing
       about who may enter — and half of it is impossible here anyway, because the credentials it
-      reads are the ones that may never cross to this application.
+      reads may never cross to this application.
 
-      The page has already applied the reference's own CLIENT-side checks with the reference's own
-      messages. This is the authoritative pass.
+      The page has already applied the reference's own CLIENT-side checks with its own messages.
+      This is the authoritative pass.
     */
     let decision;
     try {
       decision = await decideRoomEntryRemotely(shortCode ?? '', {
         name,
-        email: claims.email,
+        email,
         phone,
         password: String(form.get('password') ?? ''),
         secretToken: String(form.get('secTok') ?? ''),
@@ -223,14 +269,24 @@ export const actions: Actions = {
       `disableEditingUsername` is enforced HERE as well as disabled in the form. A disabled input is
       a UI state, not an authorization check, and this is where the difference lands: the name
       reaches the roster and rides on every message this member sends.
+
+      A guest has no name to fall back TO, so the typed one stands — there is nothing else, and the
+      setting exists to stop somebody CHANGING a name the controller gave them.
     */
     const mayRename =
-      roomRoleFor(membership) === 'staff' || settings.disableEditingUsername !== true;
-    const displayName = mayRename && name ? name : claims.name;
+      !claims || roomRoleFor(membership) === 'staff' || settings.disableEditingUsername !== true;
+    const displayName = mayRename && name ? name : (claims?.name ?? name);
 
+    /*
+      THE ROLE, and the one line that keeps a typed email from being an authority claim.
+
+      `membership` is null for every tokenless arrival — `verifyEntry` refuses to look one up
+      without a verified email — so `roomRoleFor` answers `member`. Somebody typing the owner's
+      address gets a chat nickname, not the owner's room.
+    */
     const role = roomRoleFor(membership);
     const now = new Date();
-    const existing = db.select().from(users).where(eq(users.email, claims.email)).get();
+    const existing = db.select().from(users).where(eq(users.email, email)).get();
 
     const account = existing
       ? (db
@@ -249,8 +305,8 @@ export const actions: Actions = {
           .insert(users)
           .values({
             displayName,
-            email: claims.email,
-            avatarUrl: `https://www.gravatar.com/avatar/${hashEmail(claims.email)}?d=mm`,
+            email,
+            avatarUrl: `https://www.gravatar.com/avatar/${hashEmail(email)}?d=mm`,
             role,
             status: 'online',
             // No password hash, and `authSource: 'handoff'` to say so on purpose.

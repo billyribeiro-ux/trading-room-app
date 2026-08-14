@@ -15,29 +15,39 @@ will fetch it. A gap recorded in only one app's document is a gap the next perso
 
 ---
 
-## State, 2026-08-14 14:12 EDT
+## State, 2026-08-14 15:44 EDT
 
-Nine rows remain, and **not one of them is blocked on effort**. Every item that could be built from
+Eight rows remain, and **not one of them is blocked on effort**. Every item that could be built from
 the evidence has been; what is left is blocked on a decision, an environment, or an architecture
 this deployment does not have.
 
 | row | what it needs | who or what unblocks it |
 | --- | --- | --- |
-| **P** | nothing — bookkeeping. PR #20 is green and mergeable; `feat/extra-chat-column` waits behind it | the owner merges |
-| **S** | the login page — **ask Will before touching it** | the owner |
+| **P** | nothing — bookkeeping. PR #20 is MERGED; PR #21 is open and green | the owner merges #21 |
 | **G** | the Postgres host question — Neon under volume | the owner |
 | **H** | production topology — separating media from the app tier | the owner |
 | **Q** | the WordPress plugin run inside a live WordPress | an environment |
 | **E** | `apps/room/.env`, which holds secrets not authored here | an environment |
-| **R** | screenshare quality / MP4 — three sub-rows | partly the owner, partly server-side recording |
+| **R** | screenshare quality / MP4 — the measurement needs a human at an OS screen-picker dialog | the owner, then server-side recording |
 | **X** | `app-recording-preview-window` — its URL is written by a server that does not exist here | server-side recording |
 | **AC** | `stopRecMsg` — the same missing producer | server-side recording |
 
-Six rows were CLOSED today and removed from this file rather than struck through, because a row
+**Row S closed 2026-08-14.** The room owns its login page again, the product has ONE entry form
+rather than two, and the question I put to the owner turned out to have an answer in the bundle:
+`webinarPW` is in no room code at all, so the reference validates the password on its server exactly
+as this now does.
+
+Seven rows were CLOSED today and removed from this file rather than struck through, because a row
 that is not something somebody still has to DO does not belong in it — see the rule at the top. Each
 one's record is in `CHANGELOG.md` under 2026-08-14: **Z** the unbounded chat and alert reads, **Z2**
 the alert-question tenancy leak in both directions, **X2** the extra chat column, **AB** the chat
-mode control, and **AA**, which was already closed on 2026-08-12.
+mode control, **V** — whose premise did not survive being read — **S** the room's login page, and
+**AA**, which was already closed on 2026-08-12.
+
+**Three of those rows were WRONG about their own subject**, which is the most useful thing this file
+learned today: AB said the producer was not modelled when the consumer was the missing half; V said
+a bandwidth saving was missing when the reference never made one; S framed a design decision that
+the bundle already answered. A row is a hypothesis until it is re-read against the evidence.
 
 ---
 

@@ -636,7 +636,16 @@ async function verifyContract() {
     'version: v0.34.1',
     'driver: docker-container',
     'image=moby/buildkit:v0.31.2@sha256:2f5adac4ecd194d9f8c10b7b5d7bceb5186853db1b26e5abd3a657af0b7e26ec',
-    'run: pnpm backend:release:verify',
+    /*
+      Invoked by PATH, not through `pnpm backend:release:verify`.
+
+      That package script lives in `apps/controller` and the repository root defines no such
+      script, so the workflow step running it at the root failed outright the first time this gate
+      actually executed. This contract pinned the broken spelling, which is why it has to move with
+      the fix rather than be relaxed: the point of the pin is that the workflow really runs this
+      verifier, not that it runs it under one particular name.
+    */
+    'run: node apps/controller/scripts/verify-api-release-artifact.mjs --verify-contract',
     'run: bash scripts/build-api-release-evidence.sh',
     'uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a',
     'retention-days: 30'
