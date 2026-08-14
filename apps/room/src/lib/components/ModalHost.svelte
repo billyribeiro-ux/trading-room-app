@@ -1217,6 +1217,7 @@
       'presenter-push-to-talk': 'pushToTalk',
       'presenter-speech-recognition': 'doSpeechReco',
       'app-speech-reco-overlay': 'showSpeechRecoOverlay',
+      'chat-always-scroll': 'alwaysScrollToBottom',
       'app-disable-video': 'disableVideo'
     };
     /*

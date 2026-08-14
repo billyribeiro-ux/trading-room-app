@@ -78,6 +78,12 @@ const WIRES = [
     preference: 'showSpeechRecoOverlay',
     handler: 'showSpeechRecoOverlayOnChange',
     assignment: "if (key === 'showSpeechRecoOverlay') {"
+  },
+  {
+    id: 'chat-always-scroll',
+    preference: 'alwaysScrollToBottom',
+    handler: 'chatAlwaysScrollToBottomChange',
+    assignment: "if (key === 'alwaysScrollToBottom') alwaysScrollToBottom = value;"
   }
 ] as const;
 
@@ -132,10 +138,14 @@ describe('the wire has no silent break points', () => {
 
   it('the four counts the CHANGELOG states are the ones in the source', () => {
     /*
-      26 reach the handler, 1 returns early, 12 are mapped, 13 are unmapped with no consumer — and
-      the dead list is 19, which answers a DIFFERENT question: every id that could have been
+      26 reach the handler, 1 returns early, **13 are mapped, 12 are unmapped** with no consumer —
+      and the dead list is 19, which answers a DIFFERENT question: every id that could have been
       written as junk, i.e. the 26 minus the 6 mapped before this work minus the early-returning
-      one.
+      one. The dead list does NOT shrink as wires are added: `chat-always-scroll` is mapped now, but
+      the junk it wrote under its element id before that is still in people's blobs.
+
+      Was 12 mapped / 13 unmapped until `chat-always-scroll` -> `alwaysScrollToBottom` landed. This
+      assertion went red on that change, which is the point of pinning it.
 
       Pinned because I gave two wrong counts writing this up — fifteen, then fourteen — by counting
       `app-disable-video`, which was already reaching `savePreference` by its raw id, and
@@ -147,8 +157,8 @@ describe('the wire has no silent break points', () => {
     const mapped = (table.match(/': '/g) ?? []).length;
 
     expect(reaching).toBe(26);
-    expect(mapped).toBe(12);
-    expect(reaching - 1 - mapped).toBe(13);
+    expect(mapped).toBe(13);
+    expect(reaching - 1 - mapped).toBe(12);
     expect(DEAD_PREFERENCE_KEYS).toHaveLength(reaching - 1 - 6);
   });
 
@@ -241,6 +251,39 @@ describe('the wire has no silent break points', () => {
   it('both controls for the overlay stay in agreement', () => {
     // The modal is the second control; without this the navbar checkbox would contradict it.
     expect(pageCode).toContain("soundChecks['presentation-subtitles'] = value;");
+  });
+
+  it('alwaysScrollToBottom defaults OFF, and only the CHAT scroller takes it', () => {
+    /*
+      Both halves of this were found by running the negative controls and watching them PASS.
+      Neither was caught by anything, and each is a defect that renders perfectly.
+
+      1. THE DEFAULT. `=== true`, not `!== false`. The preferences blob ships
+         `alwaysScrollToBottom:!1` (`main.d6d3c112b59b7d0d.js` byte 979602), so seeding it on would
+         drag every viewer who has never touched the checkbox out of the history they are reading.
+         Note this is the OPPOSITE comparison to `showSpeechRecoOverlay`, where `=== true` was the
+         bug — the reference's own default decides which is right, and there is no house style to
+         fall back on.
+
+      2. THE SCOPE. The subscriber lives on the component that owns `this.channel`, `this.msgs`,
+         `this.searchTerm` and `chatLog[o.c]` — the chat scroller. The alerts scroller shares
+         `shouldAutoScrollForMessage`, and passing the override there would yank a reader out of the
+         alert history they were scrolled into, from a checkbox whose label says "chat".
+    */
+    expect(pageCode).toContain(
+      'let alwaysScrollToBottom = $state(loadedSettings.alwaysScrollToBottom === true);'
+    );
+    expect(pageCode).not.toContain(
+      'let alwaysScrollToBottom = $state(loadedSettings.alwaysScrollToBottom !== false);'
+    );
+
+    const alerts = /shouldAutoScrollForMessage\(\s*alertsScrollingUp[\s\S]{0,140}?\)/.exec(
+      pageCode
+    )?.[0];
+    expect(alerts, 'the alerts scroller call must be findable').toBeTruthy();
+    expect(alerts, 'the alerts scroller must NOT take the chat override').not.toContain(
+      'alwaysScrollToBottom'
+    );
   });
 
   it('the consumers the wires feed are still there', () => {

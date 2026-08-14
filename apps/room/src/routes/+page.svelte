@@ -659,6 +659,20 @@
   let popupOnUserLeave = $state(loadedSettings.popupOnUserLeave !== false);
   let beepOnUserJoin = $state(loadedSettings.beepOnUserJoin !== false);
   let beepOnUserLeave = $state(loadedSettings.beepOnUserLeave !== false);
+  /**
+   * `preferences.alwaysScrollToBottom` — the chat's "always scroll to bottom" override.
+   *
+   * `=== true`, not `!== false`, and the difference is the reference's own default: the preferences
+   * blob ships `alwaysScrollToBottom:!1` (`main.d6d3c112b59b7d0d.js` byte 979602). Seeding it ON for
+   * anyone who has never touched the checkbox would drag a reader out of the history they are
+   * scrolled up into — the opposite of the mistake made with `showSpeechRecoOverlay`, where
+   * `=== true` wrongly disabled a feature that defaults ON. The default decides which comparison is
+   * correct; neither is a house style.
+   *
+   * PERSISTED, unlike `saveData`: `chatAlwaysScrollToBottomChange` calls
+   * `setPreference('alwaysScrollToBottom', …)` (byte 2246247).
+   */
+  let alwaysScrollToBottom = $state(loadedSettings.alwaysScrollToBottom === true);
   let recordingStartSound = $state(loadedSettings.recordingStartSound !== false);
   let recordingStopSound = $state(loadedSettings.recordingStopSound !== false);
 
@@ -2168,7 +2182,12 @@
       isInitialView ||
       didSwitchChannel ||
       (isNewMessage &&
-        shouldAutoScrollForMessage(chatScrollingUp, newestMessage?.senderId, data.user.id))
+        shouldAutoScrollForMessage(
+          chatScrollingUp,
+          newestMessage?.senderId,
+          data.user.id,
+          alwaysScrollToBottom
+        ))
     ) {
       chatScrollingUp = false;
       void tick().then(() => {
@@ -2945,6 +2964,7 @@
       if (key === 'recordingStopSound') recordingStopSound = value;
       if (key === 'pushToTalk') pushToTalk = value;
       if (key === 'doSpeechReco') doSpeechReco = value;
+      if (key === 'alwaysScrollToBottom') alwaysScrollToBottom = value;
       /*
         Both halves, because this preference has TWO controls: the navbar's
         `presentation-subtitles` checkbox and the settings modal's `app-speech-reco-overlay`. The

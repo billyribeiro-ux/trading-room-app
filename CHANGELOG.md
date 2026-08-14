@@ -24,6 +24,53 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-14
 
+### 2026-08-14 09:49 EDT — chat "always scroll to bottom" wired; two of my own tests were decoration
+
+**Runtime impact: the chat checkbox now works.** Sixth dead control repaired.
+
+**It was not a feature after all**, which is the lesson worth keeping from this one. Row X listed
+`chat-always-scroll` among twelve checkboxes whose preference "has no consumer in this room" — and
+`shouldAutoScrollForMessage` in `room-scroller.ts` already implemented the reference's guard
+verbatim:
+
+```
+(!this.isScrollingUp || o.uid == this.appService.globals.user.uid) && (…scrollToBottom(!0))
+```
+
+`alwaysScrollToBottom` is the viewer's override of **exactly that guard** — a separate
+`appEventBus.subscribe('alwaysScrollToBottom', …)` at byte 1413501, fired from `chatMsg` when the
+message is on the channel being viewed (byte 1430890). Two subscribers, one outcome, so it folded in
+as a third term and the whole wire was one parameter. **Check the concept, not the preference name**
+— searching for `alwaysScrollToBottom` finds nothing here; searching for what it DOES finds the
+function that already existed.
+
+**Chat only.** The subscriber sits on the component that also owns `this.channel`, `this.msgs`,
+`this.searchTerm` and `chatLog[o.c]`. The alerts scroller shares the same function and must not take
+the override, or a checkbox labelled "chat" would yank a reader out of alert history.
+
+**Then the negative controls found two of my own tests were decoration.** Three were run; only the
+first went red:
+
+| control | result | what it meant |
+| --- | --- | --- |
+| ignore the override parameter | **red** ✅ | the wire is guarded |
+| seed it `!== false` instead of `=== true` | **passed** ❌ | nothing checked the default |
+| pass the override to the ALERTS scroller too | **passed** ❌ | nothing checked the scope |
+
+Both gaps are now assertions, and both were re-run red afterwards. The default one matters
+disproportionately: `=== true` is correct here because the reference ships
+`alwaysScrollToBottom:!1` (byte 979602) — **the OPPOSITE comparison to `showSpeechRecoOverlay`**,
+where `=== true` was itself the bug. There is no house style; the reference's own default decides
+each case, and the only way to be sure is to read the defaults blob.
+
+**The pinned counts moved and said so.** `settings-preference-wiring-contract.test.ts` went red on
+`mapped` 12 -> 13 and `unmapped` 13 -> 12, which is what pinning them was for. The dead-key list
+stays at 19 deliberately: `chat-always-scroll` is mapped now, but the junk it wrote under its element
+id before today is still sitting in people's blobs.
+
+**Verified:** room suite **831 tests / 76 files**, `svelte-check` 0 errors, prettier clean. Row X
+down to twelve.
+
 ### 2026-08-14 09:33 EDT — item W built: the switch that stops the stream, not just hides it
 
 **Runtime impact: a member on cellular can now stop screen video being FETCHED.** The control

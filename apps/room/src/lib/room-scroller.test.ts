@@ -32,6 +32,21 @@ describe('captured room scroller behavior', () => {
     expect(shouldAutoScrollForMessage(true, 7, 7)).toBe(true);
   });
 
+  it('alwaysScrollToBottom overrides the reading-history guard, and defaults OFF', () => {
+    /*
+      The viewer's own override — a separate `appEventBus.subscribe('alwaysScrollToBottom', …)`
+      upstream (`main.d6d3c112b59b7d0d.js` byte 1413501), fired from `chatMsg` when the message is
+      on the channel being viewed. Folded in here as a third term: two subscribers, one outcome.
+
+      The middle case is the whole point. Reading history, somebody else's message: normally FALSE,
+      and the override is what makes it true. If the parameter were ignored this stays false.
+    */
+    expect(shouldAutoScrollForMessage(true, 42, 7, true)).toBe(true);
+    expect(shouldAutoScrollForMessage(true, 42, 7, false)).toBe(false);
+    // Omitted entirely — the alerts scroller shares this function and must not take the override.
+    expect(shouldAutoScrollForMessage(true, 42, 7)).toBe(false);
+  });
+
   it('scrolls immediately and repeats after the captured 200ms render delay', () => {
     const scroller = {
       scrollHeight: 1_000,

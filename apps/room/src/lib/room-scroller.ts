@@ -10,12 +10,40 @@ export function isRoomScrollerReadingHistory(scroller: RoomScrollerViewport) {
   );
 }
 
+/**
+ * Whether a new message should pull the viewport back to the bottom.
+ *
+ * The first two terms are the reference's own condition, verbatim:
+ * `(!this.isScrollingUp || o.uid == this.appService.globals.user.uid) && (…scrollToBottom(!0))`
+ * — you are not dragged away from history you are reading, unless the message is your own.
+ *
+ * `alwaysScrollToBottom` is the viewer's override of exactly that guard, and it is a SEPARATE
+ * subscriber upstream rather than an extra clause:
+ *
+ * ```js
+ * this.appEventBus.subscribe('alwaysScrollToBottom', () => {
+ *   this.appService.globals.preferences.alwaysScrollToBottom && this.scrollToBottom(!0)
+ * })
+ * ```
+ *
+ * (`main.d6d3c112b59b7d0d.js` byte 1413501), fired from the `chatMsg` handler when the message
+ * belongs to the channel on screen (byte 1430890). Two subscribers, one outcome — so folding it in
+ * as a third term here is the same behaviour with one code path instead of two.
+ *
+ * **Chat only.** The subscriber lives on the component that also owns `this.channel`, `this.msgs`,
+ * `this.searchTerm` and `chatLog[o.c]` — the chat scroller. The alerts scroller shares this
+ * function but must NOT take the override, which is why the parameter defaults to false rather
+ * than being required.
+ *
+ * Default off, matching the preferences blob at byte 979602 (`alwaysScrollToBottom:!1`).
+ */
 export function shouldAutoScrollForMessage(
   isReadingHistory: boolean,
   senderId: number | undefined,
-  connectedUserId: number
+  connectedUserId: number,
+  alwaysScrollToBottom = false
 ) {
-  return !isReadingHistory || senderId === connectedUserId;
+  return alwaysScrollToBottom || !isReadingHistory || senderId === connectedUserId;
 }
 
 export function scrollRoomScrollerToBottom(
