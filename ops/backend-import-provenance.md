@@ -473,3 +473,62 @@ and `docs/MEDIASOUP-DEPLOYMENT-PLAN.md`, and both actually live under `apps/cont
 
 Until that edit is authorised the seal stays red, and that remains the correct state: it is
 reporting something true.
+
+## Eleventh divergence: the release attestor learns about 0009 — 2026-08-14
+
+The seal moved from **88 untouched + 10 diverged** to **87 + 11**. The file that crossed is
+`services/api/src/bin/postgres-release-attestation.rs`, and it crossed because `main` was red.
+
+### What was wrong
+
+`0009_rename_runtime_roles.sql` shipped in `b9f775e` and renames the runtime login
+`ptr_clone_app` -> `tradingroom_app`. The attestor was not told, in two separate ways:
+
+1. **The migration pin.** `ATTESTED_MIGRATION_VERSIONS` listed `0001`-`0008`, so
+   `the_embedded_migration_pin_matches_the_migrations_on_disk` failed and took the Backend quality
+   workflow with it. That is the gate behaving correctly: extending the pin is meant to be a
+   reviewed act, and nobody had reviewed it. Now `0001`-`0009`.
+
+2. **The role name — found while fixing the first, and worse than it.** `validate_runtime_role`
+   accepted only `EXPECTED_RUNTIME_ROLE`, and the `room_events` policy check required its target
+   list to equal exactly `[EXPECTED_RUNTIME_ROLE]`. After 0009 the role answers to
+   `tradingroom_app`, so the attestor would have **refused to attest any correctly migrated
+   cluster** — reporting `runtime_role_mismatch`, which reads like a security finding rather than a
+   stale pin. Both now accept either name.
+
+The second is a repeat of a defect already fixed once. `db::migrate` gained `RENAMED_RUNTIME_ROLE`
+on 2026-08-11 after the adversarial review recorded it exactly: *"Pinning a single name made 0009
+rename the role its own preflight requires to exist."* That fix did not reach this binary, because
+the name only appears in a live-database code path that no unit test covered.
+
+### What did NOT change
+
+The posture checks. `LOGIN`, and never `SUPERUSER` / `CREATEDB` / `CREATEROLE` / `INHERIT` /
+`REPLICATION` / `BYPASSRLS`, with zero direct memberships — applied identically to whichever name is
+present, so a cluster mid-transition is held to exactly the same standard. A rename buys a role
+nothing. The RLS policy must still target exactly ONE role; only the name it may carry widened.
+
+`pg_policy` stores targets by OID, so a renamed role keeps its policies and simply reports the new
+name — which is why this is a name-tolerance change and not a policy change.
+
+### Coverage added, because the gap was a missing test rather than missing care
+
+`the_runtime_role_is_accepted_under_either_name_but_never_with_a_weaker_posture` asserts a migrated
+cluster is attestable, that `BYPASSRLS` still fails under **both** names, and that no third name
+(`tradingroom_app_v2`) is smuggled in by the tolerance. Its negative control was run: restoring the
+single-name check turned it red, and it was restored.
+
+### Verification
+
+- `cargo test -p tradingroom-api --bin postgres-release-attestation` — 10 passed, 0 failed.
+- `cargo clippy -p tradingroom-api --all-targets --features testing -- -D warnings` — clean.
+  Without `--features testing` eight integration targets fail to compile **by design**; that is
+  fence #2 of the tenancy kernel, not a regression.
+- `rust-analyzer` diagnostics on the edited file — 0 errors, 0 warnings.
+- `node apps/controller/scripts/verify-backend-provenance.mjs` — PASS, 98 imported
+  (87 untouched + 11 diverged, each pinned) + 1 authored here; path-list unchanged at `66ab4696…`;
+  manifest now `70e62cc904daa01466c7616b71106cde741e05867ea750a2ddf4371ed5169aad`.
+
+The `88` and `9e5fe0a6…` quoted in the 2026-08-12 section above are left as written. That section
+records a decision point as it stood; superseding it in place would destroy the record of what was
+measured when. This section supersedes it.
