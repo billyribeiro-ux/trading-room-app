@@ -26,7 +26,8 @@ import {
   roomConfigUrl,
   roomEntryUrl,
   roomSettingUrl,
-  streamIngestUrl
+  streamIngestUrl,
+  streamReadUrl
 } from './control-plane';
 /*
   The ingest-key shape lives in the PURE `$lib/stream-ingest` so the panel can name it too — a
@@ -198,6 +199,30 @@ export interface RoomSessionSettings {
    * both mean no override: the controller's `saveSetting` stores an empty string as null.
    */
   overwriteCashRegisterSound?: string | null;
+  /**
+   * "Use MediaMTX?" — whether this room has a MediaMTX tier, and therefore a Streams tab.
+   *
+   * `this.hideStreams = !this.appService.globals.sessData.useMediaMTX`
+   * (`app-presentationarea.full.js:2293`). Note the NEGATION: the room setting says the feature is
+   * ON, and the flag derived from it says the tab is HIDDEN. Absent means `!undefined` — true —
+   * which is the correct default for a room with no MediaMTX behind it.
+   *
+   * That one flag gates the `#streams-tab` `li` (`:5357`) and the `#streams` pane (`:5388-5391`)
+   * alike, so it is the whole feature's on-switch rather than a cosmetic hide.
+   */
+  useMediaMTX?: boolean;
+  /**
+   * "Overlay userID on screenshare?" — the viewer's own id printed over an MTX stream.
+   *
+   * Read by `StreamingView.svelte` and gated on this AND `!isPresenter`, which is `TCe` (main
+   * bundle byte 1901148). A leak-tracing measure: a member who records the stream and reposts it
+   * carries their own `userXrefID` in the frame, and the presenter is exempt because their copy is
+   * the source.
+   *
+   * Despite the name it is read on the STREAM view, not on a screenshare — that is the reference's
+   * naming, kept so the setting matches the label an owner ticks on the Manage page.
+   */
+  overlayUserIdOnScreenshare?: boolean;
 }
 
 /** The connected member's per-room standing, which is per room and not per account. */
@@ -519,6 +544,86 @@ export async function requestStreamIngestKey(
     ingestPath: payload.ingestPath,
     streamServerMTX: typeof payload.streamServerMTX === 'string' ? payload.streamServerMTX : '',
     configured: payload.configured === true
+  };
+}
+
+/** The viewer's playback credential, as `/internal/stream-read/{code}` returns it. */
+export interface StreamReadToken {
+  /** `globals.mtxToken` — spent as `?jwt=` on the HLS playlist. */
+  mtxToken: string;
+  /** Host only, no scheme and no port. Empty when the deployment has no media server. */
+  streamServerMTX: string;
+  /** False means no media server is configured, so the pane must not build a playlist URL. */
+  configured: boolean;
+  expiresInSeconds: number;
+}
+
+/**
+ * The viewer's read credential, fetched with the page.
+ *
+ * ## Why this one is part of the load and the ingest key is not
+ *
+ * `userLoggedIn` (bundle byte 994430) copies `mtxToken` and `streamServerMTX` out of the login
+ * response into globals for EVERY session, presenter or not, and `app-streaming-view` spends the
+ * token the moment a stream tab renders. There is no on-demand request to reproduce.
+ *
+ * ## Why a failure here is not an error
+ *
+ * A room with no MediaMTX behind it is the normal case today, and a member who cannot get a
+ * playback token still has a working room — chat, screens, notes and files are all unaffected. So
+ * this returns `null` on any failure rather than throwing, and the pane reads that as "no
+ * playback", which is the same state as `configured: false`.
+ *
+ * That is a deliberate exception to this file's fail-loud rule, and it is safe for one specific
+ * reason: **`null` denies rather than grants.** The rule exists so that a network failure can never
+ * be mistaken for permission — which is why {@link decideRoomEntryRemotely} fails closed and throws.
+ * Here the failure mode is already closed, and throwing would take down the whole room load over a
+ * feature most rooms do not use.
+ */
+export async function requestStreamReadToken(
+  shortCode: string,
+  memberEmail: string
+): Promise<StreamReadToken | null> {
+  const secret = privateEnv.ROOM_JWT_SECRET;
+  if (!secret) return null;
+
+  const base = streamReadUrl(shortCode);
+  if (!base) return null;
+
+  let response: Response;
+  try {
+    response = await fetch(base, {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${configReadToken(secret, shortCode)}`,
+        'content-type': 'application/json'
+      },
+      body: JSON.stringify({ email: memberEmail }),
+      signal: AbortSignal.timeout(TIMEOUT_MS)
+    });
+  } catch (cause) {
+    // Logged rather than swallowed: no `.catch(() => {})` here, the reason is recorded.
+    console.warn('[stream-read] the controller could not be reached', { shortCode, cause });
+    return null;
+  }
+
+  if (!response.ok) {
+    /*
+      403 is a correct answer — a banned member may not watch — and 404 means the room is gone. Both
+      are logged at info rather than warn so a normal refusal does not read as an outage.
+    */
+    console.info('[stream-read] no playback token', { shortCode, status: response.status });
+    return null;
+  }
+
+  const payload = (await response.json()) as Partial<StreamReadToken>;
+  if (typeof payload.mtxToken !== 'string' || !payload.mtxToken) return null;
+
+  return {
+    mtxToken: payload.mtxToken,
+    streamServerMTX: typeof payload.streamServerMTX === 'string' ? payload.streamServerMTX : '',
+    configured: payload.configured === true,
+    expiresInSeconds: typeof payload.expiresInSeconds === 'number' ? payload.expiresInSeconds : 0
   };
 }
 

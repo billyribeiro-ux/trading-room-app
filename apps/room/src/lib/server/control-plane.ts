@@ -113,3 +113,19 @@ export function streamIngestUrl(shortCode: string): string | null {
   const origin = controlPlaneOrigin();
   return origin ? `${origin}/internal/stream-ingest/${encodeURIComponent(shortCode)}` : null;
 }
+
+/**
+ * The VIEWER's playback credential: `POST {control}/internal/stream-read/{shortCode}`.
+ *
+ * Deliberately NOT {@link streamIngestUrl} with a flag. That route ROTATES the publish key on every
+ * call, so a member merely opening a room would revoke the presenter's live stream — and the two
+ * answer different questions anyway: ingest is presenter-only and path-scoped, this is every
+ * non-banned member and room-scoped.
+ *
+ * Unlike the ingest key this one IS part of the page load, because the reference hands every session
+ * an `mtxToken` at login (`userLoggedIn`, bundle byte 994430) rather than on demand.
+ */
+export function streamReadUrl(shortCode: string): string | null {
+  const origin = controlPlaneOrigin();
+  return origin ? `${origin}/internal/stream-read/${encodeURIComponent(shortCode)}` : null;
+}

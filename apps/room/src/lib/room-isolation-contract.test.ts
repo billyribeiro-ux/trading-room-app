@@ -75,7 +75,20 @@ vi.mock('$lib/server/room-config-client', () => ({
       }
     }
   }),
-  requestMobilePin: async () => '000000'
+  requestMobilePin: async () => '000000',
+  /*
+    ECHOES the short code rather than returning a fixed string, so the assertion below is about
+    isolation and not about a stub. A playback token is room-scoped by design — `mintRoomReadToken`
+    signs the short code and `decideIngestAuth` refuses a token presented for another room — and
+    this is the file where "room A must not receive room B's anything" is proven. A constant here
+    would make that assertion pass no matter what `load` did with the code.
+  */
+  requestStreamReadToken: async (shortCode: string) => ({
+    mtxToken: `read-token-for-${shortCode}`,
+    streamServerMTX: 'media.example.test',
+    configured: true,
+    expiresInSeconds: 43_200
+  })
 }));
 
 const { load } = await import('../routes/+page.server');
@@ -198,6 +211,25 @@ describe('a room created a moment ago', () => {
     expect(data.files, 'files').toEqual([]);
     expect(data.savedPolls, 'saved polls').toEqual([]);
     expect(data.activePoll, 'active poll').toBeNull();
+  });
+
+  it('is given a playback token minted for ITSELF, not for whatever room asked last', async () => {
+    /*
+      The MediaMTX read token is a credential that authorises watching a room's video, and `load`
+      mints one on every page load. It is scoped by the short code it is minted with — the real
+      `mintRoomReadToken` signs that code and `decideIngestAuth` refuses a token presented against a
+      different room — so the one thing that must never happen here is `load` passing a room code
+      that is not the one being loaded.
+
+      Asserted in both rooms and then asserted DIFFERENT, because a single-room check would pass
+      just as happily if `load` ignored the argument entirely.
+    */
+    const fresh = await pageDataFor(FRESH_ROOM);
+    const other = await pageDataFor(OTHER_ROOM);
+
+    expect(fresh.streamRead?.mtxToken).toBe(`read-token-for-${FRESH_ROOM}`);
+    expect(other.streamRead?.mtxToken).toBe(`read-token-for-${OTHER_ROOM}`);
+    expect(fresh.streamRead?.mtxToken).not.toBe(other.streamRead?.mtxToken);
   });
 
   it('and the alert questions really were scoped, not merely absent', async () => {

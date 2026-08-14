@@ -121,7 +121,15 @@ const EXPECTED_WIRED_SETTINGS = [
   'userUploads',
   'tokenExpiresIn',
   'usernameInstructions',
-  'webinarPW'
+  'webinarPW',
+  /*
+    Added 2026-08-14 with the Streams pane. `useMediaMTX` is the whole Streams tab — the reference
+    derives `hideStreams` by negating it and hides both the main-tab item and the pane on that one
+    value. `overlayUserIdOnScreenshare` gates the viewer id printed over the video for
+    non-presenters. Their manage-page neighbours, the two MediaMTX cluster ids, stay unwired.
+  */
+  'useMediaMTX',
+  'overlayUserIdOnScreenshare'
 ].sort();
 
 const fail = (message) => {

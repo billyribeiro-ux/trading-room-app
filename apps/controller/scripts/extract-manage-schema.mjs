@@ -173,7 +173,21 @@ const ROOM_CONSUMED = [
   'simUserCount',
   'userPM',
   'userToPresenterPM',
-  'userUploads'
+  'userUploads',
+  /* The two MediaMTX playback settings, added 2026-08-14 with the Streams pane.
+
+     `useMediaMTX` is the whole tab: the reference computes hideStreams as the negation of it and
+     hides both the main-tab li and the pane on that one value. Until now the room had a
+     placeholder li with a hardcoded hidden attribute, because the flag never arrived.
+
+     `overlayUserIdOnScreenshare` gates the userXrefID burned over the video for non-presenters,
+     which StreamingView renders. Both were captured manage-page rows marked unwired; both now
+     have a named reader.
+
+     The two cluster ids that sit beside useMediaMTX on the manage page stay out. They name
+     infrastructure, the room bundle reads neither, and the room finds its host server-side. */
+  'useMediaMTX',
+  'overlayUserIdOnScreenshare'
 ];
 
 /**
@@ -566,9 +580,16 @@ const missingWiredSettings = [...WIRED_SETTINGS].filter((name) => !defs.some((de
 // Earlier at 46: `hideChatAlerts`, `isChatOnlyRoom` and `disableCopy` joined when the room gained
 // the gates that read them.
 //
+// 58 since 2026-08-14: `useMediaMTX` and `overlayUserIdOnScreenshare` joined ROOM_CONSUMED with the
+// Streams pane. The first is the entire Streams tab — the reference computes `hideStreams` as its
+// negation and hides both the tab and the pane on that one value, so with the flag absent the room
+// hid the tab in every room, MediaMTX or not. The second gates the viewer id burned over the video
+// for non-presenters. Their two manage-page neighbours, the MediaMTX cluster ids, stay unwired:
+// they name infrastructure, the room bundle reads neither, and the room finds its host server-side.
+//
 // The literal is a tripwire, not a fact about the schema — it is here so the wired set cannot grow
 // by accident, which is why changing it is a deliberate edit.
-if (WIRED_SETTINGS.size !== 56 || missingWiredSettings.length > 0) {
+if (WIRED_SETTINGS.size !== 58 || missingWiredSettings.length > 0) {
   throw new Error(
     `wired-setting contract invalid: ${WIRED_SETTINGS.size} keys, missing ${missingWiredSettings.join(', ') || 'none'}`
   );

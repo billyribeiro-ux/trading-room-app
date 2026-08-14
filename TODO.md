@@ -97,13 +97,18 @@ no client-side MediaMTX connection to reproduce — the service keeps a list and
 - ✅ the stream TAB BAR — `StreamTabs.svelte` (`RSe`, `:543-588`) with
   `stream-tabs-contract.test.ts`. **NOT reusable from `ScreenTabs`**: that component renders
   `img.presenter-img` and `{name}-{screenName}` unconditionally, and `RSe` renders neither.
-- ⬜ the `#streams` PANE — `OSe`, `:589-618`: the `h3.text-center.mt-4` "No one is streaming right
-  now..." empty state, `ul#streamsTabs`, and `div#streamsTabsContent` with one `div.tab-pane.fade`
-  per stream carrying `app-streaming-view`. Also unhides the main tab: `hideStreams =
-  !sessData.useMediaMTX` (`:2293`), and `useMediaMTX` is currently a `dont-touch` row with
-  `wired: false` in the controller's `room-settings-schema.ts`, so it does not yet reach the room.
-- ⬜ `/internal/media-hook` plus the three `cmds` commands (`mtxStartStream`, `mtxStopStream`,
-  payload key `muser`; `getSessionMTXMediaState`, payload `data`).
+- ✅ the `#streams` PANE — `OSe`, `:589-618` — BUILT 2026-08-14, and the Streams main tab opens.
+  `useMediaMTX` and `overlayUserIdOnScreenshare` now cross the config boundary (56 → 58 wired), the
+  playback token arrives with the page from `/internal/stream-read/{code}`, and the pane reproduces
+  the `disableVideo` gate that blanks `#screens` — the same preference blanks BOTH panes upstream
+  (`O(41, disableVideo ? 41 : 42)` at `:5388-5393`).
+- ✅ the three `cmds` commands — BUILT 2026-08-14. **The two names are NOT the same thing and this
+  cost a wrong draft:** `getSessionMTXMediaState` (MTX in the MIDDLE) is the WIRE command in both
+  directions, payload `data`; `getSessionMediaStateMTX` (MTX at the END) is an INTERNAL bus event
+  upstream carrying no payload. `mtxStartStream`/`mtxStopStream` carry the stream under `muser`.
+  Validated by `isMtxStream` at the wire boundary — a deliberate divergence, because upstream pushes
+  `i.muser` in unchecked and two of its fields are interpolated into a playlist URL.
+- ⬜ `/internal/media-hook` — the last piece. See the note below on hooks versus reconciliation.
 
 **The "not ours to author" blocker this row used to claim was WRONG, and it is retracted.** The
 `muser` shape is fully determined by the bundle: `_id` (identity, tab id `${_id}-tab`, pane id, and

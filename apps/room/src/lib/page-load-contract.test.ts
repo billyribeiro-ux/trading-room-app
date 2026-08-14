@@ -54,7 +54,15 @@ vi.mock('$lib/server/room-config-client', () => ({
         canEditNotes: true
       }
     }
-  })
+  }),
+  /*
+    The playback credential. Stubbed as ABSENT — `null` is the normal answer for a room with no
+    MediaMTX behind it, and it is the branch that must not throw: `load` runs this on every page
+    load, so a room whose media tier is unreachable has to keep serving chat, screens, notes and
+    files. Returning a token here instead would leave the failure path untested and would put a
+    credential-shaped string into a payload assertion for no reason.
+  */
+  requestStreamReadToken: async () => null
 }));
 
 const { load } = await import('../routes/+page.server');
@@ -151,6 +159,7 @@ describe('page load contract', () => {
         "sessData",
         "sessionHandle",
         "settings",
+        "streamRead",
         "user",
       ]
     `);

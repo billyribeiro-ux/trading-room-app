@@ -10,7 +10,7 @@
 // roomType has no captured value because its editor is absent from rendered evidence.
 //
 // `wired` is the honest bit: false means the controller can store the value but
-// nothing in the room reads it yet. 56 of 269 are wired today.
+// nothing in the room reads it yet. 58 of 269 are wired today.
 // Flip one to true ONLY when a consumer exists, so the UI can mark the rest
 // instead of pretending they do something.
 
@@ -248,7 +248,7 @@ export const ROOM_SETTINGS: readonly RoomSettingDef[] = [
   { name: "runawayRecAutoKill", section: "settings", type: "checkbox", label: "Auto stop recording if inactive?", help: "If enabled, auto stop inactive recordings", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
   { name: "runawayRecPostURL", section: "settings", type: "textarea", label: "Slack url to post", help: "If set, it will post to this slack url when a recording is flagged as inactive (runaway)", helpShape: "muted", helpOutside: false, captured: null, capturedIsDisplayOnly: false, group: null, wired: false },
   { name: "stickyGiveMicAndCam", section: "settings", type: "checkbox", label: "Sticky give Mic/Cam?", help: "If enabled, when a presenter gives mic/cam, the setting will stick", helpShape: "plain", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
-  { name: "overlayUserIdOnScreenshare", section: "settings", type: "checkbox", label: "Overlay userID on screenshare?", help: "If enabled, it will overlay userID on screenshare", helpShape: "plain", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
+  { name: "overlayUserIdOnScreenshare", section: "settings", type: "checkbox", label: "Overlay userID on screenshare?", help: "If enabled, it will overlay userID on screenshare", helpShape: "plain", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: true },
   { name: "regUserCanPresent", section: "settings", type: "checkbox", label: "Auto give Mic/Screen to Users?", help: "If enabled, ALL regular users will have mic/screenshare in the room. ***** CAREFULL ******", helpShape: "plain", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
   { name: "dontStopRecOnMicMute", section: "settings", type: "checkbox", label: "Don't stop on mute?", help: "Don't auto stop the rec on mic mute", helpShape: "plain", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
   { name: "individualVolumeControls", section: "settings", type: "checkbox", label: "Individual Volume Controls?", help: "Individual volume controls for each Presenter", helpShape: "plain", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: true },
@@ -296,7 +296,7 @@ export const ROOM_SETTINGS: readonly RoomSettingDef[] = [
   { name: "superClusterExpectedServerCount", section: "settings", type: "number", label: "Super Cluster Expected Server Count", help: "(Expected number of servers needed to handle the session)", helpShape: "muted", helpOutside: false, captured: 0, capturedIsDisplayOnly: false, group: "dont-touch", wired: false },
   { name: "useFFmpegRecording", section: "settings", type: "checkbox", label: "Use FFmpeg for Recording (BETA)", help: null, helpShape: null, helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: "dont-touch", wired: false },
   { name: "useLessBusyVsRoundRobin", section: "settings", type: "checkbox", label: "Use Less busy server algo vs round robin", help: null, helpShape: null, helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: "dont-touch", wired: false },
-  { name: "useMediaMTX", section: "settings", type: "checkbox", label: "Use MediaMTX?", help: null, helpShape: null, helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: "dont-touch", wired: false },
+  { name: "useMediaMTX", section: "settings", type: "checkbox", label: "Use MediaMTX?", help: null, helpShape: null, helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: "dont-touch", wired: true },
   { name: "mediaMTXClusterID", section: "settings", type: "text", label: "MediaMTX ClusterID", help: null, helpShape: null, helpOutside: false, captured: null, capturedIsDisplayOnly: false, group: "dont-touch", wired: false },
   { name: "backupMediaMTXClustterID", section: "settings", type: "text", label: "Backup MediaMTX ClustterID", help: null, helpShape: null, helpOutside: false, captured: null, capturedIsDisplayOnly: false, group: "dont-touch", wired: false },
   { name: "media_max_bitrate", section: "settings", type: "text", label: "ScreenShare MAX BitRate", help: "(i.e. 1024000,512000,254000)", helpShape: "muted", helpOutside: false, captured: "512000", capturedIsDisplayOnly: false, group: "dont-touch", wired: false },

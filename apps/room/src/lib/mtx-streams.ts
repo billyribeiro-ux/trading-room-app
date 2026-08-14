@@ -187,3 +187,51 @@ export function mtxPlaybackPath(stream: MtxStream, streamServerMTX: string): str
 export function mtxPlaylistUrl(stream: MtxStream, streamServerMTX: string, mtxToken: string): string {
   return `https://${streamServerMTX}/${mtxPlaybackPath(stream, streamServerMTX)}/index.m3u8?jwt=${mtxToken}`;
 }
+
+/**
+ * One path segment that cannot escape its own segment.
+ *
+ * Letters, digits, `_` and `-` only — which admits a 24-character hex ObjectId (what upstream's
+ * `sessionID` is) and a dashed UUID (what a producer id looks like), while refusing `/`, `.`, `%`,
+ * `?`, `#` and whitespace. Those are the characters that turn a path segment into something else:
+ * `..%2f` climbs, `?` starts a query and would detach the `jwt`, `#` truncates the URL.
+ */
+const SAFE_PATH_SEGMENT = /^[A-Za-z0-9_-]+$/;
+
+/**
+ * Is this thing off the wire actually a stream?
+ *
+ * ## Upstream does not check, and this deliberately diverges
+ *
+ * `case "mtxStartStream": this.appEventBus.emit("mtxStartStream", i.muser)` (bundle byte 1010826)
+ * pushes whatever arrived straight into the list. That is survivable there and not here, because
+ * two of these fields are INTERPOLATED INTO A URL by {@link mtxPlaylistUrl}: a `producerID` of
+ * `x?jwt=stolen` would detach the real token from the request, and one containing `../` would climb
+ * out of the room's path prefix. Refusing the object costs one stream tab; accepting it costs the
+ * property that a playback URL always addresses the room it was built for.
+ *
+ * It is one gate, at the wire boundary, and deliberately not repeated inside the URL builders —
+ * two places enforcing one rule is how one of them goes stale. Anything that reaches
+ * {@link mtxPlaybackPath} has already been through here.
+ *
+ * `mediaValue.name` is checked for type only. It is the TAB LABEL and never enters a URL, so
+ * constraining its characters would reject real display names — "Dana Vero" has a space in it.
+ */
+export function isMtxStream(value: unknown): value is MtxStream {
+  if (typeof value !== 'object' || value === null) return false;
+  const candidate = value as Record<string, unknown>;
+
+  for (const field of ['_id', 'sessionID', 'producerID'] as const) {
+    const segment = candidate[field];
+    if (typeof segment !== 'string' || !SAFE_PATH_SEGMENT.test(segment)) return false;
+  }
+
+  const mediaValue = candidate.mediaValue;
+  if (typeof mediaValue !== 'object' || mediaValue === null) return false;
+  const media = mediaValue as Record<string, unknown>;
+  if (typeof media.name !== 'string') return false;
+  // Optional upstream — a stream with no `serverName` is the `__reb` case, not a malformed one.
+  if (media.serverName !== undefined && typeof media.serverName !== 'string') return false;
+
+  return true;
+}

@@ -24,6 +24,85 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-14
 
+### 2026-08-14 19:14 EDT — the `#streams` pane goes live: the tab, the commands, and the token
+
+**Runtime impact: yes.** The Streams main tab can now open, in rooms whose owner has ticked "Use
+MediaMTX?". On `feat/extra-chat-column`.
+
+**The tab existed and could never open.** `li#streams-tab` carried a hardcoded `hidden` and no click
+handler, and the pane under it was three empty elements with a permanently visible "No one is
+streaming right now...". The reason was upstream of the markup: `hideStreams =
+!sessData.useMediaMTX` (`app-presentationarea.full.js:2293`) and `useMediaMTX` never reached the
+room, so the flag was `!undefined` — hidden in every room, MediaMTX or not.
+
+**Two settings crossed the boundary, through all four places that decide it.** `useMediaMTX` and
+`overlayUserIdOnScreenshare` were captured Manage-page rows marked `wired: false`. Adding them meant
+`ROOM_VISIBLE_SETTINGS` (with the reason), `ROOM_CONSUMED` in the generator, the consumer map in
+`room-config-boundary.test.ts` (which is the only one that has to say WHY), and the verifier's own
+expected set — plus the deliberate `WIRED_SETTINGS.size` tripwire, 56 → 58. `schema:verify` reports
+58 wired. Their two Manage-page neighbours, the MediaMTX cluster ids, stay out: they name
+infrastructure, the room bundle reads neither, and the room finds its host server-side.
+
+**Two nearly identical wire names, and they are not the same thing.** This cost a wrong first draft:
+
+- `getSessionMTXMediaState` — MTX in the MIDDLE — is the WIRE command in both directions. The client
+  sends it bare to ask; the server replies with the same name carrying `data`.
+- `getSessionMediaStateMTX` — MTX at the END — is an INTERNAL bus event upstream, emitted with no
+  payload once the reply is in `globals.roomMediaStateMTX`.
+
+Decoded at bundle bytes 1013960 and 989729. There is no `globals` here, so the payload goes straight
+to the reducer and the internal hop disappears — three steps become one, with nothing lost.
+
+**A wire-boundary type guard, and a deliberate divergence.** Upstream pushes `i.muser` into the list
+unchecked. Two of its fields are interpolated into a playlist URL, so `isMtxStream` refuses anything
+whose `_id`, `sessionID` or `producerID` is not a safe path segment: a `producerID` of `x?jwt=stolen`
+would detach the real token from the request, and one containing `../` would climb out of the room's
+path prefix. `mediaValue.name` is checked for type only — it is the tab label, never a URL, and
+constraining it would reject real names like "Dana Vero". One gate, at the boundary, deliberately
+not repeated inside the URL builders.
+
+**The playback credential now arrives with the page**, from `/internal/stream-read/{code}`, because
+that is where the reference puts it: `userLoggedIn` copies `mtxToken` and `streamServerMTX` into
+globals for every session (byte 994430), presenter or not. It returns `null` on any failure rather
+than throwing — a stated exception to this file's fail-loud rule, and a safe one, because `null`
+DENIES. The rule exists so a network failure cannot be mistaken for permission; here the failure
+mode is already closed, and throwing would take down an entire room load over a feature most rooms
+do not use.
+
+**The same `disableVideo` preference blanks this pane too**, which was not obvious and is now
+reproduced: `O(41, preferences.disableVideo ? 41 : 42)` at `:5388-5393` selects the identical
+`Video off to preserve data...` message that `#screens` shows. One switch, two panes — a viewer
+saving data must not keep pulling an HLS playlist here.
+
+**Three handlers, and only one of them does anything.** `selectStreamTabByUser` is two assignments,
+because switching stream tabs touches nothing else — every pane stays mounted and only its classes
+change, unlike `onScreenShareTabChange` with its `stopWatchScreenOf`/`startWatchScreenOf` pair.
+`bringEveryoneToStream` sends and nothing more, and is deliberately NOT `bringEveryoneToScreen`,
+which assigns `selectedScreenTab` and `forcedScreenId` locally — pointing either at a stream id
+would select a screenshare tab that does not exist. `toggleLockStreamMtx` reports the same
+`console.error` the reference reports, because `toggleLockScreenMTX` is a stub with no wire command,
+no globals write and no server half anywhere in the bundle to transcribe.
+
+**One structural mapping worth naming.** Const 117 puts `h-inherit` on the `<app-streaming-view>`
+HOST while the component's own root carries `h-100` (its const 1). Angular has a host element and
+Svelte has none, so the host became a wrapper `div`. Dropping it would drop the height chain and
+collapse the video to its intrinsic size.
+
+**Two things caught only because the wider set was run.** `page-load-contract` and
+`room-isolation-contract` both mock the config client and both failed on the new export — neither was
+in the set I predicted from the diff. The isolation mock now ECHOES the short code instead of
+returning a constant, and a new assertion proves the room gets a token minted for ITSELF: a playback
+token is a room-scoped credential, and a constant stub would have made that assertion pass however
+`load` behaved.
+
+**Verified.** `svelte-check` 0 errors / 0 warnings (the first run's 2 errors were stale generated
+types, cleared by `svelte-kit sync`). `svelte-autofixer` on the page: **zero issues** — every
+suggestion it returned is pre-existing and in the Files pane, none inside the new lines.
+`mtx-streams` 40/40 including 19 new guard cases; the room contract set 128/128; every test that
+mocks the config client 87/87; `schema:verify` and `dont-touch-block` green. The new isolation
+assertion was negative-controlled by passing a fixed room code to the token request and watching it
+go red, then reverted. The full gate was NOT run — it runs once before the merge.
+
 ### 2026-08-14 18:58 EDT — `StreamTabs.svelte`, and the four controls that do nothing in the reference
 
 **Runtime impact: none yet.** The component and its contract test are added; nothing renders it

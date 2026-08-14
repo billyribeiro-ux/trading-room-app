@@ -4,6 +4,7 @@ import {
   applyMtxStopStream,
   applySessionMediaState,
   emptyMtxState,
+  isMtxStream,
   mtxPlaybackPath,
   mtxPlaylistUrl,
   selectMtxStreamTab,
@@ -181,5 +182,65 @@ describe('the playback path and playlist URL', () => {
   it('carries no port, unlike the WHIP ingest URL', () => {
     expect(mtxPlaylistUrl(stream('a'), HOST, 'TOKEN')).not.toContain(':8889');
     expect(mtxPlaylistUrl(stream('a'), HOST, 'TOKEN')).toMatch(/^https:\/\//);
+  });
+});
+
+describe('isMtxStream — the wire boundary', () => {
+  /*
+    A deliberate divergence: upstream pushes `i.muser` into the list unchecked. Two of these fields
+    are interpolated into a playback URL, so the shape is validated once, here, before it can reach
+    `mtxPlaylistUrl`.
+  */
+  it('accepts a real stream, with and without serverName', () => {
+    expect(isMtxStream(stream('a'))).toBe(true);
+    expect(isMtxStream({ ...stream('a'), mediaValue: { name: 'Dana Vero' } })).toBe(true);
+  });
+
+  it('accepts the two id shapes the reference actually carries', () => {
+    // A 24-character hex ObjectId, and a dashed UUID.
+    const real = {
+      _id: '652882112ad80b3e7c5132d5',
+      sessionID: '652882112ad80b3e7c5132d5',
+      producerID: '9f2c1a4e-6b0d-4f8a-9c3e-1d5b7a0e2f46',
+      mediaValue: { name: 'Dana Vero' }
+    };
+    expect(isMtxStream(real)).toBe(true);
+  });
+
+  it('allows a space in the LABEL, which never enters a URL', () => {
+    expect(isMtxStream({ ...stream('a'), mediaValue: { name: 'Dana Vero' } })).toBe(true);
+  });
+
+  it.each([
+    ['a slash, which climbs out of the segment', 'room__x/../../etc'],
+    ['a dot-dot segment', '..'],
+    ['an encoded slash', 'x%2f..'],
+    ['a query start, which would detach the jwt', 'x?jwt=stolen'],
+    ['a fragment start, which truncates the URL', 'x#frag'],
+    ['whitespace', 'x y'],
+    ['empty', '']
+  ])('refuses a producerID with %s', (_why, producerID) => {
+    expect(isMtxStream({ ...stream('a'), producerID })).toBe(false);
+  });
+
+  it('refuses the same characters in _id and sessionID', () => {
+    expect(isMtxStream({ ...stream('a'), _id: 'a/b' })).toBe(false);
+    expect(isMtxStream({ ...stream('a'), sessionID: '?x' })).toBe(false);
+  });
+
+  it.each([
+    ['null', null],
+    ['a string', 'nope'],
+    ['a number', 7],
+    ['an array', []],
+    ['no mediaValue', { _id: 'a', sessionID: 'b', producerID: 'c' }],
+    ['a null mediaValue', { _id: 'a', sessionID: 'b', producerID: 'c', mediaValue: null }],
+    ['a non-string name', { _id: 'a', sessionID: 'b', producerID: 'c', mediaValue: { name: 1 } }]
+  ])('refuses %s', (_why, value) => {
+    expect(isMtxStream(value)).toBe(false);
+  });
+
+  it('refuses a non-string serverName rather than ignoring it', () => {
+    expect(isMtxStream({ ...stream('a'), mediaValue: { name: 'a', serverName: 5 } })).toBe(false);
   });
 });

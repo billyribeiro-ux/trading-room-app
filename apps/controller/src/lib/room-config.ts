@@ -388,7 +388,39 @@ export const ROOM_VISIBLE_SETTINGS = [
     what this list is for: the checkbox has existed on the Manage page all along, and until the
     bindings landed, ticking it protected nothing.
   */
-  'disableCopy'
+  'disableCopy',
+  /*
+    "Use MediaMTX?" — whether this room has a MediaMTX tier at all, and therefore whether the
+    Streams main tab exists.
+
+    `this.hideStreams = !this.appService.globals.sessData.useMediaMTX`
+    (`app-presentationarea.full.js:2293`), feeding `z('hidden', o.hideStreams)` on BOTH the
+    `#streams-tab` `li` (`:5357`) and the `#streams` pane itself (`:5388-5391`). Without it
+    `hideStreams` evaluates `!undefined` — true — and the tab is hidden in every room, including the
+    ones that have MediaMTX, which is the shape this row had until now: a placeholder `li` with a
+    hardcoded `hidden`.
+
+    Not a credential. It is a boolean saying which media tier the room uses, and the two values that
+    ARE sensitive alongside it on the Manage page — `mediaMTXClusterID` and
+    `backupMediaMTXClustterID` (the typo is upstream's) — are deliberately NOT here. They name
+    infrastructure, the room bundle never reads either, and the room reaches its MediaMTX host
+    through `STREAM_SERVER_MTX` on the server rather than through a cluster id in the browser.
+  */
+  'useMediaMTX',
+  /*
+    "Overlay userID on screenshare?" — prints the VIEWER'S OWN `userXrefID` over the video.
+
+    `TCe` (main bundle byte 1901148) renders `<span class="overlay-userID-container">` inside
+    `app-streaming-view`, gated on the room setting AND `!isPresenter`. It is a leak-tracing measure:
+    a member who screen-records the stream and reposts it carries their own id burned into the
+    frame, and the presenter is exempt because their copy is the source.
+
+    It identifies the person ALREADY WATCHING to themselves — the room hands each session its own
+    `userXrefID` regardless — so it crosses no boundary this room does not already cross. Read by
+    `StreamingView.svelte`; without it the gate evaluated `undefined` and the overlay could never
+    appear however the owner configured the room.
+  */
+  'overlayUserIdOnScreenshare'
 ] as const satisfies readonly (keyof RoomSettings)[];
 
 const ROOM_VISIBLE = new Set<string>(ROOM_VISIBLE_SETTINGS);
