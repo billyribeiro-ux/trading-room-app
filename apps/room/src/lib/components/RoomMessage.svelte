@@ -2,6 +2,7 @@
   import EmojiPicker from '$lib/components/EmojiPicker.svelte';
   import type { EmojiDumpEntry } from '$lib/emoji-data';
   import { isMentionOf } from '$lib/mention';
+  import { safeChatHtml } from './chat-safe-html';
   import { calculateMessageMenuPosition } from '$lib/message-menu-position';
   import { ngbTooltipWith } from '$lib/ngb-tooltip';
   import {
@@ -47,6 +48,12 @@
     senderRole?: string;
     senderStatus?: string;
     body: string;
+    /**
+     * Sanitised HTML for a message written with the rich text editor, or null/absent for a plain
+     * one. Its presence is what selects the HTML branch — the renderer never sniffs `body` for
+     * tags, so somebody who TYPES `<b>` still sees the characters they typed.
+     */
+    bodyHtml?: string | null;
     createdAt: Date;
     kind?: string;
     targetUrl?: string | null;
@@ -850,6 +857,29 @@
                       </div>
                     {:else}{segment.text}{/if}
                   {/each}
+                {:else if item.bodyHtml}
+                  <!--
+                    The rich-text branch, and it does NOT use Svelte's raw-html tag. That rule is
+                    asserted next door in `message-links-contract.test.ts` and is kept: markup
+                    reaches the DOM through an attachment that sanitises first, so there is no path
+                    where an unfiltered string is trusted. `item.bodyHtml` was already sanitised by
+                    the server on the way in, and is sanitised AGAIN here before insertion.
+
+                    (This comment names no raw-html tag on purpose. That contract reads SOURCE TEXT,
+                    so a comment mentioning the literal fails it just as code would — which is
+                    exactly what happened on the first draft.)
+
+                    Twice is not belt-and-braces for its own sake. The server pass is the control —
+                    it is what a crafted request cannot bypass. The browser pass covers the rows
+                    that already existed when the allow-list was narrower, which is the case that
+                    bit the notes table: `notes-repository` re-sanitises historical rows on read for
+                    exactly this reason, and its test says so.
+
+                    The segment parser is deliberately NOT applied here. It exists to find links,
+                    tickers and images in PLAIN text; run over markup it would rewrite the author's
+                    own tags.
+                  -->
+                  <span {@attach safeChatHtml(item.bodyHtml)}></span>
                 {:else}
                   {@render bodySegments(stockSegments)}
                   {#if kind === 'alert' && item.targetUrl}

@@ -1,6 +1,7 @@
 import { fail, redirect } from '@sveltejs/kit';
 import { createHash } from 'node:crypto';
 import { and, asc, desc, eq, gt, isNull } from 'drizzle-orm';
+import { isEmptyChatHtml, sanitizeChatHtml } from '$lib/server/chat-html';
 import { pruneDeadPreferenceKeys } from '$lib/dead-preference-keys';
 import { calculatePollTotals, parsePollChoices } from '$lib/poll-behavior';
 import {
@@ -353,6 +354,7 @@ export const load: PageServerLoad = async ({ depends, locals, request, cookies }
       replyToBody: messages.replyToBody,
       reactionsJson: messages.reactionsJson,
       createdAt: messages.createdAt,
+      bodyHtml: messages.bodyHtml,
       senderName: users.displayName,
       senderEmail: users.email,
       senderAvatarUrl: users.avatarUrl,
@@ -852,8 +854,31 @@ export const actions: Actions = {
     }
 
     const data = await request.formData();
-    const body = String(data.get('body') ?? '').trim();
     const room = String(data.get('room') ?? 'main');
+
+    /*
+      RICH TEXT, when the editor sent it.
+
+      `bodyHtml` arrives only from the RTE modal. It is sanitised HERE, on the server, and the
+      sanitised value is what is stored — never the submitted one. A client-side sanitiser is a
+      convenience for the person typing; it is not a control, because the request can be made
+      without the client.
+
+      `body` is then derived from the sanitised HTML with its tags stripped, so every existing
+      reader keeps working: the plain-text segment renderer, the mention rule, the popup, search,
+      and any client that never learns this column exists. Two representations of one message, and
+      the HTML one is never the only copy.
+    */
+    const submittedHtml = String(data.get('bodyHtml') ?? '').trim();
+    const sanitizedHtml = submittedHtml ? sanitizeChatHtml(submittedHtml) : '';
+    const bodyHtml = sanitizedHtml && !isEmptyChatHtml(sanitizedHtml) ? sanitizedHtml : null;
+
+    const body = bodyHtml
+      ? bodyHtml
+          .replace(/<[^>]*>/g, '')
+          .replace(/&nbsp;/g, ' ')
+          .trim()
+      : String(data.get('body') ?? '').trim();
 
     if (!body) return fail(400, { message: 'A message is required.' });
     if (body.length > MAX_MESSAGE_BODY) {
@@ -894,6 +919,7 @@ export const actions: Actions = {
         room,
         senderId: requireUser(locals).id,
         body,
+        bodyHtml,
         isAdmin: isPresenterRole(requireUser(locals).role),
         createdAt: new Date()
       })

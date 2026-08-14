@@ -41,6 +41,7 @@ export function ensureDatabase() {
       reply_to_name TEXT,
       reply_to_body TEXT,
       reactions_json TEXT NOT NULL DEFAULT '{}',
+      body_html TEXT,
       created_at INTEGER NOT NULL
     );
     CREATE TABLE IF NOT EXISTS alerts (
@@ -265,6 +266,22 @@ export function ensureDatabase() {
   }
   if (!messageColumns.has('reply_to_body')) {
     sqlite.exec('ALTER TABLE messages ADD COLUMN reply_to_body TEXT');
+  }
+  /*
+    `body_html` — a message written with the rich text editor, sanitised on the way in.
+
+    NULLABLE, and that is the design rather than a convenience. A message is EITHER plain text or
+    RTE HTML, and which one it is has to be a fact the row carries — not something the renderer
+    guesses from whether the body happens to contain angle brackets. Somebody typing `<b>` into the
+    ordinary composer must render as the characters they typed.
+
+    So: plain messages leave this null and keep rendering through the existing segment parser; RTE
+    messages fill it and render as sanitised HTML. `body` is still written either way, holding the
+    text with tags stripped, so search, notifications and any client that never learns about this
+    column keep working.
+  */
+  if (!messageColumns.has('body_html')) {
+    sqlite.exec('ALTER TABLE messages ADD COLUMN body_html TEXT');
   }
   if (!messageColumns.has('reactions_json')) {
     sqlite.exec("ALTER TABLE messages ADD COLUMN reactions_json TEXT NOT NULL DEFAULT '{}'");

@@ -24,6 +24,51 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-14
 
+### 2026-08-14 11:52 EDT — RTE step 2: the column, the server control, and the render branch
+
+**Runtime impact: still none — no editor sends `bodyHtml` yet.** The path it will use is now built
+and proved end to end.
+
+**A message is EITHER plain or rich, and the ROW says which.** `body_html` is nullable, added
+idempotently behind a `PRAGMA table_info` guard exactly like the nine columns before it. The
+alternative — sniffing `body` for angle brackets — would render somebody who TYPED `<b>hello</b>`
+in the ordinary composer as bold, which is a different message from the one they sent. That is
+asserted, not just intended.
+
+**The server is the control.** It sanitises what was submitted and stores only the result; the
+submitted value is never written. `body` is then derived from the sanitised HTML with its tags
+stripped, so there is never an HTML-only message — the mention rule, the popup, search and any
+client that never learns this column exists all keep working unchanged. Negative controls store the
+submitted value and drop the derivation; both go red.
+
+**Two sanitisers, asserted to agree.** The browser pass is not belt-and-braces: it covers rows
+written when the allow-list said something else, which is the case `notes-repository` already
+learned and re-sanitises historical rows for. A test reads the tag list out of BOTH files and
+compares them, because two lists that are supposed to agree are exactly the pair that drifts —
+letting the browser allow `<a>` goes red on two assertions.
+
+**The existing no-raw-html rule is kept, not overridden.** `message-links-contract.test.ts` asserts
+message bodies never use Svelte's raw-html tag, and it still passes: markup reaches the DOM through
+an attachment that sanitises first. There is no path where an unfiltered string is trusted.
+
+**Three of my own mistakes, all caught by the repository's own contracts.**
+
+1. My COMMENT contained the raw-html literal — written to explain that I was not using it. That
+   contract reads source text and cannot tell prose from code. **Third time today** a comment of
+   mine tripped a parser, after brackets inside `ROOM_CONSUMED` and then quoting the regex that
+   warned about them.
+2. A test asserted string equality against the sanitiser's output and failed on a space:
+   `sanitize-html` re-serialises `color: #ff0000` as `color:#ff0000`. Asserted by structure now —
+   the input-equality version was testing the library's whitespace habits, not our policy.
+3. Another banned `item.body.includes` outright and failed on the question-mark rule, which is
+   correct and unrelated. Scoped to sniffing for a tag character.
+
+**Verified:** 13 new contract tests plus the 16 from step 1. Three negative controls, each red on
+the right assertion. **Full gate exit 0**: room 950 tests / 84 files, controller 937 / 90.
+
+**Remaining:** (3) the modal, five controls, `Save` when editing and `Send` otherwise; (4) the four
+settings edits and the `enableRTE` preference wire.
+
 ### 2026-08-14 11:40 EDT — RTE step 1: the chat sanitiser, deny-by-default
 
 **Runtime impact: none yet — nothing calls it.** This is the foundation the rest of the editor sits

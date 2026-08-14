@@ -124,6 +124,14 @@ export const messages = sqliteTable('messages', {
   replyToName: text('reply_to_name'),
   replyToBody: text('reply_to_body'),
   reactionsJson: text('reactions_json').notNull().default('{}'),
+  /**
+   * Sanitised HTML for a message written with the rich text editor, or null for a plain one.
+   *
+   * Null is meaningful: it is what tells the renderer to use the plain-text segment parser rather
+   * than `{@html}`. Sniffing tags out of `body` instead would render somebody's typed `<b>` as
+   * bold, which is a different message from the one they sent.
+   */
+  bodyHtml: text('body_html'),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull()
 });
 
