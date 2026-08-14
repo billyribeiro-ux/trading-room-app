@@ -24,6 +24,65 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-14
 
+### 2026-08-14 10:55 EDT — chat badges render: the supply built across both apps
+
+**Runtime impact: badges appear on chat messages. They had never once been visible.**
+
+`RoomMessage.svelte` was always a faithful port — the four-term gate chain and both markup branches
+match the reference exactly. It showed nothing because it was unfed at three levels, and all three
+are closed:
+
+| level | what was missing | what it is now |
+| --- | --- | --- |
+| controller | badges never crossed `internal/room-config` | definitions + a hash-keyed assignment map |
+| room load | no field for them | passed through, defaulting to empty |
+| page | `item.badges` never populated | joined onto every message by `senderEmailHash` |
+
+**The join is by md5(email), and that is a design decision rather than a convenience.** Upstream one
+server owns both the chat log and the badge assignments, so it stamps `msg.b` onto each row. Ours
+live in different databases with no shared key space — the endpoint's own comment says so. The map
+crosses keyed by the same hash `hashEmail()` computes and every message already carries as
+`senderEmailHash`, so **the room never receives an address**. This response is serialised into SSR
+HTML on every load; a member list of raw emails crossing that boundary is exactly what the settings
+allow-list exists to prevent, and people deserve the same rule. Only members WITH badges are sent,
+so the payload is bounded by assignments rather than roster size.
+
+**The dark-theme swap is T5-27 proven at the render site.** `r.darkTheme` holds the ID of a variant
+badge and the whole definition is replaced with it — established from the manage page months ago,
+now corroborated in the renderer. Our column is still the superseded boolean, so the controller
+sends `darkTheme` only when it is a NUMBER: `true` names no badge, and that lookup could only fail.
+One deliberate divergence: if the variant id names a badge that has been deleted, upstream renders
+nothing and we fall back to the light one. Losing a badge because its dark variant was deleted is
+the worse outcome.
+
+**The three gate settings earned their place, in that order.** `enableBadges`,
+`showBadgesToPresentersOnly` and `disableStarYears` were deliberately held out of
+`ROOM_VISIBLE_SETTINGS` while `item.badges` was empty — the list's rule is that every entry has a
+consumer, and a gate with nothing to gate is not one. They went in with the supply, in the same
+change, with all FOUR edits the repository names.
+
+**Three guards fired, and each was right.**
+
+- The allow-list refused them until the room consumed them.
+- The generator's wired-count tripwire threw at 53 against an expected 50.
+- **`evidence:verify` caught five capture files added hours earlier.** The seal on `evidence-dumps/`
+  pins its exact contents, and I had been running per-app suites rather than the full gate, so it
+  had been red across several pushes. Registered now, with each file's provenance and why it holds
+  no customer data — and the verifier improved rather than loosened: it asserted every entry was a
+  DIRECTORY, so files get their own list and their own `isFile()` assertion. Both still fail closed.
+
+**My own comment broke a parser, twice.** `room-config-boundary.test.ts` reads `ROOM_CONSUMED` with
+a regex that stops at the first closing bracket, and I wrote a path containing brackets inside the
+array — the list silently read as ONE entry. The fix's first draft explained the hazard and QUOTED
+the regex, putting the brackets straight back. Describe it, never quote it. Same family as the rule
+about template syntax in comments: prose to a human, a terminator to a parser.
+
+**Verified:** 13 new tests. Four negative controls — the map keyed by raw email, `darkTheme` sent
+unconditionally, an unknown badge id drawn as a blank chip, and the join removed — each red on the
+right assertion and green on restore. **Full gate exit 0**: room 888 tests / 80 files, controller
+937 / 90, schema regenerated (269 total, 53 wired) with the generator run output-visible, both
+`svelte-check`s clean.
+
 ### 2026-08-14 10:41 EDT — presenter messages can align right; the badge supply is specified
 
 **Runtime impact: a manage-page setting that did nothing now does what it says.**

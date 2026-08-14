@@ -10,7 +10,7 @@
 // roomType has no captured value because its editor is absent from rendered evidence.
 //
 // `wired` is the honest bit: false means the controller can store the value but
-// nothing in the room reads it yet. 50 of 269 are wired today.
+// nothing in the room reads it yet. 53 of 269 are wired today.
 // Flip one to true ONLY when a consumer exists, so the UI can mark the rest
 // instead of pretending they do something.
 
@@ -181,12 +181,12 @@ export const ROOM_SETTINGS: readonly RoomSettingDef[] = [
   { name: "alertLabels", section: "settings", type: "textarea", label: "Alert Labels", help: "JSON array of alert labels, i.e. [ { \"name\": \"Day Trade\", \"hash\": \"DayTrade\", \"color\": \"#9c4537\", \"bgcolor\":\"#e8f5f7\" }, { \"name\": \"Swing Trade\", \"hash\": \"SwingTrade\", \"color\": \"#24794f\", \"bgcolor\":\"#e8f5f7\" } ]", helpShape: "muted", helpOutside: false, captured: null, capturedIsDisplayOnly: false, group: null, wired: false },
   { name: "advancedSearchAlerts", section: "settings", type: "checkbox", label: "Advanced Search Alerts?", help: "If enabled, will allow advanced search alerts", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
   { name: "enableDeleteLog", section: "settings", type: "checkbox", label: "Enable Delete Log?", help: "If enabled, will keep track of deleted messages", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
-  { name: "enableBadges", section: "settings", type: "checkbox", label: "User Badges?", help: "If enabled, You can cofigure and set badges next to each user name, like [Gold], etc", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
+  { name: "enableBadges", section: "settings", type: "checkbox", label: "User Badges?", help: "If enabled, You can cofigure and set badges next to each user name, like [Gold], etc", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: true },
   { name: "enableTokenBadges", section: "settings", type: "checkbox", label: "Token Badges?", help: "If enabled, Badges will come from JWT token in this room", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
   { name: "remToken", section: "settings", type: "checkbox", label: "Remove token from url", help: "If enabled, remove the jwt from the ULR.", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
-  { name: "showBadgesToPresentersOnly", section: "settings", type: "checkbox", label: "Show Badges only to Presenters?", help: "If enabled, You can cofigure and set badges next to each user name, like [Gold], etc", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
+  { name: "showBadgesToPresentersOnly", section: "settings", type: "checkbox", label: "Show Badges only to Presenters?", help: "If enabled, You can cofigure and set badges next to each user name, like [Gold], etc", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: true },
   { name: "dontFollowPresenters", section: "settings", type: "checkbox", label: "Don't follow Presenters?", help: "If enabled, users will not follow Presenters", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
-  { name: "disableStarYears", section: "settings", type: "checkbox", label: "Disable Stars ?", help: "If disabled, users will not see the stars next to user names", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
+  { name: "disableStarYears", section: "settings", type: "checkbox", label: "Disable Stars ?", help: "If disabled, users will not see the stars next to user names", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: true },
   { name: "hasRequiredPhoneInLogin", section: "settings", type: "checkbox", label: "Phone Number Required?", help: "User will need to enter a valid phone number to enter", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: true },
   { name: "showPasswordField", section: "settings", type: "checkbox", label: "Show password field?", help: "Show password field on the login page", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: true },
   { name: "isMainRoom", section: "settings", type: "checkbox", label: "Is Main Room?", help: null, helpShape: null, helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },

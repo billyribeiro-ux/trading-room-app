@@ -26,16 +26,60 @@ const expectedDirectories = [
   'login-page',
   'main-nav-login-clicked',
   'register-page',
-  'room-login'
+  'room-login',
+  /*
+    Added 2026-08-14, from one browser session against the live site. Five FILES rather than
+    directories, listed here for the same reason the fetched set above is: this assertion exists to
+    stop an undocumented artefact appearing in the evidence tree, and excluding the ones I had just
+    produced would defeat it.
+
+    `stripe-details-2026-08-14.json` — `openStripeDetails` and `doBatchInvite` read off the live
+    AngularJS scope, closing T5-15 and T5-21. Contains function SOURCE and no customer data: the
+    room had no marketplace member on screen, so `stripeBlock` and `modal` are both null, and a
+    scan for emails, Stripe ids and long digit runs comes back empty.
+
+    `rendered-states-2026-08-14.json` — the manage page's striped table and 15/15 bootbox handler
+    sources (T2-7, T2-20). `rendered-states-welcome-2026-08-14.json` — the welcome page, whose
+    "login form" turned out to be the Add Admin User form; kept because its computed styles are
+    real evidence for that form. `rendered-states-login-2026-08-14.json` — the genuine logged-out
+    login form and its geometry (T2-22).
+
+    `static-asset-manifest-2026-08-14.json` — METADATA ONLY, 7.7 KB standing in for a 4.2 MB
+    capture that `.gitignore` excludes as `ptr-*.json`. url + bytes + contentType + sha256 for all
+    22 targets, which identifies each byte-for-byte on any re-fetch without committing 1.28 MB of
+    base64 for marketing screenshots that are explicitly out of scope.
+  */
+];
+
+/**
+ * Capture FILES, as opposed to the capture sets above.
+ *
+ * Split out rather than folded in, because the loop below asserts every listed name is a
+ * directory — and loosening that to "directory or file" would let a set that was supposed to be a
+ * tree pass as a stray json. Two lists, two assertions, and both still fail closed: an artefact
+ * that is in neither list breaks the equality check above.
+ */
+const expectedFiles = [
+  'README.md',
+  'rendered-states-2026-08-14.json',
+  'rendered-states-login-2026-08-14.json',
+  'rendered-states-welcome-2026-08-14.json',
+  'static-asset-manifest-2026-08-14.json',
+  'stripe-details-2026-08-14.json'
 ];
 
 const entries = await readdir(evidenceRoot, { withFileTypes: true });
 const repositoryEntries = entries.filter(({ name }) => name !== '.DS_Store');
 assert.deepEqual(
   repositoryEntries.map(({ name }) => name).sort(),
-  [...expectedDirectories, 'README.md'].sort(),
-  'evidence-dumps must contain only the documented evidence sets and its index'
+  [...expectedDirectories, ...expectedFiles].sort(),
+  'evidence-dumps must contain only the documented evidence sets, capture files and its index'
 );
+
+for (const file of expectedFiles) {
+  const entry = repositoryEntries.find(({ name }) => name === file);
+  assert.ok(entry?.isFile(), `evidence-dumps/${file} must be a file`);
+}
 
 for (const directory of expectedDirectories) {
   const entry = repositoryEntries.find(({ name }) => name === directory);

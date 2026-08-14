@@ -92,6 +92,21 @@ const ROOM_CONSUMED = [
      `showBadgesToPresentersOnly`, `disableStarYears`) stay out until badges and star years
      have a supply. */
   'presenterMsgsOnTheRight',
+  /* The other three terms of the chat-badge gate. Added 2026-08-14 with the badge SUPPLY: the
+     internal room-config endpoint now sends definitions plus a hash-keyed assignment map, and
+     the room joins them onto each message, so `visibleBadges` finally has something to show.
+     `disableStarYears` is honest about being ahead of its data — it gates the membership star,
+     whose `item.membershipYears` has no supply yet.
+
+     NOTE, and it cost two red runs: no square bracket may appear anywhere inside this array, not
+     even in a comment. `room-config-boundary.test.ts` reads the list with a regex that stops at
+     the first closing bracket, so one written in prose ends the match early and the whole list
+     silently reads as a single entry. The first attempt at this note said so and QUOTED the
+     regex, which put the brackets straight back in. Describe it, never quote it. Same family as
+     the rule about template syntax in comments: prose to a human, a terminator to a parser. */
+  'enableBadges',
+  'showBadgesToPresentersOnly',
+  'disableStarYears',
   'allowUsersToChangeUsername',
   'altBenzingaLinkURL',
   'altBenzingaLogoURL',
@@ -481,6 +496,9 @@ if (defs.length !== EXPECTED_TOTAL_COUNT) {
 }
 
 const missingWiredSettings = [...WIRED_SETTINGS].filter((name) => !defs.some((definition) => definition.name === name));
+// 53 since 2026-08-14: `enableBadges`, `showBadgesToPresentersOnly` and `disableStarYears`
+// joined once chat badges had a SUPPLY — see the note in `verify-room-settings-schema.mjs`.
+//
 // 50 since 2026-08-14: `presenterMsgsOnTheRight` joined when the room began reading it. Both its
 // consumers had existed in `RoomMessage.svelte` since that component was written and neither was
 // ever fed — `presenter-msg-right` on the message body and `presenter-reactions-right` on the
@@ -505,7 +523,7 @@ const missingWiredSettings = [...WIRED_SETTINGS].filter((name) => !defs.some((de
 //
 // The literal is a tripwire, not a fact about the schema — it is here so the wired set cannot grow
 // by accident, which is why changing it is a deliberate edit.
-if (WIRED_SETTINGS.size !== 50 || missingWiredSettings.length > 0) {
+if (WIRED_SETTINGS.size !== 53 || missingWiredSettings.length > 0) {
   throw new Error(
     `wired-setting contract invalid: ${WIRED_SETTINGS.size} keys, missing ${missingWiredSettings.join(', ') || 'none'}`
   );

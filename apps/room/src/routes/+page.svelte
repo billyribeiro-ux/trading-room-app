@@ -71,6 +71,7 @@
   import NotesPane from '$lib/components/notes/NotesPane.svelte';
   import { resolveNoteSurfaceGates } from '$lib/components/notes/note-gates';
   import RoomMessage from '$lib/components/RoomMessage.svelte';
+  import type { MessageBadge } from '$lib/types';
   import ToastHost from '$lib/components/ToastHost.svelte';
   import VideoPlayer from '$lib/components/VideoPlayer.svelte';
   import YoutubePlayerOverlay from '$lib/components/YoutubePlayerOverlay.svelte';
@@ -730,6 +731,81 @@
    * and is reproduced by `visibleBadges`.
    */
   const presenterMessagesOnTheRight = $derived(data.sessData?.presenterMsgsOnTheRight === true);
+
+  /**
+   * The other three terms of the reference's chat-badge gate:
+   *
+   * ```js
+   * preferences.chatBadges && !sessData.presenterMsgsOnTheRight && sessData.enableBadges &&
+   *   msg.b && msg.b.length && (!sessData.showBadgesToPresentersOnly || globals.isPresenter)
+   * ```
+   *
+   * `enableBadges` is the owner's master switch and is `=== true`: a room that has never been
+   * configured shows no badges, which is what an absent setting means everywhere else in this
+   * payload — the controller omits unset values rather than sending null.
+   *
+   * `showBadgesToPresentersOnly` narrows them to presenters. `disableStarYears` gates the
+   * membership-star, whose `item.membershipYears` still has no supply, so it is passed for the
+   * component's own gate and is expected to change nothing until that lands — recorded rather than
+   * left to look like an oversight.
+   */
+  const enableBadges = $derived(data.sessData?.enableBadges === true);
+  const showBadgesToPresentersOnly = $derived(data.sessData?.showBadgesToPresentersOnly === true);
+  const disableStarYears = $derived(data.sessData?.disableStarYears === true);
+
+  /**
+   * A sender's badges, resolved the way `app-st-message.full.js` byte 28120 resolves them.
+   *
+   * ```js
+   * for (let o = 0; o < this.msg.b.length; o++) {
+   *   let r = sessData.badgesH[this.msg.b[o]];
+   *   r && r.darkTheme && 'darkTheme' === preferences.theme && (r = sessData.badgesH[r.darkTheme]);
+   *   r && (this.badges += r.imgURL ? '<img …>' : '<span class="badge …">' + r.text + '</span>');
+   * }
+   * ```
+   *
+   * Three things carried across exactly:
+   *
+   * * **The dark-theme swap is a LOOKUP, not a flag.** `r.darkTheme` holds the id of a variant
+   *   badge and the whole definition is replaced with it. This is the render-site proof of T5-27,
+   *   which had been established from the manage page alone.
+   * * **An id with no definition renders nothing.** `r &&` — a badge deleted from the account while
+   *   still assigned to a member is skipped, not drawn as a blank chip.
+   * * **A missing variant falls back to the original.** `badgesH[r.darkTheme]` can itself be
+   *   undefined if the variant was deleted; upstream would then render nothing, so the `?? badge`
+   *   here is a deliberate divergence — losing a badge because its DARK variant was deleted is a
+   *   worse outcome than showing the light one.
+   *
+   * Returns `[]` rather than undefined so `RoomMessage`'s own gate chain does the deciding; this
+   * function answers "which badges", never "should badges show".
+   */
+  function badgesForSender(emailHash: string | null | undefined): MessageBadge[] {
+    if (!emailHash) return [];
+    const ids = data.badges?.byEmailHash?.[emailHash];
+    if (!ids?.length) return [];
+    const definitions = data.badges?.definitions ?? {};
+    const resolved: MessageBadge[] = [];
+    for (const id of ids) {
+      const badge = definitions[String(id)];
+      if (!badge) continue;
+      const variant =
+        theme === 'dark' && typeof badge.darkTheme === 'number'
+          ? (definitions[String(badge.darkTheme)] ?? badge)
+          : badge;
+      resolved.push({
+        text: variant.text,
+        color: variant.color,
+        backgroundColor: variant.backgroundColor,
+        imageUrl: variant.imageUrl
+      });
+    }
+    return resolved;
+  }
+  /**
+   * `preferences.chatBadges` — the VIEWER's half of the badge gate, distinct from the owner's
+   * `enableBadges`. Ships `!0`, so `!== false`.
+   */
+  let chatBadges = $state(loadedSettings.chatBadges !== false);
   let chatGif = $state(loadedSettings.chatGif !== false);
   let makeUsersFollowMyScreens = $state(loadedSettings.makeUsersFollowMyScreens === true);
   let alwaysScrollToBottom = $state(loadedSettings.alwaysScrollToBottom === true);
@@ -2179,6 +2255,17 @@
     data.messages
       .filter((item) => item.room === chatTab && !isEvidenceMessageHidden(item))
       .map(withEvidenceState)
+      /*
+        `msg.b` — the sender's badges, attached here rather than stored on the row.
+
+        Upstream they ride on the message itself, because that server owns both the chat log and
+        the badge assignments. Ours do not: badges live in the controller and messages in the room's
+        own database, so they are joined at render time on `senderEmailHash`, which every message
+        already carries. A member given a badge mid-session sees it on their NEXT message upstream
+        and on ALL of them here — a divergence in our favour, and the alternative would be
+        denormalising controller state into room rows that then go stale.
+      */
+      .map((item) => ({ ...item, badges: badgesForSender(item.senderEmailHash) }))
   );
 
   function forceAlertsToBottom(scroller: HTMLElement) {
@@ -3027,6 +3114,7 @@
       if (key === 'alwaysScrollToBottom') alwaysScrollToBottom = value;
       if (key === 'makeUsersFollowMyScreens') makeUsersFollowMyScreens = value;
       if (key === 'chatGif') chatGif = value;
+      if (key === 'chatBadges') chatBadges = value;
       /*
         Both halves, because this preference has TWO controls: the navbar's
         `presentation-subtitles` checkbox and the settings modal's `app-speech-reco-overlay`. The
@@ -9104,6 +9192,10 @@
                             kind="alert"
                             {chatGif}
                             {presenterMessagesOnTheRight}
+                            {chatBadges}
+                            {enableBadges}
+                            {showBadgesToPresentersOnly}
+                            {disableStarYears}
                             currentUserId={data.user.id}
                             currentUserEmailHash={data.user.emailHash}
                             currentUserName={data.user.displayName}
@@ -9232,6 +9324,10 @@
                             kind="chat"
                             {chatGif}
                             {presenterMessagesOnTheRight}
+                            {chatBadges}
+                            {enableBadges}
+                            {showBadgesToPresentersOnly}
+                            {disableStarYears}
                             currentUserId={data.user.id}
                             currentUserEmailHash={data.user.emailHash}
                             currentUserName={data.user.displayName}

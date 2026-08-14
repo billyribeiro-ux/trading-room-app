@@ -175,6 +175,9 @@ describe('the allow-list itself', () => {
       `scripts/room-config-seam-e2e.mjs` flipping one and watching nothing happen.
     */
     const consumers: Record<string, string> = {
+      enableBadges: 'RoomMessage `visibleBadges` — the owner master switch on chat badges',
+      showBadgesToPresentersOnly: 'RoomMessage `visibleBadges` — narrows badges to presenters',
+      disableStarYears: 'RoomMessage — the membership-star gate',
       presenterMsgsOnTheRight:
         'RoomMessage — `presenter-msg-right` on the body and `presenter-reactions-right` on the reactions',
       allowUsersToChangeUsername: 'O(9) fallback — a member renaming themselves',

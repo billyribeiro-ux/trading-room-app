@@ -2,10 +2,11 @@ import { error, json } from '@sveltejs/kit';
 import { eq } from 'drizzle-orm';
 import { ROOM_JWT_SECRET } from '$app/env/private';
 import { getDb } from '$lib/server/db';
-import { ACCOUNT_ACTIVE, accounts, roomUsers, rooms, users } from '$lib/server/db/schema';
-import { readPermissions, readSettings } from '$lib/server/rooms';
+import { ACCOUNT_ACTIVE, accounts, badges, roomUsers, rooms, users } from '$lib/server/db/schema';
+import { parseBadgeIds, readPermissions, readSettings } from '$lib/server/rooms';
 import { roomVisibleConfig } from '$lib/room-config';
 import { isRoomPresenter } from '$lib/room-member-role';
+import { createHash } from 'node:crypto';
 import { verifyConfigReadToken } from '$lib/server/room-handoff';
 import type { RequestHandler } from './$types';
 
@@ -107,17 +108,65 @@ export const GET: RequestHandler = async ({ params, request, url }) => {
     error — it is a guest, and the room needs to render them as one rather than 404.
   */
   const email = url.searchParams.get('email')?.trim().toLowerCase();
-  const membership = email
-    ? (
-        await getDb()
-          .select({ roomUser: roomUsers, user: users })
-          .from(roomUsers)
-          .innerJoin(users, eq(roomUsers.userId, users.id))
-          .where(eq(roomUsers.roomId, room.id))
-      ).find((row) => row.user.email.trim().toLowerCase() === email)
-    : undefined;
+  /* Loaded once and used twice — the membership lookup below and the badge map further down. This
+     query was already fetching every member of the room in order to `.find()` one of them. */
+  const roomMembers = await getDb()
+    .select({ roomUser: roomUsers, user: users })
+    .from(roomUsers)
+    .innerJoin(users, eq(roomUsers.userId, users.id))
+    .where(eq(roomUsers.roomId, room.id));
+
+  const membership = email ? roomMembers.find((row) => row.user.email.trim().toLowerCase() === email) : undefined;
+
+  /*
+    BADGES — the two halves the room needs, and neither is the whole table.
+
+    The reference keeps them in the same two shapes: `sessData.badgesH`, a hash of badge id ->
+    definition, and `msg.b`, the ids carried on each message
+    (`app-st-message.full.js` byte 28120). This repository's two databases do not share a key
+    space, so the per-member half is keyed by **md5(email)** — the same
+    `createHash('md5').update(email.trim().toLowerCase())` the room computes in
+    `hashEmail()` and already carries on every message as `senderEmailHash`.
+
+    Hashed rather than plain: the room needs to MATCH a sender, not to learn anybody's address, and
+    this response is serialised into SSR HTML on every load. A member list of raw emails crossing
+    that boundary is the kind of thing `ROOM_VISIBLE_SETTINGS` exists to prevent for settings, and
+    the same reasoning applies to people.
+
+    Only members WITH badges appear. A room where nobody has one sends `{}`, not a map of every
+    member to an empty array — the payload is bounded by badge assignments rather than by roster
+    size.
+  */
+  const accountBadges = await getDb().select().from(badges).where(eq(badges.accountId, room.accountId));
+  const badgeDefinitions = Object.fromEntries(
+    accountBadges.map((badge) => [
+      badge.id,
+      {
+        text: badge.label,
+        color: badge.textColor,
+        backgroundColor: badge.backgroundColor,
+        /* `imgURL` upstream. Null becomes undefined so the room's `badge.imageUrl ? … : …` branch
+           reads the same for "no image" as for a badge that never had one. */
+        imageUrl: badge.imageUrl ?? undefined,
+        /* `darkTheme` holds the ID of a variant badge, not a boolean — proven at the render site
+           by `r.darkTheme && 'darkTheme' === preferences.theme && (r = badgesH[r.darkTheme])`.
+           Our column is still the superseded boolean (T5-27), so it is sent only when it is a
+           number; `true` would name no badge and the room would look up `badgesH[true]`. */
+        darkTheme: typeof badge.darkTheme === 'number' ? badge.darkTheme : undefined
+      }
+    ])
+  );
+
+  const memberBadges: Record<string, number[]> = {};
+  for (const row of roomMembers) {
+    const ids = parseBadgeIds(row.roomUser.badgesJson);
+    if (ids.length === 0) continue;
+    const hash = createHash('md5').update(row.user.email.trim().toLowerCase()).digest('hex');
+    memberBadges[hash] = ids;
+  }
 
   return json({
+    badges: { definitions: badgeDefinitions, byEmailHash: memberBadges },
     room: {
       shortCode: room.shortCode,
       name: room.name,

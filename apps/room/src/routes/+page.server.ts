@@ -614,6 +614,13 @@ export const load: PageServerLoad = async ({ depends, locals, request, cookies }
      * row at all.
      */
     sessData: roomConfig.settings,
+    /**
+     * The account's badges and who wears which — `sessData.badgesH` and the ids behind `msg.b`
+     * upstream. Passed straight through: the controller has already reduced it to definitions plus
+     * a hash-keyed assignment map holding only members who have one, so there is nothing to filter
+     * here and nothing identifying in it.
+     */
+    badges: roomConfig.badges ?? { definitions: {}, byEmailHash: {} },
     /** Settings the owner is enforcing. A locked control must not render as a flippable toggle. */
     lockedSettings: roomConfig.locked,
     /** This room, as the controller describes it. */

@@ -146,6 +146,14 @@ export const ROOM_VISIBLE_SETTINGS = [
     nothing. They belong here the day their supply exists, not before.
   */
   'presenterMsgsOnTheRight',
+  /* The rest of the chat-badge gate. These were deliberately held OUT until 2026-08-14, when
+     the badge supply landed — this list's rule is that every entry has a consumer, and until
+     `item.badges` was populated they would have been values crossing a trust boundary for
+     nothing. `disableStarYears` is the one exception still ahead of its data, and it is passed
+     to the component's own gate rather than left unread. */
+  'enableBadges',
+  'showBadgesToPresentersOnly',
+  'disableStarYears',
   // The sidebar's roster gates — `O(44)`, the per-row gate, and `O(6)` for the count badge.
   'onlyPresentersVisibleToViewers',
   'rosterCountVisibleToViewers',
