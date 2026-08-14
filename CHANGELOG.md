@@ -24,6 +24,47 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-14
 
+### 2026-08-14 08:19 EDT — 137 files of test output stopped being tracked
+
+**Runtime impact: none. Review impact: every future diff is readable.**
+
+`apps/controller/coverage/` (136 files) and `.vitest-report.json` were tracked. The cost was never
+disk. Both are rewritten by every `test:unit` run — `vitest run --coverage --reporter=json
+--outputFile=.vitest-report.json` — so the working tree was permanently dirty and each file was
+swept into whatever commit came next. That happened six times today, on commits about the room.
+
+**It defeats the rule this repository leans on hardest.** "Re-read your own `git diff` like a senior
+reviewer before saying done" is not possible against a diff carrying 136 files of regenerated HTML.
+The one real change in it is precisely the change that goes unreviewed.
+
+**This aligns the controller with a standard that already existed** rather than inventing one:
+`apps/room` never tracked its equivalents, and `vite.config.ts:60` had already reached the same
+conclusion for the file watcher, calling `coverage/` output "written by the test run". Nothing in
+this repository reads either path — the search for a consumer came back empty, which is what makes
+untracking safe rather than merely tidy.
+
+Untracked with `git rm --cached`, so both are still on disk and still regenerated; only the tracking
+is gone.
+
+**Guarded, because untracking without ignoring lasts until the next `git add -A`** — which is how
+the directory arrived in the first place. `tracked-artifacts.test.ts` asserts that no tracked path
+has a `coverage`, `node_modules`, `.svelte-kit` or `.vitest-report.json` component, AND that each is
+in `.gitignore`. Both halves or neither.
+
+**The first version of that guard was wrong and is worth recording.** It asked git for `*coverage*`
+and failed on `apps/room/scripts/audit-behavior-coverage.mjs` — a hand-written source file whose
+name contains the word. The check, not the repository. It now matches whole path SEGMENTS, and the
+file it wrongly flagged is now a permanent assertion: if the match is ever loosened back to a
+substring, that test goes red instead of an honest source file. This is the same lesson as the
+`corepack install` assertion satisfied by a comment, twice in one session: **a check must be proven
+right before its failure is believed.**
+
+**Verified:** 7 tests. Two negative controls — one coverage file force-added back, and the ignore
+rule deleted — each red on the right assertion, green on restore. Runtime evidence rather than
+reasoning: a full gate was run afterwards and `git status` showed only the five intended changes,
+where before it showed 137. Documented counts 930 -> 937 across four sites. Full gate exit 0: room
+815 / 75 files, controller 937 / 90 files.
+
 ### 2026-08-14 08:13 EDT — CI: the pnpm version was written twice and the copies disagreed
 
 **Runtime impact: none. CI impact: the backend gate could not pass at all.**
