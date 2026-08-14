@@ -24,7 +24,7 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-14
 
-### 2026-08-14 10:07 EDT — "Bring everyone here" now brings everyone
+### 2026-08-14 10:01 EDT — "Bring everyone here" now brings everyone
 
 **Runtime impact: a presenter can move the room to a screen. The menu item existed and moved nobody.**
 
