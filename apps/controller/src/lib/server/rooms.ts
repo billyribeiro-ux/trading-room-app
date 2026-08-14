@@ -978,6 +978,23 @@ export interface ApiKeyRestrictions {
   ips: string[];
   /** allowed scopes; empty means all */
   scopes: string[];
+  /**
+   * Allowed room SHORT CODES; empty means every room on the account.
+   *
+   * The reference's `restrictToSessions` — `page.welcome.html:1339` gates its "Restricted" padlock
+   * on `k.restrictToSessions && k.restrictToSessions.length`, so the field exists and is a list.
+   * This is a genuinely different axis from `scopes`: scopes say WHICH COMMANDS a key may call,
+   * sessions say WHICH ROOMS it may call them against. A key scoped to `sessions/list` with no room
+   * restriction still enumerates every room on the account.
+   *
+   * Short codes rather than internal ids, because that is what the API itself takes and what an
+   * operator can read off the account page. `restrictToEndpoints` is our existing `scopes`.
+   *
+   * HONEST GAP: `manageApiKeyRestrictions(k)` is what drives the reference's editor and its shape is
+   * in no capture. The FIELD and its semantics are evidence; the widget below follows our own
+   * established pattern for `ips` and `scopes`, which is stated rather than implied.
+   */
+  sessions: string[];
 }
 
 /**
@@ -1004,12 +1021,15 @@ export const API_SCOPES = [
 export function readRestrictions(json: string): ApiKeyRestrictions {
   try {
     const parsed = JSON.parse(json) as Partial<ApiKeyRestrictions>;
-    return {
-      ips: Array.isArray(parsed?.ips) ? parsed.ips.filter((v) => typeof v === 'string') : [],
-      scopes: Array.isArray(parsed?.scopes) ? parsed.scopes.filter((v) => typeof v === 'string') : []
-    };
+    const list = (v: unknown) => (Array.isArray(v) ? v.filter((x) => typeof x === 'string') : []);
+    /*
+      Every dimension defaults to EMPTY, and empty means unrestricted. That is the reference's own
+      sense — its padlock shows when a list is non-empty — and it is what makes `sessions` safe to
+      add to rows written before this field existed: they parse as [] and keep working unchanged.
+    */
+    return { ips: list(parsed?.ips), scopes: list(parsed?.scopes), sessions: list(parsed?.sessions) };
   } catch {
-    return { ips: [], scopes: [] };
+    return { ips: [], scopes: [], sessions: [] };
   }
 }
 

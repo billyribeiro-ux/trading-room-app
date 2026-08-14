@@ -262,6 +262,9 @@ for (let i = 0; i < lines.length; i++) {
   let helpShape = null;
   /** True when the helper is a sibling of the row's `<p>` rather than a child. */
   let helpOutside = false;
+  /* Hoisted above the loop: two of the break clauses below compare against it, and it used to be
+     declared after them — a temporal dead zone that threw at runtime. */
+  const anchorIndent = lines[i].search(/\S/);
   for (let j = i + 1; j < lines.length && j < i + 10; j++) {
     if (/<a\.editable|<label[^>]*\.control-label/.test(lines[j])) break;
     /*
@@ -288,6 +291,42 @@ for (let i = 0; i < lines.length; i++) {
     */
     if (/<div[^>]*\bng-(show|if)=/.test(lines[j])) break;
     /*
+      THE ROW'S OWN PARAGRAPH ENDS THE SEARCH, and so does a rule between sections.
+
+      A row whose `<p>` closes with no helper used to keep the scan running into whatever came next,
+      and two settings picked up text that is not theirs:
+
+        hidePoweredBy     took "For pushing alerts and streams to other rooms, you can use the
+                          following settings…" — the SECTION INTRODUCTION for the linked-rooms block,
+                          which sits after an `<hr>` and belongs to the group, not to a
+                          "Hide Powered By" checkbox. An operator saw a paragraph about relaying
+                          alerts under a toggle that hides a footer credit.
+        streamingThreads  took a stray "×".
+
+      Both rows genuinely have NO helper. `<hr>` is furniture between groups and `<p>` opens the next
+      row or a section paragraph — in either case the field above it is finished. The bare-text
+      helpers this loop was widened for are unaffected: their text node precedes the next `<p>`,
+      which is exactly the outline documented above.
+    */
+    if (/^\s*<(hr|p)\b/.test(lines[j])) break;
+    /*
+      LEAVING THE ROW'S PARAGRAPH ends the search.
+
+      `streamingThreads` is the LAST setting in the pane. Its `<p>` closes, then the panel footer,
+      then the permissions MODAL — and the scan walked all the way into that modal's close button and
+      took its `×` as the setting's helper. An outline has no closing tags, so nothing else stopped
+      it.
+
+      Indent is the boundary. The anchor sits inside the `<p>`, so the paragraph itself is at
+      `anchorIndent - 2`. Anything SHALLOWER than that has left the row entirely.
+
+      `< anchorIndent - 2` and not `< anchorIndent`, deliberately: a `helpOutside` helper is a SIBLING
+      of the `<p>`, sitting at exactly `anchorIndent - 2`. `doNotAutoSoftReset` is the case — its
+      label is at 22 against its anchor's 24 — and a stricter test would drop the one shape this
+      loop was widened to catch.
+    */
+    if (/^\s*</.test(lines[j]) && lines[j].search(/\S/) < anchorIndent - 2) break;
+    /*
       A helper with NO ELEMENT AT ALL — the fourth shape, and the one that made three settings come
       out `help: null` while a hand-maintained table in `room-settings-help.ts` carried their text.
 
@@ -304,7 +343,6 @@ for (let i = 0; i < lines.length; i++) {
 
       Counted: 3 settings, exactly the three the `BARE` table held.
     */
-    const anchorIndent = lines[i].search(/\S/);
     if (/^\s*·/.test(lines[j]) && lines[j].search(/\S/) <= anchorIndent) {
       const text = textOf(j);
       /*

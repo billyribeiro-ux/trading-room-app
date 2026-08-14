@@ -377,9 +377,15 @@
     reference room has the filter off, so the reference contributes NOTHING for either row while
     ours rendered two complete rows an operator of that room could never have seen.
 
-    HONEST GAP: no visibility field is recorded in the generated schema, and these are the only two
-    `ng-show` rows anywhere in the settings list, so — like `authModeGated` above — this is our own
-    plumbing, hand-written and keyed by name. Only the CONDITION is evidence.
+    HONEST GAP: no visibility field is recorded in the generated schema, so — like `authModeGated`
+    above — this is our own plumbing, hand-written and keyed by name. Only the CONDITION is evidence.
+
+    This note used to claim these were "the only two `ng-show` rows anywhere in the settings list".
+    That was written from the capture and is wrong: the template has FOURTEEN gated wrappers over
+    nine distinct expressions, ten of which wrap a named setting. Seven of those ten are the
+    authMode rows in the map above, two are these, and the tenth is `webinarDate`, gated by
+    `hidden={!isWebinar}` in the header block. `settings-row-gates.test.ts` extracts all ten from the
+    template and fails if a new one appears — which is what the old wording would have hidden.
   */
   const profanityGated: Record<string, () => boolean> = {
     ingnoreBadWordsList: () => !!settingValue('hasProfanityFilter'),
@@ -941,6 +947,11 @@
           - "Current" was `data.users.length`, which is the list AFTER the search box and the seven
             filters. Typing a name into search made the room's occupancy readout say 1. It is now
             `rosterCount`, counted with `count(*)` before any filter is applied.
+
+            `rosterCount` is still a SUBSTITUTION and is stated as one: `current_capacity` is LIVE
+            occupancy, and this server receives no occupancy signal — only the room service knows who
+            is connected. The roster size is the closest fact the controller holds. The account
+            page's room list makes the same substitution, so the two agree. T5-20.
           - "Max" was `maxUsers`, the CONFIGURED limit — and `resetMaxCount` set that to zero, so
             "Reset Counts" destroyed the value shipped to the room. It is now
             `recordedMaxCapacity`, which is what the reset clears.
@@ -2916,8 +2927,16 @@ Please click this link to attend: ______ unique link will be here_____
                     ></form>
                   {/if}
 
+                  <!--
+                    `href="/public/html/api-docs.html?src=/public/html/POST_ROUTE_API_DOCUMENTATION.md"`
+                    — page.manageSession.html:1695. The reference serves TWO documents through one
+                    viewer, and this button opens the POST ROUTES one. Ours pointed at
+                    `/account/api-docs`, which is the OTHER document — the Sessions API reference the
+                    account page's "API Docs" button opens. A button whose label named a document it
+                    did not open.
+                  -->
                   <p class="form-control-static">
-                    <a class="btn btn-default" target="_blank" rel="noopener noreferrer" href={resolve('/(app)/account/api-docs')}>
+                    <a class="btn btn-default" target="_blank" rel="noopener noreferrer" href={resolve('/(app)/account/api-post-routes')}>
                       API POST Routes Docs
                     </a>
                   </p>
@@ -2942,9 +2961,23 @@ Please click this link to attend: ______ unique link will be here_____
                             `ng-click="openChatTabsWithBadgesEditor(sess.chatTabsWithBadges)"` off
                             this `<i>`, and that editor never rendered anywhere in the capture. The
                             markup is transcribed; the handler is not invented, so the icon here is
-                            an icon and nothing else. `ms-2` and `cursor-pointer` likewise have no
-                            rule in any stylesheet this repo holds — they are the capture's class
-                            list, carried across, not classes we style.
+                            an icon and nothing else.
+
+                            The two utility classes are NOT equivalent, and an earlier version of
+                            this note had them wrong. Corrected 2026-08-13 after the raw stylesheet
+                            was fetched:
+
+                              `cursor-pointer`  IS a real rule — `evidence-dumps/TIER1-fetched/
+                                                styles.css` defines `.cursor-pointer:hover { cursor:
+                                                pointer }`. Scoped to `:hover`, which is unusual and
+                                                works, since a cursor only matters while hovering.
+                              `ms-2`            has NO rule in any stylesheet this repo holds. It is
+                                                a Bootstrap 5 spacing utility on a Bootstrap 3 page —
+                                                inert, like `btn-small` on the APPROVE button.
+
+                            The note claiming neither had a rule was true when written: only the
+                            CSSOM captures existed then, and `styles.css` — the raw sheet Chrome had
+                            re-serialised — was fetched later.
                           -->
                           <i class="fa fa-gear ms-2 cursor-pointer" title="Configure Chat Tabs"
                           ></i> Chat Tabs With Badges:

@@ -584,6 +584,25 @@ export const badges = pgTable('badges', {
    * signature supports and the most the evidence proves; if that markup is captured later and shows
    * an id, that is a new migration, not a rewrite.
    *
+   * ## IT IS NOW CAPTURED, AND IT SHOWS AN ID. This column is the wrong type. (2026-08-13)
+   *
+   * `evidence-dumps/TIER1-fetched/views/page.welcome.html:1191-1211` — the fetched TEMPLATE, which
+   * the empty capture could never have shown — renders the Dark Theme cell as a nested repeat over
+   * the badge list, filtered by:
+   *
+   *     ng-if="roomBadge._id === b.darkTheme"
+   *
+   * and draws that badge's own chip inline, with its `bkcolor` and `color`. **A boolean cannot be
+   * compared to an `_id`.** `darkTheme` holds the id of another badge — the dark-theme VARIANT of
+   * this one — exactly as the `.dark-theme-badge-id` class name suggested.
+   *
+   * NOT changed here yet, and that is deliberate. The STORAGE is proven and so is the DISPLAY, but
+   * the control that SETS it is not: `addBadgeDarkTheme(b._id, b.text, b.imgURL, b.darkTheme)` hands
+   * back the current value, which is the shape of a picker, and no picker appears in any capture.
+   * Migrating to an id column now would leave a column nothing can write — the same defect recorded
+   * as T5-20. Tracked as **T5-27** with the migration plan; the boolean stays until the setter is
+   * evidenced, and is now known to be a placeholder rather than the model.
+   *
    * Equally honest: nothing here invents what a dark-theme badge LOOKS like. No CSS in our evidence
    * describes a dark-theme chip, so the flag is stored, round-tripped and surfaced as the control's
    * pressed state — and the chip renders exactly as it did before.

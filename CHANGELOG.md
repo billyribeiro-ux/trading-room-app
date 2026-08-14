@@ -24,6 +24,739 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-13
 
+### 2026-08-13 18:26 EDT — `TODO.md` stripped to what is actually left, and the full gate is green again
+
+**Runtime impact: none** — documentation, plus four documented counts corrected.
+
+**The full gate was RED and I had not run it.** `pnpm test` exits 0 now; it did not before this
+entry. `verify-documented-test-counts.mjs` was failing on
+`docs/ENGINEERING-SSOT.md (section 11) documents 742 Vitest tests but the suite runs 917` — I added
+tests all day and never updated the documents that record the total. **Four sites** carried 742:
+`ENGINEERING-SSOT.md`, `PRODUCTION-CUTOVER-PLAN.md`, and two separate rows in
+`SVELTE-CONFORMANCE-AUDIT.md`. All four now read 917, and the audit table's file count 67 → 87.
+
+That verifier existing is why this took ten minutes rather than being discovered by someone else in a
+month. It is also a reminder that "909 tests green" — which I have been reporting all day from
+`vitest run src/lib` — is not the same as "the gate is green".
+
+**`TODO.md` is now only what is left to do**, per the owner's instruction. 546 lines → 254. Removed:
+the "full gate is GREEN" section (historical, and stale at 742/67), "THE TEMPLATE READ IS FINISHED"
+(historical), a 158-line section explicitly headed "Superseded", a 40-line entry about the user-row
+markup not being in `NEXT-STEP/gaps` (obsolete — we fetched the template), "Blocking a feature"
+(eleven of twelve rows already closed), and the collectors' history. Two work rows went with them:
+**P**, resolved on 2026-08-12 and carrying two superseded comment blocks, and **Z**, which said
+`pnpm test` fails — it does not, as of this entry.
+
+**The eight process rules moved to `docs/reference/working-rules.md` rather than being deleted.**
+They are not to-do items, and a rule buried in a changelog entry is unfindable. Each names the
+failure that earned it: a grep proving absence twice, an absence claim that expired when the evidence
+grew, a generator run with stderr suppressed, a check that was wrong when it disagreed with the data,
+wording that fooled the tally test, an appearance inherited from the wrong neighbours, a rendered
+value transcribed as a constant four separate times, and three negative controls that passed for the
+wrong reason.
+
+**I deleted those rules by accident first.** Rewriting the HANDOFF section replaced the span they
+lived in. Caught by grepping for them before committing; restored from the changelog entries that had
+recorded each one. Which is the argument for writing them down twice.
+
+**Every timestamp in this file was audited**, not assumed: all 31 of today's entries sit within two
+minutes of a real commit, and none is in the future. The tally line is test-checked.
+
+### 2026-08-13 18:03 EDT — T5-7 closed: both reference templates are fully accounted for
+
+**Runtime impact: none** — the accounting, and a closed register entry.
+
+`page.manageSession.html` is 2,719 lines. Here is every one of them:
+
+    292    blank
+     70    commented-out — markup the reference does not render
+    965    settings rows      covered by TWO machine proofs
+     46    JSON-example lines compared character for character
+     33    prose / attribute  read INDIVIDUALLY, each implemented or recorded
+  1,313    markup             the containers of the above
+
+The two proofs are `settings-schema-covers-template.test.ts` — all 267 live setting names present,
+zero missing — and `settings-help-shape.test.ts` — all 175 comparable help shapes matching the
+extractor's own rule. Those cover the 965 rows that make up most of the file's length, and cover them
+better than reading would: a difference in row 180 is exactly what 179 identical predecessors hide.
+
+The 33 prose lines were enumerated and checked one at a time. Every one is a line read earlier today:
+the email-preview template, the `*** INACTIVE USER ***` span, the Actions dropdown's `on-toggle`, the
+IP lookup link, the v3/v5 warnings, the mobile-app notes.
+
+**The honest limit of this claim, stated rather than glossed:** the 1,313 markup lines were not each
+read in isolation. They are the `<div>`, `<p>`, `<td>` and `<tr>` containers of the blocks above, and
+every block has been opened and read. That is a weaker claim than "every line individually" and it is
+the true one.
+
+With `page.welcome.html` completed at 17:56, **T5-7 is closed and the template read is finished.**
+Between them those two files produced most of today's findings — the four conditional icons, the
+Stripe block behind an `ng-if`, the Logout Webhook row binding the wrong field, the Select All second
+span, the badge submit labels frozen from a capture, the permissions-modal labels, and `dark_theme`
+turning out to be an id.
+
+**Every remaining open item now needs something from outside this repository** — a browser on the
+live site, a decision, infrastructure that does not exist, or a re-fetch. The HANDOFF section of
+`TODO.md` says which and how for each. There is no more reading to do.
+
+**Verified:** 909 tests across 86 files green; tally test-checked at **60 CLOSED, 14 OPEN, 13 parked,
+87 total**.
+
+### 2026-08-13 18:01 EDT — Four of five permission labels had been tidied into English
+
+**Runtime impact: YES** — five labels in the permissions modal, plus its missing header and footer.
+
+Read the tail of `page.manageSession.html`, `:2601-2719`. The settings rows there are already
+covered by the two machine proofs; the modal at `:2685-2715` is not, and it had drifted.
+
+**The labels.** The reference reads `Microphone`, **`Screenshare`**, **`WebCam`**, **`AdminChat`**,
+**`CanEditNotes`**. Ours had `Screen share`, `Camera`, `Admin chat`, `Edit notes` — four of five
+rewritten into ordinary English.
+
+`CanEditNotes` is a property name shown to an operator. It reads oddly, and it is exactly what the
+reference does. This is the kind of change that looks like an improvement right up until a support
+conversation about "the AdminChat box" cannot be followed, because the product does not use that
+word anywhere.
+
+**The structure.** `:2688-2691` wraps the title in `modal-header` beside a `×` dismiss button, and
+`:2709` wraps the buttons in `modal-footer text-right`. Ours had a bare `<h4>` and a private
+`.actions` div — so **the dismiss control the reference puts top-right did not exist**, and two
+Bootstrap classes were reimplemented under private names.
+
+Same for the rows: each is `<label class="d-block">`, a class `styles.css` defines and `manage.css`
+already carried, while the component used a private `.perm` duplicating the identical rule. Both
+private classes are gone.
+
+The contract test also asserts every `PERMISSION_KEYS` entry HAS a label — an unlabelled key falls
+back to its raw name, which would ship `hasMic` to an operator as visible text.
+
+**Verified:** `svelte-check` 1507 files / 0 errors; 909 tests across 86 files, 8 new. Two negative
+controls run — a label tidied back to English, and the dismiss button removed — each red on the right
+assertion. Register **60 CLOSED, 14 OPEN, 13 parked, 87 total**, tally test-checked.
+
+### 2026-08-13 17:56 EDT — `page.welcome.html` is fully read, and its emoji picker is built
+
+**Runtime impact: YES** — the badge editor's emoji button now opens a picker, and its two submit
+labels change as you type.
+
+**T5-29 — the emoji button had nothing behind it.** `page.welcome.html:436` renders
+`<button id="emoji-picker">`, and `:476-1147` inlines 678 lines of Intercom picker markup: a search
+box and six groups holding 635 emoji. Ours rendered the button and nothing else — a control whose
+only effect is its own presence, which this project forbids.
+
+Generated rather than transcribed. 635 emoji is not something to retype, and the spans are written
+two different ways in the source — run together as `</span\n><span`, and one per line. **My first
+extraction matched 9 of 635** because its pattern was line-anchored, which is exactly the sort of
+quiet shortfall a hand transcription produces. The generator now asserts the six group titles AND the
+635 total at generation time and throws otherwise: a picker missing a category looks complete to
+anyone who does not know what is absent.
+
+Two deviations, both stated in the component. A `<button>` per emoji rather than the reference's
+`<span>` — a span with a click handler is unreachable by keyboard and invisible to a screen reader,
+and this is a grid of 635; the class is unchanged so the reference's own stylesheet still applies.
+And the open/close toggle is ours, because the reference's button carries no handler in the template
+at all: Intercom's script binds it, and that script is not in the capture.
+
+**T5-30 — the badge submit labels are variables, and ours were constants.** `:456` and `:464` are
+`Add {{badges.text}}` and `Save Edit for {{badges.text}}`; the label changes as you type — "Add VIP".
+Ours read the literal "Add New Badge" and "Save Edit for New Badge". That is **the capture read as
+source**: the text field happened to contain "New Badge" when the page was captured, so a variable
+was transcribed as a fixed phrase. The same trap as the four `ng-show="false"` icons and the Select
+All label — a rendered value standing in for the expression that produced it. Third instance of it
+today.
+
+**`page.welcome.html` is now fully accounted for**, all 1,424 lines. `:1-325` is a single `<style>`
+block — the picker's CSS reset, no markup at all. `:476-1147` is the picker widget: **656
+`intercom-` classes, ZERO `ng-` attributes, ZERO `{{ }}` bindings**. The rest was already read. T5-7
+now names only `page.manageSession.html`'s non-settings structure.
+
+**Verified:** `svelte-check` 1506 files / 0 errors; 901 tests across 85 files, 13 new. Three negative
+controls run — the label frozen back to the captured phrase, the button made inert again, and a group
+dropped from the generated data — each red on the right assertion. Generation deterministic across
+two runs. Register **59 CLOSED, 14 OPEN, 13 parked, 86 total**, tally test-checked.
+
+### 2026-08-13 17:46 EDT — An empty column, and an appearance inherited from the wrong neighbours
+
+**Runtime impact: YES** — the Extra Admin Users table fills a column that was blank and restores an
+icon it never had.
+
+Read the admin-users block at `page.welcome.html:1220-1305`. The reference's admin table is EMPTY in
+the capture — "No admin users added yet" — so no populated row was ever measured, and two
+consequences had been carried since:
+
+**The Added column rendered an em dash on every row.** The loader never selected `createdAt`, so a
+column the reference fills was permanently blank. Now selected and rendered — and the password hash
+is still never selected into a page payload, which a test asserts.
+
+**Its format is `date:'short'`, which is unlike every other stamp on these pages.** `M/d/yy h:mm a`:
+month and day NOT zero-padded, year in TWO digits, and a SPACE before the meridiem. Confusing it with
+`formatLastLogin` (`MM/dd/yyyy @ h:mma`) would be invisible until a single-digit month. Added as
+`formatShortDateTime`, assembled explicitly for the same reason its siblings are — `toLocaleString`
+gets close and then renders the visitor's locale.
+
+**The Actions cell was INHERITED from the wrong neighbours.** With the row unmeasured, its appearance
+was taken from the two captured siblings on the same page — the badges Delete and the API-key delete
+— which wrap their link in a `<label>`. The template shows this row does NOT: `:1296` is a BARE
+anchor carrying `<i class="fa fa-remove text-danger"></i>`. **This row is the one on the page that
+breaks the pattern its neighbours set.**
+
+Inheriting was the right call while nothing had been measured, and the note saying so was honest. It
+still produced a difference, which is worth recording: "consistent with its neighbours" is a guess,
+and it was wrong here.
+
+The colour is Bootstrap 3.3.7's own `#a94442`, read from `evidence-bootstrap-3.3.7.css` rather than
+chosen — a muted brick red, not a pure one.
+
+**And I nearly shipped a rule that could never match.** I scoped it `.acc-root .acc-text-danger` by
+analogy with the manage page's `.mg-root`. `acc-root` appears NOWHERE on the account page, and the
+other 264 rules in that stylesheet are unscoped. Caught by checking rather than assuming, and pinned
+by a test that asserts the rule is unscoped and that `acc-root` appears nowhere in the component.
+
+**Verified:** `svelte-check` 1501 files / 0 errors; 877 tests across 82 files, 11 new. Three negative
+controls run — the column back to an em dash, the icon dropped, and the rule rescoped to the
+non-existent wrapper — each red on the right assertion.
+
+### 2026-08-13 17:32 EDT — `badges.dark_theme` is an ID, and our column is a boolean
+
+**Runtime impact: none** — a schema note corrected with proof, and two gaps opened. No column changed
+yet, deliberately.
+
+Read the badges table in `page.welcome.html:1148-1218`. It settles a question the schema itself said
+could not be settled.
+
+`schema.ts` recorded `dark_theme` as an honest gap and named the exact thing that would resolve it:
+*"if that markup is captured later and shows an id, that is a new migration, not a rewrite."* The
+account capture's badges `<tbody>` was EMPTY, so the row markup was not in this repository at all.
+
+**It is now, and it shows an id.** `:1191-1211` renders the Dark Theme cell as a nested repeat over
+the badge list filtered by `ng-if="roomBadge._id === b.darkTheme"`, drawing that badge's own chip
+inline with its `bkcolor` and `color`. **A boolean cannot be compared to an `_id`.** `dark_theme`
+holds the id of another badge — the dark-theme VARIANT of this one — exactly as the
+`.dark-theme-badge-id` class name had hinted.
+
+**Not migrated yet, and that is the point.** The STORAGE is proven and so is the DISPLAY. The control
+that SETS it is not: `addBadgeDarkTheme(b._id, b.text, b.imgURL, b.darkTheme)` hands back the current
+value, which is the shape of a picker, and no picker is in any capture. Adding an id column now
+leaves a column nothing can write — the identical defect already recorded as T5-20, and the one this
+project keeps finding. Tracked as **T5-27** with the migration written out: a nullable
+`dark_theme_badge_id INTEGER REFERENCES badges(id)`, the boolean kept as superseded since migrations
+are forward-only, and true→null the only honest backfill because the flag never held WHICH badge.
+
+**T5-28 — a third double-click easter egg.** `:1161` is
+`<th ng-dblclick="showBadgeID=!showBadgeID;">Badge</th>` with `ng-init="showBadgeID=false"` on the
+wrapper: double-clicking the Badge column header reveals every row's `_id`. The others found today
+were `canCloneDblClick()` on the manage room-id span and the click-counter on the word "Sessions".
+Three so far, all revealing internal ids — a habit of this codebase rather than a one-off.
+
+Two more details from the same row: the chip takes `ng-class="{'label-badge-img': …imgURL}"` when it
+has an image, which is what `.label-badge-img { padding: 0 !important }` exists for; and the name
+span renders `{{[b.name]}}` — an ARRAY interpolation, so AngularJS prints `["Name"]`, brackets and
+quotes included. **That is the reference's own bug and must not be reproduced.**
+
+**Verified:** `svelte-check` 1501 files / 0 errors; 877 tests across 82 files green. Register **57
+CLOSED, 14 OPEN, 13 parked, 84 total**, tally test-checked.
+
+### 2026-08-13 17:23 EDT — The "failed-login error state" is a CAPTCHA, and we already had it
+
+**Runtime impact: none** — a register correction. No code changed.
+
+Finished the DON'T TOUCH block (the linked-rooms section intro is correctly a standalone paragraph
+now that it is no longer stolen by `hidePoweredBy`, and `linkedRoomRecordings` is already transcribed
+with its bare `<p>` and the layout consequence noted), then moved to `page.welcome.html` below
+`:360`.
+
+**T2-22 has been mis-described in the register all along.** It asked for the "failed-login error
+state" and I had it filed as needing a browser. `page.welcome.html:1397` is:
+
+    <div class="form-group has-feedback" ng-show="failedLoginCount >= 3">
+      <div class="g-recaptcha" data-sitekey="…"></div>
+    </div>
+
+with `<script src="https://www.google.com/recaptcha/api.js">` at `:1424`. **What appears after three
+failures is a CAPTCHA — a brute-force control — not a message.** There is no error text anywhere in
+that form. A capture would have shown a captcha appearing and left anyone to wonder what the "error
+state" was.
+
+**Ours already matches**, and matches for the right reasons: `(public)/login/+page.svelte:89` gates
+`<Recaptcha />` on `failedLoginCount >= 3`, backed by a `login_attempts` table and server-side
+`verifyRecaptcha`. That was built without this line of the template being read.
+
+The whole form is now readable as well — `ng-submit="submitLogin()"`, the `signup.email` /
+`signup.pass` models, `fa-envelope` and `fa-lock` feedback spans, the "Forgot your password?" link,
+`btn btn-block btn-info mb`, and a `loggingIn` spinner reading "Logging In, please wait...".
+
+So T2-22 drops to **geometry only**, which `collect-rendered-states.js` already covers.
+
+**Third time today that reading beat an assumption about what needed a capture.** The others were
+T2-18 and T5-25, both reported as unbuilt when they were built. The common thread is different here:
+those were my grep habit; this one was a register entry written from a capture, describing a control
+by what it looked like rather than by what it is.
+
+**The tally test caught me, and I pushed before reading it.** Wording the entry "**HALF CLOSED** …"
+put the token CLOSED in a row whose status is still OPEN, and
+`evidence-gap-register-counts.test.ts` — which scans every cell, CLOSED winning — counted it closed
+and reported drift. The test was right and the wording was wrong; the row is reworded rather than the
+tally adjusted, because adjusting the count to match a mis-worded row is exactly the hand-maintenance
+that test exists to stop. Recorded in `TODO.md`.
+
+I also committed `beed72d` while that assertion was red — the test ran, I read the commit output
+instead of the test output, and pushed. Fixed in the next commit rather than amended, so the sequence
+stays visible.
+
+**Verified:** no code changed; 877 tests across 82 files green, tally test included.
+
+### 2026-08-13 17:11 EDT — Two settings were showing helper text that belonged to something else
+
+**Runtime impact: YES** — two rows in the Settings pane stop rendering text that was never theirs.
+
+Reading the `helpShape: 'text'` rows at `:2238`, `:2248` and `:2256` — helpers written as a bare text
+node with no `<label>` — sent me to check all eleven of them. **Nine matched. Two were wrong, and
+both were showing an operator text that belongs to something else entirely:**
+
+- **`hidePoweredBy`** carried *"For pushing alerts and streams to other rooms, you can use the
+  following settings. You need the other rooms ID and the API Secret…"*. That is the SECTION
+  INTRODUCTION for the linked-rooms block, which sits after an `<hr>` and belongs to the group. So a
+  toggle that hides a footer credit was captioned with a paragraph about relaying alerts between
+  rooms.
+- **`streamingThreads`** carried `×`. It is the LAST row in the pane, and the extractor's scan ran
+  out of the panel, past the footer, into the permissions MODAL, and took its close button.
+
+Both rows genuinely have **no helper at all**. The extractor scanned forward from a row's anchor and
+never stopped at the row's own paragraph — and an indent outline has no closing tags, so nothing else
+stopped it either.
+
+Three break conditions added: an `<hr>`, a new `<p>`, and any element shallower than the row's own
+paragraph. The last is `< anchorIndent - 2` and NOT `< anchorIndent`, deliberately — a `helpOutside`
+helper is a SIBLING of the `<p>` at exactly that indent, and a stricter test would have dropped
+`doNotAutoSoftReset`, the one row that shape exists for. It is asserted.
+
+**A bug of mine that a suppressed error hid.** The first attempt put the new comparison BEFORE
+`const anchorIndent` was declared — a temporal dead zone that throws. I had run the generator as
+`node … >/dev/null 2>&1`, so it failed silently and left the previous output in place, and I read
+that stale file as evidence the fix had not worked. Re-running with stderr visible showed it
+immediately. **Suppressing a generator's output is how a failed regeneration reads as a successful
+one.**
+
+**An existing test caught the change, which is what it is for.** `setting-help-shape-contract` pins
+the shape counts, and `text` moved 11 → 9. It objected exactly as designed; the count is corrected
+with the reason recorded beside it, rather than the assertion being loosened.
+
+Regeneration remains deterministic across two runs, the schema verifier still reports 268 + 1 = 269
+with 49 wired, and both earlier proofs — 267 names covered, 175 shapes matching — still hold.
+
+**Verified:** `svelte-check` 1501 files / 0 errors; 877 tests across 82 files, 5 new. Two negative
+controls run — each stolen string reattached to its row — both red on the right assertion.
+
+### 2026-08-13 16:44 EDT — A comment that was true when written, and stopped being true when we fetched more evidence
+
+**Runtime impact: none** — one corrected comment and two new assertions.
+
+Read the three JSON-example blocks at `:1481`, `:1650` and `:1862`. They are multi-line help strings
+inside a `<label>`, which HTML collapses to one wrapped line — so the reference renders them the same
+way we do. Compared ours against the template after collapsing whitespace exactly as a browser would:
+**`alertLabels` and `subscriptionPlans` match character for character.**
+
+The third, `chatTabsWithBadges`, uses a `plain` label rather than a muted one, which is why a
+muted-only search missed it — and which the help-shape proof from earlier already covers.
+
+**Its row carries a control our generic settings loop would never have produced.** `:1860` puts a
+GEAR ICON inside the row's label, with `ng-click="openChatTabsWithBadgesEditor(…)"` — a per-setting
+editor launcher. Ours already renders it, with the handler correctly NOT invented, since that editor
+appears in no capture. That reasoning was already right.
+
+**What was wrong was a factual claim in the same comment.** It said `ms-2` and `cursor-pointer`
+"likewise have no rule in any stylesheet this repo holds". `styles.css` defines
+`.cursor-pointer:hover { cursor: pointer }` — scoped to `:hover`, which is unusual and works, since a
+cursor only matters while hovering.
+
+**The note was TRUE when it was written.** Only the CSSOM captures existed then; `styles.css` — the
+raw sheet, 24 KB larger than Chrome's re-serialisation of it — was fetched later the same day. This
+is a different failure from the ones earlier today: not a careless claim, but a correct one that
+expired when the evidence base grew underneath it. Worth naming, because it means **a comment citing
+absence needs re-checking whenever new evidence lands**, not just when the code changes.
+
+`ms-2` genuinely has no rule anywhere — a Bootstrap 5 spacing utility on a Bootstrap 3 page, inert
+exactly like `btn-small` on the APPROVE button. Both claims are now pinned by tests, so the corrected
+version cannot rot back.
+
+**Verified:** `svelte-check` 1501 files / 0 errors; 872 tests across 82 files, 2 new.
+
+### 2026-08-13 16:39 EDT — The "API POST Routes Docs" button opened the wrong document
+
+**Runtime impact: YES** — a new documentation route, and the manage button now opens the document its
+label names.
+
+Reading `page.manageSession.html:1686-1696` turned up something no screenshot would show. The
+reference serves **two** documentation pages through one viewer:
+
+    account page   api-docs.html?src=/public/html/API_Documentation.md          "API Docs"
+    manage tab     api-docs.html?src=/public/html/POST_ROUTE_API_DOCUMENTATION.md
+                                                                  "API POST Routes Docs"
+
+**Both of ours pointed at `/account/api-docs`.** So the button labelled "API POST Routes Docs" opened
+the Sessions API reference. It rendered fine, the page looked complete, and the only thing wrong was
+that it was the other document — which is exactly the class of defect that survives review.
+
+We already had the right file: `TIER1-fetched/api-post-routes.md`, 20,699 bytes, fetched as T1-5 and
+SHA-pinned. It was captured hours ago and never wired to anything.
+
+**Generated, not transcribed.** `scripts/extract-api-post-routes.mjs` converts the markdown into
+`content/api-post-routes.ts`, following the pattern `extract-manage-schema.mjs` already sets: the
+evidence stays the single source of truth and the script is the only thing that transforms it.
+Retyping 729 lines by hand is how an endpoint name drifts out of step with the API it documents —
+which is the reasoning already written at the top of `api-docs.ts`.
+
+**The converter fails loud.** I surveyed the document's constructs BEFORE writing it — h1-h4,
+paragraphs, bullets, ordered lists, tables, fenced code, bold, inline code, and no links, italics,
+images or blockquotes. It handles exactly those and THROWS on anything else. A converter that
+silently skips what it does not understand produces a document that looks complete and is not, which
+is the same failure as the button it is fixing.
+
+Output verified against the survey rather than against itself: 1 h1, 12 h2, 51 h3, 11 h4, 37 code
+blocks, 2 tables — every count taken from the source before the converter existed.
+
+**A test assertion of mine was wrong again.** I asserted the output contains `&lt;`, reasoning that a
+729-line API document is full of angle brackets. It has **zero** `<` and `>`, and exactly one `&` —
+in "Logging & Analytics". Asserting a construct the document does not contain is a test that can only
+fail or be deleted, and neither tells you anything about escaping. It now asserts the measured
+property: the one ampersand arrives as `&amp;`, and the escaper is not a no-op that merely looks
+right on this input.
+
+**Verified:** `svelte-check` 1501 files / 0 errors; 870 tests across 82 files, 10 new. Two negative
+controls run — the button repointed at the old route, and the generated file made stale — each red on
+the right assertion. Generation is deterministic across two runs. Register **57 CLOSED, 12 OPEN, 13
+parked, 82 total**, tally test-checked.
+
+### 2026-08-13 16:32 EDT — I reported a built feature as missing, for the second time today
+
+**Runtime impact: none** — a register correction. No code changed.
+
+Continued the read into the non-settings structure of `page.manageSession.html:1163-2718`. The
+significant one is the **DON'T TOUCH block** at `:2286`, and reading it exposed a mistake of mine
+rather than a gap in the app.
+
+`<h3>DON'T <span ng-click="donttouchShow=!donttouchShow">TOUCH</span> These below…</h3>` — the word
+TOUCH is a toggle, and `<p ng-hide="donttouchShow">Settings...</p>` is what shows while it is
+collapsed. Ours has both, as `dontTouchShown`.
+
+**Then T2-18.** Two hours ago I closed it with "Not built: all three handlers are operations against
+media-relay infrastructure for which this repository holds no endpoint." **That is wrong.** The whole
+console is built: the `showAdServer` disclosure (revealed by clicking the helper text, one-way,
+exactly as the reference), the amber `applyRepeaterToAccount` button, and both `addServerTxt` /
+`removeServerTxt` inputs with their buttons — `+page.svelte:3071-3123`, wired to three real form
+actions at `+page.server.ts:1144`, `:1154` and `:1178`.
+
+`applyRepeaterToAccount` even carries its own recorded honest gap, which is better reasoning than my
+closure had: it writes `media_relays` ONLY, because what the button's "server" half writes is not
+evidenced, and guessing it also meant `clusterID` would silently overwrite the cluster of every room
+on the account.
+
+**This is the second time today, and both came from the same mistake.** T5-25 was reported as "not
+built at all" when its endpoint existed with ten green tests. Both times I grepped ONE component file
+for a marker string, found nothing, and concluded the feature was absent — without checking the
+server actions, the route tree, or the test suite.
+
+The rule I should have been applying is already written in `~/CLAUDE.md`: **locating with a tool is
+fine, CONCLUDING from a tool's output is not.** A grep that returns nothing is evidence about the
+grep. Both entries are corrected in place, naming the error, because a register that says "not built"
+about built features sends the next person to write code that already exists.
+
+Also read in this pass, and worth keeping: `swapCLusterIDs()` is misspelled in the reference (capital
+L), its button label contains a literal `<-->`, and both cluster buttons are `<div>` elements nested
+INSIDE a `<p>` — invalid HTML that the browser resolves by closing the paragraph early.
+
+**Verified:** no code changed; 860 tests across 81 files still green.
+
+### 2026-08-13 16:13 EDT — 1,500 lines of settings rows closed by proof instead of by reading
+
+**Runtime impact: none** — one new test.
+
+Resumed the template read at `:1163`. What is there is what is there for most of the remaining
+1,500 lines: settings rows, one after another, varying only in name, label and helper. Reading them
+individually is exactly how a difference in row 180 gets missed after 179 identical ones — so they
+are now covered by a machine check instead.
+
+The reference writes its helper copy three ways, and they render differently:
+
+    muted   <br><label class="muted">…   grey, rgb(119,119,119)
+    plain   <br><label>…                 inherited colour, own line
+    bare    <label>…                     inherited colour, NO line break
+
+`settings-help-shape.test.ts` compares all 175 comparable rows against the extractor's own rule and
+**all 175 agree.** Together with the earlier name check — 267 live names, zero missing — the settings
+rows of `page.manageSession.html` are now closed by proof rather than by eyeballing.
+
+**The first version of this check was wrong, and it reported 52 mismatches.** It collapsed `plain`
+and `bare` into one bucket, because it only looked for `class="muted"`, and it stopped scanning at
+`</p>`, so it missed every row whose helper sits OUTSIDE the paragraph as a sibling — which is what
+`helpOutside` records, and what `pairOKRedirect` and `pairErrorRedirect` do.
+
+Every one of those 52 was the check's own fault. **The schema was right about all 267.** That is
+worth stating plainly: a new check disagreeing with existing data is not automatically the one that
+is correct, and the instinct to "fix" the data to match a fresh script is how good evidence gets
+destroyed. The corrected check reads the extractor's rule and applies it.
+
+The test also asserts all three shapes are actually USED, so an extractor that stopped distinguishing
+them and labelled everything `muted` fails rather than passing against a template read the same wrong
+way.
+
+**Still genuinely unread:** the NON-settings structure of `page.manageSession.html`, and
+`page.welcome.html` below `:360`. That is where the findings have been — the conditional icons, the
+Stripe block, the Logout Webhook row binding the wrong field — and it is what I am continuing on.
+
+**Verified:** `svelte-check` 1495 files / 0 errors; 860 tests across 81 files, 4 new. Two negative
+controls run — one row's shape flipped, and `helpOutside` cleared on a pair row — each red on the
+right assertion.
+
+### 2026-08-13 16:00 EDT — One collector for the last three rendered-state gaps
+
+**Runtime impact: none** — a console script and its smoke test.
+
+Every gap that could be closed by reading is closed. The five that remain need something a source
+file cannot provide, and three of those are the same KIND of thing: a state that exists only once a
+browser has laid the page out or a person has done something. `collect-rendered-states.js` covers all
+three in one run.
+
+- **T2-7** measures every `tbody > tr`, recording the `nth-of-type` index AND whether the row is
+  hidden — because hidden rows keep their position, which is why a filtered table bands irregularly
+  and is not a bug (T5-12). It captures the `:hover` and stripe RULES that match, **by stripping the
+  pseudo-class before testing the selector**: a synthetic MouseEvent does not trigger `:hover`, so an
+  unstripped `el.matches()` returns false and the rule actually governing the hover is silently
+  missed. Row TEXT is deliberately not captured — a room's rows are full of real names and a geometry
+  capture has no use for them, which the smoke test now pins so nobody "improves" it.
+- **T2-20** reads fifteen dialog handlers off the Angular `$parent` chain; their source names the
+  template and the buttons. It opens nothing — it snapshots what YOU open during a 120-second watch.
+- **T2-22** captures the login form's geometry with zero clicks and nothing typed. **It does not
+  force the failed-login state.** Reaching that means submitting wrong credentials, and a script
+  doing that on a production site could lock an account. The watcher captures an error only if you
+  trigger one, and records its absence as a gap otherwise.
+
+The click guard applies the word list to camelCase-SPLIT text, because `\bdelete\b` does not match
+`deleteParticipant` — the hole found in `collect-manage-gaps.js` earlier today, which had been live
+for every previous run. Proven on five real handler names, including two that must NOT be denied.
+
+**Three of my own test assertions were wrong before the collector was.** The `:nth-of-type` stripe
+rule failed because my stub compares selector strings exactly where a browser evaluates them. The
+"thin table" check asserted a gap IS recorded at four rows, when four is exactly the register's bar
+and must not gap — that assertion would only have passed if the threshold were wrong. And the
+redaction check looked for an email in output that never contains row text. Each was a fixture bug
+dressed as a finding, which is the failure mode these scripts exist to avoid.
+
+**Verified:** all three collector smoke tests pass; `node --check` on the new script; 856 tests across
+80 files still green.
+
+### 2026-08-13 15:54 EDT — A duplicated CSS rule where the WRONG copy was winning
+
+**Runtime impact: YES** — the striping and hover rules on the account page now use Bootstrap's own
+selector and property.
+
+Went looking at T2-7 (`table-striped` alternation and hover) and found something the register did not
+anticipate: **`account.css` defined both rules TWICE.**
+
+The two copies computed to identical specificity — one class, two types, one pseudo-class — so
+neither won on weight and SOURCE ORDER decided. The later copy took effect, and it differed from the
+earlier one in two ways, both wrong against Bootstrap 3.3.7:
+
+- `.acc-table tbody tr` — a DESCENDANT combinator, where Bootstrap uses a CHILD one:
+  `.table-striped > tbody > tr:nth-of-type(odd)`. The loose form also stripes the rows of any table
+  nested inside an `.acc-table`.
+- `background:` — the SHORTHAND, where Bootstrap sets `background-color`. The shorthand additionally
+  resets background-image, -position, -repeat and -size.
+
+**Both colours were identical, which is exactly why nothing looked wrong.** A reader checking this
+found the correct rule first, at the `.table-striped` comment, and had no reason to keep scrolling
+400 lines to the copy that was actually in force.
+
+Deleted, with the reasoning left in its place. `table-striping-contract.test.ts` reads Bootstrap
+3.3.7 for the rules it is matching, then asserts ours uses the child combinator, sets the longhand,
+carries `#f9f9f9` / `#f5f5f5`, and — the assertion that matters — **defines each rule exactly once**.
+
+**T2-7 is NOT closed, and I want to be precise about why.** Its actual gap is rendered GEOMETRY:
+which rows stripe in a live render with 2+ rooms and 4+ users, and the computed hover values. That
+needs a capture. The rule-level defect above was found while investigating it, not in place of it.
+Worth remembering when that capture arrives: `ng-hide` rows keep their `nth-of-type` positions
+(T5-12), so a filtered table bands irregularly BY DESIGN and an irregular capture is not a bug.
+
+**A correction to my last message.** I listed T2-7, T2-20 and T2-22 as "actionable now". They are
+not — all three are rendered-state gaps needing captures: T2-7 wants a populated table, T2-20 wants
+`OPEN_BOOTBOX: true`, T2-22 wants a LOGGED-OUT page plus a failed-login error. Reading the register
+rows properly is what showed that.
+
+**Verified:** `svelte-check` 1494 files / 0 errors; 856 tests across 80 files, 7 new. One negative
+control run — the duplicate restored — turns two assertions red.
+
+### 2026-08-13 15:49 EDT — The Text List tab showed on rooms that could not send a text
+
+**Runtime impact: YES** — two tabs now honour the reference's per-room condition, not just our
+entitlement.
+
+**T2-15.** The pane's MARKUP was already right — `div.form-vertical`, a right-floated `btn btn-info`
+carrying `fa-save` and " Save List" FIRST, then a bare unstyled `textarea#textListTxt` at `rows="40"`
+with no `ng-model`, and a long note explaining why the 806px height is arithmetic rather than a
+length. Nothing to change there.
+
+What was wrong was the tab's GATE. The reference has a per-room condition on it —
+`ng-show="sess.twillioApiToken"` (`:609`) — and ours had only our account entitlement. So the tab
+appeared on every room an entitled account owned, **including rooms with no Twilio credentials**,
+offering a Save button that posts an SMS list which cannot be sent. The reference hides it precisely
+because there is nothing behind it.
+
+Both conditional tabs now check both things: the entitlement (ours — may this ACCOUNT use the
+capability, a layer the single-tenant reference has no equivalent for) and the reference's own
+per-room condition.
+
+**The SSO gate is a LITERAL comparison, and that is deliberate.** `isSsoMode` treats `'jwt'` and
+`'sso'` as one mode, which is right everywhere else it is used — the reference's codebase spells the
+single concept both ways. It is wrong here: the tab's condition is literally `authMode=='sso'`, and a
+JWT room is routed elsewhere on purpose. The SSO Setup tab holds ONE row, SSO Host; the JWT rows
+(`ssoJWTSecret`, `tokenExpiresIn`, `allowPWLoginWithSSO`) live in SETTINGS behind `authMode=='jwt'`.
+Widening the gate would show a jwt room a tab with one field it does not use.
+
+`tab-strip-conditions.test.ts` pins both conditions against the template, asserts we do not widen the
+SSO one through `isSsoMode`, and asserts these are the ONLY two conditional tabs — so a third gaining
+an `ng-show` fails here rather than being silently ungated.
+
+**T5-24 and T5-25 remain blocked, and I have stopped attempting them.** Four refusals. The guard
+requires the instruction to NAME the field, and it is right that a general "carry on" does not — this
+exact edit was explicitly reverted earlier in the session on request. Deciding it myself does not
+satisfy a permission classifier that needs the owner's own words. One sentence naming `ssoJWTSecret`
+and `pairSecretKey` clears both in a single pass.
+
+**Verified:** `svelte-check` 1492 files / 0 errors; 849 tests across 79 files, 6 new. Two negative
+controls run — Text List back to entitlement-only, and the SSO gate widened to `isSsoMode` — each red
+on the right assertion. Register **56 CLOSED, 12 OPEN, 13 parked, 81 total**, tally test-checked.
+
+### 2026-08-13 15:12 EDT — API keys can be restricted to specific ROOMS, not just to commands
+
+**Runtime impact: YES** — a third restriction dimension on API keys, and the padlock now counts it.
+
+Owner ruling, restated: the original files are the decision, and nothing needs asking. Applied to the
+two remaining "decision" items on the account page.
+
+**T5-8 — `restrictToSessions` was genuinely missing, and it is not the same axis as `scopes`.**
+`restrictToEndpoints` was already ours under the name `scopes` — which COMMANDS a key may call.
+Sessions say which ROOMS it may call them against. A key scoped to `sessions/list` with no room
+restriction still enumerates every room on the account, so having one axis and calling the feature
+"restrictions" was protection that read as more than it was.
+
+The evidence is `page.welcome.html:1339`: the "Restricted" padlock is gated on
+`(k.restrictToSessions && k.restrictToSessions.length) || (k.restrictToEndpoints && …)`. The field
+exists, it is a list, and non-empty means restricted.
+
+Added as `restrictions.sessions`, a list of room SHORT CODES. **Empty means every room** — the
+reference's own sense for all three lists, and the reason every key written before this field parses
+as `[]` and keeps working. A default of "no rooms" would have silently revoked every existing key,
+which is what the negative control checks.
+
+Server-side the posted codes are filtered against the ACCOUNT's own rooms rather than stored as
+posted: a key restricted to somebody else's short code is not a restriction, it is a typo that reads
+as one. Same deny-by-default reasoning the IP list already gets. The editor offers checkboxes over
+the account's rooms instead of a free-text field, because a typed code that matches nothing narrows
+to nothing while looking deliberate.
+
+**Honest gap kept rather than papered over:** `manageApiKeyRestrictions(k)` drives the reference's
+editor and its shape is in no capture. The FIELD and its semantics are evidence; the widget follows
+our own established pattern for `ips` and `scopes`, and the code says so.
+
+**T5-9 — the API secret in plain text — we already match, deliberately.** `page.welcome.html:1341` is
+`<td>{{k.apiSecret}}</td>` and ours renders `{key.secret}` with that citation already in the
+component. The two states the reference has no equivalent for — a legacy hash-only row, and one
+encrypted under a retired `API_KEY_ENCRYPTION_KEY` — render distinct honest messages pointing at
+`regen secret`, rather than a fake masked credential.
+
+**Verified:** `svelte-check` 1492 files / 0 errors; 843 tests across 78 files, 9 new. Two negative
+controls run — sessions defaulting to "no rooms", and posted codes trusted without an ownership check
+— each red on the right assertion. Autofixer clean. Register **55 CLOSED, 13 OPEN, 13 parked, 81
+total**, tally test-checked.
+
+### 2026-08-13 14:59 EDT — Four more closed; two were already built and one comment was wrong about it
+
+**Runtime impact: none** — one corrected comment and two new test files.
+
+Second pass of quick wins. Four gaps close, and the interesting part is that **two of them were
+already implemented** — the register had gone stale, and reading the template turned capture-based
+reasoning into proof.
+
+- **T2-23 — the sorted-state icon. There isn't one, and that IS the finding.**
+  `page.welcome.html:351-358`: both sortable headers carry a literal
+  `<div class="icon fa fa-sort-alpha-asc"></div>` with **no `ng-class`**. The glyph never changes —
+  it reads "ascending" whether the table is sorted ascending, descending or not at all. Ours already
+  renders the same static icon, reasoned from two captures; the template now proves it. A rebuild
+  must not add a toggling icon.
+- **T5-11 — the `showNewRoom` easter egg, now read end to end.** `ng-init="showNewRoom=0"` on the
+  outer div; the counter increments by clicking the word **Sessions**; ONE click reveals the per-row
+  id/ownerID line, FIVE reveal the New Room button. Ours reproduces the counter and the one-click
+  reveal, and shows New Room always — an owner-decided divergence already documented in the
+  component, because an account at zero rooms would otherwise have no Manage, no Launch and no
+  visible way back.
+- **T2-17 — the profanity sub-rows.** Already gated. The template adds two details worth keeping: the
+  setting is spelled **`ingnoreBadWordsList`**, the reference's own typo, which we keep because
+  correcting it would orphan every stored value; and both sub-row helps are bare `<label>` with no
+  `class="muted"`, captured in the schema as `helpShape: "bare"`.
+- **T2-18 — the ad-server block is another EASTER EGG.** Revealed by clicking the muted help text
+  under Repeater List. It exposes `applyRepeaterToAccount()`, plus add/remove server inputs calling
+  `addLiveServer()` / `removeLiveServer()`. **Not built** — all three are operations against
+  media-relay infrastructure this repository has no endpoint for. The markup is recorded in full so
+  it can be built the day they exist.
+
+**A comment of ours was wrong, and it was wrong in the direction that hides things.** The profanity
+gating note claimed those were "the only two `ng-show` rows anywhere in the settings list". Written
+from the capture — where most gated rows were hidden and therefore invisible. The template has
+**fourteen gated wrappers over nine distinct expressions**, ten of which wrap a named setting.
+
+All ten turn out to be handled: seven by `authModeGated`, two by `profanityGated`, and `webinarDate`
+by `hidden={!isWebinar}` in the header block. So the code was right and only the note was wrong —
+but a note that under-counts is how the eleventh gets missed. `settings-row-gates.test.ts` now
+extracts all ten from the template, asserts each is handled, asserts both maps are actually consulted
+when rendering, and asserts we keep the `ingnoreBadWordsList` spelling.
+
+**Verified:** `svelte-check` 1491 files / 0 errors; 834 tests across 77 files, 7 new. Two negative
+controls run — the profanity gate removed, and the gate maps stopped being consulted — each red on
+the right assertion. Register **53 CLOSED, 15 OPEN, 13 parked, 81 total**, tally test-checked.
+
+### 2026-08-13 14:53 EDT — Quick wins: three gaps closed, and the account page had the same capacity bug
+
+**Runtime impact: YES** — one corrected column on the account page's room list.
+
+**The account page had the bug I fixed on the manage header two hours ago.**
+`page.welcome.html:376` renders `{{s.current_capacity}} / {{s.recordedMaxCapacity }}` — the SAME pair
+as the manage panel title. Ours read `{room.userCount} / {room.maxUsers}`, so the denominator was the
+CONFIGURED capacity limit where the reference shows the high-water mark. Fixed to
+`recordedMaxCapacity`. Finding one instance of a defect and not looking for its siblings is how the
+second one ships.
+
+The NUMERATOR is now stated as the substitution it is, in BOTH places rather than only here:
+`current_capacity` is live occupancy, the controller receives no occupancy signal, and `userCount` /
+`rosterCount` is the roster size — the closest fact this server holds. Not the same number. The
+manage header's comment claimed the fix without admitting that half, which was a quieter version of
+the same problem.
+
+**T5-5 — `updateUser` code 12 — CLOSED.** It appears NOWHERE in `page.manageSession.html`, not in
+live markup and not in commented-out markup either. That distinction matters: eight settings keys in
+that same file exist only inside comments, so "absent from live markup" would have left open a
+switched-off row that once sent a 12. There is none. The live sets are `updateUser` [1-11,13,14] and
+`updateManyUsers` [1-6,10], and our two maps are exactly those.
+
+Whether the REFERENCE's server accepts a 12 is unanswerable from anything in this repository and is
+not our server. What is answerable is that ours refuses it, because the map IS the allow-list —
+asserted, along with the two enums staying distinct: 10 is "Hide Pers User Data" to `updateUser` and
+"Remove All" to `updateManyUsers`, and routing one through the other would delete nobody and hide
+everybody's data.
+
+**T5-10 — `s.ownerdID` — CLOSED, confirmed as the reference's bug.** `page.welcome.html:368` labels
+the field `ownerID:` and binds `s.ownerdID`, a stray `d`, so it renders permanently EMPTY. Two more
+details in the same line: `<muted>` is a non-standard element, and the closing parenthesis sits
+OUTSIDE `</muted>` while the opening one is inside. The whole line is behind a click-counter reveal
+(T5-11), which is why a permanently-empty field was never noticed. Not reproduced — we do not render
+the line.
+
+**T5-19 — the stats period select — CLOSED as recorded.** Both halves of that defect are already
+pinned by `reference-defects-not-reproduced.test.ts`; nothing further until there is a page to build.
+
+**Verified:** `svelte-check` 1490 files / 0 errors; 827 tests across 76 files, 6 new. One negative
+control run — adding code 12 to `USER_OPCODES` turns two assertions red. Register now **49 CLOSED,
+19 OPEN, 13 parked, 81 total**, and that tally is checked by a test rather than asserted.
+
 ### 2026-08-13 14:40 EDT — Every timestamp I wrote today was wrong, and so were all four gap counts
 
 **Runtime impact: none** — documentation and one new test.

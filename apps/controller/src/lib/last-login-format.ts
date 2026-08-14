@@ -39,3 +39,24 @@ export function formatLastLogin(at: Date | string | number): string {
      padding logic is how one of them drifts. */
   return `${formatShortDate(d)} @ ${hour12}:${pad(d.getMinutes())}${meridiem}`;
 }
+
+/**
+ * AngularJS's `date:'short'` — `M/d/yy h:mm a`, e.g. `8/13/26 5:32 PM`.
+ *
+ * The admin-users table is the only place the reference uses this format
+ * (`page.welcome.html:1294`, `{{au.created | date:'short'}}`), and it differs from every other
+ * stamp on these pages in three ways: the month and day are NOT zero-padded, the year is TWO
+ * digits, and there is a SPACE before the meridiem.
+ *
+ * Assembled explicitly, for the same reason `formatShortDate` is: `toLocaleString('en-US')` gets
+ * close and then renders the visitor's locale, which is how an owner abroad reads a swapped date.
+ */
+export function formatShortDateTime(at: Date | string | number): string {
+  const d = new Date(at);
+  const hours = d.getHours();
+  // 0 and 12 both map to 12 — midnight is 12 AM, noon is 12 PM.
+  const hour12 = hours % 12 === 0 ? 12 : hours % 12;
+  const meridiem = hours < 12 ? 'AM' : 'PM';
+  const yy = String(d.getFullYear()).slice(-2);
+  return `${d.getMonth() + 1}/${d.getDate()}/${yy} ${hour12}:${pad(d.getMinutes())} ${meridiem}`;
+}

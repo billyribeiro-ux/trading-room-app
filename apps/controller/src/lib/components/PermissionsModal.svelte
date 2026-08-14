@@ -15,12 +15,26 @@
 
   let saving = $state(false);
 
+  /**
+   * The reference's own label text — `page.manageSession.html:2693-2707`, verbatim.
+   *
+   * FOUR of these five were wrong, and all four were "tidied" into ordinary English:
+   *
+   *     Screenshare    was "Screen share"
+   *     WebCam         was "Camera"
+   *     AdminChat      was "Admin chat"
+   *     CanEditNotes   was "Edit notes"
+   *
+   * `CanEditNotes` is the property name shown to an operator, which reads oddly and is exactly what
+   * the reference does. Renaming these is the kind of change that looks like an improvement and
+   * makes a support conversation about "the AdminChat box" impossible to follow.
+   */
   const LABELS: Record<string, string> = {
     hasMic: 'Microphone',
-    hasScreen: 'Screen share',
-    hasCam: 'Camera',
-    hasAdminChat: 'Admin chat',
-    canEditNotes: 'Edit notes'
+    hasScreen: 'Screenshare',
+    hasCam: 'WebCam',
+    hasAdminChat: 'AdminChat',
+    canEditNotes: 'CanEditNotes'
   };
 </script>
 
@@ -28,7 +42,16 @@
 <div class="modal in" role="dialog" aria-modal="true" aria-label="Adjust permissions">
   <div class="modal-dialog">
     <div class="modal-content">
-      <h4>Adjust Mic/Cam/Screen permissions for user: <i>{userName}</i></h4>
+      <!-- `modal-header` holding the dismiss button and the titled h4 — :2688-2691. Ours had a
+           bare `<h4>` and no header at all, so the `×` the reference puts top-right was missing. -->
+      <div class="modal-header">
+        <button type="button" class="close" aria-label="Close" onclick={onclose}
+          ><span aria-hidden="true">&times;</span></button
+        >
+        <h4 class="modal-title" id="permissionsModalLabel">
+          Adjust Mic/Cam/Screen permissions for user: <i>{userName}</i>
+        </h4>
+      </div>
 
       {#if role === 1}
         <p class="note">
@@ -51,13 +74,17 @@
       >
         <input type="hidden" name="roomUserId" value={roomUserId} />
         {#each permissionKeys as key (key)}
-          <label class="perm">
+          <!-- `class="d-block"` — the reference's own class, and `styles.css` defines
+               `.d-block { display: block }`. `manage.css` already carries it; this component was
+               using a private `.perm` that duplicated the same rule under a different name. -->
+          <label class="d-block">
             <input type="checkbox" name={key} checked={permissions[key] === true} />
             {LABELS[key] ?? key}
           </label>
         {/each}
 
-        <div class="actions">
+        <!-- `modal-footer text-right` — :2709. Ours was a private `.actions` reimplementing it. -->
+        <div class="modal-footer text-right">
           <button class="btn btn-default" type="button" onclick={onclose}>Close</button>
           <button class="btn btn-success" type="submit" disabled={saving}>Save Changes</button>
         </div>
@@ -68,16 +95,14 @@
 <div class="modal-backdrop"></div>
 
 <style>
-  h4 {
-    margin: 0 0 12px;
-  }
-  .perm {
-    display: block;
-    padding: 4px 0;
-  }
-  .actions {
-    margin-top: 15px;
-    text-align: right;
+  /*
+    `.d-block`, `.modal-header`, `.modal-title`, `.modal-footer`, `.text-right` and `.close` are all
+    the reference's own classes, styled by Bootstrap 3 and `styles.css` — including
+    `#permissionsModal .modal-content { padding: 20px }`. Nothing is redefined here; the private
+    `.perm` and `.actions` rules that used to duplicate them under different names are gone.
+  */
+  .modal-title {
+    margin: 0;
   }
   .note {
     color: var(--muted);

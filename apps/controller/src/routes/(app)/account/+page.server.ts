@@ -139,7 +139,15 @@ export const load: PageServerLoad = async ({ locals, setHeaders }) => {
     })),
     badges: await getDb().select().from(badges).where(eq(badges.accountId, accountId)),
     admins: await getDb()
-      .select({ id: adminUsers.id, name: adminUsers.name, email: adminUsers.email })
+      /* `createdAt` feeds the Added column — `{{au.created | date:'short'}}` in the reference
+         (page.welcome.html:1294). It was omitted, so that column rendered an em dash on every row.
+         The password hash is still never selected. */
+      .select({
+        id: adminUsers.id,
+        name: adminUsers.name,
+        email: adminUsers.email,
+        createdAt: adminUsers.createdAt
+      })
       .from(adminUsers)
       .where(eq(adminUsers.accountId, accountId)),
     // Never select the verification hash or encrypted envelope into a page
@@ -475,9 +483,31 @@ export const actions: Actions = {
       .map(String)
       .filter((s) => (API_SCOPES as readonly string[]).includes(s));
 
+    /*
+      `restrictToSessions` — which ROOMS the key may act on, a different axis from which COMMANDS.
+
+      Filtered against the account's OWN rooms, not merely stored as posted. A key restricted to a
+      short code belonging to somebody else is not a restriction, it is a typo that reads as one —
+      and the same deny-by-default reasoning the IP list already gets. An unknown code is dropped
+      rather than rejected, because the list is a narrowing and a stale room should not block saving
+      the rest of it.
+    */
+    const ownRooms = new Set(
+      (
+        await getDb()
+          .select({ shortCode: rooms.shortCode })
+          .from(rooms)
+          .where(eq(rooms.accountId, accountId))
+      ).map((r) => r.shortCode)
+    );
+    const sessions = form
+      .getAll('sessions')
+      .map(String)
+      .filter((code) => ownRooms.has(code));
+
     const changed = await getDb()
       .update(apiKeys)
-      .set({ restrictionsJson: JSON.stringify({ ips, scopes }) })
+      .set({ restrictionsJson: JSON.stringify({ ips, scopes, sessions }) })
       .where(and(eq(apiKeys.id, id), eq(apiKeys.accountId, accountId)))
       .returning({ id: apiKeys.id });
     if (changed.length === 0) return fail(404, { message: 'No such API key.' });

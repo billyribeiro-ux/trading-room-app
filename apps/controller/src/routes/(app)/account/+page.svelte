@@ -62,12 +62,14 @@
 </script>
 
 <script lang="ts">
+  import { formatShortDateTime } from '$lib/last-login-format';
   import { enhance } from '$app/forms';
   import { resolve } from '$app/paths';
   import { bootbox } from '$lib/bootbox.svelte';
   import type { SubmitFunction } from '@sveltejs/kit';
   import type { PageProps } from './$types';
   import PasswordReveal from '$lib/components/PasswordReveal.svelte';
+  import EmojiPicker from '$lib/components/EmojiPicker.svelte';
 
   let { data, form }: PageProps = $props();
 
@@ -111,6 +113,9 @@
   let badgeBk = $state('#ffcc00');
   let badgeFg = $state('#ffffff');
   let badgeText = $state('');
+  /** Whether the emoji picker is open. Ours — the reference's button is bound by a script that is
+      not in the capture, so the open/close mechanism is not evidenced; the PICKER is. */
+  let showEmojiPicker = $state(false);
   /** `badges.name`. Bound now because edit mode has to prefill it. */
   let badgeName = $state('');
 
@@ -581,7 +586,25 @@
                   <div class="acc-label acc-label-orange">{room.state}</div>
                 {/if}
               </td>
-              <td class="acc-td-center"><div class="acc-muted">{room.userCount} / {room.maxUsers}</div></td>
+              <!--
+                `{{s.current_capacity}} / {{s.recordedMaxCapacity }}` — page.welcome.html:376. The
+                SAME pair the manage panel title uses, and the same two fields our manage header had
+                wrong until 2026-08-13.
+
+                The DENOMINATOR was `maxUsers`, the CONFIGURED capacity limit. The reference's is
+                `recordedMaxCapacity`, the high-water mark — a different fact, proven by its own API
+                documentation listing `current_max` 100 beside `recordedMaxCapacity` 150. Fixed.
+
+                The NUMERATOR is an honest substitution, stated rather than hidden: the reference's
+                `current_capacity` is LIVE occupancy, and the controller receives no occupancy signal
+                — only the room service knows who is connected. `userCount` is the ROSTER size, which
+                is the closest fact this server actually holds. It is not the same number, and the
+                same substitution is made on the manage panel title so the two pages at least agree.
+                Recorded as T5-20 along with the missing writer.
+              -->
+              <td class="acc-td-center">
+                <div class="acc-muted">{room.userCount} / {room.recordedMaxCapacity}</div>
+              </td>
               <td>
                 <!-- The reference's `ng-href`: the whole handoff URL, resolved server-side at
                      page load. `resolve()` cannot be used because this is a runtime string that is
@@ -748,9 +771,34 @@
                 bind:value={badgeText}
                 aria-label="Badge Text"
               />
-              <button class="acc-btn acc-btn-default acc-btn-sm" type="button" id="emoji-picker" aria-label="Emoji">
+              <!--
+                `#emoji-picker` — page.welcome.html:436. The reference inlines 678 lines of picker
+                markup behind this button. Ours rendered the button and NOTHING behind it, which is
+                a control whose only effect is its own presence.
+
+                `aria-expanded` and the toggle are ours: the reference's button carries no handler
+                in the template at all — Intercom's own script binds it, and that script is not in
+                the capture. What IS evidenced is the picker's markup, its six groups and its 635
+                emoji, all generated from the template into `content/emoji-picker.ts`.
+              -->
+              <button
+                class="acc-btn acc-btn-default acc-btn-sm"
+                type="button"
+                id="emoji-picker"
+                aria-label="Emoji"
+                aria-expanded={showEmojiPicker}
+                onclick={() => (showEmojiPicker = !showEmojiPicker)}
+              >
                 <i class="fa fa-smile-o fa-1x"></i>
               </button>
+              {#if showEmojiPicker}
+                <EmojiPicker
+                  onpick={(char) => {
+                    badgeText += char;
+                    showEmojiPicker = false;
+                  }}
+                />
+              {/if}
             </div>
             <hr />
             <div class="acc-badge-row">
@@ -775,10 +823,21 @@
               <button
                 class="acc-btn acc-btn-primary acc-pull-right"
                 type="submit"
-                formaction="?/updateBadge">Save Edit for New Badge</button
+                formaction="?/updateBadge">Save Edit for {badgeText}</button
               >
             {:else}
-              <button class="acc-btn acc-btn-warning acc-pull-right" type="submit">Add New Badge</button>
+              <!--
+                `Add {{badges.text}}` and `Save Edit for {{badges.text}}` — page.welcome.html:456
+                and :464. BOTH labels INTERPOLATE the badge's own text, so they change as you type:
+                "Add VIP", "Save Edit for VIP".
+
+                Ours had them as the literal strings "Add New Badge" and "Save Edit for New Badge".
+                That is almost certainly the capture read as source: the badge text field happened
+                to contain "New Badge" when the page was captured, so the rendered label read
+                "Save Edit for New Badge" — and a fixed phrase was transcribed from what was really
+                a variable. The same trap as the four `ng-show="false"` icons.
+              -->
+              <button class="acc-btn acc-btn-warning acc-pull-right" type="submit">Add {badgeText}</button>
             {/if}
             <button class="acc-btn acc-btn-default acc-pull-right" type="button" onclick={closeBadgeEditor}
               >Close</button
@@ -1009,21 +1068,32 @@
                 <tr>
                   <td>{admin.name}</td>
                   <td>{admin.email}</td>
-                  <td>—</td>
+                  <!-- `{{au.created | date:'short'}}` — page.welcome.html:1294. This was an em
+                       dash: the loader never selected `createdAt`, so the column the reference
+                       fills was permanently empty. -->
+                  <td>{admin.createdAt ? formatShortDateTime(admin.createdAt) : ''}</td>
                   <td class="acc-td-center">
                     <!-- The exact bootbox copy the reference pops:
                          `Remove admin user "…"? This cannot be undone.`
 
-                         HONEST GAP on the appearance: the reference's admin table
-                         is EMPTY in the capture ("No admin users added yet",
-                         #794/#795), so no admin Actions cell was ever measured.
-                         This INHERITS the pattern its two captured siblings on the
-                         same page use for row actions — `label > a` at
-                         rgb(51,122,183), 14px/20, weight 700, measured on the
-                         badges Delete (#757/#758) and the API-key delete
-                         (#822/#823). It is not a captured value; the red
-                         `btn-danger` button it replaces was not one either, and
-                         `btn-danger` appears nowhere in the capture at all. -->
+                         THE GAP THIS NOTE RECORDED IS CLOSED (2026-08-13). It said the
+                         admin table is EMPTY in the capture — true — so no Actions cell
+                         was ever measured, and the appearance was INHERITED from the
+                         badges Delete and API-key delete rows, which wrap their link in
+                         a `<label>`.
+
+                         The fetched template settles it, and the inherited pattern was
+                         WRONG. `page.welcome.html:1296` is a BARE anchor with an icon,
+                         with no `<label>` wrapper at all:
+
+                           <a href="" ng-click="removeAdminUser(au._id, au.name)">
+                             <i class="fa fa-remove text-danger"></i> Remove </a>
+
+                         So this row is the one on the page that does NOT follow its
+                         siblings. The icon is restored here; the `<label>` was never
+                         emitted by us, so nothing had to be removed. Inheriting from
+                         siblings was the right call while the row was unmeasured, and
+                         it is worth recording that it still produced a difference. -->
                     <span class="acc-row-action"
                       ><form
                         method="POST"
@@ -1033,7 +1103,9 @@
                         )}
                       >
                         <input type="hidden" name="id" value={admin.id} />
-                        <button class="acc-link" type="submit">Remove</button>
+                        <button class="acc-link" type="submit"
+                          ><i class="fa fa-remove acc-text-danger" aria-hidden="true"></i> Remove</button
+                        >
                       </form></span
                     >
                   </td>
@@ -1085,7 +1157,11 @@
                          capture only because that key happens to be unrestricted — without it, a
                          key that can call one command from one IP looks identical to one that can
                          call everything from anywhere. -->
-                    {#if key.restrictions.ips.length > 0 || key.restrictions.scopes.length > 0}
+                    <!-- `sessions` counts toward the padlock as well: the reference's own gate is
+                         `(k.restrictToSessions && k.restrictToSessions.length) ||
+                          (k.restrictToEndpoints && k.restrictToEndpoints.length)`, so a key narrowed
+                         to one ROOM is restricted even if it may call every command. -->
+                    {#if key.restrictions.ips.length > 0 || key.restrictions.scopes.length > 0 || key.restrictions.sessions.length > 0}
                       <i class="fa fa-lock acc-text-warning" title="Restricted"></i>
                     {/if}
                   </td>
@@ -1190,6 +1266,33 @@
                     IPv4 addresses or CIDR blocks, comma separated. Leave blank to allow any.
                   </span>
                 </div>
+
+                <!--
+                  `restrictToSessions` — which ROOMS this key may act on.
+
+                  A checkbox per room rather than a free-text list: the valid values are exactly the
+                  account's own short codes, they are on this same page, and a typed code that does
+                  not match one is a restriction that silently narrows to nothing. The server filters
+                  against the account's rooms regardless — this just stops an operator having to be
+                  right by hand.
+
+                  Empty means every room, which is the reference's sense for all three lists.
+                -->
+                <fieldset class="acc-field">
+                  <legend>Allowed rooms</legend>
+                  <span class="acc-hint">Leave all unticked to allow every room on the account.</span>
+                  {#each data.rooms as room (room.id)}
+                    <label class="acc-scope">
+                      <input
+                        type="checkbox"
+                        name="sessions"
+                        value={room.shortCode}
+                        checked={key.restrictions.sessions.includes(room.shortCode)}
+                      />
+                      {room.shortCode}{room.name ? ` — ${room.name}` : ''}
+                    </label>
+                  {/each}
+                </fieldset>
 
                 <fieldset class="acc-field">
                   <legend>Allowed commands</legend>
