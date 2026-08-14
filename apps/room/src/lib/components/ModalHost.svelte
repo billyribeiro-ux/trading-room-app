@@ -1170,15 +1170,58 @@
       return;
     }
     settingChecks[input.id] = input.checked;
+    /*
+      Element id -> PREFERENCE NAME, and the `?? input.id` fallback below is why this table has to
+      be right rather than merely present.
+
+      An id with no entry here is still persisted — under the id. `+page.svelte` reads preferences
+      by their reference names (`loadedSettings.recordingStartSound`), so an unmapped checkbox
+      writes `app-recording-start-sound`, which nothing reads, and the setting appears to work: the
+      label flips, the POST succeeds, and the sound still plays. That is the same defect class as
+      the dead `app-disable-video` checkbox, but harder to see, because here the consumer exists and
+      is simply never reached.
+
+      The four added on 2026-08-14 each had a live consumer sitting unreached. Every name is the
+      one the reference passes to `setPreference`, read out of `app-user-settings-modal.full.js`
+      rather than inferred from the id:
+      `recordingStartSoundOnChange` :1106-1113, `recordingStopSoundOnChange` :1114-1121,
+      `pushToTalkOnChange` :1023-1030, and `speechRecoCCOnChange` :990-1008, which sets
+      `speechRecoCC` AND mirrors it into `doSpeechReco` — `doSpeechReco` is the one this room gates
+      speech recognition on, so that is the half carried here.
+
+      Still unmapped, deliberately: the ids whose preference has no consumer in this room at all
+      (`chat-gif-donot-disturb`, `extra-chat-column`, `chat-mem-clear`, and the rest). Mapping those
+      would move the junk key rather than remove it. They are recorded in `TODO.md`.
+    */
     const preferenceKeyByInputId: Record<string, string> = {
       'alert-popup-donot-disturb': 'alertPopup',
       'settings-alert-donot-disturb': 'alertSoundOn',
       'settings-qa-donot-disturb': 'qaSoundOn',
       'settings-chat-donot-disturb': 'chatSoundOn',
       'non-trade-alert': 'nonTradeSound',
-      'longer-alert-popup': 'longerAlertPopup'
+      'longer-alert-popup': 'longerAlertPopup',
+      'app-recording-start-sound': 'recordingStartSound',
+      'app-recording-stop-sound': 'recordingStopSound',
+      'presenter-push-to-talk': 'pushToTalk',
+      'presenter-speech-recognition': 'doSpeechReco',
+      'app-speech-reco-overlay': 'showSpeechRecoOverlay',
+      'app-disable-video': 'disableVideo'
     };
-    onPreferenceChange(preferenceKeyByInputId[input.id] ?? input.id, input.checked);
+    /*
+      NO FALLBACK. This used to be `preferenceKeyByInputId[input.id] ?? input.id`, and that `??` is
+      what wrote nineteen element ids into every user's settings blob as if they were preferences.
+
+      An id with no entry above now persists NOTHING, which is the honest outcome: its checkbox has
+      no consumer in this room, so there is nothing for a stored value to restore. Writing it
+      anyway produced a key that looked like a working setting, survived reloads, and changed
+      nothing — the failure mode that hid four real defects.
+
+      Adding a checkbox therefore now means adding its preference name here as a deliberate step.
+      That is the point: the mapping is the declaration that a control HAS a consumer, and a
+      missing row fails loudly at review instead of quietly at runtime.
+    */
+    const preferenceKey = preferenceKeyByInputId[input.id];
+    if (preferenceKey) onPreferenceChange(preferenceKey, input.checked);
   }
 
   function applyGroupChatMode(mode: string) {

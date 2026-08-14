@@ -1,6 +1,7 @@
 import { fail, redirect } from '@sveltejs/kit';
 import { createHash } from 'node:crypto';
 import { and, asc, desc, eq, gt, isNull } from 'drizzle-orm';
+import { pruneDeadPreferenceKeys } from '$lib/dead-preference-keys';
 import { calculatePollTotals, parsePollChoices } from '$lib/poll-behavior';
 import {
   deleteSessionNoteTabSchema,
@@ -2235,6 +2236,21 @@ export const actions: Actions = {
       settings = {};
     }
     settings[key] = value;
+    /*
+      Remove what the old element-id fallback wrote, on the way past.
+
+      `updateSettingCheck` used to persist `preferenceKeyByInputId[input.id] ?? input.id`, so
+      nineteen HTML ids went into this blob as if they were preferences and nothing ever read them
+      back. Deleting the write does not delete what was written: every account that has opened the
+      settings modal is carrying some of them.
+
+      Here rather than in a migration, because this action already parses and rewrites the whole
+      blob — the prune is free, it needs no downtime, and it cannot half-apply. It is idempotent, so
+      an account converges on its next preference change and a converged one pays nothing. The list
+      is a deny-list for the reason `dead-preference-keys.ts` sets out: an allow-list would delete
+      the next preference somebody adds without updating it.
+    */
+    pruneDeadPreferenceKeys(settings);
 
     db.update(userSettings)
       .set({ settingsJson: JSON.stringify(settings), updatedAt: new Date() })

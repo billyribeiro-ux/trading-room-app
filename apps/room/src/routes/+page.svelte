@@ -26,6 +26,7 @@
   } from '$lib/screen-zoom';
   import ScreenVolumeControl from '$lib/components/ScreenVolumeControl.svelte';
   import PresenterMuteRows from '$lib/components/PresenterMuteRows.svelte';
+  import { DEAD_PREFERENCE_KEYS } from '$lib/dead-preference-keys';
   import {
     adjustVolumeForPresenter,
     toggleTalkingPresenter,
@@ -662,6 +663,37 @@
   let recordingStopSound = $state(loadedSettings.recordingStopSound !== false);
 
   /**
+   * `preferences.disableVideo` - the viewer's own "turn the video off to preserve data" switch.
+   *
+   * The CHECKBOX has been in the settings modal since it was built (`ModalHost.svelte:2652`,
+   * `id="app-disable-video"`). Nothing read it. `settingChecks['app-disable-video']` is written at
+   * `ModalHost.svelte:1172` and was read only by its own label two lines below itself, which made
+   * it a control whose only effect was changing its own words - the thing this repository
+   * forbids. This state is the missing consumer.
+   *
+   * Upstream the flag swaps the ENTIRE screens pane for one line of text.
+   * `app-presentationarea.render-helpers.js:496-499` - `TSe` renders `eSe` when the flag is set
+   * and `wSe` otherwise, and `wSe` is the "No one is presenting right now..." h3, `ul#screenTabs`
+   * and `div#screensTabsContent` together. The message is `eSe` at `:126-128`:
+   * `<h3 class="text-center mt-4">Video off to preserve data...</h3>`, its class being const 23 at
+   * `app-presentationarea.full.js:3907`.
+   *
+   * INVERTED relative to the checkbox, which is checked when video is ENABLED: the reference binds
+   * `checked: !preferences.disableVideo` (`app-user-settings-modal.full.js:3070`) and labels it
+   * "Enabled" / "Disabled" (`XEe` / `JEe`, `:293-298`). The modal's own default is
+   * `'app-disable-video': true`, so both halves start at "video on" without being wired together.
+   *
+   * NOT restored from a saved preference, and that is deliberate rather than an omission.
+   * `disableVideoChange()` (`app-user-settings-modal.full.js:1223-1226`) is the ONE handler in that
+   * neighbourhood that does not call `appService.setPreference` - `beepOnUserLeaveChange`,
+   * `popupOnUserLeaveChange` and `smallImagePreviewOnChange` (`:1197-1221`) all do. Upstream the
+   * switch lasts for the session and a reload comes back with video on. Matching that is also the
+   * kinder default: a member who turned the screens off on a phone last month should not open the
+   * room today to an empty pane and no idea why.
+   */
+  let videoDisabled = $state(false);
+
+  /**
    * The ROOM's recording state - `globals.roomState.isRecording` / `isRecordingPaused` / `recName`.
    *
    * Distinct from `recording`, which is this browser's own `MediaRecorder`. The `[ REC ]` badge is
@@ -1026,7 +1058,29 @@
     }
     return map;
   }
-  let subtitles = $state(false);
+  /**
+   * This viewer's caption-overlay preference — `preferences.showSpeechRecoOverlay`.
+   *
+   * `$state(false)` before, seeded from nothing, and that was the whole bug: the navbar's
+   * `presentation-subtitles` checkbox seeds and renders from
+   * `soundChecks['presentation-subtitles']`, persists through `savePreference`, and **never touched
+   * this**. Two comments in this file asserted it was "already wired". It was not — the only
+   * writers were `toggleMute`, `setMasterVolume` and the overlay's own close button. So the
+   * checkbox read "on" by default while the overlay was off, and ticking it did nothing at all.
+   *
+   * `!== false` reproduces the reference's gate exactly:
+   * `isSpeechRecoOverlayEnabled() { const e = …preferences.showSpeechRecoOverlay; return null == e
+   * || !!e }` (`app-presentationarea.full.js:2409-2412`) — absent, null and true all enable it, and
+   * only an explicit `false` turns it off. The same expression already seeds the checkbox at the
+   * `soundChecks` declaration below, which is where that reasoning was first written down; it
+   * simply never reached the state the overlay reads.
+   *
+   * Defaulting ON is safe rather than noisy, because the overlay carries its OWN second gate:
+   * `SpeechRecoOverlay.svelte:86` renders nothing at all unless there is a current caption or a
+   * non-empty history. Two gates, both of which must be open — which is what the comment at the
+   * render site already claimed.
+   */
+  let subtitles = $state(loadedSettings.showSpeechRecoOverlay !== false);
   /**
    * Closed captions.
    *
@@ -1371,14 +1425,21 @@
    * `preferences.pushToTalk` — a per-USER preference, not a room setting, so it is seeded from the
    * persisted settings blob like every other preference rather than crossing the config boundary.
    *
-   * HONEST GAP, stated because it is half a feature: nothing in this room WRITES it yet. Upstream
-   * the checkbox lives in `app-user-settings-modal` (the only other component in the decoded tree
-   * that mentions `pushToTalk`), which is a separate component and a separate piece of work. The
-   * gate below reads the preference correctly and will do the right thing the moment a control sets
-   * it; inventing a checkbox here would mean guessing at its label and position, which is the one
-   * thing this repository does not do.
+   * This USED to read "HONEST GAP: nothing in this room WRITES it yet", and that claim expired
+   * without anything here changing — the failure mode working-rule 2 exists for. The control was
+   * already built: `ModalHost.svelte` renders it as `id="presenter-push-to-talk"`. What was missing
+   * was one row in that component's id-to-preference table, so the checkbox persisted itself under
+   * its own element id and this gate never saw it. The old comment's own words were right about
+   * what to do — it "will do the right thing the moment a control sets it" — and now one does.
+   *
+   * `$state` rather than `$derived`, and the difference is not cosmetic. `loadedSettings` is a
+   * plain object, deliberately (`svelte-ignore state_referenced_locally` where it is built), so
+   * `savePreference` mutating it notifies nothing: a `$derived` over it would hold its
+   * page-load value until some unrelated dependency happened to change, and push-to-talk would
+   * start working only after a reload. Seeded from the same blob, then assigned by
+   * `savePreference`, which is what every other live preference on this page does.
    */
-  const pushToTalk = $derived(loadedSettings.pushToTalk === true);
+  let pushToTalk = $state(loadedSettings.pushToTalk === true);
   /*
     `document.body.classList.add('noselect')` — `ngAfterViewInit`, `app-room.full.js:2227-2229`,
     behind the same `!isPresenter && sessData.disableCopy` the keystroke and right-click gates use.
@@ -2863,9 +2924,48 @@
         chatSoundOn = value;
         soundChecks['chat-donot-disturb'] = value;
       }
+      /*
+        INVERTED, and the inversion is the whole point: the modal reports whether the box is
+        TICKED, and a ticked box means video is enabled. `updateSettingCheck` sends `input.checked`
+        under the reference's own preference name, and the label reads "Enabled" when checked -
+        matching the reference's `checked: !preferences.disableVideo`
+        (`app-user-settings-modal.full.js:3070`). Storing `value` here rather than `!value` would
+        blank the screens pane for every viewer who has video ON, which is all of them by default.
+      */
+      if (key === 'disableVideo') videoDisabled = !value;
+      /*
+        Four preferences whose CONSUMER already existed and whose control never reached it. The
+        modal writes them under their reference names (see the mapping table in
+        `ModalHost.svelte`); these lines are the other half, because persisting a preference does
+        not move the state this page already read it into. Without them the setting would take
+        effect only after a reload — which is how `recordingStartSound` behaved: the checkbox
+        flipped, the POST succeeded, and the sound still played.
+      */
+      if (key === 'recordingStartSound') recordingStartSound = value;
+      if (key === 'recordingStopSound') recordingStopSound = value;
+      if (key === 'pushToTalk') pushToTalk = value;
+      if (key === 'doSpeechReco') doSpeechReco = value;
+      /*
+        Both halves, because this preference has TWO controls: the navbar's
+        `presentation-subtitles` checkbox and the settings modal's `app-speech-reco-overlay`. The
+        navbar one sets `soundChecks` itself before calling here, so that line is redundant for it
+        and load-bearing for the modal — without it, changing the setting from the modal would open
+        the overlay while the navbar checkbox went on reading "off".
+      */
+      if (key === 'showSpeechRecoOverlay') {
+        subtitles = value;
+        soundChecks['presentation-subtitles'] = value;
+      }
     }
     if (typeof localStorage !== 'undefined') {
       localStorage.setItem(key, JSON.stringify(value));
+      /*
+        The same nineteen dead keys are in localStorage too, and the server's prune cannot reach
+        them: `savePreference` writes both stores, so the element-id fallback left a copy in each.
+        Removed here on the next preference change of any kind, which is the same converge-on-use
+        rule the server side uses — no startup pass, nothing to run, and idempotent once clean.
+      */
+      for (const dead of DEAD_PREFERENCE_KEYS) localStorage.removeItem(dead);
     }
     const body = new FormData();
     body.set('key', key);
@@ -9482,6 +9582,18 @@
                     aria-labelledby="screens-tab"
                   >
                     <!--
+                      The viewer's own "off to preserve data" switch, and it replaces the WHOLE
+                      pane rather than hiding the videos inside it. `TSe`
+                      (`app-presentationarea.render-helpers.js:496-499`) chooses between `eSe` -
+                      this one h3 - and `wSe`, and `wSe` is the empty-room h3, `ul#screenTabs` and
+                      `div#screensTabsContent` together, so nothing below survives the switch.
+                      That is the point: a tab strip with no video under it would still be
+                      requesting streams.
+                    -->
+                    {#if videoDisabled}
+                      <h3 class="text-center mt-4">Video off to preserve data...</h3>
+                    {:else}
+                    <!--
                       `screenSharingUsers` is an array and each presenter holds a Map of screens, so
                       N sharers x M screens each all land here as sibling tabs - the captured bar
                       carried three at once, all belonging to a single presenter.
@@ -9593,6 +9705,7 @@
                         />
                       {/each}
                     </div>
+                    {/if}
                   </div>
                   <div
                     id="streams"
