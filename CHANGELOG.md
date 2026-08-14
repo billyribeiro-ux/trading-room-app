@@ -24,6 +24,64 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-14
 
+### 2026-08-14 18:10 EDT — `main` was red: the release attestor had never been told about migration 0009
+
+**Runtime impact: none on the apps.** This is the release-attestation binary and the provenance
+seal. It is the fix that makes `main` green again.
+
+**What was red, and why it was right to be.** `0009_rename_runtime_roles.sql` shipped in `b9f775e`
+without extending `ATTESTED_MIGRATION_VERSIONS`, so
+`the_embedded_migration_pin_matches_the_migrations_on_disk` failed and took the whole Backend
+quality workflow with it (run `31836436043`). That pin is deliberately a literal: adding a migration
+is supposed to be a REVIEWED act, and the gate held until somebody reviewed it. So this was not a
+broken gate — it was a gate doing the one job it exists for.
+
+Reviewed rather than rubber-stamped: `0009` is forward-only, idempotent in both directions, refuses
+to guess when BOTH role names exist, and re-asserts the restricted posture under the new name. Pin
+extended to `0001`–`0009`.
+
+**A second defect found while fixing the first, and worse than it.** `validate_runtime_role`
+accepted only `ptr_clone_app`, and the `room_events` policy check required its target list to equal
+exactly `[EXPECTED_RUNTIME_ROLE]`. After 0009 the runtime login answers to `tradingroom_app` — so
+the attestor would have **refused to attest any correctly migrated cluster**, and would have done it
+with `runtime_role_mismatch`, a message that reads like a security finding rather than a stale pin.
+
+That is a repeat of a defect already fixed once. `db::migrate` gained `RENAMED_RUNTIME_ROLE` on
+2026-08-11, the review recording it exactly: *"Pinning a single name made 0009 rename the role its
+own preflight requires to exist."* The fix never reached this binary, because the name only appears
+in a live-database path no unit test covered. Both checks now accept either name.
+
+**The posture checks did not change.** `LOGIN`, never `SUPERUSER`/`CREATEDB`/`CREATEROLE`/
+`INHERIT`/`REPLICATION`/`BYPASSRLS`, zero direct memberships — applied identically to whichever name
+is present. A rename buys a role nothing. The policy must still target exactly ONE role; only the
+name it may carry widened. `pg_policy` stores targets by OID, so a renamed role keeps its policies
+and merely reports a new name.
+
+**Verified:**
+
+- `cargo test -p tradingroom-api --bin postgres-release-attestation` — **10 passed**, including the
+  previously failing pin test and a new one,
+  `the_runtime_role_is_accepted_under_either_name_but_never_with_a_weaker_posture`, which asserts a
+  migrated cluster is attestable, that `BYPASSRLS` still fails under BOTH names, and that no third
+  name is smuggled in by the tolerance. **Negative control run:** restoring the single-name check
+  turned it red; restored.
+- `cargo clippy -p tradingroom-api --all-targets --features testing -- -D warnings` — clean.
+- `rust-analyzer` diagnostics on the edited file — 0 errors, 0 warnings.
+- `verify-backend-provenance.mjs` — PASS, 98 imported (**87 untouched + 11 diverged**, each pinned)
+  + 1 authored here.
+
+**One by-design failure re-confirmed rather than reported as a bug.** `cargo clippy -p
+tradingroom-api --all-targets` without `--features testing` fails to compile exactly eight
+integration targets. That is fence #2 of the tenancy kernel, it is documented in `CLAUDE.md`, and
+reporting it as breakage has already cost a turn once.
+
+**Governed change, recorded as one.** `services/**` is an import-governed mirror, so the attestor
+moved from "imported untouched" to "reviewed divergence": pinned individually by hash in
+`DIVERGED_FROM_IMPORT`, counts moved 88/10 → 87/11, manifest re-pinned, and a new section appended
+to `ops/backend-import-provenance.md`. The 2026-08-12 section's `88` and `9e5fe0a6…` are left as
+written — that section records a decision point as it stood, and superseding it in place would
+destroy the record of what was measured when.
+
 ### 2026-08-14 17:02 EDT — The playback half was never a gap. It was an unopened file, and it left a security hole
 
 **Runtime impact: YES, and this closes a hole the 16:44 entry opened.** Read authorisation, a second

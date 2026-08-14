@@ -21,7 +21,9 @@ use sqlx::postgres::{PgConnectOptions, PgListener};
 use sqlx::{ConnectOptions, Connection, Executor, FromRow, PgConnection};
 use tokio::time::timeout;
 use tracing::log::LevelFilter;
-use tradingroom_api::db::migrate::{EXPECTED_MIGRATOR_ROLE, EXPECTED_RUNTIME_ROLE, MIGRATOR};
+use tradingroom_api::db::migrate::{
+    EXPECTED_MIGRATOR_ROLE, EXPECTED_RUNTIME_ROLE, MIGRATOR, RENAMED_RUNTIME_ROLE,
+};
 use uuid::Uuid;
 
 const ATTESTATION_VERSION: u32 = 1;
@@ -876,8 +878,24 @@ fn elevated_capabilities(flags: &RoleFlags) -> Vec<&'static str> {
     capabilities
 }
 
+/// Either name the runtime login may legitimately carry.
+///
+/// `0009_rename_runtime_roles` renames `ptr_clone_app` -> `tradingroom_app`, so a cluster that has
+/// migrated presents the new name and one that has not presents the old one. Both are correct, and
+/// the POSTURE checks below are identical for either — a rename does not buy a role any capability.
+///
+/// This mirrors `db::migrate`, whose preflight already accepts both. That tolerance was added there
+/// by the adversarial review of 2026-08-11, which recorded the failure exactly: "Pinning a single
+/// name made 0009 rename the role its own preflight requires to exist." **The attestor was missed by
+/// that fix.** Left as it was, it would have refused to attest any cluster that had actually applied
+/// 0009 — which is every cluster from now on — and it would have done so with a
+/// `runtime_role_mismatch`, a message that reads like a security finding rather than a stale pin.
+fn runtime_role_name_is_expected(name: &str) -> bool {
+    name == EXPECTED_RUNTIME_ROLE || name == RENAMED_RUNTIME_ROLE
+}
+
 fn validate_runtime_role(row: &RoleRow) -> Result<RuntimeRoleEvidence, AttestationError> {
-    let exact = row.name == EXPECTED_RUNTIME_ROLE
+    let exact = runtime_role_name_is_expected(&row.name)
         && row.can_login
         && !row.is_superuser
         && !row.can_create_database
@@ -914,7 +932,14 @@ fn validate_runtime_role(row: &RoleRow) -> Result<RuntimeRoleEvidence, Attestati
 /// `services/` reconcile. `0008` is the load-bearing one: `room_events` carried three independent
 /// foreign keys, so a row could hold one tenant's `enterprise_id` beside another's `room_id` and
 /// still satisfy RLS. Both are recorded in `ops/backend-import-provenance.md`.
-const ATTESTED_MIGRATION_VERSIONS: [i64; 8] = [1, 2, 3, 4, 5, 6, 7, 8];
+///
+/// Extended to `0001-0009` on 2026-08-14 for `0009_rename_runtime_roles`, which renames the runtime
+/// login `ptr_clone_app` -> `tradingroom_app`. Reviewed rather than rubber-stamped: it is
+/// forward-only, idempotent in both directions, refuses to guess when BOTH names exist, and
+/// re-asserts the restricted posture under the new name — so it cannot quietly hand the grants to a
+/// role that may bypass RLS. `0009` shipped in `b9f775e` without this list being extended, which is
+/// exactly the reviewed-act gate working: `main` went red until somebody looked.
+const ATTESTED_MIGRATION_VERSIONS: [i64; 9] = [1, 2, 3, 4, 5, 6, 7, 8, 9];
 
 fn validate_embedded_migration_contract() -> Result<(), AttestationError> {
     let versions: Vec<i64> = MIGRATOR
@@ -928,7 +953,7 @@ fn validate_embedded_migration_contract() -> Result<(), AttestationError> {
 
     Err(AttestationError::new(
         "embedded_migration_contract_changed",
-        "the attestor is pinned to repository migration versions 0001 through 0008",
+        "the attestor is pinned to repository migration versions 0001 through 0009",
     ))
 }
 
@@ -1055,10 +1080,21 @@ async fn query_and_validate_room_events(
         .as_deref()
         .ok_or_else(room_events_policy_mismatch)?;
 
+    /*
+       Targeted to EXACTLY ONE role, which must be the runtime login under either of its names.
+
+       The single-element check is the load-bearing half and is unchanged: a policy listing a second
+       role is a policy somebody widened. What 0009 changes is only which name that one role
+       answers to — and `pg_policy` stores targets by OID, so a renamed role keeps its policies and
+       simply reports the new name here.
+    */
+    let targets_runtime_role_only = matches!(policy.roles.as_slice(), [only]
+        if runtime_role_name_is_expected(only));
+
     if policy.name != "room_events_tenant_isolation"
         || policy.permissive != "PERMISSIVE"
         || policy.command != "ALL"
-        || policy.roles != [EXPECTED_RUNTIME_ROLE]
+        || !targets_runtime_role_only
         || using_expression != EXPECTED_POLICY_EXPRESSION
         || with_check_expression != EXPECTED_POLICY_EXPRESSION
     {
@@ -1084,7 +1120,7 @@ async fn query_and_validate_room_events(
 const fn room_events_policy_mismatch() -> AttestationError {
     AttestationError::new(
         "room_events_policy_mismatch",
-        "public.room_events must have exactly the reviewed tenant policy targeted only to ptr_clone_app",
+        "public.room_events must have exactly the reviewed tenant policy targeted only to the runtime role",
     )
 }
 
@@ -2015,6 +2051,41 @@ mod tests {
             mutate(&mut row);
             assert!(validate_runtime_role(&row).is_err());
         }
+    }
+
+    /// A cluster that has applied `0009` must still be attestable.
+    ///
+    /// `0009_rename_runtime_roles` renames `ptr_clone_app` -> `tradingroom_app`. `db::migrate`
+    /// learned to accept both names on 2026-08-11; this binary did not, and nothing caught it
+    /// because the name only appears in a live-database check. Left alone it would have refused
+    /// every migrated cluster with `runtime_role_mismatch` — a message that reads like a security
+    /// finding rather than a stale pin, which is the expensive way to be wrong.
+    ///
+    /// The posture half is deliberately re-asserted under the NEW name too: a rename must not buy a
+    /// role a single capability, so `BYPASSRLS` on `tradingroom_app` has to fail exactly as it does
+    /// on `ptr_clone_app`.
+    #[test]
+    fn the_runtime_role_is_accepted_under_either_name_but_never_with_a_weaker_posture() {
+        let mut renamed = restricted_runtime_row();
+        renamed.name = RENAMED_RUNTIME_ROLE.into();
+        let evidence =
+            validate_runtime_role(&renamed).expect("a migrated cluster must still be attestable");
+        assert_eq!(evidence.name, RENAMED_RUNTIME_ROLE);
+
+        for name in [EXPECTED_RUNTIME_ROLE, RENAMED_RUNTIME_ROLE] {
+            let mut row = restricted_runtime_row();
+            row.name = name.into();
+            row.bypasses_rls = true;
+            assert!(
+                validate_runtime_role(&row).is_err(),
+                "{name} must not pass with BYPASSRLS"
+            );
+        }
+
+        // And no third name is smuggled in by the tolerance.
+        let mut impostor = restricted_runtime_row();
+        impostor.name = "tradingroom_app_v2".into();
+        assert!(validate_runtime_role(&impostor).is_err());
     }
 
     /// The embedded migration pin had no test, and that cost 25 minutes to discover.

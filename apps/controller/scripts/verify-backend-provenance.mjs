@@ -48,8 +48,8 @@ const EXPECTED_PATH_LIST_SHA256 = '66ab4696e3d3685daaa5ba27e28137a1cc038a71a32fc
   to any one of them still fails — and fails naming the file — while these 88 stay sealed against
   the bytes that actually arrived at the import.
 */
-const EXPECTED_UNTOUCHED_COUNT = 88;
-const EXPECTED_MANIFEST_SHA256 = '9e5fe0a6c5ae0d8fad3eeed7baadf6aac48cccc94ab1ac2796c4983a949bc9e0';
+const EXPECTED_UNTOUCHED_COUNT = 87;
+const EXPECTED_MANIFEST_SHA256 = '70e62cc904daa01466c7616b71106cde741e05867ea750a2ddf4371ed5169aad';
 
 /*
   Files under `services/**` that were AUTHORED HERE and never imported.
@@ -114,6 +114,25 @@ const LOCALLY_AUTHORED = new Map([
 */
 const DIVERGED_FROM_IMPORT = new Map([
   ['services/Cargo.lock', '9ba77dc5f3fe6dac83a40799f6c5d60ad9e5f358f635ab094ceae608ca6d1668'],
+  /*
+    Diverged 2026-08-14, and it is the file this very comment block warned about.
+
+    Two reviewed changes, both forced by `0009_rename_runtime_roles`:
+
+      1. `ATTESTED_MIGRATION_VERSIONS` extended 0001-0008 -> 0001-0009. `0009` shipped in `b9f775e`
+         without it, which turned `main` red — the reviewed-act gate working exactly as designed.
+      2. The runtime-role and RLS-policy checks now accept EITHER `ptr_clone_app` or
+         `tradingroom_app`. `db::migrate` (already diverged, directly below) learned this on
+         2026-08-11; this binary was missed by that fix and would have refused to attest any cluster
+         that had actually applied 0009.
+
+    The posture checks are unchanged and apply to whichever name is present, so a cluster
+    mid-transition is held to exactly the same standard.
+  */
+  [
+    'services/api/src/bin/postgres-release-attestation.rs',
+    '2240bb60f82269981f11aea501209d9ca32ae66336ce33e935addca594f54738'
+  ],
   ['services/api/src/db/migrate.rs', 'edeb66043c53bcd15af46c05adb5225775716a3861dc93e1b9dd37cdf4729927'],
   ['services/media/Dockerfile', 'ae967613fdd0dba2065ec6b488c71d8a61e29eef47fca32f90690066b0eb407a'],
   ['services/media/src/config.rs', 'f9af8fb80a7ccadb1a05b506c14ecd043fae4e5b169e36d403d5d8f1fd4fe449'],
