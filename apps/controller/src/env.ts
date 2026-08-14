@@ -55,6 +55,11 @@ export const variables = defineEnvVars({
     description: 'Optional absolute URL of the separate live-room application.',
     schema: optionalUrl
   },
+  STREAM_SERVER_MTX: {
+    description:
+      "Host of the MediaMTX media server that external encoders (OBS, XSplit) publish into — HOST ONLY, no scheme and no port, because the two ingest URLs append their own: WHIP is http://<host>:8889/<path>/whip and RTMP is rtmp://<host>/<path>. Named after the reference's own `globals.streamServerMTX` so the two systems can be read side by side. Optional, and its absence is REPORTED rather than defaulted: with it blank the room's OBS panel says the server is not configured instead of handing a presenter a link to nowhere. It is a separate host from the SFU, and deliberately so — the reference keeps `streamServerMTX` and `streamServer` as two globals.",
+    schema: optionalText
+  },
   PUBLIC_SITE_ORIGIN: {
     public: true,
     description:

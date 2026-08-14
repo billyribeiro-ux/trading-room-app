@@ -71,7 +71,15 @@ export function base64Url(value: object | string): string {
     .replace(/=+$/, '');
 }
 
-function signature(secret: string, signingInput: string): string {
+/**
+ * HMAC-SHA256 over `signingInput`, base64url. Exported so there is ONE signer in this application
+ * rather than a second `createHmac` that drifts in encoding.
+ *
+ * Domain separation is the CALLER's job and is not optional: every caller prefixes its input with a
+ * literal that names the credential (`config-read:`, `stream-ingest:`). Without that, one secret
+ * mints every token type and a value valid in one context is replayable in another.
+ */
+export function signature(secret: string, signingInput: string): string {
   return createHmac('sha256', secret)
     .update(signingInput)
     .digest('base64')

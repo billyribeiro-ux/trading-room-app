@@ -655,3 +655,45 @@ export const apiKeys = pgTable('api_keys', {
    */
   restrictionsJson: text('restrictions_json').notNull().default('{}')
 });
+
+/**
+ * The credential an external encoder (OBS, XSplit) publishes into a room with.
+ *
+ * The reference mints one per presenter with `invokeAdminCmd('getRTMPToken') -> { rtmpToken }` and
+ * shows it beside the ingest URL, with a "New Link" button that replaces it
+ * (`main.d6d3c112b59b7d0d.js` byte 2169850). The full contract is in
+ * `apps/room/docs/OBS-XSPLIT-INGEST.md`.
+ *
+ * A row, not a column on `room_users`, because a credential has a lifecycle a membership does not —
+ * see migration `0012-stream-ingest-keys`. The unique index on `ingest_key` is the one the media
+ * server's auth check reads; the unique index on `(room_id, user_id)` is what makes "New Link" a
+ * replacement rather than an accumulation, so a rotated key stops working by ceasing to exist.
+ */
+export const streamIngestKeys = pgTable(
+  'stream_ingest_keys',
+  {
+    id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
+    roomId: integer('room_id')
+      .notNull()
+      .references(() => rooms.id, { onDelete: 'cascade' }),
+    userId: integer('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    /** Opaque and high-entropy. A key derivable from a room code would not be a credential. */
+    ingestKey: text('ingest_key').notNull(),
+    /**
+     * The path this key may publish to — `room__{shortCode}__{name}`.
+     *
+     * STORED rather than recomputed on each check: a presenter renaming themselves must not
+     * silently widen what an already-issued key is allowed to do.
+     */
+    ingestPath: text('ingest_path').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    /** Moves on every "New Link". The first question after a key leaks is when it was last minted. */
+    rotatedAt: timestamp('rotated_at', { withTimezone: true }).notNull().defaultNow()
+  },
+  (table) => [
+    uniqueIndex('stream_ingest_keys_key_idx').on(table.ingestKey),
+    uniqueIndex('stream_ingest_keys_room_user_idx').on(table.roomId, table.userId)
+  ]
+);

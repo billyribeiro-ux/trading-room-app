@@ -2,10 +2,11 @@
   import { ngbTooltip, ngbTooltipWith } from '$lib/ngb-tooltip';
   import { alertDateFormatter } from '$lib/message-formatters';
   import { panelDragResize } from '$lib/panel-drag';
+  import { rtmpIngestUrl, whipIngestUrl, type StreamIngestKey } from '$lib/stream-ingest';
   import { deserialize } from '$app/forms';
   import { invalidateAll } from '$app/navigation';
   import { resolve } from '$app/paths';
-  import { onMount } from 'svelte';
+  import { onMount, untrack } from 'svelte';
   import type {
     AlertTab,
     ActivePoll,
@@ -119,6 +120,19 @@
     onFollowStyleChange: (user: ModalTargetUser, style: FollowChatStyle) => void;
     onMuteToggle: (user: ModalTargetUser) => void;
     onUserAction: (action: string, user: ModalTargetUser) => void;
+    /**
+     * The saved `streamingType` preference — `'RTMP'`, `'WHIP'`, or `''` when never chosen.
+     *
+     * The radio pair has always WRITTEN this and never read it back, which was invisible while
+     * nothing depended on the value. It is load-bearing now: the reference gates its two ingest
+     * blocks on `streamingType` (byte 2152300), so an unseeded field means a presenter who chose
+     * WHIP last session reopens the panel to a blank pane.
+     *
+     * Blank stays blank rather than defaulting to one of the two. A default here would be a value
+     * nothing captured, and the reference has no unset state to copy — its preference is always
+     * populated.
+     */
+    streamingType: string;
     onManagedUserRemoval: (list: 'mutedUsers' | 'followedUsers', user: ManagedChatUser) => void;
     onManagedUserInfo: (user: ManagedChatUser) => void;
     currentUser: {
@@ -240,6 +254,7 @@
     onFollowStyleChange,
     onMuteToggle,
     onUserAction,
+    streamingType,
     onManagedUserRemoval,
     onManagedUserInfo,
     currentUser,
@@ -439,8 +454,47 @@
   let devicesLoadError = $state('');
   const fileUploadInputId = 'fupload';
   let streamPlayerEnabled = $state(false);
-  let streamingProtocol = $state('');
+  /*
+    Seeded from the saved preference, then owned locally.
+
+    Not `$derived`: the radio pair binds to it with `bind:group` and the user must be able to change
+    it without the preference having round-tripped. The initial read is the point — see the
+    `streamingType` prop.
+  */
+  let streamingProtocol = $state(untrack(() => streamingType));
   let restreamLink = $state('');
+  /*
+    OBS / XSplit ingest.
+
+    `mtxToken` is `globals.mtxToken` in the reference and is the ONE secret: the RTMP URL carries it
+    as `?jwt=`, and WHIP presents the same value as an HTTP Bearer
+    (`main.d6d3c112b59b7d0d.js` byte 2157950).
+
+    `$state.raw` on the answer object, not `$state`: it is replaced wholesale on every mint and never
+    mutated field-by-field, so a deep proxy over it would cost a proxy read on every render for a
+    reactivity nobody uses.
+  */
+  let ingest = $state.raw<StreamIngestKey | null>(null);
+  let ingestError = $state('');
+  let ingestLoading = $state(false);
+  /*
+    The three strings the presenter copies, derived from the one answer rather than assigned.
+
+    This is a DELIBERATE, named divergence from the reference, and the reason is a defect there:
+    its `getNewToken()` rebuilds `streamingLinkRTMP` only (byte 2169850), leaving `streamKey` and
+    `streamingLink` holding the token that was just revoked. A presenter who pressed "New Link"
+    while on the WHIP tab would copy a dead Bearer and the publish would be refused with nothing
+    on screen to explain why. Deriving all three from one source makes that state unrepresentable.
+  */
+  const streamKey = $derived(ingest?.rtmpToken ?? '');
+  const streamingLink = $derived(
+    ingest && ingest.configured ? whipIngestUrl(ingest.streamServerMTX, ingest.ingestPath) : ''
+  );
+  const streamingLinkRTMP = $derived(
+    ingest && ingest.configured
+      ? rtmpIngestUrl(ingest.streamServerMTX, ingest.ingestPath, ingest.rtmpToken)
+      : ''
+  );
   let reportLoading = $state(true);
   let alertDisplayMode = $state<'regular' | 'compact'>('regular');
   let chatDisplayMode = $state<'regular' | 'compact'>('regular');
@@ -1349,6 +1403,85 @@
     restreamLink = '';
     onPreferenceChange('restreamToURL', '');
   }
+
+  /**
+   * `getNewToken` — mint (or re-mint) this presenter's OBS / XSplit publish credential.
+   *
+   * The reference calls the same command on the panel's first render and on "New Link"
+   * (`main.d6d3c112b59b7d0d.js` byte 2169850), and so does this: there is no "fetch my existing
+   * key" mode, because the server rotates on every call and a key it did not just issue may
+   * already have been replaced.
+   */
+  async function getNewToken() {
+    ingestLoading = true;
+    ingestError = '';
+    try {
+      const response = await fetch('/api/stream-ingest', { method: 'POST' });
+      if (!response.ok) {
+        const body = (await response.json().catch(() => ({}))) as { message?: string };
+        /*
+          The server's own sentence, and no fallback to a stale key. A panel that kept showing the
+          previous token after a failed rotation would be showing a credential that may already be
+          revoked — the presenter would copy it, OBS would be refused, and nothing on screen would
+          say why.
+        */
+        ingest = null;
+        ingestError = body.message ?? 'The stream key could not be issued.';
+        return;
+      }
+      ingest = (await response.json()) as StreamIngestKey;
+    } catch {
+      ingest = null;
+      ingestError = 'The stream key could not be issued.';
+    } finally {
+      ingestLoading = false;
+    }
+  }
+
+  /**
+   * The reference's three copy handlers, which differ only in which field they read
+   * (bytes 2168500-2169300). Each selects the textarea first — that is what makes the copied text
+   * visibly highlighted — then writes to the clipboard and raises the same toast.
+   *
+   * `node.select()` rather than a `document.querySelector` by id: the element is right here, and
+   * querying the document for something this component rendered is how a copy button ends up
+   * reading a different pane's textarea after a refactor.
+   */
+  async function copyIngestField(node: HTMLTextAreaElement | null) {
+    if (!node) return;
+    node.select();
+    await navigator.clipboard.writeText(node.value);
+    onUserAction('copied-to-clipboard', targetUser);
+  }
+
+  /** The `here` link inside both instruction blocks — `openRestreamTab()`. */
+  function openRestreamTab() {
+    streamingControlTab = 'restream';
+  }
+
+  let streamingLinkNode = $state<HTMLTextAreaElement | null>(null);
+  let streamingLinkRtmpNode = $state<HTMLTextAreaElement | null>(null);
+  let streamWhipKeyNode = $state<HTMLTextAreaElement | null>(null);
+
+  /*
+    Mint on first sight of the OBS pane — the reference's `handleStreaming()`, which runs when the
+    streaming section initialises rather than when the modal opens.
+
+    Deliberately NOT on page load. This is a live publish credential and every request rotates it,
+    so issuing one for every viewer who opens Session Control would revoke a presenter's working
+    key from a pane they never looked at.
+
+    The guards are read through `untrack` on purpose: `getNewToken` writes both of them, and an
+    effect that both reads and writes the same state is the shape that loops. Only the two tab
+    values are dependencies, which is exactly when this should re-evaluate.
+  */
+  $effect(() => {
+    const showingObsPane =
+      sessionControlTab === 'streaming-selection' && streamingControlTab === 'obs-streaming';
+    if (!showingObsPane) return;
+    if (untrack(() => ingest !== null || ingestLoading || ingestError !== '')) return;
+    void getNewToken();
+  });
 
   async function loadDevices() {
     if (!navigator.mediaDevices?.enumerateDevices) {
@@ -4107,10 +4240,168 @@
                 <label for="streaming-whip" class="form-check-label font-weight-bold"> Whip </label>
               </div>
             </div>
-            <p>
-              If you want to stream directly from OBS into this room, you can use the following
-              interface to get your WHIP streraming link.
-            </p>
+            <!--
+              The RTMP half — the reference's `_De`, which renders only when `streamingType` is
+              RTMP (`O(153, "RTMP" === e.streamingType ? 153 : -1)`, byte 2152300). The intro
+              sentence lives INSIDE that conditional upstream, typo `streraming` and all, so it
+              moves here with it.
+            -->
+            {#if streamingProtocol === 'RTMP'}
+              <p>
+                If you want to stream directly from OBS into this room, you can use the following
+                interface to get your WHIP streraming link.
+              </p>
+              <!-- `gDe`, gated on `streamingLinkRTMP` being non-empty. No link, no block. -->
+              {#if streamingLinkRTMP}
+                <div class="m-2">
+                  <div class="d-flex align-items-center">
+                    <label for="streaming-link-rtmp" class="form-label me-2">
+                      Streaming link:
+                    </label>
+                    <button
+                      class="btn btn-outline-info btn-sm m-1"
+                      onclick={() => copyIngestField(streamingLinkRtmpNode)}
+                    >
+                      <i class="fas fa-copy"></i> Copy
+                    </button>
+                    <button
+                      class="btn btn-outline-info btn-sm m-1"
+                      disabled={ingestLoading}
+                      onclick={getNewToken}
+                    >
+                      <i class="fas fa-sync"></i> New Link
+                    </button>
+                  </div>
+                  <textarea
+                    bind:this={streamingLinkRtmpNode}
+                    id="streaming-link-rtmp"
+                    readonly
+                    class="form-control border border-danger"
+                    style="height: 100px;"
+                    value={streamingLinkRTMP}></textarea>
+                  <p>
+                    IN OBS or any RTMP compatible broadcaster enter the above link. Replace
+                    <strong>"name="</strong> with your desired name
+                  </p>
+                  <p>
+                    Note: you can re-stream this incoming stream to another rtmp destination, click
+                    <!--
+                      The reference makes this a clickable `<strong>` (consts index 112:
+                      `[1,"text-primary","fw-bold","restream-link",3,"click"]`). A `<button>`
+                      carries the SAME three classes instead, which is a deliberate and visually
+                      identical substitution: `fw-bold` already supplies the weight `<strong>` gave
+                      it, `text-primary` the colour, and the captured `.restream-link:hover` rule
+                      the underline and pointer. What changes is that a control which was
+                      mouse-only becomes focusable, announced, and operable by keyboard — Svelte
+                      refuses `role="button"` on a `<strong>`, and it is right to.
+
+                      The button chrome is stripped by `#session-control-modal button.restream-link`
+                      in `app.css`, beside the captured hover rule it belongs with.
+                    -->
+                    <button
+                      type="button"
+                      class="text-primary fw-bold restream-link"
+                      onclick={openRestreamTab}>here</button
+                    > to set that up.
+                  </p>
+                </div>
+                <hr />
+              {/if}
+            {/if}
+
+            <!--
+              The WHIP half — the reference's `vDe`, `O(154, "WHIP" === e.streamingType ? 154 : -1)`.
+
+              Its `bDe` child (Start/Stop WHIP Streaming) is deliberately NOT reproduced. Upstream it
+              renders only when `useMTX` is FALSE — it belongs to a browser-publishes-WHIP path that
+              exists when MediaMTX is switched off. This deployment's OBS design IS MediaMTX, so
+              those buttons never render in the reference for this configuration either; building
+              them here would be two controls calling nothing.
+            -->
+            {#if streamingProtocol === 'WHIP'}
+              <div class="mt-1">
+                <div class="m-2">
+                  <div class="d-flex align-items-center">
+                    <label for="streaming-link" class="form-label me-2"> Streaming link: </label>
+                    <button
+                      class="btn btn-outline-info btn-sm m-1"
+                      onclick={() => copyIngestField(streamingLinkNode)}
+                    >
+                      <i class="fas fa-copy"></i> Copy
+                    </button>
+                  </div>
+                  <div class="mb-2">
+                    <label for="streaming-link">Streaming Link</label>
+                    <textarea
+                      bind:this={streamingLinkNode}
+                      id="streaming-link"
+                      readonly
+                      rows="2"
+                      class="form-control border border-danger"
+                      style="height: auto; overflow-y: scroll;"
+                      value={streamingLink}></textarea>
+                  </div>
+                  <div class="mb-2">
+                    <label for="stream-whip-key">Bearer</label>
+                    <button
+                      class="btn btn-outline-info btn-sm m-1"
+                      onclick={() => copyIngestField(streamWhipKeyNode)}
+                    >
+                      <i class="fas fa-copy"></i> Copy
+                    </button>
+                    <textarea
+                      bind:this={streamWhipKeyNode}
+                      id="stream-whip-key"
+                      readonly
+                      rows="2"
+                      class="form-control border border-danger"
+                      style="height: auto; overflow-y: scroll;"
+                      value={streamKey}></textarea>
+                  </div>
+                  <p>
+                    Note: you can re-stream this incoming stream to another rtmp destination, click
+                    <!--
+                      The reference makes this a clickable `<strong>` (consts index 112:
+                      `[1,"text-primary","fw-bold","restream-link",3,"click"]`). A `<button>`
+                      carries the SAME three classes instead, which is a deliberate and visually
+                      identical substitution: `fw-bold` already supplies the weight `<strong>` gave
+                      it, `text-primary` the colour, and the captured `.restream-link:hover` rule
+                      the underline and pointer. What changes is that a control which was
+                      mouse-only becomes focusable, announced, and operable by keyboard — Svelte
+                      refuses `role="button"` on a `<strong>`, and it is right to.
+
+                      The button chrome is stripped by `#session-control-modal button.restream-link`
+                      in `app.css`, beside the captured hover rule it belongs with.
+                    -->
+                    <button
+                      type="button"
+                      class="text-primary fw-bold restream-link"
+                      onclick={openRestreamTab}>here</button
+                    > to set that up.
+                  </p>
+                  <p>
+                    IN OBS, under streaming, select "WHIP", and enter the above link. Replace
+                    <strong>"name="</strong> with your desired name
+                  </p>
+                </div>
+              </div>
+            {/if}
+
+            <!--
+              Not in the reference, and deliberately added: it has no state in which the ingest
+              server is missing, because its `streamServerMTX` is always populated. Ours can be
+              unset, and the repository's rule is that an absent value is REPORTED rather than
+              filled in — the alternative is a panel that composes `http://:8889/…` and looks like
+              a working link.
+            -->
+            {#if ingestError}
+              <div class="alert alert-danger m-2">{ingestError}</div>
+            {:else if ingest && !ingest.configured}
+              <div class="alert alert-info m-2">
+                No ingest server is configured for this deployment, so there is no link to publish
+                to yet. Your stream key has still been issued.
+              </div>
+            {/if}
           </div>
           <div
             id="restream"

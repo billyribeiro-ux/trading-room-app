@@ -24,6 +24,206 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-14
 
+### 2026-08-14 17:02 EDT — The playback half was never a gap. It was an unopened file, and it left a security hole
+
+**Runtime impact: YES, and this closes a hole the 16:44 entry opened.** Read authorisation, a second
+token scope, a new endpoint, and corrected guidance in two documents that would have made every
+room's video public if an operator had followed it.
+
+**What happened.** The 16:44 entry recorded "how the room PLAYS an MTX stream is not established from
+the bundle" and speculated that WHEP "would be the low-latency choice". Neither was evidence. The
+answer was in `docs/source/components/app-streaming-view.full.js` — a file in the dump I never
+opened — and reading it took four minutes:
+
+```js
+setupStream() {
+  let e = `room__${this.muser.sessionID}__${this.muser.producerID}`;
+  this.muser.mediaValue.serverName !== globals.streamServerMTX && (e += '__reb');
+  this.videoSrc = `https://${globals.streamServerMTX}/${e}/index.m3u8?jwt=${globals.mtxToken}`;
+  this.loadStream();
+}
+```
+
+**It is HLS via hls.js on 443, not WHEP on 8889.** And the playlist URL carries `?jwt=`, so playback
+is AUTHENTICATED — confirmed at the other end by `userLoggedIn`, byte 994430, which hands
+`mtxToken` and `streamServerMTX` to **every session**, presenter or not.
+
+**The defect that follows, stated plainly.** Because I had called playback undesigned, `media-auth`
+refused every non-`publish` action and both documents told operators to write
+`authHTTPExclude: [{action: read}]` in `mediamtx.yml`. An operator following that would have had
+MediaMTX serve every room's HLS playlist to anyone who could guess a path. The instruction was
+wrong, it was wrong because of an unread file, and it is now removed from both documents with the
+reason recorded in place rather than quietly deleted.
+
+**The fix — two scopes, neither spendable as the other:**
+
+- `publish` — names one exact path, backed by a database row, 30-day `exp`, revoked by New Link.
+- `read` — names a ROOM, stateless, 12-hour `exp`. Stateless because it is checked on every HLS
+  segment, several per second per viewer, and a database read per segment is the wrong trade. It has
+  to be room-scoped rather than path-scoped because the playback path is
+  `room__{sessionID}__{producerID}` and does not exist until somebody starts streaming.
+
+The room is recovered from the path by **parsing and comparing the second segment**, never by
+`startsWith` — a prefix test would let a token for room `ab` read room `abc`'s streams, and there is
+a test for exactly that. `ingestPathFor` now refuses a non-alphanumeric room key rather than
+producing a path the parser cannot read back unambiguously.
+
+**Also corrected: `MtxHandlerService`'s `connectToMTX`, `disconnectFromMTX` and `handleStreamsMTX`
+are EMPTY FUNCTION BODIES in the shipped bundle** (byte 1137300, read in full). That is not a
+capture gap — upstream ships them empty. The service keeps a list and selects tabs; the `<video>`
+element does the connecting. Anyone who assumes there is a client-side MediaMTX connection to
+reproduce will look for something that does not exist.
+
+**Landed:**
+
+- `scope` claim on every token, validated as a two-value allow-list — absent or unrecognised is
+  refused rather than read as the weaker right
+- `mintRoomReadToken`, `roomKeyOfPath`, `READ_TOKEN_TTL_SECONDS`
+- `POST /internal/stream-read/[code]` — any non-banned member, no rotation, returns `mtxToken`
+- `media-auth` authorises `read` and `playback`; `api`/`metrics`/`pprof` refused outright
+- `mediamtx.yml` example gains the HLS block and loses `authHTTPExclude`
+
+**Verified — and this time with the endpoint actually running:**
+
+- **12/12 against the live controller over HTTP**, including real **200s** so the allow path is
+  proven and not just the deny path: read token in its own room 200; `__reb` relayed path 200;
+  different room 401; prefix-adjacent room `7f3ab` 401; read-token-used-to-publish 401;
+  publish-token-used-to-read 401; wrong secret 401; no token 401; `api` 401; `metrics` 401; token in
+  a query parameter not named `jwt` 401.
+- `stream-ingest.test.ts` 26 green (was 16), `stream-ingest.db.test.ts` 7 green, room 1092/93,
+  controller 963/91, `svelte-check` 0/0 both apps.
+- **Negative control run:** deleting the publish-scope check turned "refuses a read token presented
+  for a publish" red; reverted, green.
+
+**A false result I caught and did not report as a finding.** My first runtime probe returned 401 for
+everything and looked like proof. It was not: the dev server had no `ROOM_JWT_SECRET`, so every
+request hit the "no signing secret configured" branch and never reached a token check — confirmed by
+five matching lines in its log. Re-run with a secret set, which is where the real 200s came from. A
+probe that cannot produce a 200 cannot prove a 401 means anything.
+
+**Still not built, and now precisely specified rather than hand-waved:** `/internal/media-hook`, the
+room's `mtxStreams` list, the stream tabs, and the `app-streaming-view` equivalent. Every value they
+need is read and cited in `OBS-XSPLIT-INGEST.md` §6 — including the full hls.js configuration, the
+three buffer levels, and the adaptive-degradation ladder. They are blocked on one thing: `producerID`
+and `mediaValue` come from the server's stream object, and `services/**` is an import-governed mirror,
+so that shape is not ours to invent here.
+
+### 2026-08-14 16:44 EDT — OBS / XSplit ingest, built end to end
+
+**Runtime impact: YES, and it adds a new credential type.** A presenter can now be issued a publish
+key for an external encoder, MediaMTX can be pointed at an endpoint that authorises it, and the OBS
+panel has every element the reference's does. A new database table (`stream_ingest_keys`, migration
+`0012`), a new environment variable (`STREAM_SERVER_MTX`), and two new controller routes.
+
+**Nothing here is dead.** The entry 20 minutes earlier said this should not be built until a
+MediaMTX host exists, and that reasoning was half right — it applied to the *panel*, not to the
+credential. The token, its rotation and its validation are testable and correct without the media
+server existing, because MediaMTX authorises publishes by POSTing to an endpoint **we** own. And the
+panel is not a link to nowhere: with `STREAM_SERVER_MTX` blank it says the ingest server is not
+configured instead of composing `http://:8889/…`.
+
+**Two claims in the contract written 20 minutes earlier were WRONG. Both are corrected in place and
+recorded, not quietly fixed** — and both came from reading a fragment instead of the region around
+it, which is the failure mode `~/CLAUDE.md` exists to prevent:
+
+1. **`useMediaMTX` does not switch the RTMP/WHIP instructions.** The radio pair does —
+   `O(153, "RTMP" === e.streamingType ? 153 : -1)`, `O(154, "WHIP" === … ? 154 : -1)` at byte
+   2152300. `useMTX` gates one thing one level in: a pair of Start/Stop WHIP Streaming buttons that
+   render only when `useMediaMTX` is **off**. They are deliberately not reproduced — this
+   deployment's OBS design *is* MediaMTX, so they never render upstream for this configuration
+   either. Consequence: `useMediaMTX` never had to cross `ROOM_VISIBLE_SETTINGS`.
+2. **The RTMP URL ends `?jwt=${mtxToken}`.** The earlier version stopped at the path. That parameter
+   name is the *only* evidence of the token's format anywhere in the bundle, and the WHIP side
+   carries the same token as an HTTP **Bearer** — the panel's field is labelled exactly that (consts
+   index 116). One token, two carriers, which is precisely how MediaMTX's HTTP auth surfaces it.
+
+**A defect in the reference, and the one deliberate divergence.** Its `getNewToken()` rebuilds
+`streamingLinkRTMP` and nothing else, so `streamKey` and `streamingLink` keep showing the token that
+was just revoked: press New Link on the WHIP tab and you copy a dead Bearer, with the publish
+refused and nothing on screen explaining it. All three are `$derived` from one source here, which
+makes that state unrepresentable. Same strings, no staleness.
+
+**The credential design, and why it is both a JWT and a row.** A bare JWT cannot be revoked and
+"New Link" exists to revoke; a bare opaque key needs a database read to reject anything, and this is
+checked on every publish attempt. So: HS256 over `sub` (the exact path), `jti` (the row), `iat`,
+`exp`, verified in memory *before* any query — then `jti` matched against the one live row.
+`UNIQUE (room_id, user_id)` plus an upsert means rotation replaces the predecessor in the same
+statement that creates the successor, so a revoked key stops working by ceasing to exist rather than
+by being remembered as stale. 30-day `exp` is a backstop, chosen and documented as ours because the
+bundle does not show a lifetime.
+
+**Deny-by-default at every step**, and each has a test: no token → refused; wrong signature →
+refused; expired → refused; `sub` ≠ requested path → refused (by equality, never prefix); action
+other than `publish` → refused; a correctly signed token missing any claim → refused rather than
+read as unrestricted. Room A's key cannot publish to room B. Deleting a room takes its keys with it.
+
+**Authority stays on the server.** The room sends who is asking; the controller re-derives from
+`room_users` whether that person may publish, using the same `role === 0 || isRoomPresenter(…)`
+expression `/internal/room-config` uses for `isP`. A 403 is passed through as a 403 rather than
+collapsed into "controller unavailable" — a participant being told no is the system working, not an
+outage.
+
+**Landed:**
+
+- `apps/controller/src/lib/server/db/migrations/0012-stream-ingest-keys.js`, registered in
+  `migrations/index.js`; `streamIngestKeys` in `schema.ts`
+- `apps/controller/src/lib/server/stream-ingest.ts` — path builder, mint/rotate, verify, the auth
+  decision, and `tokenFromAuthRequest` reading `token` or the `jwt` query parameter and nothing else
+- `apps/controller/src/routes/internal/stream-ingest/[code]/+server.ts` — `getRTMPToken`
+- `apps/controller/src/routes/internal/media-auth/+server.ts` — MediaMTX's `authHTTPAddress` target
+- `apps/room/src/lib/stream-ingest.ts` + `apps/room/src/routes/api/stream-ingest/+server.ts`
+- `ModalHost.svelte` — the seven missing panel elements, transcribed from `gDe`/`vDe` and decoded
+  against the component's `consts` array at byte 2173342
+- `STREAM_SERVER_MTX` in `src/env.ts` and `.env.example`
+- `apps/room/docs/OBS-XSPLIT-SETUP.md` — operator setup and presenter instructions
+
+**A pre-existing bug this work exposed, found by re-reading the diff.** The RTMP/WHIP radio pair has
+always WRITTEN `streamingType` to preferences and never read it back. That was invisible while
+nothing depended on the value; the moment the two ingest blocks are gated on it — which is what the
+reference does — an unseeded field means a presenter who chose WHIP last session reopens the panel to
+a blank pane. `streamingType` is now a prop, supplied from `loadedSettings`. Blank stays blank rather
+than defaulting to one of the two: a default would be a value nothing captured, and the reference has
+no unset state to copy because its preference is always populated.
+
+**One `<strong>` became a `<button>`, deliberately.** The restream cross-link is a clickable
+`<strong>` upstream (consts index 112). Svelte refuses `role="button"` on a `<strong>` and is right
+to; the button carries the reference's three classes, so `fw-bold` supplies the weight, `text-primary`
+the colour and the captured `.restream-link:hover` rule the underline. Identical rendering, and a
+control that was mouse-only is now focusable. The chrome reset sits in `app.css` beside the captured
+rule it belongs with. The reference's `type="text"` on a `<textarea>` (consts index 117) is dropped —
+invalid HTML with no effect.
+
+**Verified:**
+
+- `svelte-check` — 0 errors, 0 warnings, both apps
+- `svelte-autofixer` on `ModalHost.svelte` — no issues
+- full unit suites, both apps: controller **953 tests / 91 files**, room **1092 / 93**, zero failures
+- `verify-documented-test-counts.mjs` — green after updating the four documented sites from 937/90 to
+  953/91. It caught the drift before a push, which is what it is for; the CHANGELOG's historical
+  937s are records of past runs and were left alone.
+- `stream-ingest.test.ts` — 16 green. **Negative control run:** relaxing the empty-`sub` check turned
+  the claim test red; reverted, green.
+- `stream-ingest.db.test.ts` — 7 green against a real PostgreSQL, which also proves migration 0012
+  applies to a fresh database. **Negative control run:** pointing the upsert at the wrong conflict
+  target turned both the rotation test and the one-row test red; reverted, green.
+- `apps/room/src/lib/stream-ingest.test.ts` — 5 green. **Negative control run:** dropping `:8889`
+  from the WHIP URL turned three red; reverted, green.
+
+**One test failure was MINE, not the code's**, and is recorded because the rule is to rule that out
+before reporting anything: the cascade test did a bare `DELETE FROM rooms`, which `room_settings`'
+foreign key refuses. `stream_ingest_keys` cascades correctly; the test now clears the two
+non-cascading tables first and says why in a comment.
+
+**NOT verified, and it is the honest gap:** no publish from a real encoder has been made, because
+there is no MediaMTX host. That is the one piece of evidence this feature cannot yet produce, and
+`OBS-XSPLIT-INGEST.md` §9 says so. The playback half — how the room renders an MTX stream as a tab —
+is also still unbuilt and unclaimed; `/internal/media-hook` is named in the config example and
+explicitly marked as not written rather than pointed at nothing.
+
+**Correction for whoever wires the hooks:** MediaMTX's are `runOnAvailable` / `runOnUnavailable`.
+`runOnReady` / `runOnNotReady`, which the earlier entry and `TODO.md` both named, were renamed and no
+longer exist (mediamtx.org/docs/usage/hooks).
+
 ### 2026-08-14 16:24 EDT — The OBS/XSplit ingest contract, read rather than designed
 
 **Runtime impact: none. Nothing built, deliberately** — and the reason is in the last line of the

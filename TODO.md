@@ -32,38 +32,72 @@ this deployment does not have.
 | **X** | `app-recording-preview-window` — `setRecPreview` comes from the MediaMTX path | a MediaMTX cluster |
 | **AC** | `stopRecMsg` — the same producer, the same path | a MediaMTX cluster |
 
-| **AD** | **OBS / XSplit ingest — contract COMPLETE in `apps/room/docs/OBS-XSPLIT-INGEST.md`, nothing built.** | a MediaMTX host at `streamServerMTX` |
+| **AD** | **OBS / XSplit ingest — INGEST BUILT 2026-08-14. Two things remain: a MediaMTX host, and the playback half.** | a MediaMTX host at `STREAM_SERVER_MTX` |
 
-**Row AD, established 2026-08-14 16:2x.** The owner's requirement is that a presenter can stream from
-the BROWSER (works today, mediasoup) and from **OBS / XSplit** (does not). The reference's panel is at
-bundle bytes 2141780–2143720 and our `ModalHost` copy has only its first two elements: the RTMP/WHIP
-radio pair and the intro sentence, typo `streraming` and all. Missing: the streaming link itself, the
-`streamKey`, **Copy**, **New Link** (`getNewToken()`), the RTMP instructions ("IN OBS or any RTMP
-compatible broadcaster enter the above link. Replace `name=` with your desired name"), the WHIP
-instructions ("IN OBS, under streaming, select \"WHIP\", and enter the above link"), and the restream
-cross-link ("you can re-stream this incoming stream to another rtmp destination, click here"). The two
-instruction blocks are switched by `O(1, e.useMTX ? -1 : 1)` — **`useMediaMTX` is exactly what turns
-OBS ingest from RTMP into WHIP**, which is the tie between this row and X/AC/R row 10.
+**Row AD, built 2026-08-14 16:41.** The owner's requirement is that a presenter can stream from the
+BROWSER (works today, mediasoup) **and** from OBS / XSplit. The ingest half now exists end to end:
+the migration, the credential, its rotation, the media server's authorisation check, the room
+endpoint and every missing panel element. `apps/room/docs/OBS-XSPLIT-INGEST.md` is the contract and
+`apps/room/docs/OBS-XSPLIT-SETUP.md` is the operator + presenter instructions.
 
-**THE CONTRACT IS NOW COMPLETE — `apps/room/docs/OBS-XSPLIT-INGEST.md`, every value read at a cited
-byte offset.** The URLs are not guesses: `http://{streamServerMTX}:8889/room__{sessionID}__{name}/whip`
-and `rtmp://{streamServerMTX}/room__{sessionID}__{name}`, with the key from
-`invokeAdminCmd('getRTMPToken') -> {rtmpToken}` and `name` sanitised by
-`replace(/[^a-zA-Z0-9_-]/g,'_')` and THEN `encodeURIComponent` (byte 2157950, 2169850).
-**`streamServerMTX` is a DIFFERENT global from `streamServer`** — MediaMTX is its own host in the
-reference too, which is the separate media tier row H argues for.
+**Two claims in the previous version of this row were WRONG, and reading the region around the
+fragment is what disproved them.** Recorded rather than quietly corrected:
 
-**Latency decides the protocol split, so it is not arbitrary.** WHIP is WebRTC end to end, sub-second,
-native in OBS since v30 — that is the quality path and the reason `useMediaMTX` exists. RTMP is TCP
-with buffering, but ingesting H.264 and republishing over WebRTC WITHOUT transcoding stays near a
-second, and XSplit is RTMP-centric so that path is what makes XSplit work at all. MediaMTX serves both
-and does not transcode when codecs align — one server answers both halves of the requirement.
+1. *"The two instruction blocks are switched by `O(1, e.useMTX ? -1 : 1)` — `useMediaMTX` is exactly
+   what turns OBS ingest from RTMP into WHIP."* **No.** Byte 2152300 shows the switch is the radio
+   pair: `O(153, "RTMP" === e.streamingType ? 153 : -1)` and `O(154, "WHIP" === e.streamingType ? 154
+   : -1)`. `useMTX` gates one thing inside the WHIP block — a pair of Start/Stop WHIP Streaming
+   buttons that render only when `useMediaMTX` is **off**. Consequence: `useMediaMTX` never needed to
+   cross `ROOM_VISIBLE_SETTINGS`, so the four-edit process was not required.
+2. *The RTMP URL is `rtmp://{streamServerMTX}/room__{sessionID}__{name}`.* Incomplete — it ends
+   `?jwt=${mtxToken}`. That parameter name is the only evidence anywhere of the token's format, and
+   the WHIP side does not carry it in the URL at all: the panel's second field is labelled **`Bearer`**
+   (consts index 116). One token, two carriers, which is exactly how MediaMTX's HTTP auth surfaces it
+   (`token` vs `query`).
 
-**What is blocked is not code.** A MediaMTX host at `streamServerMTX` with 8889 (WHIP/WHEP) and 1935
-(RTMP) reachable, TLS in front, and its `runOnReady`/`runOnNotReady` hooks pointed at the controller so
-`mtxStartStream`/`mtxStopStream` can be broadcast. Everything in the spec is buildable the day that
-host exists, and none of it should be built before — a panel handing a presenter a link to nowhere is
-the dead control this repository refuses to ship.
+**A defect in the reference, and our one deliberate divergence.** Its `getNewToken()` rebuilds
+`streamingLinkRTMP` only, leaving `streamKey` and `streamingLink` holding the token just revoked — so
+pressing New Link on the WHIP tab yields a dead Bearer. Ours derives all three from one source.
+
+**What is blocked is still not the ingest code.** A MediaMTX host at `STREAM_SERVER_MTX` with 8889
+(WHIP/WHEP) and 1935 (RTMP) reachable and TLS in front. With the variable blank the panel says so
+honestly and the credential still mints, rotates and validates — `stream-ingest.db.test.ts` proves
+all three against a real PostgreSQL. What cannot be produced without the host is an end-to-end
+publish from a real encoder.
+
+**The PLAYBACK half — READ 2026-08-14 17:02, and it was never a gap.** This row said twice that the
+mechanism was "not established from the bundle" and guessed WHEP. Both were wrong. The answer was in
+`docs/source/components/app-streaming-view.full.js`, a file in the dump nobody had opened:
+
+```js
+this.videoSrc = `https://${globals.streamServerMTX}/room__${muser.sessionID}__${muser.producerID}/index.m3u8?jwt=${globals.mtxToken}`;
+```
+
+**HLS via hls.js on 443, not WHEP on 8889** — with `__reb` appended when
+`mediaValue.serverName !== streamServerMTX`. And the playlist carries `?jwt=`, so playback is
+authenticated; `userLoggedIn` (byte 994430) hands every session an `mtxToken`, not just presenters.
+
+**That mattered, because the guess had produced a real hole.** `media-auth` refused all reads and
+both documents told operators to `authHTTPExclude` them, which would have served every room's video
+to anyone who guessed a path. Fixed the same day: a `read` scope, room-scoped and stateless, proven
+by 12/12 live HTTP checks including genuine 200s.
+
+**Also read, also worth recording:** `MtxHandlerService`'s `connectToMTX`, `disconnectFromMTX` and
+`handleStreamsMTX` are **empty function bodies in the shipped bundle** (byte 1137300). Upstream has
+no client-side MediaMTX connection to reproduce — the service keeps a list and selects tabs, and the
+`<video>` element does the rest.
+
+**What is left is four named pieces, blocked on ONE thing rather than on evidence:**
+`/internal/media-hook`, the room's `mtxStreams` list, the stream tabs
+(`app-presentationarea.full.js:589-618`, including the "No one is streaming right now..." empty
+state), and the `app-streaming-view` equivalent (whose full hls.js configuration — three buffer
+levels, `lowLatencyMode`, the optimal→balanced→conservative ladder — is transcribed in
+`OBS-XSPLIT-INGEST.md` §6). The blocker: `producerID` and `mediaValue` come from the SERVER's stream
+object, and `services/**` is an import-governed mirror, so that shape is not ours to author here.
+
+**Note for whoever builds the hooks: they are `runOnAvailable`/`runOnUnavailable`.
+`runOnReady`/`runOnNotReady`, which this row previously named, were renamed and no longer exist**
+(mediamtx.org/docs/usage/hooks).
 
 **One decision unblocks X, AC and R's row 10, and it is not "build server-side recording".** Established
 2026-08-14 from the bundle: the reference hands recording to **MediaMTX**, an off-the-shelf media
@@ -73,8 +107,13 @@ reference's SERVER — they appear nowhere in the room bundle. The room only obs
 asks the server to record them, so **there is no room code waiting to be written.** Client-side
 `MediaRecorder` is NOT a divergence — upstream takes that same branch whenever no MTX stream exists.
 
-**Not established, and not claimed:** how a stream reaches MediaMTX. An earlier draft said "over
-WHIP"; reading the WHIP sites disproved it — they are the OBS-ingest panel, a different feature.
+**Established 2026-08-14, having previously been listed here as unknown:** how a stream reaches
+MediaMTX. It is the OBS-ingest panel — an external encoder publishes over WHIP or RTMP with a token
+the controller mints, and MediaMTX asks the controller to authorise it. That is row AD, now built.
+The earlier draft's error was the opposite one: it said the *client* publishes over WHIP, and the
+WHIP sites turned out to be this panel. Both halves of that confusion are now resolved.
+
+**Still not established, and still not claimed:** how the room PLAYS an MTX stream once it exists.
 
 **Row S closed 2026-08-14.** The room owns its login page again, the product has ONE entry form
 rather than two, and the question I put to the owner turned out to have an answer in the bundle:
