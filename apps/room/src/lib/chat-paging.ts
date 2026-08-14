@@ -25,14 +25,27 @@ export const CHAT_PAGE_TRIGGER_SCROLL_TOP = 100;
 export const CHAT_PAGE_TRIGGER_MIN_MESSAGES = 15;
 
 /**
- * `scrollTop = scrollTop + 30` after the request goes out.
+ * `scrollTop = scrollTop + 30`, applied IMMEDIATELY after the request goes out.
  *
  * The reader is pinned at the top when the request fires, and `scrollTop` stays under the threshold
  * until the answer arrives and re-flows the list. Without the nudge, every scroll event in that
  * window re-fires the trigger; `loadingMore` catches those, but the nudge is what stops the
  * scroller from feeling stuck against the top edge while it waits.
  */
-export const CHAT_PAGE_SCROLL_NUDGE = 30;
+export const CHAT_PAGE_REQUEST_NUDGE = 30;
+
+/**
+ * `this.scroller.scrollTop = this.scroller.scrollTop + 1` when a page GREATER THAN ZERO arrives.
+ *
+ * The reference nudges twice, and the second one is not a duplicate of the first. Prepending fifty
+ * rows leaves the browser free to keep `scrollTop` where it was, which is now pointing at different
+ * content; a one-pixel scroll is the smallest thing that makes the scroller recompute its anchor
+ * without visibly moving the reader.
+ *
+ * Only for a later page. Page 0 arriving takes upstream's other branch entirely — that is the
+ * initial log, and it belongs at the bottom, not one pixel down from wherever the reader was.
+ */
+export const CHAT_PAGE_ARRIVAL_NUDGE = 1;
 
 export type ChatPagingState = {
   scrollTop: number;

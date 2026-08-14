@@ -1,7 +1,8 @@
 <script lang="ts">
   import { deserialize } from '$app/forms';
   import {
-    CHAT_PAGE_SCROLL_NUDGE,
+    CHAT_PAGE_ARRIVAL_NUDGE,
+    CHAT_PAGE_REQUEST_NUDGE,
     mergeOlderChatMessages,
     shouldLoadOlderMessages
   } from '$lib/chat-paging';
@@ -2151,8 +2152,25 @@
   // it does not survive a reload.
   const unreadQaAlertIds = new SvelteSet<number>();
 
+  /*
+    The alerts log pages too, and shares this machinery deliberately: upstream renders ONE roomlog
+    component for both, switched on `logType`, so the trigger, the guards, the terminator and both
+    nudges are the same code there and are the same code here. What differs is only that alerts have
+    no channel — `getAlertsLog {page}` against `getChatLog {channel, page}`.
+  */
+  /** Older alert pages, oldest-first. */
+  let olderAlerts = $state.raw<(typeof data.alerts)[number][]>([]);
+  let alertsPage = $state.raw(0);
+  let alertsHasMoreData = $state(true);
+  let alertsLoadingMore = $state(false);
+  /*
+    The live tail from the load, with whatever older pages the reader has scrolled back to in front
+    of it — the same two-lifetime split the chat log uses, and for the same reason: `data.alerts` is
+    replaced by every `invalidateAll()`, so older pages held there would be discarded by one new
+    alert.
+  */
   const visibleAlerts = $derived(
-    data.alerts
+    mergeOlderChatMessages(olderAlerts, data.alerts)
       .filter((item) => !isEvidenceMessageHidden(item))
       .map(withEvidenceState)
       .filter((item) => matchesAlertSearch(item))
@@ -2389,6 +2407,7 @@
   let olderChatMessages = $state.raw<Record<string, (typeof data.messages)[number][]>>({});
   /** `this.currPage`, per channel. Page 0 is what the load already sent. */
   let chatPage = $state.raw<Record<string, number>>({});
+
   /**
    * `this.hasMoreData`, PER CHANNEL — cleared when a page comes back empty, re-armed at the bottom.
    *
@@ -2445,7 +2464,54 @@
   }
 
   function trackAlertsScroll(event: Event) {
-    alertsScrollingUp = isRoomScrollerReadingHistory(event.currentTarget as HTMLElement);
+    const scroller = event.currentTarget as HTMLElement;
+    alertsScrollingUp = isRoomScrollerReadingHistory(scroller);
+    // Back at the bottom, so paging is armed again — `hasMoreData = !0` on the way down.
+    if (!alertsScrollingUp) alertsHasMoreData = true;
+    if (
+      !shouldLoadOlderMessages({
+        scrollTop: scroller.scrollTop,
+        messageCount: visibleAlerts.length,
+        /* REAL here, unlike the chat log: the alerts pane has a live search field, and
+           `matchesAlertSearch` filters the rendered list by it. Upstream refuses to page while a
+           term is set because a filtered log is not a paged one — asking for page 2 of a filter the
+           server knows nothing about would interleave unfiltered history into a filtered view. */
+        searchTerm: alertSearch,
+        hasMoreData: alertsHasMoreData,
+        loadingMore: alertsLoadingMore
+      })
+    ) {
+      return;
+    }
+    scroller.scrollTop += CHAT_PAGE_REQUEST_NUDGE;
+    void loadOlderAlerts(scroller);
+  }
+
+  /** `loadMoreLogs({type: 'alerts', page})` -> `getAlertsLog {page}`. */
+  async function loadOlderAlerts(scroller: HTMLElement) {
+    alertsLoadingMore = true;
+    const page = alertsPage + 1;
+
+    const body = new FormData();
+    body.set('page', String(page));
+    const response = await fetch('?/loadOlderAlerts', { method: 'POST', body });
+    const result = deserialize<
+      { page?: number; alerts?: (typeof data.alerts)[number][] },
+      { message?: string }
+    >(await response.text());
+
+    alertsLoadingMore = false;
+    if (result.type !== 'success' || !result.data?.alerts) return;
+
+    const incoming = result.data.alerts;
+    if (incoming.length === 0) {
+      alertsHasMoreData = false;
+      return;
+    }
+
+    alertsPage = page;
+    olderAlerts = mergeOlderChatMessages(incoming, olderAlerts);
+    scroller.scrollTop += CHAT_PAGE_ARRIVAL_NUDGE;
   }
 
   function trackChatScroll(event: Event) {
@@ -2487,6 +2553,12 @@
     ) {
       return;
     }
+    /*
+      `+30` the instant the request goes out, before any answer — upstream applies it synchronously
+      after the emit, in the scroll handler itself. It moves the reader off the trigger zone so a
+      continuing gesture is not fighting the threshold while the fetch is in flight.
+    */
+    scroller.scrollTop += CHAT_PAGE_REQUEST_NUDGE;
     void loadOlderChatMessages(chatTab, scroller);
   }
 
@@ -2525,11 +2597,13 @@
       [channel]: mergeOlderChatMessages(incoming, olderChatMessages[channel] ?? [])
     };
     /*
-      `scrollTop = scrollTop + 30` — the reference's nudge, applied here rather than at request time
-      because that is when the list has actually grown. Leaving the reader pinned at 0 against a
-      taller list reads as the scroller being stuck.
+      The SECOND nudge. The reference does two and they are not duplicates: `+30` the instant the
+      request goes out, which is above, and `+1` when a page greater than zero arrives, which is
+      here. Prepending fifty rows leaves the browser free to keep `scrollTop` pointing at what is
+      now different content, and one pixel is the smallest scroll that makes it recompute the
+      anchor without visibly moving the reader.
     */
-    scroller.scrollTop += CHAT_PAGE_SCROLL_NUDGE;
+    scroller.scrollTop += CHAT_PAGE_ARRIVAL_NUDGE;
   }
 
   $effect(() => {

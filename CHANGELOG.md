@@ -24,6 +24,53 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-14
 
+### 2026-08-14 13:01 EDT — The alerts log is paged too, and the chat nudge was wrong
+
+**Runtime impact: yes.** The alerts read was the same unbounded `.all()` the chat read had been —
+every alert row for the room, re-read and re-serialised on every `invalidateAll()`, which is every
+SSE event. It serves fifty now, with the rest on demand.
+
+**The page size is the CHAT constant, and that is upstream's doing, not a shortcut.** There is no
+`alertLogPageSize` anywhere in the bundle. `trimAlertsLog` splices the alerts log down to
+`globals.chatLogPageSize`, and the handler that receives a page is literally the same component for
+both logs, switched on `logType`. So `alert-log.ts` imports `CHAT_LOG_PAGE_SIZE` rather than
+declaring a second fifty that could quietly become a different number.
+
+**Shared machinery, for the same reason.** `shouldLoadOlderMessages` and `mergeOlderChatMessages`
+serve both logs, because upstream's trigger, its two guards, its empty-page terminator and both its
+nudges are one implementation there. The only real difference is the wire: `getAlertsLog {page}` has
+no channel, because alerts are one stream per room.
+
+**A CORRECTION to what shipped at 12:43.** Reading the arrival handler whole, to port the alerts
+branch, showed that the reference nudges the scroller **twice** and that the two are not duplicates:
+`scrollTop + 30` synchronously after the request goes out, in the scroll handler, and
+`scrollTop + 1` when a page greater than zero arrives. The 30 moves the reader off the trigger zone
+so a continuing gesture is not fighting the threshold mid-flight; the 1 makes the browser recompute
+its scroll anchor after fifty rows are prepended, without visibly moving anybody. The chat
+implementation had applied 30 on ARRIVAL and nothing at request time — one nudge doing neither job.
+Both logs now do both, and `CHAT_PAGE_SCROLL_NUDGE` is split into `CHAT_PAGE_REQUEST_NUDGE` and
+`CHAT_PAGE_ARRIVAL_NUDGE` so the two cannot be confused again.
+
+**The alerts search term is a real gate, where chat's was vacuous.** The chat pane has no live
+filter, so its call site passes `''` and says so in a comment. The alerts pane does —
+`matchesAlertSearch` filters the rendered list — so upstream's refusal to page while a term is set
+is load-bearing here: asking for page 2 of a filter the server knows nothing about would interleave
+unfiltered history into a filtered view.
+
+**A test defect found by a negative control that stayed GREEN.** `page 0 is refused` asserted
+`toContain` over the whole server file. Once the alerts action landed carrying the identical guard,
+deleting the guard from the CHAT action left the assertion passing — the other action satisfied it.
+Both are now sliced apart by their own boundaries and each goes red on its own. This is the third
+time an over-broad assertion has been caught here, and the first time the catch came from a control
+that did not go red rather than from a failure.
+
+**Verified:** `svelte-check` 0 errors 0 warnings; room **1011/87**, up from 1003/87. **Ten negative
+controls run**: unbounding the alerts read, declaring a second page-size constant, dropping the
+alerts index, discarding older alert pages on invalidate, paging while a search filter is active,
+never re-arming, losing one of the two nudges, and each action's page guard independently. **Not
+run:** the full gate; no `EXPLAIN ANALYZE`, for the same reason as the chat entry — no dataset here
+large enough for the measurement to mean anything.
+
 ### 2026-08-14 12:47 EDT — SECURITY: alert questions crossed rooms, in both directions
 
 **Runtime impact: yes, and this is a tenancy fix rather than a feature.** Two independent holes in

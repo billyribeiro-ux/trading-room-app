@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  CHAT_PAGE_SCROLL_NUDGE,
+  CHAT_PAGE_ARRIVAL_NUDGE,
+  CHAT_PAGE_REQUEST_NUDGE,
   CHAT_PAGE_TRIGGER_MIN_MESSAGES,
   CHAT_PAGE_TRIGGER_SCROLL_TOP,
   mergeOlderChatMessages,
@@ -74,8 +75,18 @@ describe('shouldLoadOlderMessages', () => {
     expect(shouldLoadOlderMessages({ ...armed, loadingMore: true })).toBe(false);
   });
 
-  it('the nudge is the reference number', () => {
-    expect(CHAT_PAGE_SCROLL_NUDGE).toBe(30);
+  it('there are TWO nudges, and they are not duplicates', () => {
+    /*
+      `+30` synchronously after the emit, in the scroll handler, so a continuing gesture is not
+      fighting the threshold while the fetch is in flight. Then `+1` when a page greater than zero
+      arrives, because prepending fifty rows leaves the browser free to keep `scrollTop` pointing at
+      what is now different content.
+
+      The first draft of this feature applied 30 on arrival and nothing at request time — a single
+      nudge doing neither job properly. Both numbers are upstream's.
+    */
+    expect(CHAT_PAGE_REQUEST_NUDGE).toBe(30);
+    expect(CHAT_PAGE_ARRIVAL_NUDGE).toBe(1);
   });
 });
 

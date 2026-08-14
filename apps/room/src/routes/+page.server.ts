@@ -34,6 +34,7 @@ import {
   loadChatPage,
   loadNewestChatPages
 } from '$lib/server/chat-log';
+import { loadAlertPage } from '$lib/server/alert-log';
 import { parseReactions } from '$lib/server/reactions';
 import { readRoomConfig, requestMobilePin, writeRoomSetting } from '$lib/server/room-config-client';
 import { alertSoundCommandValue } from '$lib/files-gates';
@@ -334,38 +335,14 @@ export const load: PageServerLoad = async ({ depends, locals, request, cookies }
   */
   const messageRows = loadNewestChatPages(requireRoomShortCode(locals));
 
-  const alertRows = db
-    .select({
-      id: alerts.id,
-      senderId: alerts.senderId,
-      kind: alerts.kind,
-      body: alerts.body,
-      targetUrl: alerts.targetUrl,
-      nonTrade: alerts.nonTrade,
-      isAdmin: alerts.isAdmin,
-      backgroundColor: alerts.backgroundColor,
-      fontColor: alerts.fontColor,
-      questionCount: alerts.questionCount,
-      questionAnswered: alerts.questionAnswered,
-      reactionsJson: alerts.reactionsJson,
-      createdAt: alerts.createdAt,
-      senderName: users.displayName,
-      senderEmail: users.email,
-      senderAvatarUrl: users.avatarUrl,
-      senderRole: users.role,
-      senderStatus: users.status
-    })
-    .from(alerts)
-    .innerJoin(users, eq(alerts.senderId, users.id))
-    // `/sess/${sessionID}/alerts/` — this room's alerts.
-    .where(eq(alerts.roomShortCode, requireRoomShortCode(locals)))
-    .orderBy(asc(alerts.createdAt))
-    .all()
-    .map(({ senderEmail, reactionsJson, ...alert }) => ({
-      ...alert,
-      reactions: parseReactions(reactionsJson),
-      senderEmailHash: hashEmail(senderEmail)
-    }));
+  /*
+    THE NEWEST PAGE, not every alert the room has ever posted.
+
+    The same defect the chat log had and the same cure — see `$lib/server/alert-log.ts`. Older
+    pages come from `loadOlderAlerts` and are held in client state, so an `invalidateAll()` cannot
+    throw away what a reader scrolled back to.
+  */
+  const alertRows = loadAlertPage(requireRoomShortCode(locals));
 
   const questionRows = db
     .select({
@@ -1637,6 +1614,33 @@ export const actions: Actions = {
       channel,
       page,
       messages: loadChatPage(requireRoomShortCode(locals), channel, page)
+    };
+  },
+
+  /**
+   * `getAlertsLog {page}` — one page of older alerts.
+   *
+   * The sibling of `loadOlderChatMessages`, minus the channel: alerts are one stream per room, so
+   * upstream's command carries a page and nothing else. An EMPTY answer is what stops the client
+   * asking, and the arrival handler that reads it is literally the same component for both log
+   * types, switched on `logType`.
+   */
+  loadOlderAlerts: async ({ request, locals }) => {
+    ensureDatabase();
+    requireUser(locals);
+
+    const data = await request.formData();
+    /* Page 0 is the newest page and the load already sent it; the upper bound caps the OFFSET
+       walk, which is a scan. Same reasoning as the chat action, same constant. */
+    const page = Number(data.get('page') ?? 0);
+    if (!Number.isInteger(page) || page < 1 || page > MAX_CHAT_LOG_PAGE) {
+      return fail(400, { message: 'No such page.' });
+    }
+
+    return {
+      success: true,
+      page,
+      alerts: loadAlertPage(requireRoomShortCode(locals), page)
     };
   },
 

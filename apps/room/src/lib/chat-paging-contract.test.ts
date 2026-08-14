@@ -24,6 +24,7 @@ import {
 const SERVER = readFileSync(new URL('../routes/+page.server.ts', import.meta.url), 'utf8');
 const PAGE = readFileSync(new URL('../routes/+page.svelte', import.meta.url), 'utf8');
 const CHAT_LOG = readFileSync(new URL('./server/chat-log.ts', import.meta.url), 'utf8');
+const ALERT_LOG = readFileSync(new URL('./server/alert-log.ts', import.meta.url), 'utf8');
 const DB = readFileSync(new URL('./server/db/index.ts', import.meta.url), 'utf8');
 
 const stripComments = (source: string) =>
@@ -32,6 +33,24 @@ const stripComments = (source: string) =>
 const serverCode = stripComments(SERVER);
 const pageCode = stripComments(PAGE);
 const chatLogCode = stripComments(CHAT_LOG);
+const alertLogCode = stripComments(ALERT_LOG);
+
+/*
+  The two paging actions, sliced apart by their own boundaries.
+
+  They sit next to each other and carry identical guards, so any assertion that searches the whole
+  file proves nothing about either. `loadOlderChatMessages` runs to `loadOlderAlerts`, and
+  `loadOlderAlerts` runs to `deletePrivateChatLog`, which is the next action after it.
+*/
+const between = (start: string, end: string) => {
+  const from = serverCode.indexOf(start);
+  const to = serverCode.indexOf(end, from);
+  expect(from, `${start} must exist`).toBeGreaterThan(-1);
+  expect(to, `${end} must follow ${start}`).toBeGreaterThan(from);
+  return serverCode.slice(from, to);
+};
+const chatAction = () => between('loadOlderChatMessages: async', 'loadOlderAlerts: async');
+const alertsAction = () => between('loadOlderAlerts: async', 'deletePrivateChatLog: async');
 
 describe('the read is bounded', () => {
   it('the page size is the reference constant', () => {
@@ -126,7 +145,13 @@ describe('the action refuses what it should', () => {
   });
 
   it('page 0 is refused, because the load already sent it', () => {
-    expect(serverCode).toContain('page < 1 || page > MAX_CHAT_LOG_PAGE');
+    /*
+      SCOPED to the chat action. A bare `toContain` over the whole file passed while the guard was
+      deleted from this action, because the alerts action added later carries the identical line —
+      caught by a negative control that stayed green when it should have gone red. Two actions with
+      the same guard need two assertions that can tell them apart.
+    */
+    expect(chatAction()).toContain('page < 1 || page > MAX_CHAT_LOG_PAGE');
   });
 
   it('and the offset is capped, because OFFSET is a scan', () => {
@@ -143,10 +168,8 @@ describe('the action refuses what it should', () => {
       A `roomShortCode` field on this form would be the 2026-08-07 privilege escalation in a new
       place: one tenant reading another tenant's chat log by editing a form field.
     */
-    const from = serverCode.indexOf('loadOlderChatMessages: async');
-    const action = serverCode.slice(from, serverCode.indexOf('deletePrivateChatLog', from));
-    expect(action).toContain('requireRoomShortCode(locals)');
-    expect(action).not.toContain("data.get('roomShortCode')");
+    expect(chatAction()).toContain('requireRoomShortCode(locals)');
+    expect(chatAction()).not.toContain("data.get('roomShortCode')");
   });
 });
 
@@ -169,5 +192,79 @@ describe('the client stops asking at the end of history', () => {
     expect(pageCode).toContain(
       'if (!chatScrollingUp) chatHasMoreData = { ...chatHasMoreData, [chatTab]: true };'
     );
+  });
+});
+
+describe('the alerts log is paged by the same machinery', () => {
+  /*
+    Upstream renders ONE roomlog component for both logs, switched on `logType`. The scroll trigger,
+    the two guards, the empty-page terminator and both nudges are literally the same code there, so
+    they are the same code here — `shouldLoadOlderMessages` and `mergeOlderChatMessages` are shared.
+    What differs is only the wire: `getAlertsLog {page}` has no channel.
+  */
+
+  it('the read is bounded, and by the CHAT constant, because upstream has no separate one', () => {
+    /*
+      There is no `alertLogPageSize` anywhere in the bundle. `trimAlertsLog` splices the alerts log
+      down to `globals.chatLogPageSize`, so the same fifty governs both. Importing it rather than
+      declaring a second constant is what stops the two drifting.
+    */
+    expect(alertLogCode).toContain("import { CHAT_LOG_PAGE_SIZE } from './chat-log';");
+    expect(alertLogCode).toContain('.limit(CHAT_LOG_PAGE_SIZE)');
+    expect(alertLogCode).toContain('.offset(page * CHAT_LOG_PAGE_SIZE)');
+    expect(serverCode).toContain('loadAlertPage(requireRoomShortCode(locals))');
+    expect(serverCode).not.toContain('.orderBy(asc(alerts.createdAt))');
+  });
+
+  it('pages on the room alone — alerts are one stream, not per channel', () => {
+    expect(alertLogCode).toContain('.where(eq(alerts.roomShortCode, roomShortCode))');
+    expect(alertLogCode).not.toContain('alerts.room,');
+  });
+
+  it('has its own paging index', () => {
+    expect(DB).toContain('CREATE INDEX IF NOT EXISTS alerts_paging_idx');
+    expect(DB).toContain('ON alerts(room_short_code, created_at DESC, id DESC)');
+  });
+
+  it('older pages are fetched and survive the invalidate', () => {
+    expect(serverCode).toContain('loadOlderAlerts: async ({ request, locals }) => {');
+    expect(pageCode).toContain("await fetch('?/loadOlderAlerts'");
+    expect(pageCode).toContain('mergeOlderChatMessages(olderAlerts, data.alerts)');
+  });
+
+  it('and it refuses page 0 and an unbounded offset, like the chat action', () => {
+    expect(alertsAction()).toContain('page < 1 || page > MAX_CHAT_LOG_PAGE');
+    expect(alertsAction()).toContain('requireRoomShortCode(locals)');
+    expect(alertsAction()).not.toContain("data.get('roomShortCode')");
+  });
+
+  it('the alerts search term REALLY gates paging, unlike the chat one', () => {
+    /*
+      The chat log has no live filter, so its call site passes `''` and says so. The alerts pane
+      does have one — `matchesAlertSearch` filters the rendered list — so upstream's refusal to page
+      while a term is set is load-bearing here: asking for page 2 of a filter the server knows
+      nothing about would interleave unfiltered history into a filtered view.
+    */
+    expect(pageCode).toContain('searchTerm: alertSearch,');
+  });
+
+  it('and stops at the first empty page, re-arming at the bottom', () => {
+    expect(pageCode).toContain('alertsHasMoreData = false;');
+    expect(pageCode).toContain('if (!alertsScrollingUp) alertsHasMoreData = true;');
+  });
+});
+
+describe('both logs nudge twice, which is what upstream does', () => {
+  it('+30 the instant the request goes out, and +1 when a later page arrives', () => {
+    /*
+      Two different jobs. The 30 moves the reader off the trigger zone so a continuing gesture is
+      not fighting the threshold mid-flight; the 1 makes the browser recompute its scroll anchor
+      after fifty rows are prepended, without visibly moving anybody.
+
+      The first draft of the chat side applied 30 on ARRIVAL and nothing at request time — one nudge
+      doing neither job. Found by reading the arrival handler while porting the alerts side.
+    */
+    expect(pageCode.match(/scrollTop \+= CHAT_PAGE_REQUEST_NUDGE;/g)).toHaveLength(2);
+    expect(pageCode.match(/scrollTop \+= CHAT_PAGE_ARRIVAL_NUDGE;/g)).toHaveLength(2);
   });
 });

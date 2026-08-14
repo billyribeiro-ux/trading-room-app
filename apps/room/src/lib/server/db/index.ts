@@ -390,6 +390,13 @@ export function ensureDatabase() {
        ON messages(room_short_code, room, created_at DESC, id DESC)`
   );
 
+  /* The alerts log's paging index, for the same reason and in the same shape. Alerts have no
+     channel, so the room is the only equality column. */
+  sqlite.exec(
+    `CREATE INDEX IF NOT EXISTS alerts_paging_idx
+       ON alerts(room_short_code, created_at DESC, id DESC)`
+  );
+
   /*
     The two captured-item tables need the room in their PRIMARY KEY, not beside it: the same
     fixture item is re-emitted into every room, so hiding or editing one is a fact about one room's
