@@ -29,8 +29,24 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 **Runtime impact: none.** Three rows re-characterised from the bundle, because all three named their
 blocker wrongly and that wrong name made the work look bigger and vaguer than it is.
 
+> **CORRECTION, 16:20 EDT, before this entry was an hour old.** The paragraph below originally said
+> the reference "publishes to MediaMTX over **WHIP**". That was INFERENCE from two strings sitting in
+> the same bundle, and reading them disproved it: every `WHIP` occurrence is the OBS-ingest panel —
+> *"If you want to stream directly from OBS into this room, you can use the following interface to
+> get your WHIP streaming link"*, with Start/Stop WHIP Streaming buttons (byte 2142400). It is a
+> different feature.
+>
+> What the MTX path actually does is narrower and it makes the conclusion stronger, not weaker:
+> `mtxStartStream` and `mtxStopStream` are SERVER→client notifications. The room pushes each into
+> `mtxStreams` and renders it as a stream TAB (`selectStreamTabOfId`, byte 1137850). **The client
+> never publishes to MediaMTX at all** — it observes streams the server already holds and asks the
+> server to record them. So there is no client-side publish to write, and the entire feature is
+> server-side infrastructure. How a stream reaches MediaMTX in the first place is NOT established by
+> the client bundle and is not claimed here.
+
 **Every recording row said "server-side recording", which reads as something to be BUILT.** It is
-not. The reference publishes to **MediaMTX** over **WHIP** and lets that server do the recording:
+not built from scratch either — the reference hands recording to **MediaMTX**, an off-the-shelf
+media server:
 
 ```js
 this.useMTX = this.globals.sessData.useMediaMTX;      // byte 1115350
