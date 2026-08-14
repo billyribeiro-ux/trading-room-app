@@ -130,6 +130,28 @@ describe('the wire has no silent break points', () => {
     );
   });
 
+  it('the four counts the CHANGELOG states are the ones in the source', () => {
+    /*
+      26 reach the handler, 1 returns early, 12 are mapped, 13 are unmapped with no consumer — and
+      the dead list is 19, which answers a DIFFERENT question: every id that could have been
+      written as junk, i.e. the 26 minus the 6 mapped before this work minus the early-returning
+      one.
+
+      Pinned because I gave two wrong counts writing this up — fifteen, then fourteen — by counting
+      `app-disable-video`, which was already reaching `savePreference` by its raw id, and
+      `pm-window-layout`, which never went through the fallback. A number stated in prose and
+      nowhere else is a number that drifts; these are now read from the files.
+    */
+    const reaching = MODAL.split('onchange={updateSettingCheck}').length - 1;
+    const table = /const preferenceKeyByInputId[\s\S]*?\n    \};/.exec(modalCode)?.[0] ?? '';
+    const mapped = (table.match(/': '/g) ?? []).length;
+
+    expect(reaching).toBe(26);
+    expect(mapped).toBe(12);
+    expect(reaching - 1 - mapped).toBe(13);
+    expect(DEAD_PREFERENCE_KEYS).toHaveLength(reaching - 1 - 6);
+  });
+
   it('every dead key is gone from both stores, and pm-window-layout is not mistaken for one', () => {
     /*
       Removing the WRITE does not remove what was written. The server prunes the blob it is already

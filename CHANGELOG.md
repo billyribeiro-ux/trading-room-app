@@ -65,14 +65,23 @@ unless it is named, and every name was established by reading every occurrence o
 
 **`pm-window-layout` is deliberately NOT on the list**, and it looks exactly like one that should
 be. It has its own handler and has always persisted under `pmLogsOnRight`, a real name — deleting it
-would throw away a genuine preference. Its absence is asserted, not assumed. That also corrects the
-count in the previous entry: fourteen was one too many, because `pm-window-layout` never went
-through the fallback at all.
+would throw away a genuine preference. Its absence is asserted, not assumed.
 
-**Verified:** 27 tests in the wiring contract, including a sweep proving all 26 ids that reach the
+**The arithmetic, since I gave two wrong counts on the way here.** 26 checkboxes reach
+`updateSettingCheck`; 1 returns early (`settings-app-donot-disturb`) and never persists; 12 are now
+mapped; **13** remain unmapped with no consumer. The 07:33 entry said fifteen and the TODO row said
+fourteen — the first counted `app-disable-video`, which was already reaching `savePreference` by its
+raw id, and both counted `pm-window-layout`, which never went through the fallback at all. The dead
+list is **19**, a different number for a different question: every id that could have been WRITTEN
+as junk, which is the 26 minus the 6 mapped before today minus the early-returning one. All four
+figures are now asserted from source by `settings-preference-wiring-contract.test.ts`.
+
+**Verified:** 28 tests in the wiring contract, including a sweep proving all 26 ids that reach the
 handler are mapped, listed as dead, or the early-returning one — so a new checkbox added without a
-mapping row fails here. Three negative controls: the fallback restored, one key dropped from the
-dead list, and the server prune deleted. Each red on the right assertion, green on restore.
+mapping row fails here — and the four counts above read out of the source rather than typed into
+this file. Four negative controls: the fallback restored, one key dropped from the dead list, the
+server prune deleted, and a thirteenth mapping row added. Each red on the right assertion, green on
+restore.
 
 **One of my own checks was wrong first and is worth recording.** The sweep initially keyed on
 `class="form-check-input"` and reported `follow-chat-text-color` — a colour picker on a different
@@ -81,7 +90,8 @@ the actual criterion. Two contract tests also went red on this change and both w
 they pinned the old behaviour, and one carried a note saying removing the fallback *should* trip it
 rather than pass silently.
 
-Room suite 814 tests / 75 files, `svelte-check` 0 errors, `svelte-autofixer` no issues, prettier
+Full gate exit 0 immediately before the push: room 815 tests / 75 files, controller 925 tests / 88
+files, documented totals verified, `svelte-check` 0 errors, `svelte-autofixer` no issues, prettier
 clean.
 
 ### 2026-08-14 07:37 EDT — the caption overlay was gated on a flag nothing set
