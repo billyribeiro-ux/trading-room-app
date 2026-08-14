@@ -107,6 +107,19 @@ const ROOM_CONSUMED = [
   'enableBadges',
   'showBadgesToPresentersOnly',
   'disableStarYears',
+  /* "Enable Rich Text Editor?" — the OWNER term in a THREE-way gate. The room reads it as
+     `sessData.enableRTE && preferences.enableRTE && isPresenter`, and that expression appears three
+     times in the decoded bundle: on the composer button that opens the editor (byte 1426967), in
+     `loadRTE` which refuses to construct the editor without it, and again in `retriveRTEContent`
+     which returns an empty string. The same double-gate shape as `beepOnUserJoin` — owner AND
+     viewer must both allow it — with a presenter term on top. Added 2026-08-14 with the editor.
+
+     AND NO APOSTROPHE ABOVE, for the same reason the note further up forbids a square bracket.
+     The test reads this array by matching single-quoted runs, so an apostrophe in prose opens a
+     phantom string that swallows every name until the next one. This comment said "the OWNER-s
+     term" with a real apostrophe and turned the whole 38-name list into punctuation. The rule is
+     now two characters wide: no square bracket, no apostrophe, anywhere inside this array. */
+  'enableRTE',
   'allowUsersToChangeUsername',
   'altBenzingaLinkURL',
   'altBenzingaLogoURL',
@@ -496,6 +509,11 @@ if (defs.length !== EXPECTED_TOTAL_COUNT) {
 }
 
 const missingWiredSettings = [...WIRED_SETTINGS].filter((name) => !defs.some((definition) => definition.name === name));
+// 54 since 2026-08-14: `enableRTE` joined with the chat rich text editor. It is the owner's term
+// in a three-way gate the room resolves as `sessData.enableRTE && preferences.enableRTE &&
+// isPresenter`; the other two terms are the presenter's own preference and their role, neither of
+// which is the owner's to decide, so only this one crosses.
+//
 // 53 since 2026-08-14: `enableBadges`, `showBadgesToPresentersOnly` and `disableStarYears`
 // joined once chat badges had a SUPPLY — see the note in `verify-room-settings-schema.mjs`.
 //
@@ -523,7 +541,7 @@ const missingWiredSettings = [...WIRED_SETTINGS].filter((name) => !defs.some((de
 //
 // The literal is a tripwire, not a fact about the schema — it is here so the wired set cannot grow
 // by accident, which is why changing it is a deliberate edit.
-if (WIRED_SETTINGS.size !== 53 || missingWiredSettings.length > 0) {
+if (WIRED_SETTINGS.size !== 54 || missingWiredSettings.length > 0) {
   throw new Error(
     `wired-setting contract invalid: ${WIRED_SETTINGS.size} keys, missing ${missingWiredSettings.join(', ') || 'none'}`
   );

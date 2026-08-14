@@ -24,6 +24,90 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-14
 
+### 2026-08-14 12:28 EDT — RTE steps 3 and 4: the editor, both entry points, and the gate
+
+**Runtime impact: YES.** A presenter in a room whose owner has ticked "Enable Rich Text Editor?",
+and who has ticked "Enable RTE" in their own settings, now gets a `fa-font` button in the chat
+composer that opens a working editor. Everyone else sees exactly what they saw before.
+
+Steps 3 and 4 landed together on purpose. Step 3 alone would have shipped a component behind a gate
+whose inputs did not exist — dead code at every commit — and this repository's rule is that nothing
+exists without a consumer.
+
+**The gate, resolved once.** `sessData.enableRTE && preferences.enableRTE && isPresenter` is the
+reference's own expression and appears three times in the decoded bundle: on the composer button
+(the fifth conditional in the same const block that resolves the image, YouTube and GIF buttons,
+byte 1426967), inside `loadRTE()`, which refuses to construct the editor at all, and inside
+`retriveRTEContent()`, which returns an empty string so a send that was somehow reached reads
+nothing out. Three consumers is three chances to disagree, so the room derives `canUseRTE` once and
+all three read it.
+
+**Step 4, the four settings edits, all in the same change** — `ROOM_CONSUMED`,
+`ROOM_VISIBLE_SETTINGS`, the verifier's own note, and the `consumers` map. 54 wired, up from 53; the
+generator's count tripwire fired exactly as designed and was raised deliberately. The preference
+wire `presenter-enable-rte` → `enableRTE` is joined too: that checkbox has rendered since the
+presenter tab was built and its value went nowhere, so it was the twenty-first row in
+`preferenceKeyByInputId` and the fourteenth wire repaired. Its element id stays on
+`DEAD_PREFERENCE_KEYS`, because the junk it wrote under that id before today is still in people's
+blobs.
+
+**Default OFF, and read rather than chosen.** `enableRTE` is not among the twenty-five keys in the
+reference's default preferences object (byte 979500ff, where `pushToTalk:!1` and
+`makeUsersFollowMyScreens:!1` are), so a fresh account evaluates the gate on `undefined`. `!== false`
+would have handed every presenter a toolbar upstream does not give them.
+
+**The component.** `RichTextEditor.svelte` — the five captured controls and no sixth, the captured
+placeholder and the captured 200px minimum. `bind:innerHTML` on a contenteditable region, which is
+the documented Svelte binding, rather than jQuery plus summernote; `execCommand` for the five
+commands, with the reasoning for that written down where the next person will look. It draws no
+Close and no Send, because the capture puts those in `modal-footer` and the `#rteModal` shell
+already had them — `Save` when editing, `Send` otherwise, from `O(14, o.isEditing ? 14 : 15)`.
+
+**Both entry points.** The composer button carries the composer's text in and leaves the composer
+empty, both halves of `openRTEModal()`. That text is ESCAPED on the way in: `#textAreaTxt` is a
+textarea, so its value is text, and upstream handing it to `summernote('code', …)` parses it as
+markup. The edit path routes to the editor when the message HAS a `body_html` — a column read, not
+the `containsHtml(msg.txt)` sniff upstream uses, and the same rule the renderer already follows.
+
+**Two deliberate narrowings, each recorded in the code that makes them.** Upstream's edit branch
+omits the presenter term while `retriveRTEContent()` still requires it, so a member who owns a rich
+message gets an editor, types, presses Save, and is told their message is empty; ours asks the full
+gate, so strictly fewer people reach the editor and everyone who reaches it can finish. And the
+emptiness test is the SERVER's rule rather than upstream's four literal strings, because `<b></b>`
+— Bold, then Send — passes those, is refused by the server with a 400, and leaves the modal with
+nothing to display.
+
+**The server edit path now rewrites BOTH columns.** A chat edit sets `body_html` to the sanitised
+HTML or to NULL, never "leave whatever was there": editing a rich message through the plain prompt,
+which is what happens once an owner turns the editor off, would otherwise write a new `body` and
+leave the old markup behind, and the renderer picks the column — the message would go on displaying
+a sentence it no longer says. Chat only; the alerts table has no such column and upstream's rich
+edit branch is chat-only too.
+
+**Found by re-reading the diff, not by a test — and now it has a test.** `Modal` renders its
+children whether it is open or not; it hides with `inert` plus `display: none`. Gating the editor on
+`canUseRTE` alone mounted it at page load, ran its focus attachment into a hidden container, and
+meant it would NOT focus on the open that matters, because the attachment had already run. It is
+gated on `name === 'rich-text'` as well, which is also the exact shape of `destroyRTE()` replacing
+the host with an empty div of the same id on every close.
+
+**A comment broke a contract for the third time, in a new way.** The note in `ROOM_CONSUMED` forbids
+a square bracket anywhere inside that array, because the boundary test reads the list with a regex
+that stops at the first closing bracket. The new entry used an APOSTROPHE — "the OWNER's term" —
+and `matchAll(/'([^']+)'/g)` read it as the start of a string literal, turning all thirty-eight
+names into punctuation. Same family, different character. The rule in that file is now two
+characters wide.
+
+**Verified:** `svelte-check` 0 errors 0 warnings; `svelte-autofixer` clean on the new component and
+on both new markup regions; room `chat-rte-gate-contract` (20), `settings-preference-wiring-contract`
+(78), `chat-rich-text-contract`, `chat-html` — 115 passing; controller `room-config-boundary` and
+`sso-boundary` 32 passing; `verify-room-settings-schema.mjs` green at 54 wired. **Eight negative
+controls run and each went red**: dropping `isPresenter` from the gate, flipping the preference
+default ON, un-narrowing the edit branch to upstream's polarity, letting the server edit leave stale
+markup, cutting the preference wire again, losing the `Save` label, swapping a captured control for
+one the config does not have, and mounting the editor for the whole session instead of per open.
+**Not run:** the full gate, and `room-config-seam-e2e.mjs`, which needs a live controller.
+
 ### 2026-08-14 11:52 EDT — RTE step 2: the column, the server control, and the render branch
 
 **Runtime impact: still none — no editor sends `bodyHtml` yet.** The path it will use is now built

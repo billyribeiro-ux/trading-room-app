@@ -22,6 +22,7 @@
   import Modal from './Modal.svelte';
   import PollPanel from './PollPanel.svelte';
   import PostAlertModal from './PostAlertModal.svelte';
+  import RichTextEditor from './RichTextEditor.svelte';
   import RoomMessage from './RoomMessage.svelte';
   import type { PastedImageSubmission, PostAlertSubmission } from '$lib/post-alert-behavior';
   import {
@@ -169,6 +170,21 @@
      * `filterAlerts` in `$lib/alerts-advanced-search`.
      */
     alerts: SearchableAlert[];
+    /**
+     * The chat rich text editor's three-way gate, already resolved by the page.
+     *
+     * `sessData.enableRTE && preferences.enableRTE && isPresenter`. Resolved there and not here
+     * because the same answer gates the composer button that opens this modal, and one expression
+     * with one consumer cannot drift from itself. The reference asks it twice for the same reason
+     * and gets it wrong once — see `canUseRTE` in `+page.svelte`.
+     */
+    canUseRTE?: boolean;
+    /** The message being composed in the editor, as HTML. The page owns it; this modal shows it. */
+    rteDraft?: string;
+    /** `Save` when editing an existing message, `Send` otherwise — the reference's two labels. */
+    rteIsEditing?: boolean;
+    onRteDraftChange: (html: string) => void;
+    onRteSend: () => void;
   }
 
   let {
@@ -233,7 +249,12 @@
     mutedUsers,
     followedUsers,
     targetMessage,
-    alerts
+    alerts,
+    canUseRTE = false,
+    rteDraft = '',
+    rteIsEditing = false,
+    onRteDraftChange,
+    onRteSend
   }: Props = $props();
 
   /**
@@ -1223,6 +1244,10 @@
       'chat-badges-donot-disturb': 'chatBadges',
       'chat-popup-donot-disturb': 'chatPopup',
       'chat-mem-clear': 'trimChatLogs',
+      /* `enableRTEOnChange()` at `app-user-settings-modal.full.js:1031-1035` persists `enableRTE`,
+         read from that handler rather than inferred from the id. The checkbox has rendered since
+         the presenter tab was built and its value went nowhere. */
+      'presenter-enable-rte': 'enableRTE',
       /* The presenter tab's own Do-not-disturb pair. SECOND controls for preferences that
          already have live consumers — the reference wires them to `alertSoundOnChange()` and
          `chatSoundOnChange()`, the very same handlers its main tab uses. */
@@ -5281,13 +5306,51 @@
     titleClass="modal-title"
     {onclose}
   >
-    <div id="msgTxtContainer"></div>
+    <!--
+      `#msgTxtContainer` is the editor HOST, kept because that is what the capture calls it: the
+      reference mounts summernote onto this div and `destroyRTE()` replaces the whole element with
+      an empty one of the same id. Unmounting the component is our equivalent, so the id is
+      structural here rather than decorative — the toolbar and the editable region are inside it.
+
+      Gated, not merely hidden. `loadRTE()` refuses to construct the editor at all unless
+      `sessData.enableRTE && preferences.enableRTE && isPresenter`, so with the gate shut there is
+      no editor rather than a disabled one — and `retriveRTEContent()` asks the same question again
+      before reading anything out of it, which is the half reproduced on the send below.
+    -->
+    <div id="msgTxtContainer">
+      <!--
+        `name === 'rich-text'` as well as the gate, and it is load-bearing rather than tidy.
+        `Modal` renders its children whether it is open or not — it hides with `inert` plus
+        `display: none` so the dialog keeps its DOM. An editor mounted on page load would run its
+        focus attachment into a hidden container at startup, and then NOT focus on the open that
+        matters, because the attachment had already run.
+
+        Mount on open and unmount on close is also the exact shape of the capture: `destroyRTE()`
+        tears summernote down and replaces the host with an empty div of the same id, and every
+        open calls `loadRTE()` again.
+      -->
+      {#if name === 'rich-text' && canUseRTE}
+        <!--
+          A function binding rather than `bind:` on a bindable prop: this component reports
+          everything to the page through callbacks, and one prop reaching back into the parent's
+          state would be the only exception. The getter and setter say the same thing explicitly.
+        -->
+        <RichTextEditor bind:value={() => rteDraft, (html) => onRteDraftChange(html)} />
+      {/if}
+    </div>
     {#snippet footer()}
       <div class="d-flex justify-content-between w-100 align-items-center">
         <button type="button" data-bs-dismiss="modal" class="btn btn-secondary" onclick={onclose}>
           Close
         </button>
-        <button type="button" class="btn btn-primary"><span>Send</span></button>
+        <!--
+          Two labels, chosen by `o.isEditing ? 14 : 15` over a pair of embedded views that hold
+          `<span>Save</span>` and `<span>Send</span>`. The span is the capture's, not a wrapper
+          added here.
+        -->
+        <button type="button" class="btn btn-primary" onclick={onRteSend}>
+          {#if rteIsEditing}<span>Save</span>{:else}<span>Send</span>{/if}
+        </button>
       </div>
     {/snippet}
   </Modal>

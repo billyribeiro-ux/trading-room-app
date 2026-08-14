@@ -10,7 +10,7 @@
 // roomType has no captured value because its editor is absent from rendered evidence.
 //
 // `wired` is the honest bit: false means the controller can store the value but
-// nothing in the room reads it yet. 53 of 269 are wired today.
+// nothing in the room reads it yet. 54 of 269 are wired today.
 // Flip one to true ONLY when a consumer exists, so the UI can mark the rest
 // instead of pretending they do something.
 
@@ -173,7 +173,7 @@ export const ROOM_SETTINGS: readonly RoomSettingDef[] = [
   { name: "userUploads", section: "settings", type: "checkbox", label: "User Chat Screenshots?", help: "If enabled, Users will be able to upload screenshots on the chat", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: true },
   { name: "enableDiscord", section: "settings", type: "checkbox", label: "Enable Discord?", help: "It will enable Discord", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
   { name: "disableEmojis", section: "settings", type: "checkbox", label: "Disable Emojis?", help: "If enabled, Users will be able to add emojis using the emoji tool", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
-  { name: "enableRTE", section: "settings", type: "checkbox", label: "Enable Rich Text Editor?", help: "If enabled, Presenter will be able to format their messages using the rich text editor", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
+  { name: "enableRTE", section: "settings", type: "checkbox", label: "Enable Rich Text Editor?", help: "If enabled, Presenter will be able to format their messages using the rich text editor", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: true },
   { name: "enableReactions", section: "settings", type: "checkbox", label: "Enable Reactions?", help: "If enabled, Users will be able to add reactions to the messages", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
   { name: "enableQAReactions", section: "settings", type: "checkbox", label: "Enable QA Reactions?", help: "If enabled, Users will be able to add reactions to the QA messages", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
   { name: "enableEditMessage", section: "settings", type: "checkbox", label: "Enable Edit Messages?", help: "If enabled, everyone will be able to edit their own messages", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },

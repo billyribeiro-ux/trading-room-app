@@ -126,6 +126,12 @@ const WIRES = [
     preference: 'trimChatLogs',
     handler: 'reduceChatLogMemoryChange',
     assignment: "if (key === 'trimChatLogs') trimChatLogs = value;"
+  },
+  {
+    id: 'presenter-enable-rte',
+    preference: 'enableRTE',
+    handler: 'enableRTEOnChange',
+    assignment: "if (key === 'enableRTE') enableRTE = value;"
   }
 ] as const;
 
@@ -186,9 +192,17 @@ describe('the wire has no silent break points', () => {
       one. The dead list does NOT shrink as wires are added: `chat-always-scroll` is mapped now, but
       the junk it wrote under its element id before that is still in people's blobs.
 
-      Was 12/13, then 13/12 when `chat-always-scroll` landed, now 14/11 with
-      `presenter-follow-my-screens`. This assertion has gone red on every one of those and been
-      updated deliberately each time, which is the point of pinning it.
+      Was 12/13, then 13/12 when `chat-always-scroll` landed, then 14/11 with
+      `presenter-follow-my-screens`, and now 21/4 with `presenter-enable-rte`. This assertion has
+      gone red on every one of those and been updated deliberately each time, which is the point of
+      pinning it.
+
+      The four still unmapped are the ones whose preference has NO consumer in this room:
+      `app-recording-preview-window` (server-side recording does not exist here),
+      `small-image-preview` (`chat-uploaded-img-sm` has no rule in any of the 52 captured
+      stylesheets), `extra-chat-column` (the second chat column is not built) and
+      `visibility-change-enabled`. Mapping any of them would move the junk key rather than remove
+      it.
 
       Pinned because I gave two wrong counts writing this up — fifteen, then fourteen — by counting
       `app-disable-video`, which was already reaching `savePreference` by its raw id, and
@@ -200,8 +214,8 @@ describe('the wire has no silent break points', () => {
     const mapped = (table.match(/': '/g) ?? []).length;
 
     expect(reaching).toBe(26);
-    expect(mapped).toBe(20);
-    expect(reaching - 1 - mapped).toBe(5);
+    expect(mapped).toBe(21);
+    expect(reaching - 1 - mapped).toBe(4);
     expect(DEAD_PREFERENCE_KEYS).toHaveLength(reaching - 1 - 6);
   });
 

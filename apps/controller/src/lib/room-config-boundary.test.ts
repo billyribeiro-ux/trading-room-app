@@ -178,6 +178,15 @@ describe('the allow-list itself', () => {
       enableBadges: 'RoomMessage `visibleBadges` — the owner master switch on chat badges',
       showBadgesToPresentersOnly: 'RoomMessage `visibleBadges` — narrows badges to presenters',
       disableStarYears: 'RoomMessage — the membership-star gate',
+      /*
+        Verified in the room before being written here, as the note above requires: `canUseRTE` in
+        `+page.svelte` gates the composer's `fa-font` button, and the same expression gates the
+        modal's editor and its send. Gated THREE ways — `sessData.enableRTE &&
+        preferences.enableRTE && isPresenter` — so this name is only one term of it, exactly as
+        `beepOnUserJoin` is one term of the join beep.
+      */
+      enableRTE:
+        '+page.svelte `canUseRTE` — the composer rich-text button, the editor, and the send, all three',
       presenterMsgsOnTheRight:
         'RoomMessage — `presenter-msg-right` on the body and `presenter-reactions-right` on the reactions',
       allowUsersToChangeUsername: 'O(9) fallback — a member renaming themselves',

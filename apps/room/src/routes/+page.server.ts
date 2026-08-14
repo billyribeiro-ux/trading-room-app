@@ -2169,7 +2169,32 @@ export const actions: Actions = {
     }
 
     if (operation === 'edit') {
-      const newBody = String(data.get('newBody') ?? '').trim();
+      /*
+        RICH TEXT on the edit path — `editChatMessage` with `newMsg` set to the editor's content.
+
+        Sanitised here and derived here, exactly as the post path above does it, and for the same
+        reason: the submitted value is never what gets stored.
+
+        CHAT ONLY. The reference's rich edit branch is inside `if ("chat" === this.logType)`, the
+        alerts table has no such column, and an alert edited through the presenter's prompt is
+        plain text. Reading the field for an alert would be accepting input nothing can store.
+
+        AND IT ALWAYS REWRITES BOTH COLUMNS. A chat edit sets `body_html` to the sanitised HTML or
+        to NULL — never "leave whatever was there". Otherwise editing a rich message through the
+        PLAIN prompt (which is what happens when the owner has since turned the editor off) would
+        write a new `body` and leave the old markup behind, and the renderer picks the column: the
+        message would keep displaying the sentence it no longer says.
+      */
+      const submittedHtml = kind === 'chat' ? String(data.get('newBodyHtml') ?? '').trim() : '';
+      const sanitizedHtml = submittedHtml ? sanitizeChatHtml(submittedHtml) : '';
+      const newBodyHtml = sanitizedHtml && !isEmptyChatHtml(sanitizedHtml) ? sanitizedHtml : null;
+
+      const newBody = newBodyHtml
+        ? newBodyHtml
+            .replace(/<[^>]*>/g, '')
+            .replace(/&nbsp;/g, ' ')
+            .trim()
+        : String(data.get('newBody') ?? '').trim();
       if (!newBody) return fail(400, { message: 'A message is required.' });
 
       // Captured items, under the same rules the real branches apply below: an alert is
@@ -2211,7 +2236,7 @@ export const actions: Actions = {
       const isOwner = message.senderId === requireUser(locals).id;
       if (!isOwner && (!isPresenter || message.isAdmin)) return fail(403);
       db.update(messages)
-        .set({ body: newBody })
+        .set({ body: newBody, bodyHtml: newBodyHtml })
         .where(and(eq(messages.roomShortCode, requireRoomShortCode(locals)), eq(messages.id, id)))
         .run();
       return { success: true };
