@@ -24,7 +24,54 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-14
 
-### 2026-08-14 11:32 EDT — recording preview specified and blocked on server-side recording
+### 2026-08-14 11:36 EDT — rich text editor specified; row X's wiring work is finished
+
+**No code. The last of the four determinations, and the row's wiring is now complete.**
+
+`presenter-enable-rte` is a new component and, more importantly, a **security surface**. Its whole
+configuration is captured, and it is much smaller than "a rich text editor" suggests:
+
+```js
+rteConfig = {
+  placeholder: 'Type your message here...', minHeight: 200,
+  toolbar: [['font', ['bold', 'italic', 'underline', 'clear']], ['color', ['forecolor']]],
+  popover: { air: [] }, dialogsInBody: true, disableResizeEditor: true
+}
+```
+
+**Five controls.** It is a MODAL (`#rteModal`) in a standalone `app-rich-text-editor`, opened by
+`doRTEModal` / `doRTEModalEdit`, gated on all three of `sessData.enableRTE && preferences.enableRTE
+&& isPresenter`. `retriveRTEContent()` treats `""`, `"<p><br></p>"`, `"<br>"` and `"<p></p>"` as
+empty — the four ways an editor reports "nothing typed".
+
+**summernote is the reference's implementation, not the requirement.** A jQuery plugin has no place
+in a Svelte 5 app, and five commands are portable without one. What makes this a feature rather than
+a wire is not the editor: **it posts HTML into chat**, so it belongs on the sanitisation path by
+design rather than bolted onto it afterwards. The room setting already exists here
+(`room-settings-schema.ts:176`) and is deliberately not yet room-visible, for the same reason the
+badge settings were held back — no consumer yet.
+
+---
+
+**Row X: the wiring is done.** It began as thirteen "checkboxes with no consumer in this room".
+
+| outcome | count | |
+| --- | --- | --- |
+| **wired and working** | **8** | recording start/stop sound, push-to-talk, speech recognition, speech-reco overlay, always-scroll, follow-my-screens, gifs, badges, popups, trim, and both presenter DND boxes |
+| **closed by evidence, no code** | **1** | `small-image-preview` — its class has no rule in 52 stylesheets |
+| **specified, blocked on infrastructure** | **3** | recording preview (server-side recording), extra chat column (a second channel + pagination), RTE (a component + sanitisation design) |
+| **parked, deliberately** | **1** | `visibility-change-enabled` — item AA: gating our SSE roster on it makes a hidden tab poll forever |
+
+**Nearly 40% of that list was wrong when I wrote it**, and always in the direction of "this is
+bigger than it is". Five had consumers already built — one implemented verbatim under a different
+name, one behind a mechanism the code's own comment described incorrectly, two that were duplicate
+controls for preferences that already worked. The habit that found them: **search for what the
+preference DOES, never for its name.**
+
+Each of the four that remain now carries the byte offset or stylesheet count that settles it, so the
+next session builds or defers on evidence rather than re-deriving what I already read.
+
+### 2026-08-14 11:31 EDT — recording preview specified and blocked on server-side recording
 
 **No code. A determination, made from the whole component rather than from its name.**
 
