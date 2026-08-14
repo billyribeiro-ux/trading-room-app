@@ -124,3 +124,32 @@ Not aspirational — it has caught real holes:
   because it matched `visits\s*:` and the key was written in shorthand.
 
 **Change the thing the test guards and watch it go red. If it does not, the test is decoration.**
+
+---
+
+## 9. Do not push again until the work is finished — the backend gate restarts from zero
+
+Owner instruction, 2026-08-14, in these words: **"from now on do not push anything that triggers the
+backend CI until we're all done to avoid time delays."**
+
+The mechanics that make it matter, and they are worse than "CI is slow":
+
+- `backend-quality.yml` declares `concurrency: backend-quality-${{ github.ref }}` with
+  `cancel-in-progress: true`. A second push **cancels the run in flight** and starts a new one. It
+  does not queue, and it does not resume. Every push throws away whatever the previous run had
+  already proved. Watched happen on 2026-08-14: run `31799962473` was cancelled mid-flight by a
+  docs-only push and replaced by `31800376616`.
+- The job compiles the Rust workspace, stands up two PostgreSQL clusters and rebuilds the API
+  image. Its own header puts it at **~33 minutes**, with a 90-minute timeout.
+- **On a branch whose diff already contains `backend-quality.yml`, choosing "safe" files does not
+  help.** The scope step decides from the diff against the base, not from the last commit, and a
+  change to that workflow is deliberately treated as a backend path so the gate proves changes to
+  itself. So once the workflow is in the branch, a one-line README push runs the full 33 minutes.
+- Any event that is not a `pull_request` — a push to `main`, a `merge_group`, a
+  `workflow_dispatch` — skips the scope check entirely and always runs the full gate.
+
+**So: accumulate commits locally and push once, when the work is actually done.** Committing is free
+and loses nothing; pushing is the expensive act. This is the same argument as the batching rule in
+`CLAUDE.md`, sharpened by having measured what a push actually costs here.
+
+The exception is an explicit instruction to push now, which overrides this.

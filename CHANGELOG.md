@@ -24,6 +24,33 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-14
 
+### 2026-08-14 08:28 EDT — working rule 9: stop pushing mid-work
+
+Owner instruction, in these words: **"from now on do not push anything that triggers the backend CI
+until we're all done to avoid time delays."** Written into
+`docs/reference/working-rules.md` as rule 9, with the mechanics, because a rule with no recorded why
+gets undone.
+
+The mechanics are worse than "CI is slow", and I measured them rather than assuming:
+
+- `backend-quality.yml` sets `concurrency: backend-quality-${{ github.ref }}` with
+  `cancel-in-progress: true`. A second push **cancels the run in flight** and starts over — it does
+  not queue and it does not resume. Observed directly: run `31799962473` was cancelled mid-flight by
+  the docs-only push above and replaced by `31800376616`. Everything the first run had already
+  proved was discarded.
+- The job compiles the Rust workspace, stands up two PostgreSQL clusters and rebuilds the API image.
+  Its own header puts it at ~33 minutes.
+- **Choosing "safe" files does not avoid it on this branch.** The scope step reads the diff against
+  the BASE, not the last commit, and this branch's diff contains `backend-quality.yml` — which is
+  deliberately a backend path, so that a change to the gate is proved by the gate. A one-line README
+  push here runs the full 33 minutes.
+- Any event that is not a `pull_request` skips the scope check entirely and always runs the gate.
+
+So: commit freely, push once. Committing is free and loses nothing; **pushing is the expensive act.**
+An explicit "push now" overrides this.
+
+**This entry is committed and deliberately not pushed**, which is the rule applying to itself.
+
 ### 2026-08-14 08:20 EDT — PR #19 opened: 29 commits proposed to main
 
 Bookkeeping rather than a change — no file in the product moved. Recorded because the branch had
