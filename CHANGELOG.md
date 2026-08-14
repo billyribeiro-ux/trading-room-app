@@ -24,6 +24,27 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-14
 
+### 2026-08-14 15:11 EDT — PR #20 merged; PR #21 opened with the eight commits since
+
+**Runtime impact: yes — #20 is now on `main`**, which auto-deploys. It carries the five features that
+landed before midday: the chat rich text editor, chat log paging, the alert-question tenancy fix,
+alerts paging, and the chat mode control.
+
+**Merged on the green from the FINAL push, and verified on the exact SHA.** Head `db79ee6`, checked
+commit-by-commit rather than from the PR rollup — "Rust and PostgreSQL security contracts" SUCCESS,
+`mergeable: MERGEABLE`, `mergeState: CLEAN`. Merging and pushing were kept separate acts, which is
+what rule 9 asks for: a push would have invalidated the very checks the merge rested on. `main` is
+now `2235d9e`.
+
+**PR #21 opened** with the eight commits since — the extra chat column as its own component, mention
+routing, the `hideChat` collapse, the visibility-change work, row V closed by evidence, the Launch
+flow confirmed, the login-page blocker recorded, and row AC re-audited. The full gate was run against
+that branch before opening it: **exit 0**, room 1075/91, controller 937/90, zero failures. Thirteen
+files, +1700/−142.
+
+Its diff now reads against a clean `main` rather than against eight commits it already contained,
+which is why it was deliberately left unopened until #20 landed.
+
 ### 2026-08-14 15:02 EDT — Second branch proven green; row AC re-audited and it holds
 
 **Runtime impact: none.** Verification and bookkeeping, done because both were things I could finish
