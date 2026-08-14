@@ -24,6 +24,39 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-14
 
+### 2026-08-14 13:30 EDT — The full gate, run once, at the end: exit 0
+
+**Runtime impact: none.** This entry records evidence, not a change.
+
+Five pieces of work landed today — the rich text editor, chat log paging, the alert-question tenancy
+fix, alerts paging, and the chat mode control — each verified with the tests covering it and each
+with its negative controls run. **The full gate had not run once**, which is correct while work is in
+flight and not correct at the end of it: the gate is what a merge decision rests on.
+
+`pnpm -r test`, **exit 0**. Room **1036 tests across 89 files**; controller **937 across 90**, with
+`verify-documented-test-counts.mjs` confirming the documented totals at all four sites. The chain
+underneath is thirteen controller verifiers plus coverage before a single unit test runs —
+`schema:verify`, `backend:migrations:verify`, `backend:release:verify`, `evidence:verify`,
+`privacy:verify`, `breakpoints:verify`, `manage:styles`, `account:contract`, `home:contract`,
+`fonts:verify`, `room-login:contract`, `runtime:http` — and the room's own `privacy:verify` and
+`schema:verify`. No Rust compile: that lives in `backend:check` and `quality`, not in `test`.
+
+On GitHub, PR #20: **Rust and PostgreSQL security contracts SUCCESS**, Vercel SUCCESS,
+`mergeable: MERGEABLE`.
+
+**What is deliberately NOT in this PR.** `extra-chat-column` is the one remaining buildable item and
+it is a real refactor — roughly 300 lines of chat-pane markup turned into a snippet instantiated
+twice, per-pane state for the tab, composer, scroller and pickers, and updates to however many of
+the **37 contract tests that read `+page.svelte` source text** assert on the strings it moves.
+Pushing that onto a PR that is green and ready would invalidate the very checks the merge rests on,
+which is what rule 9 of `working-rules.md` is for. It gets its own PR once this one is merged.
+
+**Also repaired today, outside any feature:** two corrupt git refs literally named
+`fix/green-the-gate 2` — the macOS duplicate-file artifact — sat in `.git/refs/heads` and
+`.git/refs/remotes/origin` and broke `git fetch` with "did not send all necessary objects". Both
+pointed at `dc659e8`, which was verified to be an ancestor of HEAD before either was removed, so
+nothing unique was lost.
+
 ### 2026-08-14 13:21 EDT — The chat mode control does something now, and a muted member is told
 
 **Runtime impact: yes.** A presenter can disable the room's chat, or put it into webinar mode, and it
