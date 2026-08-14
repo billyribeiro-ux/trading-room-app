@@ -1,4 +1,5 @@
 <script lang="ts">
+  import type { MessageAction, RoomMessageItem } from '$lib/types';
   import EmojiPicker from '$lib/components/EmojiPicker.svelte';
   import type { EmojiDumpEntry } from '$lib/emoji-data';
   import { isMentionOf } from '$lib/mention';
@@ -18,80 +19,9 @@
   import type { FollowChatStyle, MessageBadge, MessageReactions } from '$lib/types';
 
   type MessageKind = 'alert' | 'chat';
-  type MessageAction =
-    | 'delete'
-    | 'mute'
-    | 'user'
-    | 'mention'
-    | 'show-all'
-    | 'report'
-    | 'copy'
-    | 'reply'
-    | 'answered'
-    | 'private'
-    | 'question'
-    | 'image'
-    | 'edit'
-    | 'reaction';
-
   interface MessageReactionPayload {
     key: string;
     emoji: string;
-  }
-
-  interface RoomMessageItem {
-    id: number;
-    senderId: number;
-    senderName: string;
-    senderEmailHash: string;
-    senderAvatarUrl: string;
-    senderRole?: string;
-    senderStatus?: string;
-    body: string;
-    /**
-     * Sanitised HTML for a message written with the rich text editor, or null/absent for a plain
-     * one. Its presence is what selects the HTML branch — the renderer never sniffs `body` for
-     * tags, so somebody who TYPES `<b>` still sees the characters they typed.
-     */
-    bodyHtml?: string | null;
-    createdAt: Date;
-    kind?: string;
-    targetUrl?: string | null;
-    questionCount?: number | null;
-    questionAnswered?: boolean;
-    unreadQa?: boolean;
-    isAdmin?: boolean;
-    backgroundColor?: string | null;
-    fontColor?: string | null;
-    answered?: boolean;
-    replyToName?: string | null;
-    replyToBody?: string | null;
-    reactions?: MessageReactions;
-    badges?: MessageBadge[];
-    isTrial?: boolean;
-    isNew?: boolean;
-    membershipYears?: number | null;
-    sessionName?: string | null;
-    evidenceKey?: string;
-    evidenceTimestampText?: string;
-    evidenceSeparatorText?: string | null;
-    evidenceMessageBoxClass?: string;
-    evidenceMessageBoxStyle?: string | null;
-    evidenceDirection?: string;
-    evidenceQuestion?: boolean;
-    evidenceBodyStyle?: string | null;
-    targetWidth?: number | null;
-    targetHeight?: number | null;
-    evidenceBodySegments?: Array<{
-      kind: string;
-      text?: string;
-      url?: string;
-      // Intrinsic pixel size of the upload. Emitted as width/height attributes so the browser
-      // reserves the box from the aspect ratio instead of collapsing to 0 until the bytes land.
-      width?: number;
-      height?: number;
-    }>;
-    evidenceMenuItems?: string[];
   }
 
   interface Props {

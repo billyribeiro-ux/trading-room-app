@@ -67,15 +67,22 @@ describe('K4e reverses the child order, which is why the DOM is reordered', () =
     const source = compact(PAGE);
     // Mobile: presentation, gutter, chat/alerts.
     expect(source).toContain(
-      '{#ifisMobileScreen}{#if!hidePresentation}{@renderpresentationPane()}{/if}{@rendermainGutter()}{#if!hideChatAlerts}{@renderchatAlertsPane()}{/if}'
+      '{#ifisMobileScreen}{#if!hidePresentation}{@renderpresentationPane()}{/if}{@rendermainGutter()}{#if!hideChatAlerts}{@renderchatAlertsPane()}{/if}{#if!hideChatAlerts&&extraChatColumnVisible}{@renderextraChatPane()}{/if}'
     );
-    // Desktop: chat/alerts, presentation, gutter.
+    // Desktop: chat/alerts, the extra column, presentation, gutter.
     expect(source).toContain(
-      '{:else}{#if!hideChatAlerts}{@renderchatAlertsPane()}{/if}{#if!hidePresentation}{@renderpresentationPane()}{/if}{@rendermainGutter()}{/if}'
+      '{:else}{#if!hideChatAlerts}{@renderchatAlertsPane()}{/if}{#if!hideChatAlerts&&extraChatColumnVisible}{@renderextraChatPane()}{/if}{#if!hidePresentation}{@renderpresentationPane()}{/if}{@rendermainGutter()}{/if}'
     );
+    /*
+      THE THIRD AREA, added 2026-08-14. `K4e` renders three `as-split-area` children and gates the
+      last on `!e.hideChatAlerts && preferences.extraChatColumn` — index 3 of the same block that
+      places presentation and chat/alerts. It follows the chat/alerts column in DOM order in both
+      branches, which on mobile IS the layout because those areas carry no `order`.
+    */
     // One definition each — a duplicated pane is a layout that drifts.
     expect(PAGE.match(/\{#snippet presentationPane\(\)\}/g)?.length).toBe(1);
     expect(PAGE.match(/\{#snippet chatAlertsPane\(\)\}/g)?.length).toBe(1);
+    expect(PAGE.match(/\{#snippet extraChatPane\(\)\}/g)?.length).toBe(1);
   });
 });
 

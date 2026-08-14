@@ -1256,6 +1256,15 @@
       'chat-badges-donot-disturb': 'chatBadges',
       'chat-popup-donot-disturb': 'chatPopup',
       'chat-mem-clear': 'trimChatLogs',
+      /* `extraChatColumnOnChange()` at `app-user-settings-modal.full.js:1044-1057` persists
+         `extraChatColumn`. It also fires `getChatLog {channel:'offTopic', page:0, extraChat:true}`
+         on the way ON; this room needs no such fetch, because its page load already sends page 0 of
+         EVERY rendered channel — see `loadNewestChatPages`. */
+      /* `visibilityChangeEnabledChange()` persists `visibilityChangeEnabled` and emits
+         `appVisibilityChange`. Only the CHAT half of that feature is reproduced — see the note on
+         the preference in `+page.svelte` for why the roster half would be worse than nothing here. */
+      'visibility-change-enabled': 'visibilityChangeEnabled',
+      'extra-chat-column': 'extraChatColumn',
       /* `enableRTEOnChange()` at `app-user-settings-modal.full.js:1031-1035` persists `enableRTE`,
          read from that handler rather than inferred from the id. The checkbox has rendered since
          the presenter tab was built and its value went nowhere. */

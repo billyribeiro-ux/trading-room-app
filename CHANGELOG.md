@@ -24,6 +24,352 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-14
 
+### 2026-08-14 15:11 EDT — PR #20 merged; PR #21 opened with the eight commits since
+
+**Runtime impact: yes — #20 is now on `main`**, which auto-deploys. It carries the five features that
+landed before midday: the chat rich text editor, chat log paging, the alert-question tenancy fix,
+alerts paging, and the chat mode control.
+
+**Merged on the green from the FINAL push, and verified on the exact SHA.** Head `db79ee6`, checked
+commit-by-commit rather than from the PR rollup — "Rust and PostgreSQL security contracts" SUCCESS,
+`mergeable: MERGEABLE`, `mergeState: CLEAN`. Merging and pushing were kept separate acts, which is
+what rule 9 asks for: a push would have invalidated the very checks the merge rested on. `main` is
+now `2235d9e`.
+
+**PR #21 opened** with the eight commits since — the extra chat column as its own component, mention
+routing, the `hideChat` collapse, the visibility-change work, row V closed by evidence, the Launch
+flow confirmed, the login-page blocker recorded, and row AC re-audited. The full gate was run against
+that branch before opening it: **exit 0**, room 1075/91, controller 937/90, zero failures. Thirteen
+files, +1700/−142.
+
+Its diff now reads against a clean `main` rather than against eight commits it already contained,
+which is why it was deliberately left unopened until #20 landed.
+
+### 2026-08-14 15:02 EDT — Second branch proven green; row AC re-audited and it holds
+
+**Runtime impact: none.** Verification and bookkeeping, done because both were things I could finish
+without a decision from the owner.
+
+**The full gate now covers BOTH branches.** `fix/green-the-gate` (PR #20) was proved at 13:30;
+`feat/extra-chat-column` carries seven further commits — the second chat column, mention routing,
+the `hideChat` collapse, visibility-change and the row-V correction — and had never had the gate run
+against it. `pnpm -r test`, **exit 0**: room **1075 tests across 91 files**, controller **937 across
+90**, `verify-documented-test-counts.mjs` agreeing at all four documented sites, zero failures
+anywhere in the log.
+
+**Row AC was re-audited, and unlike its siblings its premise HOLDS.** That matters: three rows today
+turned out to be wrong when read (AB, V, and earlier the T2-18 family), so "the row says so" had
+stopped being evidence. Every occurrence of `stopRecMsg` was checked — three in the bundle. Its only
+emitter is the SERVER command switch:
+
+```js
+case "stopRecMsg": this.guiEventBus.emit("stopRecMsg", i); break;     // byte 1014265
+```
+
+and the subscriber is `app-room`:
+
+```js
+-1 != i.data.indexOf("Stopped") ? alertsService.error(i.data) : alertsService.info(i.data),
+new Notification(i.data, {body: i.data})                              // byte 2501954
+```
+
+The payload is server-GENERATED text, so a client-side recorder cannot produce it. This room's
+`recordingState` action broadcasts `startRec` / `stopRec` / `pauseRec` / `resumeRec` with no message
+body, and nothing here writes the sentence the notification would display. It stays blocked on
+server-side recording, the same wall as row X.
+
+**What that leaves.** Nine rows, and after today's audits the split is clean: four need an owner
+decision, two need an environment this machine does not have, three need server-side recording. The
+login page — row S — is the only one where code is waiting on a single answer rather than on
+infrastructure.
+
+### 2026-08-14 14:54 EDT — The room login page: an invention caught, and a real blocker found
+
+**Runtime impact: none.** Nothing shipped. This records a correction to my own work and a constraint
+that has to be settled before the page can be built.
+
+**The goal is clear and confirmed:** match the original, which always renders `app-session-login` and
+never auto-submits — `doLoginCheck()` has exactly four callers, every one a click or submit binding.
+Ours redirects straight into the room, which is the divergence that was reported.
+
+**I invented something and then caught it.** A first draft of the entry action compared the submitted
+password to the room's `webinarPW`. That comparison does not exist anywhere in the capture.
+`loginToRoom()` builds `{cver, nick, email}`, adds `i.pw` when a password was typed, and sends it —
+the reference's own SERVER decides, and that server is not in the bundle. The only client-side rule
+is `e.pw || 'pw' != e.authMode || e.appService.globals.passedToken`, so a password is REQUIRED only
+when `authMode == 'pw'` and no token was passed. On the launch path a token is always present, so it
+is never demanded. The draft was deleted rather than patched.
+
+**Then the real blocker, and it is why the page cannot simply be written.** Every setting that DRIVES
+that page was checked against `ROOM_VISIBLE_SETTINGS`, and all seven are absent:
+`showPasswordField`, `usernameInstructions`, `hasRequiredPhoneInLogin`, `disableEditingUsername`,
+`customEnterDisclosure`, `webinarPW`, `banIPList`. Building the page today would produce a form with
+every one of its features permanently off — the dead scaffolding this repository exists to refuse.
+
+**Five can be added** by the usual four edits. **Two cannot.** `webinarPW` and `banIPList` match the
+`credentialShaped` pattern that `room-config-boundary.test.ts` asserts no room-visible setting may
+match — `PW$`, and `banIPList` by name. That test is not an obstacle to route around: the room
+serialises its config into SSR HTML and into the `__sveltekit` payload, so a room-visible setting
+reaches the browser, any cache in front of it, and any HAR on a support ticket.
+
+**Upstream does not have this problem, and that is the whole conflict.** Its room and its site are
+one system, so it can hold the room password in the browser and compare there. This reconstruction
+split them deliberately. The behaviour can still be matched — the room's SERVER asking the controller
+to validate — but that has no counterpart in the capture and is therefore a design decision rather
+than a transcription. It needs the owner, which is what row S has said since 2026-08-11.
+
+**Verified:** working tree clean, room **1075 tests across 91 files**, `svelte-check` 0 errors — the
+half-built file was removed rather than left behind.
+
+### 2026-08-14 14:38 EDT — Confirmed from evidence: what "Launch" actually does
+
+**Runtime impact: none.** A question answered from the captures, recorded so the owner conversation
+on row S starts from facts rather than recollection.
+
+**The question:** launching a room from the main website leads to a login page where you type your
+username and password again. Confirmed, with one correction worth having.
+
+**The Launch button, captured verbatim** at
+`evidence-dumps/TIER1-fetched/views/page.manageSession.html:11`, and again on `page.welcome.html:379`:
+
+```html
+<a ng-href="/session?id={{sess.uuid}}&jwtSite={{tokSite}}" target="_blank"
+   class="btn btn-sm pull-right btn-info mr"><i class="icon fa fa-external-link"></i>&nbsp;Launch </a>
+```
+
+**`jwtSite` appears nowhere in the room's 2.9 MB bundle**, so `/session` is the MAIN site's route. It
+validates the site JWT and hands off to the room; the room's own URL surface is
+`id`, `tok`, `pw`, `email`, `name`, `dlf`, `vo`, `co`, `sl`, `dscreen`, `changePasswordUID`
+(byte 2595200ff).
+
+**There IS always a login page, and nothing auto-submits.** The room renders `app-session-login`, and
+`doLoginCheck()` has exactly FOUR callers — all click or submit bindings, at
+`app-session-login.full.js:408, 451, 908, 948`. The button reads `Login`.
+
+**But the retyping is narrower than "username and password again".** On the token path the form is
+PREFILLED: name from `savedNick` or the token's `name`, email from the token's `email`, and
+`this.email && e && (this.readOnlyEmail = !0)` makes the email read-only. So a member normally
+retypes nothing — they press Login.
+
+**A password is only demanded when the room asks for one.** The field is gated on
+`showPresenter || 'pw' == authMode || 'webinarRoom' === authMode` (`:362`, `:1013`), where
+`showPresenter = sessData.showPasswordField` — the manage-page checkbox "Show password field?", whose
+help text is "Show password field on the login page". Default `authMode` is `"reg"`.
+
+**HONEST GAP:** what `/session` does internally is server-side on protradingroom.com and is in no
+capture held here, so whether it ALWAYS mints a token — or sometimes drops the member at the room
+bare, which is when they WOULD retype everything — cannot be proven from this evidence. That is the
+one part of the answer that needs Will rather than a file.
+
+### 2026-08-14 14:18 EDT — Row V closed by evidence: the "missing bandwidth saving" was never there
+
+**Runtime impact: small and real** — a muted presenter's audio element is now PAUSED rather than
+merely turned down.
+
+**Row V's premise was wrong, and so was a long comment in `+page.svelte` that repeated it.** Both
+said that `mediaSoupService.stopListeningToPresenter` "stops the server SENDING that presenter's
+audio", that this room's signalling wire has no equivalent command, and that "the bandwidth saving is
+the part that is missing". Reading the function settles it:
+
+```js
+stopListeningToPresenter(e) {
+  if (this.globals.chatOnlyMode) return;
+  let s = document.getElementById("msRemAudio-" + e.userID);
+  s && (s.pause(), s.currentTime = 0);
+}
+```
+
+No socket, no command, no consumer. It pauses the same hidden `<audio>` element this room already
+reaches for. There is no saving to miss, and the two options the row offered the owner — add
+`pauseConsumer` to the SFU mirror, or retain every `ProducerInfo` so `closeConsumer` can round-trip —
+were both solutions to a problem upstream does not solve either.
+
+**How the wrong claim survived**: it was derived from the two CALLERS. `toggleTalkingPresenter` and
+`adjustVolPres` do call `startListeningToPresenter`, and that one DOES reach the SFU — it consumes.
+The pair was assumed symmetric. It is not, and the asymmetry is the whole finding. `services/media`'s
+own source says the same thing from the other side: "the bundle contains no `pauseConsumer` command
+and no client-side `consumer.resume()` anywhere".
+
+**One genuine fidelity gap did fall out of it, in the opposite direction.** This room set
+`volume = 0` and never paused. Audibly identical; the difference is that a paused element stops
+DECODING, which is the saving upstream actually makes. It pauses on mute and plays on unmute now.
+`currentTime = 0` is deliberately not reproduced — an element backed by a live `MediaStream` is not
+seekable, so the assignment does nothing upstream and can throw here.
+
+**This is the third TODO row whose premise did not survive being read** — T2-18's family, then AB
+("the producer is not modelled": it was; the consumer was not), now V. All three were closed by
+reading the evidence rather than by writing code, and in two of the three the row had been steering
+work toward building something that already existed or was never needed.
+
+**Verified:** `svelte-check` 0 errors 0 warnings; room **1075 tests across 91 files**, unchanged in
+count because this closes a row rather than adding a feature. **Not run:** the full gate on this
+branch.
+
+### 2026-08-14 14:12 EDT — Register cleared to what is genuinely blocked; TODO pruned
+
+**Runtime impact: none.** Bookkeeping, recorded because the register had stopped telling the truth
+about itself.
+
+**Five closed rows removed from `TODO.md` rather than struck through**, which is that file's own
+rule — "if a section here is not something somebody still has to DO, it does not belong". Each was
+checked against this file before deletion rather than trusted from memory: **Z** (the unbounded chat
+and alert reads), **Z2** (the alert-question tenancy leak, both directions), **X2** (the extra chat
+column), **AB** (the chat mode control) and **AA** (closed 2026-08-12). Ten rows remain.
+
+**Row X is finished at twelve of thirteen.** The thirteenth,
+`app-recording-preview-window`, is blocked on architecture and that is now proven from the bundle
+rather than assumed — see the 14:00 entry.
+
+**None of the ten remaining rows is blocked on effort.** Four wait on an owner decision (the login
+page, the Postgres host, production topology, and part of the screenshare work), two on an
+environment this machine does not have (a live WordPress, and `apps/room/.env`), one lives in
+`services/**` which is a mirror and would be lost on the next sync, and three need server-side
+recording, which `MEDIASOUP-DEPLOYMENT-PLAN.md` defers. That distinction is written into the table
+so the next person does not re-derive it.
+
+**Branch state at this stamp.** `fix/green-the-gate` carries the five features that landed before
+midday and is **PR #20 — green, mergeable, full gate exit 0**, untouched since. `feat/extra-chat-column`
+carries the second chat column, its mention routing, the `hideChat` collapse and the
+visibility-change work: room **1066 tests across 90 files**, `svelte-check` 0 errors. Its PR is
+deliberately not opened yet, because it branches off #20 and its diff will not read cleanly until #20
+lands.
+
+### 2026-08-14 14:00 EDT — A hidden tab stops re-reading the room
+
+**Runtime impact: yes, for anyone who turns it on.** `visibilityChangeEnabled` was one of the dead
+element ids. It is wired now, and it does the thing that matters most in THIS room rather than the
+thing it does upstream.
+
+**Item AA deferred this, and AA was right about the half it was talking about.** Upstream's handler
+does two things. The ROSTER half — `unloadRoster()` / `loadRoster()` — gates a five-second poll;
+ours is SSE-pushed, so reproducing it would leave a hidden tab holding a stale roster for anyone who
+had not opted in, which is worse than doing nothing. That half is still deliberately absent, and the
+contract asserts its absence rather than leaving it to memory.
+
+**The CHAT half is the reverse, and it is worth more here than upstream.** There, a hidden tab stops
+appending to an array. Here, the room re-reads its entire chat log from the server on every SSE
+event — so a hidden tab was doing a full page load for every message anybody posted in the room.
+That refetch is now skipped while the tab is hidden, and a single catch-up runs on return
+(`appHasFocusGetChatLog`), only when something actually arrived.
+
+**Mentions are never paused**, because upstream's hidden branch keeps them:
+`visibilityChangeEnabled && !appHasFocus ? te.isMention && emit('chatMsg', te) : push(...)`. The gate
+sits AFTER the mention path, and the contract asserts that ordering — a feature that silences the one
+message addressed to you by name is not a saving.
+
+**Defaults OFF, and that is a stated divergence.** The reference ships `visibilityChangeEnabled:!0`.
+Inheriting that would mean a viewer who never asked for it silently stops receiving until they look
+at the tab — acceptable when the cost is an array append, not when it is a network read.
+
+**The last row-X item is BLOCKED, and now proven rather than assumed.**
+`app-recording-preview-window` polls `${sessData.recPreviewLocation}?${Date.now()}` every second, and
+`recPreviewLocation` is written by the SERVER on the command channel — `case "setRecPreview"` at
+bundle byte 1023704. The component's own gate is
+`videoOnlyMode || !isPresenter || !recPreviewLocation || !recPreviewWindow` → do nothing. This room
+records client-side with `MediaRecorder`, a divergence declared in item R, so no snapshot exists and
+no `setRecPreview` ever arrives. Building it would ship a component that cannot run; generating the
+frame locally would invent a mechanism the reference does not have — its own heading says "DELAYED
+UPTO 20s" precisely because the snapshot is made server-side.
+
+**Verified:** `svelte-check` 0 errors 0 warnings; room **1075 tests across 91 files**, up from
+1062/90. (This entry first said 1066/90 — the number was read before `visibility-change-contract.test.ts`
+was added, so it undercounted by that file's nine tests. Corrected 14:18 rather than left to be
+found by the next person who runs the suite.) **Five negative controls run and each went red**:
+letting a hidden tab keep refetching,
+refetching on every return even when nothing arrived, leaking the visibilitychange listener, cutting
+the preference wire, and inheriting the reference's ON default. **Not run:** the full gate on this
+branch.
+
+### 2026-08-14 13:52 EDT — The extra column's last two gaps: mention routing, and hideChat
+
+**Runtime impact: yes.** Both gaps recorded at 13:45 are closed, so the second chat column is
+complete rather than mostly built.
+
+**Mentions now reach the column you are actually in.** The rule is upstream's, both terms:
+`preferences.extraChatColumn && (this.extraChatMsg || 'textAreaTxtExtra' === globals.chatInputFocus)`.
+The first term covers clicking a name inside the extra column. The second is the one that is easy to
+miss and the reason the flag exists at all: clicking a name in the MAIN log while you are composing
+in the extra column has to insert where you are typing, not where you clicked. Both composers report
+focus now, because without that the flag never moves and the second term is dead.
+
+**`hideChat` — the pane collapses for non-presenters while chat is disabled.** `chatSize = 0`,
+`alertSize = 100`, emitted only for everyone who is not a presenter: the presenter turned chat off
+and still has to read it. Restored to the size it was when the mode returns.
+
+**The extra column is hidden by a RUNTIME override, and that detail is the whole point.** Upstream
+assigns `preferences.extraChatColumn = !1` directly and never calls `setPreference` on that path,
+remembering the old value in `extraChatColumnWasEnabled`. Persisting it instead would have silently
+destroyed the viewer's own setting the first time any presenter disabled chat — they would turn chat
+back on and find their second column gone for good. The contract asserts the collapse writes no
+preference at all.
+
+**One thing deliberately NOT reproduced.** `app-extra-chat` subscribes to `doUserInfo` and clears
+`#textAreaTxtExtra` whenever any user-info modal opens — throwing away whatever the viewer had typed,
+for no reason the capture states. The ROUTING is reproduced; the clear is not, and the reason is
+recorded where the decision was made rather than in a commit nobody will find.
+
+**Verified:** `svelte-check` 0 errors 0 warnings; room **1062 tests across 90 files**, up from
+1055/90. **Seven negative controls run and each went red**: dropping the focus term from the mention
+router, stopping the extra column reporting its own rows, removing the focus report, collapsing the
+presenter's pane too, not collapsing chat to zero, letting the extra column survive the collapse, and
+persisting the hide instead of overriding it. Two earlier assertions were re-pointed deliberately —
+the render gate is `extraChatColumnVisible` now, not the raw preference, precisely because the
+collapse must not persist. **Not run:** the full gate on this branch.
+
+### 2026-08-14 13:45 EDT — The extra chat column, as a second component rather than a refactor
+
+**Runtime impact: yes.** Ticking "Extra Chat Column" in the settings modal now adds a second chat
+column to the room, showing Off Topic by default, with its own tabs, composer, scroller and paging.
+
+**The shape was not a judgement call, and I had been treating it as one.** I spent a while weighing a
+Svelte snippet against extracting `+page.svelte`'s chat pane into a component, worried about the 37
+contract tests that read that file by source text. The decoded components answer it: `app-chat` and
+`app-extra-chat` are TWO components upstream, in two split areas. So this is a new file,
+`ExtraChatPane.svelte`, and the main pane was never touched — which is also why none of those 37
+tests needed rewriting.
+
+**What actually differs from `app-chat`**, and it is a short list: `this.channel = 'offTopic'`,
+`extraChatMsg`, and the composer id `#textAreaTxtExtra`. Everything else is the same shape, which is
+why the two components' template consts line up one for one. It is placed as a third
+`as-split-area`, gated exactly as `K4e` gates its index 3 —
+`!hideChatAlerts && preferences.extraChatColumn`. The comment on `primaryAreaStyle` used to end
+"which this room does not model"; it does now.
+
+**One pipeline, two columns.** `chatMessagesFor(tab)` is shared, because a second derived would have
+been a second copy of merge, trim, evidence-hiding, badges and the webinar filter — five steps that
+must agree. The PAGING state is shared for a different reason: it is keyed by channel, so two
+columns on the same channel read that history once, while two on different channels page
+independently. Each column scrolls on its own, which is why `app-extra-roomscroller` is its own
+component upstream too.
+
+**A bug this would have shipped, caught by writing the send path down.** `sendMessageBody` took the
+main column's tab from module scope. Left that way, a message typed in the off-topic column would
+have been posted to main. It takes the room as a parameter now.
+
+**Three shapes moved rather than copied**: `RoomMessageItem` out of `RoomMessage.svelte`,
+`sameCalendarDay` out of `+page.svelte`, and `MessageAction` — which was already declared identically
+in TWO files before today and would have become three. A shape declared inside one consumer is a
+shape the other has to guess at.
+
+**My own bug, from a careless edit:** factoring the message pipeline into a function left `return`
+alone on its line, so automatic semicolon insertion returned `undefined` and eleven type errors
+followed. Fixed before anything ran.
+
+**HONEST GAPS, both recorded rather than half-built.** The reference also routes mentions and
+user-info to whichever column has focus — `doMentionExtra`, `doUserInfoExtra`, keyed on
+`chatInputFocus === 'textAreaTxtExtra'`. That flag is recorded here but the two routers still point
+at the main pane, so clicking a name always inserts into the main composer. And `hideChat`'s
+size-collapse, which remembers and restores `extraChatColumn`, is the last piece of row AB.
+
+**Verified:** `svelte-check` 0 errors 0 warnings; room **1055 tests across 90 files**, up from
+1036/89. **Seven negative controls run and each went red**: never rendering the column, flipping the
+default on, cutting the preference wire, giving both composers the same id, defaulting the extra
+column to main, sending its messages into the main channel, and pointing both columns at the same
+tab. Two existing contracts were updated deliberately — the mobile layout's render order, which now
+carries a third area, and the paging nudge count, which is three requests against two arrivals
+because the extra column shares the main column's arrival path. **Not run:** the full gate, which
+this branch has not reached yet.
+
 ### 2026-08-14 13:30 EDT — The full gate, run once, at the end: exit 0
 
 **Runtime impact: none.** This entry records evidence, not a change.

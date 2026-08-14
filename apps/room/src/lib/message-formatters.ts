@@ -67,3 +67,19 @@ const mutedTillTime = new Intl.DateTimeFormat('en-US', {
 export function formatChatMutedTill(value: Date): string {
   return `${mutedTillWeekday.format(value)} @ ${mutedTillTime.format(value)}`;
 }
+
+/**
+ * Whether two messages fall on the same calendar day — the date-separator rule.
+ *
+ * Lifted out of `+page.svelte` on 2026-08-14 with the extra chat column, for the reason
+ * `RoomMessageItem` moved too: two panes draw separators now, and the rule has to be one rule.
+ * `day-separator-contract.test.ts` still counts the CALLS in the page, which are unchanged.
+ */
+export function sameCalendarDay(current: Date, previous?: Date) {
+  if (!previous) return false;
+  return (
+    current.getFullYear() === previous.getFullYear() &&
+    current.getMonth() === previous.getMonth() &&
+    current.getDate() === previous.getDate()
+  );
+}

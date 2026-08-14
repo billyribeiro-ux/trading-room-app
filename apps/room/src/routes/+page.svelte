@@ -1,6 +1,6 @@
 <script lang="ts">
   import { deserialize } from '$app/forms';
-  import { formatChatMutedTill } from '$lib/message-formatters';
+  import { formatChatMutedTill, sameCalendarDay } from '$lib/message-formatters';
   import {
     chatComposerEnabled,
     isChatMode,
@@ -77,6 +77,7 @@
     shouldDisableSelection
   } from '$lib/room-key-gates';
   import EmojiPicker from '$lib/components/EmojiPicker.svelte';
+  import ExtraChatPane from '$lib/components/ExtraChatPane.svelte';
   import GifConfirmDialog from '$lib/components/GifConfirmDialog.svelte';
   import GiphyPicker from '$lib/components/GiphyPicker.svelte';
   import ImageUploadDialog from '$lib/components/ImageUploadDialog.svelte';
@@ -119,6 +120,7 @@
   import type {
     AlertTab,
     ChatTab,
+    MessageAction,
     FileTab,
     FollowChatStyle,
     MainTab,
@@ -870,6 +872,89 @@
    * it — `pushToTalk:!1` and `makeUsersFollowMyScreens:!1` are both `=== true` for the same reason.
    */
   let enableRTE = $state(loadedSettings.enableRTE === true);
+
+  /**
+   * `preferences.extraChatColumn` — the second chat column.
+   *
+   * Defaults OFF, read rather than chosen: it is absent from the reference's twenty-five default
+   * preferences, exactly like `enableRTE`, so a fresh account evaluates the gate on `undefined`.
+   */
+  let extraChatColumn = $state(loadedSettings.extraChatColumn === true);
+  /** The extra column's own channel. `this.channel = 'offTopic'` in `app-extra-chat`. */
+  let extraChatTab: ChatTab = $state('off-topic');
+  /** `#textAreaTxtExtra`. */
+  let extraComposer = $state('');
+  let extraChatScroller = $state<HTMLElement | undefined>();
+  let extraChatScrollingUp = false;
+  /**
+   * `globals.chatInputFocus` — which composer the viewer last typed in.
+   *
+   * The mention router reads it: `preferences.extraChatColumn && (extraChatMsg ||
+   * 'textAreaTxtExtra' === chatInputFocus) ? 'doMentionExtra' : 'doMention'`. Without it, clicking
+   * a name while the extra column has focus would insert the mention into the other composer.
+   */
+  let chatInputFocus = $state('textAreaTxt');
+
+  /**
+   * `preferences.visibilityChangeEnabled`, and `globals.appHasFocus` — pause chat work while the
+   * tab is hidden, catch up when it comes back.
+   *
+   * ```js
+   * document.hidden
+   *   ? (globals.appHasFocus = !1, unloadRoster())
+   *   : (globals.appHasFocus = !0, …, guiEventBus.emit('appHasFocusGetChatLog'),
+   *      preferences.extraChatColumn && guiEventBus.emit('appHasFocusGetChatLogExtraChatColumn'))
+   * ```
+   *
+   * ## Why this matters MORE here than upstream
+   *
+   * Upstream a hidden tab merely stops appending to an in-memory array. This room re-reads its chat
+   * log from the server on every SSE event, so a hidden tab was doing a full page load per message
+   * posted in the room. That is the cost this removes.
+   *
+   * ## The ROSTER half is deliberately not reproduced
+   *
+   * `unloadRoster()` / `loadRoster()` gate a five-second POLL. This roster is SSE-pushed, so gating
+   * it the same way would make a hidden tab hold a stale roster for anyone who has not opted in —
+   * strictly worse than doing nothing. Recorded in item AA before this was built and still true.
+   *
+   * ## Mentions are never paused
+   *
+   * `visibilityChangeEnabled && !appHasFocus ? te.isMention && emit('chatMsg', te) : push(...)` —
+   * the hidden branch still surfaces a mention. A feature that silences the one message addressed
+   * to you by name is not a saving.
+   */
+  let visibilityChangeEnabled = $state(loadedSettings.visibilityChangeEnabled === true);
+  let appHasFocus = $state(true);
+  /** Set while hidden, so the catch-up only runs when something was actually missed. */
+  let missedChatWhileHidden = false;
+
+  /**
+   * The `visibilitychange` listener — `globals.appHasFocus`, and the catch-up on the way back.
+   *
+   * An attachment on `<svelte:document>` would be tidier, but this listener has to exist whether or
+   * not any element is mounted, and it must be removed on teardown: a detached listener holding a
+   * closure over `data` is how a single-page app leaks a page.
+   *
+   * The catch-up is `appHasFocusGetChatLog`, and it fires ONCE rather than replaying what was
+   * missed, because the load already returns the newest page per channel — the room re-reads itself
+   * and is current, which is exactly what upstream's `getChatLog` on that event does.
+   */
+  $effect(() => {
+    if (typeof document === 'undefined') return;
+    const onVisibilityChange = () => {
+      if (document.hidden) {
+        appHasFocus = false;
+        return;
+      }
+      appHasFocus = true;
+      if (!missedChatWhileHidden) return;
+      missedChatWhileHidden = false;
+      void invalidateAll();
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', onVisibilityChange);
+  });
 
   /**
    * `preferences.disableVideo` - the viewer's own "turn the video off to preserve data" switch.
@@ -1905,6 +1990,23 @@
    * this same full question. Strictly fewer people reach the editor than upstream, and everyone
    * who reaches it can finish.
    */
+  /**
+   * `showPMBtn` — the chat header's private-chat button.
+   *
+   * ```js
+   * this.showPMBtn = (isPresenter || sessData.userPM || sessData.userToPresenterPM)
+   *   && !(user.isFT && sessData.disablePMForTrials)
+   * ```
+   *
+   * The same three settings the roster's per-target `canShowRosterPrivateChat` reads, asked without
+   * a target because this button opens the chooser rather than one conversation.
+   */
+  const showPmButton = $derived(
+    (isPresenter ||
+      data.sessData?.userPM === true ||
+      data.sessData?.userToPresenterPM === true) &&
+      !(data.user.isFT === true && data.sessData?.disablePMForTrials === true)
+  );
   const canUseRTE = $derived(data.sessData?.enableRTE === true && enableRTE && isPresenter);
   /**
    * The room's chat mode — `g` group, `p` webinar, `d` disabled.
@@ -1992,6 +2094,73 @@
     isMobileScreen
       ? `flex: 0 0 ${presentationColumn};`
       : `order: ${primaryIsFirst ? 2 : 0}; flex: 0 0 ${presentationColumn};`
+  );
+  /*
+    The extra chat column, as its own area.
+
+    `K4e` places it as index 3, gated `!e.hideChatAlerts && preferences.extraChatColumn`, and `q4e`
+    gives it `size = chatAlertsSize` — the same width as the chat/alerts column it sits beside. The
+    order puts it after that column, which is what `orderChatAlerts()` resolves to when the extra
+    column is present.
+  */
+  /**
+   * `hideChat` — the chat pane collapses for NON-presenters while the room's chat mode is `d`.
+   *
+   * ```js
+   * guiEventBus.subscribe('changeChatMode', e => { …
+   *   setTimeout(() => { guiEventBus.emit('resizeChatView');
+   *     this.isPresenter || guiEventBus.emit('hideChat', 'd' == e); }, 1e3) })
+   *
+   * guiEventBus.subscribe('hideChat', i => {
+   *   if (i) { this.chatSize = 0; this.alertSize = 100;
+   *     preferences.extraChatColumn && (preferences.extraChatColumn = !1,
+   *                                     this.extraChatColumnWasEnabled = !0) }
+   *   else { this.extraChatColumnWasEnabled && (preferences.extraChatColumn = !0, …)
+   *          … restore alertSize/chatSize from localStorage … } })
+   * ```
+   *
+   * A presenter keeps their pane: they are the one who turned chat off and still has to read it.
+   *
+   * The extra column is turned off WITHOUT persisting — upstream assigns
+   * `preferences.extraChatColumn` directly and never calls `setPreference` on this path, so the
+   * viewer's own setting is remembered and restored rather than overwritten. Reproduced with a
+   * runtime override for exactly that reason.
+   *
+   * Sizes are restored from what they were rather than from `localStorage` keys: upstream reads
+   * `chatAlertSizes` or `chatAlertSizes-bottom` depending on split direction because its sizes live
+   * in those keys, and ours live in `chatAlertsSplit`. Same outcome, one source of truth.
+   */
+  let chatCollapsedByMode = $state(false);
+  let splitBeforeCollapse: number | null = null;
+  let extraChatColumnWasEnabled = false;
+
+  $effect(() => {
+    const shouldHide = !isPresenter && chatMode === 'd';
+    if (shouldHide === chatCollapsedByMode) return;
+    if (shouldHide) {
+      splitBeforeCollapse = chatAlertsSplit;
+      extraChatColumnWasEnabled = extraChatColumn;
+      // `chatSize = 0; alertSize = 100` — the alerts pane takes the whole column.
+      chatAlertsSplit = 1;
+      chatCollapsedByMode = true;
+      return;
+    }
+    chatAlertsSplit = splitBeforeCollapse;
+    chatCollapsedByMode = false;
+  });
+
+  /**
+   * Whether the second column is on screen.
+   *
+   * `extraChatColumn` is the viewer's preference; this is that preference AND the collapse, so the
+   * setting survives being hidden — `extraChatColumnWasEnabled` in the capture.
+   */
+  const extraChatColumnVisible = $derived(extraChatColumn && !chatCollapsedByMode);
+
+  const extraChatAreaStyle = $derived(
+    isMobileScreen
+      ? `flex: 0 0 ${primaryColumn};`
+      : `order: ${primaryIsFirst ? 1 : 3}; flex: 0 0 ${primaryColumn};`
   );
   const alertsAreaStyle = $derived(`order: 0; flex: 0 0 ${alertsRow};`);
   const chatAreaStyle = $derived(`order: 2; flex: 0 0 ${chatRow};`);
@@ -2084,22 +2253,6 @@
     selectRosterUser(user);
     showPrivateChat();
   }
-  type MessageAction =
-    | 'delete'
-    | 'mute'
-    | 'user'
-    | 'mention'
-    | 'show-all'
-    | 'report'
-    | 'copy'
-    | 'reply'
-    | 'answered'
-    | 'private'
-    | 'question'
-    | 'image'
-    | 'edit'
-    | 'reaction';
-
   interface MessageReactionPayload {
     key: string;
     emoji: string;
@@ -2469,12 +2622,19 @@
     however far back somebody paged. Trimming first would let the cap be exceeded by exactly the
     pages this feature adds.
   */
-  const visibleChatMessages = $derived(
-    trimChatLog(
-      mergeOlderChatMessages(olderChatMessages[chatTab] ?? [], data.messages),
+  /*
+    The extra column's rows, through the SAME pipeline as the main column's — merge, trim, hide,
+    badge, and the webinar filter — differing only in which channel it reads. Written as a function
+    so the two columns cannot drift: a second derived would be a second copy of six steps.
+  */
+  const visibleExtraChatMessages = $derived(chatMessagesFor(extraChatTab));
+
+  function chatMessagesFor(tab: ChatTab) {
+    return trimChatLog(
+      mergeOlderChatMessages(olderChatMessages[tab] ?? [], data.messages),
       trimChatLogs
     )
-      .filter((item) => item.room === chatTab && !isEvidenceMessageHidden(item))
+      .filter((item) => item.room === tab && !isEvidenceMessageHidden(item))
       /*
         WEBINAR MODE. Upstream applies this as messages ARRIVE, dropping them before they ever reach
         the log; applied here as a view filter instead, because this room re-reads its log from the
@@ -2514,8 +2674,10 @@
         and on ALL of them here — a divergence in our favour, and the alternative would be
         denormalising controller state into room rows that then go stale.
       */
-      .map((item) => ({ ...item, badges: badgesForSender(item.senderEmailHash) }))
-  );
+      .map((item) => ({ ...item, badges: badgesForSender(item.senderEmailHash) }));
+  }
+
+  const visibleChatMessages = $derived(chatMessagesFor(chatTab));
 
   function forceAlertsToBottom(scroller: HTMLElement) {
     if (alertScrollTimer !== undefined) globalThis.clearTimeout(alertScrollTimer);
@@ -3502,6 +3664,8 @@
       if (key === 'chatPopup') chatPopup = value;
       if (key === 'trimChatLogs') trimChatLogs = value;
       if (key === 'enableRTE') enableRTE = value;
+      if (key === 'extraChatColumn') extraChatColumn = value;
+      if (key === 'visibilityChangeEnabled') visibilityChangeEnabled = value;
       /*
         Both halves, because this preference has TWO controls: the navbar's
         `presentation-subtitles` checkbox and the settings modal's `app-speech-reco-overlay`. The
@@ -3541,15 +3705,6 @@
     filesMenuOpen = false;
     userMenuId = null;
     messageMenuId = null;
-  }
-
-  function sameCalendarDay(current: Date, previous?: Date) {
-    if (!previous) return false;
-    return (
-      current.getFullYear() === previous.getFullYear() &&
-      current.getMonth() === previous.getMonth() &&
-      current.getDate() === previous.getDate()
-    );
   }
 
   function openImageModal(event: MouseEvent | undefined, url: string) {
@@ -4509,7 +4664,31 @@
     return false;
   }
 
-  function mentionUser(name: string) {
+  /**
+   * `doMention` / `doMentionExtra` — the SAME insert, into whichever composer is the target.
+   *
+   * ```js
+   * doMention(e) {
+   *   guiEventBus.emit(
+   *     this.isQAMsg ? "doQAMention"
+   *     : preferences.extraChatColumn && (this.extraChatMsg || "textAreaTxtExtra" === globals.chatInputFocus)
+   *       ? "doMentionExtra" : "doMention", e)
+   * }
+   * ```
+   *
+   * Two ways to reach the extra column, and both matter: the message you clicked was IN that column
+   * (`extraChatMsg`, true for every row it renders), or you were last typing there
+   * (`chatInputFocus`). Without the second, clicking a name in the main log while composing in the
+   * extra column would insert into the pane you are not looking at.
+   *
+   * The extra column's insert is upstream's own, and it differs by a space:
+   * `i.length ? val(i + ' @' + e + ' ') : val('@' + e + ' ')`.
+   */
+  function mentionUser(name: string, toExtraColumn = false) {
+    if (toExtraColumn) {
+      extraComposer += `${extraComposer ? ' ' : ''}@${name} `;
+      return;
+    }
     composer += `${composer ? ' ' : ''}@${name} `;
     requestAnimationFrame(() => {
       composerElement?.focus();
@@ -4517,11 +4696,18 @@
     });
   }
 
+  /** Which composer a mention belongs in, given where the click came from. */
+  function mentionTargetIsExtraColumn(fromExtraColumn: boolean) {
+    return extraChatColumn && (fromExtraColumn || chatInputFocus === 'textAreaTxtExtra');
+  }
+
   function handleMessageAction(
     kind: 'alert' | 'chat',
     action: MessageAction,
     item: MessageActionItem,
-    payload?: MouseEvent | MessageReactionPayload
+    payload?: MouseEvent | MessageReactionPayload,
+    /** True when the click came from the extra chat column — upstream's `extraChatMsg`. */
+    fromExtraColumn = false
   ) {
     if (action !== 'reaction') messageMenuId = null;
     selectedMessage = item;
@@ -4537,7 +4723,9 @@
     };
 
     if (action === 'user') openModal('user');
-    if (action === 'mention') mentionUser(item.senderName);
+    if (action === 'mention'){
+      mentionUser(item.senderName, mentionTargetIsExtraColumn(fromExtraColumn));
+    }
     if (action === 'reply') openModal('reply');
     if (action === 'report') openModal('report');
     if (action === 'question') {
@@ -4814,6 +5002,17 @@
       .querySelectorAll<HTMLMediaElement>(`[id^="msRemAudio-${userID}"]`)
       .forEach((element) => {
         element.volume = level;
+        /*
+          `s.pause()` on the way down, and playing again on the way up — the other half of
+          `stopListeningToPresenter`, which this room set volume for and never paused.
+
+          Audibly the two are the same; the difference is that a paused element stops DECODING,
+          which is the saving upstream actually makes. `play()` returns a promise that rejects if
+          the element is removed mid-call, so the rejection is swallowed deliberately: a muted
+          presenter leaving while you unmute them is not an error anybody can act on.
+        */
+        if (level === 0) element.pause();
+        else if (element.paused) void element.play().catch(() => {});
       });
   }
 
@@ -4825,15 +5024,29 @@
    *
    * 1. **The persistence**, `setPreference('audioMutedFor'|'audioVolumeFor', …)`, which is this
    *    room's `savePreference`.
-   * 2. **The SFU half** — and this is an HONEST GAP rather than a reproduction.
-   *    `mediaSoupService.startListeningToPresenter` / `stopListeningToPresenter` stop the server
-   *    SENDING that presenter's audio; this room's signalling wire has no equivalent command
-   *    (`Commands` in `src/lib/media/signalling.ts` carries `resumeConsumer`, `closeConsumer`,
-   *    `pauseProducer`, `resumeProducer` — nothing that pauses a consumer, and `closeConsumer`
-   *    cannot be undone without re-consuming from a `ProducerInfo` this page does not retain).
-   *    So the mute is applied where it can be applied honestly: the listener's own audio element.
-   *    The member hears exactly what the reference's member hears; the bandwidth saving is the part
-   *    that is missing, and `TODO.md` records it with the exact command that would close it.
+   * 2. **Pausing the listener's own audio element** — which is ALL the reference does, and this
+   *    comment said the opposite for weeks.
+   *
+   *    It used to read that `stopListeningToPresenter` stops the server SENDING that presenter's
+   *    audio, that our wire has no equivalent command, and that "the bandwidth saving is the part
+   *    that is missing". Reading the function settles it — there is no such saving to miss:
+   *
+   *    ```js
+   *    stopListeningToPresenter(e) {
+   *      if (this.globals.chatOnlyMode) return;
+   *      let s = document.getElementById("msRemAudio-" + e.userID);
+   *      s && (s.pause(), s.currentTime = 0);
+   *    }
+   *    ```
+   *
+   *    No socket, no command, no consumer. It pauses the same hidden `<audio>` element this room
+   *    already reaches for, so upstream's consumer keeps receiving exactly as ours does. The claim
+   *    came from reading the two CALLERS — which do call `startListeningToPresenter` — and assuming
+   *    the pair was symmetric. `startListeningToPresenter` does reach the SFU: it consumes. `stop`
+   *    does not.
+   *
+   *    `currentTime = 0` is deliberately not reproduced: an element backed by a live `MediaStream`
+   *    is not seekable, so the assignment does nothing upstream and can throw here.
    */
   function toggleTalkingPresenterAudio(user: PresenterAudioUser) {
     const next = toggleTalkingPresenter(presenterAudio, user);
@@ -6195,14 +6408,14 @@
    * it and derives its own `body` from the result, so what arrives here as plain text is the
    * optimistic copy and never the stored one.
    */
-  async function sendMessageBody(body: string, bodyHtml?: string) {
+  async function sendMessageBody(body: string, bodyHtml?: string, room: ChatTab = chatTab) {
     const trimmedBody = body.trim();
     if (!trimmedBody) return false;
 
     const form = new FormData();
     form.set('body', trimmedBody);
     if (bodyHtml) form.set('bodyHtml', bodyHtml);
-    form.set('room', chatTab);
+    form.set('room', room);
     const response = await fetch('?/sendMessage', { method: 'POST', body: form });
 
     if (response.ok) {
@@ -6349,6 +6562,53 @@
     const result = deserialize<{ mode?: string }, { message?: string }>(await response.text());
     if (result.type !== 'success') return;
     await invalidateAll();
+  }
+
+  /** The extra column's composer, sending into the channel that column is showing. */
+  async function sendExtraComposerMessage() {
+    const body = extraComposer.trim();
+    if (!body) return;
+    if (await sendMessageBody(body, undefined, extraChatTab)) extraComposer = '';
+  }
+
+  /**
+   * The extra column's scroll handler.
+   *
+   * Its own `isScrollingUp` and its own paging trigger: two scrollers with two positions is the
+   * whole point of `app-extra-roomscroller` being a separate component upstream. The paging STATE
+   * is shared because it is keyed by channel — two columns showing the same channel are looking at
+   * the same history, and should not fetch it twice.
+   */
+  function trackExtraChatScroll(scroller: HTMLElement) {
+    extraChatScrollingUp = isRoomScrollerReadingHistory(scroller);
+    if (!extraChatScrollingUp) {
+      chatHasMoreData = { ...chatHasMoreData, [extraChatTab]: true };
+    }
+    if (
+      !shouldLoadOlderMessages({
+        scrollTop: scroller.scrollTop,
+        messageCount: visibleExtraChatMessages.length,
+        searchTerm: '',
+        hasMoreData: chatHasMoreData[extraChatTab] ?? true,
+        loadingMore: chatLoadingMore
+      })
+    ) {
+      return;
+    }
+    scroller.scrollTop += CHAT_PAGE_REQUEST_NUDGE;
+    void loadOlderChatMessages(extraChatTab, scroller);
+  }
+
+  /**
+   * The extra column's rich-text button — `openRTEModal()` on `app-extra-chat`, which reads
+   * `#textAreaTxtExtra` rather than `#textAreaTxt` and clears that one.
+   */
+  function openExtraRTEModal() {
+    rteIsEditing = false;
+    rteEditTarget = null;
+    rteDraft = textToEditorHtml(extraComposer.trim());
+    extraComposer = '';
+    openModal('rich-text');
   }
 
   function openImageUpload() {
@@ -7201,6 +7461,18 @@
         const followStyle = senderHash ? followedUsers[senderHash]?.followChatStyle : undefined;
         if (followStyle?.playSound) playSoundEffect('pling');
         else if (data.sessData?.dingOnNewMessage) playSoundEffect('followed');
+      }
+
+      /*
+        `visibilityChangeEnabled && !appHasFocus` — do not re-read the room for a hidden tab.
+
+        The MENTION path above has already run, so the one message addressed to you by name still
+        reaches you; what is skipped is the full refetch. `missedChatWhileHidden` records that there
+        is something to catch up on, so returning to a tab where nothing happened costs nothing.
+      */
+      if (visibilityChangeEnabled && !appHasFocus) {
+        missedChatWhileHidden = true;
+        return;
       }
 
       void invalidateAll();
@@ -9996,6 +10268,7 @@
                             class="txt-area form-control border-0"
                             {@attach captureComposerElement}
                             bind:value={composer}
+                            onfocus={() => (chatInputFocus = 'textAreaTxt')}
                             oninput={(event) => autoExpandComposer(event.currentTarget)}
                             onkeydown={(event) => {
                               if (event.key === 'Enter' && !event.shiftKey) {
@@ -11216,6 +11489,63 @@
           </as-split-area>
           {/snippet}
 
+          <!--
+            `q4e` — the extra chat column, its own `as-split-area` holding `app-extra-chat`.
+
+            A third area, not a second pane inside the chat column: `K4e` renders three areas and
+            gates this one on `!hideChatAlerts && preferences.extraChatColumn`. The comment on
+            `primaryAreaStyle` above used to end "which this room does not model"; it does now.
+          -->
+          {#snippet extraChatPane()}
+            <as-split-area
+              minsize="0"
+              class="alert-chat-box as-split-area"
+              style={extraChatAreaStyle}
+            >
+              <ExtraChatPane
+                bind:tab={extraChatTab}
+                bind:composer={extraComposer}
+                messages={visibleExtraChatMessages}
+                {doNotDisturbOn}
+                {chatEnabled}
+                {webinarMode}
+                {selfMutedUntil}
+                {showPmButton}
+                {canPostImages}
+                {isPresenter}
+                {canUseRTE}
+                {giphyApiKey}
+                {theme}
+                chatStyle={globalChatStyle}
+                {chatGif}
+                {chatBadges}
+                {enableBadges}
+                {showBadgesToPresentersOnly}
+                {disableStarYears}
+                {presenterMessagesOnTheRight}
+                currentUserId={data.user.id}
+                currentUserEmailHash={data.user.emailHash}
+                currentUserName={data.user.displayName}
+                viewerIsPresenter={data.user.role === 'staff' || data.user.role === 'admin'}
+                {followedUsers}
+                openMenuKey={messageMenuId}
+                onmenutoggle={(key) => (messageMenuId = key)}
+                onaction={(action, message, event) =>
+                  handleMessageAction('chat', action, message, event, true)}
+                onfocus={() => (chatInputFocus = 'textAreaTxtExtra')}
+                onsend={() => void sendExtraComposerMessage()}
+                onscroll={(scroller) => trackExtraChatScroll(scroller)}
+                onscrollerready={(scroller) => (extraChatScroller = scroller)}
+                onprivatechat={showPrivateChat}
+                onsearch={() => openModal('chat-logs')}
+                onsettings={() => openModal('settings')}
+                onimageupload={openImageUpload}
+                onrte={openExtraRTEModal}
+                onselectgif={(url) => selectGif('', url)}
+              />
+            </as-split-area>
+          {/snippet}
+
           {#snippet mainGutter()}
             <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
             <div
@@ -11264,8 +11594,10 @@
             {#if !hidePresentation}{@render presentationPane()}{/if}
             {@render mainGutter()}
             {#if !hideChatAlerts}{@render chatAlertsPane()}{/if}
+            {#if !hideChatAlerts && extraChatColumnVisible}{@render extraChatPane()}{/if}
           {:else}
             {#if !hideChatAlerts}{@render chatAlertsPane()}{/if}
+            {#if !hideChatAlerts && extraChatColumnVisible}{@render extraChatPane()}{/if}
             {#if !hidePresentation}{@render presentationPane()}{/if}
             {@render mainGutter()}
           {/if}
