@@ -1,5 +1,10 @@
 <script lang="ts">
   import { deserialize } from '$app/forms';
+  import {
+    CHAT_PAGE_SCROLL_NUDGE,
+    mergeOlderChatMessages,
+    shouldLoadOlderMessages
+  } from '$lib/chat-paging';
   import { chooseRecordingOptions } from '$lib/recording-codec';
   import { page } from '$app/state';
   import { panelDragResize, readPanelBounds } from '$lib/panel-drag';
@@ -2375,8 +2380,45 @@
     }
   });
 
+  /**
+   * Older pages, oldest-first, keyed by channel.
+   *
+   * `$state.raw`: these arrays are only ever REPLACED, never mutated in place, so a deep proxy over
+   * every message row would cost a proxy read per field on every render and buy nothing.
+   */
+  let olderChatMessages = $state.raw<Record<string, (typeof data.messages)[number][]>>({});
+  /** `this.currPage`, per channel. Page 0 is what the load already sent. */
+  let chatPage = $state.raw<Record<string, number>>({});
+  /**
+   * `this.hasMoreData`, PER CHANNEL — cleared when a page comes back empty, re-armed at the bottom.
+   *
+   * Per channel because the reference's state lives on the roomlog COMPONENT, and it renders one
+   * per channel; a single shared flag here meant that reaching the start of `main` also stopped
+   * `off-topic` from ever paging, however much history it had. Absent means true: a channel nobody
+   * has paged yet has more data until it says otherwise.
+   */
+  let chatHasMoreData = $state.raw<Record<string, boolean>>({});
+  /** `this.loadingMore` — one request at a time. */
+  let chatLoadingMore = $state(false);
+
+  /*
+    The live tail from the load, with whatever older pages the reader has scrolled back to in front
+    of it.
+
+    The two halves have different lifetimes on purpose: `data.messages` is replaced by every
+    `invalidateAll()`, which is every SSE event, while `olderChatMessages` survives them. Merging
+    rather than concatenating because offset paging over a live tail can hand the boundary row back
+    twice — see `mergeOlderChatMessages`, which matches on identity and never on order.
+
+    The trim runs AFTER the merge, so `trimChatLogs` still caps what is held at the reference's 300
+    however far back somebody paged. Trimming first would let the cap be exceeded by exactly the
+    pages this feature adds.
+  */
   const visibleChatMessages = $derived(
-    trimChatLog(data.messages, trimChatLogs)
+    trimChatLog(
+      mergeOlderChatMessages(olderChatMessages[chatTab] ?? [], data.messages),
+      trimChatLogs
+    )
       .filter((item) => item.room === chatTab && !isEvidenceMessageHidden(item))
       .map(withEvidenceState)
       /*
@@ -2407,7 +2449,87 @@
   }
 
   function trackChatScroll(event: Event) {
-    chatScrollingUp = isRoomScrollerReadingHistory(event.currentTarget as HTMLElement);
+    const scroller = event.currentTarget as HTMLElement;
+    chatScrollingUp = isRoomScrollerReadingHistory(scroller);
+    /*
+      Back at the bottom, so paging is armed again: `hasMoreData = !0` on the way down is the
+      reference's own reset, and without it a reader who once hit the end of the history could never
+      page again in that session even after the log had grown.
+    */
+    if (!chatScrollingUp) chatHasMoreData = { ...chatHasMoreData, [chatTab]: true };
+    maybeLoadOlderMessages(scroller);
+  }
+
+  /*
+    ── Older chat history ───────────────────────────────────────────────────────────────────────
+    The page load sends the NEWEST page per channel. Everything before that is fetched here, one
+    page at a time, and held in client state so an `invalidateAll()` — which every SSE event
+    triggers — refreshes the live tail without throwing away what the reader scrolled back to.
+  */
+
+  function maybeLoadOlderMessages(scroller: HTMLElement) {
+    if (
+      !shouldLoadOlderMessages({
+        scrollTop: scroller.scrollTop,
+        messageCount: visibleChatMessages.length,
+        /*
+          Always empty HERE, and deliberately not invented. The reference's roomlog component has
+          its own `searchTerm` that filters the live log in place, and refuses to page while one is
+          set — a filtered log is not a paged one. This room has no such filter: its chat search is
+          the `chat-logs` archive modal, a separate view over its own query. The rule is kept whole
+          in `shouldLoadOlderMessages` because it is the reference's, and this call site passes the
+          only honest value it has.
+        */
+        searchTerm: '',
+        hasMoreData: chatHasMoreData[chatTab] ?? true,
+        loadingMore: chatLoadingMore
+      })
+    ) {
+      return;
+    }
+    void loadOlderChatMessages(chatTab, scroller);
+  }
+
+  /**
+   * `loadMoreLogs({type: 'chat', channel, page})` — one page older, appended in front.
+   *
+   * The empty answer is the terminator, exactly as upstream reads it
+   * (`0 == o.length && (this.hasMoreData = !1)`): the server does not say how much history is left
+   * and does not need to, because running out is something you discover by asking once too often.
+   */
+  async function loadOlderChatMessages(channel: ChatTab, scroller: HTMLElement) {
+    chatLoadingMore = true;
+    const page = (chatPage[channel] ?? 0) + 1;
+
+    const body = new FormData();
+    body.set('channel', channel);
+    body.set('page', String(page));
+    const response = await fetch('?/loadOlderChatMessages', { method: 'POST', body });
+    const result = deserialize<
+      { channel?: string; page?: number; messages?: (typeof data.messages)[number][] },
+      { message?: string }
+    >(await response.text());
+
+    chatLoadingMore = false;
+    if (result.type !== 'success' || !result.data?.messages) return;
+
+    const incoming = result.data.messages;
+    if (incoming.length === 0) {
+      chatHasMoreData = { ...chatHasMoreData, [channel]: false };
+      return;
+    }
+
+    chatPage = { ...chatPage, [channel]: page };
+    olderChatMessages = {
+      ...olderChatMessages,
+      [channel]: mergeOlderChatMessages(incoming, olderChatMessages[channel] ?? [])
+    };
+    /*
+      `scrollTop = scrollTop + 30` — the reference's nudge, applied here rather than at request time
+      because that is when the list has actually grown. Leaving the reader pinned at 0 against a
+      taller list reads as the scroller being stuck.
+    */
+    scroller.scrollTop += CHAT_PAGE_SCROLL_NUDGE;
   }
 
   $effect(() => {

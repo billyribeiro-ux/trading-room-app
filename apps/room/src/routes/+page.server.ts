@@ -28,6 +28,13 @@ import {
   noCapturedRoomItems
 } from '$lib/server/captured-room';
 import { hashEmail, publicSessionHandle } from '$lib/server/connection';
+import {
+  MAX_CHAT_LOG_PAGE,
+  isChatChannel,
+  loadChatPage,
+  loadNewestChatPages
+} from '$lib/server/chat-log';
+import { parseReactions } from '$lib/server/reactions';
 import { readRoomConfig, requestMobilePin, writeRoomSetting } from '$lib/server/room-config-client';
 import { alertSoundCommandValue } from '$lib/files-gates';
 import { memberDeniedArchives } from '$lib/roster-gates';
@@ -93,29 +100,6 @@ import type { ActivePoll, MessageReactions } from '$lib/types';
 const MAX_MESSAGE_BODY = 4_000;
 const MAX_ALERT_BODY = 8_000;
 import type { Actions, PageServerLoad } from './$types';
-
-function parseReactions(value: string): MessageReactions {
-  try {
-    const parsed: unknown = JSON.parse(value);
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
-
-    return Object.fromEntries(
-      Object.entries(parsed).filter(
-        ([key, reaction]) =>
-          key.length > 0 &&
-          reaction !== null &&
-          typeof reaction === 'object' &&
-          'emoji' in reaction &&
-          typeof reaction.emoji === 'string' &&
-          'clickedBy' in reaction &&
-          Array.isArray(reaction.clickedBy) &&
-          reaction.clickedBy.every((emailHash: unknown) => typeof emailHash === 'string')
-      )
-    ) as MessageReactions;
-  } catch {
-    return {};
-  }
-}
 
 export const load: PageServerLoad = async ({ depends, locals, request, cookies }) => {
   ensureDatabase();
@@ -339,39 +323,16 @@ export const load: PageServerLoad = async ({ depends, locals, request, cookies }
     };
   }
 
-  const messageRows = db
-    .select({
-      id: messages.id,
-      room: messages.room,
-      senderId: messages.senderId,
-      body: messages.body,
-      isAdmin: messages.isAdmin,
-      backgroundColor: messages.backgroundColor,
-      fontColor: messages.fontColor,
-      answered: messages.answered,
-      replyToMessageId: messages.replyToMessageId,
-      replyToName: messages.replyToName,
-      replyToBody: messages.replyToBody,
-      reactionsJson: messages.reactionsJson,
-      createdAt: messages.createdAt,
-      bodyHtml: messages.bodyHtml,
-      senderName: users.displayName,
-      senderEmail: users.email,
-      senderAvatarUrl: users.avatarUrl,
-      senderRole: users.role,
-      senderStatus: users.status
-    })
-    .from(messages)
-    .innerJoin(users, eq(messages.senderId, users.id))
-    // `/sess/${sessionID}/chat/…` — this room's chat, not the deployment's.
-    .where(eq(messages.roomShortCode, requireRoomShortCode(locals)))
-    .orderBy(asc(messages.createdAt))
-    .all()
-    .map(({ senderEmail, reactionsJson, ...message }) => ({
-      ...message,
-      reactions: parseReactions(reactionsJson),
-      senderEmailHash: hashEmail(senderEmail)
-    }));
+  /*
+    THE NEWEST PAGE PER CHANNEL, not the whole log.
+
+    This selected every row in `messages` for the room until 2026-08-14 — no LIMIT, `.all()` — and
+    every SSE event calls `invalidateAll()`, so a room with 50,000 messages re-read and
+    re-serialised all of them each time anybody said anything. Older pages are fetched on demand by
+    `loadOlderChatMessages` and held in client state, so nothing became unreachable; see
+    `$lib/server/chat-log.ts` for why a bare LIMIT would have been worse than the bug.
+  */
+  const messageRows = loadNewestChatPages(requireRoomShortCode(locals));
 
   const alertRows = db
     .select({
@@ -1597,6 +1558,53 @@ export const actions: Actions = {
       peerId,
       page,
       messages: loadThread(requireRoomShortCode(locals), user.id, peerId, page)
+    };
+  },
+
+  /**
+   * `getChatLog {channel, page}` — one page of older history for the main chat log.
+   *
+   * The reference's own command, minus the socket. Its client asks for page N when the reader
+   * scrolls near the top, and the server answers with that page and nothing else; an EMPTY answer
+   * is what tells the client to stop asking (`0 == o.length && (this.hasMoreData = !1)`).
+   *
+   * ## The channel is validated, not trusted
+   *
+   * `isChatChannel` is an allow-list of the two channels this room renders. Without it the field
+   * would be an arbitrary string reaching a WHERE clause — parameterised, so not injectable, but it
+   * would let a caller enumerate whether messages exist under any label they cared to guess. Deny
+   * by default costs one line.
+   *
+   * ## Scoped like every other read here
+   *
+   * `requireRoomShortCode(locals)` — the room comes from the session, never from the request. A
+   * `roomShortCode` field on this form would be the 2026-08-07 privilege escalation again, in a
+   * new place.
+   */
+  loadOlderChatMessages: async ({ request, locals }) => {
+    ensureDatabase();
+    requireUser(locals);
+
+    const data = await request.formData();
+    const channel = String(data.get('channel') ?? '');
+    if (!isChatChannel(channel)) return fail(400, { message: 'No such channel.' });
+
+    /*
+      Page 0 is the newest page and the page load already sent it, so asking for it here would
+      duplicate what the client holds rather than reach further back. Bounded at the top too: a
+      caller cannot ask for page 10,000,000 and make SQLite count its way there, which is what an
+      unvalidated OFFSET is.
+    */
+    const page = Number(data.get('page') ?? 0);
+    if (!Number.isInteger(page) || page < 1 || page > MAX_CHAT_LOG_PAGE) {
+      return fail(400, { message: 'No such page.' });
+    }
+
+    return {
+      success: true,
+      channel,
+      page,
+      messages: loadChatPage(requireRoomShortCode(locals), channel, page)
     };
   },
 

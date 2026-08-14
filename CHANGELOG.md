@@ -24,6 +24,77 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-14
 
+### 2026-08-14 12:43 EDT — The chat log read is bounded, and its history is still reachable
+
+**Runtime impact: yes, and it is the largest performance change made to this room.** The page load
+selected every row in `messages` for the room — no LIMIT, `.all()` — and every SSE event calls
+`invalidateAll()`. A room with 50,000 messages re-read and re-serialised all 50,000 every time
+anybody said anything. It now reads fifty per channel.
+
+**Why this was a feature and not a limit clause.** `.limit(300)` alone would have been WORSE than
+the bug: history older than 300 messages would have silently become unreachable, with nothing
+anywhere to say so. The reference pages, so this pages — `chatLogPageSize = 50` at byte 977432, from
+the same globals object as `trimLogSize = 300`. Those two numbers are different mechanisms sitting
+side by side, and the code now says so: 50 bounds what the server sends per request, 300 bounds what
+the client keeps once `preferences.trimChatLogs` is on.
+
+**Per channel, because upstream pages per channel.** It sends `getChatLog {channel, page}` once for
+`main` and again for `offTopic`. A single global page of fifty would leave `off-topic` empty in any
+room where `main` is busy, however much history it had.
+
+**The design that makes it work.** Older pages are held in CLIENT state, not in `data`. That is the
+whole point: `data.messages` is replaced by every `invalidateAll()`, so older pages living there
+would be discarded by one new chat message — the reader would be thrown back to the bottom every
+time somebody typed. They are merged at render instead, and merged by IDENTITY rather than by
+position, because offset paging over a live tail can hand the boundary row back twice. Upstream
+shows that duplicate; here it costs one `Set`, and the match is `Set.has` — equality only, never
+`<` or `Math.max`, so it survives ids becoming uuids.
+
+**The trigger is upstream's whole condition**, not a paraphrase: `scrollTop < 100`, more than 15
+messages, no active search, plus the `hasMoreData` and `loadingMore` guards, and the `scrollTop +=
+30` nudge afterwards. Each term has its own test, because each one is the entire rule for somebody —
+the threshold for a reader mid-scroll, the message floor for a nearly-empty room, `loadingMore` for
+a trackpad emitting forty scroll events a second. An EMPTY page is the terminator
+(`0 == o.length && (this.hasMoreData = !1)`); the server never says how much is left, because
+running out is something you discover by asking once too often.
+
+**Two bugs of my own, both caught by re-reading the diff and both now tested.** `hasMoreData` was
+one flag shared across channels, so a reader who reached the start of `main` could not page
+`off-topic` for the rest of the session — upstream keeps that state on the roomlog component, and it
+renders one per channel. And the trim has to run AFTER the merge: trimming `data.messages` first and
+then prepending older pages lets the held log exceed `trimLogSize` by exactly the pages this feature
+adds, which would quietly break the preference for the readers most likely to have it on.
+
+**A composite index, because the paging would otherwise have moved the cost rather than removed it.**
+`messages(room_short_code, room, created_at DESC, id DESC)` answers the WHERE and supplies the ORDER
+BY in one ordered walk. The existing single-column room index narrowed to the room and left SQLite
+to sort the whole channel on every page request.
+
+**`MAX_CHAT_LOG_PAGE = 2000`** bounds the OFFSET scan. `OFFSET n` makes SQLite walk and discard n
+rows, so an unvalidated page number turns one HTTP request into a full table scan. It is a DoS
+bound, not a product limit — no legitimate client reaches it, because the reader stops at the first
+empty page. The channel is an allow-list for the same reason, and the room comes from the session
+rather than the form, which is the 2026-08-07 escalation not being reintroduced in a new place.
+
+**`parseReactions` moved** out of `+page.server.ts` into `$lib/server/reactions.ts`: the paged read
+needs it for messages and the route still needs it for alerts and captured-item overrides, and two
+copies of a validator is how one of them stops matching the data.
+
+**HONEST GAP, and it is the same defect: `alerts` is still unbounded.** `+page.server.ts` selects
+every alert row for the room, `orderBy(asc(alerts.createdAt))`, `.all()`, re-read on every
+invalidate. Upstream pages it identically — `getAlertsLog {page}`, `loadMoreLogs {type: 'alerts',
+page}`, `trimAlertsLog` beside `trimChatLog` — so the machinery to copy is the machinery just
+written. Recorded in row Z as the next unit rather than left for somebody to find.
+
+**Verified:** `svelte-check` 0 errors 0 warnings; room **1001/87**, up from 974/85. **Twelve negative
+controls run and each went red**: removing the LIMIT, dropping the per-channel WHERE, dropping the
+index, removing the channel allow-list, allowing page 0 and an unbounded offset, throwing older pages
+away on every invalidate, never re-arming at the bottom, ignoring the empty-page terminator, paging
+only at the very top edge, removing the dedupe, and dropping each of the two guards — plus a
+thirteenth for the shared-flag bug. **Not run:** the full gate, and no `EXPLAIN ANALYZE` — the index
+is asserted at the schema level, not measured, because this room's SQLite has no dataset large
+enough for the measurement to mean anything.
+
 ### 2026-08-14 12:28 EDT — RTE steps 3 and 4: the editor, both entry points, and the gate
 
 **Runtime impact: YES.** A presenter in a room whose owner has ticked "Enable Rich Text Editor?",

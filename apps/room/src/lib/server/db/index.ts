@@ -374,6 +374,23 @@ export function ensureDatabase() {
   }
 
   /*
+    The chat log's paging index.
+
+    `loadChatPage` filters on (room_short_code, room) and orders by (created_at DESC, id DESC). The
+    single-column `messages_room_idx` above narrows to the room and then leaves SQLite to sort what
+    is left on every page request — which is the whole channel, every time, exactly the cost the
+    paging was added to remove. This index answers the WHERE and supplies the ORDER BY in one
+    ordered walk, so a page read touches the fifty rows it returns plus the offset it skips.
+
+    Column order is the query's: equality columns first, then the sort. `id` is last so the tie
+    break is served from the index rather than by a sort of the ties.
+  */
+  sqlite.exec(
+    `CREATE INDEX IF NOT EXISTS messages_channel_paging_idx
+       ON messages(room_short_code, room, created_at DESC, id DESC)`
+  );
+
+  /*
     The two captured-item tables need the room in their PRIMARY KEY, not beside it: the same
     fixture item is re-emitted into every room, so hiding or editing one is a fact about one room's
     copy. SQLite cannot add to a primary key in place, so the table is rebuilt — the only
