@@ -24,6 +24,41 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-14
 
+### 2026-08-14 09:22 EDT — Tier 0 finished: T1-9 closed, T1-10 parked, register 67/6/14
+
+The static fetcher ran clean once its denylist bug was out of the way: **17/22 fetched, 5 honest
+soft-404s.** That completes the browser work entirely — **section A and section E of the handoff are
+both empty**, and nothing left in the register can be closed from this machine.
+
+**T1-9 — CLOSED, 8/8.** All eight public-site images fetched with content and SHA-256.
+
+**T1-10 — PARKED to Tier 4.** Both room build assets soft-404'd a second time: HTTP **200** with the
+52-byte `<h3>this is not the page you are looking for...</h3>` body, so `res.ok` is TRUE for a file
+that is not there. That second confirmation is exactly the condition the row set for parking it.
+**Nothing is blocked by it** — the room's real bundle has been in this repository all along at
+`apps/room/docs/source/`, decoded into 194 component files. It is the same bundle that unblocked
+item W an hour earlier.
+
+**T1-6 confirmed independently.** Its three glyphicon fonts soft-404 too, which is what its existing
+"CLOSED AS NOT-DEPLOYED" status already claimed — now corroborated by a second run rather than
+resting on one.
+
+**The capture is NOT committed, deliberately.** `.gitignore:49` matches `ptr-*.json`, and the rule
+above it is emphatic: live captures stay out, findings come to `docs/` with a citation. So a
+metadata manifest went in instead — `evidence-dumps/static-asset-manifest-2026-08-14.json`, **7.7 KB
+in place of 4.2 MB** — carrying url, bytes, contentType and sha256 for all 22, which identifies every
+file byte-for-byte on any re-fetch. No asset body is stored.
+
+That also avoids committing **1.28 MB of base64 for three marketing screenshots**
+(`ptr_descrived_perspective.png`, `user_comments.png`, `ss3.png`) which `TODO.md` puts explicitly
+outside the match: they are photographs of the ORIGINAL's interface and will be retaken against this
+product. Fetching them was free; storing them would not have been.
+
+**Tier 0 scoreboard — six gaps closed and one parked, from one browser session:** T5-15, T5-21,
+T2-20, T2-7, T2-22, T1-9 closed; T1-10 parked. Register 61 -> **67 closed, 6 open, 14 parked, 87
+total**. Every one of the six that remain needs infrastructure that does not exist or a decision that
+is the owner's.
+
 ### 2026-08-14 09:15 EDT — T2-22 closed; the login-detector fix proved itself on the next run
 
 `evidence-dumps/rendered-states-login-2026-08-14.json`, captured logged out. **66 closed, 8 open.**

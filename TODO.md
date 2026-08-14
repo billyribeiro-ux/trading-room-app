@@ -95,19 +95,19 @@ Every gap from the full read of `apps/controller/evidence-dumps/` now lives ther
 five tiers. **That file is the tracker — this section is only the index to it.** Do not record a
 gap's status in both places; one of them will go stale.
 
-As of 2026-08-14 09:15 EDT: **66 CLOSED, 8 OPEN, 13 parked/won't-fix, 87 total.**
+As of 2026-08-14 09:22 EDT: **67 CLOSED, 6 OPEN, 14 parked/won't-fix, 87 total.**
 
-**Everything closable by READING is closed.** The eight that remain need something no source file
+**Everything closable by READING is closed.** The six that remain need something no source file
 can give. Each is written out below with the exact next action, because "blocked" without an
 instruction is just a note that something is unfinished.
 
 ---
 
-### HANDOFF — the EIGHT still open, and exactly what each needs
+### HANDOFF — the SIX still open, and exactly what each needs
 
 Rewritten 2026-08-13 18:21 EDT, recounted 2026-08-14. It said twelve while the template read was
 still running, then fourteen, and the prose disagreed with the tally line above it in BOTH
-directions for a day. The items below count 0 + 1 + 4 + 1 + 2 = **eight** after the 2026-08-14 browser session closed five, which is what the
+directions for a day. The items below count 0 + 1 + 4 + 1 + 0 = **six** after the 2026-08-14 browser session closed six and parked one, which is what the
 tally says and what `evidence-gap-register-counts.test.ts` recounts from the register itself.
 Section B reads "two" because one sentence unblocks two EDITS; only one of them (T5-24) is an open
 register row. Every item says WHO does the next step and WHAT it is. **No item here
@@ -168,13 +168,16 @@ specified in the register.
   rebuild has to choose. **Recommendation: omit it and record why**, the same call already taken for
   the Stripe Details link. Moot until T5-16 exists.
 
-#### E. Two need a re-fetch, and may simply not exist any more.
+#### E. Nothing. Both re-fetched 2026-08-14 and resolved.
 
-**T1-9** (public-site images) and **T1-10** (the Angular-17 room build assets) both came back as
-**SOFT 404s** — this server answers a missing file with HTTP **200** and a 52-byte
-`<h3>this is not the page you are looking for...</h3>` body, so `res.ok` is TRUE for a file that is
-not there. Re-run `scripts/ptr-fetch-static.js` after a deploy: the hashed filenames change with
-every build. If they soft-404 again they are genuinely not deployed, and both should move to Tier 4.
+**T1-9 CLOSED** — all 8 public-site images fetched, recorded in
+`evidence-dumps/static-asset-manifest-2026-08-14.json` by url + bytes + sha256.
+**T1-10 PARKED to Tier 4** — both room build assets soft-404'd a second time (HTTP 200, 52-byte body), which is
+the condition this bucket set for parking them. Nothing is blocked: the room's real bundle is already in the
+repository at `apps/room/docs/source/`, decoded into 194 component files.
+
+**T1-6 was independently re-confirmed** by the same run — its three glyphicon fonts soft-404 as well, which is
+what its existing "CLOSED AS NOT-DEPLOYED" status already said.
 
 #### F. Nothing. This bucket is empty.
 

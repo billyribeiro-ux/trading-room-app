@@ -1,0 +1,224 @@
+{
+ "note": "METADATA ONLY. Generated from a ptr-fetch-static.js run; the capture itself is excluded by .gitignore (ptr-*.json) under the repository rule that live captures stay out and findings come here with a citation. No asset BODY is stored: the sha256 identifies each byte-for-byte if it is ever re-fetched.",
+ "capturedAt": "2026-08-14T13:17:52.814Z",
+ "pageUrl": "https://protradingroom.com/ptrApp#/page/welcome",
+ "cver": "1786262947549",
+ "cverSource": "window.__cver (live)",
+ "assets": [
+  {
+   "gapId": "T1-1",
+   "name": "app.min.js",
+   "url": "https://protradingroom.com/public/dist/app.min.js?v=1786262947549",
+   "ok": true,
+   "status": 200,
+   "bytes": 455329,
+   "contentType": "application/javascript; charset=UTF-8",
+   "sha256": "dcad77f4578fa9a75c46491dd3e31c534624b627afb6f4a2b74a6dcfdde6f439"
+  },
+  {
+   "gapId": "T1-2",
+   "name": "vendor.min.js",
+   "url": "https://protradingroom.com/public/dist/vendor.min.js?v=2.18.100",
+   "ok": true,
+   "status": 200,
+   "bytes": 1265906,
+   "contentType": "application/javascript; charset=UTF-8",
+   "sha256": "dd1fd2b3869615a21e32d1d2cee1d727993c34e6de6fc609cab8ed3a4fb3bbba"
+  },
+  {
+   "gapId": "T1-4",
+   "name": "styles.css",
+   "url": "https://protradingroom.com/public/app/css/styles.css",
+   "ok": true,
+   "status": 200,
+   "bytes": 218719,
+   "contentType": "text/css; charset=UTF-8",
+   "sha256": "23bc4e026a06c84c8ed31d4726c54651932b82087436dbfe36eee77936c2f49c"
+  },
+  {
+   "gapId": "T1-5",
+   "name": "API_Documentation.md",
+   "url": "https://protradingroom.com/public/html/POST_ROUTE_API_DOCUMENTATION.md",
+   "ok": true,
+   "status": 200,
+   "bytes": 20699,
+   "contentType": "text/markdown; charset=UTF-8",
+   "sha256": "29d08ef2b00764d499d8f77f67c04671f1e488009ad2a2f82c012a373092e051"
+  },
+  {
+   "gapId": "T1-5b",
+   "name": "api-docs source alt",
+   "url": "https://protradingroom.com/public/html/API_Documentation.md",
+   "ok": true,
+   "status": 200,
+   "bytes": 14011,
+   "contentType": "text/markdown; charset=UTF-8",
+   "sha256": "f66cbb787fe91441adbf38b58aaff81ef27af219fe6c74077b4716fed1243f3c"
+  },
+  {
+   "gapId": "T1-6",
+   "name": "glyphicons.woff2",
+   "url": "https://protradingroom.com/public/app/fonts/glyphicons-halflings-regular.woff2",
+   "ok": false,
+   "status": 200,
+   "bytes": 52,
+   "note": "SOFT 404 — server returned HTTP 200 with its \"not the page you are looking for\" body. The asset is NOT deployed at this path. Recorded as an honest gap; do NOT treat as fetched."
+  },
+  {
+   "gapId": "T1-6",
+   "name": "glyphicons.woff",
+   "url": "https://protradingroom.com/public/app/fonts/glyphicons-halflings-regular.woff",
+   "ok": false,
+   "status": 200,
+   "bytes": 52,
+   "note": "SOFT 404 — server returned HTTP 200 with its \"not the page you are looking for\" body. The asset is NOT deployed at this path. Recorded as an honest gap; do NOT treat as fetched."
+  },
+  {
+   "gapId": "T1-6",
+   "name": "glyphicons.ttf",
+   "url": "https://protradingroom.com/public/app/fonts/glyphicons-halflings-regular.ttf",
+   "ok": false,
+   "status": 200,
+   "bytes": 52,
+   "note": "SOFT 404 — server returned HTTP 200 with its \"not the page you are looking for\" body. The asset is NOT deployed at this path. Recorded as an honest gap; do NOT treat as fetched."
+  },
+  {
+   "gapId": "T1-7",
+   "name": "fontawesome.woff2",
+   "url": "https://protradingroom.com/public/vendor/font-awesome/fonts/fontawesome-webfont.woff2?v=4.3.0",
+   "ok": true,
+   "status": 200,
+   "bytes": 56780,
+   "contentType": "font/woff2",
+   "sha256": "aadc3580d2b64ff5a7e6f1425587db4e8b033efcbf8f5c332ca52a5ed580c87c"
+  },
+  {
+   "gapId": "T1-8",
+   "name": "theme.css",
+   "url": "https://protradingroom.com/public/css/compiled/theme.css",
+   "ok": true,
+   "status": 200,
+   "bytes": 232979,
+   "contentType": "text/css; charset=UTF-8",
+   "sha256": "497733a044053a64d2ff340192b9542306269bde38a55db30308791ee26470ab"
+  },
+  {
+   "gapId": "T1-8",
+   "name": "vendor-animate.css",
+   "url": "https://protradingroom.com/public/css/vendor/animate.css",
+   "ok": true,
+   "status": 200,
+   "bytes": 63376,
+   "contentType": "text/css; charset=UTF-8",
+   "sha256": "0cb9156494d7c7c70ee5d710c0452b3fd3c1e774ecb5d042385aa5972e869bfa"
+  },
+  {
+   "gapId": "T1-8",
+   "name": "main.css",
+   "url": "https://protradingroom.com/public/css/main.css?v1.0",
+   "ok": true,
+   "status": 200,
+   "bytes": 2103,
+   "contentType": "text/css; charset=UTF-8",
+   "sha256": "a27b150001e49d3cb6b82f954c21c693c1e74e87d4fee6e7bcc4d87cfde10c42"
+  },
+  {
+   "gapId": "T1-9",
+   "name": "protradingroom_icon.png",
+   "url": "https://protradingroom.com/public/images/protradingroom_icon.png",
+   "ok": true,
+   "status": 200,
+   "bytes": 2811,
+   "contentType": "image/png",
+   "sha256": "f9c8e4a59a690bfb8818819ab0cfef00d0800044ee028d99faf535c3253148a5"
+  },
+  {
+   "gapId": "T1-9",
+   "name": "protradingroom_icon_dark.png",
+   "url": "https://protradingroom.com/public/images/protradingroom_icon_dark.png",
+   "ok": true,
+   "status": 200,
+   "bytes": 4566,
+   "contentType": "image/png",
+   "sha256": "06aae3e4cdaf555af2ba8b89353dd023db45015e67b684830e37721efdca0e46"
+  },
+  {
+   "gapId": "T1-9",
+   "name": "ptr_descrived_perspective.png",
+   "url": "https://protradingroom.com/public/images/ptr_descrived_perspective.png",
+   "ok": true,
+   "status": 200,
+   "bytes": 712178,
+   "contentType": "image/png",
+   "sha256": "4419e8ded4a3e4e19a15809fb9c577044629c9345b75843b81b56f49207e699c"
+  },
+  {
+   "gapId": "T1-9",
+   "name": "user_comments.png",
+   "url": "https://protradingroom.com/public/images/user_comments.png",
+   "ok": true,
+   "status": 200,
+   "bytes": 475899,
+   "contentType": "image/png",
+   "sha256": "b133877779a920e6e6d36749284dbd1548cf5a2a1fbc59330825a8155445a4ba"
+  },
+  {
+   "gapId": "T1-9",
+   "name": "ss3.png",
+   "url": "https://protradingroom.com/public/images/ss3.png",
+   "ok": true,
+   "status": 200,
+   "bytes": 95469,
+   "contentType": "image/png",
+   "sha256": "bf4fd92aaa5865cd6824852b946a04c2e00b026f28b9b45d032a904e077d8752"
+  },
+  {
+   "gapId": "T1-9",
+   "name": "icon-locked.png",
+   "url": "https://protradingroom.com/public/images/circle-icons/one-color/locked.png",
+   "ok": true,
+   "status": 200,
+   "bytes": 2640,
+   "contentType": "image/png",
+   "sha256": "beab5323195e7c7d351298464c8f0af4484f881039924487d0ed2f5775458b82"
+  },
+  {
+   "gapId": "T1-9",
+   "name": "icon-cloud.png",
+   "url": "https://protradingroom.com/public/images/circle-icons/one-color/cloud.png",
+   "ok": true,
+   "status": 200,
+   "bytes": 2505,
+   "contentType": "image/png",
+   "sha256": "5a387d3acfc0b59e024e995d1a677a23833802f263c42fab2bc85ba768b18eff"
+  },
+  {
+   "gapId": "T1-9",
+   "name": "icon-browser.png",
+   "url": "https://protradingroom.com/public/images/circle-icons/one-color/browser.png",
+   "ok": true,
+   "status": 200,
+   "bytes": 2138,
+   "contentType": "image/png",
+   "sha256": "16f5d6e2d032d66b4c5c5a4c720f6d9b5577c09996188fd99809753544478dec"
+  },
+  {
+   "gapId": "T1-10",
+   "name": "room styles.css",
+   "url": "https://protradingroom.com/styles.d622cb9ed2bbc221.css",
+   "ok": false,
+   "status": 200,
+   "bytes": 52,
+   "note": "SOFT 404 — server returned HTTP 200 with its \"not the page you are looking for\" body. The asset is NOT deployed at this path. Recorded as an honest gap; do NOT treat as fetched."
+  },
+  {
+   "gapId": "T1-10",
+   "name": "room main.js",
+   "url": "https://protradingroom.com/main.d6d3c112b59b7d0d.js",
+   "ok": false,
+   "status": 200,
+   "bytes": 52,
+   "note": "SOFT 404 — server returned HTTP 200 with its \"not the page you are looking for\" body. The asset is NOT deployed at this path. Recorded as an honest gap; do NOT treat as fetched."
+  }
+ ]
+}
