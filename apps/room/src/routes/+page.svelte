@@ -1,6 +1,6 @@
 <script lang="ts">
   import { deserialize } from '$app/forms';
-  import { formatChatMutedTill } from '$lib/message-formatters';
+  import { formatChatMutedTill, sameCalendarDay } from '$lib/message-formatters';
   import {
     chatComposerEnabled,
     isChatMode,
@@ -77,6 +77,7 @@
     shouldDisableSelection
   } from '$lib/room-key-gates';
   import EmojiPicker from '$lib/components/EmojiPicker.svelte';
+  import ExtraChatPane from '$lib/components/ExtraChatPane.svelte';
   import GifConfirmDialog from '$lib/components/GifConfirmDialog.svelte';
   import GiphyPicker from '$lib/components/GiphyPicker.svelte';
   import ImageUploadDialog from '$lib/components/ImageUploadDialog.svelte';
@@ -119,6 +120,7 @@
   import type {
     AlertTab,
     ChatTab,
+    MessageAction,
     FileTab,
     FollowChatStyle,
     MainTab,
@@ -870,6 +872,28 @@
    * it — `pushToTalk:!1` and `makeUsersFollowMyScreens:!1` are both `=== true` for the same reason.
    */
   let enableRTE = $state(loadedSettings.enableRTE === true);
+
+  /**
+   * `preferences.extraChatColumn` — the second chat column.
+   *
+   * Defaults OFF, read rather than chosen: it is absent from the reference's twenty-five default
+   * preferences, exactly like `enableRTE`, so a fresh account evaluates the gate on `undefined`.
+   */
+  let extraChatColumn = $state(loadedSettings.extraChatColumn === true);
+  /** The extra column's own channel. `this.channel = 'offTopic'` in `app-extra-chat`. */
+  let extraChatTab: ChatTab = $state('off-topic');
+  /** `#textAreaTxtExtra`. */
+  let extraComposer = $state('');
+  let extraChatScroller = $state<HTMLElement | undefined>();
+  let extraChatScrollingUp = false;
+  /**
+   * `globals.chatInputFocus` — which composer the viewer last typed in.
+   *
+   * The mention router reads it: `preferences.extraChatColumn && (extraChatMsg ||
+   * 'textAreaTxtExtra' === chatInputFocus) ? 'doMentionExtra' : 'doMention'`. Without it, clicking
+   * a name while the extra column has focus would insert the mention into the other composer.
+   */
+  let chatInputFocus = $state('textAreaTxt');
 
   /**
    * `preferences.disableVideo` - the viewer's own "turn the video off to preserve data" switch.
@@ -1905,6 +1929,23 @@
    * this same full question. Strictly fewer people reach the editor than upstream, and everyone
    * who reaches it can finish.
    */
+  /**
+   * `showPMBtn` — the chat header's private-chat button.
+   *
+   * ```js
+   * this.showPMBtn = (isPresenter || sessData.userPM || sessData.userToPresenterPM)
+   *   && !(user.isFT && sessData.disablePMForTrials)
+   * ```
+   *
+   * The same three settings the roster's per-target `canShowRosterPrivateChat` reads, asked without
+   * a target because this button opens the chooser rather than one conversation.
+   */
+  const showPmButton = $derived(
+    (isPresenter ||
+      data.sessData?.userPM === true ||
+      data.sessData?.userToPresenterPM === true) &&
+      !(data.user.isFT === true && data.sessData?.disablePMForTrials === true)
+  );
   const canUseRTE = $derived(data.sessData?.enableRTE === true && enableRTE && isPresenter);
   /**
    * The room's chat mode — `g` group, `p` webinar, `d` disabled.
@@ -1992,6 +2033,19 @@
     isMobileScreen
       ? `flex: 0 0 ${presentationColumn};`
       : `order: ${primaryIsFirst ? 2 : 0}; flex: 0 0 ${presentationColumn};`
+  );
+  /*
+    The extra chat column, as its own area.
+
+    `K4e` places it as index 3, gated `!e.hideChatAlerts && preferences.extraChatColumn`, and `q4e`
+    gives it `size = chatAlertsSize` — the same width as the chat/alerts column it sits beside. The
+    order puts it after that column, which is what `orderChatAlerts()` resolves to when the extra
+    column is present.
+  */
+  const extraChatAreaStyle = $derived(
+    isMobileScreen
+      ? `flex: 0 0 ${primaryColumn};`
+      : `order: ${primaryIsFirst ? 1 : 3}; flex: 0 0 ${primaryColumn};`
   );
   const alertsAreaStyle = $derived(`order: 0; flex: 0 0 ${alertsRow};`);
   const chatAreaStyle = $derived(`order: 2; flex: 0 0 ${chatRow};`);
@@ -2084,22 +2138,6 @@
     selectRosterUser(user);
     showPrivateChat();
   }
-  type MessageAction =
-    | 'delete'
-    | 'mute'
-    | 'user'
-    | 'mention'
-    | 'show-all'
-    | 'report'
-    | 'copy'
-    | 'reply'
-    | 'answered'
-    | 'private'
-    | 'question'
-    | 'image'
-    | 'edit'
-    | 'reaction';
-
   interface MessageReactionPayload {
     key: string;
     emoji: string;
@@ -2469,12 +2507,19 @@
     however far back somebody paged. Trimming first would let the cap be exceeded by exactly the
     pages this feature adds.
   */
-  const visibleChatMessages = $derived(
-    trimChatLog(
-      mergeOlderChatMessages(olderChatMessages[chatTab] ?? [], data.messages),
+  /*
+    The extra column's rows, through the SAME pipeline as the main column's — merge, trim, hide,
+    badge, and the webinar filter — differing only in which channel it reads. Written as a function
+    so the two columns cannot drift: a second derived would be a second copy of six steps.
+  */
+  const visibleExtraChatMessages = $derived(chatMessagesFor(extraChatTab));
+
+  function chatMessagesFor(tab: ChatTab) {
+    return trimChatLog(
+      mergeOlderChatMessages(olderChatMessages[tab] ?? [], data.messages),
       trimChatLogs
     )
-      .filter((item) => item.room === chatTab && !isEvidenceMessageHidden(item))
+      .filter((item) => item.room === tab && !isEvidenceMessageHidden(item))
       /*
         WEBINAR MODE. Upstream applies this as messages ARRIVE, dropping them before they ever reach
         the log; applied here as a view filter instead, because this room re-reads its log from the
@@ -2514,8 +2559,10 @@
         and on ALL of them here — a divergence in our favour, and the alternative would be
         denormalising controller state into room rows that then go stale.
       */
-      .map((item) => ({ ...item, badges: badgesForSender(item.senderEmailHash) }))
-  );
+      .map((item) => ({ ...item, badges: badgesForSender(item.senderEmailHash) }));
+  }
+
+  const visibleChatMessages = $derived(chatMessagesFor(chatTab));
 
   function forceAlertsToBottom(scroller: HTMLElement) {
     if (alertScrollTimer !== undefined) globalThis.clearTimeout(alertScrollTimer);
@@ -3502,6 +3549,7 @@
       if (key === 'chatPopup') chatPopup = value;
       if (key === 'trimChatLogs') trimChatLogs = value;
       if (key === 'enableRTE') enableRTE = value;
+      if (key === 'extraChatColumn') extraChatColumn = value;
       /*
         Both halves, because this preference has TWO controls: the navbar's
         `presentation-subtitles` checkbox and the settings modal's `app-speech-reco-overlay`. The
@@ -3541,15 +3589,6 @@
     filesMenuOpen = false;
     userMenuId = null;
     messageMenuId = null;
-  }
-
-  function sameCalendarDay(current: Date, previous?: Date) {
-    if (!previous) return false;
-    return (
-      current.getFullYear() === previous.getFullYear() &&
-      current.getMonth() === previous.getMonth() &&
-      current.getDate() === previous.getDate()
-    );
   }
 
   function openImageModal(event: MouseEvent | undefined, url: string) {
@@ -6195,14 +6234,14 @@
    * it and derives its own `body` from the result, so what arrives here as plain text is the
    * optimistic copy and never the stored one.
    */
-  async function sendMessageBody(body: string, bodyHtml?: string) {
+  async function sendMessageBody(body: string, bodyHtml?: string, room: ChatTab = chatTab) {
     const trimmedBody = body.trim();
     if (!trimmedBody) return false;
 
     const form = new FormData();
     form.set('body', trimmedBody);
     if (bodyHtml) form.set('bodyHtml', bodyHtml);
-    form.set('room', chatTab);
+    form.set('room', room);
     const response = await fetch('?/sendMessage', { method: 'POST', body: form });
 
     if (response.ok) {
@@ -6349,6 +6388,53 @@
     const result = deserialize<{ mode?: string }, { message?: string }>(await response.text());
     if (result.type !== 'success') return;
     await invalidateAll();
+  }
+
+  /** The extra column's composer, sending into the channel that column is showing. */
+  async function sendExtraComposerMessage() {
+    const body = extraComposer.trim();
+    if (!body) return;
+    if (await sendMessageBody(body, undefined, extraChatTab)) extraComposer = '';
+  }
+
+  /**
+   * The extra column's scroll handler.
+   *
+   * Its own `isScrollingUp` and its own paging trigger: two scrollers with two positions is the
+   * whole point of `app-extra-roomscroller` being a separate component upstream. The paging STATE
+   * is shared because it is keyed by channel — two columns showing the same channel are looking at
+   * the same history, and should not fetch it twice.
+   */
+  function trackExtraChatScroll(scroller: HTMLElement) {
+    extraChatScrollingUp = isRoomScrollerReadingHistory(scroller);
+    if (!extraChatScrollingUp) {
+      chatHasMoreData = { ...chatHasMoreData, [extraChatTab]: true };
+    }
+    if (
+      !shouldLoadOlderMessages({
+        scrollTop: scroller.scrollTop,
+        messageCount: visibleExtraChatMessages.length,
+        searchTerm: '',
+        hasMoreData: chatHasMoreData[extraChatTab] ?? true,
+        loadingMore: chatLoadingMore
+      })
+    ) {
+      return;
+    }
+    scroller.scrollTop += CHAT_PAGE_REQUEST_NUDGE;
+    void loadOlderChatMessages(extraChatTab, scroller);
+  }
+
+  /**
+   * The extra column's rich-text button — `openRTEModal()` on `app-extra-chat`, which reads
+   * `#textAreaTxtExtra` rather than `#textAreaTxt` and clears that one.
+   */
+  function openExtraRTEModal() {
+    rteIsEditing = false;
+    rteEditTarget = null;
+    rteDraft = textToEditorHtml(extraComposer.trim());
+    extraComposer = '';
+    openModal('rich-text');
   }
 
   function openImageUpload() {
@@ -11216,6 +11302,62 @@
           </as-split-area>
           {/snippet}
 
+          <!--
+            `q4e` — the extra chat column, its own `as-split-area` holding `app-extra-chat`.
+
+            A third area, not a second pane inside the chat column: `K4e` renders three areas and
+            gates this one on `!hideChatAlerts && preferences.extraChatColumn`. The comment on
+            `primaryAreaStyle` above used to end "which this room does not model"; it does now.
+          -->
+          {#snippet extraChatPane()}
+            <as-split-area
+              minsize="0"
+              class="alert-chat-box as-split-area"
+              style={extraChatAreaStyle}
+            >
+              <ExtraChatPane
+                bind:tab={extraChatTab}
+                bind:composer={extraComposer}
+                messages={visibleExtraChatMessages}
+                {doNotDisturbOn}
+                {chatEnabled}
+                {webinarMode}
+                {selfMutedUntil}
+                {showPmButton}
+                {canPostImages}
+                {isPresenter}
+                {canUseRTE}
+                {giphyApiKey}
+                {theme}
+                chatStyle={globalChatStyle}
+                {chatGif}
+                {chatBadges}
+                {enableBadges}
+                {showBadgesToPresentersOnly}
+                {disableStarYears}
+                {presenterMessagesOnTheRight}
+                currentUserId={data.user.id}
+                currentUserEmailHash={data.user.emailHash}
+                currentUserName={data.user.displayName}
+                viewerIsPresenter={data.user.role === 'staff' || data.user.role === 'admin'}
+                {followedUsers}
+                openMenuKey={messageMenuId}
+                onmenutoggle={(key) => (messageMenuId = key)}
+                onaction={(action, message, event) =>
+                  handleMessageAction('chat', action, message, event)}
+                onsend={() => void sendExtraComposerMessage()}
+                onscroll={(scroller) => trackExtraChatScroll(scroller)}
+                onscrollerready={(scroller) => (extraChatScroller = scroller)}
+                onprivatechat={showPrivateChat}
+                onsearch={() => openModal('chat-logs')}
+                onsettings={() => openModal('settings')}
+                onimageupload={openImageUpload}
+                onrte={openExtraRTEModal}
+                onselectgif={(url) => selectGif('', url)}
+              />
+            </as-split-area>
+          {/snippet}
+
           {#snippet mainGutter()}
             <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
             <div
@@ -11264,8 +11406,10 @@
             {#if !hidePresentation}{@render presentationPane()}{/if}
             {@render mainGutter()}
             {#if !hideChatAlerts}{@render chatAlertsPane()}{/if}
+            {#if !hideChatAlerts && extraChatColumn}{@render extraChatPane()}{/if}
           {:else}
             {#if !hideChatAlerts}{@render chatAlertsPane()}{/if}
+            {#if !hideChatAlerts && extraChatColumn}{@render extraChatPane()}{/if}
             {#if !hidePresentation}{@render presentationPane()}{/if}
             {@render mainGutter()}
           {/if}

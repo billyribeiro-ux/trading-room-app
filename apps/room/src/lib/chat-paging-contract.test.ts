@@ -114,8 +114,19 @@ describe('and nothing became unreachable', () => {
       pages lived there too, one new chat message would throw away everything the reader had
       scrolled back to. They are held in client state and merged at render.
     */
+    /*
+      Inside `chatMessagesFor(tab)` since 2026-08-14, when the extra chat column arrived: BOTH
+      columns run the same pipeline and differ only in which channel they read, so the merge is
+      keyed by the parameter rather than by the main column's tab. A second derived would have been
+      a second copy of six steps, and the copies drift.
+    */
+    expect(pageCode).toContain('function chatMessagesFor(tab: ChatTab) {');
     expect(pageCode).toContain(
-      'mergeOlderChatMessages(olderChatMessages[chatTab] ?? [], data.messages)'
+      'mergeOlderChatMessages(olderChatMessages[tab] ?? [], data.messages)'
+    );
+    expect(pageCode).toContain('const visibleChatMessages = $derived(chatMessagesFor(chatTab));');
+    expect(pageCode).toContain(
+      'const visibleExtraChatMessages = $derived(chatMessagesFor(extraChatTab));'
     );
   });
 
@@ -125,7 +136,7 @@ describe('and nothing became unreachable', () => {
       `trimLogSize` by exactly the pages this feature adds — the preference would stop meaning
       anything for the readers most likely to have it on.
     */
-    const from = pageCode.indexOf('const visibleChatMessages = $derived(');
+    const from = pageCode.indexOf('function chatMessagesFor(tab: ChatTab) {');
     const derived = pageCode.slice(from, pageCode.indexOf('.filter(', from));
     expect(derived).toContain('trimChatLog(');
     expect(derived).toContain('mergeOlderChatMessages(');
@@ -264,7 +275,13 @@ describe('both logs nudge twice, which is what upstream does', () => {
       The first draft of the chat side applied 30 on ARRIVAL and nothing at request time — one nudge
       doing neither job. Found by reading the arrival handler while porting the alerts side.
     */
-    expect(pageCode.match(/scrollTop \+= CHAT_PAGE_REQUEST_NUDGE;/g)).toHaveLength(2);
+    /*
+      THREE request nudges since the extra chat column landed — main chat, alerts, and the extra
+      column — against TWO arrival nudges, because the extra column shares the main chat's
+      `loadOlderChatMessages` and therefore its arrival path. Pinned as separate numbers precisely
+      so that asymmetry is visible rather than looking like a miscount.
+    */
+    expect(pageCode.match(/scrollTop \+= CHAT_PAGE_REQUEST_NUDGE;/g)).toHaveLength(3);
     expect(pageCode.match(/scrollTop \+= CHAT_PAGE_ARRIVAL_NUDGE;/g)).toHaveLength(2);
   });
 });

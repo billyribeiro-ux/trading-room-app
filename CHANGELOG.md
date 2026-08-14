@@ -24,6 +24,60 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-14
 
+### 2026-08-14 13:45 EDT — The extra chat column, as a second component rather than a refactor
+
+**Runtime impact: yes.** Ticking "Extra Chat Column" in the settings modal now adds a second chat
+column to the room, showing Off Topic by default, with its own tabs, composer, scroller and paging.
+
+**The shape was not a judgement call, and I had been treating it as one.** I spent a while weighing a
+Svelte snippet against extracting `+page.svelte`'s chat pane into a component, worried about the 37
+contract tests that read that file by source text. The decoded components answer it: `app-chat` and
+`app-extra-chat` are TWO components upstream, in two split areas. So this is a new file,
+`ExtraChatPane.svelte`, and the main pane was never touched — which is also why none of those 37
+tests needed rewriting.
+
+**What actually differs from `app-chat`**, and it is a short list: `this.channel = 'offTopic'`,
+`extraChatMsg`, and the composer id `#textAreaTxtExtra`. Everything else is the same shape, which is
+why the two components' template consts line up one for one. It is placed as a third
+`as-split-area`, gated exactly as `K4e` gates its index 3 —
+`!hideChatAlerts && preferences.extraChatColumn`. The comment on `primaryAreaStyle` used to end
+"which this room does not model"; it does now.
+
+**One pipeline, two columns.** `chatMessagesFor(tab)` is shared, because a second derived would have
+been a second copy of merge, trim, evidence-hiding, badges and the webinar filter — five steps that
+must agree. The PAGING state is shared for a different reason: it is keyed by channel, so two
+columns on the same channel read that history once, while two on different channels page
+independently. Each column scrolls on its own, which is why `app-extra-roomscroller` is its own
+component upstream too.
+
+**A bug this would have shipped, caught by writing the send path down.** `sendMessageBody` took the
+main column's tab from module scope. Left that way, a message typed in the off-topic column would
+have been posted to main. It takes the room as a parameter now.
+
+**Three shapes moved rather than copied**: `RoomMessageItem` out of `RoomMessage.svelte`,
+`sameCalendarDay` out of `+page.svelte`, and `MessageAction` — which was already declared identically
+in TWO files before today and would have become three. A shape declared inside one consumer is a
+shape the other has to guess at.
+
+**My own bug, from a careless edit:** factoring the message pipeline into a function left `return`
+alone on its line, so automatic semicolon insertion returned `undefined` and eleven type errors
+followed. Fixed before anything ran.
+
+**HONEST GAPS, both recorded rather than half-built.** The reference also routes mentions and
+user-info to whichever column has focus — `doMentionExtra`, `doUserInfoExtra`, keyed on
+`chatInputFocus === 'textAreaTxtExtra'`. That flag is recorded here but the two routers still point
+at the main pane, so clicking a name always inserts into the main composer. And `hideChat`'s
+size-collapse, which remembers and restores `extraChatColumn`, is the last piece of row AB.
+
+**Verified:** `svelte-check` 0 errors 0 warnings; room **1055 tests across 90 files**, up from
+1036/89. **Seven negative controls run and each went red**: never rendering the column, flipping the
+default on, cutting the preference wire, giving both composers the same id, defaulting the extra
+column to main, sending its messages into the main channel, and pointing both columns at the same
+tab. Two existing contracts were updated deliberately — the mobile layout's render order, which now
+carries a third area, and the paging nudge count, which is three requests against two arrivals
+because the extra column shares the main column's arrival path. **Not run:** the full gate, which
+this branch has not reached yet.
+
 ### 2026-08-14 13:30 EDT — The full gate, run once, at the end: exit 0
 
 **Runtime impact: none.** This entry records evidence, not a change.

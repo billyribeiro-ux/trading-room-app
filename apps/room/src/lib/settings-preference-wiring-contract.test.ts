@@ -128,6 +128,12 @@ const WIRES = [
     assignment: "if (key === 'trimChatLogs') trimChatLogs = value;"
   },
   {
+    id: 'extra-chat-column',
+    preference: 'extraChatColumn',
+    handler: 'extraChatColumnOnChange',
+    assignment: "if (key === 'extraChatColumn') extraChatColumn = value;"
+  },
+  {
     id: 'presenter-enable-rte',
     preference: 'enableRTE',
     handler: 'enableRTEOnChange',
@@ -193,16 +199,15 @@ describe('the wire has no silent break points', () => {
       the junk it wrote under its element id before that is still in people's blobs.
 
       Was 12/13, then 13/12 when `chat-always-scroll` landed, then 14/11 with
-      `presenter-follow-my-screens`, and now 21/4 with `presenter-enable-rte`. This assertion has
-      gone red on every one of those and been updated deliberately each time, which is the point of
-      pinning it.
+      `presenter-follow-my-screens`, then 21/4 with `presenter-enable-rte`, and now 22/3 with
+      `extra-chat-column`. This assertion has gone red on every one of those and been updated
+      deliberately each time, which is the point of pinning it.
 
-      The four still unmapped are the ones whose preference has NO consumer in this room:
+      The three still unmapped are the ones whose preference has NO consumer in this room:
       `app-recording-preview-window` (server-side recording does not exist here),
       `small-image-preview` (`chat-uploaded-img-sm` has no rule in any of the 52 captured
-      stylesheets), `extra-chat-column` (the second chat column is not built) and
-      `visibility-change-enabled`. Mapping any of them would move the junk key rather than remove
-      it.
+      stylesheets) and `visibility-change-enabled`. Mapping any of them would move the junk key
+      rather than remove it.
 
       Pinned because I gave two wrong counts writing this up — fifteen, then fourteen — by counting
       `app-disable-video`, which was already reaching `savePreference` by its raw id, and
@@ -214,8 +219,8 @@ describe('the wire has no silent break points', () => {
     const mapped = (table.match(/': '/g) ?? []).length;
 
     expect(reaching).toBe(26);
-    expect(mapped).toBe(21);
-    expect(reaching - 1 - mapped).toBe(4);
+    expect(mapped).toBe(22);
+    expect(reaching - 1 - mapped).toBe(3);
     expect(DEAD_PREFERENCE_KEYS).toHaveLength(reaching - 1 - 6);
   });
 
