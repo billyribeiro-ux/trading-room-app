@@ -24,6 +24,47 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-14
 
+### 2026-08-14 15:31 EDT — The room has its login page back, and the dumps settled the argument
+
+**Runtime impact: yes.** Clicking Launch no longer drops you straight into the room. `/session` is a
+page now: it verifies the handoff, prefills your name and email from the token, locks the email, and
+waits for `Login` — which is what the reference does and never auto-submits.
+
+**The A/B question I put to the owner should never have been asked.** I framed "where is the room
+password checked" as a design decision between shipping `webinarPW` to the room or validating it
+server-side. The bundle answers it: **`webinarPW` appears nowhere in the room's 2.9 MB of code.**
+`loginToRoom()` builds `{cver, nick, email}`, adds `i.pw` when one was typed, and posts it — the
+reference's own SERVER decides. There was no choice to make; there was a file to read.
+
+**So the entry check went where the credentials already are.** `internal/room-entry/[code]` runs the
+SAME `decideRoomEntry` the guest door calls — `isLocked`, `banIPList`, `nickFilter`, the three room
+passwords, the free-trial password, `secTok` and the disclosure — so there is one entry decision in
+this product rather than two that drift. The room asks and fails CLOSED: a controller that cannot be
+reached means the room cannot know whether somebody may enter, and "cannot know" is not "yes".
+
+**The five settings that drive the page now cross**, by the four-edit process, each with the byte
+offset where the bundle reads it: `showPasswordField` (1189804), `usernameInstructions` (1189881),
+`hasRequiredPhoneInLogin` (1189964), `customEnterDisclosure` (1190048), `disableEditingUsername`
+(1192694). 56 wired, up from 54 — three were already on the login list, so the union moved by two
+while `ROOM_CONSUMED` moved by five, and the tripwire caught my first attempt at three.
+
+**One deliberate narrowing, named rather than silent.** `banIPList` DOES cross to the reference's
+room and is checked in its browser (`doLoginCheck`, byte 1194680). Ours checks it server-side only:
+a ban list in a browser hands every banned address to every visitor, and the server decision is
+authoritative either way.
+
+**The apostrophe rule was broken for the third time.** `ROOM'S` and `repository's` inside the
+`ROOM_CONSUMED` comment turned the whole 43-name list into punctuation again, exactly as the note
+above it warns. The note now says so in its own words: two characters, no exceptions.
+
+**HONEST GAP, and it is the next unit.** A guest now meets TWO forms — the controller's
+`/session/[code]` and this one — where the reference has one, in the room. The controller's guest
+door should become a token-minting step so the room owns the form, which needs no new evidence, only
+the work.
+
+**Verified:** full gate `pnpm -r test` **exit 0** — room **1075 tests across 91 files**, controller
+**937 across 90**, documented totals verified, zero failures. `svelte-check` 0 errors 0 warnings.
+
 ### 2026-08-14 15:11 EDT — PR #20 merged; PR #21 opened with the eight commits since
 
 **Runtime impact: yes — #20 is now on `main`**, which auto-deploys. It carries the five features that

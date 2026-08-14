@@ -120,6 +120,27 @@ const ROOM_CONSUMED = [
      term" with a real apostrophe and turned the whole 38-name list into punctuation. The rule is
      now two characters wide: no square bracket, no apostrophe, anywhere inside this array. */
   'enableRTE',
+  /* The five the ROOM OWN LOGIN PAGE reads from `sessData`, added 2026-08-14 with that page.
+     Each is read in the decoded bundle at the offset named in the note on ROOM_VISIBLE_SETTINGS.
+     Three of them were already on LOGIN_CONSUMED for the controller-side room-login
+     route, so the union grows by two rather than five.
+
+     `webinarPW` is deliberately absent and is not an oversight: it appears NOWHERE in the room
+     bundle. The reference sends the typed password to its SERVER and never compares it in the
+     browser, which is what `internal/room-entry` reproduces. `banIPList` is absent too — the
+     reference does ship that one and checks it client-side, and we decline, because a ban list in
+     a browser hands every banned address to every visitor while the server decision is
+     authoritative anyway.
+
+     NO APOSTROPHE ANYWHERE ABOVE. This is the THIRD time that rule has been broken in this array —
+     brackets once, an apostrophe in 2026-08-14 morning, and an apostrophe again in this very
+     comment, which turned the whole list into punctuation and failed the boundary test. Two
+     characters, no exceptions. */
+  'showPasswordField',
+  'usernameInstructions',
+  'hasRequiredPhoneInLogin',
+  'customEnterDisclosure',
+  'disableEditingUsername',
   'allowUsersToChangeUsername',
   'altBenzingaLinkURL',
   'altBenzingaLogoURL',
@@ -509,6 +530,12 @@ if (defs.length !== EXPECTED_TOTAL_COUNT) {
 }
 
 const missingWiredSettings = [...WIRED_SETTINGS].filter((name) => !defs.some((definition) => definition.name === name));
+// 56 since 2026-08-14: the room's own login page landed, and the five settings that DRIVE it now
+// cross — `showPasswordField`, `usernameInstructions`, `hasRequiredPhoneInLogin`,
+// `customEnterDisclosure`, `disableEditingUsername`. THREE of them were already on LOGIN_CONSUMED
+// for the controller-side room-login route, so the union grows by TWO, not five. The first attempt
+// at this said three and the tripwire caught it.
+//
 // 54 since 2026-08-14: `enableRTE` joined with the chat rich text editor. It is the owner's term
 // in a three-way gate the room resolves as `sessData.enableRTE && preferences.enableRTE &&
 // isPresenter`; the other two terms are the presenter's own preference and their role, neither of
@@ -541,7 +568,7 @@ const missingWiredSettings = [...WIRED_SETTINGS].filter((name) => !defs.some((de
 //
 // The literal is a tripwire, not a fact about the schema — it is here so the wired set cannot grow
 // by accident, which is why changing it is a deliberate edit.
-if (WIRED_SETTINGS.size !== 54 || missingWiredSettings.length > 0) {
+if (WIRED_SETTINGS.size !== 56 || missingWiredSettings.length > 0) {
   throw new Error(
     `wired-setting contract invalid: ${WIRED_SETTINGS.size} keys, missing ${missingWiredSettings.join(', ') || 'none'}`
   );
