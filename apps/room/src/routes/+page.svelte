@@ -710,6 +710,13 @@
    * `=== true` — the blob ships `makeUsersFollowMyScreens:!1` (byte 980006). A presenter who has
    * never touched it should not be dragging the room around by clicking their own tabs.
    */
+  /**
+   * `preferences.chatGif` — whether inline gifs play or show a click-to-reveal placeholder.
+   *
+   * `!== false`, because the blob ships `chatGif:!0`. A viewer who has never touched the checkbox
+   * gets gifs, which is what the reference does; `=== true` would mute them for everybody.
+   */
+  let chatGif = $state(loadedSettings.chatGif !== false);
   let makeUsersFollowMyScreens = $state(loadedSettings.makeUsersFollowMyScreens === true);
   let alwaysScrollToBottom = $state(loadedSettings.alwaysScrollToBottom === true);
   let recordingStartSound = $state(loadedSettings.recordingStartSound !== false);
@@ -3005,6 +3012,7 @@
       if (key === 'doSpeechReco') doSpeechReco = value;
       if (key === 'alwaysScrollToBottom') alwaysScrollToBottom = value;
       if (key === 'makeUsersFollowMyScreens') makeUsersFollowMyScreens = value;
+      if (key === 'chatGif') chatGif = value;
       /*
         Both halves, because this preference has TWO controls: the navbar's
         `presentation-subtitles` checkbox and the settings modal's `app-speech-reco-overlay`. The
@@ -9080,6 +9088,7 @@
                           <RoomMessage
                             {item}
                             kind="alert"
+                            {chatGif}
                             currentUserId={data.user.id}
                             currentUserEmailHash={data.user.emailHash}
                             currentUserName={data.user.displayName}
@@ -9206,6 +9215,7 @@
                           <RoomMessage
                             {item}
                             kind="chat"
+                            {chatGif}
                             currentUserId={data.user.id}
                             currentUserEmailHash={data.user.emailHash}
                             currentUserName={data.user.displayName}

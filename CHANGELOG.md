@@ -24,6 +24,57 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-14
 
+### 2026-08-14 10:13 EDT — muted gifs; and the discovery that chat badges never render at all
+
+**Runtime impact: the gif checkbox works.** Eighth dead control. But the bigger finding is one I was
+not looking for.
+
+**CHAT BADGES NEVER RENDER, FOR ANYONE.** `RoomMessage.svelte` implements the whole thing —
+`visibleBadges`, the image-badge branch, the coloured-label branch, `user-badge` classes — and it is
+unfed at **three** levels:
+
+1. `MessageBadge` is declared in `lib/types.ts` and referenced only by `RoomMessage.svelte`. Nothing
+   populates `item.badges`: not `room-events.ts`, not `private-chat.ts`, not the page server.
+2. The four gate props — `chatBadges`, `enableBadges`, `showBadgesToPresentersOnly`,
+   `presenterMessagesOnTheRight` — all default `false`, and the chat call site passes **none** of
+   them. Its thirteen props were read one by one.
+3. The room settings behind them are not carried by `room-config-client.ts` or the page server.
+
+So `visibleBadges` is permanently `[]`. This is not a dead control — it is a **built feature with no
+supply**, and wiring only the checkbox would have changed nothing while looking like progress.
+Recorded in row X with all three levels, because the next person to see the checkbox will otherwise
+reach for the same one-line fix.
+
+**What DID close: `chat-gif-donot-disturb`.** Both halves captured, neither guessed:
+
+- MARKUP from the `urlwrapImg` pipe (byte 1326105) — when the preference is off and the URL is a
+  `.gif`, a `chat-gif-muted` placeholder is emitted and the image container takes `d-none`. The
+  `<img>` is **hidden, not omitted**, which is why revealing needs no refetch.
+- BEHAVIOUR from `deployed-index.html`, the only place `showChatGif` exists and not in any bundle: a
+  toggle carrying both labels, `gif muted, click to show` and `click to hide`.
+- CSS verbatim from the shipped stylesheet, including the `:hover` that is the only thing making a
+  `<div>` read as clickable.
+
+**Reproduced as component state, not as a jQuery sibling walk.** `showChatGif` resolves the image
+with `el.next()`, which stops being true the instant anything is inserted between placeholder and
+image. Keyed by URL rather than by the captured `gif_${id}`, because that id is derived from the
+MESSAGE — two gifs in one message would collide upstream. The id is still rendered for fidelity, and
+nothing here resolves through it.
+
+**It mutes gifs ONLY.** `.png` is never touched. That single term has its own negative control,
+because dropping it would mute every inline image the moment somebody unticks a box labelled "gif".
+
+**Four more investigated and confirmed as genuine features**, with the evidence recorded so nobody
+repeats the search: `extra-chat-column` (42 reference sites — a second channel with its own log,
+search and pagination), `chat-badges-donot-disturb` (above), `small-image-preview` (seeded from a
+room setting we do not carry), `chat-mem-clear` (no chat-log trim exists; the only `.slice(-N)` in
+the room is caption history).
+
+**Verified:** 9 new tests, three negative controls — mute every image, drop the image instead of
+hiding it, default the preference off — each red on the right assertion and green on restore. Room
+suite **858 tests / 78 files**, `svelte-check` 0 errors, prettier clean. Counts 14 -> 15 mapped,
+11 -> 10 unmapped. Row X down to ten.
+
 ### 2026-08-14 10:01 EDT — "Bring everyone here" now brings everyone
 
 **Runtime impact: a presenter can move the room to a screen. The menu item existed and moved nobody.**

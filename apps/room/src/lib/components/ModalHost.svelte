@@ -1219,6 +1219,7 @@
       'app-speech-reco-overlay': 'showSpeechRecoOverlay',
       'chat-always-scroll': 'alwaysScrollToBottom',
       'presenter-follow-my-screens': 'makeUsersFollowMyScreens',
+      'chat-gif-donot-disturb': 'chatGif',
       'app-disable-video': 'disableVideo'
     };
     /*
