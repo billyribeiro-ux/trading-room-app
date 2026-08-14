@@ -24,6 +24,45 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-14
 
+### 2026-08-14 11:40 EDT — RTE step 1: the chat sanitiser, deny-by-default
+
+**Runtime impact: none yet — nothing calls it.** This is the foundation the rest of the editor sits
+on, and it is the piece that decides whether the feature is safe, so it is built and proved first.
+
+`lib/server/chat-html.ts`: `sanitizeChatHtml` and `isEmptyChatHtml`, 16 tests.
+
+**It is NOT `sanitizeNoteHtml`, and that was the decision.** Reusing the note allow-list would have
+been one import — and it carries tables, headings, images, **iframes**, links and six style
+properties, because a note is a document. A chat message written with this editor is a line of text
+with five controls on it. Reusing that list would have let anyone who can post by hand put an
+`<iframe>` into the chat log of a multi-tenant fintech room.
+
+So the list is the smallest set the captured toolbar can produce — `b`, `strong`, `i`, `em`, `u`,
+`span[style=color]`, `p`, `br` — and every exclusion has its own test: script, event handlers,
+iframes, author-supplied links and images, background-color, font-size, position, and a `url(...)`
+in a colour.
+
+**`a` and `img` are absent on purpose, and it is not an oversight.** Links and inline images DO
+appear in chat — the RENDERER produces them from plain text. An author-supplied `<a href>` is a
+different thing: it can point somewhere its visible text does not say.
+
+**`<font>` was in the first draft and came out.** Legacy browsers emit `<font color>` for a
+forecolor, so allowing it looked like prudence — but `sanitize-html` cannot value-check a plain
+attribute the way it checks a style, so the regex written to guard it was **dead code**, which this
+repository forbids. And we are not using summernote: our editor will emit `<span style="color">`, so
+allowing `<font>` would permit a tag nothing here produces. The text still survives; only the tag
+goes.
+
+**`isEmptyChatHtml` reproduces the reference's four empties** — `''`, `'<p><br></p>'`, `'<br>'`,
+`'<p></p>'` — the ways an editor reports "nothing typed" depending on how it got there. It runs
+AFTER sanitising, so a message whose every tag was disallowed cannot post as an empty bubble.
+
+**Remaining, in order:** (2) a nullable `bodyHtml` column, so an RTE message is explicit rather than
+sniffed from tags; (3) the modal itself, five controls, `Save` when editing and `Send` otherwise;
+(4) the four settings edits and the `enableRTE` preference wire.
+
+**Verified:** room 937 tests / 83 files, `svelte-check` 0 errors, prettier clean.
+
 ### 2026-08-14 11:36 EDT — rich text editor specified; row X's wiring work is finished
 
 **No code. The last of the four determinations, and the row's wiring is now complete.**
