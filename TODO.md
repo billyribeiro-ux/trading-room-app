@@ -87,17 +87,46 @@ by 12/12 live HTTP checks including genuine 200s.
 no client-side MediaMTX connection to reproduce — the service keeps a list and selects tabs, and the
 `<video>` element does the rest.
 
-**What is left is four named pieces, blocked on ONE thing rather than on evidence:**
-`/internal/media-hook`, the room's `mtxStreams` list, the stream tabs
-(`app-presentationarea.full.js:589-618`, including the "No one is streaming right now..." empty
-state), and the `app-streaming-view` equivalent (whose full hls.js configuration — three buffer
-levels, `lowLatencyMode`, the optimal→balanced→conservative ladder — is transcribed in
-`OBS-XSPLIT-INGEST.md` §6). The blocker: `producerID` and `mediaValue` come from the SERVER's stream
-object, and `services/**` is an import-governed mirror, so that shape is not ours to author here.
+**The four named pieces — two BUILT 2026-08-14, two remaining.**
+
+- ✅ the room's `mtxStreams` list — `apps/room/src/lib/mtx-streams.ts`, `MtxHandlerService`
+  transcribed as pure functions with 21 tests.
+- ✅ the `app-streaming-view` equivalent — `StreamingView.svelte`, the full hls.js configuration
+  (three buffer levels, `lowLatencyMode`, the optimal→balanced→conservative ladder) and the five
+  sub-templates from bundle byte 1901148.
+- ✅ the stream TAB BAR — `StreamTabs.svelte` (`RSe`, `:543-588`) with
+  `stream-tabs-contract.test.ts`. **NOT reusable from `ScreenTabs`**: that component renders
+  `img.presenter-img` and `{name}-{screenName}` unconditionally, and `RSe` renders neither.
+- ⬜ the `#streams` PANE — `OSe`, `:589-618`: the `h3.text-center.mt-4` "No one is streaming right
+  now..." empty state, `ul#streamsTabs`, and `div#streamsTabsContent` with one `div.tab-pane.fade`
+  per stream carrying `app-streaming-view`. Also unhides the main tab: `hideStreams =
+  !sessData.useMediaMTX` (`:2293`), and `useMediaMTX` is currently a `dont-touch` row with
+  `wired: false` in the controller's `room-settings-schema.ts`, so it does not yet reach the room.
+- ⬜ `/internal/media-hook` plus the three `cmds` commands (`mtxStartStream`, `mtxStopStream`,
+  payload key `muser`; `getSessionMTXMediaState`, payload `data`).
+
+**The "not ours to author" blocker this row used to claim was WRONG, and it is retracted.** The
+`muser` shape is fully determined by the bundle: `_id` (identity, tab id `${_id}-tab`, pane id, and
+the video element `video-${muser._id}`), `sessionID` and `producerID` (the two playlist path
+segments), `mediaValue.name` (the tab label) and `mediaValue.serverName` (the `__reb` decision).
+Every one of those is READ by a view in the capture. Nothing about it needed authoring in
+`services/**`.
 
 **Note for whoever builds the hooks: they are `runOnAvailable`/`runOnUnavailable`.
 `runOnReady`/`runOnNotReady`, which this row previously named, were renamed and no longer exist**
 (mediamtx.org/docs/usage/hooks).
+
+**FOUR CONTROLS IN THE STREAM TAB ARE INERT UPSTREAM — do not "finish" any of them by guessing.**
+Established 2026-08-14 and each pinned by a test in `stream-tabs-contract.test.ts`: the forced eye
+badge (`forcedScreenMTXID` — 2 occurrences in the whole bundle, one of them `=""`, no writer); the
+lock badge (`lockedScreenIDMTX` — 4 occurrences, one `=""`, three reads, no writer); "Lock Screen"
+(`toggleLockScreenMTX(e){console.error("TODO: toggleLockScreenMTX")}`); and "Bring everyone here",
+which sends a real `focusOnScreen` command that **no recipient can resolve**, because every
+receiver scans `mediaService.screenSharingUsers` and never `mtxHandlerService.mtxStreams`. They are
+rendered because a viewer of the reference sees them, and they are prop-driven so the branches stay
+reachable if the protocol is ever captured. **The badge reads `lockedScreenIDMTX` while the menu
+label reads `lockedScreenID` — an upstream asymmetry, reproduced deliberately and guarded in both
+directions, because collapsing the two props is the obvious tidy-up and is invisible by eye.**
 
 **One decision unblocks X, AC and R's row 10, and it is not "build server-side recording".** Established
 2026-08-14 from the bundle: the reference hands recording to **MediaMTX**, an off-the-shelf media

@@ -24,6 +24,69 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-14
 
+### 2026-08-14 18:58 EDT — `StreamTabs.svelte`, and the four controls that do nothing in the reference
+
+**Runtime impact: none yet.** The component and its contract test are added; nothing renders it
+until the `#streams` pane lands. On `feat/extra-chat-column`.
+
+**What was built.** `RSe` — `docs/source/components/app-presentationarea.full.js:543-588` — as a
+Svelte component, with every attribute resolved through the component's own const table rather than
+guessed. The whole update block is pinned in one assertion in
+`apps/room/src/lib/stream-tabs-contract.test.ts`, which fixes the anchor id, the `active` class map,
+`aria-controls`, both badges, the label, the presenter gate and the lock asymmetry in a single
+string.
+
+**The finding that mattered more than the markup.** Four of this tab's controls are inert in the
+shipped reference, and all four read as working if you only look at the template:
+
+1. The forced (eye) badge is gated on `forcedScreenMTXID`, which occurs exactly twice in the 2.8 MB
+   bundle — one template read, one `=""` in the constructor. No writer.
+2. The lock badge is gated on `globals.lockedScreenIDMTX`: four occurrences, one of them `=""`, the
+   other three all reads. No writer.
+3. "Lock Screen" calls `toggleLockScreenMTX(e){console.error("TODO: toggleLockScreenMTX")}` — a
+   stub sitting directly beside a working `toggleLockScreen` for screenshares.
+4. "Bring everyone here" is the one that looks live and is not. It sends the same `focusOnScreen`
+   command the screenshare menu sends, but every client's receiver scans
+   `mediaService.screenSharingUsers` only and never `mtxHandlerService.mtxStreams`, so a stream id
+   reaches no recipient that can resolve it. That is also why (1) has no writer.
+
+All four are rendered anyway, because a viewer of the reference sees them and this is a clone. They
+are prop-driven rather than hard-wired, so each branch is reachable and tested, and each finding is
+pinned by a test that will start failing if the reference ever gains the missing half. **None of
+them may be "finished" by inventing a protocol** — a lock button that locks nothing on a
+multi-tenant fintech room is worse than a lock button that is honestly inert.
+
+**The lock asymmetry is reproduced, not reconciled.** The badge reads `lockedScreenIDMTX`; the menu
+item's label reads `lockedScreenID`, the SCREENSHARE field. Two fields deciding two halves of one
+feature, in the same update block, eight lines apart. Both are separate props here, and the test
+asserts each drives its own half and not the other's — because collapsing them is the obvious tidy-up
+and it is invisible by eye, since upstream never sets either.
+
+**Divergences, each one already taken on `ScreenTabs` and taken again for consistency.** The gear
+moves out of the tab anchor (`a.dropdown-item` inside `a.nav-link` is not expressible in parsed HTML
+— the parser hoists it and hydration breaks), with `li.nav-item { display: flex }` restoring the
+captured single line. `aria-selected` becomes a real boolean instead of the hardcoded `"true"` on
+every tab. A roving `tabindex` plus `onkeydown` makes the bar keyboard-operable, which upstream is
+not. The lock badge is deliberately left non-focusable — it is nested inside the tab anchor, where an
+independently focusable control is invalid content, and the same action is available on the dropdown
+item below it, which is fully operable.
+
+**Two errors of mine, both caught by the tests and recorded because the first one is a repeat.**
+The lock-field count was first reported as three; it is four. The miscount came from a `grep -o`
+whose 40-character match window swallowed the guard's second occurrence of the name — the exact
+failure mode `~/CLAUDE.md` describes, on the exact day it was being followed elsewhere. The test now
+counts by splitting the file, so the number cannot rot. Separately, the first version of the
+"badge, not menu" assertion looked for `fa-lock` and stayed **green** through its negative control,
+because the menu item's icon is `fa-lock` too; it now keys on the badge's own tooltip, and the
+negative control fails both directions.
+
+**Verified.** `svelte-autofixer` clean (and the one `svelte-ignore` it flagged as unwarranted was
+removed after proving, by removing the *other* one, that the gear's span genuinely needs its
+suppression while the spread-carrying badge does not). `svelte-check` 0 errors / 0 warnings across
+the room app. The new contract test 15/15, with its central assertion negative-controlled by
+collapsing the two lock props and watching both directions go red, then reverted to green. The full
+gate was NOT run: two new files, nothing else touched.
+
 ### 2026-08-14 18:10 EDT — `main` was red: the release attestor had never been told about migration 0009
 
 **Runtime impact: none on the apps.** This is the release-attestation binary and the provenance
