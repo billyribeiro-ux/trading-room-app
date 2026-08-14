@@ -97,16 +97,20 @@ gap's status in both places; one of them will go stale.
 
 As of 2026-08-14 07:06 EDT: **61 CLOSED, 13 OPEN, 13 parked/won't-fix, 87 total.**
 
-**Everything closable by READING is closed.** The twelve that remain need something no source file
+**Everything closable by READING is closed.** The thirteen that remain need something no source file
 can give. Each is written out below with the exact next action, because "blocked" without an
 instruction is just a note that something is unfinished.
 
 ---
 
-### HANDOFF — the FOURTEEN still open, and exactly what each needs
+### HANDOFF — the THIRTEEN still open, and exactly what each needs
 
-Rewritten 2026-08-13 18:21 EDT. It said twelve when the template read was still running; two more
-were opened by finishing it. Every item says WHO does the next step and WHAT it is. **No item here
+Rewritten 2026-08-13 18:21 EDT, recounted 2026-08-14. It said twelve while the template read was
+still running, then fourteen, and the prose disagreed with the tally line above it in BOTH
+directions for a day. The items below count 5 + 1 + 4 + 1 + 2 = **thirteen**, which is what the
+tally says and what `evidence-gap-register-counts.test.ts` recounts from the register itself.
+Section B reads "two" because one sentence unblocks two EDITS; only one of them (T5-24) is an open
+register row. Every item says WHO does the next step and WHAT it is. **No item here
 is waiting on more reading — the templates are exhausted.**
 
 #### A. Five need a browser on the live site. Both scripts are written and smoke-tested.
