@@ -24,6 +24,47 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-14
 
+### 2026-08-14 09:06 EDT — browser session: four gaps closed, three script defects found
+
+The owner ran the collectors against the live site. **T5-15, T5-21, T2-20 and T2-7 are closed**;
+the register moves 61 -> 65 closed, 13 -> 9 open. Captures are in `evidence-dumps/`.
+
+**Every one of the three failures in that session was OUR script, not the site.** That is the
+headline, because each returned a plausible-looking result rather than an error.
+
+| # | what it reported | what was true |
+| --- | --- | --- |
+| 1 | `0/15` bootbox handlers found | the scope walk anchored on the FIRST `.ng-scope` in document order — the root — then climbed `$parent` AWAY from the controller. `collect-stripe-details.js` had captured two of those same handlers on that same page three minutes earlier, which is the contradiction that exposed it. Now collects every distinct scope from deep anchors: **0 -> 15 across 311 scopes** |
+| 2 | `ABORTED before any request` | `path.includes('post')` matched `POST_ROUTE_API_DOCUMENTATION.md` — a document naming HTTP POST *routes*. The whole static fetch aborted on a filename. Static document extensions are now exempt from the verb list; `deleteUser`, `kick` and `upload` still abort, and that is asserted |
+| 3 | `loginFormCaptured: true` | it had captured the **Add Admin User** form — `ng-submit="addAdminUser()"`, models `adminUser.name/.email/.password`, buttons "Add Admin User" and "Cancel" — because the fallback was "any form with a password field". **The capture was accurate and the LABEL was false**, which is worse than capturing nothing: it would have closed T2-22 on the wrong form |
+
+The third is the one worth remembering. A wrong value that renders is worse than a missing one — and
+a correctly-measured artefact under the wrong name is the same defect wearing evidence.
+
+**What the session actually closed:**
+
+- **T5-15** — `openStripeDetails` source in full: a `bootbox.dialog`, 17 rows in fixed order, each
+  omitted when its value is empty, one "Close" button. Its `fmtDate` is `toLocaleString()`, i.e.
+  LOCALE-SENSITIVE, unlike the fixed formats this repo hand-assembles — a decision to take
+  deliberately rather than copy.
+- **T5-21** — `doBatchInvite`: `bootbox.prompt` titled `"Enter comma separate email list"`. That
+  typo is the reference's own; `actionsWithEmailList` two entries away spells it correctly.
+- **T2-20** — 15/15 handler sources, each carrying the dialog's exact title, input type and buttons.
+  The source is stronger evidence than an observed dialog, which is one evaluation of it.
+- **T2-7** — closed by TWO independent derivations agreeing. READ: `evidence-bootstrap-3.3.7.css`
+  gives `nth-of-type(odd)` -> `#f9f9f9`, hover -> `#f5f5f5`, cells `8px`; the app's `styles.css`
+  overrides only the header padding (`20px !important`) and neither app sheet touches striping.
+  RENDERED: the live capture pulled the rule verbatim off the site's own `bootstrap.min.css` as
+  `nth-of-type(2n+1)` with rows measuring `rgb(249,249,249)` / transparent / `rgb(249,249,249)`.
+  **Three rows sufficed where the register asked for four** — odd/even/odd is the whole pattern. And
+  `hoverRules` was empty because that table has no `.table-hover`, exactly as the template says.
+  **Ours already matches**: `manage.css:868`, `account.css:412`, hover at `account.css:416`, and no
+  row-hover rule in `manage.css` — correctly.
+
+**Still open from Tier 0:** T2-22 (needs a genuinely logged-OUT run) and T1-9/T1-10 (needs the fixed
+static fetcher). The owner's instinct that "we already have the CSS" was right for T2-7 and is why
+it closed without a fourth row.
+
 ### 2026-08-14 08:36 EDT — item W unblocked: the writer was in the bundle all along
 
 No product code changed. This is a research result that moves an item from "cannot be built

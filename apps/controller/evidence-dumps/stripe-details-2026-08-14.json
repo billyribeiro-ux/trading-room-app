@@ -1,0 +1,134 @@
+{
+ "tool": "collect-stripe-details.js",
+ "closes": "T5-15 — openStripeDetails(user), the Stripe block’s Details link",
+ "capturedAt": "2026-08-14T12:51:57.622Z",
+ "pageUrl": "https://protradingroom.com/ptrApp#/page/manageSession/6a6529b318781e20ed81947d",
+ "userAgent": "Mozilla/5.0 (Linux; Android 15; Pixel 9) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Mobile Safari/537.36",
+ "role": "presenter or admin on the manage page — bulk actions visible, no Extra Admin Users",
+ "roleEvidence": {
+  "hasManageTable": true,
+  "hasExtraAdminUsers": false,
+  "hasActionsMenu": true,
+  "hasUserListActions": true
+ },
+ "angular": {
+  "present": true,
+  "version": "1.3.15",
+  "debugInfoEnabled": true
+ },
+ "handlers": {
+  "openStripeDetails": {
+   "found": true,
+   "definedOnScopeDepth": 0,
+   "scopeId": 366,
+   "source": "function(user){function addRow(label,value){void 0!==value&&null!==value&&\"\"!==value&&rows.push('<tr><th style=\"width:220px;\">'+label+\"</th><td>\"+value+\"</td></tr>\")}function fmtDate(d){try{var dt=new Date(d);if(!isNaN(dt.getTime()))return dt.toLocaleString()}catch(e){}return\"\"+d}if(user)try{var rows=[];addRow(\"Membership ID\",user.stripeMembershipId),addRow(\"Subscription ID\",user.stripeSubscriptionId),addRow(\"Customer ID\",user.stripeCustomerId),addRow(\"Checkout Session ID\",user.stripeCheckoutSessionId),addRow(\"Subscription Status\",user.stripeSubscriptionStatus),addRow(\"Last Invoice ID\",user.stripeLastInvoiceId),addRow(\"Last Paid At\",user.stripeLastPaidAt?fmtDate(user.stripeLastPaidAt):\"\"),addRow(\"Last Paid Amount\",$scope.formatStripeAmount(user.stripeLastPaidAmount,user.stripeLastPaidCurrency)),addRow(\"Last Paid Currency\",user.stripeLastPaidCurrency),addRow(\"Last Payment Failure At\",user.stripeLastPaymentFailureAt?fmtDate(user.stripeLastPaymentFailureAt):\"\"),addRow(\"Last Failure Reason\",user.stripeLastFailureReason),addRow(\"Current Period End\",user.stripeCurrentPeriodEnd?fmtDate(user.stripeCurrentPeriodEnd):\"\"),addRow(\"Cancel At\",user.stripeCancelAt?fmtDate(user.stripeCancelAt):\"\"),addRow(\"Canceled At\",user.stripeCanceledAt?fmtDate(user.stripeCanceledAt):\"\"),addRow(\"Welcome Email Sent\",user.stripeWelcomeEmailSent),addRow(\"Welcome Email Sent At\",user.stripeWelcomeEmailSentAt?fmtDate(user.stripeWelcomeEmailSentAt):\"\"),addRow(\"Stripe Data Updated\",user.stripeDataUpdated?fmtDate(user.stripeDataUpdated):\"\");var tableHtml='<div class=\"table-responsive\"><table class=\"table table-condensed table-striped\">'+rows.join(\"\")+\"</table></div>\";bootbox.dialog({title:\"Stripe Details - \"+(user.userName||user.email||\"\"),message:tableHtml,buttons:{ok:{label:\"Close\",className:\"btn-primary\"}}})}catch(e){try{bootbox.alert(\"Unable to render Stripe details\")}catch(ee){}}}"
+  },
+  "getStripeStatusClass": {
+   "found": true,
+   "definedOnScopeDepth": 0,
+   "scopeId": 366,
+   "source": "function(status){if(!status)return\"label-default\";var s=(\"\"+status).toLowerCase();return\"active\"===s||\"trialing\"===s?\"label-success\":\"past_due\"===s||\"paused\"===s?\"label-warning\":\"canceled\"===s||\"unpaid\"===s||\"incomplete\"===s||\"incomplete_expired\"===s?\"label-danger\":\"label-info\"}"
+  },
+  "formatStripeAmount": {
+   "found": true,
+   "definedOnScopeDepth": 0,
+   "scopeId": 366,
+   "source": "function(amount,currency){if(void 0===amount||null===amount||isNaN(amount))return\"\";var dollars=Number(amount)/100,curr=(currency||\"USD\").toString().toUpperCase(),symbol=\"USD\"===curr?\"$\":\"EUR\"===curr?\"€\":\"GBP\"===curr?\"£\":\"\",val=dollars.toFixed(2).replace(/\\B(?=(\\d{3})+(?!\\d))/g,\",\");return symbol?symbol+val:val+\" \"+curr}"
+  },
+  "openStripeModal": {
+   "found": false
+  },
+  "showStripeDetails": {
+   "found": false
+  },
+  "stripeDetails": {
+   "found": false
+  },
+  "loadMarketplaceUsers": {
+   "found": true,
+   "definedOnScopeDepth": 0,
+   "scopeId": 366,
+   "source": "function(){var args={};args=$scope.makeReqTokenForCmd(\"userListMarketplace\"),args.sessionID=$scope.sessionID,args.searchTerm=\"\",$scope.dataLoading=!0,$http.post(appVars.globals.APIURL+\"/users/v1/sessions\",args).success(function(data){$scope.dataLoading=!1;var usrArr=(Date.now(),data.xrefs);console.log(\"users len:\"+usrArr.length),$scope.xrefs=data.xrefs,uniqueArrEmails=[]}).error(function(err){$scope.dataLoading=!1})}"
+  },
+  "doBatchInvite": {
+   "found": true,
+   "definedOnScopeDepth": 0,
+   "scopeId": 366,
+   "source": "function(){bootbox.prompt({title:\"Enter comma separate email list\",inputType:\"textarea\",callback:function(emailList){if(emailList&&(console.log(emailList),$scope.batchEmailsList=emailList.trim().toLowerCase().replace(/\\s/g,\"\").split(\",\"),console.log($scope.batchEmailsList),$scope.batchEmailsList.length>0)){var args=$scope.makeReqTokenForCmd(\"inviteBatchUsers\");if(args.batchEmailsList=$scope.batchEmailsList,args.roomID=$scope.roomID,args.inviteHost=window.location.origin,args.emailHost=window.location.hostname,args.sessionID=$scope.sessionID,!args)return;$http.post(appVars.globals.APIURL+\"/users/v1/sessions\",args).success(function(data){console.log(\"inviteBatchUsers data: \",data),data.success&&$scope.loadUsers()})}}})}"
+  },
+  "actionsWithEmailList": {
+   "found": true,
+   "definedOnScopeDepth": 0,
+   "scopeId": 366,
+   "source": "function(){bootbox.prompt({title:\"Enter comma separated email list\",inputType:\"textarea\",callback:function(emailList){emailList&&(console.log(emailList),$scope.updateUsersFromEmailList=emailList.trim().toLowerCase().replace(/\\s/g,\"\").split(\",\").filter(Boolean),console.log(\"$scope.updateUsersFromEmailList: \",$scope.updateUsersFromEmailList),$scope.updateUsersFromEmailList.length>0?$scope.actionsWithEmailListOptions():bootbox.alert(\"Please enter at least one valid email address\"))}})}"
+  },
+  "canCloneDblClick": {
+   "found": true,
+   "definedOnScopeDepth": 0,
+   "scopeId": 366,
+   "source": "function(){$scope.canCloneClicks=!0}"
+  },
+  "scopeKeysMatchingStripe": [
+   {
+    "key": "disableMarketplace",
+    "scopeDepth": 4,
+    "type": "boolean"
+   },
+   {
+    "key": "manageMarketplaceSession",
+    "scopeDepth": 4,
+    "type": "function"
+   },
+   {
+    "key": "hasStripeInfo",
+    "scopeDepth": 4,
+    "type": "function"
+   },
+   {
+    "key": "getStripeStatusClass",
+    "scopeDepth": 4,
+    "type": "function"
+   },
+   {
+    "key": "formatStripeAmount",
+    "scopeDepth": 4,
+    "type": "function"
+   },
+   {
+    "key": "openStripeDetails",
+    "scopeDepth": 4,
+    "type": "function"
+   },
+   {
+    "key": "loadMarketplaceUsers",
+    "scopeDepth": 4,
+    "type": "function"
+   }
+  ]
+ },
+ "templatesFetched": [],
+ "stripeBlock": null,
+ "modal": null,
+ "refusedClicks": [],
+ "gaps": [
+  {
+   "what": "No .stripe-mini block is rendered, so this room has no marketplace member on screen.",
+   "whereILooked": [
+    "document.querySelector(\".stripe-mini\")"
+   ],
+   "blocks": "PHASES 2 and 3 only. PHASE 1 above does not need one. To capture the rendered modal too, open a room that HAS a marketplace member (User List Actions → Marketplace Users) and re-run."
+  }
+ ],
+ "notes": [
+  "The handler source names no .html template — the modal is likely inline (bootbox/`template:`), so its markup is in the source string itself."
+ ],
+ "summary": {
+  "handlerFound": true,
+  "templatesFetched": 0,
+  "stripeBlockRendered": false,
+  "modalCaptured": false,
+  "gaps": 1,
+  "refusedClicks": 0,
+  "verdict": "T5-15 CLOSED — openStripeDetails source captured."
+ }
+}

@@ -1,0 +1,212 @@
+{
+ "tool": "collect-rendered-states.js",
+ "closes": "T2-7 (striping/hover), T2-20 (bootbox variants), T2-22 (login form + error state)",
+ "capturedAt": "2026-08-14T13:03:02.010Z",
+ "pageUrl": "https://protradingroom.com/ptrApp#/page/manageSession/6a6529b318781e20ed81947d",
+ "userAgent": "Mozilla/5.0 (Linux; Android 15; Pixel 9) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Mobile Safari/537.36",
+ "viewport": {
+  "w": 1989,
+  "h": 1265,
+  "dpr": 2
+ },
+ "role": "presenter or admin on the manage page",
+ "striping": [
+  {
+   "tableClass": "table table-striped ",
+   "tableRect": {
+    "x": 37,
+    "y": 489,
+    "w": 1915,
+    "h": 225.765625
+   },
+   "rowCount": 3,
+   "rows": [
+    {
+     "index": 0,
+     "nthOfType": 1,
+     "odd": true,
+     "hidden": false,
+     "backgroundColor": "rgb(249, 249, 249)",
+     "height": 41
+    },
+    {
+     "index": 1,
+     "nthOfType": 2,
+     "odd": false,
+     "hidden": false,
+     "backgroundColor": "rgba(0, 0, 0, 0)",
+     "height": 62.3828125
+    },
+    {
+     "index": 2,
+     "nthOfType": 3,
+     "odd": true,
+     "hidden": false,
+     "backgroundColor": "rgb(249, 249, 249)",
+     "height": 61.8828125
+    }
+   ],
+   "hoverRules": [],
+   "stripeRules": [
+    {
+     "selector": ".table-striped > tbody > tr:nth-of-type(2n+1)",
+     "css": "background-color: rgb(249, 249, 249);",
+     "href": "https://protradingroom.com/public/app/css/bootstrap.min.css"
+    }
+   ]
+  },
+  {
+   "tableClass": "table table-striped",
+   "tableRect": {
+    "x": 0,
+    "y": 0,
+    "w": 0,
+    "h": 0
+   },
+   "rowCount": 0,
+   "rows": [],
+   "hoverRules": [],
+   "stripeRules": []
+  },
+  {
+   "tableClass": "table table-striped  ng-scope ng-hide",
+   "tableRect": {
+    "x": 0,
+    "y": 0,
+    "w": 0,
+    "h": 0
+   },
+   "rowCount": 0,
+   "rows": [],
+   "hoverRules": [],
+   "stripeRules": []
+  }
+ ],
+ "bootbox": {
+  "handlers": {
+   "manageBadges": {
+    "found": true,
+    "scopeId": 4,
+    "scopeDepth": 0,
+    "source": "function(badgesList,userBadgesList,xrefID,uname,uemail){if(!badgesList)return void bootbox.alert(\"Sorry, there are no Badges defined for this room yet...\");var f=\"<h4>Manage Badges for  \"+uname+\" (\"+uemail+\")</h4><hr/>             <form id='badgesForm' action=''><div class='form-group'> \";userBadgesList||(userBadgesList=[]);for(var i=0;i<badgesList.length;i++){var b=badgesList[i],hasIt=userBadgesList.includes(b._id);f+=b.hasOwnProperty(\"imgURL\")&&b.imgURL?'<input type=\"checkbox\" name=\"editBadgesArr\" value=\"'+b._id+'\" '+(hasIt?'checked=\"checked\" />':\"/>\")+'                  <div class=\"label\"><img class=\"user-badge-img\" src=\"'+b.imgURL+'\" alt=\"'+b.imgURL+'\"/></div><br/>':'<input type=\"checkbox\" name=\"editBadgesArr\" value=\"'+b._id+'\" '+(hasIt?'checked=\"checked\" />':\"/>\")+'                  <div class=\"label\" style=\"background-color: '+b.bkcolor+\"; color: \"+b.color+'\">'+b.text+\"</div><br/>\"}f+='<hr/>Add badges to all rooms? <input type=\"checkbox\" id=\"manageBadgeAllRoomsChk\" /></div></form>',bootbox.confirm(f,function(result){if(result){var badges=[];$.each($(\"input[name='editBadgesArr']:checked\"),function(){badges.push($(this).val())});var newUserBadgeArr=badges,allRooms=$(\"#manageBadgeAllRoomsChk\").is(\":checked\");lg(\"Badges are now: \"+newUserBadgeArr.toString()+\". All Rooms: \"+allRooms);var args=$scope.makeReqTokenForCmd(\"updateUserXref\");args&&(args.sessionID=$scope.sessionID,args.xrefID=xrefID,args.newBadges=newUserBadgeArr,args.allRooms=allRooms,$http.post(appVars.globals.APIURL+\"/users/v1/sessions\",args).success(function(data){data.success&&$scope.loadUsers()}))}})}"
+   },
+   "updateManyUsersBadgePrompt": {
+    "found": true,
+    "scopeId": 4,
+    "scopeDepth": 0,
+    "source": "function(cmd){bootbox.prompt({title:\"Enter badge id to \"+cmd,inputType:\"text\",callback:function(result){$scope.updateManyUsersBadge(result,cmd)}})}"
+   },
+   "setNoteUser": {
+    "found": true,
+    "scopeId": 4,
+    "scopeDepth": 0,
+    "source": "function(xrefid,name,$index){bootbox.prompt({title:\"Set a note for this user, put nothing here to clear\",inputType:\"text\",callback:function(result){var args=$scope.makeReqTokenForCmd(\"updateUserXref\");args&&(args.sessionID=$scope.sessionID,args.xrefID=xrefid,result||(result=\"_EMPTY_\"),args.note=result,$http.post(appVars.globals.APIURL+\"/users/v1/sessions\",args).success(function(data){data.success&&$scope.loadUsers()}))}})}"
+   },
+   "editUsername": {
+    "found": true,
+    "scopeId": 4,
+    "scopeDepth": 0,
+    "source": "function(xrefid,currentName){bootbox.prompt({title:\"Edit username for: <b>\"+currentName+\"</b>\",inputType:\"text\",value:currentName,callback:function(newName){if(null!==newName){if(newName=newName.trim(),!newName)return void bootbox.alert(\"Username cannot be empty.\");if(newName!==currentName){var args=$scope.makeReqTokenForCmd(\"editUsername\");args&&(args.sessionID=$scope.sessionID,args.xrefID=xrefid,args.newUsername=newName,$http.post(appVars.globals.APIURL+\"/users/v1/sessions\",args).success(function(data){data.success&&$scope.loadUsers()}))}}}})}"
+   },
+   "setUserPW": {
+    "found": true,
+    "scopeId": 4,
+    "scopeDepth": 0,
+    "source": "function(xrefid,name,$index){bootbox.confirm(\"<h4>Set password for  \"+name+\"</h4><hr/>                     <form id='unamePWForm' action='' onsubmit='return false'><div class='form-group'>                         Password &nbsp;&nbsp;<input type='text' name='pw' id='unamePWTxt' /><br/>                        email credentials to user? &nbsp;<input type='checkbox' name='pw' id='unamePWEmailChk' checked='checked' />                     </div></form>\",function(result){if(result){var doEmail=$(\"#unamePWEmailChk\").is(\":checked\"),pw=$(\"#unamePWTxt\").val(),args=$scope.makeReqTokenForCmd(\"updateUserXref\");args&&(args.sessionID=$scope.sessionID,args.xrefID=xrefid,args.newPW=pw,args.emailOut=doEmail,$http.post(appVars.globals.APIURL+\"/users/v1/sessions\",args).success(function(data){data.success&&$scope.loadUsers()}))}})}"
+   },
+   "doInvite": {
+    "found": true,
+    "scopeId": 4,
+    "scopeDepth": 0,
+    "source": "function(mode){$scope.invite={email:\"\",name:\"\",role:\"\",pw:\"\",sendEmail:!0,persons:[]},mode||(mode=\"webinar\"),$scope.inviteModalInstance=$modal.open({templateUrl:\"app/views/cached/inviteModal.html\",scope:$scope,resolve:{mode:function(){return mode},sessionID:function(){return $scope.sessionID},token:function(){return $localstorage.get(\"tokenSite\")}}}),$scope.inviteModalInstance.result.then(function(){},function(){})}"
+   },
+   "doBatchInvite": {
+    "found": true,
+    "scopeId": 4,
+    "scopeDepth": 0,
+    "source": "function(){bootbox.prompt({title:\"Enter comma separate email list\",inputType:\"textarea\",callback:function(emailList){if(emailList&&(console.log(emailList),$scope.batchEmailsList=emailList.trim().toLowerCase().replace(/\\s/g,\"\").split(\",\"),console.log($scope.batchEmailsList),$scope.batchEmailsList.length>0)){var args=$scope.makeReqTokenForCmd(\"inviteBatchUsers\");if(args.batchEmailsList=$scope.batchEmailsList,args.roomID=$scope.roomID,args.inviteHost=window.location.origin,args.emailHost=window.location.hostname,args.sessionID=$scope.sessionID,!args)return;$http.post(appVars.globals.APIURL+\"/users/v1/sessions\",args).success(function(data){console.log(\"inviteBatchUsers data: \",data),data.success&&$scope.loadUsers()})}}})}"
+   },
+   "setPermissions": {
+    "found": true,
+    "scopeId": 4,
+    "scopeDepth": 0,
+    "source": "function(user){$scope.userPermissions=user,console.log(\"setPermissions for user: \",$scope.userPermissions)}"
+   },
+   "manageApiKeyRestrictions": {
+    "found": true,
+    "scopeId": 4,
+    "scopeDepth": 0,
+    "source": "function(apiKey){$scope.fetchAllStatsEndpoints(function(endpoints){var container=$(\"<div>\"),sessHeader=$(\"<h5>\").text(\"Restrict to Sessions (leave none selected for no restriction)\"),sessList=$('<div class=\"list-group\" style=\"max-height: 260px; overflow-y: auto;\">'),sessionItems=($scope.login.sessions||[]).map(function(s){return{id:String(s._id||s.id||s.uuid),label:(s.name||s.uuid||s._id)+\" (\"+(s.uuid||s._id)+\")\"}}),preSelSessions=(apiKey.restrictToSessions||[]).map(function(v){return String(v)});sessionItems.forEach(function(item){var row=$('<label class=\"list-group-item\">'),cb=$('<input type=\"checkbox\" style=\"margin-right:6px;\">').prop(\"checked\",preSelSessions.indexOf(item.id)!==-1);row.append(cb).append(document.createTextNode(item.label)),row.data(\"id\",item.id),sessList.append(row)});var epHeader=$(\"<h5>\").text(\"Restrict to Endpoints (leave none selected for no restriction)\"),epList=$('<div class=\"list-group\" style=\"max-height: 260px; overflow-y: auto;\">'),preSelEndpoints=apiKey.restrictToEndpoints||[];endpoints.forEach(function(ep){var row=$('<label class=\"list-group-item\">'),cb=$('<input type=\"checkbox\" style=\"margin-right:6px;\">').prop(\"checked\",preSelEndpoints.indexOf(ep)!==-1);row.append(cb).append(document.createTextNode(ep)),row.data(\"id\",ep),epList.append(row)}),container.append(sessHeader,sessList,$(\"<hr/>\"),epHeader,epList),bootbox.dialog({title:\"Manage API Key Restrictions\",message:container,size:\"large\",buttons:{clear:{label:\"Clear All\",className:\"btn-warning\",callback:function(){try{sessList.find(\"input[type=checkbox]\").prop(\"checked\",!1),epList.find(\"input[type=checkbox]\").prop(\"checked\",!1)}catch(e){}saveApiRestrictions(apiKey._id,[],[],function(){$scope.listApiKeys()})}},cancel:{label:\"Cancel\"},save:{label:\"Save\",className:\"btn-success\",callback:function(){var selSessions=[];sessList.find(\"label\").each(function(){var lbl=$(this),checked=lbl.find(\"input[type=checkbox]\").is(\":checked\");checked&&selSessions.push(String(lbl.data(\"id\")))});var selEndpoints=[];epList.find(\"label\").each(function(){var lbl=$(this),checked=lbl.find(\"input[type=checkbox]\").is(\":checked\");checked&&selEndpoints.push(String(lbl.data(\"id\")))}),saveApiRestrictions(apiKey._id,selSessions,selEndpoints,function(){$scope.listApiKeys()})}}}})})}"
+   },
+   "openStripeDetails": {
+    "found": true,
+    "scopeId": 4,
+    "scopeDepth": 0,
+    "source": "function(user){function addRow(label,value){void 0!==value&&null!==value&&\"\"!==value&&rows.push('<tr><th style=\"width:220px;\">'+label+\"</th><td>\"+value+\"</td></tr>\")}function fmtDate(d){try{var dt=new Date(d);if(!isNaN(dt.getTime()))return dt.toLocaleString()}catch(e){}return\"\"+d}if(user)try{var rows=[];addRow(\"Membership ID\",user.stripeMembershipId),addRow(\"Subscription ID\",user.stripeSubscriptionId),addRow(\"Customer ID\",user.stripeCustomerId),addRow(\"Checkout Session ID\",user.stripeCheckoutSessionId),addRow(\"Subscription Status\",user.stripeSubscriptionStatus),addRow(\"Last Invoice ID\",user.stripeLastInvoiceId),addRow(\"Last Paid At\",user.stripeLastPaidAt?fmtDate(user.stripeLastPaidAt):\"\"),addRow(\"Last Paid Amount\",$scope.formatStripeAmount(user.stripeLastPaidAmount,user.stripeLastPaidCurrency)),addRow(\"Last Paid Currency\",user.stripeLastPaidCurrency),addRow(\"Last Payment Failure At\",user.stripeLastPaymentFailureAt?fmtDate(user.stripeLastPaymentFailureAt):\"\"),addRow(\"Last Failure Reason\",user.stripeLastFailureReason),addRow(\"Current Period End\",user.stripeCurrentPeriodEnd?fmtDate(user.stripeCurrentPeriodEnd):\"\"),addRow(\"Cancel At\",user.stripeCancelAt?fmtDate(user.stripeCancelAt):\"\"),addRow(\"Canceled At\",user.stripeCanceledAt?fmtDate(user.stripeCanceledAt):\"\"),addRow(\"Welcome Email Sent\",user.stripeWelcomeEmailSent),addRow(\"Welcome Email Sent At\",user.stripeWelcomeEmailSentAt?fmtDate(user.stripeWelcomeEmailSentAt):\"\"),addRow(\"Stripe Data Updated\",user.stripeDataUpdated?fmtDate(user.stripeDataUpdated):\"\");var tableHtml='<div class=\"table-responsive\"><table class=\"table table-condensed table-striped\">'+rows.join(\"\")+\"</table></div>\";bootbox.dialog({title:\"Stripe Details - \"+(user.userName||user.email||\"\"),message:tableHtml,buttons:{ok:{label:\"Close\",className:\"btn-primary\"}}})}catch(e){try{bootbox.alert(\"Unable to render Stripe details\")}catch(ee){}}}"
+   },
+   "showAlerterAppTokens": {
+    "found": true,
+    "scopeId": 4,
+    "scopeDepth": 0,
+    "source": "function(name,tokens){var tok=tokens||[],appTokens=JSON.stringify(tok);bootbox.alert(\"Mobile App Tokens for \"+name+\": \"+appTokens)}"
+   },
+   "getFCMTokens": {
+    "found": true,
+    "scopeId": 4,
+    "scopeDepth": 0,
+    "source": "function(xrefid,name,$index){var args=$scope.makeReqTokenForCmd(\"getFCMTokens\");args&&(args.sessionID=$scope.sessionID,args.xrefID=xrefid,$http.post(appVars.globals.APIURL+\"/users/v1/sessions\",args).success(function(data){data.success?(console.log(\"getFCMTokens OK for, data:\",data),bootbox.alert(\"Get FCM Tokens OK for: \"+name+\"\\nFCM Tokens:\"+JSON.stringify(data.fcmTokens))):bootbox.alert(\"ERROR: getFCMTokens failed. Error:\"+JSON.stringify(data.msg))}))}"
+   },
+   "manageMarketplaceSession": {
+    "found": true,
+    "scopeId": 4,
+    "scopeDepth": 0,
+    "source": "function(sessID,session){var baseUrl=\"/ptr_app/mp/v2\",api_url=appVars.globals.APIURL+baseUrl;$http.get(api_url+\"/marketplaces/\"+sessID,{headers:{Authorization:\"Bearer \"+chatModel.jwtTokenSite}}).success(function(response){if(console.log(\"getMarketPlacesForSession list:\",response),response&&0!==response.length){console.log(\"Marketplace already exists for session:\",response);var mpId=response[0]._id,url=appVars.globals.APIURL+\"/mp/room-dashboard/\"+mpId;window.open(url,\"_blank\")}else{var mp={sessionID:sessID,title:session?session.name:\"Untitled\",logoURL:session?session.logoURL:\"\",published:!1,locked:!1,featured:!1,hidden:!1,tagline:\"\",description:\"\",images:[],tags:[],memberships:[]};$http.post(api_url+\"/\",mp,{headers:{Authorization:\"Bearer \"+chatModel.jwtTokenSite}}).success(function(mpResponse){console.log(\"POST createMarketplaceEntry created:\",mpResponse);var mpId=mpResponse._id,url=appVars.globals.APIURL+\"/mp/room-dashboard/\"+mpId;window.open(url,\"_blank\")}).error(function(err){console.error(\"Error creating marketplace entry:\",err),bootbox.alert(\"Failed to create marketplace entry\")})}}).error(function(err){console.error(\"Error fetching marketplace entries:\",err),bootbox.alert(\"Failed to fetch marketplace entries\")})}"
+   },
+   "setCustomRoomURL": {
+    "found": true,
+    "scopeId": 4,
+    "scopeDepth": 0,
+    "source": "function(){bootbox.prompt(\"Enter your desired name. (Only letters and numbers allowed. No spaces or special characters allowed, as this is a URL)\",function(res){try{var cname=res.trim().replace(/[^a-z0-9]/gi,\"\"),args=$scope.makeReqTokenForCmd(\"changeCustomURL\");args.sessionID=$scope.sessionID,args.cname=cname,$http.post(appVars.globals.APIURL+\"/users/v1/sessions\",args).success(function(data){console.log(\"sessions rc=\"+JSON.stringify(data)),data.success?$scope.sess.customCname=cname:bootbox.alert(data.msg)}).error(function(err){})}catch(ee){console.error(ee)}})}"
+   },
+   "createNew": {
+    "found": true,
+    "scopeId": 4,
+    "scopeDepth": 0,
+    "source": "function(){appVars.createNew=!0,$http.post(appVars.globals.APIURL+\"/users/v1/users.json\",{cmd:\"newSession\",email:chatModel.email,token:chatModel.jwtTokenSite,demoRoom:!0}).success(function(data){lg(\"newSession data:\"+JSON.stringify(data)),$scope.roomID=__roomID=data.uuid,$state.go(\"page.manageSession\",{sessionID:data._id})}).error(function(err){bootbox.alert(\"Something went wrong, please try again...\"),$scope.doLogout()})}"
+   }
+  },
+  "templatesFetched": [],
+  "observed": [],
+  "scopesSearched": 316
+ },
+ "login": null,
+ "observedErrors": [],
+ "refusedClicks": [],
+ "gaps": [
+  {
+   "what": "Only 3 row(s) on screen — the register asks for 2+ rooms and 4+ users to read the alternation.",
+   "whereILooked": [
+    "tbody > tr of every striped table"
+   ],
+   "blocks": "the ALTERNATION half of T2-7. The per-row values and rules captured above are still valid."
+  },
+  {
+   "what": "No login form on this page.",
+   "whereILooked": [
+    "form[name=\"loginForm\"]",
+    "form#loginForm",
+    "any form containing input[type=password]"
+   ],
+   "blocks": "T2-22. Log OUT and re-run on the login page — that is the state the register asks for."
+  }
+ ],
+ "notes": [
+  "4 stylesheet(s) unreadable (cross-origin) during rule matching."
+ ],
+ "summary": {
+  "stripedTables": 3,
+  "bootboxHandlers": 15,
+  "loginFormCaptured": false,
+  "gaps": 2
+ }
+}

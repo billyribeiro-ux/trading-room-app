@@ -92,8 +92,30 @@
      nothing but a query like `?v=` containing "save" would, and — more importantly — a path
      segment such as `.../images/uploads/` would not be caught by a naive whole-URL test that the
      origin string already satisfies. Path-only keeps the check meaningful. */
+  /*
+    STATIC DOCUMENTS ARE EXEMPT FROM THE VERB LIST, and that is a correction rather than a
+    loosening.
+
+    On 2026-08-14 this aborted the entire run — before a single request — on
+    `/public/html/POST_ROUTE_API_DOCUMENTATION.md`, because `path.includes('post')` is true of a
+    filename describing HTTP POST *routes*. Nothing was fetched and T1-9/T1-10 stayed open on a
+    false positive.
+
+    The list names ACTIONS: delete, upload, submit, kick. What makes a request dangerous is that it
+    invokes one, not that a noun in its name happens to contain those letters — the same class of
+    error as `\bdelete\b` failing to match `deleteParticipant`, in the opposite direction. A path
+    ending in a document or asset extension is a FILE being read, and every request here is a GET.
+
+    Splitting on separators would not fix it either: `POST_ROUTE_…` yields `post` as a whole token.
+    The extension is the honest discriminator.
+
+    The tripwire keeps its teeth for anything added later that is NOT a static file — an endpoint
+    like `/users/v1/sessions/deleteUser` has no such extension and still aborts the run.
+  */
+  const STATIC_DOCUMENT = /\.(js|css|md|json|map|txt|woff2?|ttf|eot|otf|svg|png|jpe?g|gif|ico|webp)$/;
   const tripwire = (url) => {
     const path = new URL(url).pathname.toLowerCase();
+    if (STATIC_DOCUMENT.test(path)) return [];
     return FORBIDDEN.filter((w) => path.includes(w));
   };
 

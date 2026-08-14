@@ -236,7 +236,13 @@
       gap(
         `Only ${totalRows} row(s) on screen — the register asks for 2+ rooms and 4+ users to read the alternation.`,
         ['tbody > tr of every striped table'],
-        'the ALTERNATION half of T2-7. The rules and per-row values captured above are still valid.'
+        totalRows === 0
+          ? /* Said plainly, because the old wording claimed the rules "are still valid" at zero
+               rows — they are not. `hoverRules` and `stripeRules` are matched against `rows[0]`, so
+               with no rows NOTHING was captured for T2-7 and the empty arrays above are absence,
+               not evidence of absence. A run on a table with rows is required. */
+            'ALL of T2-7. With zero rows the rule arrays are empty because there was no row to match them against — nothing was captured here.'
+          : 'the ALTERNATION half of T2-7. The per-row values and rules captured above are still valid.'
       );
     }
   }
@@ -249,13 +255,40 @@
   if (!ng) {
     gap('window.angular is absent — no scope to read bootbox handlers from.', ['window.angular'], 'the handler half of T2-20.');
   } else {
-    let scope = null;
-    try {
-      scope = ng.element(document.querySelector('[ng-controller], .ng-scope') || document.body).scope();
-    } catch (e) {
-      OUT.bootbox.scopeError = String(e);
+    /*
+      ANCHOR DEEP, then walk up. This used to be
+
+          ng.element(document.querySelector('[ng-controller], .ng-scope') || document.body).scope()
+
+      and it could never work. `querySelector` returns the FIRST match in document order, which is
+      the outermost `.ng-scope` — effectively the root scope — and the loop below then walks UPWARD
+      via `$parent`, away from the controller that defines these handlers. On 2026-08-14 it reported
+      0 of 15 found on a manage page where `collect-stripe-details.js` had captured
+      `openStripeDetails` and `doBatchInvite` in full three minutes earlier. That was this script,
+      not the page.
+
+      `collect-stripe-details.js` gets it right by anchoring on a ROW (`tr[ng-repeat]`) — deep inside
+      the controller — so walking `$parent` climbs INTO it. This now collects every distinct scope
+      reachable from a set of anchors, deepest-yielding first, and tries each. Deduped by `$id`
+      because `.ng-scope` matches hundreds of elements sharing a handful of scopes.
+    */
+    const seenScopeIds = new Set();
+    const scopes = [];
+    for (const el of document.querySelectorAll(
+      'tr[ng-repeat], tbody tr, table.table-striped, [ng-controller], .ng-scope'
+    )) {
+      try {
+        const s = ng.element(el).scope();
+        if (s && !seenScopeIds.has(s.$id)) {
+          seenScopeIds.add(s.$id);
+          scopes.push(s);
+        }
+      } catch {
+        /* not inside an Angular tree — skip it rather than abort the phase */
+      }
     }
-    if (!scope) {
+    OUT.bootbox.scopesSearched = scopes.length;
+    if (!scopes.length) {
       gap('angular.element(…).scope() returned nothing — debug info disabled.', ['.ng-scope', '[ng-controller]'], 'the handler half of T2-20.');
     } else {
       /* Named rather than enumerated blindly: these are the handlers the templates show opening a
@@ -267,16 +300,29 @@
         'setCustomRoomURL', 'createNew'
       ];
       for (const name of WANTED) {
-        let owner = scope;
-        let depth = 0;
-        while (owner && typeof owner[name] !== 'function') {
-          owner = owner.$parent;
-          depth++;
+        let hit = null;
+        for (const start of scopes) {
+          let owner = start;
+          let depth = 0;
+          /* Bounded at 25 like `collect-stripe-details.js`: an unbounded `$parent` walk on a
+             detached or cyclic scope hangs the console, and no real scope chain is that deep. */
+          while (owner && typeof owner[name] !== 'function' && depth < 25) {
+            owner = owner.$parent;
+            depth++;
+          }
+          if (owner && typeof owner[name] === 'function') {
+            hit = { owner, depth };
+            break;
+          }
         }
-        OUT.bootbox.handlers[name] =
-          owner && typeof owner[name] === 'function'
-            ? { found: true, scopeDepth: depth, source: redact(String(owner[name])) }
-            : { found: false };
+        OUT.bootbox.handlers[name] = hit
+          ? {
+              found: true,
+              scopeId: hit.owner.$id,
+              scopeDepth: hit.depth,
+              source: redact(String(hit.owner[name]))
+            }
+          : { found: false };
       }
       const found = Object.values(OUT.bootbox.handlers).filter((h) => h.found).length;
       console.log(`[T2-20] ${found}/${WANTED.length} dialog handlers read off the scope`);
@@ -287,9 +333,32 @@
      T2-22 — the login form, if this page has one
      ══════════════════════════════════════════════════════════════════════════ */
 
+  /*
+    "A form with a password field" is NOT a login form, and on 2026-08-14 that fallback reported
+    `loginFormCaptured: true` for the **Add Admin User** form on the welcome page — `ng-submit`
+    of `addAdminUser()`, models `adminUser.name` / `.email` / `.password`, buttons "Add Admin User"
+    and "Cancel". Everything about the capture was accurate; the LABEL on it was false, which is
+    worse than capturing nothing, because it would have closed T2-22 on the wrong form.
+
+    So a password field is now necessary but not sufficient. A login form is one that submits a
+    LOGIN, and every other candidate on these pages announces itself in `ng-submit`/`ng-click` as
+    doing something else. Rejecting by intent keeps this honest without hardcoding a selector the
+    next redesign would break.
+  */
+  const NOT_LOGIN = /addAdminUser|register|signup|forgot|reset|invite|changePassword|updateUser/i;
+  const looksLikeLogin = (f) => {
+    if (!f.querySelector('input[type="password"]')) return false;
+    const intent = `${f.getAttribute('ng-submit') || ''} ${f.getAttribute('action') || ''} ${f.getAttribute('name') || ''} ${f.id || ''}`;
+    if (NOT_LOGIN.test(intent)) return false;
+    /* A login form asks for a password and NOT for a new user's details. Two text-ish inputs beside
+       the password (name AND email) is the create-a-user shape, not the sign-in shape. */
+    const textish = f.querySelectorAll('input[type="text"], input[type="email"]').length;
+    return textish <= 1;
+  };
+
   const loginForm =
     document.querySelector('form[name="loginForm"], form#loginForm') ||
-    Array.from(document.querySelectorAll('form')).find((f) => f.querySelector('input[type="password"]'));
+    Array.from(document.querySelectorAll('form')).find(looksLikeLogin);
 
   if (!loginForm) {
     gap(

@@ -95,37 +95,36 @@ Every gap from the full read of `apps/controller/evidence-dumps/` now lives ther
 five tiers. **That file is the tracker — this section is only the index to it.** Do not record a
 gap's status in both places; one of them will go stale.
 
-As of 2026-08-14 07:06 EDT: **61 CLOSED, 13 OPEN, 13 parked/won't-fix, 87 total.**
+As of 2026-08-14 09:06 EDT: **65 CLOSED, 9 OPEN, 13 parked/won't-fix, 87 total.**
 
-**Everything closable by READING is closed.** The thirteen that remain need something no source file
+**Everything closable by READING is closed.** The nine that remain need something no source file
 can give. Each is written out below with the exact next action, because "blocked" without an
 instruction is just a note that something is unfinished.
 
 ---
 
-### HANDOFF — the THIRTEEN still open, and exactly what each needs
+### HANDOFF — the NINE still open, and exactly what each needs
 
 Rewritten 2026-08-13 18:21 EDT, recounted 2026-08-14. It said twelve while the template read was
 still running, then fourteen, and the prose disagreed with the tally line above it in BOTH
-directions for a day. The items below count 5 + 1 + 4 + 1 + 2 = **thirteen**, which is what the
+directions for a day. The items below count 1 + 1 + 4 + 1 + 2 = **nine** after the 2026-08-14 browser session closed four, which is what the
 tally says and what `evidence-gap-register-counts.test.ts` recounts from the register itself.
 Section B reads "two" because one sentence unblocks two EDITS; only one of them (T5-24) is an open
 register row. Every item says WHO does the next step and WHAT it is. **No item here
 is waiting on more reading — the templates are exhausted.**
 
-#### A. Five need a browser on the live site. Both scripts are written and smoke-tested.
+#### A. One needs a browser on the live site. Four of the original five closed 2026-08-14.
 
-Paste the file's whole contents into Chrome's console. Each downloads by itself. Neither clicks a
-mutating control, submits a form, or sends anything, and both redact emails / long digit runs /
-Stripe ids to their SHAPE before writing. Drop the JSON into `apps/controller/evidence-dumps/`.
+**T5-15, T5-21, T2-20 and T2-7 are CLOSED** — see the register and `CHANGELOG.md` 2026-08-14 09:06 EDT.
+The captures are `evidence-dumps/stripe-details-2026-08-14.json` and
+`evidence-dumps/rendered-states-2026-08-14.json`. Two script defects were found and fixed by that session,
+both of which had been silently returning nothing: `collect-rendered-states.js` anchored its scope walk at the
+document root and climbed AWAY from the controller (0/15 handlers, now 15/15), and `ptr-fetch-static.js` aborted
+its whole run because `path.includes('post')` matched `POST_ROUTE_API_DOCUMENTATION.md`.
 
 | gap | script | where to be |
 | --- | --- | --- |
-| **T5-15** `openStripeDetails` — what the Stripe "Details" link opens | `scripts/collect-stripe-details.js` | any room's **manage** page. Needs NO marketplace member: it reads the handler's source off the Angular scope. |
-| **T5-21** `doBatchInvite` — the Batch User Invite prompt | same script, same run | same |
-| **T2-7** `table-striped` alternation + hover geometry | `scripts/collect-rendered-states.js` | a page with a POPULATED table. Needs **2+ rooms and 4+ users**; it reports a gap below four rows. NOTE: `ng-hide` rows keep their `nth-of-type` position (T5-12), so irregular banding is CORRECT, not a bug. |
-| **T2-20** bootbox dialog variants | same script, same run | anywhere with dialogs. After the first download it WATCHES for 120s — open Set Note, Edit Username, Badges and it captures each. It opens none itself. |
-| **T2-22** login-form GEOMETRY only | same script | **logged OUT**. The "failed-login error state" half is DONE — it was never an error message; it is a reCAPTCHA gated on `failedLoginCount >= 3`, and ours already matches. Only pixel geometry remains. |
+| **T2-22** login-form GEOMETRY only | `scripts/collect-rendered-states.js` | **logged OUT**. The "failed-login error state" half is DONE — it was never an error message; it is a reCAPTCHA gated on `failedLoginCount >= 3`, and ours already matches. Only pixel geometry remains. |
 
 #### B. Two need one sentence from the owner, naming the field.
 
