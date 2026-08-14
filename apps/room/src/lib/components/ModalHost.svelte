@@ -1221,6 +1221,7 @@
       'presenter-follow-my-screens': 'makeUsersFollowMyScreens',
       'chat-gif-donot-disturb': 'chatGif',
       'chat-badges-donot-disturb': 'chatBadges',
+      'chat-popup-donot-disturb': 'chatPopup',
       /* The presenter tab's own Do-not-disturb pair. SECOND controls for preferences that
          already have live consumers — the reference wires them to `alertSoundOnChange()` and
          `chatSoundOnChange()`, the very same handlers its main tab uses. */

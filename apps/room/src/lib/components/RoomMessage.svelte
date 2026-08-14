@@ -1,6 +1,7 @@
 <script lang="ts">
   import EmojiPicker from '$lib/components/EmojiPicker.svelte';
   import type { EmojiDumpEntry } from '$lib/emoji-data';
+  import { isMentionOf } from '$lib/mention';
   import { calculateMessageMenuPosition } from '$lib/message-menu-position';
   import { ngbTooltipWith } from '$lib/ngb-tooltip';
   import {
@@ -300,7 +301,13 @@
     );
   });
   const stockStyle = $derived(effectiveStyle ? `color: ${effectiveStyle.tickerColor};` : undefined);
-  const isMention = $derived(Boolean(currentUserName) && item.body.includes(`@${currentUserName}`));
+  /*
+    The shared rule, not a second copy. This was `item.body.includes('@' + currentUserName)` —
+    case-sensitive, no trailing space and blind to `@all`, so `@Bob` never highlighted for bob,
+    `@bobby` always did, and a presenter addressing the room with `@all ` highlighted for nobody.
+    See `$lib/mention` for the reference's own three terms.
+  */
+  const isMention = $derived(isMentionOf(item.body, currentUserName, isAdminMessage));
   const isQuestion = $derived(
     item.evidenceQuestion ??
       (kind === 'chat' && item.body.includes('?') && followedStyle === undefined)

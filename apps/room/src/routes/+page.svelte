@@ -72,6 +72,7 @@
   import { resolveNoteSurfaceGates } from '$lib/components/notes/note-gates';
   import RoomMessage from '$lib/components/RoomMessage.svelte';
   import type { MessageBadge } from '$lib/types';
+  import { isMentionOf } from '$lib/mention';
   import ToastHost from '$lib/components/ToastHost.svelte';
   import VideoPlayer from '$lib/components/VideoPlayer.svelte';
   import YoutubePlayerOverlay from '$lib/components/YoutubePlayerOverlay.svelte';
@@ -805,6 +806,33 @@
    * `preferences.chatBadges` — the VIEWER's half of the badge gate, distinct from the owner's
    * `enableBadges`. Ships `!0`, so `!== false`.
    */
+  /**
+   * `preferences.chatPopup` — a toast and a browser notification when somebody mentions you.
+   *
+   * `!doNotDisturbOn && chatPopup` upstream, sitting beside the sound in the same block:
+   * `doNotDisturbOn || (chatSoundOn && pling.play(), chatPopup && (alertService.info(…), new
+   * Notification(…)))` (`main.d6d3c112b59b7d0d.js` byte 1431308). The sound half has been here since
+   * the SSE handler was written; this is the other half.
+   *
+   * `!== false`, because the blob ships it on with its siblings and a viewer who has never opened
+   * the settings modal should be told when they are addressed by name.
+   */
+  let chatPopup = $state(loadedSettings.chatPopup !== false);
+
+  /**
+   * The id of the last chat message already considered for a popup — an OPAQUE key, never a number.
+   *
+   * `id-opacity-contract.test.ts` caught the first version of this doing `Math.max(highest,
+   * item.id)`, and it was right to: the room-to-API cutover swaps SQLite's numeric ids for uuids,
+   * and that is a server-side change ONLY while no client does arithmetic on one. `Math.max` over a
+   * uuid is not a type error, it is `NaN` at runtime. So the marker is compared with `===` and
+   * everything else is done by POSITION in the server's own ordering.
+   *
+   * `undefined` means "nothing considered yet". Not `$state`: nothing renders from it, and making
+   * it reactive would invalidate the effect that writes it.
+   */
+  let lastPopupChatId: (typeof data.messages)[number]['id'] | undefined;
+  let popupSeeded = false;
   let chatBadges = $state(loadedSettings.chatBadges !== false);
   let chatGif = $state(loadedSettings.chatGif !== false);
   let makeUsersFollowMyScreens = $state(loadedSettings.makeUsersFollowMyScreens === true);
@@ -2251,6 +2279,60 @@
     if (alertsDetachedWindow && !alertsDetachedWindow.closed) alertsDetachedWindow.close();
     alertsDetachedWindow = null;
   }
+  /**
+   * The mention popup — `chatPopup`'s half of the reference's notification block.
+   *
+   * Driven off `data.messages` rather than off the SSE payload, and that is a deliberate security
+   * choice rather than convenience. The chat event carries only `senderId`, `senderEmailHash` and
+   * the CHANNEL — never the text — because `room` is a chat channel and can be an admin one; a
+   * payload carrying message bodies would put admin chat on every subscriber's wire. The refetched
+   * `data.messages` has already been filtered by the server for THIS viewer, so reading the text
+   * from there cannot show anybody something they were not already entitled to see.
+   *
+   * An `$effect` because this IS a side effect — a toast and an OS notification — not a derivation.
+   * The marker it writes is bookkeeping, not rendered state.
+   *
+   * `lastPopupChatId` starts at -1 and is seeded on the FIRST pass without announcing anything, so
+   * arriving in a room with fifty unread mentions is silent. Only messages that appear afterwards
+   * pop.
+   */
+  $effect(() => {
+    const messages = data.messages;
+    if (!popupSeeded) {
+      popupSeeded = true;
+      lastPopupChatId = messages.at(-1)?.id;
+      return;
+    }
+    /*
+      Everything AFTER the marker, by position in the server's own ordering. If the marker is gone
+      — trimmed from the log, or the tab changed — `indexOf` gives -1 and `slice(0)` would announce
+      the whole list, so that case seeds again instead.
+    */
+    const seenAt = messages.findIndex((item) => item.id === lastPopupChatId);
+    if (lastPopupChatId !== undefined && seenAt === -1) {
+      lastPopupChatId = messages.at(-1)?.id;
+      return;
+    }
+    const fresh = messages.slice(seenAt + 1);
+    if (fresh.length === 0) return;
+    lastPopupChatId = messages.at(-1)?.id;
+
+    // `doNotDisturbOn ||` — the outer gate on the whole block, sound and popup alike.
+    if (doNotDisturbOn || !chatPopup) return;
+
+    for (const item of fresh) {
+      // Your own message is never a mention of you, whatever it says.
+      if (item.senderId === data.user.id) continue;
+      if (!isMentionOf(item.body, data.user.displayName, item.isAdmin === true)) continue;
+
+      const title = `Mention from @${item.senderName ?? 'Unknown'}`;
+      /*  — the reference passes the body as the
+         toast TEXT and the title second, and enables HTML because chat bodies carry markup. */
+      showToast({ kind: 'info', title, message: item.body, enableHtml: true });
+      requestAlertBrowserNotification(title, item.body, null, item.senderEmailHash ?? '');
+    }
+  });
+
   const visibleChatMessages = $derived(
     data.messages
       .filter((item) => item.room === chatTab && !isEvidenceMessageHidden(item))
@@ -3115,6 +3197,7 @@
       if (key === 'makeUsersFollowMyScreens') makeUsersFollowMyScreens = value;
       if (key === 'chatGif') chatGif = value;
       if (key === 'chatBadges') chatBadges = value;
+      if (key === 'chatPopup') chatPopup = value;
       /*
         Both halves, because this preference has TWO controls: the navbar's
         `presentation-subtitles` checkbox and the settings modal's `app-speech-reco-overlay`. The

@@ -24,6 +24,58 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-14
 
+### 2026-08-14 11:16 EDT — mention popups, and one shared mention rule that was wrong in three ways
+
+**Runtime impact: being mentioned now raises a toast and an OS notification.** Tenth wire closed.
+
+Both halves already existed — `showToast`, and `requestAlertBrowserNotification` built for alerts,
+already matching the reference's `granted || default` and its gravatar fallback. The sound half of
+the reference's block has been in the SSE handler since it was written; this is the popup half of
+the same statement.
+
+**The security decision is the interesting part, and it is the opposite of the obvious one.** The
+reference gets `e.txt` and `e.n` from the socket event, so the natural port is to add the body and
+sender name to our chat payload. **That would have broadcast admin chat to every subscriber**: our
+event carries `senderId`, `senderEmailHash` and the CHANNEL, and `room` is a chat channel that can
+be an admin one. So the popup reads from the refetched `data.messages`, which the server has
+already filtered for this viewer — nobody is shown anything they were not entitled to see, and the
+wire keeps its minimal shape. Asserted, with a negative control that adds `body` back and goes red.
+
+**The mention rule was wrong in three ways, and is now one shared function.** `RoomMessage` had
+`item.body.includes('@' + currentUserName)`. The reference's `isMention` is:
+
+```js
+isMention(e) {
+  this.myname || (this.myname = this.globals.user.name.toLowerCase());
+  let i = e.txt.toLowerCase();
+  return -1 != i.indexOf(`@${this.myname} `) || (-1 != i.indexOf('@all ') && e.isA)
+}
+```
+
+* **Case-insensitive.** `@Bob` never highlighted for bob.
+* **A trailing SPACE is required.** `@bobby` always pinged bob, and `@bob` ending a message —
+  which looks like a bug and is deliberate — should not ping at all. Reproduced exactly, with the
+  end-of-message case as its own test so nobody "fixes" it back.
+* **`@all ` counts, from an admin only.** A presenter addressing the room highlighted for NOBODY.
+
+`$lib/mention` now holds it once, with 8 tests, and both the highlight and the popup call it. Two
+copies of a rule this fiddly is how one of them drifts.
+
+**A repository contract caught me, and it was right.** `id-opacity-contract.test.ts` failed on my
+first marker, which did `Math.max(highest, item.id)`. Ids must stay opaque because the room-to-API
+cutover swaps SQLite's numbers for uuids — and `Math.max` over a uuid is not a type error, it is
+`NaN` at runtime. The marker now uses equality and POSITION only, and re-seeds rather than
+re-announcing if the message it remembers has been trimmed away.
+
+**It stays silent on the backlog.** Arriving in a room with fifty unread mentions gives fifty OS
+notifications if the marker is not seeded on the first pass — the behaviour that would make the
+feature worse than not having it. Its own test, and its own negative control.
+
+**Verified:** 20 new tests (12 contract + 8 for the rule). Four negative controls — the body added
+to the wire, the do-not-disturb gate dropped, the backlog announced, and your own messages
+announced — each red on the right assertion and green on restore. **Full gate exit 0**: room 912
+tests / 82 files, controller 937 / 90. Row X down to six.
+
 ### 2026-08-14 10:59 EDT — chat badges render: the supply built across both apps
 
 **Runtime impact: badges appear on chat messages. They had never once been visible.**
