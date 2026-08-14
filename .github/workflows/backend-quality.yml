@@ -144,10 +144,36 @@ jobs:
 
       - name: Activate the repository pnpm version
         if: steps.scope.outputs.backend == 'true'
+        env:
+          # Corepack asks before downloading a package manager, and there is no TTY on a runner, so
+          # the question is an immediate `exit 1` rather than a prompt. This is the documented way
+          # to answer it in CI. It does NOT weaken the pin: the version still comes from
+          # `packageManager` and is still verified below.
+          COREPACK_ENABLE_DOWNLOAD_PROMPT: '0'
         run: |
+          set -euo pipefail
           corepack enable
-          corepack prepare pnpm@11.18.0 --activate
-          test "$(pnpm --version)" = "11.18.0"
+          # `corepack install` with no argument installs exactly what `package.json` pins. The
+          # version is deliberately NOT written here — not even in a comment, which is why this one
+          # names no number. That is the fix rather than a tidy-up.
+          #
+          # This step used to call `corepack prepare` with its own literal version, three days older
+          # than the one in `package.json`. `--activate` only sets a DEFAULT, and inside a project
+          # the pnpm shim always resolves `packageManager`, so the runner activated one version and
+          # `pnpm --version` then asked for the other. Corepack tried to download it, and with no
+          # TTY the confirmation prompt ended the job. Suppressing the prompt alone would only have
+          # moved the failure one line down, onto an assertion comparing against a number the shim
+          # was never going to print.
+          #
+          # `ci-package-manager-pin.test.ts` fails if any workflow reintroduces a version literal.
+          corepack install
+          expected="$(node -p "require('./package.json').packageManager.split('@')[1]")"
+          actual="$(pnpm --version)"
+          if [ "$actual" != "$expected" ]; then
+            echo "::error title=pnpm version mismatch::package.json pins $expected, the runner has $actual"
+            exit 1
+          fi
+          echo "pnpm $actual, matching the packageManager pin"
 
       - name: Install and show the repository-pinned Rust toolchain
         if: steps.scope.outputs.backend == 'true'

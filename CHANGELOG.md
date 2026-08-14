@@ -24,6 +24,60 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-14
 
+### 2026-08-14 08:13 EDT — CI: the pnpm version was written twice and the copies disagreed
+
+**Runtime impact: none. CI impact: the backend gate could not pass at all.**
+
+The push made the backend job run, and it died on its second step:
+
+```
+Preparing pnpm@11.18.0 for immediate activation...
+! Corepack is about to download https://registry.npmjs.org/pnpm/-/pnpm-11.21.0.tgz
+Error: Process completed with exit code 1.
+```
+
+**Not caused by this branch, and worth saying plainly.** `package.json` moved to `pnpm@11.21.0` on
+2026-08-09 (`8dd0306`). The workflow was written with `corepack prepare pnpm@11.18.0 --activate` on
+2026-08-12 (`b561772`) — three days later, against a number that was already stale. No commit on
+this branch touched `package.json` or `.github/`; the push only triggered it, because the scope step
+forces `backend=true` for any event that is not a pull request.
+
+**Why the two lines in that log look unrelated but are the same bug.** `--activate` sets corepack's
+DEFAULT. Inside a project directory the pnpm shim ignores the default and resolves `packageManager`.
+So the runner activated one version and `pnpm --version` immediately went looking for the other.
+Corepack asks before downloading a package manager, a runner has no TTY, and the question is an
+`exit 1`.
+
+**Suppressing the prompt alone would have been the wrong fix** — it would have moved the failure one
+line down, onto `test "$(pnpm --version)" = "11.18.0"`, comparing against a number the shim was
+never going to print. That step could not have passed in any circumstance.
+
+**The fix is that the version is now written once.** `corepack install` with no argument installs
+exactly what `package.json` pins; the step then reads the same field back and fails loudly if what
+it got differs. `COREPACK_ENABLE_DOWNLOAD_PROMPT` is set because a runner has no TTY — it does not
+weaken the pin, which is still verified.
+
+**A guard, because this will otherwise recur on the next bump.**
+`ci-package-manager-pin.test.ts` asserts that no workflow contains a pnpm version literal — not even
+in a comment, which is why the comment explaining all this names no number — and that all three
+`packageManager` fields agree, since corepack resolves the NEAREST one and a drifted app would
+silently run a different pnpm. It deliberately does NOT assert which version, because that would
+make the test a fifth place the number lives.
+
+**Two of my own mistakes, both caught before pushing.** The first draft of the workflow comment
+quoted the stale version, so the guard failed on my own prose — correctly. And the assertion
+`toContain('corepack install')` passed against a workflow with that command DELETED, because the
+comment above it contains the words; the negative control found it, and comment lines are now
+stripped before that assertion. An assertion satisfied by prose about the code is not an assertion
+about the code — the same lesson as the h3 that had to be proved to read markup rather than my own
+comment.
+
+**Verified:** 5 tests, four negative controls — a version literal reintroduced, a manifest made to
+disagree, `corepack install` deleted, and the prompt suppression removed — each red on the right
+assertion, green on restore. The workflow was parsed with a real YAML parser to prove it still
+loads, and the extraction command was run for real rather than assumed: it prints `11.21.0`, which
+matches the local pnpm. Documented counts moved 925 -> 930 across four sites. Full gate exit 0.
+
 ### 2026-08-14 07:54 EDT — the element-id fallback is gone, and what it wrote is being removed
 
 **Runtime impact: nothing user-visible changes. Nineteen junk keys stop being written, and the ones
