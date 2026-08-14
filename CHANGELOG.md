@@ -24,13 +24,69 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-14
 
+### 2026-08-14 16:24 EDT — The OBS/XSplit ingest contract, read rather than designed
+
+**Runtime impact: none. Nothing built, deliberately** — and the reason is in the last line of the
+spec: a panel that hands a presenter a link to nowhere is exactly the dead control this repository
+refuses to ship.
+
+The owner's requirement is that a presenter can stream from the BROWSER (works today) **and from OBS
+/ XSplit**, both at the best quality and lowest latency achievable. The whole contract for the second
+half is now written down at `apps/room/docs/OBS-XSPLIT-INGEST.md`, every value read at a cited byte
+offset, with the two places the evidence stops marked as gaps rather than filled in.
+
+**The URLs are not guesses** (bytes 2157950 and 2169850):
+
+```
+http://{streamServerMTX}:8889/room__{sessionID}__{name}/whip
+rtmp://{streamServerMTX}/room__{sessionID}__{name}
+```
+
+with the key from `invokeAdminCmd('getRTMPToken') -> {rtmpToken}`, and `name` sanitised by
+`replace(/[^a-zA-Z0-9_-]/g, '_')` and THEN `encodeURIComponent` — both, in that order, because the
+sanitiser is what stops a display name creating a second path segment.
+
+**`streamServerMTX` is a different global from `streamServer`.** MediaMTX is its own host in the
+reference too, which is the separate media tier row H has been arguing for on other grounds.
+
+**Latency decides the protocol split, so it is not an arbitrary pair of radio buttons.** WHIP is
+WebRTC end to end, sub-second, native in OBS since v30 — that is the quality path, and the reason
+`useMediaMTX` exists at all. RTMP is TCP with buffering, but ingesting H.264 and republishing over
+WebRTC WITHOUT transcoding stays near a second; XSplit is RTMP-centric, so that path is what makes
+XSplit work. MediaMTX serves both and does not transcode when the codecs already align.
+
+**Four rows, one deployment.** `setRecPreview` (row X), `stopRecMsg` (row AC), server-side remux (row
+R's row 10) and this ingest panel (row AD) all become reachable the moment a MediaMTX host exists,
+and none can be reached before it.
+
+**Two corrections of my own, both inside two hours.** I first claimed the reference "publishes to
+MediaMTX over WHIP" — inference from two strings in one bundle. I then "corrected" that to WHIP having
+nothing to do with MediaMTX. Both were wrong: `O(1, e.useMTX ? -1 : 1)` shows `useMediaMTX` is exactly
+what switches OBS ingest from RTMP to WHIP. The owner pointed at the feature I had walked past twice.
+
 ### 2026-08-14 16:12 EDT — X, AC and R row 10 are one decision, and it is not "build a recorder"
 
 **Runtime impact: none.** Three rows re-characterised from the bundle, because all three named their
 blocker wrongly and that wrong name made the work look bigger and vaguer than it is.
 
+> **CORRECTION, 16:20 EDT, before this entry was an hour old.** The paragraph below originally said
+> the reference "publishes to MediaMTX over **WHIP**". That was INFERENCE from two strings sitting in
+> the same bundle, and reading them disproved it: every `WHIP` occurrence is the OBS-ingest panel —
+> *"If you want to stream directly from OBS into this room, you can use the following interface to
+> get your WHIP streaming link"*, with Start/Stop WHIP Streaming buttons (byte 2142400). It is a
+> different feature.
+>
+> What the MTX path actually does is narrower and it makes the conclusion stronger, not weaker:
+> `mtxStartStream` and `mtxStopStream` are SERVER→client notifications. The room pushes each into
+> `mtxStreams` and renders it as a stream TAB (`selectStreamTabOfId`, byte 1137850). **The client
+> never publishes to MediaMTX at all** — it observes streams the server already holds and asks the
+> server to record them. So there is no client-side publish to write, and the entire feature is
+> server-side infrastructure. How a stream reaches MediaMTX in the first place is NOT established by
+> the client bundle and is not claimed here.
+
 **Every recording row said "server-side recording", which reads as something to be BUILT.** It is
-not. The reference publishes to **MediaMTX** over **WHIP** and lets that server do the recording:
+not built from scratch either — the reference hands recording to **MediaMTX**, an off-the-shelf
+media server:
 
 ```js
 this.useMTX = this.globals.sessData.useMediaMTX;      // byte 1115350
