@@ -24,6 +24,35 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-14
 
+### 2026-08-14 14:12 EDT — Register cleared to what is genuinely blocked; TODO pruned
+
+**Runtime impact: none.** Bookkeeping, recorded because the register had stopped telling the truth
+about itself.
+
+**Five closed rows removed from `TODO.md` rather than struck through**, which is that file's own
+rule — "if a section here is not something somebody still has to DO, it does not belong". Each was
+checked against this file before deletion rather than trusted from memory: **Z** (the unbounded chat
+and alert reads), **Z2** (the alert-question tenancy leak, both directions), **X2** (the extra chat
+column), **AB** (the chat mode control) and **AA** (closed 2026-08-12). Ten rows remain.
+
+**Row X is finished at twelve of thirteen.** The thirteenth,
+`app-recording-preview-window`, is blocked on architecture and that is now proven from the bundle
+rather than assumed — see the 14:00 entry.
+
+**None of the ten remaining rows is blocked on effort.** Four wait on an owner decision (the login
+page, the Postgres host, production topology, and part of the screenshare work), two on an
+environment this machine does not have (a live WordPress, and `apps/room/.env`), one lives in
+`services/**` which is a mirror and would be lost on the next sync, and three need server-side
+recording, which `MEDIASOUP-DEPLOYMENT-PLAN.md` defers. That distinction is written into the table
+so the next person does not re-derive it.
+
+**Branch state at this stamp.** `fix/green-the-gate` carries the five features that landed before
+midday and is **PR #20 — green, mergeable, full gate exit 0**, untouched since. `feat/extra-chat-column`
+carries the second chat column, its mention routing, the `hideChat` collapse and the
+visibility-change work: room **1066 tests across 90 files**, `svelte-check` 0 errors. Its PR is
+deliberately not opened yet, because it branches off #20 and its diff will not read cleanly until #20
+lands.
+
 ### 2026-08-14 14:00 EDT — A hidden tab stops re-reading the room
 
 **Runtime impact: yes, for anyone who turns it on.** `visibilityChangeEnabled` was one of the dead
