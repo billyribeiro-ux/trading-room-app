@@ -24,6 +24,53 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-14
 
+### 2026-08-14 10:07 EDT — "Bring everyone here" now brings everyone
+
+**Runtime impact: a presenter can move the room to a screen. The menu item existed and moved nobody.**
+
+Seventh dead control, and the first that needed a **server command** rather than a wire.
+
+`bringEveryoneToScreen` set `forcedScreenId` locally under this comment:
+
+> Presenter-only. Forcing it for everyone else needs the media signalling channel, which is not
+> wired yet; locally it at least moves this presenter to the screen they chose.
+
+**Honest, and wrong about the mechanism — therefore wrong about the blocker.** The reference does not
+use the media channel:
+`bringFocusToScreen(e) { e && this.appService.sendServerAdminCommand("focusOnScreen", {id: e}) }`.
+It is a SERVER command, and this room has carried server commands on the `cmds` channel since
+`remotePresCommand` was built. Nothing was missing except the action.
+
+**The authority lives on the server, and that is the one assertion here that is not about fidelity.**
+A client that asked every other client to change screens, and was believed, is the shape of the
+2026-08-07 privilege escalation. The role is read from the session; `requireRoomShortCode` scopes the
+broadcast so a presenter of one room cannot move another. Both have negative controls — deleting the
+403 and taking the room from the request each go red.
+
+**A separate action, not another `presenterCommand` subCmd.** That was the tempting move and it would
+have meant loosening a real check: `presenterCommand` validates `Number.isInteger(targetUserId)`
+because every command it carries names a PERSON. This one names a SCREEN. Two payload shapes, two
+validations — asserted, so nobody merges them later.
+
+**The loop guard is structural rather than a boolean.** Upstream it is the `i` parameter of
+`onScreenShareTabChange(e, i = !0)`, passed false for programmatic changes. Here
+`selectScreenTabByUser` is the only path that broadcasts and `selectScreenTabOfId` — every
+programmatic caller, including the one that receives this very command — does not. A boolean would
+let a future caller opt into broadcasting by forgetting an argument. The negative control that makes
+the programmatic path broadcast goes red.
+
+**Receiving honours the lock.** The handler calls `selectScreenTabOfId`, which respects
+`lockedScreenId`, so a member who deliberately locked a screen is not dragged off it.
+
+**And the preference:** `presenter-follow-my-screens` -> `makeUsersFollowMyScreens`, seeded `=== true`
+because the blob ships `makeUsersFollowMyScreens:!1` (byte 980006) — a presenter who has never
+touched it should not be moving the room by clicking their own tabs.
+
+**Verified:** 10 new tests, three negative controls (403 deleted, room taken from the request,
+programmatic path broadcasting) each red on the right assertion and green on restore. Room suite
+**845 tests / 77 files**, `svelte-check` 0 errors, prettier clean. The pinned counts went red again
+and were updated deliberately: 13 mapped -> 14, 12 unmapped -> 11. Row X down to eleven.
+
 ### 2026-08-14 09:49 EDT — chat "always scroll to bottom" wired; two of my own tests were decoration
 
 **Runtime impact: the chat checkbox now works.** Sixth dead control repaired.

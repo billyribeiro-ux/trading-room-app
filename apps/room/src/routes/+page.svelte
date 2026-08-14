@@ -569,15 +569,41 @@
     popout.close();
   }
 
+  /**
+   * A tab the USER clicked, as opposed to `selectScreenTabOfId`, which is every programmatic path.
+   *
+   * That split is the reference's `i` parameter made structural: `onScreenShareTabChange(e, i = !0)`
+   * broadcasts only when `i`, and callers pass false when the change came from a command. Keeping
+   * two functions instead of a boolean means a new programmatic caller cannot accidentally opt into
+   * broadcasting by forgetting an argument.
+   */
+  function selectScreenTabByUser(screenId: string) {
+    selectedScreenTab = screenId;
+    if (isPresenter && makeUsersFollowMyScreens) bringEveryoneToScreen(screenId);
+  }
+
   function toggleLockScreen(screenId: string) {
     lockedScreenId = lockedScreenId === screenId ? null : screenId;
   }
 
   function bringEveryoneToScreen(screenId: string) {
-    // Presenter-only. Forcing it for everyone else needs the media signalling channel, which is
-    // not wired yet; locally it at least moves this presenter to the screen they chose.
+    /*
+      `bringFocusToScreen(e) { e && this.appService.sendServerAdminCommand("focusOnScreen", {id: e}) }`.
+      This used to move only the presenter, with a comment saying the broadcast "needs the media
+      signalling channel, which is not wired yet". It does not need that channel: the reference
+      sends a SERVER command, and the room already carries server commands on the `cmds` channel —
+      the same one `remotePresCommand` uses.
+
+      The local move stays and happens FIRST, so the presenter's own view responds to their click
+      without waiting for a round trip. The server re-checks that the caller is a presenter and
+      scopes the broadcast to their room, so authority is decided there rather than here.
+    */
     forcedScreenId = screenId;
     selectedScreenTab = screenId;
+    if (!isPresenter) return;
+    const body = new FormData();
+    body.set('screenId', screenId);
+    void fetch('?/focusOnScreen', { method: 'POST', body });
   }
 
   function stopSharedScreen(screenId: string) {
@@ -672,6 +698,19 @@
    * PERSISTED, unlike `saveData`: `chatAlwaysScrollToBottomChange` calls
    * `setPreference('alwaysScrollToBottom', …)` (byte 2246247).
    */
+  /**
+   * `preferences.makeUsersFollowMyScreens` — when this presenter changes screen tab, take the room
+   * with them.
+   *
+   * `i && globals.isPresenter && preferences.makeUsersFollowMyScreens && this.bringFocusToScreen(…)`
+   * at the end of `onScreenShareTabChange` (`main.d6d3c112b59b7d0d.js` byte 1967413). `i` defaults
+   * true and is passed false for programmatic changes, which is the loop guard: receiving a focus
+   * command must not send one back.
+   *
+   * `=== true` — the blob ships `makeUsersFollowMyScreens:!1` (byte 980006). A presenter who has
+   * never touched it should not be dragging the room around by clicking their own tabs.
+   */
+  let makeUsersFollowMyScreens = $state(loadedSettings.makeUsersFollowMyScreens === true);
   let alwaysScrollToBottom = $state(loadedSettings.alwaysScrollToBottom === true);
   let recordingStartSound = $state(loadedSettings.recordingStartSound !== false);
   let recordingStopSound = $state(loadedSettings.recordingStopSound !== false);
@@ -2965,6 +3004,7 @@
       if (key === 'pushToTalk') pushToTalk = value;
       if (key === 'doSpeechReco') doSpeechReco = value;
       if (key === 'alwaysScrollToBottom') alwaysScrollToBottom = value;
+      if (key === 'makeUsersFollowMyScreens') makeUsersFollowMyScreens = value;
       /*
         Both halves, because this preference has TWO controls: the navbar's
         `presentation-subtitles` checkbox and the settings modal's `app-speech-reco-overlay`. The
@@ -6144,6 +6184,8 @@
               give?: boolean;
               /** `playMP3ForAll`'s payload: `{url}`. Room-wide, so it carries no target. */
               url?: string;
+              /** `focusOnScreen` — the producer id of the screen to move to. */
+              screenId?: string;
             }
           | undefined;
 
@@ -6270,6 +6312,20 @@
         if (command?.cmd === 'stopMp3ForAll') {
           mp3Url = null;
           mp3Playing = false;
+          return;
+        }
+
+        if (command?.cmd === 'focusOnScreen') {
+          /*
+            A presenter pulled the room to a screen. `selectScreenTabOfId` rather than assigning
+            `selectedScreenTab`, because it HONOURS THE LOCK — a member who has locked a screen is
+            not dragged off it, which is the same rule `addRemoteScreen` relies on.
+
+            No re-broadcast from here. Upstream that guard is the `i` parameter of
+            `onScreenShareTabChange(e, i = !0)`, which callers pass false for programmatic changes;
+            here the equivalent is simply that only the user-initiated tab click broadcasts.
+          */
+          if (typeof command.screenId === 'string') selectScreenTabOfId(command.screenId);
           return;
         }
 
@@ -9722,7 +9778,7 @@
                       {forcedScreenId}
                       {lockedScreenId}
                       {isPresenter}
-                      onselect={(id) => (selectedScreenTab = id)}
+                      onselect={selectScreenTabByUser}
                       ondetach={detachScreen}
                       ontogglelock={toggleLockScreen}
                       onbringeveryone={bringEveryoneToScreen}

@@ -1677,6 +1677,43 @@ export const actions: Actions = {
   },
 
   /**
+   * `focusOnScreen` — a presenter pulls the whole room to one screen.
+   *
+   * `bringFocusToScreen(e) { e && this.appService.sendServerAdminCommand("focusOnScreen", {id: e}) }`
+   * (`main.d6d3c112b59b7d0d.js` byte 1918706 for the menu item, and the method itself). It is a
+   * SERVER command upstream, and it has to be one here too: the room learns about it over the same
+   * `cmds` channel every other broadcast uses, and the authority to send it belongs to the server.
+   *
+   * A separate action rather than another `presenterCommand` subCmd, deliberately. That action
+   * validates `Number.isInteger(targetUserId)` because every command it carries names a PERSON;
+   * this one names a SCREEN, so folding it in would mean loosening a check that currently rejects
+   * anything without an integer target. Two payload shapes, two validations.
+   *
+   * The presenter check is made here, from the session's own role, and is not asserted by the
+   * client — the 2026-08-07 privilege escalation was exactly that mistake. `requireRoomShortCode`
+   * scopes the broadcast to the caller's own room, so a presenter of room A cannot move room B.
+   */
+  focusOnScreen: async ({ request, locals }) => {
+    ensureDatabase();
+    const isPresenter =
+      requireUser(locals).role === 'staff' || requireUser(locals).role === 'admin';
+    if (!isPresenter) return fail(403);
+
+    const data = await request.formData();
+    const screenId = String(data.get('screenId') ?? '').trim();
+    /* `e &&` — the reference sends nothing for an empty id, and an empty broadcast would ask every
+       client to focus a screen that does not exist. */
+    if (!screenId) return fail(400, { message: 'No screen.' });
+
+    publishToRoom(requireRoomShortCode(locals), {
+      channel: 'cmds',
+      data: { cmd: 'focusOnScreen', screenId }
+    });
+
+    return { success: true };
+  },
+
+  /**
    * `giveMicScreen` — a presenter hands a member mic and screenshare, or takes them back.
    *
    * Transcribed from `docs/source/main.d6d3c112b59b7d0d.js` offset 2075481, where it sits on the

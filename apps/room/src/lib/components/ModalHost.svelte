@@ -1218,6 +1218,7 @@
       'presenter-speech-recognition': 'doSpeechReco',
       'app-speech-reco-overlay': 'showSpeechRecoOverlay',
       'chat-always-scroll': 'alwaysScrollToBottom',
+      'presenter-follow-my-screens': 'makeUsersFollowMyScreens',
       'app-disable-video': 'disableVideo'
     };
     /*

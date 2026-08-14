@@ -84,6 +84,12 @@ const WIRES = [
     preference: 'alwaysScrollToBottom',
     handler: 'chatAlwaysScrollToBottomChange',
     assignment: "if (key === 'alwaysScrollToBottom') alwaysScrollToBottom = value;"
+  },
+  {
+    id: 'presenter-follow-my-screens',
+    preference: 'makeUsersFollowMyScreens',
+    handler: 'makeUsersFollowMyScreensOnChange',
+    assignment: "if (key === 'makeUsersFollowMyScreens') makeUsersFollowMyScreens = value;"
   }
 ] as const;
 
@@ -138,14 +144,15 @@ describe('the wire has no silent break points', () => {
 
   it('the four counts the CHANGELOG states are the ones in the source', () => {
     /*
-      26 reach the handler, 1 returns early, **13 are mapped, 12 are unmapped** with no consumer —
+      26 reach the handler, 1 returns early, **14 are mapped, 11 are unmapped** with no consumer —
       and the dead list is 19, which answers a DIFFERENT question: every id that could have been
       written as junk, i.e. the 26 minus the 6 mapped before this work minus the early-returning
       one. The dead list does NOT shrink as wires are added: `chat-always-scroll` is mapped now, but
       the junk it wrote under its element id before that is still in people's blobs.
 
-      Was 12 mapped / 13 unmapped until `chat-always-scroll` -> `alwaysScrollToBottom` landed. This
-      assertion went red on that change, which is the point of pinning it.
+      Was 12/13, then 13/12 when `chat-always-scroll` landed, now 14/11 with
+      `presenter-follow-my-screens`. This assertion has gone red on every one of those and been
+      updated deliberately each time, which is the point of pinning it.
 
       Pinned because I gave two wrong counts writing this up — fifteen, then fourteen — by counting
       `app-disable-video`, which was already reaching `savePreference` by its raw id, and
@@ -157,8 +164,8 @@ describe('the wire has no silent break points', () => {
     const mapped = (table.match(/': '/g) ?? []).length;
 
     expect(reaching).toBe(26);
-    expect(mapped).toBe(13);
-    expect(reaching - 1 - mapped).toBe(12);
+    expect(mapped).toBe(14);
+    expect(reaching - 1 - mapped).toBe(11);
     expect(DEAD_PREFERENCE_KEYS).toHaveLength(reaching - 1 - 6);
   });
 
