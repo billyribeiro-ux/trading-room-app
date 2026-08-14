@@ -1,0 +1,106 @@
+# MediaMTX for the Streams tab — ingest (WHIP/RTMP) and playback (HLS).
+#
+# Render this OUTSIDE Git, replace every <angle-bracket> placeholder, and install it at
+# /etc/tradingroom-mediamtx/mediamtx.yml. Do not commit a rendered copy: it carries the hook secret.
+#
+# Every key below is quoted from the upstream default config of the pinned release. Keys NOT listed
+# here keep their upstream defaults, and the ones deliberately left at their default are called out
+# where that default is load-bearing.
+
+###############################################
+# Authentication — every publish AND every read is asked about.
+
+authMethod: http
+authHTTPAddress: https://<controller-host>/internal/media-auth
+
+# LEFT AT THE UPSTREAM DEFAULT ON PURPOSE, and it must not be edited to add `read`.
+#
+#   authHTTPExclude:
+#     - action: api
+#     - action: metrics
+#     - action: pprof
+#
+# Excluding `api` is what lets the room poll /v3/paths/list without a token, which is safe because
+# the API is bound to loopback below. The controller's /internal/media-auth refuses `api`, `metrics`
+# and `pprof` anyway, so if this exclusion were ever removed the API would be DENIED rather than
+# opened — two layers, failing the same direction.
+#
+# ⛔ NEVER add `- action: read`. An earlier draft of this deployment recommended exactly that, and it
+# would have served every room's video to anyone who could guess a path. Playback is authenticated:
+# the room hands each session an `mtxToken` and hls.js spends it as `?jwt=` on the playlist.
+
+###############################################
+# Control API — the room polls this to reconcile the stream list.
+
+api: yes
+# LOOPBACK ONLY. The upstream default is `:9997`, which binds every interface; this must not be
+# left at that value, because the API can create and delete paths. The room reaches it over
+# loopback via MEDIA_API_URL, and Caddy never proxies it.
+apiAddress: 127.0.0.1:9997
+
+###############################################
+# Ingest.
+
+# WHIP/WebRTC. 8889 is the port in the reference's own ingest URL.
+webrtc: yes
+webrtcAddress: :8889
+# WebRTC needs a UDP media path as well as the HTTP handshake port. This is the ICE listener, and
+# UDP/8189 must be open in the firewall or a WHIP publish completes its handshake and sends nothing.
+webrtcLocalUDPAddress: :8189
+# The server has to tell clients an address they can actually reach. On a host behind NAT the
+# interface addresses are private, so name the public one explicitly.
+webrtcAdditionalHosts: [<STATIC_PUBLIC_IPV4>]
+
+# RTMP, standard port, which is why the reference's rtmp:// URL carries none.
+rtmp: yes
+rtmpAddress: :1935
+
+###############################################
+# Playback — HLS, served to Caddy on loopback and reaching browsers on 443.
+
+hls: yes
+# Loopback: Caddy terminates TLS and is the only thing that talks to this.
+hlsAddress: 127.0.0.1:8888
+hlsVariant: lowLatency
+hlsAlwaysRemux: yes
+# CORS. The plural is not a typo — the upstream key is `hlsAllowOrigins`, an ARRAY.
+# The room fetches the playlist from a DIFFERENT origin than the page, so without the room's origin
+# here every playback fails in the browser with a CORS error and nothing in MediaMTX logs a problem.
+# Named explicitly rather than left at the upstream `["*"]`.
+hlsAllowOrigins: ["https://<room-host>"]
+
+###############################################
+# Everything unused is OFF. Deny by default applies to listeners too.
+
+rtsp: no
+srt: no
+metrics: no
+pprof: no
+playback: no
+
+###############################################
+# Paths.
+
+paths:
+  # One path per presenter per room, named room__<shortCode>__<name> by the controller's
+  # `ingestPathFor`. The regex is anchored so nothing outside that shape is servable.
+  '~^room__[A-Za-z0-9_-]+__[A-Za-z0-9_-]+$':
+    # Tell the ROOM when a stream goes live and when it stops, so it can raise mtxStartStream /
+    # mtxStopStream immediately instead of waiting for the next reconcile.
+    #
+    # These are the CURRENT hook names. runOnReady/runOnNotReady were renamed and no longer exist.
+    #
+    # The hook is the FAST path, not the correct one: this is a shell command with no retry and no
+    # delivery guarantee, and it reaches only the room instance it lands on. The room's reconcile
+    # against /v3/paths/list is what keeps the list true. If these two lines were deleted the
+    # feature would still work, just up to one interval slower.
+    runOnAvailable: >
+      curl -sS -m 5 -X POST https://<room-host>/internal/media-hook
+      -H "authorization: Bearer $MEDIA_HOOK_SECRET"
+      -H 'content-type: application/json'
+      -d "{\"event\":\"available\",\"path\":\"$MTX_PATH\"}"
+    runOnUnavailable: >
+      curl -sS -m 5 -X POST https://<room-host>/internal/media-hook
+      -H "authorization: Bearer $MEDIA_HOOK_SECRET"
+      -H 'content-type: application/json'
+      -d "{\"event\":\"unavailable\",\"path\":\"$MTX_PATH\"}"

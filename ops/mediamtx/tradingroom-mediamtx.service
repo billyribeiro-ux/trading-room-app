@@ -1,0 +1,38 @@
+[Unit]
+Description=Trading Room MediaMTX (WHIP/RTMP ingest, HLS playback)
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+EnvironmentFile=/etc/tradingroom-mediamtx/mediamtx.env
+EnvironmentFile=/etc/tradingroom-mediamtx/mediamtx-image.env
+ExecStartPre=-/usr/bin/docker rm -f tradingroom-mediamtx
+# --network host because WebRTC/ICE needs a wide UDP range and a predictable announced address;
+# port-mapping ICE through Docker's NAT is the classic cause of "handshake succeeds, no media".
+# The config binds the API and HLS to 127.0.0.1 itself, so host networking does not expose them.
+ExecStart=/usr/bin/docker run --name tradingroom-mediamtx \
+  --network host \
+  --env-file /etc/tradingroom-mediamtx/mediamtx.env \
+  -v /etc/tradingroom-mediamtx/mediamtx.yml:/mediamtx.yml:ro \
+  --read-only \
+  --tmpfs /tmp:rw,noexec,nosuid,nodev,size=64m \
+  --cap-drop ALL \
+  --security-opt no-new-privileges:true \
+  --pids-limit 512 \
+  --ulimit nofile=65536:65536 \
+  --log-driver json-file --log-opt max-size=10m --log-opt max-file=3 \
+  --stop-timeout 30 \
+  ${MEDIAMTX_IMAGE}
+ExecStop=/usr/bin/docker stop --time 30 tradingroom-mediamtx
+ExecStopPost=-/usr/bin/docker rm -f tradingroom-mediamtx
+Restart=always
+RestartSec=5
+TimeoutStartSec=0
+TimeoutStopSec=45
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

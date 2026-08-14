@@ -1,0 +1,34 @@
+{
+	admin off
+	servers {
+		protocols h1 h2
+	}
+}
+
+# TLS for the PLAYBACK path only. Ingest does not come through here: WHIP is 8889 and RTMP is 1935,
+# both spoken directly to MediaMTX by the encoder.
+{$MEDIA_STREAM_HOSTNAME} {
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "no-referrer"
+		-Server
+	}
+
+	# HLS. Everything under a room path, and nothing else.
+	#
+	# The `?jwt=` query string is what authorises the read, and reverse_proxy forwards the query
+	# untouched — MediaMTX passes it to /internal/media-auth as the `query` field, which is where
+	# the controller reads `jwt` from. A rewrite that dropped the query would make every playback
+	# 401 with no obvious cause.
+	@room path_regexp ^/room__[A-Za-z0-9_-]+__[A-Za-z0-9_-]+/
+	handle @room {
+		reverse_proxy 127.0.0.1:8888
+	}
+
+	# The control API is NOT proxied. It listens on loopback and it can create and delete paths;
+	# the room reaches it over loopback, and nothing from the internet may.
+	handle {
+		respond 404
+	}
+}
