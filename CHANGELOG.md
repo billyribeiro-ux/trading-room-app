@@ -24,6 +24,54 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-14
 
+### 2026-08-14 10:20 EDT — row X finished: 13 checkboxes settled, 5 wired, 8 are features
+
+**Every one of the thirteen has been settled by evidence.** Not "looked at" — each has a specific
+locator that decides it, recorded in row X so nobody repeats the search.
+
+**Two more wires closed here**, and they were hiding in plain sight: the presenter tab's
+Do-not-disturb pair. The reference binds them to `alertSoundOnChange()` and `chatSoundOnChange()` —
+**the same handlers its main tab uses** (`app-user-settings-modal.full.js` @16827, inputs 177 and
+179). They are second controls for `alertSoundOn` / `chatSoundOn`, both of which already have live
+consumers here. Two mapping rows, nothing else.
+
+**The final tally for row X:**
+
+| wired (5) | why it was possible |
+| --- | --- |
+| `chat-always-scroll` | the consumer was already in `room-scroller.ts` |
+| `presenter-follow-my-screens` | needed a `focusOnScreen` server command — which also fixed "Bring everyone here", a menu item that had never brought anyone |
+| `chat-gif-donot-disturb` | the muted-gif placeholder, captured in two halves |
+| `presenter-alert-donot-disturb` | second control for `alertSoundOn` |
+| `presenter-chat-donot-disturb` | second control for `chatSoundOn` |
+
+| feature / parked (8) | what settles it |
+| --- | --- |
+| `extra-chat-column` | 42 reference sites — a second channel with its own log, search, pagination |
+| `chat-badges-donot-disturb` | unfed at three levels; **badges never render for anyone** |
+| `small-image-preview` | seeded from a room setting we do not carry |
+| `chat-mem-clear` | no chat-log trim exists; the only `.slice(-N)` is caption history |
+| `app-recording-preview-window` | we hold the captured CSS and no component |
+| `presenter-enable-rte` | needs summernote AND `sessData.enableRTE`; we have the webfonts, no editor |
+| `chat-popup-donot-disturb` | a toast plus a browser `Notification`; no "Message from" exists here |
+| `visibility-change-enabled` | **parked** — item AA: gating our SSE roster on it makes a hidden tab poll forever |
+
+**What the exercise was actually worth.** The row began as "thirteen checkboxes with no consumer in
+this room". Five had consumers — one already implemented verbatim under a different name, one behind
+a mechanism the code's own comment had described wrongly, and two that were simply duplicate
+controls for preferences that already worked. **Nearly 40% of a list I had written myself was wrong
+in the direction of "this is bigger than it is."** The habit that found them was not clever: search
+for what the preference DOES, never for its name.
+
+And the most valuable single finding came from a checkbox I could NOT close — chat badges never
+render, which no amount of wiring would have fixed and which nobody had noticed because the
+component implements it perfectly.
+
+**Verified:** the pinned counts moved 15 -> 17 mapped, 10 -> 8 unmapped and were updated
+deliberately, as on every wire. Negative control: dropping one of the two new mappings goes red on
+both the wire assertion and the count. Room suite **866 tests / 78 files**, `svelte-check` 0 errors,
+prettier clean.
+
 ### 2026-08-14 10:13 EDT — muted gifs; and the discovery that chat badges never render at all
 
 **Runtime impact: the gif checkbox works.** Eighth dead control. But the bigger finding is one I was
