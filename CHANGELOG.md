@@ -24,6 +24,69 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-14
 
+### 2026-08-14 09:33 EDT — item W built: the switch that stops the stream, not just hides it
+
+**Runtime impact: a member on cellular can now stop screen video being FETCHED.** The control
+existed and did nothing.
+
+**Fifth dead control in two days.** `ModalHost.svelte` already rendered the AV settings modal's
+"Disable Video (saves bandwidth)" link, backed by `let avVideoDisabled = $state(false)` that was read
+only by its own title and label. Zero occurrences in `+page.svelte`. Rule 1 caught it before a line
+was written — the plan had said "build the control", and the control was already there.
+
+**What `saveData` actually is, and why a lazier port would have been worthless.** It is not a
+visibility toggle. Upstream `callScreenOfUserWEBRTC` opens with
+`this.saveData ? P("callScreenOfUserWEBRTC saveData on.. nop...") : (…)`
+(`main.d6d3c112b59b7d0d.js` byte 1132193), so **the consumer is never created and no screen stream
+is requested**. The `Video Disabled` h3 and the hidden `<video>` are only what the viewer sees. A
+port that bound the class and stopped there would look identical on screen and save nothing — which
+is why the test that guards the consume gate is labelled "THE POINT".
+
+**Where it landed:**
+
+- `ModalHost` gives up ownership: `saveData` is a prop, `onSaveDataChange` the callback, matching
+  the `doNotDisturbOn` convention already in that component.
+- `+page.svelte` owns the flag, unpersisted — the writer is
+  `toggleDisableVideo(){this.saveData=!this.saveData}` (byte 1136736) and it calls no
+  `setPreference`, so it lasts the session.
+- `addRemoteScreen` gates the consume **after** the tab is added, deliberately: upstream the
+  screenshare view still renders, and that is where the message lives. Skipping the tab would hide
+  that a presenter is sharing at all, which is not what the switch claims to do.
+- Skipped producers are retained in `deferredScreens` and fetched when video is re-enabled. The
+  reference re-consumes by another route — selecting a tab calls `startWatchingScreenOf` — which
+  this room has no equivalent of, because it consumes on producer ARRIVAL. Without the retention, a
+  viewer who turned video back on would see nothing until the presenter restarted their share. Item
+  V records the same retention problem for per-presenter mute.
+- `ScreenPane` renders `<h3 class="mt-4 text-center">Video Disabled</h3>` — const 1 of
+  `app-screenshare-view`, whose class order is the OPPOSITE of the presentation area's const 23
+  (`text-center mt-4`). Two h3s, two orders; the wrong one would have been a silent mismatch.
+
+**Reproduced faithfully, including something that looks like a bug:** turning it ON does not tear
+down consumers that already exist. `saveData` is read in exactly three places upstream and none of
+them closes a consumer, so a screen already being watched keeps arriving and is merely hidden.
+Stated in the code rather than silently "improved", because it reads as an oversight until you have
+checked all three sites.
+
+**One deliberate divergence:** the reference's `title` is static — const 13 is
+`["title","Disable Video",…]` — so upstream the tooltip still says "Disable Video" while video is
+already off. Ours flips. A tooltip contradicting its own label is an upstream slip, and reproducing
+it would only mislead a screen reader; same call already taken for `aria-selected` in `ScreenTabs`.
+
+**An existing test went red and was right to.** `screen-volume-contract.test.ts` pinned
+`class:hidden={stream === null}` with a comment saying `saveData` was unmodelled. It is modelled
+now, so the assertion moved to two terms — the binding getting more faithful, not the test getting
+looser.
+
+**My own check was wrong first, for the fourth time today.** The positional test searched the whole
+file for `session.consume(info)` and found the one in `setSaveData`, which is defined ABOVE
+`addRemoteScreen`. Scoped to the function body now, with the reason written beside it.
+
+**Verified:** 10 new tests. Four negative controls — the consume gate deleted while leaving the h3
+and class intact (the silent-failure shape), the modal reverted to owning its flag, `saveData`
+dropped from the hidden binding, and the re-consume removed — each red on the right assertion, green
+on restore. Room suite **825 tests / 76 files**, `svelte-check` 0 errors, `svelte-autofixer` clean on
+`ScreenPane` with zero suggestions, prettier clean. TODO row W removed rather than struck through.
+
 ### 2026-08-14 09:24 EDT — docs squared away before Tier 1 starts
 
 Bookkeeping, recorded because the next entry will be a feature and the state it starts from should

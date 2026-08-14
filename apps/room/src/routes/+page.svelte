@@ -3231,6 +3231,65 @@
    * immediately, and the stream is filled in when it arrives - a tab with no picture is honest,
    * a picture with no tab is unreachable.
    */
+  /**
+   * `mediaService.saveData` — "Disable Video (saves bandwidth)", from the AV settings modal.
+   *
+   * DISTINCT from `videoDisabled` above, which is `preferences.disableVideo` from the USER settings
+   * modal and swaps the screens and streams panes for a message. Both exist upstream, each with its
+   * own control, and the original row in `TODO.md` conflated them. This one is the media-layer
+   * switch, and it does something the pane preference does not: upstream
+   * `callScreenOfUserWEBRTC` opens with
+   * `this.saveData ? P("callScreenOfUserWEBRTC saveData on.. nop...") : (…)`
+   * (`main.d6d3c112b59b7d0d.js` byte 1132193), so **the consumer is never created and no screen
+   * stream is requested at all**. The `Video Disabled` h3 and the hidden `<video>` are only what the
+   * viewer sees; the bandwidth saving is that nothing is fetched.
+   *
+   * Not persisted, matching the reference: the writer is
+   * `toggleDisableVideo(){this.saveData=!this.saveData}` (byte 1136736) on the media service, which
+   * calls no `setPreference`. It lasts the session.
+   */
+  let saveData = $state(false);
+
+  /**
+   * Screens whose stream was NOT fetched because `saveData` was on when they arrived.
+   *
+   * The reference re-consumes by a different route — selecting a tab calls
+   * `startWatchScreenOf` -> `mediaService.startWatchingScreenOf`, so turning video back on and
+   * clicking a tab re-requests it. This room consumes on producer ARRIVAL instead, so without
+   * keeping the `ProducerInfo` a viewer who re-enabled video would see nothing until the presenter
+   * happened to restart their share.
+   *
+   * A plain `Map`, not `SvelteMap`: nothing renders from it. It is bounded by the number of screens
+   * in the room, and every entry is removed the moment it is consumed.
+   */
+  const deferredScreens = new Map<string, ProducerInfo>();
+
+  /**
+   * The one place `saveData` changes, so the re-consume cannot be forgotten at a second call site.
+   *
+   * Turning it ON does NOT tear down consumers that already exist, and that is the reference's
+   * behaviour rather than an oversight on our part: `saveData` is read in exactly three places
+   * upstream — `callScreenOfUserWEBRTC`, the `hidden` class and the `Video Disabled` h3 — and none
+   * of them closes a consumer. So a screen already being watched keeps arriving and is hidden,
+   * while screens that arrive AFTER the switch are never fetched. Stating it plainly because it
+   * looks like a bug until you have read all three sites.
+   */
+  async function setSaveData(enabled: boolean) {
+    saveData = enabled;
+    if (enabled || deferredScreens.size === 0) return;
+    /* `sessionReady` resolves to void — it is a barrier, not a handle. The session lives in
+       `mediaSession`, which `restartMediaSession` sets to null while it rebuilds, so it is read
+       AFTER the await rather than before. */
+    await sessionReady;
+    const session = mediaSession;
+    if (!session) return;
+    for (const [producerId, info] of [...deferredScreens]) {
+      deferredScreens.delete(producerId);
+      const remote = await session.consume(info);
+      if (remote) screenStreams.set(producerId, remote.stream);
+    }
+  }
+
   async function addRemoteScreen(session: MediaSession, info: ProducerInfo) {
     const share = info.appData as { share?: unknown; screenName?: unknown } | null;
     if (info.kind !== 'video' || share?.share !== true) return;
@@ -3269,6 +3328,20 @@
     // starts talking has one - and without it a member sitting on Notes never learns a screen
     // exists. `selectScreenTabOfId` honours the lock, so a forced screen still cannot be stolen.
     selectScreenTabOfId(info.producerId);
+
+    /*
+      The gate, and it sits AFTER the tab is added on purpose. Upstream `saveData` stops
+      `callScreenOfUserWEBRTC` from creating the consumer, but the screenshare view still renders —
+      that is where the `Video Disabled` h3 lives — so the tab must exist for there to be anything
+      to show. Skipping the tab as well would hide the fact that a presenter is sharing at all,
+      which is not what the switch says it does.
+
+      The `ProducerInfo` is kept so re-enabling can fetch it; see `setSaveData`.
+    */
+    if (saveData) {
+      deferredScreens.set(info.producerId, info);
+      return;
+    }
 
     const remote = await session.consume(info);
     // `consume` returns null when this producer is already being consumed, which is the dedupe the
@@ -9697,6 +9770,7 @@
                           {zoomLevel}
                           pan={screenPans.get(screen.id) ?? NEUTRAL_PAN}
                           detached={detachedScreenId !== null}
+                          {saveData}
                           onpan={(x, y) => screenPans.set(screen.id, { x, y })}
                           ontogglezoom={togglePanZoom}
                           onzoomin={panZoomIn}
@@ -10407,6 +10481,8 @@
       onAlertTab={(tab) => (alertTab = tab)}
       onTheme={setTheme}
       onPreferenceChange={savePreference}
+      {saveData}
+      onSaveDataChange={setSaveData}
       onDoNotDisturbChange={(enabled) => (doNotDisturbOn = enabled)}
       onPlayYoutube={playYoutubeForAll}
       onPostAlert={postAlert}
