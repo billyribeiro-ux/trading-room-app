@@ -348,3 +348,50 @@ With the variable blank the panel is honest about it and the endpoints still wor
 minted, rotated and validated, and `stream-ingest.db.test.ts` exercises all three. What cannot be
 done without the host is an end-to-end publish from a real encoder, which is the one piece of
 evidence this feature is not yet able to produce.
+
+---
+
+## 10. Live capture, 2026-08-14 — what it confirmed and what it could not reach
+
+Three runs of `apps/room/scripts/mtx-collect.js` against the live `chat.protradingroom.com`, two
+different rooms, ~9 minutes total. All three ran to completion and downloaded.
+
+### Confirmed against the live app
+
+| finding | value |
+| --- | --- |
+| room URL shape | `https://chat.protradingroom.com/?id=<24-hex>` — the session id is a Mongo ObjectId, not the short code. A second room carried `&sl=1`. |
+| the Streams area is real | `#streams-tab`, labelled **"Streams"** — the `presAreaTabs-streams` main tab from `app-presentationarea.full.js`, present in the live DOM. |
+| the empty state renders | `noOneStreaming: true` — *"No one is streaming right now…"* is what the live room shows with no MTX stream. Confirms the transcription target in §6. |
+| the OBS link elements are ABSENT when unconfigured | `#streaming-link-rtmp`, `#streaming-link` and `#stream-whip-key` do not exist in the DOM at all. Confirms both blocks are gated, not merely hidden. |
+| `appService.globals` is NOT on `window` | Production does not expose it. Anything we want from globals has to come off the wire. |
+| webcam elements | `#webcamVideo-` (`.webcamsHolderVideo`), `#webcamScreenLocalPreview` (`.webcamPreviewScreen`). |
+
+### Not reached, and why — stated rather than worked around
+
+**No `mtxStartStream`, `mtxStopStream` or `getSessionMTXMediaState` frame was captured**, so the real
+`muser` payload is still un-observed. Three independent reasons, and it is not yet known which
+dominate:
+
+1. **Nothing was streaming.** Both rooms showed the empty state throughout, and every `<video>` had
+   `readyState: 0` with no `currentSrc`. There was nothing to notify about.
+2. **The runs were from a phone** (Pixel 9, mobile Chrome). An OBS publish could not be started from
+   the capturing device.
+3. **A defect in the collector, owned here rather than reported as a finding about their app.**
+   `recordFrame` only stores frames matching an MTX regex, so `frames: 0` cannot distinguish "the
+   hook worked and the room was quiet" from "the hook never saw a frame at all" — which is what
+   would happen if the app uses socket.io HTTP long-polling rather than a WebSocket. The script
+   needs a total-frames counter and an XHR/fetch hook before another run is worth doing.
+
+### What a useful capture requires
+
+A **desktop** browser, in a room with **`useMediaMTX` on**, with an **actual OBS/XSplit publish**
+running during the window. Absent any one of those there is nothing to observe, and further runs
+would produce more empty files rather than more knowledge.
+
+### What this does NOT block
+
+Nothing. The client contract in §1-§6 is read from the bundle and is complete: the three server
+commands and their payload keys, the `muser` fields the views consume, the HLS URL, and the whole
+hls.js configuration. The capture is confirmation, not a dependency. What it would add is the real
+`rtmpToken` format and the real `muser` values — useful, not load-bearing.
