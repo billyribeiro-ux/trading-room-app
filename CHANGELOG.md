@@ -24,6 +24,44 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-14
 
+### 2026-08-14 11:27 EDT — small-image-preview closed by evidence: its class styles nothing
+
+**No code, and that is the finding.** The checkbox does nothing upstream either.
+
+`smallImagePreview` applies exactly one thing: `B1e = t => ({'chat-uploaded-img-sm': t})`, bound as
+`ngClass(ut(12, B1e, preferences.smallImagePreview && preferences.defaultImagePreview))` on the chat
+log container (`app-chat.full.js:5`).
+
+**`chat-uploaded-img-sm` has no rule in any of the 52 stylesheets this repository holds** — 46
+component sheets, the shipped `styles.d622cb9ed2bbc221.css`, and our own three. It appears in four
+files and every one of them is a JavaScript class-map. The search was proved against
+`chat-gif-muted`, a class known to be styled, which it finds in CSS immediately — so the absence is
+about the class, not about the search.
+
+The nearest real rule targets a **different class and a different mechanism**:
+
+```css
+.alert-chat-box-sm .chat-uploaded-img .uploaded-img { max-height: 50px !important }
+```
+
+driven by a size mode on an ancestor, not by this preference. There IS a small-image behaviour in
+the reference; this checkbox is not what turns it on.
+
+**So it stays unwired, deliberately.** Wiring it would ship "a `.flipped` class with no CSS", which
+this repository forbids by name, and inventing the rule would be worse — a colour picked because it
+looked right is the failure that rule exists for. Pinned by an assertion, with a negative control
+that wires it and goes red, so neither happens by accident later.
+
+**One correction on the way.** That assertion first checked the id was absent from the whole
+component and failed on `settingChecks`, where it correctly appears as a default — the checkbox
+still renders and still remembers its own position, it simply persists nothing. Scoped to the
+mapping table.
+
+This is the third item closed by evidence rather than by code, after `calculateDuplicates` (zero
+call sites) and the `.alert-chat-box` hover (a selector matching nothing). Room X down to four.
+
+**Verified:** room suite 920 tests / 82 files, `svelte-check` 0 errors.
+
 ### 2026-08-14 11:21 EDT — chat-log trimming, and an unbounded read it exposed
 
 **Runtime impact: the chat view is bounded at 300 messages when the preference is on.** Eleventh

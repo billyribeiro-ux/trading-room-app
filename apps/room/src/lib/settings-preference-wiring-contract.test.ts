@@ -329,6 +329,39 @@ describe('the wire has no silent break points', () => {
     );
   });
 
+  it('small-image-preview stays UNWIRED, because its class has no rule anywhere', () => {
+    /*
+      Closed by evidence on 2026-08-14 with no code, which is a real outcome and not a deferral.
+
+      `smallImagePreview` applies exactly one thing upstream:
+      `B1e = t => ({'chat-uploaded-img-sm': t})`, bound as
+      `ngClass(ut(12, B1e, preferences.smallImagePreview && preferences.defaultImagePreview))`
+      on the chat log container (`app-chat.full.js:5`).
+
+      `chat-uploaded-img-sm` has NO RULE in any of the 52 stylesheets this repository holds — 46
+      component sheets, the shipped `styles.d622cb9ed2bbc221.css`, and our own. It appears in four
+      files and every one is a JavaScript class-map. The search was proved against
+      `chat-gif-muted`, a class we know is styled, which it finds in the CSS immediately.
+
+      The nearest real rule targets a DIFFERENT class and a different mechanism:
+      `.alert-chat-box-sm .chat-uploaded-img .uploaded-img { max-height: 50px !important }` — driven
+      by a size mode on an ancestor, not by this preference.
+
+      So the checkbox toggles a class that styles nothing, upstream as well as here. Wiring it would
+      ship "a `.flipped` class with no CSS", which this repository forbids by name, and inventing the
+      rule would be worse. Asserted so that neither happens by accident.
+    */
+    expect(pageCode).not.toContain('chat-uploaded-img-sm');
+    /*
+      Scoped to the MAPPING TABLE. The first version of this asserted the id was absent from the
+      whole component and failed on `settingChecks`, where it correctly appears as a default — the
+      checkbox still renders and still remembers its own position, it simply persists nothing.
+    */
+    const table = /const preferenceKeyByInputId[\s\S]*?\n    \};/.exec(modalCode)?.[0] ?? '';
+    expect(table, 'the mapping table must be findable').not.toBe('');
+    expect(table).not.toContain('small-image-preview');
+  });
+
   it('the consumers the wires feed are still there', () => {
     // If a consumer is deleted, the assignment above becomes dead and this file should say so.
     expect(pageCode).toContain('pushToTalkShouldUnmute(event, { pushToTalk, micMuted })');
