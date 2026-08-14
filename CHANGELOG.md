@@ -22,6 +22,1825 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ---
 
+## 2026-08-14
+
+### 2026-08-14 07:06 EDT — T5-28 was already built; what was missing was a test
+
+**Runtime impact: none** — one new test file. No markup changed.
+
+Went to build the badges table's double-click ID reveal and found it already there:
+`+page.svelte:904` carries `ondblclick={() => (showBadgeID = !showBadgeID)}` on the Badge header,
+`:171` starts it false exactly as `ng-init="showBadgeID=false"` does, `:937-939` renders
+`&nbsp;&nbsp;({badge.id})` with the reference's two non-breaking spaces and parentheses, and the chip
+takes the image class only for image badges.
+
+**The register said "OPEN — NOT YET BUILT". It was wrong, and this is the THIRD time today** — after
+T2-18, whose whole ad-server console was wired to three real form actions, and T5-25, whose endpoint
+had ten green tests. All three came from describing a gap after reading the reference without
+checking our own implementation. Rule 1 in `docs/reference/working-rules.md` is the four-place check
+that would have caught every one.
+
+**What WAS missing is a test, and that is not a small distinction.** `showBadgeID` is client state
+that SSR always renders false, so a server render is identical whether the reveal works or has been
+deleted. That is the exact blind spot that let the Select All revert pass 780 green tests yesterday.
+`badge-row-reveal.test.ts` guards it at source level: the toggle is `ondblclick` and not `onclick`
+(a click would make an easter egg an ordinary control — all three of the reference's reveals are
+double-click or a counter), the id keeps its two nbsp and parentheses, the image class is
+conditional, and **we do not reproduce the reference's `{{[b.name]}}` array interpolation**, which
+prints `["Gold"]` with brackets and quotes.
+
+That last assertion cuts against matching: it exists so a later pass comparing character by character
+does not "restore" a bug.
+
+**The documented-count verifier caught me again**, and correctly: adding 8 tests moved the suite
+917 -> 925 and 87 -> 88 files, which four documents record. All four updated, Scope: 2 of 3 workspace projects
+apps/controller test$ pnpm run schema:verify && pnpm run backend:migrations:verify && pnpm run backend:release:verify && pnpm run evidence:verify && pnpm run privacy:verify && pnpm run breakpoints:verify && pnpm run manage:styles && pnpm run account:contract && pnpm run home:contract && pnpm run fonts:verify && pnpm run room-login:contract && pnpm run runtime:http && pnpm run test:unit && node scripts/verify-documented-test-counts.mjs --report .vitest-report.json
+apps/room test$ pnpm privacy:verify && pnpm schema:verify && vitest run
+apps/room test: $ node scripts/verify-privacy-boundary.mjs
+apps/controller test: $ node scripts/verify-room-settings-schema.mjs
+apps/room test: [privacy] 80 baselined finding(s) are gone — run --update to shrink the baseline:
+apps/room test:   gravatar alert-section/1.html
+apps/room test:   gravatar alert-section/2.html
+apps/room test:   gravatar alert-section/3.html
+apps/room test:   gravatar app-message-modal/app-st-message-1
+apps/room test:   gravatar app-message-modal/app-st-message-2
+apps/room test:   gravatar app-message-modal/app-st-message-3
+apps/room test:   gravatar app-message-modal/app-st-message-4
+apps/room test:   gravatar app-room/app-room-file.clean.html
+apps/room test:   gravatar app-room/app-room-file.txt
+apps/room test:   gravatar app-room/app-room-scroller
+apps/room test: [privacy] PASS no new personal data; 95 baselined finding(s) across 359 tracked and untracked files
+apps/controller test: room-settings schema verified: 268 extracted + 1 reviewed deviation = 269 total; 49 wired
+apps/room test: $ node scripts/verify-postgres-schema-artifacts.mjs
+apps/room test: PostgreSQL schema evidence contract: PASS
+apps/room test: - Canonical artifacts: 1,960 / 290 / 2,814 lines; SHA-256 exact
+apps/room test: - Inventory: 24 tables, 317 public columns, 167 constraints, 93 indexes
+apps/room test: - Security: 20 FORCE+ENABLE RLS tables; 19 tenant policies + 1 PM exception
+apps/room test: - Functions: 5 SECURITY DEFINER helpers pinned and safely ordered in RECREATE
+apps/room test: - Runtime roles/grants: ptr_clone_app remains NOBYPASSRLS with exact table/function grants
+apps/room test: - Restore boundary: raw SCHEMA-FULL ordering trap preserved and detected
+apps/controller test: $ node scripts/verify-backend.mjs --migrations-only && node scripts/verify-backend-provenance.mjs
+apps/controller test: [backend:check] PASS migration integrity: 9 pinned migrations (4 imported + 5 reviewed forward), baseline c8baed853578437e18de0fae3406bfa1ee2791b2e625db8d13e2b72a51ac27d9
+apps/controller test: [backend:provenance] PASS 98 imported (88 untouched + 10 diverged, each pinned) + 1 authored here; paths 66ab4696e3d3685daaa5ba27e28137a1cc038a71a32fcf92d30bdd144f35ecef; manifest 9e5fe0a6c5ae0d8fad3eeed7baadf6aac48cccc94ab1ac2796c4983a949bc9e0; 3 documented-count site(s) agree
+apps/controller test: $ node scripts/verify-api-release-artifact.mjs --verify-contract
+apps/room test: The `config.alias` option is deprecated, and will be removed in a future version of SvelteKit. Use subpath imports instead: https://svelte.dev/docs/kit/$lib
+apps/controller test: [backend:release-artifact] source, tool-pin, and policy contract passed
+apps/room test:  RUN  v4.1.10 /Users/billyribeiro/Desktop/trading-room-app/apps/room
+apps/controller test: $ node scripts/verify-evidence-layout.mjs
+apps/controller test: Evidence archive layout verified
+apps/controller test: $ node scripts/verify-privacy-boundary.mjs
+apps/controller test: Tracked privacy boundary verified
+apps/room test:  Test Files  73 passed (73)
+apps/room test:       Tests  775 passed (775)
+apps/room test:    Start at  07:08:45
+apps/room test:    Duration  1.83s (transform 6.77s, setup 1.38s, import 15.12s, tests 1.72s, environment 3.10s)
+apps/room test: Done
+apps/controller test: $ node scripts/verify-breakpoints.mjs
+apps/controller test: Breakpoint contract verified from /Users/billyribeiro/Desktop/trading-room-app/apps/controller/
+apps/controller test: $ node scripts/verify-manage-styles.mjs
+apps/controller test: manage.css vs capture: 59 declarations compared against 18637 pinned facts from 8827 nodes
+apps/controller test: no divergence between a declared value and its measurement, and every declared border can paint
+apps/controller test: $ node scripts/verify-account-contract.mjs
+apps/controller test: Authenticated account source contract verified
+apps/controller test: $ node scripts/verify-home-contract.mjs
+apps/controller test: Home surface contract passed: no raster imagery, pinned animation stack, copy-deck anchors with all 7 verbatim quotes, motion/SSR safety, dedicated chrome, accessibility floor, consent contract, and footer links.
+apps/controller test: $ node scripts/verify-font-contract.mjs
+apps/controller test: Font contract verified: exact Roboto v51/300 binary, room-login weight 700, licensed local delivery, pnpm SSOT, and pinned FA4/FA5 assets
+apps/controller test: $ node scripts/verify-room-login-contract.mjs
+apps/controller test: Authenticated room-login identity and typography contract verified
+apps/controller test: $ node scripts/verify-public-preview-http.mjs
+apps/controller test: Control-plane HTTP contracts verified: marketing fails closed, postgres mode demands a connection string, and the account flow works
+apps/controller test: $ vitest run --coverage --reporter=default --reporter=json --outputFile=.vitest-report.json
+apps/controller test: The `config.alias` option is deprecated, and will be removed in a future version of SvelteKit. Use subpath imports instead: https://svelte.dev/docs/kit/$lib
+apps/controller test: (!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+apps/controller test:   - import "./kit.config" without a file extension (vite.config.ts:2:27). Add the file extension
+apps/controller test: Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+apps/controller test:  RUN  v4.1.10 /Users/billyribeiro/Desktop/trading-room-app/apps/controller
+apps/controller test:       Coverage enabled with v8
+apps/controller test:  ✓ src/lib/server/admin-guard-contract.test.ts (7 tests) 5ms
+apps/controller test:  ✓ src/lib/server/control-plane-policy.test.ts (28 tests) 16ms
+apps/controller test:  ✓ src/lib/server/sso-token.test.ts (23 tests) 6ms
+apps/controller test:  ✓ src/lib/settings-help-shape.test.ts (9 tests) 7ms
+apps/controller test:  ✓ src/lib/room-config.test.ts (13 tests) 8ms
+apps/controller test:  ✓ src/lib/room-config-boundary.test.ts (17 tests) 7ms
+apps/controller test: stderr | src/lib/server/fcm.test.ts > classifying what FCM says > calls an UNREGISTERED registration unregistered, which is the only thing that licenses pruning
+apps/controller test: [fcm] send refused {
+apps/controller test:   status: 404,
+apps/controller test:   googleStatus: 'NOT_FOUND',
+apps/controller test:   errorCode: 'UNREGISTERED',
+apps/controller test:   body: '{"error":{"status":"NOT_FOUND","details":[{"errorCode":"UNREGISTERED"}]}}'
+apps/controller test: }
+apps/controller test: stderr | src/lib/server/fcm.test.ts > classifying what FCM says > calls a malformed token invalid, separately from a dead one
+apps/controller test: [fcm] send refused {
+apps/controller test:   status: 400,
+apps/controller test:   googleStatus: 'INVALID_ARGUMENT',
+apps/controller test:   errorCode: 'INVALID_ARGUMENT',
+apps/controller test:   body: '{"error":{"status":"INVALID_ARGUMENT","details":[{"errorCode":"INVALID_ARGUMENT"}]}}'
+apps/controller test: }
+apps/controller test: stderr | src/lib/server/fcm.test.ts > classifying what FCM says > does NOT call a quota or server error unregistered
+apps/controller test: [fcm] send refused {
+apps/controller test:   status: 429,
+apps/controller test:   googleStatus: 'RESOURCE_EXHAUSTED',
+apps/controller test:   errorCode: '',
+apps/controller test:   body: '{"error":{"status":"RESOURCE_EXHAUSTED"}}'
+apps/controller test: }
+apps/controller test: stderr | src/lib/server/fcm.test.ts > classifying what FCM says > does NOT call a quota or server error unregistered
+apps/controller test: [fcm] send refused {
+apps/controller test:   status: 503,
+apps/controller test:   googleStatus: '',
+apps/controller test:   errorCode: '',
+apps/controller test:   body: '<html>unavailable</html>'
+apps/controller test: }
+apps/controller test:  ✓ src/lib/room-entry.test.ts (28 tests) 5ms
+apps/controller test:  ✓ src/lib/setting-help-shape-contract.test.ts (14 tests) 6ms
+apps/controller test:  ✓ src/lib/emoji-picker-contract.test.ts (8 tests) 45ms
+apps/controller test:  ✓ src/lib/server/fcm.test.ts (15 tests) 31ms
+apps/controller test:  ✓ src/lib/api-post-routes-docs.test.ts (10 tests) 38ms
+apps/controller test:  ✓ src/lib/server/email-verification.test.ts (20 tests) 7ms
+apps/controller test:  ✓ src/lib/server/member-email.test.ts (13 tests) 5ms
+apps/controller test:  ✓ src/lib/server/member-push.test.ts (15 tests) 8ms
+apps/controller test:  ✓ src/lib/dont-touch-block.test.ts (24 tests) 6ms
+apps/controller test:  ✓ src/lib/rects-completion-proof.test.ts (7 tests) 6ms
+apps/controller test:  ✓ src/lib/server/recaptcha.test.ts (13 tests) 6ms
+apps/controller test:  ✓ src/lib/user-row-contract.test.ts (22 tests) 4ms
+apps/controller test:  ✓ src/lib/export-format-contract.test.ts (18 tests) 5ms
+apps/controller test:  ✓ src/lib/stats-export-contract.test.ts (15 tests) 5ms
+apps/controller test:  ✓ src/lib/server/room-handoff.test.ts (17 tests) 5ms
+apps/controller test:  ✓ src/lib/server/password-reset.test.ts (16 tests) 4ms
+apps/controller test:  ✓ src/lib/manage-panel-bootstrap3-contract.test.ts (9 tests) 5ms
+apps/controller test:  ✓ src/lib/sso-boundary.test.ts (15 tests) 4ms
+apps/controller test:  ✓ src/lib/manage-tab-strip.test.ts (5 tests) 5ms
+apps/controller test:  ✓ src/lib/server/sso-wordpress-contract.test.ts (16 tests) 5ms
+apps/controller test:  ✓ src/lib/account-actions-contract.test.ts (24 tests) 3ms
+apps/controller test:  ✓ src/lib/api-key-undecryptable.test.ts (5 tests) 4ms
+apps/controller test:  ✓ src/lib/server/api-key-secret.test.ts (5 tests) 4ms
+apps/controller test:  ✓ src/lib/room-settings-profile.test.ts (11 tests) 5ms
+apps/controller test:  ✓ src/lib/admin-users-row.test.ts (11 tests) 4ms
+apps/controller test:  ✓ src/lib/table-striping-contract.test.ts (9 tests) 5ms
+apps/controller test: stderr | src/lib/server/superadmin.test.ts > the guard > answers 404 for an anonymous visitor
+apps/controller test: [admin] refused {
+apps/controller test:   userId: null,
+apps/controller test:   authenticated: false,
+apps/controller test:   held: 'none',
+apps/controller test:   needed: 'read-only',
+apps/controller test:   configuredAdmins: 1
+apps/controller test: }
+apps/controller test: stderr | src/lib/server/superadmin.test.ts > the guard > answers 404 for a signed-in user who is not on the list
+apps/controller test: [admin] refused {
+apps/controller test:   userId: 7,
+apps/controller test:   authenticated: true,
+apps/controller test:   held: 'none',
+apps/controller test:   needed: 'read-only',
+apps/controller test:   configuredAdmins: 1
+apps/controller test: }
+apps/controller test: stderr | src/lib/server/superadmin.test.ts > the guard > answers 404 for everyone when no superadmin is configured
+apps/controller test: [admin] refused {
+apps/controller test:   userId: 7,
+apps/controller test:   authenticated: true,
+apps/controller test:   held: 'none',
+apps/controller test:   needed: 'read-only',
+apps/controller test:   configuredAdmins: 0
+apps/controller test: }
+apps/controller test: stderr | src/lib/server/superadmin.test.ts > operator roles > drops an entry with an unknown role rather than defaulting it to full
+apps/controller test: [admin] ignoring an allow-list entry with an unknown role { role: 'suport' }
+apps/controller test:  ✓ src/lib/server/db/migrator.test.ts (7 tests) 4ms
+apps/controller test:  ✓ src/lib/server/superadmin.test.ts (15 tests) 431ms
+apps/controller test:      ✓ nobody, when the list is unset or blank  412ms
+apps/controller test:  ✓ src/lib/row-actions-exist.test.ts (40 tests) 3ms
+apps/controller test:  ✓ src/lib/manage-action-scope.test.ts (13 tests) 3ms
+apps/controller test:  ✓ src/lib/focus-date-field.test.ts (6 tests) 3ms
+apps/controller test:  ✓ src/lib/server/sso-entitlement.test.ts (15 tests) 4ms
+apps/controller test:  ✓ scripts/privacy-utils.test.mjs (8 tests) 4ms
+apps/controller test:  ✓ src/lib/server/sanitize-html.test.ts (12 tests) 4ms
+apps/controller test:  ✓ src/lib/server/mobile-pairing.test.ts (11 tests) 4ms
+apps/controller test:  ✓ src/lib/app-pair-contract.test.ts (10 tests) 3ms
+apps/controller test:  ✓ src/lib/last-login-format.test.ts (6 tests) 3ms
+apps/controller test:  ✓ src/lib/settings-row-gates.test.ts (7 tests) 3ms
+apps/controller test:  ✓ src/lib/reference-defects-not-reproduced.test.ts (4 tests) 3ms
+apps/controller test:  ✓ src/lib/features.test.ts (2 tests) 3ms
+apps/controller test:  ✓ src/lib/editable-display.test.ts (19 tests) 3ms
+apps/controller test:  ✓ src/lib/server/db/room-sessions-fk-contract.test.ts (5 tests) 3ms
+apps/controller test:  ✓ src/lib/server/rooms.test.ts (8 tests) 4ms
+apps/controller test:  ✓ src/lib/settings-schema-covers-template.test.ts (5 tests) 3ms
+apps/controller test:  ✓ src/lib/permissions-modal-contract.test.ts (8 tests) 3ms
+apps/controller test:  ✓ src/lib/manage-stats-row-contract.test.ts (6 tests) 3ms
+apps/controller test:  ✓ src/lib/tab-strip-conditions.test.ts (6 tests) 2ms
+apps/controller test:  ✓ src/lib/editable-hover-contract.test.ts (7 tests) 3ms
+apps/controller test:  ✓ src/lib/server/login-attempts.test.ts (3 tests) 3ms
+apps/controller test:  ✓ src/lib/badge-editor-contract.test.ts (5 tests) 3ms
+apps/controller test:  ✓ src/lib/mobile-filter-contract.test.ts (7 tests) 3ms
+apps/controller test:  ✓ src/lib/stripe-status.test.ts (6 tests) 2ms
+apps/controller test:  ✓ src/lib/password-reset-pages.test.ts (14 tests) 7ms
+apps/controller test:  ✓ src/lib/manage-form-errors.test.ts (5 tests) 3ms
+apps/controller test:  ✓ src/lib/account-sessions-filter.test.ts (10 tests) 3ms
+apps/controller test:  ✓ src/lib/account-new-room-reveal.test.ts (5 tests) 5ms
+apps/controller test:  ✓ src/lib/account-form-errors.test.ts (5 tests) 6ms
+apps/controller test:  ✓ src/lib/room-url-identity.test.ts (6 tests) 6ms
+apps/controller test:  ✓ src/lib/account-empty-state.test.ts (3 tests) 6ms
+apps/controller test:  ✓ src/lib/account-page-render.test.ts (7 tests) 7ms
+apps/controller test: stdout | src/lib/account-page-sbs.test.ts > account page, side by side with the post-login dump > matches element for element
+apps/controller test: === account page — reference | ours ===
+apps/controller test:  !   0  div.center-block.mt-xl                                 | div.acc-inner
+apps/controller test:  !   1  div                                                    | h4.acc-h4
+apps/controller test:  !   2  div.app.ng-fadeInLeft2                                 | span.acc-clickable
+apps/controller test:  !   3  h4                                                     | div.acc-row
+apps/controller test:  !   4  span                                                   | div.col-md-4.acc-col-4.acc-panel
+apps/controller test:  !   5  div.row                                                | input.acc-input.acc-search
+apps/controller test:  !   6  div.col-md-4.panel.pane-default                        | button.acc-btn.acc-btn-sm.acc-btn-default
+apps/controller test:  !   7  input.form-control                                     | span
+apps/controller test:  !   8  button.btn.btn-sm.btn-default                          | div.acc-row-block
+apps/controller test:  !   9  span                                                   | div.col-md-12.acc-panel
+apps/controller test:  !  10  div.row                                                | div.acc-table-responsive
+apps/controller test:  !  11  div.col-md-12.panel.pane-default                       | table.acc-table
+apps/controller test:  !  12  div.table-responsive                                   | thead
+apps/controller test:  !  13  table.table.table-striped.table-bordered.table-hover   | tr
+apps/controller test:  !  14  thead                                                  | th
+apps/controller test:  !  15  tr                                                     | i.fa.fa-sort-alpha-asc.acc-sort-icon
+apps/controller test:  !  16  th                                                     | th.acc-th-center
+apps/controller test:  !  17  div.icon.fa.fa-sort-alpha-asc                          | i.fa.fa-sort-alpha-asc.acc-sort-icon
+apps/controller test:  !  18  th.text-center                                         | th.acc-th-center
+apps/controller test:  !  19  div.icon.fa.fa-sort-alpha-asc                          | th.acc-th-center
+apps/controller test:  !  20  th.text-center                                         | th.acc-th-center
+apps/controller test:  !  21  th.text-center                                         | tbody
+apps/controller test:  !  22  th.text-center                                         | tr
+apps/controller test:  !  23  tbody                                                  | td
+apps/controller test:  !  24  tr                                                     | strong
+apps/controller test:     25  td                                                     | td
+apps/controller test:  !  26  strong                                                 | td.acc-td-center
+apps/controller test:  !  27  td                                                     | div.acc-label.acc-label-orange
+apps/controller test:  !  28  td.text-center                                         | td.acc-td-center
+apps/controller test:  !  29  div.label.label-orange                                 | div.acc-muted
+apps/controller test:  !  30  td.text-center                                         | td
+apps/controller test:  !  31  div.text-muted                                         | a.acc-btn.acc-btn-sm.acc-btn-info
+apps/controller test:  !  32  td                                                     | i.fa.fa-external-link
+apps/controller test:  !  33  a.btn.btn-sm.btn-info                                  | a.acc-btn.acc-btn-sm.acc-btn-inverse
+apps/controller test:  !  34  i.icon.fa.fa-external-link                             | i.fa.fa-cogs
+apps/controller test:  !  35  a.btn.btn-sm.btn-inverse                               | a.acc-btn.acc-btn-sm.acc-btn-default
+apps/controller test:  !  36  i.icon.fa.fa-cogs                                      | i.fa.fa-credit-card
+apps/controller test:  !  37  hr                                                     | button.acc-btn.acc-btn-sm.acc-btn-default
+apps/controller test:  !  38  h3                                                     | i.fa.fa-archive
+apps/controller test:  !  39  div.row                                                | input.acc-input
+apps/controller test:  !  40  div.col-md-9.panel.pane-default                        | button.acc-btn.acc-btn-warning.acc-mb.acc-btn-block
+apps/controller test:  !  41  a.btn.btn.btn-warning.mb                               | hr.acc-hr
+apps/controller test:  !  42  a.btn.btn-info.mb                                      | h3.acc-h3
+apps/controller test:  !  43  i.fa.fa-cloud-upload                                   | div.acc-row
+apps/controller test:  !  44  a.btn.btn.btn-default.mb                               | div.col-md-9.acc-panel
+apps/controller test:  !  45  div.table-responsive                                   | button.acc-btn.acc-btn-warning.acc-mb
+apps/controller test:  !  46  table.table.table-striped.table-bordered.table-hover   | button.acc-btn.acc-btn-info.acc-mb
+apps/controller test:  !  47  thead                                                  | i.fa.fa-cloud-upload
+apps/controller test:  !  48  tr                                                     | button.acc-btn.acc-btn-default.acc-mb
+apps/controller test:  !  49  th                                                     | div.acc-table-responsive
+apps/controller test:  !  50  th.text-center                                         | table.acc-table
+apps/controller test:  !  51  tbody                                                  | thead
+apps/controller test:     52  tr                                                     | tr
+apps/controller test:  !  53  td                                                     | th
+apps/controller test:  !  54  div.label.label-badge-img                              | th.acc-th-center
+apps/controller test:  !  55  img.user-badge-img                                     | tbody
+apps/controller test:  !  56  td                                                     | hr.acc-hr
+apps/controller test:  !  57  label                                                  | h3.acc-h3
+apps/controller test:  !  58  a                                                      | div.acc-row
+apps/controller test:  !  59  label                                                  | div.col-md-12.acc-panel
+apps/controller test:    … 58 more
+apps/controller test: account page: 116 of 118 differ (baseline 999)
+apps/controller test:  ✓ src/lib/account-page-sbs.test.ts (2 tests) 10ms
+apps/controller test:  ✓ src/lib/money.test.ts (20 tests) 1093ms
+apps/controller test:      ✓ is exact for every cent from $0.00 to $20,000.00, and matches the float path there  1088ms
+apps/controller test:  ✓ src/lib/manage-menu-stays-open.test.ts (4 tests) 2ms
+apps/controller test:  ✓ src/lib/evidence-gap-register-counts.test.ts (4 tests) 3ms
+apps/controller test:  ✓ src/lib/chrome.test.ts (13 tests) 2ms
+apps/controller test:  ✓ src/lib/badge-row-reveal.test.ts (8 tests) 2ms
+apps/controller test:  ✓ src/lib/api-key-session-restrictions.test.ts (9 tests) 3ms
+apps/controller test:  ✓ src/lib/room-member-role.test.ts (4 tests) 2ms
+apps/controller test:  ✓ src/lib/server/account-entitlements.test.ts (2 tests) 2ms
+apps/controller test:  ✓ src/lib/auth-modes.test.ts (7 tests) 2ms
+apps/controller test:  ✓ src/lib/badge-editor-labels.test.ts (5 tests) 2ms
+apps/controller test:  ✓ src/lib/error-reporting-contract.test.ts (2 tests) 2ms
+apps/controller test:  ✓ src/lib/manage-user-row-sbs.test.ts (3 tests) 12ms
+apps/controller test: stdout | src/lib/manage-user-table-sbs.test.ts > user table, side by side with the reference > matches element for element
+apps/controller test:    #    REFERENCE                                              | OURS
+apps/controller test:      0  table.table.table-striped                              | table.table.table-striped
+apps/controller test:      1  thead                                                  | thead
+apps/controller test:      2  tr                                                     | tr
+apps/controller test:      3  th                                                     | th
+apps/controller test:      4  «#»                                                    | «#»
+apps/controller test:      5  th                                                     | th
+apps/controller test:      6  «Name / Email»                                         | «Name / Email»
+apps/controller test:      7  th                                                     | th
+apps/controller test:      8  «Last Login/Notes»                                     | «Last Login/Notes»
+apps/controller test:      9  th                                                     | th
+apps/controller test:     10  «Role / Status»                                        | «Role / Status»
+apps/controller test:     11  th                                                     | th
+apps/controller test:     12  «Actions»                                              | «Actions»
+apps/controller test:     13  tbody                                                  | tbody
+apps/controller test:     14  tr                                                     | tr
+apps/controller test:     15  td                                                     | td
+apps/controller test:     16  «0»                                                    | «0»
+apps/controller test:     17  td                                                     | td
+apps/controller test:     18  img.thumb24                                            | img.thumb24
+apps/controller test:     19  br                                                     | br
+apps/controller test:     20  td                                                     | td
+apps/controller test:     21  td                                                     | td
+apps/controller test:     22  span                                                   | span
+apps/controller test:     23  «Owner»                                                | «Owner»
+apps/controller test:     24  td                                                     | td
+apps/controller test:     25  tr                                                     | tr
+apps/controller test:     26  td                                                     | td
+apps/controller test:     27  «1»                                                    | «1»
+apps/controller test:     28  td                                                     | td
+apps/controller test:     29  input                                                  | input
+apps/controller test:     30  img.thumb24                                            | img.thumb24
+apps/controller test:     31  «Billy Ribeiro»                                        | «Billy Ribeiro»
+apps/controller test:     32  br                                                     | br
+apps/controller test:     33  «willribeirodrums@icloud.com»                          | «willribeirodrums@icloud.com»
+apps/controller test:     34  span                                                   | span
+apps/controller test:     35  i.fa.fa-lock                                           | i.fa.fa-lock
+apps/controller test:     36  «PW set»                                               | «PW set»
+apps/controller test:     37  td                                                     | td
+apps/controller test:     38  «08/07/2026 @ 5:05PM»                                  | «08/07/2026 @ 5:05PM»
+apps/controller test:     39  td                                                     | td
+apps/controller test:     40  span                                                   | span
+apps/controller test:     41  «Presenter»                                            | «Presenter»
+apps/controller test:     42  span                                                   | span
+apps/controller test:  !  43  «/ manual»                                             | «/»
+apps/controller test:     44  td                                                     | td
+apps/controller test:     45  div.btn-group.mb-sm.mr                                 | div.btn-group.mb-sm.mr
+apps/controller test:     46  button.btn.dropdown-toggle.btn-primary                 | button.btn.dropdown-toggle.btn-primary
+apps/controller test:     47  «Actions»                                              | «Actions»
+apps/controller test:     48  span.caret                                             | span.caret
+apps/controller test:     49  ul.dropdown-menu.dropdown-menu-right                   | ul.dropdown-menu.dropdown-menu-right
+apps/controller test:     50  li.dropdown-submenu                                    | li.dropdown-submenu
+apps/controller test:     51  action                                                 | action
+apps/controller test:     52  i.fa.fa-shield                                         | i.fa.fa-shield
+apps/controller test:     53  «Permissions»                                          | «Permissions»
+apps/controller test:     54  i.fa.fa-caret-right.pull-right                         | i.fa.fa-caret-right.pull-right
+apps/controller test:     55  ul.dropdown-menu                                       | ul.dropdown-menu
+apps/controller test:     56  li                                                     | li
+apps/controller test:     57  action                                                 | action
+apps/controller test:     58  i.fa.fa-microphone                                     | i.fa.fa-microphone
+apps/controller test:     59  i.fa.fa-desktop                                        | i.fa.fa-desktop
+apps/controller test:     60  «Make Presenter»                                       | «Make Presenter»
+apps/controller test:     61  li                                                     | li
+apps/controller test:     62  action                                                 | action
+apps/controller test:     63  i.fa.fa-cog                                            | i.fa.fa-cog
+apps/controller test:     64  i.fa.fa-user-md                                        | i.fa.fa-user-md
+apps/controller test:     65  «Make Admin»                                           | «Make Admin»
+apps/controller test:     66  li                                                     | li
+apps/controller test:     67  action                                                 | action
+apps/controller test:     68  i.fa.fa-user                                           | i.fa.fa-user
+apps/controller test:     69  «Make Participant»                                     | «Make Participant»
+apps/controller test:     70  li                                                     | li
+apps/controller test:     71  action                                                 | action
+apps/controller test:     72  i.fa.fa-user                                           | i.fa.fa-user
+apps/controller test:     73  «Make Trial»                                           | «Make Trial»
+apps/controller test:     74  li                                                     | li
+apps/controller test:     75  action                                                 | action
+apps/controller test:     76  i.fa.fa-user-times                                     | i.fa.fa-user-times
+apps/controller test:     77  «MUTE Participant»                                     | «MUTE Participant»
+apps/controller test:     78  li                                                     | li
+apps/controller test:     79  action                                                 | action
+apps/controller test:     80  i.fa.fa-user-times                                     | i.fa.fa-user-times
+apps/controller test:     81  «BAN»                                                  | «BAN»
+apps/controller test:     82  li.divider                                             | li.divider
+apps/controller test:     83  li                                                     | li
+apps/controller test:     84  action                                                 | action
+apps/controller test:     85  i.fa.fa-user                                           | i.fa.fa-user
+apps/controller test:     86  «Unban»                                                | «Unban»
+apps/controller test:     87  li                                                     | li
+apps/controller test:     88  action                                                 | action
+apps/controller test:     89  i.fa.fa-clock-o                                        | i.fa.fa-clock-o
+apps/controller test:     90  «Freshen Login Date»                                   | «Freshen Login Date»
+apps/controller test:     91  li.dropdown-submenu                                    | li.dropdown-submenu
+apps/controller test:     92  action                                                 | action
+apps/controller test:     93  i.fa.fa-sliders                                        | i.fa.fa-sliders
+apps/controller test:     94  «Granular Perms»                                       | «Granular Perms»
+apps/controller test:     95  i.fa.fa-caret-right.pull-right                         | i.fa.fa-caret-right.pull-right
+apps/controller test:     96  ul.dropdown-menu                                       | ul.dropdown-menu
+apps/controller test:     97  li.divider                                             | li.divider
+apps/controller test:     98  li                                                     | li
+apps/controller test:     99  action                                                 | action
+apps/controller test:    100  i.fa.fa-user-circle                                    | i.fa.fa-user-circle
+apps/controller test:    101  «Show User Count»                                      | «Show User Count»
+apps/controller test:    102  li                                                     | li
+apps/controller test:    103  action                                                 | action
+apps/controller test:    104  i.fa.fa-user-circle                                    | i.fa.fa-user-circle
+apps/controller test:    105  «Hide User Count»                                      | «Hide User Count»
+apps/controller test:    106  li                                                     | li
+apps/controller test:    107  action                                                 | action
+apps/controller test:    108  i.fa.fa-hdd-o                                          | i.fa.fa-hdd-o
+apps/controller test:    109  «Deny Archives Access»                                 | «Deny Archives Access»
+apps/controller test:    110  li                                                     | li
+apps/controller test:    111  action                                                 | action
+apps/controller test:    112  i.fa.fa-lock                                           | i.fa.fa-lock
+apps/controller test:    113  «Hide Pers User Data»                                  | «Hide Pers User Data»
+apps/controller test:    114  li                                                     | li
+apps/controller test:    115  action                                                 | action
+apps/controller test:    116  i.fa.fa-user                                           | i.fa.fa-user
+apps/controller test:    117  «Don't Hide Pers User Data»                            | «Don't Hide Pers User Data»
+apps/controller test:    118  li.divider                                             | li.divider
+apps/controller test:    119  li                                                     | li
+apps/controller test:    120  action                                                 | action
+apps/controller test:    121  i.fa.fa-comment-o                                      | i.fa.fa-comment-o
+apps/controller test:    122  «Disallow User2User PM»                                | «Disallow User2User PM»
+apps/controller test:    123  li                                                     | li
+apps/controller test:    124  action                                                 | action
+apps/controller test:    125  i.fa.fa-comment-o                                      | i.fa.fa-comment-o
+apps/controller test:    126  «Allow User2User PM»                                   | «Allow User2User PM»
+apps/controller test:    127  li.divider                                             | li.divider
+apps/controller test:    128  li.dropdown-submenu                                    | li.dropdown-submenu
+apps/controller test:    129  action                                                 | action
+apps/controller test:    130  i.fa.fa-mobile                                         | i.fa.fa-mobile
+apps/controller test:    131  «App and Notifications»                                | «App and Notifications»
+apps/controller test:    132  i.fa.fa-caret-right.pull-right                         | i.fa.fa-caret-right.pull-right
+apps/controller test:    133  ul.dropdown-menu                                       | ul.dropdown-menu
+apps/controller test:    134  li                                                     | li
+apps/controller test:    135  action                                                 | action
+apps/controller test:    136  i.fa.fa-mobile                                         | i.fa.fa-mobile
+apps/controller test:    137  «Get App PIN»                                          | «Get App PIN»
+apps/controller test:    138  li                                                     | li
+apps/controller test:    139  action                                                 | action
+apps/controller test:    140  i.fa.fa-mobile                                         | i.fa.fa-mobile
+apps/controller test:    141  «Show App Tokens»                                      | «Show App Tokens»
+apps/controller test:    142  li                                                     | li
+apps/controller test:    143  action                                                 | action
+apps/controller test:    144  i.fa.fa-mobile                                         | i.fa.fa-mobile
+apps/controller test:    145  «Get FCM Tokens»                                       | «Get FCM Tokens»
+apps/controller test:    146  li.divider                                             | li.divider
+apps/controller test:    147  li                                                     | li
+apps/controller test:    148  action                                                 | action
+apps/controller test:    149  i.fa.fa-mobile                                         | i.fa.fa-mobile
+apps/controller test:    150  i.fa.fa.fa-bell-o                                      | i.fa.fa.fa-bell-o
+apps/controller test:    151  «PAUSE Mobile Notifs»                                  | «PAUSE Mobile Notifs»
+apps/controller test:    152  li                                                     | li
+apps/controller test:    153  action                                                 | action
+apps/controller test:    154  i.fa.fa-mobile                                         | i.fa.fa-mobile
+apps/controller test:    155  i.fa.fa-play                                           | i.fa.fa-play
+apps/controller test:    156  «RESUME Mobile Notifs»                                 | «RESUME Mobile Notifs»
+apps/controller test:    157  li                                                     | li
+apps/controller test:    158  action                                                 | action
+apps/controller test:    159  i.fa.fa-mobile                                         | i.fa.fa-mobile
+apps/controller test:    160  i.fa.fa-trash                                          | i.fa.fa-trash
+apps/controller test:    161  «Remove Mobile Notifs»                                 | «Remove Mobile Notifs»
+apps/controller test:    162  li                                                     | li
+apps/controller test:    163  action                                                 | action
+apps/controller test:    164  i.fa.fa-mobile                                         | i.fa.fa-mobile
+apps/controller test:    165  i.fa.fa.fa-bell-o                                      | i.fa.fa.fa-bell-o
+apps/controller test:    166  «Send Test Mobile Notifs»                              | «Send Test Mobile Notifs»
+apps/controller test:    167  li                                                     | li
+apps/controller test:    168  action                                                 | action
+apps/controller test:    169  i.fa.fa-mobile                                         | i.fa.fa-mobile
+apps/controller test:    170  i.fa.fa-reload                                         | i.fa.fa-reload
+apps/controller test:    171  «Reset Mobile Notifs»                                  | «Reset Mobile Notifs»
+apps/controller test:    172  li.dropdown-submenu                                    | li.dropdown-submenu
+apps/controller test:    173  action                                                 | action
+apps/controller test:    174  i.fa.fa-certificate                                    | i.fa.fa-certificate
+apps/controller test:    175  «Badges»                                               | «Badges»
+apps/controller test:    176  i.fa.fa-caret-right.pull-right                         | i.fa.fa-caret-right.pull-right
+apps/controller test:    177  ul.dropdown-menu                                       | ul.dropdown-menu
+apps/controller test:    178  li.divider                                             | li.divider
+apps/controller test:    179  li                                                     | li
+apps/controller test:    180  action                                                 | action
+apps/controller test:    181  i.fa.fa-pencil-square-o                                | i.fa.fa-pencil-square-o
+apps/controller test:    182  «Set Note»                                             | «Set Note»
+apps/controller test:    183  li                                                     | li
+apps/controller test:    184  action                                                 | action
+apps/controller test:    185  i.fa.fa-edit                                           | i.fa.fa-edit
+apps/controller test:    186  «Edit Username»                                        | «Edit Username»
+apps/controller test:    187  li                                                     | li
+apps/controller test:    188  action                                                 | action
+apps/controller test:    189  i.fa.fa-trash                                          | i.fa.fa-trash
+apps/controller test:    190  «Remove User»                                          | «Remove User»
+apps/controller test:    191  li.divider                                             | li.divider
+apps/controller test:    192  li                                                     | li
+apps/controller test:    193  action                                                 | action
+apps/controller test:    194  i.fa.fa-lock                                           | i.fa.fa-lock
+apps/controller test:    195  «Set/Change Password»                                  | «Set/Change Password»
+apps/controller test:    196  li                                                     | li
+apps/controller test:    197  action                                                 | action
+apps/controller test:    198  i.fa.fa-envelope                                       | i.fa.fa-envelope
+apps/controller test:    199  «Resend Welcome Email»                                 | «Resend Welcome Email»
+apps/controller test:    200  li.divider                                             | li.divider
+apps/controller test:    201  li                                                     | li
+apps/controller test:    202  action                                                 | action
+apps/controller test:    203  i.fa.fa-pause                                          | i.fa.fa-pause
+apps/controller test:    204  «Pause / Pending»                                      | «Pause / Pending»
+apps/controller test:    205  tr                                                     | tr
+apps/controller test:    206  td                                                     | td
+apps/controller test:    207  «2»                                                    | «2»
+apps/controller test:    208  td                                                     | td
+apps/controller test:    209  input                                                  | input
+apps/controller test:    210  img.thumb24                                            | img.thumb24
+apps/controller test:    211  «Welber Ribeiro»                                       | «Welber Ribeiro»
+apps/controller test:    212  br                                                     | br
+apps/controller test:    213  «willribeirodrums@gmail.com»                           | «willribeirodrums@gmail.com»
+apps/controller test:    214  span                                                   | span
+apps/controller test:    215  i.fa.fa-lock                                           | i.fa.fa-lock
+apps/controller test:    216  «PW set»                                               | «PW set»
+apps/controller test:    217  td                                                     | td
+apps/controller test:    218  td                                                     | td
+apps/controller test:    219  span                                                   | span
+apps/controller test:    220  «Presenter»                                            | «Presenter»
+apps/controller test:    221  span                                                   | span
+apps/controller test:  ! 222  «/ manual»                                             | «/»
+apps/controller test:    223  td                                                     | td
+apps/controller test:    224  div.btn-group.mb-sm.mr                                 | div.btn-group.mb-sm.mr
+apps/controller test:    225  button.btn.dropdown-toggle.btn-primary                 | button.btn.dropdown-toggle.btn-primary
+apps/controller test:    226  «Actions»                                              | «Actions»
+apps/controller test:    227  span.caret                                             | span.caret
+apps/controller test:    228  ul.dropdown-menu.dropdown-menu-right                   | ul.dropdown-menu.dropdown-menu-right
+apps/controller test:    229  li.dropdown-submenu                                    | li.dropdown-submenu
+apps/controller test:    230  action                                                 | action
+apps/controller test:    231  i.fa.fa-shield                                         | i.fa.fa-shield
+apps/controller test:    232  «Permissions»                                          | «Permissions»
+apps/controller test:    233  i.fa.fa-caret-right.pull-right                         | i.fa.fa-caret-right.pull-right
+apps/controller test:    234  ul.dropdown-menu                                       | ul.dropdown-menu
+apps/controller test:    235  li                                                     | li
+apps/controller test:    236  action                                                 | action
+apps/controller test:    237  i.fa.fa-microphone                                     | i.fa.fa-microphone
+apps/controller test:    238  i.fa.fa-desktop                                        | i.fa.fa-desktop
+apps/controller test:    239  «Make Presenter»                                       | «Make Presenter»
+apps/controller test:    240  li                                                     | li
+apps/controller test:    241  action                                                 | action
+apps/controller test:    242  i.fa.fa-cog                                            | i.fa.fa-cog
+apps/controller test:    243  i.fa.fa-user-md                                        | i.fa.fa-user-md
+apps/controller test:    244  «Make Admin»                                           | «Make Admin»
+apps/controller test:    245  li                                                     | li
+apps/controller test:    246  action                                                 | action
+apps/controller test:    247  i.fa.fa-user                                           | i.fa.fa-user
+apps/controller test:    248  «Make Participant»                                     | «Make Participant»
+apps/controller test:    249  li                                                     | li
+apps/controller test:    250  action                                                 | action
+apps/controller test:    251  i.fa.fa-user                                           | i.fa.fa-user
+apps/controller test:    252  «Make Trial»                                           | «Make Trial»
+apps/controller test:    253  li                                                     | li
+apps/controller test:    254  action                                                 | action
+apps/controller test:    255  i.fa.fa-user-times                                     | i.fa.fa-user-times
+apps/controller test:    256  «MUTE Participant»                                     | «MUTE Participant»
+apps/controller test:    257  li                                                     | li
+apps/controller test:    258  action                                                 | action
+apps/controller test:    259  i.fa.fa-user-times                                     | i.fa.fa-user-times
+apps/controller test:    260  «BAN»                                                  | «BAN»
+apps/controller test:    261  li.divider                                             | li.divider
+apps/controller test:    262  li                                                     | li
+apps/controller test:    263  action                                                 | action
+apps/controller test:    264  i.fa.fa-user                                           | i.fa.fa-user
+apps/controller test:    265  «Unban»                                                | «Unban»
+apps/controller test:    266  li                                                     | li
+apps/controller test:    267  action                                                 | action
+apps/controller test:    268  i.fa.fa-clock-o                                        | i.fa.fa-clock-o
+apps/controller test:    269  «Freshen Login Date»                                   | «Freshen Login Date»
+apps/controller test:    270  li.dropdown-submenu                                    | li.dropdown-submenu
+apps/controller test:    271  action                                                 | action
+apps/controller test:    272  i.fa.fa-sliders                                        | i.fa.fa-sliders
+apps/controller test:    273  «Granular Perms»                                       | «Granular Perms»
+apps/controller test:    274  i.fa.fa-caret-right.pull-right                         | i.fa.fa-caret-right.pull-right
+apps/controller test:    275  ul.dropdown-menu                                       | ul.dropdown-menu
+apps/controller test:    276  li.divider                                             | li.divider
+apps/controller test:    277  li                                                     | li
+apps/controller test:    278  action                                                 | action
+apps/controller test:    279  i.fa.fa-user-circle                                    | i.fa.fa-user-circle
+apps/controller test:    280  «Show User Count»                                      | «Show User Count»
+apps/controller test:    281  li                                                     | li
+apps/controller test:    282  action                                                 | action
+apps/controller test:    283  i.fa.fa-user-circle                                    | i.fa.fa-user-circle
+apps/controller test:    284  «Hide User Count»                                      | «Hide User Count»
+apps/controller test:    285  li                                                     | li
+apps/controller test:    286  action                                                 | action
+apps/controller test:    287  i.fa.fa-hdd-o                                          | i.fa.fa-hdd-o
+apps/controller test:    288  «Deny Archives Access»                                 | «Deny Archives Access»
+apps/controller test:    289  li                                                     | li
+apps/controller test:    290  action                                                 | action
+apps/controller test:    291  i.fa.fa-lock                                           | i.fa.fa-lock
+apps/controller test:    292  «Hide Pers User Data»                                  | «Hide Pers User Data»
+apps/controller test:    293  li                                                     | li
+apps/controller test:    294  action                                                 | action
+apps/controller test:    295  i.fa.fa-user                                           | i.fa.fa-user
+apps/controller test:    296  «Don't Hide Pers User Data»                            | «Don't Hide Pers User Data»
+apps/controller test:    297  li.divider                                             | li.divider
+apps/controller test:    298  li                                                     | li
+apps/controller test:    299  action                                                 | action
+apps/controller test:    300  i.fa.fa-comment-o                                      | i.fa.fa-comment-o
+apps/controller test:    301  «Disallow User2User PM»                                | «Disallow User2User PM»
+apps/controller test:    302  li                                                     | li
+apps/controller test:    303  action                                                 | action
+apps/controller test:    304  i.fa.fa-comment-o                                      | i.fa.fa-comment-o
+apps/controller test:    305  «Allow User2User PM»                                   | «Allow User2User PM»
+apps/controller test:    306  li.divider                                             | li.divider
+apps/controller test:    307  li.dropdown-submenu                                    | li.dropdown-submenu
+apps/controller test:    308  action                                                 | action
+apps/controller test:    309  i.fa.fa-mobile                                         | i.fa.fa-mobile
+apps/controller test:    310  «App and Notifications»                                | «App and Notifications»
+apps/controller test:    311  i.fa.fa-caret-right.pull-right                         | i.fa.fa-caret-right.pull-right
+apps/controller test:    312  ul.dropdown-menu                                       | ul.dropdown-menu
+apps/controller test:    313  li                                                     | li
+apps/controller test:    314  action                                                 | action
+apps/controller test:    315  i.fa.fa-mobile                                         | i.fa.fa-mobile
+apps/controller test:    316  «Get App PIN»                                          | «Get App PIN»
+apps/controller test:    317  li                                                     | li
+apps/controller test:    318  action                                                 | action
+apps/controller test:    319  i.fa.fa-mobile                                         | i.fa.fa-mobile
+apps/controller test:    320  «Show App Tokens»                                      | «Show App Tokens»
+apps/controller test:    321  li                                                     | li
+apps/controller test:    322  action                                                 | action
+apps/controller test:    323  i.fa.fa-mobile                                         | i.fa.fa-mobile
+apps/controller test:    324  «Get FCM Tokens»                                       | «Get FCM Tokens»
+apps/controller test:    325  li.divider                                             | li.divider
+apps/controller test:    326  li                                                     | li
+apps/controller test:    327  action                                                 | action
+apps/controller test:    328  i.fa.fa-mobile                                         | i.fa.fa-mobile
+apps/controller test:    329  i.fa.fa.fa-bell-o                                      | i.fa.fa.fa-bell-o
+apps/controller test:    330  «PAUSE Mobile Notifs»                                  | «PAUSE Mobile Notifs»
+apps/controller test:    331  li                                                     | li
+apps/controller test:    332  action                                                 | action
+apps/controller test:    333  i.fa.fa-mobile                                         | i.fa.fa-mobile
+apps/controller test:    334  i.fa.fa-play                                           | i.fa.fa-play
+apps/controller test:    335  «RESUME Mobile Notifs»                                 | «RESUME Mobile Notifs»
+apps/controller test:    336  li                                                     | li
+apps/controller test:    337  action                                                 | action
+apps/controller test:    338  i.fa.fa-mobile                                         | i.fa.fa-mobile
+apps/controller test:    339  i.fa.fa-trash                                          | i.fa.fa-trash
+apps/controller test:    340  «Remove Mobile Notifs»                                 | «Remove Mobile Notifs»
+apps/controller test:    341  li                                                     | li
+apps/controller test:    342  action                                                 | action
+apps/controller test:    343  i.fa.fa-mobile                                         | i.fa.fa-mobile
+apps/controller test:    344  i.fa.fa.fa-bell-o                                      | i.fa.fa.fa-bell-o
+apps/controller test:    345  «Send Test Mobile Notifs»                              | «Send Test Mobile Notifs»
+apps/controller test:    346  li                                                     | li
+apps/controller test:    347  action                                                 | action
+apps/controller test:    348  i.fa.fa-mobile                                         | i.fa.fa-mobile
+apps/controller test:    349  i.fa.fa-reload                                         | i.fa.fa-reload
+apps/controller test:    350  «Reset Mobile Notifs»                                  | «Reset Mobile Notifs»
+apps/controller test:    351  li.dropdown-submenu                                    | li.dropdown-submenu
+apps/controller test:    352  action                                                 | action
+apps/controller test:    353  i.fa.fa-certificate                                    | i.fa.fa-certificate
+apps/controller test:    354  «Badges»                                               | «Badges»
+apps/controller test:    355  i.fa.fa-caret-right.pull-right                         | i.fa.fa-caret-right.pull-right
+apps/controller test:    356  ul.dropdown-menu                                       | ul.dropdown-menu
+apps/controller test:    357  li.divider                                             | li.divider
+apps/controller test:    358  li                                                     | li
+apps/controller test:    359  action                                                 | action
+apps/controller test:    360  i.fa.fa-pencil-square-o                                | i.fa.fa-pencil-square-o
+apps/controller test:    361  «Set Note»                                             | «Set Note»
+apps/controller test:    362  li                                                     | li
+apps/controller test:    363  action                                                 | action
+apps/controller test:    364  i.fa.fa-edit                                           | i.fa.fa-edit
+apps/controller test:    365  «Edit Username»                                        | «Edit Username»
+apps/controller test:    366  li                                                     | li
+apps/controller test:    367  action                                                 | action
+apps/controller test:    368  i.fa.fa-trash                                          | i.fa.fa-trash
+apps/controller test:    369  «Remove User»                                          | «Remove User»
+apps/controller test:    370  li.divider                                             | li.divider
+apps/controller test:    371  li                                                     | li
+apps/controller test:    372  action                                                 | action
+apps/controller test:    373  i.fa.fa-lock                                           | i.fa.fa-lock
+apps/controller test:    374  «Set/Change Password»                                  | «Set/Change Password»
+apps/controller test:    375  li                                                     | li
+apps/controller test:    376  action                                                 | action
+apps/controller test:    377  i.fa.fa-envelope                                       | i.fa.fa-envelope
+apps/controller test:    378  «Resend Welcome Email»                                 | «Resend Welcome Email»
+apps/controller test:    379  li.divider                                             | li.divider
+apps/controller test:    380  li                                                     | li
+apps/controller test:    381  action                                                 | action
+apps/controller test:    382  i.fa.fa-pause                                          | i.fa.fa-pause
+apps/controller test:    383  «Pause / Pending»                                      | «Pause / Pending»
+apps/controller test: 2 of 384 lines differ
+apps/controller test:  ✓ src/lib/manage-row-actions-render.test.ts (5 tests) 15ms
+apps/controller test:  ✓ src/lib/manage-panel-capacity-contract.test.ts (7 tests) 16ms
+apps/controller test:  ✓ src/lib/manage-stats-arrival-row.test.ts (10 tests) 16ms
+apps/controller test: stdout | src/lib/manage-sections-sbs.test.ts > manage page, section by section > Users matches the reference
+apps/controller test: === Users — reference | ours (from the first divergence) ===
+apps/controller test:    … 162 matching rows above
+apps/controller test:    162  td                                                     | td
+apps/controller test:    163  span                                                   | span
+apps/controller test:    164  «Presenter»                                            | «Presenter»
+apps/controller test:    165  span                                                   | span
+apps/controller test:  ! 166  «/ manual»                                             | «/»
+apps/controller test:    167  td                                                     | td
+apps/controller test:    168  div.btn-group.mb-sm.mr                                 | div.btn-group.mb-sm.mr
+apps/controller test:    169  button.btn.dropdown-toggle.btn-primary                 | button.btn.dropdown-toggle.btn-primary
+apps/controller test:    170  «Actions»                                              | «Actions»
+apps/controller test:    171  span.caret                                             | span.caret
+apps/controller test:    172  ul.dropdown-menu.dropdown-menu-right                   | ul.dropdown-menu.dropdown-menu-right
+apps/controller test:    173  li.dropdown-submenu                                    | li.dropdown-submenu
+apps/controller test:    174  action                                                 | action
+apps/controller test:    175  i.fa.fa-shield                                         | i.fa.fa-shield
+apps/controller test:    176  «Permissions»                                          | «Permissions»
+apps/controller test:    177  i.fa.fa-caret-right.pull-right                         | i.fa.fa-caret-right.pull-right
+apps/controller test:    178  ul.dropdown-menu                                       | ul.dropdown-menu
+apps/controller test:    179  li                                                     | li
+apps/controller test:    180  action                                                 | action
+apps/controller test:    181  i.fa.fa-microphone                                     | i.fa.fa-microphone
+apps/controller test:    182  i.fa.fa-desktop                                        | i.fa.fa-desktop
+apps/controller test:    183  «Make Presenter»                                       | «Make Presenter»
+apps/controller test:    184  li                                                     | li
+apps/controller test:    185  action                                                 | action
+apps/controller test:    186  i.fa.fa-cog                                            | i.fa.fa-cog
+apps/controller test:    187  i.fa.fa-user-md                                        | i.fa.fa-user-md
+apps/controller test:    188  «Make Admin»                                           | «Make Admin»
+apps/controller test:    189  li                                                     | li
+apps/controller test:    190  action                                                 | action
+apps/controller test:    191  i.fa.fa-user                                           | i.fa.fa-user
+apps/controller test:    192  «Make Participant»                                     | «Make Participant»
+apps/controller test:    193  li                                                     | li
+apps/controller test:    194  action                                                 | action
+apps/controller test:    195  i.fa.fa-user                                           | i.fa.fa-user
+apps/controller test:    196  «Make Trial»                                           | «Make Trial»
+apps/controller test:    197  li                                                     | li
+apps/controller test:    198  action                                                 | action
+apps/controller test:    199  i.fa.fa-user-times                                     | i.fa.fa-user-times
+apps/controller test:    200  «MUTE Participant»                                     | «MUTE Participant»
+apps/controller test:    201  li                                                     | li
+apps/controller test:    … 305 more lines
+apps/controller test: Users: 2 of 507 differ (baseline 2)
+apps/controller test:  ✓ src/lib/manage-user-table-sbs.test.ts (2 tests) 15ms
+apps/controller test: stdout | src/lib/manage-sections-sbs.test.ts > manage page, section by section > User Stats matches the reference
+apps/controller test: === User Stats — reference | ours (from the first divergence) ===
+apps/controller test:    … 4 matching rows above
+apps/controller test:      4  div                                                    | div
+apps/controller test:      5  p.form-control-static                                  | p.form-control-static
+apps/controller test:      6  label.col-sm-4.control-label                           | label.col-sm-4.control-label
+apps/controller test:      7  «Start Date:»                                          | «Start Date:»
+apps/controller test:  !   8  a.editable.editable-click                              | a.editable.editable-click.editable-empty
+apps/controller test:  !   9  «08-07-2026»                                           | «empty»
+apps/controller test:     10  br                                                     | br
+apps/controller test:  !  11  label.muted                                            | span.muted
+apps/controller test:     12  «Choose a start date»                                  | «Choose a start date»
+apps/controller test:     13  p.form-control-static                                  | p.form-control-static
+apps/controller test:     14  label.col-sm-4.control-label                           | label.col-sm-4.control-label
+apps/controller test:     15  «End Date:»                                            | «End Date:»
+apps/controller test:  !  16  a.editable.editable-click                              | a.editable.editable-click.editable-empty
+apps/controller test:  !  17  «08-08-2026»                                           | «empty»
+apps/controller test:     18  br                                                     | br
+apps/controller test:  !  19  label.muted                                            | span.muted
+apps/controller test:     20  «Choose an end date»                                   | «Choose an end date»
+apps/controller test:     21  button.btn.btn-md.btn-info                             | button.btn.btn-md.btn-info
+apps/controller test:     22  i.fa.fa-user-plus                                      | i.fa.fa-user-plus
+apps/controller test:     23  «Load Stats»                                           | «Load Stats»
+apps/controller test:     24  button.btn.btn-md.btn-info                             | button.btn.btn-md.btn-info
+apps/controller test:     25  i.fa.fa-floppy-o                                       | i.fa.fa-floppy-o
+apps/controller test:     26  «Export»                                               | «Export»
+apps/controller test:     27  button.btn.btn-md.btn-info                             | button.btn.btn-md.btn-info
+apps/controller test:     28  i.fa.fa-users                                          | i.fa.fa-users
+apps/controller test:     29  «Monthly report for date range»                        | «Monthly report for date range»
+apps/controller test:     30  div                                                    | div
+apps/controller test:     31  label.col-sm-2.control-label                           | label.col-sm-2.control-label
+apps/controller test:     32  «Search Users»                                         | «Search Users»
+apps/controller test:     33  div.col-sm-4                                           | div.col-sm-4
+apps/controller test:     34  input.form-control                                     | input.form-control
+apps/controller test:     35  br                                                     | br
+apps/controller test:     36  label                                                  | label
+apps/controller test:     37  input                                                  | input
+apps/controller test:     38  «Show Online Users Only»                               | «Show Online Users Only»
+apps/controller test:     39  label                                                  | label
+apps/controller test:     40  input                                                  | input
+apps/controller test:     41  «Show»                                                 | «Show»
+apps/controller test:     42  span.badge.badge-danger                                | span.badge.badge-danger
+apps/controller test:     43  «Free Trials»                                          | «Free Trials»
+apps/controller test:    … 9 more lines
+apps/controller test: User Stats: 6 of 53 differ (baseline 6)
+apps/controller test:  ✓ src/lib/motion-import-contract.test.ts (2 tests) 2ms
+apps/controller test: stdout | src/lib/manage-sections-sbs.test.ts > manage page, section by section > Settings matches the reference
+apps/controller test: === Settings — reference | ours (from the first divergence) ===
+apps/controller test:    … 1481 matching rows above
+apps/controller test:    1481  «empty»                                                | «empty»
+apps/controller test:    1482  br                                                     | br
+apps/controller test:    1483  label.muted                                            | label.muted
+apps/controller test:    1484  «Comma separated list of invalid JWT tokens.»          | «Comma separated list of invalid JWT tokens.»
+apps/controller test:  ! 1485  hr                                                     | p.form-control-static
+apps/controller test:  ! 1486  h3                                                     | label.col-sm-2.control-label
+apps/controller test:  ! 1487  «DON'T»                                                | «Room Type»
+apps/controller test:  ! 1488  span                                                   | a.editable.editable-click.editable-empty
+apps/controller test:  ! 1489  «TOUCH»                                                | «empty»
+apps/controller test:  ! 1490  «These below unless you know what you are doing...»    | br
+apps/controller test:  ! 1491  p                                                      | label.muted
+apps/controller test:  ! 1492  «Settings...»                                          | «A webinar room adds a scheduled date and the reminder-email tools.»
+apps/controller test:  ! 1493                                                         | hr
+apps/controller test:  ! 1494                                                         | h3
+apps/controller test:  ! 1495                                                         | «DON'T»
+apps/controller test:  ! 1496                                                         | button.editable.editable-click
+apps/controller test:  ! 1497                                                         | «TOUCH»
+apps/controller test:  ! 1498                                                         | «These below unless you know what you are doing...»
+apps/controller test:  ! 1499                                                         | p
+apps/controller test:  ! 1500                                                         | «Settings...»
+apps/controller test: Settings: 16 of 1501 differ (baseline 16)
+apps/controller test: stdout | src/lib/manage-sections-sbs.test.ts > manage page, section by section > reports the scoreboard
+apps/controller test: --- manage page: differing elements per section ---
+apps/controller test:   tab strip          0 / 15
+apps/controller test:   Users              2 / 507
+apps/controller test:   Text List          0 / 6
+apps/controller test:   Branding           0 / 94
+apps/controller test:   SSO Setup          0 / 9
+apps/controller test:   User Stats         6 / 53
+apps/controller test:   Settings          16 / 1501
+apps/controller test:  ✓ src/lib/manage-sections-sbs.test.ts (9 tests) 30ms
+apps/controller test:  ✓ src/lib/manage-user-row-reference-fields.test.ts (36 tests) 71ms
+apps/controller test:  ✓ src/lib/opcode-sets-match-template.test.ts (6 tests) 3ms
+apps/controller test:  ✓ src/lib/server/room-visits.test.ts (7 tests) 3ms
+apps/controller test:  Test Files  88 passed (88)
+apps/controller test:       Tests  925 passed (925)
+apps/controller test:    Start at  07:08:56
+apps/controller test:    Duration  1.82s (transform 14.74s, setup 0ms, import 21.75s, tests 2.14s, environment 17ms)
+apps/controller test: JSON report written to /Users/billyribeiro/Desktop/trading-room-app/apps/controller/.vitest-report.json
+apps/controller test:  % Coverage report from v8
+apps/controller test: -------------------|---------|----------|---------|---------|-------------------
+apps/controller test: File               | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s 
+apps/controller test: -------------------|---------|----------|---------|---------|-------------------
+apps/controller test: All files          |   36.85 |    40.01 |   39.79 |   36.25 |                   
+apps/controller test:  src               |   17.39 |        0 |       0 |   19.04 |                   
+apps/controller test:   hooks.server.ts  |       0 |        0 |       0 |       0 | 10-74             
+apps/controller test:  src/lib           |   66.36 |       76 |   63.79 |   65.27 |                   
+apps/controller test:   animate-once.ts  |       0 |        0 |       0 |       0 | 20-26             
+apps/controller test:   ...box.svelte.ts |    7.69 |        0 |       0 |    9.09 | 55-62,67-116      
+apps/controller test:   ...ap-tooltip.ts |       0 |        0 |       0 |       0 | 15-142            
+apps/controller test:   dom-shape.ts     |     100 |    91.54 |     100 |     100 | ...40,187,210,237 
+apps/controller test:   ...e-duration.ts |   78.26 |    70.83 |     100 |   73.33 | 34-38             
+apps/controller test:   motion.ts        |       0 |        0 |       0 |       0 | 78-244            
+apps/controller test:   ...ence-users.ts |   93.33 |       50 |     100 |     100 | 46-63             
+apps/controller test:   room-config.ts   |     100 |    96.77 |     100 |     100 | 93                
+apps/controller test:   room-entry.ts    |    93.1 |    93.82 |     100 |      96 | 239,260           
+apps/controller test:   ...tings-help.ts |     100 |       90 |     100 |     100 | 123               
+apps/controller test:   sanitize-html.ts |   98.86 |    91.54 |     100 |     100 | 115-117,134-137   
+apps/controller test:   stats-csv.ts     |     100 |     87.5 |     100 |     100 | 56,84,90          
+apps/controller test:   toast.svelte.ts  |   28.57 |        0 |       0 |   36.36 | 46-59,63-64       
+apps/controller test:  ...omponents/home |       0 |      100 |       0 |       0 |                   
+apps/controller test:   market-feed.ts   |       0 |      100 |       0 |       0 | 21-49             
+apps/controller test:  src/lib/content   |   13.79 |      100 |     100 |   13.79 |                   
+apps/controller test:   home.ts          |       0 |      100 |     100 |       0 | 15-229            
+apps/controller test:  src/lib/server    |   58.45 |    60.79 |   62.56 |   59.77 |                   
+apps/controller test:   ...key-secret.ts |      96 |     90.9 |     100 |      96 | 54                
+apps/controller test:   auth.ts          |     3.5 |        0 |       0 |    4.34 | 23-228            
+apps/controller test:   ...ane-policy.ts |     100 |    96.29 |     100 |     100 | 58                
+apps/controller test:   ...ne-runtime.ts |       0 |      100 |     100 |       0 | 6-15              
+apps/controller test:   ...rification.ts |   89.18 |       96 |      75 |   89.28 | 204-238           
+apps/controller test:   fcm.ts           |   92.39 |    76.92 |   93.33 |   94.18 | ...34-235,242,329 
+apps/controller test:   gravatar.ts      |       0 |        0 |       0 |       0 | 34-37             
+apps/controller test:   impersonation.ts |    3.33 |        0 |       0 |    4.54 | 47-135            
+apps/controller test:   mail.ts          |   29.41 |       10 |      40 |   33.33 | 58-59,103-136     
+apps/controller test:   member-email.ts  |   97.29 |       85 |     100 |     100 | 143-163,227       
+apps/controller test:   ...le-pairing.ts |   56.81 |    59.18 |      80 |   51.42 | 135-261           
+apps/controller test:   ...ision-room.ts |       0 |        0 |       0 |       0 | 55-173            
+apps/controller test:   recaptcha.ts     |   96.15 |    95.65 |      75 |   95.23 | 119               
+apps/controller test:   room-handoff.ts  |   87.17 |    72.41 |   88.88 |    87.5 | 169-173           
+apps/controller test:   room-visits.ts   |   37.03 |    67.74 |   33.33 |    37.5 | 112-199           
+apps/controller test:   rooms.ts         |   31.14 |     30.4 |   33.89 |   31.25 | ...-968,1044-1109 
+apps/controller test:   sso-token.ts     |   97.22 |    97.22 |     100 |   98.33 | 284               
+apps/controller test:   superadmin.ts    |   83.78 |    86.66 |      70 |   85.29 | 150-153,202-244   
+apps/controller test:  src/lib/server/db |   30.39 |    33.33 |    6.06 |   31.31 |                   
+apps/controller test:   index.ts         |    3.12 |        0 |       0 |    3.44 | 13-74,115-205     
+apps/controller test:   migrator.js      |    37.5 |    61.11 |      50 |    37.5 | 84-139            
+apps/controller test:   schema.ts        |   45.94 |      100 |       0 |   45.94 | ...51,562,625,644 
+apps/controller test:  src/routes        |       0 |      100 |       0 |       0 |                   
+apps/controller test:   ...out.server.ts |       0 |      100 |       0 |       0 | 4                 
+apps/controller test:  .../(app)/account |       0 |        0 |       0 |       0 |                   
+apps/controller test:   +page.server.ts  |       0 |        0 |       0 |       0 | 17-557            
+apps/controller test:  ...count/api-docs |       0 |      100 |       0 |       0 |                   
+apps/controller test:   +page.server.ts  |       0 |      100 |       0 |       0 | 14-16             
+apps/controller test:  ...pi-post-routes |       0 |      100 |       0 |       0 |                   
+apps/controller test:   +page.server.ts  |       0 |      100 |       0 |       0 | 22-24             
+apps/controller test:  ...s/[id]/[[tab]] |       0 |        0 |       0 |       0 |                   
+apps/controller test:   +page.server.ts  |       0 |        0 |       0 |       0 | 85-1190           
+apps/controller test:  ...[id]/stats.csv |       0 |        0 |       0 |       0 |                   
+apps/controller test:   +server.ts       |       0 |        0 |       0 |       0 | 38-95             
+apps/controller test:  ...es/(app)/admin |       0 |        0 |       0 |       0 |                   
+apps/controller test:   ...out.server.ts |       0 |        0 |       0 |       0 | 34-57             
+apps/controller test:   +page.server.ts  |       0 |        0 |       0 |       0 | 43-264            
+apps/controller test:  ...p)/launch/[id] |       0 |        0 |       0 |       0 |                   
+apps/controller test:   +server.ts       |       0 |        0 |       0 |       0 | 26-111            
+apps/controller test:  ...s/(app)/logout |       0 |      100 |       0 |       0 |                   
+apps/controller test:   +page.server.ts  |       0 |      100 |       0 |       0 | 5-15              
+apps/controller test:  ...auth)/register |       0 |        0 |       0 |       0 |                   
+apps/controller test:   +page.server.ts  |       0 |        0 |       0 |       0 | 11-153            
+apps/controller test:  ...ublic)/contact |       0 |        0 |       0 |       0 |                   
+apps/controller test:   +page.server.ts  |       0 |        0 |       0 |       0 | 5-29              
+apps/controller test:  ...orgot-password |       0 |        0 |       0 |       0 |                   
+apps/controller test:   +page.server.ts  |       0 |        0 |       0 |       0 | 16-102            
+apps/controller test:  ...(public)/login |       0 |        0 |       0 |       0 |                   
+apps/controller test:   +page.server.ts  |       0 |        0 |       0 |       0 | 14-126            
+apps/controller test:  ...ser/[publicId] |       0 |        0 |       0 |       0 |                   
+apps/controller test:   +server.ts       |       0 |        0 |       0 |       0 | 56-126            
+apps/controller test:  ...reset-password |       0 |        0 |       0 |       0 |                   
+apps/controller test:   +page.server.ts  |       0 |        0 |       0 |       0 | 28-121            
+apps/controller test:  ...session/[code] |       0 |        0 |       0 |       0 |                   
+apps/controller test:   +page.server.ts  |       0 |        0 |       0 |       0 | 11-140            
+apps/controller test:  .../[code]/joined |       0 |        0 |       0 |       0 |                   
+apps/controller test:   +page.server.ts  |       0 |        0 |       0 |       0 | 28-90             
+apps/controller test:  ...ic)/sso/[code] |       0 |        0 |       0 |       0 |                   
+apps/controller test:   +server.ts       |       0 |        0 |       0 |       0 | 66-230            
+apps/controller test:  ...)/verify-email |       0 |        0 |       0 |       0 |                   
+apps/controller test:   +page.server.ts  |       0 |        0 |       0 |       0 | 27-49             
+apps/controller test:  ...pi/mobile/pair |       0 |        0 |       0 |       0 |                   
+apps/controller test:   +server.ts       |       0 |        0 |       0 |       0 | 40-82             
+apps/controller test:  ...ile-pin/[code] |       0 |        0 |       0 |       0 |                   
+apps/controller test:   +server.ts       |       0 |        0 |       0 |       0 | 32-83             
+apps/controller test:  ...-config/[code] |       0 |        0 |       0 |       0 |                   
+apps/controller test:   +server.ts       |       0 |        0 |       0 |       0 | 51-120            
+apps/controller test:  ...setting/[code] |       0 |        0 |       0 |       0 |                   
+apps/controller test:   +server.ts       |       0 |        0 |       0 |       0 | 54-135            
+apps/controller test: -------------------|---------|----------|---------|---------|-------------------
+apps/controller test: =============================== Coverage summary ===============================
+apps/controller test: Statements   : 36.85% ( 1054/2860 )
+apps/controller test: Branches     : 40.01% ( 771/1927 )
+apps/controller test: Functions    : 39.79% ( 193/485 )
+apps/controller test: Lines        : 36.25% ( 897/2474 )
+apps/controller test: ================================================================================
+apps/controller test: Documented Vitest totals verified: 88 files, 925 tests across 4 documented sites
+apps/controller test: Done back to
+exit 0. That is twice in two days, so it is now a habit to check rather than a surprise: **adding a
+test means updating four counts.**
+
+**Verified:** Scope: 2 of 3 workspace projects
+apps/controller test$ pnpm run schema:verify && pnpm run backend:migrations:verify && pnpm run backend:release:verify && pnpm run evidence:verify && pnpm run privacy:verify && pnpm run breakpoints:verify && pnpm run manage:styles && pnpm run account:contract && pnpm run home:contract && pnpm run fonts:verify && pnpm run room-login:contract && pnpm run runtime:http && pnpm run test:unit && node scripts/verify-documented-test-counts.mjs --report .vitest-report.json
+apps/room test$ pnpm privacy:verify && pnpm schema:verify && vitest run
+apps/controller test: $ node scripts/verify-room-settings-schema.mjs
+apps/room test: $ node scripts/verify-privacy-boundary.mjs
+apps/room test: [privacy] 80 baselined finding(s) are gone — run --update to shrink the baseline:
+apps/room test:   gravatar alert-section/1.html
+apps/room test:   gravatar alert-section/2.html
+apps/room test:   gravatar alert-section/3.html
+apps/room test:   gravatar app-message-modal/app-st-message-1
+apps/room test:   gravatar app-message-modal/app-st-message-2
+apps/room test:   gravatar app-message-modal/app-st-message-3
+apps/room test:   gravatar app-message-modal/app-st-message-4
+apps/room test:   gravatar app-room/app-room-file.clean.html
+apps/room test:   gravatar app-room/app-room-file.txt
+apps/room test:   gravatar app-room/app-room-scroller
+apps/room test: [privacy] PASS no new personal data; 95 baselined finding(s) across 359 tracked and untracked files
+apps/controller test: room-settings schema verified: 268 extracted + 1 reviewed deviation = 269 total; 49 wired
+apps/room test: $ node scripts/verify-postgres-schema-artifacts.mjs
+apps/room test: PostgreSQL schema evidence contract: PASS
+apps/room test: - Canonical artifacts: 1,960 / 290 / 2,814 lines; SHA-256 exact
+apps/room test: - Inventory: 24 tables, 317 public columns, 167 constraints, 93 indexes
+apps/room test: - Security: 20 FORCE+ENABLE RLS tables; 19 tenant policies + 1 PM exception
+apps/room test: - Functions: 5 SECURITY DEFINER helpers pinned and safely ordered in RECREATE
+apps/room test: - Runtime roles/grants: ptr_clone_app remains NOBYPASSRLS with exact table/function grants
+apps/room test: - Restore boundary: raw SCHEMA-FULL ordering trap preserved and detected
+apps/controller test: $ node scripts/verify-backend.mjs --migrations-only && node scripts/verify-backend-provenance.mjs
+apps/controller test: [backend:check] PASS migration integrity: 9 pinned migrations (4 imported + 5 reviewed forward), baseline c8baed853578437e18de0fae3406bfa1ee2791b2e625db8d13e2b72a51ac27d9
+apps/controller test: [backend:provenance] PASS 98 imported (88 untouched + 10 diverged, each pinned) + 1 authored here; paths 66ab4696e3d3685daaa5ba27e28137a1cc038a71a32fcf92d30bdd144f35ecef; manifest 9e5fe0a6c5ae0d8fad3eeed7baadf6aac48cccc94ab1ac2796c4983a949bc9e0; 3 documented-count site(s) agree
+apps/room test: The `config.alias` option is deprecated, and will be removed in a future version of SvelteKit. Use subpath imports instead: https://svelte.dev/docs/kit/$lib
+apps/controller test: $ node scripts/verify-api-release-artifact.mjs --verify-contract
+apps/controller test: [backend:release-artifact] source, tool-pin, and policy contract passed
+apps/room test:  RUN  v4.1.10 /Users/billyribeiro/Desktop/trading-room-app/apps/room
+apps/controller test: $ node scripts/verify-evidence-layout.mjs
+apps/controller test: Evidence archive layout verified
+apps/controller test: $ node scripts/verify-privacy-boundary.mjs
+apps/room test:  Test Files  73 passed (73)
+apps/room test:       Tests  775 passed (775)
+apps/room test:    Start at  07:09:00
+apps/room test:    Duration  1.39s (transform 7.78s, setup 543ms, import 15.68s, tests 1.70s, environment 1.07s)
+apps/room test: Done
+apps/controller test: Tracked privacy boundary verified
+apps/controller test: $ node scripts/verify-breakpoints.mjs
+apps/controller test: Breakpoint contract verified from /Users/billyribeiro/Desktop/trading-room-app/apps/controller/
+apps/controller test: $ node scripts/verify-manage-styles.mjs
+apps/controller test: manage.css vs capture: 59 declarations compared against 18637 pinned facts from 8827 nodes
+apps/controller test: no divergence between a declared value and its measurement, and every declared border can paint
+apps/controller test: $ node scripts/verify-account-contract.mjs
+apps/controller test: Authenticated account source contract verified
+apps/controller test: $ node scripts/verify-home-contract.mjs
+apps/controller test: Home surface contract passed: no raster imagery, pinned animation stack, copy-deck anchors with all 7 verbatim quotes, motion/SSR safety, dedicated chrome, accessibility floor, consent contract, and footer links.
+apps/controller test: $ node scripts/verify-font-contract.mjs
+apps/controller test: Font contract verified: exact Roboto v51/300 binary, room-login weight 700, licensed local delivery, pnpm SSOT, and pinned FA4/FA5 assets
+apps/controller test: $ node scripts/verify-room-login-contract.mjs
+apps/controller test: Authenticated room-login identity and typography contract verified
+apps/controller test: $ node scripts/verify-public-preview-http.mjs
+apps/controller test: Control-plane HTTP contracts verified: marketing fails closed, postgres mode demands a connection string, and the account flow works
+apps/controller test: $ vitest run --coverage --reporter=default --reporter=json --outputFile=.vitest-report.json
+apps/controller test: The `config.alias` option is deprecated, and will be removed in a future version of SvelteKit. Use subpath imports instead: https://svelte.dev/docs/kit/$lib
+apps/controller test: (!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+apps/controller test:   - import "./kit.config" without a file extension (vite.config.ts:2:27). Add the file extension
+apps/controller test: Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+apps/controller test:  RUN  v4.1.10 /Users/billyribeiro/Desktop/trading-room-app/apps/controller
+apps/controller test:       Coverage enabled with v8
+apps/controller test:  ✓ src/lib/dont-touch-block.test.ts (24 tests) 5ms
+apps/controller test:  ✓ src/lib/settings-help-shape.test.ts (9 tests) 7ms
+apps/controller test:  ✓ src/lib/server/sso-token.test.ts (23 tests) 6ms
+apps/controller test:  ✓ src/lib/server/recaptcha.test.ts (13 tests) 5ms
+apps/controller test:  ✓ src/lib/setting-help-shape-contract.test.ts (14 tests) 7ms
+apps/controller test:  ✓ src/lib/room-config.test.ts (13 tests) 9ms
+apps/controller test:  ✓ src/lib/room-config-boundary.test.ts (17 tests) 9ms
+apps/controller test:  ✓ src/lib/server/control-plane-policy.test.ts (28 tests) 19ms
+apps/controller test: stderr | src/lib/server/fcm.test.ts > classifying what FCM says > calls an UNREGISTERED registration unregistered, which is the only thing that licenses pruning
+apps/controller test: [fcm] send refused {
+apps/controller test:   status: 404,
+apps/controller test:   googleStatus: 'NOT_FOUND',
+apps/controller test:   errorCode: 'UNREGISTERED',
+apps/controller test:   body: '{"error":{"status":"NOT_FOUND","details":[{"errorCode":"UNREGISTERED"}]}}'
+apps/controller test: }
+apps/controller test: stderr | src/lib/server/fcm.test.ts > classifying what FCM says > calls a malformed token invalid, separately from a dead one
+apps/controller test: [fcm] send refused {
+apps/controller test:   status: 400,
+apps/controller test:   googleStatus: 'INVALID_ARGUMENT',
+apps/controller test:   errorCode: 'INVALID_ARGUMENT',
+apps/controller test:   body: '{"error":{"status":"INVALID_ARGUMENT","details":[{"errorCode":"INVALID_ARGUMENT"}]}}'
+apps/controller test: }
+apps/controller test: stderr | src/lib/server/fcm.test.ts > classifying what FCM says > does NOT call a quota or server error unregistered
+apps/controller test: [fcm] send refused {
+apps/controller test:   status: 429,
+apps/controller test:   googleStatus: 'RESOURCE_EXHAUSTED',
+apps/controller test:   errorCode: '',
+apps/controller test:   body: '{"error":{"status":"RESOURCE_EXHAUSTED"}}'
+apps/controller test: }
+apps/controller test: stderr | src/lib/server/fcm.test.ts > classifying what FCM says > does NOT call a quota or server error unregistered
+apps/controller test: [fcm] send refused {
+apps/controller test:   status: 503,
+apps/controller test:   googleStatus: '',
+apps/controller test:   errorCode: '',
+apps/controller test:   body: '<html>unavailable</html>'
+apps/controller test: }
+apps/controller test:  ✓ src/lib/emoji-picker-contract.test.ts (8 tests) 48ms
+apps/controller test:  ✓ src/lib/api-post-routes-docs.test.ts (10 tests) 42ms
+apps/controller test:  ✓ src/lib/server/fcm.test.ts (15 tests) 30ms
+apps/controller test:  ✓ src/lib/server/email-verification.test.ts (20 tests) 7ms
+apps/controller test:  ✓ src/lib/server/member-push.test.ts (15 tests) 8ms
+apps/controller test:  ✓ src/lib/rects-completion-proof.test.ts (7 tests) 6ms
+apps/controller test:  ✓ src/lib/manage-tab-strip.test.ts (5 tests) 4ms
+apps/controller test:  ✓ src/lib/server/room-handoff.test.ts (17 tests) 5ms
+apps/controller test:  ✓ src/lib/room-entry.test.ts (28 tests) 5ms
+apps/controller test:  ✓ src/lib/server/member-email.test.ts (13 tests) 6ms
+apps/controller test:  ✓ src/lib/server/admin-guard-contract.test.ts (7 tests) 9ms
+apps/controller test:  ✓ src/lib/stats-export-contract.test.ts (15 tests) 5ms
+apps/controller test:  ✓ src/lib/export-format-contract.test.ts (18 tests) 5ms
+apps/controller test:  ✓ src/lib/manage-panel-bootstrap3-contract.test.ts (9 tests) 4ms
+apps/controller test:  ✓ src/lib/room-settings-profile.test.ts (11 tests) 5ms
+apps/controller test:  ✓ src/lib/server/sso-wordpress-contract.test.ts (16 tests) 5ms
+apps/controller test:  ✓ src/lib/table-striping-contract.test.ts (9 tests) 3ms
+apps/controller test:  ✓ src/lib/user-row-contract.test.ts (22 tests) 5ms
+apps/controller test:  ✓ src/lib/sso-boundary.test.ts (15 tests) 4ms
+apps/controller test:  ✓ src/lib/server/password-reset.test.ts (16 tests) 4ms
+apps/controller test:  ✓ src/lib/api-key-undecryptable.test.ts (5 tests) 4ms
+apps/controller test:  ✓ src/lib/server/api-key-secret.test.ts (5 tests) 4ms
+apps/controller test:  ✓ src/lib/admin-users-row.test.ts (11 tests) 4ms
+apps/controller test:  ✓ src/lib/server/sso-entitlement.test.ts (15 tests) 3ms
+apps/controller test:  ✓ scripts/privacy-utils.test.mjs (8 tests) 4ms
+apps/controller test:  ✓ src/lib/server/db/migrator.test.ts (7 tests) 4ms
+apps/controller test: stderr | src/lib/server/superadmin.test.ts > the guard > answers 404 for an anonymous visitor
+apps/controller test: [admin] refused {
+apps/controller test:   userId: null,
+apps/controller test:   authenticated: false,
+apps/controller test:   held: 'none',
+apps/controller test:   needed: 'read-only',
+apps/controller test:   configuredAdmins: 1
+apps/controller test: }
+apps/controller test: stderr | src/lib/server/superadmin.test.ts > the guard > answers 404 for a signed-in user who is not on the list
+apps/controller test: [admin] refused {
+apps/controller test:   userId: 7,
+apps/controller test:   authenticated: true,
+apps/controller test:   held: 'none',
+apps/controller test:   needed: 'read-only',
+apps/controller test:   configuredAdmins: 1
+apps/controller test: }
+apps/controller test: stderr | src/lib/server/superadmin.test.ts > the guard > answers 404 for everyone when no superadmin is configured
+apps/controller test: [admin] refused {
+apps/controller test:   userId: 7,
+apps/controller test:   authenticated: true,
+apps/controller test:   held: 'none',
+apps/controller test:   needed: 'read-only',
+apps/controller test:   configuredAdmins: 0
+apps/controller test: }
+apps/controller test: stderr | src/lib/server/superadmin.test.ts > operator roles > drops an entry with an unknown role rather than defaulting it to full
+apps/controller test: [admin] ignoring an allow-list entry with an unknown role { role: 'suport' }
+apps/controller test:  ✓ src/lib/server/superadmin.test.ts (15 tests) 450ms
+apps/controller test:      ✓ nobody, when the list is unset or blank  428ms
+apps/controller test:  ✓ src/lib/manage-action-scope.test.ts (13 tests) 3ms
+apps/controller test:  ✓ src/lib/account-actions-contract.test.ts (24 tests) 4ms
+apps/controller test:  ✓ src/lib/app-pair-contract.test.ts (10 tests) 4ms
+apps/controller test:  ✓ src/lib/settings-schema-covers-template.test.ts (5 tests) 3ms
+apps/controller test:  ✓ src/lib/focus-date-field.test.ts (6 tests) 4ms
+apps/controller test:  ✓ src/lib/reference-defects-not-reproduced.test.ts (4 tests) 5ms
+apps/controller test:  ✓ src/lib/server/sanitize-html.test.ts (12 tests) 4ms
+apps/controller test:  ✓ src/lib/server/db/room-sessions-fk-contract.test.ts (5 tests) 3ms
+apps/controller test:  ✓ src/lib/settings-row-gates.test.ts (7 tests) 3ms
+apps/controller test:  ✓ src/lib/row-actions-exist.test.ts (40 tests) 3ms
+apps/controller test:  ✓ src/lib/manage-form-errors.test.ts (5 tests) 3ms
+apps/controller test:  ✓ src/lib/last-login-format.test.ts (6 tests) 3ms
+apps/controller test:  ✓ src/lib/editable-display.test.ts (19 tests) 4ms
+apps/controller test:  ✓ src/lib/server/login-attempts.test.ts (3 tests) 3ms
+apps/controller test:  ✓ src/lib/server/mobile-pairing.test.ts (11 tests) 4ms
+apps/controller test:  ✓ src/lib/server/rooms.test.ts (8 tests) 4ms
+apps/controller test:  ✓ src/lib/password-reset-pages.test.ts (14 tests) 6ms
+apps/controller test:  ✓ src/lib/editable-hover-contract.test.ts (7 tests) 3ms
+apps/controller test:  ✓ src/lib/account-new-room-reveal.test.ts (5 tests) 5ms
+apps/controller test:  ✓ src/lib/account-sessions-filter.test.ts (10 tests) 6ms
+apps/controller test:  ✓ src/lib/account-form-errors.test.ts (5 tests) 6ms
+apps/controller test:  ✓ src/lib/room-url-identity.test.ts (6 tests) 6ms
+apps/controller test:  ✓ src/lib/account-empty-state.test.ts (3 tests) 5ms
+apps/controller test:  ✓ src/lib/account-page-render.test.ts (7 tests) 7ms
+apps/controller test: stdout | src/lib/account-page-sbs.test.ts > account page, side by side with the post-login dump > matches element for element
+apps/controller test: === account page — reference | ours ===
+apps/controller test:  !   0  div.center-block.mt-xl                                 | div.acc-inner
+apps/controller test:  !   1  div                                                    | h4.acc-h4
+apps/controller test:  !   2  div.app.ng-fadeInLeft2                                 | span.acc-clickable
+apps/controller test:  !   3  h4                                                     | div.acc-row
+apps/controller test:  !   4  span                                                   | div.col-md-4.acc-col-4.acc-panel
+apps/controller test:  !   5  div.row                                                | input.acc-input.acc-search
+apps/controller test:  !   6  div.col-md-4.panel.pane-default                        | button.acc-btn.acc-btn-sm.acc-btn-default
+apps/controller test:  !   7  input.form-control                                     | span
+apps/controller test:  !   8  button.btn.btn-sm.btn-default                          | div.acc-row-block
+apps/controller test:  !   9  span                                                   | div.col-md-12.acc-panel
+apps/controller test:  !  10  div.row                                                | div.acc-table-responsive
+apps/controller test:  !  11  div.col-md-12.panel.pane-default                       | table.acc-table
+apps/controller test:  !  12  div.table-responsive                                   | thead
+apps/controller test:  !  13  table.table.table-striped.table-bordered.table-hover   | tr
+apps/controller test:  !  14  thead                                                  | th
+apps/controller test:  !  15  tr                                                     | i.fa.fa-sort-alpha-asc.acc-sort-icon
+apps/controller test:  !  16  th                                                     | th.acc-th-center
+apps/controller test:  !  17  div.icon.fa.fa-sort-alpha-asc                          | i.fa.fa-sort-alpha-asc.acc-sort-icon
+apps/controller test:  !  18  th.text-center                                         | th.acc-th-center
+apps/controller test:  !  19  div.icon.fa.fa-sort-alpha-asc                          | th.acc-th-center
+apps/controller test:  !  20  th.text-center                                         | th.acc-th-center
+apps/controller test:  !  21  th.text-center                                         | tbody
+apps/controller test:  !  22  th.text-center                                         | tr
+apps/controller test:  !  23  tbody                                                  | td
+apps/controller test:  !  24  tr                                                     | strong
+apps/controller test:     25  td                                                     | td
+apps/controller test:  !  26  strong                                                 | td.acc-td-center
+apps/controller test:  !  27  td                                                     | div.acc-label.acc-label-orange
+apps/controller test:  !  28  td.text-center                                         | td.acc-td-center
+apps/controller test:  !  29  div.label.label-orange                                 | div.acc-muted
+apps/controller test:  !  30  td.text-center                                         | td
+apps/controller test:  !  31  div.text-muted                                         | a.acc-btn.acc-btn-sm.acc-btn-info
+apps/controller test:  !  32  td                                                     | i.fa.fa-external-link
+apps/controller test:  !  33  a.btn.btn-sm.btn-info                                  | a.acc-btn.acc-btn-sm.acc-btn-inverse
+apps/controller test:  !  34  i.icon.fa.fa-external-link                             | i.fa.fa-cogs
+apps/controller test:  !  35  a.btn.btn-sm.btn-inverse                               | a.acc-btn.acc-btn-sm.acc-btn-default
+apps/controller test:  !  36  i.icon.fa.fa-cogs                                      | i.fa.fa-credit-card
+apps/controller test:  !  37  hr                                                     | button.acc-btn.acc-btn-sm.acc-btn-default
+apps/controller test:  !  38  h3                                                     | i.fa.fa-archive
+apps/controller test:  !  39  div.row                                                | input.acc-input
+apps/controller test:  !  40  div.col-md-9.panel.pane-default                        | button.acc-btn.acc-btn-warning.acc-mb.acc-btn-block
+apps/controller test:  !  41  a.btn.btn.btn-warning.mb                               | hr.acc-hr
+apps/controller test:  !  42  a.btn.btn-info.mb                                      | h3.acc-h3
+apps/controller test:  !  43  i.fa.fa-cloud-upload                                   | div.acc-row
+apps/controller test:  !  44  a.btn.btn.btn-default.mb                               | div.col-md-9.acc-panel
+apps/controller test:  !  45  div.table-responsive                                   | button.acc-btn.acc-btn-warning.acc-mb
+apps/controller test:  !  46  table.table.table-striped.table-bordered.table-hover   | button.acc-btn.acc-btn-info.acc-mb
+apps/controller test:  !  47  thead                                                  | i.fa.fa-cloud-upload
+apps/controller test:  !  48  tr                                                     | button.acc-btn.acc-btn-default.acc-mb
+apps/controller test:  !  49  th                                                     | div.acc-table-responsive
+apps/controller test:  !  50  th.text-center                                         | table.acc-table
+apps/controller test:  !  51  tbody                                                  | thead
+apps/controller test:     52  tr                                                     | tr
+apps/controller test:  !  53  td                                                     | th
+apps/controller test:  !  54  div.label.label-badge-img                              | th.acc-th-center
+apps/controller test:  !  55  img.user-badge-img                                     | tbody
+apps/controller test:  !  56  td                                                     | hr.acc-hr
+apps/controller test:  !  57  label                                                  | h3.acc-h3
+apps/controller test:  !  58  a                                                      | div.acc-row
+apps/controller test:  !  59  label                                                  | div.col-md-12.acc-panel
+apps/controller test:    … 58 more
+apps/controller test: account page: 116 of 118 differ (baseline 999)
+apps/controller test:  ✓ src/lib/mobile-filter-contract.test.ts (7 tests) 5ms
+apps/controller test:  ✓ src/lib/account-page-sbs.test.ts (2 tests) 11ms
+apps/controller test:  ✓ src/lib/features.test.ts (2 tests) 2ms
+apps/controller test:  ✓ src/lib/badge-editor-contract.test.ts (5 tests) 3ms
+apps/controller test:  ✓ src/lib/money.test.ts (20 tests) 1092ms
+apps/controller test:      ✓ is exact for every cent from $0.00 to $20,000.00, and matches the float path there  1088ms
+apps/controller test:  ✓ src/lib/permissions-modal-contract.test.ts (8 tests) 3ms
+apps/controller test:  ✓ src/lib/evidence-gap-register-counts.test.ts (4 tests) 2ms
+apps/controller test:  ✓ src/lib/manage-stats-row-contract.test.ts (6 tests) 5ms
+apps/controller test:  ✓ src/lib/stripe-status.test.ts (6 tests) 2ms
+apps/controller test:  ✓ src/lib/badge-row-reveal.test.ts (8 tests) 3ms
+apps/controller test:  ✓ src/lib/tab-strip-conditions.test.ts (6 tests) 3ms
+apps/controller test: stdout | src/lib/manage-user-table-sbs.test.ts > user table, side by side with the reference > matches element for element
+apps/controller test:    #    REFERENCE                                              | OURS
+apps/controller test:      0  table.table.table-striped                              | table.table.table-striped
+apps/controller test:      1  thead                                                  | thead
+apps/controller test:      2  tr                                                     | tr
+apps/controller test:      3  th                                                     | th
+apps/controller test:      4  «#»                                                    | «#»
+apps/controller test:      5  th                                                     | th
+apps/controller test:      6  «Name / Email»                                         | «Name / Email»
+apps/controller test:      7  th                                                     | th
+apps/controller test:      8  «Last Login/Notes»                                     | «Last Login/Notes»
+apps/controller test:      9  th                                                     | th
+apps/controller test:     10  «Role / Status»                                        | «Role / Status»
+apps/controller test:     11  th                                                     | th
+apps/controller test:     12  «Actions»                                              | «Actions»
+apps/controller test:     13  tbody                                                  | tbody
+apps/controller test:     14  tr                                                     | tr
+apps/controller test:     15  td                                                     | td
+apps/controller test:     16  «0»                                                    | «0»
+apps/controller test:     17  td                                                     | td
+apps/controller test:     18  img.thumb24                                            | img.thumb24
+apps/controller test:     19  br                                                     | br
+apps/controller test:     20  td                                                     | td
+apps/controller test:     21  td                                                     | td
+apps/controller test:     22  span                                                   | span
+apps/controller test:     23  «Owner»                                                | «Owner»
+apps/controller test:     24  td                                                     | td
+apps/controller test:     25  tr                                                     | tr
+apps/controller test:     26  td                                                     | td
+apps/controller test:     27  «1»                                                    | «1»
+apps/controller test:     28  td                                                     | td
+apps/controller test:     29  input                                                  | input
+apps/controller test:     30  img.thumb24                                            | img.thumb24
+apps/controller test:     31  «Billy Ribeiro»                                        | «Billy Ribeiro»
+apps/controller test:     32  br                                                     | br
+apps/controller test:     33  «willribeirodrums@icloud.com»                          | «willribeirodrums@icloud.com»
+apps/controller test:     34  span                                                   | span
+apps/controller test:     35  i.fa.fa-lock                                           | i.fa.fa-lock
+apps/controller test:     36  «PW set»                                               | «PW set»
+apps/controller test:     37  td                                                     | td
+apps/controller test:     38  «08/07/2026 @ 5:05PM»                                  | «08/07/2026 @ 5:05PM»
+apps/controller test:     39  td                                                     | td
+apps/controller test:     40  span                                                   | span
+apps/controller test:     41  «Presenter»                                            | «Presenter»
+apps/controller test:     42  span                                                   | span
+apps/controller test:  !  43  «/ manual»                                             | «/»
+apps/controller test:     44  td                                                     | td
+apps/controller test:     45  div.btn-group.mb-sm.mr                                 | div.btn-group.mb-sm.mr
+apps/controller test:     46  button.btn.dropdown-toggle.btn-primary                 | button.btn.dropdown-toggle.btn-primary
+apps/controller test:     47  «Actions»                                              | «Actions»
+apps/controller test:     48  span.caret                                             | span.caret
+apps/controller test:     49  ul.dropdown-menu.dropdown-menu-right                   | ul.dropdown-menu.dropdown-menu-right
+apps/controller test:     50  li.dropdown-submenu                                    | li.dropdown-submenu
+apps/controller test:     51  action                                                 | action
+apps/controller test:     52  i.fa.fa-shield                                         | i.fa.fa-shield
+apps/controller test:     53  «Permissions»                                          | «Permissions»
+apps/controller test:     54  i.fa.fa-caret-right.pull-right                         | i.fa.fa-caret-right.pull-right
+apps/controller test:     55  ul.dropdown-menu                                       | ul.dropdown-menu
+apps/controller test:     56  li                                                     | li
+apps/controller test:     57  action                                                 | action
+apps/controller test:     58  i.fa.fa-microphone                                     | i.fa.fa-microphone
+apps/controller test:     59  i.fa.fa-desktop                                        | i.fa.fa-desktop
+apps/controller test:     60  «Make Presenter»                                       | «Make Presenter»
+apps/controller test:     61  li                                                     | li
+apps/controller test:     62  action                                                 | action
+apps/controller test:     63  i.fa.fa-cog                                            | i.fa.fa-cog
+apps/controller test:     64  i.fa.fa-user-md                                        | i.fa.fa-user-md
+apps/controller test:     65  «Make Admin»                                           | «Make Admin»
+apps/controller test:     66  li                                                     | li
+apps/controller test:     67  action                                                 | action
+apps/controller test:     68  i.fa.fa-user                                           | i.fa.fa-user
+apps/controller test:     69  «Make Participant»                                     | «Make Participant»
+apps/controller test:     70  li                                                     | li
+apps/controller test:     71  action                                                 | action
+apps/controller test:     72  i.fa.fa-user                                           | i.fa.fa-user
+apps/controller test:     73  «Make Trial»                                           | «Make Trial»
+apps/controller test:     74  li                                                     | li
+apps/controller test:     75  action                                                 | action
+apps/controller test:     76  i.fa.fa-user-times                                     | i.fa.fa-user-times
+apps/controller test:     77  «MUTE Participant»                                     | «MUTE Participant»
+apps/controller test:     78  li                                                     | li
+apps/controller test:     79  action                                                 | action
+apps/controller test:     80  i.fa.fa-user-times                                     | i.fa.fa-user-times
+apps/controller test:     81  «BAN»                                                  | «BAN»
+apps/controller test:     82  li.divider                                             | li.divider
+apps/controller test:     83  li                                                     | li
+apps/controller test:     84  action                                                 | action
+apps/controller test:     85  i.fa.fa-user                                           | i.fa.fa-user
+apps/controller test:     86  «Unban»                                                | «Unban»
+apps/controller test:     87  li                                                     | li
+apps/controller test:     88  action                                                 | action
+apps/controller test:     89  i.fa.fa-clock-o                                        | i.fa.fa-clock-o
+apps/controller test:     90  «Freshen Login Date»                                   | «Freshen Login Date»
+apps/controller test:     91  li.dropdown-submenu                                    | li.dropdown-submenu
+apps/controller test:     92  action                                                 | action
+apps/controller test:     93  i.fa.fa-sliders                                        | i.fa.fa-sliders
+apps/controller test:     94  «Granular Perms»                                       | «Granular Perms»
+apps/controller test:     95  i.fa.fa-caret-right.pull-right                         | i.fa.fa-caret-right.pull-right
+apps/controller test:     96  ul.dropdown-menu                                       | ul.dropdown-menu
+apps/controller test:     97  li.divider                                             | li.divider
+apps/controller test:     98  li                                                     | li
+apps/controller test:     99  action                                                 | action
+apps/controller test:    100  i.fa.fa-user-circle                                    | i.fa.fa-user-circle
+apps/controller test:    101  «Show User Count»                                      | «Show User Count»
+apps/controller test:    102  li                                                     | li
+apps/controller test:    103  action                                                 | action
+apps/controller test:    104  i.fa.fa-user-circle                                    | i.fa.fa-user-circle
+apps/controller test:    105  «Hide User Count»                                      | «Hide User Count»
+apps/controller test:    106  li                                                     | li
+apps/controller test:    107  action                                                 | action
+apps/controller test:    108  i.fa.fa-hdd-o                                          | i.fa.fa-hdd-o
+apps/controller test:    109  «Deny Archives Access»                                 | «Deny Archives Access»
+apps/controller test:    110  li                                                     | li
+apps/controller test:    111  action                                                 | action
+apps/controller test:    112  i.fa.fa-lock                                           | i.fa.fa-lock
+apps/controller test:    113  «Hide Pers User Data»                                  | «Hide Pers User Data»
+apps/controller test:    114  li                                                     | li
+apps/controller test:    115  action                                                 | action
+apps/controller test:    116  i.fa.fa-user                                           | i.fa.fa-user
+apps/controller test:    117  «Don't Hide Pers User Data»                            | «Don't Hide Pers User Data»
+apps/controller test:    118  li.divider                                             | li.divider
+apps/controller test:    119  li                                                     | li
+apps/controller test:    120  action                                                 | action
+apps/controller test:    121  i.fa.fa-comment-o                                      | i.fa.fa-comment-o
+apps/controller test:    122  «Disallow User2User PM»                                | «Disallow User2User PM»
+apps/controller test:    123  li                                                     | li
+apps/controller test:    124  action                                                 | action
+apps/controller test:    125  i.fa.fa-comment-o                                      | i.fa.fa-comment-o
+apps/controller test:    126  «Allow User2User PM»                                   | «Allow User2User PM»
+apps/controller test:    127  li.divider                                             | li.divider
+apps/controller test:    128  li.dropdown-submenu                                    | li.dropdown-submenu
+apps/controller test:    129  action                                                 | action
+apps/controller test:    130  i.fa.fa-mobile                                         | i.fa.fa-mobile
+apps/controller test:    131  «App and Notifications»                                | «App and Notifications»
+apps/controller test:    132  i.fa.fa-caret-right.pull-right                         | i.fa.fa-caret-right.pull-right
+apps/controller test:    133  ul.dropdown-menu                                       | ul.dropdown-menu
+apps/controller test:    134  li                                                     | li
+apps/controller test:    135  action                                                 | action
+apps/controller test:    136  i.fa.fa-mobile                                         | i.fa.fa-mobile
+apps/controller test:    137  «Get App PIN»                                          | «Get App PIN»
+apps/controller test:    138  li                                                     | li
+apps/controller test:    139  action                                                 | action
+apps/controller test:    140  i.fa.fa-mobile                                         | i.fa.fa-mobile
+apps/controller test:    141  «Show App Tokens»                                      | «Show App Tokens»
+apps/controller test:    142  li                                                     | li
+apps/controller test:    143  action                                                 | action
+apps/controller test:    144  i.fa.fa-mobile                                         | i.fa.fa-mobile
+apps/controller test:    145  «Get FCM Tokens»                                       | «Get FCM Tokens»
+apps/controller test:    146  li.divider                                             | li.divider
+apps/controller test:    147  li                                                     | li
+apps/controller test:    148  action                                                 | action
+apps/controller test:    149  i.fa.fa-mobile                                         | i.fa.fa-mobile
+apps/controller test:    150  i.fa.fa.fa-bell-o                                      | i.fa.fa.fa-bell-o
+apps/controller test:    151  «PAUSE Mobile Notifs»                                  | «PAUSE Mobile Notifs»
+apps/controller test:    152  li                                                     | li
+apps/controller test:    153  action                                                 | action
+apps/controller test:    154  i.fa.fa-mobile                                         | i.fa.fa-mobile
+apps/controller test:    155  i.fa.fa-play                                           | i.fa.fa-play
+apps/controller test:    156  «RESUME Mobile Notifs»                                 | «RESUME Mobile Notifs»
+apps/controller test:    157  li                                                     | li
+apps/controller test:    158  action                                                 | action
+apps/controller test:    159  i.fa.fa-mobile                                         | i.fa.fa-mobile
+apps/controller test:    160  i.fa.fa-trash                                          | i.fa.fa-trash
+apps/controller test:    161  «Remove Mobile Notifs»                                 | «Remove Mobile Notifs»
+apps/controller test:    162  li                                                     | li
+apps/controller test:    163  action                                                 | action
+apps/controller test:    164  i.fa.fa-mobile                                         | i.fa.fa-mobile
+apps/controller test:    165  i.fa.fa.fa-bell-o                                      | i.fa.fa.fa-bell-o
+apps/controller test:    166  «Send Test Mobile Notifs»                              | «Send Test Mobile Notifs»
+apps/controller test:    167  li                                                     | li
+apps/controller test:    168  action                                                 | action
+apps/controller test:    169  i.fa.fa-mobile                                         | i.fa.fa-mobile
+apps/controller test:    170  i.fa.fa-reload                                         | i.fa.fa-reload
+apps/controller test:    171  «Reset Mobile Notifs»                                  | «Reset Mobile Notifs»
+apps/controller test:    172  li.dropdown-submenu                                    | li.dropdown-submenu
+apps/controller test:    173  action                                                 | action
+apps/controller test:    174  i.fa.fa-certificate                                    | i.fa.fa-certificate
+apps/controller test:    175  «Badges»                                               | «Badges»
+apps/controller test:    176  i.fa.fa-caret-right.pull-right                         | i.fa.fa-caret-right.pull-right
+apps/controller test:    177  ul.dropdown-menu                                       | ul.dropdown-menu
+apps/controller test:    178  li.divider                                             | li.divider
+apps/controller test:    179  li                                                     | li
+apps/controller test:    180  action                                                 | action
+apps/controller test:    181  i.fa.fa-pencil-square-o                                | i.fa.fa-pencil-square-o
+apps/controller test:    182  «Set Note»                                             | «Set Note»
+apps/controller test:    183  li                                                     | li
+apps/controller test:    184  action                                                 | action
+apps/controller test:    185  i.fa.fa-edit                                           | i.fa.fa-edit
+apps/controller test:    186  «Edit Username»                                        | «Edit Username»
+apps/controller test:    187  li                                                     | li
+apps/controller test:    188  action                                                 | action
+apps/controller test:    189  i.fa.fa-trash                                          | i.fa.fa-trash
+apps/controller test:    190  «Remove User»                                          | «Remove User»
+apps/controller test:    191  li.divider                                             | li.divider
+apps/controller test:    192  li                                                     | li
+apps/controller test:    193  action                                                 | action
+apps/controller test:    194  i.fa.fa-lock                                           | i.fa.fa-lock
+apps/controller test:    195  «Set/Change Password»                                  | «Set/Change Password»
+apps/controller test:    196  li                                                     | li
+apps/controller test:    197  action                                                 | action
+apps/controller test:    198  i.fa.fa-envelope                                       | i.fa.fa-envelope
+apps/controller test:    199  «Resend Welcome Email»                                 | «Resend Welcome Email»
+apps/controller test:    200  li.divider                                             | li.divider
+apps/controller test:    201  li                                                     | li
+apps/controller test:    202  action                                                 | action
+apps/controller test:    203  i.fa.fa-pause                                          | i.fa.fa-pause
+apps/controller test:    204  «Pause / Pending»                                      | «Pause / Pending»
+apps/controller test:    205  tr                                                     | tr
+apps/controller test:    206  td                                                     | td
+apps/controller test:    207  «2»                                                    | «2»
+apps/controller test:    208  td                                                     | td
+apps/controller test:    209  input                                                  | input
+apps/controller test:    210  img.thumb24                                            | img.thumb24
+apps/controller test:    211  «Welber Ribeiro»                                       | «Welber Ribeiro»
+apps/controller test:    212  br                                                     | br
+apps/controller test:    213  «willribeirodrums@gmail.com»                           | «willribeirodrums@gmail.com»
+apps/controller test:    214  span                                                   | span
+apps/controller test:    215  i.fa.fa-lock                                           | i.fa.fa-lock
+apps/controller test:    216  «PW set»                                               | «PW set»
+apps/controller test:    217  td                                                     | td
+apps/controller test:    218  td                                                     | td
+apps/controller test:    219  span                                                   | span
+apps/controller test:    220  «Presenter»                                            | «Presenter»
+apps/controller test:    221  span                                                   | span
+apps/controller test:  ! 222  «/ manual»                                             | «/»
+apps/controller test:    223  td                                                     | td
+apps/controller test:    224  div.btn-group.mb-sm.mr                                 | div.btn-group.mb-sm.mr
+apps/controller test:    225  button.btn.dropdown-toggle.btn-primary                 | button.btn.dropdown-toggle.btn-primary
+apps/controller test:    226  «Actions»                                              | «Actions»
+apps/controller test:    227  span.caret                                             | span.caret
+apps/controller test:    228  ul.dropdown-menu.dropdown-menu-right                   | ul.dropdown-menu.dropdown-menu-right
+apps/controller test:    229  li.dropdown-submenu                                    | li.dropdown-submenu
+apps/controller test:    230  action                                                 | action
+apps/controller test:    231  i.fa.fa-shield                                         | i.fa.fa-shield
+apps/controller test:    232  «Permissions»                                          | «Permissions»
+apps/controller test:    233  i.fa.fa-caret-right.pull-right                         | i.fa.fa-caret-right.pull-right
+apps/controller test:    234  ul.dropdown-menu                                       | ul.dropdown-menu
+apps/controller test:    235  li                                                     | li
+apps/controller test:    236  action                                                 | action
+apps/controller test:    237  i.fa.fa-microphone                                     | i.fa.fa-microphone
+apps/controller test:    238  i.fa.fa-desktop                                        | i.fa.fa-desktop
+apps/controller test:    239  «Make Presenter»                                       | «Make Presenter»
+apps/controller test:    240  li                                                     | li
+apps/controller test:    241  action                                                 | action
+apps/controller test:    242  i.fa.fa-cog                                            | i.fa.fa-cog
+apps/controller test:    243  i.fa.fa-user-md                                        | i.fa.fa-user-md
+apps/controller test:    244  «Make Admin»                                           | «Make Admin»
+apps/controller test:    245  li                                                     | li
+apps/controller test:    246  action                                                 | action
+apps/controller test:    247  i.fa.fa-user                                           | i.fa.fa-user
+apps/controller test:    248  «Make Participant»                                     | «Make Participant»
+apps/controller test:    249  li                                                     | li
+apps/controller test:    250  action                                                 | action
+apps/controller test:    251  i.fa.fa-user                                           | i.fa.fa-user
+apps/controller test:    252  «Make Trial»                                           | «Make Trial»
+apps/controller test:    253  li                                                     | li
+apps/controller test:    254  action                                                 | action
+apps/controller test:    255  i.fa.fa-user-times                                     | i.fa.fa-user-times
+apps/controller test:    256  «MUTE Participant»                                     | «MUTE Participant»
+apps/controller test:    257  li                                                     | li
+apps/controller test:    258  action                                                 | action
+apps/controller test:    259  i.fa.fa-user-times                                     | i.fa.fa-user-times
+apps/controller test:    260  «BAN»                                                  | «BAN»
+apps/controller test:    261  li.divider                                             | li.divider
+apps/controller test:    262  li                                                     | li
+apps/controller test:    263  action                                                 | action
+apps/controller test:    264  i.fa.fa-user                                           | i.fa.fa-user
+apps/controller test:    265  «Unban»                                                | «Unban»
+apps/controller test:    266  li                                                     | li
+apps/controller test:    267  action                                                 | action
+apps/controller test:    268  i.fa.fa-clock-o                                        | i.fa.fa-clock-o
+apps/controller test:    269  «Freshen Login Date»                                   | «Freshen Login Date»
+apps/controller test:    270  li.dropdown-submenu                                    | li.dropdown-submenu
+apps/controller test:    271  action                                                 | action
+apps/controller test:    272  i.fa.fa-sliders                                        | i.fa.fa-sliders
+apps/controller test:    273  «Granular Perms»                                       | «Granular Perms»
+apps/controller test:    274  i.fa.fa-caret-right.pull-right                         | i.fa.fa-caret-right.pull-right
+apps/controller test:    275  ul.dropdown-menu                                       | ul.dropdown-menu
+apps/controller test:    276  li.divider                                             | li.divider
+apps/controller test:    277  li                                                     | li
+apps/controller test:    278  action                                                 | action
+apps/controller test:    279  i.fa.fa-user-circle                                    | i.fa.fa-user-circle
+apps/controller test:    280  «Show User Count»                                      | «Show User Count»
+apps/controller test:    281  li                                                     | li
+apps/controller test:    282  action                                                 | action
+apps/controller test:    283  i.fa.fa-user-circle                                    | i.fa.fa-user-circle
+apps/controller test:    284  «Hide User Count»                                      | «Hide User Count»
+apps/controller test:    285  li                                                     | li
+apps/controller test:    286  action                                                 | action
+apps/controller test:    287  i.fa.fa-hdd-o                                          | i.fa.fa-hdd-o
+apps/controller test:    288  «Deny Archives Access»                                 | «Deny Archives Access»
+apps/controller test:    289  li                                                     | li
+apps/controller test:    290  action                                                 | action
+apps/controller test:    291  i.fa.fa-lock                                           | i.fa.fa-lock
+apps/controller test:    292  «Hide Pers User Data»                                  | «Hide Pers User Data»
+apps/controller test:    293  li                                                     | li
+apps/controller test:    294  action                                                 | action
+apps/controller test:    295  i.fa.fa-user                                           | i.fa.fa-user
+apps/controller test:    296  «Don't Hide Pers User Data»                            | «Don't Hide Pers User Data»
+apps/controller test:    297  li.divider                                             | li.divider
+apps/controller test:    298  li                                                     | li
+apps/controller test:    299  action                                                 | action
+apps/controller test:    300  i.fa.fa-comment-o                                      | i.fa.fa-comment-o
+apps/controller test:    301  «Disallow User2User PM»                                | «Disallow User2User PM»
+apps/controller test:    302  li                                                     | li
+apps/controller test:    303  action                                                 | action
+apps/controller test:    304  i.fa.fa-comment-o                                      | i.fa.fa-comment-o
+apps/controller test:    305  «Allow User2User PM»                                   | «Allow User2User PM»
+apps/controller test:    306  li.divider                                             | li.divider
+apps/controller test:    307  li.dropdown-submenu                                    | li.dropdown-submenu
+apps/controller test:    308  action                                                 | action
+apps/controller test:    309  i.fa.fa-mobile                                         | i.fa.fa-mobile
+apps/controller test:    310  «App and Notifications»                                | «App and Notifications»
+apps/controller test:    311  i.fa.fa-caret-right.pull-right                         | i.fa.fa-caret-right.pull-right
+apps/controller test:    312  ul.dropdown-menu                                       | ul.dropdown-menu
+apps/controller test:    313  li                                                     | li
+apps/controller test:    314  action                                                 | action
+apps/controller test:    315  i.fa.fa-mobile                                         | i.fa.fa-mobile
+apps/controller test:    316  «Get App PIN»                                          | «Get App PIN»
+apps/controller test:    317  li                                                     | li
+apps/controller test:    318  action                                                 | action
+apps/controller test:    319  i.fa.fa-mobile                                         | i.fa.fa-mobile
+apps/controller test:    320  «Show App Tokens»                                      | «Show App Tokens»
+apps/controller test:    321  li                                                     | li
+apps/controller test:    322  action                                                 | action
+apps/controller test:    323  i.fa.fa-mobile                                         | i.fa.fa-mobile
+apps/controller test:    324  «Get FCM Tokens»                                       | «Get FCM Tokens»
+apps/controller test:    325  li.divider                                             | li.divider
+apps/controller test:    326  li                                                     | li
+apps/controller test:    327  action                                                 | action
+apps/controller test:    328  i.fa.fa-mobile                                         | i.fa.fa-mobile
+apps/controller test:    329  i.fa.fa.fa-bell-o                                      | i.fa.fa.fa-bell-o
+apps/controller test:    330  «PAUSE Mobile Notifs»                                  | «PAUSE Mobile Notifs»
+apps/controller test:    331  li                                                     | li
+apps/controller test:    332  action                                                 | action
+apps/controller test:    333  i.fa.fa-mobile                                         | i.fa.fa-mobile
+apps/controller test:    334  i.fa.fa-play                                           | i.fa.fa-play
+apps/controller test:    335  «RESUME Mobile Notifs»                                 | «RESUME Mobile Notifs»
+apps/controller test:    336  li                                                     | li
+apps/controller test:    337  action                                                 | action
+apps/controller test:    338  i.fa.fa-mobile                                         | i.fa.fa-mobile
+apps/controller test:    339  i.fa.fa-trash                                          | i.fa.fa-trash
+apps/controller test:    340  «Remove Mobile Notifs»                                 | «Remove Mobile Notifs»
+apps/controller test:    341  li                                                     | li
+apps/controller test:    342  action                                                 | action
+apps/controller test:    343  i.fa.fa-mobile                                         | i.fa.fa-mobile
+apps/controller test:    344  i.fa.fa.fa-bell-o                                      | i.fa.fa.fa-bell-o
+apps/controller test:    345  «Send Test Mobile Notifs»                              | «Send Test Mobile Notifs»
+apps/controller test:    346  li                                                     | li
+apps/controller test:    347  action                                                 | action
+apps/controller test:    348  i.fa.fa-mobile                                         | i.fa.fa-mobile
+apps/controller test:    349  i.fa.fa-reload                                         | i.fa.fa-reload
+apps/controller test:    350  «Reset Mobile Notifs»                                  | «Reset Mobile Notifs»
+apps/controller test:    351  li.dropdown-submenu                                    | li.dropdown-submenu
+apps/controller test:    352  action                                                 | action
+apps/controller test:    353  i.fa.fa-certificate                                    | i.fa.fa-certificate
+apps/controller test:    354  «Badges»                                               | «Badges»
+apps/controller test:    355  i.fa.fa-caret-right.pull-right                         | i.fa.fa-caret-right.pull-right
+apps/controller test:    356  ul.dropdown-menu                                       | ul.dropdown-menu
+apps/controller test:    357  li.divider                                             | li.divider
+apps/controller test:    358  li                                                     | li
+apps/controller test:    359  action                                                 | action
+apps/controller test:    360  i.fa.fa-pencil-square-o                                | i.fa.fa-pencil-square-o
+apps/controller test:    361  «Set Note»                                             | «Set Note»
+apps/controller test:    362  li                                                     | li
+apps/controller test:    363  action                                                 | action
+apps/controller test:    364  i.fa.fa-edit                                           | i.fa.fa-edit
+apps/controller test:    365  «Edit Username»                                        | «Edit Username»
+apps/controller test:    366  li                                                     | li
+apps/controller test:    367  action                                                 | action
+apps/controller test:    368  i.fa.fa-trash                                          | i.fa.fa-trash
+apps/controller test:    369  «Remove User»                                          | «Remove User»
+apps/controller test:    370  li.divider                                             | li.divider
+apps/controller test:    371  li                                                     | li
+apps/controller test:    372  action                                                 | action
+apps/controller test:    373  i.fa.fa-lock                                           | i.fa.fa-lock
+apps/controller test:    374  «Set/Change Password»                                  | «Set/Change Password»
+apps/controller test:    375  li                                                     | li
+apps/controller test:    376  action                                                 | action
+apps/controller test:    377  i.fa.fa-envelope                                       | i.fa.fa-envelope
+apps/controller test:    378  «Resend Welcome Email»                                 | «Resend Welcome Email»
+apps/controller test:    379  li.divider                                             | li.divider
+apps/controller test:    380  li                                                     | li
+apps/controller test:    381  action                                                 | action
+apps/controller test:    382  i.fa.fa-pause                                          | i.fa.fa-pause
+apps/controller test:    383  «Pause / Pending»                                      | «Pause / Pending»
+apps/controller test: 2 of 384 lines differ
+apps/controller test:  ✓ src/lib/manage-user-row-sbs.test.ts (3 tests) 12ms
+apps/controller test:  ✓ src/lib/manage-row-actions-render.test.ts (5 tests) 15ms
+apps/controller test:  ✓ src/lib/manage-stats-arrival-row.test.ts (10 tests) 15ms
+apps/controller test:  ✓ src/lib/room-member-role.test.ts (4 tests) 2ms
+apps/controller test:  ✓ src/lib/manage-panel-capacity-contract.test.ts (7 tests) 16ms
+apps/controller test: stdout | src/lib/manage-sections-sbs.test.ts > manage page, section by section > Users matches the reference
+apps/controller test: === Users — reference | ours (from the first divergence) ===
+apps/controller test:    … 162 matching rows above
+apps/controller test:    162  td                                                     | td
+apps/controller test:    163  span                                                   | span
+apps/controller test:    164  «Presenter»                                            | «Presenter»
+apps/controller test:    165  span                                                   | span
+apps/controller test:  ! 166  «/ manual»                                             | «/»
+apps/controller test:    167  td                                                     | td
+apps/controller test:    168  div.btn-group.mb-sm.mr                                 | div.btn-group.mb-sm.mr
+apps/controller test:    169  button.btn.dropdown-toggle.btn-primary                 | button.btn.dropdown-toggle.btn-primary
+apps/controller test:    170  «Actions»                                              | «Actions»
+apps/controller test:    171  span.caret                                             | span.caret
+apps/controller test:    172  ul.dropdown-menu.dropdown-menu-right                   | ul.dropdown-menu.dropdown-menu-right
+apps/controller test:    173  li.dropdown-submenu                                    | li.dropdown-submenu
+apps/controller test:    174  action                                                 | action
+apps/controller test:    175  i.fa.fa-shield                                         | i.fa.fa-shield
+apps/controller test:    176  «Permissions»                                          | «Permissions»
+apps/controller test:    177  i.fa.fa-caret-right.pull-right                         | i.fa.fa-caret-right.pull-right
+apps/controller test:    178  ul.dropdown-menu                                       | ul.dropdown-menu
+apps/controller test:    179  li                                                     | li
+apps/controller test:    180  action                                                 | action
+apps/controller test:    181  i.fa.fa-microphone                                     | i.fa.fa-microphone
+apps/controller test:    182  i.fa.fa-desktop                                        | i.fa.fa-desktop
+apps/controller test:    183  «Make Presenter»                                       | «Make Presenter»
+apps/controller test:    184  li                                                     | li
+apps/controller test:    185  action                                                 | action
+apps/controller test:    186  i.fa.fa-cog                                            | i.fa.fa-cog
+apps/controller test:    187  i.fa.fa-user-md                                        | i.fa.fa-user-md
+apps/controller test:    188  «Make Admin»                                           | «Make Admin»
+apps/controller test:    189  li                                                     | li
+apps/controller test:    190  action                                                 | action
+apps/controller test:    191  i.fa.fa-user                                           | i.fa.fa-user
+apps/controller test:    192  «Make Participant»                                     | «Make Participant»
+apps/controller test:    193  li                                                     | li
+apps/controller test:    194  action                                                 | action
+apps/controller test:    195  i.fa.fa-user                                           | i.fa.fa-user
+apps/controller test:    196  «Make Trial»                                           | «Make Trial»
+apps/controller test:    197  li                                                     | li
+apps/controller test:    198  action                                                 | action
+apps/controller test:    199  i.fa.fa-user-times                                     | i.fa.fa-user-times
+apps/controller test:    200  «MUTE Participant»                                     | «MUTE Participant»
+apps/controller test:    201  li                                                     | li
+apps/controller test:    … 305 more lines
+apps/controller test: Users: 2 of 507 differ (baseline 2)
+apps/controller test:  ✓ src/lib/manage-user-table-sbs.test.ts (2 tests) 15ms
+apps/controller test: stdout | src/lib/manage-sections-sbs.test.ts > manage page, section by section > User Stats matches the reference
+apps/controller test: === User Stats — reference | ours (from the first divergence) ===
+apps/controller test:    … 4 matching rows above
+apps/controller test:      4  div                                                    | div
+apps/controller test:      5  p.form-control-static                                  | p.form-control-static
+apps/controller test:      6  label.col-sm-4.control-label                           | label.col-sm-4.control-label
+apps/controller test:      7  «Start Date:»                                          | «Start Date:»
+apps/controller test:  !   8  a.editable.editable-click                              | a.editable.editable-click.editable-empty
+apps/controller test:  !   9  «08-07-2026»                                           | «empty»
+apps/controller test:     10  br                                                     | br
+apps/controller test:  !  11  label.muted                                            | span.muted
+apps/controller test:     12  «Choose a start date»                                  | «Choose a start date»
+apps/controller test:     13  p.form-control-static                                  | p.form-control-static
+apps/controller test:     14  label.col-sm-4.control-label                           | label.col-sm-4.control-label
+apps/controller test:     15  «End Date:»                                            | «End Date:»
+apps/controller test:  !  16  a.editable.editable-click                              | a.editable.editable-click.editable-empty
+apps/controller test:  !  17  «08-08-2026»                                           | «empty»
+apps/controller test:     18  br                                                     | br
+apps/controller test:  !  19  label.muted                                            | span.muted
+apps/controller test:     20  «Choose an end date»                                   | «Choose an end date»
+apps/controller test:     21  button.btn.btn-md.btn-info                             | button.btn.btn-md.btn-info
+apps/controller test:     22  i.fa.fa-user-plus                                      | i.fa.fa-user-plus
+apps/controller test:     23  «Load Stats»                                           | «Load Stats»
+apps/controller test:     24  button.btn.btn-md.btn-info                             | button.btn.btn-md.btn-info
+apps/controller test:     25  i.fa.fa-floppy-o                                       | i.fa.fa-floppy-o
+apps/controller test:     26  «Export»                                               | «Export»
+apps/controller test:     27  button.btn.btn-md.btn-info                             | button.btn.btn-md.btn-info
+apps/controller test:     28  i.fa.fa-users                                          | i.fa.fa-users
+apps/controller test:     29  «Monthly report for date range»                        | «Monthly report for date range»
+apps/controller test:     30  div                                                    | div
+apps/controller test:     31  label.col-sm-2.control-label                           | label.col-sm-2.control-label
+apps/controller test:     32  «Search Users»                                         | «Search Users»
+apps/controller test:     33  div.col-sm-4                                           | div.col-sm-4
+apps/controller test:     34  input.form-control                                     | input.form-control
+apps/controller test:     35  br                                                     | br
+apps/controller test:     36  label                                                  | label
+apps/controller test:     37  input                                                  | input
+apps/controller test:     38  «Show Online Users Only»                               | «Show Online Users Only»
+apps/controller test:     39  label                                                  | label
+apps/controller test:     40  input                                                  | input
+apps/controller test:     41  «Show»                                                 | «Show»
+apps/controller test:     42  span.badge.badge-danger                                | span.badge.badge-danger
+apps/controller test:     43  «Free Trials»                                          | «Free Trials»
+apps/controller test:    … 9 more lines
+apps/controller test: User Stats: 6 of 53 differ (baseline 6)
+apps/controller test:  ✓ src/lib/chrome.test.ts (13 tests) 5ms
+apps/controller test:  ✓ src/lib/auth-modes.test.ts (7 tests) 4ms
+apps/controller test:  ✓ src/lib/manage-menu-stays-open.test.ts (4 tests) 3ms
+apps/controller test:  ✓ src/lib/badge-editor-labels.test.ts (5 tests) 2ms
+apps/controller test: stdout | src/lib/manage-sections-sbs.test.ts > manage page, section by section > Settings matches the reference
+apps/controller test: === Settings — reference | ours (from the first divergence) ===
+apps/controller test:    … 1481 matching rows above
+apps/controller test:    1481  «empty»                                                | «empty»
+apps/controller test:    1482  br                                                     | br
+apps/controller test:    1483  label.muted                                            | label.muted
+apps/controller test:    1484  «Comma separated list of invalid JWT tokens.»          | «Comma separated list of invalid JWT tokens.»
+apps/controller test:  ! 1485  hr                                                     | p.form-control-static
+apps/controller test:  ! 1486  h3                                                     | label.col-sm-2.control-label
+apps/controller test:  ! 1487  «DON'T»                                                | «Room Type»
+apps/controller test:  ! 1488  span                                                   | a.editable.editable-click.editable-empty
+apps/controller test:  ! 1489  «TOUCH»                                                | «empty»
+apps/controller test:  ! 1490  «These below unless you know what you are doing...»    | br
+apps/controller test:  ! 1491  p                                                      | label.muted
+apps/controller test:  ! 1492  «Settings...»                                          | «A webinar room adds a scheduled date and the reminder-email tools.»
+apps/controller test:  ! 1493                                                         | hr
+apps/controller test:  ! 1494                                                         | h3
+apps/controller test:  ! 1495                                                         | «DON'T»
+apps/controller test:  ! 1496                                                         | button.editable.editable-click
+apps/controller test:  ! 1497                                                         | «TOUCH»
+apps/controller test:  ! 1498                                                         | «These below unless you know what you are doing...»
+apps/controller test:  ! 1499                                                         | p
+apps/controller test:  ! 1500                                                         | «Settings...»
+apps/controller test: Settings: 16 of 1501 differ (baseline 16)
+apps/controller test: stdout | src/lib/manage-sections-sbs.test.ts > manage page, section by section > reports the scoreboard
+apps/controller test: --- manage page: differing elements per section ---
+apps/controller test:   tab strip          0 / 15
+apps/controller test:   Users              2 / 507
+apps/controller test:   Text List          0 / 6
+apps/controller test:   Branding           0 / 94
+apps/controller test:   SSO Setup          0 / 9
+apps/controller test:   User Stats         6 / 53
+apps/controller test:   Settings          16 / 1501
+apps/controller test:  ✓ src/lib/motion-import-contract.test.ts (2 tests) 2ms
+apps/controller test:  ✓ src/lib/error-reporting-contract.test.ts (2 tests) 2ms
+apps/controller test:  ✓ src/lib/server/account-entitlements.test.ts (2 tests) 2ms
+apps/controller test:  ✓ src/lib/manage-sections-sbs.test.ts (9 tests) 34ms
+apps/controller test:  ✓ src/lib/api-key-session-restrictions.test.ts (9 tests) 3ms
+apps/controller test:  ✓ src/lib/opcode-sets-match-template.test.ts (6 tests) 3ms
+apps/controller test:  ✓ src/lib/manage-user-row-reference-fields.test.ts (36 tests) 77ms
+apps/controller test:  ✓ src/lib/server/room-visits.test.ts (7 tests) 3ms
+apps/controller test:  Test Files  88 passed (88)
+apps/controller test:       Tests  925 passed (925)
+apps/controller test:    Start at  07:09:11
+apps/controller test:    Duration  1.86s (transform 15.97s, setup 0ms, import 24.36s, tests 2.20s, environment 17ms)
+apps/controller test: JSON report written to /Users/billyribeiro/Desktop/trading-room-app/apps/controller/.vitest-report.json
+apps/controller test:  % Coverage report from v8
+apps/controller test: -------------------|---------|----------|---------|---------|-------------------
+apps/controller test: File               | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s 
+apps/controller test: -------------------|---------|----------|---------|---------|-------------------
+apps/controller test: All files          |   36.85 |    40.01 |   39.79 |   36.25 |                   
+apps/controller test:  src               |   17.39 |        0 |       0 |   19.04 |                   
+apps/controller test:   hooks.server.ts  |       0 |        0 |       0 |       0 | 10-74             
+apps/controller test:  src/lib           |   66.36 |       76 |   63.79 |   65.27 |                   
+apps/controller test:   animate-once.ts  |       0 |        0 |       0 |       0 | 20-26             
+apps/controller test:   ...box.svelte.ts |    7.69 |        0 |       0 |    9.09 | 55-62,67-116      
+apps/controller test:   ...ap-tooltip.ts |       0 |        0 |       0 |       0 | 15-142            
+apps/controller test:   dom-shape.ts     |     100 |    91.54 |     100 |     100 | ...40,187,210,237 
+apps/controller test:   ...e-duration.ts |   78.26 |    70.83 |     100 |   73.33 | 34-38             
+apps/controller test:   motion.ts        |       0 |        0 |       0 |       0 | 78-244            
+apps/controller test:   ...ence-users.ts |   93.33 |       50 |     100 |     100 | 46-63             
+apps/controller test:   room-config.ts   |     100 |    96.77 |     100 |     100 | 93                
+apps/controller test:   room-entry.ts    |    93.1 |    93.82 |     100 |      96 | 239,260           
+apps/controller test:   ...tings-help.ts |     100 |       90 |     100 |     100 | 123               
+apps/controller test:   sanitize-html.ts |   98.86 |    91.54 |     100 |     100 | 115-117,134-137   
+apps/controller test:   stats-csv.ts     |     100 |     87.5 |     100 |     100 | 56,84,90          
+apps/controller test:   toast.svelte.ts  |   28.57 |        0 |       0 |   36.36 | 46-59,63-64       
+apps/controller test:  ...omponents/home |       0 |      100 |       0 |       0 |                   
+apps/controller test:   market-feed.ts   |       0 |      100 |       0 |       0 | 21-49             
+apps/controller test:  src/lib/content   |   13.79 |      100 |     100 |   13.79 |                   
+apps/controller test:   home.ts          |       0 |      100 |     100 |       0 | 15-229            
+apps/controller test:  src/lib/server    |   58.45 |    60.79 |   62.56 |   59.77 |                   
+apps/controller test:   ...key-secret.ts |      96 |     90.9 |     100 |      96 | 54                
+apps/controller test:   auth.ts          |     3.5 |        0 |       0 |    4.34 | 23-228            
+apps/controller test:   ...ane-policy.ts |     100 |    96.29 |     100 |     100 | 58                
+apps/controller test:   ...ne-runtime.ts |       0 |      100 |     100 |       0 | 6-15              
+apps/controller test:   ...rification.ts |   89.18 |       96 |      75 |   89.28 | 204-238           
+apps/controller test:   fcm.ts           |   92.39 |    76.92 |   93.33 |   94.18 | ...34-235,242,329 
+apps/controller test:   gravatar.ts      |       0 |        0 |       0 |       0 | 34-37             
+apps/controller test:   impersonation.ts |    3.33 |        0 |       0 |    4.54 | 47-135            
+apps/controller test:   mail.ts          |   29.41 |       10 |      40 |   33.33 | 58-59,103-136     
+apps/controller test:   member-email.ts  |   97.29 |       85 |     100 |     100 | 143-163,227       
+apps/controller test:   ...le-pairing.ts |   56.81 |    59.18 |      80 |   51.42 | 135-261           
+apps/controller test:   ...ision-room.ts |       0 |        0 |       0 |       0 | 55-173            
+apps/controller test:   recaptcha.ts     |   96.15 |    95.65 |      75 |   95.23 | 119               
+apps/controller test:   room-handoff.ts  |   87.17 |    72.41 |   88.88 |    87.5 | 169-173           
+apps/controller test:   room-visits.ts   |   37.03 |    67.74 |   33.33 |    37.5 | 112-199           
+apps/controller test:   rooms.ts         |   31.14 |     30.4 |   33.89 |   31.25 | ...-968,1044-1109 
+apps/controller test:   sso-token.ts     |   97.22 |    97.22 |     100 |   98.33 | 284               
+apps/controller test:   superadmin.ts    |   83.78 |    86.66 |      70 |   85.29 | 150-153,202-244   
+apps/controller test:  src/lib/server/db |   30.39 |    33.33 |    6.06 |   31.31 |                   
+apps/controller test:   index.ts         |    3.12 |        0 |       0 |    3.44 | 13-74,115-205     
+apps/controller test:   migrator.js      |    37.5 |    61.11 |      50 |    37.5 | 84-139            
+apps/controller test:   schema.ts        |   45.94 |      100 |       0 |   45.94 | ...51,562,625,644 
+apps/controller test:  src/routes        |       0 |      100 |       0 |       0 |                   
+apps/controller test:   ...out.server.ts |       0 |      100 |       0 |       0 | 4                 
+apps/controller test:  .../(app)/account |       0 |        0 |       0 |       0 |                   
+apps/controller test:   +page.server.ts  |       0 |        0 |       0 |       0 | 17-557            
+apps/controller test:  ...count/api-docs |       0 |      100 |       0 |       0 |                   
+apps/controller test:   +page.server.ts  |       0 |      100 |       0 |       0 | 14-16             
+apps/controller test:  ...pi-post-routes |       0 |      100 |       0 |       0 |                   
+apps/controller test:   +page.server.ts  |       0 |      100 |       0 |       0 | 22-24             
+apps/controller test:  ...s/[id]/[[tab]] |       0 |        0 |       0 |       0 |                   
+apps/controller test:   +page.server.ts  |       0 |        0 |       0 |       0 | 85-1190           
+apps/controller test:  ...[id]/stats.csv |       0 |        0 |       0 |       0 |                   
+apps/controller test:   +server.ts       |       0 |        0 |       0 |       0 | 38-95             
+apps/controller test:  ...es/(app)/admin |       0 |        0 |       0 |       0 |                   
+apps/controller test:   ...out.server.ts |       0 |        0 |       0 |       0 | 34-57             
+apps/controller test:   +page.server.ts  |       0 |        0 |       0 |       0 | 43-264            
+apps/controller test:  ...p)/launch/[id] |       0 |        0 |       0 |       0 |                   
+apps/controller test:   +server.ts       |       0 |        0 |       0 |       0 | 26-111            
+apps/controller test:  ...s/(app)/logout |       0 |      100 |       0 |       0 |                   
+apps/controller test:   +page.server.ts  |       0 |      100 |       0 |       0 | 5-15              
+apps/controller test:  ...auth)/register |       0 |        0 |       0 |       0 |                   
+apps/controller test:   +page.server.ts  |       0 |        0 |       0 |       0 | 11-153            
+apps/controller test:  ...ublic)/contact |       0 |        0 |       0 |       0 |                   
+apps/controller test:   +page.server.ts  |       0 |        0 |       0 |       0 | 5-29              
+apps/controller test:  ...orgot-password |       0 |        0 |       0 |       0 |                   
+apps/controller test:   +page.server.ts  |       0 |        0 |       0 |       0 | 16-102            
+apps/controller test:  ...(public)/login |       0 |        0 |       0 |       0 |                   
+apps/controller test:   +page.server.ts  |       0 |        0 |       0 |       0 | 14-126            
+apps/controller test:  ...ser/[publicId] |       0 |        0 |       0 |       0 |                   
+apps/controller test:   +server.ts       |       0 |        0 |       0 |       0 | 56-126            
+apps/controller test:  ...reset-password |       0 |        0 |       0 |       0 |                   
+apps/controller test:   +page.server.ts  |       0 |        0 |       0 |       0 | 28-121            
+apps/controller test:  ...session/[code] |       0 |        0 |       0 |       0 |                   
+apps/controller test:   +page.server.ts  |       0 |        0 |       0 |       0 | 11-140            
+apps/controller test:  .../[code]/joined |       0 |        0 |       0 |       0 |                   
+apps/controller test:   +page.server.ts  |       0 |        0 |       0 |       0 | 28-90             
+apps/controller test:  ...ic)/sso/[code] |       0 |        0 |       0 |       0 |                   
+apps/controller test:   +server.ts       |       0 |        0 |       0 |       0 | 66-230            
+apps/controller test:  ...)/verify-email |       0 |        0 |       0 |       0 |                   
+apps/controller test:   +page.server.ts  |       0 |        0 |       0 |       0 | 27-49             
+apps/controller test:  ...pi/mobile/pair |       0 |        0 |       0 |       0 |                   
+apps/controller test:   +server.ts       |       0 |        0 |       0 |       0 | 40-82             
+apps/controller test:  ...ile-pin/[code] |       0 |        0 |       0 |       0 |                   
+apps/controller test:   +server.ts       |       0 |        0 |       0 |       0 | 32-83             
+apps/controller test:  ...-config/[code] |       0 |        0 |       0 |       0 |                   
+apps/controller test:   +server.ts       |       0 |        0 |       0 |       0 | 51-120            
+apps/controller test:  ...setting/[code] |       0 |        0 |       0 |       0 |                   
+apps/controller test:   +server.ts       |       0 |        0 |       0 |       0 | 54-135            
+apps/controller test: -------------------|---------|----------|---------|---------|-------------------
+apps/controller test: =============================== Coverage summary ===============================
+apps/controller test: Statements   : 36.85% ( 1054/2860 )
+apps/controller test: Branches     : 40.01% ( 771/1927 )
+apps/controller test: Functions    : 39.79% ( 193/485 )
+apps/controller test: Lines        : 36.25% ( 897/2474 )
+apps/controller test: ================================================================================
+apps/controller test: Documented Vitest totals verified: 88 files, 925 tests across 4 documented sites
+apps/controller test: Done exit 0; 925 tests across 88 files, 8 new. Three negative controls run — the toggle weakened to a single click, the id
+span deleted, and the array bug reproduced — each red on the right assertion. Register **61 CLOSED,
+13 OPEN, 13 parked, 87 total**, tally test-checked.
+
 ## 2026-08-13
 
 ### 2026-08-13 18:26 EDT — `TODO.md` stripped to what is actually left, and the full gate is green again

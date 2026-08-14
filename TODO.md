@@ -95,7 +95,7 @@ Every gap from the full read of `apps/controller/evidence-dumps/` now lives ther
 five tiers. **That file is the tracker — this section is only the index to it.** Do not record a
 gap's status in both places; one of them will go stale.
 
-As of 2026-08-13 18:10 EDT: **60 CLOSED, 14 OPEN, 13 parked/won't-fix, 87 total.**
+As of 2026-08-14 07:06 EDT: **61 CLOSED, 13 OPEN, 13 parked/won't-fix, 87 total.**
 
 **Everything closable by READING is closed.** The twelve that remain need something no source file
 can give. Each is written out below with the exact next action, because "blocked" without an
@@ -175,13 +175,10 @@ specified in the register.
 not there. Re-run `scripts/ptr-fetch-static.js` after a deploy: the hashed filenames change with
 every build. If they soft-404 again they are genuinely not deployed, and both should move to Tier 4.
 
-#### F. One is not built and needs nothing but time.
+#### F. Nothing. This bucket is empty.
 
-- **T5-28 — the badge-ID double-click reveal.** `page.welcome.html:1161` is
-  `<th ng-dblclick="showBadgeID=!showBadgeID;">Badge</th>` with `ng-init="showBadgeID=false"`;
-  double-clicking the Badge column header reveals every row's `_id` in a
-  `<span class="room-badge-id">`. Fully evidenced, no dependency. Also records the reference's own
-  `{{[b.name]}}` array-interpolation bug, which prints `["Name"]` and must NOT be reproduced.
+**T5-28 closed 2026-08-14** — it was already built; only a test was missing. Every remaining item
+needs something from outside this repository.
 
 ### Not an evidence gap — missing work, recorded so it is not lost
 
