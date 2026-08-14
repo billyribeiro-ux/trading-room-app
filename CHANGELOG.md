@@ -24,6 +24,44 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-14
 
+### 2026-08-14 15:02 EDT — Second branch proven green; row AC re-audited and it holds
+
+**Runtime impact: none.** Verification and bookkeeping, done because both were things I could finish
+without a decision from the owner.
+
+**The full gate now covers BOTH branches.** `fix/green-the-gate` (PR #20) was proved at 13:30;
+`feat/extra-chat-column` carries seven further commits — the second chat column, mention routing,
+the `hideChat` collapse, visibility-change and the row-V correction — and had never had the gate run
+against it. `pnpm -r test`, **exit 0**: room **1075 tests across 91 files**, controller **937 across
+90**, `verify-documented-test-counts.mjs` agreeing at all four documented sites, zero failures
+anywhere in the log.
+
+**Row AC was re-audited, and unlike its siblings its premise HOLDS.** That matters: three rows today
+turned out to be wrong when read (AB, V, and earlier the T2-18 family), so "the row says so" had
+stopped being evidence. Every occurrence of `stopRecMsg` was checked — three in the bundle. Its only
+emitter is the SERVER command switch:
+
+```js
+case "stopRecMsg": this.guiEventBus.emit("stopRecMsg", i); break;     // byte 1014265
+```
+
+and the subscriber is `app-room`:
+
+```js
+-1 != i.data.indexOf("Stopped") ? alertsService.error(i.data) : alertsService.info(i.data),
+new Notification(i.data, {body: i.data})                              // byte 2501954
+```
+
+The payload is server-GENERATED text, so a client-side recorder cannot produce it. This room's
+`recordingState` action broadcasts `startRec` / `stopRec` / `pauseRec` / `resumeRec` with no message
+body, and nothing here writes the sentence the notification would display. It stays blocked on
+server-side recording, the same wall as row X.
+
+**What that leaves.** Nine rows, and after today's audits the split is clean: four need an owner
+decision, two need an environment this machine does not have, three need server-side recording. The
+login page — row S — is the only one where code is waiting on a single answer rather than on
+infrastructure.
+
 ### 2026-08-14 14:54 EDT — The room login page: an invention caught, and a real blocker found
 
 **Runtime impact: none.** Nothing shipped. This records a correction to my own work and a constraint
