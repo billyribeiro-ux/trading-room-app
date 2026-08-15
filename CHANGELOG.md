@@ -24,6 +24,46 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-14
 
+### 2026-08-14 22:19 EDT — Edit Carousel, and the carousel becomes testable
+
+**Runtime impact: yes.** A carousel already in a note can be reopened and edited. On
+`feat/extra-chat-column`.
+
+**What was missing.** The reference's `T0e` renders an **Edit Carousel** button (const 14,
+`fas fa-images`) whenever `carouselInNote`, calling `editCarousel()` to pull an existing carousel's
+interval, height and slides back into the same modal. Ours could insert one and never re-open it.
+Found while reading `app-note.full.js` for the version-history work and recorded then rather than
+built, so this closes it. `M0e`'s two label swings came with it — the heading between `Insert` and
+`Edit Image Carousel`, the submit button between `Insert Carousel` and `Save Changes`.
+
+**A pre-existing string was wrong and is corrected.** The modal heading read "Insert an image
+carousel", which is the TOOLBAR BUTTON's tooltip in `carouselButton()`, not the modal title in `M0e`.
+
+**The node moved out of the component.** `components/notes/carousel.ts` now holds the Tiptap node,
+the three parsers, `numericRange`, and two document queries. None of it was component state, and
+inside a `.svelte` file the round trip that matters — stored HTML → node attributes → stored HTML —
+could only be checked by eye. It is now checked against a **real Tiptap document under jsdom**:
+`note-carousel.test.ts`, 22 assertions, including in-place replacement leaving the surrounding
+paragraphs untouched and a carousel nested in a blockquote that a top-level scan would miss.
+
+**One deliberate divergence.** The reference takes the FIRST carousel and replaces the FIRST, so in a
+note holding two the second is uneditable and editing it silently overwrites the first — data loss,
+not a missing feature. A selected carousel now wins. With one carousel, every captured note, the two
+are identical.
+
+**Something the test surfaced, recorded UNVERIFIED rather than acted on.** Under jsdom, Tiptap's
+`getHTML()` returns CSSOM-normalised styles — `background:#111` comes back `rgb(17, 17, 17)`, which
+neither sanitiser allow-list accepts. Almost certainly a jsdom artefact: Chrome preserves a
+`setAttribute('style', …)` value verbatim, and the server sanitiser is `sanitize-html` over
+`htmlparser2`, a string parser with no CSSOM. **Nothing was changed on the strength of it** —
+widening a sanitiser allow-list against unobserved behaviour is speculation. In `TODO.md` under
+Evidence gaps, needing one look in a real browser.
+
+**Verified:** `svelte-check` 1036 files, 0 errors 0 warnings; `pnpm lint` exits 0; 77 tests across
+all eleven note suites green. **Negative-controlled:** dropping the selection preference from
+`findCarousel` turned the suite red, and was restored. **Not run:** the full gate, and no browser —
+the button has not been seen rendered.
+
 ### 2026-08-14 22:03 EDT — note Version History, and the evidence that was one file away
 
 **Runtime impact: yes.** Presenters editing a note now get the Version History toggle and panel, and

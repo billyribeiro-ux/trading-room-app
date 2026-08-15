@@ -106,10 +106,50 @@ open), `w0e` for the panel as a SIBLING of the button bar, `S0e` for a row, and 
 what we render. Negative-controlled twice: removing `class:active` and changing the tag substitution
 from a space to the empty string each turned it red.
 
-**Still open in the same file, and NOT built:** the reference's `T0e` also renders an **Edit
-Carousel** button (const 14, `fas fa-images`) when `carouselInNote` is true, which calls
-`editCarousel()` to reopen an existing carousel for editing. Ours can insert a carousel but not
-re-open one. That is a separate gap, evidenced and unbuilt.
+### Closed 2026-08-14 22:19 — Edit Carousel, and the carousel is now testable
+
+The same `T0e` renders an **Edit Carousel** button (const 14, `fas fa-images`) when `carouselInNote`
+is true, calling `editCarousel()` to reopen an existing carousel. Ours could insert one and never
+re-open it. Built, along with `M0e`'s two label swings — the heading between `Insert`/`Edit Image
+Carousel` and the submit button between `Insert Carousel`/`Save Changes`.
+
+**The heading was wrong before this and is corrected.** It read "Insert an image carousel", which is
+the text of the TOOLBAR BUTTON's tooltip in `carouselButton()`, not of the modal title in `M0e`.
+
+**The node moved out of the component**, into `components/notes/carousel.ts`: the Tiptap node, the
+three parsers, `numericRange`, and two document queries (`hasCarousel`, `findCarousel`). None of it
+was ever component state, and inside a `.svelte` file the round trip that actually matters — stored
+HTML → node attributes → stored HTML — could only be checked by eye. `note-carousel.test.ts` now
+builds a **real Tiptap document under jsdom** and reads it back: 22 assertions covering the
+reference's own emitted markup, the malformed-attribute fallbacks, in-place replacement leaving the
+surrounding paragraphs untouched, and a carousel nested in a blockquote that a top-level scan misses.
+
+**One deliberate divergence.** The reference takes the FIRST carousel — `querySelector` returns it,
+and `replaceCarouselInEditor` replaces it — so in a note holding two, the second can never be edited
+and trying to edit it silently overwrites the first. That is data loss, not a missing feature. When
+the user has actually selected one, that is the one edited. With a single carousel, which is every
+captured note, the two are identical. Negative-controlled: dropping the selection preference turns
+the suite red.
+
+### Evidence gaps
+
+**Whether a real browser serialises `background:#111` as `rgb(17, 17, 17)` — UNVERIFIED, and it
+matters.** Writing the jsdom test surfaced that Tiptap's `getHTML()` returns CSSOM-normalised style
+attributes there: `width:50.000000%` comes back `width: 50%`, and `background:#111` comes back
+`background: rgb(17, 17, 17)`. Both sanitiser allow-lists — `safe-html.ts` client-side and
+`server/notes.ts` line 123 — accept `background` only as `/^#111$/i`, so **if** a browser normalises
+the same way, every carousel saved through our editor loses its black backing.
+
+I do not believe it does: `setAttribute('style', …)` preserves the attribute verbatim in Chrome, and
+the server sanitiser is `sanitize-html` over `htmlparser2`, a string parser with no CSSOM at all. So
+this is most likely a jsdom artefact and **nothing has been changed on the strength of it** —
+widening a sanitiser allow-list to defend against a behaviour I have not observed is exactly the
+speculative change this file exists to prevent.
+
+- **What is missing:** one look at `editor.getHTML()` in a real browser after inserting a carousel.
+- **Where I looked:** `carousel.ts` `renderHTML`, `safe-html.ts` `TAG_STYLE_RULES.div.background`,
+  `server/notes.ts:123`, and the jsdom output pinned in `note-carousel.test.ts`.
+- **What it blocks:** nothing today. It decides whether the allow-lists need a second accepted form.
 
 | count | rule | what they were |
 | --- | --- | --- |
