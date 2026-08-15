@@ -26,7 +26,12 @@ describe('roster private-chat evidence contract', () => {
   });
 
   it('renders the exact third roster item and captured open-menu attribute', () => {
-    expect(pageSource).toContain('data-bs-popper={userMenuId === user.id');
+    /*
+      The per-row menu id moved into `RoomMenus` with the other ten floating menus, so the read is
+      `menus.userId` now. Re-pointed rather than deleted — this asserts the captured attribute is
+      still bound to WHICH ROW is open, which is the thing that breaks if the id becomes a boolean.
+    */
+    expect(pageSource).toContain('data-bs-popper={menus.userId === user.id');
     expect(pageSource).toContain('<i class="fas fa-comments"></i>&nbsp;&nbsp;Private Chat');
     expect(pageSource).toContain('onclick={() => openRosterPrivateChat(user)}');
   });
