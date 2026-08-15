@@ -24,6 +24,52 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-15
 
+### 2026-08-15 12:47 EDT — the reactivity test could not be written, and finding out why is the result
+
+**Runtime impact: none.** One new test file, six assertions. No source changed.
+
+Slice 1 (`room-mtx.svelte.ts`) shipped with **no test at all** — the audit's own finding against my
+work. `MtxStreamTabs` is a class holding `$state.raw` behind getters, and it landed on
+`svelte-check` clean, `svelte-autofixer` clean, eslint clean and a green suite. None of those can
+see whether reading `mtx.streams` actually re-runs when a stream arrives.
+
+Six value assertions now cover the transitions. **The reactivity assertion could not be written,
+and that is the real result of this pass.** Diagnosed rather than assumed:
+
+- `vite.config.ts` has no `resolve.conditions: ['browser']` under VITEST, which the official
+  testing guidance requires for tests exercising runes.
+- Every existing "render" test in this suite imports `render` from **`svelte/server`**. The suite
+  runs SSR, where `$effect` is a documented no-op.
+
+So an `$effect` inside `$effect.root` here records nothing, throws nothing and reports nothing.
+**No test in this repository can currently verify client reactivity.**
+
+**Two drafts of that test were written and BOTH were vacuous — caught by deliberate probing, not by
+the gates.** The first mutated and flushed outside `$effect.root` and recorded nothing. The second
+moved the assertions inside the root and went green *with a deliberately false* `toEqual([99999])`
+in it, because `$effect.root` swallows a thrown assertion. Neither was kept: a test that cannot fail
+is worse than no test, which is the rule the size ratchet was built on two hours ago.
+
+**A second finding, pre-existing and left alone.** `applySessionMediaState`'s docstring says an
+empty refresh "leaves the previous selection alone rather than clearing it", quoting an upstream
+`&&` guard. Its signature is `(list) => MtxStreamState` — it never receives the previous state — and
+it returns `selectedTabID: null` for an empty list. `mtx-streams.test.ts` already pins that
+behaviour. **The code and its own comment disagree**, and deciding which is right needs the
+reference bundle read at the offsets the comment cites. Not guessed at here; recorded.
+
+My first draft of the empty-list test believed the docstring and asserted `'b'`. It failed, and the
+test was what was wrong.
+
+**Verified:** room suite **1536/1536 across 115 files**, `svelte-check` **0 errors 0 warnings**,
+eslint **exit 0 on the files in this commit**. `eslint .` across the whole app now reports 26 errors
+in untracked, local-only `scripts/… 2.mjs` duplicate files dated Aug 12 — not in any commit, not
+touched here, and stated rather than glossed as green.
+
+**Still open (TODO row AE):** the reactivity gap needs `resolve.conditions` plus a jsdom
+environment. That changes how all 115 test files resolve Svelte, so it is its own commit with its
+own full gate run — not a rider on an extraction.
+
+### 2026-08-15 12:34 EDT — 131 lines that decided what a user reads, and could not be tested
 ### 2026-08-15 12:24 EDT — the frontend gate is GREEN on `main` for the first time
 
 **Runtime impact: one restoration, see below.** Otherwise configuration, a moved parser, a tracked
