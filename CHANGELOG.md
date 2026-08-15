@@ -24,6 +24,59 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-15
 
+### 2026-08-15 08:33 EDT — Alert Labels had a whole second consumer nobody had found
+
+**Runtime impact: none.** Two documents. Four for four on specs re-verified before building.
+
+The first pass called this "configuration plus a text transform" and gave the entry shape as
+`{ hash, checked }`. Both wrong.
+
+**An entry has FOUR configured fields** — `hash`, `name`, `bgcolor`, `color` — with `checked` added at
+runtime. And the labels are consumed in **two** places, not one.
+
+**The consumer that was missed:** `parseSymbols`, byte 1,328,216. It replaces `#hash` in alert text
+with a coloured badge showing `name`:
+
+```js
+if (s && s.length > 0 && "alerts" === i)
+  for (const r of s)
+    e.includes(`#${r.hash}`) &&
+      (e = e.replace(`#${r.hash}`,
+        `<span class="my-1 me-1 badge" style="background-color: ${r.bgcolor}; color: ${r.color}; border: 1px solid ${r.color};">`
+        + hu.sanitize(r.name) + "</span>"));
+```
+
+So `hash` is what goes into the text and `name` is what the reader sees — **two different strings, and
+the mapping between them is the whole feature.** A build using `hash` for both produces something that
+looks plausible and is wrong.
+
+Four further facts from the same read: it applies to `"alerts"` only, so chat never gets badges, and
+the call sites pass `isQAMsg ? null : alertLabels` so **Q&A is excluded too**; only the FIRST
+occurrence is replaced, because it is `String.replace` with a string and not a regex; the classes are
+`my-1 me-1 badge`; and it hands off to `parseStock`, so labels and `$SYMBOL` colouring share one pipe.
+
+**A shape we must NOT reproduce.** `hu.sanitize(r.name)` sanitises the name while **`bgcolor` and
+`color` are interpolated raw into a `style` attribute**. In the reference these come from an
+owner-controlled room setting, so it is not member-facing — but it is unsanitised interpolation into
+markup. Validate the colours or bind them as custom properties, and record the divergence.
+
+**Two more corrections:** `processAlertLabels` is called from **four** sites, not one — the two image
+paths, `postAlert`, and the scheduler. And the checkboxes are cleared in **three** places, not one:
+after a successful prepend, on `doCloseModal`, and on `clearInputFields`. Selection never survives
+leaving the composer by any route.
+
+**Ruling out my own tooling before asserting a surprise.** The checkbox label compiles to
+`Ne("", e.name, "?")`. Rather than assume the helper's arity, it was calibrated against known cases
+in the same bundle — `Ne("[", e.duplicatesCount + 1, "]")` renders `[3]` — confirming
+`Ne(prefix, value, suffix)`, so the label really does render `{name}?` with a trailing question mark.
+Recorded as read and **flagged as surprising** rather than silently "fixed" or silently copied.
+
+**Four for four.** Every spec re-verified before building has contained at least one error: the sort
+bar three, Alert Filter an inverted architecture, Alert Labels a missing consumer and a wrong entry
+shape. None of these were caught by compiling, type-checking or testing — only by reading the bundle
+again.
+
+
 ### 2026-08-15 08:22 EDT — verifying the Alert Filter spec before building it found an architectural error in my own work
 
 **Runtime impact: none.** Two documents.

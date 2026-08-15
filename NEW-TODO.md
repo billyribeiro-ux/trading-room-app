@@ -252,10 +252,19 @@ both directions, one modal, no entitlement flag found.
 `hasAlertLabels` are all 0 occurrences. Configuration plus a text transform.
 
 - `sessData.alertLabels` is a **string containing JSON**, trimmed then `JSON.parse`d, every entry
-  given `checked = false` (byte 1,147,292). `sessData.chatTabsWithBadges` uses the identical shape.
+  given `checked = false` (byte 1,147,292). `chatTabsWithBadges` and `modAlertFilterList` use the
+  identical shape — **three room settings shipped as JSON strings.**
+- **CORRECTED 2026-08-15: an entry is `{hash, name, bgcolor, color}`, not `{hash}`** — and the labels
+  have a **SECOND consumer** the first pass missed entirely. `parseSymbols` (byte 1,328,216) replaces
+  `#hash` in ALERT text with a coloured `span.badge` showing `name`. Chat and Q&A messages are
+  excluded. `hash` is what goes in the text; `name` is what the reader sees.
+- **`bgcolor` and `color` are interpolated RAW into a `style` attribute** while only `name` is
+  sanitised. Owner-controlled in the reference, so not member-facing — but **do not reproduce that
+  shape**; validate the colours or bind them as custom properties, and record the divergence.
 - `processAlertLabels` prefixes `" #" + hash` per checked label, **newline after the last and a space
-  after the others**, prepends the result to `txt`, and **clears every checkbox as a side effect of
-  formatting** (byte 2,131,206).
+  after the others** (byte 2,131,295). Called from **four** sites, not one.
+- Checkboxes are cleared in **three** places, not one: after a successful prepend, on `doCloseModal`,
+  and on `clearInputFields`. Selection never survives leaving the composer by any route.
 
 ## 5.3 Alert Scheduler — post an alert later, optionally repeating 🔴
 

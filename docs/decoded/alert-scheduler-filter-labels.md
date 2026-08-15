@@ -333,11 +333,66 @@ reproduced** — a customer-specific hardcode is the opposite of the theming rul
 - **The per-entry list item markup** (template `Tue`, byte 1,219,660) was not decoded — only that the
   list exists, its empty state, and the three buttons.
 
-# 3. Alert Labels — per-room hashtags prefixed onto alert text
+# 3. Alert Labels — per-room hashtags, and a badge renderer nobody had found
 
-**This is NOT a wire feature.** Measured: `getAlertLabels`, `saveAlertLabels`, `updateAlertLabels`,
-`alertLabelsModal` and `hasAlertLabels` are all **0 occurrences**. It is configuration plus a text
-transform.
+**CORRECTED 2026-08-15.** The first version of this section said an entry is `{ hash, checked }` and
+that the feature is "configuration plus a text transform". **Both are wrong.** An entry has four
+configured fields, and the labels have a **second consumer** that renders them as coloured badges.
+
+**Still true:** this is not a wire feature. `getAlertLabels`, `saveAlertLabels`, `updateAlertLabels`,
+`alertLabelsModal` and `hasAlertLabels` are all **0 occurrences**.
+
+## The entry shape — four configured fields, not one
+
+Proven by the renderer at byte 1,328,216 and the checkbox list at 2,119,605:
+
+| field | used by | for |
+| --- | --- | --- |
+| `hash` | `processAlertLabels`, `parseSymbols` | the token written into the text as `#hash` |
+| `name` | `parseSymbols`, the checkbox list | the human label shown in the badge and the checkbox |
+| `bgcolor` | `parseSymbols` | the badge background |
+| `color` | `parseSymbols` | the badge text colour **and** its 1px border |
+
+`checked` is added at runtime, not configured — `map(r => (r.checked = !1, r))` at byte 1,147,292.
+
+## THE SECOND CONSUMER — `#hash` becomes a badge, in ALERTS only
+
+`parseSymbols`, read verbatim at byte 1,328,216. This is the piece the first version missed entirely:
+
+```js
+transform(e, i, o, s) {
+  if (s && s.length > 0 && "alerts" === i)
+    for (const r of s)
+      e.includes(`#${r.hash}`) &&
+        (e = e.replace(
+          `#${r.hash}`,
+          `<span class="my-1 me-1 badge" style="background-color: ${r.bgcolor}; color: ${r.color}; border: 1px solid ${r.color};">` +
+            hu.sanitize(r.name) +
+            "</span>"
+        ));
+  return e.includes("$") ? this.parseStock(e, i, o) : e;
+}
+```
+
+Five things follow:
+
+1. **`logType` must be `"alerts"`.** Chat messages never get label badges, even if the text contains
+   `#hash`. The call sites pass `isQAMsg ? null : globals.alertLabels`, so **Q&A messages are excluded
+   too** — bytes 1,331,842 / 1,332,732 / 1,340,566.
+2. **The badge shows `name`, the text carries `hash`.** They are different strings and the mapping
+   between them is the whole point of the feature. `processAlertLabels` writes ` #hash`;
+   `parseSymbols` swaps it for a badge reading `name`.
+3. **Only the FIRST occurrence is replaced.** `String.replace` with a string argument, not a regex, so
+   a text containing `#hash` twice keeps the second one literal.
+4. **Classes are `my-1 me-1 badge`** — Bootstrap, verbatim.
+5. **`hu.sanitize(r.name)` sanitises the NAME — and `bgcolor` and `color` are interpolated RAW into a
+   `style` attribute.** In the reference these come from a room setting the owner controls, so it is
+   not a member-facing hole, but it is unsanitised interpolation into markup and **we must not
+   reproduce it that way.** Validate the two colours, or bind them as CSS custom properties, and say
+   in a comment that the divergence is deliberate.
+
+Then it hands off to `parseStock`, so the two features share one pipe: labels first, `$SYMBOL`
+colouring second, and the symbol pass only runs when the text contains `$`.
 
 ## The source is a JSON STRING in a room setting
 
@@ -351,18 +406,16 @@ if (i.globals.sessData.alertLabels && i.globals.sessData.alertLabels.length > 0)
 }
 ```
 
-So `sessData.alertLabels` is a **string containing JSON**, trimmed then parsed, and every entry gets
-`checked = false` on load. `globals.alertLabels` initialises to `[]` at byte **981,181**
-(`this.alertLabels=[]`, in the globals constructor beside `mutedUsers`, `followedUsers` and
-`showPositions`).
+`globals.alertLabels` initialises to `[]` at byte **981,181**. `sessData.chatTabsWithBadges` uses the
+identical shape in the very next block, and `sessData.modAlertFilterList` is the third — **three room
+settings shipped as JSON strings.**
 
-**`sessData.chatTabsWithBadges` uses the identical shape** in the very next block — a JSON string in
-a room setting, trimmed and parsed. Two settings share this pattern, which is worth knowing before
-anyone models either as a real array.
+Note the `JSON.parse` here is **not** inside a try/catch, and neither is the one in
+`syncModAlertFilterList`. A malformed setting throws during session setup.
 
-## The transform
+## The composer transform
 
-`processAlertLabels(e)`, byte **2,131,206**, read verbatim:
+`processAlertLabels(e)`, byte **2,131,295**:
 
 ```js
 processAlertLabels(e) {
@@ -378,18 +431,59 @@ processAlertLabels(e) {
 }
 ```
 
-Three details that a rewrite loses:
+- Each label is prefixed **space then `#`**, so the first puts a leading space at the very start.
+- **Newline after the last, space after the others** — the labels end up on their own line above the
+  body.
+- It mutates `e.txt` and returns `e`.
 
-1. **Each label is prefixed with a space then `#`** — `" #" + hash`. The first label therefore puts a
-   leading space at the very start of the alert text.
-2. **The last label is followed by a newline, the others by a space.** The labels end up on their own
-   line above the alert body.
-3. **The checkboxes are cleared as a side effect of formatting.** Selection does not persist past one
-   send, and it is reset inside the formatter rather than by the caller.
+**Called from FOUR sites**, not one — the first version implied a single caller:
 
-Each label is `{ hash, checked }`; `hash` is the tag text without the `#`.
+| byte | path |
+| --- | --- |
+| 2,126,822 | the image-alert path, after the uploaded link is appended |
+| 2,127,278 | the second image path |
+| 2,129,610 | `postAlert()`, the ordinary text alert |
+| 2,130,855 | `alertMsgLater`, the scheduler — see §1 |
 
----
+Every one is guarded by `globals.alertLabels.length > 0 &&` first.
+
+## The checkboxes are cleared in THREE places
+
+The first version said "cleared as a side effect of formatting", which is true and incomplete:
+
+| byte | when |
+| --- | --- |
+| 2,131,474 | inside `processAlertLabels`, after a successful prepend |
+| 2,127,804 | `doCloseModal()` — closing the alert modal |
+| 2,128,623 | `clearInputFields()` — clearing the composer |
+
+All three run the same `forEach(s => { s.checked = !1 })` guarded by a length check. **Selection never
+survives leaving the composer, by any route.**
+
+## The checkbox list
+
+Template `zTe`, rendered by `GTe` over `globals.alertLabels`, byte **2,119,605**:
+
+- a checkbox bound `ngModel` → `e.checked`, with `id="alert-trade-label-{index}"`
+- a `label` whose `for` is the same `"alert-trade-label-" + i`
+
+The label's text is `Ne("", e.name, "?")`. The helper is `Ne(prefix, value, suffix)` — calibrated
+against known cases in the same bundle, e.g. `Ne("[", e.duplicatesCount + 1, "]")` renders `[3]` — so
+**this renders `{name}?` with a trailing question mark.** Recorded as read and flagged as surprising,
+because `name` is a plain display label everywhere else. Do not "fix" it without checking the live
+app; do not reproduce it without noting it either.
+
+The block is gated in the post-alert modal at byte **2,139,108**:
+`O(62, alertLabels && alertLabels.length > 0 ? 62 : -1)` — no labels configured, no section.
+
+## Honest gaps
+
+- **The container classes for the checkbox list** (const 35, and the `input`/`label` const 53) were
+  not resolved to their class lists.
+- **Where `bgcolor` / `color` are authored** — presumably the manage page, but no control for
+  `alertLabels` was located in the manage capture, exactly as with `hasAlertScheduler`.
+- **Whether `hash` may contain characters needing escaping** is not established; `parseSymbols` builds
+  a plain `String.replace` from it, not a regex, so no escaping is required there.
 
 # What this means for us
 
