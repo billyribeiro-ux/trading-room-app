@@ -59,7 +59,7 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       moved once; the second is why it has not moved since — through five conversions and down to
       13,550, which is BELOW where it stood before the raise.
     */
-    max: 13550,
+    max: 13542,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {
@@ -69,7 +69,7 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
   },
   {
     file: 'routes/+page.server.ts',
-    max: 2997,
+    max: 2776,
     why: 'the loader and every form action left; 3,233 before the remote-function conversions began'
   }
 ];

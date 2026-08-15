@@ -24,6 +24,102 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-15
 
+### 2026-08-15 13:58 EDT — "For All", and the gate that had to move a second time
+
+**Runtime impact: yes, on the four "For All" broadcasts.** `videoForAll` and `youtubeForAll` move to
+`src/routes/for-all-broadcast.remote.ts`, taking `broadcastableMediaUrl` and `MAX_BROADCAST_URL`
+with them — both were declared at the top of `+page.server.ts` and used by nothing else.
+
+**The gate moved twice in ten minutes, and the second move is the lesson.** At 13:48 the presenter
+role check was pulled out of two hand-written copies into `presenterRoom()` inside
+`presenter-commands.remote.ts`. This conversion needed the same gate — and leaving it there would
+have **recreated the exact duplication one level up**, between modules instead of between actions.
+It now lives in `$lib/server/auth.ts` beside the other authority helpers. That is the general shape:
+deduplicating within a module is a local win; the invariant only stops being copyable when it lives
+where every caller can reach it.
+
+**It returns the room ONLY after the role check**, so "gated" and "scoped to the caller's tenant"
+are one event and cannot be applied separately — applying only the first is a presenter of one room
+reaching another. Negative-controlled: returning the room before the check turns two assertions red
+across two files.
+
+**Two commands, one module, and one thing they deliberately do NOT share.** They share the gate, the
+`cmds` channel and the 2,000-character length bound (now one `forAllArgs` factory instead of two
+copies). They do not share the URL check, and each says why at its own site: `videoForAll` parses
+with `new URL` plus a two-entry protocol allow-list because the string reaches a `<video src>` as
+itself; `youtubeForAll` does not, because the overlay interpolates only the captured video-id group
+into a hard-coded `youtube.com/embed/` origin, and requiring a parseable URL would reject
+`www.youtube.com/watch?v=x` which the reference accepts and plays. **"Make them consistent" is the
+tidy-up that would break one of them**, so the asymmetry is documented at both ends and pinned by a
+test.
+
+**A zod `.url()` would not have been the same check** and was deliberately not used: it accepts
+every scheme `new URL` does, including `javascript:` and `data:`. The allow-list stays hand-written;
+the schema only bounds the length. Negative-controlled by deleting the protocol line.
+
+**One test kept reading `+page.server.ts` on purpose.** `for-all-broadcast-contract.test.ts`'s last
+assertion proves the family was never folded into `fileMediaCommand` — which is still a form action,
+because its url must be a file THIS room holds. Re-pointing that `not.toContain` at the remote
+module would have made it pass against a file that never contained `fileMediaCommand`: green,
+guarding nothing. It keeps a `serverCode` reader for exactly that one.
+
+**Ceilings lowered again, no raise.** `+page.svelte` 13,546 → **13,542**. `+page.server.ts`
+2,947 → **2,776** — **−457 from 3,233, a 14% reduction**, and the staleness half of the ratchet is
+what caught the ceiling being left 171 lines high.
+
+**Verified:** `svelte-check` 0/0 (1,089 files) · suite **1600/1600 across 119 files** · `eslint`
+clean outside the untracked gitignored `scripts/… 2.*` · `prettier --check` clean · `vite build`
+succeeds and the manifest registers **six** remotes, the newest (`'vhg2ob'`) called by the client as
+`vhg2ob/videoForAll` and `vhg2ob/youtubeForAll`. Three negative controls run and seen red: making
+the gate and the room scope separable, swapping the YouTube stop-then-play order, and dropping the
+protocol allow-list. **Not verified:** no browser test of a live broadcast.
+
+### 2026-08-15 13:48 EDT — the presenter broadcasts, and the duplicated gate that was the whole point
+
+**Runtime impact: yes, on three presenter controls.** `presenterCommand` (mute a member's
+mic/cam/screens) and `focusOnScreen` (pull the room to one screen) move to
+`src/routes/presenter-commands.remote.ts`. Three call sites — the first multi-call-site conversion.
+
+**The duplicated gate is the finding.** Both actions inlined
+`requireUser(locals).role === 'staff' || requireUser(locals).role === 'admin'` — which is
+`isPresenterRole` spelled out by hand, twice, in adjacent functions, in a file that already imports
+`isPresenterRole`. That is precisely the shape the owner named at 13:35: **the files with many call
+sites are not harder because of the count, they are harder because an invariant is written out once
+per site, and an invariant repeated per site is one that can be fixed in one place and left wrong in
+the other.** It is now `presenterRoom()`, declared once, returning the room from the session — so
+the gate and the tenant scope cannot be applied separately, because they are the same call.
+
+**Two commands, two schemas, one module — and the test says why that is safe.**
+`focus-on-screen-contract.test.ts` exists because folding `focusOnScreen` into `presenterCommand`
+was tried and is wrong: one names a PERSON and requires an integer target, the other names a SCREEN.
+Sharing a module is not sharing a payload. The `new Set([...])` allow-list became `z.enum`, refused
+before the handler runs rather than inside it.
+
+**The `not.toContain` that would have gone quietly green.** That same file's most important
+assertion is `does NOT loosen presenterCommand` — a negative. Left reading `+page.server.ts` after
+the extraction it would have passed against a file containing neither command: green, guarding
+nothing, the exact failure this suite shipped at 12:56 today. It now reads the module that owns them
+and asserts the slice was found first. Verified by negative control: adding a `screenId` to
+`presenterCommand`'s schema turns it red.
+
+**`void fetch(...)` became `void x().catch(console.error)`, and that is not a swallowed catch.**
+Upstream shows the presenter nothing when a broadcast fails, so inventing a toast would change what
+the room does — but a dropped rejection is what this repository forbids, and these can only reject
+on a real fault: a network failure, or a 403 meaning client and server disagree about who is a
+presenter. `console.error` is loud where it costs the room nothing, and honest that the user has not
+been told. The `if (!isPresenter) return` on the client stays what it always was — responsiveness,
+never security.
+
+**Ceilings lowered again, no raise.** `+page.svelte` 13,550 → **13,546**. `+page.server.ts`
+2,997 → **2,947** — **−286 from 3,233**, a 12% reduction of the file across five conversions.
+
+**Verified:** `svelte-check` 0/0 (1,088 files) · suite **1600/1600 across 119 files** · `eslint`
+clean outside the untracked gitignored `scripts/… 2.*` · `prettier --check` clean · `vite build`
+succeeds and the manifest registers **five** remotes, the newest (`'hu9bcb'`) called by the client as
+`hu9bcb/focusOnScreen` and `hu9bcb/presenterCommand`. Three negative controls run and seen red:
+removing the presenter gate, loosening `presenterCommand` to carry a screen id, and dropping the
+client's rejection handler. **Not verified:** no browser test of a presenter moving a live room.
+
 ### 2026-08-15 13:42 EDT — the private-chat trio, converted as a FEATURE, and the coverage gap that proved itself
 
 **Runtime impact: yes, on private chat.** `sendPrivateMessage`, `loadPrivateChatLog` and

@@ -29,6 +29,8 @@
     loadPrivateChatLog as loadPrivateChatLogCommand,
     sendPrivateMessage as sendPrivateMessageCommand
   } from './private-chat.remote';
+  import { focusOnScreen, presenterCommand } from './presenter-commands.remote';
+  import { videoForAll, youtubeForAll } from './for-all-broadcast.remote';
   import { isHttpError } from '@sveltejs/kit';
   import {
     PUBLIC_PTR_CDN_UPLOAD_KEY,
@@ -409,9 +411,7 @@
    */
   function bringEveryoneToStream(streamId: string) {
     if (!isPresenter) return;
-    const body = new FormData();
-    body.set('screenId', streamId);
-    void fetch('?/focusOnScreen', { method: 'POST', body });
+    void focusOnScreen(streamId).catch((cause) => console.error('[focusOnScreen]', cause));
   }
 
   /**
@@ -762,9 +762,7 @@
     forcedScreenId = screenId;
     selectedScreenTab = screenId;
     if (!isPresenter) return;
-    const body = new FormData();
-    body.set('screenId', screenId);
-    void fetch('?/focusOnScreen', { method: 'POST', body });
+    void focusOnScreen(screenId).catch((cause) => console.error('[focusOnScreen]', cause));
   }
 
   function stopSharedScreen(screenId: string) {
@@ -3565,10 +3563,9 @@
         // open microphone belongs to a presenter.
         targets.forEach((entry, index) => {
           globalThis.setTimeout(() => {
-            const body = new FormData();
-            body.set('subCmd', 'mutemic');
-            body.set('targetUserId', String(entry.userID));
-            void fetch('?/presenterCommand', { method: 'POST', body });
+            void presenterCommand({ subCmd: 'mutemic', targetUserId: entry.userID }).catch(
+              (cause) => console.error('[presenterCommand]', cause)
+            );
           }, MUTE_STAGGER_MS * index);
         });
       }
@@ -7267,12 +7264,11 @@
   }
 
   async function sendYoutubeForAllCommand(cmd: 'playYTForAll' | 'stopYTForAll', url?: string) {
-    const body = new FormData();
-    body.set('cmd', cmd);
-    if (url !== undefined) body.set('url', url);
-    const response = await fetch('?/youtubeForAll', { method: 'POST', body });
-    const result = deserialize<{ success?: boolean }, { message?: string }>(await response.text());
-    if (result.type === 'failure') bootboxAlert = result.data?.message ?? 'Command failed.';
+    try {
+      await youtubeForAll({ cmd, url });
+    } catch (cause) {
+      bootboxAlert = isHttpError(cause) ? cause.body.message : 'Command failed.';
+    }
   }
 
   /**
@@ -7332,16 +7328,12 @@
     scheduledVideoTimer = undefined;
   }
 
-  async function sendVideoForAllCommand(
-    cmd: 'playVideoForAll' | 'stopVideoForAll',
-    url?: string
-  ) {
-    const body = new FormData();
-    body.set('cmd', cmd);
-    if (url !== undefined) body.set('url', url);
-    const response = await fetch('?/videoForAll', { method: 'POST', body });
-    const result = deserialize<{ success?: boolean }, { message?: string }>(await response.text());
-    if (result.type === 'failure') bootboxAlert = result.data?.message ?? 'Command failed.';
+  async function sendVideoForAllCommand(cmd: 'playVideoForAll' | 'stopVideoForAll', url?: string) {
+    try {
+      await videoForAll({ cmd, url });
+    } catch (cause) {
+      bootboxAlert = isHttpError(cause) ? cause.body.message : 'Command failed.';
+    }
   }
 
   function clamp(value: number, minimum: number, maximum: number) {

@@ -29,6 +29,25 @@ const BUNDLE = readFileSync(
 );
 const SERVER = readFileSync(new URL('../routes/+page.server.ts', import.meta.url), 'utf8');
 const PAGE = readFileSync(new URL('../routes/+page.svelte', import.meta.url), 'utf8');
+/*
+  Added 2026-08-15: both actions became remote commands in `presenter-commands.remote.ts`. The
+  assertions below were re-pointed in the same commit, not deleted — and the one that matters most
+  is the LAST in this file, `does NOT loosen presenterCommand`. It is a `not.toContain`, so an
+  extraction that left it reading `+page.server.ts` would have passed against a file no longer
+  containing either command: green, guarding nothing, exactly the failure this suite shipped once
+  today. It now reads the module that owns them, and asserts the slice was found first.
+*/
+const REMOTE = readFileSync(
+  new URL('../routes/presenter-commands.remote.ts', import.meta.url),
+  'utf8'
+);
+/*
+  The gate itself moved a SECOND time, to `$lib/server/auth.ts`, when `for-all-broadcast.remote.ts`
+  needed it too — leaving it in one `.remote.ts` would have recreated the duplication between
+  modules instead of between actions. Asserted where it lives, so this stays a real check rather
+  than a check of where a helper happens to sit today.
+*/
+const AUTH = readFileSync(new URL('./server/auth.ts', import.meta.url), 'utf8');
 
 const stripComments = (source: string) =>
   source
@@ -38,6 +57,23 @@ const stripComments = (source: string) =>
 
 const serverCode = stripComments(SERVER);
 const pageCode = stripComments(PAGE);
+const remoteCode = stripComments(REMOTE);
+
+/*
+  The two commands, sliced apart. They share a gate and a room scope, so an assertion over the whole
+  module proves nothing about either — and a slice that silently returns '' is how a `not.toContain`
+  goes green while guarding nothing, so both markers are asserted found.
+*/
+const commandSlice = (start: string, end: string) => {
+  const from = remoteCode.indexOf(start);
+  expect(from, `${start} must exist`).toBeGreaterThan(-1);
+  const to = end === '' ? remoteCode.length : remoteCode.indexOf(end, from);
+  expect(to, `${end} must follow ${start}`).toBeGreaterThan(from);
+  return remoteCode.slice(from, to);
+};
+const focusCommand = () => commandSlice('export const focusOnScreen = command(', '');
+const presenterCommandBody = () =>
+  commandSlice('export const presenterCommand = command(', 'export const focusOnScreen = command(');
 
 describe('the reference', () => {
   it('sends it as a SERVER command, not over the media channel', () => {
@@ -57,40 +93,60 @@ describe('the reference', () => {
 
 describe('the server owns the authority', () => {
   it('refuses a non-presenter', () => {
-    const from = serverCode.indexOf('focusOnScreen: async (');
-    expect(from, 'the action must exist').toBeGreaterThan(-1);
-    const body = serverCode.slice(from, serverCode.indexOf('\n  },', from));
-
-    expect(body).toContain("requireUser(locals).role === 'staff'");
-    expect(body).toContain("requireUser(locals).role === 'admin'");
-    expect(body).toContain('if (!isPresenter) return fail(403);');
+    /*
+      The gate was inlined in BOTH actions as
+      `requireUser(locals).role === 'staff' || requireUser(locals).role === 'admin'` — which is
+      `isPresenterRole` spelled out by hand, twice, next to each other. It is now `presenterRoom()`,
+      declared once, so the assertion is that this command reaches it rather than that it repeats it.
+    */
+    expect(AUTH).toContain('export function presenterRoom(): string {');
+    expect(AUTH).toContain(
+      "if (!isPresenterRole(requireUser(locals).role)) error(403, 'Presenters only.');"
+    );
+    expect(focusCommand()).toContain('publishToRoom(presenterRoom()');
   });
 
   it('scopes the broadcast to the caller’s own room', () => {
-    const from = serverCode.indexOf('focusOnScreen: async (');
-    const body = serverCode.slice(from, serverCode.indexOf('\n  },', from));
-    // Not a room id taken from the request — the session's, so room A cannot move room B.
-    expect(body).toContain('publishToRoom(requireRoomShortCode(locals)');
-    expect(body).not.toMatch(/publishToRoom\(\s*(String\()?data\.get/);
+    /*
+      Not a room id taken from the request — the session's, so room A cannot move room B. There is
+      no argument it could come from either: the whole payload is the screen id string.
+
+      `presenterRoom()` returns the room ONLY after the role check, which is why the gate and the
+      tenant scope are one call. Handed out separately they can be applied separately, and applying
+      only the first is a presenter of one room reaching another.
+    */
+    expect(AUTH).toContain('return requireRoomShortCode(locals);');
+    expect(remoteCode).not.toContain('roomShortCode:');
   });
 
   it('rejects an empty screen id rather than broadcasting one', () => {
-    const from = serverCode.indexOf('focusOnScreen: async (');
-    const body = serverCode.slice(from, serverCode.indexOf('\n  },', from));
-    expect(body).toContain('if (!screenId) return fail(400');
+    /*
+      The reference's `e &&`. An empty broadcast would ask every client in the room to focus a screen
+      that does not exist. `.trim()` before `.min(1)` so whitespace is not an id.
+    */
+    expect(focusCommand()).toContain('z.string().trim().min(1)');
   });
 
   it('does NOT loosen presenterCommand, which validates a person not a screen', () => {
     /*
-      The temptation was to add `focusOnScreen` to that action's allow-list. Its payload check is
-      `Number.isInteger(targetUserId)`, so carrying a screen id would have meant weakening a
-      validation that currently rejects anything without an integer target. Two shapes, two actions.
+      The temptation was to add `focusOnScreen` to that command's allow-list. Its payload check
+      requires an integer target, so carrying a screen id would have meant weakening a validation
+      that currently rejects anything without one. Two shapes, two schemas — which is exactly why
+      putting them in ONE module was safe: they share a gate, not a payload.
+
+      This is the assertion that would have gone quietly green if it had been left reading
+      `+page.server.ts` after the extraction, so it reads the module that owns them now.
     */
-    const from = serverCode.indexOf('presenterCommand: async (');
-    const body = serverCode.slice(from, serverCode.indexOf('\n  },', from));
-    expect(body).toContain("new Set(['mutemic', 'mutecam', 'mutescreens'])");
-    expect(body).toContain('if (!Number.isInteger(targetUserId))');
+    const body = presenterCommandBody();
+    expect(body).toContain("z.enum(['mutemic', 'mutecam', 'mutescreens'])");
+    expect(body).toContain('targetUserId: z.number().int().positive()');
     expect(body).not.toContain('focusOnScreen');
+    expect(body).not.toContain('screenId');
+  });
+
+  it('has left `+page.server.ts` entirely, so there is one way in and not two', () => {
+    expect(serverCode).not.toContain('focusOnScreen: async (');
+    expect(serverCode).not.toContain('presenterCommand: async (');
   });
 });
 
@@ -98,10 +154,18 @@ describe('the client', () => {
   it('broadcasts from the menu item, after moving locally', () => {
     const from = pageCode.indexOf('function bringEveryoneToScreen(');
     const body = pageCode.slice(from, pageCode.indexOf('\n  }', from));
-    expect(body).toContain("void fetch('?/focusOnScreen', { method: 'POST', body });");
+    expect(body).toContain('void focusOnScreen(screenId).catch(');
+    /*
+      The catch is not a swallowed one. Upstream shows the presenter nothing when a broadcast fails
+      and inventing a toast would change what the room does — but a dropped rejection is the
+      swallowed catch this repository forbids, and this can only reject on a real fault (a network
+      failure, or a 403 meaning client and server disagree about who is a presenter). `console.error`
+      is loud where it costs the room nothing, and honest that the user has not been told.
+    */
+    expect(body).toContain("console.error('[focusOnScreen]', cause)");
     // Local first, so the presenter's own view does not wait on a round trip.
     expect(body.indexOf('selectedScreenTab = screenId;')).toBeLessThan(
-      body.indexOf("fetch('?/focusOnScreen'")
+      body.indexOf('focusOnScreen(screenId)')
     );
     // The stale claim that this needed the media channel must not come back.
     expect(body).not.toContain('not wired yet');

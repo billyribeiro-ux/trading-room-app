@@ -65,10 +65,44 @@ const pageCode = stripComments(PAGE);
 const playerCode = stripComments(PLAYER);
 const overlayCode = stripComments(OVERLAY);
 
+/*
+  Re-pointed 2026-08-15: both actions became remote commands in `for-all-broadcast.remote.ts`, and
+  `broadcastableMediaUrl` / `MAX_BROADCAST_URL` went with them.
+
+  `videoForAll` is declared first in that module and `youtubeForAll` second, so the first runs to the
+  second and the second runs to the end of the file. Both markers are asserted found — a slice that
+  silently returns '' is how a `not.toContain` goes green while guarding nothing, and there are three
+  of those below.
+*/
+const REMOTE = readFileSync(
+  new URL('../routes/for-all-broadcast.remote.ts', import.meta.url),
+  'utf8'
+);
+const AUTH = stripComments(readFileSync(new URL('./server/auth.ts', import.meta.url), 'utf8'));
+const remoteCode = stripComments(REMOTE);
+
+/*
+  Still a FORM ACTION reader, and kept deliberately: `fileMediaCommand` has not been converted, and
+  the last assertion in this file is a `not.toContain` proving the "For All" family was never folded
+  into it. Re-pointing that one at the remote module would have made it pass against a file that
+  never contained `fileMediaCommand` — green, guarding nothing.
+*/
 const actionBody = (name: string) => {
   const from = serverCode.indexOf(`${name}: async (`);
   expect(from, `the ${name} action must exist`).toBeGreaterThan(-1);
   return serverCode.slice(from, serverCode.indexOf('\n  },', from));
+};
+
+const COMMAND_ORDER = ['videoForAll', 'youtubeForAll'] as const;
+
+const commandBody = (name: (typeof COMMAND_ORDER)[number]) => {
+  const from = remoteCode.indexOf(`export const ${name} = command(`);
+  expect(from, `the ${name} command must exist`).toBeGreaterThan(-1);
+  const next = COMMAND_ORDER[COMMAND_ORDER.indexOf(name) + 1];
+  if (!next) return remoteCode.slice(from);
+  const to = remoteCode.indexOf(`export const ${next} = command(`, from);
+  expect(to, `${next} must follow ${name}`).toBeGreaterThan(from);
+  return remoteCode.slice(from, to);
 };
 
 /*
@@ -162,19 +196,38 @@ describe('the reference, at the byte offsets this was decoded from', () => {
 });
 
 describe('the server owns the authority', () => {
-  it('refuses a non-presenter on both actions', () => {
-    for (const name of ['videoForAll', 'youtubeForAll']) {
-      expect(actionBody(name)).toContain(
-        "if (!isPresenterRole(user.role)) return fail(403, { message: 'Presenters only.' });"
-      );
+  it('refuses a non-presenter on both commands', () => {
+    /*
+      The gate was `if (!isPresenterRole(user.role)) return fail(403, …)` inlined in both. It is now
+      `presenterRoom()` in `$lib/server/auth.ts`, which returns the room ONLY after the role check —
+      so a command cannot obtain the tenant it is about to broadcast into without having passed the
+      gate. Each command is asserted to reach it, and the gate itself is asserted where it lives.
+    */
+    expect(AUTH).toContain('export function presenterRoom(): string {');
+    expect(AUTH).toContain(
+      "if (!isPresenterRole(requireUser(locals).role)) error(403, 'Presenters only.');"
+    );
+    for (const name of COMMAND_ORDER) {
+      expect(commandBody(name)).toContain('const room = presenterRoom();');
     }
   });
 
   it('publishes the four names character for character, and nothing else', () => {
-    const video = actionBody('videoForAll');
-    expect(video).toContain("if (cmd !== 'playVideoForAll' && cmd !== 'stopVideoForAll') {");
-    const youtube = actionBody('youtubeForAll');
-    expect(youtube).toContain("if (cmd !== 'playYTForAll' && cmd !== 'stopYTForAll') {");
+    /*
+      The `cmd !== 'x' && cmd !== 'y'` pairs became `z.enum`, which refuses before the handler runs
+      rather than inside it — same two values per command, checked earlier.
+    */
+    const video = commandBody('videoForAll');
+    expect(video).toContain("forAllArgs(['playVideoForAll', 'stopVideoForAll'])");
+    const youtube = commandBody('youtubeForAll');
+    expect(youtube).toContain("forAllArgs(['playYTForAll', 'stopYTForAll'])");
+    /*
+      `forAllArgs` is the shared shape — it is what makes the LENGTH bound one declaration instead of
+      two, which is the only thing the two commands are allowed to share about their url. Asserted
+      here so the names above cannot become a free-text string by the factory quietly dropping the
+      enum.
+    */
+    expect(remoteCode).toContain('cmd: z.enum(commands),');
 
     /*
       The near-miss casings that would be silently dropped by every client. `playMP3ForAll` has
@@ -188,21 +241,27 @@ describe('the server owns the authority', () => {
       'playVideoForALL',
       'stopVideoForALL'
     ]) {
-      expect(serverCode).not.toContain(wrong);
+      expect(remoteCode).not.toContain(wrong);
     }
   });
 
   it('scopes every fan-out to the caller’s own room', () => {
-    expect(actionBody('videoForAll')).toContain('publishToRoom(requireRoomShortCode(locals)');
-    expect(actionBody('youtubeForAll')).toContain('const room = requireRoomShortCode(locals);');
-    // Never a room named by the request.
-    expect(serverCode).not.toMatch(/publishToRoom\(\s*(String\()?data\.get/);
+    for (const name of COMMAND_ORDER) {
+      expect(commandBody(name)).toContain('publishToRoom(room, { channel: ');
+    }
+    /*
+      Never a room named by the request — and now it cannot be, because neither schema has a field
+      it could come from. `strictObject` makes adding one a validation error rather than an ignored
+      extra key.
+    */
+    expect(remoteCode).not.toContain('roomShortCode');
+    expect(remoteCode).toContain('z.strictObject({');
   });
 
   it('reproduces the stop-then-play order, from ONE request', () => {
-    const body = actionBody('youtubeForAll');
-    const stop = body.indexOf("data: { cmd: 'stopYTForAll', url }");
-    const play = body.indexOf("data: { cmd: 'playYTForAll', url }");
+    const body = commandBody('youtubeForAll');
+    const stop = body.indexOf("data: { cmd: 'stopYTForAll', url: trimmed }");
+    const play = body.indexOf("data: { cmd: 'playYTForAll', url: trimmed }");
     expect(stop).toBeGreaterThan(-1);
     expect(play).toBeGreaterThan(-1);
     // Inverted, every browser is left holding a torn-down overlay.
@@ -210,7 +269,7 @@ describe('the server owns the authority', () => {
   });
 
   it('the overlay’s own stop carries no url', () => {
-    const body = actionBody('youtubeForAll');
+    const body = commandBody('youtubeForAll');
     const bare = body.indexOf("if (cmd === 'stopYTForAll') {");
     expect(bare).toBeGreaterThan(-1);
     expect(body.slice(bare, bare + 200)).toContain(
@@ -219,13 +278,19 @@ describe('the server owns the authority', () => {
   });
 
   it('refuses a video url that is not http(s), parsed rather than substring-matched', () => {
-    const guard = topLevelFunctionBody(serverCode, 'function broadcastableMediaUrl(');
+    /*
+      The guard moved with the commands and is unchanged. A zod `.url()` would NOT be the same
+      thing — it accepts every scheme `new URL` does, including `javascript:` and `data:` — so the
+      allow-list stays hand-written and the schema only bounds the length.
+    */
+    const guard = topLevelFunctionBody(remoteCode, 'function broadcastableUrl(');
     expect(guard).toContain('parsed = new URL(value);');
     expect(guard).toContain(
       "if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return null;"
     );
-    expect(actionBody('videoForAll')).toContain(
-      "if (!url) return fail(400, { message: 'That is not a playable video url.' });"
+    expect(guard).toContain('if (!value || value.length > MAX_BROADCAST_URL) return null;');
+    expect(commandBody('videoForAll')).toContain(
+      "if (!playable) error(400, 'That is not a playable video url.');"
     );
   });
 
@@ -263,11 +328,22 @@ describe('the client sends, instead of moving its own screen', () => {
 
   it('both "For All" senders post to the server', () => {
     expect(functionBody(pageCode, 'async function sendVideoForAllCommand(')).toContain(
-      "fetch('?/videoForAll', { method: 'POST', body })"
+      'await videoForAll({ cmd, url });'
     );
     expect(functionBody(pageCode, 'async function sendYoutubeForAllCommand(')).toContain(
-      "fetch('?/youtubeForAll', { method: 'POST', body })"
+      'await youtubeForAll({ cmd, url });'
     );
+    /*
+      Both refusals reach the presenter with the SERVER's own wording — `That is not a playable
+      video url.` is what a mistyped url earns, and collapsing it into the generic fallback would
+      leave the presenter guessing which of the two things went wrong.
+    */
+    expect(pageCode).toContain(
+      "bootboxAlert = isHttpError(cause) ? cause.body.message : 'Command failed.';"
+    );
+    // And the actions are gone from the server, so there is one way in and not two.
+    expect(serverCode).not.toContain('videoForAll: async (');
+    expect(serverCode).not.toContain('youtubeForAll: async (');
   });
 
   it('"Stop For All" and "×" invoke DIFFERENT things', () => {
