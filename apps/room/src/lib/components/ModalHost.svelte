@@ -24,6 +24,7 @@
   import PostAlertModal from './PostAlertModal.svelte';
   import RichTextEditor from './RichTextEditor.svelte';
   import RoomMessage from './RoomMessage.svelte';
+  import { chatModeConfirmPrompt, type ChatMode } from '$lib/chat-mode';
   import type { PastedImageSubmission, PostAlertSubmission } from '$lib/post-alert-behavior';
   import {
     alertFilterAvailable,
@@ -209,9 +210,9 @@
     /** `Save` when editing an existing message, `Send` otherwise — the reference's two labels. */
     rteIsEditing?: boolean;
     /** The room's chat mode — `g`, `p` or `d` — read from `room_state` by the page load. */
-    chatMode?: string;
-    /** `changeChatMode` — a presenter act that changes the room for everyone. */
-    onChatModeChange: (mode: string) => void;
+    chatMode?: ChatMode;
+    /** `changeChatMode` — a presenter act that changes the room; `$lib/chat-mode.ts` says why typed. */
+    onChatModeChange: (mode: ChatMode) => void;
     onRteDraftChange: (html: string) => void;
     onRteSend: () => void;
     /**
@@ -1442,34 +1443,31 @@
   }
 
   /*
-    `sendServerAdminCommand('changeChatMode', {mode})`.
+    `sendServerAdminCommand('changeChatMode', {mode})`. This used to be
+    `onPreferenceChange('chatMode', mode)` — a per-user preference nothing in the room ever read, at
+    the wrong LEVEL besides; `$lib/chat-mode.ts` carries that history.
 
-    This used to be `onPreferenceChange('chatMode', mode)` — a per-user preference that nothing in
-    the room ever read. The control confirmed itself with a dialog, persisted a value, and changed
-    nothing for anybody. It was also the wrong LEVEL: upstream reads `sessData.chatMode`, so the
-    mode belongs to the ROOM and a presenter changes it for everyone. A preference could not have
-    expressed that even if something had read it.
-
-    No local assignment either. `groupChatMode` is a prop now, fed from the row the server just
-    wrote, so the radio shows what the room IS rather than what this browser last clicked.
+    What matters HERE is that there is no local assignment. `groupChatMode` is a prop, fed from the
+    row the server just wrote, so the radio shows what the room IS rather than what this browser
+    last clicked.
   */
-  function applyGroupChatMode(mode: string) {
+  function applyGroupChatMode(mode: ChatMode) {
     onChatModeChange(mode);
   }
 
-  function requestSettingsChatMode(mode: string) {
+  function requestSettingsChatMode(mode: ChatMode) {
     if (groupChatMode === mode) return;
-    const label = mode === 'p' ? '"Webinar Mode"?' : mode === 'd' ? '"Disabled"?' : '"Group Chat"?';
-    onConfirm(`Are you sure you want to change the chat mode to ${label}`, () =>
-      applyGroupChatMode(mode)
-    );
+    onConfirm(chatModeConfirmPrompt(mode), () => applyGroupChatMode(mode));
   }
 
-  function requestSessionChatMode(mode: string) {
+  /*
+    The same prompt as the settings radio, which it was NOT: this one interpolated the raw letter
+    and asked "are you sure you want to change the chat mode to p". `chatModeConfirmPrompt` owns the
+    capture's wording now, so there is one spelling instead of a right one and a wrong one.
+  */
+  function requestSessionChatMode(mode: ChatMode) {
     if (groupChatMode === mode) return;
-    onConfirm(`Are you sure you want to change the chat mode to ${mode}`, () =>
-      applyGroupChatMode(mode)
-    );
+    onConfirm(chatModeConfirmPrompt(mode), () => applyGroupChatMode(mode));
   }
 
   function requestPmWindowLayout(event: Event) {

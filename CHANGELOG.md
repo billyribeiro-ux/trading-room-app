@@ -24,6 +24,177 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-15
 
+### 2026-08-15 14:40 EDT — The harness that unblocks the rest, and the Files pane it proved itself on
+
+**Branch `feat/extra-chat-column`, not merged.** **Runtime impact: yes** — on file delete, play-for-all,
+the alert sound, and composer image uploads.
+
+**The finding that matters more than the conversion.** Every remaining `fetch('?/action')` site was
+blocked on the same thing: a form action is an ordinary function, so its tests call it directly
+against a live SQLite database and assert on what it *wrote* — `files-pane-contract.test.ts` proves
+a member cannot set the room's alert sound **and that nothing reached the controller when it
+refused**. A remote `command` opens with `get_request_store()` and throws outside a request, so
+converting looked like trading real behavioural coverage for string matching.
+
+It is not. **`$lib/server/remote-command-harness.ts`** establishes the store the way Kit's own server
+does. Four files were READ in `@sveltejs/kit@3.0.0-next.16` to build it, each cited in the docstring:
+`with_request_store` is exported from the real `./internal/server` subpath; `command.js` reads
+exactly four fields before running anything; `MUTATIVE_METHODS` is why the request is a POST;
+`run_remote_function` re-enters the store for both validation and handler. `remote-command-harness.test.ts`
+proves it against a real command (`unmuteChat`) — reaches the 403, runs the **schema** first for a
+400, and does not leak a store between calls.
+
+Two honest limits are written into it: it does **not** serialize the argument, so it proves the
+handler and not the wire; and it reproduces Kit's default `handleValidationError` because
+`hooks.server.ts` does not override it — with a test asserting that hook is still absent, so the day
+somebody adds one this goes red instead of silently asserting a body the server stopped returning.
+
+**Also read from Kit source rather than assumed: a `command` CAN carry a `File`.** `stringify_command_arg`
+registers a reducer that turns one into `{ data: ArrayBuffer, name, type, size, lastModified }` and
+the matching reviver rebuilds it with `new File([data], name, meta)`. That is what makes
+`uploadComposerImage` a command at all, and the cost is stated where it belongs: base64 in a JSON
+body is roughly a third larger on the wire than the multipart body it replaced.
+
+**Two modules, split on the GATE.** `files-pane.remote.ts` holds `deleteFile`, `fileMediaCommand`
+and `overwriteCashRegisterSound` — one module because all three enforced, in three hand-written
+copies, that the file named must be one **this room holds**. Without it, a free-text url broadcast
+to every peer plays whatever the sender names on everyone's speakers. It is `roomFileByUrl` now,
+declared once and returning the row, so the caller that needs the content type gets it from the same
+read that proved ownership. `composer-image.remote.ts` is separate because its gate is
+`isPresenter || settings.userUploads`, not the presenter role, and a looser gate living among
+exports that all open with `presenterRoom()` is how gates drift. **`uploadFile` stays a form
+action** — it is submitted from a real `<form>` and degrades without JavaScript.
+
+**Three changes that are not moves:**
+
+- **`deleteFile`'s SELECT-then-DELETE became one `DELETE … RETURNING`.** Two statements with a gap is
+  the TOCTOU this repository's standard names: two presenters deleting together both found a row and
+  both called `deleteStoredFile` on a path the first had removed.
+- **`overwriteCashRegisterSound`'s `on` is a real `z.boolean()`**, where the form body carried the
+  strings `'true'`/`'false'`.
+- **`uploadComposerImage` returns the URL, not the row** — the only caller reads `file.url`, and the
+  row exported the uploader's id and room short code to every browser that pastes an image.
+
+**A negative control caught my own test lying, and that is recorded rather than quietly fixed.** The
+TOCTOU test was behavioural — delete, delete again, expect 404 — and putting the old SELECT-then-DELETE
+back left it **green**. It had to: `better-sqlite3` is synchronous, nothing interleaves inside one
+process, and two sequential calls behave identically either way. The race is across requests and this
+suite cannot stage it. The guard is now a source-text one **and says so**, instead of dressing itself
+up as a behavioural proof that never was.
+
+| | before | after |
+| --- | --- | --- |
+| `+page.svelte` | 13,534 | **13,529** |
+| `+page.server.ts` | 2,709 | **2,473** (3,233 at the start, **−760, −24%**) |
+| room suite | 1,623 / 121 files | **1,636 / 122 files** |
+| remotes registered | 8 | **10** |
+
+**Verified:** `svelte-check` **0/0** · full room suite **1636/1636** across 122 files · `eslint src`
+**clean** — it caught three orphaned imports and a `preserve-caught-error` on a re-thrown upload
+failure, all fixed · prettier clean on every file touched · `vite build` registers ten remotes, with
+`61crsc/deleteFile`, `61crsc/fileMediaCommand`, `61crsc/overwriteCashRegisterSound` and
+`erb7ni/uploadComposerImage` READ out of the built client bundle and matched to their server chunks ·
+`svelte-autofixer` **`issues: []`** on `+page.svelte`.
+
+**Three negative controls run and seen red**, restored with `cp` from `/tmp`: restoring the
+SELECT-then-DELETE (after the guard was fixed — see above); dropping the room predicate from
+`roomFileByUrl`, which reddens both the alert-sound and play-for-all tenancy tests; and making the
+harness stop establishing the store, which reddens all of it at once.
+
+**`@sveltejs/kit/internal/server` ships no types TypeScript can resolve** for that subpath, so
+`kit-internal-server.d.ts` declares the one function used, with its signature transcribed from the
+implementation's own JSDoc and an instruction to delete the file when Kit ships types.
+
+**Still not done:** no browser click-through, now across eight conversions.
+
+### 2026-08-15 14:20 EDT — Two broadcasts that looked alike, and a confirm that was spelled two ways
+
+**Branch `feat/extra-chat-column`, not merged.** **Runtime impact: yes** — on the recording badge,
+the chat-mode radios, and (a fix) the sentence the session modal shows before changing the room.
+
+`recordingState` and `changeChatMode` leave `+page.server.ts` for **`src/routes/recording-state.remote.ts`**
+and **`src/routes/chat-mode.remote.ts`** — two modules, deliberately, because they are two features
+that merely *looked* alike sitting next to each other. Both are presenter-gated `cmds` broadcasts
+scoped by `presenterRoom()`; the one place they diverge is the one that matters and it is now
+written at both ends. Recording is **momentary** and stores nothing: a member who joins after the
+recorder stopped has missed nothing, and a row would only be a second opinion to keep in step with a
+`MediaRecorder` that dies with the tab that owns it. The chat mode is a **standing fact** and writes
+a row, because somebody arriving later has to *find* the chat disabled. Folding them into one module
+would have buried that under a shared name.
+
+**Two changes that are not moves, each stated in the code:**
+
+- **`recName` now REFUSES over 200 characters** where the action read
+  `String(data.get('recName') ?? '').slice(0, 200)`. A silent truncation turns a wrong input into a
+  plausible one and tells nobody — the fallback this repository forbids. Unreachable from the UI
+  either way: the one caller that supplies a name generates a 39-character ISO timestamp.
+- **The mode allow-list is `z.enum(CHAT_MODES)`**, not a hand-called `isChatMode`. Same three
+  letters, but *derived* from the constant `$lib/chat-mode.ts` already exports rather than restated,
+  and the type now flows all the way out: the modal prop, both radio handlers and the page wrapper
+  are `ChatMode` instead of `string`, so a fourth mode cannot be offered by a radio and refused by
+  the server.
+
+**A defect found while doing it, and fixed.** There were **two** copies of the confirm sentence and
+only one was right. `requestSettingsChatMode` built the capture's label with a ternary;
+`requestSessionChatMode` interpolated the raw letter, so the session modal asked *"Are you sure you
+want to change the chat mode to p"*. Same control, same three values, two spellings — which is what
+duplicated copy always eventually becomes. `chatModeConfirmPrompt` in `$lib/chat-mode.ts` owns the
+wording now (quotes and trailing `?` transcribed whole) and both call it.
+
+**A second defect in the test suite, found the same way and worth recording because it was GREEN.**
+`chat-mode-contract.test.ts` carved the action out of `+page.server.ts` with
+`slice(from, indexOf('getMyMobilePin: async', from))`. That end marker stopped existing when
+`getMyMobilePin` became a remote function on 2026-08-15, so `indexOf` returned `-1`, the slice ran to
+the second-to-last character of the file, and four assertions passed against *the whole rest of the
+file* rather than the action. Same family as the `exactAlerts` slice that silently became `''`. There
+is nothing to slice now — the command has a file of its own, so the file **is** the span.
+
+**The ratchet did its job, and this is the first time it took an extraction to satisfy it.** The
+conversion landed **15 over** the `+page.svelte` ceiling: a `try`/`catch` around a command is three
+lines where `void fetch(...)` was one, twice, plus two imports. Moving the reasoning into the
+modules that own it covered part of it; the rest was paid with a real module —
+**`$lib/chat-plain-text.ts`**, taking `stripHtmlToText` out of the component. Pure, twinned with a
+server derivation it has to agree with, and never once executed by a test in its life.
+
+**Also fixed:** two JSDoc blocks were stacked in `+page.svelte`, so the docstring describing
+`startRecording` sat on `broadcastRecordingState` three definitions above it. Put back on what it
+describes.
+
+| | before | after |
+| --- | --- | --- |
+| `+page.svelte` | 13,542 | **13,534** |
+| `ModalHost.svelte` | 5,985 | **5,983** — first time it has moved, and down |
+| `+page.server.ts` | 2,776 | **2,709** (3,233 at the start of the conversions, −524, **16%**) |
+| room suite | 1,600 / 119 files | **1,623 / 121 files** |
+| remotes registered | 6 | **8** |
+
+**Verified:** `svelte-check` **0 errors, 0 warnings** (1,089 files) · full room suite **1623/1623**
+across 121 files · `eslint src` **clean** (the 25 remaining errors are all in the untracked,
+gitignored `scripts/… 2.*` duplicates and predate this work) · prettier clean · `vite build`
+succeeds with **eight** remotes in the server manifest, and the two new ids READ out of the built
+client bundle as `dj3cu1/recordingState` and `1edz78e/changeChatMode`, matching
+`.svelte-kit/output/server/chunks/remote-dj3cu1.js` and `remote-1edz78e.js` · **`svelte-autofixer`
+returned `issues: []` on both `ModalHost.svelte` and `+page.svelte`.**
+
+**A correction to something recorded earlier in this session:** the plan document claims the
+autofixer "cannot be run on a 13,555-line file", and it was used to justify skipping the gate. That
+is wrong — it runs on both files and returns clean. The suggestions it emits (`SvelteMap`/`SvelteSet`,
+state assigned inside `$effect`) are all pre-existing and none fall in a region touched here, but
+they are a real backlog and should be read as one.
+
+**Three negative controls run and seen red**, each restored with `cp` from `/tmp` and never
+`git checkout` (which destroyed uncommitted work earlier in this session):
+
+1. dropping the `return;` from the `changeChatMode` catch — proves a refused change cannot fall
+   through to `invalidateAll()` and redraw the radio at a mode nobody picked;
+2. letting an empty `recName` ride along as `''` instead of `undefined`;
+3. sourcing the room without the presenter gate, via `requireRoomShortCode(getRequestEvent().locals)`
+   — proves the gate and the tenant scope are one call and cannot be applied separately.
+
+**Still not done, and it spans all seven conversions: no browser click-through.** Nothing here has
+been exercised in a live room — not the recording badge as a member sees it, not either chat-mode
+radio. Everything is proven by build manifest, type-check and contract test.
+
 ### 2026-08-15 13:58 EDT — "For All", and the gate that had to move a second time
 
 **Runtime impact: yes, on the four "For All" broadcasts.** `videoForAll` and `youtubeForAll` move to

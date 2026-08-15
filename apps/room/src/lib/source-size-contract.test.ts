@@ -58,18 +58,41 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       explanation to the code it explains is the extraction itself. The first is why the ceiling
       moved once; the second is why it has not moved since — through five conversions and down to
       13,550, which is BELOW where it stood before the raise.
+
+      The seventh conversion (`recordingState`, `changeChatMode`) is the first where moving the
+      reasoning was NOT enough on its own: it landed 15 over, because a `try`/`catch` around a
+      command is three lines where a `void fetch(...)` was one, twice over, plus the two imports.
+      What paid for it was an EXTRACTION, which is what this file is supposed to provoke —
+      `stripHtmlToText` and its docstring left for `$lib/chat-plain-text.ts`. Pure, twinned with a
+      server derivation it has to agree with, and untestable in here without mounting the page.
+
+      That is the ratchet working as designed rather than as an obstacle: the growth was real and it
+      was paid for with a real module, not with a shorter comment and not with a bigger number.
+
+      The eighth (the Files pane and the composer upload) went the same way and cost 20: four call
+      sites, each trading a `void fetch(...)` for a `try`/`catch`, plus a five-line import. Paid for
+      by moving `mediumDate` to `$lib/message-formatters.ts` — where the room's four other date
+      formatters already live, and where it stopped constructing a fresh `Intl.DateTimeFormat` on
+      every call. Then two lines back for `{ cause }` on a re-thrown upload failure, which eslint's
+      `preserve-caught-error` was right to demand: an `HttpError` re-thrown as a bare `Error` keeps
+      the sentence and loses the status the server answered with. 13,534 -> 13,529 on the commit.
     */
-    max: 13542,
+    max: 13529,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {
     file: 'lib/components/ModalHost.svelte',
-    max: 5985,
+    /*
+      Moved for the first time, and DOWN, by the chat-mode conversion. The two radios each built the
+      confirm sentence themselves and only one of them built it right; `chatModeConfirmPrompt` in
+      `$lib/chat-mode.ts` owns the capture's wording now and both call it.
+    */
+    max: 5983,
     why: 'every modal in the room, in one component'
   },
   {
     file: 'routes/+page.server.ts',
-    max: 2776,
+    max: 2474,
     why: 'the loader and every form action left; 3,233 before the remote-function conversions began'
   }
 ];

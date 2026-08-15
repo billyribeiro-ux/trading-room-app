@@ -82,16 +82,14 @@ const AUTH = stripComments(readFileSync(new URL('./server/auth.ts', import.meta.
 const remoteCode = stripComments(REMOTE);
 
 /*
-  Still a FORM ACTION reader, and kept deliberately: `fileMediaCommand` has not been converted, and
-  the last assertion in this file is a `not.toContain` proving the "For All" family was never folded
-  into it. Re-pointing that one at the remote module would have made it pass against a file that
-  never contained `fileMediaCommand` — green, guarding nothing.
+  `actionBody` used to live here, and the note beside it said `fileMediaCommand` had not been
+  converted so a `not.toContain` had to keep reading `+page.server.ts` — re-pointing it at a remote
+  module that never contained the action would have been green and guarding nothing.
+
+  `fileMediaCommand` IS converted now, to `files-pane.remote.ts`, so the assertion moved WITH it and
+  the helper had no remaining caller. Deleted rather than left: a reader that nothing reads is the
+  next person's dead end.
 */
-const actionBody = (name: string) => {
-  const from = serverCode.indexOf(`${name}: async (`);
-  expect(from, `the ${name} action must exist`).toBeGreaterThan(-1);
-  return serverCode.slice(from, serverCode.indexOf('\n  },', from));
-};
 
 const COMMAND_ORDER = ['videoForAll', 'youtubeForAll'] as const;
 
@@ -300,12 +298,22 @@ describe('the server owns the authority', () => {
       `sharedFiles` because an mp3 IS a room file; a video url is free text a presenter typed, and
       folding them together would have meant deleting that predicate.
     */
-    const body = actionBody('fileMediaCommand');
-    expect(body).toContain("if (cmd !== 'playMP3ForAll' && cmd !== 'stopMp3ForAll') {");
-    expect(body).toContain('eq(sharedFiles.roomShortCode, requireRoomShortCode(locals))');
-    expect(body).not.toContain("ForAll', 'play");
-    expect(body).not.toContain('playVideoForAll');
-    expect(body).not.toContain('playYTForAll');
+    /*
+      It left `+page.server.ts` for `files-pane.remote.ts` after this was written. Re-pointed at the
+      file that owns it — a `not.toContain` left behind would have started passing because the whole
+      region moved, not because the two families are still separate, which is the entire claim.
+    */
+    const filesPane = readFileSync(
+      new URL('../routes/files-pane.remote.ts', import.meta.url),
+      'utf8'
+    );
+    expect(filesPane).toContain("cmd: z.enum(['playMP3ForAll', 'stopMp3ForAll'])");
+    // The room predicate survived the move, and is now shared rather than inlined per command.
+    expect(filesPane).toContain('function roomFileByUrl(room: string, url: string)');
+    expect(filesPane).toContain('eq(sharedFiles.roomShortCode, room)');
+    expect(filesPane).toContain('if (!roomFileByUrl(room, playable)) error(400');
+    expect(filesPane).not.toContain('playVideoForAll');
+    expect(filesPane).not.toContain('playYTForAll');
   });
 });
 
