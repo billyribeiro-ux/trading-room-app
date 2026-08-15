@@ -24,6 +24,67 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-15
 
+### 2026-08-15 12:22 EDT — a 13,663-line component is a breach of the standard, and now it cannot grow
+
+**Runtime impact: none.** One new test file. Nothing the site serves changed.
+
+The owner raised it after I reported, as a tooling limitation, that `+page.svelte` was too large to
+feed to `svelte-autofixer`: *"in svelte 5/sveltekit no file should have anything near 12,000 lines
+so that means what has been set as the standard since the very beginning, which is to follow
+svelte's best practices, is not being implemented."* That is correct, it is not a tooling
+limitation, and I should have raised it rather than working around it — I had added 46 lines to that
+same file twenty minutes earlier without comment.
+
+**Measured, not estimated:**
+
+| | lines |
+| --- | ---: |
+| `+page.svelte` — `<script>` block, lines 1–9,411 | **9,410** |
+| `+page.svelte` — template, 9,412–13,663 | 4,251 |
+| `ModalHost.svelte` | 5,985 |
+| `+page.server.ts` | 3,233 |
+| those two `.svelte` files as a share of all Svelte source (42,520) | **46%** |
+
+My earlier figure of "~12,000" was low. The important part is the split: **the mass is not markup.**
+Nine thousand lines of TypeScript orchestration sit inside a component, which is precisely what
+`.svelte.ts` rune modules and child components exist to prevent. Pure logic HAS been extracted
+correctly all along — `alert-filter.ts`, `alert-labels.ts`, `media-elevation.ts`,
+`screen-volume.ts` — so what remains is the stateful half nobody ever took.
+
+**Why it never shrank, which is the finding that actually matters: 46 of 112 room test files read
+`+page.svelte` as raw TEXT**, and 17 read `+page.server.ts`. The contract suite asserts on source
+text rather than behaviour. Two consequences, and the second is the dangerous one:
+
+1. Every extraction breaks a pile of tests, so adding one more handler to the existing file is
+   always the cheap move, and nothing ever said no.
+2. **Negative assertions pass vacuously after a split.** Positive ones fail loudly, which is fine —
+   that is a migration telling you where the code went. But `expect(pageCode).not.toContain(…)`
+   goes green the moment the region leaves the file, because the text is gone for the wrong reason.
+   The guard turns green at the exact moment it stops guarding. `unmute-chat-contract.test.ts`,
+   written an hour ago, carries one.
+
+**Landed: the ratchet**, `source-size-contract.test.ts`, 57 assertions. Ceilings that only go DOWN,
+plus a staleness check so a ceiling cannot sit far above the real figure and quietly license growing
+all the way back. It also requires every text-reading contract test to make at least one POSITIVE
+assertion, so a purely-negative file is caught before an extraction can hollow it out.
+
+**One honest note about building it: the first version of that last check was wrong and I caught it
+before reporting it.** It counted only `toContain` and immediately failed
+`day-separator-contract.test.ts` — which asserts positively three times over using `page.match(…)`
+with `toBe(2)`. That was a defect in my check, not in the test, and reporting it would have sent the
+owner looking at working code. The check now enumerates the three assertion forms this suite
+actually uses.
+
+**Verified:** 57/57. Both halves of the ratchet negative-controlled and seen red — a ceiling one
+line below actual failed the growth gate with the right message, and a ceiling 137 above failed the
+staleness gate — then restored. Full room suite **1507/1507 across 113 files**, `eslint` exit **0**.
+
+**Agreed plan, owner 2026-08-15 (TODO row AE): the refactor runs BEFORE resuming the reference-match
+ports**, since every remaining command would otherwise add lines to these same two files and row W
+alone is six more handlers. Slices, each migrating its own contract assertions and lowering the
+ceiling: media/mic/screen orchestration, then modal + user actions, then SSE/event dispatch, then
+the template into components.
+
 ### 2026-08-15 12:01 EDT — the unmute button reported success and sent nothing
 
 **Runtime impact: a presenter can undo a chat mute.** Until now they could not, in any room, by any
