@@ -36,9 +36,9 @@ import {
 import { loadAlertPage } from '$lib/server/alert-log';
 import { isChatMode } from '$lib/chat-mode';
 import { parseReactions } from '$lib/server/reactions';
+// `requestMobilePin` left with `getMyMobilePin` for `mobile-pin.remote.ts`; this file no longer calls it.
 import {
   readRoomConfig,
-  requestMobilePin,
   requestStreamReadToken,
   writeRoomSetting
 } from '$lib/server/room-config-client';
@@ -2461,34 +2461,15 @@ export const actions: Actions = {
     return { success: true, mode };
   },
 
-  /**
-   * `sendServerCommand("getMyMobilePin", null)`.
-   *
-   * The room has never held the pin: the reference sends this on the command channel and the
-   * server answers with one. Here the controller is that server - the code lives on
-   * `room_users.mobile_pair_code`, which is per room, and it is minted fresh per request.
-   *
-   * Gated the same way the button is, and re-gated here because a hidden button is not an
-   * authorization check.
-   */
-  getMyMobilePin: async ({ request, locals }) => {
-    ensureDatabase();
-    const user = requireUser(locals);
-    const shortCode = requireRoomShortCode(locals);
+  /*
+    `getMyMobilePin` — `sendServerCommand("getMyMobilePin", null)` upstream — was an action here and
+    is now `src/routes/mobile-pin.remote.ts`. The gate, the controller call and both messages moved
+    with it unchanged; `fail(409)`/`fail(502)` became `error(409)`/`error(502)`, because a command
+    has no form-action caller to understand a `fail`.
 
-    const { settings } = await readRoomConfig(request, shortCode, user.email);
-    const appEnabled =
-      settings.ptrMobileAppEnabled === true || settings.customMobileAppEnabled === true;
-    if (!appEnabled) return fail(409, { message: 'This room has no mobile app configured.' });
-
-    try {
-      return { pin: await requestMobilePin(shortCode, user.email) };
-    } catch (cause) {
-      // Loud, not a placeholder: showing a pin that was never issued is worse than saying so.
-      console.error('[getMyMobilePin] the controller could not issue a pin', cause);
-      return fail(502, { message: 'Could not get an app pin right now.' });
-    }
-  },
+    It is a `command` and NOT a `query` despite being a read, and that module explains why at length:
+    the pin is minted fresh per request, and a query would cache it.
+  */
 
   presenterCommand: async ({ request, locals }) => {
     ensureDatabase();

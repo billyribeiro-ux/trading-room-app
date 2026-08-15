@@ -24,6 +24,50 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-15
 
+### 2026-08-15 13:23 EDT — the read that must not be a `query`
+
+**Runtime impact: yes, on one control.** `getMyMobilePin` moves from `?/getMyMobilePin` to
+`src/routes/mobile-pin.remote.ts`. The gate, the controller call and both user-facing messages are
+unchanged.
+
+**The finding is worth more than the conversion.** `getMyMobilePin` is a READ: no argument, returns
+data, mutates nothing the room can see. Every instinct maps a read to `query`. That would have been
+a bug. `query` is CACHED — SvelteKit keys on the serialised argument, dedupes concurrent callers onto
+one instance, and holds the resolved value while the query is in active use. With **no argument, one
+key covers the whole application.** This read MINTS: the pin comes from
+`room_users.mobile_pair_code` and is issued fresh per request. As a query, the second open of the
+mobile modal would return the first pin out of cache — possibly one the controller had already
+rotated — and it would look completely correct. A plausible number, in the right place, silently
+stale.
+
+**So the rule, written into the module and pinned by a test: `query` is for reads that are PURE. A
+read with a server-side side effect is a `command`, whatever the verb in its name says.** The test
+asserts `not.toContain('query(')` so that "this is a read, it should be a query" cannot be applied
+later as a tidy-up.
+
+**The rejection shape was read, not assumed.** The client needs the server's own message so the
+409 ("this room has no mobile app configured") stays distinct from the 502 ("could not get an app
+pin right now"). Kit's docs do not state what a command rejects with, so
+`src/runtime/client/remote-functions/shared.svelte.js` was read instead: `remote_request` throws
+`new HttpError({ status, ...result.error })`, and `HttpError` (in `exports/internal/shared.js`)
+carries `.status` and `.body`, the `App.Error`. `isHttpError` narrows it. Guessing here would have
+collapsed two different facts into one string.
+
+**The ceiling promise held.** The previous entry raised `+page.svelte` to 13,561 and said it would
+not move again. This conversion first pushed it to **13,569** — and the answer was the one the rule
+asks for, not another raise: the reasoning went into `mobile-pin.remote.ts` rather than being
+duplicated at the call site, and the file came out at **13,558**, below the raised ceiling. Both
+ceilings lowered to measured: `+page.svelte` **13,558**, `+page.server.ts` **3,162** (from 3,233
+before the conversions began, −71).
+
+**Verified:** `svelte-check` 0/0 (1,082 files) · suite **1565/1565 across 117 files** · `eslint`
+clean outside the untracked gitignored `scripts/… 2.*` · `prettier --check` clean · `vite build`
+succeeds and the manifest now registers **two** remotes, `'8152qc'` and `'1dg50ok'`, whose ids the
+client bundle calls as `8152qc/unmuteChat` and `1dg50ok/getMyMobilePin`. Two negative controls run
+and seen red: turning it into a `query`, and collapsing both server messages into the fallback.
+`requestMobilePin` was removed from `+page.server.ts`'s imports — it has no caller there now.
+**Not verified:** no browser click-through of the mobile modal.
+
 ### 2026-08-15 13:14 EDT — the first remote function, and the first ceiling I raised
 
 **Runtime impact: yes, on one control.** `Unmute Chat` now reaches the server through a remote

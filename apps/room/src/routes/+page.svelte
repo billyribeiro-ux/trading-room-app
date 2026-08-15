@@ -19,6 +19,8 @@
   import { invalidate, invalidateAll } from '$app/navigation';
   // The first remote function in this app. Aliased because the local wrapper below keeps the name.
   import { unmuteChat as unmuteChatCommand } from './chat-mute.remote';
+  import { getMyMobilePin } from './mobile-pin.remote';
+  import { isHttpError } from '@sveltejs/kit';
   import {
     PUBLIC_PTR_CDN_UPLOAD_KEY,
     PUBLIC_PTR_GIPHY_API_KEY,
@@ -2100,17 +2102,12 @@
     // before anything appears.
     openModal('mobile');
     mobilePin = 'N/A';
-
-    const response = await fetch('?/getMyMobilePin', { method: 'POST', body: new FormData() });
-    const result = deserialize(await response.text());
-    if (result.type === 'success' && typeof result.data?.pin === 'string') {
-      mobilePin = result.data.pin;
-    } else {
-      // No invented placeholder. `N/A` is the captured value for "no pin", and a failed request is
-      // a case of not having one.
-      bootboxAlert =
-        (result.type === 'failure' ? (result.data?.message as string) : null) ??
-        'Could not get an app pin right now.';
+    try {
+      mobilePin = await getMyMobilePin();
+    } catch (cause) {
+      // `N/A` stays as set above — no invented placeholder. `isHttpError` narrows Kit's rejection so
+      // the 409 and 502 wordings stay distinct; `mobile-pin.remote.ts` says why that shape is known.
+      bootboxAlert = isHttpError(cause) ? cause.body.message : 'Could not get an app pin right now.';
     }
   }
 

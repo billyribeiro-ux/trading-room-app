@@ -46,8 +46,15 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       added to an existing file because a module was more work. Shaving the explanation to fit would
       have been the tail wagging the dog, and this repository's standard says in as many words not
       to shorten comments to look tidy. The number moves and says why. It does not move again.
+
+      It did not. The very next conversion (`getMyMobilePin`) first pushed the file to 13,569, and
+      the answer that time was the one the rule asks for: the reasoning went into the module that
+      owns it (`mobile-pin.remote.ts`) instead of being duplicated at the call site, and the file
+      came out at 13,558 — BELOW the raised ceiling. That is the difference between compacting a
+      comment to hit a number and putting it where it belongs, and it is why the raise above was
+      once and not a habit.
     */
-    max: 13561,
+    max: 13558,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {
@@ -57,8 +64,8 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
   },
   {
     file: 'routes/+page.server.ts',
-    max: 3181,
-    why: 'the loader and every form action left; 3,233 before `unmuteChat` became a remote command'
+    max: 3162,
+    why: 'the loader and every form action left; 3,233 before the remote-function conversions began'
   }
 ];
 
