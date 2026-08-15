@@ -95,7 +95,6 @@ new-room-control/
 /apps/room/app-modals
 /apps/room/app-room
 /apps/room/app-session
-/apps/room/css
 /apps/room/navbar-section
 /apps/room/new-evidence
 /apps/room/preview
@@ -111,6 +110,32 @@ new-room-control/
 # Reference dumps captured from the live original. Large, and they carry the
 # original's own bundle text — kept locally, read, never published.
 dumps/
+
+# ---------------------------------------------------------------------------------------------
+# `apps/room/css/` — NOT evidence. A BUILD INPUT, and the distinction is why it is tracked.
+#
+# This was a symlink into the capture folder alongside the others above, on the stated grounds that
+# "the evidence-bound tests read them by relative path". That was true and it was incomplete:
+# `src/app.css` line 1 is `@import '../css/complete-app-styles.css';`, so the file is not read by a
+# test, it is COMPILED INTO THE SHIPPED STYLESHEET.
+#
+# The consequence went unnoticed for as long as it did because it was hidden behind two earlier
+# failures. Once lint and type-check went green the room's Build step failed on a clean checkout
+# with `[postcss] ENOENT ... '../css/complete-app-styles.css'` — which means the application could
+# not be built from its own repository at all. On a fintech app that is a release-blocking defect,
+# not a tidiness issue.
+#
+# Two facts decided it rather than preference. It is ALREADY PUBLISHED: every visitor to the
+# deployed site is served this stylesheet, because the build inlines it — so withholding it from
+# git protects nothing and only breaks the build. And it is clean: the repository's own detector
+# in `apps/room/gate/privacy-utils.mjs` reports no owner name, no gravatar hashes, no addresses and
+# no identity payloads across all 8,086 lines.
+#
+# The capture directory it was symlinked to holds exactly this one file, so nothing else came in
+# with it. Everything that IS evidence — `docs/source`, `second-dump` and the rest — stays out, and
+# the rule to apply to anything new here is the one this file got wrong: ask whether the build reads
+# it, not whether a test does.
+# ---------------------------------------------------------------------------------------------
 
 # ---------------------------------------------------------------------------------------------
 # `apps/room/scripts/` — every file under it, at the owner's instruction on 2026-08-15: "these
