@@ -123,42 +123,7 @@ import type { ActivePoll } from '$lib/types';
 */
 const MAX_MESSAGE_BODY = 4_000;
 const MAX_ALERT_BODY = 8_000;
-/*
-  The cap on a url a presenter broadcasts to every browser in the room ("For All" video / YouTube).
-
-  2,000 is the length IE capped an address bar at and the number every server and proxy since has
-  been built to survive; nothing this room plays is anywhere near it. It is a bound, not a
-  validation - `broadcastableMediaUrl` decides whether the string is playable.
-*/
-const MAX_BROADCAST_URL = 2_000;
 import type { Actions, PageServerLoad } from './$types';
-
-/**
- * A url this room is willing to put into an `src` attribute in every member's browser.
- *
- * Returns the trimmed url, or `null` to refuse.
- *
- * **Deny by default, and parsed rather than pattern-matched.** The client's own check is
- * `value.toLowerCase().includes('http://') || value.toLowerCase().includes('https://')` — a
- * substring test, so any string that merely CONTAINS `https://` anywhere in it passes, whatever
- * scheme it actually starts with. That was harmless while the value only ever reached the
- * presenter's own `<video>`; it is not harmless now that a presenter's typed string is broadcast
- * into an `src` attribute in every browser in the room. `new URL` plus an explicit two-entry
- * protocol allow-list is the check that actually holds.
- */
-function broadcastableMediaUrl(raw: string): string | null {
-  const value = raw.trim();
-  if (!value || value.length > MAX_BROADCAST_URL) return null;
-  let parsed: URL;
-  try {
-    parsed = new URL(value);
-  } catch {
-    // Not a url at all. Loud refusal at the call site; never a silent fallback to "play it anyway".
-    return null;
-  }
-  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return null;
-  return value;
-}
 
 /**
  * The two gates every Swing Trade Alerts mutation passes, in cost order.
@@ -1960,152 +1925,16 @@ export const actions: Actions = {
     return { success: true };
   },
 
-  /**
-   * `playVideoForAll` / `stopVideoForAll` — the VideoPlayer tab's two "For All" buttons.
-   *
-   * The sender, verbatim from `main.d1d09071be31f1ba.js` byte 1,981,613 / 1,981,761 / 1,981,811:
-   *
-   * ```js
-   * // "Play now"
-   * this.appService.sendServerAdminCommand('playVideoForAll', {url: e, videoPlayTime: null})
-   * // the "Choose time?" branch, after `new Date($('#video-start-datetime').val()).getTime()`
-   * this.appService.sendServerAdminCommand('playVideoForAll', {url: e, videoPlayTime: i})
-   * // both "Stop For All" and "Remove Scheduled Video"
-   * stopVideoForAll(e) { bootbox.confirm(`Are you sure you want to ${e} this video for all?`,
-   *                                      i => { i && sendServerAdminCommand('stopVideoForAll') }) }
-   * ```
-   *
-   * and the dispatch that turns each back into a client event, byte 1,024,587 / 1,024,668:
-   *
-   * ```js
-   * case "playVideoForAll": this.guiEventBus.emit("playVideoForAll", {url: i.url}); break;
-   * case "stopVideoForAll": this.guiEventBus.emit("stopVideoForAll"); break;
-   * ```
-   *
-   * ## What this fixes
-   *
-   * `VideoPlayer.svelte` made zero network calls. Both buttons said "For All" and cleared one
-   * browser's own `$state` — the exact "control whose only effect is changing its own label" this
-   * repository's standard names, shipped.
-   *
-   * ## Why `videoPlayTime` is not on this wire
-   *
-   * The reference sends it and its DISPATCH DROPS IT: the emit above forwards `{url: i.url}` and
-   * nothing else. It is a field the SERVER consumes — it stores the pair on the session and the
-   * late-join replay reads it back (`roomState.videoURL && !roomState.videoPlayTime && …`, byte
-   * 1,967,430), so a scheduled play is deferred server-side and only broadcast when it starts.
-   *
-   * This room has no store for it and no server-side scheduler, so the presenter's own browser
-   * holds the timer and posts here at the moment the video actually starts. Accepting the field
-   * would mean either building that scheduler or carrying a value nothing reads. The gap is
-   * recorded in `TODO.md` rather than papered over: a presenter who closes the tab before a
-   * scheduled video fires does not play it for the room, and a member who joins afterwards does
-   * not see a video already playing.
-   *
-   * ## Why the url is parsed rather than pattern-matched
-   *
-   * It reaches `src` on an `<iframe>` or a `<video>` in every browser in the room. The client's own
-   * `validURL` is
-   * `value.toLowerCase().includes('http://') || value.toLowerCase().includes('https://')` — a
-   * substring test that any string merely CONTAINING those characters passes, whatever scheme it
-   * actually starts with. Deny-by-default here: see {@link broadcastableMediaUrl}.
-   */
-  videoForAll: async ({ request, locals }) => {
-    ensureDatabase();
-    const user = requireUser(locals);
-    if (!isPresenterRole(user.role)) return fail(403, { message: 'Presenters only.' });
+  /*
+    `videoForAll` and `youtubeForAll` left together for
+    `src/routes/for-all-broadcast.remote.ts`, and `broadcastableMediaUrl` /
+    `MAX_BROADCAST_URL` went with them — they were declared at the top of this file and used by
+    nothing else.
 
-    const data = await request.formData();
-    const cmd = String(data.get('cmd') ?? '');
-    if (cmd !== 'playVideoForAll' && cmd !== 'stopVideoForAll') {
-      return fail(400, { message: 'Unknown command.' });
-    }
-
-    if (cmd === 'stopVideoForAll') {
-      publishToRoom(requireRoomShortCode(locals), { channel: 'cmds', data: { cmd } });
-      return { success: true };
-    }
-
-    const url = broadcastableMediaUrl(String(data.get('url') ?? ''));
-    if (!url) return fail(400, { message: 'That is not a playable video url.' });
-
-    publishToRoom(requireRoomShortCode(locals), { channel: 'cmds', data: { cmd, url } });
-    return { success: true };
-  },
-
-  /**
-   * `playYTForAll` / `stopYTForAll` — the YouTube modal's Play, and the overlay's "Stop For All".
-   *
-   * ## The stop-then-play sequence is the reference's, and it is deliberate
-   *
-   * Byte 2,296,932:
-   *
-   * ```js
-   * playYtVideo() {
-   *   this.appService.sendServerAdminCommand('stopYTForAll', {url: this.youtubeURL});
-   *   this.appService.sendServerAdminCommand('playYTForAll', {url: this.youtubeURL});
-   * }
-   * ```
-   *
-   * Two commands, in that order, so a second video replaces the first cleanly. What is READ, and
-   * nothing beyond it: the room's `stopYTForAll` subscriber is `() => { this.ytURL = null }`, and
-   * the overlay's `ytURL` setter is
-   *
-   * ```js
-   * set ytURL(e) { this._ytURL = e; e && (…, this.playYTURL(e, this.startTime)) }
-   * ```
-   *
-   * so a falsy value tears the frame down and a truthy one rebuilds the embed. The stop is what
-   * puts the null in between, which is what makes replaying the SAME url a change rather than a
-   * no-op.
-   *
-   * Both go out from ONE request rather than two `fetch` calls, because two in-flight posts can be
-   * answered in either order and an inverted pair leaves every browser with a torn-down overlay.
-   *
-   * ## The overlay's own stop carries no url
-   *
-   * Byte 1,503,220: `stopYTForAll() { this.appService.sendServerAdminCommand('stopYTForAll') }`.
-   * The url only rides on the stop that precedes a play, and the receiver ignores it either way
-   * (`case "stopYTForAll": this.guiEventBus.emit("stopYTForAll")`, byte 1,024,212 — no payload
-   * forwarded). It is reproduced because it is what the wire carries, not because anything reads it.
-   *
-   * ## Why the url is NOT parsed here, unlike `videoForAll`
-   *
-   * It never reaches an attribute as itself. `YoutubePlayerOverlay` matches it against the two
-   * captured patterns and interpolates the CAPTURED GROUP into a hard-coded
-   * `https://www.youtube.com/embed/…` — and the video-id group is `([^#&?]*)`, so nothing it can
-   * contain escapes that origin. Requiring a parseable URL would reject `www.youtube.com/watch?v=x`,
-   * which the reference accepts and plays.
-   */
-  youtubeForAll: async ({ request, locals }) => {
-    ensureDatabase();
-    const user = requireUser(locals);
-    if (!isPresenterRole(user.role)) return fail(403, { message: 'Presenters only.' });
-
-    const data = await request.formData();
-    const cmd = String(data.get('cmd') ?? '');
-    if (cmd !== 'playYTForAll' && cmd !== 'stopYTForAll') {
-      return fail(400, { message: 'Unknown command.' });
-    }
-
-    const room = requireRoomShortCode(locals);
-
-    if (cmd === 'stopYTForAll') {
-      publishToRoom(room, { channel: 'cmds', data: { cmd } });
-      return { success: true };
-    }
-
-    const url = String(data.get('url') ?? '').trim();
-    if (!url || url.length > MAX_BROADCAST_URL) {
-      return fail(400, { message: 'That is not a playable youtube url.' });
-    }
-
-    // The reference's order, reproduced exactly. Publishing is synchronous, so the two arrive on
-    // every subscriber in this order and cannot be reordered by the network.
-    publishToRoom(room, { channel: 'cmds', data: { cmd: 'stopYTForAll', url } });
-    publishToRoom(room, { channel: 'cmds', data: { cmd: 'playYTForAll', url } });
-    return { success: true };
-  },
+    One feature, one decision: a presenter's typed string becomes an `src` attribute in every
+    browser in the room. They share the presenter gate and the length bound; they do NOT share the
+    URL check, and that module says at each of them why making them consistent would break one.
+  */
 
   /**
    * `overwriteCashRegisterSound(url, on)` — the Files pane's two `set-alert-sound-btn` buttons.

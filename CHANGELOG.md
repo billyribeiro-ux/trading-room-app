@@ -24,6 +24,56 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-15
 
+### 2026-08-15 13:58 EDT — "For All", and the gate that had to move a second time
+
+**Runtime impact: yes, on the four "For All" broadcasts.** `videoForAll` and `youtubeForAll` move to
+`src/routes/for-all-broadcast.remote.ts`, taking `broadcastableMediaUrl` and `MAX_BROADCAST_URL`
+with them — both were declared at the top of `+page.server.ts` and used by nothing else.
+
+**The gate moved twice in ten minutes, and the second move is the lesson.** At 13:48 the presenter
+role check was pulled out of two hand-written copies into `presenterRoom()` inside
+`presenter-commands.remote.ts`. This conversion needed the same gate — and leaving it there would
+have **recreated the exact duplication one level up**, between modules instead of between actions.
+It now lives in `$lib/server/auth.ts` beside the other authority helpers. That is the general shape:
+deduplicating within a module is a local win; the invariant only stops being copyable when it lives
+where every caller can reach it.
+
+**It returns the room ONLY after the role check**, so "gated" and "scoped to the caller's tenant"
+are one event and cannot be applied separately — applying only the first is a presenter of one room
+reaching another. Negative-controlled: returning the room before the check turns two assertions red
+across two files.
+
+**Two commands, one module, and one thing they deliberately do NOT share.** They share the gate, the
+`cmds` channel and the 2,000-character length bound (now one `forAllArgs` factory instead of two
+copies). They do not share the URL check, and each says why at its own site: `videoForAll` parses
+with `new URL` plus a two-entry protocol allow-list because the string reaches a `<video src>` as
+itself; `youtubeForAll` does not, because the overlay interpolates only the captured video-id group
+into a hard-coded `youtube.com/embed/` origin, and requiring a parseable URL would reject
+`www.youtube.com/watch?v=x` which the reference accepts and plays. **"Make them consistent" is the
+tidy-up that would break one of them**, so the asymmetry is documented at both ends and pinned by a
+test.
+
+**A zod `.url()` would not have been the same check** and was deliberately not used: it accepts
+every scheme `new URL` does, including `javascript:` and `data:`. The allow-list stays hand-written;
+the schema only bounds the length. Negative-controlled by deleting the protocol line.
+
+**One test kept reading `+page.server.ts` on purpose.** `for-all-broadcast-contract.test.ts`'s last
+assertion proves the family was never folded into `fileMediaCommand` — which is still a form action,
+because its url must be a file THIS room holds. Re-pointing that `not.toContain` at the remote
+module would have made it pass against a file that never contained `fileMediaCommand`: green,
+guarding nothing. It keeps a `serverCode` reader for exactly that one.
+
+**Ceilings lowered again, no raise.** `+page.svelte` 13,546 → **13,542**. `+page.server.ts`
+2,947 → **2,776** — **−457 from 3,233, a 14% reduction**, and the staleness half of the ratchet is
+what caught the ceiling being left 171 lines high.
+
+**Verified:** `svelte-check` 0/0 (1,089 files) · suite **1600/1600 across 119 files** · `eslint`
+clean outside the untracked gitignored `scripts/… 2.*` · `prettier --check` clean · `vite build`
+succeeds and the manifest registers **six** remotes, the newest (`'vhg2ob'`) called by the client as
+`vhg2ob/videoForAll` and `vhg2ob/youtubeForAll`. Three negative controls run and seen red: making
+the gate and the room scope separable, swapping the YouTube stop-then-play order, and dropping the
+protocol allow-list. **Not verified:** no browser test of a live broadcast.
+
 ### 2026-08-15 13:48 EDT — the presenter broadcasts, and the duplicated gate that was the whole point
 
 **Runtime impact: yes, on three presenter controls.** `presenterCommand` (mute a member's

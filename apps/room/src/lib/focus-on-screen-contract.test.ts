@@ -41,6 +41,13 @@ const REMOTE = readFileSync(
   new URL('../routes/presenter-commands.remote.ts', import.meta.url),
   'utf8'
 );
+/*
+  The gate itself moved a SECOND time, to `$lib/server/auth.ts`, when `for-all-broadcast.remote.ts`
+  needed it too — leaving it in one `.remote.ts` would have recreated the duplication between
+  modules instead of between actions. Asserted where it lives, so this stays a real check rather
+  than a check of where a helper happens to sit today.
+*/
+const AUTH = readFileSync(new URL('./server/auth.ts', import.meta.url), 'utf8');
 
 const stripComments = (source: string) =>
   source
@@ -92,17 +99,23 @@ describe('the server owns the authority', () => {
       `isPresenterRole` spelled out by hand, twice, next to each other. It is now `presenterRoom()`,
       declared once, so the assertion is that this command reaches it rather than that it repeats it.
     */
-    expect(remoteCode).toContain('function presenterRoom(): string {');
-    expect(remoteCode).toContain(
+    expect(AUTH).toContain('export function presenterRoom(): string {');
+    expect(AUTH).toContain(
       "if (!isPresenterRole(requireUser(locals).role)) error(403, 'Presenters only.');"
     );
     expect(focusCommand()).toContain('publishToRoom(presenterRoom()');
   });
 
   it('scopes the broadcast to the caller’s own room', () => {
-    // Not a room id taken from the request — the session's, so room A cannot move room B. There is
-    // no argument it could come from either: the whole payload is the screen id string.
-    expect(remoteCode).toContain('return requireRoomShortCode(locals);');
+    /*
+      Not a room id taken from the request — the session's, so room A cannot move room B. There is
+      no argument it could come from either: the whole payload is the screen id string.
+
+      `presenterRoom()` returns the room ONLY after the role check, which is why the gate and the
+      tenant scope are one call. Handed out separately they can be applied separately, and applying
+      only the first is a presenter of one room reaching another.
+    */
+    expect(AUTH).toContain('return requireRoomShortCode(locals);');
     expect(remoteCode).not.toContain('roomShortCode:');
   });
 

@@ -1,7 +1,6 @@
-import { error } from '@sveltejs/kit';
-import { command, getRequestEvent } from '$app/server';
+import { command } from '$app/server';
 import { z } from 'zod';
-import { isPresenterRole, requireRoomShortCode, requireUser } from '$lib/server/auth';
+import { presenterRoom } from '$lib/server/auth';
 import { ensureDatabase } from '$lib/server/db';
 import { publishToRoom } from '$lib/server/room-events';
 
@@ -24,12 +23,17 @@ import { publishToRoom } from '$lib/server/room-events';
   `requireUser(locals).role === 'staff' || requireUser(locals).role === 'admin'`, which is
   `isPresenterRole` spelled out by hand, twice, next to each other. That is the duplication this
   whole conversion exists to remove: an invariant repeated per call site is an invariant that can be
-  fixed in one place and left wrong in the other. It is now `presenterRoom()`, below, and every
-  command in this file is one line away from it.
+  fixed in one place and left wrong in the other.
 
-  Authority is decided HERE, from the session's own role, and never asserted by the client. The
-  clients do check `isPresenter` before calling — but that is responsiveness, not security, and the
-  2026-08-07 privilege escalation was exactly the mistake of believing otherwise.
+  It became `presenterRoom()` in this file, and then MOVED AGAIN to `$lib/server/auth.ts` the moment
+  `for-all-broadcast.remote.ts` needed the same gate — because leaving it here would have recreated
+  the duplication one level up, between modules instead of between actions. It returns the room only
+  after the role check, so "gated" and "scoped to the caller's tenant" are the same event and cannot
+  be applied separately.
+
+  Authority is decided on the SERVER, from the session's own role, and never asserted by the client.
+  The clients do check `isPresenter` before calling — but that is responsiveness, not security, and
+  the 2026-08-07 privilege escalation was exactly the mistake of believing otherwise.
 
   HOW A REFUSAL SURFACES. Every call site is fire-and-forget: upstream shows the presenter nothing
   when a broadcast fails, and inventing a toast would be a change to what the room does. But a
@@ -38,18 +42,6 @@ import { publishToRoom } from '$lib/server/room-events';
   about who is a presenter. So the call sites `catch` to `console.error`: loud in the one place that
   costs the room nothing, and honest that the user has not been told.
 */
-
-/**
- * The presenter gate and the room, together, because they are never wanted apart.
- *
- * Returns the caller's room short code — from the SESSION. A `roomShortCode` on any argument in this
- * file would let a presenter of room A move room B, which is why none of them has one.
- */
-function presenterRoom(): string {
-  const { locals } = getRequestEvent();
-  if (!isPresenterRole(requireUser(locals).role)) error(403, 'Presenters only.');
-  return requireRoomShortCode(locals);
-}
 
 /**
  * `remotePresCommand` — a presenter mutes one member's mic, camera or screens.

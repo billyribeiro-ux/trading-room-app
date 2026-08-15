@@ -1,4 +1,5 @@
-import { redirect, type Cookies } from '@sveltejs/kit';
+import { error, redirect, type Cookies } from '@sveltejs/kit';
+import { getRequestEvent } from '$app/server';
 import { randomUUID } from 'node:crypto';
 import { eq } from 'drizzle-orm';
 import { db } from './db';
@@ -54,6 +55,34 @@ export function requirePresenter(locals: App.Locals): User {
   const user = requireUser(locals);
   if (!isPresenterRole(user.role)) redirect(303, '/');
   return user;
+}
+
+/**
+ * The presenter gate and the caller's room, together, for REMOTE FUNCTIONS.
+ *
+ * Returns the room short code — from the SESSION. A `roomShortCode` on any remote function's
+ * argument would let a presenter of room A command room B, so none of them has one, and this is the
+ * only way any of them learns which room it is acting on.
+ *
+ * **Why the two are one call and not two.** Every presenter broadcast needs both: the authority to
+ * send, and the tenant to send into. Handed out separately they can be applied separately, and the
+ * failure mode of applying only the first is a presenter of one room reaching another — the
+ * 2026-08-07 privilege escalation. Returning the room only after the role check makes "gated" and
+ * "scoped" the same event.
+ *
+ * **Why it lives here rather than in a `.remote.ts`.** It began inside
+ * `presenter-commands.remote.ts`, where it replaced the same role test inlined by hand in two
+ * adjacent actions. The moment a second module needed it, keeping it there would have recreated the
+ * duplication one level up. Authority helpers belong with the other authority helpers.
+ *
+ * `error(403)` and not `redirect` — unlike {@link requirePresenter} above, which serves page loads.
+ * A redirect is not a thing a remote command can do (SvelteKit refuses it), and a rejected promise
+ * is the failure a command's caller can actually see.
+ */
+export function presenterRoom(): string {
+  const { locals } = getRequestEvent();
+  if (!isPresenterRole(requireUser(locals).role)) error(403, 'Presenters only.');
+  return requireRoomShortCode(locals);
 }
 
 function setSessionCookie(cookies: Cookies, sessionId: string, remember: boolean) {
