@@ -16,6 +16,12 @@ const cleanRosterContract = readFileSync(
 );
 const pageSource = readFileSync(new URL('../routes/+page.svelte', import.meta.url), 'utf8');
 
+/*
+  `.room-sidebar` became `RoomSidebar.svelte` on 2026-08-15. The reference-bundle assertions are
+  untouched; ours follow the markup into the component.
+*/
+const SIDEBAR = readFileSync(new URL('./components/RoomSidebar.svelte', import.meta.url), 'utf8');
+
 describe('roster private-chat evidence contract', () => {
   it('keeps the decoded source and clean root contract as gates', () => {
     expect(decodedRosterSource).toContain('(this.canPM =');
@@ -31,9 +37,11 @@ describe('roster private-chat evidence contract', () => {
       `menus.userId` now. Re-pointed rather than deleted — this asserts the captured attribute is
       still bound to WHICH ROW is open, which is the thing that breaks if the id becomes a boolean.
     */
-    expect(pageSource).toContain('data-bs-popper={menus.userId === user.id');
-    expect(pageSource).toContain('<i class="fas fa-comments"></i>&nbsp;&nbsp;Private Chat');
-    expect(pageSource).toContain('onclick={() => openRosterPrivateChat(user)}');
+    expect(SIDEBAR).toContain('data-bs-popper={menus.userId === user.id');
+    expect(SIDEBAR).toContain('<i class="fas fa-comments"></i>&nbsp;&nbsp;Private Chat');
+    // The handler is the page's, reached through a callback prop — the gate stays in one place.
+    expect(SIDEBAR).toContain('onclick={() => onopenrosterprivatechat(user)}');
+    expect(pageSource).toContain('onopenrosterprivatechat={openRosterPrivateChat}');
   });
 
   it('shows the action to presenters', () => {

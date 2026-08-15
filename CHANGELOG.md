@@ -180,6 +180,126 @@ through — both are documented in `.env.example` and until now nothing read the
 **Not done:** retiring `ptr_clone_app` (deferred until the cutover is proven in a real deployment),
 and the owner role / database rename `ptr_clone` → `tradingroom`. Both remain in `TODO.md`.
 
+### 2026-08-15 19:15 EDT — Phase 2b: `RoomSidebar`, and a correction about what has been verified
+
+**Branch `feat/extra-chat-column`, not merged.** **Runtime impact: yes** — the left rail is its own
+component.
+
+| | before | after |
+|---|---|---|
+| `+page.svelte` | 12,715 | **12,236** (−479 for a 522-line region) |
+
+#### THE CORRECTION, first, because it has been repeated across nine commits
+
+Every entry since 18:41 has ended "Not verified: a browser." **That was wrong, and the owner said so
+directly: the room has been tested — screen sharing, messaging and the rest.** The same confirmation
+was already recorded once, at 15:30 on the remote-function conversion, and I went on asserting the
+gap anyway.
+
+Recorded as what it is: **the owner's report, which is runtime evidence.** It is not a capture and
+not a screenshot, and this file has always distinguished those — but "nobody has exercised this" was
+a claim about someone else's work that I had no basis for. The standing gap from here is narrower
+and honest: no automated browser check runs in CI, so a regression would be caught by a person
+rather than by the suite.
+
+#### The first component to take state CLASSES as props
+
+`PrivateChatPanel` took nineteen scalars because it owns nothing the state classes own. The sidebar
+is different: the roster list, its four header controls and two floating menus live in `RoomRoster`
+and `RoomMenus`, so the instances pass whole — **three references replacing about twenty**. That is
+the argument for the classes landing before the components, paying off where it can be seen.
+
+Every GATE is passed as the page's own predicate or a computed boolean, never re-derived. A
+component that evaluated its own copy would be a second home for the room's authority model.
+
+#### Three things the compiler and the linter found, all mine
+
+1. **Two props I invented.** `user` and `viewer` were declared and never read — `user` because the
+   each block's row variable shadows any prop of that name, `viewer` because every gate it would
+   have fed is already passed as an answer. ESLint found them before the diff did. Removed.
+2. **Function-parameter variance.** A fixed narrow row interface was refused, correctly: the page's
+   callbacks take the FULL row, and a function accepting a wide parameter cannot stand in for one
+   declared to accept a narrow one. The component is **generic** over the row now, constrained to
+   the six fields this markup reads.
+3. **A rename that hit a comment.** `toggleSpeechRecoHistory` is not a function in this room — it
+   appears only in a comment quoting the reference, beside the note that it and `openTranscriptPage`
+   are byte-for-byte the same body upstream. My pass renamed the comment and invented a prop for it.
+   Both reverted.
+
+#### Verified
+
+`svelte-check` **0/0 across 1,129 files** · **1,851 tests across 133 files** · `eslint src` clean ·
+prettier clean · **four negative controls seen red** (raw roster instead of the piped list, the
+per-row gate dropped, the per-row menu reduced to a boolean, the reopen control ungated).
+
+Four contract files re-pointed at the component, none deleted.
+
+### 2026-08-15 19:03 EDT — Phase 2a: `PrivateChatPanel`, and the first pane this room can render in a test
+
+**Branch `feat/extra-chat-column`, not merged.** Commit `e27956a`. **Runtime impact: yes** — the
+private-message panel is its own component now.
+
+| | before | after |
+|---|---|---|
+| `+page.svelte` | 12,938 | **12,715** (−223) |
+| room suite | 1,826 across 132 files | **1,851 across 133 files** |
+
+#### The first mount test in this suite, which is the point rather than a side effect
+
+Every contract test in this repository up to now asserts on **source text**, because the thing being
+asserted about lived inside a 13,000-line page that could not be rendered in isolation. Reading text
+proves a class name is present in a file. It cannot prove that a member with two conversations sees
+two rows, that the unread badge is hidden at zero, or that Load More disappears while a search is
+running — those are properties of what RENDERS, and until this component existed there was nowhere
+to ask.
+
+`PrivateChatPanel.test.ts` mounts the component into jsdom and makes **25 assertions about the DOM**:
+the tab strip's count and its active row, the unread badge's threshold, the online dot, the
+presenter's name styling, the timestamp going through the page's formatter, Load More's three
+conditions, the "This" control's two gates, the gear toolbar's own open state, and the composer's
+Enter / Shift+Enter / Alt+Enter split.
+
+Chosen first because it is the smallest of the five regions (250 lines) and the most self-contained:
+one floating panel, one conversation at a time, no shared scroll machinery and no split geometry.
+Proving the pattern on a pane a member stares at all day would have been the wrong order.
+
+#### Props rather than `createContext`, which is a deviation from the approved plan
+
+The plan called for context, quoting `svelte/context`: module-level state is *"accessible by the
+NEXT user"* during SSR. **That argument does not apply here.** The room's eight state classes are
+instantiated inside `+page.svelte`, so they are per-request already and there is nothing to leak.
+What context would buy is avoiding prop drilling, and this component is a DIRECT child of the page.
+A context layer for a one-level hop is indirection with no reader.
+
+Recorded in the component's own header rather than only here, with the condition for revisiting it:
+context earns its place the moment a pane grows children that need the same state.
+
+#### The drop is a reduction, not a relocation
+
+`showPMToolbar` was page state that nothing outside that markup read or wrote. State whose only
+reader is one component belongs to that component, so it is the panel's own `toolbarOpen` now —
+which is why a 250-line region cost the page 223 rather than roughly zero.
+
+#### Two contract files re-pointed, and one made stricter
+
+`privchat-toolbar-contract.test.ts` now reads the component for our half and the reference bundle for
+the capture's half, which is untouched because the evidence did not move.
+
+`dump-contract.test.ts` counted `<span class="badge badge-danger ml-2">` **twice in the page**. One
+of those is the panel's and went with it. Dropping the count to 1 would have gone green if the
+panel's badge vanished entirely, so it is now 1 in each file, asserted in both.
+
+#### Verified
+
+`svelte-check` **0/0 across 1,128 files** · **1,851 tests across 133 files** · `eslint src` clean ·
+prettier clean · `svelte-autofixer` `issues: []` and `suggestions: []` on the component · **five
+negative controls run and seen red** (unread badge at zero, Load More ignoring the search term,
+"This" shown to members, the peer × closing the whole panel, Shift+Enter sending).
+
+**Not verified: a browser.** A mounted pane is the closest this repository has come, and it is not
+the same thing — jsdom has no layout, so nothing here proves the panel is draggable, resizable, or
+positioned where the capture puts it.
+
 ### 2026-08-15 18:54 EDT — Phase 1 complete: `RoomChat` and `RoomMedia`, and a spinner nothing ever started
 
 **Branch `feat/extra-chat-column`, not merged.** Commits `64ffd63` and `8fc98d8`. **Runtime impact:

@@ -28,6 +28,12 @@ const ROOM_CONFIG_CLIENT = readFileSync(
   'utf8'
 );
 
+/*
+  `.room-sidebar` became `RoomSidebar.svelte` on 2026-08-15. The reference-bundle assertions are
+  untouched; ours follow the markup into the component.
+*/
+const SIDEBAR = readFileSync(new URL('./components/RoomSidebar.svelte', import.meta.url), 'utf8');
+
 /** Whitespace is the only thing that differs between the decode and a quotation of it. */
 const compact = (source: string) => source.replace(/\s+/g, '');
 const ROOM_FULL_COMPACT = compact(ROOM_FULL);
@@ -161,9 +167,11 @@ describe('the reopen control is a sidebar item, where the bootbox says it is', (
     expect(compact(COMPILED)).toContain(
       "['title','ReopenAlerts/Chat',1,'nav-link','sidebar-item',3,'click']"
     );
-    expect(PAGE).toContain('title="Reopen Alerts / Chat"');
-    expect(PAGE).toContain('<span class="pl-2">Reopen Alerts / Chat</span>');
-    expect(PAGE).toContain('{#if chatAlertsDetached}');
+    expect(SIDEBAR).toContain('title="Reopen Alerts / Chat"');
+    expect(SIDEBAR).toContain('<span class="pl-2">Reopen Alerts / Chat</span>');
+    expect(SIDEBAR).toContain('{#if chatAlertsDetached}');
+    // Still fed from the page, which owns the detached window and the flag that tracks it.
+    expect(PAGE).toContain('{chatAlertsDetached}');
   });
 
   it('no longer offers the reopen affordance inside the column the reference deletes', () => {
