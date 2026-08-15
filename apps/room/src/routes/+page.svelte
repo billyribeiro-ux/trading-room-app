@@ -114,12 +114,7 @@
     swingAlertsTabVisible
   } from '$lib/swing-alerts';
   import type { SwingAlertRow } from '$lib/types';
-  import {
-    alertFilterAvailable,
-    alertPassesFilter,
-    hasActiveAlertFilter,
-    type AlertFilterFor
-  } from '$lib/alert-filter';
+  import { alertPassesFilter, type AlertFilterFor } from '$lib/alert-filter';
   import DayTradeAlertsPane from '$lib/components/day-trade-alerts/DayTradeAlertsPane.svelte';
   import type { DayTradeAlertDraft } from '$lib/components/day-trade-alerts/draft';
   import {
@@ -2614,10 +2609,14 @@
     return map;
   }
 
-  /** `doFilteredAlerts`, byte 1,221,430 — gates the header badge. */
-  const doFilteredAlerts = $derived(hasActiveAlertFilter(alertFilterFor));
-  /** The room configured a list at all — the reference gates every entry point on this. */
-  const alertFilterIsAvailable = $derived(alertFilterAvailable(data.sessData?.modAlertFilterList));
+  /*
+    `doFilteredAlerts` (byte 1,221,430) and the availability gate are NOT declared here yet.
+
+    They exist to drive the header badge and the settings-modal entry point, and neither is built.
+    Declaring them now would be two `$derived` values nothing reads — dead scaffolding, which the
+    standard forbids and which lint catches. They arrive in the same change as the controls that
+    read them, from `hasActiveAlertFilter` and `alertFilterAvailable` in `$lib/alert-filter`.
+  */
 
   /**
    * `updateAlertFilter` — the reference persists the map server-side AND sets the preference.

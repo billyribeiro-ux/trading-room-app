@@ -1,4 +1,4 @@
-import { fail, redirect } from '@sveltejs/kit';
+import { fail } from '@sveltejs/kit';
 import { and, asc, desc, eq, gt, isNull } from 'drizzle-orm';
 import { isEmptyChatHtml, sanitizeChatHtml } from '$lib/server/chat-html';
 import { pruneDeadPreferenceKeys } from '$lib/dead-preference-keys';
@@ -19,7 +19,7 @@ import {
   requireSessionId,
   requireUser
 } from '$lib/server/auth';
-import { signedOutDestination } from '$lib/server/control-plane';
+import { redirectSignedOut } from '$lib/server/control-plane';
 import {
   CAPTURE_REFERENCE_ROOM,
   capturedRoomItem,
@@ -346,7 +346,7 @@ export const load: PageServerLoad = async ({ depends, locals, request, cookies }
     logout(cookies);
     locals.user = null;
     locals.sessionId = undefined;
-    redirect(303, signedOutDestination());
+    redirectSignedOut();
   }
 
   const connectedUser = {
@@ -857,7 +857,7 @@ export const actions: Actions = {
     locals.user = null;
     locals.sessionId = undefined;
     // Back to the controller, which is where signing in happens now.
-    redirect(303, signedOutDestination());
+    redirectSignedOut();
   },
 
   newSessionNoteTab: async ({ request, locals }) => {
