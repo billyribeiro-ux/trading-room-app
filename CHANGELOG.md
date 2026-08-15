@@ -24,6 +24,80 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-15
 
+### 2026-08-15 09:12 EDT — the enterprise layer, read from three sources, and the one door nobody has opened
+
+**Runtime impact: none.** One decode document.
+
+`docs/decoded/enterprise-and-control-plane.md`. Three first-party sources, all read on the same day:
+the manage-page DOM with **18 dropdowns and modals captured OPEN** (23.5 MB), the account-page DOM
+(9.4 MB), and **`/public/dist/app.min.js` — PTR's own controller bundle, 455 KB, which had never been
+fetched before today.**
+
+**The answer, scoped exactly.** There is no SaaS operator console and no balance in any of the three.
+That is a statement about the account page and manage page **as rendered to a tenant**, and the
+controller bundle **as served to that tenant** — the Launch JWT decodes to `"type":"site"`. Absence
+from a tenant's view is not absence from the product, and the document does not claim otherwise.
+
+**One door was never opened.** `manageMarketplaceSession(s._id, s)` carries `ng-hide` at both entry
+points because `disableMarketplace` is truthy on the captured account, so the handler never ran and
+its contents are simply not in this evidence. It has a `fa-credit-card` icon and a matching
+`loadMarketplaceUsers()` filter. **If a balance exists in the client, it is behind that button.**
+
+**A false positive caught and refused:** the account page contains `moneybag`, `dollar`,
+`credit_card`, `money_with_wings` — that is the Intercom emoji picker. Reporting it as a money surface
+would have been reporting our own tooling.
+
+**The SaaS machinery that IS present**, all unambiguous: a seat quota (`1 / 2`), a usage watermark
+(`Current : 0 / Max 0` with `Reset Counts`), three entitlement allow-lists (`allowedMemberships`,
+`allowedProducts`, `allowedPerms`), tenant→end-user billing (`subscriptionPlans` with real fees,
+`stripeEmail`), a room kill switch (`isLocked`), and three identity layers — site, **ownerID**, room.
+
+Two quotes carry more weight than the rest. *"these counts are just for information purposes, does
+not affect your room's **limits**"* — **an authority above the manage page sets the limit.** And
+*"put any emails here of admins you want to allow access to **the admin panel section**"* — **a panel
+exists beyond this page.**
+
+**Why the earlier probe missed the mechanism.** `switchSession` posts to `/users/v1/ssoJWT` and its
+pulldown appears only when `otherJWTSessions.length > 1` — **data-gated, not state-gated.** Reading
+the ui-router registry found 31 states and no operator surface because **the registry was the wrong
+layer.** A token carrying many sessions renders a room-picker an ordinary customer never sees.
+
+**The API is command dispatch, not REST** — `POST {cmd: …}` built by `makeReqTokenForCmd`, across
+five endpoints. An operator surface here would be additional `cmd` values, not new routes. That is
+the shape to look for next.
+
+---
+
+### 🔴 The role-number trap, recorded before anyone builds this
+
+**The same integer means different things in the per-user menu and the bulk menu**, because they are
+different commands:
+
+| N | `updateUserXref` (per user) | `updateUserXrefMulty` (bulk) |
+| ---: | --- | --- |
+| **10** | **Hide Pers User Data** | **` Remove All`** |
+
+**One shared vocabulary would turn "hide personal data" into "delete every selected user".** Code
+`12` is unobserved in either menu and is recorded as a gap rather than guessed. Role `0` is the owner
+and is skipped by every bulk operation — **client-side only**; nothing proves the server re-checks.
+
+---
+
+**Eight defects in the reference** were found while reading and are recorded, because "match
+identically" makes each one a decision rather than an oversight: `addBadgeForUser` and
+`removeBadgeForUser` build a request and **never send it**; `loadSettingsFromJSON` is a copy-paste of
+the export and **exports instead of loading**; **hardcoded Imgur and RapidAPI credentials ship to
+every browser**; the API-secret fallback is two `Math.random()` slices; an operator-precedence bug in
+the badge title; `doWebRTCReset` ignores its own confirm result so Cancel still resets;
+`loadSettingsFromRoom` posts once per field and silently uses only the first selected room; and a
+`var` capture mislabels every upload.
+
+**Honest gaps:** the Marketplace pane, the `perms` vocabulary for `/users/v1/adminusers`,
+`makeReqTokenForCmd`, whether `otherJWTSessions` can span tenants, `updateUserXref` code 12, `__al`,
+and **`vendor.min.js` (1.25 MB) which was classified as third-party and NOT read — a judgement, not a
+measurement.**
+
+
 ### 2026-08-15 08:42 EDT — the parking bucket is deleted, and the rule is written down
 
 **Runtime impact: none.** Owner directive, 2026-08-15: **nothing that is not built ever gets parked.**
