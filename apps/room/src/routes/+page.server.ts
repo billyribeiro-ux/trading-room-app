@@ -27,12 +27,9 @@ import {
   noCapturedRoomItems
 } from '$lib/server/captured-room';
 import { hashEmail, publicSessionHandle } from '$lib/server/connection';
-import {
-  MAX_CHAT_LOG_PAGE,
-  isChatChannel,
-  loadChatPage,
-  loadNewestChatPages
-} from '$lib/server/chat-log';
+// `MAX_CHAT_LOG_PAGE`, `isChatChannel` and `loadChatPage` left with the paging queries for
+// `log-pages.remote.ts`. What stays is the FIRST page, which the loader still sends with the room.
+import { loadNewestChatPages } from '$lib/server/chat-log';
 import { loadAlertPage } from '$lib/server/alert-log';
 import { isChatMode } from '$lib/chat-mode';
 import { parseReactions } from '$lib/server/reactions';
@@ -2284,79 +2281,16 @@ export const actions: Actions = {
     };
   },
 
-  /**
-   * `getChatLog {channel, page}` — one page of older history for the main chat log.
-   *
-   * The reference's own command, minus the socket. Its client asks for page N when the reader
-   * scrolls near the top, and the server answers with that page and nothing else; an EMPTY answer
-   * is what tells the client to stop asking (`0 == o.length && (this.hasMoreData = !1)`).
-   *
-   * ## The channel is validated, not trusted
-   *
-   * `isChatChannel` is an allow-list of the two channels this room renders. Without it the field
-   * would be an arbitrary string reaching a WHERE clause — parameterised, so not injectable, but it
-   * would let a caller enumerate whether messages exist under any label they cared to guess. Deny
-   * by default costs one line.
-   *
-   * ## Scoped like every other read here
-   *
-   * `requireRoomShortCode(locals)` — the room comes from the session, never from the request. A
-   * `roomShortCode` field on this form would be the 2026-08-07 privilege escalation again, in a
-   * new place.
-   */
-  loadOlderChatMessages: async ({ request, locals }) => {
-    ensureDatabase();
-    requireUser(locals);
+  /*
+    `loadOlderChatMessages` and `loadOlderAlerts` were actions here and are now
+    `src/routes/log-pages.remote.ts` — the first `query` functions in this application, and the
+    first reads that earn one: two SELECTs with a LIMIT and an OFFSET, no write anywhere on the
+    path. (`getMyMobilePin` is a read that had to stay a command, because it mints.)
 
-    const data = await request.formData();
-    const channel = String(data.get('channel') ?? '');
-    if (!isChatChannel(channel)) return fail(400, { message: 'No such channel.' });
-
-    /*
-      Page 0 is the newest page and the page load already sent it, so asking for it here would
-      duplicate what the client holds rather than reach further back. Bounded at the top too: a
-      caller cannot ask for page 10,000,000 and make SQLite count its way there, which is what an
-      unvalidated OFFSET is.
-    */
-    const page = Number(data.get('page') ?? 0);
-    if (!Number.isInteger(page) || page < 1 || page > MAX_CHAT_LOG_PAGE) {
-      return fail(400, { message: 'No such page.' });
-    }
-
-    return {
-      success: true,
-      channel,
-      page,
-      messages: loadChatPage(requireRoomShortCode(locals), channel, page)
-    };
-  },
-
-  /**
-   * `getAlertsLog {page}` — one page of older alerts.
-   *
-   * The sibling of `loadOlderChatMessages`, minus the channel: alerts are one stream per room, so
-   * upstream's command carries a page and nothing else. An EMPTY answer is what stops the client
-   * asking, and the arrival handler that reads it is literally the same component for both log
-   * types, switched on `logType`.
-   */
-  loadOlderAlerts: async ({ request, locals }) => {
-    ensureDatabase();
-    requireUser(locals);
-
-    const data = await request.formData();
-    /* Page 0 is the newest page and the load already sent it; the upper bound caps the OFFSET
-       walk, which is a scan. Same reasoning as the chat action, same constant. */
-    const page = Number(data.get('page') ?? 0);
-    if (!Number.isInteger(page) || page < 1 || page > MAX_CHAT_LOG_PAGE) {
-      return fail(400, { message: 'No such page.' });
-    }
-
-    return {
-      success: true,
-      page,
-      alerts: loadAlertPage(requireRoomShortCode(locals), page)
-    };
-  },
+    Everything that made them safe moved with them: the channel allow-list, the page bound that
+    stops an unvalidated OFFSET becoming a scan, and the room coming from the SESSION rather than
+    the request. The two hand-written page guards became one shared schema used twice.
+  */
 
   /** `deletePeerPCLog {peerID}` - the whole conversation, both directions. */
   deletePrivateChatLog: async ({ request, locals }) => {

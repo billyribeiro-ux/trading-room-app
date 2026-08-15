@@ -24,6 +24,61 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-15
 
+### 2026-08-15 13:33 EDT — the first two reads that earn a `query`, and a contract test that had to move with them
+
+**Runtime impact: yes, on both log panes.** `loadOlderChatMessages` and `loadOlderAlerts` move from
+`?/`-actions to `src/routes/log-pages.remote.ts` as this application's first `query` functions.
+Every guard moved with them.
+
+**These earn `query` where `getMyMobilePin` could not.** The rule set an hour ago holds: `query` is
+for reads that are PURE. `loadChatPage` and `loadAlertPage` are two SELECTs with a LIMIT and an
+OFFSET and no write anywhere on the path, so they qualify; the pin mints, so it did not.
+
+**Why the cache is safe under pagination**, which is the question that had to be answered before
+converting rather than after. A query's cache key is its serialised argument, so page 2 and page 3
+are separate entries. Then: the client asks for each page exactly ONCE (`alertsPage` /
+`chatPage[channel]` only advance on a non-empty answer), and every page it receives is already
+merged into `olderAlerts` / `olderChatMessages` and held in component state for the life of the
+page — `+page.server.ts` says so where it explains why `invalidateAll()` cannot disturb them. **The
+client has been caching these pages permanently since long before this conversion; a per-request
+query cache released when nothing holds it is strictly shorter-lived than the state it feeds.**
+
+**Two hand-written guards became one schema.** Each action carried its own
+`Number.isInteger(page) || page < 1 || page > MAX_CHAT_LOG_PAGE`. There is now a single `pageNumber`
+schema referenced by both — which matters because the old contract test carries a comment recording
+a negative control that **stayed green when it should have gone red**, precisely because the two
+actions had identical lines and a whole-file `toContain` could not tell them apart. That risk is now
+structural rather than watched: they cannot drift because there is one of them.
+
+**A type error caught a real hole.** `z.custom<ChatChannel>(isChatChannel)` does not compile:
+`z.custom` hands its predicate `unknown` (the argument comes off the wire and could be a number or
+an object) while `isChatChannel` is declared over `string`. Casting the error away would have meant
+handing a non-string to `.includes` and trusting the answer. It is now
+`typeof value === 'string' && isChatChannel(value)`, and a test pins the `typeof`.
+
+**`chat-paging-contract.test.ts` went red — seven assertions — and that is the system working.**
+Positive assertions fail loudly when a region is extracted; that is the migration telling you where
+it needs to go. All seven were re-pointed at `log-pages.remote.ts` in the same commit, including the
+`between()` slicer, whose markers changed shape (`X: async` → `export const X = query(`). Getting
+that wrong would not fail loudly — it would return an empty slice every `not.toContain` passes
+against, which is the exact defect this suite shipped at 12:56 today. `between` asserts both markers
+were found. Three `not.toContain` guards were re-expressed rather than deleted, because the thing
+they refused changed shape too: `data.get('roomShortCode')` has no meaning without `FormData`, so
+the equivalent is a `roomShortCode` FIELD, refused by `z.strictObject`.
+
+**Both ceilings lowered again, no raise.** `+page.svelte` 13,558 → **13,556** (it first went to
+13,562; the fix was moving the failure-handling reasoning into `log-pages.remote.ts`, not shaving
+it). `+page.server.ts` 3,162 → **3,096** — that is **−137 from 3,233** across the three conversions.
+
+**Verified:** `svelte-check` 0/0 (1,085 files) · suite **1578/1578 across 118 files** · `eslint`
+clean outside the untracked gitignored `scripts/… 2.*` · `prettier --check` clean · `vite build`
+succeeds and the manifest registers **three** remotes, the newest (`'6pjrlz'`) called by the client
+bundle as `6pjrlz/loadOlderAlerts` and `6pjrlz/loadOlderChatMessages`. Three negative controls run
+and seen red: dropping the page bound, dropping the `typeof` guard, and moving the loading-flag
+reset out of `finally`. `MAX_CHAT_LOG_PAGE`, `isChatChannel` and `loadChatPage` removed from
+`+page.server.ts`'s imports — no callers there now. **Not verified:** no browser scrollback test in
+a live room.
+
 ### 2026-08-15 13:23 EDT — the read that must not be a `query`
 
 **Runtime impact: yes, on one control.** `getMyMobilePin` moves from `?/getMyMobilePin` to

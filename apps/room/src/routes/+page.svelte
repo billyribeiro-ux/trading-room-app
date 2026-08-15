@@ -20,6 +20,10 @@
   // The first remote function in this app. Aliased because the local wrapper below keeps the name.
   import { unmuteChat as unmuteChatCommand } from './chat-mute.remote';
   import { getMyMobilePin } from './mobile-pin.remote';
+  import {
+    loadOlderAlerts as loadOlderAlertsPage,
+    loadOlderChatMessages as loadOlderChatPage
+  } from './log-pages.remote';
   import { isHttpError } from '@sveltejs/kit';
   import {
     PUBLIC_PTR_CDN_UPLOAD_KEY,
@@ -3098,18 +3102,16 @@
     alertsLoadingMore = true;
     const page = alertsPage + 1;
 
-    const body = new FormData();
-    body.set('page', String(page));
-    const response = await fetch('?/loadOlderAlerts', { method: 'POST', body });
-    const result = deserialize<
-      { page?: number; alerts?: (typeof data.alerts)[number][] },
-      { message?: string }
-    >(await response.text());
+    let incoming: Awaited<ReturnType<typeof loadOlderAlertsPage>>;
+    try {
+      incoming = await loadOlderAlertsPage(page);
+    } catch {
+      // Non-fatal by design, not swallowed: `hasMoreData` stays true and the next scroll retries.
+      return; // `log-pages.remote.ts` carries why, and why the `finally` below must not move.
+    } finally {
+      alertsLoadingMore = false;
+    }
 
-    alertsLoadingMore = false;
-    if (result.type !== 'success' || !result.data?.alerts) return;
-
-    const incoming = result.data.alerts;
     if (incoming.length === 0) {
       alertsHasMoreData = false;
       return;
@@ -3179,19 +3181,15 @@
     chatLoadingMore = true;
     const page = (chatPage[channel] ?? 0) + 1;
 
-    const body = new FormData();
-    body.set('channel', channel);
-    body.set('page', String(page));
-    const response = await fetch('?/loadOlderChatMessages', { method: 'POST', body });
-    const result = deserialize<
-      { channel?: string; page?: number; messages?: (typeof data.messages)[number][] },
-      { message?: string }
-    >(await response.text());
+    let incoming: Awaited<ReturnType<typeof loadOlderChatPage>>;
+    try {
+      incoming = await loadOlderChatPage({ channel, page });
+    } catch {
+      return; // Non-fatal and retried, exactly as the alerts sibling above.
+    } finally {
+      chatLoadingMore = false;
+    }
 
-    chatLoadingMore = false;
-    if (result.type !== 'success' || !result.data?.messages) return;
-
-    const incoming = result.data.messages;
     if (incoming.length === 0) {
       chatHasMoreData = { ...chatHasMoreData, [channel]: false };
       return;
