@@ -1,5 +1,12 @@
 export type Theme = 'light' | 'dark';
-export type MainTab = 'screens' | 'streams' | 'notes' | 'videoplayer' | 'files';
+export type MainTab =
+  | 'screens'
+  | 'streams'
+  | 'notes'
+  | 'videoplayer'
+  | 'files'
+  /** `presAreaTabs-swingAlerts`. Present only in rooms with `hasSwingTradeAlerts`. */
+  | 'swingAlerts';
 export type FileTab = 'files' | 'images' | 'sounds';
 export type ChatTab = 'main' | 'off-topic';
 
@@ -110,6 +117,62 @@ export interface NoteVersion {
   updatedById: number | null;
   version: number;
   createdAt: string;
+}
+
+/**
+ * `long` or `short` — the two values of the direction radio pair, and the two the row prints.
+ *
+ * A union rather than a `string`, because the pair is closed at both ends: the radios carry
+ * `value="long"` / `value="short"` (const indices 183 and 186) and the model defaults to `"long"`.
+ * Widening it would let a third value reach the table, where it would render as itself — the row's
+ * `<td>` has no class, no `ngClass` and no pipe, so nothing would object.
+ */
+export type SwingAlertDirection = 'long' | 'short';
+
+/**
+ * One row of the Swing Trade Alerts log, as the table, the pipes and the CSV read it.
+ *
+ * Field names are the decode's, from `docs/decoded/swing-alerts.md` §5 — including `entryDate`,
+ * which an earlier revision of that document had as `created`. The string `created` appears on no
+ * swing path; `entryDate` occurs at exactly four offsets in the bundle, all reads, two in the row
+ * templates and two in the CSV builders.
+ *
+ * ## Why the prices are strings
+ *
+ * `entryPrice`, `stop` and `target` are `type="text"` inputs whose values are rendered back through
+ * bare interpolations — no pipe, no `toFixed`, no currency (spec §3). No arithmetic is performed on
+ * them anywhere on this path, so there is nothing for the repository's money rule to protect: they
+ * are transcribed strings, and storing them as cents would round what a presenter typed and change
+ * what the table shows. See the `swingAlerts` table comment for the same note on the column type.
+ *
+ * ## `id` rather than `_id`
+ *
+ * The reference is Mongo-backed and the row carries `_id`; this room's rows come from its own
+ * SQLite table with an integer primary key, exactly like {@link RoomNote}. The wire field is still
+ * called `swingAlertID`, which is what the three mutation payloads name.
+ */
+export interface SwingAlertRow {
+  id: number;
+  symbol: string;
+  direction: SwingAlertDirection;
+  /** ISO 8601. Rendered through `date:'YYYY-MM-dd hh:mm:ss'`; the only formatted cell. */
+  entryDate: string;
+  entryPrice: string;
+  stop: string;
+  target: string;
+  /** `''` when the row has no image, which is what empties the image cell. */
+  image: string;
+  senderName: string;
+  /**
+   * The sender's avatar, preferred over the Gravatar fallback exactly as the row template has it:
+   * `row.senderPic || 'https://secure.gravatar.com/avatar/' + row.senderAvt + '?d=mm&s=30'`.
+   *
+   * The client never writes either of these — both occur only as reads inside the two row
+   * templates — so both are produced server-side here too.
+   */
+  senderPic: string;
+  /** The md5 of the sender's email, i.e. the Gravatar hash the fallback URL is built from. */
+  senderAvt: string;
 }
 
 export type ModalName =

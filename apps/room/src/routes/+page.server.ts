@@ -82,6 +82,18 @@ import {
   setWelcomeMatNote
 } from '$lib/server/notes-repository';
 import {
+  createSwingAlert,
+  deleteSwingAlert,
+  editSwingAlert,
+  getSwingAlerts
+} from '$lib/server/swing-alerts-repository';
+import {
+  deleteSwingAlertMsgSchema,
+  editSwingAlertMsgSchema,
+  swingAlertMsgSchema
+} from '$lib/swing-alerts-command';
+import { SWING_ALERT_INITIAL_DAYS, swingAlertsTabVisible } from '$lib/swing-alerts';
+import {
   alertQuestions,
   alerts,
   capturedItemOverrides,
@@ -107,6 +119,59 @@ import type { ActivePoll } from '$lib/types';
 const MAX_MESSAGE_BODY = 4_000;
 const MAX_ALERT_BODY = 8_000;
 import type { Actions, PageServerLoad } from './$types';
+
+/**
+ * The two gates every Swing Trade Alerts mutation passes, in cost order.
+ *
+ * Returns an `ActionFailure` to hand straight back, or `null` to proceed.
+ *
+ * **Presenter first, entitlement second.** The role check is a field read on a row already in
+ * memory; the entitlement is a call to the controller with a two-second timeout. Asking the cheap
+ * question first means a member who should never have reached this action does not cost a round
+ * trip, and it means a controller outage cannot be used to probe for it.
+ *
+ * The entitlement is re-asked here rather than trusted from the page load, because the load ran
+ * against a different request: a presenter whose owner turned the feature off mid-session must stop
+ * being able to write, and this is the only place that can know. `readRoomConfig` throws when the
+ * controller cannot be reached, which fails the action closed — the correct direction for a feature
+ * switch, and the same behaviour the page load has.
+ */
+async function refuseSwingAlert(
+  request: Request,
+  locals: App.Locals,
+  verb: string
+): Promise<ReturnType<typeof fail> | null> {
+  const user = requireUser(locals);
+  if (!isPresenterRole(user.role)) {
+    return fail(403, { message: `You cannot ${verb}.` });
+  }
+  const { settings } = await readRoomConfig(request, requireRoomShortCode(locals), user.email);
+  if (!swingAlertsTabVisible(settings)) {
+    // 404 rather than 403: in a room without the entitlement the feature does not exist, and
+    // saying "forbidden" would confirm that it exists somewhere and this member is not allowed it.
+    return fail(404, { message: 'Swing Trade Alerts are not enabled for this room.' });
+  }
+  return null;
+}
+
+/**
+ * The six typed fields, read off the form untouched.
+ *
+ * No coercion and no defaulting beyond `''` for an absent field: the zod schema trims, bounds and
+ * refuses, and doing any of that twice in two places is how the two get to disagree. In particular
+ * the three price fields stay strings — they came from `type="text"` inputs and are rendered back
+ * verbatim.
+ */
+function swingAlertFieldsFrom(formData: FormData) {
+  return {
+    symbol: String(formData.get('symbol') ?? ''),
+    direction: String(formData.get('direction') ?? ''),
+    entryPrice: String(formData.get('entryPrice') ?? ''),
+    stop: String(formData.get('stop') ?? ''),
+    target: String(formData.get('target') ?? ''),
+    image: String(formData.get('image') ?? '')
+  };
+}
 
 export const load: PageServerLoad = async ({ depends, locals, request, cookies }) => {
   ensureDatabase();
@@ -573,6 +638,24 @@ export const load: PageServerLoad = async ({ depends, locals, request, cookies }
     // (`getAllPCLogsLoaded`), which is one round trip we can simply not make.
     privateChats: loadConversations(requireRoomShortCode(locals), account.id),
     notes: getNotes(requireRoomShortCode(locals)),
+    /**
+     * `loadTradeAlerts("Swing")` — the log, fetched with the page as the reference fetches it on
+     * session load.
+     *
+     * Gated on the SAME room setting that gates the tab, so a room without the entitlement does not
+     * read the table, does not serialise a log into its SSR HTML, and cannot have one recovered
+     * from `__sveltekit` data by a member who edits the DOM. `loadSessionLogs()` gates its own
+     * fetch identically: `sessData.hasSwingTradeAlerts && this.loadTradeAlerts("Swing")`.
+     *
+     * **42 days, not `30 * swingAlertMonths`.** The first fetch hardcodes `days: 42` while the
+     * select that describes the window initialises to 2 and would ask for 60, so the first list is
+     * 42 days of data under a label reading "Last 2 Months". That mismatch is the reference's, read
+     * from three separate places, and changing the select once reconciles them. Reproduced rather
+     * than corrected — see `SWING_ALERT_INITIAL_DAYS`.
+     */
+    swingAlerts: swingAlertsTabVisible(roomConfig.settings)
+      ? getSwingAlerts(requireRoomShortCode(locals), SWING_ALERT_INITIAL_DAYS, new Date())
+      : [],
     notesEnabled: true,
     /*
       The PERMISSION, not the role.
@@ -822,6 +905,150 @@ export const actions: Actions = {
     return note === null
       ? fail(404, { message: 'Session note was not found.' })
       : { success: true, note };
+  },
+
+  /*
+    ── Swing Trade Alerts ──────────────────────────────────────────────────────────────────────
+
+    The three mutations, named for the wire commands they reproduce — `swingAlertMsg`,
+    `editSwingAlertMsg`, `deleteSwingAlertMsg`. `SWING_ALERT_COMMANDS` in `$lib/swing-alerts` holds
+    those three plus the log read and the two feed-mirror commands, and
+    `swing-alerts-contract.test.ts` asserts that the actions declared here still match it, because a
+    renamed action is a 404 the browser reports only as "Unable to save".
+
+    **Create is `swingAlertMsg`, never `newSwingAlertMsg`.** That name is a payload KEY on the edit
+    command and, separately, the server→client push. Two independent decodes had to correct it.
+
+    Every one of the three is gated twice and neither gate is the browser's: the room must have the
+    entitlement, and the caller must be a presenter. A hidden form is not a check.
+  */
+
+  /**
+   * `swingAlertMsg` — post a swing alert.
+   *
+   * Two writes, in one transaction: the row, and the mirrored message the reference also posts into
+   * the main alerts feed with `alertMsg`. See `swing-alerts-repository.ts`.
+   */
+  swingAlertMsg: async ({ request, locals }) => {
+    ensureDatabase();
+    const user = requireUser(locals);
+    const guard = await refuseSwingAlert(request, locals, 'post swing trade alerts');
+    if (guard) return guard;
+
+    /*
+      The SAME bucket `postAlert` spends, and that is the point rather than a copy-paste.
+
+      This action posts into the main alerts feed — that is the second of its two writes — so
+      without this it is a way to post alerts at any rate the network allows, straight past the
+      limiter guarding the composer that posts the identical row. Found by re-reading the diff
+      against `postAlert`, not by a test. Only the create needs it: edit rewrites a message that
+      already exists and delete removes one.
+    */
+    const limit = consumeRateLimit('alert', user.id);
+    if (!limit.allowed) {
+      return fail(429, {
+        message: `You are posting alerts too quickly. Try again in ${Math.ceil(limit.retryAfterMs / 1000)}s.`
+      });
+    }
+
+    const formData = await request.formData();
+    const command = swingAlertMsgSchema.safeParse({
+      cmd: 'swingAlertMsg',
+      data: swingAlertFieldsFrom(formData)
+    });
+    if (!command.success) return fail(400, { message: 'That swing alert is not valid.' });
+
+    const created = createSwingAlert({
+      room: requireRoomShortCode(locals),
+      alert: command.data.data,
+      now: new Date(),
+      // `senderName: globals.user.nick || globals.user.name` — taken from the session, never sent
+      // by the client, because a client-supplied author is a client-supplied identity.
+      senderName: user.displayName,
+      userId: user.id
+    });
+
+    /*
+      Tell the room about the mirrored message, on the same channel and in the same shape as
+      `postAlert` — writing the row made the alert exist, it did not make anyone see it.
+
+      Only the CREATE announces. Edits and deletes of an alert are not published anywhere in this
+      room today (`messageAction`'s delete branch writes and returns), so they reach other members
+      on their next load. Publishing an edit on this channel would append a SECOND copy of the alert
+      to every open feed, which is worse than the delay. Named here rather than left as a surprise.
+    */
+    if (created.mirror.alertId !== null) {
+      publishToRoom(requireRoomShortCode(locals), {
+        channel: 'alerts',
+        data: {
+          id: created.mirror.alertId,
+          senderId: user.id,
+          senderName: user.displayName,
+          body: created.mirror.body ?? '',
+          kind: 'text',
+          nonTrade: false
+        }
+      });
+    }
+    return { success: true, swingAlert: created.row };
+  },
+
+  /**
+   * `editSwingAlertMsg` — rewrite a swing alert and its mirrored feed message.
+   *
+   * The reference sends `editAlertMessageSwing` as a second command to update the mirror; here the
+   * repository does both halves in one transaction, keyed by the recorded `alert_id` rather than by
+   * re-deriving the old text and scanning the feed for it.
+   */
+  editSwingAlertMsg: async ({ request, locals }) => {
+    ensureDatabase();
+    const user = requireUser(locals);
+    const guard = await refuseSwingAlert(request, locals, 'edit swing trade alerts');
+    if (guard) return guard;
+
+    const formData = await request.formData();
+    const command = editSwingAlertMsgSchema.safeParse({
+      cmd: 'editSwingAlertMsg',
+      data: {
+        swingAlertID: Number(formData.get('swingAlertID')),
+        ...swingAlertFieldsFrom(formData)
+      }
+    });
+    if (!command.success) return fail(400, { message: 'That swing alert is not valid.' });
+
+    const updated = editSwingAlert({
+      room: requireRoomShortCode(locals),
+      swingAlertID: command.data.data.swingAlertID,
+      alert: command.data.data,
+      senderName: user.displayName,
+      userId: user.id
+    });
+    if (updated === null) return fail(404, { message: 'That swing alert was not found.' });
+    return { success: true, swingAlert: updated.row };
+  },
+
+  /** `deleteSwingAlertMsg` — soft-delete the row, hard-delete its mirrored feed message. */
+  deleteSwingAlertMsg: async ({ request, locals }) => {
+    ensureDatabase();
+    const user = requireUser(locals);
+    const guard = await refuseSwingAlert(request, locals, 'delete swing trade alerts');
+    if (guard) return guard;
+
+    const formData = await request.formData();
+    const command = deleteSwingAlertMsgSchema.safeParse({
+      cmd: 'deleteSwingAlertMsg',
+      data: { swingAlertID: Number(formData.get('swingAlertID')) }
+    });
+    if (!command.success) return fail(400, { message: 'A valid swing alert is required.' });
+
+    const deleted = deleteSwingAlert({
+      room: requireRoomShortCode(locals),
+      swingAlertID: command.data.data.swingAlertID,
+      now: new Date(),
+      userId: user.id
+    });
+    if (deleted === null) return fail(404, { message: 'That swing alert was not found.' });
+    return { success: true };
   },
 
   editUsername: async ({ request, locals }) => {

@@ -353,6 +353,109 @@ export const noteVersions = sqliteTable(
   ]
 );
 
+/**
+ * One Swing Trade Alert.
+ *
+ * The log the `#swingAlerts` pane renders, decoded in `docs/decoded/swing-alerts.md`. Room-scoped
+ * like every other room-content table — see the note on `messages.roomShortCode` — and every query
+ * in `swing-alerts-repository.ts` carries the predicate, because this table is per-room trading
+ * information and a missing predicate here is one room reading another room's positions.
+ *
+ * ## Why the three price columns are TEXT
+ *
+ * This repository's rule is that money is `i64` / `BIGINT` end to end, and that rule is not being
+ * waived here — it does not reach these columns, because none of them is money that anything does
+ * arithmetic on. The decode is unambiguous on both halves of that (spec §2 and §3):
+ *
+ *   - the inputs are `type="text"`, explicitly and deliberately, not `type="number"`;
+ *   - the cells are bare interpolations — no pipe, no `toFixed`, no currency — so what is stored is
+ *     what the presenter typed and what the table shows.
+ *
+ * There is no multiplication, no summing and no comparison anywhere on this path, including in the
+ * CSV export. Storing cents would mean parsing a free-text field, rounding it, and rendering
+ * something back that the presenter did not type. If a future feature ever computes with these —
+ * a risk/reward ratio, say — that feature adds its own parsed column and leaves these verbatim.
+ *
+ * ## Why `senderName` is stored rather than joined
+ *
+ * The client supplies it on every create AND every edit, from `globals.user.nick || .name`
+ * (spec §5c, byte 1,982,850), so an edit by a different presenter rewrites the row's sender — the
+ * value is a property of the write, not of the account. A join to `users` would answer with the
+ * current display name of the original author instead, which is a different fact. `senderId` is
+ * kept beside it for the avatar and for an audit trail, and it is what `senderPic` / `senderAvt`
+ * are derived from at read time; the client never writes either of those.
+ */
+export const swingAlerts = sqliteTable(
+  'swing_alerts',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    /*
+      The room this row belongs to — see the note on `messages.roomShortCode`. Every realtime
+      channel in the original is namespaced by the session, and without this column a new room
+      opened showing another room's content.
+    */
+    roomShortCode: text('room_short_code').notNull(),
+    symbol: text('symbol').notNull(),
+    /** `'long'` | `'short'`, the only two values the radio pair offers. */
+    direction: text('direction', { enum: ['long', 'short'] }).notNull(),
+    entryPrice: text('entry_price').notNull(),
+    stop: text('stop').notNull(),
+    target: text('target').notNull(),
+    /** `''` for a row with no image, which is what leaves the image cell empty. */
+    image: text('image').notNull().default(''),
+    senderId: integer('sender_id')
+      .notNull()
+      .references(() => users.id),
+    senderName: text('sender_name').notNull(),
+    /**
+     * The row's timestamp, named as the decode names it.
+     *
+     * `entryDate`, NOT `created` — the row templates and both CSV builders read `entryDate` and the
+     * string `created` appears on no swing path. Keeping the reference's name here means the column,
+     * the DTO and the template all say the same word.
+     */
+    entryDate: integer('entry_date', { mode: 'timestamp' }).notNull(),
+    /**
+     * The mirrored message this alert posted into the MAIN alerts feed.
+     *
+     * ## Why there is a mirror at all
+     *
+     * A swing submit sends TWO commands, not one — read at bundle byte 1,983,136 onwards:
+     * `swingAlertMsg` writes the row, then `alertMsg` posts `formatSwingAlertTxt(h)` into the feed.
+     * Editing sends `editSwingAlertMsg` and then `editAlertMessageSwing`; deleting removes both.
+     * A rebuild that keeps only the row leaves the feed copy orphaned the first time somebody edits.
+     *
+     * ## Why a column instead of the reference's text scan
+     *
+     * The reference has no key to join on, so `editSwingAlert` walks `globals.alertsLog` comparing
+     * `r.txt == formatSwingAlertTxt(row)` to recover the feed message's `_id`, and `deleteSwingAlert`
+     * repeats that scan. That is a linear scan of the feed per edit, and it silently finds nothing
+     * once anybody edits the feed copy by hand — `alertLogID` is then `""` and the second command is
+     * a no-op against an empty id.
+     *
+     * This room owns both tables, so the association is recorded when it is created and the two
+     * writes go in one transaction. The observable behaviour is the reference's; what changes is
+     * that it cannot come apart. NULLABLE because a row that predates this column, or whose feed
+     * copy a presenter deleted from the feed itself, still has to edit and delete cleanly.
+     */
+    alertId: integer('alert_id').references(() => alerts.id),
+    deletedAt: integer('deleted_at', { mode: 'timestamp' }),
+    deletedById: integer('deleted_by_id').references(() => users.id)
+  },
+  (table) => [
+    /*
+      The log query, whole: room equality first, then the sort the list is displayed in.
+
+      `getSwingAlertsLog` reads one room's rows newer than a cutoff and shows them newest first
+      (the reference reverses the server's oldest-first array and prepends new rows). This index
+      answers the room predicate, the `entry_date` range and the ordering in one ordered walk, so
+      the read touches the rows it returns rather than the room's whole history. `id` is last so
+      the tie-break comes from the index instead of a sort of the ties.
+    */
+    index('swing_alerts_room_entry_idx').on(table.roomShortCode, table.entryDate, table.id)
+  ]
+);
+
 export const chatMutes = sqliteTable(
   'chat_mutes',
   {
@@ -610,6 +713,7 @@ export type PollAnswer = typeof pollAnswers.$inferSelect;
 export type SavedPoll = typeof savedPolls.$inferSelect;
 export type Note = typeof notes.$inferSelect;
 export type NoteVersion = typeof noteVersions.$inferSelect;
+export type SwingAlert = typeof swingAlerts.$inferSelect;
 export type ChatMute = typeof chatMutes.$inferSelect;
 export type Session = typeof sessions.$inferSelect;
 

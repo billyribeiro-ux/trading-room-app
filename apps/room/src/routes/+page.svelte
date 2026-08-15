@@ -99,6 +99,14 @@
   import ModalHost from '$lib/components/ModalHost.svelte';
   import NotesPane from '$lib/components/notes/NotesPane.svelte';
   import { resolveNoteSurfaceGates } from '$lib/components/notes/note-gates';
+  import SwingAlertsPane from '$lib/components/swing-alerts/SwingAlertsPane.svelte';
+  import type { SwingAlertDraft } from '$lib/components/swing-alerts/draft';
+  import {
+    SWING_ALERT_INITIAL_DAYS,
+    swingAlertLogDays,
+    swingAlertsTabVisible
+  } from '$lib/swing-alerts';
+  import type { SwingAlertRow } from '$lib/types';
   import RoomMessage from '$lib/components/RoomMessage.svelte';
   import type { MessageBadge } from '$lib/types';
   import { isMentionOf } from '$lib/mention';
@@ -8539,6 +8547,168 @@
     return (await response.json()) as readonly NoteVersion[];
   }
 
+  /* ── Swing Trade Alerts ──────────────────────────────────────────────────────────────────── */
+
+  /**
+   * `hasSwingTradeAlerts` — the per-room entitlement, gating the nav item AND the pane.
+   *
+   * `$derived` rather than copied into a `let`, so a room whose configuration is re-read mid-session
+   * cannot leave the tab showing after the owner turned the feature off. The reference reads it once
+   * in `ngOnInit` and therefore does NOT react; reacting is the safer direction of that divergence
+   * and costs nothing.
+   */
+  const swingAlertsEnabled = $derived(swingAlertsTabVisible(data.sessData ?? {}));
+
+  /**
+   * `globals.swingAlertsLog`.
+   *
+   * `$state.raw` because it is only ever REPLACED — by the page load's seed and by
+   * `refreshSwingAlerts` — and never mutated in place. A deep proxy over a list of a few hundred
+   * rows would cost on every read of every cell and buy nothing.
+   *
+   * Seeded from `data.swingAlerts` and thereafter owned here. It deliberately does NOT track
+   * `data.swingAlerts` afterwards: the load always answers the 42-day window, so a `$derived` would
+   * throw away the presenter's chosen months window the next time anything else on the page called
+   * `invalidateAll()`. Every swing mutation refetches this list itself instead.
+   */
+  // The page data is the intentional one-time seed; every later value comes from the refetch below.
+  // svelte-ignore state_referenced_locally
+  let swingAlertsLog = $state.raw<readonly SwingAlertRow[]>(data.swingAlerts);
+  /** The window currently displayed, so a refetch after a mutation asks for the same one. */
+  let swingAlertsDays = $state(SWING_ALERT_INITIAL_DAYS);
+
+  /** A pending image upload for the swing form, and its `resolve`. `imgUpload('swing')`. */
+  let swingImageUpload = $state.raw<{ resolve: (url: string | null) => void } | null>(null);
+  /** A pasted image awaiting the confirmation `onImagePaste` shows before uploading. */
+  let swingImagePaste = $state.raw<{
+    file: File;
+    previewUrl: string;
+    resolve: (url: string | null) => void;
+  } | null>(null);
+
+  /**
+   * `getSwingAlertsLog` — refetch the log for the current window.
+   *
+   * A plain GET rather than a form action, for the reason `loadNoteVersions` gives: this changes
+   * nothing, so it must not go through `invalidateAll()` and re-run every load function on the page
+   * to answer a question about one table.
+   */
+  async function refreshSwingAlerts(): Promise<void> {
+    const response = await fetch(`/api/swing-alerts?days=${swingAlertsDays}`);
+    if (!response.ok) throw new Error('Unable to load swing trade alerts.');
+    swingAlertsLog = (await response.json()) as readonly SwingAlertRow[];
+  }
+
+  /**
+   * The three swing mutations. Named for the wire commands, which are the action names.
+   *
+   * No `invalidateAll()`, unlike `submitNoteMutation`: the only page data these change is the swing
+   * log, and re-running every load function would additionally reset the log to the 42-day window
+   * the load always returns. The explicit refetch below keeps the presenter's chosen window.
+   */
+  async function submitSwingCommand(
+    action: 'swingAlertMsg' | 'editSwingAlertMsg' | 'deleteSwingAlertMsg',
+    values: Record<string, string | number>
+  ): Promise<void> {
+    const body = new FormData();
+    for (const [key, value] of Object.entries(values)) body.set(key, String(value));
+    const response = await fetch(`?/${action}`, { method: 'POST', body });
+    const result = deserialize<Record<string, unknown>, { message?: string }>(await response.text());
+
+    if (result.type === 'failure') throw new Error(result.data?.message ?? 'Unable to save.');
+    if (result.type === 'error') throw new Error(result.error.message ?? 'Unable to save.');
+    if (result.type !== 'success') throw new Error('Unable to save.');
+
+    await refreshSwingAlerts();
+  }
+
+  function swingAlertPayload(draft: SwingAlertDraft): Record<string, string> {
+    return {
+      symbol: draft.symbol,
+      direction: draft.direction,
+      entryPrice: draft.entryPrice,
+      stop: draft.stop,
+      target: draft.target,
+      image: draft.image
+    };
+  }
+
+  /** `onTradeAlertWeeksChange('Swing')` — clear the list, then refetch for the new window. */
+  async function changeSwingAlertMonths(months: number): Promise<void> {
+    swingAlertsDays = swingAlertLogDays(months);
+    /*
+      The reference empties `globals.swingAlertsLog` BEFORE sending the command, so the list is
+      blank while the refetch is in flight rather than showing the previous window under the new
+      label. Reproduced, including the flash of the empty-state heading that comes with it.
+    */
+    swingAlertsLog = [];
+    await refreshSwingAlerts();
+  }
+
+  function requestSwingImageUpload(): Promise<string | null> {
+    return new Promise((resolve) => {
+      swingImageUpload = { resolve };
+    });
+  }
+
+  async function completeSwingImageUpload(files: readonly File[]): Promise<void> {
+    const pending = swingImageUpload;
+    swingImageUpload = null;
+    if (!pending) return;
+    /*
+      One file. The reference's own dialog sets `multiple='false'`; `ImageUploadDialog` is shared
+      with the chat composer, which does allow several, so the extras are dropped here rather than
+      by forking the component.
+    */
+    const [file] = files;
+    if (!file) {
+      pending.resolve(null);
+      return;
+    }
+    try {
+      const [url] = await uploadAlertFiles([file]);
+      pending.resolve(url ?? null);
+    } catch (error) {
+      console.error(error);
+      bootboxAlert = 'Upload Failed...';
+      pending.resolve(null);
+    }
+  }
+
+  /**
+   * `onImagePaste(event, 'swing')` — confirm the pasted image, then upload it.
+   *
+   * The object URL is created for the confirmation's preview and revoked when the dialog closes,
+   * whichever way it closes. Leaking one per paste would pin the image bytes for the life of the
+   * tab.
+   */
+  function requestSwingImagePaste(file: File): Promise<string | null> {
+    return new Promise((resolve) => {
+      swingImagePaste = { file, previewUrl: URL.createObjectURL(file), resolve };
+    });
+  }
+
+  function closeSwingImagePaste(): { file: File; resolve: (url: string | null) => void } | null {
+    const pending = swingImagePaste;
+    swingImagePaste = null;
+    if (!pending) return null;
+    URL.revokeObjectURL(pending.previewUrl);
+    return { file: pending.file, resolve: pending.resolve };
+  }
+
+  async function confirmSwingImagePaste(): Promise<void> {
+    const pending = closeSwingImagePaste();
+    if (!pending) return;
+    try {
+      const [url] = await uploadAlertFiles([pending.file]);
+      pending.resolve(url ?? null);
+    } catch (error) {
+      console.error(error);
+      bootboxAlert = 'Upload Failed...';
+      pending.resolve(null);
+    }
+  }
+
   function mountUploadFileLink(menu: HTMLUListElement) {
     const item = document.createElement('li');
     const link = document.createElement('a');
@@ -10974,6 +11144,42 @@
                   </li>
                   {/if}
                   <!--
+                    Swing Alerts — `XCe`, gated on the room setting rather than on presenter status:
+
+                      O(26, o.hasSwingTradeAlerts ? 26 : -1)
+
+                    `{#if}` and not `hidden`, because `-1` is `ɵɵconditional`'s "instantiate
+                    nothing". An entitlement that ships hidden markup has already told the member
+                    the feature exists, and this one is what a room pays for.
+
+                    The icon is `fas fa-bell` (const 64), shared with the Day Trades tab.
+                  -->
+                  {#if swingAlertsEnabled}
+                    <li role="presentation" class="nav-item">
+                      <a
+                        id="swingAlerts-tab"
+                        class="nav-link"
+                        class:active={mainTab === 'swingAlerts'}
+                        data-bs-toggle="tab"
+                        data-bs-target="#swingAlerts"
+                        role="tab"
+                        aria-controls="swingAlerts"
+                        aria-selected={mainTab === 'swingAlerts'}
+                        tabindex={mainTab === 'swingAlerts' ? undefined : -1}
+                        onclick={() => (mainTab = 'swingAlerts')}
+                        onkeydown={(event) => {
+                          if (event.key === 'Enter' || event.key === ' ') mainTab = 'swingAlerts';
+                        }}
+                      >
+                        <div class="d-flex align-items-center">
+                          <div>
+                            <i class="fas fa-bell"></i><span class="mx-1">Swing Alerts</span>
+                          </div>
+                        </div>
+                      </a>
+                    </li>
+                  {/if}
+                  <!--
                     "Hide Files Section?" - `z('hidden', o.hideFiles)` on this `li`
                     (app-presentationarea.full.js:5375) and on the `#files` pane (5410-5413). Both,
                     because either one alone leaves a tab that opens nothing or a pane still
@@ -11310,6 +11516,48 @@
                       />
                     {/if}
                   </div>
+                  <!--
+                    The `#swingAlerts` pane — `vwe`, slot 48, carrying the SAME gate as the nav
+                    item above (`O(48, o.hasSwingTradeAlerts ? 48 : -1)`). Both, because either one
+                    alone leaves a tab that opens nothing or a pane reachable from a tab that is
+                    gone.
+
+                    The pane re-applies the gate itself, which is not redundancy for its own sake:
+                    it is what lets the contract test prove the component renders nothing on a false
+                    entitlement without standing up this whole page.
+                  -->
+                  {#if swingAlertsEnabled}
+                    <div
+                      id="swingAlerts"
+                      class={mainTab === 'swingAlerts'
+                        ? 'tab-pane position-relative show active'
+                        : 'tab-pane position-relative'}
+                      role="tabpanel"
+                      aria-labelledby="swingAlerts-tab"
+                    >
+                      <SwingAlertsPane
+                        alerts={swingAlertsLog}
+                        hasSwingTradeAlerts={swingAlertsEnabled}
+                        {isPresenter}
+                        onCreate={async (draft) => {
+                          await submitSwingCommand('swingAlertMsg', swingAlertPayload(draft));
+                        }}
+                        onDelete={async (swingAlertID) => {
+                          await submitSwingCommand('deleteSwingAlertMsg', { swingAlertID });
+                        }}
+                        onEdit={async (draft) => {
+                          await submitSwingCommand('editSwingAlertMsg', {
+                            ...swingAlertPayload(draft),
+                            swingAlertID: draft.swingAlertID ?? 0
+                          });
+                        }}
+                        onMonthsChange={(months) => void changeSwingAlertMonths(months)}
+                        onPasteImage={requestSwingImagePaste}
+                        onUploadImage={requestSwingImageUpload}
+                        sessionHandle={data.sessionHandle}
+                      />
+                    </div>
+                  {/if}
                   <!-- Slot 47 carries the same gate as the tab above. -->
                   {#if isPresenter}
                   <div
@@ -12061,6 +12309,40 @@
         onclose={() => (modal = null)}
         onupload={(files, message) => void uploadComposerImages(files, message)}
       />
+    {/if}
+    <!--
+      `imgUpload('swing')` — the swing form's own upload dialog.
+
+      A SECOND instance rather than a share of the composer's `modal === 'image-upload'`: the
+      reference's `imgUpload` takes the feature name as an argument and opens a dialog whose
+      completion belongs to that feature, and routing the swing upload through the composer's
+      handler would post the image into chat instead of putting its URL in the form.
+    -->
+    {#if swingImageUpload}
+      <ImageUploadDialog
+        onclose={() => {
+          swingImageUpload?.resolve(null);
+          swingImageUpload = null;
+        }}
+        onupload={(files) => void completeSwingImageUpload(files)}
+      />
+    {/if}
+    <!--
+      `onImagePaste(event, 'swing')` puts the pasted image in a `bootbox.confirm` before uploading,
+      so a stray paste cannot silently push bytes to the upload server.
+    -->
+    {#if swingImagePaste}
+      {@const pastePreviewUrl = swingImagePaste.previewUrl}
+      <BootboxDialog
+        mode="confirm"
+        message=""
+        onclose={() => closeSwingImagePaste()?.resolve(null)}
+        onconfirm={() => void confirmSwingImagePaste()}
+      >
+        <div class="text-center">
+          <img src={pastePreviewUrl} class="img-fluid" alt="Pasted screenshot" />
+        </div>
+      </BootboxDialog>
     {/if}
     {#if pendingGifUrl}
       <GifConfirmDialog

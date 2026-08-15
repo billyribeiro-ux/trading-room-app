@@ -695,6 +695,31 @@ literal string `n/a`. `row.senderName` is written at offset 1,985,533. The whole
 > The previous revision also listed four commands; there are six on the client → server side, because
 > creating and editing a swing alert also writes a mirrored message into the main alerts feed.
 
+### Two additions — 2026-08-15, read from the bundle during implementation
+
+Both were verified by reading `main.d1d09071be31f1ba.js` directly; everything else in this section
+was already correct and is unchanged.
+
+**1. `editAlertMessageSwing` is NOT swing-only. The Day Trade path sends the same literal command.**
+The identifier occurs at exactly **two** offsets in the whole file — **1,983,136** (swing) and
+**1,987,189** (day trade) — and the two payloads differ in one key:
+
+```js
+// swing, 1,983,136
+sendServerCommand("editAlertMessageSwing", { alertID: …, newAlertMsg: f, swingTradeAlert: !0, txt: … })
+// day trade, 1,987,189 — note the command name is unchanged
+sendServerCommand("editAlertMessageSwing", { alertID: …, newAlertMsg: f, dayTradeAlert: !0,  txt: … })
+```
+
+This matters for the port promised in section 7: `dayTradeAlertMsg` and `editDayTradeAlertMsg` are
+renamed for Day Trade, and `editAlertMessageSwing` **is not**. Inventing `editAlertMessageDayTrade`
+by analogy produces a command the server does not implement.
+
+**2. The edit branch clears `txtInAlerts` immediately after sending.** At offset **1,983,262**,
+`this.swingAlert.txtInAlerts = ""` runs as the second statement of the comma expression that follows
+`editAlertMessageSwing` — so the recovered old text is consumed exactly once. The Day Trade twin does
+the same at 1,987,319. The create branch has no counterpart, because nothing recovered anything.
+
 The alert object sent on both create and edit, offset 1,982,748:
 
 ```js
@@ -977,3 +1002,5 @@ Everything else that section 6 previously listed is closed above: the const tabl
   day conversion is `28 * months` rather than `30 * months`, the initial fetch is `days: 21` rather
   than `days: 42`, `dayTradeAlertMonths` defaults to 1 rather than 2, and `searchDayTradeLogs` (class
   `ICe`, 1,915,738) uses optional chaining where `searchSwingLogs` (class `PCe`, 1,915,251) does not.
+  **One command does NOT get renamed on the port: `editAlertMessageSwing`** — see the 2026-08-15
+  addition in section 5, offsets 1,983,136 and 1,987,189.

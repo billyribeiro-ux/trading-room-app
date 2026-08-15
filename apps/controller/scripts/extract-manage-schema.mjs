@@ -187,7 +187,22 @@ const ROOM_CONSUMED = [
      The two cluster ids that sit beside useMediaMTX on the manage page stay out. They name
      infrastructure, the room bundle reads neither, and the room finds its host server-side. */
   'useMediaMTX',
-  'overlayUserIdOnScreenshare'
+  'overlayUserIdOnScreenshare',
+  /* "Enable Swing Trade Alerts Tab?" — the entitlement for the whole Swing Alerts feature.
+     Added 2026-08-15 with that pane, and it has a reader on the day it crosses: the room reads it
+     as `sessData.hasSwingTradeAlerts` and gates three things on it — the nav item, the pane, and
+     the initial log fetch. All three collapse to nothing when it is absent, which is the correct
+     state for a room that has not bought the feature.
+
+     Not a credential and not something the room could infer: it is a per-room product entitlement
+     the owner ticks, and the room is where the tab is drawn.
+
+     `linkedRoomSwingAlertsOther` stays OUT, deliberately. Upstream it redirects the log fetch to
+     ANOTHER room by substituting that room-s session id, and this room takes the room from the
+     session row precisely so that no client-supplied value can name the room being read. Sending
+     it would reopen a cross-room read by configuration. If it is ever wanted it has to arrive as a
+     server-resolved room id with the link confirmed here, not as a string the room dereferences. */
+  'hasSwingTradeAlerts'
 ];
 
 /**
@@ -544,6 +559,13 @@ if (defs.length !== EXPECTED_TOTAL_COUNT) {
 }
 
 const missingWiredSettings = [...WIRED_SETTINGS].filter((name) => !defs.some((definition) => definition.name === name));
+// 59 since 2026-08-15: `hasSwingTradeAlerts` joined ROOM_CONSUMED with the Swing Trade Alerts pane.
+// One flag is the whole feature — the nav item, the pane and the initial `getSwingAlertsLog` fetch
+// all collapse to nothing without it, which is the right state for a room that has not bought it.
+// Its sibling `linkedRoomSwingAlertsOther` stays unwired on purpose: upstream it redirects the log
+// fetch at ANOTHER room by substituting that room's session id, and the room deliberately takes its
+// room from the session row so that nothing the browser can reach names the room being read.
+//
 // 56 since 2026-08-14: the room's own login page landed, and the five settings that DRIVE it now
 // cross — `showPasswordField`, `usernameInstructions`, `hasRequiredPhoneInLogin`,
 // `customEnterDisclosure`, `disableEditingUsername`. THREE of them were already on LOGIN_CONSUMED
@@ -589,7 +611,7 @@ const missingWiredSettings = [...WIRED_SETTINGS].filter((name) => !defs.some((de
 //
 // The literal is a tripwire, not a fact about the schema — it is here so the wired set cannot grow
 // by accident, which is why changing it is a deliberate edit.
-if (WIRED_SETTINGS.size !== 58 || missingWiredSettings.length > 0) {
+if (WIRED_SETTINGS.size !== 59 || missingWiredSettings.length > 0) {
   throw new Error(
     `wired-setting contract invalid: ${WIRED_SETTINGS.size} keys, missing ${missingWiredSettings.join(', ') || 'none'}`
   );

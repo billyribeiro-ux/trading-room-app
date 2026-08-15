@@ -212,6 +212,29 @@ export interface RoomSessionSettings {
    */
   useMediaMTX?: boolean;
   /**
+   * "Enable Swing Trade Alerts Tab?" — whether this room has a Swing Alerts tab at all.
+   *
+   * The owner's label on the Manage page, verbatim, with the help text "If enabled, the room will
+   * have swing alerts tab."
+   *
+   * `this.hasSwingTradeAlerts = this.appService.globals.sessData.hasSwingTradeAlerts` in `ngOnInit`
+   * (bundle byte 1,955,884), and one flag gates three things: the nav `<li>`
+   * (`O(26, o.hasSwingTradeAlerts ? 26 : -1)`), the `#swingAlerts` pane (`O(48, …)`) and the initial
+   * fetch in `loadSessionLogs()`. `-1` is "instantiate nothing", so a room without the setting
+   * emits no markup rather than hidden markup — see `swingAlertsTabVisible` in `$lib/swing-alerts`.
+   *
+   * NOT presenter status. Presenter status gates only the form and the row buttons, inside the pane.
+   *
+   * `linkedRoomSwingAlertsOther` is deliberately NOT here beside it, and that is an explicit
+   * decision rather than an omission: upstream, a non-empty value makes both fetches ask for
+   * ANOTHER room's log by substituting its `sessionID` (bytes 1,010,146 and 1,993,765). This room
+   * takes the room from the session row precisely so that a client cannot name the room it reads,
+   * and carrying a setting whose whole purpose is to redirect a read across rooms would reopen that
+   * by configuration. If it is ever wanted, it has to arrive as a server-resolved room id with the
+   * controller confirming the link, not as a string the room dereferences.
+   */
+  hasSwingTradeAlerts?: boolean;
+  /**
    * "Overlay userID on screenshare?" — the viewer's own id printed over an MTX stream.
    *
    * Read by `StreamingView.svelte` and gated on this AND `!isPresenter`, which is `TCe` (main

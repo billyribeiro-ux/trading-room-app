@@ -24,6 +24,164 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-15
 
+### 2026-08-15 02:36 EDT — Swing Alerts audited as chief architect, not accepted on report
+
+**Runtime impact: none from this entry** — one comment correction in `apps/room/eslint.config.js`.
+The Swing feature itself is the entry below.
+
+The build reported green. `docs/BUILD-AUDIT.md` exists because a build report is a CLAIM, so every
+line below was executed here rather than read from the agent's transcript.
+
+| check | result |
+| --- | --- |
+| Did it edit the spec it was built from? | `docs/decoded/swing-alerts.md` **+27 / −0** — additive only, nothing rewritten |
+| The two offsets it added | **1,983,262** and **1,987,319** opened and read: both exact |
+| `editAlertMessageSwing` / `editAlertMessageDayTrade` in the bundle | **2 / 0** — the shared-name claim holds |
+| `editAlertMessageDayTrade` in our code | 2 hits, both **warnings in comments**, not an invented command |
+| All six wire literals | match the bundle character for character |
+| Every repository query | room predicate present; all three mutations are one atomic conditional `UPDATE … WHERE … RETURNING`, no SELECT-then-UPDATE |
+| Where `room` comes from | `requireRoomShortCode(locals)` in every action; `senderName` from the session. Nothing client-asserted |
+| `alert_questions` delete with no room predicate | **correct** — that table has no room column and is scoped through an `alertId` the same transaction just proved belongs to the room |
+| `svelte-check` after `rm -rf .svelte-kit && sync` | **1046 files, 0 errors** |
+| `pnpm run lint` | clean |
+| `verify-room-settings-schema.mjs` | 268 + 1 deviation = 269 total, 59 wired |
+| `room-config-boundary.test.ts` | 17/17 |
+| `prettier --check` | clean |
+
+**Negative controls run by me, not taken on report.** Both restored and confirmed byte-identical
+with `diff -q`, 19/19 green afterwards:
+
+- `create: 'swingAlertMsg'` → `'newSwingAlertMsg'` — **2 failed / 17 passed**
+- the entitlement gate forced open — **1 failed / 18 passed**, on the case that says it must render
+  NOTHING rather than hidden markup
+
+**Did it weaken any guard to pass?** No. The three test/verifier edits are additive: the wired-count
+expectation moved 58 → 59 because a setting genuinely became wired, and `room-config-boundary.test.ts`
+asserts the consumer map equals `ROOM_VISIBLE_SETTINGS`, so adding the flag FORCED a documented
+consumer entry. No assertion was deleted or loosened.
+
+**`formatSwingAlertTxt` survived intact**, which is the trap most likely to be "tidied": the header
+is `"#SwingTrade \n"` with the space before the newline, and the label **"Exit" renders the STOP
+value**. Not corrected, and commented as deliberate.
+
+**One defect found in the audit and fixed here.** The new eslint ignore comment credited commit
+`19cdc25` with adding both dated capture directories. `19cdc25` added the **v3** one; `37a72c6` added
+**v4**. The lint claim itself is true — `docs/source/**` genuinely does not match
+`docs/source-v4-2026-08-15/**`, both directories predate this work, so the 18,516 errors were
+pre-existing — but a reader running `git show 19cdc25` would have found only half the story.
+Corrected, and the glob left as `source-*` because the next capture will be dated too.
+
+**Not verified, and stated plainly: the pane has never been rendered in a browser.** SSR output and
+assertions are all that stand behind it. The full gate was not run either — the tests covering what
+changed were.
+
+
+### 2026-08-15 02:26 EDT — a collector that asks the application to enumerate itself
+
+**Runtime impact: none.** Two new files under `apps/controller/scripts/`, both console-only tooling.
+
+`docs/decoded/admin-surface.md` §D concluded that the operator/superadmin control plane **cannot be
+matched, only designed** — twelve operator terms return zero across every capture. That conclusion is
+right about the evidence, and it rests entirely on captures taken while signed in as one ordinary
+tenant owner. So it cannot separate the only two possibilities that matter: the product has no
+operator console, or it has one and our account cannot see it. **All eight existing collectors read
+what is on screen, so all eight are blind to that distinction in the same way.**
+
+`collect-control-plane.js` asks a different question. A single-page application must register every
+screen it can ever show at boot, before it knows who you are. In ui-router that registry is
+`$state.get()`, and it lists states this account cannot reach and has no menu entry for. Reading the
+registry separates the two cases in a way no screenshot ever could.
+
+**The framework was confirmed from evidence before a line was written**, not assumed: `ng-app="app"`,
+four nested `ui-view` containers, zero `ng-view`, zero `$routeProvider`, and `$state.includes('page')`
+evaluated live inside an `ng-class` at byte 4,411 of the rendered account page. The script still
+probes for ngRoute and records which one answered, because "the evidence said ui-router" and "this
+build uses ui-router" are different statements.
+
+It also captures what no other collector does: the API-key restrictions control, Marketplace, Extra
+Admin Users, Badges, the Sessions list, account-lifecycle controls, and the server-injected globals —
+including `__disableMarketplace`, which is what actually hides Marketplace and ships as the **string**
+`'true'`, not a boolean.
+
+**Two defects were caught before this could ship, and both are the interesting part.**
+
+**1. The script would have refused its own only click.** The reveal control is not the heading — read
+verbatim at `views/page.welcome.html:333-336` it is a `span` carrying
+`ng-click="showNewRoom=showNewRoom+1;"`, and the guard refuses every element with an `ng-click`. The
+run would have completed, downloaded a file, and reported "New Room did not appear": a clean-looking
+result that was entirely about the tool. Fixed with a single anchored exemption for that exact
+expression. Found by READING the template, which is the only way it could have been found before the
+one trip to the live site.
+
+**2. The guard's own test did not test the guard.** The smoke test asserted the camelCase denylist
+fix by handing it an element with `ng-click="deleteApiKey(k)"`. A negative control — deleting
+`splitCamel` outright — left the suite fully green, because the handler clause was doing all the work
+and the camelCase fix was untested. Run C now uses `class="…deleteApiKeyBtn"` with **no** handler, so
+only `splitCamel` can refuse it. Re-run with `splitCamel` disabled: exactly those two assertions go
+red, everything else stays green.
+
+The design rule the whole thing is built around: **it never concludes that something does not
+exist.** It reports what is REGISTERED in this build and REACHABLE by this account, and the smoke
+test asserts the emitted verdict string cannot claim otherwise. The census runs positive controls and
+marks itself untrustworthy if they fail, because a zero from a broken search and a real absence look
+identical in a JSON file — and the JSON file is all anyone will have.
+
+**Verified:** `node --check`; smoke test 15/15 across three runs; both negative controls run and
+reverted; `prettier --check` clean. **Not run:** the full gate — nothing under `src/` changed.
+
+
+### 2026-08-15 02:23 EDT — Swing Trade Alerts, end to end
+
+**Runtime impact: yes**, but inert until an owner ticks the box. The whole feature is behind the
+per-room `hasSwingTradeAlerts` entitlement, which no room has set; a room without it emits no nav
+item, no pane, no log read and refuses all three mutations. Nothing existing changed behaviour.
+
+Built from `docs/decoded/swing-alerts.md`: the `#swingAlerts` pane, the one form that serves create
+and edit, the eight-column log with its search / limit / CSV strip, the months window, and the
+`swing_alerts` table behind them.
+
+**A swing submit is TWO writes, not one.** `swingAlertMsg` writes the row and `alertMsg` posts
+`formatSwingAlertTxt(…)` into the MAIN alerts feed (bundle byte 1,983,136); edit and delete carry the
+mirror with them. The reference re-finds its own feed message by scanning `alertsLog` for matching
+formatted text, which is linear per edit and silently finds nothing once the feed copy is touched.
+This room records the association as `swing_alerts.alert_id` and does both writes in one
+transaction — same observable behaviour, and it cannot come apart.
+
+**Three traps the decode names, each now pinned by an assertion that was watched going red:**
+
+| trap | why it bites |
+| --- | --- |
+| create is `swingAlertMsg`, **not** `newSwingAlertMsg` | that name is a payload key on the edit command AND the server→client push; two decodes had to correct it |
+| `limitSwingLogs(rows, 0)` returns `[]` | `rows.slice(0, limit \|\| rows.length)` is the tempting rewrite and it inverts the box |
+| the entitlement must render **nothing** | `-1` is "instantiate nothing"; hidden markup tells a member the feature exists |
+
+The three prices are `type="text"` and stored as TEXT, deliberately — no pipe, no `toFixed`, no
+arithmetic anywhere on the path, so the money rule does not reach them and rounding into cents would
+change what a presenter typed. Both the schema and the type say so, at length, because this is the
+edit somebody will otherwise make.
+
+**Two facts added to `docs/decoded/swing-alerts.md`**, each read from the bundle rather than taken on
+report: `editAlertMessageSwing` is shared verbatim by the Day Trade path (only two occurrences in the
+file, 1,983,136 and 1,987,189, differing solely in `swingTradeAlert` vs `dayTradeAlert`), so the port
+must NOT rename it; and the edit branch clears `txtInAlerts` at 1,983,262. Everything else the
+coordinator flagged was already correct in that document and was left alone.
+
+**Controller:** `hasSwingTradeAlerts` joined `ROOM_VISIBLE_SETTINGS`, `ROOM_CONSUMED`, the generated
+schema (regenerated, not hand-edited — 58 → 59 wired) and both duplicate lists that guard them. Its
+sibling `linkedRoomSwingAlertsOther` stays out on purpose: upstream it redirects the log fetch at
+another room, and this room takes its room from the session row precisely so nothing the browser can
+reach names the room being read.
+
+**`pnpm run lint` was already failing** before this work — 18,516 errors, every one inside the two
+minified bundles commit `19cdc25` added as *siblings* of `docs/source/`, which the exact ignore glob
+stopped covering. Widened to `docs/source-*/**`. Not a silenced diagnostic: nothing in those files is
+authored here.
+
+Verified: `svelte-check` 0/0 on a wiped `.svelte-kit`; `eslint .` clean; 19 new assertions plus the
+page-load and room-isolation contracts (32 passed) and the three controller boundary tests (45
+passed); the schema verifier re-run. Three negative controls run and reverted byte-identically. Not
+run: the full suite, and no browser — the pane has not been seen rendered in a real room.
+
 ### 2026-08-15 02:09 EDT — the admin surface inventoried, and the control plane is confirmed unmatchable
 
 **Runtime impact: none.** One new document plus a five-line comment correction in a generated header.

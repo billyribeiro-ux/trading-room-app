@@ -46,8 +46,21 @@ export default defineConfig(
       siblings hold DOM dumps. `CLAUDE.md` forbids reformatting or "fixing" anything in them, and
       they are SHA-256 pinned by `dump-contract.test.ts`. A linter cannot improve a file whose whole
       value is being byte-identical to what the reference served.
+
+      `docs/source-*` is the same thing under a dated name. TWO commits added dated capture
+      directories as SIBLINGS of `docs/source/` rather than children — `37a72c6` added
+      `docs/source-v4-2026-08-15/` and `19cdc25` added `docs/source-v3-2026-08-15/` — so the exact
+      glob above stopped covering them and `pnpm run lint` began reporting 18,516 errors, every one
+      of them inside those two minified bundles. Widened here so the gate is about this
+      repository's own code again.
+
+      The glob is `source-*` rather than the two names because the next capture will be dated too.
+
+      This is NOT an ignored diagnostic in the sense the standard forbids. Nothing in these files is
+      authored here, nothing is fixable, and the alternative is a lint gate nobody can read.
     */
     'docs/source/**',
+    'docs/source-*/**',
     'second-dump/**',
     'new-evidence/**',
     'more-fucking-evidence/**',
