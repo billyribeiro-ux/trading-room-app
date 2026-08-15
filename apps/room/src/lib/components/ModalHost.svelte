@@ -2,7 +2,6 @@
   import { ngbTooltip, ngbTooltipWith } from '$lib/ngb-tooltip';
   import { alertDateFormatter } from '$lib/message-formatters';
   import { rtmpIngestUrl, whipIngestUrl, type StreamIngestKey } from '$lib/stream-ingest';
-  import { deserialize } from '$app/forms';
   import { invalidateAll } from '$app/navigation';
   import { resolve } from '$app/paths';
   import { onMount, untrack } from 'svelte';
@@ -25,6 +24,12 @@
   import RichTextEditor from './RichTextEditor.svelte';
   import RoomMessage from './RoomMessage.svelte';
   import { chatModeConfirmPrompt, type ChatMode } from '$lib/chat-mode';
+  import { refusalMessage, refusalOrTransportMessage } from '$lib/refusal-message';
+  import { uploadFile } from '../../routes/files-pane.remote';
+  import {
+    giveMicScreen as giveMicScreenCommand,
+    presenterCommand
+  } from '../../routes/presenter-commands.remote';
   import type { PastedImageSubmission, PostAlertSubmission } from '$lib/post-alert-behavior';
   import {
     alertFilterAvailable,
@@ -1231,22 +1236,12 @@
 
     for (const [index, file] of uploadQueue.entries()) {
       uploadStatus = `Uploading ${index}/${total}: ${file.name}.`;
-      const body = new FormData();
-      body.append('file', file);
-      body.append('originalname', file.name);
-
+      // One `catch` where there were two: an action's refusal came back as a 200 with the reason
+      // in the body. A command rejects for both, and `refusalOrTransportMessage` tells them apart.
       try {
-        const response = await fetch('?/uploadFile', { method: 'POST', body });
-        const result = deserialize<{ success?: boolean }, { message?: string }>(
-          await response.text()
-        );
-        if (result.type !== 'success') {
-          failures.push(
-            `${file.name}: ${result.type === 'failure' ? (result.data?.message ?? 'refused') : 'upload failed'}`
-          );
-        }
+        await uploadFile({ file, originalName: file.name });
       } catch (cause) {
-        failures.push(`${file.name}: ${cause instanceof Error ? cause.message : 'network error'}`);
+        failures.push(`${file.name}: ${refusalOrTransportMessage(cause, 'network error')}`);
       }
     }
 
@@ -1337,12 +1332,11 @@
       micScreenAlert = `Can't ${give ? 'give' : 'take'} 'Mic/Screenshare' to yourself.`;
       return;
     }
-    const body = new FormData();
-    body.set('targetUserId', String(targetUser.id));
-    body.set('give', String(give));
-    const response = await fetch('?/giveMicScreen', { method: 'POST', body });
-    if (!response.ok) {
-      console.error('[room] giveMicScreen failed', response.status);
+    try {
+      await giveMicScreenCommand({ targetUserId: targetUser.id, give });
+    } catch (cause) {
+      // Shown, not swallowed: this used to `console.error` a status and tell the presenter nothing.
+      micScreenAlert = refusalMessage(cause, 'That did not work.');
       return;
     }
     micScreenAlert = give ? 'Mic/Screenshare given OK' : 'Mic/Screen taken away OK';
@@ -1350,11 +1344,16 @@
 
   async function revokePermission(subCmd: 'mutemic' | 'mutecam' | 'mutescreens') {
     if (!targetUser?.id) return;
-    const body = new FormData();
-    body.set('subCmd', subCmd);
-    body.set('targetUserId', String(targetUser.id));
-    const response = await fetch('?/presenterCommand', { method: 'POST', body });
-    if (!response.ok) console.error('[room] presenter command failed', response.status);
+    /*
+      THIS WAS BROKEN: `presenterCommand`'s action was removed on 2026-08-15 and this call site was
+      missed — it is in ModalHost, not `+page.svelte`, and only that file was checked. It posted to
+      an action that no longer existed, so revoking a member's mic or camera did nothing at all.
+    */
+    try {
+      await presenterCommand({ subCmd, targetUserId: targetUser.id });
+    } catch (cause) {
+      console.error('[room] presenter command failed', cause);
+    }
   }
 
   function updateSettingCheck(event: Event) {

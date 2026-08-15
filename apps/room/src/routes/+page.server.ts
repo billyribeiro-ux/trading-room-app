@@ -1,6 +1,7 @@
 import { fail } from '@sveltejs/kit';
 import { and, asc, desc, eq, gt } from 'drizzle-orm';
-import { isEmptyChatHtml, sanitizeChatHtml } from '$lib/server/chat-html';
+// `isEmptyChatHtml` and `sanitizeChatHtml` left with the two paths that sanitise — `sendMessage` in
+// `chat-messages.remote.ts` and the edit branch in `message-actions.remote.ts`.
 // `pruneDeadPreferenceKeys` left with `savePreference` for `user-settings.remote.ts`; the browser
 // half went to `mirrorPreferenceToLocalStorage`, beside the list it evicts.
 import { calculatePollTotals, parsePollChoices } from '$lib/poll-behavior';
@@ -23,7 +24,6 @@ import {
 import { redirectSignedOut } from '$lib/server/control-plane';
 import {
   CAPTURE_REFERENCE_ROOM,
-  capturedRoomItem,
   capturedRoomItems,
   noCapturedRoomItems
 } from '$lib/server/captured-room';
@@ -43,10 +43,10 @@ import { isBannedFromRoom, isShutOutByRoomState, roomRoleFor } from '$lib/server
 import { consumeRateLimit } from '$lib/server/rate-limit';
 import { mediaSignallingUrl } from '$lib/server/media-grant';
 import { publishToRoom } from '$lib/server/room-events';
-import { grantMediaElevation, revokeMediaElevation } from '$lib/server/media-elevation';
-// `deleteStoredFile` left with `deleteFile`. `storeUpload` stays: `uploadFile` is still a form
-// action here, because it is submitted from a real `<form>` and degrades without JavaScript.
-import { storeUpload } from '$lib/server/file-storage';
+// `grantMediaElevation` / `revokeMediaElevation` left with `giveMicScreen` for
+// `presenter-commands.remote.ts`; nothing else in this file elevates anybody.
+// `deleteStoredFile` and `storeUpload` left with the Files-pane commands; nothing here stores a
+// file any more.
 // `deleteThread`, `insertPrivateMessage`, `loadThread` and `searchThread` left with the trio for
 // `private-chat.remote.ts`. What stays is the CONVERSATION LIST, which the loader still sends.
 import { loadConversations } from '$lib/server/private-chat';
@@ -105,7 +105,6 @@ import {
   chatMutes,
   roomState,
   hiddenRoomItems,
-  messages,
   pollAnswers,
   polls,
   savedPolls,
@@ -1382,189 +1381,18 @@ export const actions: Actions = {
    * Presenter-only, matching `O(81, o.isP ? 81 : -1)` on the button that opens the modal. Gating
    * the button alone would leave the action reachable by anyone who can post a form.
    */
-  uploadFile: async ({ request, locals }) => {
-    ensureDatabase();
-    const user = requireUser(locals);
-    if (!isPresenterRole(user.role)) return fail(403, { message: 'Presenters only.' });
-
-    const data = await request.formData();
-    const file = data.get('file');
-    if (!(file instanceof File)) return fail(400, { message: 'No file.' });
-
-    // The capture sends the display name alongside the blob rather than trusting the part's own
-    // filename; `originalname` is what ends up in the row and on screen.
-    const originalName = String(data.get('originalname') ?? file.name).trim();
-    if (!originalName) return fail(400, { message: 'No file name.' });
-
-    let stored;
-    try {
-      stored = await storeUpload(file);
-    } catch (cause) {
-      // Fail loud with the real reason - too large, or empty - rather than a silent no-op that
-      // looks like a successful upload of nothing.
-      return fail(400, { message: cause instanceof Error ? cause.message : 'Upload failed.' });
-    }
-
-    const row = db
-      .insert(sharedFiles)
-      .values({
-        // The Files pane is per room, so an upload lands in the room it was made from.
-        roomShortCode: requireRoomShortCode(locals),
-        name: originalName,
-        kind: stored.kind,
-        url: stored.url,
-        contentType: stored.contentType,
-        size: stored.size,
-        uploadedBy: user.id,
-        createdAt: new Date()
-      })
-      .returning()
-      .get();
-
-    // Everyone's Files pane is stale the moment this lands; `getSessionFiles()` is what the capture
-    // calls after its own upload, and this is the equivalent for the other peers in the room.
-    publishToRoom(requireRoomShortCode(locals), { channel: 'cmds', data: { cmd: 'filesChanged' } });
-
-    return { success: true, file: row };
-  },
-
   /*
-    `deleteFile`, `fileMediaCommand` and `overwriteCashRegisterSound` left together for
-    `src/routes/files-pane.remote.ts` — one module because all three enforced, in three separate
-    hand-written copies, that the file named must be one THIS ROOM HOLDS. That predicate is
-    `roomFileByUrl` there now, declared once and returning the row, so the caller that needs the
-    content type gets it from the same read that proved ownership.
+    `giveMicScreen` left for `src/routes/presenter-commands.remote.ts`, beside `presenterCommand`
+    and `focusOnScreen` — same gate, same `cmds` channel, same room scope. The media-elevation row
+    and the reason it is written on the server went with it unchanged.
 
-    `deleteFile`'s SELECT-then-DELETE became a single conditional `DELETE … RETURNING`, which is a
-    FIX and not a move: two statements with a gap between them is the TOCTOU this repository's
-    standard names, and two presenters deleting the same file both reached `deleteStoredFile` on a
-    path the first had already removed. Zero rows now means somebody else won the race.
-
-    `overwriteCashRegisterSound`'s `on` is a real `z.boolean()` where the form body carried the
-    strings `'true'`/`'false'`. The action compared against those exact strings so an unrecognised
-    value could not fall through to "remove" and silently clear the room's sound; the schema is that
-    same refusal, enforced before the handler runs.
-
-    `uploadComposerImage` did NOT go with them. It is gated by `isPresenter || settings.userUploads`
-    rather than by the presenter role, and a looser gate living in a module whose every other export
-    opens with `presenterRoom()` is how gates drift. `src/routes/composer-image.remote.ts`.
-
-    `uploadFile` STAYS here, and stays a form action: it is submitted from a real `<form>` in the
-    Files-pane modal, so it degrades without JavaScript — the case SvelteKit's guidance says to
-    prefer `form` for.
+    IT WAS THE TWELFTH CALL SITE AND IT WAS NOT IN `+page.svelte`. Neither was `presenterCommand`'s,
+    and that one was a LIVE DEFECT: `presenterCommand`'s action was removed on 2026-08-15 while
+    `ModalHost.svelte` went on posting `fetch('?/presenterCommand')` to an action that no longer
+    existed, so revoking a member's mic or camera from the user-info modal did nothing for three
+    commits. Found by grepping the whole of `src/` rather than the one file being edited — which is
+    what should have happened the first time.
   */
-
-  /*
-    `videoForAll` and `youtubeForAll` left together for
-    `src/routes/for-all-broadcast.remote.ts`, and `broadcastableMediaUrl` /
-    `MAX_BROADCAST_URL` went with them — they were declared at the top of this file and used by
-    nothing else.
-
-    One feature, one decision: a presenter's typed string becomes an `src` attribute in every
-    browser in the room. They share the presenter gate and the length bound; they do NOT share the
-    URL check, and that module says at each of them why making them consistent would break one.
-  */
-
-  /*
-    `recordingState` and `changeChatMode` left together for `src/routes/recording-state.remote.ts`
-    and `src/routes/chat-mode.remote.ts` — two modules, because they are two features that merely
-    LOOKED alike here.
-
-    Both are presenter-gated `cmds` broadcasts scoped to the caller's own room, so both now share
-    `presenterRoom()` instead of spelling the role test out by hand. The one place they diverge is
-    the one that matters and it is written at both ends: recording is MOMENTARY and stores nothing,
-    the chat mode is a standing fact about the room and writes a row. Folding them into one module
-    would have buried that difference under a shared name.
-
-    Two changes went with them, neither of them a move:
-      - `recName` now REFUSES over 200 characters where this truncated with `.slice(0, 200)`. A
-        silent truncation is the fallback this repository forbids.
-      - the mode allow-list is `z.enum(CHAT_MODES)` rather than a hand-called `isChatMode`, so it is
-        derived from the constant `$lib/chat-mode.ts` already exports instead of restated.
-  */
-
-  /*
-    `getMyMobilePin` — `sendServerCommand("getMyMobilePin", null)` upstream — was an action here and
-    is now `src/routes/mobile-pin.remote.ts`. The gate, the controller call and both messages moved
-    with it unchanged; `fail(409)`/`fail(502)` became `error(409)`/`error(502)`, because a command
-    has no form-action caller to understand a `fail`.
-
-    It is a `command` and NOT a `query` despite being a read, and that module explains why at length:
-    the pin is minted fresh per request, and a query would cache it.
-  */
-
-  /*
-    `presenterCommand` and `focusOnScreen` left together for
-    `src/routes/presenter-commands.remote.ts`. Both broadcast on the `cmds` channel, both are
-    refused to non-presenters, and both scope the broadcast to the caller's own room — so the gate
-    and the room scope, which were spelled out by hand in BOTH actions, are written once there.
-
-    They stay two commands with two schemas, which `focus-on-screen-contract.test.ts` exists to
-    enforce: one names a PERSON and validates an integer target, the other names a SCREEN. Folding
-    them together would loosen a check to fit a payload it was never for.
-  */
-
-  /**
-   * `giveMicScreen` — a presenter hands a member mic and screenshare, or takes them back.
-   *
-   * Transcribed from `docs/source/main.d6d3c112b59b7d0d.js` offset 2075481, where it sits on the
-   * same class as `saveCustomPerms` and `startPrivateChat` — the user-info modal:
-   *
-   * ```js
-   * giveMicScreen(e) {
-   *   if (this.user.userXrefID == this.appService.globals.user.userXrefID)
-   *     return bootbox.alert(`Can't ${e ? 'give' : 'take'} 'Mic/Screenshare' to yourself.`), !1;
-   *   this.appService.sendServerAdminCommand('giveMicScreen', { user: this.user._id, give: e });
-   *   bootbox.alert(e ? 'Mic/Screenshare given OK' : 'Mic/Screen taken away OK');
-   * }
-   * ```
-   *
-   * It is a COMMAND, not a stored permission. The recipient's own client flips
-   * `isPresenter`/`isLimitedPresenter` and reinitialises its media — which is why
-   * `is_limited_presenter` was correctly removed as a column: it is transient state, not a
-   * property of an account.
-   *
-   * The self-target refusal is enforced here as well as in the UI. The reference checks it only in
-   * the browser, and a presenter who reached this endpoint directly would otherwise flip their own
-   * presenter flag off and have no control left to flip it back.
-   */
-  giveMicScreen: async ({ request, locals }) => {
-    ensureDatabase();
-    const actor = requireUser(locals);
-    if (actor.role !== 'staff' && actor.role !== 'admin') return fail(403);
-
-    const data = await request.formData();
-    const targetUserId = Number(data.get('targetUserId') ?? NaN);
-    const give = data.get('give') === 'true';
-    if (!Number.isInteger(targetUserId)) return fail(400, { message: 'No target.' });
-    if (targetUserId === actor.id) {
-      return fail(400, {
-        message: `Can't ${give ? 'give' : 'take'} 'Mic/Screenshare' to yourself.`
-      });
-    }
-
-    /*
-      Recorded on the SERVER before it is announced — `TODO.md` gap 22.
-
-      The SFU decides who may produce from the grant's role, and `/api/media/grant` reads this row
-      when it mints. Without it the recipient restarts its media and is refused `forbidden`, because
-      a runtime hand-over never touches the controller's membership.
-
-      Written here rather than trusted from the client: the reference achieves the same thing by
-      letting the browser re-join asserting its own `isP`, which is the privilege escalation removed
-      on 2026-08-07. This action is already staff-gated and refuses a self-target, so the authority
-      is established before the row is written.
-    */
-    if (give) grantMediaElevation(requireRoomShortCode(locals), targetUserId, actor.id);
-    else revokeMediaElevation(requireRoomShortCode(locals), targetUserId);
-
-    publishToRoom(requireRoomShortCode(locals), {
-      channel: 'cmds',
-      data: { cmd: 'giveMicScreen', targetUserId, give }
-    });
-
-    return { micScreen: give ? 'Mic/Screenshare given OK' : 'Mic/Screen taken away OK' };
-  },
 
   savePoll: async ({ request, locals }) => {
     ensureDatabase();
@@ -1729,323 +1557,28 @@ export const actions: Actions = {
       )
       .run();
     return { success: true };
-  },
-
-  messageAction: async ({ request, locals }) => {
-    ensureDatabase();
-    const data = await request.formData();
-    const operation = String(data.get('operation') ?? '');
-    const kind = String(data.get('kind') ?? '');
-    const id = Number(data.get('id'));
-    const isPresenter =
-      requireUser(locals).role === 'staff' || requireUser(locals).role === 'admin';
-
-    if (!Number.isInteger(id)) return fail(400, { message: 'A message ID is required.' });
-
-    /**
-     * Resolves a captured item, or null for a real one.
-     *
-     * Negative ids belong to the fixture and have no row anywhere, so every branch below has to
-     * decide between "update a table" and "record an override" before it can look anything up.
-     */
-    const captured =
-      id < 0
-        ? capturedRoomItem(
-            { id: requireUser(locals).id, emailHash: hashEmail(requireUser(locals).email) },
-            kind === 'alert' ? 'alert' : 'chat',
-            id,
-            requireRoomShortCode(locals)
-          )
-        : null;
-
-    /** Writes one override column, leaving the others as they were. */
-    function recordOverride(
-      evidenceKey: string,
-      patch: { answered?: boolean; body?: string; reactionsJson?: string }
-    ) {
-      const now = new Date();
-      db.insert(capturedItemOverrides)
-        .values({
-          evidenceKey,
-          roomShortCode: requireRoomShortCode(locals),
-          ...patch,
-          updatedByUserId: requireUser(locals).id,
-          updatedAt: now
-        })
-        .onConflictDoUpdate({
-          /*
-            The conflict target is the whole key, room included. Keyed on `evidenceKey` alone this
-            upsert would collapse every room's edit of the same captured item into one row, so
-            editing it here rewrote it everywhere.
-          */
-          target: [capturedItemOverrides.evidenceKey, capturedItemOverrides.roomShortCode],
-          // Only the columns in `patch` - an edit must not wipe an existing reaction override.
-          set: { ...patch, updatedByUserId: requireUser(locals).id, updatedAt: now }
-        })
-        .run();
-    }
-
-    if (operation === 'delete') {
-      // Captured items carry negative ids and live in the fixture, not in a table, so there is no
-      // row to delete. Record the deletion instead: the load filters the fixture through
-      // hidden_room_items, which makes it stick for everyone rather than only for the browser that
-      // asked. Same authorisation rule as a real delete - a presenter may remove anything, anyone
-      // else only what the capture attributes to them.
-      if (id < 0) {
-        if (!captured) return fail(404, { message: 'Message not found.' });
-        if (!isPresenter && captured.senderId !== requireUser(locals).id) return fail(403);
-        db.insert(hiddenRoomItems)
-          .values({
-            evidenceKey: captured.evidenceKey,
-            // Hiding the fixture's copy in THIS room only — every room is served the same item.
-            roomShortCode: requireRoomShortCode(locals),
-            hiddenByUserId: requireUser(locals).id,
-            hiddenAt: new Date()
-          })
-          .onConflictDoNothing()
-          .run();
-        return { success: true };
-      }
-
-      /*
-        Every lookup below is room-scoped, and that is load-bearing rather than tidy.
-
-        `id` comes from the form. Without the room predicate a presenter — who is a presenter only
-        in their OWN room — could delete any alert or message on the deployment by naming its id,
-        and the ownership check beneath would pass because the row really is theirs to delete in
-        the room it came from. Resolving nothing outside this room is what makes that check mean
-        what it says.
-      */
-      if (kind === 'alert') {
-        const alert = db
-          .select()
-          .from(alerts)
-          .where(and(eq(alerts.roomShortCode, requireRoomShortCode(locals)), eq(alerts.id, id)))
-          .get();
-        if (!alert) return fail(404, { message: 'Alert not found.' });
-        if (!isPresenter && alert.senderId !== requireUser(locals).id) return fail(403);
-        // The questions belong to the alert, so they go with it. Left behind they are unreachable -
-        // nothing renders a question whose alert is gone - but they still count towards the pending
-        // total that decides whether the Q&A button flashes.
-        db.transaction((transaction) => {
-          // `alertQuestions` reaches its room through `alertId`, which the lookup above just
-          // proved belongs here.
-          transaction.delete(alertQuestions).where(eq(alertQuestions.alertId, id)).run();
-          transaction
-            .delete(alerts)
-            .where(and(eq(alerts.roomShortCode, requireRoomShortCode(locals)), eq(alerts.id, id)))
-            .run();
-        });
-        return { success: true };
-      }
-
-      const message = db
-        .select()
-        .from(messages)
-        .where(and(eq(messages.roomShortCode, requireRoomShortCode(locals)), eq(messages.id, id)))
-        .get();
-      if (!message) return fail(404, { message: 'Message not found.' });
-      if (!isPresenter && message.senderId !== requireUser(locals).id) return fail(403);
-      db.delete(messages)
-        .where(and(eq(messages.roomShortCode, requireRoomShortCode(locals)), eq(messages.id, id)))
-        .run();
-      return { success: true };
-    }
-
-    if (operation === 'reaction') {
-      const key = String(data.get('reactionKey') ?? '').trim();
-      const emoji = String(data.get('reactionEmoji') ?? '').trim();
-      if (!key || !emoji) return fail(400, { message: 'A reaction is required.' });
-
-      const currentUserHash = hashEmail(requireUser(locals).email);
-
-      // Captured items: same toggle, written to the overlay instead of to a row. Anyone who can see
-      // the item may react to it, which is what the real branches below allow too.
-      if (id < 0) {
-        if (!captured) return fail(404, { message: 'Message not found.' });
-        const stored = db
-          .select({ reactionsJson: capturedItemOverrides.reactionsJson })
-          .from(capturedItemOverrides)
-          .where(
-            and(
-              eq(capturedItemOverrides.roomShortCode, requireRoomShortCode(locals)),
-              eq(capturedItemOverrides.evidenceKey, captured.evidenceKey)
-            )
-          )
-          .get();
-        // Start from the override if one exists, otherwise from the fixture's own reactions.
-        const reactions = parseReactions(stored?.reactionsJson ?? captured.reactionsJson);
-        const reaction = reactions[key] ?? { emoji, clickedBy: [] };
-        const clickedIndex = reaction.clickedBy.indexOf(currentUserHash);
-        if (clickedIndex >= 0) reaction.clickedBy.splice(clickedIndex, 1);
-        else reaction.clickedBy.push(currentUserHash);
-        if (reaction.clickedBy.length === 0) delete reactions[key];
-        else reactions[key] = { emoji: reaction.emoji || emoji, clickedBy: reaction.clickedBy };
-        recordOverride(captured.evidenceKey, { reactionsJson: JSON.stringify(reactions) });
-        return { success: true, reactions };
-      }
-
-      if (kind === 'alert') {
-        const alert = db
-          .select()
-          .from(alerts)
-          .where(and(eq(alerts.roomShortCode, requireRoomShortCode(locals)), eq(alerts.id, id)))
-          .get();
-        if (!alert) return fail(404, { message: 'Alert not found.' });
-        const reactions = parseReactions(alert.reactionsJson);
-        const reaction = reactions[key] ?? { emoji, clickedBy: [] };
-        const clickedIndex = reaction.clickedBy.indexOf(currentUserHash);
-        if (clickedIndex >= 0) reaction.clickedBy.splice(clickedIndex, 1);
-        else reaction.clickedBy.push(currentUserHash);
-        if (reaction.clickedBy.length === 0) delete reactions[key];
-        else reactions[key] = { emoji: reaction.emoji || emoji, clickedBy: reaction.clickedBy };
-        db.update(alerts)
-          .set({ reactionsJson: JSON.stringify(reactions) })
-          .where(and(eq(alerts.roomShortCode, requireRoomShortCode(locals)), eq(alerts.id, id)))
-          .run();
-        return { success: true, reactions };
-      }
-
-      const message = db
-        .select()
-        .from(messages)
-        .where(and(eq(messages.roomShortCode, requireRoomShortCode(locals)), eq(messages.id, id)))
-        .get();
-      if (!message) return fail(404, { message: 'Message not found.' });
-      const reactions = parseReactions(message.reactionsJson);
-      const reaction = reactions[key] ?? { emoji, clickedBy: [] };
-      const clickedIndex = reaction.clickedBy.indexOf(currentUserHash);
-      if (clickedIndex >= 0) reaction.clickedBy.splice(clickedIndex, 1);
-      else reaction.clickedBy.push(currentUserHash);
-      if (reaction.clickedBy.length === 0) delete reactions[key];
-      else reactions[key] = { emoji: reaction.emoji || emoji, clickedBy: reaction.clickedBy };
-      db.update(messages)
-        .set({ reactionsJson: JSON.stringify(reactions) })
-        .where(and(eq(messages.roomShortCode, requireRoomShortCode(locals)), eq(messages.id, id)))
-        .run();
-      return { success: true, reactions };
-    }
-
-    if (operation === 'edit') {
-      /*
-        RICH TEXT on the edit path — `editChatMessage` with `newMsg` set to the editor's content.
-
-        Sanitised here and derived here, exactly as the post path above does it, and for the same
-        reason: the submitted value is never what gets stored.
-
-        CHAT ONLY. The reference's rich edit branch is inside `if ("chat" === this.logType)`, the
-        alerts table has no such column, and an alert edited through the presenter's prompt is
-        plain text. Reading the field for an alert would be accepting input nothing can store.
-
-        AND IT ALWAYS REWRITES BOTH COLUMNS. A chat edit sets `body_html` to the sanitised HTML or
-        to NULL — never "leave whatever was there". Otherwise editing a rich message through the
-        PLAIN prompt (which is what happens when the owner has since turned the editor off) would
-        write a new `body` and leave the old markup behind, and the renderer picks the column: the
-        message would keep displaying the sentence it no longer says.
-      */
-      const submittedHtml = kind === 'chat' ? String(data.get('newBodyHtml') ?? '').trim() : '';
-      const sanitizedHtml = submittedHtml ? sanitizeChatHtml(submittedHtml) : '';
-      const newBodyHtml = sanitizedHtml && !isEmptyChatHtml(sanitizedHtml) ? sanitizedHtml : null;
-
-      const newBody = newBodyHtml
-        ? newBodyHtml
-            .replace(/<[^>]*>/g, '')
-            .replace(/&nbsp;/g, ' ')
-            .trim()
-        : String(data.get('newBody') ?? '').trim();
-      if (!newBody) return fail(400, { message: 'A message is required.' });
-
-      // Captured items, under the same rules the real branches apply below: an alert is
-      // presenter-only, a chat message is the author's or a presenter's unless it is an admin
-      // message.
-      if (id < 0) {
-        if (!captured) return fail(404, { message: 'Message not found.' });
-        if (kind === 'alert') {
-          if (!isPresenter) return fail(403);
-        } else {
-          const isOwner = captured.senderId === requireUser(locals).id;
-          if (!isOwner && (!isPresenter || captured.isAdmin)) return fail(403);
-        }
-        recordOverride(captured.evidenceKey, { body: newBody });
-        return { success: true };
-      }
-
-      if (kind === 'alert') {
-        if (!isPresenter) return fail(403);
-        const alert = db
-          .select()
-          .from(alerts)
-          .where(and(eq(alerts.roomShortCode, requireRoomShortCode(locals)), eq(alerts.id, id)))
-          .get();
-        if (!alert) return fail(404, { message: 'Alert not found.' });
-        db.update(alerts)
-          .set({ body: newBody })
-          .where(and(eq(alerts.roomShortCode, requireRoomShortCode(locals)), eq(alerts.id, id)))
-          .run();
-        return { success: true };
-      }
-
-      const message = db
-        .select()
-        .from(messages)
-        .where(and(eq(messages.roomShortCode, requireRoomShortCode(locals)), eq(messages.id, id)))
-        .get();
-      if (!message) return fail(404, { message: 'Message not found.' });
-      const isOwner = message.senderId === requireUser(locals).id;
-      if (!isOwner && (!isPresenter || message.isAdmin)) return fail(403);
-      db.update(messages)
-        .set({ body: newBody, bodyHtml: newBodyHtml })
-        .where(and(eq(messages.roomShortCode, requireRoomShortCode(locals)), eq(messages.id, id)))
-        .run();
-      return { success: true };
-    }
-
-    if (!isPresenter) return fail(403);
-
-    if (operation === 'markAnswered' && kind === 'chat') {
-      // Presenter-only already, by the guard above.
-      if (id < 0) {
-        if (!captured) return fail(404, { message: 'Message not found.' });
-        recordOverride(captured.evidenceKey, { answered: true });
-        return { success: true };
-      }
-      db.update(messages)
-        .set({ answered: true })
-        .where(and(eq(messages.roomShortCode, requireRoomShortCode(locals)), eq(messages.id, id)))
-        .run();
-      return { success: true };
-    }
-
-    if (operation === 'mute24') {
-      const targetUserId = Number(data.get('targetUserId'));
-      if (!Number.isInteger(targetUserId)) {
-        return fail(400, { message: 'A target user ID is required.' });
-      }
-      const createdAt = new Date();
-      const expiresAt = new Date(createdAt.getTime() + 24 * 60 * 60 * 1000);
-      db.insert(chatMutes)
-        .values({
-          /*
-            A mute is granted in the room it was issued in. The controller models the same thing as
-            role 3 CHAT MUTED on a `room_users` membership, which is per room — muting somebody
-            here must not silence them in a room this presenter has no authority over.
-          */
-          roomShortCode: requireRoomShortCode(locals),
-          targetUserId,
-          mutedByUserId: requireUser(locals).id,
-          expiresAt,
-          createdAt
-        })
-        .run();
-      return { success: true };
-    }
-
-    if (operation === 'showMsgToAll') {
-      return { success: true };
-    }
-
-    return fail(400, { message: 'Unsupported message operation.' });
   }
+
+  /*
+    `messageAction` left for `src/routes/message-actions.remote.ts` — 314 lines and six operations,
+    the largest single thing in this file.
+
+    ONE command and not six. The six share the room scope, the captured-fixture resolution, the
+    override upsert and the presenter-or-author rule; split six ways those become six copies, which
+    is exactly how `sendMessage` and `replyMessage` drifted apart. What they do NOT share is their
+    argument shape, and as a form action that was invisible — every field was an optional string, so
+    `delete` sent a `targetUserId` nothing read and `edit` sent none at all.
+    `z.discriminatedUnion('operation', …)` gives each one its own fields and refuses the rest.
+
+    Three tightenings went with it, none of them a move:
+      - `kind` is `z.enum(['alert', 'chat'])`. It was a bare string compared with `kind === 'alert'`,
+        so every other value — a typo, the empty string — fell through to the chat branch.
+      - `mute24`'s `targetUserId` is `.positive()`; `Number.isInteger` let 0 and negatives through.
+      - the edit path is bounded by `MAX_MESSAGE_BODY`, which it never was.
+
+    `mute24` and `unmuteChat` are now the only pair left split across two files, and the note below
+    is why that is recorded rather than left to be searched for.
+  */
 
   /*
     `unmuteChat` was an action here and is now `src/routes/chat-mute.remote.ts` — the first remote

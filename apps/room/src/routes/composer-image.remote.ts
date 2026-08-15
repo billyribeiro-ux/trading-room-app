@@ -33,12 +33,16 @@ import { publishToRoom } from '$lib/server/room-events';
   variable — `PTR_USER_UPLOADS` was a process-wide switch standing in for a per-room one, so two
   rooms on one deployment could not disagree about it.
 
-  ## `uploadFile` stays a form action, and that is not an oversight
+  ## A correction: `uploadFile` was NOT a progressive form
 
-  It is submitted from a real `<form>` in the Files-pane modal, so it degrades without JavaScript —
-  which is exactly the case SvelteKit's own guidance says to prefer `form` for. This one has no
-  form: it is driven by a paste and a drag-drop in the rich-text composer, so `command` is the
-  honest flavour.
+  This section used to say `uploadFile` stayed an action because it is "submitted from a real
+  `<form>` and degrades without JavaScript". That was written without opening `ModalHost.svelte` and
+  it is wrong — `doFileListUpload` is a JS-driven loop over a queue with a per-file status line.
+  There was no form and nothing degraded. It is a command in `files-pane.remote.ts` now, with that
+  module's presenter gate.
+
+  What IS true of this one either way: it is driven by a paste and a drag-drop in the rich-text
+  composer, so `command` is the honest flavour.
 */
 
 /**

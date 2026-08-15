@@ -6,7 +6,7 @@ import { alertSoundCommandValue } from '$lib/files-gates';
 import { presenterRoom, requireUser } from '$lib/server/auth';
 import { db, ensureDatabase } from '$lib/server/db';
 import { sharedFiles } from '$lib/server/db/schema';
-import { deleteStoredFile } from '$lib/server/file-storage';
+import { deleteStoredFile, storeUpload } from '$lib/server/file-storage';
 import { publishToRoom } from '$lib/server/room-events';
 import { writeRoomSetting } from '$lib/server/room-config-client';
 
@@ -46,6 +46,9 @@ import { writeRoomSetting } from '$lib/server/room-config-client';
   It is gated differently — `isPresenter || sessData.userUploads`, a room setting, not the presenter
   role — and putting it in a module whose every other export begins `presenterRoom()` is how a gate
   gets tightened by proximity. `composer-image.remote.ts`.
+
+  `uploadFile` IS here, because it has this module's gate exactly: the Files pane's upload button is
+  `O(81, o.isP ? 81 : -1)`, presenter-only.
 */
 
 /**
@@ -190,5 +193,71 @@ export const overwriteCashRegisterSound = command(
       console.error('[overwriteCashRegisterSound] the controller refused the write', cause);
       error(502, 'Could not change the alert sound right now.');
     }
+  }
+);
+
+/**
+ * The Files pane's upload, one file per call.
+ *
+ * ## It was NOT a progressive form, and a comment of mine said it was
+ *
+ * When `uploadComposerImage` was converted, both this file's pointer in `+page.server.ts` and
+ * `composer-image.remote.ts` said `uploadFile` stayed an action because it was "submitted from a
+ * real `<form>` and degrades without JavaScript". That was wrong, and it was written without opening
+ * `ModalHost.svelte`. `doFileListUpload` is a JS-driven loop over a queue with a per-file status
+ * line and a collected failure list — there is no form and nothing degrades. Both comments are
+ * corrected; this note stays because a wrong reason that shipped is worth more to the next reader
+ * than a right one that was always there.
+ *
+ * ## One request per file, and the client keeps the loop
+ *
+ * `doFileListUpload()` iterates and awaits each, which is the capture's own shape. The loop stays on
+ * the client because that is where the per-file status line and the "which one failed" list live.
+ *
+ * Returns nothing. The caller only ever asked whether it succeeded, and a rejection answers that.
+ */
+export const uploadFile = command(
+  z.strictObject({
+    file: z.instanceof(File),
+    /*
+      The capture sends the display name alongside the blob rather than trusting the part's own
+      filename; `originalname` is what ends up in the row and on screen. Kept as a separate field for
+      that reason, and bounded because it is rendered in every reader's Files pane.
+    */
+    originalName: z.string().trim().min(1).max(255)
+  }),
+  async ({ file, originalName }) => {
+    ensureDatabase();
+    const room = presenterRoom();
+    const { locals } = getRequestEvent();
+
+    let stored;
+    try {
+      stored = await storeUpload(file);
+    } catch (cause) {
+      // Fail loud with the real reason — too large, or empty — rather than a silent no-op that looks
+      // like a successful upload of nothing.
+      error(400, cause instanceof Error ? cause.message : 'Upload failed.');
+    }
+
+    db.insert(sharedFiles)
+      .values({
+        // The Files pane is per room, so an upload lands in the room it was made from.
+        roomShortCode: room,
+        name: originalName,
+        kind: stored.kind,
+        url: stored.url,
+        contentType: stored.contentType,
+        size: stored.size,
+        uploadedBy: requireUser(locals).id,
+        createdAt: new Date()
+      })
+      .run();
+
+    /*
+      Everyone's Files pane is stale the moment this lands. `getSessionFiles()` is what the capture
+      calls after its own upload, and this is the equivalent for the other peers in the room.
+    */
+    publishToRoom(room, { channel: 'cmds', data: { cmd: 'filesChanged' } });
   }
 );

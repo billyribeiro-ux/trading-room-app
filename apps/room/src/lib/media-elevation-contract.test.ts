@@ -18,7 +18,8 @@ import { describe, expect, it } from 'vitest';
  * something the client can send.
  */
 
-const ACTION = readFileSync(new URL('../routes/+page.server.ts', import.meta.url), 'utf8');
+// `ACTION` is gone: `+page.server.ts` no longer holds `giveMicScreen`, and a reader
+// that nothing reads is the next person's dead end.
 const GRANT = readFileSync(
   new URL('../routes/api/media/grant/+server.ts', import.meta.url),
   'utf8'
@@ -63,12 +64,19 @@ describe('the elevation is decided on the server', () => {
     expect(code).not.toMatch(/isPresenter:[^\n]*elevated/);
   });
 
-  it('is written only by the staff-gated action, on both give and take', () => {
-    const code = strip(ACTION);
-    const handler = code.slice(
-      code.indexOf('giveMicScreen: async'),
-      code.indexOf('giveMicScreen: async') + 2500
+  it('is written only by the presenter-gated command, on both give and take', () => {
+    /*
+      `giveMicScreen` became a remote command on 2026-08-15 and moved to
+      `presenter-commands.remote.ts`. Re-pointed there — an assertion left reading `+page.server.ts`
+      would have gone green the moment the whole handler left it, which is precisely the escalation
+      this file exists to prevent.
+    */
+    const code = strip(
+      readFileSync(new URL('../routes/presenter-commands.remote.ts', import.meta.url), 'utf8')
     );
+    const from = code.indexOf('export const giveMicScreen = command(');
+    expect(from, 'the command must be present').toBeGreaterThan(-1);
+    const handler = code.slice(from);
     /*
       The authority check comes FIRST — the row must never be written by someone who could not
       issue the command.
@@ -79,7 +87,13 @@ describe('the elevation is decided on the server', () => {
       adversarial review of 2026-08-11, in a test written the same day to prevent exactly the
       privilege escalation the missing gate would reopen.
     */
-    const gateAt = handler.indexOf("actor.role !== 'staff'");
+    /*
+      The gate is `presenterRoom()` now — the same `isPresenterRole` test the action spelled out by
+      hand, plus the room, returned only after the check passes. Asserting on THAT rather than on
+      the old inline comparison is the point: what must come first is the authority, not a
+      particular spelling of it.
+    */
+    const gateAt = handler.indexOf('const room = presenterRoom();');
     const writeAt = handler.indexOf('grantMediaElevation(');
     expect(gateAt, 'the staff gate must be present').toBeGreaterThan(-1);
     expect(writeAt, 'the elevation write must be present').toBeGreaterThan(-1);

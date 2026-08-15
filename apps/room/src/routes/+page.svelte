@@ -15,6 +15,7 @@
     shouldLoadOlderMessages
   } from '$lib/chat-paging';
   import { stripHtmlToText } from '$lib/chat-plain-text';
+  import { toggleReaction } from '$lib/reaction-toggle';
   import { chooseRecordingOptions } from '$lib/recording-codec';
   import { page } from '$app/state';
   import { panelDragResize, readPanelBounds } from '$lib/panel-drag';
@@ -46,6 +47,7 @@
   import { replyMessage, sendMessage as sendMessageCommand } from './chat-messages.remote';
   import { askQuestion } from './alert-questions.remote';
   import { postAlert as postAlertCommand } from './post-alert.remote';
+  import { messageAction } from './message-actions.remote';
   import { isHttpError } from '@sveltejs/kit';
   import {
     PUBLIC_PTR_CDN_UPLOAD_KEY,
@@ -5075,21 +5077,27 @@
     item: MessageActionItem,
     operation: 'delete' | 'markAnswered' | 'mute24' | 'showMsgToAll'
   ) {
-    const form = new FormData();
-    form.set('kind', kind);
-    form.set('id', String(item.id));
-    form.set('operation', operation);
-    form.set('targetUserId', String(item.senderId));
-    const response = await fetch('?/messageAction', { method: 'POST', body: form });
-    // A refused action still answers 200 - SvelteKit puts the failure in the body, not the status -
-    // so `response.ok` reports "the request arrived", not "the operation happened". Anything that
-    // undoes an optimistic update on failure has to read the result itself.
-    const result = deserialize<{ success?: boolean }, { message?: string }>(await response.text());
-    const succeeded = result.type === 'success';
-    if (succeeded && (operation === 'delete' || operation === 'markAnswered')) {
-      await invalidateAll();
+    /*
+      `targetUserId` rides ONLY on `mute24` now. The action took it on every operation and read it on
+      one, so a delete carried a field nothing looked at; `z.discriminatedUnion` refuses it on the
+      other three, which is what makes the shape honest.
+
+      A rejection is the refusal. The old `response.ok` reported "the request arrived" and not "the
+      operation happened" — SvelteKit put a `fail` in the BODY with a 200 status — so anything
+      undoing an optimistic update had to read the result itself.
+    */
+    try {
+      await messageAction(
+        operation === 'mute24'
+          ? { kind, id: item.id, operation, targetUserId: item.senderId }
+          : { kind, id: item.id, operation }
+      );
+    } catch (cause) {
+      bootboxAlert = isHttpError(cause) ? cause.body.message : 'That did not work.';
+      return false;
     }
-    return succeeded;
+    if (operation === 'delete' || operation === 'markAnswered') await invalidateAll();
+    return true;
   }
 
   /**
@@ -5105,19 +5113,14 @@
     newBody: string,
     newBodyHtml?: string
   ) {
-    const form = new FormData();
-    form.set('kind', kind);
-    form.set('id', String(item.id));
-    form.set('operation', 'edit');
-    form.set('newBody', newBody);
-    if (newBodyHtml) form.set('newBodyHtml', newBodyHtml);
-    const response = await fetch('?/messageAction', { method: 'POST', body: form });
-    // As in runMessageOperation: a refused action answers 200 with the failure in the body, so the
-    // status alone cannot tell an edit that was applied from one that was rejected.
-    const result = deserialize<{ success?: boolean }, { message?: string }>(await response.text());
-    const succeeded = result.type === 'success';
-    if (succeeded) await invalidateAll();
-    return succeeded;
+    try {
+      await messageAction({ kind, id: item.id, operation: 'edit', newBody, newBodyHtml });
+    } catch (cause) {
+      bootboxAlert = isHttpError(cause) ? cause.body.message : 'That edit did not save.';
+      return false;
+    }
+    await invalidateAll();
+    return true;
   }
 
   async function toggleMessageReaction(
@@ -5125,37 +5128,33 @@
     item: MessageActionItem,
     reaction: MessageReactionPayload
   ) {
-    const form = new FormData();
-    form.set('kind', kind);
-    form.set('id', String(item.id));
-    form.set('operation', 'reaction');
-    form.set('reactionKey', reaction.key);
-    form.set('reactionEmoji', reaction.emoji);
-    const response = await fetch('?/messageAction', { method: 'POST', body: form });
-    // As in runMessageOperation: a refused action answers 200 with the failure in the body.
-    const result = deserialize<{ success?: boolean }, { message?: string }>(await response.text());
-    const succeeded = result.type === 'success';
-    if (succeeded) await invalidateAll();
-    return succeeded;
+    try {
+      await messageAction({
+        kind,
+        id: item.id,
+        operation: 'reaction',
+        reactionKey: reaction.key,
+        reactionEmoji: reaction.emoji
+      });
+    } catch (cause) {
+      bootboxAlert = isHttpError(cause) ? cause.body.message : 'That reaction did not save.';
+      return false;
+    }
+    await invalidateAll();
+    return true;
   }
 
   function toggleEvidenceReaction(
     item: MessageActionItem,
     reactionPayload: MessageReactionPayload
   ) {
-    const reactions = structuredClone(item.reactions ?? {});
-    const reaction = reactions[reactionPayload.key] ?? {
-      emoji: reactionPayload.emoji,
-      clickedBy: []
-    };
-    const index = reaction.clickedBy.indexOf(data.user.emailHash);
-
-    if (index >= 0) reaction.clickedBy.splice(index, 1);
-    else reaction.clickedBy.push(data.user.emailHash);
-
-    if (reaction.clickedBy.length === 0) delete reactions[reactionPayload.key];
-    else reactions[reactionPayload.key] = reaction;
-
+    // The same four rules the server applies, from the same function — see `$lib/reaction-toggle`.
+    const reactions = toggleReaction(
+      item.reactions ?? {},
+      reactionPayload.key,
+      reactionPayload.emoji,
+      data.user.emailHash
+    );
     updateEvidenceMessage(item, { reactions });
   }
 

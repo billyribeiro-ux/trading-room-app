@@ -87,8 +87,16 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       `fileSizeInKb`, which went to `$lib/file-sort.ts` where the module that owns how the Files pane
       sorts and labels its rows now owns how it formats them; and with the two selected-message sends
       collapsed into one, because they differed only in which command they called.
+
+      The eleventh and last — `messageAction`, 314 lines and six operations — cost 4, and paid with a
+      duplication the conversion exposed: the reaction toggle existed THREE times, twice on the server
+      and once as the page's optimistic copy, and no test had ever read the result of any of them.
+      `$lib/reaction-toggle.ts` states the four rules once, both sides call it, and it is executed.
+
+      Eleven conversions, and the ceiling has moved once — up, early, on the first one. Everything
+      since has been paid for with a module.
     */
-    max: 13523,
+    max: 13522,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {
@@ -97,13 +105,24 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       Moved for the first time, and DOWN, by the chat-mode conversion. The two radios each built the
       confirm sentence themselves and only one of them built it right; `chatModeConfirmPrompt` in
       `$lib/chat-mode.ts` owns the capture's wording now and both call it.
+
+      Down again on the last conversion. `uploadFile` was the eleventh call site and the one I did
+      not know about — it lived HERE, not in `+page.svelte`, and a comment of mine had asserted it
+      was a progressive `<form>` that degraded without JavaScript. It was a JS-driven loop over a
+      queue. Converting it took `deserialize` out of this file entirely.
+
+      `presenterCommand` and `giveMicScreen` were called from here too, and `presenterCommand`'s
+      call site was BROKEN — its action had been removed three commits earlier while this file went
+      on posting to it. Both are commands now. Held at the same number: the three command imports and
+      the bug's explanation were paid for by `$lib/refusal-message.ts`, which eleven call sites had
+      been writing out by hand.
     */
-    max: 5983,
+    max: 5982,
     why: 'every modal in the room, in one component'
   },
   {
     file: 'routes/+page.server.ts',
-    max: 2084,
+    max: 1617,
     why: 'the loader and every form action left; 3,233 before the remote-function conversions began'
   }
 ];
