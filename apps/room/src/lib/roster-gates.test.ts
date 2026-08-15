@@ -29,20 +29,6 @@ const bundle = readFileSync(
   new URL('../../docs/source/main.d6d3c112b59b7d0d.js', import.meta.url),
   'utf8'
 );
-const pageSource = readFileSync(new URL('../routes/+page.svelte', import.meta.url), 'utf8');
-
-/*
-  The page reader is KEPT, with one assertion of its own, and that is deliberate rather than tidy-up
-  avoidance. When `.room-sidebar` moved to a component every gate assertion here followed it, which
-  left this const unused — CI caught that as a lint error, and the lazy fix is to delete it.
-
-  Deleting it would have made every assertion below true of a component the room does not render.
-  `source-size-contract.test.ts` requires each text-reading test to make at least one POSITIVE
-  assertion about the file it thinks it is testing, for exactly this failure mode: a guard that is
-  green because the feature left, not because the guard still holds. The assertion below is that
-  one — the page renders the sidebar, and hands it the gates.
-*/
-
 /*
   `.room-sidebar` became `RoomSidebar.svelte` on 2026-08-15 — the second of the five template
   regions. Assertions read out of the reference bundle are untouched, because the evidence did not

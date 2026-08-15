@@ -168,3 +168,71 @@ Two corollaries, both already learned the hard way:
 - Do not batch pushes to save CI minutes at the cost of unbacked-up work. The minutes are worth less
   than the work, and `cancel-in-progress` means an obsolete run stops the moment it is obsolete —
   the runner is not billed for the 33 minutes it never spends.
+
+---
+
+## 10. `svelte-check` is only evidence after `rm -rf .svelte-kit`
+
+Moved here 2026-08-15 from `TODO.md`, where it was the residue of a closed row. It was earned on
+2026-08-14 by six `Cannot find module '$env/dynamic/private'` errors that were **pre-existing on
+`main` and invisible locally**, because a stale `.svelte-kit` still held the old ambient types.
+Fixed in `7ea4b77`.
+
+A green local check against a stale generated directory is not a green check, and it was reported as
+one several times before CI contradicted it.
+
+---
+
+## 11. A test that returns early on a missing fixture is a silent pass
+
+Also moved here 2026-08-15. Two distinct shapes of the same failure, both found on 2026-08-14:
+
+- `account-page-sbs.test.ts` opened with `if (!existsSync(REFERENCE)) return;`, which made a missing
+  dump into a **green test that compared nothing**. Removed. Guard with `describe.skipIf` so the
+  skip is REPORTED, or fail naming the file and the override — never return.
+- **A green privacy check says nothing about an ignored file.** `privacy:verify` scans with
+  `git ls-files --exclude-standard`, so when the captures were copied into the tree it passed
+  **without reading one byte of them**. The check was working correctly; the conclusion drawn from
+  it was not.
+
+The general form is rule 1 wearing different clothes: a pass is evidence about what the test
+actually executed, which is not always what its name says. `PTR_CAPTURE_ROOT` exists for exactly
+this reason — pointing it at an empty directory reproduces what a CI runner sees, without spending a
+CI run to find out.
+
+---
+
+## 12. A green PR check does not prove the backend. `main` is where backend rot surfaces
+
+Moved here 2026-08-15 from `TODO.md` row P, whose bookkeeping is long done but whose lesson is
+**current behaviour, not history**.
+
+`backend-quality.yml`'s scope step skips every real step on a pull request whose diff touches no
+backend path — by design, and documented in its own skip notice. So #19, #20 and #21 were each
+merged on a SUCCESS that was a skip. The first push to `main` set `backend=true`, the steps ran for
+the first time ever, and three latent defects fired at once: verifier paths that do not exist at the
+repository root, a `REPOSITORY_ROOT` computed one level up instead of three, and a `cargo tree
+--invert` missing `--target all`.
+
+Confirmed still live on 2026-08-15: PR #56 (a `CHANGELOG.md`-only change) reported
+`Rust and PostgreSQL security contracts  pass  23s` — a skip, correctly. The same filter applies to
+pushes, so a docs merge to `main` costs 23 seconds rather than 33 minutes.
+
+**Treat a red `main` after a merge as expected-by-design and fix forward. Never read a green PR as
+proof the Rust and PostgreSQL contracts ran** — check the duration.
+
+---
+
+## 13. A row in `TODO.md` is a hypothesis until it is re-read against the evidence
+
+Moved here 2026-08-15. On 2026-08-14, three rows closed in one day turned out to be **wrong about
+their own subject**: AB said the producer was not modelled when the consumer was the missing half; V
+said a bandwidth saving was missing when the reference never made one; S framed a design decision
+the bundle already answered.
+
+The same shape recurred on 2026-08-15 in the backend: `TODO.md` asserted the `28P01` failure was a
+password-quoting bug in a tree that was "a mirror" of a sibling repository. Every clause was false —
+the role did not exist, and no sync exists in either direction.
+
+**Before acting on a row, re-read its subject.** A row records what somebody believed when they
+wrote it, and it is often the last thing anyone checked.
