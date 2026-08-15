@@ -114,6 +114,14 @@ export default defineConfig(
       A pattern list that has to be revised every time a directory is added is a gate that breaks on
       unrelated work. The ignore list decides what is linted; this block decides what those files are
       allowed to reference, and the answer for first-party code is the same everywhere.
+
+      The list was tried once more before this landed. `b267143` extended it with a pattern for
+      `gate` ESM files and one for dotted `svelte.config` variants, and it was measured against a
+      clean checkout: still 48 errors. It fixes the 31 `no-undef` and cannot touch the other 47,
+      because those come from preset ORDER and no `files` entry can reach them. Its second pattern
+      also never matches: the file in the tree is `svelte.config 2.js`, with a SPACE, while the glob
+      requires a literal dot — which is the last remaining `no-undef` in that run, and a fair
+      illustration of why this block does not enumerate paths.
     */
     languageOptions: {
       globals: {
