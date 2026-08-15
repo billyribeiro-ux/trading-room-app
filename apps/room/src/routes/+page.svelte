@@ -3723,6 +3723,21 @@
     if (response.ok) await invalidateAll();
   }
 
+  /**
+   * Lifts a member's chat mute — the other half of `mute24`.
+   *
+   * The mute was enforced on the server and the unmute was not sent anywhere: the modal's button
+   * raised the reference's alert and stopped. `invalidateAll()` refreshes the presenter's own view
+   * of the roster; the MEMBER learns about it on the `privCmds` channel, because their gate is
+   * server-read and nothing local to them changed.
+   */
+  async function unmuteChat(user: ModalTargetUser) {
+    const body = new FormData();
+    body.set('targetUserId', String(user.id));
+    const response = await fetch('?/unmuteChat', { method: 'POST', body });
+    if (response.ok) await invalidateAll();
+  }
+
   function handleUserAction(action: string, user: ModalTargetUser) {
     if (action === 'session-reload-config') {
       requestModalConfirmation('Are you sure you want to reload tge session config?', () => {
@@ -3950,11 +3965,24 @@
       return;
     }
 
+    /*
+      `unmute-chat` is handled ahead of the table below because it is no longer only a string.
+
+      Everything in `exactAlerts` is a control whose whole effect is its own toast, which is the
+      shape this repository calls out by name. The unmute has left that table because it now sends
+      something: the entry stayed while the wire was missing, and its presence made the button look
+      finished. The alert text is unchanged and still the capture's, lower-case and all.
+    */
+    if (action === 'unmute-chat') {
+      void unmuteChat(user);
+      bootboxAlert = 'user chat unmuted';
+      return;
+    }
+
     const exactAlerts: Record<string, string> = {
       'save-permissions': 'Permissions applied, user will reload the page now to apply...',
       'mute-chat-24': 'user chat muted',
       'mute-chat-indefinitely': 'user chat muted',
-      'unmute-chat': 'user chat unmuted',
       'restart-audio': 'Audio restart request sent OK',
       'force-reload': 'Reload request sent OK'
     };
@@ -8123,11 +8151,25 @@
         return;
       }
 
-      /* `/privCmdsIn/{uid}-{id}/` - emits `forceReload`, addressed to one member. */
+      /* `/privCmdsIn/{uid}-{id}/` - emits `forceReload` and `unmuteChat`, addressed to one member. */
       if (payload.channel === 'privCmds') {
         const command = payload.data as { cmd?: string; targetUserId?: number } | undefined;
         if (command?.cmd === 'forceReload' && command.targetUserId === data.user.id) {
           location.reload();
+        }
+        /*
+          The capture's receiver toast for the unmute, verbatim: `Chat enabled`. It is a plain
+          info toast, not the presenter's `user chat unmuted` - those are two different strings on
+          two different screens and collapsing them would put the presenter's wording in front of
+          the member.
+
+          `invalidateAll()` is what actually re-opens the composer: `chatMutedTill` is read on the
+          server, so the gate does not lift until the loader runs again. Toasting without it would
+          tell the member they can type while the box stayed disabled.
+        */
+        if (command?.cmd === 'unmuteChat' && command.targetUserId === data.user.id) {
+          showToast({ kind: 'info', message: 'Chat enabled', enableHtml: false });
+          void invalidateAll();
         }
         return;
       }

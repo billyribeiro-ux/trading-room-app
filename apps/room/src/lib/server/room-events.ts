@@ -195,8 +195,18 @@ export type RoomEvent =
       channel: 'privChat';
       data: { toUserId: number; fromUserId: number; message?: PrivateChatMessage };
     }
-  /** `/sess/{id}/privCmdsIn/{uid}-{id}/` - emits `forceReload`. */
-  | { channel: 'privCmds'; data: { cmd: 'forceReload'; targetUserId?: number } };
+  /**
+   * `/sess/{id}/privCmdsIn/{uid}-{id}/` - emits `forceReload` and `unmuteChat`.
+   *
+   * Both are addressed to ONE member, which is what this channel is for. `unmuteChat` is a command
+   * of its own on the capture's wire (bytes 996325, 1430505, 2080257, 2376996) carrying `{user}`,
+   * and it is reached only through `muteChat(-1)` - there is no button bound directly to it.
+   *
+   * The target is named in the payload rather than in the channel because the transport here is
+   * per room, not per user; the client compares `targetUserId` against its own id, exactly as it
+   * already does for `forceReload`.
+   */
+  | { channel: 'privCmds'; data: { cmd: 'forceReload' | 'unmuteChat'; targetUserId?: number } };
 
 type Subscriber = (event: RoomEvent) => void;
 

@@ -24,6 +24,66 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-15
 
+### 2026-08-15 12:01 EDT — the unmute button reported success and sent nothing
+
+**Runtime impact: a presenter can undo a chat mute.** Until now they could not, in any room, by any
+route — and the UI told them they had.
+
+The mute was built end to end and the unmute was a string. `mute24` writes the `chat_mutes` row,
+`sendMessage` refuses while one is live, and the loader hands the viewer their own `chatMutedTill`
+so the composer can explain itself. All of that works. The way back did not exist: `ModalHost.svelte`
+renders **Unmute Chat**, it calls `onUserAction('unmute-chat', …)`, and the handler matched it in a
+`Record<string, string>` of action-to-toast strings whose only effect was to raise the capture's own
+alert text.
+
+**This is the worst-behaved kind of gap, because the control reported success.** A presenter who
+muted the wrong person saw `user chat unmuted`, believed it, and the member stayed silenced for the
+full 24 hours. Nothing threw, nothing logged, and no test that rendered the modal noticed — the
+button was there and it was wired to a function.
+
+It survived an audit for a specific and repeatable reason: **upstream has no button bound to
+`unmuteChat`.** It is a command of its own on the wire — `{user}`, bundle bytes 996325, 1430505,
+2080257, 2376996 — reached only through `muteChat(-1)`. An identifier search of our source for
+`unmuteChat` therefore found nothing to match, and the triage listed it as missing while our repo
+appeared to have the feature. It was found by READING `handleUserAction` end to end.
+
+**Built:**
+
+- `unmuteChat` as a form action of its own, not another `messageAction` operation — that one
+  returns 400 without a message id, and this is addressed to a user the presenter picked out of the
+  roster, where no message exists.
+- Authority decided on the server from the session role, `403` otherwise. A member who posts the
+  form directly cannot unmute themselves the moment a presenter mutes them.
+- One conditional `DELETE`, scoped to the room and to mutes that are still live. No `SELECT` first —
+  read-then-delete is the TOCTOU this repository removes everywhere else, and one statement makes a
+  double click a no-op rather than a race. Expired rows are already inert to both readers, so
+  deleting them would erase the record of past mutes and change nothing observable.
+- The member is told on `privCmds`, the per-user private channel `forceReload` already uses, and the
+  branch calls `invalidateAll()` — `chatMutedTill` is server-read, so a toast alone would tell the
+  member their chat is back while the composer stayed disabled. That is the same class of lie the
+  original bug was.
+- The two strings stay two strings: the presenter sees `user chat unmuted`, the member sees
+  `Chat enabled`. Both are the capture's, on two different screens.
+
+**The wider finding, recorded as TODO row W.** `unmute-chat` was not alone in that table. Read in
+the same pass and still toast-only: `kick`, `kick-ban`, `kick-duplicates` (which answers
+`No duplicates found` unconditionally), `admin-notes-password` (which answers `Wrong password!`
+unconditionally, so the correct password is refused too), `session-send-users-url` and
+`session-send-sales-image`. Their wire commands are already decoded with payloads and byte offsets,
+so they are ports rather than research. `mute-chat-24` is the instructive one — its server half
+works from the message context menu, and only the modal's copy of the button is inert, which is
+exactly the shape this fix had. **Not claimed:** whether `save-permissions`, `restart-audio` and
+`force-reload` are sent from some other path was not checked, and `forceReload` demonstrably is a
+real `privCmds` command, so at least one of those three has a wire somewhere.
+
+**Verified:** `unmute-chat-contract.test.ts`, 14 assertions. **Negative control run and seen red:**
+putting `unmute-chat` back into the toast table failed exactly the assertion that guards the
+original bug (`is no longer one of the toast-only controls`), then restored to green. Full room
+suite **1450/1450 across 112 files**, `svelte-check` **0 errors 0 warnings**, `eslint` exit **0**.
+**Not run:** `svelte-autofixer` on `+page.svelte` — the file is ~12,000 lines and could not be fed
+to the tool in this session; `svelte-check` covered it with the same compiler instead, and the edit
+adds no template markup, only script.
+
 ### 2026-08-15 11:53 EDT — a merge had quietly un-wired four settings, and the markers didn't say so
 
 **Runtime impact: none by itself — it restores runtime behaviour that a previous merge removed.**
