@@ -36,6 +36,7 @@
   import StreamTabs from '$lib/components/StreamTabs.svelte';
   import StreamingView from '$lib/components/StreamingView.svelte';
   import { isMtxStream } from '$lib/mtx-streams';
+  import { MISSING_SCHEME_ALERT, addVideoToList, isAcceptableSendUrl, userActionAlert } from '$lib/user-action-intent';
   import {
     captureErrorMessage,
     captureErrorName,
@@ -3825,19 +3826,19 @@
         onconfirm: (value) => {
           const url = value.trim();
           bootboxPrompt = null;
-          if (!url.toLowerCase().includes('http://') && !url.toLowerCase().includes('https://')) {
-            bootboxAlert = 'The link seems to be missing "https://" or "http://"';
+          if (!isAcceptableSendUrl(url)) {
+            bootboxAlert = MISSING_SCHEME_ALERT;
             return;
           }
           if (action === 'session-send-video') {
             const key = `videos-${data.sessionHandle}`;
-            const videos = JSON.parse(localStorage.getItem(key) ?? '[]') as string[];
-            if (videos.includes(url)) {
+            const stored = JSON.parse(localStorage.getItem(key) ?? '[]') as string[];
+            const result = addVideoToList(stored, url);
+            if (!result.added) {
               bootboxAlert = 'Video already exists.';
               return;
             }
-            videos.push(url);
-            localStorage.setItem(key, JSON.stringify(videos));
+            localStorage.setItem(key, JSON.stringify(result.videos));
             modal = null;
             bootboxAlert = 'Video added.';
             return;
@@ -3973,16 +3974,11 @@
       return;
     }
 
-    const exactAlerts: Record<string, string> = {
-      'save-permissions': 'Permissions applied, user will reload the page now to apply...',
-      'mute-chat-24': 'user chat muted',
-      'mute-chat-indefinitely': 'user chat muted',
-      'restart-audio': 'Audio restart request sent OK',
-      'force-reload': 'Reload request sent OK'
-    };
-    if (exactAlerts[action]) {
+    // The table moved to `user-action-intent.ts`; the state writes stay here. See it for why.
+    const fixedAlert = userActionAlert(action);
+    if (fixedAlert) {
       if (action === 'save-permissions') modal = null;
-      bootboxAlert = exactAlerts[action];
+      bootboxAlert = fixedAlert;
     }
   }
 
