@@ -1,15 +1,23 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
-import { parseConstTable } from '../../scripts/lib/const-table.mjs';
+import { parseConstTable } from './const-table.mjs';
 
 /*
   ONE parser, TWO readers - and the duplication is proven, not assumed.
 
-  scripts/lib/const-table.mjs is the source of truth and scripts/extract-component-source.mjs
-  imports it. scripts/pull-component-source.js cannot: it is a single IIFE pasted into a DevTools
-  console, where there is no module loader. So it carries a copy, and this file is the thing that
-  keeps the copy honest - if someone fixes one and not the other, the first assertion below fails.
+  src/lib/const-table.mjs is the source of truth and scripts/extract-component-source.mjs imports it.
+  scripts/pull-component-source.js cannot: it is a single IIFE pasted into a DevTools console, where
+  there is no module loader. So it carries a copy, and this file is the thing that keeps the copy
+  honest - if someone fixes one and not the other, the first assertion below fails.
+
+  The parser lived at scripts/lib/const-table.mjs until 2026-08-15, when every file under
+  apps/room/scripts was untracked and gitignored - that directory is reference-match tooling aimed at
+  a live third-party application and this repository is public. Three TRACKED tests import this
+  parser, so leaving it there meant three `Cannot find module` errors in svelte-check on every clean
+  checkout, which is exactly what the room's Type-check gate reported. It was misfiled: a parser with
+  its own unit test beside it in src/lib is first-party source, not a collector. The collectors stay
+  out; this came in.
 
   NORMALISATION, stated exactly: the console copy lives inside the IIFE and is therefore indented
   two spaces deeper. The only transform applied is removing ONE leading two-space run from each
@@ -23,7 +31,7 @@ const consoleScript = readFileSync(
   'utf8'
 );
 const moduleSource = readFileSync(
-  new URL('../../scripts/lib/const-table.mjs', import.meta.url),
+  new URL('./const-table.mjs', import.meta.url),
   'utf8'
 );
 const offlineScript = readFileSync(
@@ -70,7 +78,12 @@ describe('const-table parser: one source of truth', () => {
   });
 
   it('is what the offline extractor actually calls - the shortcut is gone', () => {
-    expect(offlineScript).toContain("import { parseConstTable } from './lib/const-table.mjs';");
+    // Path updated with the parser's move into src/lib on 2026-08-15. This assertion is the reason
+    // the move could not be done by editing imports alone: it pins the extractor to the ONE parser
+    // rather than a copy, so it has to name wherever that parser actually lives.
+    expect(offlineScript).toContain(
+      "import { parseConstTable } from '../src/lib/const-table.mjs';"
+    );
     expect(offlineScript).toContain('entries = parseConstTable(table);');
     // The shortcut survives only inside the comments that explain why it is gone.
     const code = offlineScript

@@ -15,11 +15,48 @@ will fetch it. A gap recorded in only one app's document is a gap the next perso
 
 ---
 
-## ⛔ THE ONE DECISION BLOCKING A GREEN FRONTEND GATE — restated 2026-08-15 10:48 EDT
+## ✅ THE FRONTEND GATE IS GREEN — 2026-08-15 12:24 EDT, commit `030a209`
 
-**`quality.yml` has never passed. `gh run list` returns failure on all 8 runs, back to PR #28.** Any
-sentence that treats a specific recent change as the reason the gate is red is wrong before it is
-written; this was measured, not assumed.
+```
+030a209  Frontend quality  completed/success     controller quality: success
+                                                 room quality:       success
+030a209  smoke             completed/success
+```
+
+**It had failed every run since PR #28.** Six root causes, each hidden behind the one before it
+because CI stops at the first red step — which is why the list only became visible one layer at a
+time:
+
+| # | root cause | fix |
+| --- | --- | --- |
+| 1 | flat-config preset ORDER: `svelte.configs.recommended` sat BELOW the overrides and re-enabled two rules that are deliberately `off` (43 errors) | presets first |
+| 2 | the `files:` list stripped Node globals from `gate/` (31 errors) | globals block un-scoped |
+| 3 | `svelte.config 2.js`, a macOS duplicate with a literal space (1 error) | deleted, PR #37 |
+| 4 | three TRACKED tests imported `scripts/lib/const-table.mjs`, evicted with `apps/room/scripts` (3 errors) | parser moved to `src/lib`, PR #38 |
+| 5 | **`src/app.css` imported a gitignored symlink — the room could not be built from its own repository** | stylesheet tracked as the build input it is, PR #40 |
+| 6 | a merge dropped half of `49a536a`: schema said 64 settings wired, verifier said 62 (8 type errors + 3 test failures) | restored, PR #39 |
+
+**The reason it took so long to attribute, recorded so nobody loses a day to it again:**
+`quality.yml` pins no `ref:`, so `pull_request` runs lint the **merge commit**, not the branch head.
+`pnpm run lint` passed locally and failed on CI **at the same commit**, which reads as a broken
+runner rather than a stale branch. `src/lib/eslint-config-resolution.test.ts` now asserts the
+RESOLVED config via `ESLint.calculateConfigForFile` — a grep for `'off'` would have passed
+throughout the entire failure, because the string was always there.
+
+### Still open — CI can accept an UNVERIFIED commit onto a deploying branch
+
+Not a leftover; the mechanism that let #1 land in the first place.
+
+1. **`quality.yml:29-31` sets `concurrency` with `cancel-in-progress: true`, and it applies to
+   pushes on `main`.** `060ba72` — the commit that broke the gate — had its own verification run
+   CANCELLED when a PR merge landed two minutes later. The gate never checked the commit that broke
+   it. Fix: `cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}`. On a branch, cancelling a
+   superseded run is right; on `main`, where every commit is a production deploy, it is not.
+2. **`gh api repos/billyribeiro-ux/trading-room-app/branches/main/protection` returns 404.** There
+   is no branch protection and no required status check, so nothing stops a red commit reaching an
+   auto-deploying default branch. That is the whole reason this list exists.
+
+Both need the owner: one edits a workflow, the other changes repository settings.
 
 **The wall was architectural, not a bug: 49 of the room's 108 test files read evidence that is
 deliberately not in the repository** — `docs/source`, `second-dump`, `css`, `new-evidence` and the

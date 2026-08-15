@@ -24,157 +24,80 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-15
 
-### 2026-08-15 12:34 EDT — 131 lines that decided what a user reads, and could not be tested
+### 2026-08-15 12:24 EDT — the frontend gate is GREEN on `main` for the first time
 
-**Runtime impact: none intended.** Every user-facing string is reproduced to the character. What
-changed is where the decision lives. `+page.svelte` **13,651 → 13,555**; ceiling lowered to match.
+**Runtime impact: one restoration, see below.** Otherwise configuration, a moved parser, a tracked
+build input and documentation.
 
-Slice 2. `getBrowserPermissionGuidance`, `checkPermissionState`, `captureErrorName`,
-`captureErrorMessage` and the 67-line `reportMediaCaptureError` were one cluster inside the
-component, and **exactly one line of the 131 was stateful** — the final `bootboxAlert = …`.
-Everything else decided which sentence to show when a microphone, camera or screen capture fails.
+```
+030a209  Frontend quality  completed/success     controller quality: success
+                                                 room quality:       success
+030a209  smoke             completed/success
+```
 
-**The argument for the extraction, in one sentence: those decisions could not be tested.** Exercising
-any branch meant mounting the whole room page and provoking a real `getUserMedia` rejection, so
-nothing did. `media-capture-error.test.ts` now covers 23 cases that were previously unreachable.
+`quality.yml` had failed **every run since PR #28**. Not once did the failure indicate a defect in
+the application.
 
-**A plain `.ts`, not a `.svelte.ts`** — there is no reactive state here, and a `.svelte.ts` would
-advertise runes that do not exist and invite somebody to add some. The component keeps the async
-Permissions API round trip and the assignment, which are genuinely the page's job.
+**Six root causes, each hidden behind the one before it.** CI stops at the first red step, so the
+list could only be discovered one layer at a time — #5 was invisible until #1–#4 were green, and #5
+is the most serious of them.
 
-**Three behaviours the tests now pin, all of which were invisible before and easy to "tidy up"
-wrongly:**
+| # | root cause | landed |
+| --- | --- | --- |
+| 1 | Flat-config preset ORDER. `060ba72` moved `js/ts/svelte.configs.recommended` BELOW the override block; last match wins, so `svelte.configs.recommended` re-enabled `svelte/no-useless-mustaches` and `svelte/prefer-svelte-reactivity` — 43 errors for exactly the patterns the 15-line comment above them calls deliberate. | earlier |
+| 2 | The same commit narrowed that block to two `files` patterns, stripping Node/browser globals from every path they missed. `gate/` did not exist when they were written — 31 errors. | earlier |
+| 3 | `svelte.config 2.js` — a macOS duplicate with a literal SPACE in the name. The follow-up glob `svelte.config.*.js` never matched it, because that pattern needs a dot. 1 error. | PR #37 |
+| 4 | Three TRACKED tests imported `scripts/lib/const-table.mjs`, evicted with `apps/room/scripts`. The vitest partition did not reach it: `svelte-check` type-checks files vitest excludes. 3 errors. | PR #38 |
+| 5 | **`src/app.css:1` imported `../css/complete-app-styles.css`, a gitignored symlink with zero tracked files — the room could not be built from its own repository.** | PR #40 |
+| 6 | A merge dropped half of `49a536a`: `room-settings-schema.ts` said 64 settings wired while the verifier, tripwire and header all still said 62, and `+page.svelte` passed four props that resolved to nothing. 8 type errors + 3 controller failures, one cause. | PR #39 |
 
-1. **Screen sharing has no `OverconstrainedError` branch.** Microphone and camera each answer it
-   with their own sentence; screen falls through to the generic one. The module records the absence
-   explicitly so nobody supplies the missing case — that would be inventing product copy.
-2. **`checkPermissionState` returns SENTINELS, not prose,** for every state except denied —
-   `permission_granted`, `permission_prompt`, `permission_unknown`, `permission_check_failed`. The
-   caller distinguishes them by testing for the `Permission denied` prefix. Return a friendly
-   sentence for `prompt` and the room starts telling people they were denied before the browser has
-   even asked. There is now a test asserting that prefix holds for every user agent.
-3. **The unknown-browser sentence contains a double space** — `go to your browser  and allow` —
-   because the settings path is empty and the template joins around it. That is shipped copy. It is
-   reproduced exactly and the test locks it, rather than being silently corrected under cover of a
-   refactor.
+**Why it took a day to attribute, and the part worth keeping.** `quality.yml` pins no `ref:`, so
+`pull_request` runs check out `refs/pull/N/merge` — CI lints the MERGE while a developer lints their
+branch. `pnpm run lint` passed locally and failed on CI **at the same commit**. That reads as a
+broken runner, not a stale branch, and it is why dependency drift was chased first: `node_modules`
+was deleted and reinstalled with `--frozen-lockfile`, every version identical, lint still exit 0.
+The runner log settled it — `HEAD is now at 6ee3729 Merge 7ad52ba… into c1ff436…` — and swapping
+only that config blob into a clean tree reproduced the CI output **line-for-line identical**.
 
-The user-agent sniffing came across intact, including the two orderings that matter: Chrome's test
-excludes `edg` because every Chromium browser claims `chrome`, and Safari's excludes `chrome` for
-the mirror reason. Both now have a test that fails if the exclusion is dropped — previously an Edge
-user could have been sent to a Chrome menu that does not exist, with nothing to catch it.
+**The guard that makes #1 unrepeatable.** `src/lib/eslint-config-resolution.test.ts` asserts the
+RESOLVED config through `ESLint.calculateConfigForFile`, not the text of the file. A grep for
+`'off'` would have passed throughout the entire failure — the string was always there. Negative
+control exercised: re-adding a preset after the overrides turns it red naming the cause.
 
-**Verified:** `svelte-check` **0 errors 0 warnings**, room suite **1530/1530 across 114 files**
-(1507 → 1530, the 23 new), `eslint` exit **0**, ceiling lowered 13,651 → 13,555 and the ratchet
-re-run green.
+**#5 deserves its own note, because the category was wrong rather than the rule.** `.gitignore`
+grouped `apps/room/css` with the capture symlinks on the stated grounds that "the evidence-bound
+tests read them by relative path". True and incomplete: that file is not read by a test, it is
+COMPILED INTO THE SHIPPED STYLESHEET. Two facts decided it rather than preference — it is already
+published, since the build inlines it and every visitor to the deployed site is served it; and the
+repository's own detector reports no owner name, no gravatar hashes, no addresses and no identity
+payloads across all 8,086 lines. Tracked at its existing path, so the `@import`, ten test readers
+and the two contract tests that assert `app.css` STARTS WITH that exact string all keep working
+untouched. The rule for anything new here: ask whether the BUILD reads it, not whether a test does.
 
-**Running total for the decomposition: 13,663 → 13,555, two modules extracted, 23 tests that could
-not previously exist.**
+**Runtime impact, stated plainly:** #6 is a restoration, not a no-op. Four `$derived` values start
+flowing into `RoomMessage` again, so `usersPublicReply`, `enableReactions`, `enableEditMessage` and
+`enableEditAlerts` are honoured once more. Each is read `=== true`, so absent stays off — but a room
+whose stored `sessData` has one set to `true` gains that control on deploy.
 
-### 2026-08-15 12:28 EDT — the first `.svelte.ts` module, and the proof the pattern holds
+**Verified before the merge, on the exact merge result, in an isolated worktree with a real
+`pnpm install --frozen-lockfile`** — not symlinked `node_modules`, which produced a 180-error
+`$types` artifact that was tooling rather than code and was discarded as such:
 
-**Runtime impact: none intended.** The MediaMTX stream list moved out of `+page.svelte` into a
-module; the behaviour, the transitions and the reference notes are unchanged. `+page.svelte` is
-**13,663 → 13,651** and the ceiling moved down with it.
+| | room | controller |
+| --- | --- | --- |
+| lint | exit 0 | exit 0 |
+| type-check | 1073 files, 0 errors | 1523 files, 0 errors |
+| tests | exit 0 — 63 files, 719 passed, 1 skipped | exit 0 — 91 files, 964 passed |
+| build | exit 0 | exit 0 |
 
-Twelve lines is a small number and that is the honest framing: this slice was chosen to prove the
-pattern end to end, not to move mass. **There were zero `.svelte.ts` files in this repository**, so
-there was no house pattern to copy and the first one had to be right.
+**Backend quality was still `in_progress` at the time of writing** (the ~33-minute job, started
+16:22 UTC). Its `Rust and PostgreSQL security contracts` job passed on every PR in this sequence.
+Not claimed as green here, because it had not finished.
 
-**What the official guidance decided, and it is not a detail:** reassigned state cannot be exported
-from a `.svelte.ts` module — the importing side binds the value, not the reactive box. Every
-transition here REPLACES the whole state object rather than mutating it, so `export let mtxState`
-would have compiled and then silently stopped updating. A stream would simply never appear, with
-nothing to debug. `MtxStreamTabs` is therefore a class: the box stays behind `this` and
-`+page.svelte` reads through getters.
-
-**The boundary drawn, and why it is not "all the media code":** the module owns the reactive list
-and every transition of it. `bringEveryoneToStream` and `toggleLockStreamMtx` stayed in the
-component — one is a `fetch`, the other a documented upstream stub, and neither reads or writes this
-state. Dragging them along would have traded a large component for a module doing two unrelated
-jobs.
-
-**Comments moved WITH the code.** The reasoning for `$state.raw`, and the warning that this list
-must never be merged with `sharedScreens`, now sit in the module. Leaving them behind would have
-left `+page.svelte` explaining something no longer in it — the exact way comments go stale.
-
-**The compiler caught the one real hazard.** `svelte-check` rejected `readonly MtxStream[]` against
-`StreamTabs`'s mutable `MtxStream[]` prop. Fixed at the CONSUMER — the prop is now `readonly`,
-because a tab bar has no business mutating the list it renders, and saying so is what lets the owner
-hand out its own array instead of defensively copying on every read.
-
-**And the point the owner made, demonstrated:** `svelte-autofixer` ran on `room-mtx.svelte.ts` and
-returned `issues: []`. That is the gate this repository mandates on every Svelte change and which I
-reported an hour ago as impossible — because a 13,663-line file cannot be fed to it. An 80-line
-module can. Small files are not a style preference here; they are the difference between a gate
-running and a gate being skipped.
-
-**Verified:** `svelte-check` **0 errors 0 warnings** (after fixing the one it found), room suite
-**1507/1507 across 113 files**, `eslint` exit **0**, autofixer `issues: []`, ceiling lowered
-13,663 → 13,651 and the ratchet re-run green.
-
-**Next slices** (TODO row AE): media/mic/screen orchestration, then modal + user actions, then SSE
-dispatch, then the template. Each one migrates its own contract assertions and lowers the ceiling.
-
-### 2026-08-15 12:22 EDT — a 13,663-line component is a breach of the standard, and now it cannot grow
-
-**Runtime impact: none.** One new test file. Nothing the site serves changed.
-
-The owner raised it after I reported, as a tooling limitation, that `+page.svelte` was too large to
-feed to `svelte-autofixer`: *"in svelte 5/sveltekit no file should have anything near 12,000 lines
-so that means what has been set as the standard since the very beginning, which is to follow
-svelte's best practices, is not being implemented."* That is correct, it is not a tooling
-limitation, and I should have raised it rather than working around it — I had added 46 lines to that
-same file twenty minutes earlier without comment.
-
-**Measured, not estimated:**
-
-| | lines |
-| --- | ---: |
-| `+page.svelte` — `<script>` block, lines 1–9,411 | **9,410** |
-| `+page.svelte` — template, 9,412–13,663 | 4,251 |
-| `ModalHost.svelte` | 5,985 |
-| `+page.server.ts` | 3,233 |
-| those two `.svelte` files as a share of all Svelte source (42,520) | **46%** |
-
-My earlier figure of "~12,000" was low. The important part is the split: **the mass is not markup.**
-Nine thousand lines of TypeScript orchestration sit inside a component, which is precisely what
-`.svelte.ts` rune modules and child components exist to prevent. Pure logic HAS been extracted
-correctly all along — `alert-filter.ts`, `alert-labels.ts`, `media-elevation.ts`,
-`screen-volume.ts` — so what remains is the stateful half nobody ever took.
-
-**Why it never shrank, which is the finding that actually matters: 46 of 112 room test files read
-`+page.svelte` as raw TEXT**, and 17 read `+page.server.ts`. The contract suite asserts on source
-text rather than behaviour. Two consequences, and the second is the dangerous one:
-
-1. Every extraction breaks a pile of tests, so adding one more handler to the existing file is
-   always the cheap move, and nothing ever said no.
-2. **Negative assertions pass vacuously after a split.** Positive ones fail loudly, which is fine —
-   that is a migration telling you where the code went. But `expect(pageCode).not.toContain(…)`
-   goes green the moment the region leaves the file, because the text is gone for the wrong reason.
-   The guard turns green at the exact moment it stops guarding. `unmute-chat-contract.test.ts`,
-   written an hour ago, carries one.
-
-**Landed: the ratchet**, `source-size-contract.test.ts`, 57 assertions. Ceilings that only go DOWN,
-plus a staleness check so a ceiling cannot sit far above the real figure and quietly license growing
-all the way back. It also requires every text-reading contract test to make at least one POSITIVE
-assertion, so a purely-negative file is caught before an extraction can hollow it out.
-
-**One honest note about building it: the first version of that last check was wrong and I caught it
-before reporting it.** It counted only `toContain` and immediately failed
-`day-separator-contract.test.ts` — which asserts positively three times over using `page.match(…)`
-with `toBe(2)`. That was a defect in my check, not in the test, and reporting it would have sent the
-owner looking at working code. The check now enumerates the three assertion forms this suite
-actually uses.
-
-**Verified:** 57/57. Both halves of the ratchet negative-controlled and seen red — a ceiling one
-line below actual failed the growth gate with the right message, and a ceiling 137 above failed the
-staleness gate — then restored. Full room suite **1507/1507 across 113 files**, `eslint` exit **0**.
-
-**Agreed plan, owner 2026-08-15 (TODO row AE): the refactor runs BEFORE resuming the reference-match
-ports**, since every remaining command would otherwise add lines to these same two files and row W
-alone is six more handlers. Slices, each migrating its own contract assertions and lowering the
-ceiling: media/mic/screen orchestration, then modal + user actions, then SSE/event dispatch, then
-the template into components.
+**Left open deliberately, both needing the owner** — see TODO.md: `cancel-in-progress: true` applies
+to pushes on `main`, which is how `060ba72` landed with its own verification run cancelled; and
+`branches/main/protection` returns 404, so nothing stops a red commit reaching a branch that
+auto-deploys.
 
 ### 2026-08-15 12:01 EDT — the unmute button reported success and sent nothing
 
