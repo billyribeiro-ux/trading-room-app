@@ -21,7 +21,7 @@ describe('the ICE servers the troubleshooter uses', () => {
   it('takes them from this deployment, passed down as a prop', () => {
     expect(MODAL_HOST).toContain('mediaIceServers?: RTCIceServer[]');
     expect(MODAL_HOST).toContain('mediaIceServers = []');
-    expect(ROOM_PAGE).toContain('{mediaIceServers}');
+    expect(ROOM_PAGE).toContain('mediaIceServers={media.iceServers}');
   });
 
   /*
@@ -98,13 +98,15 @@ describe('the ICE servers the troubleshooter uses', () => {
 describe('the room page no longer traps the ICE servers in a closure', () => {
   it('holds them as component-level raw state', () => {
     // `$state.raw`, not `$state`: the array is replaced on every grant, never mutated.
-    expect(ROOM_PAGE).toContain('let mediaIceServers = $state.raw<RTCIceServer[]>([])');
+    expect(readFileSync(new URL('./room/media.svelte.ts', import.meta.url), 'utf8')).toContain(
+      '#iceServers = $state.raw<RTCIceServer[]>([]);'
+    );
   });
 
   it('assigns them where the grant is minted, and feeds the media session from the same value', () => {
     // One source. Two copies is how the modal and the media session end up testing different things.
-    expect(ROOM_PAGE).toContain('mediaIceServers = minted.iceServers ?? []');
-    expect(ROOM_PAGE).toContain('iceServers: () => mediaIceServers');
+    expect(ROOM_PAGE).toContain('media.iceServers = minted.iceServers ?? []');
+    expect(ROOM_PAGE).toContain('iceServers: () => media.iceServers');
     // The old function-local must be gone, or the getter could close over a stale empty array.
     expect(ROOM_PAGE).not.toContain('let iceServers: RTCIceServer[] = []');
   });

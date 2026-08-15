@@ -139,8 +139,18 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       from any one of them: `extraChatColumn && (fromExtraColumn || chatInputFocus === 'textAreaTxtExtra')`
       decides which composer every mention lands in. Moving five declarations saves few lines;
       naming the thing that reads three of them at once is the whole slice.
+
+      `RoomMedia` is the eighth and closes Phase 1: 12,954 -> 12,938. Twenty-one flags, and the
+      boundary is the design — STATE moved, TRANSPORT did not. A class that owned a `MediaRecorder`
+      would have to own its lifecycle, its error paths and its `ondataavailable`, and the room would
+      have gained an abstraction over the browser rather than an owner for its state.
+
+      It also collected the two fields `RoomRoster` refused by name, and it found a control with no
+      writer: `isRecordingStarting` was declared once, rendered once as `recIndicatorStart`, and set
+      by nothing — so the presenter got no feedback at all between pressing record and the room
+      confirming. Wired, including the failure path.
     */
-    max: 12954,
+    max: 12938,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {

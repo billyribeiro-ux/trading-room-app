@@ -30,11 +30,11 @@ const PAGE = readFileSync(new URL('../routes/+page.svelte', import.meta.url), 'u
 */
 const CODE = PAGE.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
 
-/** The body of a `media.on('<event>', …)` registration. */
+/** The body of a `signalling.on('<event>', …)` registration — `media` until the 2026-08-15 rename. */
 function handler(event: string): string {
-  const at = CODE.indexOf(`media.on('${event}'`);
+  const at = CODE.indexOf(`signalling.on('${event}'`);
   expect(at, `the ${event} handler must exist`).toBeGreaterThan(-1);
-  return CODE.slice(at, CODE.indexOf("media.on('", at + 10));
+  return CODE.slice(at, CODE.indexOf("signalling.on('", at + 10));
 }
 
 describe('handlers read the live session, not the one captured at build time', () => {
@@ -79,7 +79,7 @@ describe('teardown closes whichever session is live', () => {
 describe('the reset clears the dedupe guards, not just the visible streams', () => {
   const reset = CODE.slice(
     CODE.indexOf('function dropRemoteMedia()'),
-    CODE.indexOf('media.on(', CODE.indexOf('function dropRemoteMedia()'))
+    CODE.indexOf('signalling.on(', CODE.indexOf('function dropRemoteMedia()'))
   );
 
   it('exists once and is used by both callers', () => {

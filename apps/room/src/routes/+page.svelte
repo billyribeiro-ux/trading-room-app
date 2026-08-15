@@ -112,6 +112,7 @@
   import { RoomAlerts } from '$lib/room/alerts.svelte';
   import { ALERTS_LOG, RoomLogPages } from '$lib/room/log-pages.svelte';
   import { EXTRA_COMPOSER, RoomChat } from '$lib/room/chat.svelte';
+  import { RoomMedia } from '$lib/room/media.svelte';
   import { alertSoundButtonFor, filesSectionHidden } from '$lib/files-gates';
   import {
     INITIAL_FILE_SORT,
@@ -266,12 +267,6 @@
     }
   }
 
-  type TalkingUser = {
-    userID: number;
-    mediaValue: {
-      name: string;
-    };
-  };
   type SessionControlTab =
     | 'reset-session'
     | 'close-session'
@@ -293,8 +288,6 @@
   // `class="nav-link active"` with `aria-selected="true"`, and `notes-tab` carries
   // `class="nav-link presAreaTabs-notes"` with `aria-selected="false"`. The room opens on Screens.
   let mainTab: MainTab = $state('screens');
-  /** Mirrors the capture's `isMediaConnected`. */
-  let isMediaConnected = $state(false);
 
   /**
    * Screens currently being shared, one tab each.
@@ -453,7 +446,7 @@
    * `archivesAvailableTo()`, transcribed:
    *
    * ```js
-   * return isPresenter && !isLimitedPresenter
+   * return isPresenter && !media.limitedPresenter
    *   ? !(sessData.showArchivesToSpecificPresenters &&
    *       !sessData.showArchivesToSpecificPresenters.includes(user.email))
    *   : !(!sessData.showArchivesToUsers || user.denyArchivesAccess);
@@ -776,7 +769,7 @@
   );
   /**
    * `preferences.recordingStartSound` / `recordingStopSound` - whether this listener hears the room
-   * start and stop recording. Both default ON: the capture's checks are
+   * start and stop media.recording. Both default ON: the capture's checks are
    * `!doNotDisturbOn && preferences.recordingStartSound && ...`, so an unset preference would
    * silence a cue the room is meant to give everyone.
    */
@@ -1080,17 +1073,25 @@
   let videoDisabled = $state(false);
 
   /**
-   * The ROOM's recording state - `globals.roomState.isRecording` / `isRecordingPaused` / `recName`.
+   * The ROOM's media.recording state - `globals.roomState.isRecording` / `isRecordingPaused` / `recName`.
    *
-   * Distinct from `recording`, which is this browser's own `MediaRecorder`. The `[ REC ]` badge is
+   * Distinct from `media.recording`, which is this browser's own `MediaRecorder`. The `[ REC ]` badge is
    * a report about the room, so it must follow what the server says; gating it on the local flag is
    * why a member never saw it.
    */
-  /** `isRecordingStarting` - the spinner state between asking to record and the room confirming. */
-  let isRecordingStarting = $state(false);
-  let roomIsRecording = $state(false);
-  let roomRecordingPaused = $state(false);
-  let roomRecName = $state('');
+  /*
+    The room's media STATE, in `$lib/room/media.svelte.ts`.
+
+    Every flag the interface renders from — mic, camera, screen, this browser's media.recording and the
+    ROOM's, who has a microphone open, and whether this member has been handed limited-presenter
+    status. Not the transport: the `MediaStream`s, the `MediaRecorder`, the producer ids and the
+    preview window stay as plain `let`s below, because nothing renders from a handle and a class
+    that owned one would have gained an abstraction over the browser rather than an owner for state.
+
+    `media.talking` and `media.limitedPresenter` were both filed under `RoomRoster` in the phase plan and
+    both refused there. They arrive here because this is where their writers are.
+  */
+  const media = new RoomMedia();
 
   /**
    * `'Recording to: ' + decodedRecName()`, suppressed for non-presenters when the session says so.
@@ -1100,8 +1101,8 @@
    */
   const recordingTooltip = $derived.by(() => {
     const hideFromUsers = loadedSettings.dontShowRecInfoToUsers === true;
-    if ((hideFromUsers && !isPresenter) || !roomRecName) return '';
-    return `Recording to: ${decodeURIComponent(roomRecName)}`;
+    if ((hideFromUsers && !isPresenter) || !media.roomRecordingName) return '';
+    return `Recording to: ${decodeURIComponent(media.roomRecordingName)}`;
   });
 
   let alertPopup = $state(
@@ -1449,7 +1450,7 @@
    *   PLAYBACK mode — the only other thing that reads it raises "The stream has ended. You can
    *   close this page now." on `streamPlayerEnded` (`full.js:2162-2165`). This room has no such
    *   mode, so there is nothing to read.
-   * - `videoOnlyMode` is the `r` query parameter, the recording-bot mode — the same gap
+   * - `videoOnlyMode` is the `r` query parameter, the media.recording-bot mode — the same gap
    *   `files-gates.ts` already records for `hideFiles`. `recordChat` is deliberately not on the
    *   wire either, because it appears ONLY inside that writer and would arrive with no reader.
    *
@@ -1602,10 +1603,7 @@
    * Empty until the first grant is minted, which happens when the socket opens. The modal treats
    * empty as "not connected yet" and says so rather than pretending.
    */
-  let mediaIceServers = $state.raw<RTCIceServer[]>([]);
-  let micMuted = $state(true);
-  let micLaunching = $state(false);
-  let talkingUsers = $state<TalkingUser[]>([]);
+
   /**
    * producer id -> the peer that audio producer belongs to.
    *
@@ -1628,7 +1626,7 @@
    *
    * Derived, not stored. It used to be a `$state` flag flipped only inside a listener for a
    * `window` event named `'presenterTalking'` that nothing in this codebase ever dispatched, so it
-   * was permanently false - `{#if presenterTalking && talkingUsers.length > 0}` could never be
+   * was permanently false - `{#if media.anyoneTalking && media.talking.length > 0}` could never be
    * true, and " ( No one is speaking )" stayed on screen even with the microphone on.
    *
    * "Talking" here means unmuted, not making sound. That is what the capture sends:
@@ -1639,20 +1637,9 @@
    * so the roster changes on mute and unmute, and the indicator holds for as long as a microphone
    * is open. Pausing between sentences must not flip it back to " ( No one is speaking )".
    */
-  const presenterTalking = $derived(talkingUsers.length > 0);
-  let webcamMuted = $state(true);
-  let camLaunching = $state(false);
-  let screenSharing = $state(false);
-  let recording = $state(false);
-  let recordingPaused = $state(false);
-  let recordingReminder = $state(false);
-  // `this.recPreviewOpen = !1` in the capture's globals. Ours defaulted to true, so the menu
-  // opened saying "Hide Rec Preview" with nothing shown.
-  let recPreviewOpen = $state(false);
+
   /** The separate window the preview lives in - the capture's `reopenRecPreviewWindow` target. */
   let recPreviewWindow: Window | null = null;
-  let soundCloudUrl = $state('');
-  let soundCloudPlaying = $state(false);
   let microphoneStream: MediaStream | null = null;
   /**
    * Reactive, unlike the other capture streams, because a `<video>` has to follow it.
@@ -1685,9 +1672,7 @@
   let screenStream: MediaStream | null = null;
   let screenRecorder: MediaRecorder | null = null;
   let recordedScreenChunks: Blob[] = [];
-  let recordedScreenUrl = $state('');
-  /** Whether the last recording actually captured the microphone, so the UI can say so. */
-  let recordingHasAudio = $state(false);
+
   let soundChecks = $state<Record<string, boolean>>({
     'alert-donot-disturb':
       typeof loadedSettings.alertSoundOn === 'boolean'
@@ -1887,26 +1872,16 @@
    * The sidebar's gates. Every one is a transcription in `$lib/roster-gates`, tested there against
    * its truth table; this file only supplies the viewer and the session.
    */
-  /**
-   * `globals.isLimitedPresenter` - runtime state, not a stored flag.
-   *
-   * It was a column on `users`, which was inventing durable state for something the capture treats
-   * as transient. Nothing in the controller stores it either: `giveMicScreen` assigns it in one
-   * statement alongside `isPresenter`
-   * (`globals.user.isPresenter = globals.isLimitedPresenter = globals.isPresenter = e.give`), so it
-   * is what a member BECOMES when a presenter hands them mic and screen, and what they stop being
-   * when it is taken away.
-   *
-   * False on arrival, every time. `archivesAvailableTo()` reads it unchanged; only its source moved.
-   */
-  let isLimitedPresenter = $state(false);
-
+  /*
+    `isLimitedPresenter` moved to `RoomMedia` — it is written by `giveMicScreen`, which is a media
+    command, and its full reasoning went with it. Read here because the gates need it.
+  */
   const rosterViewer = $derived({
     isPresenter,
     email: data.user.email,
     userXrefID: data.user.userXrefID,
     hasAdminChat: data.user.hasAdminChat,
-    isLimitedPresenter,
+    isLimitedPresenter: media.limitedPresenter,
     denyArchivesAccess: data.user.denyArchivesAccess
   });
   const rosterSession = $derived(data.sessData ?? {});
@@ -2347,14 +2322,14 @@
     room that allows editing alerts also allow editing chat.
   */
   /*
-    The OWNER term of the recording-reminder banner, byte 2,477,770.
+    The OWNER term of the media.recording-reminder banner, byte 2,477,770.
 
     Upstream shares this name between a room setting and a local runtime flag, and the gate needs
     BOTH. The room already had the flag and the banner, so this is the missing half rather than a
     new feature: without it an owner cannot switch the reminder off at all.
 
     HONEST GAP: the captured gate also requires mic state -
-    !micDisabled && !micMuted - which this room does not model on that banner. Named here rather
+    !micDisabled && !media.micMuted - which this room does not model on that banner. Named here rather
     than silently approximated.
   */
   const recordingReminderAllowed = $derived(data.sessData?.recordingReminder === true);
@@ -3174,13 +3149,13 @@
     // `if (!globals.user.isPresenter) return` — the first line of the method, before the dialog.
     if (!isPresenter) return;
     // `!e || 0 === e.length ||` — with nobody speaking the confirm never opens at all.
-    if (talkingUsers.length === 0) return;
+    if (media.talking.length === 0) return;
 
     bootboxConfirmation = {
       message: MUTE_ALL_CONFIRM,
       onconfirm: () => {
         bootboxConfirmation = null;
-        const targets = nonAdminTalkingUsers(talkingUsers, roster.users);
+        const targets = nonAdminTalkingUsers(media.talking, roster.users);
         // `0 !== r.length &&` — an empty selection sends nothing, which is the case where every
         // open microphone belongs to a presenter.
         targets.forEach((entry, index) => {
@@ -3956,7 +3931,7 @@
   let presenterReconnectToastId: number | null = null;
 
   function mediaServerConnected(_reconnected: boolean) {
-    isMediaConnected = true;
+    media.connected = true;
     /*
       Cleared here, on the socket's `connect`, exactly where the reference clears them — inline in
       that handler beside `emit("mediaServerConnected")` and `reproduceLocalTracksIfAny()`.
@@ -3993,8 +3968,8 @@
    * permanent - which is exactly what it did when I killed the SFU and left it dead.
    */
   function mediaServerDisconnected() {
-    if (!isMediaConnected) return;
-    isMediaConnected = false;
+    if (!media.connected) return;
+    media.connected = false;
     showToast({
       kind: 'error',
       message: 'Disconnected from Media Server... reconnecting...',
@@ -4242,7 +4217,7 @@
       if (ownerId !== null) {
         const owner = { userID: ownerId, name: info.displayName ?? 'Presenter' };
         audioProducerOwners.set(info.producerId, owner);
-        startTalking({ userID: owner.userID, mediaValue: { name: owner.name } });
+        media.startTalking({ userID: owner.userID, mediaValue: { name: owner.name } });
       }
     }
   }
@@ -4250,19 +4225,19 @@
   /** `producerPaused` - the capture's `presMuted`, i.e. that peer stopped talking. */
   function onRemoteAudioPaused(producerId: string) {
     const owner = audioProducerOwners.get(producerId);
-    if (owner) stopTalking(owner.userID);
+    if (owner) media.stopTalking(owner.userID);
   }
 
   /** `producerResumed` - the capture's `presUnmuted`, i.e. that peer is talking again. */
   function onRemoteAudioResumed(producerId: string) {
     const owner = audioProducerOwners.get(producerId);
-    if (owner) startTalking({ userID: owner.userID, mediaValue: { name: owner.name } });
+    if (owner) media.startTalking({ userID: owner.userID, mediaValue: { name: owner.name } });
   }
 
   function removeRemoteAudio(producerId: string) {
     remoteAudioStreams.delete(producerId);
     const owner = audioProducerOwners.get(producerId);
-    if (owner) stopTalking(owner.userID);
+    if (owner) media.stopTalking(owner.userID);
     audioProducerOwners.delete(producerId);
   }
 
@@ -5034,7 +5009,7 @@
     const mp3Player = document.getElementById('mp3player');
     if (mp3Player instanceof HTMLMediaElement) mp3Player.volume = nextVolume / 100;
 
-    if (soundCloudPlaying) {
+    if (media.soundCloudPlaying) {
       const soundCloudFrame = document.getElementById('soundCloudIFrame');
       const soundCloud = (
         window as Window & {
@@ -5343,7 +5318,7 @@
    * silently. Four call sites in this file each set `privateChatOpen = true` on their own, so the
    * guard has to live in one place or it is four places to forget it.
    *
-   * `videoOnlyMode` is the `r` query parameter — the recording-bot mode — which this room does not
+   * `videoOnlyMode` is the `r` query parameter — the media.recording-bot mode — which this room does not
    * model, the same honest gap `files-gates.ts` already records for `hideFiles`. The half that is
    * modelled is enforced.
    */
@@ -5425,14 +5400,6 @@
     });
   }
 
-  function startTalking(talkingUser: TalkingUser) {
-    if (talkingUsers.some((currentUser) => currentUser.userID === talkingUser.userID)) return;
-    talkingUsers.push(talkingUser);
-  }
-
-  function stopTalking(userID: number) {
-    talkingUsers = talkingUsers.filter((talkingUser) => talkingUser.userID !== userID);
-  }
 
 
   /**
@@ -5472,7 +5439,7 @@
       }
       microphoneStream ??= await navigator.mediaDevices.getUserMedia({ audio: true });
       setStreamEnabled(microphoneStream, true);
-      micMuted = false;
+      media.micMuted = false;
 
       /*
         Publish it, or nobody hears anything.
@@ -5500,7 +5467,7 @@
         }
       }
       // An open mic is what "talking" means here - see `audioProducerOwners`.
-      startTalking({
+      media.startTalking({
         userID: data.user.id,
         mediaValue: { name: data.user.displayName }
       });
@@ -5510,14 +5477,14 @@
         await enableMicrophone(1);
         return;
       }
-      micMuted = true;
-      stopTalking(data.user.id);
+      media.micMuted = true;
+      media.stopTalking(data.user.id);
       await reportMediaCaptureError('microphone', error);
     }
   }
 
   async function toggleMicrophone() {
-    if (!micMuted) {
+    if (!media.micMuted) {
       /*
         The TOOLBAR is `toggleMute()`, and its mute branch is `disableMic()` - not `muteMic()`.
 
@@ -5527,7 +5494,7 @@
 
         disableMic() {
           if (this.micProducer) {
-            this.micMuted = !0; this.guiEventBus.emit("micMuted", this.micMuted);
+            this.micMuted = !0; this.guiEventBus.emit("media.micMuted", this.micMuted);
             this.stopSpeechRecognition(); this.micStream = null;
             this.micProducer.close();
             this.prevMicStream.getAudioTracks()[0].stop();
@@ -5547,17 +5514,17 @@
       localMicProducerId = null;
       stopStream(microphoneStream);
       microphoneStream = null;
-      micMuted = true;
-      stopTalking(data.user.id);
+      media.micMuted = true;
+      media.stopTalking(data.user.id);
       endSpeechRecognition();
       return;
     }
 
-    micLaunching = true;
+    media.micLaunching = true;
     try {
       await enableMicrophone();
     } finally {
-      micLaunching = false;
+      media.micLaunching = false;
     }
   }
 
@@ -5589,9 +5556,9 @@
    * The SFU half - `closeProducer` - is not reproduced; this room has no camera producer yet.
    */
   async function toggleWebcam() {
-    camLaunching = true;
+    media.camLaunching = true;
     try {
-      if (!webcamMuted) {
+      if (!media.camMuted) {
         // `stopCam()` closes the producer as well as stopping the tracks:
         //   socket.emit("cmd", {cmd:"closeProducer", kind:"video", producerId: camProducer.id},
         //              () => { this.camProducer.close(); this.camProducer = null })
@@ -5603,7 +5570,7 @@
         localWebcamProducerId = null;
         stopStream(webcamStream);
         webcamStream = null;
-        webcamMuted = true;
+        media.camMuted = true;
         removeWebcamPresenter(String(data.user.id));
         return;
       }
@@ -5624,7 +5591,7 @@
       webcamStream = await navigator.mediaDevices.getUserMedia({
         video: { deviceId: { ideal: selectedVideoDeviceId } }
       });
-      webcamMuted = false;
+      media.camMuted = false;
       // `webcamingUsers.push(r)` then `guiEventBus.emit("newWebcamPresenter", r)`.
       addWebcamPresenter({
         id: String(data.user.id),
@@ -5659,23 +5626,23 @@
         }
       }
     } catch (error) {
-      webcamMuted = true;
+      media.camMuted = true;
       await reportMediaCaptureError('camera', error);
     } finally {
-      camLaunching = false;
+      media.camLaunching = false;
     }
   }
 
 
   function stopRecording() {
-    const wasRecording = recording;
+    const wasRecording = media.recording;
     if (screenRecorder && screenRecorder.state !== 'inactive') screenRecorder.stop();
     // Only announce a stop we actually made: `stopScreenSharing()` calls this unconditionally, and
-    // a stop broadcast with no start would clear the badge for a room that is still recording.
+    // a stop broadcast with no start would clear the badge for a room that is still media.recording.
     if (wasRecording) void broadcastRecordingState('stopRec');
-    recording = false;
-    recordingPaused = false;
-    recordingReminder = false;
+    media.recording = false;
+    media.recordingPaused = false;
+    media.recordingReminder = false;
   }
 
   /** The navbar's stop control: ends every screen this presenter is sharing. */
@@ -5687,7 +5654,7 @@
     stopStream(screenStream);
     screenStream = null;
     localScreenProducerId = null;
-    screenSharing = false;
+    media.screenSharing = false;
   }
 
   /**
@@ -5800,7 +5767,7 @@
               }
             });
       screenStream = stream;
-      screenSharing = true;
+      media.screenSharing = true;
       menus.set('screen', false);
       const track = stream.getVideoTracks()[0];
 
@@ -5865,12 +5832,12 @@
         }
       }
     } catch (error) {
-      // Only this attempt failed. Screens already being shared are untouched, and `screenSharing`
+      // Only this attempt failed. Screens already being shared are untouched, and `media.screenSharing`
       // stays true if any of them survive - flipping it off would hide the stop control for shares
       // that are still running.
       stopStream(stream);
       screenStream = localScreenStreams.values().next().value ?? null;
-      screenSharing = localScreenStreams.size > 0;
+      media.screenSharing = localScreenStreams.size > 0;
       await reportMediaCaptureError('screen', error);
     }
   }
@@ -5905,12 +5872,12 @@
     screenStream = localScreenStreams.values().next().value ?? null;
     if (localScreenStreams.size === 0) {
       stopRecording();
-      screenSharing = false;
+      media.screenSharing = false;
     }
   }
 
   /**
-   * Tells the room what this presenter's recorder is doing. `recording-state.remote.ts` carries the
+   * Tells the room what this presenter's recorder is doing. `media.recording-state.remote.ts` carries the
    * reasoning for all of it: why the room is told rather than each browser reading its own flag, why
    * `cmd` is the command's schema instead of four restated strings, and why the catch is here once
    * rather than at each of the four `void`-ed call sites.
@@ -5918,9 +5885,24 @@
   type RecordingTransition = Parameters<typeof recordingState>[0]['cmd'];
 
   async function broadcastRecordingState(cmd: RecordingTransition, recName = '') {
+    /*
+      THE SPINNER'S MISSING WRITER, added 2026-08-15.
+
+      `recIndicatorStart` — the spinner-plus-REC navbar indicator, consts 92/93/94 — was rendered
+      and `media.roomRecordingStarting` was never set by anything, so the branch was unreachable and the
+      presenter got no feedback at all between pressing record and the room confirming. Found by
+      reading every use of the field while extracting `RoomMedia`: one declaration, one template
+      branch, no writer.
+
+      The failure path clears it too, and that half matters as much: a spinner left running on a
+      refused command reads as "still starting" for the rest of the session, which is worse than no
+      feedback because it is wrong feedback.
+    */
+    if (cmd === 'startRec') media.roomRecordingRequested();
     try {
       await recordingState({ cmd, recName });
     } catch (error) {
+      if (cmd === 'startRec') media.roomRecordingRequestFailed();
       console.error('recordingState', cmd, error);
     }
   }
@@ -5932,28 +5914,28 @@
    * SERVER-side - `mediaSoupService.startRec(muser)` and
    * `sendServerAdminCommand('startRecMtx', {streams})`, with the server pushing back a `recName`
    * - and the whole bundle contains exactly ONE `new MediaRecorder`, which is the microphone test
-   * in the AV settings modal. The original never writes a session recording to your computer.
-   * Server-side recording needs the recording/transcoding workers that the deployment plan defers,
+   * in the AV settings modal. The original never writes a session media.recording to your computer.
+   * Server-side media.recording needs the media.recording/transcoding workers that the deployment plan defers,
    * so this records in the browser instead.
    *
    * Three things were wrong with it:
    *
    *   1. SILENT. `getDisplayMedia({ audio: false })` means `screenStream` carries video only, so
-   *      every recording was a silent movie. The presenter's microphone is mixed in below.
-   *   2. UNREACHABLE. `recordedScreenUrl` is only set by the recorder's `stop` event, which also
-   *      sets `recording = false` - and the menu item that exposed it sat inside `{#if recording}`.
+   *      every media.recording was a silent movie. The presenter's microphone is mixed in below.
+   *   2. UNREACHABLE. `media.recordedUrl` is only set by the recorder's `stop` event, which also
+   *      sets `media.recording = false` - and the menu item that exposed it sat inside `{#if media.recording}`.
    *      It existed only at the moment it became invisible.
    *   3. NEVER SAVED. A blob URL was created and nothing ever downloaded it.
    */
   function startRecording() {
-    if (!screenStream || !screenSharing || typeof MediaRecorder === 'undefined') return;
+    if (!screenStream || !media.screenSharing || typeof MediaRecorder === 'undefined') return;
 
     // Video from the share, audio from the mic. `getAudioTracks()` on the display stream is empty
     // by construction, so without this the file has no sound at all.
     const tracks: MediaStreamTrack[] = [...screenStream.getVideoTracks()];
     const micTrack = microphoneStream?.getAudioTracks()[0];
     if (micTrack && micTrack.readyState === 'live') tracks.push(micTrack);
-    recordingHasAudio = Boolean(micTrack && micTrack.readyState === 'live');
+    media.recordedHasAudio = Boolean(micTrack && micTrack.readyState === 'live');
     const recordedStream = new MediaStream(tracks);
 
     recordedScreenChunks = [];
@@ -5963,14 +5945,14 @@
       With none, the browser chose both the container and roughly 2.5 Mbps. `docs/streaming-choices.md`
       row 4 measured, on realistic chart content, that VP9 produces 3841 kbps at an 8 Mbps cap and
       keeps scaling, while H.264 saturates near 2033 and ignores anything higher — so the detail was
-      available and simply never asked for. See `recording-codec.ts` for the full ordering and for
+      available and simply never asked for. See `media.recording-codec.ts` for the full ordering and for
       why 8 Mbps rather than 12: a second 1080p encode competes with the live encoder, and the share
       members are watching matters more than the presenter's own file.
     */
     const recordingOptions = chooseRecordingOptions();
     screenRecorder = new MediaRecorder(recordedStream, {
       // Omitted entirely when nothing is supported: passing an unsupported `mimeType` THROWS, and a
-      // recording that fails to start is worse than one at the browser's default.
+      // media.recording that fails to start is worse than one at the browser's default.
       ...(recordingOptions.mimeType ? { mimeType: recordingOptions.mimeType } : {}),
       videoBitsPerSecond: recordingOptions.videoBitsPerSecond,
       audioBitsPerSecond: recordingOptions.audioBitsPerSecond
@@ -5981,30 +5963,30 @@
     screenRecorder.addEventListener(
       'stop',
       () => {
-        if (recordedScreenUrl) URL.revokeObjectURL(recordedScreenUrl);
+        if (media.recordedUrl) URL.revokeObjectURL(media.recordedUrl);
         if (recordedScreenChunks.length === 0) {
           bootboxAlert = 'Nothing was recorded.';
           return;
         }
         const type = screenRecorder?.mimeType || 'video/webm';
-        recordedScreenUrl = URL.createObjectURL(new Blob(recordedScreenChunks, { type }));
+        media.recordedUrl = URL.createObjectURL(new Blob(recordedScreenChunks, { type }));
         downloadRecording();
       },
       { once: true }
     );
     // A timeslice, so `dataavailable` fires periodically instead of only at stop. Without it a
-    // recording lost to a crash or a closed tab is a recording with zero chunks.
+    // media.recording lost to a crash or a closed tab is a media.recording with zero chunks.
     screenRecorder.start(1000);
-    recording = true;
+    media.recording = true;
     // The room learns from the server, never from this flag - see `broadcastRecordingState`.
-    void broadcastRecordingState('startRec', `room-recording-${new Date().toISOString()}`);
-    recordingPaused = false;
-    recordingReminder = true;
+    void broadcastRecordingState('startRec', `room-media.recording-${new Date().toISOString()}`);
+    media.recordingPaused = false;
+    media.recordingReminder = true;
     menus.set('recording', false);
   }
 
   /**
-   * Writes the finished recording to the user's Downloads folder.
+   * Writes the finished media.recording to the user's Downloads folder.
    *
    * Called automatically when the recorder stops, and again from the menu if they want another
    * copy. The extension follows the container the browser actually chose - Chrome gives
@@ -6023,47 +6005,47 @@
    *
    * There the preview is a separate WINDOW pointed at a server-supplied URL - the server sends
    * `setRecPreview` and the client stores `sessData.recPreviewLocation = i.url`. We have no
-   * server-side recording and therefore no such URL, so the window shows the local recording
+   * server-side media.recording and therefore no such URL, so the window shows the local media.recording
    * instead. The window model itself is the capture's.
    *
-   * The toggle previously flipped `recPreviewOpen` and nothing read it anywhere else in the app:
+   * The toggle previously flipped `media.recPreviewOpen` and nothing read it anywhere else in the app:
    * a control that changed its own label and did nothing.
    */
   function showRecPreview() {
-    if (!recordedScreenUrl) return;
+    if (!media.recordedUrl) return;
     recPreviewWindow?.close();
-    recPreviewWindow = window.open(recordedScreenUrl, 'RecPreview', 'width=960,height=600');
+    recPreviewWindow = window.open(media.recordedUrl, 'RecPreview', 'width=960,height=600');
     menus.set('recording', false);
 
     // `window.open` returns null when the popup is blocked. Flipping the label to "Hide" anyway
     // would claim a window that is not there, and staying silent looks like a dead button - which
     // is what the control already was. Say what happened; the file is still on disk either way.
     if (!recPreviewWindow) {
-      recPreviewOpen = false;
+      media.recPreviewOpen = false;
       bootboxAlert =
-        'Your browser blocked the preview window. Allow pop-ups for this site, or open the downloaded recording from your Downloads folder.';
+        'Your browser blocked the preview window. Allow pop-ups for this site, or open the downloaded media.recording from your Downloads folder.';
       return;
     }
-    recPreviewOpen = true;
+    media.recPreviewOpen = true;
   }
 
   function hideRecPreview() {
     recPreviewWindow?.close();
     recPreviewWindow = null;
-    recPreviewOpen = false;
+    media.recPreviewOpen = false;
     menus.set('recording', false);
   }
 
   function downloadRecording() {
-    if (!recordedScreenUrl) return;
+    if (!media.recordedUrl) return;
     const type = screenRecorder?.mimeType || 'video/webm';
     const extension = type.includes('mp4') ? 'mp4' : 'webm';
     // `sv-SE` gives `2026-08-05 20:33:41` - ISO-shaped and already local time, so the name sorts
     // chronologically in Finder without any timezone arithmetic.
     const stamp = new Date().toLocaleString('sv-SE').replace(/[: ]/g, '-');
     const link = document.createElement('a');
-    link.href = recordedScreenUrl;
-    link.download = `room-recording-${stamp}.${extension}`;
+    link.href = media.recordedUrl;
+    link.download = `room-media.recording-${stamp}.${extension}`;
     link.style.display = 'none';
     document.body.appendChild(link);
     link.click();
@@ -6074,8 +6056,8 @@
     if (!screenRecorder || screenRecorder.state !== 'recording') return;
     screenRecorder.pause();
     void broadcastRecordingState('pauseRec');
-    recordingPaused = true;
-    recordingReminder = true;
+    media.recordingPaused = true;
+    media.recordingReminder = true;
     menus.set('recording', false);
   }
 
@@ -6083,8 +6065,8 @@
     if (!screenRecorder || screenRecorder.state !== 'paused') return;
     screenRecorder.resume();
     void broadcastRecordingState('resumeRec');
-    recordingPaused = false;
-    recordingReminder = false;
+    media.recordingPaused = false;
+    media.recordingReminder = false;
     menus.set('recording', false);
   }
 
@@ -6100,8 +6082,8 @@
           bootboxAlert = 'Invalid SoundCloud URL...';
           return;
         }
-        soundCloudUrl = value;
-        soundCloudPlaying = true;
+        media.soundCloudUrl = value;
+        media.soundCloudPlaying = true;
         menus.set('soundcloud', false);
         if (typeof window !== 'undefined') {
           window.dispatchEvent(new CustomEvent('playSoundCloudForAll', { detail: { url: value } }));
@@ -6111,7 +6093,7 @@
   }
 
   function stopSoundCloud() {
-    soundCloudPlaying = false;
+    media.soundCloudPlaying = false;
     menus.set('soundcloud', false);
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('stopSoundCloudForAll', { detail: { url: null } }));
@@ -6119,7 +6101,7 @@
   }
 
   function stopSoundCloudForMe() {
-    soundCloudPlaying = false;
+    media.soundCloudPlaying = false;
     menus.set('soundcloud', false);
   }
 
@@ -7062,7 +7044,7 @@
           | undefined;
 
         /*
-          The room's recording state, for EVERYONE in it. Verbatim:
+          The room's media.recording state, for EVERYONE in it. Verbatim:
 
             subscribe("startRec",  i => { roomState.isRecording = !0;
               !doNotDisturbOn && recordingStartSound && !videoOnlyMode && recordingStart.play() })
@@ -7078,26 +7060,22 @@
           neither checks `videoOnlyMode` where start and stop do.
         */
         if (command?.cmd === 'startRec') {
-          roomIsRecording = true;
-          roomRecordingPaused = false;
-          roomRecName = command.recName ?? '';
+          media.roomRecordingStarted(command.recName ?? '');
           if (!doNotDisturbOn && recordingStartSound) playSoundEffect('recordingStart');
           return;
         }
         if (command?.cmd === 'stopRec') {
-          roomIsRecording = false;
-          roomRecordingPaused = false;
-          roomRecName = '';
+          media.roomRecordingStopped();
           if (!doNotDisturbOn && recordingStopSound) playSoundEffect('recordingStop');
           return;
         }
         if (command?.cmd === 'pauseRec') {
-          roomRecordingPaused = true;
+          media.roomRecordingPauseChanged(true);
           if (!doNotDisturbOn && recordingStopSound) playSoundEffect('recordingStop');
           return;
         }
         if (command?.cmd === 'resumeRec') {
-          roomRecordingPaused = false;
+          media.roomRecordingPauseChanged(false);
           if (!doNotDisturbOn && recordingStopSound) playSoundEffect('recordingStart');
           return;
         }
@@ -7113,12 +7091,12 @@
           `globals.user.isPresenter = globals.isLimitedPresenter = globals.isPresenter = e.give`.
           So being handed mic and screen makes a member a LIMITED presenter - presenter enough to
           speak and share, not enough for the archives or the administrative half of the user-info
-          modal, both of which read `isPresenter && !isLimitedPresenter`. Taking it away puts them
+          modal, both of which read `isPresenter && !media.limitedPresenter`. Taking it away puts them
           back.
         */
         if (command?.cmd === 'giveMicScreen') {
           if (command.targetUserId !== data.user.id) return;
-          isLimitedPresenter = command.give === true;
+          media.micScreenGranted(command.give === true);
           /*
             The recipient is told, in the reference's own words. From offset 2499228:
 
@@ -7153,7 +7131,7 @@
             forgotten line.** The SFU decides who may produce from the GRANT's role, and
             `/api/media/grant` mints that from the CONTROLLER's membership —
             `joinsMediaAsProducer(isPresenter || hasCam || hasMic || hasScreen)`, read from
-            `readRoomConfig`. `isLimitedPresenter` is runtime state that never touches the
+            `readRoomConfig`. `media.limitedPresenter` is runtime state that never touches the
             membership, so a rebuilt session re-mints the SAME `member` grant and the SFU answers
             `forbidden` to `produce`.
 
@@ -7329,8 +7307,8 @@
         // Addressed to one member; everyone else ignores it.
         if (command.targetUserId !== data.user.id) return;
 
-        if (command.subCmd === 'mutemic' && !micMuted) void toggleMicrophone();
-        if (command.subCmd === 'mutecam' && !webcamMuted) void toggleWebcam();
+        if (command.subCmd === 'mutemic' && !media.micMuted) void toggleMicrophone();
+        if (command.subCmd === 'mutecam' && !media.camMuted) void toggleWebcam();
         if (command.subCmd === 'mutescreens') stopScreenSharing();
         return;
       }
@@ -7623,7 +7601,13 @@
      * because the transports read it through a getter, so a reconnect uses the credentials minted
      * for the new grant instead of the expired ones from the first attempt.
      */
-    const media = new SignallingClient({
+    /*
+      `signalling`, not `media` — renamed 2026-08-15 when `RoomMedia` took that identifier at the
+      top of the file. A local `const media` here shadowed the class for the whole block, and three
+      of its own reads (`iceServers`, `connected`, `recordedUrl`) resolved to a `SignallingClient`
+      that has none of them. `svelte-check` caught it; the rename is to what the object IS.
+    */
+    const signalling = new SignallingClient({
       url: data.mediaWsUrl,
       grant: async () => {
         const response = await fetch('/api/media/grant', { method: 'POST' });
@@ -7633,8 +7617,8 @@
           iceServers?: RTCIceServer[];
         };
         // Component-level now, not a local: the connectivity test reads the same value, so it
-        // tests THIS deployment's relay instead of Google's STUN. See `mediaIceServers`.
-        mediaIceServers = minted.iceServers ?? [];
+        // tests THIS deployment's relay instead of Google's STUN. See `media.iceServers`.
+        media.iceServers = minted.iceServers ?? [];
         return minted.grant;
       }
     });
@@ -7657,17 +7641,17 @@
       One formula, one import, both halves.
     */
     const session = new MediaSession({
-      signalling: media,
+      signalling,
       canProduce: joinsMediaAsProducer({
         isPresenter,
         hasMic: data.user.hasMic,
         hasCam: data.user.hasCam,
         hasScreen: data.user.hasScreen
       }),
-      iceServers: () => mediaIceServers
+      iceServers: () => media.iceServers
     });
     mediaSession = session;
-    mediaSignalling = media;
+    mediaSignalling = signalling;
 
     /*
       Everything this peer consumed from other people, dropped in one place.
@@ -7699,8 +7683,8 @@
       audioProducerOwners.clear();
     }
 
-    media.on('socketopen', ({ reconnected }) => mediaServerConnected(reconnected));
-    media.on('disconnected', () => {
+    signalling.on('socketopen', ({ reconnected }) => mediaServerConnected(reconnected));
+    signalling.on('disconnected', () => {
       mediaServerDisconnected();
       // The far side closed every consumer with the socket. Drop them so a stale picture is never
       // left frozen on screen pretending to be live; the tabs rebuild from `getProducers` on the
@@ -7715,7 +7699,7 @@
      * addRemoteScreen, which dedupes - the two overlap by design, because losing a producer is a
      * permanently blank tile.
      */
-    media.on('connected', () => {
+    signalling.on('connected', () => {
       void (async () => {
         try {
           /*
@@ -7737,7 +7721,7 @@
           if (!active) return;
           sessionReady = active.load();
           await sessionReady;
-          const { producers } = await media.request('getProducers');
+          const { producers } = await signalling.request('getProducers');
           for (const producer of producers) {
             await addRemoteScreen(active, producer);
             await addRemoteWebcam(active, producer);
@@ -7776,21 +7760,21 @@
       dropRemoteMedia();
 
       const rebuilt = new MediaSession({
-        signalling: media,
+        signalling,
         canProduce: joinsMediaAsProducer({
           isPresenter,
           hasMic: data.user.hasMic,
           hasCam: data.user.hasCam,
           hasScreen: data.user.hasScreen
         }),
-        iceServers: () => mediaIceServers
+        iceServers: () => media.iceServers
       });
       mediaSession = rebuilt;
 
       try {
         sessionReady = rebuilt.load();
         await sessionReady;
-        const { producers } = await media.request('getProducers');
+        const { producers } = await signalling.request('getProducers');
         for (const producer of producers) {
           await addRemoteScreen(rebuilt, producer);
           await addRemoteWebcam(rebuilt, producer);
@@ -7815,7 +7799,7 @@
       the window between closing the old session and the new one being assigned, and a producer can
       arrive inside it.
     */
-    media.on('newProducer', (info) => {
+    signalling.on('newProducer', (info) => {
       const active = mediaSession;
       if (!active) return;
       void addRemoteScreen(active, info);
@@ -7830,7 +7814,7 @@
      * That is what `speechRecoHistoryMode` reads, and it is why interim lines are not appended -
      * recognition revises the same sentence repeatedly as it hears more of it.
      */
-    media.on('speechReco', (line) => {
+    signalling.on('speechReco', (line) => {
       const caption = {
         timestamp: line.timestamp,
         sender: line.sender ?? 'Presenter',
@@ -7844,14 +7828,14 @@
     });
     // `producerPaused` / `producerResumed` are declared in `src/lib/media/signalling.ts:162,164`
     // and were listened for by nothing. They are the capture's `presMuted` / `presUnmuted`.
-    media.on('producerPaused', ({ producerId }) => onRemoteAudioPaused(producerId));
-    media.on('producerResumed', ({ producerId }) => onRemoteAudioResumed(producerId));
-    media.on('producerClosed', ({ producerId }) => {
+    signalling.on('producerPaused', ({ producerId }) => onRemoteAudioPaused(producerId));
+    signalling.on('producerResumed', ({ producerId }) => onRemoteAudioResumed(producerId));
+    signalling.on('producerClosed', ({ producerId }) => {
       removeRemoteScreen(producerId);
       removeRemoteWebcam(producerId);
       removeRemoteAudio(producerId);
     });
-    media.on('peerClosed', ({ peerId }) => {
+    signalling.on('peerClosed', ({ peerId }) => {
       // The current session, for the same reason as `newProducer` above: after a role change the
       // captured `session` holds the streams of a connection that no longer exists, so a peer
       // leaving would tear down nothing and leave their tile painted.
@@ -7874,10 +7858,10 @@
      * showToast() already dedupes on title+message, so the socket path firing as well cannot
      * produce two identical toasts.
      */
-    void media.connect().catch(() => {
-      // The first connect never reached `socketopen`, so `isMediaConnected` is still false and the
+    void signalling.connect().catch(() => {
+      // The first connect never reached `socketopen`, so `media.connected` is still false and the
       // transition guard would swallow this. A first failure is a real disconnect to report.
-      isMediaConnected = true;
+      media.connected = true;
       mediaServerDisconnected();
     });
 
@@ -7943,7 +7927,7 @@
       const live = mediaSession;
       mediaSession = null;
       live?.close();
-      media.close();
+      signalling.close();
       stopRefresh();
       document.removeEventListener('visibilitychange', handleVisibility);
       if (previousOpenImageModal) imageModalWindow.openImageModal = previousOpenImageModal;
@@ -7955,7 +7939,7 @@
       for (const timer of toastTimers.values()) globalThis.clearTimeout(timer);
       toastTimers.clear();
       unloadSoundEffects();
-      stopTalking(data.user.id);
+      media.stopTalking(data.user.id);
       stopStream(microphoneStream);
       stopStream(webcamStream);
       // Every shared screen, not just the newest: leaving the others running holds the camera or
@@ -7963,7 +7947,7 @@
       for (const stream of localScreenStreams.values()) stopStream(stream);
       localScreenStreams.clear();
       stopStream(screenStream);
-      if (recordedScreenUrl) URL.revokeObjectURL(recordedScreenUrl);
+      if (media.recordedUrl) URL.revokeObjectURL(media.recordedUrl);
     };
   });
 
@@ -8269,7 +8253,7 @@
     node.muted = true;
     node.playsInline = true;
 
-    const stream = webcamMuted ? null : webcamStream;
+    const stream = media.camMuted ? null : webcamStream;
     if (node.srcObject !== stream) node.srcObject = stream;
 
     if (stream) {
@@ -8710,7 +8694,7 @@
   <ScreenVolumeControl
     {viewerOnlyMode}
     audioVolume={volume}
-    {talkingUsers}
+    talkingUsers={media.talking}
     preferences={presenterAudio}
     {individualVolumeControls}
     onvolume={setMasterVolume}
@@ -8760,7 +8744,7 @@
       Escape handling below because that returns early on every other key, which is exactly how a
       host binding added here would go unnoticed.
     */
-    if (pushToTalkShouldUnmute(event, { pushToTalk, micMuted })) void toggleMicrophone();
+    if (pushToTalkShouldUnmute(event, { pushToTalk, micMuted: media.micMuted })) void toggleMicrophone();
     if (shouldBlockCopyKey(event, { disableCopy, isPresenter })) event.preventDefault();
 
     if (event.key !== 'Escape') return;
@@ -8786,7 +8770,7 @@
       that listener upstream: `disableCopy` has no keyup arm, because suppressing a keystroke has
       to happen on the way down.
     */
-    if (pushToTalkShouldMute(event, { pushToTalk, micMuted })) void toggleMicrophone();
+    if (pushToTalkShouldMute(event, { pushToTalk, micMuted: media.micMuted })) void toggleMicrophone();
   }}
   oncontextmenu={(event) => {
     /*
@@ -8938,14 +8922,14 @@
               class={mobileNavOpen ? 'collapse navbar-collapse show' : 'collapse navbar-collapse'}
             >
               <ul class="navbar-nav align-items-center ml-auto">
-                {#if presenterTalking && talkingUsers.length > 0}
+                {#if media.anyoneTalking && media.talking.length > 0}
                   <li class="nav-item talkingIndicator animated fadeIn">
                     <!-- svelte-ignore a11y_missing_attribute -->
                     <a class="talking">
                       <i class="icon fa fa-microphone"></i>
                       &nbsp;
                       <span class="talking-string">
-                        {#each talkingUsers as talkingUser, index (talkingUser.userID)}
+                        {#each media.talking as talkingUser, index (talkingUser.userID)}
                           <span>
                             {index > 0 ? ',' : ''}
                             {talkingUser.mediaValue.name}
@@ -8970,7 +8954,7 @@
                   </li>
                 {/if}
 <!--
-                  The room's recording badge, for EVERYONE - this reports state, it does not change
+                  The room's media.recording badge, for EVERYONE - this reports state, it does not change
                   it, so it is deliberately outside the presenter block below.
 
                   Consts 92/93/94, and the gating from the update block:
@@ -8978,32 +8962,32 @@
                     O(8, isRecordingPaused && isRecording ? 8 : -1)    -> [ REC PAUSED]
                     recIndicatorStart                                  -> spinner + REC, while starting
 
-                  Driven by `roomIsRecording`, which the server pushes. It used to be gated on
-                  `recording` - this browser's own MediaRecorder - so it only ever appeared for the
-                  presenter doing the recording, and every member saw nothing.
+                  Driven by `media.roomRecording`, which the server pushes. It used to be gated on
+                  `media.recording` - this browser's own MediaRecorder - so it only ever appeared for the
+                  presenter doing the media.recording, and every member saw nothing.
 
                   The tooltip is the one part that IS member-aware, and only to hide the file name:
                     (sessData.dontShowRecInfoToUsers && !isPresenter) || !roomState.recName
                       ? '' : 'Recording to: ' + decodedRecName()
                 -->
-                {#if roomRecordingPaused && roomIsRecording}
+                {#if media.roomRecordingPaused && media.roomRecording}
                   <li class="nav-item recIndicator animated flash">
                     <!-- svelte-ignore a11y_missing_attribute -->
                     <a>[ REC PAUSED]</a>
                   </li>
-                {:else if roomIsRecording}
+                {:else if media.roomRecording}
                   <li class="nav-item recIndicator animated fadeIn">
                     <!-- svelte-ignore a11y_missing_attribute -->
                     <a title={recordingTooltip}>[ REC ]</a>
                   </li>
-                {:else if isRecordingStarting}
+                {:else if media.roomRecordingStarting}
                   <li class="nav-item recIndicatorStart">
                     <!-- svelte-ignore a11y_missing_attribute -->
                     <a class="nav-link"><i class="fas fa-spinner fa-spin"></i> REC </a>
                   </li>
                 {/if}
                 <!--
-                  Broadcast controls - recording, SoundCloud, microphone, screen sharing, webcam and
+                  Broadcast controls - media.recording, SoundCloud, microphone, screen sharing, webcam and
                   session control - drive what the room sends to everyone, so they are presenter-only.
                   A reader keeps the Volume dropdown and Reload below, plus the talking and REC
                   indicators above, which report state rather than change it.
@@ -9024,20 +9008,20 @@
                       aria-haspopup="true"
                       aria-expanded={menus.recording}
                       class="nav-link dropdown-toggle d-flex align-items-center"
-                      class:muted={!screenSharing}
+                      class:muted={!media.screenSharing}
                       onclick={() => toggleTopMenu('recording')}
                     >
                       <i class="far fa-2x fa-dot-circle"></i>
                       <span class="ml-2 mainNavItem">Start/Stop Recording</span>
                     </a>
-                    {#if recordingReminderAllowed && recordingReminder && (!recording || recordingPaused)}
-                      <div class="recording-reminder">
-                        <span class="recording-reminder-arrow"></span>
-                        <span>You are not recording!</span>
+                    {#if recordingReminderAllowed && media.recordingReminder && (!media.recording || media.recordingPaused)}
+                      <div class="media.recording-reminder">
+                        <span class="media.recording-reminder-arrow"></span>
+                        <span>You are not media.recording!</span>
                         <button
                           type="button"
                           class="btn-close"
-                          onclick={() => (recordingReminder = false)}
+                          onclick={() => (media.recordingReminder = false)}
                           aria-label="Close"
                         ></button>
                       </div>
@@ -9049,10 +9033,10 @@
                       class:show={menus.recording}
                       style={menus.recording ? 'display: block;' : undefined}
                     >
-                      {#if !screenSharing}
-                        <li class="nav-item">Can't start recording without screenshare</li>
+                      {#if !media.screenSharing}
+                        <li class="nav-item">Can't start media.recording without screenshare</li>
                       {:else}
-                        {#if !recording}
+                        {#if !media.recording}
                           <!-- svelte-ignore a11y_click_events_have_key_events -->
                           <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
                           <li onclick={startRecording}>
@@ -9068,7 +9052,7 @@
                             <!-- svelte-ignore a11y_missing_attribute -->
                             <a aria-hidden="true"><i class="far fa-square"></i> STOP Recording </a>
                           </li>
-                          {#if !recordingPaused}
+                          {#if !media.recordingPaused}
                             <!-- svelte-ignore a11y_click_events_have_key_events -->
                             <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
                             <li onclick={pauseRecording}>
@@ -9089,12 +9073,12 @@
                           {/if}
                         {/if}
                         <!--
-                          Outside the recording branch on purpose. `recordedScreenUrl` is set by the
-                          recorder's `stop` handler, which also clears `recording` - so while this
-                          sat inside `{#if recording}` it appeared and vanished in the same tick and
+                          Outside the media.recording branch on purpose. `media.recordedUrl` is set by the
+                          recorder's `stop` handler, which also clears `media.recording` - so while this
+                          sat inside `{#if media.recording}` it appeared and vanished in the same tick and
                           could never be clicked.
                         -->
-                        {#if recordedScreenUrl}
+                        {#if media.recordedUrl}
                           <li><hr class="dropdown-divider" /></li>
                           <li class="nav-item">
                             <!-- svelte-ignore a11y_missing_attribute -->
@@ -9102,18 +9086,18 @@
                             <!-- svelte-ignore a11y_no_static_element_interactions -->
                             <a onclick={downloadRecording}>
                               <i class="fas fa-download"></i> Download Recording
-                              {#if !recordingHasAudio}(no audio){/if}
+                              {#if !media.recordedHasAudio}(no audio){/if}
                             </a>
                           </li>
                           <li class="nav-item">
                             <!-- svelte-ignore a11y_missing_attribute -->
                             <a
                               aria-hidden="true"
-                              onclick={recPreviewOpen ? hideRecPreview : showRecPreview}
+                              onclick={media.recPreviewOpen ? hideRecPreview : showRecPreview}
                             >
-                              <i class={recPreviewOpen ? 'fas fa-times-circle' : 'fas fa-circle'}
+                              <i class={media.recPreviewOpen ? 'fas fa-times-circle' : 'fas fa-circle'}
                               ></i>
-                              {recPreviewOpen ? ' Hide Rec Preview ' : ' Show Rec Preview'}
+                              {media.recPreviewOpen ? ' Hide Rec Preview ' : ' Show Rec Preview'}
                             </a>
                           </li>
                         {/if}
@@ -9135,13 +9119,13 @@
                       aria-haspopup="true"
                       aria-expanded={menus.soundcloud}
                       class="nav-link dropdown-toggle d-flex align-items-center"
-                      class:text-white={soundCloudPlaying}
+                      class:text-white={media.soundCloudPlaying}
                       onclick={() => toggleTopMenu('soundcloud')}
                     >
                       <i class="fab fa-2x fa-soundcloud"></i>
                       <span class="ml-2">
                         <span class="caret"></span>
-                        {#if soundCloudPlaying}
+                        {#if media.soundCloudPlaying}
                           <img src="/assets/images/playing.gif" alt="" style="max-height: 25px;" />
                         {/if}
                       </span>
@@ -9171,15 +9155,15 @@
                       </li>
                     </ul>
                   </li>
-                  {#if !micLaunching}
+                  {#if !media.micLaunching}
                     <li title="Unmute/Mute Microphone" class="nav-item d-flex align-items-center">
                       <!-- svelte-ignore a11y_click_events_have_key_events -->
                       <!-- svelte-ignore a11y_no_static_element_interactions -->
                       <a
                         id="unmuteMuteMicrophone"
                         class="nav-link d-flex align-items-center"
-                        class:muted={micMuted}
-                        class:text-white={!micMuted}
+                        class:muted={media.micMuted}
+                        class:text-white={!media.micMuted}
                         onclick={toggleMicrophone}
                       >
                         <i class="fas fa-2x fa-microphone"></i>
@@ -9218,8 +9202,8 @@
                       aria-haspopup="true"
                       aria-expanded={menus.screen}
                       class="nav-link dropdown-toggle d-flex align-items-center"
-                      class:muted={!screenSharing}
-                      class:text-white={screenSharing}
+                      class:muted={!media.screenSharing}
+                      class:text-white={media.screenSharing}
                       onclick={() => toggleTopMenu('screen')}
                     >
                       <i class="fas fa-2x fa-desktop"></i>
@@ -9260,7 +9244,7 @@
                         anywhere in the menu; `stopScreenSharing()` existed and was only ever
                         reachable through a remote `mutescreens` command from a presenter.
                       -->
-                      {#if screenSharing}
+                      {#if media.screenSharing}
                         <div class="dropdown-divider"></div>
                         <div class="dropdown-divider"></div>
                         <!-- svelte-ignore a11y_click_events_have_key_events -->
@@ -9272,15 +9256,15 @@
                       {/if}
                     </ul>
                   </li>
-                  {#if !camLaunching}
+                  {#if !media.camLaunching}
                     <!-- svelte-ignore a11y_click_events_have_key_events -->
                     <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
                     <li title="Start / Stop WebCam" class="nav-item" onclick={toggleWebcam}>
                       <a
                         id="startStopWebCam"
                         class="nav-link d-flex align-items-center"
-                        class:muted={webcamMuted}
-                        class:text-white={!webcamMuted}
+                        class:muted={media.camMuted}
+                        class:text-white={!media.camMuted}
                       >
                         <i class="fas fa-2x fa-video"></i>
                         <span class="ml-2 mainNavItem">Start / Stop WebCam</span>
@@ -9388,9 +9372,9 @@
                       TWO defects, both from `app-room.render-helpers.js:1005-1028` (`p4e`) and its
                       gate at `:1434`.
 
-                      THE GATE was `soundCloudPlaying` alone. The reference is
+                      THE GATE was `media.soundCloudPlaying` alone. The reference is
                       `O(48, e.scPlaying || e.mp3Playing || e.appService.globals.roomState.ytURL ? 48 : -1)`
-                      — three sources, of which this room already models all three: `soundCloudPlaying`,
+                      — three sources, of which this room already models all three: `media.soundCloudPlaying`,
                       `mp3Playing` (set from the `playMP3ForAll` command) and `youtubeForAllUrl`
                       (the room-wide YouTube overlay, this app's `roomState.ytURL`). So the slider was
                       dead for two of the three things it controls: `setBackgroundVolume` reaches
@@ -9402,7 +9386,7 @@
                       `div` with `style="text-align: center"` and no class at all. `m-0` belongs to the
                       `<p>` inside it (const 199, `[1,'m-0']`), which already has it.
                     -->
-                    {#if soundCloudPlaying || mp3Playing || youtubeForAllUrl}
+                    {#if media.soundCloudPlaying || mp3Playing || youtubeForAllUrl}
                       <div style="text-align: center;">
                         <hr />
                         <p class="m-0">Background Music:</p>
@@ -9430,7 +9414,7 @@
 
                         `app-room.render-helpers.js:1224-1225` puts `H(51, b4e, 3, 0, 'hr')` at the
                         head of `div.room-sound-options` (const 116), gated on
-                        `talkingUsers && talkingUsers.length > 0` (`:1436`), and `b4e` is
+                        `media.talking && media.talking.length > 0` (`:1436`), and `b4e` is
                         `ht(0, _4e, 7, 14, null, null, qAe), T(2, 'hr')` — the same per-presenter
                         row the screen overlay renders, plus a trailing rule, and only THEN the six
                         sound checkboxes below.
@@ -9440,7 +9424,7 @@
                         drift; the `hr` is this copy's, not the overlay's.
                       -->
                       <PresenterMuteRows
-                        {talkingUsers}
+                        talkingUsers={media.talking}
                         preferences={presenterAudio}
                         {individualVolumeControls}
                         trailingRule
@@ -9655,11 +9639,11 @@
                     The raw staff capture (`sidebar-forced-open`) shows the same two rows, and it
                     was taken mid-reconnect: `i.fas.fa-cog.fa-spin` beside "Reconnecting Media..."
                     and `i.fas.fa-check` beside "Chat". So the ELEMENTS are right; what was missing
-                    is that they report state. `isMediaConnected` already tracks the SFU socket, and
+                    is that they report state. `media.connected` already tracks the SFU socket, and
                     `roomEventsConnected` tracks the SSE channel that carries chat.
                   -->
                   <p>
-                    {#if isMediaConnected}
+                    {#if media.connected}
                       <i class="fas fa-check"></i> Media
                     {:else}
                       <i class="fas fa-cog fa-spin"></i>Reconnecting Media...
@@ -10134,7 +10118,7 @@
           (`css/complete-app-styles.css:4992`) is what makes the screen fill the window instead of
           keeping the height it had beside them.
 
-          `videoOnlyMode` is the `r` query parameter — the recording-bot mode — which this room does
+          `videoOnlyMode` is the `r` query parameter — the media.recording-bot mode — which this room does
           not model; the same honest gap `files-gates.ts` already records for `hideFiles`. The two
           modes this room does model are bound.
         -->
@@ -10444,7 +10428,7 @@
                                 <!--
                                   `O2e`, gated on `showAlertsToolbarExtended`: the save button,
                                   and inside it the archive control gated again on
-                                  `isPresenter && !isLimitedPresenter`. Search-only shows neither -
+                                  `isPresenter && !media.limitedPresenter`. Search-only shows neither -
                                   this room showed both in every state.
                                 -->
                                 {#if alerts.toolbarExtended}
@@ -11259,8 +11243,8 @@
 
                     The reference feeds the binding `sessData.hideFiles || globals.videoOnlyMode`
                     (2289-2290). Only the first term is implemented, and `filesSectionHidden` in
-                    `$lib/files-gates` says why: the second is not a setting but the recording-bot
-                    client global, set from the `r` query parameter, and this room has no recording
+                    `$lib/files-gates` says why: the second is not a setting but the media.recording-bot
+                    client global, set from the `r` query parameter, and this room has no media.recording
                     bot to model.
                   -->
                   <li role="presentation" class="nav-item" hidden={filesHidden}>
@@ -12212,7 +12196,7 @@
                     onclose={closeYoutubeFrame}
                   />
                 {/if}
-                {#if soundCloudUrl && soundCloudPlaying}
+                {#if media.soundCloudUrl && media.soundCloudPlaying}
                   <app-scplayer>
                     <div
                       id="soundCloudDiv"
@@ -12226,7 +12210,7 @@
                         scrolling="no"
                         frameborder="no"
                         allow="autoplay; encrypted-media"
-                        src={`https://w.soundcloud.com/player/?url=${soundCloudUrl}&auto_play=true`}
+                        src={`https://w.soundcloud.com/player/?url=${media.soundCloudUrl}&auto_play=true`}
                       ></iframe>
                     </div>
                   </app-scplayer>
@@ -12397,7 +12381,7 @@
     </div>
     <ModalHost
       name={modal}
-      {mediaIceServers}
+      mediaIceServers={media.iceServers}
       {mobilePin}
       modAlertFilterList={data.sessData?.modAlertFilterList}
       bind:alertFilterFor={alerts.filterFor}
@@ -12411,7 +12395,7 @@
         ? data.sessData?.customMobileAppIOSUrl
         : null}
       hideMobileCredentials={Boolean(data.sessData?.hideMobileCredentials)}
-      {isLimitedPresenter}
+      isLimitedPresenter={media.limitedPresenter}
       canEditUsername={Boolean(data.sessData?.allowUsersToChangeUsername)}
       alerts={searchableAlerts}
       {chatMode}

@@ -421,7 +421,7 @@ describe('part 1 capture contract', () => {
     expect(pageSource).toContain('<i class="fas fa-bell-slash"></i> DND');
     expect(pageSource).toContain("typeof loadedSettings.doNotDisturbOn === 'boolean'");
     expect(pageSource).toContain('DEFAULT_ALERT_DELIVERY_PREFERENCES.doNotDisturbOn');
-    expect(pageSource).toContain('{#if presenterTalking && talkingUsers.length > 0}');
+    expect(pageSource).toContain('{#if media.anyoneTalking && media.talking.length > 0}');
     expect(modalHostSource).toContain('onDoNotDisturbChange(input.checked);');
   });
 

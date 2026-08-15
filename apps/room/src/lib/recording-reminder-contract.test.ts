@@ -1,5 +1,10 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+/*
+  The media STATE moved to `room/media.svelte.ts` on 2026-08-15 — every flag the interface renders
+  from. The TRANSPORT stayed in the page, so assertions about it are unchanged; only flags moved.
+*/
+const mediaClass = readFileSync(new URL('./room/media.svelte.ts', import.meta.url), 'utf8');
 
 /*
   One name, TWO values, and only one of them is a setting.
@@ -31,13 +36,13 @@ describe('the recording reminder needs the owner AND the runtime flag', () => {
 
   it('keeps the local runtime flag separate from the setting', () => {
     // The recorder raises and lowers this one; it is not the owner's value and must stay writable.
-    expect(code).toContain('let recordingReminder = $state(false);');
-    expect(code).not.toContain('let recordingReminder = $derived');
+    expect(mediaClass).toContain('#recordingReminder = $state(false);');
+    expect(mediaClass).not.toContain('#recordingReminder = $derived');
   });
 
   it('ANDs the policy into the banner gate rather than beside it', () => {
     expect(code).toContain(
-      '{#if recordingReminderAllowed && recordingReminder && (!recording || recordingPaused)}'
+      '{#if recordingReminderAllowed && media.recordingReminder && (!media.recording || media.recordingPaused)}'
     );
   });
 
@@ -47,8 +52,9 @@ describe('the recording reminder needs the owner AND the runtime flag', () => {
       gates markup must carry the policy term with it, so the count of gated sites and the count of
       policy-carrying sites are the same.
     */
-    const gatedSites = code.split('{#if recordingReminder').length - 1;
-    const policySites = code.split('{#if recordingReminderAllowed && recordingReminder').length - 1;
+    const gatedSites = code.split('media.recordingReminder &&').length - 1;
+    const policySites =
+      code.split('{#if recordingReminderAllowed && media.recordingReminder').length - 1;
     expect(gatedSites).toBe(policySites);
   });
 });

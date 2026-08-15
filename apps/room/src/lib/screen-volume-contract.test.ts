@@ -396,7 +396,7 @@ describe('the NAVBAR dropdown, which is the same control in a different componen
     expect(ROOM_HELPERS).toContain(
       'O(48, e.scPlaying || e.mp3Playing || e.appService.globals.roomState.ytURL ? 48 : -1)'
     );
-    expect(PAGE).toContain('{#if soundCloudPlaying || mp3Playing || youtubeForAllUrl}');
+    expect(PAGE).toContain('{#if media.soundCloudPlaying || mp3Playing || youtubeForAllUrl}');
 
     // Const 114 is `[2,'text-align','center']` — a `2` marker is STYLES, so no class at all.
     expect(ROOM_CONSTS[114]).toEqual([2, 'text-align', 'center']);

@@ -412,7 +412,9 @@ describe('the wire has no silent break points', () => {
 
   it('the consumers the wires feed are still there', () => {
     // If a consumer is deleted, the assignment above becomes dead and this file should say so.
-    expect(pageCode).toContain('pushToTalkShouldUnmute(event, { pushToTalk, micMuted })');
+    expect(pageCode).toContain(
+      'pushToTalkShouldUnmute(event, { pushToTalk, micMuted: media.micMuted })'
+    );
     expect(pageCode).toContain('!doSpeechReco');
     expect(pageCode).toContain("&& recordingStartSound) playSoundEffect('recordingStart')");
     expect(pageCode).toContain("&& recordingStopSound) playSoundEffect('recordingStop')");
