@@ -41,6 +41,8 @@
     overwriteCashRegisterSound
   } from './files-pane.remote';
   import { uploadComposerImage } from './composer-image.remote';
+  import { savePreference as savePreferenceCommand, saveTheme } from './user-settings.remote';
+  import { editUsername } from './username.remote';
   import { isHttpError } from '@sveltejs/kit';
   import {
     PUBLIC_PTR_CDN_UPLOAD_KEY,
@@ -82,7 +84,7 @@
   } from '$lib/screen-zoom';
   import ScreenVolumeControl from '$lib/components/ScreenVolumeControl.svelte';
   import PresenterMuteRows from '$lib/components/PresenterMuteRows.svelte';
-  import { DEAD_PREFERENCE_KEYS } from '$lib/dead-preference-keys';
+  import { mirrorPreferenceToLocalStorage } from '$lib/dead-preference-keys';
   import {
     adjustVolumeForPresenter,
     toggleTalkingPresenter,
@@ -3717,14 +3719,17 @@
     openModal('user');
   }
 
+  /** `invalidateAll()` only on the resolved path — the roster is this route's `load`, not a query. */
   async function updateUsername(user: ModalTargetUser, username: string) {
     const trimmed = username.trim();
     if (!trimmed) return;
-    const body = new FormData();
-    body.set('userId', String(user.id));
-    body.set('username', trimmed);
-    const response = await fetch('?/editUsername', { method: 'POST', body });
-    if (response.ok) await invalidateAll();
+    try {
+      await editUsername({ userId: user.id, username: trimmed });
+    } catch (cause) {
+      bootboxAlert = isHttpError(cause) ? cause.body.message : 'Could not change that username.';
+      return;
+    }
+    await invalidateAll();
   }
 
   /**
@@ -4114,9 +4119,8 @@
 
   function setTheme(nextTheme: Theme) {
     theme = nextTheme;
-    const body = new FormData();
-    body.set('theme', nextTheme);
-    void fetch('?/saveTheme', { method: 'POST', body });
+    // Optimistic as always; the catch is here because a `void`-ed rejection is a swallowed error.
+    void saveTheme(nextTheme).catch((cause) => console.error('saveTheme', nextTheme, cause));
   }
 
   function savePreference(key: string, value: unknown) {
@@ -4196,20 +4200,13 @@
         soundChecks['presentation-subtitles'] = value;
       }
     }
-    if (typeof localStorage !== 'undefined') {
-      localStorage.setItem(key, JSON.stringify(value));
-      /*
-        The same nineteen dead keys are in localStorage too, and the server's prune cannot reach
-        them: `savePreference` writes both stores, so the element-id fallback left a copy in each.
-        Removed here on the next preference change of any kind, which is the same converge-on-use
-        rule the server side uses — no startup pass, nothing to run, and idempotent once clean.
-      */
-      for (const dead of DEAD_PREFERENCE_KEYS) localStorage.removeItem(dead);
-    }
-    const body = new FormData();
-    body.set('key', key);
-    body.set('value', JSON.stringify(value));
-    void fetch('?/savePreference', { method: 'POST', body });
+    mirrorPreferenceToLocalStorage(key, value);
+    // The value goes as a VALUE — devalue carries it, and `z.json()` is the schema for what the
+    // settings blob can hold. It used to be stringified for the wire and parsed back in a `try`.
+    void savePreferenceCommand({
+      key,
+      value: value as Parameters<typeof savePreferenceCommand>[0]['value']
+    }).catch((cause) => console.error('savePreference', key, cause));
   }
 
   function closeFloatingMenus() {

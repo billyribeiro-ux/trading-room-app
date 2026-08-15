@@ -242,10 +242,34 @@ describe('the wire has no silent break points', () => {
     expect(DEAD_PREFERENCE_KEYS).toContain('app-disable-video');
     expect(DEAD_PREFERENCE_KEYS).toHaveLength(19);
 
-    expect(SERVER).toContain('pruneDeadPreferenceKeys(settings);');
-    expect(pageCode).toContain(
+    /*
+      The server half moved to `user-settings.remote.ts` with `savePreference`. Re-pointed at the
+      file that owns it, and that file is asserted to hold the command first — after an extraction a
+      `toContain` can otherwise start reading a file the thing was never in.
+
+      `notes-account-action-contract.test.ts` now EXECUTES this prune against the database as well;
+      this stays as the wiring check that both stores are pruned, which is what this file is for.
+    */
+    const userSettingsCommand = readFileSync(
+      new URL('../routes/user-settings.remote.ts', import.meta.url),
+      'utf8'
+    );
+    expect(userSettingsCommand).toContain('export const savePreference = command(');
+    expect(userSettingsCommand).toContain('pruneDeadPreferenceKeys(settings);');
+    expect(SERVER).not.toContain('pruneDeadPreferenceKeys(settings);');
+    /*
+      The browser half moved to `mirrorPreferenceToLocalStorage`, beside the list it evicts — the
+      page had the loop inline, four lines from the server write it pairs with, and the two halves
+      could drift apart without anything noticing. Both are asserted where they now live, and the
+      page is asserted to CALL it, which is what makes this a wiring check rather than two file
+      reads that happen to pass.
+    */
+    const deadKeys = readFileSync(new URL('dead-preference-keys.ts', import.meta.url), 'utf8');
+    expect(deadKeys).toContain('export function mirrorPreferenceToLocalStorage(');
+    expect(deadKeys).toContain(
       'for (const dead of DEAD_PREFERENCE_KEYS) localStorage.removeItem(dead);'
     );
+    expect(pageCode).toContain('mirrorPreferenceToLocalStorage(key, value);');
 
     /*
       Every id that REACHES the handler is either mapped, dead, or the early-returning one.

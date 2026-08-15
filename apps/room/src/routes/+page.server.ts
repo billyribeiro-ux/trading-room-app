@@ -1,7 +1,8 @@
 import { fail } from '@sveltejs/kit';
 import { and, asc, desc, eq, gt, isNull } from 'drizzle-orm';
 import { isEmptyChatHtml, sanitizeChatHtml } from '$lib/server/chat-html';
-import { pruneDeadPreferenceKeys } from '$lib/dead-preference-keys';
+// `pruneDeadPreferenceKeys` left with `savePreference` for `user-settings.remote.ts`; the browser
+// half went to `mirrorPreferenceToLocalStorage`, beside the list it evicts.
 import { calculatePollTotals, parsePollChoices } from '$lib/poll-behavior';
 import {
   deleteSessionNoteTabSchema,
@@ -1292,35 +1293,16 @@ export const actions: Actions = {
     return { success: true };
   },
 
-  editUsername: async ({ request, locals }) => {
-    ensureDatabase();
-    const data = await request.formData();
-    const userId = Number(data.get('userId'));
-    const username = String(data.get('username') ?? '').trim();
+  /*
+    `editUsername` left for `src/routes/username.remote.ts` — a module of ONE, deliberately not
+    folded in with the settings writes beside it. Those name nobody; this takes a `userId` and can
+    rename any account when the caller is a presenter, so it is split on the GATE.
 
-    if (!Number.isInteger(userId)) return fail(400, { message: 'A user ID is required.' });
-    if (!username) return fail(400, { message: 'A username is required.' });
-
-    /*
-      This guard used to read `role === 'user' && id !== userId`, which never fired: no row
-      ever holds the role `'user'`. The schema default is `'staff'`
-      (src/lib/server/db/schema.ts:8), the provisioning script issues
-      `admin | staff | member | guest` (scripts/set-password.mjs:13), and
-      src/lib/server/media-grant.test.ts:199 says outright that `'user'` "exists in no row".
-      A dead condition meant every authenticated caller - including a guest - could rename
-      any other account by id, an admin's included.
-
-      Stated positively instead: you may rename yourself, and a presenter may rename
-      anyone. `isPresenterRole` is the same staff|admin test the rest of the file uses.
-    */
-    const actor = requireUser(locals);
-    if (actor.id !== userId && !isPresenterRole(actor.role)) {
-      return fail(403, { message: 'You cannot edit this username.' });
-    }
-
-    db.update(users).set({ displayName: username }).where(eq(users.id, userId)).run();
-    return { success: true };
-  },
+    The whole dead-`'user'`-role story went with it, along with the positive restatement that
+    replaced it. New at the boundary: `z.number().int().positive()` also refuses 0 and negatives,
+    where `Number.isInteger` let them through to match no row and report success; and
+    `displayName` gained a 200-character bound it never had.
+  */
 
   sendMessage: async ({ request, locals }) => {
     ensureDatabase();
@@ -2384,7 +2366,7 @@ export const actions: Actions = {
     }
 
     return fail(400, { message: 'Unsupported message operation.' });
-  },
+  }
 
   /*
     `unmuteChat` was an action here and is now `src/routes/chat-mute.remote.ts` — the first remote
@@ -2404,69 +2386,19 @@ export const actions: Actions = {
     and the pair should not have to be searched for.
   */
 
-  saveTheme: async ({ request, locals }) => {
-    ensureDatabase();
-    const data = await request.formData();
-    const theme = data.get('theme') === 'dark' ? 'dark' : 'light';
+  /*
+    `saveTheme` and `savePreference` left together for `src/routes/user-settings.remote.ts` — one
+    module because they share the only gate either has: the row written is always the CALLER's, with
+    no target on the argument.
 
-    db.update(userSettings)
-      .set({ theme, updatedAt: new Date() })
-      .where(eq(userSettings.userId, requireUser(locals).id))
-      .run();
+    Two changes that are not moves, and both are stated there at length:
 
-    return { success: true };
-  },
-
-  savePreference: async ({ request, locals }) => {
-    ensureDatabase();
-    const data = await request.formData();
-    const key = String(data.get('key') ?? '').trim();
-    const rawValue = String(data.get('value') ?? 'null');
-    if (!key) return fail(400, { message: 'A preference key is required.' });
-
-    let value: unknown;
-    try {
-      value = JSON.parse(rawValue);
-    } catch {
-      return fail(400, { message: 'The preference value must be valid JSON.' });
-    }
-
-    const current = db
-      .select({ settingsJson: userSettings.settingsJson })
-      .from(userSettings)
-      .where(eq(userSettings.userId, requireUser(locals).id))
-      .get();
-    let settings: Record<string, unknown> = {};
-    try {
-      const parsed: unknown = JSON.parse(current?.settingsJson ?? '{}');
-      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-        settings = parsed as Record<string, unknown>;
-      }
-    } catch {
-      settings = {};
-    }
-    settings[key] = value;
-    /*
-      Remove what the old element-id fallback wrote, on the way past.
-
-      `updateSettingCheck` used to persist `preferenceKeyByInputId[input.id] ?? input.id`, so
-      nineteen HTML ids went into this blob as if they were preferences and nothing ever read them
-      back. Deleting the write does not delete what was written: every account that has opened the
-      settings modal is carrying some of them.
-
-      Here rather than in a migration, because this action already parses and rewrites the whole
-      blob — the prune is free, it needs no downtime, and it cannot half-apply. It is idempotent, so
-      an account converges on its next preference change and a converged one pays nothing. The list
-      is a deny-list for the reason `dead-preference-keys.ts` sets out: an allow-list would delete
-      the next preference somebody adds without updating it.
-    */
-    pruneDeadPreferenceKeys(settings);
-
-    db.update(userSettings)
-      .set({ settingsJson: JSON.stringify(settings), updatedAt: new Date() })
-      .where(eq(userSettings.userId, requireUser(locals).id))
-      .run();
-
-    return { success: true };
-  }
+      - `saveTheme` refuses an unrecognised value where this read
+        `data.get('theme') === 'dark' ? 'dark' : 'light'` and silently made everything else `light`.
+      - `savePreference`'s value crosses as a VALUE. The client stringified, this parsed inside a
+        `try`, and an unparseable string was a `fail(400)`. devalue carries the real value and
+        `z.json()` is the schema for exactly what the blob can store — so the failure mode is gone
+        rather than relocated. `key` also gained a 100-character bound, because this blob is parsed
+        and rewritten on every preference write.
+  */
 };
