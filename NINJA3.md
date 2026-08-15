@@ -17,11 +17,13 @@ Open Terminal on your Mac and run:
 
 ```bash
 openssl rand -hex 32
-cf0987703ee48a7796bcc038451aa4d4a60c07008e62eb42df2aa1974fea667b
 ```
 
-✅ **You should see:** a 64-character line like
-`8f3a91c4d2e7b6054a1f8e93c7d2b5a06e4f19c8d3b7a2e5f0c9d6b3a8e1f4c7`
+✅ **You should see:** a 64-character line of hex.
+
+> 🔴 **Never paste the real value into this file, or any file in the repository.** A secret was
+> pasted here on 2026-08-14, committed, and pushed to a **public** repo. It had to be rotated. This
+> file is tracked by git; the `.env` files are not, which is the whole point of them.
 
 **📋 Copy that line.** You are about to paste the **same** value into two different files.
 
@@ -147,3 +149,31 @@ what it finds.
 
 > I did not create these files for you, deliberately. Making up a shared secret so a test goes green
 > is exactly the kind of shortcut that hides a real problem.
+
+
+
+
+Last login: Fri Aug 14 22:01:47 on ttys003
+You have new mail.
+billyribeiro@Billys-Mac-Studio ~ % openssl rand -hex 32
+cf0987703ee48a7796bcc038451aa4d4a60c07008e62eb42df2aa1974fea667b
+billyribeiro@Billys-Mac-Studio ~ % cd ~/Desktop/trading-room-app/apps/room
+billyribeiro@Billys-Mac-Studio room % cat > .env <<'EOF'
+CONTROL_BASE_URL=http://127.0.0.1:5173
+ROOM_JWT_SECRET=cf0987703ee48a7796bcc038451aa4d4a60c07008e62eb42df2aa1974fea667b
+EOF
+billyribeiro@Billys-Mac-Studio room % cat .env
+CONTROL_BASE_URL=http://127.0.0.1:5173
+ROOM_JWT_SECRET=cf0987703ee48a7796bcc038451aa4d4a60c07008e62eb42df2aa1974fea667b
+billyribeiro@Billys-Mac-Studio room % cd ~/Desktop/trading-room-app/apps/controller
+billyribeiro@Billys-Mac-Studio controller % ls -la .env 
+-rw-r--r--@ 1 billyribeiro  staff  1413 Aug 12 16:45 .env
+billyribeiro@Billys-Mac-Studio controller % cat > .env <<'EOF'
+ROOM_JWT_SECRET=cf0987703ee48a7796bcc038451aa4d4a60c07008e62eb42df2aa1974fea667b
+EOF
+billyribeiro@Billys-Mac-Studio controller % cd ~/Desktop/trading-room-app
+a=$(grep '^ROOM_JWT_SECRET=' apps/room/.env | cut -d= -f2)
+b=$(grep '^ROOM_JWT_SECRET=' apps/controller/.env | cut -d= -f2)
+if [ -n "$a" ] && [ "$a" = "$b" ]; then echo "MATCH — both files agree"; else echo "MISMATCH — fix before continuing"; fi
+MATCH — both files agree
+billyribeiro@Billys-Mac-Studio trading-room-app %
