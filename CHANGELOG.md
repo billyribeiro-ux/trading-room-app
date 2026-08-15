@@ -24,10 +24,82 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-15
 
+### 2026-08-15 18:26 EDT — Two steps that could never have passed, found by finally reaching them
+
+**Merged to `main` in `9aee3d9` (PR #55), commits `189bcfd` and `559953d`. Runtime impact: none** —
+both changes are to CI plumbing. Neither defect was introduced by that PR; both had been latent
+since the `services/` reconcile and were unreachable because the backend gate died earlier every
+time. **This is the first time in this repository's history that the backend gate has been green
+end to end**, run `31910327192`, 33m36s.
+
+The pattern is worth naming, because it will happen again the next time a long gate starts getting
+further: **a step that has never executed is not a passing step, it is an unknown one.** Three
+consecutive runs each failed at a different, later place, and each failure was older than the change
+that exposed it.
+
+**1. `189bcfd` — the attestation dirtied the tree the next step demands be pristine.**
+
+`backend-quality.yml` creates `release-evidence/api-<sha>/` to hold the redacted attestation JSON.
+The very next step runs `scripts/build-api-release-evidence.sh`, which refuses to run unless the
+checkout is clean — checked with `--untracked-files=all` — and the directory was not gitignored. So
+the gate was guaranteed to fail there, unconditionally, on every run that got that far:
+
+```
+[backend:release-artifact] ERROR: release evidence requires a clean checkout
+```
+
+Reproduced locally before fixing: creating that path makes `git status --porcelain
+--untracked-files=all` non-empty, and ignoring it makes it empty again. Ignoring the directory is
+the fix rather than relaxing the cleanliness check — that check exists to prove the artifact was
+built from exactly the committed revision, and a build output of the same run is not evidence
+against that. It is already uploaded as a CI artifact, which is where it is meant to be read from.
+
+**2. `559953d` — the release evaluator pointed at a file that has never existed here, and then lied
+about why.**
+
+```
+Cannot find module '.../trading-room-app/scripts/verify-api-release-artifact.mjs'
+[backend:release-artifact] ERROR: vulnerability policy rejected the builder or release artifact
+```
+
+Two defects in one line. The verifier lives at `apps/controller/scripts/`; the build script called
+`${repository_root}/scripts/`. **This is the same defect already recorded at the top of
+`verify-backend-provenance.mjs`**, which died on `apps/controller/services/` for exactly the same
+reason: both came from the sibling repository, where `scripts/` sits at the repository root, and
+moving them under `apps/controller/` invalidated the path without changing the name. The workflow's
+own earlier step invokes the verifier correctly, which is why the contract check passed while this
+could not.
+
+The second defect is the message. `set +e; node …; policy_status=$?` treats **any** non-zero exit as
+a policy rejection, so `MODULE_NOT_FOUND` was reported as a vulnerability finding — a message that
+sends whoever reads it hunting CVEs instead of a stale path. There is now a `[[ -f ]]` guard before
+the call, and the rejection branch refuses to claim a finding when the verifier wrote no result
+file. Same family as the `28P01` diagnosis that cost a turn: PostgreSQL reports a nonexistent role
+as an authentication failure, and this reported a missing file as a security finding.
+
+**The trap in fixing it, recorded because it nearly cost another 33-minute cycle.** The verifier
+*asserts the broken path back*: `verify-api-release-artifact.mjs` anchored its contract check on the
+literal string `node "${repository_root}/scripts/verify-api-release-artifact.mjs" --evaluate`.
+Fixing only the build script would have turned the currently-green contract step red. The anchor
+moved with the invocation, and because a bare `${verifier}` variable pins less than a literal path,
+the `verifier=` assignment is now asserted separately — together pinning what the original pinned:
+which script runs, and that all four vulnerability reports reach it in one bounded invocation.
+
+**Verified.** `--verify-contract` and `--self-test` both pass locally (pure Node, no Docker). The
+negative control was run: pointing the assignment back at `scripts/` fails with `build script must
+resolve the release-policy evaluator from apps/controller/scripts`. Every
+`${repository_root}`-relative path in the build script was audited and the rest resolve.
+
+**Stated as an honest limit:** the body of that build step cannot run on this machine — it refuses
+on non-Linux/non-x86_64 and needs Docker — so CI was the only place it could be proven. It is now
+proven there.
+
 ### 2026-08-15 16:45 EDT — The attestor refused a two-role tenant policy, and it was right: `0009` now retargets instead of appending
 
-**Branch `fix/backout-0009-nonconvergent`, not merged.** **Runtime impact: none yet** — no database
-outside the scratch verification clusters has run this. It changes what the next migration run does.
+**Merged to `main` in `9aee3d9` (PR #55) at 18:20 EDT, on the first fully green backend gate this
+repository has had — run `31910327192`, 33m36s, every step passing.** **Runtime impact: none yet**
+— no database outside the scratch verification clusters and CI has run this. It changes what the
+next migration run does.
 
 **What went red.** The full backend gate on `main` (run `31905657116`, merge commit `c83f0f1`) got
 further than it ever had: provisioning, the chain on both clusters, the two-tenant fixture, `fmt`,
