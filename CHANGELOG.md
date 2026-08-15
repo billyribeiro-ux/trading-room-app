@@ -24,6 +24,124 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-15
 
+### 2026-08-15 08:11 EDT — the "For All" controls audited, and one undocumented reasoning dependency closed
+
+**Runtime impact: none from this entry** — one added test. The broadcast fix itself is the entry
+below.
+
+Three controls that said "For All" and moved one browser now reach the room. Audited here rather
+than accepted:
+
+| check | result |
+| --- | --- |
+| working tree | exactly the six files the brief named, plus the new contract test |
+| `startTime` on the wire | **0 non-comment references** outside the test asserting its absence — the trap held |
+| authority | both actions `requireUser(locals)` then `isPresenterRole(user.role)`, room from `requireRoomShortCode(locals)` — server-owned, deny-by-default command allow-list |
+| `svelte-check`, clean `.svelte-kit` | **1057 files, 0 errors** |
+| lint · prettier | clean · clean |
+| contract test | **39/39** |
+
+**Negative controls I ran myself, not taken on report.** Removing the presenter gate from
+`videoForAll` turns *"refuses a non-presenter on both actions"* red; restored byte-identically.
+
+#### The finding: one input skips the url guard, and is safe for an undocumented reason
+
+`broadcastableMediaUrl` is a proper deny-by-default check — `new URL` plus an explicit http/https
+allow-list — and it correctly notes that the reference's own client-side test
+(`value.includes('https://')`) is a substring match that any string merely *containing* the scheme
+passes.
+
+**The YouTube path does not use it.** Its only server check is a length cap, and the value is
+broadcast into an `src` attribute in every browser in the room.
+
+It is nonetheless safe, and the reason was nowhere written down: `YoutubePlayerOverlay` never binds
+the received string. It extracts a video or playlist id and **rebuilds** the url from a literal
+`https://www.youtube.com/embed/` prefix, returning empty when neither matches. Measured before the
+test was written:
+
+```
+javascript:alert(1)                       -> (empty)
+javascript:alert(1)//watch?v=x            -> https://www.youtube.com/embed/x
+data:text/html,<script>...                -> (empty)
+https://evil.com/embed/xyz                -> https://www.youtube.com/embed/xyz
+https://youtube.com/watch?v=../../../evil -> https://www.youtube.com/evil
+```
+
+Every input is confined to the youtube origin, including the ones that choose their own scheme.
+
+**That is a reasoning dependency, so it is now a test rather than a comment.** If anyone
+"simplifies" the overlay to bind the raw url into `src`, the length cap becomes the sole defence and
+it is not one. Negative control: changing the binding to the raw url turns *"builds the src from a
+literal youtube prefix"* red on the first assertion; restored byte-identically, 39/39.
+
+**The build agent also found a test of its own that could not fail** and rewrote it — it had
+asserted `roomSubscriberCount(room) === 0`, which answers 0 for a dropped room *and* an empty one,
+so deleting the drop changed nothing observable. Recorded because catching it is the standard, not
+an exception.
+
+**Not verified:** no browser run. Two-browser delivery is proven at module level against the real
+`subscribeToRoom`/`publishToRoom` hub, not against two real tabs. The full gate was not run.
+
+
+### 2026-08-15 08:03 EDT — four controls said "For All" and moved one browser
+
+**Runtime impact: yes.** Two new form actions, four new receivers, and a tab gate that had been
+reduced to a term this room could not yet evaluate.
+
+**The defect, not a missing feature.** `VideoPlayer.svelte` shipped "Play For All" and "Stop For All"
+that made ZERO network calls — no `fetch`, no `use:enhance`, no `action=`. `requestStopVideo` carried
+the reference's confirm string verbatim and both of the reference's callers, and its `onconfirm`
+cleared local `$state` and a timer. The YouTube overlay had two buttons and one handler behind both,
+so "Stop For All" and "×" did the same thing, which was neither of the two things they mean.
+
+**What the reference actually does**, read at the byte offsets rather than searched for:
+
+| command | payload out | what every client does with it |
+| --- | --- | --- |
+| `playVideoForAll` | `{url}` after dispatch (byte 1,024,587) | sets the url, sets `hideVideoPlayer`; a NON-presenter is moved to the video tab (1,966,711) |
+| `stopVideoForAll` | none (1,024,668) | clears url + both scheduled fields; a NON-presenter is moved back to screens (1,966,882) |
+| `playYTForAll` | `{url}` (1,024,137) | the floating overlay, on every screen |
+| `stopYTForAll` | none forwarded (1,024,212) | tears the overlay down everywhere |
+
+Three details that decide whether this is right or merely plausible:
+
+1. **"Stop For All" and "×" differ by WHICH BUS the reference emits on** — `stopYTForAll()` calls
+   `sendServerAdminCommand`, `closeYTFrame()` calls `guiEventBus.emit` (byte 1,503,220). That is
+   also why the markup gates only the first on presenter: a member must be able to dismiss an
+   overlay over their own room without taking it away from the room.
+2. **A play is a stop and THEN a play** (byte 2,296,932), so a second video replaces the first
+   cleanly — the receiver's `ytURL` setter is what starts playback, so re-assigning the same url
+   would start nothing. Both go out from one request; two `fetch` calls can be answered in either
+   order, and the inverted pair leaves every browser holding a torn-down overlay.
+3. **`hideVideoPlayer` is now modelled**, because the captured gate needs it:
+   `O(25, o.hideVideoPlayer && !o.isP || o.isP ? 25 : -1)` (bytes 2,016,864 and 2,017,661). It had
+   been reduced to `isPresenter` while nothing could set it; leaving it that way would have
+   force-switched a member to a tab that renders nothing.
+
+**Authority is the server's.** Both actions read the role from the session (`isPresenterRole`) and
+scope the fan-out with `requireRoomShortCode(locals)` — never a room named by the request. The video
+url is now PARSED (`new URL` plus an http/https allow-list) rather than substring-matched, because
+the client's own `includes('https://')` check passes for any string merely containing those
+characters, which stopped being harmless the moment a presenter's typed string reached an `src`
+attribute in every browser in the room.
+
+**The seek offset is derived, never transmitted, and is honestly absent.** The subscriber computes
+`Math.round((Date.now() - Number(e.startTime)) / 1e3)` (byte 1,964,799); `startTime` reaches it only
+on the late-join replay out of room state (byte 1,965,054, and `ytStartTime` occurs exactly once in
+the bundle). This room has no persisted video state, so there is no honest source for it and none
+was invented — recorded in `TODO.md` under Evidence gaps along with the two other consequences
+(no replay for a member who joins mid-video; a scheduled play held in the presenter's own browser).
+
+**Verified:** `rm -rf .svelte-kit && svelte-kit sync` then `svelte-check` — 1057 files, 0 errors,
+0 warnings. The new `for-all-broadcast-contract.test.ts` — 31 passing, including a RUNTIME block
+that drives the real `publishToRoom`/`subscribeToRoom` hub and asserts a second connection receives
+all four commands, in order, without crossing rooms (BUILD-AUDIT §4). Twenty negative controls run,
+each restored byte-identically and confirmed with `diff -q`; **one of them exposed an assertion of
+mine that could not fail** — `roomSubscriberCount` answers 0 for a dropped room and an empty one
+alike — and it was rewritten to assert the disposer instead. The 49 test files that read any changed
+file: 723 passing. `eslint` and `prettier --check` clean on all five files. **Not run:** the full
+`pnpm test` gate.
+
 ### 2026-08-15 07:53 EDT — "fully decoded" was nearly right, and wrong in the way that ships a broken control
 
 **Runtime impact: none.** One spec, one superseded section.

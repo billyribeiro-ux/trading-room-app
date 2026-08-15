@@ -1352,6 +1352,51 @@
   let sendingGif = $state(false);
   let pendingGifUrl = $state<string | null>(null);
   let youtubeForAllUrl = $state('');
+  /**
+   * `videoPlayerUrl` / `hideVideoPlayer` / `scheduledVideo` — the VideoPlayer tab, for the ROOM.
+   *
+   * All three were `VideoPlayer.svelte`'s own `$state`, and that is why "Play For All" and
+   * "Stop For All" only ever moved one browser. They live here because this is where the `cmds`
+   * subscription is; the component receives them as props, exactly as `mp3Url` already worked.
+   *
+   * The two subscribers this reproduces, verbatim from `main.d1d09071be31f1ba.js` byte 1,966,711
+   * and 1,966,882:
+   *
+   * ```js
+   * subscribe("playVideoForAll", e => { this.videoPlayerUrl = e.url; this.hideVideoPlayer = !0;
+   *                                     this.isP || this.onMainTabChange("presAreaTabs-videoplayer") })
+   * subscribe("stopVideoForAll", () => { this.videoPlayerUrl = ""; this.scheduledVideo.videoURL = "";
+   *                                      this.scheduledVideo.videoPlayTime = null;
+   *                                      this.hideVideoPlayer = !1;
+   *                                      this.isP || this.onMainTabChange("presAreaTabs-screens") })
+   * ```
+   *
+   * `hideVideoPlayer` is named for what upstream called it and means the OPPOSITE of what it
+   * sounds like: it is true while a video is playing, and it is the term that lets a MEMBER see
+   * the tab at all (`O(25, o.hideVideoPlayer && !o.isP || o.isP ? 25 : -1)`, byte 2,016,864). It
+   * was previously unmodelled here, which is recorded in the comment on the tab itself.
+   */
+  let videoPlayerUrl = $state('');
+  let hideVideoPlayer = $state(false);
+  /*
+    Replaced wholesale rather than mutated, so `$state.raw`: the two writers both assign a fresh
+    pair, and a deep proxy over an object that is never edited in place is cost with no reader.
+  */
+  let scheduledVideoForAll = $state.raw<{ videoURL: string; videoPlayTime: string | null }>({
+    videoURL: '',
+    videoPlayTime: null
+  });
+  /*
+    The armed play, held in the presenter's OWN browser.
+
+    Upstream this timer is the server's: `playVideoForAll` is posted at the moment the presenter
+    presses Send, carrying `videoPlayTime`, and the session record holds the pair until it fires
+    (the late-join replay reads it back at byte 1,967,430). This room has no store for that and no
+    server-side scheduler, so the browser that armed it is the one that posts when it fires. The
+    consequences are real and recorded in `TODO.md`: closing the tab cancels the play, and a member
+    who joins after a video started does not see it.
+  */
+  let scheduledVideoTimer: number | undefined;
   let composer = $state('');
   let fileSearch = $state('');
   // The sort bar is the one part of the Files pane with no counterpart in the pinned capture -
@@ -7026,12 +7071,127 @@
     sendingGif = false;
   }
 
-  function playYoutubeForAll(url: string) {
-    youtubeForAllUrl = url;
+  /**
+   * The YouTube modal's Play button — `playYtVideo()`, byte 2,296,932.
+   *
+   * ```js
+   * playYtVideo() {
+   *   this.appService.sendServerAdminCommand('stopYTForAll', {url: this.youtubeURL});
+   *   this.appService.sendServerAdminCommand('playYTForAll', {url: this.youtubeURL});
+   * }
+   * ```
+   *
+   * A stop and then a play, in that order, so a second video replaces the first cleanly. Both are
+   * posted in ONE request — see the action — because two in-flight posts can be answered in either
+   * order, and the inverted pair leaves every browser holding a torn-down overlay.
+   *
+   * This used to be `youtubeForAllUrl = url`, which played the video for the presenter alone.
+   */
+  async function playYoutubeForAll(url: string) {
+    await sendYoutubeForAllCommand('playYTForAll', url);
   }
 
-  function stopYoutubeForAll() {
+  /**
+   * The overlay's "Stop For All" — `stopYTForAll() { sendServerAdminCommand('stopYTForAll') }`,
+   * byte 1,503,220. Presenter-only in the markup, and re-checked on the server.
+   */
+  async function stopYoutubeForAll() {
+    await sendYoutubeForAllCommand('stopYTForAll');
+  }
+
+  /**
+   * The overlay's "×" — `closeYTFrame() { this.appService.guiEventBus.emit('stopYTForAll') }`,
+   * byte 1,503,275.
+   *
+   * THE DISTINCTION IS THE POINT, and it is drawn by which bus the reference emits on: "Stop For
+   * All" goes to the SERVER and takes the video off everyone's screen; "×" emits on the LOCAL gui
+   * bus, so it dismisses this viewer's own iframe and nobody else's. That is also why "×" is not
+   * presenter-gated in the markup and "Stop For All" is — a member must be able to close an
+   * overlay sitting over their room, without taking it away from the room.
+   *
+   * Both were wired to the same function here, which collapsed the two into one and made the "×"
+   * on a member's screen a no-op they had no authority to perform.
+   */
+  function closeYoutubeFrame() {
     youtubeForAllUrl = '';
+  }
+
+  async function sendYoutubeForAllCommand(cmd: 'playYTForAll' | 'stopYTForAll', url?: string) {
+    const body = new FormData();
+    body.set('cmd', cmd);
+    if (url !== undefined) body.set('url', url);
+    const response = await fetch('?/youtubeForAll', { method: 'POST', body });
+    const result = deserialize<{ success?: boolean }, { message?: string }>(await response.text());
+    if (result.type === 'failure') bootboxAlert = result.data?.message ?? 'Command failed.';
+  }
+
+  /**
+   * "Play For All" → "Play now", and the moment an armed schedule fires.
+   *
+   * `sendServerAdminCommand('playVideoForAll', {url: e, videoPlayTime: null})`, byte 1,981,761.
+   * Nothing is assigned locally: the broadcast comes back down the `cmds` channel to this browser
+   * along with every other, which is the same rule the private chat note states — the sender learns
+   * its own message from the channel and nobody inserts optimistically.
+   */
+  async function playVideoForAll(url: string) {
+    clearScheduledVideoTimer();
+    scheduledVideoForAll = { videoURL: '', videoPlayTime: null };
+    await sendVideoForAllCommand('playVideoForAll', url);
+  }
+
+  /**
+   * "Choose time?" → "Send". Arms the play locally and shows the presenter what is pending.
+   *
+   * `whenLocal` is the raw `datetime-local` value, kept as the string the reference keeps
+   * (`this.scheduledVideo.videoPlayTime = i` before it is converted) because that is what the
+   * "Video scheduled for:" line formats.
+   *
+   * A time already past plays immediately rather than never — `delay > 0` arms the timer, and a
+   * finite non-positive delay falls through to the immediate path. An unparseable value arms
+   * nothing and plays nothing, loudly: the pending line simply does not appear.
+   */
+  function scheduleVideoForAll(url: string, whenLocal: string) {
+    clearScheduledVideoTimer();
+
+    const delay = new Date(whenLocal).getTime() - Date.now();
+    if (!Number.isFinite(delay)) return;
+    if (delay <= 0) {
+      void playVideoForAll(url);
+      return;
+    }
+
+    scheduledVideoForAll = { videoURL: url, videoPlayTime: whenLocal };
+    scheduledVideoTimer = window.setTimeout(() => {
+      scheduledVideoTimer = undefined;
+      void playVideoForAll(url);
+    }, delay);
+  }
+
+  /**
+   * "Stop For All" and "Remove Scheduled Video" — one command for both, byte 1,981,811.
+   *
+   * The armed timer is dropped when the command ARRIVES, not here, so that a stop sent by another
+   * presenter cancels this browser's pending play too. See the `stopVideoForAll` case below.
+   */
+  async function stopVideoForAll() {
+    await sendVideoForAllCommand('stopVideoForAll');
+  }
+
+  function clearScheduledVideoTimer() {
+    if (scheduledVideoTimer !== undefined) window.clearTimeout(scheduledVideoTimer);
+    scheduledVideoTimer = undefined;
+  }
+
+  async function sendVideoForAllCommand(
+    cmd: 'playVideoForAll' | 'stopVideoForAll',
+    url?: string
+  ) {
+    const body = new FormData();
+    body.set('cmd', cmd);
+    if (url !== undefined) body.set('url', url);
+    const response = await fetch('?/videoForAll', { method: 'POST', body });
+    const result = deserialize<{ success?: boolean }, { message?: string }>(await response.text());
+    if (result.type === 'failure') bootboxAlert = result.data?.message ?? 'Command failed.';
   }
 
   function clamp(value: number, minimum: number, maximum: number) {
@@ -7479,6 +7639,76 @@
         if (command?.cmd === 'stopMp3ForAll') {
           mp3Url = null;
           mp3Playing = false;
+          return;
+        }
+
+        /*
+          `playVideoForAll` / `stopVideoForAll`, verbatim (bytes 1,966,711 and 1,966,882):
+
+            subscribe("playVideoForAll", e => { this.videoPlayerUrl = e.url;
+              this.hideVideoPlayer = !0;
+              this.isP || this.onMainTabChange("presAreaTabs-videoplayer") })
+            subscribe("stopVideoForAll", () => { this.videoPlayerUrl = "";
+              this.scheduledVideo.videoURL = ""; this.scheduledVideo.videoPlayTime = null;
+              this.hideVideoPlayer = !1;
+              this.isP || this.onMainTabChange("presAreaTabs-screens") })
+
+          Room-wide, so no `targetUserId` to match on. The tab move is for NON-presenters only, and
+          the reason is visible in the gate it pairs with: a presenter is already able to reach the
+          VideoPlayer tab whenever they like, while a member's tab exists only while
+          `hideVideoPlayer` is true — dragging them there is what makes it reachable at all, and
+          putting them back on screens is what stops them staring at an empty pane afterwards.
+        */
+        if (command?.cmd === 'playVideoForAll') {
+          if (typeof command.url !== 'string') return;
+          videoPlayerUrl = command.url;
+          hideVideoPlayer = true;
+          if (!isPresenter) mainTab = 'videoplayer';
+          return;
+        }
+        if (command?.cmd === 'stopVideoForAll') {
+          /*
+            The armed timer dies here rather than in the sender, so that a stop sent by ANOTHER
+            presenter also cancels this browser's pending play. Clearing it only where the button
+            is pressed would leave the first presenter's video arriving minutes after the room was
+            told it had been removed.
+          */
+          clearScheduledVideoTimer();
+          videoPlayerUrl = '';
+          scheduledVideoForAll = { videoURL: '', videoPlayTime: null };
+          hideVideoPlayer = false;
+          if (!isPresenter) mainTab = 'screens';
+          return;
+        }
+
+        /*
+          `playYTForAll` / `stopYTForAll` — the floating overlay, on every screen in the room.
+
+            case "playYTForAll": this.guiEventBus.emit("playYTForAll", {url: i.url});
+            case "stopYTForAll": this.guiEventBus.emit("stopYTForAll");
+
+          THE SEEK POSITION IS DERIVED, NEVER SENT. The subscriber at byte 1,964,799 is
+
+            let i = 0;
+            if (e.startTime) { let o = Number(e.startTime); i = Math.round((Date.now() - o) / 1e3) }
+            else this.startTime = 0;
+
+          and `startTime` is absent from the live command above — it arrives only on the late-join
+          replay, `emit("playYTForAll", {url: roomState.ytURL, startTime: roomState.ytStartTime})`
+          at byte 1,965,054. That replay needs a persisted room video state, which this room does
+          not have, so the offset here is always the live command's 0 and no `start=` is appended.
+          The gap is recorded in `TODO.md`. What must NOT happen is a `startTime` invented onto the
+          wire to make the branch look implemented: the value is a function of when the room
+          started playing, and nothing here knows that.
+        */
+        if (command?.cmd === 'playYTForAll') {
+          if (typeof command.url === 'string') youtubeForAllUrl = command.url;
+          return;
+        }
+        if (command?.cmd === 'stopYTForAll') {
+          // No payload is read. A url rides with the stop that precedes a play (byte 2,296,932)
+          // and the reference's dispatch forwards none of it.
+          youtubeForAllUrl = '';
           return;
         }
 
@@ -8155,6 +8385,8 @@
       else delete imageModalWindow.openImageModal;
       if (alertScrollTimer !== undefined) globalThis.clearTimeout(alertScrollTimer);
       if (chatScrollTimer !== undefined) globalThis.clearTimeout(chatScrollTimer);
+      // An armed "play at" that outlives the room would post a broadcast from a page nobody is on.
+      clearScheduledVideoTimer();
       for (const timer of toastTimers.values()) globalThis.clearTimeout(timer);
       toastTimers.clear();
       unloadSoundEffects();
@@ -11277,21 +11509,28 @@
                     </a>
                   </li>
                   <!--
-                    VideoPlayer is presenter-only here. The captured gate, verbatim, on both the
-                    tab (slot 25) and its pane (slot 47):
+                    The captured gate, verbatim, on both the tab (slot 25, byte 2,016,864) and its
+                    pane (slot 47, byte 2,017,661):
 
                       O(25, (o.hideVideoPlayer && !o.isP) || o.isP ? 25 : -1)
 
-                    i.e. a presenter always sees it, and a member sees it only when
-                    `hideVideoPlayer` is set. This room does not model `hideVideoPlayer`, and the
-                    owner's own member capture of `#mainTabs` shows the tab collapsed to an
-                    empty Angular comment anchor, alongside Recordings, Swing Alerts and Day
-                    Trades - so for a member the gate evaluated false there. Reducing it to `isPresenter` reproduces both observed
-                    states; the unmodelled term is recorded rather than invented.
+                    i.e. a presenter always sees it, and a member sees it only while a video is
+                    playing for the room. `hideVideoPlayer` is now modelled - `playVideoForAll`
+                    sets it and `stopVideoForAll` clears it, both on the `cmds` channel.
 
-                    This tab was rendered with no gate at all, so every member saw it.
+                    Two earlier states of this gate, kept because each was a real defect: the tab
+                    once rendered with NO gate, so every member saw it; it was then reduced to
+                    `isPresenter`, correct only for as long as nothing could set the other term.
+                    Now that the broadcast exists, dropping the term would force-switch a member to
+                    a tab that renders nothing.
+
+                    Evidence, stated as what was observed and no further: the owner's own MEMBER
+                    capture of `#mainTabs` has this tab collapsed to an empty Angular comment
+                    anchor, so the gate was false for that member at that moment. No member capture
+                    taken WHILE a video was playing exists, so the true branch is transcribed from
+                    the bundle above rather than from a rendered page.
                   -->
-                  {#if isPresenter}
+                  {#if (hideVideoPlayer && !isPresenter) || isPresenter}
                     <li role="presentation" class="nav-item">
                     <a
                       id="videoplayer-tab"
@@ -11817,7 +12056,7 @@
                     </div>
                   {/if}
                   <!-- Slot 47 carries the same gate as the tab above. -->
-                  {#if isPresenter}
+                  {#if (hideVideoPlayer && !isPresenter) || isPresenter}
                   <div
                     id="videoplayer"
                     class={mainTab === 'videoplayer'
@@ -11826,7 +12065,15 @@
                     role="tabpanel"
                     aria-labelledby="videoplayer-tab"
                   >
-                    <VideoPlayer sessionId={data.sessionHandle} {isPresenter} />
+                    <VideoPlayer
+                      sessionId={data.sessionHandle}
+                      {isPresenter}
+                      {videoPlayerUrl}
+                      scheduledVideo={scheduledVideoForAll}
+                      onplaynow={(url) => void playVideoForAll(url)}
+                      onschedule={scheduleVideoForAll}
+                      onstopforall={() => void stopVideoForAll()}
+                    />
                   </div>
                   {/if}
                   <!--
@@ -12293,12 +12540,17 @@
                   </div>
                 </div>
                 {#if youtubeForAllUrl}
+                  <!--
+                    Two DIFFERENT handlers, which is the whole point of the two buttons: `onstop`
+                    posts `stopYTForAll` and takes the video off the room, `onclose` dismisses this
+                    viewer's own iframe and nothing else. Both were wired to one function.
+                  -->
                   <YoutubePlayerOverlay
                     url={youtubeForAllUrl}
                     {isPresenter}
                     muted={doNotDisturbOn}
-                    onstop={stopYoutubeForAll}
-                    onclose={stopYoutubeForAll}
+                    onstop={() => void stopYoutubeForAll()}
+                    onclose={closeYoutubeFrame}
                   />
                 {/if}
                 {#if soundCloudUrl && soundCloudPlaying}
@@ -12527,7 +12779,7 @@
       {saveData}
       onSaveDataChange={setSaveData}
       onDoNotDisturbChange={(enabled) => (doNotDisturbOn = enabled)}
-      onPlayYoutube={playYoutubeForAll}
+      onPlayYoutube={(url) => void playYoutubeForAll(url)}
       onPostAlert={postAlert}
       onPastePostAlert={postPastedAlertImage}
       onPollMinimize={minimizePoll}

@@ -68,6 +68,20 @@ export type RoomEvent =
       // `url` carries `playMP3ForAll`: the capture dispatches it from the same switch as every
       // other server command - `case "playMP3ForAll": this.guiEventBus.emit("playMP3ForAll",
       // {url: i.url})` - not from `handleServerCmdAdmin`, which only knows `gotPollAnswer`.
+      //
+      // It carries the three other room-wide media commands from the same switch, all four of
+      // which sit within 500 bytes of each other at `main.d1d09071be31f1ba.js` 1,024,137:
+      //
+      //   case "playYTForAll":    emit("playYTForAll",    {url: i.url})
+      //   case "stopYTForAll":    emit("stopYTForAll")
+      //   case "playVideoForAll": emit("playVideoForAll", {url: i.url})
+      //   case "stopVideoForAll": emit("stopVideoForAll")
+      //
+      // The two stops forward NO payload, which is why neither carries a field of its own here.
+      // `stopYTForAll` is nonetheless published WITH a url when it precedes a play (byte
+      // 2,296,932) and WITHOUT one from the overlay's own button (byte 1,503,220); the difference
+      // is on the wire and invisible to the receiver, and it is reproduced rather than tidied.
+      //
       // `recName` rides with `startRec` - the capture stores it as `roomState.recName` and the
       // `[ REC ]` tooltip reads it back through `decodedRecName()`.
       data: {

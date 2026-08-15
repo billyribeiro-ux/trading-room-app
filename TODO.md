@@ -115,6 +115,43 @@ speculative change this file exists to prevent.
   `server/notes.ts:123`, and the jsdom output pinned in `note-carousel.test.ts`.
 - **What it blocks:** nothing today. It decides whether the allow-lists need a second accepted form.
 
+**No persisted room video/YouTube state, so the four "For All" commands have no LATE-JOIN REPLAY —
+2026-08-15.** The commands themselves now broadcast and are received (`videoForAll` /
+`youtubeForAll` in `apps/room/src/routes/+page.server.ts`, pinned by
+`apps/room/src/lib/for-all-broadcast-contract.test.ts`). What is absent is the reference's server
+side of them, and it is absent because this room has nowhere to put it — `room_state`
+(`apps/room/src/lib/server/db/schema.ts`) holds `chatMode` and nothing else.
+
+Three consequences, all real and none of them papered over in code:
+
+1. **A member who joins while a video is playing sees nothing.** The reference replays it from
+   session state on connect — `roomState.videoURL && !roomState.videoPlayTime && (hideVideoPlayer =
+   1, videoPlayerUrl = roomState.videoURL, onMainTabChange('presAreaTabs-videoplayer'))`, bundle
+   byte 1,967,430.
+2. **A scheduled play lives in the presenter's browser.** Upstream, `playVideoForAll` is posted the
+   moment Send is pressed and carries `videoPlayTime` (byte 1,981,613); the SERVER holds the pair
+   and broadcasts when it fires, which is why its dispatch forwards only `{url: i.url}` (byte
+   1,024,587). Here the presenter's own `setTimeout` is the scheduler and posts at fire time, so
+   closing that tab cancels the play. `videoPlayTime` is deliberately NOT on this room's wire — a
+   field no receiver reads is the dead scaffolding this repository forbids.
+3. **The YouTube seek offset is always 0, so no `start=` is ever appended.** The subscriber derives
+   it — `i = Math.round((Date.now() - Number(e.startTime)) / 1e3)`, byte 1,964,799 — and its ONLY
+   source is the replay, `emit('playYTForAll', {url: roomState.ytURL, startTime:
+   roomState.ytStartTime})` at byte 1,965,054. `ytStartTime` occurs exactly once in the whole
+   bundle, and that is it. A late joiner therefore starts a YouTube video from the beginning rather
+   than dropping into the middle. **Nothing invents a `startTime` onto the wire to hide this**; the
+   contract test asserts that no file puts one there.
+
+- **What is missing:** a decision, not evidence — whether this room persists playing-media state
+  (a `room_state` migration plus a replay in the page load and a server-side timer), or stays
+  process-local as the SSE hub itself already is.
+- **Where I looked:** bundle bytes 1,024,137–1,024,708 (the dispatch), 1,503,220 (the overlay),
+  1,964,799–1,967,430 (the four subscribers and both replays), 1,981,613–1,981,945 (the senders),
+  2,296,932 (the stop-then-play), 2,016,864 / 2,017,661 (the `hideVideoPlayer` gate); and
+  `apps/room/src/lib/server/db/schema.ts`, which has no column for any of it.
+- **What it blocks:** late joiners only. A member present when a presenter presses play gets the
+  video, the tab switch and the overlay today.
+
 ---
 
 ## State, 2026-08-14 15:44 EDT
