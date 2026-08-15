@@ -3095,74 +3095,22 @@ export const actions: Actions = {
   },
 
   /*
-    `unmuteChat` — the lift, and the half of the pair that was never built.
+    `unmuteChat` was an action here and is now `src/routes/chat-mute.remote.ts` — the first remote
+    function in this application. The DATABASE half is unchanged and carried across intact: the same
+    single conditional DELETE, the same room scope, the same live-mutes-only clause, the same
+    per-user `privCmds` publish, and the reasoning for each.
 
-    The mute existed end to end: `mute24` above writes the row, `sendMessage` refuses while one is
-    live, and the loader exposes the viewer's own `chatMutedTill` so the composer can say why. The
-    UNMUTE existed only as a button. `ModalHost.svelte` renders "Unmute Chat", it calls
-    `onUserAction('unmute-chat', …)`, and the handler's only effect was to raise the reference's
-    alert string. A presenter could mute somebody permanently-by-accident and had no way back
-    except waiting out the 24 hours, while the UI told them the unmute had worked.
+    Three things at the BOUNDARY did change, and are named here so nobody reads "moved" as "identical":
+    `Number.isInteger` became a zod schema (which also refuses 0 and negatives, where the old guard
+    let them through to match nothing); `fail(400)` became the schema's own rejection; and `fail(403)`
+    became `error(403)`, because `fail` returns a value only a form action's caller understands and a
+    command has no such caller.
 
-    Upstream it is a command of its own on the wire (`{user}`, main bundle bytes 996325, 1430505,
-    2080257 and 2376996) reached only through `muteChat(-1)` — there is no button bound directly to
-    it, which is why an identifier search for `unmuteChat` in our source found nothing to match.
-
-    It is an action of its own rather than another `messageAction` operation because
-    `messageAction` requires a message id and returns 400 without one (see its guard above), and
-    this is addressed to a USER — the presenter is looking at a roster entry, not a message.
-
-    One conditional DELETE, no SELECT first: reading the row and then deleting it is the TOCTOU
-    this repository fixes everywhere else, and the delete is already idempotent, so a double click
-    is a no-op rather than a race.
-
-    It removes only LIVE mutes. Rows whose `expiresAt` has passed are already inert — the loader
-    and `sendMessage` both compare against `now` — so deleting them would destroy the record of
-    past mutes to no effect.
+    What the move bought is that boundary. As an action it was reached by `fetch('?/unmuteChat')` with
+    a hand-built `FormData`, so the endpoint name, the argument's type and the meaning of a failure
+    were all agreements nothing checked. This note is left here because `mute24` is still in this file
+    and the pair should not have to be searched for.
   */
-  unmuteChat: async ({ request, locals }) => {
-    ensureDatabase();
-    const data = await request.formData();
-    const targetUserId = Number(data.get('targetUserId'));
-    if (!Number.isInteger(targetUserId)) {
-      return fail(400, { message: 'A target user ID is required.' });
-    }
-
-    /*
-      Server-side authority, from data the server owns. `role` comes off the session, never from
-      the client — a member who posts this form directly gets a 403 rather than the power to
-      unmute themselves the moment a presenter mutes them.
-    */
-    const isPresenter =
-      requireUser(locals).role === 'staff' || requireUser(locals).role === 'admin';
-    if (!isPresenter) return fail(403);
-
-    db.delete(chatMutes)
-      .where(
-        and(
-          /*
-            Room-scoped for the same reason the mute is: authority here is per room, and a
-            presenter of this room must not reach into a room they hold nothing in.
-          */
-          eq(chatMutes.roomShortCode, requireRoomShortCode(locals)),
-          eq(chatMutes.targetUserId, targetUserId),
-          gt(chatMutes.expiresAt, new Date())
-        )
-      )
-      .run();
-
-    /*
-      `/privCmdsIn/{uid}-{id}/` — the per-user private channel, the same one `forceReload` uses.
-      Without this the unmuted member keeps the disabled composer until they happen to reload,
-      which is the same silence the mute already had: the state changed and nobody was told.
-    */
-    publishToRoom(requireRoomShortCode(locals), {
-      channel: 'privCmds',
-      data: { cmd: 'unmuteChat', targetUserId }
-    });
-
-    return { success: true };
-  },
 
   saveTheme: async ({ request, locals }) => {
     ensureDatabase();

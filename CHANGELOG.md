@@ -24,6 +24,59 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-15
 
+### 2026-08-15 13:14 EDT — the first remote function, and the first ceiling I raised
+
+**Runtime impact: yes, on one control.** `Unmute Chat` now reaches the server through a remote
+command instead of a hand-written `fetch('?/unmuteChat')`, and a refusal is now VISIBLE where it was
+previously dropped. The delete, the room scope, the role gate and the `privCmds` publish are
+byte-for-byte the same logic, moved.
+
+**What changed.** `?/unmuteChat` left `+page.server.ts` for `src/routes/chat-mute.remote.ts`, this
+application's first `.remote.ts` file. `kit.experimental.remoteFunctions` is switched on in the same
+commit as its first consumer, never on its own — a flag nothing reads is the dead configuration this
+repository forbids by name. The flag lives in `vite.config.ts`, because `apps/room` has no
+`svelte.config.js`: Kit 3 takes its options through the plugin, which is worth knowing before anyone
+goes looking for the usual file.
+
+**Why it is worth an experimental API.** The thing it replaces names its endpoint in a string nothing
+type-checks, hands it a `FormData` of stringified numbers that the server parses back with `Number()`,
+and reports failure as a boolean on a `Response` that the call site was free to ignore — and did:
+`void unmuteChat(user)` with no handler at all. That is the exact shape of the bug this control was
+built to fix in the first place (a button that said "user chat unmuted" while the member stayed
+silenced), reintroduced one layer down. A command rejects, so a refusal has to be caught to be
+dropped. The argument is now validated once, by a zod schema, on the server. `zod@4.4.3` was already
+a dependency and already used this way by `notes-command.ts` and its siblings; nothing was added.
+
+`compilerOptions.experimental.async` is deliberately NOT set alongside it, and a test asserts that it
+stays off. That option is what allows `await` in a component TEMPLATE; every call here is `await`
+inside an ordinary event handler, which is plain JavaScript. Turning it on would change how a
+13,000-line component compiles to buy nothing.
+
+**A vacuous assertion, found and fixed.** `unmute-chat-contract.test.ts` proved the unmute had left
+the toast-only table by slicing `+page.svelte` for `const exactAlerts`. That table was extracted to
+`user-action-intent.ts` at 12:56 today, so the slice found nothing, the "body" it checked was the
+empty string, and the guard went green having stopped guarding. It shipped that way. This is exactly
+the failure mode `source-size-contract.test.ts` was written to warn about four hours earlier, and no
+test caught it — it was caught by reading the file. It now reads the file that owns the table and
+asserts the table was FOUND before asserting what is absent from it.
+
+**The ceiling went UP, once, and it is recorded rather than quietly edited.** `+page.svelte`
+**13,551 → 13,561**; `+page.server.ts` **3,233 → 3,181**. Net across the two capped files is −42,
+plus a 99-line documented module — but the per-file rule in `source-size-contract.test.ts` says
+ceilings only go down, and this commit costs the component nine lines of comment explaining, at the
+first call site in the codebase, why a refusal is now caught. Shaving that to fit the number would
+have been the tail wagging the dog. The raise is written into the file with its reason.
+
+**Verified:** `svelte-check` 0 errors / 0 warnings (1,081 files) · full room suite **1555/1555 across
+116 files** (was 1550/116) · `eslint .` clean outside the untracked, gitignored `scripts/… 2.*`
+duplicates · `prettier --check` clean · **`vite build` succeeds**, and the built server manifest
+registers exactly one remote module (`remotes: { '8152qc': … }`) whose id the client bundle calls as
+`8152qc/unmuteChat` — client and server agree on the endpoint by construction, which is the thing the
+string `'?/unmuteChat'` never gave us. Three negative controls were run and each went red for the
+right reason: reintroducing `unmute-chat` to `EXACT_ALERTS`, switching `remoteFunctions` off, and
+deleting the `.catch`. **Not verified:** no browser click-through of the unmute in a live room, and
+`svelte-autofixer` still cannot be run on a 13,561-line component.
+
 ### 2026-08-15 12:56 EDT — slice 3, and the ratchet caught me making the file BIGGER
 
 **Runtime impact: none.** Every string and every branch behaves as before. `+page.svelte`

@@ -31,8 +31,7 @@ export function isAcceptableSendUrl(url: string): boolean {
 
 /** The outcome of adding a URL to a presenter's saved video list. */
 export type VideoListAdd =
-  | { added: false; reason: 'duplicate' }
-  | { added: true; videos: readonly string[] };
+  { added: false; reason: 'duplicate' } | { added: true; videos: readonly string[] };
 
 /**
  * Add a URL to the saved video list, refusing an exact duplicate.
@@ -62,6 +61,12 @@ export function addVideoToList(existing: readonly string[], url: string): VideoL
  * row W tracks them. Keeping them in one exported table rather than inline is what makes the list
  * countable, and the test asserts the count so that wiring one up for real is a visible change here
  * rather than a quiet edit inside a 253-line function.
+ *
+ * `unmute-chat` was a SIXTH entry, and it is the reason this table is treated as a defect list
+ * rather than a copy table. Its presence here WAS the bug: the presenter got "user chat unmuted"
+ * and the member stayed silenced for the full 24 hours, because an entry in this table is the
+ * definition of a control that sends nothing. It now has a real wire — `chat-mute.remote.ts` — and
+ * `+page.svelte` handles it before consulting this table. It must never come back.
  */
 const EXACT_ALERTS: Readonly<Record<string, string>> = {
   'save-permissions': 'Permissions applied, user will reload the page now to apply...',

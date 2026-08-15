@@ -17,6 +17,8 @@
   import { page } from '$app/state';
   import { panelDragResize, readPanelBounds } from '$lib/panel-drag';
   import { invalidate, invalidateAll } from '$app/navigation';
+  // The first remote function in this app. Aliased because the local wrapper below keeps the name.
+  import { unmuteChat as unmuteChatCommand } from './chat-mute.remote';
   import {
     PUBLIC_PTR_CDN_UPLOAD_KEY,
     PUBLIC_PTR_GIPHY_API_KEY,
@@ -3725,12 +3727,19 @@
    * raised the reference's alert and stopped. `invalidateAll()` refreshes the presenter's own view
    * of the roster; the MEMBER learns about it on the `privCmds` channel, because their gate is
    * server-read and nothing local to them changed.
+   *
+   * That `invalidateAll()` runs by hand and has to: single-flight mutations refresh remote QUERIES,
+   * and the presenter's roster is not one — it comes from this route's `load`. Converting it is its
+   * own change, and doing it here would be claiming a refresh that never happens.
+   *
+   * The caller does not await this — `handleUserAction` is synchronous — but it DOES catch it. A
+   * remote command rejects where the old `fetch('?/unmuteChat')` returned `response.ok === false`
+   * for anyone who bothered to look, and nobody did; that is the same silent success this whole
+   * path was built to fix. `chat-mute.remote.ts` carries the rest of the reasoning.
    */
   async function unmuteChat(user: ModalTargetUser) {
-    const body = new FormData();
-    body.set('targetUserId', String(user.id));
-    const response = await fetch('?/unmuteChat', { method: 'POST', body });
-    if (response.ok) await invalidateAll();
+    await unmuteChatCommand({ targetUserId: user.id });
+    await invalidateAll();
   }
 
   function handleUserAction(action: string, user: ModalTargetUser) {
@@ -3961,16 +3970,17 @@
     }
 
     /*
-      `unmute-chat` is handled ahead of the table below because it is no longer only a string.
-
-      Everything in `exactAlerts` is a control whose whole effect is its own toast, which is the
-      shape this repository calls out by name. The unmute has left that table because it now sends
-      something: the entry stayed while the wire was missing, and its presence made the button look
-      finished. The alert text is unchanged and still the capture's, lower-case and all.
+      Ahead of `userActionAlert` below because this one sends something — see `EXACT_ALERTS` in
+      `user-action-intent.ts` for why leaving it in that table was the bug. The alert is raised
+      first because the reference raises it immediately; `Command failed.` is inherited from the
+      sibling handlers in this file, not captured, because the reference never showed us a failure
+      for this control.
     */
     if (action === 'unmute-chat') {
-      void unmuteChat(user);
       bootboxAlert = 'user chat unmuted';
+      void unmuteChat(user).catch(() => {
+        bootboxAlert = 'Command failed.';
+      });
       return;
     }
 
