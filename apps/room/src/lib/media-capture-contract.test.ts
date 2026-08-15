@@ -7,6 +7,12 @@ const modalHostSource = readFileSync(
 );
 const roomSource = readFileSync(new URL('../routes/+page.svelte', import.meta.url), 'utf8');
 
+/*
+  `.mainAppNav` became `RoomNavbar.svelte` on 2026-08-15 — the third of the five template regions.
+  Reference-bundle assertions are untouched; ours follow the markup into the component.
+*/
+const NAVBAR = readFileSync(new URL('./components/RoomNavbar.svelte', import.meta.url), 'utf8');
+
 function sourceBetween(source: string, start: string, end: string) {
   const startIndex = source.indexOf(start);
   const endIndex = source.indexOf(end, startIndex);
@@ -31,8 +37,15 @@ describe('media capture activation contract', () => {
   });
 
   it('keeps microphone and webcam capture behind their explicit navbar click handlers', () => {
-    expect(roomSource).toContain('onclick={toggleMicrophone}');
-    expect(roomSource).toContain('onclick={toggleWebcam}');
+    /*
+      The BUTTONS moved to `RoomNavbar.svelte`; the capture functions they call stay on the page,
+      which is the split this whole file is about — a click handler is not an activation, and the
+      assertions below still read the page for the `getUserMedia` calls themselves.
+    */
+    expect(NAVBAR).toContain('onclick={ontogglemicrophone}');
+    expect(NAVBAR).toContain('onclick={ontogglewebcam}');
+    expect(roomSource).toContain('ontogglemicrophone={() => void toggleMicrophone()}');
+    expect(roomSource).toContain('ontogglewebcam={() => void toggleWebcam()}');
     expect(roomSource).toMatch(
       /async function toggleMicrophone\(\)[\s\S]*?await enableMicrophone\(\)/
     );

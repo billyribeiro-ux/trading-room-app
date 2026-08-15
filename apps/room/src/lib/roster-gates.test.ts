@@ -416,6 +416,13 @@ describe('the sidebar renders what the gates decide', () => {
     expect(SIDEBAR).toContain('bind:value={roster.searchTerm}');
   });
 
+  it('is rendered by the page, and handed the gates it renders from', () => {
+    expect(pageSource).toContain('<RoomSidebar');
+    expect(pageSource).toContain('{rosterVisible}');
+    expect(pageSource).toContain('{rosterCountVisible}');
+    expect(pageSource).toContain('{rowVisible}');
+  });
+
   it('applies both roster gates, not just the outer one', () => {
     expect(SIDEBAR).toContain('{#if rosterVisible}');
     expect(SIDEBAR).toContain('{#if rowVisible(user)}');

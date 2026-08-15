@@ -223,6 +223,64 @@ through — both are documented in `.env.example` and until now nothing read the
 **Not done:** retiring `ptr_clone_app` (deferred until the cutover is proven in a real deployment),
 and the owner role / database rename `ptr_clone` → `tradingroom`. Both remain in `TODO.md`.
 
+### 2026-08-15 19:32 EDT — Phase 2c: `RoomNavbar`, a prop that would not have moved anything, and a CI lint I caused
+
+**Branch `feat/extra-chat-column`, not merged.** **Runtime impact: yes** — the top bar is its own
+component.
+
+| | before | after |
+|---|---|---|
+| `+page.svelte` | 12,236 | **11,585** (−651 for a 711-line region) |
+| room suite | 1,851 | **1,852 across 133 files** |
+
+Seventy-odd identifiers, two thirds of them handlers, and almost every piece of state belonging to
+`RoomMedia` or `RoomMenus` — **three instances replacing about thirty scalars**. Nothing in the file
+starts a recording, opens a device or touches a `MediaStream`: it decides what a button LOOKS like,
+`RoomMedia` says what is true, and the work stays on the page.
+
+#### The defect this nearly shipped
+
+`sidebarOpen` and `mobileNavOpen` are both ASSIGNED by controls in that bar. As plain props those
+assignments update the component's own copy and nothing else — **the hamburger would have animated
+while the sidebar it controls, a sibling component reading the page's value, never moved.**
+`svelte-check` is silent on it and the suite would have been too; what caught it was a source-text
+assertion looking for the handler in the wrong file. Both are `$bindable()` now, bound at the call
+site.
+
+#### Four props I invented, all found by ESLint
+
+`viewerName`, `onopenmodal`, `decodedRecName` and `onstopsharingall` were declared and never read.
+Two came from scanning the region for identifiers and picking up **comment text**; the other two
+were guesses about what a top bar surely needs. It does not — the brand shows no name, and every
+modal this bar reaches it reaches through `onopensessioncontrol` or `ongetmypinanddoinfo`.
+
+That is the third and fourth time this phase that a scan produced props for prose, after
+`user`/`viewer` in the sidebar and `toggleSpeechRecoHistory` before them. The lesson is the
+repository's own, and it is now written into the component: **locating with a tool is fine,
+CONCLUDING from its output is not.**
+
+#### A lint error I pushed, and the lazy fix I did not take
+
+CI went red on `roster-gates.test.ts`: every gate assertion followed the markup into the component,
+which left `pageSource` unused. **Deleting the const was the one-line fix and it was the wrong one** —
+it would have left the whole file true of a component the room does not render.
+`source-size-contract.test.ts` requires every text-reading test to make one POSITIVE assertion about
+the file it thinks it is testing, for exactly this failure. The const stays, with an assertion that
+earns it: the page renders `<RoomSidebar>` and hands it the gates.
+
+Two of my own edits also broke files while fixing them — a header inserted into the middle of a
+`function text()` body, and another into the middle of a statement. Both were parse errors and both
+were caught by the gate rather than pushed.
+
+#### Verified — all of it, before the push this time
+
+`svelte-check` **0/0 across 1,130 files** · **1,852 tests across 133 files** · `eslint src` clean ·
+prettier clean · **`svelte-autofixer` `issues: []` and `suggestions: []` on `RoomNavbar.svelte` AND
+`RoomSidebar.svelte`**.
+
+Six contract files re-pointed at the component, none deleted, and three of them now assert in BOTH
+files so a captured string cannot drift in one alone.
+
 ### 2026-08-15 19:15 EDT — Phase 2b: `RoomSidebar`, and a correction about what has been verified
 
 **Branch `feat/extra-chat-column`, not merged.** **Runtime impact: yes** — the left rail is its own

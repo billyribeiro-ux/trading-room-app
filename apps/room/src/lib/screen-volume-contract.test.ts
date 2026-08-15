@@ -5,6 +5,12 @@ import { parseConstTable } from './const-table.mjs';
 import { volumeIcon } from './screen-volume';
 
 /*
+  `.mainAppNav` became `RoomNavbar.svelte` on 2026-08-15 — the third of the five template regions.
+  Reference-bundle assertions are untouched; ours follow the markup into the component.
+*/
+const NAVBAR = readFileSync(new URL('./components/RoomNavbar.svelte', import.meta.url), 'utf8');
+
+/*
   The screen overlay's volume dropdown, pinned against the DECODED component rather than against a
   transcription of it.
 
@@ -68,6 +74,12 @@ const rowsMarkup = stripComments(ROWS);
  * would fail on the note explaining the fix rather than on the markup.
  */
 const pageMarkup = stripComments(PAGE);
+/*
+  The navbar dropdown is `RoomNavbar.svelte` since 2026-08-15. This describe block reads it; the
+  in-presentation copy of the same control is still the page's, which is the whole point of the
+  block above — a superset and a subset, not alternatives.
+*/
+const navbarMarkup = stripComments(NAVBAR);
 
 /** The component's `consts:[…]` table, parsed with the repository's own tokenizer. */
 function constTable(compiled: string): unknown[] {
@@ -349,7 +361,7 @@ describe('the two room-sound-options are a superset and a subset, not alternativ
     );
     // …which is why the navbar copy in this app is INCOMPLETE, recorded in TODO.md rather than
     // silently fixed here: `+page.svelte`'s `room-sound-options` renders the six checkboxes only.
-    expect(PAGE).toContain('class="room-sound-options"');
+    expect(NAVBAR).toContain('class="room-sound-options"');
   });
 });
 
@@ -373,7 +385,9 @@ describe('the NAVBAR dropdown, which is the same control in a different componen
     expect(classesOf(ROOM_CONSTS[117])).toEqual(['my-1']);
     expect(attributesOf(ROOM_CONSTS[118]).id).toBe('alert-donot-disturb');
 
-    const soundOptions = PAGE.slice(PAGE.indexOf('<div class="room-sound-options">'));
+    const soundOptions = navbarMarkup.slice(
+      navbarMarkup.indexOf('<div class="room-sound-options">')
+    );
     const rowsAt = soundOptions.indexOf('<PresenterMuteRows');
     const firstCheckbox = soundOptions.indexOf('alert-donot-disturb');
     expect(rowsAt, 'the navbar dropdown must render the presenter rows').toBeGreaterThan(-1);
@@ -387,8 +401,10 @@ describe('the NAVBAR dropdown, which is the same control in a different componen
     expect(classesOf(ROOM_CONSTS[106])).toEqual(['fas', 'fa-2x', 'fa-volume-down']);
     expect(classesOf(ROOM_CONSTS[107])).toEqual(['fas', 'fa-2x', 'fa-volume-off']);
     expect(ROOM_HELPERS).toContain('O(35, e.audioVolume < 4 ? 35 : -1)');
-    expect(pageMarkup).toContain('fas fa-2x fa-volume-off');
-    expect(pageMarkup, 'fa-volume-mute is in neither const table').not.toContain('fa-volume-mute');
+    expect(navbarMarkup).toContain('fas fa-2x fa-volume-off');
+    expect(navbarMarkup, 'fa-volume-mute is in neither const table').not.toContain(
+      'fa-volume-mute'
+    );
   });
 
   it('gates the background-music block on THREE sources and styles its container', () => {
@@ -396,20 +412,20 @@ describe('the NAVBAR dropdown, which is the same control in a different componen
     expect(ROOM_HELPERS).toContain(
       'O(48, e.scPlaying || e.mp3Playing || e.appService.globals.roomState.ytURL ? 48 : -1)'
     );
-    expect(PAGE).toContain('{#if media.soundCloudPlaying || mp3Playing || youtubeForAllUrl}');
+    expect(NAVBAR).toContain('{#if media.soundCloudPlaying || mp3Playing || youtubeForAllUrl}');
 
     // Const 114 is `[2,'text-align','center']` — a `2` marker is STYLES, so no class at all.
     expect(ROOM_CONSTS[114]).toEqual([2, 'text-align', 'center']);
     expect(classesOf(ROOM_CONSTS[114])).toEqual([]);
     expect(classesOf(ROOM_CONSTS[199])).toEqual(['m-0']);
-    expect(PAGE).toContain('<div style="text-align: center;">');
+    expect(NAVBAR).toContain('<div style="text-align: center;">');
   });
 
   it('the Subtitles label icon is the const the reference names', () => {
     // `T(79, 'i', 54)` inside the subtitles label (`app-room.render-helpers.js:1268`).
     expect(ROOM_HELPERS).toContain("T(79, 'i', 54)");
     expect(classesOf(ROOM_CONSTS[54])).toEqual(['fas', 'fa-closed-captioning']);
-    expect(PAGE).toContain('<i class="fas fa-closed-captioning"></i> Subtitles');
+    expect(NAVBAR).toContain('<i class="fas fa-closed-captioning"></i> Subtitles');
   });
 
   it('the muted class on the row label is the reference own, not an assumption', () => {

@@ -25,6 +25,13 @@ const mediaClass = readFileSync(new URL('./room/media.svelte.ts', import.meta.ur
 */
 
 const page = readFileSync(new URL('../routes/+page.svelte', import.meta.url), 'utf8');
+
+/*
+  `.mainAppNav` became `RoomNavbar.svelte` on 2026-08-15 — the third of the five template regions.
+  Reference-bundle assertions are untouched; ours follow the markup into the component.
+*/
+const NAVBAR = readFileSync(new URL('./components/RoomNavbar.svelte', import.meta.url), 'utf8');
+
 const code = page.replace(/\/\*[\s\S]*?\*\//g, '').replace(/<!--[\s\S]*?-->/g, '');
 
 describe('the recording reminder needs the owner AND the runtime flag', () => {
@@ -41,7 +48,7 @@ describe('the recording reminder needs the owner AND the runtime flag', () => {
   });
 
   it('ANDs the policy into the banner gate rather than beside it', () => {
-    expect(code).toContain(
+    expect(NAVBAR).toContain(
       '{#if recordingReminderAllowed && media.recordingReminder && (!media.recording || media.recordingPaused)}'
     );
   });
@@ -52,9 +59,11 @@ describe('the recording reminder needs the owner AND the runtime flag', () => {
       gates markup must carry the policy term with it, so the count of gated sites and the count of
       policy-carrying sites are the same.
     */
-    const gatedSites = code.split('media.recordingReminder &&').length - 1;
+    // Counted across BOTH files, so moving the banner cannot make the count agree by emptying one.
+    const both = code + NAVBAR;
+    const gatedSites = both.split('media.recordingReminder &&').length - 1;
     const policySites =
-      code.split('{#if recordingReminderAllowed && media.recordingReminder').length - 1;
+      both.split('{#if recordingReminderAllowed && media.recordingReminder').length - 1;
     expect(gatedSites).toBe(policySites);
   });
 });
