@@ -31,7 +31,7 @@ import { hashEmail, publicSessionHandle } from '$lib/server/connection';
 // `log-pages.remote.ts`. What stays is the FIRST page, which the loader still sends with the room.
 import { loadNewestChatPages } from '$lib/server/chat-log';
 import { loadAlertPage } from '$lib/server/alert-log';
-import { isChatMode } from '$lib/chat-mode';
+// `isChatMode` left with `changeChatMode` for `chat-mode.remote.ts`, where it is `z.enum(CHAT_MODES)`.
 import { parseReactions } from '$lib/server/reactions';
 // `requestMobilePin` left with `getMyMobilePin` for `mobile-pin.remote.ts`; this file no longer calls it.
 import {
@@ -2040,90 +2040,23 @@ export const actions: Actions = {
     the request. The two hand-written page guards became one shared schema used twice.
   */
 
-  /**
-   * Broadcasts the room's recording state.
-   *
-   * `roomState.isRecording` is SERVER state in the capture, not a local flag - the client only ever
-   * reads it, and the four transitions arrive as events:
-   *
-   * ```js
-   * appEventBus.subscribe("startRec",  i => { roomState.isRecording = !0; ...recordingStart.play() })
-   * appEventBus.subscribe("stopRec",   i => { roomState.isRecording = !1; ...recordingStop.play() })
-   * appEventBus.subscribe("pauseRec",  () => { roomState.isRecordingPaused = !0; ... })
-   * appEventBus.subscribe("resumeRec", () => { roomState.isRecordingPaused = !1; ... })
-   * ```
-   *
-   * That is why the `[ REC ]` badge shows to everyone: a member learns the room is being recorded
-   * from the server, never from their own browser. Ours was gated on the presenter's local
-   * `MediaRecorder` flag, so a member's copy was permanently false and the badge never appeared.
-   *
-   * `recName` rides along because the tooltip needs it - and the capture suppresses only the NAME
-   * from non-presenters (`dontShowRecInfoToUsers && !isPresenter`), never the badge.
-   */
-  recordingState: async ({ request, locals }) => {
-    ensureDatabase();
-    const user = requireUser(locals);
-    if (!isPresenterRole(user.role)) return fail(403, { message: 'Presenters only.' });
+  /*
+    `recordingState` and `changeChatMode` left together for `src/routes/recording-state.remote.ts`
+    and `src/routes/chat-mode.remote.ts` — two modules, because they are two features that merely
+    LOOKED alike here.
 
-    const data = await request.formData();
-    const cmd = String(data.get('cmd') ?? '');
-    const allowed = new Set(['startRec', 'stopRec', 'pauseRec', 'resumeRec']);
-    if (!allowed.has(cmd)) return fail(400, { message: 'Unknown command.' });
+    Both are presenter-gated `cmds` broadcasts scoped to the caller's own room, so both now share
+    `presenterRoom()` instead of spelling the role test out by hand. The one place they diverge is
+    the one that matters and it is written at both ends: recording is MOMENTARY and stores nothing,
+    the chat mode is a standing fact about the room and writes a row. Folding them into one module
+    would have buried that difference under a shared name.
 
-    const recName = String(data.get('recName') ?? '').slice(0, 200);
-    publishToRoom(requireRoomShortCode(locals), {
-      channel: 'cmds',
-      data: { cmd, recName: recName || undefined }
-    });
-    return { success: true };
-  },
-
-  /**
-   * `sendServerAdminCommand('changeChatMode', {mode})` — a PRESENTER act that changes the room.
-   *
-   * ```js
-   * changeChatMode(e, i) {
-   *   if (sessData.chatMode == e) return;
-   *   let o = '"Group Chat"?';
-   *   'p' == e ? (o = '"Webinar Mode"?') : 'd' == e && (o = '"Disabled"?');
-   *   bootbox.confirm('Are you sure you want to change the chat mode to ' + o, s => {
-   *     s && this.appService.sendServerAdminCommand('changeChatMode', {mode: e});
-   *   });
-   * }
-   * ```
-   *
-   * PERSISTED, unlike the recording state next to it. Recording is momentary and a late joiner has
-   * missed nothing by not hearing it; a disabled chat is a standing fact about the room, and a
-   * member who arrives afterwards has to find it disabled. Broadcast as well, so the tabs that are
-   * already open change without waiting for a reload.
-   *
-   * Presenter-gated on the SERVER from the session's own role. The radio is presenter-only in the
-   * modal too, and a hidden control is not an authorization check.
-   */
-  changeChatMode: async ({ request, locals }) => {
-    ensureDatabase();
-    const user = requireUser(locals);
-    if (!isPresenterRole(user.role)) return fail(403, { message: 'Presenters only.' });
-
-    const data = await request.formData();
-    const mode = String(data.get('mode') ?? '');
-    // Deny by default: three letters, and anything else is refused rather than stored.
-    if (!isChatMode(mode)) return fail(400, { message: 'Unknown chat mode.' });
-
-    const roomShortCode = requireRoomShortCode(locals);
-    db.insert(roomState)
-      .values({ roomShortCode, chatMode: mode, updatedAt: new Date() })
-      /* One row per room, so a second change UPDATES rather than appending a second opinion about
-         what the mode is. The conflict target is the primary key. */
-      .onConflictDoUpdate({
-        target: roomState.roomShortCode,
-        set: { chatMode: mode, updatedAt: new Date() }
-      })
-      .run();
-
-    publishToRoom(roomShortCode, { channel: 'cmds', data: { cmd: 'changeChatMode', mode } });
-    return { success: true, mode };
-  },
+    Two changes went with them, neither of them a move:
+      - `recName` now REFUSES over 200 characters where this truncated with `.slice(0, 200)`. A
+        silent truncation is the fallback this repository forbids.
+      - the mode allow-list is `z.enum(CHAT_MODES)` rather than a hand-called `isChatMode`, so it is
+        derived from the constant `$lib/chat-mode.ts` already exports instead of restated.
+  */
 
   /*
     `getMyMobilePin` — `sendServerCommand("getMyMobilePin", null)` upstream — was an action here and

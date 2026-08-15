@@ -5,7 +5,8 @@
     chatComposerEnabled,
     isChatMode,
     isWebinarMode,
-    webinarMessageVisible
+    webinarMessageVisible,
+    type ChatMode
   } from '$lib/chat-mode';
   import {
     CHAT_PAGE_ARRIVAL_NUDGE,
@@ -13,6 +14,7 @@
     mergeOlderChatMessages,
     shouldLoadOlderMessages
   } from '$lib/chat-paging';
+  import { stripHtmlToText } from '$lib/chat-plain-text';
   import { chooseRecordingOptions } from '$lib/recording-codec';
   import { page } from '$app/state';
   import { panelDragResize, readPanelBounds } from '$lib/panel-drag';
@@ -31,6 +33,8 @@
   } from './private-chat.remote';
   import { focusOnScreen, presenterCommand } from './presenter-commands.remote';
   import { videoForAll, youtubeForAll } from './for-all-broadcast.remote';
+  import { recordingState } from './recording-state.remote';
+  import { changeChatMode as changeChatModeCommand } from './chat-mode.remote';
   import { isHttpError } from '@sveltejs/kit';
   import {
     PUBLIC_PTR_CDN_UPLOAD_KEY,
@@ -6324,6 +6328,22 @@
   }
 
   /**
+   * Tells the room what this presenter's recorder is doing. `recording-state.remote.ts` carries the
+   * reasoning for all of it: why the room is told rather than each browser reading its own flag, why
+   * `cmd` is the command's schema instead of four restated strings, and why the catch is here once
+   * rather than at each of the four `void`-ed call sites.
+   */
+  type RecordingTransition = Parameters<typeof recordingState>[0]['cmd'];
+
+  async function broadcastRecordingState(cmd: RecordingTransition, recName = '') {
+    try {
+      await recordingState({ cmd, recName });
+    } catch (error) {
+      console.error('recordingState', cmd, error);
+    }
+  }
+
+  /**
    * Records the shared screen to a file on this machine.
    *
    * NOT what the capture does, and the divergence is deliberate. The original records
@@ -6343,21 +6363,6 @@
    *      It existed only at the moment it became invisible.
    *   3. NEVER SAVED. A blob URL was created and nothing ever downloaded it.
    */
-  /**
-   * Tells the room what this presenter's recorder is doing.
-   *
-   * The capture's recording is server-side, so the server is the one that emits `startRec`. Ours
-   * records in the browser, so the presenter announces it instead - but the SHAPE is the capture's:
-   * every peer, including this one, learns the state from the `cmds` channel rather than from a
-   * local flag. That is what makes the badge appear for members.
-   */
-  async function broadcastRecordingState(cmd: string, recName = '') {
-    const body = new FormData();
-    body.set('cmd', cmd);
-    if (recName) body.set('recName', recName);
-    await fetch('?/recordingState', { method: 'POST', body });
-  }
-
   function startRecording() {
     if (!screenStream || !screenSharing || typeof MediaRecorder === 'undefined') return;
 
@@ -6941,32 +6946,19 @@
   }
 
   /**
-   * The plain-text twin of a rich message, for every reader that never learns about `body_html`.
-   *
-   * The mention rule, the chat popup, the log search and the copy-to-clipboard all read `body`. The
-   * server derives it the same way and its derivation is the authoritative one — this is the
-   * optimistic copy, so the two must agree, and `chat-rich-text-contract` pins the server's.
-   */
-  function stripHtmlToText(html: string) {
-    return html
-      .replace(/<[^>]*>/g, '')
-      .replace(/&nbsp;/g, ' ')
-      .trim();
-  }
-
-  /**
    * `sendServerAdminCommand('changeChatMode', {mode})` — presenter-only, and re-checked there.
    *
-   * No optimistic update. The mode is room state, so the answer that matters is the row the server
-   * wrote; `invalidateAll()` re-reads it, and the same broadcast reaches every other tab in the
-   * room. Assuming success here would show this presenter a mode nobody else had.
+   * No optimistic update; `chat-mode.remote.ts` says why the command hands back nothing to assign.
+   * The `return` in the catch is what `if (result.type !== 'success') return` used to buy: a refetch
+   * after a refusal re-reads the unchanged row and redraws the radio at the mode nobody picked.
    */
-  async function changeChatMode(mode: string) {
-    const body = new FormData();
-    body.set('mode', mode);
-    const response = await fetch('?/changeChatMode', { method: 'POST', body });
-    const result = deserialize<{ mode?: string }, { message?: string }>(await response.text());
-    if (result.type !== 'success') return;
+  async function changeChatMode(mode: ChatMode) {
+    try {
+      await changeChatModeCommand(mode);
+    } catch (error) {
+      console.error('changeChatMode', mode, error);
+      return;
+    }
     await invalidateAll();
   }
 

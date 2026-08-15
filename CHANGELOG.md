@@ -24,6 +24,94 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-15
 
+### 2026-08-15 14:20 EDT — Two broadcasts that looked alike, and a confirm that was spelled two ways
+
+**Branch `feat/extra-chat-column`, not merged.** **Runtime impact: yes** — on the recording badge,
+the chat-mode radios, and (a fix) the sentence the session modal shows before changing the room.
+
+`recordingState` and `changeChatMode` leave `+page.server.ts` for **`src/routes/recording-state.remote.ts`**
+and **`src/routes/chat-mode.remote.ts`** — two modules, deliberately, because they are two features
+that merely *looked* alike sitting next to each other. Both are presenter-gated `cmds` broadcasts
+scoped by `presenterRoom()`; the one place they diverge is the one that matters and it is now
+written at both ends. Recording is **momentary** and stores nothing: a member who joins after the
+recorder stopped has missed nothing, and a row would only be a second opinion to keep in step with a
+`MediaRecorder` that dies with the tab that owns it. The chat mode is a **standing fact** and writes
+a row, because somebody arriving later has to *find* the chat disabled. Folding them into one module
+would have buried that under a shared name.
+
+**Two changes that are not moves, each stated in the code:**
+
+- **`recName` now REFUSES over 200 characters** where the action read
+  `String(data.get('recName') ?? '').slice(0, 200)`. A silent truncation turns a wrong input into a
+  plausible one and tells nobody — the fallback this repository forbids. Unreachable from the UI
+  either way: the one caller that supplies a name generates a 39-character ISO timestamp.
+- **The mode allow-list is `z.enum(CHAT_MODES)`**, not a hand-called `isChatMode`. Same three
+  letters, but *derived* from the constant `$lib/chat-mode.ts` already exports rather than restated,
+  and the type now flows all the way out: the modal prop, both radio handlers and the page wrapper
+  are `ChatMode` instead of `string`, so a fourth mode cannot be offered by a radio and refused by
+  the server.
+
+**A defect found while doing it, and fixed.** There were **two** copies of the confirm sentence and
+only one was right. `requestSettingsChatMode` built the capture's label with a ternary;
+`requestSessionChatMode` interpolated the raw letter, so the session modal asked *"Are you sure you
+want to change the chat mode to p"*. Same control, same three values, two spellings — which is what
+duplicated copy always eventually becomes. `chatModeConfirmPrompt` in `$lib/chat-mode.ts` owns the
+wording now (quotes and trailing `?` transcribed whole) and both call it.
+
+**A second defect in the test suite, found the same way and worth recording because it was GREEN.**
+`chat-mode-contract.test.ts` carved the action out of `+page.server.ts` with
+`slice(from, indexOf('getMyMobilePin: async', from))`. That end marker stopped existing when
+`getMyMobilePin` became a remote function on 2026-08-15, so `indexOf` returned `-1`, the slice ran to
+the second-to-last character of the file, and four assertions passed against *the whole rest of the
+file* rather than the action. Same family as the `exactAlerts` slice that silently became `''`. There
+is nothing to slice now — the command has a file of its own, so the file **is** the span.
+
+**The ratchet did its job, and this is the first time it took an extraction to satisfy it.** The
+conversion landed **15 over** the `+page.svelte` ceiling: a `try`/`catch` around a command is three
+lines where `void fetch(...)` was one, twice, plus two imports. Moving the reasoning into the
+modules that own it covered part of it; the rest was paid with a real module —
+**`$lib/chat-plain-text.ts`**, taking `stripHtmlToText` out of the component. Pure, twinned with a
+server derivation it has to agree with, and never once executed by a test in its life.
+
+**Also fixed:** two JSDoc blocks were stacked in `+page.svelte`, so the docstring describing
+`startRecording` sat on `broadcastRecordingState` three definitions above it. Put back on what it
+describes.
+
+| | before | after |
+| --- | --- | --- |
+| `+page.svelte` | 13,542 | **13,534** |
+| `ModalHost.svelte` | 5,985 | **5,983** — first time it has moved, and down |
+| `+page.server.ts` | 2,776 | **2,709** (3,233 at the start of the conversions, −524, **16%**) |
+| room suite | 1,600 / 119 files | **1,623 / 121 files** |
+| remotes registered | 6 | **8** |
+
+**Verified:** `svelte-check` **0 errors, 0 warnings** (1,089 files) · full room suite **1623/1623**
+across 121 files · `eslint src` **clean** (the 25 remaining errors are all in the untracked,
+gitignored `scripts/… 2.*` duplicates and predate this work) · prettier clean · `vite build`
+succeeds with **eight** remotes in the server manifest, and the two new ids READ out of the built
+client bundle as `dj3cu1/recordingState` and `1edz78e/changeChatMode`, matching
+`.svelte-kit/output/server/chunks/remote-dj3cu1.js` and `remote-1edz78e.js` · **`svelte-autofixer`
+returned `issues: []` on both `ModalHost.svelte` and `+page.svelte`.**
+
+**A correction to something recorded earlier in this session:** the plan document claims the
+autofixer "cannot be run on a 13,555-line file", and it was used to justify skipping the gate. That
+is wrong — it runs on both files and returns clean. The suggestions it emits (`SvelteMap`/`SvelteSet`,
+state assigned inside `$effect`) are all pre-existing and none fall in a region touched here, but
+they are a real backlog and should be read as one.
+
+**Three negative controls run and seen red**, each restored with `cp` from `/tmp` and never
+`git checkout` (which destroyed uncommitted work earlier in this session):
+
+1. dropping the `return;` from the `changeChatMode` catch — proves a refused change cannot fall
+   through to `invalidateAll()` and redraw the radio at a mode nobody picked;
+2. letting an empty `recName` ride along as `''` instead of `undefined`;
+3. sourcing the room without the presenter gate, via `requireRoomShortCode(getRequestEvent().locals)`
+   — proves the gate and the tenant scope are one call and cannot be applied separately.
+
+**Still not done, and it spans all seven conversions: no browser click-through.** Nothing here has
+been exercised in a live room — not the recording badge as a member sees it, not either chat-mode
+radio. Everything is proven by build manifest, type-check and contract test.
+
 ### 2026-08-15 13:58 EDT — "For All", and the gate that had to move a second time
 
 **Runtime impact: yes, on the four "For All" broadcasts.** `videoForAll` and `youtubeForAll` move to

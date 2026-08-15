@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import { chatModeConfirmPrompt } from './chat-mode';
 
 /*
   The chat mode control, end to end — and the reason this file exists is that it did NOTHING.
@@ -59,30 +60,112 @@ describe('the mode is ROOM state, not a preference', () => {
   });
 });
 
-describe('the action', () => {
-  it('is presenter-only, checked on the SERVER', () => {
-    const from = serverCode.indexOf('changeChatMode: async');
-    expect(from, 'the action must exist').toBeGreaterThan(-1);
-    const action = serverCode.slice(from, serverCode.indexOf('getMyMobilePin: async', from));
-    // A hidden radio is not an authorization check.
-    expect(action).toContain('if (!isPresenterRole(user.role)) return fail(403');
-    expect(action).toContain('requireRoomShortCode(locals)');
-    expect(action).not.toContain("data.get('roomShortCode')");
+describe('the confirm, which the two radios spelled two different ways', () => {
+  it('is the capture’s sentence, quotes and question mark included', () => {
+    /*
+      `let o = '"Group Chat"?'; 'p' == e ? (o = '"Webinar Mode"?') : 'd' == e && (o = '"Disabled"?');`
+      then `bootbox.confirm('Are you sure you want to change the chat mode to ' + o, …)`.
+
+      The `?` belongs to the LABEL, so the prefix carries none of its own — reproduced rather than
+      tidied, because the sentence is what a presenter reads before changing the room for everyone.
+    */
+    expect(chatModeConfirmPrompt('g')).toBe(
+      'Are you sure you want to change the chat mode to "Group Chat"?'
+    );
+    expect(chatModeConfirmPrompt('p')).toBe(
+      'Are you sure you want to change the chat mode to "Webinar Mode"?'
+    );
+    expect(chatModeConfirmPrompt('d')).toBe(
+      'Are you sure you want to change the chat mode to "Disabled"?'
+    );
   });
 
-  it('refuses any mode that is not one of the three letters', () => {
-    expect(serverCode).toContain('if (!isChatMode(mode)) return fail(400');
+  it('and BOTH radios ask it, where the session one used to show the raw letter', () => {
+    /*
+      The defect this extraction found. `requestSessionChatMode` interpolated `${mode}` directly, so
+      the session modal asked "are you sure you want to change the chat mode to p" while the
+      settings modal — the same control, the same three values — asked it properly. One copy right
+      and one wrong is what duplicated copy always eventually becomes.
+    */
+    expect(modalCode).toContain(
+      'onConfirm(chatModeConfirmPrompt(mode), () => applyGroupChatMode(mode));'
+    );
+    expect(modalCode.split('chatModeConfirmPrompt(mode)').length - 1).toBe(2);
+    expect(modalCode).not.toContain('change the chat mode to ${mode}');
+    expect(modalCode).not.toContain("mode === 'p' ? '\"Webinar Mode\"?'");
+  });
+});
+
+/*
+  The command — and a note on why these assertions no longer SLICE.
+
+  This block used to carve the action out of `+page.server.ts` with
+  `serverCode.slice(from, serverCode.indexOf('getMyMobilePin: async', from))`. That end marker
+  stopped existing the day `getMyMobilePin` became a remote function, so `indexOf` returned -1 and
+  the slice ran from `changeChatMode` to the second-to-last character of a 2,700-line file. Every
+  assertion below still passed — against the whole rest of the file, matching lines belonging to
+  actions that have nothing to do with the chat mode.
+
+  Nothing went red, which is the point: it is the same failure as the `exactAlerts` slice that
+  silently became `''`. A slice whose end marker can vanish is a guard that quietly widens to
+  everything. The command has a file of its own now, so there is nothing to slice — the file IS the
+  span, and a marker that disappears takes the `indexOf` assertion with it.
+*/
+const CHAT_MODE_COMMAND = readFileSync(
+  new URL('../routes/chat-mode.remote.ts', import.meta.url),
+  'utf8'
+);
+const commandCode = stripComments(CHAT_MODE_COMMAND);
+
+describe('the command', () => {
+  it('is presenter-only, checked on the SERVER, and scoped by the same call', () => {
+    // A hidden radio is not an authorization check.
+    expect(commandCode).toContain('const room = presenterRoom();');
+    /*
+      `presenterRoom()` returns the room only AFTER the role check, so the gate and the tenant scope
+      cannot be applied separately. The room comes from the SESSION, and the argument schema below
+      is a bare `z.enum` with nowhere to put a room even if a caller sent one — a `roomShortCode` on
+      the argument would let a presenter of room A rewrite room B's policy.
+    */
+    expect(commandCode).not.toContain('requireRoomShortCode');
+    expect(commandCode).not.toContain('z.strictObject');
+  });
+
+  it('refuses any mode that is not one of the three letters, from the ONE constant', () => {
+    /*
+      `z.enum(CHAT_MODES)` and not a hand-called `isChatMode`. Same three letters, deny-by-default
+      either way — but derived from what `$lib/chat-mode.ts` exports, so a fourth mode cannot be
+      added there and silently refused here.
+    */
+    expect(commandCode).toContain('command(z.enum(CHAT_MODES), async (mode)');
+    expect(commandCode).toContain("import { CHAT_MODES } from '$lib/chat-mode';");
   });
 
   it('upserts rather than appending a second opinion about the mode', () => {
-    expect(serverCode).toContain('.onConflictDoUpdate({');
-    expect(serverCode).toContain('target: roomState.roomShortCode,');
+    expect(commandCode).toContain('.onConflictDoUpdate({');
+    expect(commandCode).toContain('target: roomState.roomShortCode,');
   });
 
   it('broadcasts, so tabs already open follow the presenter', () => {
-    expect(serverCode).toContain(
-      "publishToRoom(roomShortCode, { channel: 'cmds', data: { cmd: 'changeChatMode', mode } });"
+    expect(commandCode).toContain(
+      "publishToRoom(room, { channel: 'cmds', data: { cmd: 'changeChatMode', mode } });"
     );
+  });
+
+  it('returns nothing, so the client cannot assign a mode it was handed', () => {
+    /*
+      The action returned `{ success: true, mode }` and the caller ignored the `mode` — correctly.
+      Handing one back invites a second source of truth that can disagree with the row.
+    */
+    expect(commandCode).not.toContain('return { success: true');
+    expect(commandCode).not.toContain('return { mode');
+  });
+
+  it('and the form action it replaced is gone from the file that held it', () => {
+    // Pointed at `+page.server.ts` deliberately: that file DID contain this, so the guard is real.
+    expect(serverCode).toContain('export const actions: Actions = {');
+    expect(serverCode).not.toContain('changeChatMode: async');
+    expect(serverCode).not.toContain('if (!isChatMode(mode)) return fail(400');
   });
 });
 
@@ -95,6 +178,25 @@ describe('the client reads the ROW, never the broadcast', () => {
     expect(pageCode).toContain(
       "const chatMode = $derived(isChatMode(data.chatMode) ? data.chatMode : 'g');"
     );
+  });
+
+  it('and it refetches ONLY on the path where the write actually happened', () => {
+    /*
+      The `fetch` version read `if (result.type !== 'success') return` before invalidating. A
+      rejected command throws instead, so the equivalent is a `return` inside the catch — without
+      it, a refused change would re-read the unchanged row and redraw the radio at the mode the
+      presenter did not pick, which looks exactly like a successful no-op.
+
+      The catch logs rather than swallowing. Nothing is shown to the presenter, because upstream
+      shows nothing either and inventing a toast would change what the room does.
+    */
+    const from = pageCode.indexOf('async function changeChatMode(');
+    expect(from, 'the client wrapper must exist').toBeGreaterThan(-1);
+    const wrapper = pageCode.slice(from, pageCode.indexOf('\n  }', from));
+    expect(wrapper).toContain('await changeChatModeCommand(mode);');
+    expect(wrapper).toContain("console.error('changeChatMode', mode, error);");
+    expect(wrapper).toContain('return;');
+    expect(wrapper).not.toContain("fetch('?/changeChatMode'");
   });
 
   it('and the broadcast makes it REFETCH rather than assigning a mode', () => {
