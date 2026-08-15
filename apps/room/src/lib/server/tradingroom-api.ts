@@ -37,16 +37,23 @@
  */
 
 import type { Cookies } from '@sveltejs/kit';
-import { env } from '$env/dynamic/private';
+import { TRADINGROOM_API_URL } from '$app/env/private';
 
 /**
  * Where the Rust API listens.
  *
- * Read from `$env/dynamic/private` rather than `$env/static/private` so the same build runs in
- * dev and in a container without recompiling - the value is only known at deploy time.
+ * Read at runtime rather than inlined at build time, so the same build runs in dev and in a
+ * container without recompiling — the value is only known at deploy time.
+ *
+ * This read `$env/dynamic/private` until 2026-08-15, and `TRADINGROOM_API_URL` was NOT DECLARED in
+ * `src/env.ts`. Under Kit 2 that still worked, because the module was a live view of the real
+ * environment. Under Kit 3 it is a shim over `$app/env/private`, which exports exactly what that
+ * file declares — so setting the variable would have been silently ignored and every call would
+ * have gone to localhost. Nothing calls this yet, which is the only reason it was not a live
+ * defect; it is declared now so that the first caller is not the one who discovers it.
  */
 function baseUrl(): string {
-  return (env.TRADINGROOM_API_URL ?? 'http://127.0.0.1:8080').replace(/\/$/, '');
+  return (TRADINGROOM_API_URL ?? 'http://127.0.0.1:8080').replace(/\/$/, '');
 }
 
 /** The two cookies the API issues. Names must match `http::ACCESS_COOKIE` / `REFRESH_COOKIE`. */

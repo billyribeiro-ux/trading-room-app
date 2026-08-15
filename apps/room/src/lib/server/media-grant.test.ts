@@ -20,10 +20,20 @@ import { createHmac, createPrivateKey } from 'node:crypto';
  * signing key — in a clean checkout, which is what CI has, `loadSigningKey()` threw and two tests
  * failed. A test whose result depends on the machine it runs on is not evidence of anything.
  *
- * Mocking `$env/dynamic/private` fixes that AND sharpens the guarantee. If this module ever
- * regressed to reading `process.env`, the mock would not be consulted and these tests would fail
- * exactly as they did before — so the mock is what proves the source, rather than merely allowing
- * the test to run.
+ * Mocking the env module fixes that AND sharpens the guarantee. If this module ever regressed to
+ * reading `process.env`, the mock would not be consulted and these tests would fail exactly as they
+ * did before — so the mock is what proves the source, rather than merely allowing the test to run.
+ *
+ * The target is `$app/env/private`, and it moved there with the module under test on 2026-08-15.
+ * Kit 3 turns `$env/dynamic/private` into a five-line shim that logs "use `$app/env/private`
+ * instead" and stops emitting its ambient types. Mocking the OLD specifier after that move would
+ * have been worse than useless: it would have silently stopped intercepting, and these two tests
+ * would have gone back to depending on the developer's machine without anybody noticing.
+ *
+ * ALL FIVE names `media-grant.ts` imports are listed, not just the key. A named import of an export
+ * the factory omits is a hard error, so this list is checked by the module loader on every run —
+ * which makes it the one place that cannot drift from the module's real environment surface.
+ * `MEDIA_WS_URL` is deliberately `undefined`: one test below asserts the fallback URL.
  *
  * `vi.hoisted` is required: `vi.mock` is lifted above the imports, so the PEM has to exist before
  * the factory runs.
@@ -34,10 +44,14 @@ const mockedEnv = vi.hoisted(() => {
   const seed = Buffer.from(Array.from({ length: 32 }, (_, index) => index));
   const pem = Buffer.concat([prefix, seed]).toString('base64');
   return {
-    MEDIA_GRANT_PRIVATE_KEY: `-----BEGIN PRIVATE KEY-----\n${pem}\n-----END PRIVATE KEY-----\n`
+    MEDIA_GRANT_PRIVATE_KEY: `-----BEGIN PRIVATE KEY-----\n${pem}\n-----END PRIVATE KEY-----\n`,
+    MEDIA_STUN_URLS: undefined,
+    MEDIA_TURN_SECRET: undefined,
+    MEDIA_TURN_URLS: undefined,
+    MEDIA_WS_URL: undefined
   };
 });
-vi.mock('$env/dynamic/private', () => ({ env: mockedEnv }));
+vi.mock('$app/env/private', () => mockedEnv);
 import {
   GRANT_TTL_SECONDS,
   GRANT_VERSION,
