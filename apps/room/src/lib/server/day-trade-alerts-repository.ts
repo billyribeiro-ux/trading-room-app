@@ -1,58 +1,67 @@
 import { and, desc, eq, gte, isNull } from 'drizzle-orm';
-import type { SwingAlertDirection, SwingAlertRow } from '$lib/types';
+import type { DayTradeAlertDirection, DayTradeAlertRow } from '$lib/types';
 import { db, ensureDatabase } from '$lib/server/db';
-import { alertQuestions, alerts, swingAlerts, users, type SwingAlert } from '$lib/server/db/schema';
+import {
+  alertQuestions,
+  alerts,
+  dayTradeAlerts,
+  users,
+  type DayTradeAlert
+} from '$lib/server/db/schema';
 import { hashEmail } from '$lib/server/connection';
-import { formatSwingAlertTxt } from '$lib/swing-alerts';
+import { formatDayTradeAlertTxt } from '$lib/day-trade-alerts';
 
 /**
- * Swing Trade Alerts, persisted.
+ * Day Trade Alerts, persisted.
  *
- * Shaped like `notes-repository.ts`, and for the same reason its comment gives: **every query here
- * is scoped to one room**, in the WHERE clause rather than by a caller remembering to filter. This
- * table holds a room's trading positions — entries, stops and targets — and a query that reaches it
- * without `roomShortCode` is one tenant reading another tenant's book. The room short code comes
- * from the session row, never from the request.
+ * The port of `swing-alerts-repository.ts`, function for function, and for the same reason its
+ * comment gives: **every query here is scoped to one room**, in the WHERE clause rather than by a
+ * caller remembering to filter. This table holds a room's trading positions — entries, stops and
+ * targets — and a query that reaches it without `roomShortCode` is one tenant reading another
+ * tenant's book. The room short code comes from the session row, never from the request.
  *
  * ## Two writes per operation, in one transaction
  *
- * A swing submit sends TWO commands (bundle byte 1,983,136): `swingAlertMsg` writes the row and
- * `alertMsg` posts `formatSwingAlertTxt(h)` into the MAIN alerts feed. Edit sends
- * `editSwingAlertMsg` then `editAlertMessageSwing`; delete removes both. So every mutation here
- * touches `swing_alerts` AND `alerts`, and it does so inside `db.transaction` — a swing row whose
- * feed message failed to write is exactly the orphan the reference suffers from, and it is the one
- * thing this room can cheaply not have.
+ * A Day Trade submit sends TWO commands (bundle byte 1,985,961): `dayTradeAlertMsg` writes the row
+ * and `alertMsg` posts `formatDayTradeAlertTxt(h)` into the MAIN alerts feed. Edit sends
+ * `editDayTradeAlertMsg` then `editAlertMessageSwing` — spelled with `Swing`, on this path, read at
+ * byte 1,987,189; delete removes both. So every mutation here touches `day_trade_alerts` AND
+ * `alerts`, and it does so inside `db.transaction` — a day trade row whose feed message failed to
+ * write is exactly the orphan the reference suffers from, and it is the one thing this room can
+ * cheaply not have.
  *
  * That is why this module writes a table it does not own. The alternative is two repositories and
  * two statements a caller has to remember to pair, which is the same bug with more files.
  *
  * ## Soft delete for the row, hard delete for the mirror
  *
- * The swing row is soft-deleted, as `notes` are: a mis-clicked delete on a position somebody is
- * trading is not recoverable from a broadcast, and `deleted_at` costs one predicate. The feed
- * message is hard-deleted, because that is what deleting an alert does everywhere else in this room
- * (`messageAction`'s `delete` branch) and a tombstoned alert would still be served by the feed.
+ * The day trade row is soft-deleted, as `notes` and `swing_alerts` are: a mis-clicked delete on a
+ * position somebody is trading is not recoverable from a broadcast, and `deleted_at` costs one
+ * predicate. The feed message is hard-deleted, because that is what deleting an alert does
+ * everywhere else in this room (`messageAction`'s `delete` branch) and a tombstoned alert would
+ * still be served by the feed.
  */
 
 /**
  * The sender's avatar pair, derived rather than stored.
  *
- * The client writes neither `senderPic` nor `senderAvt` — both occur in the bundle only as reads
- * inside the two row templates (spec §5c), so they are produced server-side. `senderPic` is the
- * account's own avatar and `senderAvt` is the md5 of its email, which is exactly the hash the row's
- * fallback URL is built from. A row whose author's account has since been removed falls back to an
- * empty pair, and the template's Gravatar default (`?d=mm`) then draws the anonymous silhouette.
+ * The client writes neither `senderPic` nor `senderAvt` — both occur in the Day Trade region only
+ * as reads inside the row template (byte 1,943,900), so they are produced server-side. `senderPic`
+ * is the account's own avatar and `senderAvt` is the md5 of its email, which is exactly the hash
+ * the row's fallback URL is built from. A row whose author's account has since been removed falls
+ * back to an empty pair, and the template's Gravatar default (`?d=mm`) then draws the anonymous
+ * silhouette.
  */
 interface SenderIdentity {
   senderPic: string;
   senderAvt: string;
 }
 
-function swingAlertDto(row: SwingAlert, sender: SenderIdentity): SwingAlertRow {
+function dayTradeAlertDto(row: DayTradeAlert, sender: SenderIdentity): DayTradeAlertRow {
   return {
     id: row.id,
     symbol: row.symbol,
-    direction: row.direction as SwingAlertDirection,
+    direction: row.direction as DayTradeAlertDirection,
     entryDate: row.entryDate.toISOString(),
     entryPrice: row.entryPrice,
     stop: row.stop,
@@ -65,9 +74,9 @@ function swingAlertDto(row: SwingAlert, sender: SenderIdentity): SwingAlertRow {
 }
 
 /** The fields a create or an edit writes. `senderName` is added by the caller, from the session. */
-export interface SwingAlertInput {
+export interface DayTradeAlertInput {
   symbol: string;
-  direction: SwingAlertDirection;
+  direction: DayTradeAlertDirection;
   entryPrice: string;
   stop: string;
   target: string;
@@ -80,28 +89,30 @@ export interface SwingAlertInput {
  * Returned rather than published from here: `publishToRoom` must run AFTER the transaction commits,
  * or a rolled-back write is announced to every member in the room as though it had happened.
  */
-export interface SwingAlertMirrorResult {
+export interface DayTradeAlertMirrorResult {
   /** The feed message's id, or null when the row has no mirror to speak of. */
   alertId: number | null;
   /** The feed message's text after the operation, or null when it was removed. */
   body: string | null;
 }
 
-export interface SwingAlertMutation {
-  row: SwingAlertRow;
-  mirror: SwingAlertMirrorResult;
+export interface DayTradeAlertMutation {
+  row: DayTradeAlertRow;
+  mirror: DayTradeAlertMirrorResult;
 }
 
 /**
- * `getSwingAlertsLog` — one room's alerts inside a rolling window, newest first.
+ * `getDayTradeAlertsLog` — one room's alerts inside a rolling window, newest first.
  *
  * ## What bounds this read
  *
  * Two things, and both are needed. `days` bounds it in time, which is the reference's own window
- * (`{ sessionID, days }`); the caller clamps it, so the worst case is 600 days of one room. The
- * index `(room_short_code, entry_date, id)` then serves the equality, the range and the ordering in
- * one walk, so the cost is the rows returned rather than the room's whole history. At ten thousand
- * rows in a room this reads the window, not the table.
+ * (`{ sessionID, days }`); the caller clamps it, so the worst case is 420 days of one room — the
+ * largest window the select can ask for, `4 * 15 * 7`, and 180 days narrower than the Swing bound
+ * because the Day Trade select stops at 15 months and multiplies by 28. The index
+ * `(room_short_code, entry_date, id)` then serves the equality, the range and the ordering in one
+ * walk, so the cost is the rows returned rather than the room's whole history. At ten thousand rows
+ * in a room this reads the window, not the table.
  *
  * ## Why the join is here rather than per row
  *
@@ -112,28 +123,32 @@ export interface SwingAlertMutation {
  *
  * ## Newest first
  *
- * The reference reverses the server's array on receipt and prepends new rows, so the displayed
- * order is newest first. That ordering is produced here, by the index, rather than by reversing an
- * array in the browser.
+ * The reference reverses the server's array on receipt (`i.data.reverse()`, byte 1,018,629) and
+ * prepends new rows, so the displayed order is newest first. That ordering is produced here, by the
+ * index, rather than by reversing an array in the browser.
  */
-export function getSwingAlerts(room: string, days: number, now: Date): readonly SwingAlertRow[] {
+export function getDayTradeAlerts(
+  room: string,
+  days: number,
+  now: Date
+): readonly DayTradeAlertRow[] {
   ensureDatabase();
   const since = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
   return db
-    .select({ alert: swingAlerts, avatarUrl: users.avatarUrl, email: users.email })
-    .from(swingAlerts)
-    .leftJoin(users, eq(users.id, swingAlerts.senderId))
+    .select({ alert: dayTradeAlerts, avatarUrl: users.avatarUrl, email: users.email })
+    .from(dayTradeAlerts)
+    .leftJoin(users, eq(users.id, dayTradeAlerts.senderId))
     .where(
       and(
-        eq(swingAlerts.roomShortCode, room),
-        isNull(swingAlerts.deletedAt),
-        gte(swingAlerts.entryDate, since)
+        eq(dayTradeAlerts.roomShortCode, room),
+        isNull(dayTradeAlerts.deletedAt),
+        gte(dayTradeAlerts.entryDate, since)
       )
     )
-    .orderBy(desc(swingAlerts.entryDate), desc(swingAlerts.id))
+    .orderBy(desc(dayTradeAlerts.entryDate), desc(dayTradeAlerts.id))
     .all()
     .map(({ alert, avatarUrl, email }) =>
-      swingAlertDto(alert, {
+      dayTradeAlertDto(alert, {
         senderPic: avatarUrl ?? '',
         senderAvt: email === null ? '' : hashEmail(email)
       })
@@ -141,28 +156,29 @@ export function getSwingAlerts(room: string, days: number, now: Date): readonly 
 }
 
 /**
- * `swingAlertMsg` + `alertMsg` — the create, both halves.
+ * `dayTradeAlertMsg` + `alertMsg` — the create, both halves.
  *
  * `entryDate` is set here, from the server's clock, because the client never sends it: the payload
  * the reference builds carries the six typed fields plus `senderName` and nothing else, and `_id`,
  * `entryDate`, `senderPic` and `senderAvt` are explicitly not sent.
  *
- * The feed message is written FIRST so its id can be recorded on the swing row in the same
+ * The feed message is written FIRST so its id can be recorded on the day trade row in the same
  * transaction. Its payload in the reference is
- * `{ txt, n, sendTxt:!1, sendEmail:!1, sendTweet:!1, dontPush:!1, nonTradeAlert:!1, swingTradeAlert:!0 }`
- * — of those, the four `send*`/`dontPush` flags are delivery instructions this room has no
- * equivalent for, and `nonTradeAlert:!1` is the one that maps onto a stored column: `nonTrade`
- * false, i.e. this IS a trade alert.
+ * `{ txt, n, sendTxt:!1, sendEmail:!1, sendTweet:!1, dontPush:!1, nonTradeAlert:!1, dayTradeAlert:!0 }`
+ * (byte 1,987,595) — of those, the four `send*`/`dontPush` flags are delivery instructions this room
+ * has no equivalent for, `dayTradeAlert:!0` is the discriminator that tells the server which of the
+ * two features posted (and is the ONLY difference from the swing payload), and `nonTradeAlert:!1`
+ * is the one that maps onto a stored column: `nonTrade` false, i.e. this IS a trade alert.
  */
-export function createSwingAlert(input: {
+export function createDayTradeAlert(input: {
   room: string;
-  alert: SwingAlertInput;
+  alert: DayTradeAlertInput;
   now: Date;
   senderName: string;
   userId: number;
-}): SwingAlertMutation {
+}): DayTradeAlertMutation {
   ensureDatabase();
-  const body = formatSwingAlertTxt(input.alert);
+  const body = formatDayTradeAlertTxt(input.alert);
   const row = db.transaction((transaction) => {
     const mirror = transaction
       .insert(alerts)
@@ -171,7 +187,7 @@ export function createSwingAlert(input: {
         senderId: input.userId,
         kind: 'text',
         body,
-        // `nonTradeAlert: !1` — a swing alert is a trade alert.
+        // `nonTradeAlert: !1` — a day trade alert is a trade alert.
         nonTrade: false,
         createdAt: input.now
       })
@@ -179,7 +195,7 @@ export function createSwingAlert(input: {
       .get();
 
     return transaction
-      .insert(swingAlerts)
+      .insert(dayTradeAlerts)
       .values({
         roomShortCode: input.room,
         symbol: input.alert.symbol,
@@ -197,39 +213,40 @@ export function createSwingAlert(input: {
       .get();
   });
   return {
-    row: swingAlertDto(row, sender(input.userId)),
+    row: dayTradeAlertDto(row, sender(input.userId)),
     mirror: { alertId: row.alertId, body }
   };
 }
 
 /**
- * `editSwingAlertMsg` + `editAlertMessageSwing` — replace a row's fields and re-write its mirror.
+ * `editDayTradeAlertMsg` + `editAlertMessageSwing` — replace a row's fields and re-write its mirror.
  *
  * One conditional UPDATE with the room in the WHERE and `RETURNING`, not a SELECT then an UPDATE:
  * zero rows back means the id does not name an undeleted row of THIS room, and the caller answers
  * 404. Splitting it would be a TOCTOU where the check passes and the write lands after a delete.
  *
  * **`senderName` is rewritten to the editor**, which looks wrong and is correct: the reference puts
- * `globals.user.nick || .name` into the payload of the edit command just as it does the create, so
- * an edit by a second presenter does move the row's sender. Reproduced deliberately; "preserving"
- * the original author here would be a divergence chosen by me.
+ * `globals.user.nick || .name` into the payload of the edit command just as it does the create — it
+ * is the same object literal `h`, built once at byte 1,986,780 and used by both branches — so an
+ * edit by a second presenter does move the row's sender. Reproduced deliberately; "preserving" the
+ * original author here would be a divergence chosen by me.
  *
  * The mirror update is room-scoped as well, even though `alertId` came off a row this statement
  * just proved belongs to the room. The predicate costs nothing and means no future caller can turn
  * this into a cross-room write by passing an id from somewhere else.
  */
-export function editSwingAlert(input: {
+export function editDayTradeAlert(input: {
   room: string;
-  swingAlertID: number;
-  alert: SwingAlertInput;
+  dayTradeAlertID: number;
+  alert: DayTradeAlertInput;
   senderName: string;
   userId: number;
-}): SwingAlertMutation | null {
+}): DayTradeAlertMutation | null {
   ensureDatabase();
-  const body = formatSwingAlertTxt(input.alert);
+  const body = formatDayTradeAlertTxt(input.alert);
   const updated = db.transaction((transaction) => {
     const row = transaction
-      .update(swingAlerts)
+      .update(dayTradeAlerts)
       .set({
         symbol: input.alert.symbol,
         direction: input.alert.direction,
@@ -242,9 +259,9 @@ export function editSwingAlert(input: {
       })
       .where(
         and(
-          eq(swingAlerts.roomShortCode, input.room),
-          eq(swingAlerts.id, input.swingAlertID),
-          isNull(swingAlerts.deletedAt)
+          eq(dayTradeAlerts.roomShortCode, input.room),
+          eq(dayTradeAlerts.id, input.dayTradeAlertID),
+          isNull(dayTradeAlerts.deletedAt)
         )
       )
       .returning()
@@ -263,13 +280,13 @@ export function editSwingAlert(input: {
 
   if (updated === undefined) return null;
   return {
-    row: swingAlertDto(updated, sender(input.userId)),
+    row: dayTradeAlertDto(updated, sender(input.userId)),
     mirror: { alertId: updated.alertId, body }
   };
 }
 
 /**
- * `deleteSwingAlertMsg` — soft delete the row, hard delete its feed mirror.
+ * `deleteDayTradeAlertMsg` — soft delete the row, hard delete its feed mirror.
  *
  * Zero rows back means the row is not this room's, or is already deleted. Both answer 404, and
  * neither tells the caller which — a room must not be able to probe another room's ids.
@@ -286,46 +303,44 @@ export function editSwingAlert(input: {
  * `SqliteError: FOREIGN KEY constraint failed` — the whole transaction rolls back and the presenter
  * gets a 500 with nothing deleted.
  *
- * **This function shipped without that clearing statement and deleting a swing alert could not
- * work at all.** Nothing caught it: it type-checks, it lints, and `swing-alerts-contract.test.ts`
- * never reaches the repository. It was found on 2026-08-15 by running the create/edit/delete round
- * trip against a real SQLite file while porting the Day Trade twin, which had inherited the same
- * defect line for line. Both were fixed in the same change.
+ * Found by a runtime probe of this repository, not by a type error or a passing test, and confirmed
+ * to be identical in `swing-alerts-repository.ts`, which shipped first and had the same defect.
+ * Fixed in both in the same change.
  *
  * The extra UPDATE is not a second race: the conditional UPDATE above is what decides who wins, and
  * this statement runs inside the same transaction on a row that statement has already claimed. It
- * keeps the room predicate anyway, for the same reason the mirror update does. Nulling is also the
- * honest end state: the row no longer has a feed mirror, and an `alert_id` pointing at a deleted
- * alert would be a dangling one.
+ * keeps the room predicate anyway, for the same reason the mirror update does — so that no future
+ * caller can turn it into a cross-room write. Nulling is also the honest end state: the row no
+ * longer has a feed mirror, and an `alert_id` pointing at a deleted alert would be a dangling one.
  */
-export function deleteSwingAlert(input: {
+export function deleteDayTradeAlert(input: {
   room: string;
-  swingAlertID: number;
+  dayTradeAlertID: number;
   now: Date;
   userId: number;
-}): SwingAlertMirrorResult | null {
+}): DayTradeAlertMirrorResult | null {
   ensureDatabase();
   const deleted = db.transaction((transaction) => {
     const row = transaction
-      .update(swingAlerts)
+      .update(dayTradeAlerts)
       .set({ deletedAt: input.now, deletedById: input.userId })
       .where(
         and(
-          eq(swingAlerts.roomShortCode, input.room),
-          eq(swingAlerts.id, input.swingAlertID),
-          isNull(swingAlerts.deletedAt)
+          eq(dayTradeAlerts.roomShortCode, input.room),
+          eq(dayTradeAlerts.id, input.dayTradeAlertID),
+          isNull(dayTradeAlerts.deletedAt)
         )
       )
-      .returning({ id: swingAlerts.id, alertId: swingAlerts.alertId })
+      .returning({ id: dayTradeAlerts.id, alertId: dayTradeAlerts.alertId })
       .get();
     if (row === undefined) return undefined;
 
     if (row.alertId !== null) {
       // Release the foreign key first — see the note above. Without this the DELETE below fails.
       transaction
-        .update(swingAlerts)
+        .update(dayTradeAlerts)
         .set({ alertId: null })
-        .where(and(eq(swingAlerts.roomShortCode, input.room), eq(swingAlerts.id, row.id)))
+        .where(and(eq(dayTradeAlerts.roomShortCode, input.room), eq(dayTradeAlerts.id, row.id)))
         .run();
       transaction.delete(alertQuestions).where(eq(alertQuestions.alertId, row.alertId)).run();
       transaction

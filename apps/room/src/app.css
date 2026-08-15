@@ -3083,54 +3083,44 @@ th {
 }
 
 /*
-  The Files sort bar, styled to the owner's rendered markup:
+  The Files sort bar. These three rules are CAPTURED, read at bytes 435,538-435,767 of
+  docs/source-v4-2026-08-15/styles.ee2a710065b60389.css, unminified here and otherwise unchanged:
 
-      <div class="d-flex flex-wrap justify-content-center align-items-center mt-2 st-fileSortBar">
-        <span class="mr-2">Sorting by:</span>
-        <button class="btn btn-sm m-1 st-fileSortName active"
-                title="Sorted A to Z (click to sort Z to A)"> Name <i class="fas ml-2 fa-sort-alpha-down"></i></button>
-        <button class="btn btn-sm m-1 st-fileSortDate"
-                title="Sorted newest to oldest (click to sort oldest to newest)"> Date <i class="fas fa-sort ml-2"></i></button>
-      </div>
+      .st-fileSortBar{font-size:12px}
+      .st-fileSortName,.st-fileSortDate{color:var(--tabs-color);background-color:transparent;border:1px solid var(--file-see-more-bg)}
+      .st-fileSortName.active,.st-fileSortDate.active{background-color:var(--file-see-more-bg)}
 
-  Layout comes entirely from those Bootstrap utilities - `mt-2` on the bar, `m-1` on the buttons -
-  so nothing here sets spacing. What IS needed is colour: `btn btn-sm` carries no variant, so
-  Bootstrap leaves the near-black body colour, which is invisible on the near-black Files pane.
-  That was my bug, and the fix is not a new value - it is the one every sibling control in the
-  captured pane already uses:
+  They land immediately after `.st-fileSeeMore` in that stylesheet, among the sibling Files rules
+  this pane already uses.
 
-      .st-fileName, .st-fileSize, .st-fileDeleteSelected, .st-fileSeeMore,
-      .st-fileDownload, .st-fileDelete, .st-fileUpload { font-size: 12px; }
-      .st-fileSeeMore { background-color: var(--file-see-more-bg); color: var(--tabs-color); }
+  What used to be here was written before we had a capture that contained the sort bar at all, and
+  four of its declarations were mine rather than the reference's: a `:hover` rule, a `font-size` on
+  the buttons, `border: 1px solid transparent` where the capture says `var(--file-see-more-bg)`, and
+  a `border-color` plus `color` on `.active`. The border is the visible one - the capture outlines
+  BOTH buttons in the accent all the time and fills only the active one, where ours drew no outline
+  until the pointer was over it. All four are gone; nothing here is now a value I chose.
 
-  `.active` is the governing sort. It gets the pane's own accent - `--file-see-more-bg`, the same
-  fill Refresh uses - rather than an invented highlight.
+  Note there is no `cursor: pointer`. The capture does not set one, so neither does this.
+
+  TOKENS, NOT COLOURS. `--tabs-color` and `--file-see-more-bg` are both already declared in
+  src/lib/styles/tokens.css (lines 191 and 61). Resolving them to #fff and #375a7f here would hard-
+  code Simpler Trading's theme into markup another customer re-themes by setting the same two
+  variables to something else.
 */
 .st-fileSortBar {
   font-size: 12px;
-  color: var(--tabs-color);
 }
 
 .st-fileSortName,
 .st-fileSortDate {
-  font-size: 12px;
   color: var(--tabs-color);
   background-color: transparent;
-  border: 1px solid transparent;
-}
-
-.st-fileSortName:hover,
-.st-fileSortDate:hover {
-  color: var(--tabs-color);
-  border-color: var(--file-see-more-bg);
-  cursor: pointer;
+  border: 1px solid var(--file-see-more-bg);
 }
 
 .st-fileSortName.active,
 .st-fileSortDate.active {
   background-color: var(--file-see-more-bg);
-  border-color: var(--file-see-more-bg);
-  color: var(--tabs-color);
 }
 
 /*

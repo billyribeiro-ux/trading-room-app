@@ -515,7 +515,7 @@
     const walk = (name) => {
       if (seen.has(name)) return;
       seen.add(name);
-      let mod = null;
+      let mod;
       try {
         mod = window.angular.module(name);
       } catch {

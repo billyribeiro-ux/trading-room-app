@@ -147,6 +147,7 @@ describe('page load contract', () => {
         "chatMode",
         "chatMutedTill",
         "connectedUsers",
+        "dayTradeAlerts",
         "files",
         "lockedSettings",
         "mediaWsUrl",

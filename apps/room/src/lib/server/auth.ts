@@ -4,7 +4,7 @@ import { eq } from 'drizzle-orm';
 import { db } from './db';
 import { sessions, users, type User } from './db/schema';
 import { verifyPassword } from './password';
-import { signedOutDestination } from './control-plane';
+import { redirectSignedOut } from './control-plane';
 
 export const SESSION_COOKIE = 'ptr_connection';
 const THIRTY_DAYS = 60 * 60 * 24 * 30;
@@ -28,7 +28,7 @@ export function requireUser(locals: App.Locals): User {
   // The room has no login of its own; the controller is the front door. `hooks.server.ts` refuses
   // an anonymous request before this is ever reached, so this is the second line of defence for a
   // route added outside the guard.
-  if (!locals.user) redirect(303, signedOutDestination());
+  if (!locals.user) redirectSignedOut();
   return locals.user;
 }
 
@@ -41,12 +41,12 @@ export function requireUser(locals: App.Locals): User {
  * settings. Sending them back to the front door is the only correct answer.
  */
 export function requireRoomShortCode(locals: App.Locals): string {
-  if (!locals.roomShortCode) redirect(303, signedOutDestination());
+  if (!locals.roomShortCode) redirectSignedOut();
   return locals.roomShortCode;
 }
 
 export function requireSessionId(locals: App.Locals): string {
-  if (!locals.sessionId) redirect(303, signedOutDestination());
+  if (!locals.sessionId) redirectSignedOut();
   return locals.sessionId;
 }
 

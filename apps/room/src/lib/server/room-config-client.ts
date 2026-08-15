@@ -235,6 +235,36 @@ export interface RoomSessionSettings {
    */
   hasSwingTradeAlerts?: boolean;
   /**
+   * "Enable Day Trade Alerts Tab?" — whether this room has a Day Trades tab at all.
+   *
+   * The owner's label on the Manage page, verbatim, with the help text "If enabled, the room will
+   * have day trade alerts tab."
+   *
+   * `this.hasDayTradeAlerts = this.appService.globals.sessData.hasDayTradeAlerts` in `ngOnInit`
+   * (bundle byte 1,955,967), and one flag gates three things: the nav `<li>`
+   * (`O(27, o.hasDayTradeAlerts ? 27 : -1)`, byte 2,016,951), the `#dayTradeAlerts` pane
+   * (`O(49, …)`, byte 2,017,748) and the initial fetch in `loadSessionLogs()` (byte 1,009,503).
+   * `-1` is "instantiate nothing", so a room without the setting emits no markup rather than hidden
+   * markup — see `dayTradeAlertsTabVisible` in `$lib/day-trade-alerts`.
+   *
+   * **Note the spelling against its sibling.** The Swing flag doubles the word — `hasSwingTradeAlerts`
+   * — and this one does not. Both were read side by side in `loadSessionLogs()` at bytes 1,009,430
+   * and 1,009,503; the asymmetry is upstream's and `hasDayTradeTradeAlerts` names nothing.
+   *
+   * NOT presenter status. Presenter status gates only the form and the row buttons, inside the pane.
+   *
+   * `linkedRoomDayTradeAlertsOther` is deliberately NOT here beside it, and that is an explicit
+   * decision rather than an omission — the same one taken for its Swing twin. Upstream, a non-empty
+   * value makes both fetches ask for ANOTHER room's log by substituting its `sessionID`: the key is
+   * built by the template literal `` `linkedRoom${e}AlertsOther` `` at bytes 1,010,164 and
+   * 1,993,783, which is why the full name appears NOWHERE in the bundle as a literal. This room
+   * takes the room from the session row precisely so that a client cannot name the room it reads,
+   * and carrying a setting whose whole purpose is to redirect a read across rooms would reopen that
+   * by configuration. If it is ever wanted, it has to arrive as a server-resolved room id with the
+   * controller confirming the link, not as a string the room dereferences.
+   */
+  hasDayTradeAlerts?: boolean;
+  /**
    * "Overlay userID on screenshare?" — the viewer's own id printed over an MTX stream.
    *
    * Read by `StreamingView.svelte` and gated on this AND `!isPresenter`, which is `TCe` (main
@@ -246,6 +276,29 @@ export interface RoomSessionSettings {
    * naming, kept so the setting matches the label an owner ticks on the Manage page.
    */
   overlayUserIdOnScreenshare?: boolean;
+  /**
+   * "Alert filter list for mods:" — the people a viewer may filter their own alerts by.
+   *
+   * **A STRING CONTAINING JSON, not an array.** `syncModAlertFilterList()` at bundle byte 1,221,905
+   * does `JSON.parse(sessData.modAlertFilterList) || []` — with **no try/catch**, unlike the filter
+   * guard, which has one. That asymmetry is reproduced in `parseModAlertFilterList`: a malformed
+   * setting throws when the modal opens and the room keeps running.
+   *
+   * The parsed shape is `{ username, avatar }`, proven by `selectAll()` at byte 1,220,674. It is the
+   * third room setting shipped as a JSON string, after `alertLabels` and `chatTabsWithBadges`.
+   *
+   * **It gates the whole feature, not just the list.** The reference hangs its entry points on this
+   * value being truthy — bytes 2,042,979 and 2,286,654 — so a room that configures nothing has no
+   * button, no modal and no filtering. There is nothing to default from, which is why the room
+   * cannot decide it locally.
+   *
+   * The avatars are gravatar hashes of emails the owner already administers, and every alert already
+   * carries `senderAvt` so the feed can draw the avatar — so nothing crosses here that the alerts
+   * feed does not already carry.
+   *
+   * Read by `$lib/alert-filter`.
+   */
+  modAlertFilterList?: string;
 }
 
 /** The connected member's per-room standing, which is per room and not per account. */

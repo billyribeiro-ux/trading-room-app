@@ -5,23 +5,49 @@
   interface Props {
     sessionId: string;
     isPresenter: boolean;
+    /**
+     * What is playing IN THE ROOM, owned by the page.
+     *
+     * It used to be this component's own `$state`, which is why both "For All" buttons only ever
+     * moved the presenter's own screen. It is the page that holds the `cmds` subscription, so the
+     * room's answer to "what is playing" has to live there and arrive here as a prop — the same
+     * shape `mp3Url` already had.
+     */
+    videoPlayerUrl: string;
+    /**
+     * `this.scheduledVideo` — the pending play a presenter has armed but not yet sent.
+     *
+     * Page-owned for the same reason, and for one more: `stopVideoForAll` clears it for EVERY
+     * client (`scheduledVideo.videoURL = ''; scheduledVideo.videoPlayTime = null`, byte
+     * 1,966,882), so a second presenter pressing stop has to be able to cancel the first
+     * presenter's armed timer. A copy held privately here could not be reached by that command.
+     */
+    scheduledVideo: { videoURL: string; videoPlayTime: string | null };
+    /** "Play now" — broadcast this url to the room immediately. */
+    onplaynow: (url: string) => void;
+    /** "Send" on the datetime dialog — arm it for `whenLocal`, a `datetime-local` value. */
+    onschedule: (url: string, whenLocal: string) => void;
+    /** "Stop For All" and "Remove Scheduled Video" — both send `stopVideoForAll`, byte 1,981,811. */
+    onstopforall: () => void;
   }
 
-  let { sessionId, isPresenter }: Props = $props();
+  let {
+    sessionId,
+    isPresenter,
+    videoPlayerUrl,
+    scheduledVideo,
+    onplaynow,
+    onschedule,
+    onstopforall
+  }: Props = $props();
 
   let videoURL = $state('');
   let videoList = $state<string[]>([]);
-  let videoPlayerUrl = $state('');
-  let scheduledVideo = $state<{ videoURL: string; videoPlayTime: string | null }>({
-    videoURL: '',
-    videoPlayTime: null
-  });
   let alertMessage = $state<string | null>(null);
   let confirmDialog = $state<{ message: string; onconfirm: () => void } | null>(null);
   let playChoiceUrl = $state<string | null>(null);
   let scheduleChoiceUrl = $state<string | null>(null);
   let scheduledDateTime = $state('');
-  let scheduledTimer: number | null = null;
 
   const storageKey = $derived(`videos-${sessionId}`);
 
@@ -39,10 +65,6 @@
         videoList = [];
       }
     }
-
-    return () => {
-      if (scheduledTimer !== null) window.clearTimeout(scheduledTimer);
-    };
   });
 
   function saveVideoList() {
@@ -119,9 +141,7 @@
   function playVideoNow(value: string) {
     playChoiceUrl = null;
     scheduleChoiceUrl = null;
-    scheduledVideo.videoURL = '';
-    scheduledVideo.videoPlayTime = null;
-    videoPlayerUrl = value;
+    onplaynow(value);
   }
 
   function chooseScheduledTime(value: string) {
@@ -134,37 +154,23 @@
     if (!scheduleChoiceUrl) return;
 
     const value = scheduleChoiceUrl;
-    scheduledVideo.videoPlayTime = scheduledDateTime;
-    scheduledVideo.videoURL = value;
     scheduleChoiceUrl = null;
-
-    if (scheduledTimer !== null) window.clearTimeout(scheduledTimer);
-    const playTime = new Date(scheduledDateTime).getTime();
-    const delay = playTime - Date.now();
-    if (Number.isFinite(delay) && delay > 0) {
-      scheduledTimer = window.setTimeout(() => {
-        videoPlayerUrl = value;
-        scheduledVideo.videoURL = '';
-        scheduledVideo.videoPlayTime = null;
-        scheduledTimer = null;
-      }, delay);
-    } else if (Number.isFinite(delay)) {
-      playVideoNow(value);
-    }
+    onschedule(value, scheduledDateTime);
   }
 
+  /**
+   * "Stop For All" (`stop`) and "Remove Scheduled Video" (`remove`).
+   *
+   * The verb is only ever the confirm STRING — `stopVideoForAll(e)` interpolates it into the
+   * question and then sends the same bare `stopVideoForAll` either way (byte 1,981,811). Which is
+   * why the callback takes no argument: two prompts, one command.
+   */
   function requestStopVideo(action: 'stop' | 'remove') {
     confirmDialog = {
       message: `Are you sure you want to ${action} this video for all?`,
       onconfirm: () => {
         confirmDialog = null;
-        if (scheduledTimer !== null) {
-          window.clearTimeout(scheduledTimer);
-          scheduledTimer = null;
-        }
-        videoPlayerUrl = '';
-        scheduledVideo.videoURL = '';
-        scheduledVideo.videoPlayTime = null;
+        onstopforall();
       }
     };
   }

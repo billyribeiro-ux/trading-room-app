@@ -195,8 +195,7 @@ describe('the allow-list itself', () => {
       hasRequiredPhoneInLogin: 'app-session-login — whether a phone number is collected and required',
       customEnterDisclosure: 'app-session-login — the disclosure dialog shown before entry',
       disableEditingUsername: 'app-session-login — whether a non-presenter may change their name',
-      enableRTE:
-        '+page.svelte `canUseRTE` — the composer rich-text button, the editor, and the send, all three',
+      enableRTE: '+page.svelte `canUseRTE` — the composer rich-text button, the editor, and the send, all three',
       presenterMsgsOnTheRight:
         'RoomMessage — `presenter-msg-right` on the body and `presenter-reactions-right` on the reactions',
       allowUsersToChangeUsername: 'O(9) fallback — a member renaming themselves',
@@ -279,7 +278,34 @@ describe('the allow-list itself', () => {
         three mutations. The pane re-applies it so the component renders nothing on its own.
       */
       hasSwingTradeAlerts:
-        'swingAlertsTabVisible() — the Swing Alerts tab, the #swingAlerts pane, the initial getSwingAlertsLog read and the three mutations, all on one flag'
+        'swingAlertsTabVisible() — the Swing Alerts tab, the #swingAlerts pane, the initial getSwingAlertsLog read and the three mutations, all on one flag',
+      /*
+        THE THIRD PLACE again, added in the same change that put the name on
+        `ROOM_VISIBLE_SETTINGS` and on `ROOM_CONSUMED` — the lesson the notes above record, applied
+        rather than re-learned.
+
+        Verified in the room before being written here: `dayTradeAlertsTabVisible` is imported by
+        `+page.svelte`, where `dayTradeAlertsEnabled` gates the `#dayTradeAlerts-tab` li AND the
+        `#dayTradeAlerts` pane, by `+page.server.ts`, where it gates the initial log read and all
+        three mutations, and by `api/day-trade-alerts/+server.ts`. The pane re-applies it so the
+        component renders nothing on its own.
+
+        The name is spelled WITHOUT the doubled word its Swing sibling carries. That is upstream's,
+        read at bundle bytes 1,009,430 and 1,009,503, and it is why this entry cannot be derived
+        from the one above by substitution.
+      */
+      hasDayTradeAlerts:
+        'dayTradeAlertsTabVisible() — the Day Trades tab, the #dayTradeAlerts pane, the initial getDayTradeAlertsLog read and the three mutations, all on one flag',
+      /*
+        THE THIRD PLACE, added in the same change that put the name on `ROOM_VISIBLE_SETTINGS` and
+        on `ROOM_CONSUMED`, rather than being found red afterwards.
+
+        Not a boolean like its neighbours. `alertFilterAvailable()` in `alert-filter.ts` treats a
+        truthy, non-whitespace value as "the feature exists at all", which is the reference's own
+        gate at bundle bytes 2,042,979 and 2,286,654.
+      */
+      modAlertFilterList:
+        'alert-filter.ts — alertFilterAvailable() gates the whole feature, and parseModAlertFilterList() turns the JSON string into the {username, avatar} rows the filter modal lists'
     };
     expect(Object.keys(consumers).sort()).toEqual([...ROOM_VISIBLE_SETTINGS].sort());
   });

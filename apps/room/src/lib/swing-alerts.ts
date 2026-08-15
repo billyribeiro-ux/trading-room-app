@@ -200,7 +200,10 @@ interface SwingSearchable {
  *
  * **No optional chaining, deliberately.** The swing pipe dereferences `o.symbol` and `o.senderName`
  * directly (byte 1,915,362) while the Day Trade twin `searchDayTradeLogs` (class `ICe`, byte
- * 1,915,738) writes `o?.symbol?.toLowerCase?.()`. Transcribing the swing one as forgiving would be
+ * 1,915,738) writes `o?.symbol?.toLowerCase()?.includes(i)` — the guard sits AFTER the call, not
+ * before it, and an earlier revision of this comment had those two transposed as
+ * `o?.symbol?.toLowerCase?.()`. Corrected 2026-08-15 by reading both pipe classes side by side, 487
+ * bytes apart, while porting the Day Trade half. Transcribing the swing one as forgiving would be
  * quietly choosing the other component's behaviour; both columns are `NOT NULL` in this room's own
  * table, so a row that reaches here without them is a defect that should be loud.
  */

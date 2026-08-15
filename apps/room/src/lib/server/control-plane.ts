@@ -9,6 +9,7 @@
  * The mirror image of the controller's `ROOM_BASE_URL`, and blank by the same logic: a room that
  * has not been told where its controller is should say so rather than guess at a hostname.
  */
+import { redirect } from '@sveltejs/kit';
 import { CONTROL_BASE_URL } from '$app/env/private';
 
 /*
@@ -50,6 +51,43 @@ export function controlPlaneOrigin(): string | null {
 export function signedOutDestination(): string {
   const origin = controlPlaneOrigin();
   return origin ? `${origin}/account` : '/';
+}
+
+/**
+ * Send a signed-out visitor back to the controller.
+ *
+ * ## Why this exists rather than six bare `redirect` calls
+ *
+ * The destination is on ANOTHER ORIGIN — this room and the controller are two deployments — and
+ * **SvelteKit refuses a cross-origin redirect** unless it is told to allow one:
+ *
+ * ```
+ * Cannot redirect to external URL "…/account". To redirect to an external URL, pass
+ * `{ external: true }` or an allowlist of permitted origins as the third argument to `redirect`
+ * ```
+ *
+ * That is not a test detail. Six call sites redirect here — `requireUser`, `requireSessionId`,
+ * `requireRoomShortCode`, two page loads and the logout action — so **every auth guard and the
+ * logout button were throwing instead of redirecting.** Caught by
+ * `notes-account-action-contract.test.ts`, which asserts the 303 rather than merely that something
+ * was thrown.
+ *
+ * ## The allowlist, not `external: true`
+ *
+ * `{ external: true }` permits a redirect to ANY origin. This room only ever sends people to one
+ * place, and that place is a value it already holds, so the allowlist names it and nothing else.
+ * Deny-by-default is the house rule for every other boundary here and there is no reason to make
+ * this one the exception — a redirect target is exactly the kind of value that later becomes
+ * attacker-influenced by accident.
+ *
+ * When no controller is configured the destination is `/`, which is same-origin and needs no
+ * permission at all, so the allowlist is empty and the call behaves as an ordinary redirect.
+ */
+export function redirectSignedOut(status: 303 | 307 = 303): never {
+  const origin = controlPlaneOrigin();
+  // `external` takes `boolean | string[]`. The array form IS the allowlist — passing the one origin
+  // permits exactly that host and refuses every other, where `true` would permit any of them.
+  redirect(status, signedOutDestination(), { external: origin ? [origin] : false });
 }
 
 /** The room's own configuration read: `GET {control}/internal/room-config/{shortCode}`. */

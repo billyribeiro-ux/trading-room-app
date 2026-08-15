@@ -24,6 +24,804 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-15
 
+### 2026-08-15 09:30 EDT — proving what is built BEFORE building, and four errors in my own decode
+
+**Runtime impact: none.** Spec corrections and a revert.
+
+**The rule that produced this, from the owner:** prove what is already built, from hard evidence,
+before implementing anything. A previous list claimed the manage-page action surface was entirely
+unbuilt. **It is 42 actions and 7 tabs.** Building from that list would have duplicated working code.
+
+**The Alert Filter / Alert Labels build was stopped mid-flight** and told to write nothing and return
+a gap list instead. It had already edited **two of the four** settings-pipeline files — adding
+`modAlertFilterList` and `alertLabels` to `ROOM_VISIBLE_SETTINGS` and `ROOM_CONSUMED` while leaving
+`EXPECTED_WIRED_SETTINGS`, the boundary test's consumer map and the generated schema untouched. **That
+left the repo red.** Reverted, along with two new modules nothing imported — dead scaffolding by the
+standard's own definition. Verified back to green: 269 total / 60 wired, boundary test 17/17.
+
+#### Four errors in `alert-scheduler-filter-labels.md`, all mine, all verified before correcting
+
+1. **The three filter sites are NOT the same shape.** The predicate is identical term for term; the
+   structure is not. Site 1, the live SSE handler, is **two `continue` guards, not `.filter`** — and
+   it sits **before `alertsLog.push` and before `emit("alertMsg")`, so a filtered-out alert also
+   suppresses the toast and the sound.** In a rebuild that is a separate third call site, not a
+   duplicate of the log one.
+2. **The debug log fires for every alert**, not the filtered ones — it is inside the first `if`'s
+   comma expression, so it prints while the filter is merely engaged.
+3. **`parseSymbols` offset was wrong.** 1,328,216 is where the pipe registers its NAME and lands
+   mid-`parseStock`. The transform starts at **1,326,855**; the `my-1 me-1 badge` literal is at
+   **1,326,988**, once.
+4. **Twelve call sites pass `isQAMsg ? null : alertLabels`, not three.** The first version listed
+   three and implied that was all.
+
+All four re-read at the offsets before being written down.
+
+#### What the verification found in OUR source
+
+- **An `app-alert-filter-modal` shell already exists** at `ModalHost.svelte:5295-5323` — and **nothing
+  opens it.** All 29 `openModal` call sites were enumerated; `'alert-filter'` is not among the 19
+  names. **Dead scaffolding already in the repo.**
+- **Its title is wrong, not merely incomplete.** The reference title is DYNAMIC — `"Show"` /
+  `"Filter out"` chosen by `showAlertsFrom`, then `" alerts from the following: "` with a trailing
+  space. The shell hardcodes the false branch and drops the space.
+- **`modAlertFilterList` and `alertLabels` are BOTH already in the schema**, `wired: false`. The
+  `alertLabels` help text independently corroborates the four-field entry shape.
+- One entry point is **deliberately excluded and must stay excluded** — `alerts-toolbar-contract.test.ts`
+  keeps the toolbar Filter button out with a capture-backed layout reason.
+
+**A verification pass is now running over the whole implementation list** — six areas, every NOT-BUILT
+claim then attacked by an independent refuter, one-directional because a false NOT-BUILT is what
+caused this.
+
+
+### 2026-08-15 09:17 EDT — the implementation list, and the 209 nobody had counted
+
+**Runtime impact: none.** One document, `docs/IMPLEMENTATION-LIST.md`.
+
+Every row generated from the evidence, not from memory, and every block traces to a named source.
+
+**The headline nobody had enumerated: 209 of 269 room settings are stored and read by NOTHING.**
+`wired: false` means neither the room nor the controller consumes it. Each one is a control the room
+owner can set on the manage page that changes nothing. Under match-identically, every one is
+outstanding work.
+
+| block | count |
+| --- | ---: |
+| settings wired to nothing | **209** |
+| reference wire commands confirmed missing | 25 |
+| the manage-page action surface, per-user + bulk | 1 whole surface, none of it built |
+| named features decoded and unbuilt | 5 |
+
+**A near-miss caught before it reached the document, and recorded because it is exactly the class of
+error the list exists to prevent.** A first pass reported **129** unwired. The regex required a
+`help:` field that not every row carries, so **79 rows were silently dropped**. The count is now taken
+with the parse **asserted at 269 rows** (268 extracted + 1 reviewed deviation), so nothing can vanish
+quietly. The grouping was also redone: the first attempt bucketed settings by keywords I invented,
+which is an assumption; it now groups by the schema's own `section` field, which is evidence.
+
+**The role-number trap is carried into the list in a callout**, because it is the one thing on it that
+can cause damage: `10` is *Hide Pers User Data* in the per-user menu and **`Remove All`** in the bulk
+menu. Different commands, different vocabularies. One shared enum would turn a privacy toggle into a
+mass delete. Code `12` is unobserved in either menu and is recorded as a gap.
+
+**Order of work** is set: the two alert features in flight, then the divergence register — which gates
+every match-identically decision and therefore lands before the bulk settings work — then the 209 by
+section, then the manage-page surface, then the wire commands by cluster.
+
+**What is deliberately NOT on the list:** the Part 1 improvements, because they are divergences FROM
+the reference and the directive is match first; the four NOISE identifiers, which were never ours; and
+`vendor.min.js` at 1.25 MB, which is recorded as an unread gap rather than a decision.
+
+The superadmin layer is parked at the owner's instruction. Its decode is complete, with the
+Marketplace pane named as the one surface never opened.
+
+
+### 2026-08-15 09:12 EDT — the enterprise layer, read from three sources, and the one door nobody has opened
+
+**Runtime impact: none.** One decode document.
+
+`docs/decoded/enterprise-and-control-plane.md`. Three first-party sources, all read on the same day:
+the manage-page DOM with **18 dropdowns and modals captured OPEN** (23.5 MB), the account-page DOM
+(9.4 MB), and **`/public/dist/app.min.js` — PTR's own controller bundle, 455 KB, which had never been
+fetched before today.**
+
+**The answer, scoped exactly.** There is no SaaS operator console and no balance in any of the three.
+That is a statement about the account page and manage page **as rendered to a tenant**, and the
+controller bundle **as served to that tenant** — the Launch JWT decodes to `"type":"site"`. Absence
+from a tenant's view is not absence from the product, and the document does not claim otherwise.
+
+**One door was never opened.** `manageMarketplaceSession(s._id, s)` carries `ng-hide` at both entry
+points because `disableMarketplace` is truthy on the captured account, so the handler never ran and
+its contents are simply not in this evidence. It has a `fa-credit-card` icon and a matching
+`loadMarketplaceUsers()` filter. **If a balance exists in the client, it is behind that button.**
+
+**A false positive caught and refused:** the account page contains `moneybag`, `dollar`,
+`credit_card`, `money_with_wings` — that is the Intercom emoji picker. Reporting it as a money surface
+would have been reporting our own tooling.
+
+**The SaaS machinery that IS present**, all unambiguous: a seat quota (`1 / 2`), a usage watermark
+(`Current : 0 / Max 0` with `Reset Counts`), three entitlement allow-lists (`allowedMemberships`,
+`allowedProducts`, `allowedPerms`), tenant→end-user billing (`subscriptionPlans` with real fees,
+`stripeEmail`), a room kill switch (`isLocked`), and three identity layers — site, **ownerID**, room.
+
+Two quotes carry more weight than the rest. *"these counts are just for information purposes, does
+not affect your room's **limits**"* — **an authority above the manage page sets the limit.** And
+*"put any emails here of admins you want to allow access to **the admin panel section**"* — **a panel
+exists beyond this page.**
+
+**Why the earlier probe missed the mechanism.** `switchSession` posts to `/users/v1/ssoJWT` and its
+pulldown appears only when `otherJWTSessions.length > 1` — **data-gated, not state-gated.** Reading
+the ui-router registry found 31 states and no operator surface because **the registry was the wrong
+layer.** A token carrying many sessions renders a room-picker an ordinary customer never sees.
+
+**The API is command dispatch, not REST** — `POST {cmd: …}` built by `makeReqTokenForCmd`, across
+five endpoints. An operator surface here would be additional `cmd` values, not new routes. That is
+the shape to look for next.
+
+---
+
+### 🔴 The role-number trap, recorded before anyone builds this
+
+**The same integer means different things in the per-user menu and the bulk menu**, because they are
+different commands:
+
+| N | `updateUserXref` (per user) | `updateUserXrefMulty` (bulk) |
+| ---: | --- | --- |
+| **10** | **Hide Pers User Data** | **` Remove All`** |
+
+**One shared vocabulary would turn "hide personal data" into "delete every selected user".** Code
+`12` is unobserved in either menu and is recorded as a gap rather than guessed. Role `0` is the owner
+and is skipped by every bulk operation — **client-side only**; nothing proves the server re-checks.
+
+---
+
+**Eight defects in the reference** were found while reading and are recorded, because "match
+identically" makes each one a decision rather than an oversight: `addBadgeForUser` and
+`removeBadgeForUser` build a request and **never send it**; `loadSettingsFromJSON` is a copy-paste of
+the export and **exports instead of loading**; **hardcoded Imgur and RapidAPI credentials ship to
+every browser**; the API-secret fallback is two `Math.random()` slices; an operator-precedence bug in
+the badge title; `doWebRTCReset` ignores its own confirm result so Cancel still resets;
+`loadSettingsFromRoom` posts once per field and silently uses only the first selected room; and a
+`var` capture mislabels every upload.
+
+**Honest gaps:** the Marketplace pane, the `perms` vocabulary for `/users/v1/adminusers`,
+`makeReqTokenForCmd`, whether `otherJWTSessions` can span tenants, `updateUserXref` code 12, `__al`,
+and **`vendor.min.js` (1.25 MB) which was classified as third-party and NOT read — a judgement, not a
+measurement.**
+
+
+### 2026-08-15 08:42 EDT — the parking bucket is deleted, and the rule is written down
+
+**Runtime impact: none.** Owner directive, 2026-08-15: **nothing that is not built ever gets parked.**
+
+`missing-commands-triage.md` filed five commands under *"unclear, needs a decision rather than more
+reading"*. That read as a resolved category. It was **five unbuilt features**, and the totals table
+carried them in a separate row from the 25 "confirmed missing" — so the outstanding count looked like
+25 when it was 30.
+
+**Worse: the decision they were waiting on was already answered.** They are not "should a presenter be
+able to reset shared media infrastructure". They are the **SaaS operator's toolkit** — when a tenant
+has a problem, the operator resets, diagnoses and hard-reboots their room. Parking them made a core
+product surface look like an open question.
+
+**What changed**
+
+- The triage's summary now leads with **NOT BUILT — outstanding work: 30**, split into 25 ready and
+  5 needing a decision first, with both still counted. The `NOISE` rows are the only exception,
+  because third-party library internals were never ours to build.
+- The section formerly headed "Unclear — these need a decision, not more reading" is now
+  **"NOT BUILT — the five that need a decision first, and are outstanding regardless"**.
+- `presAreaTabs-recordings` was struck through and labelled BLOCKED in `TODO.md`. Struck-through
+  reads as done. It is now **"NOT BUILT, blocker named"**, still on the list.
+- Both TODO files carry the rule inline so it is read where the counting happens.
+
+**Three things recorded from the same conversation, which raise the priority of all five:**
+
+1. They travel on a **separate channel** — `sendAdminCmd` → `socket.transmit("adminCmd", …)`,
+   distinct from the ordinary command transport. The reference has a dedicated admin path.
+2. **Six of the wider reset/diagnose family are already built here** — `hardResetSession`,
+   `softResetSession`, `reloadSessionConfig`, `saveAndCloseSession`, `saveCloseMessage`,
+   `refreshRoster`.
+3. **What is missing is REACH, not the commands.** Ours work inside a room for that room; the
+   operator need is to invoke them for a tenant's room from a central console, and `/admin` already
+   has impersonation as half that bridge.
+
+**`docs/BUILD-AUDIT.md` gains §7 — "Nothing unbuilt is ever parked."** Blocked, undecided, unclear,
+needs-an-environment, waiting-on-the-owner are **notes on a row, never a substitute for one**. The
+only exits from the outstanding list are: built, or proven already built.
+
+**This is the second time a confident-sounding category has hidden work here.** The first was a TODO
+sentence claiming everything buildable was built, while Swing and Day Trade Alerts sat in the bundle
+undiscovered. The failures table now records both, and §7 exists so the next one is caught by a
+checklist rather than by the owner.
+
+
+### 2026-08-15 08:41 EDT — Files sort bar built, and both of its "honest gaps" turned out to be readable
+
+**Runtime impact: yes.** The Files pane's sort bar was rebuilt against
+`docs/source-v4-2026-08-15/main.d1d09071be31f1ba.js` (sha256 `40796ca8…bab87524`, re-checked against
+that directory's `sha256sums.txt` before reading). New module `apps/room/src/lib/file-sort.ts`;
+`+page.svelte` and `app.css` changed; `files-pane-contract.test.ts` extended from 3 sort-bar tests
+to 21.
+
+**What was already here was built from the owner's pasted markup**, because the capture we held then
+(`docs/source/main.d6d3c112b59b7d0d.js`) contains `st-fileSortBar` **0 times** and the v4 bundle
+contains it **1 time** — python `.count()` over bytes, never `grep -c`, which on a one-line bundle
+can only answer 1 or 0. That older build diverged in five ways, each now fixed and each pinned:
+
+1. **Two direction variables became one.** `nameAscending` and `dateNewestFirst` are gone. Both icon
+   views read the same `fileSortDir` — bytes 1,946,450 and 1,946,605.
+2. **Switching field now RESETS the direction** to that field's default (`date`→`desc`,
+   `name`→`asc`) instead of restoring a remembered one. `toggleFileSort`, byte 1,975,308.
+3. **The pane opens `date`/`desc`**, not `name`/`asc`. Byte 1,954,640.
+4. **The comparator is the reference's**, not a `localeCompare` rewrite: copies before sorting,
+   passes the list through when the field is falsy (contrast `limitSwingLogs` at byte 1,915,553,
+   which returns `[]`), returns 0 for ties, defaults `""`/`"asc"`. Byte 1,914,860.
+5. **The titles carry a FIELD conjunct**, so an inactive button shows its own default-state string.
+
+**Both of the spec's honest gaps were closed by reading, not derived:**
+
+- `.active` is captured. `mo` at byte 1,916,345 wraps its argument as an object keyed `active`, and
+  the two bindings are at 1,950,577 / 1,950,805. It depends on the field alone.
+- **The bar sits INSIDE the table's gate.** Node 85 is the view `t2e` (byte 2,016,231), `t2e` holds
+  the sort bar *and* the table (byte 1,950,099), and node 85 is gated
+  `o.sessionFiles && o.sessionFiles.length > 0` (byte 2,018,251). Ours rendered the bar
+  unconditionally, so an empty room showed a "Sorting by:" strip above an absent table. Fixed.
+
+**The CSS was four-fifths invented and is now captured** — bytes 435,538-435,767 of
+`styles.ee2a710065b60389.css`. A `:hover` rule, a `font-size`, a `border-color`+`color` on `.active`
+and a transparent border all came out; the real border is `1px solid var(--file-see-more-bg)` on
+both buttons at all times. Written against the token names, never the resolved colours.
+
+**`docs/decoded/files-sort-bar.md` was corrected in four places** — the title table's condition
+column (it omitted the field conjunct), the label byte offset (1,975,308 was `toggleFileSort`'s
+offset; the labels are at 1,950,263 and 1,950,396), the bar's const (missing its leading `1`), and
+both gap sections, now closed with offsets.
+
+**Verified:** `rm -rf .svelte-kit && svelte-kit sync` then `svelte-check` — 1058 files, 0 errors,
+0 warnings. 55/55 in `files-pane-contract.test.ts`. `eslint .` clean, `prettier --check` clean.
+Svelte MCP autofixer: 0 issues (its four `{' '}` suggestions are declined — that is the captured
+whitespace, and nine sibling labels in this pane already use the same construct).
+
+**14 negative controls, each mutating the SOURCE and re-running:** all 14 went red and the tree
+restored byte-identically (`diff -q` plus sha256). One of them earned its keep — deleting
+`.toLowerCase()` from the name comparator left the case-insensitivity test GREEN, because the
+`Alpha`/`beta`/`gamma` fixture sorts the same either way ('A' is 65, 'b' is 98). It is now written
+against `apple`/`Banana`, which straddles the case boundary and does fail.
+
+**Not verified:** no browser screenshot of the rendered bar, and no test drives a real click through
+the DOM — the transition is exercised as a pure function instead. The room was not run.
+
+### 2026-08-15 08:33 EDT — Alert Labels had a whole second consumer nobody had found
+
+**Runtime impact: none.** Two documents. Four for four on specs re-verified before building.
+
+The first pass called this "configuration plus a text transform" and gave the entry shape as
+`{ hash, checked }`. Both wrong.
+
+**An entry has FOUR configured fields** — `hash`, `name`, `bgcolor`, `color` — with `checked` added at
+runtime. And the labels are consumed in **two** places, not one.
+
+**The consumer that was missed:** `parseSymbols`, byte 1,328,216. It replaces `#hash` in alert text
+with a coloured badge showing `name`:
+
+```js
+if (s && s.length > 0 && "alerts" === i)
+  for (const r of s)
+    e.includes(`#${r.hash}`) &&
+      (e = e.replace(`#${r.hash}`,
+        `<span class="my-1 me-1 badge" style="background-color: ${r.bgcolor}; color: ${r.color}; border: 1px solid ${r.color};">`
+        + hu.sanitize(r.name) + "</span>"));
+```
+
+So `hash` is what goes into the text and `name` is what the reader sees — **two different strings, and
+the mapping between them is the whole feature.** A build using `hash` for both produces something that
+looks plausible and is wrong.
+
+Four further facts from the same read: it applies to `"alerts"` only, so chat never gets badges, and
+the call sites pass `isQAMsg ? null : alertLabels` so **Q&A is excluded too**; only the FIRST
+occurrence is replaced, because it is `String.replace` with a string and not a regex; the classes are
+`my-1 me-1 badge`; and it hands off to `parseStock`, so labels and `$SYMBOL` colouring share one pipe.
+
+**A shape we must NOT reproduce.** `hu.sanitize(r.name)` sanitises the name while **`bgcolor` and
+`color` are interpolated raw into a `style` attribute**. In the reference these come from an
+owner-controlled room setting, so it is not member-facing — but it is unsanitised interpolation into
+markup. Validate the colours or bind them as custom properties, and record the divergence.
+
+**Two more corrections:** `processAlertLabels` is called from **four** sites, not one — the two image
+paths, `postAlert`, and the scheduler. And the checkboxes are cleared in **three** places, not one:
+after a successful prepend, on `doCloseModal`, and on `clearInputFields`. Selection never survives
+leaving the composer by any route.
+
+**Ruling out my own tooling before asserting a surprise.** The checkbox label compiles to
+`Ne("", e.name, "?")`. Rather than assume the helper's arity, it was calibrated against known cases
+in the same bundle — `Ne("[", e.duplicatesCount + 1, "]")` renders `[3]` — confirming
+`Ne(prefix, value, suffix)`, so the label really does render `{name}?` with a trailing question mark.
+Recorded as read and **flagged as surprising** rather than silently "fixed" or silently copied.
+
+**Four for four.** Every spec re-verified before building has contained at least one error: the sort
+bar three, Alert Filter an inverted architecture, Alert Labels a missing consumer and a wrong entry
+shape. None of these were caught by compiling, type-checking or testing — only by reading the bundle
+again.
+
+
+### 2026-08-15 08:22 EDT — verifying the Alert Filter spec before building it found an architectural error in my own work
+
+**Runtime impact: none.** Two documents.
+
+The Files sort bar was called "fully decoded, ready to build" and re-reading it found three errors.
+So the Alert Filter spec — written by me eight hours ago — got the same treatment before anyone
+built from it. **It contained a worse error than the sort bar did.**
+
+**It said: "The SERVER owns the filtering. The client sends its selection and asks for the log again;
+it does not filter `alertsLog` in the browser. That is the correct shape and the one to reproduce."**
+
+The filtering is **client-side**, and in three separate places, each with the identical guard:
+
+| site | byte |
+| --- | ---: |
+| the live `/alerts` SSE stream — logs `"filtered out alert for " + te.avt` | 1,004,533 |
+| `case "getAlertsLog"` | 1,017,070 |
+| the alerts SEARCH results, inside the `"alerts" == i.type` branch | 1,020,817 |
+
+Building to the original claim would have produced a server-side filter the reference does not have.
+The command exists for **persistence**, not for effect — which is why its response re-fetches the log
+so the client-side code can re-apply the newly stored selection.
+
+**And a consequence that changes what the feature IS:** every alert reaches every browser and some
+are hidden after arrival. **This is a display preference, not an access control.** Nothing stops a
+member reading a filtered-out alert from the network tab. Filtering server-side would be a genuine
+improvement AND a deliberate divergence, and is now recorded as a decision to take rather than a
+shape to copy.
+
+**Three further corrections in the same pass:**
+
+- **`modAlertFilterList` is two different things.** `sessData.modAlertFilterList` is a **string
+  containing JSON**; `globals.modAlertFilterList` is the parsed array. Bridged by
+  `syncModAlertFilterList()` at 1,221,905 — whose `JSON.parse` is **not** inside a try/catch, unlike
+  the filter guard. Third room setting shipped as a JSON string, after `alertLabels` and
+  `chatTabsWithBadges`.
+- **The guard fails OPEN and silently.** It needs both a non-empty setting AND a non-empty selection,
+  and sits inside `try {} catch {}`. A malformed list means every alert shows.
+- **The whole feature is gated on the room configuring a list** — `sessData.modAlertFilterList` being
+  truthy gates the entry points at 2,042,979 and 2,286,654. A room with no list has no feature.
+
+**Recorded and deliberately NOT reproduced:** at byte 977,658, beside the empty
+`modAlertFilterList`, the globals carry `stTraders` — a hardcoded array of `{username, avatar}` with
+real gravatar MD5 hashes, a Simpler Trading trader list compiled into the bundle. A customer-specific
+hardcode is the opposite of the theming rule.
+
+**The pattern is now three for three.** Every spec that has been re-verified before building has
+contained at least one error, and in two cases an error that would have shipped. Verification before
+implementation is not ceremony here; it has a 100 per cent hit rate.
+
+
+### 2026-08-15 08:15 EDT — both TODO files reconciled against what is actually true
+
+**Runtime impact: none.** Bookkeeping, and one deleted sentence that mattered.
+
+**The sentence.** `TODO.md` opened its state section with *"Eight rows remain, and not one of them is
+blocked on effort. Every item that could be built from the evidence has been."*
+
+**That was false when it was written.** At that moment Swing Trade Alerts and Day Trade Alerts — two
+entire presentation-area tabs — were sitting in the captured bundle unbuilt and had been since day
+one. `presAreaTabs-swingAlerts` occurs 3 times in v3, 3 in our 2026-07-30 capture and 3 in current
+v4. The sentence was not a claim about the evidence; it was a claim about what somebody had thought
+to look for, phrased as though it were the former.
+
+Replaced with the measured position, and with the reason the old one was wrong, so the next person
+distrusts the shape of that sentence rather than just this instance of it.
+
+**What the state section now records:** the triage totals (25 confirmed missing, 7+1 refuted, 9 built
+under another name, 4 noise, 5 parked on a product decision), a table of the six items that are
+fully specified and ready to build, and the control-plane answer — 31 registered states, none an
+operator surface, `states[*].data` null on all 31, so there is no route-level role model to copy.
+
+**Row P corrected.** It still said PR #28 was the open one. PR #30 is open, and it **must not be
+merged as-is**: it carries the Swing delete that could not delete, whose fix is on the branch but not
+in that PR, and its full gate has never run.
+
+**`NEW-TODO.md`:** §2.3 and §2.4 were already removed rather than struck through when Swing and Day
+Trade shipped — the rule was followed and nothing was left orphaned. The suggested order is rewritten
+around what is actually next: the sort bar, then `presAreaTabs-recordings` — the cheapest remaining
+tab-level gap, since its pane holds one iframe and half its gate already exists at
+`roster-gates.ts:54` — then Alert Filter and Alert Labels. The 25 confirmed gaps are pointed at as
+the only complete list of what is left.
+
+**The reusable part:** a TODO row that says a thing is done is checkable. A TODO *sentence* that says
+everything is done is not, and this one survived three weeks and two whole missing tabs.
+
+
+### 2026-08-15 08:11 EDT — the "For All" controls audited, and one undocumented reasoning dependency closed
+
+**Runtime impact: none from this entry** — one added test. The broadcast fix itself is the entry
+below.
+
+Three controls that said "For All" and moved one browser now reach the room. Audited here rather
+than accepted:
+
+| check | result |
+| --- | --- |
+| working tree | exactly the six files the brief named, plus the new contract test |
+| `startTime` on the wire | **0 non-comment references** outside the test asserting its absence — the trap held |
+| authority | both actions `requireUser(locals)` then `isPresenterRole(user.role)`, room from `requireRoomShortCode(locals)` — server-owned, deny-by-default command allow-list |
+| `svelte-check`, clean `.svelte-kit` | **1057 files, 0 errors** |
+| lint · prettier | clean · clean |
+| contract test | **39/39** |
+
+**Negative controls I ran myself, not taken on report.** Removing the presenter gate from
+`videoForAll` turns *"refuses a non-presenter on both actions"* red; restored byte-identically.
+
+#### The finding: one input skips the url guard, and is safe for an undocumented reason
+
+`broadcastableMediaUrl` is a proper deny-by-default check — `new URL` plus an explicit http/https
+allow-list — and it correctly notes that the reference's own client-side test
+(`value.includes('https://')`) is a substring match that any string merely *containing* the scheme
+passes.
+
+**The YouTube path does not use it.** Its only server check is a length cap, and the value is
+broadcast into an `src` attribute in every browser in the room.
+
+It is nonetheless safe, and the reason was nowhere written down: `YoutubePlayerOverlay` never binds
+the received string. It extracts a video or playlist id and **rebuilds** the url from a literal
+`https://www.youtube.com/embed/` prefix, returning empty when neither matches. Measured before the
+test was written:
+
+```
+javascript:alert(1)                       -> (empty)
+javascript:alert(1)//watch?v=x            -> https://www.youtube.com/embed/x
+data:text/html,<script>...                -> (empty)
+https://evil.com/embed/xyz                -> https://www.youtube.com/embed/xyz
+https://youtube.com/watch?v=../../../evil -> https://www.youtube.com/evil
+```
+
+Every input is confined to the youtube origin, including the ones that choose their own scheme.
+
+**That is a reasoning dependency, so it is now a test rather than a comment.** If anyone
+"simplifies" the overlay to bind the raw url into `src`, the length cap becomes the sole defence and
+it is not one. Negative control: changing the binding to the raw url turns *"builds the src from a
+literal youtube prefix"* red on the first assertion; restored byte-identically, 39/39.
+
+**The build agent also found a test of its own that could not fail** and rewrote it — it had
+asserted `roomSubscriberCount(room) === 0`, which answers 0 for a dropped room *and* an empty one,
+so deleting the drop changed nothing observable. Recorded because catching it is the standard, not
+an exception.
+
+**Not verified:** no browser run. Two-browser delivery is proven at module level against the real
+`subscribeToRoom`/`publishToRoom` hub, not against two real tabs. The full gate was not run.
+
+
+### 2026-08-15 08:03 EDT — four controls said "For All" and moved one browser
+
+**Runtime impact: yes.** Two new form actions, four new receivers, and a tab gate that had been
+reduced to a term this room could not yet evaluate.
+
+**The defect, not a missing feature.** `VideoPlayer.svelte` shipped "Play For All" and "Stop For All"
+that made ZERO network calls — no `fetch`, no `use:enhance`, no `action=`. `requestStopVideo` carried
+the reference's confirm string verbatim and both of the reference's callers, and its `onconfirm`
+cleared local `$state` and a timer. The YouTube overlay had two buttons and one handler behind both,
+so "Stop For All" and "×" did the same thing, which was neither of the two things they mean.
+
+**What the reference actually does**, read at the byte offsets rather than searched for:
+
+| command | payload out | what every client does with it |
+| --- | --- | --- |
+| `playVideoForAll` | `{url}` after dispatch (byte 1,024,587) | sets the url, sets `hideVideoPlayer`; a NON-presenter is moved to the video tab (1,966,711) |
+| `stopVideoForAll` | none (1,024,668) | clears url + both scheduled fields; a NON-presenter is moved back to screens (1,966,882) |
+| `playYTForAll` | `{url}` (1,024,137) | the floating overlay, on every screen |
+| `stopYTForAll` | none forwarded (1,024,212) | tears the overlay down everywhere |
+
+Three details that decide whether this is right or merely plausible:
+
+1. **"Stop For All" and "×" differ by WHICH BUS the reference emits on** — `stopYTForAll()` calls
+   `sendServerAdminCommand`, `closeYTFrame()` calls `guiEventBus.emit` (byte 1,503,220). That is
+   also why the markup gates only the first on presenter: a member must be able to dismiss an
+   overlay over their own room without taking it away from the room.
+2. **A play is a stop and THEN a play** (byte 2,296,932), so a second video replaces the first
+   cleanly — the receiver's `ytURL` setter is what starts playback, so re-assigning the same url
+   would start nothing. Both go out from one request; two `fetch` calls can be answered in either
+   order, and the inverted pair leaves every browser holding a torn-down overlay.
+3. **`hideVideoPlayer` is now modelled**, because the captured gate needs it:
+   `O(25, o.hideVideoPlayer && !o.isP || o.isP ? 25 : -1)` (bytes 2,016,864 and 2,017,661). It had
+   been reduced to `isPresenter` while nothing could set it; leaving it that way would have
+   force-switched a member to a tab that renders nothing.
+
+**Authority is the server's.** Both actions read the role from the session (`isPresenterRole`) and
+scope the fan-out with `requireRoomShortCode(locals)` — never a room named by the request. The video
+url is now PARSED (`new URL` plus an http/https allow-list) rather than substring-matched, because
+the client's own `includes('https://')` check passes for any string merely containing those
+characters, which stopped being harmless the moment a presenter's typed string reached an `src`
+attribute in every browser in the room.
+
+**The seek offset is derived, never transmitted, and is honestly absent.** The subscriber computes
+`Math.round((Date.now() - Number(e.startTime)) / 1e3)` (byte 1,964,799); `startTime` reaches it only
+on the late-join replay out of room state (byte 1,965,054, and `ytStartTime` occurs exactly once in
+the bundle). This room has no persisted video state, so there is no honest source for it and none
+was invented — recorded in `TODO.md` under Evidence gaps along with the two other consequences
+(no replay for a member who joins mid-video; a scheduled play held in the presenter's own browser).
+
+**Verified:** `rm -rf .svelte-kit && svelte-kit sync` then `svelte-check` — 1057 files, 0 errors,
+0 warnings. The new `for-all-broadcast-contract.test.ts` — 31 passing, including a RUNTIME block
+that drives the real `publishToRoom`/`subscribeToRoom` hub and asserts a second connection receives
+all four commands, in order, without crossing rooms (BUILD-AUDIT §4). Twenty negative controls run,
+each restored byte-identically and confirmed with `diff -q`; **one of them exposed an assertion of
+mine that could not fail** — `roomSubscriberCount` answers 0 for a dropped room and an empty one
+alike — and it was rewritten to assert the disposer instead. The 49 test files that read any changed
+file: 723 passing. `eslint` and `prettier --check` clean on all five files. **Not run:** the full
+`pnpm test` gate.
+
+### 2026-08-15 07:53 EDT — "fully decoded" was nearly right, and wrong in the way that ships a broken control
+
+**Runtime impact: none.** One spec, one superseded section.
+
+`NEW-TODO.md` §2.1 called the Files sort bar "FULLY DECODED, ready to build". Re-checking it against
+the bundle before anyone built from it found **three defects**, and the first would have produced a
+control that looks correct and behaves wrongly.
+
+**1. The two buttons share ONE direction variable.** §2.1 presents a per-button asc/desc table,
+which reads as though Name and Date each keep their own direction. Both icons key off the same
+`fileSortDir` — bytes 1,946,476 and 1,946,631. One field, one direction.
+
+**2. Switching field RESETS the direction**, and §2.1 does not mention it at all. `toggleFileSort`
+at byte 1,975,331: clicking the active field flips direction; clicking the other field switches to it
+and resets to **that field's** default — `date` → `desc`, `name` → `asc`. The previous direction is
+discarded, so a direction cannot be carried across a field change.
+
+**3. The pane opens `date`/`desc`**, not unsorted — byte 1,954,645. A build that starts unsorted
+diverges on first paint. Also: the labels are `" Name "` and `" Date "` with leading AND trailing
+spaces, which §2.1 renders bare.
+
+**What §2.1 got right, all confirmed:** the six class lists from the const table, all four title
+strings at their offsets (1,950,683 / 1,950,722 / 1,950,910 / 1,950,969), and the comparator's date /
+name keys with ties returning 0.
+
+**Three further comparator properties are now recorded** because a rebuild loses them silently:
+`[...e].sort()` copies before sorting — a mutating sort on a `$state.raw` list is a reactivity bug;
+an empty field means **passthrough, not empty**, unlike `limitSwingLogs` where a limit of 0 returns
+`[]`; and the defaults are `i = ""`, `o = "asc"`.
+
+**The recorded lesson about this feature was itself wrong, and is corrected.** `~/CLAUDE.md` opens
+with the incident where a search for `st-fileSortBar` returned nothing, it was reported as "not in
+the capture", and the owner pasted the real markup. The lesson written down was *stop searching, read
+the region*. Measured: the class occurs **0 times** in the older bundle and **once** in current v4.
+The search was fine — **our evidence predated the feature**. Evidence has a date and the live
+application moves.
+
+**Honest gaps recorded rather than filled:** the exact expression that applies `.active` was not
+opened (the CSS proves the class is styled, the binding slot is known, the expression is not); and
+the sort bar's position among its siblings in the Files pane was not established.
+
+
+### 2026-08-15 07:47 EDT — the full triage of what the reference has and we do not
+
+**Runtime impact: none.** One reference document.
+
+`audit-feature-coverage.mjs` reported 43 wire commands and 2 presentation-area tabs present in the
+reference and absent from `apps/room/src`. `docs/decoded/missing-commands-triage.md` is the result of
+reading **every occurrence of every one of them** in the bundle and then checking each against our own
+source.
+
+| outcome | count |
+| --- | ---: |
+| confirmed missing | **25** |
+| claimed missing, then refuted — we already build it | 7 (plus 1 contested, resolved against it) |
+| built under another name | 9 |
+| framework/library noise | 4 |
+| unclear, needs a product decision | 5 |
+
+**The adversarial pass killed 8 of 34 REAL_GAP claims.** That asymmetry was deliberate — only gap
+claims were refuted, never the other way — because the expensive error is telling the owner something
+is missing when it is built, which sends them reading working code.
+
+**`presAreaTabs-videoplayer` is the instructive kill.** We key that tab `'videoplayer'`; the reference
+keys it `'presAreaTabs-videoplayer'`. The audit's identifier search missed our implementation purely
+because of the prefix, and it was one refuter away from being written up as a missing tab. **The
+coverage audit reports identifiers, not features** — PRESENT is a floor, MISSING is a question.
+
+**`subtitleTrack` (48) and `setPosition` (12) were the two largest MISSING counts in the entire
+report and both are third-party plumbing** — hls.js subtitles and Angular animation internals. Volume
+is not evidence of importance.
+
+**One verdict was contested and resolved by reading, not by majority.** `stopVideoForAll` was judged
+twice with opposite results. The gap is real: `requestStopVideo()` at `VideoPlayer.svelte:156` has the
+right confirm string and the right two callers, and its `onconfirm` clears local state and a timer and
+nothing else — the component makes zero network calls of any kind. The refuter matched the BUTTON; the
+brief asked for the BEHAVIOUR.
+
+**A control that says "For All" and reaches nobody is worse than an absent one, because it reports
+success.** Three such defects are now evidenced and are being fixed: the video play/stop pair, and the
+YouTube overlay where our `onstop` and `onclose` are wired to the same function — collapsing a
+distinction the reference draws deliberately, where "Stop For All" goes to the server and "×" is local.
+
+**Verified:** every table's row count re-counted against its stated total after an internal
+contradiction was found and corrected — `stopVideoForAll` had landed in both the false-gap table and
+the prose refuting that classification, because the dedup kept the first of two disagreeing verdicts.
+All five tables now reconcile.
+
+
+### 2026-08-15 07:35 EDT — Day Trade audited, and the audit checklist gains the line that would have caught the delete bug
+
+**Runtime impact: one lint fix in console tooling.** The Day Trade feature and the `deleteSwingAlert`
+fix are the entry below; this is the audit of them.
+
+#### The defect, verified independently before anything was accepted
+
+The build report claimed `deleteSwingAlert` had never been able to delete anything. **Reproduced
+here with plain SQL and no project code:**
+
+```
+PRAGMA foreign_keys = ON;                     -- db/index.ts:12
+swing_alerts.alert_id REFERENCES alerts(id)   -- db/schema.ts:441
+
+UPDATE swing_alerts SET deleted_at=… WHERE id=1;   -- soft-delete the row
+DELETE FROM alerts WHERE id=1;                     -- hard-delete the mirror
+=> FOREIGN KEY constraint failed
+```
+
+With `alert_id` cleared first, the delete succeeds. The claim is exact: **deleting a swing alert
+could not work, in any room, since the feature shipped at 02:23 EDT.**
+
+**The test whose absence was the bug now exists and was negative-controlled here**: reverting the
+fix in the Swing repository makes `trade-alerts-mirror-delete.test.ts` fail with the literal
+`SqliteError: FOREIGN KEY constraint failed`, and restoring it byte-identically returns 3/3.
+
+#### Why the earlier audit missed it, stated plainly
+
+That audit checked the room predicate on every query, the atomicity of every mutation, all six wire
+literals against the bundle, `svelte-check` on a clean `.svelte-kit`, lint, prettier, and two
+negative controls with byte-identical restores. **Every one of those passed, and not one of them
+touches a database.** `swing-alerts-contract.test.ts` never reaches the repository layer.
+
+`CLAUDE.md` already says *"Runtime evidence before done. Compiles + tests pass ≠ done."*
+`docs/BUILD-AUDIT.md` had no line making that concrete for a persistence path, so the check was
+never run. It now has **§4 — Exercise the PERSISTENCE PATH against a real database**, with three
+items: one create/edit/delete round trip against a real SQLite file; treat a soft delete beside a
+hard delete as a foreign-key trap and ask which row holds the reference; and `EXPLAIN QUERY PLAN` on
+every new read path. The failures table records the incident as the sixth.
+
+**PR #30 was corrected** with a comment rather than left standing — it described Swing as audited,
+which was no longer wholly true, and it is the outward-facing artefact.
+
+#### The audit of the Day Trade port, executed here
+
+| check | result |
+| --- | --- |
+| spec diff | **5 insertions, 5 deletions** — offset corrections only, no claim altered |
+| the corrected offsets | old 1,993,797 lands inside `linkedRoom${e}AlertsOther`; new **1,993,857** lands exactly on the log-command template literal ✅ |
+| day conversion | `"Swing"===e?30*swingAlertMonths:4*dayTradeAlertMonths*7` read at 1,993,612/1,993,637 ✅ |
+| months options | Swing `[1…20]`, Day Trade **`[1…15]`** ✅ |
+| months defaults | `swingAlertMonths=2`, `dayTradeAlertMonths=1` ✅ |
+| `editAlertMessageDayTrade` in our code | 4 hits, **all comments or a `.not.toBe()` assertion** — no invention ✅ |
+| `linkedRoomDayTradeAlertsOther` | **0** — correctly unwired ✅ |
+| room predicate | present on every statement, including the new FK-release UPDATE ✅ |
+| `svelte-check`, clean `.svelte-kit` | **1056 files, 0 errors** ✅ |
+| room lint · prettier · schema verifier · boundary test | clean · clean · 269 total/**60 wired** · 17/17 ✅ |
+
+#### One defect found in my own file during the audit
+
+`apps/controller/scripts/collect-control-plane.js:518` failed `no-useless-assignment` — `let mod =
+null` where every path either reassigns or returns. The controller lint gate had been red on it.
+Mine, from earlier today, and fixed here.
+
+#### Not verified, and stated
+
+**Neither pane has been rendered in a browser.** SSR output, assertions and SQLite round trips are
+all that stand behind them. The full `pnpm test` gate was not run.
+
+**Left for the owner rather than changed:** the `svelte.config 2.js` stray in `apps/room` is a macOS
+duplicate of a file deliberately deleted in `ff948db` when the app adopted SvelteKit 3 — untracked,
+read by nothing, harmless. And template syntax still appears inside comments in roughly nine
+pre-existing places in `+page.svelte`, which `CLAUDE.md` forbids; the new files carry none.
+
+
+### 2026-08-15 07:24 EDT — Day Trade Alerts, end to end, and the delete that never worked
+
+**Runtime impact: yes, in two separate ways, and the second one is a fix to code that shipped five
+hours ago.**
+
+1. The whole Day Trade feature is behind the per-room `hasDayTradeAlerts` entitlement, which no room
+   has set; a room without it emits no nav item, no pane, no log read and refuses all three
+   mutations. Nothing existing changes behaviour.
+2. **`deleteSwingAlert` could not delete anything and now can.** That is live behaviour, in a
+   feature already deployed. See below.
+
+#### The port
+
+Built from `docs/decoded/day-trade-alerts.md` as a port of the Swing build, file for file: the
+`#dayTradeAlerts` pane, the one form that serves create and edit, the eight-column log with its
+search / limit / CSV strip, the months window, and the `day_trade_alerts` table behind them.
+
+**The six values that had to be CARRIED across rather than copied**, each read at its own offset in
+`main.d1d09071be31f1ba.js` and each one still compiling if it were wrong:
+
+| | Swing | Day Trade | read at |
+| --- | --- | --- | --- |
+| gate flag | `hasSwingTradeAlerts` | `hasDayTradeAlerts` — no doubled word | 1,009,430 / 1,009,503 |
+| months options | 1–20 | **1–15** | 1,916,549 / 1,916,648 |
+| months default | 2 | **1** | 1,955,344 / 1,955,601 |
+| months → days | `30 * m` | **`4 * m * 7`** | 1,993,612 / 1,993,637 |
+| first fetch | `days: 42` | **`days: 21`** | 1,010,116 |
+| search pipe | no optional chaining | **optional chaining at every hop** | 1,915,251 / 1,915,738 |
+
+**And one that must NOT be renamed.** `editAlertMessageSwing` is the command the DAY TRADE edit path
+sends — the literal occurs at exactly two offsets, 1,983,136 and **1,987,189**, and both spell it
+`…Swing`; the two payloads differ only in `swingTradeAlert:!0` versus `dayTradeAlert:!0`.
+`editAlertMessageDayTrade` occurs at **zero** offsets. It is pinned in the contract test for that
+reason.
+
+`newDayTradeAlertMsg` is not the create command — it is a payload key on the edit command and the
+server→client push. Create is `dayTradeAlertMsg`. Same trap as Swing, one word different.
+
+The create action spends `consumeRateLimit('alert', user.id)` **from the first line**, unlike the
+Swing action, which shipped without it and had it added after a diff re-read: the action posts into
+the main alerts feed as its second write, so without the limiter it is a way past the composer's.
+One shared bucket, not two, so alternating tabs cannot double the rate.
+
+#### The defect this found, which was not mine
+
+The Day Trade repository was a faithful port, so it inherited a defect nobody knew about. A runtime
+create/edit/delete round trip against a real SQLite file — not a type check, not a render assertion —
+produced:
+
+```
+SqliteError: FOREIGN KEY constraint failed
+```
+
+Both trade-alert tables SOFT-delete their own row and HARD-delete the mirrored message in `alerts`,
+both carry `alert_id REFERENCES alerts(id)`, and `db/index.ts` sets `PRAGMA foreign_keys = ON`. The
+surviving row still pointed at the alert being removed, so the transaction rolled back and a
+presenter clicking the bin icon got a 500 with the row still there.
+
+**Running the identical probe against the untouched Swing repository threw the identical error**, so
+this was pre-existing in the feature that shipped at 02:23 EDT and was reproduced here rather than
+introduced. Nothing caught it: it type-checks, it lints, `svelte-check` is clean, and
+`swing-alerts-contract.test.ts` never reaches the repository. Both are fixed by clearing `alert_id`
+inside the same transaction before the mirror is deleted, and
+`src/lib/server/trade-alerts-mirror-delete.test.ts` is the test whose absence was the bug.
+
+#### Verified here, by running it
+
+| check | result |
+| --- | --- |
+| `rm -rf .svelte-kit && svelte-kit sync`, then `svelte-check` | **1056 files, 0 errors, 0 warnings** |
+| `day-trade-alerts-contract.test.ts` | 29/29 |
+| `trade-alerts-mirror-delete.test.ts` | 3/3 |
+| `swing-alerts-contract.test.ts` + `page-load-contract.test.ts` | 27/27 |
+| all four together, thirteen consecutive runs | 59/59 |
+| `pnpm run lint` (room) | clean |
+| `prettier --check` on all 18 touched files | clean |
+| `verify-room-settings-schema.mjs` | 268 + 1 deviation = 269 total, **60 wired** |
+| `room-config-boundary.test.ts` | 17/17 |
+| `dont-touch-block.test.ts` + `room-settings-profile.test.ts` | 35/35 |
+| table, columns and index | read back from SQLite; `EXPLAIN QUERY PLAN` reports `SEARCH day_trade_alerts USING INDEX day_trade_alerts_room_entry_idx (room_short_code=? AND entry_date>?)` |
+| cross-room reads and writes | probed: read of another room 0 rows, edit and delete naming another room both `null` |
+
+**Ten negative controls, every one restored and confirmed byte-identical with `diff -q`:** the create
+command name (3 failed), the entitlement gate forced open (1), the day conversion swapped for Swing's
+(2), `editAlertMessageSwing` renamed (1), the rate limiter removed (1), the initial window set to 42
+(1), a sixteenth month option (3), the FK clearing statement removed from the Swing repository (1)
+and from the Day Trade one (2), and the room predicate dropped from the Day Trade delete (1).
+
+**One test failure was mine, found and fixed before reporting:** the id-prefix case asserted the
+limit and search boxes against an empty pane, and those live behind the empty-state branch.
+
+**Three offsets in `docs/decoded/day-trade-alerts.md` were wrong and were corrected**, each verified
+by opening the bundle at the offset first: the `getDayTradeAlertsLog` send site (1,993,797 →
+1,993,857 — the old value pointed into the neighbouring `linkedRoom${e}AlertsOther` expression), and
+the two CSS rule ranges 2,024,861 → 2,024,939 and 2,025,478 → 2,025,489, both of which had pointed
+inside the preceding rule. Five lines, offsets only; no claim was changed.
+
+**One run, once, reported `Test Files 1 failed | 3 passed` with `51 passed | 8 skipped` and no named
+failing test** — a file bailing early rather than an assertion going red. It came immediately after a
+sequence of rapid rewrites of the two repository files during the negative controls. It did not
+recur in sixteen subsequent runs, including three that deliberately rewrote a repository file
+immediately beforehand. Root cause not established, and recorded here rather than dropped because it
+was never explained.
+
+**Not verified, and stated plainly: the pane has never been rendered in a browser.** SSR output,
+assertions and SQLite round trips are all that stand behind it. The full gate was not run — the tests
+covering what changed were.
+
 ### 2026-08-15 07:04 EDT — the audit found three more features nobody had decoded
 
 **Runtime impact: none.** One new spec, one NEW-TODO section.

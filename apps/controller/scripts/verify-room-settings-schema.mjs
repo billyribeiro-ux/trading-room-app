@@ -13,10 +13,27 @@ const GENERATOR = resolve(SCRIPT_DIR, 'extract-manage-schema.mjs');
 const CANONICAL_SCHEMA = resolve(REPO_ROOT, 'src/lib/room-settings-schema.ts');
 
 /*
-  Eleven consumed by this repository's room-login page, FORTY-SIX by the room application
+  Eleven consumed by this repository's room-login page, FORTY-EIGHT by the room application
   through `internal/room-config/[code]`, and six by the WordPress SSO door at `(public)/sso/[code]`.
   `allowUsersToChangeUsername` is on the first two lists, and so now are `showPasswordField`,
-  `usernameInstructions` and `hasRequiredPhoneInLogin`, so the union is 59.
+  `usernameInstructions` and `hasRequiredPhoneInLogin`, so the union is 61.
+
+  47 -> 48 on 2026-08-15: `modAlertFilterList` joined with the Alert Filter, and it is the FIRST
+  entry on this list that is not a boolean gate — a string containing JSON, a list of username and
+  avatar pairs, parsed at bundle byte 1,221,905. The reference gates the whole feature on it being
+  truthy, so a room that configures no list has no entry point and no modal.
+
+  This sentence is checked. `sso-boundary.test.ts` asserts the prose here states the same total the
+  code computes, which is why the number appears in words and digits and both had to change. That
+  guard exists because a comment claiming a count is exactly the kind of thing that goes stale
+  silently and then gets quoted as fact.
+
+  46 -> 47 on 2026-08-15: `hasDayTradeAlerts` joined with the Day Trade Alerts pane, one step after
+  its Swing twin. One flag is the whole feature again — the nav item, the pane, the initial log
+  fetch and all three mutations collapse to nothing without it. Its sibling
+  `linkedRoomDayTradeAlertsOther` stays unwired for the same reason the Swing one does. Note the
+  spelling: the Swing flag doubles the word and this one does not, which is upstream's asymmetry and
+  is confirmed read at bundle bytes 1,009,430 and 1,009,503.
 
   45 -> 46 on 2026-08-15: `hasSwingTradeAlerts` joined with the Swing Trade Alerts pane. One flag is
   the whole feature — the nav item, the pane and the initial log fetch all collapse to nothing
@@ -150,7 +167,28 @@ const EXPECTED_WIRED_SETTINGS = [
     log fetch at ANOTHER room, and this room takes its room from the session row so that nothing the
     browser can reach names the room being read.
   */
-  'hasSwingTradeAlerts'
+  'hasSwingTradeAlerts',
+  /*
+    Added 2026-08-15 with the Day Trade Alerts pane, one step after the Swing one. One flag IS the
+    feature again: the nav item, the `#dayTradeAlerts` pane, the initial `getDayTradeAlertsLog` read
+    and all three mutations are gated on it, and a room without it renders no markup at all rather
+    than hidden markup.
+
+    Note the spelling. The Swing flag doubles the word and this one does not; both are read side by
+    side in the reference bundle at bytes 1,009,430 and 1,009,503.
+
+    `linkedRoomDayTradeAlertsOther` stays unwired beside it for the same reason its Swing twin does:
+    upstream it redirects the log fetch at ANOTHER room, and this room takes its room from the
+    session row so that nothing the browser can reach names the room being read.
+  */
+  'hasDayTradeAlerts',
+  /*
+    Added 2026-08-15 with the Alert Filter. Not a boolean gate like its neighbours: a STRING
+    CONTAINING JSON, an array of {username, avatar}, which the reference parses at bundle byte
+    1,221,905 with no try/catch. The whole feature is gated on it being truthy, so a room that
+    configures no list has no entry point and no modal.
+  */
+  'modAlertFilterList'
 ].sort();
 
 const fail = (message) => {

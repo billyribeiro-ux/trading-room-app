@@ -157,13 +157,73 @@ A sixth element is conditional — a `span` reading **`"no weekends"`**, rendere
 
 # 2. Alert Filter — each viewer chooses whose alerts they see
 
-No entitlement flag was found for this one; it appears to be always available. **Stated as a
-measurement, not a conclusion** — `hasAlertFilter` and similar return 0, but absence of a flag name
-is weaker evidence than presence of one.
+**CORRECTED 2026-08-15, and the correction is architectural.** The first version of this section said
+*"The SERVER owns the filtering. The client sends its selection and asks for the log again; it does
+not filter `alertsLog` in the browser. That is the correct shape and the one to reproduce."*
 
-## The command, both directions
+**That is wrong.** The filtering is done **in the browser**, in three separate places, and building to
+the original claim would have produced a server-side filter the reference does not have.
 
-**Send**, byte **1,221,491**:
+## The filtering is client-side, in THREE places, with one identical guard
+
+| site | byte | shape | what it filters |
+| --- | ---: | --- | --- |
+| the live `/alerts` SSE stream | 1,004,533 | **`continue` guard, NOT `.filter`** | each alert as it arrives |
+| `case "getAlertsLog"` | 1,017,070 | `.filter` | the paged log on every fetch |
+| the alerts SEARCH results | 1,020,817 | `.filter` | inside the `"alerts" == i.type` branch |
+
+**CORRECTED 2026-08-15: the three are NOT the same shape, and the difference is behavioural.** An
+earlier version of this section said all three ran the identical expression. The predicate is
+identical term for term; the *structure* is not. Site 1 is two `continue` guards, read verbatim:
+
+```js
+if (P("filtered out alert for " + te.avt), preferences.showAlertsFrom && !user.alertFilterFor[te.avt]) continue;
+if (!preferences.showAlertsFrom && user.alertFilterFor[te.avt]) continue;
+```
+
+It sits **before `alertsLog.push` and before `appEventBus.emit("alertMsg")`**, so on the live path a
+filtered-out alert also **suppresses the toast and the sound**. The other two only shape a list that
+has already arrived. In a rebuild this is a genuinely separate third call site, not a duplicate.
+
+**And the debug log is inside the first `if`'s comma expression**, so upstream prints
+`"filtered out alert for X"` for **every** alert while the filter is engaged, including the ones it
+keeps. Reproduce that only if reproducing the logging; it is a reference quirk, not a signal.
+
+All three run the same expression, read verbatim at 1,017,070:
+
+```js
+try {
+  this.globals.sessData.modAlertFilterList?.trim()?.length > 0 &&
+    Object.keys(this.globals.user.alertFilterFor).length > 0 &&
+    (i.data = i.data.filter((se) =>
+      this.globals.preferences.showAlertsFrom
+        ? this.globals.user.alertFilterFor[se.avt]
+        : !this.globals.user.alertFilterFor[se.avt]
+    ));
+} catch {}
+```
+
+Three things follow, and each one matters for a rebuild:
+
+1. **`showAlertsFrom` inverts the whole meaning.** True keeps only the selected people (allow-list);
+   false removes them (deny-list). The original section had this right and it is the one claim that
+   survives unchanged.
+2. **The match key is `se.avt`** — the alert's avatar hash, not a user id and not a name. Which is why
+   `alertFilterFor` is keyed by avatar.
+3. **The guard is doubly gated and it fails OPEN.** Nothing is filtered unless BOTH
+   `sessData.modAlertFilterList` is a non-empty string AND the selection is non-empty; and the whole
+   thing sits in a `try/catch {}` that swallows silently. A malformed list means every alert shows.
+
+**The privacy consequence, stated because it changes what this feature IS.** Every alert reaches
+every browser and some are hidden after arrival. This is a display preference, **not** an access
+control, and nothing about it prevents a member reading a filtered-out alert from the network tab.
+If we ever filter server-side instead, that is a deliberate divergence and must be recorded as one —
+it would be a genuine improvement, and it would not be a match.
+
+## What `updateAlertFilter` is actually for
+
+Since the browser does the filtering, the command is for **persistence**, not for effect. Send site,
+byte 1,221,491:
 
 ```js
 this.appService.globals.doFilteredAlerts =
@@ -175,7 +235,8 @@ this.appService.sendServerCommand("updateAlertFilter", {
 this.appService.setPreference("showAlertsFrom", this.appService.globals.preferences.showAlertsFrom)
 ```
 
-**Receive**, byte **1,017,535** — and note it re-fetches the whole log rather than filtering locally:
+Receive, byte 1,017,535 — it re-fetches so the newly stored selection is re-applied by the client
+code above:
 
 ```js
 case "updateAlertFilter":
@@ -185,32 +246,62 @@ case "updateAlertFilter":
   break;
 ```
 
-**The server owns the filtering.** The client sends its selection and asks for the log again; it does
-not filter `alertsLog` in the browser. That is the correct shape and the one to reproduce.
+## Two things called `modAlertFilterList`, and they are different types
 
-## The state
+**Corrected:** the first version described one array. There are two.
 
-| name | shape | meaning |
-| --- | --- | --- |
-| `globals.user.alertFilterFor` | object, **avatar hash → username** | who is selected |
-| `globals.modAlertFilterList` | array of `{ avatar, username }` | the people offered |
-| `globals.doFilteredAlerts` | boolean | `Object.keys(alertFilterFor).length > 0` |
-| `globals.preferences.showAlertsFrom` | boolean | **inverts the whole meaning** — see below |
+| name | type | byte |
+| --- | --- | ---: |
+| `sessData.modAlertFilterList` | a **string containing JSON** — `.trim()?.length` is tested on it | 1,004,533 |
+| `globals.modAlertFilterList` | the **parsed array**, initialised `[]` | 977,658 |
 
-`showAlertsFrom` flips the filter between an allow-list and a deny-list. The same selection means
-"only show these people" when true and "filter out these people" when false. A rebuild that treats it
-as a display toggle gets the semantics backwards.
+Bridged by `syncModAlertFilterList()`, byte 1,221,905:
 
-`toggleTraders(e, i)` deletes the key when set and assigns it otherwise, so the map is the selection.
-`syncModAlertFilterList()` seeds it from `modAlertFilterList`, assigning `alertFilterFor[e.avatar] =
-e.username` for anyone not already present.
+```js
+syncModAlertFilterList() {
+  const e = JSON.parse(this.appService.globals.sessData.modAlertFilterList) || [];
+  this.appService.globals.modAlertFilterList = e;
+}
+```
 
-The modal is opened by the GUI event **`doAlertFilterModal`**, which the component subscribes to in
-`ngOnInit` and answers by calling `syncModAlertFilterList()`.
+**Note the `JSON.parse` is NOT inside a try/catch** — unlike the filter guard. A malformed setting
+throws here. This is the third room setting shipped as a JSON string, after `alertLabels` and
+`chatTabsWithBadges`.
 
-## The controls, verbatim
+Each entry is `{ username, avatar }` — proven by `selectAll()`, byte 1,220,674:
 
-Byte **1,220,064** — three buttons, and the leading and trailing spaces are part of the strings:
+```js
+selectAll() {
+  for (const e of this.appService.globals.modAlertFilterList)
+    this.appService.globals.user.alertFilterFor[e.avatar] ||
+      (this.appService.globals.user.alertFilterFor[e.avatar] = e.username);
+}
+```
+
+## The whole feature is gated on the room configuring a list
+
+`sessData.modAlertFilterList` being truthy gates the entry points themselves — bytes 2,042,979 and
+2,286,654 (`O(5, …modAlertFilterList ? 5 : -1)` and `O(195, … ? 195 : -1)`), and byte 2,056,417 gates
+an indicator on `modAlertFilterList && doFilteredAlerts`. A room that configures no list has no
+feature, and there is nothing to build a default from.
+
+## The component
+
+Selector **`app-alert-filter-modal`**, `decls: 20, vars: 4`. Modal attributes verbatim:
+
+```
+id="alert-filter-modal" tabIndex="-1" role="dialog" aria-labelledby="alert-filter-modal" aria-hidden="true" class="modal fade"
+```
+
+Note `tabIndex` with a capital I, and `aria-labelledby` pointing at the modal's own id rather than a
+title element. Both are the reference's; reproduce them.
+
+The list renders when `modAlertFilterList.length > 0`, else the empty state **`List is empty.`**
+(byte 1,219,660). Component style block includes `.text-opacity{opacity:.1}`.
+
+## The controls, verbatim — spaces are part of the strings
+
+Byte 1,220,064:
 
 | text | handler |
 | --- | --- |
@@ -218,13 +309,15 @@ Byte **1,220,064** — three buttons, and the leading and trailing spaces are pa
 | `" Select All "` | `selectAll()` |
 | `" Save"` | `updateAlertFilter()` |
 
-**`" Save"` has a leading space and no trailing space**, unlike its two neighbours. That asymmetry is
-in the bundle; keep it.
+**`" Save"` has a leading space and no trailing space**, unlike its two neighbours. Keep the asymmetry.
+
+`toggleTraders(e, i)` deletes the key when set and assigns it otherwise, so the map IS the selection.
+The modal is opened by the GUI event **`doAlertFilterModal`**, which the component subscribes to in
+`ngOnInit` and answers with `syncModAlertFilterList()`.
 
 ## The two confirm strings, verbatim
 
-Both are template literals with an interpolation inside, and the branch is on whether the selection
-is empty (byte 1,220,940):
+Byte 1,220,940, branching on whether the selection is empty:
 
 ```js
 // when Object.keys(alertFilterFor).length === 0
@@ -234,20 +327,132 @@ is empty (byte 1,220,940):
 `Are you sure you want to ${showAlertsFrom ? "only show " : "filter out "} alerts from the selected people?`
 ```
 
-Note the inner spacing: `"only show alert "` carries a trailing space and `"alert"` does not, so the
-first string renders with a double space in one branch and not the other. That is the reference's,
-and it is the kind of detail that is "tidied" by accident.
+The inner spacing is uneven — `"only show alert "` has a trailing space and `"alert"` does not — so
+one branch renders a double space and the other does not. That is the reference's, and it is exactly
+the kind of thing that gets "tidied" by accident.
 
 **On cancel the component reverts `showAlertsFrom`** rather than leaving the toggle where the user
 put it.
 
----
+## A hardcoded per-client list sits beside this, and it is NOT this feature
 
-# 3. Alert Labels — per-room hashtags prefixed onto alert text
+At byte 977,658, immediately after `modAlertFilterList = []`, the globals carry `stTraders` — a
+hardcoded array of `{username, avatar}` with real gravatar MD5 hashes, e.g.
+`{username: "Allison", avatar: "c90b7e877c17de66ff99477ffa260e5f"}`. It is a Simpler Trading trader
+list compiled into the bundle. Recorded so nobody mistakes it for the configurable list, and **not
+reproduced** — a customer-specific hardcode is the opposite of the theming rule.
 
-**This is NOT a wire feature.** Measured: `getAlertLabels`, `saveAlertLabels`, `updateAlertLabels`,
-`alertLabelsModal` and `hasAlertLabels` are all **0 occurrences**. It is configuration plus a text
-transform.
+## What ALREADY EXISTS in our repository, verified 2026-08-15
+
+Established by reading our source before any build, after a list wrongly claimed a whole surface was
+unbuilt.
+
+| piece | state | evidence |
+| --- | --- | --- |
+| the modal shell | **PARTIALLY BUILT** | `ModalHost.svelte:5295-5323` — the `app-alert-filter-modal` host, `Modal id="alert-filter-modal"`, the `show-alerts` checkbox carrying the captured `ng-untouched ng-pristine ng-valid`, the label, `List is empty.` and a Close button |
+| the modal TITLE | **WRONG, not merely missing** | the shell hardcodes `title="Filter out alerts from the following:"` at `ModalHost.svelte:5300`. **The reference title is DYNAMIC** — `"Show"` / `"Filter out"` selected by `O(5, showAlertsFrom ? 5 : 6)`, then `" alerts from the following: "` **with a trailing space**. The shell carries only the false branch and drops the space |
+| anything that opens it | **NOT BUILT — the modal is unreachable today** | `open={name === 'alert-filter'}` at `ModalHost.svelte:5298` is its only reader. All 29 `openModal` call sites were enumerated; 19 distinct names, `'alert-filter'` not among them. **Dead scaffolding already in the repo** |
+| `alertFilterFor` / `showAlertsFrom` / `doFilteredAlerts` | **NOT BUILT** | zero occurrences in `apps/room/src` and `apps/controller/src`. The only `modAlertFilterList` hits are prose in `alerts-toolbar-contract.test.ts:112,123` |
+| the alerts feed filtering by sender | **NOT BUILT** | `visibleAlerts` (`+page.svelte:2578-2587`) filters on evidence-hidden, a body/name substring search and the archive cutoff. The arrival path (`:3152-3168` → `deliverAlert`) has no sender check |
+| a sender-hash filter that is a DIFFERENT feature | exists, do not confuse them | `alerts-advanced-search.ts:198` — `traders.includes(alert.senderEmailHash)`, allow-list only, no inversion, no `modAlertFilterList` gate |
+| `modAlertFilterList` setting | **PRESENT, `wired: false`** | `room-settings-schema.ts:320`, `group: "dont-touch"`, textarea, label `Alert filter list for mods:` |
+| `alertLabels` setting | **PRESENT, `wired: false`** | `room-settings-schema.ts:185`, textarea, label `Alert Labels`. **Its help text independently corroborates the four-field entry shape** — `{ "name", "hash", "color", "bgcolor" }` |
+| persistence plumbing | **already available** | `savePreference` (`+page.svelte:3875`, action at `+page.server.ts:3110`) already persists arbitrary JSON per user and already carries map-shaped values such as `audioMutedFor` |
+
+**One entry point is deliberately excluded and must stay excluded.**
+`alerts-toolbar-contract.test.ts:110-127` keeps the toolbar Filter button (bundle `N2e`, byte
+2,042,435, `" Filter alerts"`) OUT, with a capture-backed layout reason. The two that are free:
+the alerts-header badge `M2e` (byte 2,041,178 — `span.badge.badge-danger.ms-1.filtered-text`, text
+`" filtered"`, title `Alert Filter`, gated `modAlertFilterList && doFilteredAlerts`) and the
+user-settings button `Fke` (byte 2,233,255 — `btn btn-primary btn-sm mt-4 ml-4`, `fas fa-filter me-1`,
+text `" Filter out alerts "`), which belongs after `ModalHost.svelte:3110` in the `#alertPopup` box.
+
+### For Alert Labels
+
+| piece | state | evidence |
+| --- | --- | --- |
+| parsing `sessData.alertLabels` | **NOT BUILT** | not in `RoomSessionSettings` (`room-config-client.ts`), so it never crosses the boundary |
+| composer checkbox list | **NOT BUILT** | `PostAlertModal.svelte` read end to end, 464 lines: the footer has `keepOpenChk`, `postOnXChk`, `alert-push-label`, `alert-non-trade-label`, `alert-legal-disclosure-label` — no `alert-trade-label-*`. It slots between `:417` and `:418` per the gate order at byte 2,139,108 |
+| `processAlertLabels` | **NOT BUILT** | no prefixing on any of the three composer paths — `+page.svelte:7019`, `:7053`, `post-alert-behavior.ts:73` |
+| the three clear sites | **NOT BUILT** | `PostAlertModal.svelte:48` and `:58` would be two of the three homes; there is no close-time equivalent to `doCloseModal` |
+| badge renderer | **NOT BUILT** | `RoomMessage.svelte:325-351 parseBodySegments` is our `parseStock` equivalent — `$SYMBOL`, links, inline images. No `#` token handling anywhere |
+| the alerts-only / Q&A-excluded gate | **NOT BUILT, but both terms exist as props** | `kind` (`RoomMessage.svelte:21`) and `isQaMessage` (`:48`). The alerts pane renders `kind="alert"` at `+page.svelte:10898`; the Q&A modal renders `kind="chat"` at `ModalHost.svelte:4677` |
+
+**Note for whoever builds this:** `direct-evidence-contract.ts:112-118` lists `'alertLabels'` under
+`postAlert.hiddenCapabilityBranches` — a branch present in the bundle that the DOM capture never
+rendered. Building it does not invalidate that entry, since with no labels configured the section
+still renders nothing.
+
+## Honest gaps
+
+- **What the server does with `updateAlertFilter` is not in the bundle.** It clearly persists the map
+  against `userXrefID`, since the response echoes `alertFilterFor` back, but the storage and its
+  lifetime are not established here.
+- **The per-entry list item markup** (template `Tue`, byte 1,219,660) was not decoded — only that the
+  list exists, its empty state, and the three buttons.
+
+# 3. Alert Labels — per-room hashtags, and a badge renderer nobody had found
+
+**CORRECTED 2026-08-15.** The first version of this section said an entry is `{ hash, checked }` and
+that the feature is "configuration plus a text transform". **Both are wrong.** An entry has four
+configured fields, and the labels have a **second consumer** that renders them as coloured badges.
+
+**Still true:** this is not a wire feature. `getAlertLabels`, `saveAlertLabels`, `updateAlertLabels`,
+`alertLabelsModal` and `hasAlertLabels` are all **0 occurrences**.
+
+## The entry shape — four configured fields, not one
+
+Proven by the renderer at byte 1,328,216 and the checkbox list at 2,119,605:
+
+| field | used by | for |
+| --- | --- | --- |
+| `hash` | `processAlertLabels`, `parseSymbols` | the token written into the text as `#hash` |
+| `name` | `parseSymbols`, the checkbox list | the human label shown in the badge and the checkbox |
+| `bgcolor` | `parseSymbols` | the badge background |
+| `color` | `parseSymbols` | the badge text colour **and** its 1px border |
+
+`checked` is added at runtime, not configured — `map(r => (r.checked = !1, r))` at byte 1,147,292.
+
+## THE SECOND CONSUMER — `#hash` becomes a badge, in ALERTS only
+
+`parseSymbols`, read verbatim. **CORRECTED: the transform starts at byte 1,326,855**; 1,328,216 — cited in the first version — is where the pipe REGISTERS ITS NAME and lands mid-`parseStock`. The `my-1 me-1 badge` literal is at byte **1,326,988** and occurs exactly once:
+
+```js
+transform(e, i, o, s) {
+  if (s && s.length > 0 && "alerts" === i)
+    for (const r of s)
+      e.includes(`#${r.hash}`) &&
+        (e = e.replace(
+          `#${r.hash}`,
+          `<span class="my-1 me-1 badge" style="background-color: ${r.bgcolor}; color: ${r.color}; border: 1px solid ${r.color};">` +
+            hu.sanitize(r.name) +
+            "</span>"
+        ));
+  return e.includes("$") ? this.parseStock(e, i, o) : e;
+}
+```
+
+Five things follow:
+
+1. **`logType` must be `"alerts"`.** Chat messages never get label badges, even if the text contains
+   `#hash`. The call sites pass `isQAMsg ? null : globals.alertLabels`, so **Q&A messages are excluded
+   too**. **CORRECTED: there are TWELVE call sites, not three** — 1,331,808 · 1,332,698 · 1,332,883 ·
+   1,340,532 · 1,341,346 · 1,341,531 · 1,370,111 · 1,371,001 · 1,371,186 · 1,378,832 · 1,379,646 ·
+   1,379,831. The first version listed three and implied that was all of them.
+2. **The badge shows `name`, the text carries `hash`.** They are different strings and the mapping
+   between them is the whole point of the feature. `processAlertLabels` writes ` #hash`;
+   `parseSymbols` swaps it for a badge reading `name`.
+3. **Only the FIRST occurrence is replaced.** `String.replace` with a string argument, not a regex, so
+   a text containing `#hash` twice keeps the second one literal.
+4. **Classes are `my-1 me-1 badge`** — Bootstrap, verbatim.
+5. **`hu.sanitize(r.name)` sanitises the NAME — and `bgcolor` and `color` are interpolated RAW into a
+   `style` attribute.** In the reference these come from a room setting the owner controls, so it is
+   not a member-facing hole, but it is unsanitised interpolation into markup and **we must not
+   reproduce it that way.** Validate the two colours, or bind them as CSS custom properties, and say
+   in a comment that the divergence is deliberate.
+
+Then it hands off to `parseStock`, so the two features share one pipe: labels first, `$SYMBOL`
+colouring second, and the symbol pass only runs when the text contains `$`.
 
 ## The source is a JSON STRING in a room setting
 
@@ -261,18 +466,16 @@ if (i.globals.sessData.alertLabels && i.globals.sessData.alertLabels.length > 0)
 }
 ```
 
-So `sessData.alertLabels` is a **string containing JSON**, trimmed then parsed, and every entry gets
-`checked = false` on load. `globals.alertLabels` initialises to `[]` at byte **981,181**
-(`this.alertLabels=[]`, in the globals constructor beside `mutedUsers`, `followedUsers` and
-`showPositions`).
+`globals.alertLabels` initialises to `[]` at byte **981,181**. `sessData.chatTabsWithBadges` uses the
+identical shape in the very next block, and `sessData.modAlertFilterList` is the third — **three room
+settings shipped as JSON strings.**
 
-**`sessData.chatTabsWithBadges` uses the identical shape** in the very next block — a JSON string in
-a room setting, trimmed and parsed. Two settings share this pattern, which is worth knowing before
-anyone models either as a real array.
+Note the `JSON.parse` here is **not** inside a try/catch, and neither is the one in
+`syncModAlertFilterList`. A malformed setting throws during session setup.
 
-## The transform
+## The composer transform
 
-`processAlertLabels(e)`, byte **2,131,206**, read verbatim:
+`processAlertLabels(e)`, byte **2,131,295**:
 
 ```js
 processAlertLabels(e) {
@@ -288,18 +491,59 @@ processAlertLabels(e) {
 }
 ```
 
-Three details that a rewrite loses:
+- Each label is prefixed **space then `#`**, so the first puts a leading space at the very start.
+- **Newline after the last, space after the others** — the labels end up on their own line above the
+  body.
+- It mutates `e.txt` and returns `e`.
 
-1. **Each label is prefixed with a space then `#`** — `" #" + hash`. The first label therefore puts a
-   leading space at the very start of the alert text.
-2. **The last label is followed by a newline, the others by a space.** The labels end up on their own
-   line above the alert body.
-3. **The checkboxes are cleared as a side effect of formatting.** Selection does not persist past one
-   send, and it is reset inside the formatter rather than by the caller.
+**Called from FOUR sites**, not one — the first version implied a single caller:
 
-Each label is `{ hash, checked }`; `hash` is the tag text without the `#`.
+| byte | path |
+| --- | --- |
+| 2,126,822 | the image-alert path, after the uploaded link is appended |
+| 2,127,278 | the second image path |
+| 2,129,610 | `postAlert()`, the ordinary text alert |
+| 2,130,855 | `alertMsgLater`, the scheduler — see §1 |
 
----
+Every one is guarded by `globals.alertLabels.length > 0 &&` first.
+
+## The checkboxes are cleared in THREE places
+
+The first version said "cleared as a side effect of formatting", which is true and incomplete:
+
+| byte | when |
+| --- | --- |
+| 2,131,474 | inside `processAlertLabels`, after a successful prepend |
+| 2,127,804 | `doCloseModal()` — closing the alert modal |
+| 2,128,623 | `clearInputFields()` — clearing the composer |
+
+All three run the same `forEach(s => { s.checked = !1 })` guarded by a length check. **Selection never
+survives leaving the composer, by any route.**
+
+## The checkbox list
+
+Template `zTe`, rendered by `GTe` over `globals.alertLabels`, byte **2,119,605**:
+
+- a checkbox bound `ngModel` → `e.checked`, with `id="alert-trade-label-{index}"`
+- a `label` whose `for` is the same `"alert-trade-label-" + i`
+
+The label's text is `Ne("", e.name, "?")`. The helper is `Ne(prefix, value, suffix)` — calibrated
+against known cases in the same bundle, e.g. `Ne("[", e.duplicatesCount + 1, "]")` renders `[3]` — so
+**this renders `{name}?` with a trailing question mark.** Recorded as read and flagged as surprising,
+because `name` is a plain display label everywhere else. Do not "fix" it without checking the live
+app; do not reproduce it without noting it either.
+
+The block is gated in the post-alert modal at byte **2,139,108**:
+`O(62, alertLabels && alertLabels.length > 0 ? 62 : -1)` — no labels configured, no section.
+
+## Honest gaps
+
+- **The container classes for the checkbox list** (const 35, and the `input`/`label` const 53) were
+  not resolved to their class lists.
+- **Where `bgcolor` / `color` are authored** — presumably the manage page, but no control for
+  `alertLabels` was located in the manage capture, exactly as with `hasAlertScheduler`.
+- **Whether `hash` may contain characters needing escaping** is not established; `parseSymbols` builds
+  a plain `String.replace` from it, not a regex, so no escaping is required there.
 
 # What this means for us
 

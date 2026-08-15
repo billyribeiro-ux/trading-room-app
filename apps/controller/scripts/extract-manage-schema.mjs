@@ -202,7 +202,44 @@ const ROOM_CONSUMED = [
      session row precisely so that no client-supplied value can name the room being read. Sending
      it would reopen a cross-room read by configuration. If it is ever wanted it has to arrive as a
      server-resolved room id with the link confirmed here, not as a string the room dereferences. */
-  'hasSwingTradeAlerts'
+  'hasSwingTradeAlerts',
+  /* "Enable Day Trade Alerts Tab?" — the entitlement for the whole Day Trade Alerts feature.
+     Added 2026-08-15 with that pane, one step after the Swing one, and it has a reader on the day
+     it crosses: the room reads it as `sessData.hasDayTradeAlerts` and gates four things on it — the
+     nav item, the pane, the initial log fetch, and all three mutations. Every one of them collapses
+     to nothing when it is absent, which is the correct state for a room that has not bought the
+     feature.
+
+     Note the spelling beside its sibling: the Swing flag doubles the word and this one does not.
+     Both are read side by side in the reference bundle at bytes 1,009,430 and 1,009,503, so that is
+     a read fact rather than a typo to tidy.
+
+     `linkedRoomDayTradeAlertsOther` stays OUT, deliberately, as its Swing twin does. Upstream it
+     redirects the log fetch to ANOTHER room by substituting that room-s session id, and this room
+     takes the room from the session row precisely so that no client-supplied value can name the
+     room being read.
+
+     NO SQUARE BRACKET AND NO APOSTROPHE ANYWHERE ABOVE, for the reason the two notes further up
+     give. The boundary test reads this array with a regex that stops at the first closing bracket
+     and matches single-quoted runs, so either character silently truncates the whole list. That has
+     gone red three times, which is why the word for the punctuation is spelled out instead. */
+  'hasDayTradeAlerts',
+  /* "Alert filter list for mods:" — added 2026-08-15 with the Alert Filter.
+
+     Not a boolean gate like every flag above it. This one is a STRING CONTAINING JSON, holding a
+     list of username and avatar pairs, which the reference parses at bundle byte 1,221,905 with no
+     try around it. It is the third room setting shipped that way, after alertLabels and
+     chatTabsWithBadges.
+
+     It has to cross because the reference gates the WHOLE feature on it being truthy, at bytes
+     2,042,979 and 2,286,654. A room that configures no list gets no entry point, no modal and no
+     filtering, and the room cannot decide that for itself.
+
+     The avatars are gravatar hashes of emails the owner already administers, and every alert
+     already carries senderAvt so the room can draw the avatar. Nothing new crosses.
+
+     NO SQUARE BRACKET AND NO APOSTROPHE ANYWHERE ABOVE, for the reason the notes further up give. */
+  'modAlertFilterList'
 ];
 
 /**
@@ -559,6 +596,15 @@ if (defs.length !== EXPECTED_TOTAL_COUNT) {
 }
 
 const missingWiredSettings = [...WIRED_SETTINGS].filter((name) => !defs.some((definition) => definition.name === name));
+// 60 since 2026-08-15: `hasDayTradeAlerts` joined ROOM_CONSUMED with the Day Trade Alerts pane, one
+// step after its Swing twin. One flag is the whole feature again — the nav item, the pane, the
+// initial `getDayTradeAlertsLog` fetch and all three mutations collapse to nothing without it.
+// Its sibling `linkedRoomDayTradeAlertsOther` stays unwired for the same reason the Swing one does:
+// upstream it redirects the log fetch at ANOTHER room by substituting that room's session id, and
+// the room deliberately takes its room from the session row so nothing the browser can reach names
+// the room being read. Note the spelling — the Swing flag doubles the word and this one does not,
+// which is upstream's asymmetry and is confirmed read at bundle bytes 1,009,430 and 1,009,503.
+//
 // 59 since 2026-08-15: `hasSwingTradeAlerts` joined ROOM_CONSUMED with the Swing Trade Alerts pane.
 // One flag is the whole feature — the nav item, the pane and the initial `getSwingAlertsLog` fetch
 // all collapse to nothing without it, which is the right state for a room that has not bought it.
@@ -609,9 +655,15 @@ const missingWiredSettings = [...WIRED_SETTINGS].filter((name) => !defs.some((de
 // for non-presenters. Their two manage-page neighbours, the MediaMTX cluster ids, stay unwired:
 // they name infrastructure, the room bundle reads neither, and the room finds its host server-side.
 //
+// 61 since 2026-08-15: `modAlertFilterList` joined with the Alert Filter. It is the first entry on
+// this list that is NOT a boolean gate — a string containing JSON, a list of username and avatar
+// pairs, parsed at bundle byte 1,221,905. The reference gates the entire feature on it being
+// truthy, so a room that configures no list has no entry point and no modal, and the room cannot
+// decide that for itself.
+//
 // The literal is a tripwire, not a fact about the schema — it is here so the wired set cannot grow
 // by accident, which is why changing it is a deliberate edit.
-if (WIRED_SETTINGS.size !== 59 || missingWiredSettings.length > 0) {
+if (WIRED_SETTINGS.size !== 61 || missingWiredSettings.length > 0) {
   throw new Error(
     `wired-setting contract invalid: ${WIRED_SETTINGS.size} keys, missing ${missingWiredSettings.join(', ') || 'none'}`
   );

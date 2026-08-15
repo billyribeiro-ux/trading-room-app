@@ -115,17 +115,103 @@ speculative change this file exists to prevent.
   `server/notes.ts:123`, and the jsdom output pinned in `note-carousel.test.ts`.
 - **What it blocks:** nothing today. It decides whether the allow-lists need a second accepted form.
 
+**No persisted room video/YouTube state, so the four "For All" commands have no LATE-JOIN REPLAY —
+2026-08-15.** The commands themselves now broadcast and are received (`videoForAll` /
+`youtubeForAll` in `apps/room/src/routes/+page.server.ts`, pinned by
+`apps/room/src/lib/for-all-broadcast-contract.test.ts`). What is absent is the reference's server
+side of them, and it is absent because this room has nowhere to put it — `room_state`
+(`apps/room/src/lib/server/db/schema.ts`) holds `chatMode` and nothing else.
+
+Three consequences, all real and none of them papered over in code:
+
+1. **A member who joins while a video is playing sees nothing.** The reference replays it from
+   session state on connect — `roomState.videoURL && !roomState.videoPlayTime && (hideVideoPlayer =
+   1, videoPlayerUrl = roomState.videoURL, onMainTabChange('presAreaTabs-videoplayer'))`, bundle
+   byte 1,967,430.
+2. **A scheduled play lives in the presenter's browser.** Upstream, `playVideoForAll` is posted the
+   moment Send is pressed and carries `videoPlayTime` (byte 1,981,613); the SERVER holds the pair
+   and broadcasts when it fires, which is why its dispatch forwards only `{url: i.url}` (byte
+   1,024,587). Here the presenter's own `setTimeout` is the scheduler and posts at fire time, so
+   closing that tab cancels the play. `videoPlayTime` is deliberately NOT on this room's wire — a
+   field no receiver reads is the dead scaffolding this repository forbids.
+3. **The YouTube seek offset is always 0, so no `start=` is ever appended.** The subscriber derives
+   it — `i = Math.round((Date.now() - Number(e.startTime)) / 1e3)`, byte 1,964,799 — and its ONLY
+   source is the replay, `emit('playYTForAll', {url: roomState.ytURL, startTime:
+   roomState.ytStartTime})` at byte 1,965,054. `ytStartTime` occurs exactly once in the whole
+   bundle, and that is it. A late joiner therefore starts a YouTube video from the beginning rather
+   than dropping into the middle. **Nothing invents a `startTime` onto the wire to hide this**; the
+   contract test asserts that no file puts one there.
+
+- **What is missing:** a decision, not evidence — whether this room persists playing-media state
+  (a `room_state` migration plus a replay in the page load and a server-side timer), or stays
+  process-local as the SSE hub itself already is.
+- **Where I looked:** bundle bytes 1,024,137–1,024,708 (the dispatch), 1,503,220 (the overlay),
+  1,964,799–1,967,430 (the four subscribers and both replays), 1,981,613–1,981,945 (the senders),
+  2,296,932 (the stop-then-play), 2,016,864 / 2,017,661 (the `hideVideoPlayer` gate); and
+  `apps/room/src/lib/server/db/schema.ts`, which has no column for any of it.
+- **What it blocks:** late joiners only. A member present when a presenter presses play gets the
+  video, the tab switch and the overlay today.
+
 ---
 
-## State, 2026-08-14 15:44 EDT
+## State, 2026-08-15 08:11 EDT
 
-Eight rows remain, and **not one of them is blocked on effort**. Every item that could be built from
-the evidence has been; what is left is blocked on a decision, an environment, or an architecture
-this deployment does not have.
+**The previous version of this section said "Eight rows remain, and not one of them is blocked on
+effort. Every item that could be built from the evidence has been." That was false when it was
+written, and it is worth understanding why before trusting any similar sentence.**
+
+At the moment it was written, Swing Trade Alerts and Day Trade Alerts — two entire
+presentation-area tabs — were sitting in the captured bundle unbuilt, and had been since day one.
+`presAreaTabs-swingAlerts` occurs 3 times in v3, 3 times in our 2026-07-30 capture and 3 times in
+current v4. Nothing had ever ENUMERATED the reference's features, so "everything buildable is built"
+was a statement about what somebody had thought to look for.
+
+`apps/room/scripts/audit-feature-coverage.mjs` now asks the bundle directly. Since it was written it
+has found, three separate times, work nobody knew existed. **Run it after every feature lands.**
+
+### What the enumeration says today
+
+`docs/decoded/missing-commands-triage.md` — every missing identifier read at every occurrence, then
+each gap claim put through an adversarial pass that killed 8 of 34:
+
+| | |
+| --- | ---: |
+| **NOT BUILT — outstanding work** | **30** |
+| — fully specified, ready to build | 25 |
+| — need a decision first, still outstanding | 5 |
+| claimed missing then refuted — we already build it | 7 (+1 contested, resolved by reading) |
+| built under another name — the audit cannot see these | 9 |
+| third-party noise, never ours to build | 4 |
+
+**Nothing that is not built gets parked.** An earlier version of this table carried a fifth bucket —
+"unclear, needs a product decision" — which read as resolved and was not. A pending decision is
+outstanding work; the only thing that removes a row is building it or proving we already did. Owner
+directive, 2026-08-15, after the same mistake had already hidden two whole tabs behind a confident
+sentence.
+
+**Ready to build, fully specified:**
+
+| item | spec | note |
+| --- | --- | --- |
+| `presAreaTabs-recordings` — **NOT BUILT, blocker named** | `docs/decoded/missing-commands-triage.md` | NOT cheap after all. The reference's pane is one iframe onto a SERVER archive page; we have **zero recordings/archive tables** in either database, so the tab would front nothing. Needs an archive service first — a design decision, not a port |
+| Alert Filter | `docs/decoded/alert-scheduler-filter-labels.md` | server owns the filtering; `showAlertsFrom` inverts allow-list vs deny-list |
+| Alert Labels | same | not a wire feature; a JSON-string room setting plus a text transform |
+| Alert Scheduler | same | needs an entitlement whose manage-page control was NOT located, and a server-side scheduler we do not have |
+| Benzinga | `NEW-TODO.md` §2.2 | small; needs one more decode pass for the const-table classes |
+
+**The control-plane question is answered.** `docs/decoded/control-plane-capture.md`: the reference
+registers **31 ui-router states and not one is an operator surface**, and `states[*].data` is `null`
+on all 31 — the reference expresses no authority in its router at all. There is no route-level role
+model to copy, and the super-admin portal can only be designed, not matched.
+
+### The rows below
+
+What is left in the table is blocked on a decision, an environment, or an architecture this
+deployment does not have — which is what the old sentence *meant* and should have said.
 
 | row | what it needs | who or what unblocks it |
 | --- | --- | --- |
-| **P** | bookkeeping. PRs #20–#27 are MERGED. **#28 is open and NOT green** — see the CI section at the top of this file | the two open items there |
+| **P** | bookkeeping. PRs #20–#27 are MERGED. **#30 is open and must NOT be merged as-is** — it contains the Swing delete that could not delete (fixed on the branch, not in that PR), and its full gate has never run | a clean tree, then the gate |
 | **G** | the Postgres host question — Neon under volume | the owner |
 | **H** | production topology — separating media from the app tier | the owner |
 | **Q** | the WordPress plugin run inside a live WordPress | an environment |

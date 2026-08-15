@@ -78,6 +78,13 @@
   } from '$lib/roster-gates';
   import { alertSoundButtonFor, filesSectionHidden } from '$lib/files-gates';
   import {
+    INITIAL_FILE_SORT,
+    type FileSortField,
+    fileSortTitle,
+    sortFiles,
+    toggleFileSort
+  } from '$lib/file-sort';
+  import {
     MUTE_ALL_CONFIRM,
     MUTE_STAGGER_MS,
     nonAdminTalkingUsers
@@ -107,6 +114,15 @@
     swingAlertsTabVisible
   } from '$lib/swing-alerts';
   import type { SwingAlertRow } from '$lib/types';
+  import { alertPassesFilter, type AlertFilterFor } from '$lib/alert-filter';
+  import DayTradeAlertsPane from '$lib/components/day-trade-alerts/DayTradeAlertsPane.svelte';
+  import type { DayTradeAlertDraft } from '$lib/components/day-trade-alerts/draft';
+  import {
+    DAY_TRADE_ALERT_INITIAL_DAYS,
+    dayTradeAlertLogDays,
+    dayTradeAlertsTabVisible
+  } from '$lib/day-trade-alerts';
+  import type { DayTradeAlertRow } from '$lib/types';
   import RoomMessage from '$lib/components/RoomMessage.svelte';
   import type { MessageBadge } from '$lib/types';
   import { isMentionOf } from '$lib/mention';
@@ -1344,19 +1360,68 @@
   let sendingGif = $state(false);
   let pendingGifUrl = $state<string | null>(null);
   let youtubeForAllUrl = $state('');
+  /**
+   * `videoPlayerUrl` / `hideVideoPlayer` / `scheduledVideo` — the VideoPlayer tab, for the ROOM.
+   *
+   * All three were `VideoPlayer.svelte`'s own `$state`, and that is why "Play For All" and
+   * "Stop For All" only ever moved one browser. They live here because this is where the `cmds`
+   * subscription is; the component receives them as props, exactly as `mp3Url` already worked.
+   *
+   * The two subscribers this reproduces, verbatim from `main.d1d09071be31f1ba.js` byte 1,966,711
+   * and 1,966,882:
+   *
+   * ```js
+   * subscribe("playVideoForAll", e => { this.videoPlayerUrl = e.url; this.hideVideoPlayer = !0;
+   *                                     this.isP || this.onMainTabChange("presAreaTabs-videoplayer") })
+   * subscribe("stopVideoForAll", () => { this.videoPlayerUrl = ""; this.scheduledVideo.videoURL = "";
+   *                                      this.scheduledVideo.videoPlayTime = null;
+   *                                      this.hideVideoPlayer = !1;
+   *                                      this.isP || this.onMainTabChange("presAreaTabs-screens") })
+   * ```
+   *
+   * `hideVideoPlayer` is named for what upstream called it and means the OPPOSITE of what it
+   * sounds like: it is true while a video is playing, and it is the term that lets a MEMBER see
+   * the tab at all (`O(25, o.hideVideoPlayer && !o.isP || o.isP ? 25 : -1)`, byte 2,016,864). It
+   * was previously unmodelled here, which is recorded in the comment on the tab itself.
+   */
+  let videoPlayerUrl = $state('');
+  let hideVideoPlayer = $state(false);
+  /*
+    Replaced wholesale rather than mutated, so `$state.raw`: the two writers both assign a fresh
+    pair, and a deep proxy over an object that is never edited in place is cost with no reader.
+  */
+  let scheduledVideoForAll = $state.raw<{ videoURL: string; videoPlayTime: string | null }>({
+    videoURL: '',
+    videoPlayTime: null
+  });
+  /*
+    The armed play, held in the presenter's OWN browser.
+
+    Upstream this timer is the server's: `playVideoForAll` is posted at the moment the presenter
+    presses Send, carrying `videoPlayTime`, and the session record holds the pair until it fires
+    (the late-join replay reads it back at byte 1,967,430). This room has no store for that and no
+    server-side scheduler, so the browser that armed it is the one that posts when it fires. The
+    consequences are real and recorded in `TODO.md`: closing the tab cancels the play, and a member
+    who joins after a video started does not see it.
+  */
+  let scheduledVideoTimer: number | undefined;
   let composer = $state('');
   let fileSearch = $state('');
-  // The sort bar is the one part of the Files pane with no counterpart in the pinned capture -
-  // `st-fileSortBar`, `st-fileSortName`, `st-fileSortDate`, `fa-sort` and `fa-sort-amount-up` are
-  // absent from main.d6d3c112b59b7d0d.js, from complete-app-styles.css and from the rendered Files
-  // dump, so the deployment we hold predates it. These class names come from the owner's own
-  // markup rather than from the bundle.
-  let fileSortKey = $state<'name' | 'date'>('name');
-  // Each button keeps its own direction, which is why the capture's inactive Date button still
-  // says "Sorted newest to oldest". Name defaults A-to-Z and Date defaults newest-first, matching
-  // the rendered titles in the owner's markup.
-  let nameAscending = $state(true);
-  let dateNewestFirst = $state(true);
+  /*
+    The Files sort bar's state - ONE field and ONE direction, opening on date/desc.
+
+    This used to be three variables (`fileSortKey`, `nameAscending`, `dateNewestFirst`) built from
+    the owner's pasted markup, because the capture we held at the time contained no sort bar at all.
+    The v4 bundle does contain it, and it disagrees on two points that a per-button direction cannot
+    express: both icons read the same `fileSortDir` (bytes 1,946,450 and 1,946,605), and switching
+    field RESETS that direction to the new field's default rather than restoring a remembered one
+    (byte 1,975,308). `$lib/file-sort` holds the decode and the reasoning.
+
+    `$state.raw`, not `$state`: this object is only ever REPLACED, by `toggleFileSort` returning a
+    new pair, so a deep proxy over it would be per-read overhead buying nothing. The pair is one
+    value rather than two so the field and the direction cannot drift apart.
+  */
+  let fileSort = $state.raw(INITIAL_FILE_SORT);
   // The row checkboxes that feed "Delete Selected"; `#filesDriveList input:checked` in the capture.
   let selectedFileIds = $state<Set<number>>(new Set());
   let volume = $state(100);
@@ -2511,11 +2576,86 @@
     replaced by every `invalidateAll()`, so older pages held there would be discarded by one new
     alert.
   */
+  /**
+   * `globals.user.alertFilterFor` and `preferences.showAlertsFrom` — the Alert Filter.
+   *
+   * `$state.raw` on the map for the same reason `presenterAudio` uses it: every transition in
+   * `$lib/alert-filter` REPLACES the object rather than mutating it, so a deep proxy would cost a
+   * proxy per key and buy nothing.
+   *
+   * Seeded from the stored preferences, which is where `updateAlertFilter` persists them — the
+   * reference sends the map to the server AND calls `setPreference('showAlertsFrom', …)` in the same
+   * expression, byte 1,221,491.
+   */
+  // The stored settings are the intentional one-time seed for editable client preference state.
+  let alertFilterFor = $state.raw<AlertFilterFor>(readAlertFilterFor(loadedSettings.alertFilterFor));
+  // The stored settings are the intentional one-time seed for editable client preference state.
+  let showAlertsFrom = $state(loadedSettings.showAlertsFrom === true);
+
+  /**
+   * The stored map, taken strictly rather than coerced.
+   *
+   * Same posture as `readPresenterMuteMap`: the value is `avatar hash -> username`, and an entry
+   * whose value is not a string is DROPPED rather than turned into a truthy placeholder. A junk
+   * entry that survived would filter out a trader nobody selected, and in the allow-list direction
+   * it would hide almost every alert in the room.
+   */
+  function readAlertFilterFor(stored: unknown): AlertFilterFor {
+    if (!stored || typeof stored !== 'object' || Array.isArray(stored)) return {};
+    const map: AlertFilterFor = {};
+    for (const [hash, username] of Object.entries(stored as Record<string, unknown>)) {
+      if (typeof username === 'string') map[hash] = username;
+    }
+    return map;
+  }
+
+  /*
+    `doFilteredAlerts` (byte 1,221,430) and the availability gate are NOT declared here yet.
+
+    They exist to drive the header badge and the settings-modal entry point, and neither is built.
+    Declaring them now would be two `$derived` values nothing reads — dead scaffolding, which the
+    standard forbids and which lint catches. They arrive in the same change as the controls that
+    read them, from `hasActiveAlertFilter` and `alertFilterAvailable` in `$lib/alert-filter`.
+  */
+
+  /**
+   * `updateAlertFilter` — the reference persists the map server-side AND sets the preference.
+   *
+   * This room has one mechanism for both: `savePreference` already stores arbitrary JSON per user
+   * and already carries map-shaped values, so no new endpoint is needed. The observable result is
+   * the reference's: the selection survives a reload.
+   */
+  function saveAlertFilter(next: { alertFilterFor: AlertFilterFor; showAlertsFrom: boolean }) {
+    alertFilterFor = next.alertFilterFor;
+    showAlertsFrom = next.showAlertsFrom;
+    savePreference('alertFilterFor', next.alertFilterFor);
+    savePreference('showAlertsFrom', next.showAlertsFrom);
+  }
+
   const visibleAlerts = $derived(
     mergeOlderChatMessages(olderAlerts, data.alerts)
       .filter((item) => !isEvidenceMessageHidden(item))
       .map(withEvidenceState)
       .filter((item) => matchesAlertSearch(item))
+      /*
+        THE ALERT FILTER — the second of the reference's three sites, `case "getAlertsLog"` at byte
+        1,017,070.
+
+        `senderEmailHash` is this room's name for what the reference calls `avt`: the gravatar hash
+        of the sender's email, which is what the selection is keyed by. `alerts-advanced-search.ts`
+        matches on the same field for the same reason.
+
+        The predicate lives in `$lib/alert-filter` rather than here because it fails OPEN in three
+        distinct ways and inlining it would put that logic in three places.
+      */
+      .filter((item) =>
+        alertPassesFilter({
+          avatarHash: item.senderEmailHash,
+          alertFilterFor,
+          showAlertsFrom,
+          modAlertFilterListRaw: data.sessData?.modAlertFilterList
+        })
+      )
       .filter(
         (item) => alertsArchivedAt === null || new Date(item.createdAt).getTime() > alertsArchivedAt
       )
@@ -6389,25 +6529,37 @@
   function searchedFiles() {
     const query = fileSearch.trim().toLowerCase();
     const matching = data.files.filter((item) =>
-      Object.values(item).some((field) => typeof field === 'string' && field.toLowerCase().includes(query))
+      Object.values(item).some(
+        (field) => typeof field === 'string' && field.toLowerCase().includes(query)
+      )
     );
-    return matching.sort((a, b) =>
-      fileSortKey === 'name'
-        ? (nameAscending ? 1 : -1) * a.name.localeCompare(b.name)
-        : // "newest to oldest" is descending, so the default direction is the reverse of name's.
-          (dateNewestFirst ? -1 : 1) *
-          (new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
-    );
+    /*
+      SEARCH FIRST, THEN SORT, which is the order the reference composes its two pipes in - read at
+      byte 1,951,076:
+
+          pt(rg(16,9,Ct(15,6,e.sessionFiles,e.filesSearch),e.fileSortField,e.fileSortDir))
+
+      `Ct` binds the two-argument `filter`, and its result is the FIRST argument to the
+      three-argument `sortFiles`. Sorting first and filtering after would give the same rows here,
+      but it is not what the reference does and it costs a comparison pass over rows that are about
+      to be discarded.
+
+      `sortFiles` copies before it sorts, so the array `filter` just allocated is not sorted in
+      place either; see property 1 in `$lib/file-sort`.
+    */
+    return sortFiles(matching, fileSort.field, fileSort.direction);
   }
 
   /**
-   * Both titles read "Sorted X (click to sort Y)", on the active button and the inactive one alike,
-   * so a click flips that button's own direction and makes it the governing sort.
+   * One click on one of the two sort buttons.
+   *
+   * The whole transition lives in `$lib/file-sort` so it can be exercised without rendering this
+   * component; all this does is hand the current pair in and store the pair that comes back. The
+   * single assignment is deliberate - `$state.raw` reacts to reassignment, and assigning field and
+   * direction separately is what would let a stale direction survive a field change.
    */
-  function toggleFileSort(key: 'name' | 'date') {
-    if (key === 'name') nameAscending = !nameAscending;
-    else dateNewestFirst = !dateNewestFirst;
-    fileSortKey = key;
+  function applyFileSort(field: FileSortField) {
+    fileSort = toggleFileSort(fileSort, field);
   }
 
   /**
@@ -7018,12 +7170,127 @@
     sendingGif = false;
   }
 
-  function playYoutubeForAll(url: string) {
-    youtubeForAllUrl = url;
+  /**
+   * The YouTube modal's Play button — `playYtVideo()`, byte 2,296,932.
+   *
+   * ```js
+   * playYtVideo() {
+   *   this.appService.sendServerAdminCommand('stopYTForAll', {url: this.youtubeURL});
+   *   this.appService.sendServerAdminCommand('playYTForAll', {url: this.youtubeURL});
+   * }
+   * ```
+   *
+   * A stop and then a play, in that order, so a second video replaces the first cleanly. Both are
+   * posted in ONE request — see the action — because two in-flight posts can be answered in either
+   * order, and the inverted pair leaves every browser holding a torn-down overlay.
+   *
+   * This used to be `youtubeForAllUrl = url`, which played the video for the presenter alone.
+   */
+  async function playYoutubeForAll(url: string) {
+    await sendYoutubeForAllCommand('playYTForAll', url);
   }
 
-  function stopYoutubeForAll() {
+  /**
+   * The overlay's "Stop For All" — `stopYTForAll() { sendServerAdminCommand('stopYTForAll') }`,
+   * byte 1,503,220. Presenter-only in the markup, and re-checked on the server.
+   */
+  async function stopYoutubeForAll() {
+    await sendYoutubeForAllCommand('stopYTForAll');
+  }
+
+  /**
+   * The overlay's "×" — `closeYTFrame() { this.appService.guiEventBus.emit('stopYTForAll') }`,
+   * byte 1,503,275.
+   *
+   * THE DISTINCTION IS THE POINT, and it is drawn by which bus the reference emits on: "Stop For
+   * All" goes to the SERVER and takes the video off everyone's screen; "×" emits on the LOCAL gui
+   * bus, so it dismisses this viewer's own iframe and nobody else's. That is also why "×" is not
+   * presenter-gated in the markup and "Stop For All" is — a member must be able to close an
+   * overlay sitting over their room, without taking it away from the room.
+   *
+   * Both were wired to the same function here, which collapsed the two into one and made the "×"
+   * on a member's screen a no-op they had no authority to perform.
+   */
+  function closeYoutubeFrame() {
     youtubeForAllUrl = '';
+  }
+
+  async function sendYoutubeForAllCommand(cmd: 'playYTForAll' | 'stopYTForAll', url?: string) {
+    const body = new FormData();
+    body.set('cmd', cmd);
+    if (url !== undefined) body.set('url', url);
+    const response = await fetch('?/youtubeForAll', { method: 'POST', body });
+    const result = deserialize<{ success?: boolean }, { message?: string }>(await response.text());
+    if (result.type === 'failure') bootboxAlert = result.data?.message ?? 'Command failed.';
+  }
+
+  /**
+   * "Play For All" → "Play now", and the moment an armed schedule fires.
+   *
+   * `sendServerAdminCommand('playVideoForAll', {url: e, videoPlayTime: null})`, byte 1,981,761.
+   * Nothing is assigned locally: the broadcast comes back down the `cmds` channel to this browser
+   * along with every other, which is the same rule the private chat note states — the sender learns
+   * its own message from the channel and nobody inserts optimistically.
+   */
+  async function playVideoForAll(url: string) {
+    clearScheduledVideoTimer();
+    scheduledVideoForAll = { videoURL: '', videoPlayTime: null };
+    await sendVideoForAllCommand('playVideoForAll', url);
+  }
+
+  /**
+   * "Choose time?" → "Send". Arms the play locally and shows the presenter what is pending.
+   *
+   * `whenLocal` is the raw `datetime-local` value, kept as the string the reference keeps
+   * (`this.scheduledVideo.videoPlayTime = i` before it is converted) because that is what the
+   * "Video scheduled for:" line formats.
+   *
+   * A time already past plays immediately rather than never — `delay > 0` arms the timer, and a
+   * finite non-positive delay falls through to the immediate path. An unparseable value arms
+   * nothing and plays nothing, loudly: the pending line simply does not appear.
+   */
+  function scheduleVideoForAll(url: string, whenLocal: string) {
+    clearScheduledVideoTimer();
+
+    const delay = new Date(whenLocal).getTime() - Date.now();
+    if (!Number.isFinite(delay)) return;
+    if (delay <= 0) {
+      void playVideoForAll(url);
+      return;
+    }
+
+    scheduledVideoForAll = { videoURL: url, videoPlayTime: whenLocal };
+    scheduledVideoTimer = window.setTimeout(() => {
+      scheduledVideoTimer = undefined;
+      void playVideoForAll(url);
+    }, delay);
+  }
+
+  /**
+   * "Stop For All" and "Remove Scheduled Video" — one command for both, byte 1,981,811.
+   *
+   * The armed timer is dropped when the command ARRIVES, not here, so that a stop sent by another
+   * presenter cancels this browser's pending play too. See the `stopVideoForAll` case below.
+   */
+  async function stopVideoForAll() {
+    await sendVideoForAllCommand('stopVideoForAll');
+  }
+
+  function clearScheduledVideoTimer() {
+    if (scheduledVideoTimer !== undefined) window.clearTimeout(scheduledVideoTimer);
+    scheduledVideoTimer = undefined;
+  }
+
+  async function sendVideoForAllCommand(
+    cmd: 'playVideoForAll' | 'stopVideoForAll',
+    url?: string
+  ) {
+    const body = new FormData();
+    body.set('cmd', cmd);
+    if (url !== undefined) body.set('url', url);
+    const response = await fetch('?/videoForAll', { method: 'POST', body });
+    const result = deserialize<{ success?: boolean }, { message?: string }>(await response.text());
+    if (result.type === 'failure') bootboxAlert = result.data?.message ?? 'Command failed.';
   }
 
   function clamp(value: number, minimum: number, maximum: number) {
@@ -7471,6 +7738,76 @@
         if (command?.cmd === 'stopMp3ForAll') {
           mp3Url = null;
           mp3Playing = false;
+          return;
+        }
+
+        /*
+          `playVideoForAll` / `stopVideoForAll`, verbatim (bytes 1,966,711 and 1,966,882):
+
+            subscribe("playVideoForAll", e => { this.videoPlayerUrl = e.url;
+              this.hideVideoPlayer = !0;
+              this.isP || this.onMainTabChange("presAreaTabs-videoplayer") })
+            subscribe("stopVideoForAll", () => { this.videoPlayerUrl = "";
+              this.scheduledVideo.videoURL = ""; this.scheduledVideo.videoPlayTime = null;
+              this.hideVideoPlayer = !1;
+              this.isP || this.onMainTabChange("presAreaTabs-screens") })
+
+          Room-wide, so no `targetUserId` to match on. The tab move is for NON-presenters only, and
+          the reason is visible in the gate it pairs with: a presenter is already able to reach the
+          VideoPlayer tab whenever they like, while a member's tab exists only while
+          `hideVideoPlayer` is true — dragging them there is what makes it reachable at all, and
+          putting them back on screens is what stops them staring at an empty pane afterwards.
+        */
+        if (command?.cmd === 'playVideoForAll') {
+          if (typeof command.url !== 'string') return;
+          videoPlayerUrl = command.url;
+          hideVideoPlayer = true;
+          if (!isPresenter) mainTab = 'videoplayer';
+          return;
+        }
+        if (command?.cmd === 'stopVideoForAll') {
+          /*
+            The armed timer dies here rather than in the sender, so that a stop sent by ANOTHER
+            presenter also cancels this browser's pending play. Clearing it only where the button
+            is pressed would leave the first presenter's video arriving minutes after the room was
+            told it had been removed.
+          */
+          clearScheduledVideoTimer();
+          videoPlayerUrl = '';
+          scheduledVideoForAll = { videoURL: '', videoPlayTime: null };
+          hideVideoPlayer = false;
+          if (!isPresenter) mainTab = 'screens';
+          return;
+        }
+
+        /*
+          `playYTForAll` / `stopYTForAll` — the floating overlay, on every screen in the room.
+
+            case "playYTForAll": this.guiEventBus.emit("playYTForAll", {url: i.url});
+            case "stopYTForAll": this.guiEventBus.emit("stopYTForAll");
+
+          THE SEEK POSITION IS DERIVED, NEVER SENT. The subscriber at byte 1,964,799 is
+
+            let i = 0;
+            if (e.startTime) { let o = Number(e.startTime); i = Math.round((Date.now() - o) / 1e3) }
+            else this.startTime = 0;
+
+          and `startTime` is absent from the live command above — it arrives only on the late-join
+          replay, `emit("playYTForAll", {url: roomState.ytURL, startTime: roomState.ytStartTime})`
+          at byte 1,965,054. That replay needs a persisted room video state, which this room does
+          not have, so the offset here is always the live command's 0 and no `start=` is appended.
+          The gap is recorded in `TODO.md`. What must NOT happen is a `startTime` invented onto the
+          wire to make the branch look implemented: the value is a function of when the room
+          started playing, and nothing here knows that.
+        */
+        if (command?.cmd === 'playYTForAll') {
+          if (typeof command.url === 'string') youtubeForAllUrl = command.url;
+          return;
+        }
+        if (command?.cmd === 'stopYTForAll') {
+          // No payload is read. A url rides with the stop that precedes a play (byte 2,296,932)
+          // and the reference's dispatch forwards none of it.
+          youtubeForAllUrl = '';
           return;
         }
 
@@ -8147,6 +8484,8 @@
       else delete imageModalWindow.openImageModal;
       if (alertScrollTimer !== undefined) globalThis.clearTimeout(alertScrollTimer);
       if (chatScrollTimer !== undefined) globalThis.clearTimeout(chatScrollTimer);
+      // An armed "play at" that outlives the room would post a broadcast from a page nobody is on.
+      clearScheduledVideoTimer();
       for (const timer of toastTimers.values()) globalThis.clearTimeout(timer);
       toastTimers.clear();
       unloadSoundEffects();
@@ -8698,6 +9037,169 @@
 
   async function confirmSwingImagePaste(): Promise<void> {
     const pending = closeSwingImagePaste();
+    if (!pending) return;
+    try {
+      const [url] = await uploadAlertFiles([pending.file]);
+      pending.resolve(url ?? null);
+    } catch (error) {
+      console.error(error);
+      bootboxAlert = 'Upload Failed...';
+      pending.resolve(null);
+    }
+  }
+
+  /* ── Day Trade Alerts ────────────────────────────────────────────────────────────────────── */
+
+  /**
+   * `hasDayTradeAlerts` — the per-room entitlement, gating the nav item AND the pane.
+   *
+   * `$derived` rather than copied into a `let`, so a room whose configuration is re-read mid-session
+   * cannot leave the tab showing after the owner turned the feature off. The reference reads it once
+   * in `ngOnInit` (byte 1,955,967) and therefore does NOT react; reacting is the safer direction of
+   * that divergence and costs nothing.
+   */
+  const dayTradeAlertsEnabled = $derived(dayTradeAlertsTabVisible(data.sessData ?? {}));
+
+  /**
+   * `globals.dayTradeAlertsLog`.
+   *
+   * `$state.raw` because it is only ever REPLACED — by the page load's seed and by
+   * `refreshDayTradeAlerts` — and never mutated in place. A deep proxy over a list of a few hundred
+   * rows would cost on every read of every cell and buy nothing.
+   *
+   * Seeded from `data.dayTradeAlerts` and thereafter owned here. It deliberately does NOT track
+   * `data.dayTradeAlerts` afterwards: the load always answers the 21-day window, so a `$derived`
+   * would throw away the presenter's chosen months window the next time anything else on the page
+   * called `invalidateAll()`. Every day trade mutation refetches this list itself instead.
+   */
+  // The page data is the intentional one-time seed; every later value comes from the refetch below.
+  // svelte-ignore state_referenced_locally
+  let dayTradeAlertsLog = $state.raw<readonly DayTradeAlertRow[]>(data.dayTradeAlerts);
+  /** The window currently displayed, so a refetch after a mutation asks for the same one. */
+  let dayTradeAlertsDays = $state(DAY_TRADE_ALERT_INITIAL_DAYS);
+
+  /** A pending image upload for the day trade form, and its `resolve`. `imgUpload('dayTrade')`. */
+  let dayTradeImageUpload = $state.raw<{ resolve: (url: string | null) => void } | null>(null);
+  /** A pasted image awaiting the confirmation `onImagePaste` shows before uploading. */
+  let dayTradeImagePaste = $state.raw<{
+    file: File;
+    previewUrl: string;
+    resolve: (url: string | null) => void;
+  } | null>(null);
+
+  /**
+   * `getDayTradeAlertsLog` — refetch the log for the current window.
+   *
+   * A plain GET rather than a form action, for the reason `refreshSwingAlerts` gives: this changes
+   * nothing, so it must not go through `invalidateAll()` and re-run every load function on the page
+   * to answer a question about one table.
+   */
+  async function refreshDayTradeAlerts(): Promise<void> {
+    const response = await fetch(`/api/day-trade-alerts?days=${dayTradeAlertsDays}`);
+    if (!response.ok) throw new Error('Unable to load day trade alerts.');
+    dayTradeAlertsLog = (await response.json()) as readonly DayTradeAlertRow[];
+  }
+
+  /**
+   * The three day trade mutations. Named for the wire commands, which are the action names.
+   *
+   * No `invalidateAll()`: the only page data these change is the day trade log, and re-running
+   * every load function would additionally reset the log to the 21-day window the load always
+   * returns. The explicit refetch below keeps the presenter's chosen window.
+   */
+  async function submitDayTradeCommand(
+    action: 'dayTradeAlertMsg' | 'editDayTradeAlertMsg' | 'deleteDayTradeAlertMsg',
+    values: Record<string, string | number>
+  ): Promise<void> {
+    const body = new FormData();
+    for (const [key, value] of Object.entries(values)) body.set(key, String(value));
+    const response = await fetch(`?/${action}`, { method: 'POST', body });
+    const result = deserialize<Record<string, unknown>, { message?: string }>(await response.text());
+
+    if (result.type === 'failure') throw new Error(result.data?.message ?? 'Unable to save.');
+    if (result.type === 'error') throw new Error(result.error.message ?? 'Unable to save.');
+    if (result.type !== 'success') throw new Error('Unable to save.');
+
+    await refreshDayTradeAlerts();
+  }
+
+  function dayTradeAlertPayload(draft: DayTradeAlertDraft): Record<string, string> {
+    return {
+      symbol: draft.symbol,
+      direction: draft.direction,
+      entryPrice: draft.entryPrice,
+      stop: draft.stop,
+      target: draft.target,
+      image: draft.image
+    };
+  }
+
+  /** `onTradeAlertWeeksChange('DayTrade')` — clear the list, then refetch for the new window. */
+  async function changeDayTradeAlertMonths(months: number): Promise<void> {
+    dayTradeAlertsDays = dayTradeAlertLogDays(months);
+    /*
+      The reference empties `globals.dayTradeAlertsLog` BEFORE sending the command (byte
+      1,993,666), so the list is blank while the refetch is in flight rather than showing the
+      previous window under the new label. Reproduced, including the flash of the empty-state
+      heading that comes with it.
+    */
+    dayTradeAlertsLog = [];
+    await refreshDayTradeAlerts();
+  }
+
+  function requestDayTradeImageUpload(): Promise<string | null> {
+    return new Promise((resolve) => {
+      dayTradeImageUpload = { resolve };
+    });
+  }
+
+  async function completeDayTradeImageUpload(files: readonly File[]): Promise<void> {
+    const pending = dayTradeImageUpload;
+    dayTradeImageUpload = null;
+    if (!pending) return;
+    /*
+      One file. The reference's own dialog sets `multiple='false'`; `ImageUploadDialog` is shared
+      with the chat composer, which does allow several, so the extras are dropped here rather than
+      by forking the component.
+    */
+    const [file] = files;
+    if (!file) {
+      pending.resolve(null);
+      return;
+    }
+    try {
+      const [url] = await uploadAlertFiles([file]);
+      pending.resolve(url ?? null);
+    } catch (error) {
+      console.error(error);
+      bootboxAlert = 'Upload Failed...';
+      pending.resolve(null);
+    }
+  }
+
+  /**
+   * `onImagePaste(event, 'dayTrade')` — confirm the pasted image, then upload it.
+   *
+   * The object URL is created for the confirmation's preview and revoked when the dialog closes,
+   * whichever way it closes. Leaking one per paste would pin the image bytes for the life of the
+   * tab.
+   */
+  function requestDayTradeImagePaste(file: File): Promise<string | null> {
+    return new Promise((resolve) => {
+      dayTradeImagePaste = { file, previewUrl: URL.createObjectURL(file), resolve };
+    });
+  }
+
+  function closeDayTradeImagePaste(): { file: File; resolve: (url: string | null) => void } | null {
+    const pending = dayTradeImagePaste;
+    dayTradeImagePaste = null;
+    if (!pending) return null;
+    URL.revokeObjectURL(pending.previewUrl);
+    return { file: pending.file, resolve: pending.resolve };
+  }
+
+  async function confirmDayTradeImagePaste(): Promise<void> {
+    const pending = closeDayTradeImagePaste();
     if (!pending) return;
     try {
       const [url] = await uploadAlertFiles([pending.file]);
@@ -11106,21 +11608,28 @@
                     </a>
                   </li>
                   <!--
-                    VideoPlayer is presenter-only here. The captured gate, verbatim, on both the
-                    tab (slot 25) and its pane (slot 47):
+                    The captured gate, verbatim, on both the tab (slot 25, byte 2,016,864) and its
+                    pane (slot 47, byte 2,017,661):
 
                       O(25, (o.hideVideoPlayer && !o.isP) || o.isP ? 25 : -1)
 
-                    i.e. a presenter always sees it, and a member sees it only when
-                    `hideVideoPlayer` is set. This room does not model `hideVideoPlayer`, and the
-                    owner's own member capture of `#mainTabs` shows the tab collapsed to an
-                    empty Angular comment anchor, alongside Recordings, Swing Alerts and Day
-                    Trades - so for a member the gate evaluated false there. Reducing it to `isPresenter` reproduces both observed
-                    states; the unmodelled term is recorded rather than invented.
+                    i.e. a presenter always sees it, and a member sees it only while a video is
+                    playing for the room. `hideVideoPlayer` is now modelled - `playVideoForAll`
+                    sets it and `stopVideoForAll` clears it, both on the `cmds` channel.
 
-                    This tab was rendered with no gate at all, so every member saw it.
+                    Two earlier states of this gate, kept because each was a real defect: the tab
+                    once rendered with NO gate, so every member saw it; it was then reduced to
+                    `isPresenter`, correct only for as long as nothing could set the other term.
+                    Now that the broadcast exists, dropping the term would force-switch a member to
+                    a tab that renders nothing.
+
+                    Evidence, stated as what was observed and no further: the owner's own MEMBER
+                    capture of `#mainTabs` has this tab collapsed to an empty Angular comment
+                    anchor, so the gate was false for that member at that moment. No member capture
+                    taken WHILE a video was playing exists, so the true branch is transcribed from
+                    the bundle above rather than from a rendered page.
                   -->
-                  {#if isPresenter}
+                  {#if (hideVideoPlayer && !isPresenter) || isPresenter}
                     <li role="presentation" class="nav-item">
                     <a
                       id="videoplayer-tab"
@@ -11174,6 +11683,46 @@
                         <div class="d-flex align-items-center">
                           <div>
                             <i class="fas fa-bell"></i><span class="mx-1">Swing Alerts</span>
+                          </div>
+                        </div>
+                      </a>
+                    </li>
+                  {/if}
+                  <!--
+                    Day Trades — `JCe`, byte 1,917,906, the `<li>` immediately after the Swing one
+                    and gated the same way, on its own room setting rather than on presenter status:
+
+                      O(27, o.hasDayTradeAlerts ? 27 : -1)
+
+                    A conditional block and not a `hidden` attribute, because `-1` is
+                    `ɵɵconditional`'s "instantiate nothing". An entitlement that ships hidden markup has
+                    already told the member the feature exists, and this one is what a room pays for.
+
+                    The label is `Day Trades` (byte 1,918,110), NOT "Day Trade Alerts" — the pane's
+                    own heading says "Latest Day Trade Alerts" and the tab says the short form. The
+                    icon is `fas fa-bell` (const 64), the same tuple the Swing tab uses.
+                  -->
+                  {#if dayTradeAlertsEnabled}
+                    <li role="presentation" class="nav-item">
+                      <a
+                        id="dayTradeAlerts-tab"
+                        class="nav-link"
+                        class:active={mainTab === 'dayTradeAlerts'}
+                        data-bs-toggle="tab"
+                        data-bs-target="#dayTradeAlerts"
+                        role="tab"
+                        aria-controls="dayTradeAlerts"
+                        aria-selected={mainTab === 'dayTradeAlerts'}
+                        tabindex={mainTab === 'dayTradeAlerts' ? undefined : -1}
+                        onclick={() => (mainTab = 'dayTradeAlerts')}
+                        onkeydown={(event) => {
+                          if (event.key === 'Enter' || event.key === ' ')
+                            mainTab = 'dayTradeAlerts';
+                        }}
+                      >
+                        <div class="d-flex align-items-center">
+                          <div>
+                            <i class="fas fa-bell"></i><span class="mx-1">Day Trades</span>
                           </div>
                         </div>
                       </a>
@@ -11558,8 +12107,55 @@
                       />
                     </div>
                   {/if}
+                  <!--
+                    The `#dayTradeAlerts` pane — `Iwe`, slot 49, carrying the SAME gate as the nav
+                    item above (`O(49, o.hasDayTradeAlerts ? 49 : -1)`, byte 2,017,748). Both,
+                    because either one alone leaves a tab that opens nothing or a pane reachable
+                    from a tab that is gone.
+
+                    The pane re-applies the gate itself, which is not redundancy for its own sake:
+                    it is what lets the contract test prove the component renders nothing on a false
+                    entitlement without standing up this whole page.
+                  -->
+                  {#if dayTradeAlertsEnabled}
+                    <div
+                      id="dayTradeAlerts"
+                      class={mainTab === 'dayTradeAlerts'
+                        ? 'tab-pane position-relative show active'
+                        : 'tab-pane position-relative'}
+                      role="tabpanel"
+                      aria-labelledby="dayTradeAlerts-tab"
+                    >
+                      <DayTradeAlertsPane
+                        alerts={dayTradeAlertsLog}
+                        hasDayTradeAlerts={dayTradeAlertsEnabled}
+                        {isPresenter}
+                        onCreate={async (draft) => {
+                          await submitDayTradeCommand(
+                            'dayTradeAlertMsg',
+                            dayTradeAlertPayload(draft)
+                          );
+                        }}
+                        onDelete={async (dayTradeAlertID) => {
+                          await submitDayTradeCommand('deleteDayTradeAlertMsg', {
+                            dayTradeAlertID
+                          });
+                        }}
+                        onEdit={async (draft) => {
+                          await submitDayTradeCommand('editDayTradeAlertMsg', {
+                            ...dayTradeAlertPayload(draft),
+                            dayTradeAlertID: draft.dayTradeAlertID ?? 0
+                          });
+                        }}
+                        onMonthsChange={(months) => void changeDayTradeAlertMonths(months)}
+                        onPasteImage={requestDayTradeImagePaste}
+                        onUploadImage={requestDayTradeImageUpload}
+                        sessionHandle={data.sessionHandle}
+                      />
+                    </div>
+                  {/if}
                   <!-- Slot 47 carries the same gate as the tab above. -->
-                  {#if isPresenter}
+                  {#if (hideVideoPlayer && !isPresenter) || isPresenter}
                   <div
                     id="videoplayer"
                     class={mainTab === 'videoplayer'
@@ -11568,7 +12164,15 @@
                     role="tabpanel"
                     aria-labelledby="videoplayer-tab"
                   >
-                    <VideoPlayer sessionId={data.sessionHandle} {isPresenter} />
+                    <VideoPlayer
+                      sessionId={data.sessionHandle}
+                      {isPresenter}
+                      {videoPlayerUrl}
+                      scheduledVideo={scheduledVideoForAll}
+                      onplaynow={(url) => void playVideoForAll(url)}
+                      onschedule={scheduleVideoForAll}
+                      onstopforall={() => void stopVideoForAll()}
+                    />
                   </div>
                   {/if}
                   <!--
@@ -11793,59 +12397,10 @@
                       </div>
                     </div>
                     <!--
-                      The sort bar, from the owner's own rendered markup. Angular's structural
-                      anchors are dropped; every class, its ORDER, and both titles are verbatim.
-
-                      Each button carries three icon variants (the two empty anchors after each `i`
-                      are collapsed ngIfs): `fa-sort` when it is not the governing sort, and an
-                      up/down pair when it is. Note the class order genuinely differs between the
-                      two states in the capture - `fas ml-2 fa-sort-alpha-down` when active,
-                      `fas fa-sort ml-2` when not - so they are written out rather than composed.
-                    -->
-                    <div
-                      class="d-flex flex-wrap justify-content-center align-items-center mt-2 st-fileSortBar"
-                    >
-                      <span class="mr-2">Sorting by:</span>
-                      <button
-                        class="btn btn-sm m-1 st-fileSortName"
-                        class:active={fileSortKey === 'name'}
-                        title={nameAscending
-                          ? 'Sorted A to Z (click to sort Z to A)'
-                          : 'Sorted Z to A (click to sort A to Z)'}
-                        onclick={() => toggleFileSort('name')}
-                      >
-                        {' '}Name{' '}
-                        {#if fileSortKey === 'name'}
-                          <i class="fas ml-2 {nameAscending
-                              ? 'fa-sort-alpha-down'
-                              : 'fa-sort-alpha-up'}"></i>
-                        {:else}
-                          <i class="fas fa-sort ml-2"></i>
-                        {/if}
-                      </button>
-                      <button
-                        class="btn btn-sm m-1 st-fileSortDate"
-                        class:active={fileSortKey === 'date'}
-                        title={dateNewestFirst
-                          ? 'Sorted newest to oldest (click to sort oldest to newest)'
-                          : 'Sorted oldest to newest (click to sort newest to oldest)'}
-                        onclick={() => toggleFileSort('date')}
-                      >
-                        {' '}Date{' '}
-                        {#if fileSortKey === 'date'}
-                          <i class="fas ml-2 {dateNewestFirst
-                              ? 'fa-sort-amount-down'
-                              : 'fa-sort-amount-up'}"></i>
-                        {:else}
-                          <i class="fas fa-sort ml-2"></i>
-                        {/if}
-                      </button>
-                    </div>
-                    <!--
-                      An EMPTY room renders neither the heading nor the table.
+                      An EMPTY room renders no heading, no SORT BAR and no table.
 
                       The two gates are `O(84, o.sessionFiles ? -1 : 84)` for the `<h4>` and
-                      `O(85, o.sessionFiles && o.sessionFiles.length > 0 ? 85 : -1)` for the table.
+                      `O(85, o.sessionFiles && o.sessionFiles.length > 0 ? 85 : -1)` for node 85.
                       They are not complements: the heading needs `sessionFiles` to be FALSY, and an
                       empty array is truthy, so a room with zero files shows nothing at all. Both
                       rendered captures confirm it — the badges read 0 and after the toolbar there
@@ -11856,8 +12411,94 @@
                       array, so that state cannot arise here and the heading is not rendered at all
                       rather than kept as a branch nothing can reach. Ours previously showed it
                       whenever the list was empty, which is the one case the reference stays silent.
+
+                      THE SORT BAR IS INSIDE THIS GATE, and that was read rather than assumed. Node
+                      85 is the view `t2e` (byte 2,016,231, `H(84,Bwe,2,0,"h4",48)(85,t2e,17,17)`),
+                      and `t2e` opens with the sort bar div and closes with the files table — one
+                      view holding both, read at byte 1,950,099. Its gate is the one quoted above,
+                      read at byte 2,018,251. So the two elements share a single condition, and a
+                      room with no files shows no "Sorting by:" strip either. Ours rendered the bar
+                      unconditionally, which put a sort control above an absent table.
                     -->
                     {#if data.files.length > 0}
+                      <!--
+                        The sort bar. Every class comes from the const table read at bytes
+                        2,011,253-2,011,600:
+
+                          242 [1,"d-flex","flex-wrap","justify-content-center","align-items-center","mt-2","st-fileSortBar"]
+                          243 [1,"mr-2"]
+                          244 [1,"btn","btn-sm","m-1","st-fileSortName",3,"click","ngClass","title"]
+                          245 [1,"fas","ml-2",3,"ngClass"]
+                          246 [1,"btn","btn-sm","m-1","st-fileSortDate",3,"click","ngClass","title"]
+                          249 [1,"fas","fa-sort","ml-2"]
+
+                        Both labels keep their LEADING AND TRAILING space - `v(4," Name ")` at byte
+                        1,950,263 and `v(8," Date ")` at 1,950,396. Svelte trims whitespace at the
+                        edges of an element's children, so each pad has to be an expression to
+                        survive into the DOM text node, exactly as the other padded labels in this
+                        pane already are.
+
+                        The icon class ORDER differs by state and is not a typo. Const 245 is static
+                        `fas ml-2` with the glyph appended by ngClass, so the active icon renders
+                        `fas ml-2 fa-sort-alpha-down`; const 249 is entirely static, so the inactive
+                        one renders `fas fa-sort ml-2`. Both variants key off the SAME direction.
+                      -->
+                      <div
+                        class="d-flex flex-wrap justify-content-center align-items-center mt-2 st-fileSortBar"
+                      >
+                        <span class="mr-2">Sorting by:</span>
+                        <!--
+                          `.active` is CAPTURED, not derived. The binding is
+                          `z("ngClass",ct(13,mo,"name"===e.fileSortField))` at byte 1,950,577, and
+                          `mo` is the shared pure function read at byte 1,916,345 — it takes one
+                          argument and returns an object whose only key is `active`, set to that
+                          argument. So the class is present exactly when this button's field is the
+                          governing field, and it depends on the field alone, never on the
+                          direction. `docs/decoded/files-sort-bar.md` listed this expression as an
+                          honest gap; it was opened and the gap is closed.
+
+                          `mo` is quoted verbatim in `$lib/file-sort`, and asserted verbatim against
+                          the bundle in `files-pane-contract.test.ts`. It is written out in words
+                          HERE because its body is brace-delimited, and a brace-delimited construct
+                          inside a Svelte comment is prose to a human and a mustache to a parser.
+                          That exact shape has already turned a contract test red in this repository
+                          while `svelte-check` stayed green.
+                        -->
+                        <button
+                          class="btn btn-sm m-1 st-fileSortName"
+                          class:active={fileSort.field === 'name'}
+                          title={fileSortTitle('name', fileSort)}
+                          onclick={() => applyFileSort('name')}
+                        >
+                          {' '}Name{' '}
+                          {#if fileSort.field === 'name'}
+                            <i
+                              class="fas ml-2 {fileSort.direction === 'asc'
+                                ? 'fa-sort-alpha-down'
+                                : 'fa-sort-alpha-up'}"
+                            ></i>
+                          {:else}
+                            <i class="fas fa-sort ml-2"></i>
+                          {/if}
+                        </button>
+                        <button
+                          class="btn btn-sm m-1 st-fileSortDate"
+                          class:active={fileSort.field === 'date'}
+                          title={fileSortTitle('date', fileSort)}
+                          onclick={() => applyFileSort('date')}
+                        >
+                          {' '}Date{' '}
+                          {#if fileSort.field === 'date'}
+                            <i
+                              class="fas ml-2 {fileSort.direction === 'asc'
+                                ? 'fa-sort-amount-down'
+                                : 'fa-sort-amount-up'}"
+                            ></i>
+                          {:else}
+                            <i class="fas fa-sort ml-2"></i>
+                          {/if}
+                        </button>
+                      </div>
                       <table class="table table-striped m-auto w-100 mt-3 st-fileTable">
                         <tbody id="filesDriveList">
                           {#each searchedFiles() as item (item.id)}
@@ -12035,12 +12676,17 @@
                   </div>
                 </div>
                 {#if youtubeForAllUrl}
+                  <!--
+                    Two DIFFERENT handlers, which is the whole point of the two buttons: `onstop`
+                    posts `stopYTForAll` and takes the video off the room, `onclose` dismisses this
+                    viewer's own iframe and nothing else. Both were wired to one function.
+                  -->
                   <YoutubePlayerOverlay
                     url={youtubeForAllUrl}
                     {isPresenter}
                     muted={doNotDisturbOn}
-                    onstop={stopYoutubeForAll}
-                    onclose={stopYoutubeForAll}
+                    onstop={() => void stopYoutubeForAll()}
+                    onclose={closeYoutubeFrame}
                   />
                 {/if}
                 {#if soundCloudUrl && soundCloudPlaying}
@@ -12227,6 +12873,10 @@
       name={modal}
       {mediaIceServers}
       {mobilePin}
+      modAlertFilterList={data.sessData?.modAlertFilterList}
+      bind:alertFilterFor
+      bind:showAlertsFrom
+      onsavealertfilter={saveAlertFilter}
       mobileAndroidUrl={data.sessData?.customMobileAppEnabled
         ? data.sessData?.customMobileAppAndroidUrl
         : null}
@@ -12269,7 +12919,7 @@
       {saveData}
       onSaveDataChange={setSaveData}
       onDoNotDisturbChange={(enabled) => (doNotDisturbOn = enabled)}
-      onPlayYoutube={playYoutubeForAll}
+      onPlayYoutube={(url) => void playYoutubeForAll(url)}
       onPostAlert={postAlert}
       onPastePostAlert={postPastedAlertImage}
       onPollMinimize={minimizePoll}
@@ -12341,6 +12991,41 @@
       >
         <div class="text-center">
           <img src={pastePreviewUrl} class="img-fluid" alt="Pasted screenshot" />
+        </div>
+      </BootboxDialog>
+    {/if}
+    <!--
+      `imgUpload('dayTrade')` — the day trade form's own upload dialog.
+
+      A THIRD instance rather than a share of the composer's or the swing form's: `imgUpload` takes
+      the feature name as an argument and `doImggurUpload` dispatches on it deny-by-default —
+      `"swing" === i ? swingAlert.image = F : "dayTrade" === i && (dayTradeAlert.image = F)` at byte
+      1,992,037 — so the completion belongs to exactly one feature. Routing this through either of
+      the others would put the URL in the wrong box or post the image into chat.
+    -->
+    {#if dayTradeImageUpload}
+      <ImageUploadDialog
+        onclose={() => {
+          dayTradeImageUpload?.resolve(null);
+          dayTradeImageUpload = null;
+        }}
+        onupload={(files) => void completeDayTradeImageUpload(files)}
+      />
+    {/if}
+    <!--
+      `onImagePaste(event, 'dayTrade')` puts the pasted image in a `bootbox.confirm` before
+      uploading, so a stray paste cannot silently push bytes to the upload server.
+    -->
+    {#if dayTradeImagePaste}
+      {@const dayTradePastePreviewUrl = dayTradeImagePaste.previewUrl}
+      <BootboxDialog
+        mode="confirm"
+        message=""
+        onclose={() => closeDayTradeImagePaste()?.resolve(null)}
+        onconfirm={() => void confirmDayTradeImagePaste()}
+      >
+        <div class="text-center">
+          <img src={dayTradePastePreviewUrl} class="img-fluid" alt="Pasted screenshot" />
         </div>
       </BootboxDialog>
     {/if}

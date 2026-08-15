@@ -421,6 +421,26 @@ export const ROOM_VISIBLE_SETTINGS = [
     read; allow-listing this one would put a cross-room read back behind a settings field.
   */
   'hasSwingTradeAlerts',
+  /*
+    "Enable Day Trade Alerts Tab?" — "If enabled, the room will have day trade alerts tab."
+
+    The entitlement for the Day Trade Alerts feature, added 2026-08-15 with the pane that reads it,
+    one step after its Swing twin. The room resolves it once as `sessData.hasDayTradeAlerts` and
+    gates four things on it: the nav `li`, the `#dayTradeAlerts` pane, the initial
+    `getDayTradeAlertsLog` read, and all three mutations. Absent means absent — the reference emits
+    `-1`, so a room without it renders no markup at all rather than hidden markup, and the room's
+    own load skips the table entirely.
+
+    Note the spelling. The Swing flag doubles the word (`hasSwingTradeAlerts`) and this one does
+    not. Both are read side by side in the reference at bundle bytes 1,009,430 and 1,009,503.
+
+    `linkedRoomDayTradeAlertsOther` is deliberately NOT here beside it, exactly as
+    `linkedRoomSwingAlertsOther` is not. Upstream, a non-empty value makes the room fetch ANOTHER
+    room's day trade log by substituting that room's sessionID. The room takes its room from the
+    session row so that no value the browser can reach names the room being read; allow-listing this
+    one would put a cross-room read back behind a settings field.
+  */
+  'hasDayTradeAlerts',
   'useMediaMTX',
   /*
     "Overlay userID on screenshare?" — prints the VIEWER'S OWN `userXrefID` over the video.
@@ -435,7 +455,25 @@ export const ROOM_VISIBLE_SETTINGS = [
     `StreamingView.svelte`; without it the gate evaluated `undefined` and the overlay could never
     appear however the owner configured the room.
   */
-  'overlayUserIdOnScreenshare'
+  'overlayUserIdOnScreenshare',
+  /*
+    "Alert filter list for mods:" — the people a viewer may filter their alerts by.
+
+    Unlike every flag above it, this is not a boolean gate: it is a STRING CONTAINING JSON, an array
+    of `{username, avatar}` parsed by `syncModAlertFilterList()` at main bundle byte 1,221,905. The
+    third room setting shipped that way, after `alertLabels` and `chatTabsWithBadges`.
+
+    It crosses because the reference gates the WHOLE feature on it being truthy — bytes 2,042,979 and
+    2,286,654. No list configured means no entry point, no modal and no filtering, and there is
+    nothing to default from. The room cannot decide that for itself.
+
+    The avatars in it are gravatar hashes of emails the room owner already administers, and the room
+    already receives `senderAvt` on every alert to render the avatar — so this crosses no boundary
+    the alerts feed does not already cross.
+
+    Read by `alert-filter.ts` and the `#alert-filter-modal` pane.
+  */
+  'modAlertFilterList'
 ] as const satisfies readonly (keyof RoomSettings)[];
 
 const ROOM_VISIBLE = new Set<string>(ROOM_VISIBLE_SETTINGS);

@@ -86,7 +86,21 @@ We had an OLDER v4. The current one is captured in
 
 The delta between the two builds is **+3,329 bytes: twelve strings added, one removed.**
 
-## 2.1 The Files sort bar — FULLY DECODED, ready to build ✅
+## 2.1 The Files sort bar — decoded, VERIFIED, and corrected ✅
+
+> **Superseded by `docs/decoded/files-sort-bar.md`, 2026-08-15.** Everything below was re-checked
+> against the bundle offset by offset. The classes, the four title strings and the comparator all
+> hold. **Three things here are wrong or missing**, and the first would have shipped a subtly broken
+> control:
+>
+> 1. **The two buttons share ONE direction variable.** The table below reads as though Name and Date
+>    each keep their own asc/desc. They do not — both icons key off the same `fileSortDir`.
+> 2. **Switching field RESETS the direction** to that field's default (`date` → `desc`,
+>    `name` → `asc`). Not recorded below at all.
+> 3. **The pane opens `date`/`desc`**, not unsorted, and the button labels are `" Name "` and
+>    `" Date "` with leading and trailing spaces.
+>
+> Build from the spec, not from this section.
 
 Everything needed is in hand. Nothing to guess.
 
@@ -149,39 +163,6 @@ A nav `<li>` linking out, beside "Reopen Alerts / Chat" and "Recording" (`mPe`/`
 
 **Still needed:** the const table entries for exact classes on the `<li>`, `<a>` and `<img>`, and
 where `benzingaUrl` is set.
-
-## 2.3 Swing Trade Alerts — LARGE, needs a decode pass
-
-Its own presentation-area tab: `presAreaTabs-swingAlerts`, labelled **"Swing Alerts"**.
-
-**Four wire commands:** `getSwingAlertsLog` · `newSwingAlertMsg` · `editSwingAlertMsg` ·
-`deleteSwingAlertMsg`
-
-**Form fields:** `swingAlert-symbol` · `swingAlert-long` / `swingAlert-short` ·
-`swingAlert-entryPrice` · `swingAlert-target` · `swingAlert-stop` · `swingAlert-image` ·
-`swingAlert-search` · `swingAlert-limit`
-
-**Two pipes, already read:**
-
-- `searchSwingLogs` — filters on `symbol` OR `senderName`
-- `limitSwingLogs` — `slice(0, n)`
-
-**Empty state, verbatim:** `" No Swing Trade Alerts to display. "`
-**Export:** `Download Swing Trades`, class `download-swing-trades-btn`
-**Containers:** `swing-alerts-container`, `swing-alert-form`, `swing-symbol-container`,
-`swing-alert-btn-edit`, `swing-alert-btn-delete`
-
-**Scale: comparable to the notes editor.** Tab, form, log list, search, limit, export, four commands,
-plus persistence. Not an afternoon.
-
-## 2.4 Day Trade Alerts — LARGE, not yet examined
-
-A parallel feature in the same bundle: `dayTradeAlert-direction`, `dayTradeAlert-long`,
-`dayTradeAlert-short`, `dayTradeAlert-limit`, `dayTradeAlert-search`, `Download Day Trades`,
-`download-day-trades-btn`, `day-trade-alert-btn-edit`, `day-trade-alert-btn-delete`.
-
-Same shape as Swing. **Decode both together** — they will share most of their structure, and finding
-out where they differ is cheaper than doing them separately.
 
 ## 2.5 Mobile app — the other half of the v4 delta
 
@@ -253,8 +234,13 @@ both directions, one modal, no entitlement flag found.
 
 - `updateAlertFilter` — send `{alertFilterFor, userXrefID}` (byte 1,221,491); the response sets
   `user.alertFilterFor` and **re-fetches `getAlertsLog {page:0}`** (byte 1,017,535).
-- **The SERVER owns the filtering.** The client sends its selection and asks for the log again; it
-  never filters the log in the browser. Reproduce that shape.
+- **CORRECTED 2026-08-15: the filtering is CLIENT-side, in three places** — the live SSE stream
+  (1,004,533), `getAlertsLog` (1,017,070) and the alerts search results (1,020,817), all with one
+  identical guard. An earlier version of this row said the server owns it; building to that would
+  have produced an architecture the reference does not have. The command is for PERSISTENCE.
+- **Consequence worth deciding on:** every alert reaches every browser and some are hidden after
+  arrival, so this is a display preference and **not** an access control. Filtering server-side
+  instead would be a real improvement and a deliberate divergence — record it as one if taken.
 - `preferences.showAlertsFrom` **inverts the meaning** — the same selection is an allow-list when
   true and a deny-list when false. Treating it as a display toggle gets the semantics backwards.
 - Buttons verbatim, spaces included: `" Unselect All "`, `" Select All "`, `" Save"` — the last has a
@@ -266,10 +252,19 @@ both directions, one modal, no entitlement flag found.
 `hasAlertLabels` are all 0 occurrences. Configuration plus a text transform.
 
 - `sessData.alertLabels` is a **string containing JSON**, trimmed then `JSON.parse`d, every entry
-  given `checked = false` (byte 1,147,292). `sessData.chatTabsWithBadges` uses the identical shape.
+  given `checked = false` (byte 1,147,292). `chatTabsWithBadges` and `modAlertFilterList` use the
+  identical shape — **three room settings shipped as JSON strings.**
+- **CORRECTED 2026-08-15: an entry is `{hash, name, bgcolor, color}`, not `{hash}`** — and the labels
+  have a **SECOND consumer** the first pass missed entirely. `parseSymbols` (byte 1,328,216) replaces
+  `#hash` in ALERT text with a coloured `span.badge` showing `name`. Chat and Q&A messages are
+  excluded. `hash` is what goes in the text; `name` is what the reader sees.
+- **`bgcolor` and `color` are interpolated RAW into a `style` attribute** while only `name` is
+  sanitised. Owner-controlled in the reference, so not member-facing — but **do not reproduce that
+  shape**; validate the colours or bind them as custom properties, and record the divergence.
 - `processAlertLabels` prefixes `" #" + hash` per checked label, **newline after the last and a space
-  after the others**, prepends the result to `txt`, and **clears every checkbox as a side effect of
-  formatting** (byte 2,131,206).
+  after the others** (byte 2,131,295). Called from **four** sites, not one.
+- Checkboxes are cleared in **three** places, not one: after a successful prepend, on `doCloseModal`,
+  and on `clearInputFields`. Selection never survives leaving the composer by any route.
 
 ## 5.3 Alert Scheduler — post an alert later, optionally repeating 🔴
 
@@ -298,17 +293,42 @@ names on the repeat badge, the modal's own 27-declaration layout, and what the s
 
 # Suggested order
 
+**Built since this list was written, and removed from it:** 2.3 Swing Alerts, 2.4 Day Trade Alerts,
+and the four "For All" broadcast commands — which were not a missing feature but three SHIPPED
+controls that said "For All" and moved one browser. See `CHANGELOG.md`.
+
+**Re-specified because "fully decoded" was not:** 2.1, the Files sort bar. Three errors found on
+re-reading, one of which ships a control that looks right and behaves wrong. Build from
+`docs/decoded/files-sort-bar.md`, not from §2.1.
+
 1. **1.1 + 1.2 together** — they share the SSE revocation plumbing, and they are the two that cost
    money every day they are open.
-2. **2.1 the sort bar** — fully decoded, small, and it proves the theming rule end to end.
-3. **2.2 Benzinga** — small, needs one more decode pass.
-4. **2.3 + 2.4 Swing and Day Trade together** — the big one.
-5. **2.5 Mobile** — after `docs/MOBILE-APP.md` is read.
-6. **Part 3 v5** — when an account is cleared for it.
-7. **5.1 Alert Filter**, then **5.2 Alert Labels** — both small, and 5.1 is the only one of the
-   three that changes what a member sees.
-8. **5.3 Alert Scheduler** — last of these three; it needs a server-side scheduler that does not
-   exist here yet.
+2. **2.1 the sort bar** — spec verified offset by offset, small, and it proves the theming rule end
+   to end.
+3. **`presAreaTabs-recordings` — NOT BUILT. Blocker named, and it is not parked.** The pane is one iframe
+   onto `${apiROOT}/sessions/v2/archives/recordings/{sessionID}/{token}`, a SERVER archive page.
+   Measured: **zero recordings or archive tables in either database** — 22 room tables, 15 controller
+   tables, none matching. Our Recordings is a different thing: `recording-codec.ts` records the
+   presenter's screen locally to a download. That is the ACT of recording; this tab is PLAYBACK of
+   past archives. Building the surface now yields an iframe pointing at nothing, which is the dead
+   scaffolding the standard forbids. **Needs an archive service first, which is a design decision.**
+
+   Two corrections to the triage's own claims, measured here: `recsInRoom` is NOT absent from the
+   repo — it is in `room-settings-schema.ts:247` unwired and `room-settings-profile.ts:78` — and
+   `hideRecs` is already in `ROOM_VISIBLE_SETTINGS` at `room-config.ts:214`.
+4. **5.1 Alert Filter**, then **5.2 Alert Labels** — both small, and 5.1 is the only one of the
+   three that changes what an ordinary member sees.
+5. **2.2 Benzinga** — small, needs one more decode pass for the const-table classes.
+6. **2.5 Mobile** — after `docs/MOBILE-APP.md` is read.
+7. **5.3 Alert Scheduler** — needs an entitlement whose manage-page control was NOT located, and a
+   server-side scheduler that does not exist here.
+8. **Part 3 v5** — when an account is cleared for it.
+
+**Then the 25 confirmed gaps in `docs/decoded/missing-commands-triage.md`**, which is the only
+complete list of what the reference has and we do not. Moderation (`kickUser`, `unmuteChat`,
+`lockSession`) and the archives pair (`archiveLogs` / `unarchiveLogs`) are the largest clusters left.
+Five media-server admin commands are deliberately parked as UNCLEAR: whether a presenter should be
+able to reset shared media infrastructure is a product and safety decision, not a porting question.
 
 ## Evidence, all committed
 
