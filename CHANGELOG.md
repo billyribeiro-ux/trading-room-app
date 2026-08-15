@@ -24,6 +24,48 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-15
 
+### 2026-08-15 07:53 EDT — "fully decoded" was nearly right, and wrong in the way that ships a broken control
+
+**Runtime impact: none.** One spec, one superseded section.
+
+`NEW-TODO.md` §2.1 called the Files sort bar "FULLY DECODED, ready to build". Re-checking it against
+the bundle before anyone built from it found **three defects**, and the first would have produced a
+control that looks correct and behaves wrongly.
+
+**1. The two buttons share ONE direction variable.** §2.1 presents a per-button asc/desc table,
+which reads as though Name and Date each keep their own direction. Both icons key off the same
+`fileSortDir` — bytes 1,946,476 and 1,946,631. One field, one direction.
+
+**2. Switching field RESETS the direction**, and §2.1 does not mention it at all. `toggleFileSort`
+at byte 1,975,331: clicking the active field flips direction; clicking the other field switches to it
+and resets to **that field's** default — `date` → `desc`, `name` → `asc`. The previous direction is
+discarded, so a direction cannot be carried across a field change.
+
+**3. The pane opens `date`/`desc`**, not unsorted — byte 1,954,645. A build that starts unsorted
+diverges on first paint. Also: the labels are `" Name "` and `" Date "` with leading AND trailing
+spaces, which §2.1 renders bare.
+
+**What §2.1 got right, all confirmed:** the six class lists from the const table, all four title
+strings at their offsets (1,950,683 / 1,950,722 / 1,950,910 / 1,950,969), and the comparator's date /
+name keys with ties returning 0.
+
+**Three further comparator properties are now recorded** because a rebuild loses them silently:
+`[...e].sort()` copies before sorting — a mutating sort on a `$state.raw` list is a reactivity bug;
+an empty field means **passthrough, not empty**, unlike `limitSwingLogs` where a limit of 0 returns
+`[]`; and the defaults are `i = ""`, `o = "asc"`.
+
+**The recorded lesson about this feature was itself wrong, and is corrected.** `~/CLAUDE.md` opens
+with the incident where a search for `st-fileSortBar` returned nothing, it was reported as "not in
+the capture", and the owner pasted the real markup. The lesson written down was *stop searching, read
+the region*. Measured: the class occurs **0 times** in the older bundle and **once** in current v4.
+The search was fine — **our evidence predated the feature**. Evidence has a date and the live
+application moves.
+
+**Honest gaps recorded rather than filled:** the exact expression that applies `.active` was not
+opened (the CSS proves the class is styled, the binding slot is known, the expression is not); and
+the sort bar's position among its siblings in the Files pane was not established.
+
+
 ### 2026-08-15 07:47 EDT — the full triage of what the reference has and we do not
 
 **Runtime impact: none.** One reference document.

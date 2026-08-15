@@ -86,7 +86,21 @@ We had an OLDER v4. The current one is captured in
 
 The delta between the two builds is **+3,329 bytes: twelve strings added, one removed.**
 
-## 2.1 The Files sort bar — FULLY DECODED, ready to build ✅
+## 2.1 The Files sort bar — decoded, VERIFIED, and corrected ✅
+
+> **Superseded by `docs/decoded/files-sort-bar.md`, 2026-08-15.** Everything below was re-checked
+> against the bundle offset by offset. The classes, the four title strings and the comparator all
+> hold. **Three things here are wrong or missing**, and the first would have shipped a subtly broken
+> control:
+>
+> 1. **The two buttons share ONE direction variable.** The table below reads as though Name and Date
+>    each keep their own asc/desc. They do not — both icons key off the same `fileSortDir`.
+> 2. **Switching field RESETS the direction** to that field's default (`date` → `desc`,
+>    `name` → `asc`). Not recorded below at all.
+> 3. **The pane opens `date`/`desc`**, not unsorted, and the button labels are `" Name "` and
+>    `" Date "` with leading and trailing spaces.
+>
+> Build from the spec, not from this section.
 
 Everything needed is in hand. Nothing to guess.
 
