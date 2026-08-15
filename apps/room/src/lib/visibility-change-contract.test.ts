@@ -79,17 +79,38 @@ describe('the hidden tab stops refetching', () => {
 
 describe('and catches up when the tab comes back', () => {
   it('listens for visibilitychange and tracks focus', () => {
-    expect(pageCode).toContain(
-      "document.addEventListener('visibilitychange', onVisibilityChange);"
-    );
+    /*
+      BOUND ON `<svelte:document>` since 2026-08-15, not added by hand in an effect.
+      `svelte/best-practices` names this case: *"If you need to attach listeners to `window` or
+      `document` you can use `<svelte:window>` and `<svelte:document>` … Avoid using `onMount` or
+      `$effect` for this."*
+    */
+    expect(pageCode).toContain('<svelte:document onvisibilitychange={onVisibilityChange} />');
+    expect(pageCode).toContain('function onVisibilityChange() {');
     expect(pageCode).toContain('appHasFocus = false;');
     expect(pageCode).toContain('appHasFocus = true;');
   });
 
-  it('removes the listener, because a detached one holds the page alive', () => {
-    expect(pageCode).toContain(
-      "return () => document.removeEventListener('visibilitychange', onVisibilityChange);"
-    );
+  it('cannot leak the listener, because it is no longer hand-managed', () => {
+    /*
+      What the old pair of assertions guarded was a manual `addEventListener` matched by a manual
+      `removeEventListener` in a teardown — a detached listener holding a closure over `data` is how
+      a single-page app leaks a page. That risk is now STRUCTURAL rather than asserted: Svelte adds
+      the handler when the component mounts and removes it when it unmounts, and there is no hand
+      call on either side to forget.
+
+      Asserted as the absence of the hand-rolled pair FOR THIS HANDLER, which is the thing that
+      could come back.
+
+      SCOPED TO `onVisibilityChange` DELIBERATELY, and the reason is a finding this assertion made
+      when it was written unscoped: there is a SECOND `visibilitychange` listener in the page, at
+      `handleVisibility`, which pauses and resumes the five-second refresh poll. It is a different
+      concern with a real teardown that also clears an interval, so it is not a leftover — but two
+      listeners for one event on one document, in one component, is a duplication worth naming
+      rather than discovering later. Merging them is Phase 3 work and is recorded in TODO row AE.
+    */
+    expect(pageCode).not.toContain("addEventListener('visibilitychange', onVisibilityChange)");
+    expect(pageCode).not.toContain("removeEventListener('visibilitychange', onVisibilityChange)");
   });
 
   it('refetches ONCE, and only when something was missed', () => {

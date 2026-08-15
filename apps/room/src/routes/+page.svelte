@@ -171,6 +171,12 @@
   import { isMentionOf } from '$lib/mention';
   import { trimChatLog } from '$lib/room-scroller';
   import PrivateChatPanel from '$lib/components/PrivateChatPanel.svelte';
+  import {
+    NO_SPEAKER_TEXT,
+    SHARE_SCREEN_TEXT,
+    STOP_SHARING_ALL_TEXT,
+    VIRTUAL_CAM_TEXT
+  } from '$lib/navbar-labels';
   import RoomNavbar from '$lib/components/RoomNavbar.svelte';
   import RoomSidebar from '$lib/components/RoomSidebar.svelte';
   import ToastHost from '$lib/components/ToastHost.svelte';
@@ -277,10 +283,6 @@
     | 'streaming-selection'
     | 'session-history'
     | 'webinar-tools';
-  const noSpeakerText = ' ( No one is speaking )';
-  const shareScreenText = 'Share Screen ';
-  const virtualCamText = ' OBS / XSPLIT/ Share Virtual Cam';
-  const stopSharingAllText = ' Stop Sharing All Screens';
 
   let { data }: PageProps = $props();
 
@@ -1013,31 +1015,33 @@
   let missedChatWhileHidden = false;
 
   /**
-   * The `visibilitychange` listener — `globals.appHasFocus`, and the catch-up on the way back.
+   * `visibilitychange` — `globals.appHasFocus`, and the catch-up on the way back.
    *
-   * An attachment on `<svelte:document>` would be tidier, but this listener has to exist whether or
-   * not any element is mounted, and it must be removed on teardown: a detached listener holding a
-   * closure over `data` is how a single-page app leaks a page.
+   * NO LONGER AN EFFECT. `svelte/best-practices` names this case by itself: *"If you need to attach
+   * listeners to `window` or `document` you can use `<svelte:window>` and `<svelte:document>` …
+   * Avoid using `onMount` or `$effect` for this."* The handler is bound on `<svelte:document>` at
+   * the bottom of this file and Svelte owns the add and the remove, so the twelve lines of manual
+   * `addEventListener` / teardown are gone with them.
    *
-   * The catch-up is `appHasFocusGetChatLog`, and it fires ONCE rather than replaying what was
-   * missed, because the load already returns the newest page per channel — the room re-reads itself
-   * and is current, which is exactly what upstream's `getChatLog` on that event does.
+   * The comment that used to sit here weighed `{@attach}` and kept the effect, on the grounds that
+   * the listener must exist whether or not an element is mounted. That was true of an attachment
+   * and irrelevant to an event ATTRIBUTE: `<svelte:document>` is present for the component's whole
+   * lifetime, which is exactly as long as the listener should be.
+   *
+   * The catch-up fires ONCE rather than replaying what was missed, because the load already returns
+   * the newest page per channel — the room re-reads itself and is current, which is what upstream's
+   * `appHasFocusGetChatLog` does.
    */
-  $effect(() => {
-    if (typeof document === 'undefined') return;
-    const onVisibilityChange = () => {
-      if (document.hidden) {
-        appHasFocus = false;
-        return;
-      }
-      appHasFocus = true;
-      if (!missedChatWhileHidden) return;
-      missedChatWhileHidden = false;
-      void invalidateAll();
-    };
-    document.addEventListener('visibilitychange', onVisibilityChange);
-    return () => document.removeEventListener('visibilitychange', onVisibilityChange);
-  });
+  function onVisibilityChange() {
+    if (document.hidden) {
+      appHasFocus = false;
+      return;
+    }
+    appHasFocus = true;
+    if (!missedChatWhileHidden) return;
+    missedChatWhileHidden = false;
+    void invalidateAll();
+  }
 
   /**
    * `preferences.disableVideo` - the viewer's own "turn the video off to preserve data" switch.
@@ -1804,6 +1808,13 @@
 
     It touches `document.body`, which is outside this component, so it cleans up after itself rather
     than leaving state behind on navigation.
+
+    STAYS AN EFFECT, deliberately, while the `visibilitychange` listener above became a
+    `<svelte:document>` handler. The two look alike and are not: that one was a LISTENER, which the
+    docs say belongs on the element; this one is direct DOM manipulation of a node no element in
+    this component owns, which `$effect` documents as one of its legitimate uses — *"useful for
+    things like analytics and direct DOM manipulation"*. There is no element to attach to, and
+    `<svelte:body>` takes listeners rather than classes.
   */
   $effect(() => {
     if (!shouldDisableSelection({ disableCopy, isPresenter })) return;
@@ -8714,6 +8725,9 @@
 {/snippet}
 
 
+<!-- Not an effect: see `onVisibilityChange`. Svelte owns the add and the remove. -->
+<svelte:document onvisibilitychange={onVisibilityChange} />
+
 <svelte:window
   bind:innerWidth={split.viewportWidth}
   onclick={(event) => {
@@ -8878,10 +8892,10 @@
           {youtubeForAllUrl}
           {backgroundVolume}
           {soundChecks}
-          {noSpeakerText}
-          {shareScreenText}
-          {virtualCamText}
-          {stopSharingAllText}
+          noSpeakerText={NO_SPEAKER_TEXT}
+          shareScreenText={SHARE_SCREEN_TEXT}
+          virtualCamText={VIRTUAL_CAM_TEXT}
+          stopSharingAllText={STOP_SHARING_ALL_TEXT}
           {setInputChecked}
           {setRangeValue}
           ontoggletopmenu={toggleTopMenu}
