@@ -33,7 +33,7 @@ const MIGRATE_MODULE_SOURCE: &str = include_str!("../src/db/migrate.rs");
 
 fn runtime_url() -> String {
     std::env::var("DATABASE_URL").unwrap_or_else(|_| {
-        "postgres://ptr_clone_app:ptr_app_local_dev@127.0.0.1:5432/ptr_clone".into()
+        "postgres://tradingroom_app:ptr_app_local_dev@127.0.0.1:5432/ptr_clone".into()
     })
 }
 
@@ -260,8 +260,11 @@ async fn run_rejects_a_non_owner_before_creating_the_migration_ledger() {
             current_role,
         } => {
             assert_eq!(expected, "ptr_clone");
-            assert_eq!(session_role, "ptr_clone_app");
-            assert_eq!(current_role, "ptr_clone_app");
+            // The connected identity is the RUNTIME role, whatever it is currently named. Bound to
+            // the constant rather than a literal, because these two went stale the moment the
+            // runtime role was cut over and asserted a role nothing connects as.
+            assert_eq!(session_role, migrate::EXPECTED_RUNTIME_ROLE);
+            assert_eq!(current_role, migrate::EXPECTED_RUNTIME_ROLE);
         }
         other => panic!("expected a migrator-identity rejection, got {other}"),
     }
@@ -306,8 +309,11 @@ async fn preflight_accepts_only_the_provisioned_owner_connection() {
             current_role,
         } => {
             assert_eq!(expected, "ptr_clone");
-            assert_eq!(session_role, "ptr_clone_app");
-            assert_eq!(current_role, "ptr_clone_app");
+            // The connected identity is the RUNTIME role, whatever it is currently named. Bound to
+            // the constant rather than a literal, because these two went stale the moment the
+            // runtime role was cut over and asserted a role nothing connects as.
+            assert_eq!(session_role, migrate::EXPECTED_RUNTIME_ROLE);
+            assert_eq!(current_role, migrate::EXPECTED_RUNTIME_ROLE);
         }
         other => panic!("expected a migrator-identity rejection, got {other}"),
     }
@@ -371,6 +377,11 @@ async fn preflight_uses_the_immutable_authentication_identity() {
             current_role,
         } => {
             assert_eq!(expected, "ptr_clone_app");
+            // Literals on purpose, and NOT the runtime-role constant. This test drives
+            // `SET SESSION AUTHORIZATION ptr_clone_app` explicitly and passes that same name to
+            // `preflight_for_tests`, to prove `system_user` still reports the originally
+            // authenticated owner after both mutable SQL identities have been replaced. The name is
+            // the fixture here, not the deployment's runtime identity.
             assert_eq!(session_role, "ptr_clone_app");
             assert_eq!(current_role, "ptr_clone_app");
         }
@@ -664,8 +675,21 @@ async fn the_baseline_applies_cleanly_to_an_empty_database() {
     .expect("read room_events policy roles");
     assert_eq!(
         policy_roles,
-        ["ptr_clone_app"],
-        "the outbox policy must apply only to the runtime role"
+        // EXACTLY ONE name, and it is the runtime role.
+        //
+        // An earlier revision of this assertion expected BOTH names, because `0009` appended the
+        // runtime role rather than retargeting, and the comment here argued that a policy which
+        // stopped naming `ptr_clone_app` would "silently deny" it. That reasoning was backwards on
+        // both counts. Denying the baseline role is the POINT — nothing connects as it after
+        // cutover, and a role named by no policy reads zero rows under FORCE ROW LEVEL SECURITY,
+        // which is the safe direction. And appending was not even convergent-neutral: it produced a
+        // two-role tenant policy, which `postgres-release-attestation` rejects outright with
+        // `room_events_policy_mismatch`.
+        //
+        // Retargeting is convergent because policies are PER-DATABASE: `0001` re-creates each one
+        // naming the baseline role on every new database, and `0009` retargets it there too.
+        [migrate::EXPECTED_RUNTIME_ROLE],
+        "the outbox policy must apply to exactly the runtime roles, and no others"
     );
 
     let policy_shape: (String, String) = sqlx::query_as(
@@ -1012,8 +1036,17 @@ async fn runtime_object_privileges_match_the_current_api_sql_surface() {
         transaction.rollback().await.ok();
     }
 
+    // The drift must be introduced on the role the API actually authenticates as, or the check
+    // under test has nothing to detect. Named by the constant: granting to the baseline role would
+    // leave the runtime role untouched and this test would assert its own no-op.
+    // `AssertSqlSafe` because `execute` requires `'q: 'static` and this statement is built at
+    // runtime from a compile-time constant - the same idiom `tests/support/mod.rs` uses for
+    // `CREATE DATABASE`. No caller input reaches it.
     owner
-        .execute("GRANT UPDATE (is_platform_admin) ON TABLE public.users TO ptr_clone_app")
+        .execute(sqlx::AssertSqlSafe(format!(
+            "GRANT UPDATE (is_platform_admin) ON TABLE public.users TO {}",
+            migrate::EXPECTED_RUNTIME_ROLE
+        )))
         .await
         .expect("reproduce post-migration ACL drift");
     match runtime_db
@@ -1022,7 +1055,7 @@ async fn runtime_object_privileges_match_the_current_api_sql_surface() {
         .expect_err("pre-bind verification must reject an added privilege")
     {
         DbError::UnsafeRuntimeRole { role, reason } => {
-            assert_eq!(role, "ptr_clone_app");
+            assert_eq!(role, migrate::EXPECTED_RUNTIME_ROLE);
             assert_eq!(
                 reason,
                 "object privileges do not match the reviewed runtime SQL surface"

@@ -119,14 +119,16 @@ that already has objects but lacks the authentic SQLx ledger is rejected by ordi
 migration collisions; it is never silently accepted.
 
 `Db::assert_runtime_role_is_restricted` repeats the invariant before the HTTP listener
-binds. It requires the evidence-backed `ptr_clone_app` login, validates the authenticated
+binds. It requires the evidence-backed `tradingroom_app` login, validates the authenticated
 `session_user`, rejects a different `current_user`, rejects
 administrative/replication/RLS-bypass attributes, rejects `INHERIT`, and rejects any
 direct membership. Errors expose only the login role and a static reason; membership
 names and credentials never enter application logs or HTTP
 responses. The PostgreSQL bootstrap script enforces the same posture on new local
-clusters and refuses a different `POSTGRES_APP_USER`, because the grants and policies in
-the migration set explicitly name `ptr_clone_app`.
+clusters and provisions BOTH roles. It refuses a different `POSTGRES_APP_USER`, because the grants
+in migrations 1-6 explicitly name `ptr_clone_app`, and a different `POSTGRES_RUNTIME_USER`, because
+`db::migrate::EXPECTED_RUNTIME_ROLE` names `tradingroom_app`. A fresh database therefore ends at
+`tradingroom_app` having passed through `ptr_clone_app`; that reads like a mistake and is not.
 
 ## Verification and promotion
 
@@ -147,7 +149,7 @@ instance with the repository's provisioner and seed loaded:
 cd services
 MIGRATE_DATABASE_URL='postgres://ptr_clone:<owner-password>@127.0.0.1:5432/ptr_clone' \
   cargo test --locked -p tradingroom-api --features testing --test migrations
-DATABASE_URL='postgres://ptr_clone_app:<runtime-password>@127.0.0.1:5432/ptr_clone' \
+DATABASE_URL='postgres://tradingroom_app:<runtime-password>@127.0.0.1:5432/ptr_clone' \
   cargo test --locked -p tradingroom-api --features testing --test tenancy
 ```
 
@@ -171,7 +173,7 @@ pnpm backend:postgres:attest --format text
 
 `MIGRATE_DATABASE_URL` must be a direct connection that authenticates as
 `ptr_clone`; `DATABASE_URL` must be a direct or session-affine connection that
-authenticates as `ptr_clone_app`. A transaction-pooling endpoint is invalid for
+authenticates as `tradingroom_app`. A transaction-pooling endpoint is invalid for
 the runtime URL because the application requires session-retained `LISTEN`
 state. The attestor proves this by issuing `LISTEN`, recording that listener's
 exact runtime identity, target cluster/database, and backend PID internally,
@@ -202,10 +204,10 @@ provider identifiers, and endpoints. It records:
   both connections, and proof that both URLs name the same database;
 - the complete owner-role flag set, `LOGIN`, and zero direct memberships;
 - the exact membership-free runtime posture;
-- only successful SQLx ledger versions `0001`–`0006`, with descriptions and
+- only successful SQLx ledger versions `0001`–`0009`, with descriptions and
   embedded SHA-384 checksums matching this build;
 - `room_events` ownership, enabled/forced RLS, and the single exact
-  `PERMISSIVE FOR ALL TO ptr_clone_app` tenant policy including both expressions;
+  `PERMISSIVE FOR ALL TO tradingroom_app` tenant policy including both expressions;
 - every allowed and denied table/column privilege in migration 0006's effective
   ACL universe; and
 - the actual listener's exact runtime identity and target, distinct owner/listener
@@ -354,18 +356,34 @@ as one is how a database stops migrating.
 | `docker/postgres/10-provision-roles.sh` | 10 | **must keep creating `ptr_clone_app`**, because migrations 1–6 `GRANT` to that name before 0009 runs. A fresh database ends at `tradingroom_app` having passed through `ptr_clone_app`. That reads like a mistake and is not. |
 | historical documents | ~30 | records of what the imported system was called. Rewriting them falsifies the provenance they exist to carry. |
 
-RLS policies need no attention at all: policy targets are stored by OID, not by name, so they follow
-the rename automatically.
+**RLS policies were the exception, and this paragraph used to say the opposite.** It read: "policy
+targets are stored by OID, not by name, so they follow the rename automatically." That was true of a
+RENAME, and the rename was withdrawn as non-convergent. `0009_provision_tradingroom_app.sql` ADDS a
+new role instead, and a new role has no OID in any existing policy — so all 22 tenant policies must
+be retargeted explicitly, which that migration does. Policies are per-database, so `0001` re-creates
+them naming the baseline role on every new database and `0009` retargets them there too.
 
 ### What is left, and where it belongs
 
-The remaining ~150 live occurrences are connection defaults, the release-attestation expected values
-(`"scram-sha-256:ptr_clone_app"`, `certificate-subject:ptr_clone`) and the role-name assertions in
-`tests/migrations.rs` (43) and `tests/tenancy.rs` (11).
+**The "~150 live occurrences, deliberately not changed here" that this section used to list are
+gone.** The reasoning was withdrawn on 2026-08-15: it rested on `services/**` being "a mirror of
+`new-room-control`" whose edits are lost on the next sync. No such sync exists in either direction,
+this repository is ahead of both siblings — the owner confirmed it on 2026-08-12 — and `CLAUDE.md`
+has been corrected. The connection defaults, the attestation's expected identity and the role-name
+assertions have all been cut over.
 
-**They were deliberately not changed here.** `services/**` is a mirror of `new-room-control`, entry 1
-says to do this "at the source repository, as its own dedicated change with nothing else moving",
-and that tree has already diverged twice — the second time with `new-room-control` serving the
-unsafe copy. Editing 150 lines of it from this side would deepen a divergence that is already open
-as `TODO.md` item **P**. Verifying them also requires a provisioned cluster with both roles, since
-every one of those assertions is a runtime check rather than a compile-time one.
+What remains, counted on 2026-08-15 rather than estimated, is **67 occurrences across 11 files, and
+every one of them is deliberate**:
+
+| file | n | why the name stays |
+| --- | --- | --- |
+| `tests/migrations.rs` | 26 | asserts what migrations 1-6 GRANT, by name. They name the baseline role and are byte-pinned. |
+| `bin/postgres-release-attestation.rs` | 11 | history in comments, plus the checks that refuse the baseline role where it must not appear. |
+| `docker/postgres/10-provision-roles.sh` | 10 | must keep creating it: migrations 1-6 GRANT to that name before `0009` runs. |
+| `tests/migration_reappliability.rs` | 7 | the rule the withdrawn rename broke, stated in its own terms. |
+| `src/db/migrate.rs` | 5 | `BASELINE_PROVISIONED_ROLE`, and the preflight that requires it to exist. |
+| `tests/tenancy.rs`, `bin/migrate.rs`, `compose.yml`, `src/db/mod.rs`, `src/config.rs`, `.env.example` | 8 | comments recording why the two roles are not interchangeable, and the baseline role's own provisioning variables. |
+
+**The preflight is the one that looks wrong and is not.** `migrate::run` passes
+`BASELINE_PROVISIONED_ROLE`, not `EXPECTED_RUNTIME_ROLE`, because `tradingroom_app` is created BY
+`0009` — requiring it before the chain runs would be a bootstrap deadlock on every new database.

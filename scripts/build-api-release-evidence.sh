@@ -900,8 +900,22 @@ jq --null-input \
 		completeReport: "builder-image-vulnerabilities.grype.json"
 	}' >"${evidence_root}/builder-vulnerability-observation.json"
 
+# `apps/controller/scripts/`, NOT `scripts/`.
+#
+# This read `${repository_root}/scripts/verify-api-release-artifact.mjs` and that file has never
+# existed at that path here. It came from the sibling repository, where `scripts/` sits at the root;
+# moving it under `apps/controller/` invalidated the path without changing the name. The workflow's
+# own earlier step already invokes it correctly, which is why the contract check passed and this one
+# could not.
+#
+# It survived because no run ever reached this line — the gate died earlier every time. It first
+# executed on 2026-08-15, and then reported `MODULE_NOT_FOUND` as a vulnerability finding (see the
+# guard below).
+verifier="${repository_root}/apps/controller/scripts/verify-api-release-artifact.mjs"
+[[ -f "${verifier}" ]] || fail "release-artifact verifier is missing at ${verifier}"
+
 set +e
-node "${repository_root}/scripts/verify-api-release-artifact.mjs" --evaluate \
+node "${verifier}" --evaluate \
 	--policy "${repository_root}/ops/api-release-vulnerability-policy.json" \
 	--output "${evidence_root}/vulnerability-policy-result.json" \
 	"${evidence_root}/builder-image-vulnerabilities.grype.json" \
@@ -978,7 +992,15 @@ release_failures=()
 if [[ "${operational_smoke_status}" -ne 0 ]]; then
 	release_failures+=("exact-image migrator/API operational smoke failed")
 fi
+# A non-zero status here means the verifier RAN and rejected — the `[[ -f ]]` guard above proves it
+# is present, and the JSON result it is asked to write is required below. Without that guard this
+# branch reported a missing file as `vulnerability policy rejected the builder or release artifact`:
+# a message that reads like a security finding and sends the reader to look at CVEs instead of a
+# stale path. Never report a failure without first ruling out your own tooling.
 if [[ "${policy_status}" -ne 0 ]]; then
+	if [[ ! -s "${evidence_root}/vulnerability-policy-result.json" ]]; then
+		fail "the release-artifact verifier exited ${policy_status} without writing a policy result; this is a verifier failure, NOT a vulnerability finding"
+	fi
 	release_failures+=("vulnerability policy rejected the builder or release artifact")
 fi
 if [[ "${#release_failures[@]}" -ne 0 ]]; then

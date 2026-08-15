@@ -19,7 +19,7 @@ permissions:
 # verified a commit on the default branch. This is also the slowest workflow here, which is precisely
 # why it was the one that always lost the race.
 concurrency:
-  group: backend-quality-${{ github.ref }}
+  group: backend-quality-${{ github.ref }}${{ github.ref == 'refs/heads/main' && format('-{0}', github.sha) || '' }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 env:
@@ -74,25 +74,32 @@ jobs:
       # `tradingroom_app`, NOT `ptr_clone_app`, and the difference is the whole
       # reason 27 integration tests failed the first time this gate actually ran.
       #
-      # The runtime role changes NAME midway through this job. Provisioning below
-      # creates `ptr_clone_app` because migrations 0001-0006 `GRANT` to that name
-      # and must find it, and then `0009_rename_runtime_roles.sql` renames it to
-      # `tradingroom_app`. So a fresh database ends at the new name having passed
-      # through the old one — 0009 says in as many words that this "reads like a
-      # mistake and is not. Do not 'tidy' it."
+      # TWO roles exist on the cluster and they are not interchangeable:
       #
-      # Every connection made AFTER the migrate step therefore has to use the new
-      # name: `cargo test`, the release attestation, and the cross-cluster control
-      # below. This one said `ptr_clone_app`, so all 27 tests died at
-      # `api/tests/support/mod.rs:92` on `28P01 password authentication failed`.
-      # That code is misleading and cost a wrong diagnosis: PostgreSQL reports a
-      # NONEXISTENT role to the client as an authentication failure, and logs the
-      # real reason ("Role does not exist") only server-side. The password was
-      # never wrong — the role by that name was gone.
+      #   ptr_clone_app    the BASELINE role. `0001_baseline.sql` names it in 22 RLS
+      #                    policies and every grant, and re-creates it - with the
+      #                    placeholder password committed at its line 26 - if it is
+      #                    absent. The baseline is byte-identical to the captured
+      #                    schema of the original system and cannot be edited, so the
+      #                    provisioning step below creates this role properly to stop
+      #                    that branch ever running. Nothing connects as it.
       #
-      # The password survives the rename because PostgreSQL 17 stores it as
-      # scram-sha-256; a rename only clears an md5-stored password (0009, "Password
-      # survival").
+      #   tradingroom_app  the RUNTIME role, and what every connection here uses.
+      #                    `db::migrate::EXPECTED_RUNTIME_ROLE`. Provisioned alongside
+      #                    the baseline role, then granted parity with it - every
+      #                    privilege and every RLS policy membership - by
+      #                    `0009_provision_tradingroom_app.sql`.
+      #
+      # The role is ADDED, never renamed. An earlier `0009` renamed it and could not
+      # work: PostgreSQL roles are cluster-global while the sqlx ledger is
+      # per-database, so the second database migrated on one cluster met both names
+      # and the migration refused by its own design. See `ops/naming-provenance.md`.
+      #
+      # Naming this `ptr_clone_app` once cost a wrong diagnosis worth recording: all
+      # 27 tests died at `api/tests/support/mod.rs:92` with `28P01 password
+      # authentication failed`. PostgreSQL reports a NONEXISTENT role to the client as
+      # an authentication failure and logs the real reason ("Role does not exist")
+      # only server-side. The password was never wrong.
       DATABASE_URL: postgres://tradingroom_app:ptr_app_%27%5C_local@127.0.0.1:5432/ptr_clone
 
     steps:
@@ -128,16 +135,47 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if [ "${{ github.event_name }}" != "pull_request" ]; then
-            echo "reason=event ${{ github.event_name }} always runs the full gate" >> "$GITHUB_OUTPUT"
-            echo "backend=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          git fetch --no-tags --depth=0 origin "${{ github.base_ref }}" >/dev/null 2>&1 || \
-            git fetch --no-tags origin "${{ github.base_ref }}"
-          base="$(git merge-base "origin/${{ github.base_ref }}" HEAD)"
+          # A PUSH is scoped the same way a pull request is, and that is new.
+          #
+          # Every non-pull_request event ran the full gate unconditionally, so every merge to `main`
+          # spent the whole ~33-minute Rust and PostgreSQL suite whether or not it contained a single
+          # backend file. Measured over the last 20 commits on `main`: 4 touched a backend path and
+          # 16 did not, so 16 full runs verified a tree that was byte-identical to one already
+          # verified. That is roughly 500 runner-minutes to re-prove nothing, and it is why this
+          # workflow was always the one still running when the next push arrived.
+          #
+          # `merge_group` and `workflow_dispatch` deliberately keep the unconditional full gate.
+          # The merge queue is the last check before code becomes `main`, and a manual dispatch is
+          # someone asking for the real thing on purpose. Neither is on the hot path.
+          #
+          # It FAILS CLOSED. If the previous revision cannot be resolved — a first push, a force
+          # push, a rewritten history, anything where `github.event.before` is absent or no longer an
+          # object in this clone — the diff is unknowable and the full gate runs. A shallow or empty
+          # diff must never be read as "no backend change"; that is the one failure mode this step
+          # cannot have, which is also why the checkout above pins `fetch-depth: 0`.
+          case "${{ github.event_name }}" in
+            pull_request)
+              git fetch --no-tags --depth=0 origin "${{ github.base_ref }}" >/dev/null 2>&1 || \
+                git fetch --no-tags origin "${{ github.base_ref }}"
+              base="$(git merge-base "origin/${{ github.base_ref }}" HEAD)"
+              ;;
+            push)
+              base="${{ github.event.before }}"
+              if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ] \
+                 || ! git cat-file -e "${base}^{commit}" 2>/dev/null; then
+                echo "reason=push whose previous revision cannot be resolved; running the full gate" >> "$GITHUB_OUTPUT"
+                echo "backend=true" >> "$GITHUB_OUTPUT"
+                exit 0
+              fi
+              ;;
+            *)
+              echo "reason=event ${{ github.event_name }} always runs the full gate" >> "$GITHUB_OUTPUT"
+              echo "backend=true" >> "$GITHUB_OUTPUT"
+              exit 0
+              ;;
+          esac
           changed="$(git diff --name-only "$base" HEAD)"
-          printf 'changed files:\n%s\n' "$changed"
+          printf 'scoping against %s\nchanged files:\n%s\n' "$base" "$changed"
           # The workflow itself is in the list: a change to this file must be
           # proved by the gate it defines, or it could disable itself.
           # The verifier paths are `apps/controller/scripts/…`. They were written as
@@ -157,7 +195,7 @@ jobs:
         if: steps.scope.outputs.backend != 'true'
         shell: bash
         run: |
-          echo "::notice title=Backend gate skipped::${{ steps.scope.outputs.reason }}. The full Rust and PostgreSQL suite runs on every merge_group, every push to main, and any pull request touching services/**, ops/**, the backend verifiers, or this workflow."
+          echo "::notice title=Backend gate skipped::${{ steps.scope.outputs.reason }}. The full Rust and PostgreSQL suite runs on every merge_group, every workflow_dispatch, and any pull request OR push to main whose diff touches services/**, ops/**, the backend verifiers, or this workflow. A push whose previous revision cannot be resolved also runs it."
 
       - name: Install the pinned Docker Buildx and BuildKit
         if: steps.scope.outputs.backend == 'true'
@@ -328,8 +366,9 @@ jobs:
           MIGRATE_DATABASE_URL: postgres://ptr_clone:ptr_clone_local_development_password@127.0.0.1:5432/ptr_clone
           # `tradingroom_app` for the same reason as the job-level URL above: the
           # 5433 cluster has the migration chain applied to it too (see "Apply the
-          # same chain to the independent negative-control cluster"), so its runtime
-          # role has been renamed as well.
+          # same chain to the independent negative-control cluster"), so `0009` has
+          # provisioned the runtime role there as well. Not renamed — ADDED beside
+          # the baseline role, which is what makes the chain re-appliable at all.
           #
           # It matters MORE here than anywhere else. This step asserts a specific
           # failure — `[target_cluster_mismatch]` on stderr — and a connection that
