@@ -2635,23 +2635,6 @@
    */
   const alertLabels = $derived(parseAlertLabels(data.sessData?.alertLabels));
 
-  /*
-    Four gates `RoomMessage.svelte` has implemented since it was written and never received.
-
-    Each was a prop defaulting false that this page did not pass, so public reply, reactions and
-    both edit entries were unreachable in every room however the owner configured it. Every
-    occurrence of all four in the reference bundle is `sessData.` dotted onto the name, so they
-    are per-room policy and absent means off rather than "decide locally".
-
-    Edit is TWO settings because upstream gates the chat log and the alerts log apart, and
-    `sourceMessageBehavior` already picks between them on `kind`. Collapsing them would let a
-    room that allows editing alerts also allow editing chat.
-  */
-  const usersPublicReply = $derived(data.sessData?.usersPublicReply === true);
-  const enableReactions = $derived(data.sessData?.enableReactions === true);
-  const enableEditMessage = $derived(data.sessData?.enableEditMessage === true);
-  const enableEditAlerts = $derived(data.sessData?.enableEditAlerts === true);
-
   const alertFilterConfigured = $derived(alertFilterAvailable(data.sessData?.modAlertFilterList));
 
   /**

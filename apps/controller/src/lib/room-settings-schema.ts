@@ -14,7 +14,7 @@
 // and ng-show="sess.roomType=='webinar'" reads it at byte 2,652 to reveal the Date row.
 //
 // `wired` is the honest bit: false means the controller can store the value but
-// nothing in the room reads it yet. 66 of 269 are wired today.
+// nothing in the room reads it yet. 62 of 269 are wired today.
 // Flip one to true ONLY when a consumer exists, so the UI can mark the rest
 // instead of pretending they do something.
 
@@ -180,8 +180,8 @@ export const ROOM_SETTINGS: readonly RoomSettingDef[] = [
   { name: "enableRTE", section: "settings", type: "checkbox", label: "Enable Rich Text Editor?", help: "If enabled, Presenter will be able to format their messages using the rich text editor", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: true },
   { name: "enableReactions", section: "settings", type: "checkbox", label: "Enable Reactions?", help: "If enabled, Users will be able to add reactions to the messages", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: true },
   { name: "enableQAReactions", section: "settings", type: "checkbox", label: "Enable QA Reactions?", help: "If enabled, Users will be able to add reactions to the QA messages", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
-  { name: "enableEditMessage", section: "settings", type: "checkbox", label: "Enable Edit Messages?", help: "If enabled, everyone will be able to edit their own messages", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: true },
-  { name: "enableEditAlerts", section: "settings", type: "checkbox", label: "Enable Edit Alerts?", help: "If enabled, Presenters will be able to edit alerts", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: true },
+  { name: "enableEditMessage", section: "settings", type: "checkbox", label: "Enable Edit Messages?", help: "If enabled, everyone will be able to edit their own messages", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
+  { name: "enableEditAlerts", section: "settings", type: "checkbox", label: "Enable Edit Alerts?", help: "If enabled, Presenters will be able to edit alerts", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
   { name: "alertLabels", section: "settings", type: "textarea", label: "Alert Labels", help: "JSON array of alert labels, i.e. [ { \"name\": \"Day Trade\", \"hash\": \"DayTrade\", \"color\": \"#9c4537\", \"bgcolor\":\"#e8f5f7\" }, { \"name\": \"Swing Trade\", \"hash\": \"SwingTrade\", \"color\": \"#24794f\", \"bgcolor\":\"#e8f5f7\" } ]", helpShape: "muted", helpOutside: false, captured: null, capturedIsDisplayOnly: false, group: null, wired: true },
   { name: "advancedSearchAlerts", section: "settings", type: "checkbox", label: "Advanced Search Alerts?", help: "If enabled, will allow advanced search alerts", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
   { name: "enableDeleteLog", section: "settings", type: "checkbox", label: "Enable Delete Log?", help: "If enabled, will keep track of deleted messages", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
