@@ -39,7 +39,7 @@ variable. Both were found by running the tools by hand on 2026-08-14, not by CI.
 `build`, path-filtered the way the backend job already is, plus a required-checks setting so a red
 gate blocks a merge. Note that `main` auto-deploys, which is exactly why this matters.
 
-## Room lint debt — 53 problems remain, opened 2026-08-14 20:19 EDT
+## Room lint debt — 26 problems remain, opened 2026-08-14 20:19 EDT
 
 ESLint reached the room for the first time on 2026-08-14 and reported 123 problems; 26 are left, and the room lint step of `quality.yml` is RED until they are cleared. The
 reduction so far is real rather than configured away — see the CHANGELOG entry for which rules were
