@@ -32,7 +32,7 @@ const SLACK = 100;
 const CEILINGS: readonly { file: string; max: number; why: string }[] = [
   {
     file: 'routes/+page.svelte',
-    max: 13555,
+    max: 13551,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {

@@ -119,6 +119,18 @@ export default defineConfig({
     }
   },
   preview: { host: localHost, port: localPort, strictPort: true },
+  /*
+    Vitest transforms with `ssr: true` by default, which compiles `.svelte.ts` runes to their SERVER
+    form - where `$effect` is a documented no-op. The consequence is not obvious and cost a pass to
+    find: an effect in a test records nothing, throws nothing, and reports nothing, so a reactivity
+    test passes while asserting against an empty array. A jsdom environment does NOT fix it; that
+    was measured. The environment is not the cause, the compile mode is.
+
+    The official testing guidance prescribes exactly this: point Vitest at the browser entry points
+    even though it runs in Node. Guarded on VITEST so the dev server and production build are
+    untouched.
+  */
+  resolve: process.env.VITEST ? { conditions: ['browser'] } : undefined,
   test: {
     // Points the suite at a throwaway database instead of the app's; see vitest.setup.ts.
     setupFiles: ['./vitest.setup.ts'],

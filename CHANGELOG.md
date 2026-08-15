@@ -24,6 +24,79 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-15
 
+### 2026-08-15 12:56 EDT — slice 3, and the ratchet caught me making the file BIGGER
+
+**Runtime impact: none.** Every string and every branch behaves as before. `+page.svelte`
+**13,555 → 13,551**; ceiling lowered to match.
+
+`handleUserAction` is 253 lines and was NOT moved, deliberately. It writes six pieces of `$state`,
+and Svelte's rule that reassigned state cannot be exported from a module means a wholesale move
+becomes a fourteen-setter dependency object — worse coupling than the original, bought purely to
+move line count. Only the DECISIONS came out, into `user-action-intent.ts`: the URL check, the saved
+video-list rule, and the fixed-alert table. Every assignment stayed in the component.
+
+**The ratchet did its job on its author.** The first version of this slice left `+page.svelte` at
+**13,561** — six lines LARGER than before, because a four-line import block and two explanatory
+comments cost more than the extraction removed. The ceiling is 13,555 and ceilings only go down, so
+that would have failed the build. It was not a number to edit: the import went to one line and the
+reasoning moved into the module, where it belongs anyway. Without the ratchet this would have
+shipped as "an extraction" that grew the file.
+
+**What is now under test for the first time:**
+
+- **The URL check uses `includes`, not `startsWith`** — so `"see http://x.com for details"` and
+  `"xxhttps://y"` both pass, exactly as the reference accepts them. Pinned rather than corrected:
+  tightening it would reject input the reference allows, which is a behaviour change dressed as a
+  bug fix.
+- **`addVideoToList` does not mutate its argument.** The old code `push`ed the array read out of
+  `localStorage`, editing the caller's value behind its back.
+- **Case and trailing slash are DIFFERENT entries**, as upstream treats them.
+- **The toast-only table is now COUNTED at five.** Each is a control that reports success and sends
+  nothing (TODO row W), so wiring one up for real is a visible change to that number instead of a
+  quiet edit inside a 253-line function. The test asserts `unmute-chat` never returns to it.
+
+**Verified:** room suite **1550/1550 across 116 files**, `svelte-check` **0 errors 0 warnings**,
+eslint exit **0** on every file in this commit, ceiling lowered and the ratchet re-run green.
+
+**Running total: 13,663 → 13,551, four modules extracted, 58 tests that could not previously exist.**
+
+### 2026-08-15 12:52 EDT — reactivity is testable now, and the fix needed BOTH halves
+
+**Runtime impact: none.** A test-only config guard plus two assertions. `vite.config.ts` changes
+under `process.env.VITEST` only, so the dev server and the production build are untouched.
+
+The previous entry recorded that no test in this repository could verify client reactivity. That is
+now closed, and the route to it is worth writing down because two plausible single fixes both
+FAILED, each measured rather than assumed:
+
+1. **`// @vitest-environment jsdom` alone — does not work.** The effect still recorded nothing. The
+   DOM is not the cause.
+2. **`resolve.conditions: ['browser']` alone — does not work either.** Still nothing.
+
+**Both together work.** The reason is that the two solve different halves: Vitest transforms with
+`ssr: true`, so a `.svelte.ts` rune compiles to its SERVER form where `$effect` is a documented
+no-op, and the resolution condition alone does not change the compile mode. Anyone who tries one and
+gives up would reasonably conclude the thing is untestable.
+
+**Blast radius measured before committing, not asserted:** the whole suite was re-run with the
+condition applied and stayed at 115 files green. It is guarded on `VITEST` regardless.
+
+**The assertion is real, proven by its negative control.** Deleting `$state.raw` from
+`MtxStreamTabs` turns both new tests red with exact diagnoses — `[0]` instead of `[0, 1, 0]`, the
+effect having run once and never again, and `'a'` instead of `'b'` for a stale selection getter.
+That is the check that was missing when slice 1 shipped, and it is the only one that can catch a
+broken rune wiring; `svelte-check`, `svelte-autofixer` and eslint are all green against the broken
+version.
+
+**The shape of the test is load-bearing and is documented in the file.** Every mutation and flush
+happens INSIDE `$effect.root`, because that is the only place effects run; every assertion happens
+OUTSIDE it, because `$effect.root` SWALLOWS a thrown assertion. An earlier draft with the
+assertions inside passed while containing a deliberately false `toEqual([99999])`.
+
+**Verified:** room suite **1538/1538 across 115 files**, `svelte-check` **0 errors 0 warnings**,
+eslint **exit 0** on every file in this commit, negative control run and seen red then restored.
+
+### 2026-08-15 12:47 EDT — the reactivity test could not be written, and finding out why is the result
 ### 2026-08-15 12:49 EDT — CI can no longer cancel the default branch out of its own verification
 
 **Runtime impact: none.** Three workflow files, one new test, and one repository setting.
