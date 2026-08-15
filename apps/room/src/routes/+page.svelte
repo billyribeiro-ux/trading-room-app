@@ -16,6 +16,7 @@
   } from '$lib/chat-paging';
   import { stripHtmlToText } from '$lib/chat-plain-text';
   import { toggleReaction } from '$lib/reaction-toggle';
+  import { RoomPolls } from '$lib/room/polls.svelte';
   import { chooseRecordingOptions } from '$lib/recording-codec';
   import { page } from '$app/state';
   import { panelDragResize, readPanelBounds } from '$lib/panel-drag';
@@ -1221,10 +1222,23 @@
   // The persisted room layout is the intentional one-time seed for the interactive split state.
   let roomSplitDir = $state<RoomSplitDir>(loadedRoomSplitDir);
   let modal: ModalName = $state(null);
-  let pollOpenMode = $state<'setup' | 'auto'>('setup');
-  let pollMinimized = $state(false);
-  let pollRestoreToken = $state(0);
-  let deliveredPollId = $state<number | null>(null);
+  /*
+    The poll modal's four fields, in `$lib/room/polls.svelte.ts`.
+
+    The first of the room state classes. A class rather than four `let`s because that is the only
+    shape reactive state can leave a component in — `svelte/svelte-js-files` says reassigned state
+    cannot be exported from a `.svelte.ts` module, so the reactive box lives behind `this` and every
+    reader goes through a getter.
+
+    The instance is a `const` and is never reassigned. `svelte/context` warns that reassigning
+    breaks the link for anything reading it downstream, and this becomes a context value in the
+    component extraction that follows.
+
+    It owns the poll fields and the decisions between them; it does NOT own `modal`, which belongs
+    to the room's layout and is written by a dozen unrelated controls. So its methods RETURN whether
+    the modal should open and this file performs the write.
+  */
+  const polls = new RoomPolls();
   let settingsTab: SettingsTab = $state('app');
   let alertTab: AlertTab = $state('text');
   let sessionControlInitialTab = $state<SessionControlTab>('reset-session');
@@ -3393,25 +3407,9 @@
   });
 
   $effect(() => {
-    const activePoll = data.activePoll;
-
-    if (!activePoll) {
-      deliveredPollId = null;
-      pollMinimized = false;
-      return;
-    }
-    if (
-      activePoll.senderId === data.user.id ||
-      activePoll.userAnswerChoice !== null ||
-      deliveredPollId === activePoll.id
-    ) {
-      return;
-    }
-
-    deliveredPollId = activePoll.id;
-    pollOpenMode = 'auto';
-    pollMinimized = false;
-    modal = 'poll';
+    // The decision is `RoomPolls.deliver` — who may see this poll, and whether this browser has
+    // already shown it. What is left here is the one thing the class does not own: the modal.
+    if (polls.deliver(data.activePoll, data.user.id)) modal = 'poll';
   });
 
   /**
@@ -4079,24 +4077,24 @@
   }
 
   function openPollUI() {
-    if (pollMinimized) {
-      pollRestoreToken += 1;
-      pollMinimized = false;
-      modal = 'poll';
-      return;
-    }
-
-    pollOpenMode = 'setup';
-    openModal('poll');
+    /*
+      `requestOpen` restores a minimised poll rather than rebuilding it, and says so by bumping the
+      token the modal watches. Both paths open the modal; only a fresh one goes through `openModal`,
+      which closes the floating menus on the way.
+    */
+    const wasMinimized = polls.minimized;
+    polls.requestOpen();
+    if (wasMinimized) modal = 'poll';
+    else openModal('poll');
   }
 
   function minimizePoll() {
-    pollMinimized = true;
+    polls.minimize();
     modal = null;
   }
 
   function closeActiveModal() {
-    if (modal === 'poll') pollMinimized = false;
+    if (modal === 'poll') polls.closed();
     // The modal component clears the marker again on the way out, which is the path that matters
     // when an answer lands while the modal is already open - that update sets unreadQA and emits
     // `openAlertQAModal` with `openModal: !1`, so only the close can clear it:
@@ -10799,8 +10797,8 @@
                         <ul class="nav ml-auto">
                           {#if isPresenter}
                             <li
-                              class:poll-active-blink={pollIsActive && !pollMinimized}
-                              class:poll-active-indicator={pollMinimized}
+                              class:poll-active-blink={pollIsActive && !polls.minimized}
+                              class:poll-active-indicator={polls.minimized}
                               class="nav-item mx-2"
                             >
                               <!-- svelte-ignore a11y_click_events_have_key_events -->
@@ -10818,7 +10816,7 @@
                               >
                             </li>
                           {/if}
-                          {#if !isPresenter && pollMinimized}
+                          {#if !isPresenter && polls.minimized}
                             <li class="nav-item mx-2">
                               <!-- svelte-ignore a11y_click_events_have_key_events -->
                               <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -13002,8 +13000,8 @@
       {longerAlertPopup}
       {qaSoundOn}
       {chatSoundOn}
-      {pollOpenMode}
-      {pollRestoreToken}
+      pollOpenMode={polls.openMode}
+      pollRestoreToken={polls.restoreToken}
       activePoll={data.activePoll}
       savedPolls={data.savedPolls}
       onclose={closeActiveModal}

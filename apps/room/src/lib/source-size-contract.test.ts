@@ -95,8 +95,14 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
 
       Eleven conversions, and the ceiling has moved once — up, early, on the first one. Everything
       since has been paid for with a module.
+
+      THE DECOMPOSITION TO ~1,100 STARTS HERE. `RoomPolls` is the first of six state classes, and it
+      moves the number by only 2 because the page gained a comment explaining the pattern once, for
+      all six. The line count is not the point of this first slice; the pattern is, and it is proven:
+      `svelte-autofixer` returns `issues: []` AND `suggestions: []` on the 115-line class, where the
+      same call on this file returns ~100 suggestions with no way to tell new from pre-existing.
     */
-    max: 13522,
+    max: 13520,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {
