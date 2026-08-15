@@ -2306,66 +2306,16 @@ export const actions: Actions = {
     the pin is minted fresh per request, and a query would cache it.
   */
 
-  presenterCommand: async ({ request, locals }) => {
-    ensureDatabase();
-    const isPresenter =
-      requireUser(locals).role === 'staff' || requireUser(locals).role === 'admin';
-    if (!isPresenter) return fail(403);
+  /*
+    `presenterCommand` and `focusOnScreen` left together for
+    `src/routes/presenter-commands.remote.ts`. Both broadcast on the `cmds` channel, both are
+    refused to non-presenters, and both scope the broadcast to the caller's own room — so the gate
+    and the room scope, which were spelled out by hand in BOTH actions, are written once there.
 
-    const data = await request.formData();
-    const subCmd = String(data.get('subCmd') ?? '');
-    const targetUserId = Number(data.get('targetUserId') ?? NaN);
-
-    // Only the subCmds the capture defines. An unknown string would be forwarded to every client
-    // and dispatched by none, which is a silent no-op rather than an error.
-    const allowed = new Set(['mutemic', 'mutecam', 'mutescreens']);
-    if (!allowed.has(subCmd)) return fail(400, { message: 'Unknown command.' });
-    if (!Number.isInteger(targetUserId)) return fail(400, { message: 'No target.' });
-
-    publishToRoom(requireRoomShortCode(locals), {
-      channel: 'cmds',
-      data: { cmd: 'remotePresCommand', subCmd, targetUserId }
-    });
-
-    return { success: true };
-  },
-
-  /**
-   * `focusOnScreen` — a presenter pulls the whole room to one screen.
-   *
-   * `bringFocusToScreen(e) { e && this.appService.sendServerAdminCommand("focusOnScreen", {id: e}) }`
-   * (`main.d6d3c112b59b7d0d.js` byte 1918706 for the menu item, and the method itself). It is a
-   * SERVER command upstream, and it has to be one here too: the room learns about it over the same
-   * `cmds` channel every other broadcast uses, and the authority to send it belongs to the server.
-   *
-   * A separate action rather than another `presenterCommand` subCmd, deliberately. That action
-   * validates `Number.isInteger(targetUserId)` because every command it carries names a PERSON;
-   * this one names a SCREEN, so folding it in would mean loosening a check that currently rejects
-   * anything without an integer target. Two payload shapes, two validations.
-   *
-   * The presenter check is made here, from the session's own role, and is not asserted by the
-   * client — the 2026-08-07 privilege escalation was exactly that mistake. `requireRoomShortCode`
-   * scopes the broadcast to the caller's own room, so a presenter of room A cannot move room B.
-   */
-  focusOnScreen: async ({ request, locals }) => {
-    ensureDatabase();
-    const isPresenter =
-      requireUser(locals).role === 'staff' || requireUser(locals).role === 'admin';
-    if (!isPresenter) return fail(403);
-
-    const data = await request.formData();
-    const screenId = String(data.get('screenId') ?? '').trim();
-    /* `e &&` — the reference sends nothing for an empty id, and an empty broadcast would ask every
-       client to focus a screen that does not exist. */
-    if (!screenId) return fail(400, { message: 'No screen.' });
-
-    publishToRoom(requireRoomShortCode(locals), {
-      channel: 'cmds',
-      data: { cmd: 'focusOnScreen', screenId }
-    });
-
-    return { success: true };
-  },
+    They stay two commands with two schemas, which `focus-on-screen-contract.test.ts` exists to
+    enforce: one names a PERSON and validates an integer target, the other names a SCREEN. Folding
+    them together would loosen a check to fit a payload it was never for.
+  */
 
   /**
    * `giveMicScreen` — a presenter hands a member mic and screenshare, or takes them back.

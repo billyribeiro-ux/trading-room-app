@@ -29,6 +29,7 @@
     loadPrivateChatLog as loadPrivateChatLogCommand,
     sendPrivateMessage as sendPrivateMessageCommand
   } from './private-chat.remote';
+  import { focusOnScreen, presenterCommand } from './presenter-commands.remote';
   import { isHttpError } from '@sveltejs/kit';
   import {
     PUBLIC_PTR_CDN_UPLOAD_KEY,
@@ -409,9 +410,7 @@
    */
   function bringEveryoneToStream(streamId: string) {
     if (!isPresenter) return;
-    const body = new FormData();
-    body.set('screenId', streamId);
-    void fetch('?/focusOnScreen', { method: 'POST', body });
+    void focusOnScreen(streamId).catch((cause) => console.error('[focusOnScreen]', cause));
   }
 
   /**
@@ -762,9 +761,7 @@
     forcedScreenId = screenId;
     selectedScreenTab = screenId;
     if (!isPresenter) return;
-    const body = new FormData();
-    body.set('screenId', screenId);
-    void fetch('?/focusOnScreen', { method: 'POST', body });
+    void focusOnScreen(screenId).catch((cause) => console.error('[focusOnScreen]', cause));
   }
 
   function stopSharedScreen(screenId: string) {
@@ -3565,10 +3562,9 @@
         // open microphone belongs to a presenter.
         targets.forEach((entry, index) => {
           globalThis.setTimeout(() => {
-            const body = new FormData();
-            body.set('subCmd', 'mutemic');
-            body.set('targetUserId', String(entry.userID));
-            void fetch('?/presenterCommand', { method: 'POST', body });
+            void presenterCommand({ subCmd: 'mutemic', targetUserId: entry.userID }).catch(
+              (cause) => console.error('[presenterCommand]', cause)
+            );
           }, MUTE_STAGGER_MS * index);
         });
       }

@@ -24,6 +24,52 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-15
 
+### 2026-08-15 13:48 EDT — the presenter broadcasts, and the duplicated gate that was the whole point
+
+**Runtime impact: yes, on three presenter controls.** `presenterCommand` (mute a member's
+mic/cam/screens) and `focusOnScreen` (pull the room to one screen) move to
+`src/routes/presenter-commands.remote.ts`. Three call sites — the first multi-call-site conversion.
+
+**The duplicated gate is the finding.** Both actions inlined
+`requireUser(locals).role === 'staff' || requireUser(locals).role === 'admin'` — which is
+`isPresenterRole` spelled out by hand, twice, in adjacent functions, in a file that already imports
+`isPresenterRole`. That is precisely the shape the owner named at 13:35: **the files with many call
+sites are not harder because of the count, they are harder because an invariant is written out once
+per site, and an invariant repeated per site is one that can be fixed in one place and left wrong in
+the other.** It is now `presenterRoom()`, declared once, returning the room from the session — so
+the gate and the tenant scope cannot be applied separately, because they are the same call.
+
+**Two commands, two schemas, one module — and the test says why that is safe.**
+`focus-on-screen-contract.test.ts` exists because folding `focusOnScreen` into `presenterCommand`
+was tried and is wrong: one names a PERSON and requires an integer target, the other names a SCREEN.
+Sharing a module is not sharing a payload. The `new Set([...])` allow-list became `z.enum`, refused
+before the handler runs rather than inside it.
+
+**The `not.toContain` that would have gone quietly green.** That same file's most important
+assertion is `does NOT loosen presenterCommand` — a negative. Left reading `+page.server.ts` after
+the extraction it would have passed against a file containing neither command: green, guarding
+nothing, the exact failure this suite shipped at 12:56 today. It now reads the module that owns them
+and asserts the slice was found first. Verified by negative control: adding a `screenId` to
+`presenterCommand`'s schema turns it red.
+
+**`void fetch(...)` became `void x().catch(console.error)`, and that is not a swallowed catch.**
+Upstream shows the presenter nothing when a broadcast fails, so inventing a toast would change what
+the room does — but a dropped rejection is what this repository forbids, and these can only reject
+on a real fault: a network failure, or a 403 meaning client and server disagree about who is a
+presenter. `console.error` is loud where it costs the room nothing, and honest that the user has not
+been told. The `if (!isPresenter) return` on the client stays what it always was — responsiveness,
+never security.
+
+**Ceilings lowered again, no raise.** `+page.svelte` 13,550 → **13,546**. `+page.server.ts`
+2,997 → **2,947** — **−286 from 3,233**, a 12% reduction of the file across five conversions.
+
+**Verified:** `svelte-check` 0/0 (1,088 files) · suite **1600/1600 across 119 files** · `eslint`
+clean outside the untracked gitignored `scripts/… 2.*` · `prettier --check` clean · `vite build`
+succeeds and the manifest registers **five** remotes, the newest (`'hu9bcb'`) called by the client as
+`hu9bcb/focusOnScreen` and `hu9bcb/presenterCommand`. Three negative controls run and seen red:
+removing the presenter gate, loosening `presenterCommand` to carry a screen id, and dropping the
+client's rejection handler. **Not verified:** no browser test of a presenter moving a live room.
+
 ### 2026-08-15 13:42 EDT — the private-chat trio, converted as a FEATURE, and the coverage gap that proved itself
 
 **Runtime impact: yes, on private chat.** `sendPrivateMessage`, `loadPrivateChatLog` and
