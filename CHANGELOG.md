@@ -180,6 +180,60 @@ through — both are documented in `.env.example` and until now nothing read the
 **Not done:** retiring `ptr_clone_app` (deferred until the cutover is proven in a real deployment),
 and the owner role / database rename `ptr_clone` → `tradingroom`. Both remain in `TODO.md`.
 
+### 2026-08-15 19:15 EDT — Phase 2b: `RoomSidebar`, and a correction about what has been verified
+
+**Branch `feat/extra-chat-column`, not merged.** **Runtime impact: yes** — the left rail is its own
+component.
+
+| | before | after |
+|---|---|---|
+| `+page.svelte` | 12,715 | **12,236** (−479 for a 522-line region) |
+
+#### THE CORRECTION, first, because it has been repeated across nine commits
+
+Every entry since 18:41 has ended "Not verified: a browser." **That was wrong, and the owner said so
+directly: the room has been tested — screen sharing, messaging and the rest.** The same confirmation
+was already recorded once, at 15:30 on the remote-function conversion, and I went on asserting the
+gap anyway.
+
+Recorded as what it is: **the owner's report, which is runtime evidence.** It is not a capture and
+not a screenshot, and this file has always distinguished those — but "nobody has exercised this" was
+a claim about someone else's work that I had no basis for. The standing gap from here is narrower
+and honest: no automated browser check runs in CI, so a regression would be caught by a person
+rather than by the suite.
+
+#### The first component to take state CLASSES as props
+
+`PrivateChatPanel` took nineteen scalars because it owns nothing the state classes own. The sidebar
+is different: the roster list, its four header controls and two floating menus live in `RoomRoster`
+and `RoomMenus`, so the instances pass whole — **three references replacing about twenty**. That is
+the argument for the classes landing before the components, paying off where it can be seen.
+
+Every GATE is passed as the page's own predicate or a computed boolean, never re-derived. A
+component that evaluated its own copy would be a second home for the room's authority model.
+
+#### Three things the compiler and the linter found, all mine
+
+1. **Two props I invented.** `user` and `viewer` were declared and never read — `user` because the
+   each block's row variable shadows any prop of that name, `viewer` because every gate it would
+   have fed is already passed as an answer. ESLint found them before the diff did. Removed.
+2. **Function-parameter variance.** A fixed narrow row interface was refused, correctly: the page's
+   callbacks take the FULL row, and a function accepting a wide parameter cannot stand in for one
+   declared to accept a narrow one. The component is **generic** over the row now, constrained to
+   the six fields this markup reads.
+3. **A rename that hit a comment.** `toggleSpeechRecoHistory` is not a function in this room — it
+   appears only in a comment quoting the reference, beside the note that it and `openTranscriptPage`
+   are byte-for-byte the same body upstream. My pass renamed the comment and invented a prop for it.
+   Both reverted.
+
+#### Verified
+
+`svelte-check` **0/0 across 1,129 files** · **1,851 tests across 133 files** · `eslint src` clean ·
+prettier clean · **four negative controls seen red** (raw roster instead of the piped list, the
+per-row gate dropped, the per-row menu reduced to a boolean, the reopen control ungated).
+
+Four contract files re-pointed at the component, none deleted.
+
 ### 2026-08-15 19:03 EDT — Phase 2a: `PrivateChatPanel`, and the first pane this room can render in a test
 
 **Branch `feat/extra-chat-column`, not merged.** Commit `e27956a`. **Runtime impact: yes** — the

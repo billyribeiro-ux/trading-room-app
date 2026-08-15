@@ -159,8 +159,13 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       inside this component, so they are per-request already and there is nothing for context to
       protect against. The panel is a DIRECT child. Context earns its place when a pane grows
       children that need the same state, and the note in `PrivateChatPanel.svelte` says so.
+
+      `RoomSidebar` is the second: 12,715 -> 12,236, a drop of 479 for a 522-line region. The first
+      component to take state CLASSES as props rather than a wall of scalars — `roster` and `menus`
+      go whole, three references replacing about twenty. That is the argument for the classes
+      landing BEFORE the components, paying off where it can be seen.
     */
-    max: 12715,
+    max: 12236,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {

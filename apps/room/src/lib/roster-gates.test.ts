@@ -30,6 +30,12 @@ const bundle = readFileSync(
   'utf8'
 );
 const pageSource = readFileSync(new URL('../routes/+page.svelte', import.meta.url), 'utf8');
+/*
+  `.room-sidebar` became `RoomSidebar.svelte` on 2026-08-15 — the second of the five template
+  regions. Assertions read out of the reference bundle are untouched, because the evidence did not
+  move; ours follow the markup into the component.
+*/
+const SIDEBAR = readFileSync(new URL('./components/RoomSidebar.svelte', import.meta.url), 'utf8');
 
 const viewer = (overrides: Partial<RosterViewer> = {}): RosterViewer => ({
   isPresenter: false,
@@ -107,8 +113,8 @@ describe('the gates are transcriptions, not inventions', () => {
     expect(bundle).toContain(
       '"type","search","id","userSearchTermInput","placeholder","Search by nick or email,enter to search","aria-label","Search","aria-describedby","addon-search",1,"form-control"'
     );
-    expect(pageSource).toContain('placeholder="Search by nick or email,enter to search"');
-    expect(pageSource).toContain('aria-describedby="addon-search"');
+    expect(SIDEBAR).toContain('placeholder="Search by nick or email,enter to search"');
+    expect(SIDEBAR).toContain('aria-describedby="addon-search"');
   });
 });
 
@@ -402,20 +408,20 @@ describe('the sidebar renders what the gates decide', () => {
       four page-local togglers. The point of the assertion is unchanged and is the reason it exists:
       every one of these was RENDERED and did nothing before it was written.
     */
-    expect(pageSource).toContain('onclick={() => roster.toggleTrialsOnly()}');
-    expect(pageSource).toContain('onclick={() => roster.toggleSortByNick()}');
-    expect(pageSource).toContain('onclick={() => roster.toggleSearch()}');
-    expect(pageSource).toContain('class:btn-dark={roster.sortByNick}');
-    expect(pageSource).toContain('<i class="fas fa-check-circle"></i>');
+    expect(SIDEBAR).toContain('onclick={() => roster.toggleTrialsOnly()}');
+    expect(SIDEBAR).toContain('onclick={() => roster.toggleSortByNick()}');
+    expect(SIDEBAR).toContain('onclick={() => roster.toggleSearch()}');
+    expect(SIDEBAR).toContain('class:btn-dark={roster.sortByNick}');
+    expect(SIDEBAR).toContain('<i class="fas fa-check-circle"></i>');
     // The search input is the fourth, and it is a two-way binding onto the class's own term.
-    expect(pageSource).toContain('bind:value={roster.searchTerm}');
+    expect(SIDEBAR).toContain('bind:value={roster.searchTerm}');
   });
 
   it('applies both roster gates, not just the outer one', () => {
-    expect(pageSource).toContain('{#if rosterVisible}');
-    expect(pageSource).toContain('{#if rowVisible(user)}');
-    expect(pageSource).toContain('{#if rosterCountVisible}');
-    expect(pageSource).toContain('class={rosterRowClass(user)}');
+    expect(SIDEBAR).toContain('{#if rosterVisible}');
+    expect(SIDEBAR).toContain('{#if rowVisible(user)}');
+    expect(SIDEBAR).toContain('{#if rosterCountVisible}');
+    expect(SIDEBAR).toContain('class={rosterRowClass(user)}');
   });
 
   it('renders the list through the pipes rather than raw', () => {
@@ -424,9 +430,9 @@ describe('the sidebar renders what the gates decide', () => {
       list. Rendering the second would leave all four header controls decorative again, which is
       the state this whole block was written to end.
     */
-    expect(pageSource).toContain('{#each roster.display as user (user.id)}');
-    expect(pageSource).not.toContain('{#each roster.users as user (user.id)}');
-    expect(pageSource).not.toContain('{#each roster.visible as user (user.id)}');
+    expect(SIDEBAR).toContain('{#each roster.display as user (user.id)}');
+    expect(SIDEBAR).not.toContain('{#each roster.users as user (user.id)}');
+    expect(SIDEBAR).not.toContain('{#each roster.visible as user (user.id)}');
   });
 });
 
