@@ -114,7 +114,13 @@
     swingAlertsTabVisible
   } from '$lib/swing-alerts';
   import type { SwingAlertRow } from '$lib/types';
-  import { alertPassesFilter, type AlertFilterFor } from '$lib/alert-filter';
+  import { parseAlertLabels } from '$lib/alert-labels';
+  import {
+    alertFilterAvailable,
+    alertPassesFilter,
+    hasActiveAlertFilter,
+    type AlertFilterFor
+  } from '$lib/alert-filter';
   import DayTradeAlertsPane from '$lib/components/day-trade-alerts/DayTradeAlertsPane.svelte';
   import type { DayTradeAlertDraft } from '$lib/components/day-trade-alerts/draft';
   import {
@@ -2609,14 +2615,37 @@
     return map;
   }
 
-  /*
-    `doFilteredAlerts` (byte 1,221,430) and the availability gate are NOT declared here yet.
+  /**
+   * Is the Alert Filter configured for this room at all?
+   *
+   * The reference gates all THREE of its entry points on `sessData.modAlertFilterList` being
+   * truthy — a room that never configured a trader list has no feature, no button and no badge.
+   * Same value the filter predicate reads, so the controls cannot appear while the filtering they
+   * describe is inert.
+   */
+  /**
+   * The room's Alert Labels, parsed ONCE for the page rather than once per rendered alert.
+   *
+   * `RoomMessage` is instantiated per message, so parsing inside it would run `JSON.parse` for
+   * every row in the log. The reference parses once too, at byte 1,147,290, when the session
+   * arrives.
+   *
+   * This THROWS on a malformed setting, deliberately and like the reference — see
+   * `parseAlertLabels`. A room that typed bad JSON into Alert Labels should find out.
+   */
+  const alertLabels = $derived(parseAlertLabels(data.sessData?.alertLabels));
 
-    They exist to drive the header badge and the settings-modal entry point, and neither is built.
-    Declaring them now would be two `$derived` values nothing reads — dead scaffolding, which the
-    standard forbids and which lint catches. They arrive in the same change as the controls that
-    read them, from `hasActiveAlertFilter` and `alertFilterAvailable` in `$lib/alert-filter`.
-  */
+  const alertFilterConfigured = $derived(alertFilterAvailable(data.sessData?.modAlertFilterList));
+
+  /**
+   * `globals.doFilteredAlerts` (byte 1,221,430) — is a selection currently in force?
+   *
+   * Drives the header badge ALONE, and its gate in the capture is the conjunction, not this value
+   * by itself: `O(6, sessData.modAlertFilterList && doFilteredAlerts ? 6 : -1)` at byte 2,056,460.
+   * A room with a list but no selection shows the buttons and no badge, which is why the two gates
+   * are separate values rather than one.
+   */
+  const alertFilterActive = $derived(alertFilterConfigured && hasActiveAlertFilter(alertFilterFor));
 
   /**
    * `updateAlertFilter` — the reference persists the map server-side AND sets the preference.
@@ -2660,6 +2689,41 @@
         (item) => alertsArchivedAt === null || new Date(item.createdAt).getTime() > alertsArchivedAt
       )
       .map((item) => ({ ...item, unreadQa: unreadQaAlertIds.has(item.id) }))
+  );
+
+  /**
+   * THE ALERT FILTER, site three of three — the alerts SEARCH results, byte 1,020,817.
+   *
+   * `case "doChatLogSearch"`, in the `"alerts" == i.type` branch:
+   *
+   * ```js
+   * try {
+   *   sessData.modAlertFilterList?.trim()?.length > 0 &&
+   *     Object.keys(user.alertFilterFor).length > 0 &&
+   *     (i.data = i.data.filter(se =>
+   *       preferences.showAlertsFrom ? user.alertFilterFor[se.avt] : !user.alertFilterFor[se.avt]))
+   * } catch {}
+   * globals.alertsSearchResults = i.data.reverse();
+   * ```
+   *
+   * The reference filters the RESULTS the server sent back; `#alerts-advanced-search-modal` here
+   * searches the rows this room already holds, so the filter is applied to the input instead. Same
+   * observable result — a filtered-out trader's alerts cannot appear in a search — and it keeps the
+   * predicate in one place rather than reaching into `filterAlerts`.
+   *
+   * Separate from `visibleAlerts` because the advanced search deliberately does NOT inherit the
+   * toolbar's search term, the archive cut-off or the evidence-hidden rules; sharing that chain
+   * would quietly narrow the search to whatever the list happens to be showing.
+   */
+  const searchableAlerts = $derived(
+    data.alerts.filter((item) =>
+      alertPassesFilter({
+        avatarHash: item.senderEmailHash,
+        alertFilterFor,
+        showAlertsFrom,
+        modAlertFilterListRaw: data.sessData?.modAlertFilterList
+      })
+    )
   );
 
   // The captured search field reads "Type your search term, then press Enter", so the term filters
@@ -3239,7 +3303,50 @@
 
     for (const alert of unseenAlerts) seenAlertIds.add(alert.id);
     queueMicrotask(() => {
-      for (const alert of unseenAlerts) deliverAlert(alert);
+      /*
+        THE ALERT FILTER, site one of three — the LIVE arrival, byte 1,004,533.
+
+        This is a genuinely separate site from the paged log, not a duplicate of it, and the reason
+        is where the reference puts its two `continue`s:
+
+          if (sessData.modAlertFilterList?.trim()?.length > 0 &&
+              Object.keys(user.alertFilterFor).length > 0) {
+            P("filtered out alert for " + te.avt);
+            if (preferences.showAlertsFrom && !user.alertFilterFor[te.avt]) continue;
+            if (!preferences.showAlertsFrom && user.alertFilterFor[te.avt]) continue;
+          }
+          globals.alertsLog.push(te);
+          appEventBus.emit("alertMsg", te);
+
+        BOTH the push and the emit are skipped, so a filtered-out alert makes no toast and plays no
+        sound. Filtering only at render — which `visibleAlerts` already does, and which is this
+        room's equivalent of the push — would still have popped and beeped for every alert the
+        reader asked not to see.
+
+        The two `continue`s are one predicate: skip unless `showAlertsFrom ? selected : !selected`.
+        That is `alertPassesFilter`, so it is called rather than re-derived here.
+
+        Read inside the microtask, deliberately: the values are wanted as of DELIVERY, and reading
+        them in the effect body would make the filter a dependency, so toggling it would re-run
+        this and re-deliver alerts that already arrived.
+
+        NOT reproduced: the reference logs "filtered out alert for …" BEFORE both conditionals, so
+        it claims to have filtered every alert once a selection exists, including the ones it then
+        keeps. That is a defect in a debug line, and there is no `P()` here to carry it.
+      */
+      for (const alert of unseenAlerts) {
+        if (
+          !alertPassesFilter({
+            avatarHash: alert.senderEmailHash,
+            alertFilterFor,
+            showAlertsFrom,
+            modAlertFilterListRaw: data.sessData?.modAlertFilterList
+          })
+        ) {
+          continue;
+        }
+        deliverAlert(alert);
+      }
     });
   });
 
@@ -10727,6 +10834,32 @@
                         <!-- svelte-ignore a11y_missing_attribute -->
                         <a class="navbar-brand ml-1"
                           ><i class="fas fa-bell me-1"></i> Alerts
+                          <!--
+                            `M2e`, const 21 — the Alert Filter's own entry point, and the reason
+                            the toolbar button below could be left out for as long as it was.
+
+                            Order matters and is the capture's: `H(6, M2e, …, "span", 8)` then
+                            `H(7, A2e, …, "span", 9)`, so "filtered" precedes "DND" inside the
+                            brand. Gate at byte 2,056,460 is the conjunction
+                            `modAlertFilterList && doFilteredAlerts`.
+
+                            Const 8 is the same span WITHOUT the click binding — Angular's
+                            placeholder attrs for the same node — so there is one badge here, not
+                            two. `.filtered-text` is a captured rule in
+                            `captured-runtime-components.css` (font-size 12px, vertical-align
+                            middle, and a hover state), which until now had no element to style.
+                          -->
+                          {#if alertFilterActive}
+                            <!-- svelte-ignore a11y_click_events_have_key_events -->
+                            <!-- svelte-ignore a11y_no_static_element_interactions -->
+                            <span
+                              data-bs-toggle="modal"
+                              data-bs-target="#alert-filter-modal"
+                              title="Alert Filter"
+                              class="badge badge-danger ms-1 filtered-text"
+                              onclick={() => openModal('alert-filter')}>{' '}filtered</span
+                            >
+                          {/if}
                           {#if doNotDisturbOn}
                             <span class="badge badge-danger ms-2"
                               ><i class="fas fa-bell-slash"></i> DND</span
@@ -10853,25 +10986,47 @@
                                              gated on `sessData.advancedSearchAlerts &&
                                              ownerdID == '56ba547185ae93560d186ea8'`
 
-                              Only Advanced Search is rendered here, and that is an evidence
-                              decision rather than a preference. Across BOTH DOM captures of this
-                              toolbar the owner supplied, the Alert Filter button never appears -
-                              one shows the slot holding nothing but its two Angular comment
-                              anchors, the other shows Advanced Search alone. Rendering both put
-                              two buttons on a wrapped second row, a layout the capture never
-                              produces.
+                              This slot held Advanced Search alone until the Alert Filter's gate
+                              was built, and the reason was sound at the time: across BOTH DOM
+                              captures of this toolbar the Alert Filter button never appears - one
+                              shows the slot holding nothing but its two Angular comment anchors,
+                              the other shows Advanced Search alone - so rendering it
+                              UNCONDITIONALLY put two buttons on a wrapped second row, a layout
+                              the capture never produces.
 
-                              Nothing is lost by omitting it: `#alert-filter-modal` has its own
-                              entry point in the alerts header, `span.badge.filtered-text` with
-                              the same `data-bs-target` (const 8/21), gated on
-                              `modAlertFilterList && doFilteredAlerts`. That badge is also not
-                              built here, and is recorded as open rather than substituted for.
+                              That objection was about the missing gate, not about the button. The
+                              captured rooms simply had no `modAlertFilterList`, which is exactly
+                              the case `alertFilterConfigured` is false in, so both captures still
+                              render precisely what they show. Omitting it now would be the
+                              divergence.
 
-                              Advanced Search's own gate is not reproducible either - this room
-                              has no `sessData`, and the second half is a hardcoded owner id from
-                              the original deployment - so it renders unconditionally.
+                              Order is the capture's: `H(5, N2e, …, "button", 38)` before
+                              `H(6, L2e, …, "button", 39)`, so Filter alerts precedes Advanced
+                              Search.
+
+                              Advanced Search's own gate is not reproducible - the second half is
+                              a hardcoded owner id from the original deployment
+                              (`ownerdID == '56ba547185ae93560d186ea8'`) - so it renders
+                              unconditionally.
                             -->
                             <div>
+                              {#if alertFilterConfigured}
+                                <!--
+                                  Const 44 carries no `type`, where const 39 beside it opens with
+                                  `"type","button"`. Reproduced as-is. It is inert either way -
+                                  this row is a SIBLING of `#alert-settings` rather than a child
+                                  (`H(1, B2e, …)` precedes `d(2, "form", 29)`), so there is no
+                                  form for a default-type button to submit.
+                                -->
+                                <button
+                                  data-bs-toggle="modal"
+                                  data-bs-target="#alert-filter-modal"
+                                  class="btn btn-outline-light btn-sm m-1"
+                                  onclick={() => openModal('alert-filter')}
+                                >
+                                  <i class="fas fa-filter me-1"></i>{' '}Filter alerts
+                                </button>
+                              {/if}
                               <button
                                 type="button"
                                 data-bs-toggle="modal"
@@ -10974,6 +11129,7 @@
                           <RoomMessage
                             {item}
                             kind="alert"
+                            {alertLabels}
                             {chatGif}
                             {presenterMessagesOnTheRight}
                             {chatBadges}
@@ -12877,6 +13033,7 @@
       bind:alertFilterFor
       bind:showAlertsFrom
       onsavealertfilter={saveAlertFilter}
+      onopenalertfilter={() => openModal('alert-filter')}
       mobileAndroidUrl={data.sessData?.customMobileAppEnabled
         ? data.sessData?.customMobileAppAndroidUrl
         : null}
@@ -12886,7 +13043,7 @@
       hideMobileCredentials={Boolean(data.sessData?.hideMobileCredentials)}
       {isLimitedPresenter}
       canEditUsername={Boolean(data.sessData?.allowUsersToChangeUsername)}
-      alerts={data.alerts}
+      alerts={searchableAlerts}
       {chatMode}
       onChatModeChange={(mode) => void changeChatMode(mode)}
       {canUseRTE}

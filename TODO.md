@@ -242,8 +242,7 @@ sentence.
 | item | spec | note |
 | --- | --- | --- |
 | `presAreaTabs-recordings` — **NOT BUILT, blocker named** | `docs/decoded/missing-commands-triage.md` | NOT cheap after all. The reference's pane is one iframe onto a SERVER archive page; we have **zero recordings/archive tables** in either database, so the tab would front nothing. Needs an archive service first — a design decision, not a port |
-| Alert Filter | `docs/decoded/alert-scheduler-filter-labels.md` | server owns the filtering; `showAlertsFrom` inverts allow-list vs deny-list |
-| Alert Labels | same | not a wire feature; a JSON-string room setting plus a text transform |
+| Alert Labels — **composer picker only** | `docs/decoded/alert-scheduler-filter-labels.md` | The RENDER half is built (2026-08-15): the setting is wired, `#hash` becomes a badge on the alerts log. What is left is the post-alert modal's label SELECTOR, the thing `checked` exists for. **Evidence gap, not a port:** `alertLabels` is one of `direct-evidence-contract.ts`'s `hiddenCapabilityBranches`, so that branch never rendered in any capture we hold and there is no markup to match. Needs a new capture from a room that has the entitlement |
 | Alert Scheduler | same | needs an entitlement whose manage-page control was NOT located, and a server-side scheduler we do not have |
 | Benzinga | `NEW-TODO.md` §2.2 | small; needs one more decode pass for the const-table classes |
 

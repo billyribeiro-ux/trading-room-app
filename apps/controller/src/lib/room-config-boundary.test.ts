@@ -305,7 +305,19 @@ describe('the allow-list itself', () => {
         gate at bundle bytes 2,042,979 and 2,286,654.
       */
       modAlertFilterList:
-        'alert-filter.ts — alertFilterAvailable() gates the whole feature, and parseModAlertFilterList() turns the JSON string into the {username, avatar} rows the filter modal lists'
+        'alert-filter.ts — alertFilterAvailable() gates the whole feature, and parseModAlertFilterList() turns the JSON string into the {username, avatar} rows the filter modal lists',
+      /*
+        THE FOURTH PLACE, and the fourth setting shipped as a JSON string rather than a flag.
+
+        Named here in the same change that put it on `ROOM_VISIBLE_SETTINGS` and `ROOM_CONSUMED`,
+        for the reason the note above gives.
+
+        The consumer is a RENDER path, not a gate: `parseAlertLabels()` reads the string once for
+        the page and `splitAlertLabels()` swaps the first occurrence of each configured hash for a
+        badge — on the ALERTS log only, because `parseSymbols` substitutes nothing over chat.
+      */
+      alertLabels:
+        'alert-labels.ts — parseAlertLabels() reads the JSON string once per page and splitAlertLabels() turns each #hash into the coloured badge RoomMessage.svelte renders, alerts only'
     };
     expect(Object.keys(consumers).sort()).toEqual([...ROOM_VISIBLE_SETTINGS].sort());
   });

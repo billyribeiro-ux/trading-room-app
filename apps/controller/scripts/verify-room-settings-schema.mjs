@@ -13,10 +13,16 @@ const GENERATOR = resolve(SCRIPT_DIR, 'extract-manage-schema.mjs');
 const CANONICAL_SCHEMA = resolve(REPO_ROOT, 'src/lib/room-settings-schema.ts');
 
 /*
-  Eleven consumed by this repository's room-login page, FORTY-EIGHT by the room application
+  Eleven consumed by this repository's room-login page, FORTY-NINE by the room application
   through `internal/room-config/[code]`, and six by the WordPress SSO door at `(public)/sso/[code]`.
   `allowUsersToChangeUsername` is on the first two lists, and so now are `showPasswordField`,
-  `usernameInstructions` and `hasRequiredPhoneInLogin`, so the union is 61.
+  `usernameInstructions` and `hasRequiredPhoneInLogin`, so the union is 62.
+
+  48 -> 49 on 2026-08-15: `alertLabels` joined with Alert Labels — the SECOND non-boolean entry, a
+  string containing JSON holding name, hash, color and bgcolor objects, parsed at bundle byte
+  1,147,290. Unlike the gate below it this one is a render input: every byte of the badge is a value
+  the owner typed, so there is nothing to default from, and a room that configures none simply
+  renders the hash as ordinary text.
 
   47 -> 48 on 2026-08-15: `modAlertFilterList` joined with the Alert Filter, and it is the FIRST
   entry on this list that is not a boolean gate — a string containing JSON, a list of username and
@@ -188,7 +194,16 @@ const EXPECTED_WIRED_SETTINGS = [
     1,221,905 with no try/catch. The whole feature is gated on it being truthy, so a room that
     configures no list has no entry point and no modal.
   */
-  'modAlertFilterList'
+  'modAlertFilterList',
+  /*
+    Added 2026-08-15 with Alert Labels. The fourth setting shipped as a string containing JSON,
+    parsed by the room at bundle byte 1,147,290; the parseSymbols transform at byte 1,326,855 turns
+    the first occurrence of each configured hash into a coloured badge, on the ALERTS log only.
+
+    It crosses because every rendered byte of the badge - the text and both colours - is a value the
+    owner typed, with nothing to default from.
+  */
+  'alertLabels'
 ].sort();
 
 const fail = (message) => {

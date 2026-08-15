@@ -473,7 +473,26 @@ export const ROOM_VISIBLE_SETTINGS = [
 
     Read by `alert-filter.ts` and the `#alert-filter-modal` pane.
   */
-  'modAlertFilterList'
+  'modAlertFilterList',
+  /*
+    "Alert Labels" — a hash tag inside an alert body renders as a coloured badge.
+
+    The FOURTH setting shipped as a string containing JSON, and the one the note above already
+    names. Objects of name, hash, color and bgcolor, parsed by the room at bundle byte 1,147,290,
+    which also stamps checked=false onto every entry for the composer picker that the capture never
+    renders. The parseSymbols transform at byte 1,326,855 then swaps the FIRST occurrence of each
+    hash for the badge.
+
+    It crosses because every rendered byte of that badge is a value the owner typed. The label text,
+    the background and the border colour have no defaults, and a room that configures none renders
+    the hash as ordinary text - which is what the transform already does with an empty list, so the
+    absent case needs nothing.
+
+    ALERTS ONLY. The same transform runs over the chat log and substitutes nothing there.
+
+    Read by alert-labels.ts and RoomMessage.svelte.
+  */
+  'alertLabels'
 ] as const satisfies readonly (keyof RoomSettings)[];
 
 const ROOM_VISIBLE = new Set<string>(ROOM_VISIBLE_SETTINGS);
