@@ -14,6 +14,12 @@ function text(path: URL) {
   return readFileSync(path, 'utf8');
 }
 
+/*
+  `.mainAppNav` became `RoomNavbar.svelte` on 2026-08-15 — the third of the five template regions.
+  Reference-bundle assertions are untouched; ours follow the markup into the component.
+*/
+const NAVBAR = text(new URL('./components/RoomNavbar.svelte', import.meta.url));
+
 describe('part 1 capture contract', () => {
   it('accounts for the measured desktop columns', () => {
     const { sidebarWidth, primaryColumnWidth, splitGutterWidth, presentationColumnWidth } =
@@ -463,15 +469,23 @@ describe('part 1 capture contract', () => {
     */
     expect(pageSource).toContain('class="wrapper"');
     expect(pageSource).toContain('class:push-wrapper={sidebarOpen}');
-    expect(pageSource).toContain('onclick={() => (sidebarOpen = !sidebarOpen)}');
-    expect(pageSource).toContain("class={sidebarOpen ? 'fas fa-arrow-left' : 'fas fa-bars'}");
+    expect(NAVBAR).toContain('onclick={() => (sidebarOpen = !sidebarOpen)}');
+    expect(NAVBAR).toContain("class={sidebarOpen ? 'fas fa-arrow-left' : 'fas fa-bars'}");
     expect(pageSource).toContain("const noSpeakerText = ' ( No one is speaking )';");
     expect(pageSource).toContain("const shareScreenText = 'Share Screen ';");
     expect(pageSource).toContain("const virtualCamText = ' OBS / XSPLIT/ Share Virtual Cam';");
-    expect(pageSource).toContain(
+    expect(NAVBAR).toContain(
       '<nav class="navbar navbar-expand-md navbar-dark fixed-top mainAppNav" style="">'
     );
-    expect(pageSource).toContain('<a>{noSpeakerText}</a>');
+    // And the page still renders it, so the assertion above is about something the room shows.
+    expect(pageSource).toContain('<RoomNavbar');
+    /*
+      The four captured strings stay CONSTANTS on the page and are handed to the bar as props; the
+      markup that renders them moved with the bar. Both halves are asserted, in their own files, so
+      neither can drift alone — a string retyped inside the component would pass a page-only check
+      while the room showed something the capture does not.
+    */
+    expect(NAVBAR).toContain('<a>{noSpeakerText}</a>');
     expect(cleanRoom).toContain(
       '<li class="nav-item talkingIndicator animated fadeIn"><a> ( No one is speaking )</a></li>'
     );

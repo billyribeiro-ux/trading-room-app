@@ -50,10 +50,7 @@
    * changed — every class, attribute, order and text node is the reference's, spaces included.
    */
   import PresenterMuteRows from '$lib/components/PresenterMuteRows.svelte';
-  import {
-    type PresenterAudioPreferences,
-    type TalkingPresenter
-  } from '$lib/screen-volume';
+  import { type PresenterAudioPreferences, type TalkingPresenter } from '$lib/screen-volume';
 
   type Props = {
     /**
@@ -95,7 +92,6 @@
     ontogglepresenter,
     onpresentervolume
   }: Props = $props();
-
 
   /**
    * The master slider is written through an attachment rather than `bind:value`, matching how the

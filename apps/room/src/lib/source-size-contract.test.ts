@@ -164,8 +164,12 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       component to take state CLASSES as props rather than a wall of scalars — `roster` and `menus`
       go whole, three references replacing about twenty. That is the argument for the classes
       landing BEFORE the components, paying off where it can be seen.
+
+      `RoomNavbar` is the third: 12,236 -> 11,585, a drop of 651 for a 711-line region. Seventy-odd
+      identifiers, two thirds of them handlers, and almost every piece of state belonging to
+      `RoomMedia` or `RoomMenus` — three instances replacing about thirty scalars.
     */
-    max: 12236,
+    max: 11585,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {
