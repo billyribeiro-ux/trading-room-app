@@ -71,9 +71,45 @@ columns, so a reader scrolled up in one is not yanked by traffic in the other. F
 
 | where | what is missing |
 | --- | --- |
-| `+page.svelte` `loadNoteVersions` | Nothing calls it, and the route it fetches (`api/notes/[noteId]/versions`) is built and working. Note history is server-complete and client-unreachable. **This is the only remaining item that is a BUILD rather than a deletion** — it needs the reference's note-history UI read out of the bundle first. |
+| `+page.svelte` `loadNoteVersions` | Nothing calls it, and the route it fetches (`api/notes/[noteId]/versions`) is built and working. Note history is server-complete and client-unreachable. **This is the only remaining item that is a BUILD rather than a deletion — and the evidence blocking it is now DECODED, below.** |
 
 Each is a behaviour change with a decision behind it, which is why none was made inside a lint pass.
+
+#### The note-history UI, decoded 2026-08-14 21:12 — `main.d6d3c112b59b7d0d.js` byte 1460764
+
+Read from the bundle so the build no longer waits on evidence. It lives in the note-editor modal
+region (its neighbours are `carouselModal` and `fileBrowserModal`).
+
+**The toggle — `C0e`:**
+
+```js
+d(0,"button",16), x("click", () => toggleVersionHistory()), T(1,"i",17), v(2)
+// update: Et("active", e.showVersionHistory), Ne(" Version History (", e.prevVersions.length, ") ")
+```
+
+So: one button carrying an `active` class while open, and a label that PRINTS THE COUNT —
+`Version History (3)`. The count comes from `prevVersions.length`, which is what
+`loadNoteVersions` already returns.
+
+**One row per version — `S0e`, tracked by `b0e = (t, n) => n.timestamp`:**
+
+```js
+d(0,"li",21)(1,"div")(2,"span",22), v(3),        // the date
+T(4,"div",23), Je(5,"noSanitize"),               // the preview, innerHTML
+d(6,"button",24), x("click", () => revertToVersion(o)), T(7,"i",25), v(8," Revert ")
+// update: Ze(e.date), z("innerHTML", Ct(5, 2, i.getVersionPreview(e.content), "html"), wn)
+```
+
+**What that settles, and what it does not:**
+
+- Each version carries `date`, `content` and `timestamp` (the track key). Our route already returns
+  a version list — check its field names against these three before writing the markup.
+- The preview is `getVersionPreview(content)` piped through `noSanitize` into `innerHTML`. **Ours
+  must go through `safeChatHtml` instead** — `noSanitize` is the reference handing raw stored HTML
+  to the DOM, and this repository already refuses that everywhere else.
+- `revertToVersion(v)` needs a server action; the read route exists, the write does not.
+- Const indices 16, 17, 21-25 still need decoding from the note-editor component's own `consts`
+  table for the exact classes and icons. That is the only remaining unknown.
 
 --- | --- |
 | `+page.svelte` `extraChatColumnWasEnabled` | **Written, never read.** The capture quoted eighteen lines above it restores the column with `extraChatColumnWasEnabled && (preferences.extraChatColumn = !0, …)`. Only the assignment exists here, so a column hidden by webinar mode never comes back when webinar mode ends. |
