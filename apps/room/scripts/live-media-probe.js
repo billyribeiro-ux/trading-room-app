@@ -260,7 +260,7 @@
   const seen = new WeakSet();
   globalThis.__PTR_hook = (candidate) => hookDevice(candidate);
   const objectDefine = Object.defineProperty;
-  Object.defineProperty = function (target, prop, descriptor) {
+  Object.defineProperty = function (target, _prop, _descriptor) {
     const result = objectDefine.apply(this, arguments);
     try {
       if (

@@ -41,13 +41,13 @@ gate blocks a merge. Note that `main` auto-deploys, which is exactly why this ma
 
 ## Room lint debt — 53 problems remain, opened 2026-08-14 20:19 EDT
 
-ESLint reached the room for the first time on 2026-08-14 and reported 123 problems; 53 are left. The
+ESLint reached the room for the first time on 2026-08-14 and reported 123 problems; 26 are left, and the room lint step of `quality.yml` is RED until they are cleared. The
 reduction so far is real rather than configured away — see the CHANGELOG entry for which rules were
 switched off and why, each with a citation. What remains, by rule:
 
 | count | rule | what it is |
 | --- | --- | --- |
-| 27 | `@typescript-eslint/no-unused-vars` | unused imports and locals; **check each** — one in the controller turned out to be a prop passed at six sites and read nowhere |
+| 8 | `@typescript-eslint/no-unused-vars` | unused imports and locals; **check each** — one in the controller turned out to be a prop passed at six sites and read nowhere |
 | 13 | `svelte/no-unused-svelte-ignore` | stale `svelte-ignore` comments; the Svelte MCP autofixer flags the same ones |
 | 5 | `no-useless-assignment` | initialisers that can never be read |
 | 2 | `no-regex-spaces` | literal runs of spaces in a regex |

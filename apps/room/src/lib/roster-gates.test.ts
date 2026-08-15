@@ -306,7 +306,7 @@ describe('the two list pipes', () => {
 
     for (const arrangement of permutations(people)) {
       const captured = [...arrangement].sort((left, right) =>
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+         
         left.isP
           ? (left as any)
           : right.isP

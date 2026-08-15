@@ -134,6 +134,9 @@
 
   const nativeSend = WebSocket.prototype.send;
   WebSocket.prototype.send = function (data) {
+    // `this` is the WebSocket the wrapped method was invoked on; capturing it is the point of the
+    // probe, which is why the alias is deliberate here.
+    // eslint-disable-next-line @typescript-eslint/no-this-alias
     if (!live) live = this;
     try {
       rec(data, 'out');
@@ -225,7 +228,7 @@
   };
   const seen = new WeakSet();
   const nativeDefine = Object.defineProperty;
-  Object.defineProperty = function (target, prop, desc) {
+  Object.defineProperty = function (target, _prop, _desc) {
     const out = nativeDefine.apply(this, arguments);
     try {
       if (
