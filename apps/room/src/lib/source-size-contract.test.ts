@@ -56,9 +56,10 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       That is the difference worth naming, because it is what makes the ratchet useful rather than
       annoying: compacting a comment to hit a number is the tail wagging the dog, but moving an
       explanation to the code it explains is the extraction itself. The first is why the ceiling
-      moved once; the second is why it has not moved since.
+      moved once; the second is why it has not moved since — through five conversions and down to
+      13,550, which is BELOW where it stood before the raise.
     */
-    max: 13556,
+    max: 13550,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {
@@ -68,7 +69,7 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
   },
   {
     file: 'routes/+page.server.ts',
-    max: 3096,
+    max: 2997,
     why: 'the loader and every form action left; 3,233 before the remote-function conversions began'
   }
 ];

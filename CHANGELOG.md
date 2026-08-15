@@ -24,6 +24,68 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-15
 
+### 2026-08-15 13:42 EDT — the private-chat trio, converted as a FEATURE, and the coverage gap that proved itself
+
+**Runtime impact: yes, on private chat.** `sendPrivateMessage`, `loadPrivateChatLog` and
+`deletePrivateChatLog` move together to `src/routes/private-chat.remote.ts`. Every capture string,
+every scope and both publishes are preserved; one bound was added that did not exist.
+
+**Converted as a group, on purpose, and this is the shape the remaining conversions should take.**
+One action at a time would have produced three files, three copies of the peer-id guard and three
+chances to write the room scope slightly differently. They are one feature — one peer id, one room,
+one `privChat` channel, one repository module — so they are one module and what they share is
+declared once. **The unit of conversion is the FEATURE, not the call site.** That directly answers
+the owner's note at 13:35 about the harder files ahead: the ones with six to ten call sites are not
+harder because of the count, they are harder because the shared invariants are currently written out
+once per call site.
+
+**All three are commands, including the read, and that sharpens the rule rather than breaking it.**
+`loadThread` and `searchThread` are pure SELECTs, so by the rule set at 13:33 the read would be a
+`query`. It is not. `log-pages.remote.ts` is safe under caching because the client asks for each page
+exactly once; this one is the opposite — `switchChatToUser` calls it with the SAME argument every
+time a conversation is opened, and the answer REPLACES the held log. A cache hit is a stale
+conversation. So: **`query` is for a pure read that is also safe to SERVE AGAIN. A read asked
+repeatedly with the same argument, whose freshness is what it is for, is a command** — because
+`command` runs every time by construction, and correctness that depends on when a cache entry
+happens to be released is not correctness.
+
+**THE COVERAGE GAP, AND HOW IT PROVED ITSELF.** All three were rewritten end to end — moved,
+re-validated, re-scoped, three `FormData` parsers collapsed into one schema — **and the suite stayed
+at 1578/1578.** Not one assertion moved, because there were none: searching every test file for
+those three names returns a drag-handle selector in `panel-drag.test.ts` and nothing else. Three
+commands carrying private messages between users of a multi-tenant application, with a rate limit,
+an identity check, a recipient lookup and a cross-tenant read scope between them, had no test at all.
+A green suite across a rewrite of all three is the proof, not a reassurance.
+`private-chat-remote-contract.test.ts` closes it: **20 assertions, four negative controls, each seen
+red** — accepting a client-supplied `recvdNick`, taking the room from the argument instead of the
+session, dropping the sender's own echo publish, and removing the new page bound.
+
+**A bound that did not exist — a fix, not a move, and flagged as one.** `loadPrivateChatLog` read
+`Number(data.get('page') ?? 0) || 0` with **no upper limit**, so a caller could ask for page
+10,000,000 and make SQLite walk and discard that many rows. `MAX_CHAT_LOG_PAGE` is the bound already
+on the room log and the alerts log for exactly this reason; the private thread was the one log
+without it. Same constant reused, not a second one declared. `.min(0)` here rather than `.min(1)`,
+because unlike the room log nothing else supplies page 0.
+
+**The capture's own strings are raised with `error()` rather than left to the schema**, because the
+client renders `body.message` verbatim and `Chatting with yourself again?` is
+`bootbox.alert("Chatting with yourself again?")` from the reference. A schema rejection would have
+replaced it with a generic 400.
+
+**Ceilings lowered again, no raise.** `+page.svelte` 13,556 → **13,550** — **below where it stood
+before the one raise**, through five conversions. `+page.server.ts` 3,096 → **2,997**, which is
+**−236 from 3,233**.
+
+**Verified:** `svelte-check` 0/0 (1,087 files) · suite **1599/1599 across 119 files** · `eslint`
+clean outside the untracked gitignored `scripts/… 2.*` · `prettier --check` clean · `vite build`
+succeeds and the manifest registers **four** remotes, the newest (`'1f324z4'`) called by the client
+as `1f324z4/loadPrivateChatLog`, `1f324z4/sendPrivateMessage` and `1f324z4/deletePrivateChatLog`.
+`deleteThread`, `insertPrivateMessage`, `loadThread` and `searchThread` removed from
+`+page.server.ts`'s imports — no callers there now. **One check of mine was wrong and was fixed
+rather than the code:** a count of `/^\s+peerId,$/gm` failed at 1 of 2 because prettier had collapsed
+one schema to a single line. A guard that depends on where a formatter puts a line break cries wolf;
+it now asks each slice directly. **Not verified:** no browser test of a live private conversation.
+
 ### 2026-08-15 13:33 EDT — the first two reads that earn a `query`, and a contract test that had to move with them
 
 **Runtime impact: yes, on both log panes.** `loadOlderChatMessages` and `loadOlderAlerts` move from

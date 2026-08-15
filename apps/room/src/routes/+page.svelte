@@ -24,6 +24,11 @@
     loadOlderAlerts as loadOlderAlertsPage,
     loadOlderChatMessages as loadOlderChatPage
   } from './log-pages.remote';
+  import {
+    deletePrivateChatLog as deletePrivateChatLogCommand,
+    loadPrivateChatLog as loadPrivateChatLogCommand,
+    sendPrivateMessage as sendPrivateMessageCommand
+  } from './private-chat.remote';
   import { isHttpError } from '@sveltejs/kit';
   import {
     PUBLIC_PTR_CDN_UPLOAD_KEY,
@@ -5669,18 +5674,13 @@
 
   /** `loadPClogForUID(uid, page)` -> `getPCLog {page, peerID}`; with a term it is `doPCLogSearch`. */
   async function loadPrivateChatLog(peerId: number, page = 0, searchTerm = '') {
-    const body = new FormData();
-    body.set('peerID', String(peerId));
-    body.set('page', String(page));
-    if (searchTerm) body.set('searchTerm', searchTerm);
-    const response = await fetch('?/loadPrivateChatLog', { method: 'POST', body });
-    const result = deserialize<
-      { peerId?: number; page?: number; messages?: PrivateChatMessage[] },
-      { message?: string }
-    >(await response.text());
-    if (result.type !== 'success' || !result.data?.messages) return;
+    let incoming: PrivateChatMessage[];
+    try {
+      incoming = await loadPrivateChatLogCommand({ peerId, page, searchTerm });
+    } catch {
+      return; // Non-fatal: the held log stays as it was. See `private-chat.remote.ts`.
+    }
 
-    const incoming = result.data.messages;
     // Page 0 replaces; a later page is older history and goes in front of what is already there.
     privChatLog = {
       ...privChatLog,
@@ -5694,15 +5694,11 @@
     const text = privateChatDraft.trim();
     if (!text || currUser === null) return;
 
-    const body = new FormData();
-    body.set('peerID', String(currUser));
-    body.set('msg', text);
-    const response = await fetch('?/sendPrivateMessage', { method: 'POST', body });
-    const result = deserialize<{ message?: PrivateChatMessage }, { message?: string }>(
-      await response.text()
-    );
-    if (result.type === 'failure') {
-      bootboxAlert = result.data?.message ?? 'Message not sent.';
+    try {
+      await sendPrivateMessageCommand({ peerId: currUser, body: text });
+    } catch (cause) {
+      // The server's own wording, which includes the capture's `Chatting with yourself again?`.
+      bootboxAlert = isHttpError(cause) ? cause.body.message : 'Message not sent.';
       return;
     }
     privateChatDraft = '';
@@ -5718,9 +5714,7 @@
       message: 'Are you sure you want to delete all messages in this chat?',
       onconfirm: async () => {
         bootboxConfirmation = null;
-        const body = new FormData();
-        body.set('peerID', String(peerId));
-        await fetch('?/deletePrivateChatLog', { method: 'POST', body });
+        await deletePrivateChatLogCommand({ peerId });
         const { [peerId]: _dropped, ...remainingLog } = privChatLog;
         privChatLog = remainingLog;
         const { [peerId]: _unread, ...remainingUnread } = unreadByPeer;

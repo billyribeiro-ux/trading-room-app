@@ -47,13 +47,9 @@ import { mediaSignallingUrl } from '$lib/server/media-grant';
 import { publishToRoom } from '$lib/server/room-events';
 import { grantMediaElevation, revokeMediaElevation } from '$lib/server/media-elevation';
 import { deleteStoredFile, storeUpload } from '$lib/server/file-storage';
-import {
-  deleteThread,
-  insertPrivateMessage,
-  loadConversations,
-  loadThread,
-  searchThread
-} from '$lib/server/private-chat';
+// `deleteThread`, `insertPrivateMessage`, `loadThread` and `searchThread` left with the trio for
+// `private-chat.remote.ts`. What stays is the CONVERSATION LIST, which the loader still sends.
+import { loadConversations } from '$lib/server/private-chat';
 
 /**
  * The single room this build serves.
@@ -2195,92 +2191,15 @@ export const actions: Actions = {
     return { success: true };
   },
 
-  /**
-   * `sendPrivChat(peerID, msg, recvdUser)` in the capture, which puts
-   * `{peerID, msg, n, recvdNick, recvdAvt, recvdPic, recvdIsA}` on the wire as `privMsg`.
-   *
-   * Everything after `peerID` and `msg` is display data about the recipient that the SENDER
-   * supplies. None of it is trusted here: the row stores ids, and both names and avatars are read
-   * back from `users` when the thread is loaded. A client that lies about `recvdNick` changes
-   * nothing.
-   *
-   * Published to BOTH parties, matching the capture's channel semantics - see `RoomEvent`.
-   */
-  sendPrivateMessage: async ({ request, locals }) => {
-    ensureDatabase();
-    const user = requireUser(locals);
+  /*
+    The PRIVATE CHAT trio — `sendPrivateMessage`, `loadPrivateChatLog` and
+    `deletePrivateChatLog` — left together for `src/routes/private-chat.remote.ts`.
 
-    const data = await request.formData();
-    const peerId = Number(data.get('peerID') ?? NaN);
-    const body = String(data.get('msg') ?? '').trim();
-    if (!Number.isInteger(peerId)) return fail(400, { message: 'No recipient.' });
-    if (!body) return fail(400, { message: 'Empty message.' });
-    // Talking to yourself is the capture's own guard: `bootbox.alert("Chatting with yourself again?")`.
-    if (peerId === user.id) return fail(400, { message: 'Chatting with yourself again?' });
-
-    const peer = db.select().from(users).where(eq(users.id, peerId)).get();
-    if (!peer) return fail(404, { message: 'No such user.' });
-
-    // The same bucket public chat uses. A private message is a message; giving it its own quota
-    // would let one user spend both budgets at once.
-    const limit = consumeRateLimit('message', user.id);
-    if (!limit.allowed) {
-      return fail(429, { message: 'You are sending messages too quickly.' });
-    }
-
-    const row = insertPrivateMessage(requireRoomShortCode(locals), user.id, peerId, body);
-    const message = {
-      _id: String(row.id),
-      t: row.createdAt.getTime(),
-      n: user.displayName,
-      txt: row.body,
-      uid: user.id,
-      recvdID: peerId,
-      avt: user.email,
-      pic: user.avatarUrl,
-      isA: isPresenterRole(user.role)
-    };
-
-    // Both parties. The sender's own copy is how their message reaches their log.
-    publishToRoom(requireRoomShortCode(locals), {
-      channel: 'privChat',
-      data: { toUserId: peerId, fromUserId: user.id, message }
-    });
-    publishToRoom(requireRoomShortCode(locals), {
-      channel: 'privChat',
-      data: { toUserId: user.id, fromUserId: user.id, message }
-    });
-
-    return { success: true, message };
-  },
-
-  /** `getPCLog {page, peerID}`, and `doPCLogSearch {searchTerm, peerID}` when a term is given. */
-  loadPrivateChatLog: async ({ request, locals }) => {
-    ensureDatabase();
-    const user = requireUser(locals);
-
-    const data = await request.formData();
-    const peerId = Number(data.get('peerID') ?? NaN);
-    if (!Number.isInteger(peerId)) return fail(400, { message: 'No peer.' });
-
-    const searchTerm = String(data.get('searchTerm') ?? '').trim();
-    if (searchTerm) {
-      return {
-        success: true,
-        peerId,
-        page: 0,
-        messages: searchThread(requireRoomShortCode(locals), user.id, peerId, searchTerm)
-      };
-    }
-    const page = Number(data.get('page') ?? 0) || 0;
-    return {
-      success: true,
-      peerId,
-      page,
-      messages: loadThread(requireRoomShortCode(locals), user.id, peerId, page)
-    };
-  },
-
+    Together on purpose: they share a peer id, a room, the `privChat` channel and one repository
+    module, so converting them one at a time would have meant three copies of the peer-id guard.
+    The unit of conversion is the FEATURE, not the call site. All three are commands, including
+    the READ — that module explains why a thread reopened on every switch must not be cacheable.
+  */
   /*
     `loadOlderChatMessages` and `loadOlderAlerts` were actions here and are now
     `src/routes/log-pages.remote.ts` — the first `query` functions in this application, and the
@@ -2291,24 +2210,6 @@ export const actions: Actions = {
     stops an unvalidated OFFSET becoming a scan, and the room coming from the SESSION rather than
     the request. The two hand-written page guards became one shared schema used twice.
   */
-
-  /** `deletePeerPCLog {peerID}` - the whole conversation, both directions. */
-  deletePrivateChatLog: async ({ request, locals }) => {
-    ensureDatabase();
-    const user = requireUser(locals);
-
-    const data = await request.formData();
-    const peerId = Number(data.get('peerID') ?? NaN);
-    if (!Number.isInteger(peerId)) return fail(400, { message: 'No peer.' });
-
-    deleteThread(requireRoomShortCode(locals), user.id, peerId);
-    // The peer's copy is gone too, so their open tab is now lying to them.
-    publishToRoom(requireRoomShortCode(locals), {
-      channel: 'privChat',
-      data: { toUserId: peerId, fromUserId: user.id }
-    });
-    return { success: true };
-  },
 
   /**
    * Broadcasts the room's recording state.
