@@ -76,8 +76,19 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       every call. Then two lines back for `{ cause }` on a re-thrown upload failure, which eslint's
       `preserve-caught-error` was right to demand: an `HttpError` re-thrown as a bare `Error` keeps
       the sentence and loses the status the server answered with. 13,534 -> 13,529 on the commit.
+
+      The ninth (the account and settings writes) cost 14 and was paid the same way, with the piece
+      of `savePreference` that never belonged in a component: `mirrorPreferenceToLocalStorage` now
+      sits beside the dead-key list it evicts, where the module that owns WHICH keys are dead owns
+      the eviction. The page had that loop inline, four lines from the server write it pairs with.
+
+      The tenth (the four message and alert posts) is the largest single drop this file has recorded
+      on the server side — `+page.server.ts` 2,405 -> 2,084 — and cost the component 5. Paid with
+      `fileSizeInKb`, which went to `$lib/file-sort.ts` where the module that owns how the Files pane
+      sorts and labels its rows now owns how it formats them; and with the two selected-message sends
+      collapsed into one, because they differed only in which command they called.
     */
-    max: 13529,
+    max: 13523,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {
@@ -92,7 +103,7 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
   },
   {
     file: 'routes/+page.server.ts',
-    max: 2474,
+    max: 2084,
     why: 'the loader and every form action left; 3,233 before the remote-function conversions began'
   }
 ];

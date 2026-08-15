@@ -41,6 +41,11 @@
     overwriteCashRegisterSound
   } from './files-pane.remote';
   import { uploadComposerImage } from './composer-image.remote';
+  import { savePreference as savePreferenceCommand, saveTheme } from './user-settings.remote';
+  import { editUsername } from './username.remote';
+  import { replyMessage, sendMessage as sendMessageCommand } from './chat-messages.remote';
+  import { askQuestion } from './alert-questions.remote';
+  import { postAlert as postAlertCommand } from './post-alert.remote';
   import { isHttpError } from '@sveltejs/kit';
   import {
     PUBLIC_PTR_CDN_UPLOAD_KEY,
@@ -82,7 +87,7 @@
   } from '$lib/screen-zoom';
   import ScreenVolumeControl from '$lib/components/ScreenVolumeControl.svelte';
   import PresenterMuteRows from '$lib/components/PresenterMuteRows.svelte';
-  import { DEAD_PREFERENCE_KEYS } from '$lib/dead-preference-keys';
+  import { mirrorPreferenceToLocalStorage } from '$lib/dead-preference-keys';
   import {
     adjustVolumeForPresenter,
     toggleTalkingPresenter,
@@ -108,6 +113,7 @@
   import {
     INITIAL_FILE_SORT,
     type FileSortField,
+    fileSizeInKb,
     fileSortTitle,
     sortFiles,
     toggleFileSort
@@ -3717,14 +3723,17 @@
     openModal('user');
   }
 
+  /** `invalidateAll()` only on the resolved path — the roster is this route's `load`, not a query. */
   async function updateUsername(user: ModalTargetUser, username: string) {
     const trimmed = username.trim();
     if (!trimmed) return;
-    const body = new FormData();
-    body.set('userId', String(user.id));
-    body.set('username', trimmed);
-    const response = await fetch('?/editUsername', { method: 'POST', body });
-    if (response.ok) await invalidateAll();
+    try {
+      await editUsername({ userId: user.id, username: trimmed });
+    } catch (cause) {
+      bootboxAlert = isHttpError(cause) ? cause.body.message : 'Could not change that username.';
+      return;
+    }
+    await invalidateAll();
   }
 
   /**
@@ -4114,9 +4123,8 @@
 
   function setTheme(nextTheme: Theme) {
     theme = nextTheme;
-    const body = new FormData();
-    body.set('theme', nextTheme);
-    void fetch('?/saveTheme', { method: 'POST', body });
+    // Optimistic as always; the catch is here because a `void`-ed rejection is a swallowed error.
+    void saveTheme(nextTheme).catch((cause) => console.error('saveTheme', nextTheme, cause));
   }
 
   function savePreference(key: string, value: unknown) {
@@ -4196,20 +4204,13 @@
         soundChecks['presentation-subtitles'] = value;
       }
     }
-    if (typeof localStorage !== 'undefined') {
-      localStorage.setItem(key, JSON.stringify(value));
-      /*
-        The same nineteen dead keys are in localStorage too, and the server's prune cannot reach
-        them: `savePreference` writes both stores, so the element-id fallback left a copy in each.
-        Removed here on the next preference change of any kind, which is the same converge-on-use
-        rule the server side uses — no startup pass, nothing to run, and idempotent once clean.
-      */
-      for (const dead of DEAD_PREFERENCE_KEYS) localStorage.removeItem(dead);
-    }
-    const body = new FormData();
-    body.set('key', key);
-    body.set('value', JSON.stringify(value));
-    void fetch('?/savePreference', { method: 'POST', body });
+    mirrorPreferenceToLocalStorage(key, value);
+    // The value goes as a VALUE — devalue carries it, and `z.json()` is the schema for what the
+    // settings blob can hold. It used to be stringified for the wire and parsed back in a `try`.
+    void savePreferenceCommand({
+      key,
+      value: value as Parameters<typeof savePreferenceCommand>[0]['value']
+    }).catch((cause) => console.error('savePreference', key, cause));
   }
 
   function closeFloatingMenus() {
@@ -5158,29 +5159,30 @@
     updateEvidenceMessage(item, { reactions });
   }
 
-  async function sendAlertQuestion(body: string) {
+  /**
+   * The two sends that act on the modal's selected message. One helper because they differed only in
+   * the command called — two copies of a refusal path is how one of them ends up refetching anyway.
+   */
+  async function sendAgainstSelectedMessage(
+    send: (id: number) => Promise<void>,
+    failure: string
+  ): Promise<boolean> {
     if (!selectedMessage) return false;
-    const form = new FormData();
-    form.set('body', body);
-    form.set('alertId', String(selectedMessage.id));
-    const response = await fetch('?/askQuestion', { method: 'POST', body: form });
-    if (!response.ok) return false;
+    try {
+      await send(selectedMessage.id);
+    } catch (cause) {
+      bootboxAlert = isHttpError(cause) ? cause.body.message : failure;
+      return false;
+    }
     await invalidateAll();
     return true;
   }
 
-  async function sendReplyMessage(body: string) {
-    if (!selectedMessage) return false;
-    const form = new FormData();
-    form.set('body', body);
-    form.set('messageId', String(selectedMessage.id));
-    const response = await fetch('?/replyMessage', { method: 'POST', body: form });
-    if (response.ok) {
-      await invalidateAll();
-      return true;
-    }
-    return false;
-  }
+  const sendAlertQuestion = (body: string) =>
+    sendAgainstSelectedMessage((alertId) => askQuestion({ body, alertId }), 'Question not sent.');
+
+  const sendReplyMessage = (body: string) =>
+    sendAgainstSelectedMessage((messageId) => replyMessage({ body, messageId }), 'Reply not sent.');
 
   /**
    * `doMention` / `doMentionExtra` — the SAME insert, into whichever composer is the target.
@@ -6794,12 +6796,6 @@
     selectedFileIds = next;
   }
 
-  // `round(e.size / 1024)` then the literal 'Kb ' - the capture reports kilobytes, rounded, with a
-  // trailing space before the closing tag.
-  function fileSizeInKb(size: number) {
-    return Math.round(size / 1024);
-  }
-
   async function sendComposerMessage() {
     const body = composer.trim();
     if (!body) return;
@@ -6819,17 +6815,14 @@
     const trimmedBody = body.trim();
     if (!trimmedBody) return false;
 
-    const form = new FormData();
-    form.set('body', trimmedBody);
-    if (bodyHtml) form.set('bodyHtml', bodyHtml);
-    form.set('room', room);
-    const response = await fetch('?/sendMessage', { method: 'POST', body: form });
-
-    if (response.ok) {
-      await invalidateAll();
-      return true;
+    try {
+      await sendMessageCommand({ body: trimmedBody, bodyHtml, room });
+    } catch (cause) {
+      bootboxAlert = isHttpError(cause) ? cause.body.message : 'Message not sent.';
+      return false;
     }
-    return false;
+    await invalidateAll();
+    return true;
   }
 
   /* ── The chat rich text editor ────────────────────────────────────────────────────────────────
@@ -7114,15 +7107,16 @@
     nonTradeAlert: boolean,
     dontPush: boolean
   ) {
-    const form = new FormData();
-    form.set('kind', kind);
-    form.set('body', body);
-    if (targetUrl) form.set('targetUrl', targetUrl);
-    form.set('nonTradeAlert', String(nonTradeAlert));
-    form.set('dontPush', String(dontPush));
-
-    const response = await fetch('?/postAlert', { method: 'POST', body: form });
-    if (!response.ok) return false;
+    // `dontPush` is NOT sent: the action received it and never read it, and `post-alert.remote.ts`
+    // refuses it rather than accept a field nothing consumes. The parameter stays; the caller
+    // computes it, and the push suppression it names has no consumer in this room yet.
+    void dontPush;
+    try {
+      await postAlertCommand({ kind, body, targetUrl, nonTradeAlert });
+    } catch (cause) {
+      bootboxAlert = isHttpError(cause) ? cause.body.message : 'Alert not posted.';
+      return false;
+    }
     await invalidateAll();
     return true;
   }

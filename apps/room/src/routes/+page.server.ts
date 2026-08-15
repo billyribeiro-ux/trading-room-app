@@ -1,7 +1,8 @@
 import { fail } from '@sveltejs/kit';
-import { and, asc, desc, eq, gt, isNull } from 'drizzle-orm';
+import { and, asc, desc, eq, gt } from 'drizzle-orm';
 import { isEmptyChatHtml, sanitizeChatHtml } from '$lib/server/chat-html';
-import { pruneDeadPreferenceKeys } from '$lib/dead-preference-keys';
+// `pruneDeadPreferenceKeys` left with `savePreference` for `user-settings.remote.ts`; the browser
+// half went to `mirrorPreferenceToLocalStorage`, beside the list it evicts.
 import { calculatePollTotals, parsePollChoices } from '$lib/poll-behavior';
 import {
   deleteSessionNoteTabSchema,
@@ -112,7 +113,8 @@ import {
   users,
   userSettings
 } from '$lib/server/db/schema';
-import { isChatTab } from '$lib/types';
+// `isChatTab` left with `sendMessage` for `chat-messages.remote.ts`; the loader reads the channel
+// from the row, not from a request.
 import type { ActivePoll } from '$lib/types';
 
 /*
@@ -120,8 +122,8 @@ import type { ActivePoll } from '$lib/types';
   half-megabyte "chat message" is still absurd: it is stored forever and re-sent to every
   reader on every five-second poll.
 */
-const MAX_MESSAGE_BODY = 4_000;
-const MAX_ALERT_BODY = 8_000;
+// `MAX_MESSAGE_BODY` and `MAX_ALERT_BODY` left for `$lib/message-bounds.ts`, which exists because a
+// `.remote.ts` file cannot export a constant and three commands across two modules need them.
 import type { Actions, PageServerLoad } from './$types';
 
 /**
@@ -1292,383 +1294,42 @@ export const actions: Actions = {
     return { success: true };
   },
 
-  editUsername: async ({ request, locals }) => {
-    ensureDatabase();
-    const data = await request.formData();
-    const userId = Number(data.get('userId'));
-    const username = String(data.get('username') ?? '').trim();
+  /*
+    `editUsername` left for `src/routes/username.remote.ts` — a module of ONE, deliberately not
+    folded in with the settings writes beside it. Those name nobody; this takes a `userId` and can
+    rename any account when the caller is a presenter, so it is split on the GATE.
 
-    if (!Number.isInteger(userId)) return fail(400, { message: 'A user ID is required.' });
-    if (!username) return fail(400, { message: 'A username is required.' });
+    The whole dead-`'user'`-role story went with it, along with the positive restatement that
+    replaced it. New at the boundary: `z.number().int().positive()` also refuses 0 and negatives,
+    where `Number.isInteger` let them through to match no row and report success; and
+    `displayName` gained a 200-character bound it never had.
+  */
 
-    /*
-      This guard used to read `role === 'user' && id !== userId`, which never fired: no row
-      ever holds the role `'user'`. The schema default is `'staff'`
-      (src/lib/server/db/schema.ts:8), the provisioning script issues
-      `admin | staff | member | guest` (scripts/set-password.mjs:13), and
-      src/lib/server/media-grant.test.ts:199 says outright that `'user'` "exists in no row".
-      A dead condition meant every authenticated caller - including a guest - could rename
-      any other account by id, an admin's included.
+  /*
+    `sendMessage` and `replyMessage` left together for `src/routes/chat-messages.remote.ts`;
+    `askQuestion` for `src/routes/alert-questions.remote.ts`; `postAlert` for
+    `src/routes/post-alert.remote.ts`. Three modules for four commands, split on the GATE: chat and
+    replies are open to any member of the room, asking a question is too, posting an alert is
+    presenter-only — and a presenter-only function living among open ones is how a gate drifts.
 
-      Stated positively instead: you may rename yourself, and a presenter may rename
-      anyone. `isPresenterRole` is the same staff|admin test the rest of the file uses.
-    */
-    const actor = requireUser(locals);
-    if (actor.id !== userId && !isPresenterRole(actor.role)) {
-      return fail(403, { message: 'You cannot edit this username.' });
-    }
+    READING THE TWO CHAT PATHS SIDE BY SIDE IS WHAT MADE THIS WORTH DOING. Eighty lines apart they
+    had drifted three ways, and every one of them is a fix rather than a move:
 
-    db.update(users).set({ displayName: username }).where(eq(users.id, userId)).run();
-    return { success: true };
-  },
+      1. THE MUTE APPLIED TO ONE OF THEM. `sendMessage` refused while a live `chat_mutes` row
+         existed; `replyMessage` never looked. A muted member could not send and could reply, into
+         the same log — so `mute24`, a control that says it stops somebody posting for a day, did
+         not. Both call `refuseIfMuted` now. **A muted member who could previously reply cannot.**
+      2. THE LENGTH BOUND APPLIED TO ONE OF THEM. `MAX_MESSAGE_BODY` was checked on send and not on
+         reply, and `askQuestion` had no bound at all. All three are bounded now, from
+         `$lib/message-bounds.ts` — which exists because a `.remote.ts` file cannot export a
+         constant, so the alternative was the same number written three times.
+      3. The rate limit and the `chat` publish were written out verbatim twice. Declared once.
 
-  sendMessage: async ({ request, locals }) => {
-    ensureDatabase();
-    const limit = consumeRateLimit('message', requireUser(locals).id);
-    if (!limit.allowed) {
-      return fail(429, {
-        message: `You are sending messages too quickly. Try again in ${Math.ceil(limit.retryAfterMs / 1000)}s.`
-      });
-    }
-
-    const data = await request.formData();
-    const room = String(data.get('room') ?? 'main');
-
-    /*
-      RICH TEXT, when the editor sent it.
-
-      `bodyHtml` arrives only from the RTE modal. It is sanitised HERE, on the server, and the
-      sanitised value is what is stored — never the submitted one. A client-side sanitiser is a
-      convenience for the person typing; it is not a control, because the request can be made
-      without the client.
-
-      `body` is then derived from the sanitised HTML with its tags stripped, so every existing
-      reader keeps working: the plain-text segment renderer, the mention rule, the popup, search,
-      and any client that never learns this column exists. Two representations of one message, and
-      the HTML one is never the only copy.
-    */
-    const submittedHtml = String(data.get('bodyHtml') ?? '').trim();
-    const sanitizedHtml = submittedHtml ? sanitizeChatHtml(submittedHtml) : '';
-    const bodyHtml = sanitizedHtml && !isEmptyChatHtml(sanitizedHtml) ? sanitizedHtml : null;
-
-    const body = bodyHtml
-      ? bodyHtml
-          .replace(/<[^>]*>/g, '')
-          .replace(/&nbsp;/g, ' ')
-          .trim()
-      : String(data.get('body') ?? '').trim();
-
-    if (!body) return fail(400, { message: 'A message is required.' });
-    if (body.length > MAX_MESSAGE_BODY) {
-      return fail(400, { message: 'That message is too long.' });
-    }
-    /*
-      `messages.room` is a channel label, not a foreign key, so nothing in the schema
-      stops an arbitrary string being written here. The client only ever renders the two
-      channels in `ChatTab`, so a crafted request could park messages in a channel nobody
-      displays - invisible content that still occupies the table and still arrives in
-      every reader's payload on the next poll.
-    */
-    if (!isChatTab(room)) return fail(400, { message: 'Unknown channel.' });
-    // A mute is granted in one room and must not follow somebody into another.
-    const activeMute = db
-      .select({ id: chatMutes.id })
-      .from(chatMutes)
-      .where(
-        and(
-          eq(chatMutes.roomShortCode, requireRoomShortCode(locals)),
-          eq(chatMutes.targetUserId, requireUser(locals).id),
-          gt(chatMutes.expiresAt, new Date())
-        )
-      )
-      .get();
-    if (activeMute) return fail(403, { muted: true });
-
-    /*
-      Both segments of `/sess/${sessionID}/chat/${channel}/`.
-
-      `roomShortCode` is the SESSION — which room this message belongs to. The local `room` is the
-      CHANNEL within it, which is why it is almost always 'main'. They are different things and the
-      original keeps both; conflating them is what let one room read another's chat.
-    */
-    db.insert(messages)
-      .values({
-        roomShortCode: requireRoomShortCode(locals),
-        room,
-        senderId: requireUser(locals).id,
-        body,
-        bodyHtml,
-        isAdmin: isPresenterRole(requireUser(locals).role),
-        createdAt: new Date()
-      })
-      .run();
-    /*
-      Tell the room, exactly as `postAlert` does.
-
-      The capture carries chat on `/sess/{sessionID}/chat/{channel}/` - a sibling of the alerts
-      channel, sent with `socketService.send("chatMsg", {channel, msg, n})` and drained into
-      `chatLog[channel]` with an `emit("chatMsg")`. Without the publish, a message reached the
-      database and nobody else's screen until they reloaded.
-
-      `room` is the channel the capture keys by, and it is carried so a later per-channel
-      subscription can filter without changing the wire shape.
-    */
-    publishToRoom(requireRoomShortCode(locals), {
-      channel: 'chat',
-      data: {
-        senderId: requireUser(locals).id,
-        senderEmailHash: hashEmail(requireUser(locals).email),
-        room
-      }
-    });
-
-    return { success: true };
-  },
-
-  replyMessage: async ({ request, locals }) => {
-    ensureDatabase();
-    const limit = consumeRateLimit('message', requireUser(locals).id);
-    if (!limit.allowed) {
-      return fail(429, {
-        message: `You are sending messages too quickly. Try again in ${Math.ceil(limit.retryAfterMs / 1000)}s.`
-      });
-    }
-
-    const data = await request.formData();
-    const body = String(data.get('body') ?? '').trim();
-    const messageId = Number(data.get('messageId'));
-
-    if (!body) return fail(400, { message: 'A message is required.' });
-    if (!Number.isInteger(messageId)) return fail(400, { message: 'A message ID is required.' });
-
-    const original =
-      messageId < 0
-        ? capturedRoomItem(
-            {
-              id: requireUser(locals).id,
-              emailHash: hashEmail(requireUser(locals).email)
-            },
-            'chat',
-            messageId,
-            requireRoomShortCode(locals)
-          )
-        : db
-            .select({
-              id: messages.id,
-              room: messages.room,
-              body: messages.body,
-              senderName: users.displayName
-            })
-            .from(messages)
-            .innerJoin(users, eq(messages.senderId, users.id))
-            .where(
-              and(
-                eq(messages.roomShortCode, requireRoomShortCode(locals)),
-                eq(messages.id, messageId)
-              )
-            )
-            .get();
-
-    // Refuses a message id from another room, so a reply cannot quote across the boundary.
-    if (!original) return fail(404, { message: 'Message not found.' });
-
-    db.insert(messages)
-      .values({
-        roomShortCode: requireRoomShortCode(locals),
-        room: original.room,
-        senderId: requireUser(locals).id,
-        body,
-        replyToMessageId: original.id > 0 ? original.id : null,
-        replyToName: original.senderName,
-        replyToBody: original.body,
-        isAdmin: isPresenterRole(requireUser(locals).role),
-        createdAt: new Date()
-      })
-      .run();
-    /*
-      Tell the room, exactly as `postAlert` does.
-
-      The capture carries chat on `/sess/{sessionID}/chat/{channel}/` - a sibling of the alerts
-      channel, sent with `socketService.send("chatMsg", {channel, msg, n})` and drained into
-      `chatLog[channel]` with an `emit("chatMsg")`. Without the publish, a message reached the
-      database and nobody else's screen until they reloaded.
-
-      `room` is the channel the capture keys by, and it is carried so a later per-channel
-      subscription can filter without changing the wire shape.
-    */
-    publishToRoom(requireRoomShortCode(locals), {
-      channel: 'chat',
-      data: {
-        senderId: requireUser(locals).id,
-        senderEmailHash: hashEmail(requireUser(locals).email),
-        room: original.room
-      }
-    });
-
-    return { success: true };
-  },
-
-  // Asking a question against an alert. The count on the alert row and the question row are
-  // written in one transaction so the badge can never disagree with the list, and the count is
-  // derived from the rows rather than incremented blindly.
-  askQuestion: async ({ request, locals }) => {
-    ensureDatabase();
-    const limit = consumeRateLimit('question', requireUser(locals).id);
-    if (!limit.allowed) {
-      return fail(429, {
-        message: `You are asking questions too quickly. Try again in ${Math.ceil(limit.retryAfterMs / 1000)}s.`
-      });
-    }
-
-    const data = await request.formData();
-    const body = String(data.get('body') ?? '').trim();
-    const alertId = Number(data.get('alertId'));
-
-    if (!body) return fail(400, { message: 'A question is required.' });
-    if (!Number.isInteger(alertId)) return fail(400, { message: 'An alert ID is required.' });
-
-    // A question stays outstanding until the presenter who posted the alert answers it, so the
-    // button keeps flashing for everyone else until then. This deliberately keys off authorship
-    // rather than role: resolveConnectedIdentity promotes every guest to `staff`
-    // (connection.ts), so a role check would mark every question answered the moment it is asked.
-    // Without this nothing ever writes answered_at and the button would flash red forever.
-    const alertAuthorId =
-      alertId > 0
-        ? (db
-            .select({ senderId: alerts.senderId })
-            .from(alerts)
-            .where(
-              and(eq(alerts.roomShortCode, requireRoomShortCode(locals)), eq(alerts.id, alertId))
-            )
-            .get()?.senderId ?? null)
-        : (capturedRoomItem(
-            { id: requireUser(locals).id, emailHash: hashEmail(requireUser(locals).email) },
-            'alert',
-            alertId,
-            requireRoomShortCode(locals)
-          )?.senderId ?? null);
-    /*
-      THE ALERT MUST BE IN THIS ROOM — added 2026-08-14, and it was a cross-tenant WRITE until then.
-
-      The lookup above is correctly scoped, but its answer was only ever used to decide `isAnswer`.
-      A miss produced `null`, `isAnswer` went false, and the insert below ran anyway with whatever
-      `alertId` the form carried — so a member of one room could attach a question to another room's
-      alert, and that room's Q&A thread would display it. `alert_questions` has no room column of
-      its own, so nothing downstream could catch it either.
-
-      `null` here means exactly one thing: no alert with that id exists in THIS room. `senderId` is
-      `notNull`, so a found row always answers; and `capturedRoomItem` is given the room too, so a
-      captured alert that is hidden or belongs elsewhere is a miss as well. Refusing on `null` is
-      therefore the whole check, and it fails closed.
-    */
-    if (alertAuthorId === null) return fail(404, { message: 'Alert not found.' });
-
-    const isAnswer = alertAuthorId === requireUser(locals).id;
-    const now = new Date();
-
-    const stored = db.transaction((transaction) => {
-      transaction
-        .insert(alertQuestions)
-        .values({ alertId, senderId: requireUser(locals).id, body, createdAt: now })
-        .run();
-
-      if (isAnswer) {
-        transaction
-          .update(alertQuestions)
-          .set({ answeredAt: now })
-          .where(and(eq(alertQuestions.alertId, alertId), isNull(alertQuestions.answeredAt)))
-          .run();
-      }
-
-      // Captured alerts have negative ids and live in the fixture, not the alerts table, so only
-      // a real row gets its cached counters synchronised. Read through `transaction` so the rows
-      // just written are included.
-      if (alertId > 0) {
-        const rows = transaction
-          .select({ answeredAt: alertQuestions.answeredAt })
-          .from(alertQuestions)
-          .where(eq(alertQuestions.alertId, alertId))
-          .all();
-        transaction
-          .update(alerts)
-          .set({
-            questionCount: rows.length,
-            questionAnswered: rows.length > 0 && rows.every((row) => row.answeredAt !== null)
-          })
-          .where(
-            and(eq(alerts.roomShortCode, requireRoomShortCode(locals)), eq(alerts.id, alertId))
-          )
-          .run();
-      }
-      return true;
-    });
-
-    return { success: stored };
-  },
-
-  postAlert: async ({ request, locals }) => {
-    ensureDatabase();
-    const limit = consumeRateLimit('alert', requireUser(locals).id);
-    if (!limit.allowed) {
-      return fail(429, {
-        message: `You are posting alerts too quickly. Try again in ${Math.ceil(limit.retryAfterMs / 1000)}s.`
-      });
-    }
-
-    const isPresenter =
-      requireUser(locals).role === 'staff' || requireUser(locals).role === 'admin';
-    if (!isPresenter) return fail(403);
-
-    const data = await request.formData();
-    const kind = String(data.get('kind') ?? '');
-    const body = String(data.get('body') ?? '');
-    const targetUrl = String(data.get('targetUrl') ?? '') || null;
-    const nonTrade = data.get('nonTradeAlert') === 'true';
-
-    if (kind !== 'text' && kind !== 'url' && kind !== 'media') return fail(400);
-    if (!body) return fail(400);
-    if (body.length > MAX_ALERT_BODY) return fail(400, { message: 'That alert is too long.' });
-
-    const inserted = db
-      .insert(alerts)
-      .values({
-        // `/sess/${sessionID}/alerts/` — an alert belongs to one room.
-        roomShortCode: requireRoomShortCode(locals),
-        senderId: requireUser(locals).id,
-        kind,
-        body,
-        targetUrl: kind === 'media' ? targetUrl : null,
-        nonTrade,
-        createdAt: new Date()
-      })
-      .returning()
-      .get();
-
-    /*
-      Tell the room. This is the line the product was missing.
-
-      Writing the row made the alert exist; it did not make anyone see it. Every other member's
-      page only refetches after that member's OWN action, so a posted alert sat invisible until
-      they happened to reload - measured: zero `/api/v1` calls, no second socket, no polling.
-
-      The capture fans this out on a dedicated channel, `/sess/{sessionID}/alerts/`, and each
-      client pushes the row into `alertsLog` and emits `alertMsg`. `publishToRoom` is that channel;
-      `src/routes/sess/[room]/events/+server.ts` is the wire.
-    */
-    publishToRoom(requireRoomShortCode(locals), {
-      channel: 'alerts',
-      data: {
-        id: inserted?.id ?? null,
-        senderId: requireUser(locals).id,
-        senderName: requireUser(locals).displayName,
-        body,
-        kind,
-        nonTrade
-      }
-    });
-
-    return { success: true };
-  },
+    `MAX_MESSAGE_BODY` and `MAX_ALERT_BODY` were declared at the top of this file and went with
+    them. `sendMessage`'s hand-written html-to-text derivation became `stripHtmlToText` — the same
+    function the composer's optimistic copy already used, whose docstring said "the two must agree"
+    and had no way to enforce it.
+  */
 
   /**
    * `remotePresCommand` - a presenter telling ONE member's browser to do something.
@@ -2384,7 +2045,7 @@ export const actions: Actions = {
     }
 
     return fail(400, { message: 'Unsupported message operation.' });
-  },
+  }
 
   /*
     `unmuteChat` was an action here and is now `src/routes/chat-mute.remote.ts` — the first remote
@@ -2404,69 +2065,19 @@ export const actions: Actions = {
     and the pair should not have to be searched for.
   */
 
-  saveTheme: async ({ request, locals }) => {
-    ensureDatabase();
-    const data = await request.formData();
-    const theme = data.get('theme') === 'dark' ? 'dark' : 'light';
+  /*
+    `saveTheme` and `savePreference` left together for `src/routes/user-settings.remote.ts` — one
+    module because they share the only gate either has: the row written is always the CALLER's, with
+    no target on the argument.
 
-    db.update(userSettings)
-      .set({ theme, updatedAt: new Date() })
-      .where(eq(userSettings.userId, requireUser(locals).id))
-      .run();
+    Two changes that are not moves, and both are stated there at length:
 
-    return { success: true };
-  },
-
-  savePreference: async ({ request, locals }) => {
-    ensureDatabase();
-    const data = await request.formData();
-    const key = String(data.get('key') ?? '').trim();
-    const rawValue = String(data.get('value') ?? 'null');
-    if (!key) return fail(400, { message: 'A preference key is required.' });
-
-    let value: unknown;
-    try {
-      value = JSON.parse(rawValue);
-    } catch {
-      return fail(400, { message: 'The preference value must be valid JSON.' });
-    }
-
-    const current = db
-      .select({ settingsJson: userSettings.settingsJson })
-      .from(userSettings)
-      .where(eq(userSettings.userId, requireUser(locals).id))
-      .get();
-    let settings: Record<string, unknown> = {};
-    try {
-      const parsed: unknown = JSON.parse(current?.settingsJson ?? '{}');
-      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-        settings = parsed as Record<string, unknown>;
-      }
-    } catch {
-      settings = {};
-    }
-    settings[key] = value;
-    /*
-      Remove what the old element-id fallback wrote, on the way past.
-
-      `updateSettingCheck` used to persist `preferenceKeyByInputId[input.id] ?? input.id`, so
-      nineteen HTML ids went into this blob as if they were preferences and nothing ever read them
-      back. Deleting the write does not delete what was written: every account that has opened the
-      settings modal is carrying some of them.
-
-      Here rather than in a migration, because this action already parses and rewrites the whole
-      blob — the prune is free, it needs no downtime, and it cannot half-apply. It is idempotent, so
-      an account converges on its next preference change and a converged one pays nothing. The list
-      is a deny-list for the reason `dead-preference-keys.ts` sets out: an allow-list would delete
-      the next preference somebody adds without updating it.
-    */
-    pruneDeadPreferenceKeys(settings);
-
-    db.update(userSettings)
-      .set({ settingsJson: JSON.stringify(settings), updatedAt: new Date() })
-      .where(eq(userSettings.userId, requireUser(locals).id))
-      .run();
-
-    return { success: true };
-  }
+      - `saveTheme` refuses an unrecognised value where this read
+        `data.get('theme') === 'dark' ? 'dark' : 'light'` and silently made everything else `light`.
+      - `savePreference`'s value crosses as a VALUE. The client stringified, this parsed inside a
+        `try`, and an unparseable string was a `fail(400)`. devalue carries the real value and
+        `z.json()` is the schema for exactly what the blob can store — so the failure mode is gone
+        rather than relocated. `key` also gained a 100-character bound, because this blob is parsed
+        and rewritten on every preference write.
+  */
 };

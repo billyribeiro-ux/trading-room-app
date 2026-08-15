@@ -34,13 +34,14 @@ const BUNDLE = readFileSync(
   'utf8'
 );
 const PAGE = readFileSync(new URL('../routes/+page.svelte', import.meta.url), 'utf8');
-const SERVER = readFileSync(new URL('../routes/+page.server.ts', import.meta.url), 'utf8');
+// `SERVER` is gone with `serverCode`: `+page.server.ts` no longer holds any of this.
 
 const stripComments = (source: string) =>
   source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/<!--[\s\S]*?-->/g, '');
 
 const pageCode = stripComments(PAGE);
-const serverCode = stripComments(SERVER);
+// `serverCode` is gone: everything this file asserted about the server moved to the remote
+// modules, and a reader that nothing reads is the next person's dead end.
 
 describe('the reference', () => {
   it('gates the popup on doNotDisturbOn AND chatPopup, beside the sound', () => {
@@ -69,10 +70,18 @@ describe('ours', () => {
       The security property this feature must not cost. If a `body` or `text` field ever joins that
       publish, admin chat goes to every subscriber — so it is asserted rather than trusted.
     */
-    const publish = serverCode.slice(
-      serverCode.indexOf("channel: 'chat'"),
-      serverCode.indexOf("channel: 'chat'") + 260
+    /*
+      The publish moved to `chat-messages.remote.ts` with `sendMessage` and `replyMessage`, and it
+      is now ONE function both call rather than two verbatim copies — so this reads the single
+      `announceChatMessage` instead of slicing whichever copy came first.
+    */
+    const chatCommands = readFileSync(
+      new URL('../routes/chat-messages.remote.ts', import.meta.url),
+      'utf8'
     );
+    const from = chatCommands.indexOf('function announceChatMessage(');
+    expect(from, 'the publish helper must exist for this to guard anything').toBeGreaterThan(-1);
+    const publish = chatCommands.slice(from, chatCommands.indexOf('\n}', from));
     expect(publish).toContain('senderEmailHash');
     expect(publish).not.toContain('body');
     expect(publish).not.toMatch(/\btext\b/);

@@ -234,3 +234,18 @@ export function fileSortTitle(button: FileSortField, state: FileSortState): stri
     ? 'Sorted oldest to newest (click to sort newest to oldest)'
     : 'Sorted newest to oldest (click to sort oldest to newest)';
 }
+
+/**
+ * A file's size as the Files pane reports it.
+ *
+ * `i.round(e.size / 1024)` then the literal `'Kb '` — the capture reports kilobytes, rounded, with a
+ * trailing space before the closing tag. The trailing space belongs to the template, not here.
+ *
+ * Moved out of `+page.svelte` with the rest of the Files-pane conversion: this module already owns
+ * how the pane sorts and labels its rows, so it should own how it formats them too. It is also the
+ * only way this was ever going to be tested — `files-pane-contract.test.ts` asserted the expression
+ * as a STRING, which proves the text exists and nothing about what it returns.
+ */
+export function fileSizeInKb(size: number): number {
+  return Math.round(size / 1024);
+}
