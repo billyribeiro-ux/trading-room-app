@@ -571,7 +571,8 @@
     }
 
     for (const key of keys) {
-      let value = null;
+      // No initialiser: the `catch` always continues, so a value here could never be read.
+      let value;
       try {
         value = localStorage.getItem(key);
       } catch {
@@ -640,7 +641,8 @@
   function readComputed(targets) {
     const rows = [];
     for (const selector of targets) {
-      let nodes = [];
+      // No initialiser: the `catch` always continues, so a value here could never be read.
+      let nodes;
       try {
         nodes = [...document.querySelectorAll(selector)];
       } catch (cause) {

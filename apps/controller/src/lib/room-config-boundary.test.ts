@@ -264,7 +264,11 @@ describe('the allow-list itself', () => {
       userJoinAndLeavePopup:
         '+page.svelte — the join/leave toast, the second of the two independent join/leave notifications',
       tawkPresenterSupport:
-        'tawkSupportAvailable() in $lib/tawk-support — the navbar support item, which also requires presenter AND a configured PUBLIC_PTR_TAWK_PROPERTY_ID'
+        'tawkSupportAvailable() in $lib/tawk-support — the navbar support item, which also requires presenter AND a configured PUBLIC_PTR_TAWK_PROPERTY_ID',
+      useMediaMTX:
+        '+page.svelte — `hideStreams = !useMediaMTX`, applied to BOTH the #streams-tab li and the #streams pane, exactly as app-presentationarea.full.js:2293 and :5357/:5388 do. This is the whole Streams tab: without it the room hid the tab in every room, MediaMTX or not',
+      overlayUserIdOnScreenshare:
+        'StreamingView.svelte — the `span.overlay-userID-container` printing the viewer’s own userXrefID over the video, gated on this AND !isPresenter (TCe, main bundle byte 1901148)'
     };
     expect(Object.keys(consumers).sort()).toEqual([...ROOM_VISIBLE_SETTINGS].sort());
   });

@@ -41,7 +41,8 @@ ws.addEventListener('message', (e) => {
   if (m.id === undefined) return;
   const x = p.get(m.id);
   p.delete(m.id);
-  m.error ? x.reject(new Error(JSON.stringify(m.error))) : x.resolve(m.result);
+  if (m.error) x.reject(new Error(JSON.stringify(m.error)));
+  else x.resolve(m.result);
 });
 const send = (me, pa = {}, s) => {
   const i = ++id;
@@ -71,7 +72,7 @@ const check = (l, ok, x = '') => {
 };
 
 // Capture what window.open is asked for, without actually opening one.
-const opened = await ev(`(()=>{ window.__opened=null;
+await ev(`(()=>{ window.__opened=null;
   const n=window.open; window.open=(u,tgt,feat)=>{window.__opened={u,tgt,feat}; return null;};
   return 'stubbed';})()`);
 

@@ -41,7 +41,8 @@ ws.addEventListener('message', (e) => {
   if (m.id === undefined) return;
   const x = p.get(m.id);
   p.delete(m.id);
-  m.error ? x.reject(new Error(JSON.stringify(m.error))) : x.resolve(m.result);
+  if (m.error) x.reject(new Error(JSON.stringify(m.error)));
+  else x.resolve(m.result);
 });
 const send = (me, pa = {}, s) => {
   const i = ++id;

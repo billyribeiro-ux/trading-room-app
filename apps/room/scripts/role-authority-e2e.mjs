@@ -25,7 +25,6 @@ import Database from 'better-sqlite3';
 
 const CONTROL = process.env.CONTROL ?? 'http://localhost:5180';
 const ROOM = process.env.ROOM ?? 'http://localhost:5174';
-const CONTROL_DB = `${process.env.HOME}/Desktop/new-room-control/.data/control.sqlite`;
 
 const results = [];
 const check = (name, actual, expected) => {

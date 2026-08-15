@@ -1,6 +1,5 @@
 <script lang="ts">
   import { enhance } from '$app/forms';
-  import { humanizeDuration } from '$lib/humanize-duration';
   import { asset, resolve } from '$app/paths';
   import { bootbox } from '$lib/bootbox.svelte';
   import ToastHost from '$lib/components/ToastHost.svelte';
@@ -20,7 +19,6 @@
     showsRoomLinks,
     usesRoomPassword
   } from '$lib/auth-modes';
-  import { isRoomTrial } from '$lib/room-member-role';
   import { settingHelp, type SettingHelp } from '$lib/room-settings-help';
   import type { RoomSettingDef } from '$lib/room-settings-schema';
   import type { SubmitFunction } from '@sveltejs/kit';
@@ -794,14 +792,14 @@
     location.href = `/account/rooms/${data.room.shortCode}/stats.csv`;
   }
 
-  /** `MM/DD/YYYY hh:mm a`, the reference's moment format, and its `N/A` for an absent time. */
-  function statsWhen(at: Date | string | null): string {
-    if (!at) return 'N/A';
-    const d = new Date(at);
-    const hh = d.getHours() % 12 || 12;
-    const pad = (n: number) => String(n).padStart(2, '0');
-    return `${pad(d.getMonth() + 1)}/${pad(d.getDate())}/${d.getFullYear()} ${pad(hh)}:${pad(d.getMinutes())} ${d.getHours() < 12 ? 'am' : 'pm'}`;
-  }
+  /*
+    `statsWhen` was here and is gone, 2026-08-14. It was a byte-for-byte DUPLICATE of the formatter
+    in `$lib/stats-csv` — same `MM/DD/YYYY hh:mm a`, same `N/A`, same doc comment — and nothing on
+    this page ever called it. Deleting it loses nothing: the one in `stats-csv.ts` has callers and
+    tests, so the reference's format is still recorded and still enforced.
+
+    Two copies of one format is how the two stop agreeing.
+  */
 
   /**
    * `downloadMontlyStats(data)` — the monthly roll-up.
@@ -876,7 +874,7 @@
   {@const def = dontTouch(name)}
   <label class="col-sm-2 control-label" for={`mg-${def.name}`}>{def.label ?? def.name}</label>
   <span id={`mg-${def.name}`}>
-    <Editable {def} value={settingValue(def.name)} markUnwired />
+    <Editable {def} value={settingValue(def.name)} />
   </span>
 {/snippet}
 
@@ -2372,7 +2370,7 @@ Please click this link to attend: ______ unique link will be here_____
                         id={`mg-${def.name}`}
                         title={data.featureReadiness.sso ? '' : featureReason('sso')}
                       >
-                        <Editable {def} value={settingValue(def.name)} markUnwired />
+                        <Editable {def} value={settingValue(def.name)} />
                       </p>
                     </div>
                   </div>
@@ -2777,7 +2775,7 @@ Please click this link to attend: ______ unique link will be here_____
                           {def.label ?? def.name}
                         </label>
                         <span id={`mg-${def.name}`}>
-                          <Editable {def} value={settingValue(def.name)} markUnwired />
+                          <Editable {def} value={settingValue(def.name)} />
                         </span>
                         {#if def.help}
                           <br />
@@ -2859,7 +2857,7 @@ Please click this link to attend: ______ unique link will be here_____
                       -->
                       <!-- svelte-ignore a11y_label_has_associated_control -->
                       <label class="col-sm-2 control-label">{def.label ?? def.name}</label>
-                      <Editable {def} value={settingValue(def.name)} markUnwired />
+                      <Editable {def} value={settingValue(def.name)} />
                       {#if help && !help.outside}
                         <!--
                           A `<label>`, because that is what the reference's helper copy IS:
@@ -2907,7 +2905,7 @@ Please click this link to attend: ______ unique link will be here_____
                       <!-- same bare label and unwrapped editable as the loops above -->
                       <!-- svelte-ignore a11y_label_has_associated_control -->
                       <label class="col-sm-2 control-label">API secret</label>
-                      <Editable def={apiSecretDef} value={settingValue('apiSecret')} markUnwired />
+                      <Editable def={apiSecretDef} value={settingValue('apiSecret')} />
                       &nbsp;
                       <button
                         class="btn btn-sm btn-warning"
@@ -2985,7 +2983,7 @@ Please click this link to attend: ______ unique link will be here_____
                           {def.label ?? def.name}
                         {/if}
                       </label>
-                      <Editable {def} value={settingValue(def.name)} markUnwired />
+                      <Editable {def} value={settingValue(def.name)} />
                       {#if help && !help.outside}
                         <!-- the reference's own helper copy again — see the loop above -->
                         {@render helpCopy(help)}

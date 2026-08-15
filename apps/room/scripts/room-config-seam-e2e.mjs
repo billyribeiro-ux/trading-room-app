@@ -242,10 +242,19 @@ try {
           The two COLUMNS of the main split, each gated by one flag:
             O(1, e.hideChatAlerts ? -1 : 1)   app-room.render-helpers.js:1650
             O(3, e.hidePresentation ? -1 : 3) app-room.render-helpers.js:1662
-          Neither gate has an ` ||
-        isPresenter` branch on our side, so the owner who clicks Launch
+          Neither gate has an or-isPresenter branch on our side, so the owner who clicks Launch
           sees the same thing a member does - which is what makes them readable from this probe at
           all (see the note below on the presenter-biased gates that broke an earlier version).
+
+          NO BACKTICKS IN THIS COMMENT, and that is not a style note. This prose lives INSIDE a
+          template literal, so a pair of backticks here TERMINATES the string. The line that used to
+          sit here quoted the gate using them, which closed the literal early and turned the rest of
+          this probe into live JavaScript - it was evaluating the string OR isPresenter, against a
+          page that has no such variable.
+
+          ESLint found it on its first run over this app, as two errors that read as unrelated: a
+          constant truthy left-hand side, and an undefined isPresenter. Writing this very warning
+          reintroduced the bug once, because the warning itself quoted the expression.
         */
         chatAlerts: document.querySelector('.alert-chat-box') !== null,
         presentation: document.querySelector('.presentation-box') !== null

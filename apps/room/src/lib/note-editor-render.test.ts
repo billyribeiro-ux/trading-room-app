@@ -12,9 +12,13 @@ describe('NoteEditor evidence contract', () => {
         onBringEveryone: () => undefined,
         onDirtyChange: () => undefined,
         onDone: () => undefined,
+        onRequestRestore: () => undefined,
         onSave: () => undefined,
         onSetWelcomeMat: () => undefined,
-        onUploadImages: async () => []
+        onUploadImages: async () => [],
+        onVersionHistoryOpenChange: () => undefined,
+        showVersionHistory: false,
+        versions: []
       }
     }).body;
 

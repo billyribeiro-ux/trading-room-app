@@ -61,6 +61,8 @@
 
   /* ── the guard, identical to ptr-collect.js. Only the optional dropdown pass can reach it. ── */
   const FORBIDDEN = /delete|upload|remove|play|stop|send|save|submit|post|kick|ban|mute|reset/i;
+  // Present so any future click inherits the guard; the automatic phases below call nothing.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const clickSafe = (el, why) => {
     if (!el) return false;
     const fingerprint = [

@@ -240,7 +240,7 @@ transform box-shadow float clear z-index overflow-x overflow-y
         rec.rules = Array.from(rules)
           .map((r) => r.cssText)
           .join('\n');
-      } catch (e) {
+      } catch {
         rec.access = 'cors-blocked';
         if (CFG.REFETCH_CORS && ss.href) {
           try {

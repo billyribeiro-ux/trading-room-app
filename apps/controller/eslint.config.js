@@ -20,13 +20,18 @@ export default defineConfig(
     '.svelte-kit/**',
     '.vercel/**',
     /*
-      `apps/**` is the room application, which arrived when the two repositories became one. It
-      brings its own toolchain, its own lockfile and its own gate (the `room` job in
-      `.github/workflows/quality.yml`). Linting it from here ran this config over a tree it was
-      never written for: 51,311 errors, none of them findings.
+      `apps/**` is the room application, which arrived when the two repositories became one. Linting
+      it from here ran this config over a tree it was never written for: 51,311 errors, none of them
+      findings. It is ignored for the same reason `services/**` is — a separate boundary with its
+      own checker, not code this configuration is the authority for.
 
-      Ignored for the same reason `services/**` is — a separate boundary with its own checker, not
-      code this configuration is the authority for.
+      CORRECTED 2026-08-14. This note used to say the room "brings its own toolchain, its own
+      lockfile and its own gate (the `room` job in `.github/workflows/quality.yml`)". None of that
+      was true: the room had NO ESLint at all until that date, there is one lockfile for the
+      workspace, and **no `quality.yml` has ever existed in this repository** — CI is
+      `backend-quality.yml` (Rust) and `smoke.yml` (post-deploy), so neither frontend app is gated
+      on a push. The room now has `apps/room/eslint.config.js`, deliberately mirroring this file.
+      The missing CI gate is an open row in `TODO.md`.
     */
     'apps/**',
     'build/**',

@@ -220,7 +220,7 @@ describe('the wire has no silent break points', () => {
       nowhere else is a number that drifts; these are now read from the files.
     */
     const reaching = MODAL.split('onchange={updateSettingCheck}').length - 1;
-    const table = /const preferenceKeyByInputId[\s\S]*?\n    \};/.exec(modalCode)?.[0] ?? '';
+    const table = /const preferenceKeyByInputId[\s\S]*?\n {4}\};/.exec(modalCode)?.[0] ?? '';
     const mapped = (table.match(/': '/g) ?? []).length;
 
     expect(reaching).toBe(26);
@@ -381,7 +381,7 @@ describe('the wire has no silent break points', () => {
       whole component and failed on `settingChecks`, where it correctly appears as a default — the
       checkbox still renders and still remembers its own position, it simply persists nothing.
     */
-    const table = /const preferenceKeyByInputId[\s\S]*?\n    \};/.exec(modalCode)?.[0] ?? '';
+    const table = /const preferenceKeyByInputId[\s\S]*?\n {4}\};/.exec(modalCode)?.[0] ?? '';
     expect(table, 'the mapping table must be findable').not.toBe('');
     expect(table).not.toContain('small-image-preview');
   });

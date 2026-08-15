@@ -305,12 +305,23 @@ describe('the two list pipes', () => {
           );
 
     for (const arrangement of permutations(people)) {
+      /*
+        The two casts reproduce a DEFECT, and removing them would break the test rather than tidy
+        it. The reference's comparator returns the OBJECT where a number belongs — JavaScript
+        coerces that to `NaN`, which `sort` reads as "leave the pair alone". That is why presenters
+        do not actually sort to the top upstream, and this loop over every permutation is what pins
+        `sortRosterByNick` to the same observable order.
+
+        TypeScript refuses an object as a comparator result, correctly, so the cast is the only way
+        to express the reference's behaviour at all.
+      */
       const captured = [...arrangement].sort((left, right) =>
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         left.isP
-          ? (left as any)
+          ? // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (left as any)
           : right.isP
-            ? (right as any)
+            ? // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              (right as any)
             : left.displayName.toLowerCase() > right.displayName.toLowerCase()
               ? 1
               : -1

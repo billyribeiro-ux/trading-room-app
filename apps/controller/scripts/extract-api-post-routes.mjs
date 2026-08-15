@@ -87,7 +87,10 @@ while (i < src.length) {
     const lang = s.slice(3).trim();
     const body = [];
     i++;
-    while (i < src.length && !src[i].trim().startsWith('```')) body.push(src[i]), i++;
+    while (i < src.length && !src[i].trim().startsWith('```')) {
+      body.push(src[i]);
+      i++;
+    }
     if (i >= src.length) fail(line, 'unclosed code fence');
     i++;
     const cls = lang ? ` class="language-${lang.replace(/[^a-z0-9-]/gi, '')}"` : '';
@@ -108,7 +111,10 @@ while (i < src.length) {
   /* tables — a header row, a separator, then body rows */
   if (s.startsWith('|')) {
     const rows = [];
-    while (i < src.length && src[i].trim().startsWith('|')) rows.push(src[i].trim()), i++;
+    while (i < src.length && src[i].trim().startsWith('|')) {
+      rows.push(src[i].trim());
+      i++;
+    }
     if (rows.length < 2) fail(line, 'a table needs a header and a separator row');
     const cells = (r) =>
       r

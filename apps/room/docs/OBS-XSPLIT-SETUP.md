@@ -34,8 +34,13 @@ is served from:
 authMethod: http
 authHTTPAddress: https://<controller-host>/internal/media-auth
 
+# Both ingest listeners terminate TLS. The publish credential is a thirty-day token — as a Bearer
+# header on WHIP, and inside the URL itself on RTMP — so neither may cross a network in the clear.
+# `ops/mediamtx/` carries the full config; this is the ingest half of it.
 webrtcAddress: :8889
-rtmpAddress: :1935
+webrtcEncryption: yes
+rtmpEncryption: strict
+rtmpsAddress: :1936
 
 # Playback. The room plays `index.m3u8` with hls.js.
 hls: yes
@@ -65,7 +70,7 @@ STREAM_SERVER_MTX=media.yourdomain.com
 
 **Host only — no scheme, no port, no trailing slash.** The two URLs append their own; a value like
 `https://media.yourdomain.com:8889` produces
-`http://https://media.yourdomain.com:8889:8889/...`, which fails with no useful error.
+`https://https://media.yourdomain.com:8889:8889/...`, which fails with no useful error.
 
 Leaving it blank is a supported state: presenters still get a key, and the panel tells them plainly
 that no ingest server is configured. It never shows a link that cannot work.
@@ -135,7 +140,7 @@ With **Whip** selected, the panel shows two fields. In OBS:
 The Server value looks like:
 
 ```
-http://media.yourdomain.com:8889/room__7f3a__Dana_Vero/whip
+https://media.yourdomain.com:8889/room__7f3a__Dana_Vero/whip
 ```
 
 That last path segment is your display name with everything outside `A-Z a-z 0-9 _ -` turned into
@@ -148,13 +153,13 @@ or fails outright.
 
 Press **Start Streaming**.
 
-## B2b. XSplit, or OBS with RTMP
+## B2b. XSplit, or OBS with RTMPS
 
 With **Rtmp** selected, the panel shows a single **Streaming link** box. The token is already inside
 that URL — there is no separate key to enter.
 
 ```
-rtmp://media.yourdomain.com/room__7f3a__Dana_Vero?jwt=eyJhbGciOiJIUzI1NiIs...
+rtmps://media.yourdomain.com:1936/room__7f3a__Dana_Vero?jwt=eyJhbGciOiJIUzI1NiIs...
 ```
 
 **XSplit** — Broadcast → Set up new output → **Custom RTMP**:

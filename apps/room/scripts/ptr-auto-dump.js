@@ -165,6 +165,9 @@
   // can close it and let socket.io rebuild one through the patched constructor below.
   const nativeSend = WebSocket.prototype.send;
   WebSocket.prototype.send = function (data) {
+    // `this` is the WebSocket the wrapped method was invoked on; capturing it is the point of the
+    // probe, which is why the alias is deliberate here.
+    // eslint-disable-next-line @typescript-eslint/no-this-alias
     if (!liveSocket) liveSocket = this;
     try {
       record(data, 'out');
@@ -287,7 +290,7 @@
   // The Device is built inside a service we cannot name, so trap it structurally.
   const seen = new WeakSet();
   const nativeDefine = Object.defineProperty;
-  Object.defineProperty = function (target, prop, desc) {
+  Object.defineProperty = function (target, _prop, _desc) {
     const out = nativeDefine.apply(this, arguments);
     try {
       if (

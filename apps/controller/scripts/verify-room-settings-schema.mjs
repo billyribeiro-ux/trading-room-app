@@ -13,10 +13,15 @@ const GENERATOR = resolve(SCRIPT_DIR, 'extract-manage-schema.mjs');
 const CANONICAL_SCHEMA = resolve(REPO_ROOT, 'src/lib/room-settings-schema.ts');
 
 /*
-  Eleven consumed by this repository's room-login page, FORTY-THREE by the room application
+  Eleven consumed by this repository's room-login page, FORTY-FIVE by the room application
   through `internal/room-config/[code]`, and six by the WordPress SSO door at `(public)/sso/[code]`.
   `allowUsersToChangeUsername` is on the first two lists, and so now are `showPasswordField`,
-  `usernameInstructions` and `hasRequiredPhoneInLogin`, so the union is 56.
+  `usernameInstructions` and `hasRequiredPhoneInLogin`, so the union is 58.
+
+  43 -> 45 on 2026-08-14: `useMediaMTX` and `overlayUserIdOnScreenshare` joined with the Streams
+  pane. The first IS the Streams tab — the room derives `hideStreams` by negating it and hides both
+  the tab and the pane on that one value — and the second gates the viewer id printed over the
+  video for non-presenters.
 
   (Forty-three and 56 since 2026-08-14: the room gained its OWN login page — the reference always
   renders `app-session-login` and never auto-submits — and the five settings that drive it now
@@ -121,7 +126,15 @@ const EXPECTED_WIRED_SETTINGS = [
   'userUploads',
   'tokenExpiresIn',
   'usernameInstructions',
-  'webinarPW'
+  'webinarPW',
+  /*
+    Added 2026-08-14 with the Streams pane. `useMediaMTX` is the whole Streams tab — the reference
+    derives `hideStreams` by negating it and hides both the main-tab item and the pane on that one
+    value. `overlayUserIdOnScreenshare` gates the viewer id printed over the video for
+    non-presenters. Their manage-page neighbours, the two MediaMTX cluster ids, stay unwired.
+  */
+  'useMediaMTX',
+  'overlayUserIdOnScreenshare'
 ].sort();
 
 const fail = (message) => {

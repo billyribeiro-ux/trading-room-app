@@ -24,6 +24,7 @@ import {
   subscribeToRoom,
   type RoomEvent
 } from '$lib/server/room-events';
+import { startMtxReconcile, stopMtxReconcileIfEmpty } from '$lib/server/mtx-reconciler';
 import { error } from '@sveltejs/kit';
 import { requireRoomShortCode, requireUser } from '$lib/server/auth';
 import { hashEmail } from '$lib/server/connection';
@@ -89,6 +90,11 @@ export const GET: RequestHandler = async ({ params, locals, request }) => {
     closed = true;
     unsubscribe?.();
     if (heartbeat) clearInterval(heartbeat);
+    /*
+      After unsubscribing, so the count this reads already excludes this client. One timer per room,
+      stopped when the room empties — an idle room must not keep polling MediaMTX forever.
+    */
+    stopMtxReconcileIfEmpty(room);
     // Unsubscribing first means these already exclude this client.
     publishToRoom(room, {
       channel: 'roster',
@@ -187,6 +193,19 @@ export const GET: RequestHandler = async ({ params, locals, request }) => {
         channel: 'roster',
         data: { cmd: 'getRoster', users: roomRoster(room) }
       });
+
+      /*
+        Start reconciling this room's MediaMTX streams, if nothing already is.
+
+        Idempotent, so this route does not have to know whether it is the first client, and a no-op
+        when `MEDIA_API_URL` is unset — a deployment without MediaMTX runs no timers. One timer per
+        ROOM rather than per connection: ten members watching one room is one poll, not ten.
+
+        This is what makes the stream list correct rather than merely fast. `/internal/media-hook`
+        is a shell `curl` MediaMTX spawns, with no retry and no delivery guarantee, and it reaches
+        only the instance it happened to land on.
+      */
+      startMtxReconcile(room);
 
       // Proxies and browsers drop an idle stream. A comment every 25s keeps it open and costs
       // nothing; it is not an event, so no client handler sees it.

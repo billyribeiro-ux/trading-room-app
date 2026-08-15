@@ -65,7 +65,8 @@ async function browser(port, profile) {
     if (m.id === undefined) return;
     const x = pending.get(m.id);
     pending.delete(m.id);
-    m.error ? x.reject(new Error(JSON.stringify(m.error))) : x.resolve(m.result);
+    if (m.error) x.reject(new Error(JSON.stringify(m.error)));
+    else x.resolve(m.result);
   });
   const send = (method, params = {}, s) => {
     const i = ++id;

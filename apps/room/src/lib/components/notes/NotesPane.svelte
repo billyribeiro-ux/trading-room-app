@@ -1,11 +1,12 @@
 <script lang="ts">
   import BootboxDialog from '$lib/components/BootboxDialog.svelte';
-  import type { RoomNote } from '$lib/types';
+  import type { NoteVersion, RoomNote } from '$lib/types';
   import { onMount } from 'svelte';
   import { SvelteSet } from 'svelte/reactivity';
   import NoteEditor from './NoteEditor.svelte';
   import NoteTabContent from './NoteTabContent.svelte';
   import { safeNoteHtml } from './safe-html';
+  import { noteVersionRevertMessage } from './version-history';
 
   type PromptState =
     | { kind: 'new'; title: 'New Note name:'; value: '' }
@@ -13,6 +14,12 @@
 
   type ConfirmState =
     | { kind: 'delete'; noteId: number; message: 'Are you sure you want to delete this note?' }
+    /*
+      The one confirmation whose text is not a fixed string: `revertToVersion` in the reference
+      interpolates the version's own date into it, so the message is built by
+      `noteVersionRevertMessage` from the same value the row displays.
+    */
+    | { kind: 'restore'; noteId: number; versionId: number; message: string }
     | {
         kind: 'welcome';
         noteId: number;
@@ -29,8 +36,15 @@
     readonly newNoteOpen: boolean;
     readonly onCreate: (name: string) => RoomNote | void | Promise<RoomNote | void>;
     readonly onDelete: (noteId: number) => void | Promise<void>;
+    /*
+      Reads `api/notes/[noteId]/versions`, which refuses anything but a presenter of this room —
+      the history holds text that was edited away, so it is gated harder than the note itself.
+      Only ever called behind `canEdit`, which is that same authority as the client sees it.
+    */
+    readonly onLoadVersions: (noteId: number) => Promise<readonly NoteVersion[]>;
     readonly onNewNoteOpenChange: (open: boolean) => void;
     readonly onRename: (noteId: number, newName: string) => void | Promise<void>;
+    readonly onRestoreVersion: (noteId: number, versionId: number) => void | Promise<void>;
     readonly onSave: (noteId: number, contentHtml: string) => void | Promise<void>;
     readonly onSetWelcomeMat: (noteId: number, allRooms: boolean) => void | Promise<void>;
     readonly onUploadImages: (files: readonly File[]) => Promise<readonly string[]>;
@@ -43,8 +57,10 @@
     newNoteOpen,
     onCreate,
     onDelete,
+    onLoadVersions,
     onNewNoteOpenChange,
     onRename,
+    onRestoreVersion,
     onSave,
     onSetWelcomeMat,
     onUploadImages
@@ -59,6 +75,21 @@
   let confirm = $state<ConfirmState | null>(null);
   let mutationError = $state<string | null>(null);
   let noteTabChromeMounted = $state(false);
+  /*
+    Version history lives HERE rather than in `NoteEditor`, which is the component that shows it.
+
+    The editor sits inside a `{#key}` on the note's `updatedAt`, so it is destroyed and rebuilt
+    every time the note is saved — including by its own three-second autosave. Panel state kept
+    inside it would close itself under a presenter mid-read, and the list would be refetched by
+    each new instance.
+
+    The rows and the note they belong to are ONE value, not two: they are written together and are
+    only ever meaningful together, and a pair of variables is a pair that can drift. `$state.raw`
+    because it is replaced wholesale and never mutated, so a deep proxy would cost on every read
+    and buy nothing.
+  */
+  let loadedVersions = $state.raw<{ noteId: number; rows: readonly NoteVersion[] } | null>(null);
+  let showVersionHistory = $state(false);
 
   onMount(() => {
     noteTabChromeMounted = true;
@@ -73,6 +104,51 @@
   let effectivePrompt = $derived.by<PromptState | null>(() => {
     if (prompt !== null) return prompt;
     return newNoteOpen && canEdit ? { kind: 'new', title: 'New Note name:', value: '' } : null;
+  });
+  /*
+    Never show one note's history against another note's editor.
+
+    The fetch below is asynchronous, so between opening note B and its response arriving,
+    `loadedVersions` still holds note A's rows. Checking the id they were loaded for means that
+    window renders as empty — which hides the button, since the reference only offers it when there
+    is history — instead of briefly attributing A's edits to B.
+  */
+  let activeVersions = $derived(
+    loadedVersions !== null && loadedVersions.noteId === editingNoteId ? loadedVersions.rows : []
+  );
+
+  /*
+    A network read is a side effect, which is what this rune is for — the Svelte documentation names
+    "making network requests" in its first sentence. It is NOT a `$derived` in disguise: nothing
+    here can be computed synchronously from state, and `onLoadVersions` assigns nothing of ours.
+
+    It re-runs on the note's `updatedAt` as well as its id, because every save and every restore
+    writes a `note_versions` row, and `updatedAt` moving is the signal that one landed. That does
+    mean a GET per autosave while a presenter is actively typing; it is the price of the count on
+    the button being true, it is presenter-only, and it is bounded by the three-second timer.
+  */
+  $effect(() => {
+    const noteId = editingNoteId;
+    void activeNote?.updatedAt;
+    if (!canEdit || noteId === null) return;
+
+    let cancelled = false;
+    void (async () => {
+      try {
+        const rows = await onLoadVersions(noteId);
+        // The teardown ran while this was in flight: a later note, or none, is now being edited.
+        if (cancelled) return;
+        loadedVersions = { noteId, rows };
+      } catch (error: unknown) {
+        if (cancelled) return;
+        // Surfaced, not swallowed. A refusal here means the endpoint or the session is wrong.
+        mutationError = error instanceof Error ? error.message : 'Unable to load note versions.';
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   });
 
   function selectNote(noteId: number): void {
@@ -89,6 +165,18 @@
     requestedNoteId = noteId;
     editingNoteId = noteId;
     openMenuNoteId = null;
+    // A fresh editor opens with the panel shut, as a fresh `app-note` does: `showVersionHistory`
+    // is initialised to false in its constructor and the component is per-note.
+    showVersionHistory = false;
+  }
+
+  function requestRestore(noteId: number, version: NoteVersion): void {
+    confirm = {
+      kind: 'restore',
+      noteId,
+      versionId: version.id,
+      message: noteVersionRevertMessage(version.createdAt)
+    };
   }
 
   function requestRename(note: RoomNote): void {
@@ -163,6 +251,11 @@
         await onDelete(current.noteId);
         if (editingNoteId === current.noteId) editingNoteId = null;
         if (requestedNoteId === current.noteId) requestedNoteId = null;
+      } else if (current.kind === 'restore') {
+        await onRestoreVersion(current.noteId, current.versionId);
+        // The reference closes the panel as part of reverting, before the editor is rewritten.
+        showVersionHistory = false;
+        requestedNoteId = current.noteId;
       } else {
         await onSetWelcomeMat(current.noteId, current.allRooms);
         requestedNoteId = current.noteId;
@@ -253,10 +346,15 @@
               onDone={() => {
                 setDirty(activeNote.id, false);
                 editingNoteId = null;
+                showVersionHistory = false;
               }}
+              onRequestRestore={(version) => requestRestore(activeNote.id, version)}
               onSave={(contentHtml) => onSave(activeNote.id, contentHtml)}
               onSetWelcomeMat={(allRooms) => requestWelcome(activeNote.id, allRooms)}
               {onUploadImages}
+              onVersionHistoryOpenChange={(open) => (showVersionHistory = open)}
+              {showVersionHistory}
+              versions={activeVersions}
             />
           {/key}
         {:else}

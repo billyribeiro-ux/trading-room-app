@@ -262,7 +262,8 @@
           continue;
         }
         if (!rule.selectorText) continue;
-        let hit = false;
+        // No initialiser: the `catch` always continues, so a value here could never be read.
+        let hit;
         try {
           hit = el.matches(rule.selectorText);
         } catch {
@@ -363,7 +364,8 @@
       for (const rule of rules ?? []) {
         if (!rule.selectorText || !rule.selectorText.includes(':hover')) continue;
         const bare = rule.selectorText.replace(/:hover/g, '');
-        let hit = false;
+        // No initialiser: the `catch` always continues, so a value here could never be read.
+        let hit;
         try {
           hit = el.matches(bare);
         } catch {

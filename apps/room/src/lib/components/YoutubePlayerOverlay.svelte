@@ -10,8 +10,14 @@
   let { url, isPresenter, muted, onstop, onclose }: Props = $props();
 
   const videoUrl = $derived.by(() => {
+    /* Verbatim from the bundle (byte 1503474 / 1977968 / 2295405): the escapes are redundant to
+       a regex engine and kept because the capture is reproduced, not tidied. */
+    // eslint-disable-next-line no-useless-escape
     const videoPattern = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
     const videoId = url.match(videoPattern)?.[2] ?? null;
+    /* Verbatim from the bundle (byte 1503474 / 1977968 / 2295405): the escapes are redundant to
+       a regex engine and kept because the capture is reproduced, not tidied. */
+    // eslint-disable-next-line no-useless-escape
     const playlistId = url.match(/[?&]list=([^#\&\?]+)/)?.[1] ?? null;
     const mute = muted ? '&mute=1' : '';
 

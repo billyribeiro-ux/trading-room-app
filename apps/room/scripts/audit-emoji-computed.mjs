@@ -174,9 +174,8 @@ ws.onmessage = (event) => {
   const waiter = pending.get(message.id);
   if (!waiter) return;
   pending.delete(message.id);
-  message.error
-    ? waiter.reject(new Error(JSON.stringify(message.error)))
-    : waiter.resolve(message.result);
+  if (message.error) waiter.reject(new Error(JSON.stringify(message.error)));
+  else waiter.resolve(message.result);
 };
 const send = (method, params = {}) =>
   new Promise((resolve_, reject) => {

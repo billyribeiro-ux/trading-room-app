@@ -99,7 +99,8 @@ function queryAll(pool, selector) {
         const name = part.slice(1, -1).split('=')[0];
         return node.getAttribute(name) !== null;
       }
-      return node.tagName.toLowerCase() === part.split(/[.\[:]/)[0];
+      // `[` needs no escape inside a character class; the three members are `.`, `[` and `:`.
+      return node.tagName.toLowerCase() === part.split(/[.[:]/)[0];
     })
   );
 }

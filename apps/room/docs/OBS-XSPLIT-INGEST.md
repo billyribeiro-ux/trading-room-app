@@ -139,7 +139,23 @@ Two divergences, both deliberate and both visually identical:
    invalid HTML with no effect.
 
 One addition the reference has no equivalent for: when `STREAM_SERVER_MTX` is unset the panel says
-so, rather than composing `http://:8889/…`. An absent value is reported, never filled in.
+so, rather than composing `https://:8889/…`. An absent value is reported, never filled in.
+
+**One deliberate divergence, and the only one in this feature: the SCHEMES.** The reference builds
+`http://…:8889/…/whip` and `rtmp://…?jwt=…` (both quoted verbatim above, from byte 2157950). This
+application builds `https://` and `rtmps://…:1936`.
+
+Those URLs carry a **publish** token — thirty days, write access to a named room path. On plain HTTP
+the WHIP `Authorization: Bearer` header is readable by anything on the network path; on plain RTMP
+the token is *in the URL*, inside the connection handshake, where an observer need only watch.
+Presenters stream from hotel and conference networks routinely, and this is a multi-tenant fintech
+application: the failure mode is one tenant publishing into another tenant's room.
+
+It is the same rule `ScreenTabs` already applies to `aria-selected` and `tabindex` — a capture is
+reproduced unless reproducing it locks a real person out — applied to the stronger case.
+`stream-ingest.test.ts` pins both halves: that the reference really is cleartext, so this is a
+decision and not a misreading, and that ours never emits a cleartext scheme. The server half is
+`webrtcEncryption: yes` and `rtmpEncryption: strict` in `ops/mediamtx/mediamtx.yml.example`.
 
 ## 5. Authorising the publish — MediaMTX's side
 
@@ -185,11 +201,15 @@ the other; the crossover is refused as `wrong-scope` and has a test each way.
 authMethod: http
 authHTTPAddress: https://<controller-host>/internal/media-auth
 
-# WHIP. 8889 is the port in the reference's own ingest URL.
+# WHIP. 8889 is the port in the reference's own ingest URL. TLS is OURS — see the divergence note
+# in section 4: the publish credential is a thirty-day Bearer and may not cross a network in clear.
 webrtcAddress: :8889
+webrtcEncryption: yes
 
-# RTMP, standard port, which is why the reference's rtmp:// URL carries none.
-rtmpAddress: :1935
+# RTMPS. `strict` refuses plaintext outright. 1936 is MediaMTX's TLS listener and is NAMED in the
+# publish URL, unlike plain RTMP's 1935 which every encoder assumes.
+rtmpEncryption: strict
+rtmpsAddress: :1936
 
 # HLS is the PLAYBACK path — `index.m3u8`, served over TLS on 443 by the proxy in front of this.
 hls: yes
@@ -197,28 +217,49 @@ hlsAddress: :8888
 hlsVariant: lowLatency
 hlsAlwaysRemux: yes
 
+# The control API, which the room POLLS for the true stream list. `127.0.0.1:9997` is the default
+# and it is localhost-only unless configured otherwise, so this is an internal address — point the
+# room's MEDIA_API_URL at it, never at the public media host.
+api: yes
+
 paths:
   # One path per presenter per room, named room__<shortCode>__<name>.
   '~^room__.*$':
-    # Tell the controller when a stream goes live and when it stops, so the room can raise
-    # `mtxStartStream` / `mtxStopStream`. NOTE: these are the CURRENT hook names —
-    # `runOnReady`/`runOnNotReady` were the old ones and no longer exist.
+    # Tell the ROOM when a stream goes live and when it stops, so it can raise `mtxStartStream` /
+    # `mtxStopStream`. NOTE: these are the CURRENT hook names — `runOnReady`/`runOnNotReady` were
+    # the old ones and no longer exist.
     runOnAvailable: >
-      curl -sS -X POST https://<controller-host>/internal/media-hook
+      curl -sS -X POST https://<room-host>/internal/media-hook
+      -H "authorization: Bearer $MEDIA_HOOK_SECRET"
       -H 'content-type: application/json'
       -d "{\"event\":\"available\",\"path\":\"$MTX_PATH\"}"
     runOnUnavailable: >
-      curl -sS -X POST https://<controller-host>/internal/media-hook
+      curl -sS -X POST https://<room-host>/internal/media-hook
+      -H "authorization: Bearer $MEDIA_HOOK_SECRET"
       -H 'content-type: application/json'
       -d "{\"event\":\"unavailable\",\"path\":\"$MTX_PATH\"}"
 ```
 
-Hook environment variables, from https://mediamtx.org/docs/usage/hooks: `MTX_PATH`, `MTX_QUERY`,
-`MTX_SOURCE_TYPE`, `MTX_SOURCE_ID`, `RTSP_PORT`.
+**The hook goes to the ROOM, not the controller, and an earlier version of this file had it wrong.**
+The thing a hook has to reach is the SSE fan-out, and that lives in the room —
+`src/lib/server/room-events.ts`, a process-local hub. The controller has no way to push to a room's
+connected members, so a hook delivered there would have had nowhere to go.
 
-**`/internal/media-hook` is not built.** It is named here because the configuration above is what
-the design expects, and writing a config that points at nothing would be worse than saying so. See
-§6.
+`$MEDIA_HOOK_SECRET` is a **separate** value from `ROOM_JWT_SECRET`, deliberately: it ends up in this
+config file, in the media host's process table, and in whatever provisioning tool wrote it, and the
+room's session signer does not belong on a media box. Unset in the room means the hook route refuses
+everything — which is the correct closed state, and costs latency rather than correctness, because
+the reconcile below is what keeps the list true.
+
+Hook environment variables, from https://mediamtx.org/docs/usage/hooks: `MTX_PATH`, `MTX_QUERY`,
+`MTX_SOURCE_TYPE`, `MTX_SOURCE_ID`, `RTSP_PORT`, **and the regex capture groups `G1, G2, …`**. That
+last one was missed on the first pass and is worth knowing: a path pattern with capture groups hands
+the room key and the name to the command directly, instead of it re-parsing `$MTX_PATH` in shell.
+
+**`/internal/media-hook` is BUILT** (2026-08-14) — `apps/room/src/routes/internal/media-hook/`. It is
+one of only two routes reachable without a cookie, and it authenticates with a constant-time bearer
+comparison; see `media-hook-contract.test.ts`. See §6 for why it is the fast path and not the correct
+one.
 
 ## 6. How a stream becomes visible in the room — fully READ, partly built
 

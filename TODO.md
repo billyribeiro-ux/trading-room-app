@@ -15,6 +15,190 @@ will fetch it. A gap recorded in only one app's document is a gap the next perso
 
 ---
 
+## ⛔ NEITHER FRONTEND APP HAS A CI QUALITY GATE — opened 2026-08-14 20:19 EDT
+
+This is the largest open gap in the repository and it is not about any one feature.
+
+`.github/workflows/` contains exactly two workflows: `backend-quality.yml`, which gates Rust and
+skips itself when a revision does not touch `services/**`, and `smoke.yml`, which runs AFTER a
+deployment. **Nothing runs `lint`, `check`, `test` or `build` for `apps/controller` or `apps/room` on
+a push or a pull request.** The controller has a `quality` script that chains all of them; nothing
+invokes it.
+
+It was believed otherwise, in writing: `apps/controller/eslint.config.js` justified ignoring
+`apps/**` on the grounds that the room has "its own gate (the `room` job in
+`.github/workflows/quality.yml`)". **That file has never existed in this repository.** The comment
+has been corrected.
+
+Consequences already observed rather than predicted: the room had no linting at all, and a
+verification probe (`room-config-seam-e2e.mjs`) shipped a template literal terminated early by
+backticks inside a comment — evaluating `<string> || isPresenter` against a page with no such
+variable. Both were found by running the tools by hand on 2026-08-14, not by CI.
+
+**What closing it means:** a `quality.yml` with a job per app running `lint`, `check`, `test` and
+`build`, path-filtered the way the backend job already is, plus a required-checks setting so a red
+gate blocks a merge. Note that `main` auto-deploys, which is exactly why this matters.
+
+## Room lint is GREEN — and of the five gaps it exposed, THREE are real
+
+ESLint reached the room for the first time on 2026-08-14 and reported 123 problems. All are
+resolved; `pnpm lint` exits 0 and the room step of `quality.yml` is green.
+
+**Five of them were not lint problems. Two turned out to be redundancy and were removed; three were
+genuine missing behaviour and are now all three built.**
+
+### Closed — they were second sources of truth, not missing features
+
+- **`extraChatColumnWasEnabled`** — removed. Upstream needs that flag because it MUTATES
+  `preferences.extraChatColumn` to hide the column and must remember what it destroyed. Ours never
+  writes the preference: `extraChatColumnVisible` derives from `extraChatColumn &&
+  !chatCollapsedByMode`, so clearing the collapse restores the column by construction. **An earlier
+  note here claimed the missing read meant the column "never comes back". That was wrong** — it was
+  the design that differed, not the wiring. A variable being unread is evidence of nothing on its own.
+- **`muted`** — removed, with its write. Every consumer derives `volume === 0`, which the screen
+  panes are passed directly.
+
+### Closed 2026-08-14 21:05 — the extra chat column now follows its own messages
+
+`extraChatScroller` was handed back by `onscrollerready` and read by nothing, so a message arriving
+in the second column left the view where it was while the main chat scrolled — the reader simply did
+not see it. It now has an autoscroll effect that is a deliberate parallel of the main chat's: same
+four conditions, its OWN `extraChatScrollingUp` flag, and its own effect rather than a loop over both
+columns, so a reader scrolled up in one is not yanked by traffic in the other. Four assertions in
+`extra-chat-column-contract.test.ts`, negative-controlled by passing the wrong column's flag.
+
+### Closed 2026-08-14 22:03 — note Version History is reachable, and it is the LAST of the five
+
+`loadNoteVersions` now has a consumer. All five gaps ESLint exposed are closed: two were redundancy
+and were removed, three were real behaviour and are built.
+
+**The evidence turned out to be one file, not a bundle offset.** An earlier note here located the UI
+at `main.d6d3c112b59b7d0d.js` byte 1460764 and listed const indices 16, 17 and 21-25 as "the only
+remaining unknown". `docs/source/components/app-note.full.js` is that same component already
+extracted — 1287 readable lines including its whole `consts` table — and reading it end to end
+settled every open question at once, plus two the note had got wrong:
+
+- **No server action was needed.** The note said "`revertToVersion(v)` needs a server action; the
+  read route exists, the write does not." Both already existed: `restoreNoteVersion` in
+  `notes-repository.ts`, its Zod command, its form action at `+page.server.ts:706`, and tests. The
+  reference does not use a bespoke endpoint either — it reverts by writing the note back through the
+  ordinary `saveSessionNote`. **The whole feature was one client surface away from done.**
+- **The reference's history is `localStorage`, not a server.** `loadVersionsFromStorage` reads
+  `note_versions_${tab._id}` and `maxVersions = 3`. Ours is a room-scoped, presenter-gated table with
+  no cap — strictly stronger, and the reason our rows key on a primary key where the reference tracks
+  by `timestamp`.
+
+Built from that file and nothing else: consts 13 and 16-25 for every class, `C0e` for the toggle
+(absent rather than disabled when there is no history, label carrying the count, `active` while
+open), `w0e` for the panel as a SIBLING of the button bar, `S0e` for a row, and the five
+`.version-history-panel` rules transcribed value for value from `app-note.component.css`.
+
+**Two deliberate divergences, both recorded in the code:**
+
+1. The preview goes through `safeNoteHtml`, not the reference's `noSanitize` → `innerHTML`. Its
+   `getVersionPreview` strips tags with a regex, which leaves entity-encoded markup completely
+   intact — that string is not sanitised and was never meant to be.
+2. The panel's state lives in `NotesPane`, not `NoteEditor`, because the editor sits inside a
+   `{#key}` on `updatedAt` and its own three-second autosave changes `updatedAt`. State kept in the
+   editor would close the panel under a presenter mid-read.
+
+`note-version-history.test.ts` — 17 assertions pinning BOTH halves, what the capture contains and
+what we render. Negative-controlled twice: removing `class:active` and changing the tag substitution
+from a space to the empty string each turned it red.
+
+### Closed 2026-08-14 22:19 — Edit Carousel, and the carousel is now testable
+
+The same `T0e` renders an **Edit Carousel** button (const 14, `fas fa-images`) when `carouselInNote`
+is true, calling `editCarousel()` to reopen an existing carousel. Ours could insert one and never
+re-open it. Built, along with `M0e`'s two label swings — the heading between `Insert`/`Edit Image
+Carousel` and the submit button between `Insert Carousel`/`Save Changes`.
+
+**The heading was wrong before this and is corrected.** It read "Insert an image carousel", which is
+the text of the TOOLBAR BUTTON's tooltip in `carouselButton()`, not of the modal title in `M0e`.
+
+**The node moved out of the component**, into `components/notes/carousel.ts`: the Tiptap node, the
+three parsers, `numericRange`, and two document queries (`hasCarousel`, `findCarousel`). None of it
+was ever component state, and inside a `.svelte` file the round trip that actually matters — stored
+HTML → node attributes → stored HTML — could only be checked by eye. `note-carousel.test.ts` now
+builds a **real Tiptap document under jsdom** and reads it back: 22 assertions covering the
+reference's own emitted markup, the malformed-attribute fallbacks, in-place replacement leaving the
+surrounding paragraphs untouched, and a carousel nested in a blockquote that a top-level scan misses.
+
+**One deliberate divergence.** The reference takes the FIRST carousel — `querySelector` returns it,
+and `replaceCarouselInEditor` replaces it — so in a note holding two, the second can never be edited
+and trying to edit it silently overwrites the first. That is data loss, not a missing feature. When
+the user has actually selected one, that is the one edited. With a single carousel, which is every
+captured note, the two are identical. Negative-controlled: dropping the selection preference turns
+the suite red.
+
+### Closed 2026-08-14 22:26 — stream tabs are labelled with the presenter's real name
+
+The tab read `Dana_Vero`. `ingestPathFor` collapses everything outside `[a-zA-Z0-9_-]` to `_` before
+the media server sees a name, and `/v3/paths/list` reports paths and nothing else, so the sanitiser's
+underscores were the only name available. That transformation is ONE-WAY — "Dana Vero", "Dana_Vero"
+and "Dana/Vero" all land on the same string — which is why it was never un-mangled by guessing.
+
+**The room already knew, and was throwing it away.** `api/stream-ingest` is the room's own route and
+holds both halves at the moment a key is minted: the connected member, and the `ingestPath` the
+controller answered with. That pairing is now written to `stream_ingest_names`, keyed on
+`(room_short_code, ingest_path)`, and the reconciler reads the whole room in one query per poll.
+
+Two alternatives were considered and rejected, both recorded at the schema:
+
+- **Matching sanitised display names against the roster** — a heuristic that breaks on two members
+  who sanitise alike, and on a presenter whose session expired while OBS kept publishing.
+- **Asking the controller per reconcile** — a network round trip every five seconds per room, for a
+  value that changes only when somebody presses "New Link".
+
+`user_id` is stored rather than the name, so renaming a member relabels their tab. An absent record
+falls back to the path segment, which is exactly what the tab showed before — degraded, never wrong —
+and a whitespace-only display name falls back too rather than rendering a tab with no label.
+
+`stream-names.test.ts`, 11 assertions. Negative-controlled: dropping the room predicate from
+`streamNamesForRoom` turned the cross-room test red.
+
+**Known limitation, stated rather than discovered later:** deltas are keyed on the path, so a
+presenter who renames themselves mid-stream keeps the label they started with until the stream stops
+and restarts. Relabelling would mean emitting a delta, which tears down the `<video>` element and its
+hls.js instance to change a string.
+
+### Evidence gaps
+
+**Whether a real browser serialises `background:#111` as `rgb(17, 17, 17)` — UNVERIFIED, and it
+matters.** Writing the jsdom test surfaced that Tiptap's `getHTML()` returns CSSOM-normalised style
+attributes there: `width:50.000000%` comes back `width: 50%`, and `background:#111` comes back
+`background: rgb(17, 17, 17)`. Both sanitiser allow-lists — `safe-html.ts` client-side and
+`server/notes.ts` line 123 — accept `background` only as `/^#111$/i`, so **if** a browser normalises
+the same way, every carousel saved through our editor loses its black backing.
+
+I do not believe it does: `setAttribute('style', …)` preserves the attribute verbatim in Chrome, and
+the server sanitiser is `sanitize-html` over `htmlparser2`, a string parser with no CSSOM at all. So
+this is most likely a jsdom artefact and **nothing has been changed on the strength of it** —
+widening a sanitiser allow-list to defend against a behaviour I have not observed is exactly the
+speculative change this file exists to prevent.
+
+- **What is missing:** one look at `editor.getHTML()` in a real browser after inserting a carousel.
+- **Where I looked:** `carousel.ts` `renderHTML`, `safe-html.ts` `TAG_STYLE_RULES.div.background`,
+  `server/notes.ts:123`, and the jsdom output pinned in `note-carousel.test.ts`.
+- **What it blocks:** nothing today. It decides whether the allow-lists need a second accepted form.
+
+| count | rule | what they were |
+| --- | --- | --- |
+| 8 | `@typescript-eslint/no-unused-vars` | unused imports and locals; **check each** — one in the controller turned out to be a prop passed at six sites and read nowhere |
+| 13 | `svelte/no-unused-svelte-ignore` | stale `svelte-ignore` comments; the Svelte MCP autofixer flags the same ones |
+| 5 | `no-useless-assignment` | initialisers that can never be read |
+| 2 | `no-regex-spaces` | literal runs of spaces in a regex |
+| 2 | `@typescript-eslint/no-this-alias` | in the browser-console collectors |
+| 2 | `@typescript-eslint/no-explicit-any` | plus one stale disable directive beside them |
+| 1 | `@typescript-eslint/ban-ts-comment` | a `@ts-nocheck` in `scripts/lib/const-table.mjs` |
+
+Not one is a lint-config question; they are all real edits. **`no-unused-vars` in particular must be
+read rather than auto-deleted** — the same rule in the controller surfaced `markUnwired`, a
+documented prop with six call sites and no consumer, which is a feature gap wearing the costume of a
+style warning.
+
+---
+
 ## State, 2026-08-14 15:44 EDT
 
 Eight rows remain, and **not one of them is blocked on effort**. Every item that could be built from
@@ -87,17 +271,79 @@ by 12/12 live HTTP checks including genuine 200s.
 no client-side MediaMTX connection to reproduce — the service keeps a list and selects tabs, and the
 `<video>` element does the rest.
 
-**What is left is four named pieces, blocked on ONE thing rather than on evidence:**
-`/internal/media-hook`, the room's `mtxStreams` list, the stream tabs
-(`app-presentationarea.full.js:589-618`, including the "No one is streaming right now..." empty
-state), and the `app-streaming-view` equivalent (whose full hls.js configuration — three buffer
-levels, `lowLatencyMode`, the optimal→balanced→conservative ladder — is transcribed in
-`OBS-XSPLIT-INGEST.md` §6). The blocker: `producerID` and `mediaValue` come from the SERVER's stream
-object, and `services/**` is an import-governed mirror, so that shape is not ours to author here.
+**The four named pieces — two BUILT 2026-08-14, two remaining.**
+
+- ✅ the room's `mtxStreams` list — `apps/room/src/lib/mtx-streams.ts`, `MtxHandlerService`
+  transcribed as pure functions with 21 tests.
+- ✅ the `app-streaming-view` equivalent — `StreamingView.svelte`, the full hls.js configuration
+  (three buffer levels, `lowLatencyMode`, the optimal→balanced→conservative ladder) and the five
+  sub-templates from bundle byte 1901148.
+- ✅ the stream TAB BAR — `StreamTabs.svelte` (`RSe`, `:543-588`) with
+  `stream-tabs-contract.test.ts`. **NOT reusable from `ScreenTabs`**: that component renders
+  `img.presenter-img` and `{name}-{screenName}` unconditionally, and `RSe` renders neither.
+- ✅ the `#streams` PANE — `OSe`, `:589-618` — BUILT 2026-08-14, and the Streams main tab opens.
+  `useMediaMTX` and `overlayUserIdOnScreenshare` now cross the config boundary (56 → 58 wired), the
+  playback token arrives with the page from `/internal/stream-read/{code}`, and the pane reproduces
+  the `disableVideo` gate that blanks `#screens` — the same preference blanks BOTH panes upstream
+  (`O(41, disableVideo ? 41 : 42)` at `:5388-5393`).
+- ✅ the three `cmds` commands — BUILT 2026-08-14. **The two names are NOT the same thing and this
+  cost a wrong draft:** `getSessionMTXMediaState` (MTX in the MIDDLE) is the WIRE command in both
+  directions, payload `data`; `getSessionMediaStateMTX` (MTX at the END) is an INTERNAL bus event
+  upstream carrying no payload. `mtxStartStream`/`mtxStopStream` carry the stream under `muser`.
+  Validated by `isMtxStream` at the wire boundary — a deliberate divergence, because upstream pushes
+  `i.muser` in unchecked and two of its fields are interpolated into a playlist URL.
+- ✅ `/internal/media-hook` **and the reconcile** — BUILT 2026-08-14. **Hooks for latency,
+  reconciliation for truth.** The hook is a `curl` MediaMTX spawns, with no retry and no delivery
+  guarantee, reaching only the instance it lands on; `mtx-reconciler.ts` polls `/v3/paths/list` per
+  room from every process, which is instance-independent. Polling is a STATED DIVERGENCE — the
+  reference does not poll, because a SocketCluster socket has delivery semantics a spawned shell
+  command does not.
+  - It emits **deltas, never the full list on a timer**: `applySessionMediaState` moves the
+    selection to `list[0]` every time it runs, so a repeated full-list apply would drag every
+    viewer's tab back to the first stream every five seconds. Both halves are asserted.
+  - `available`, **never the deprecated `ready`** — from the project's own `api/openapi.yaml`.
+  - `MEDIA_HOOK_SECRET` is separate from `ROOM_JWT_SECRET` on purpose: it ends up in a media host's
+    config file. `MEDIA_API_URL` is MediaMTX's control API, `127.0.0.1:9997` and localhost-only.
+  - The ingest doc had the hook POSTing to the CONTROLLER, which was wrong — the SSE fan-out is in
+    the ROOM. Corrected.
+
+**What remains before OBS ingest is end-to-end: a MediaMTX host.** Every piece of room and controller
+code is now built and tested. What cannot be produced without the host is a real encoder publishing
+and a real viewer watching — see the note above on `STREAM_SERVER_MTX`.
+
+**Known limitation, inherited and not introduced.** `publishToRoom` is process-local, so a hook
+reaches only one instance's subscribers, and the room defaults to the Vercel adapter. Every existing
+realtime feature has this, `focusOnScreen` included. The reconcile is what keeps the stream list
+correct regardless; the durable fix is TODO entry 5 (PostgreSQL `room_events`, already listened on by
+`services/api`).
+
+**The two dead `svelte.config 2.js` files were REMOVED 2026-08-14**, along with `TODO 2.md`. Kit 3
+takes its configuration through the Vite plugin and **errors** on a real `svelte.config.js`, so only
+the `" 2"` in those names kept them harmless — renaming one back would have broken the build. Zero
+tracked duplicate-named files remain.
+
+**The "not ours to author" blocker this row used to claim was WRONG, and it is retracted.** The
+`muser` shape is fully determined by the bundle: `_id` (identity, tab id `${_id}-tab`, pane id, and
+the video element `video-${muser._id}`), `sessionID` and `producerID` (the two playlist path
+segments), `mediaValue.name` (the tab label) and `mediaValue.serverName` (the `__reb` decision).
+Every one of those is READ by a view in the capture. Nothing about it needed authoring in
+`services/**`.
 
 **Note for whoever builds the hooks: they are `runOnAvailable`/`runOnUnavailable`.
 `runOnReady`/`runOnNotReady`, which this row previously named, were renamed and no longer exist**
 (mediamtx.org/docs/usage/hooks).
+
+**FOUR CONTROLS IN THE STREAM TAB ARE INERT UPSTREAM — do not "finish" any of them by guessing.**
+Established 2026-08-14 and each pinned by a test in `stream-tabs-contract.test.ts`: the forced eye
+badge (`forcedScreenMTXID` — 2 occurrences in the whole bundle, one of them `=""`, no writer); the
+lock badge (`lockedScreenIDMTX` — 4 occurrences, one `=""`, three reads, no writer); "Lock Screen"
+(`toggleLockScreenMTX(e){console.error("TODO: toggleLockScreenMTX")}`); and "Bring everyone here",
+which sends a real `focusOnScreen` command that **no recipient can resolve**, because every
+receiver scans `mediaService.screenSharingUsers` and never `mtxHandlerService.mtxStreams`. They are
+rendered because a viewer of the reference sees them, and they are prop-driven so the branches stay
+reachable if the protocol is ever captured. **The badge reads `lockedScreenIDMTX` while the menu
+label reads `lockedScreenID` — an upstream asymmetry, reproduced deliberately and guarded in both
+directions, because collapsing the two props is the obvious tidy-up and is invisible by eye.**
 
 **One decision unblocks X, AC and R's row 10, and it is not "build server-side recording".** Established
 2026-08-14 from the bundle: the reference hands recording to **MediaMTX**, an off-the-shelf media

@@ -24,6 +24,580 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-14
 
+### 2026-08-14 22:26 EDT — stream tabs carry the presenter's real name
+
+**Runtime impact: yes.** A stream tab is labelled `Dana Vero` instead of `Dana_Vero`. Adds one
+SQLite table, `stream_ingest_names`. On `feat/extra-chat-column`.
+
+**Why it read wrong.** `ingestPathFor` collapses everything outside `[a-zA-Z0-9_-]` to `_` before a
+name reaches the media server, and `/v3/paths/list` returns paths and nothing else. The only name
+recoverable was the sanitiser's output, and that transformation is one-way — "Dana Vero",
+"Dana_Vero" and "Dana/Vero" all produce the same string. It was never un-mangled by guessing,
+because turning `_` back into a space renames anybody who genuinely uses one.
+
+**The room already had the answer and discarded it.** `api/stream-ingest` is the room's own route
+and holds both halves at mint time: the connected member, and the `ingestPath` the controller
+returned. That pairing is now recorded, keyed on `(room_short_code, ingest_path)` with the room IN
+the key rather than beside it, and the reconciler reads the whole room in one query per poll —
+hoisted out of the pagination loop, so it is one query per reconcile and not one per page.
+
+Two alternatives were rejected and the reasons are at the schema: matching sanitised display names
+against the roster is a heuristic that breaks on two members who sanitise alike and on a presenter
+whose session expired while OBS kept publishing; asking the controller per reconcile is a round trip
+every five seconds per room for a value that changes only on "New Link".
+
+`user_id` is stored rather than the name, so a rename relabels the tab. An absent record falls back
+to the path segment — exactly what the tab showed before, degraded rather than wrong — and so does a
+whitespace-only display name, which would otherwise render a tab with no label at all.
+
+**Known limitation, recorded rather than left to be discovered:** deltas are keyed on the path, so a
+presenter renaming themselves mid-stream keeps their original label until the stream restarts.
+Relabelling would mean emitting a delta, which tears down the `<video>` element and its hls.js
+instance to change a string.
+
+**Verified:** `svelte-check` 1038 files, 0 errors 0 warnings; `pnpm lint` exits 0; 108 tests across
+the six stream suites green, 11 of them new. **Negative-controlled:** removing the room predicate
+from `streamNamesForRoom` turned the cross-room assertion red, and was restored. A single-path
+helper was written, found to have no caller but its own test, and deleted. **Not run:** the full
+gate. **Still unproven end to end:** there is no MediaMTX host, so no tab has ever been rendered
+from a real `/v3/paths/list`.
+
+### 2026-08-14 22:19 EDT — Edit Carousel, and the carousel becomes testable
+
+**Runtime impact: yes.** A carousel already in a note can be reopened and edited. On
+`feat/extra-chat-column`.
+
+**What was missing.** The reference's `T0e` renders an **Edit Carousel** button (const 14,
+`fas fa-images`) whenever `carouselInNote`, calling `editCarousel()` to pull an existing carousel's
+interval, height and slides back into the same modal. Ours could insert one and never re-open it.
+Found while reading `app-note.full.js` for the version-history work and recorded then rather than
+built, so this closes it. `M0e`'s two label swings came with it — the heading between `Insert` and
+`Edit Image Carousel`, the submit button between `Insert Carousel` and `Save Changes`.
+
+**A pre-existing string was wrong and is corrected.** The modal heading read "Insert an image
+carousel", which is the TOOLBAR BUTTON's tooltip in `carouselButton()`, not the modal title in `M0e`.
+
+**The node moved out of the component.** `components/notes/carousel.ts` now holds the Tiptap node,
+the three parsers, `numericRange`, and two document queries. None of it was component state, and
+inside a `.svelte` file the round trip that matters — stored HTML → node attributes → stored HTML —
+could only be checked by eye. It is now checked against a **real Tiptap document under jsdom**:
+`note-carousel.test.ts`, 22 assertions, including in-place replacement leaving the surrounding
+paragraphs untouched and a carousel nested in a blockquote that a top-level scan would miss.
+
+**One deliberate divergence.** The reference takes the FIRST carousel and replaces the FIRST, so in a
+note holding two the second is uneditable and editing it silently overwrites the first — data loss,
+not a missing feature. A selected carousel now wins. With one carousel, every captured note, the two
+are identical.
+
+**Something the test surfaced, recorded UNVERIFIED rather than acted on.** Under jsdom, Tiptap's
+`getHTML()` returns CSSOM-normalised styles — `background:#111` comes back `rgb(17, 17, 17)`, which
+neither sanitiser allow-list accepts. Almost certainly a jsdom artefact: Chrome preserves a
+`setAttribute('style', …)` value verbatim, and the server sanitiser is `sanitize-html` over
+`htmlparser2`, a string parser with no CSSOM. **Nothing was changed on the strength of it** —
+widening a sanitiser allow-list against unobserved behaviour is speculation. In `TODO.md` under
+Evidence gaps, needing one look in a real browser.
+
+**Verified:** `svelte-check` 1036 files, 0 errors 0 warnings; `pnpm lint` exits 0; 77 tests across
+all eleven note suites green. **Negative-controlled:** dropping the selection preference from
+`findCarousel` turned the suite red, and was restored. **Not run:** the full gate, and no browser —
+the button has not been seen rendered.
+
+### 2026-08-14 22:03 EDT — note Version History, and the evidence that was one file away
+
+**Runtime impact: yes.** Presenters editing a note now get the Version History toggle and panel, and
+can revert to an earlier version. On `feat/extra-chat-column`.
+
+**The server half was already finished.** `restoreNoteVersion` (repository, Zod command, form action
+at `+page.server.ts:706`, tests), `getNoteVersions`, and the presenter-gated
+`api/notes/[noteId]/versions` route all existed and were tested. `loadNoteVersions` in `+page.svelte`
+fetched that route and nothing called it, carrying an `eslint-disable` for the unused-symbol warning.
+This change is the client surface, and only that.
+
+**A prior note in `TODO.md` was wrong on two points, and reading the evidence corrected both.** It
+said a server action still had to be written for the revert — it did not, and the reference does not
+use a bespoke endpoint either: `revertToVersion` writes the note back through the ordinary
+`saveSessionNote`. It also implied the history was server-side upstream; `loadVersionsFromStorage`
+reads `localStorage` under `note_versions_${tab._id}` with `maxVersions = 3`. Ours is a room-scoped,
+presenter-gated table with no cap, which is why our rows key on a primary key where the reference
+tracks by `timestamp`.
+
+**Where the evidence actually was.** The note pointed at `main.d6d3c112b59b7d0d.js` byte 1460764 and
+listed const indices 16, 17 and 21-25 as the last unknown.
+`docs/source/components/app-note.full.js` is that component already extracted — 1287 readable lines,
+its whole `consts` table included. Reading it end to end answered every question in one pass. This is
+the second time this week that reading a whole file beat resuming a search at an offset.
+
+**Built:** `C0e` as the toggle (absent rather than disabled when there is no history, label carrying
+the count, `active` while open, consts 16/17), `w0e` as a panel that is a SIBLING of the button bar,
+`S0e` as one row per version, and the five `.version-history-panel` rules transcribed value for value
+from `app-note.component.css`.
+
+**Two deliberate divergences, both commented at the code:**
+
+1. The preview reaches the DOM through `safeNoteHtml`, not the reference's `noSanitize` →
+   `innerHTML`. `getVersionPreview` strips tags with a regex, which leaves entity-encoded markup
+   fully intact — it is not a sanitiser and was never meant to be one.
+2. The panel's open state and its rows live in `NotesPane`, not `NoteEditor`. The editor sits inside
+   a `{#key}` on `updatedAt` and its own three-second autosave moves `updatedAt`, so state held in
+   the editor would close the panel under a presenter mid-read.
+
+**Verified:** `svelte-check` 1034 files, 0 errors 0 warnings; `pnpm lint` exits 0;
+`note-version-history.test.ts` 17/17 plus the five neighbouring note suites, 26 tests, all green.
+**Negative-controlled twice** — removing `class:active` and changing the tag substitution from a
+space to the empty string each turned the suite red, and each was restored. The Svelte MCP autofixer
+reported no issues on `NotesPane`; its one substantive suggestion (state assigned inside `$effect`)
+led to collapsing the rows and their note id into a single `$state.raw` value so the two cannot
+drift. **Not run:** the full gate, and no browser — the panel has not been seen rendered.
+
+### 2026-08-14 21:05 EDT — the second chat column follows its own messages
+
+**Runtime impact: yes.** The extra chat column now scrolls to new messages. On
+`feat/extra-chat-column`.
+
+**What was broken.** `onscrollerready` handed the column's scroll container back and nothing read
+it. `alertsScroller` and `chatScroller` each drive a `forceAlertsToBottom` / `forceChatToBottom`
+effect; the second column had neither. A message arrived, the view stayed where it was, and the
+reader did not see it — on a feature whose entire purpose is watching a second channel.
+
+ESLint found it, as an "assigned a value but never used". That is three times in one day the same
+rule surfaced something that was not a style problem, and the reason it kept working is that an
+unread variable is ambiguous: it is equally the signature of a missing feature and of one done a
+better way. Two of the five turned out to be redundancy and were removed; this one was real.
+
+**Built as a parallel, not a new design.** The same four conditions as the main chat — first view,
+channel switch, new message, and the reader's own position through `shouldAutoScrollForMessage` —
+the same `tick()` before measuring, and the same identity re-check after the await so a scroller
+swapped out mid-await is never written to.
+
+**It is its own effect, deliberately.** One effect reading both columns would re-run each column's
+scroll logic whenever the other changed: "a message arrived anywhere" instead of "a message arrived
+here". The visible consequence would be a reader scrolled up in one column getting yanked to the
+bottom by traffic in the other. The contract test asserts the separation, and asserts that the
+condition reads `extraChatScrollingUp` rather than the main column's flag — **negative-controlled by
+substituting `chatScrollingUp` and watching exactly that assertion go red.**
+
+**Verified.** Room `pnpm lint` exit 0, `svelte-check` 0 errors / 0 warnings across 1032 files,
+**1203/1203** (four new assertions), `extra-chat-column-contract` 26/26.
+
+### 2026-08-14 21:01 EDT — two of the five "gaps" were mine to unclaim
+
+**Runtime impact: none.** Two redundant variables removed, one false claim retracted, one contract
+test corrected. On `feat/extra-chat-column`.
+
+**I reported a bug that does not exist, and this entry is the retraction.** An hour earlier I wrote
+that `extraChatColumnWasEnabled` being written-and-never-read meant "a column hidden by webinar mode
+never comes back when it ends". It comes back. Upstream needs that flag because it MUTATES
+`preferences.extraChatColumn` to hide the column and has to remember what it destroyed; this
+application never writes the preference at all, and `extraChatColumnVisible` derives from
+`extraChatColumn && !chatCollapsedByMode`, so clearing the collapse restores the column by
+construction.
+
+**The lesson is narrower than "check before claiming".** An unread variable is evidence of nothing on
+its own — it is equally the signature of a missing feature and of a feature implemented a better way.
+I read it as the first without checking which, on a codebase whose comment three lines below already
+said the derived was the mechanism. Both `extraChatColumnWasEnabled` and `muted` are now removed
+along with their writes: each recorded an answer nothing asked, which is a second source of truth for
+one fact and the shape that goes stale.
+
+**A contract test was pinning the redundancy.** `extra-chat-column-contract.test.ts` required
+`extraChatColumnWasEnabled = extraChatColumn;` to be present in the page — so the dead assignment was
+not merely tolerated, it was enforced, and removing it would have gone red. Its comment described
+UPSTREAM's mechanism while asserting OURS. The test now asserts the two lines that actually do the
+work and records why no flag is needed here.
+
+**Three of the five remain real, and are open in `TODO.md`:** the extra chat column has no autoscroll
+(`alertsScroller` and `chatScroller` both drive one; the extra column's element is captured and never
+read), `loadNoteVersions` is uncalled against a route that is built and working, and
+`ExtraChatPane`'s `isPresenter` is declared, passed and unread.
+
+**Verified.** Room `pnpm lint` exit 0, `svelte-check` 0/0, 1199/1199 — including
+`extra-chat-column-contract` 22/22, which is the file that had to change.
+
+### 2026-08-14 20:58 EDT — the publish credential stops crossing the wire in the clear
+
+**Runtime impact: yes, and it is a breaking change for any MediaMTX host already serving plaintext.**
+The OBS / XSplit publish URLs become `https://` and `rtmps://`. On `feat/extra-chat-column`.
+
+**The defect.** `whipIngestUrl` emitted `http://{host}:8889/{path}/whip` and `rtmpIngestUrl` emitted
+`rtmp://{host}/{path}?jwt={token}`. Both were faithful transcriptions of byte 2157950, and both put
+a **thirty-day publish token** on an unencrypted connection — as a readable `Authorization: Bearer`
+header on WHIP, and *inside the URL* on RTMP, where it crosses in the connection handshake with no
+upgrade path, no SNI and nothing for an observer to do but watch. Presenters stream from hotel and
+conference networks as a matter of course.
+
+What that token authorises is writing video into a named room path. Read off the wire, it lets a
+stranger publish into that presenter's room until it is rotated, and the room renders whatever
+arrives. In a multi-tenant fintech application that is one tenant publishing into another's room.
+
+**Why diverging is right here.** The rule this repository already applies to captured markup is that
+a capture is reproduced unless reproducing it locks a real person out — `ScreenTabs` diverges on
+`aria-selected` and `tabindex` on exactly that basis. This is the stronger case: reproducing it hands
+out a credential.
+
+**Both halves are pinned**, which is the part that matters for a divergence. `stream-ingest.test.ts`
+asserts that the REFERENCE really is cleartext — so this is a decision and not a misreading of the
+bundle — and that ours never emits a cleartext scheme, including a check that no `http://` hides
+later in a string that merely starts with `https://`. A third assertion states the property rather
+than the strings: wherever the token appears, nothing before it is a plaintext scheme.
+
+**The port became explicit as a consequence.** Plain RTMP could omit 1935 because every encoder
+assumes it; nothing assumes MediaMTX's 1936 for its TLS listener, so omitting it would produce a URL
+that silently never connects. `MEDIAMTX_RTMPS_PORT` is named and asserted.
+
+**The server half shipped with it**, or the URLs would be dead on arrival:
+`webrtcEncryption: yes` and `rtmpEncryption: strict` in `ops/mediamtx/mediamtx.yml.example`, a
+certificate step added to the install procedure, the ports table corrected to 1936, and the firewall
+step now says **not** 1935 — `strict` refuses plaintext rather than accepting both, so that listener
+never starts. `OBS-XSPLIT-SETUP.md` shows presenters the URLs they will actually be given.
+
+**A deployment that skips the certificate gets publish URLs that refuse to connect.** That is the
+correct direction to fail: refusing to publish is recoverable in a minute, a publish credential read
+off a conference network is not.
+
+**Also removed: three tracked files nothing reads.** `svelte.config 2.js` in both apps and
+`TODO 2.md` — macOS duplicate-name artifacts from the iCloud-synced working tree. The two configs
+were more than clutter: Kit 3 **errors** on a real `svelte.config.js`, so only the `" 2"` in the name
+kept them harmless, and renaming one back would break the build. `TODO 2.md` was worse — a stale
+snapshot whose unique lines still asserted that "the reference publishes to MediaMTX over WHIP", a
+claim retracted in `TODO.md` after being disproved. Zero tracked duplicate-named files remain.
+
+**Verified.** Room `pnpm lint` exit 0, `svelte-check` 0/0, **1199/1199** (three new assertions).
+Controller `pnpm lint` exit 0, 963/963. `privacy:verify` and `schema:verify` both pass after the
+deletions. The full gate has still not been run.
+
+### 2026-08-14 20:47 EDT — the room lints clean, and the last five "unused variables" were features
+
+**Runtime impact: none.** Lint suppressions with citations, dead-code removal, and five gaps
+documented in place. On `feat/extra-chat-column`.
+
+**123 → 0.** `pnpm lint` exits 0 for the room, so the room step of the new `quality.yml` is green
+rather than red-on-arrival, which was the condition for shipping the gate at all.
+
+**The thirteen stale `svelte-ignore` comments were stale for a reason worth knowing.** They were
+STACKED — two `<!-- svelte-ignore … -->` comments in a row above one element. Svelte's supported form
+is a single comment listing several codes; a second stacked comment makes the first apply to a
+comment node instead of the element. That is the same failure as the `eslint-disable-next-line` I
+wrote an hour earlier, which suppressed my own second comment line. Removing all thirteen left
+`svelte-check` at 0 errors / 0 warnings, which is the proof they were suppressing nothing.
+
+**Five "unused variables" turned out to be unfinished features**, and every one is now documented at
+its declaration rather than deleted:
+
+- `extraChatColumnWasEnabled` is **written and never read**, while the capture quoted eighteen lines
+  above it restores the column from exactly that flag. A column hidden by webinar mode never comes
+  back when webinar mode ends.
+- `extraChatScroller` is handed back by `onscrollerready` and read by nothing — the extra chat column
+  has no programmatic scroll while the main chat does.
+- `loadNoteVersions` is called by nothing, and the endpoint it fetches already exists: note history
+  is server-complete and client-unreachable.
+- `muted` is written by `setMasterVolume` and read by nobody, because every consumer derives
+  `volume === 0` instead — two sources of truth for one fact.
+- `ExtraChatPane`'s `isPresenter` is declared, passed by the parent, and read by no line of the
+  component: the controller's `markUnwired` again, in the other app.
+
+**I deleted one of them and the build caught me.** `muted` was reported as "assigned a value but
+never used", which I read as unused — it is written by `setMasterVolume`, so removing the
+declaration broke `svelte-check`. Restored, documented, and left as a decision rather than a lint
+fix. The rule says *never read*, not *never referenced*, and the difference is the whole finding.
+
+**Two suppressions kept because the code is right and the rule is not.** `roster-gates.test.ts`
+casts through `any` to reproduce the reference's comparator returning an OBJECT where a number
+belongs — JavaScript coerces it to `NaN`, `sort` reads that as "leave the pair alone", and that is
+why presenters do not actually sort to the top upstream. TypeScript refuses an object comparator,
+correctly, so the cast is the only way to express the defect being pinned. And `const-table.mjs`
+keeps its `@ts-nocheck`, whose four-line reason was already written above it.
+
+**Verified, and this time ALL FOUR steps of the new gate were run locally on both apps** — which is
+the point of shipping it green rather than red: `lint` exit 0, `check` 0/0, tests 1196/1196 (room)
+and 963/963 (controller), `build` exit 0. The `quality.yml` matrix should therefore pass on its first
+run rather than arriving broken.
+
+One caveat recorded because it will bite somebody else: the room build failed once with
+`ETIMEDOUT: connection timed out, copyfile …` inside the adapter's copy step, and passed on retry
+with no change. Vite had already emitted every server chunk before it failed, so it is the working
+tree rather than the code — this repository lives under `~/Desktop`, which is iCloud-synced, the same
+cause as the `eslint 2` / `svelte.config 2.js` duplicate-name artifacts found earlier today. A CI
+runner has neither problem.
+
+### 2026-08-14 20:19 EDT — ESLint was never broken, the room was never linted, and a probe was silently corrupt
+
+**Runtime impact: none.** Lint configuration, dead-code removal, and one genuine bug fix in a
+verification script. On `feat/extra-chat-column`.
+
+**FIRST, A CORRECTION.** This session and the one before it both recorded that ESLint was broken
+repo-wide — first as `ConfigCommentParser is not a constructor`, then as `parseLevn is not a
+function`. **Both were wrong, and so was the conclusion drawn from them.** ESLint 10.8.1 runs fine.
+The `parseLevn` error only ever appeared under `npx`, which the gate does not use; the real
+`pnpm lint` failures were a stale `.svelte-kit`, cleared the moment `pnpm install` re-ran
+`svelte-kit sync`. Nothing was ever wrong with the dependency tree.
+
+**Along the way I "found" a corrupted package and was wrong about that too.** `svelte-eslint-parser`
+appeared to ship an `element.js` that did not export `convertChildren`, in both installed copies. It
+does export it — as `export function*`, a generator, which the regex I built (`^export function
+convertChildren`) cannot match. That is the exact failure `~/CLAUDE.md` describes: a search returns
+only what you already guessed the answer looked like, so it confirms the guess. The package was
+intact the whole time.
+
+**What the working linter actually found — a real bug, silent since it was written.**
+`scripts/room-config-seam-e2e.mjs` builds a browser probe as a template literal. A prose comment
+INSIDE that literal quoted a gate using backticks, which **terminated the string early** and left the
+remainder parsing as live JavaScript — the probe was evaluating `<the string> || isPresenter` against
+a page with no such variable. ESLint reported it as two unrelated-looking errors: a constant truthy
+left-hand side, and an undefined `isPresenter`. This is precisely the "never put template syntax in a
+comment" rule in `CLAUDE.md`, which was written after the same mistake broke a tab bar. **Writing the
+warning about it reintroduced it once**, because the warning quoted the expression.
+
+**The controller: 17 problems, now zero.** Three deserve naming. `collect-rendered-states.js` carried
+an `eslint-disable-next-line no-unused-vars` while the rule firing was
+`@typescript-eslint/no-unused-vars` — it suppressed nothing AND was itself reported as stale.
+`statsWhen` in the manage page was a byte-for-byte duplicate of the formatter in `$lib/stats-csv`,
+called by nothing. And `markUnwired` was a documented prop, passed at six call sites, asserted in a
+test, and **read by no line of the component**: the marker it drove was deliberately deleted earlier
+for being invented visible text, and the prop outlived it. A prop that is documented, passed
+everywhere and consumed nowhere is this repository's own definition of dead scaffolding, and it
+survived because it looks wired.
+
+**The room had NO linting at all** — no config, no dependency, no script. The controller's config
+ignored `apps/**` on the stated grounds that the room "brings its own toolchain … and its own gate
+(the `room` job in `.github/workflows/quality.yml`)". **Neither half was true**: there was no
+toolchain, and there is no `quality.yml` in this repository — only `backend-quality.yml`, which
+gates Rust, and `smoke.yml`, which runs after a deployment. **Neither frontend app has a CI quality
+gate at all.** That is now the largest open gap and is recorded in `TODO.md`.
+
+The room's first lint run reported **123 problems; 53 remain**, and the reduction is mostly real
+rather than configured away:
+
+- `no-undef` is off for TYPE-CHECKED files only, which is typescript-eslint's own guidance — it does
+  not know `RTCIceServer` or `PermissionDescriptor`. Deliberately still ON for `.js`/`.mjs`, because
+  it is the rule that caught the corrupted probe above.
+- Nineteen `no-useless-escape` reports were checked against the bundle and **every one is a verbatim
+  transcription** — `watch\?v=|\&v=` appears at bytes 1503474, 1977968 and 2295405 (which is also
+  why it is duplicated across three components: the reference duplicates it too), and the phone
+  class at 1194841. They keep their escapes and carry the citation. One more, `<\/script>`, is not
+  redundant at all: removing it would truncate a generated HTML page at that point.
+- `svelte/no-useless-mustaches` and `svelte/prefer-svelte-reactivity` are off, with reasons. The
+  first objects to `{' '}` holding whitespace the reference emits; the second objects to every plain
+  `Map`, each of which is a deliberate non-reactive collection whose declaration already says so —
+  `localScreenStreams` literally reads "nothing renders from it … making it reactive would buy a
+  dependency and no redraw". Neither signal is lost: the Svelte MCP autofixer reports both as
+  suggestions on every run, which is the right severity for a per-declaration judgement.
+- Three bare reads in `PollPanel`'s `$effect` are the dependency list, not leftovers. Deleting them
+  would freeze the pie chart at its first paint.
+
+**Verified.** Controller: lint exit 0, `svelte-check` 0/0, 963/963. Room: `svelte-check` 0/0,
+1196/1196. The room's lint run also surfaced a type error in my own `mtx-reconciler.test.ts` — a
+zero-argument `vi.fn` has no `calls[0][0]` — now typed. The full gate has still not been run.
+
+### 2026-08-14 19:30 EDT — hooks for latency, reconciliation for truth: the MediaMTX half closes
+
+**Runtime impact: yes.** A new route reachable without a cookie, a per-room polling timer on the SSE
+connection, and two new environment variables. On `feat/extra-chat-column`.
+
+**The architecture, and why it is not just the hook.** `/internal/media-hook` is what MediaMTX calls
+from `runOnAvailable` / `runOnUnavailable`. Those are shell commands it spawns — a `curl` with no
+retry, no ordering and no delivery guarantee — and `room-events.ts` says of its own SSE hub that it
+"does not survive a restart and does not span instances", while the room defaults to the Vercel
+adapter. So a hook can be lost outright, or land on an instance holding none of the viewers.
+
+That limitation is INHERITED, not introduced: every existing realtime feature has it, `focusOnScreen`
+included, and the durable fix is the one `TODO.md` already names (PostgreSQL `room_events`, which
+`services/api` already listens on). What makes the stream list correct meanwhile is the reconcile —
+every process polls MediaMTX's own `/v3/paths/list` for its own subscribers, which is
+instance-independent by construction. **The hook is the fast path; the poll is the correct one.**
+
+**The trap that would have shipped a worse bug than the one being fixed.** The obvious reconcile
+re-sends the full list, and the full list is what `getSessionMTXMediaState` carries. But
+`applySessionMediaState` moves the selection to `list[0]` every time it runs — correct for the
+reference, which sends it exactly twice (init and soft reset), and catastrophic on a five-second
+timer, where it would drag every viewer's tab back to the first stream on every tick. So the
+reconcile emits `mtxStartStream`/`mtxStopStream` deltas instead, and `mtx-reconcile.test.ts` asserts
+both halves: the yank when the naive version is used, and the viewer staying put when it is not.
+
+**Evidence, fetched rather than remembered.** MediaMTX's hooks page confirms thirteen hooks and that
+`runOnReady`/`runOnNotReady` are gone, and it surfaced something the earlier doc missed — the regex
+capture groups `G1, G2, …` are available alongside `MTX_PATH`. The `/v3/paths/list` schema came from
+the project's own `api/openapi.yaml`, which settled a field this would otherwise have got wrong:
+**`ready` and `readyTime` are DEPRECATED**, and the live pair is `available`/`availableTime` — the
+same rename as the hooks. A test asserts a path with `ready: true` and no `available` is ignored.
+
+**Corrections to the ingest doc, one of them substantive.** The hook was documented as POSTing to
+the CONTROLLER. That was wrong: the thing a hook must reach is the SSE fan-out, which lives in the
+room, and the controller has no way to push to a room's connected members — so a hook delivered
+there had nowhere to go. Also added: the `Authorization` bearer, `api: yes` for the reconcile, and
+the capture-group finding.
+
+**`MEDIA_HOOK_SECRET` is deliberately not `ROOM_JWT_SECRET`.** This value is written into a shell
+command in `mediamtx.yml`, so it lives in a media host's config file and process table; the room's
+session signer does not belong there. Unset means the route refuses everything — the correct closed
+state, costing latency rather than correctness.
+
+**Two failure rules, each with a test that fails when the rule is removed.** A control API that
+cannot be reached returns `null`, which is NOT an empty list: publishing stops on a blip would clear
+every viewer's tabs and interrupt playback, a self-inflicted outage from a dropped packet. And
+pagination follows `pageCount` rather than reading the first 100 paths and stopping, because a silent
+cap reads as "covered everything" right up until it does not.
+
+**A test of mine that was passing for the wrong reason, found by its own negative control.** Patching
+the bearer comparison to `return true` left all twelve media-hook tests GREEN. Every refusal case
+presented a bearer of the wrong LENGTH, so `secretMatches` returned early and `timingSafeEqual` was
+never reached — the suite was asserting that the route rejects strings of the wrong size, which is
+not the property anybody cares about. A same-length wrong bearer now covers it, and the negative
+control fails exactly that test.
+
+**`PUBLIC_PATHS` is now pinned.** It is the room's entire cookie-less surface and nothing asserted
+its contents, so a third entry could have been added in any diff unnoticed. Both current members
+authenticate by their own means, and the test says so where a reader will find it.
+
+**Verified.** Room 1196/1196 across 98 files (from 1092/93 at the session start); controller 963/963;
+`svelte-check` 0/0 on both apps; `schema:verify` 58 wired. Three negative controls run and reverted:
+the bearer comparison, the null-is-not-empty rule (both failure tests caught it), and the earlier
+room-scoping one. **Running the FULL controller suite rather than the tests I predicted found a real
+drift** — a prose count in `verify-room-settings-schema.mjs` still said 56; the same thing happened
+in the room, where two files mocking the config client were not in the predicted set. The full gate
+still has not been run; it runs once before the merge.
+
+### 2026-08-14 19:14 EDT — the `#streams` pane goes live: the tab, the commands, and the token
+
+**Runtime impact: yes.** The Streams main tab can now open, in rooms whose owner has ticked "Use
+MediaMTX?". On `feat/extra-chat-column`.
+
+**The tab existed and could never open.** `li#streams-tab` carried a hardcoded `hidden` and no click
+handler, and the pane under it was three empty elements with a permanently visible "No one is
+streaming right now...". The reason was upstream of the markup: `hideStreams =
+!sessData.useMediaMTX` (`app-presentationarea.full.js:2293`) and `useMediaMTX` never reached the
+room, so the flag was `!undefined` — hidden in every room, MediaMTX or not.
+
+**Two settings crossed the boundary, through all four places that decide it.** `useMediaMTX` and
+`overlayUserIdOnScreenshare` were captured Manage-page rows marked `wired: false`. Adding them meant
+`ROOM_VISIBLE_SETTINGS` (with the reason), `ROOM_CONSUMED` in the generator, the consumer map in
+`room-config-boundary.test.ts` (which is the only one that has to say WHY), and the verifier's own
+expected set — plus the deliberate `WIRED_SETTINGS.size` tripwire, 56 → 58. `schema:verify` reports
+58 wired. Their two Manage-page neighbours, the MediaMTX cluster ids, stay out: they name
+infrastructure, the room bundle reads neither, and the room finds its host server-side.
+
+**Two nearly identical wire names, and they are not the same thing.** This cost a wrong first draft:
+
+- `getSessionMTXMediaState` — MTX in the MIDDLE — is the WIRE command in both directions. The client
+  sends it bare to ask; the server replies with the same name carrying `data`.
+- `getSessionMediaStateMTX` — MTX at the END — is an INTERNAL bus event upstream, emitted with no
+  payload once the reply is in `globals.roomMediaStateMTX`.
+
+Decoded at bundle bytes 1013960 and 989729. There is no `globals` here, so the payload goes straight
+to the reducer and the internal hop disappears — three steps become one, with nothing lost.
+
+**A wire-boundary type guard, and a deliberate divergence.** Upstream pushes `i.muser` into the list
+unchecked. Two of its fields are interpolated into a playlist URL, so `isMtxStream` refuses anything
+whose `_id`, `sessionID` or `producerID` is not a safe path segment: a `producerID` of `x?jwt=stolen`
+would detach the real token from the request, and one containing `../` would climb out of the room's
+path prefix. `mediaValue.name` is checked for type only — it is the tab label, never a URL, and
+constraining it would reject real names like "Dana Vero". One gate, at the boundary, deliberately
+not repeated inside the URL builders.
+
+**The playback credential now arrives with the page**, from `/internal/stream-read/{code}`, because
+that is where the reference puts it: `userLoggedIn` copies `mtxToken` and `streamServerMTX` into
+globals for every session (byte 994430), presenter or not. It returns `null` on any failure rather
+than throwing — a stated exception to this file's fail-loud rule, and a safe one, because `null`
+DENIES. The rule exists so a network failure cannot be mistaken for permission; here the failure
+mode is already closed, and throwing would take down an entire room load over a feature most rooms
+do not use.
+
+**The same `disableVideo` preference blanks this pane too**, which was not obvious and is now
+reproduced: `O(41, preferences.disableVideo ? 41 : 42)` at `:5388-5393` selects the identical
+`Video off to preserve data...` message that `#screens` shows. One switch, two panes — a viewer
+saving data must not keep pulling an HLS playlist here.
+
+**Three handlers, and only one of them does anything.** `selectStreamTabByUser` is two assignments,
+because switching stream tabs touches nothing else — every pane stays mounted and only its classes
+change, unlike `onScreenShareTabChange` with its `stopWatchScreenOf`/`startWatchScreenOf` pair.
+`bringEveryoneToStream` sends and nothing more, and is deliberately NOT `bringEveryoneToScreen`,
+which assigns `selectedScreenTab` and `forcedScreenId` locally — pointing either at a stream id
+would select a screenshare tab that does not exist. `toggleLockStreamMtx` reports the same
+`console.error` the reference reports, because `toggleLockScreenMTX` is a stub with no wire command,
+no globals write and no server half anywhere in the bundle to transcribe.
+
+**One structural mapping worth naming.** Const 117 puts `h-inherit` on the `<app-streaming-view>`
+HOST while the component's own root carries `h-100` (its const 1). Angular has a host element and
+Svelte has none, so the host became a wrapper `div`. Dropping it would drop the height chain and
+collapse the video to its intrinsic size.
+
+**Two things caught only because the wider set was run.** `page-load-contract` and
+`room-isolation-contract` both mock the config client and both failed on the new export — neither was
+in the set I predicted from the diff. The isolation mock now ECHOES the short code instead of
+returning a constant, and a new assertion proves the room gets a token minted for ITSELF: a playback
+token is a room-scoped credential, and a constant stub would have made that assertion pass however
+`load` behaved.
+
+**Verified.** `svelte-check` 0 errors / 0 warnings (the first run's 2 errors were stale generated
+types, cleared by `svelte-kit sync`). `svelte-autofixer` on the page: **zero issues** — every
+suggestion it returned is pre-existing and in the Files pane, none inside the new lines.
+`mtx-streams` 40/40 including 19 new guard cases; the room contract set 128/128; every test that
+mocks the config client 87/87; `schema:verify` and `dont-touch-block` green. The new isolation
+assertion was negative-controlled by passing a fixed room code to the token request and watching it
+go red, then reverted. The full gate was NOT run — it runs once before the merge.
+
+### 2026-08-14 18:58 EDT — `StreamTabs.svelte`, and the four controls that do nothing in the reference
+
+**Runtime impact: none yet.** The component and its contract test are added; nothing renders it
+until the `#streams` pane lands. On `feat/extra-chat-column`.
+
+**What was built.** `RSe` — `docs/source/components/app-presentationarea.full.js:543-588` — as a
+Svelte component, with every attribute resolved through the component's own const table rather than
+guessed. The whole update block is pinned in one assertion in
+`apps/room/src/lib/stream-tabs-contract.test.ts`, which fixes the anchor id, the `active` class map,
+`aria-controls`, both badges, the label, the presenter gate and the lock asymmetry in a single
+string.
+
+**The finding that mattered more than the markup.** Four of this tab's controls are inert in the
+shipped reference, and all four read as working if you only look at the template:
+
+1. The forced (eye) badge is gated on `forcedScreenMTXID`, which occurs exactly twice in the 2.8 MB
+   bundle — one template read, one `=""` in the constructor. No writer.
+2. The lock badge is gated on `globals.lockedScreenIDMTX`: four occurrences, one of them `=""`, the
+   other three all reads. No writer.
+3. "Lock Screen" calls `toggleLockScreenMTX(e){console.error("TODO: toggleLockScreenMTX")}` — a
+   stub sitting directly beside a working `toggleLockScreen` for screenshares.
+4. "Bring everyone here" is the one that looks live and is not. It sends the same `focusOnScreen`
+   command the screenshare menu sends, but every client's receiver scans
+   `mediaService.screenSharingUsers` only and never `mtxHandlerService.mtxStreams`, so a stream id
+   reaches no recipient that can resolve it. That is also why (1) has no writer.
+
+All four are rendered anyway, because a viewer of the reference sees them and this is a clone. They
+are prop-driven rather than hard-wired, so each branch is reachable and tested, and each finding is
+pinned by a test that will start failing if the reference ever gains the missing half. **None of
+them may be "finished" by inventing a protocol** — a lock button that locks nothing on a
+multi-tenant fintech room is worse than a lock button that is honestly inert.
+
+**The lock asymmetry is reproduced, not reconciled.** The badge reads `lockedScreenIDMTX`; the menu
+item's label reads `lockedScreenID`, the SCREENSHARE field. Two fields deciding two halves of one
+feature, in the same update block, eight lines apart. Both are separate props here, and the test
+asserts each drives its own half and not the other's — because collapsing them is the obvious tidy-up
+and it is invisible by eye, since upstream never sets either.
+
+**Divergences, each one already taken on `ScreenTabs` and taken again for consistency.** The gear
+moves out of the tab anchor (`a.dropdown-item` inside `a.nav-link` is not expressible in parsed HTML
+— the parser hoists it and hydration breaks), with `li.nav-item { display: flex }` restoring the
+captured single line. `aria-selected` becomes a real boolean instead of the hardcoded `"true"` on
+every tab. A roving `tabindex` plus `onkeydown` makes the bar keyboard-operable, which upstream is
+not. The lock badge is deliberately left non-focusable — it is nested inside the tab anchor, where an
+independently focusable control is invalid content, and the same action is available on the dropdown
+item below it, which is fully operable.
+
+**Two errors of mine, both caught by the tests and recorded because the first one is a repeat.**
+The lock-field count was first reported as three; it is four. The miscount came from a `grep -o`
+whose 40-character match window swallowed the guard's second occurrence of the name — the exact
+failure mode `~/CLAUDE.md` describes, on the exact day it was being followed elsewhere. The test now
+counts by splitting the file, so the number cannot rot. Separately, the first version of the
+"badge, not menu" assertion looked for `fa-lock` and stayed **green** through its negative control,
+because the menu item's icon is `fa-lock` too; it now keys on the badge's own tooltip, and the
+negative control fails both directions.
+
+**Verified.** `svelte-autofixer` clean (and the one `svelte-ignore` it flagged as unwarranted was
+removed after proving, by removing the *other* one, that the gear's span genuinely needs its
+suppression while the spread-carrying badge does not). `svelte-check` 0 errors / 0 warnings across
+the room app. The new contract test 15/15, with its central assertion negative-controlled by
+collapsing the two lock props and watching both directions go red, then reverted to green. The full
+gate was NOT run: two new files, nothing else touched.
+
 ### 2026-08-14 18:10 EDT — `main` was red: the release attestor had never been told about migration 0009
 
 **Runtime impact: none on the apps.** This is the release-attestation binary and the provenance

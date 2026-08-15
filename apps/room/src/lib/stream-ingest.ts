@@ -32,6 +32,15 @@
 export const MEDIAMTX_WHIP_PORT = 8889;
 
 /**
+ * MediaMTX's RTMPS listener — `rtmpsAddress: :1936` in its own default configuration.
+ *
+ * Named explicitly in the URL, unlike plain RTMP's 1935. 1935 is the registered default that every
+ * encoder assumes when a scheme carries no port; 1936 is MediaMTX's choice for the TLS listener and
+ * is not assumed by anything, so omitting it would produce a URL that silently never connects.
+ */
+export const MEDIAMTX_RTMPS_PORT = 1936;
+
+/**
  * What the controller answers for `getRTMPToken`.
  *
  * Declared HERE rather than in `$lib/server/room-config-client`, even though that is the module
@@ -54,9 +63,30 @@ export interface StreamIngestKey {
 /**
  * The WHIP publish URL. The token is NOT in it — WHIP carries the credential as an HTTP Bearer, and
  * the panel shows it in a separate field whose label is literally `Bearer`.
+ *
+ * ## `https`, and the reference says `http`
+ *
+ * This is a DELIBERATE DIVERGENCE, and the only one in this module. Byte 2157950 builds
+ * `http://${streamServerMTX}:8889/…/whip`, in cleartext.
+ *
+ * The credential this URL is used with is a **publish** token: it authorises writing video into a
+ * named room path, it is valid for thirty days, and anything on the network path between the
+ * encoder and the media server can read an `Authorization: Bearer` header off an unencrypted
+ * connection. A presenter streams from hotel Wi-Fi and a conference network as a matter of course.
+ *
+ * The rule this repository already applies to captured values is that a capture is reproduced
+ * unless reproducing it locks a real person out — `ScreenTabs` diverges on `aria-selected` and
+ * `tabindex` on exactly that basis. Handing a thirty-day write credential to whoever is listening
+ * is the stronger case: this is a multi-tenant fintech application, and the failure mode is one
+ * tenant publishing into another tenant's room.
+ *
+ * The cost is that MediaMTX must terminate TLS on 8889 — `webrtcEncryption: yes` with a certificate,
+ * which `ops/mediamtx/mediamtx.yml.example` configures. A deployment that has not done that gets a
+ * URL that fails to connect, which is the correct direction to fail: refusing to publish is
+ * recoverable, publishing a credential in the clear is not.
  */
 export function whipIngestUrl(host: string, ingestPath: string): string {
-  return `http://${host}:${MEDIAMTX_WHIP_PORT}/${ingestPath}/whip`;
+  return `https://${host}:${MEDIAMTX_WHIP_PORT}/${ingestPath}/whip`;
 }
 
 /**
@@ -65,7 +95,21 @@ export function whipIngestUrl(host: string, ingestPath: string): string {
  * RTMP has no header to put a Bearer in, so the reference puts the token in the query string under
  * the name `jwt`. That name is load-bearing: the controller's media-auth check reads `jwt` and only
  * `jwt` out of the query MediaMTX forwards to it.
+ *
+ * ## `rtmps`, and the reference says `rtmp`
+ *
+ * The same deliberate divergence as {@link whipIngestUrl}, and a sharper one. Here the credential is
+ * IN THE URL rather than in a header, so on plain RTMP it crosses the network as part of the
+ * connection handshake — and RTMP has no upgrade path, no SNI and no certificate: an observer does
+ * not need to do anything but watch.
+ *
+ * A thirty-day publish token read off the wire lets a stranger publish into that presenter's room
+ * path until it is rotated, and the room renders whatever arrives on it.
+ *
+ * The port becomes explicit as a consequence: plain RTMP could omit 1935 because every encoder
+ * assumes it, and nothing assumes MediaMTX's 1936 for the TLS listener. `rtmpEncryption: strict` in
+ * `ops/mediamtx/mediamtx.yml.example` is the server half.
  */
 export function rtmpIngestUrl(host: string, ingestPath: string, token: string): string {
-  return `rtmp://${host}/${ingestPath}?jwt=${token}`;
+  return `rtmps://${host}:${MEDIAMTX_RTMPS_PORT}/${ingestPath}?jwt=${token}`;
 }

@@ -319,7 +319,8 @@
       }
     }
 
-    let block = '';
+    // No initialiser: both the try and the catch assign, so a value here could never be read.
+    let block;
     try {
       // Chrome returns "p"; some engines return "<p>". Strip the brackets rather than guess.
       block = String(document.queryCommandValue('formatBlock') || '')

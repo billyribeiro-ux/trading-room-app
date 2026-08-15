@@ -1,5 +1,4 @@
 import { fail, redirect } from '@sveltejs/kit';
-import { createHash } from 'node:crypto';
 import { and, asc, desc, eq, gt, isNull } from 'drizzle-orm';
 import { isEmptyChatHtml, sanitizeChatHtml } from '$lib/server/chat-html';
 import { pruneDeadPreferenceKeys } from '$lib/dead-preference-keys';
@@ -35,9 +34,14 @@ import {
   loadNewestChatPages
 } from '$lib/server/chat-log';
 import { loadAlertPage } from '$lib/server/alert-log';
-import { isChatMode, type ChatMode } from '$lib/chat-mode';
+import { isChatMode } from '$lib/chat-mode';
 import { parseReactions } from '$lib/server/reactions';
-import { readRoomConfig, requestMobilePin, writeRoomSetting } from '$lib/server/room-config-client';
+import {
+  readRoomConfig,
+  requestMobilePin,
+  requestStreamReadToken,
+  writeRoomSetting
+} from '$lib/server/room-config-client';
 import { alertSoundCommandValue } from '$lib/files-gates';
 import { memberDeniedArchives } from '$lib/roster-gates';
 import { isBannedFromRoom, isShutOutByRoomState, roomRoleFor } from '$lib/server/room-role';
@@ -93,7 +97,7 @@ import {
   userSettings
 } from '$lib/server/db/schema';
 import { isChatTab } from '$lib/types';
-import type { ActivePoll, MessageReactions } from '$lib/types';
+import type { ActivePoll } from '$lib/types';
 
 /*
   Body caps. The adapter's request-size limit already stops a multi-megabyte upload, but a
@@ -604,6 +608,24 @@ export const load: PageServerLoad = async ({ depends, locals, request, cookies }
      * row at all.
      */
     sessData: roomConfig.settings,
+    /**
+     * `globals.mtxToken` and `globals.streamServerMTX` — the viewer's HLS playback credential.
+     *
+     * Fetched with the page rather than on demand, because that is where the reference puts it:
+     * `userLoggedIn` copies both out of the login response for EVERY session (bundle byte 994430),
+     * and `app-streaming-view` spends the token as soon as a stream tab renders.
+     *
+     * `null` when the room has no MediaMTX behind it, when the controller refuses (a banned member),
+     * or when it cannot be reached. The pane reads all three as "no playback" and says so, rather
+     * than building a playlist URL that cannot work.
+     *
+     * NOT a credential that grants anything beyond watching: the token is scoped `read`, is
+     * room-scoped, cannot publish, and `decideIngestAuth` refuses the crossover as `wrong-scope`.
+     */
+    streamRead: await requestStreamReadToken(
+      requireRoomShortCode(locals),
+      requireUser(locals).email
+    ),
     /**
      * The account's badges and who wears which — `sessData.badgesH` and the ids behind `msg.b`
      * upstream. Passed straight through: the controller has already reduced it to definitions plus

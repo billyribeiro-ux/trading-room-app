@@ -66,8 +66,14 @@
     }
 
     if (value.includes('youtube')) {
+      /* Verbatim from the bundle (byte 1503474 / 1977968 / 2295405): the escapes are redundant to
+         a regex engine and kept because the capture is reproduced, not tidied. */
+      // eslint-disable-next-line no-useless-escape
       const videoPattern = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
       const videoId = value.match(videoPattern) ? value.match(videoPattern)?.[2] : null;
+      /* Verbatim from the bundle (byte 1503474 / 1977968 / 2295405): the escapes are redundant to
+         a regex engine and kept because the capture is reproduced, not tidied. */
+      // eslint-disable-next-line no-useless-escape
       const playlistPattern = /[?&]list=([^#\&\?]+)/;
       const playlistId = value.match(playlistPattern) ? value.match(playlistPattern)?.[1] : null;
 

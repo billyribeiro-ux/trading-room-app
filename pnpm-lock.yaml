@@ -152,6 +152,9 @@ importers:
       drizzle-orm:
         specifier: 0.45.2
         version: 0.45.2(@types/better-sqlite3@9.6.0)(better-sqlite3@13.0.3)(postgres@3.4.9)
+      hls.js:
+        specifier: ^1.7.0
+        version: 1.7.0
       howler:
         specifier: 2.2.4
         version: 2.2.4
@@ -165,6 +168,9 @@ importers:
         specifier: 4.4.3
         version: 4.4.3
     devDependencies:
+      '@eslint/js':
+        specifier: 10.0.1
+        version: 10.0.1(eslint@10.8.1(supports-color@10.2.2))
       '@sveltejs/adapter-node':
         specifier: 6.0.0-next.8
         version: 6.0.0-next.8(@sveltejs/kit@3.0.0-next.16(@sveltejs/vite-plugin-svelte@7.3.0(svelte@5.56.8(@typescript-eslint/types@8.66.0))(vite@8.2.1(@types/node@26.2.0)(esbuild@0.28.1)(tsx@4.23.11)))(svelte@5.56.8(@typescript-eslint/types@8.66.0))(typescript@6.0.3)(vite@8.2.1(@types/node@26.2.0)(esbuild@0.28.1)(tsx@4.23.11)))
@@ -192,6 +198,18 @@ importers:
       drizzle-kit:
         specifier: 0.31.10
         version: 0.31.10
+      eslint:
+        specifier: 10.8.1
+        version: 10.8.1(supports-color@10.2.2)
+      eslint-config-prettier:
+        specifier: 10.1.8
+        version: 10.1.8(eslint@10.8.1(supports-color@10.2.2))
+      eslint-plugin-svelte:
+        specifier: 3.22.0
+        version: 3.22.0(eslint@10.8.1(supports-color@10.2.2))(svelte@5.56.8(@typescript-eslint/types@8.66.0))
+      globals:
+        specifier: 17.9.0
+        version: 17.9.0
       jsdom:
         specifier: ^30.0.1
         version: 30.0.1
@@ -216,6 +234,9 @@ importers:
       typescript:
         specifier: 6.0.3
         version: 6.0.3
+      typescript-eslint:
+        specifier: 8.66.0
+        version: 8.66.0(eslint@10.8.1(supports-color@10.2.2))(supports-color@10.2.2)(typescript@6.0.3)
       vite:
         specifier: 8.2.1
         version: 8.2.1(@types/node@26.2.0)(esbuild@0.28.1)(tsx@4.23.11)
@@ -2011,6 +2032,9 @@ packages:
   has-flag@4.0.0:
     resolution: {integrity: sha512-EykJT/Q1KjTWctppgIAgfSO0tKVuZUjhgMr17kqTumMl6Afv3EISleU7qZUzoXDFTAHTDC4NOoG/ZxU3EvlMPQ==}
     engines: {node: '>=8'}
+
+  hls.js@1.7.0:
+    resolution: {integrity: sha512-NnQpT6Z//+2IB2qovSUbKbrlXY1MOpi0JynZ9L2NNOuTJiNCyMSQj9k2laEj1v7CxU/Hb8oTWR98eT3mVpPQVQ==}
 
   howler@2.2.4:
     resolution: {integrity: sha512-iARIBPgcQrwtEr+tALF+rapJ8qSc+Set2GJQl7xT1MQzWaVkFebdJhR3alVlSiUf5U7nAANKuj3aWpwerocD5w==}
@@ -4259,6 +4283,8 @@ snapshots:
       - supports-color
 
   has-flag@4.0.0: {}
+
+  hls.js@1.7.0: {}
 
   howler@2.2.4: {}
 

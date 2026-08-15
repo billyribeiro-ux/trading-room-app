@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { render as ssr } from 'svelte/server';
 import Page from '../routes/(app)/account/+page.svelte';
-import { shapeOf, render as line, sideBySide } from './dom-shape';
+import { shapeOf, sideBySide } from './dom-shape';
 
 /**
  * The account page, element for element, against a dump of the page the owner lands on after

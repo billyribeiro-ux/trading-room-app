@@ -1,7 +1,6 @@
 <script lang="ts">
   import { ngbTooltip, ngbTooltipWith } from '$lib/ngb-tooltip';
   import { alertDateFormatter } from '$lib/message-formatters';
-  import { panelDragResize } from '$lib/panel-drag';
   import { rtmpIngestUrl, whipIngestUrl, type StreamIngestKey } from '$lib/stream-ingest';
   import { deserialize } from '$app/forms';
   import { invalidateAll } from '$app/navigation';
@@ -1614,8 +1613,14 @@
   }
 
   function saveYtUrl() {
+    /* Verbatim from the bundle (byte 1503474 / 1977968 / 2295405): the escapes are redundant to
+       a regex engine and kept because the capture is reproduced, not tidied. */
+    // eslint-disable-next-line no-useless-escape
     const videoPattern = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
     const videoId = youtubeURL.match(videoPattern)?.[2] ?? null;
+    /* Verbatim from the bundle (byte 1503474 / 1977968 / 2295405): the escapes are redundant to
+       a regex engine and kept because the capture is reproduced, not tidied. */
+    // eslint-disable-next-line no-useless-escape
     const playlistId = youtubeURL.match(/[?&]list=([^#\&\?]+)/)?.[1] ?? null;
     if (videoId || playlistId) youtubePromptOpen = true;
   }

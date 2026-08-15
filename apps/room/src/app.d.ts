@@ -1,6 +1,9 @@
 import type { User } from '$lib/server/db/schema';
 
 declare module 'svelte/elements' {
+  // The type parameter is unread here but its ARITY is what makes this a declaration merge rather
+  // than a redeclaration -- `svelte/elements` declares `HTMLAttributes<T>`, so this must too.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   interface HTMLAttributes<T> {
     audiovolslider?: string;
   }

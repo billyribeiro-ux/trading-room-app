@@ -1,0 +1,116 @@
+name: Frontend quality
+
+# The gate the two applications never had.
+#
+# Until 2026-08-14 this repository ran exactly two workflows: `backend-quality.yml`, which gates
+# Rust and skips itself when a revision does not touch `services/**`, and `smoke.yml`, which runs
+# AFTER a deployment. Nothing ran lint, check, test or build for `apps/controller` or `apps/room` on
+# a push or a pull request — and `main` auto-deploys, so a push is a production release.
+#
+# The absence was not merely untested, it was believed otherwise in writing: the controller's ESLint
+# config ignored `apps/**` on the stated grounds that the room had "its own gate (the `room` job in
+# `.github/workflows/quality.yml`)". This file is that job, created for the first time. What it
+# would have caught, found by hand on the day it was written: the room had no ESLint at all, and a
+# verification probe shipped a template literal terminated early by backticks inside a comment.
+
+on:
+  workflow_dispatch:
+  merge_group:
+    types:
+      - checks_requested
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: quality-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  frontend:
+    name: ${{ matrix.app }} quality
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+
+    strategy:
+      # One app must not hide the other: a red controller should still tell you whether the room is
+      # green, because they are separate deployables and either can be fixed alone.
+      fail-fast: false
+      matrix:
+        app:
+          - controller
+          - room
+
+    steps:
+      - name: Check out the immutable revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install the repository-pinned Node runtime
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
+
+      - name: Activate the repository pnpm version
+        env:
+          # Corepack asks before downloading a package manager and there is no TTY on a runner, so
+          # the question is an immediate `exit 1` rather than a prompt. This does NOT weaken the
+          # pin: the version still comes from `packageManager` and is verified below.
+          COREPACK_ENABLE_DOWNLOAD_PROMPT: '0'
+        run: |
+          set -euo pipefail
+          corepack enable
+          # No version literal here, deliberately, and not even in a comment — `corepack install`
+          # installs exactly what `package.json` pins. `ci-package-manager-pin.test.ts` fails if any
+          # workflow reintroduces one, which is how the backend gate broke once already.
+          corepack install
+          expected="$(node -p "require('./package.json').packageManager.split('@')[1]")"
+          actual="$(pnpm --version)"
+          if [ "$actual" != "$expected" ]; then
+            echo "::error title=pnpm version mismatch::package.json pins $expected, the runner has $actual"
+            exit 1
+          fi
+          echo "pnpm $actual, matching the packageManager pin"
+
+      - name: Install dependencies from the frozen lockfile
+        # `--frozen-lockfile` so a lockfile that disagrees with any `package.json` fails here rather
+        # than being silently rewritten into something nobody reviewed.
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        working-directory: apps/${{ matrix.app }}
+        run: pnpm run lint
+
+      - name: Type-check
+        working-directory: apps/${{ matrix.app }}
+        run: pnpm run check
+
+      - name: Unit tests
+        working-directory: apps/${{ matrix.app }}
+        # `test:unit` for the controller rather than `test`, and the difference is deliberate. Its
+        # `test` script chains fourteen verifiers, and one of them — `runtime:http` — makes live
+        # HTTP requests to a DEPLOYED preview. A gate that depends on a running deployment reports
+        # somebody else's outage as this revision's failure. The room's `test` is entirely local
+        # (`privacy:verify`, `schema:verify`, `vitest run`), so it runs whole.
+        #
+        # The verifiers left out here are not unowned: they run in the pre-merge full gate. Naming
+        # that boundary is the point — a green check on this workflow means lint, types, units and a
+        # build, and does not claim to mean the evidence verifiers passed.
+        run: |
+          if [ "${{ matrix.app }}" = "controller" ]; then
+            pnpm run test:unit
+          else
+            pnpm run test
+          fi
+
+      - name: Build
+        working-directory: apps/${{ matrix.app }}
+        # Last, because it is the slowest and the least likely to fail alone: if lint, types and
+        # units are green, a broken build is usually a config or dependency problem, and having the
+        # three cheaper answers already in the log is what makes it diagnosable.
+        run: pnpm run build

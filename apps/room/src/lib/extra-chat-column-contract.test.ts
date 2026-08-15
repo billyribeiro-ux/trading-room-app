@@ -210,11 +210,19 @@ describe('hideChat — the pane collapses for non-presenters while chat is disab
 
   it('the extra column is hidden WITHOUT overwriting the viewer’s setting', () => {
     /*
-      `preferences.extraChatColumn = !1` with no `setPreference` call — a runtime override that is
-      remembered in `extraChatColumnWasEnabled` and restored. Persisting it would silently turn the
-      column off for good the first time a presenter disabled chat.
+      Upstream does this with a REMEMBERED FLAG because it destroys the setting to hide the column:
+      `preferences.extraChatColumn = !1` on hide (no `setPreference`, so it is a runtime override),
+      then `extraChatColumnWasEnabled && (preferences.extraChatColumn = !0)` to put it back.
+
+      Ours reaches the same outcome with no flag at all, and this assertion is the reason it is
+      allowed to: the preference is never written, and visibility is DERIVED from it plus the
+      collapse. Clearing the collapse restores the column by construction.
+
+      This test used to also require `extraChatColumnWasEnabled = extraChatColumn;`. That assignment
+      was never read — it recorded an answer nothing asked, because the derived had already made the
+      question unnecessary — so requiring it pinned a second source of truth for one fact. It was
+      removed 2026-08-14 once ESLint surfaced it. The two assertions below are the actual mechanism.
     */
-    expect(pageCode).toContain('extraChatColumnWasEnabled = extraChatColumn;');
     expect(pageCode).toContain(
       'const extraChatColumnVisible = $derived(extraChatColumn && !chatCollapsedByMode);'
     );
@@ -244,5 +252,52 @@ describe('shared shapes, moved rather than copied', () => {
     // And no local redeclaration left behind to drift.
     expect(PAGE).not.toContain('  type MessageAction =');
     expect(PAGE).not.toContain('  function sameCalendarDay(');
+  });
+});
+
+describe('the second column follows its own messages', () => {
+  /*
+    Until 2026-08-14 it did not. `onscrollerready` handed the element back and nothing read it, so a
+    message arriving in the extra column left the view where it was while the main chat scrolled —
+    the reader simply did not see it. ESLint surfaced the element as "assigned but never used".
+
+    The four conditions below are the main chat's, reproduced rather than reinvented, because the
+    two columns should not disagree about when a reader is left alone.
+  */
+  it('reads the scroller it is handed', () => {
+    expect(pageCode).toContain('const scroller = extraChatScroller;');
+    expect(pageCode).toContain('if (extraChatScroller === scroller) forceChatToBottom(scroller);');
+  });
+
+  it('scrolls on first view, on a channel switch, and on a new message', () => {
+    const from = pageCode.indexOf('const scroller = extraChatScroller;');
+    const effect = pageCode.slice(from, pageCode.indexOf('\n  });', from));
+    expect(effect).toContain('const isInitialView = !extraChatScrollInitialized;');
+    expect(effect).toContain("activeTab !== previousExtraChatTab");
+    expect(effect).toContain('count > previousExtraChatCount');
+  });
+
+  it('honours the reader’s own scroll position, using THIS column’s flag', () => {
+    /*
+      The assertion that matters. Passing `chatScrollingUp` here would let the main column's reader
+      position decide whether the extra column jumps — the two are independent panes and a reader
+      scrolled up in one must not be yanked by traffic in the other.
+    */
+    const from = pageCode.indexOf('const scroller = extraChatScroller;');
+    const effect = pageCode.slice(from, pageCode.indexOf('\n  });', from));
+    expect(effect).toContain('shouldAutoScrollForMessage(\n          extraChatScrollingUp,');
+    expect(effect).not.toContain('chatScrollingUp,\n');
+  });
+
+  it('is its own effect, not folded into the main chat’s', () => {
+    /*
+      One effect reading both columns would re-run each column's scroll logic whenever the other
+      changed — "a message arrived anywhere" instead of "a message arrived here".
+    */
+    const main = pageCode.indexOf('const scroller = chatScroller;');
+    const extra = pageCode.indexOf('const scroller = extraChatScroller;');
+    expect(main).toBeGreaterThan(-1);
+    expect(extra).toBeGreaterThan(main);
+    expect(pageCode.slice(main, extra)).toContain('});');
   });
 });

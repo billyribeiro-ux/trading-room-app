@@ -28,6 +28,16 @@
   import { MediaSession } from '$lib/media/session';
   import { startSpeechRecognition } from '$lib/media/speech-reco';
   import ScreenPane from '$lib/components/ScreenPane.svelte';
+  import StreamTabs from '$lib/components/StreamTabs.svelte';
+  import StreamingView from '$lib/components/StreamingView.svelte';
+  import {
+    applyMtxStartStream,
+    applyMtxStopStream,
+    applySessionMediaState,
+    emptyMtxState,
+    isMtxStream,
+    selectMtxStreamTab
+  } from '$lib/mtx-streams';
   import ScreenZoomControls from '$lib/components/ScreenZoomControls.svelte';
   import {
     INITIAL_ZOOM_LEVEL,
@@ -284,6 +294,96 @@
   /** The screen every viewer is taken to; renders the eye badge on that tab. */
   let forcedScreenId = $state<string | null>(null);
   let lockedScreenId = $state<string | null>(null);
+  /**
+   * The MediaMTX stream list and its selected tab — `MtxHandlerService`'s two fields, kept as one
+   * value because every rule in `mtx-streams.ts` changes both together.
+   *
+   * `$state.raw` rather than `$state`: the module returns a whole new object from every transition
+   * and nothing ever mutates one in place, so a deep proxy over the list would be pure overhead on
+   * every read.
+   *
+   * This is a SEPARATE list from `sharedScreens`, and the two must not be merged. They carry
+   * different objects (a `muser` versus a `ScreenTab`), they are selected by different fields
+   * (`selectedMTXStreamTab` versus `selectedScreenTab`), and their panes play different transports —
+   * WebRTC for a screenshare, HLS over `https` for a stream.
+   */
+  let mtxState = $state.raw(emptyMtxState());
+
+  /*
+    `this.hideStreams = !this.appService.globals.sessData.useMediaMTX`
+    (`app-presentationarea.full.js:2293`), applied to BOTH the `#streams-tab` `li` (`:5357`) and the
+    `#streams` pane (`:5388-5391`) — the same value, twice, so the tab and its content can never
+    disagree.
+
+    Note the NEGATION and the default that falls out of it. The setting says the feature is ON; the
+    flag says the tab is HIDDEN. A room with no MediaMTX sends no `useMediaMTX` at all, `!undefined`
+    is true, and the tab stays hidden — which is right, and is why this is not written as an
+    `=== false` check.
+  */
+  const hideStreams = $derived(!data.sessData.useMediaMTX);
+
+  /*
+    The playback credential, from `/internal/stream-read/{code}` at load time.
+
+    Empty strings when the room has no media server, when the controller refused, or when it could
+    not be reached. `StreamingView` is only ever rendered from inside the `#streams` pane, which
+    `hideStreams` already keeps out of rooms without MediaMTX, so an empty pair here means a room
+    that HAS MediaMTX but whose viewer has no token — an honest gap, not a URL built from blanks.
+  */
+  const streamServerMTX = $derived(data.streamRead?.streamServerMTX ?? '');
+  const mtxToken = $derived(data.streamRead?.mtxToken ?? '');
+
+  /**
+   * A stream tab the USER clicked — the counterpart of `selectScreenTabByUser`, and deliberately
+   * NOT the same function.
+   *
+   * `onStreamTabChange(e)` is two assignments and nothing else (`:2722-2725`). It does not emit the
+   * `stopWatchScreenOf` / `startWatchScreenOf` pair that `onScreenShareTabChange` does, because
+   * every stream pane stays mounted and only its classes change. It also does not broadcast: the
+   * `makeUsersFollowMyScreens` clause lives on the SCREENSHARE path alone.
+   */
+  function selectStreamTabByUser(streamId: string) {
+    mtxState = selectMtxStreamTab(mtxState, streamId);
+  }
+
+  /**
+   * "Bring everyone here" on a STREAM tab. It sends, and that is genuinely all it does.
+   *
+   * Upstream this is `bringFocusToScreen(e)` — the very same method the screenshare menu calls
+   * (`:2727`) — so the command that goes out is `focusOnScreen` carrying the stream's `_id`. What
+   * makes it a no-op is the RECEIVER: every client resolves that id against
+   * `mediaService.screenSharingUsers` only (bundle byte 1962380) and never against the MTX stream
+   * list, so a stream id matches nothing anywhere.
+   *
+   * Reproduced rather than repaired. Our own receiver already behaves identically — it calls
+   * `selectScreenTabOfId`, which searches `sharedScreens` — so the inertness here is emergent from
+   * the same cause rather than hand-coded, and it will start working by itself if the reference
+   * ever teaches its receiver about streams.
+   *
+   * What it must NOT do is what `bringEveryoneToScreen` does: that one assigns `selectedScreenTab`
+   * and `forcedScreenId` locally first, and pointing either at a STREAM id would select a
+   * screenshare tab that does not exist.
+   */
+  function bringEveryoneToStream(streamId: string) {
+    if (!isPresenter) return;
+    const body = new FormData();
+    body.set('screenId', streamId);
+    void fetch('?/focusOnScreen', { method: 'POST', body });
+  }
+
+  /**
+   * "Lock Screen" on a stream tab. Upstream: `toggleLockScreenMTX(e) { console.error('TODO:
+   * toggleLockScreenMTX') }` (`:3056-3058`) — an unimplemented stub beside a working
+   * `toggleLockScreen` for screenshares.
+   *
+   * There is no wire command, no globals write and no server half anywhere in the bundle to
+   * transcribe, and `globals.lockedScreenIDMTX` has no writer at all. So this reports the same
+   * thing the reference reports and changes nothing, rather than inventing a lock protocol whose
+   * only author would be me. `stream-tabs-contract.test.ts` fails if the stub ever gains a body.
+   */
+  function toggleLockStreamMtx(streamId: string) {
+    console.error('TODO: toggleLockScreenMTX', streamId);
+  }
   /**
    * Live connected count, from `/sess/{id}/roster/`.
    *
@@ -884,7 +984,23 @@
   let extraChatTab: ChatTab = $state('off-topic');
   /** `#textAreaTxtExtra`. */
   let extraComposer = $state('');
+  /**
+   * The extra chat column's scroll container, and the three trackers its autoscroll needs.
+   *
+   * `onscrollerready` wrote this element in and NOTHING read it until 2026-08-14, so the second
+   * chat column never followed a new message while the first one did — a message arrived, the
+   * column stayed where it was, and the reader saw nothing. ESLint is what surfaced it, as an
+   * "assigned but never used" that turned out to be a missing feature.
+   *
+   * The effect below is a deliberate parallel of the main chat's, not a new design: same four
+   * conditions (first view, channel switch, new message, and the reader's own scroll position via
+   * `shouldAutoScrollForMessage`), same `tick()` before measuring, and the same identity re-check
+   * afterwards so a scroller swapped out mid-await is not written to.
+   */
   let extraChatScroller = $state<HTMLElement | undefined>();
+  let extraChatScrollInitialized = false;
+  let previousExtraChatCount = 0;
+  let previousExtraChatTab: ChatTab | undefined;
   let extraChatScrollingUp = false;
   /**
    * `globals.chatInputFocus` — which composer the viewer last typed in.
@@ -1232,7 +1348,17 @@
   let selectedFileIds = $state<Set<number>>(new Set());
   let volume = $state(100);
   let previousVolume = $state(100);
-  let muted = $state(false);
+  /*
+    There is no `muted` flag here, deliberately.
+
+    `setMasterVolume` used to keep one in step with the slider, and nothing ever read it: every
+    consumer derives the same answer instead, and the screen panes are passed `muted={volume === 0}`
+    directly. Two places holding one fact is the shape that goes stale — the day someone sets
+    `volume` without going through `setMasterVolume`, the flag is wrong and the panes are right.
+
+    The first attempt at this deleted the declaration alone and broke the build, because the WRITE
+    was real. The rule reports "assigned but never READ", which is not the same as unreferenced.
+  */
   let backgroundVolume = $state(70);
   /**
    * `appService.globals.viewerOnlyMode` — the `vo` query parameter, and the ONLY gate on the screen
@@ -1315,7 +1441,6 @@
    * `setPreference('audioVolumeFor', …)`, on every toggle and every drag.
    */
   // The stored settings are the intentional one-time seed for editable client preference state.
-  // svelte-ignore state_referenced_locally
   let presenterAudio = $state.raw<PresenterAudioPreferences>({
     audioMutedFor: readPresenterMuteMap(loadedSettings.audioMutedFor),
     audioVolumeFor: readPresenterVolumeMap(loadedSettings.audioVolumeFor)
@@ -2132,14 +2257,29 @@
    */
   let chatCollapsedByMode = $state(false);
   let splitBeforeCollapse: number | null = null;
-  let extraChatColumnWasEnabled = false;
+  /*
+    `extraChatColumnWasEnabled` USED TO BE HERE, and its absence is the point.
+
+    Upstream needs that flag because it MUTATES the preference: `preferences.extraChatColumn = !1`
+    on hide, then `extraChatColumnWasEnabled && (preferences.extraChatColumn = !0)` on restore. It
+    has destroyed the viewer's setting and has to remember what it was.
+
+    Here the preference is never written. `extraChatColumnVisible` below derives from
+    `extraChatColumn && !chatCollapsedByMode`, so clearing the collapse restores the column by
+    construction and there is nothing to remember. Keeping a flag that records an answer nothing
+    asks would be a second source of truth for one fact.
+
+    Recorded because an earlier note in this spot claimed the opposite — that the missing read meant
+    "a column hidden by webinar mode never comes back". That was wrong: it comes back the moment
+    `chatCollapsedByMode` goes false. A variable being unread is evidence of nothing on its own; it
+    was the DESIGN, not the wiring, that differed.
+  */
 
   $effect(() => {
     const shouldHide = !isPresenter && chatMode === 'd';
     if (shouldHide === chatCollapsedByMode) return;
     if (shouldHide) {
       splitBeforeCollapse = chatAlertsSplit;
-      extraChatColumnWasEnabled = extraChatColumn;
       // `chatSize = 0; alertSize = 100` — the alerts pane takes the whole column.
       chatAlertsSplit = 1;
       chatCollapsedByMode = true;
@@ -2885,6 +3025,49 @@
       chatScrollingUp = false;
       void tick().then(() => {
         if (chatScroller === scroller) forceChatToBottom(scroller);
+      });
+    }
+  });
+
+  /*
+    The SECOND chat column, following its own messages.
+
+    Deliberately a separate effect rather than a loop over both: the two columns have independent
+    tabs, independent message lists and independent reader scroll positions, so one effect reading
+    both would re-run each column's scroll logic whenever the other changed. That is the difference
+    between "a message arrived here" and "a message arrived anywhere", and it is what would make a
+    reader scrolled up in this column get yanked to the bottom by traffic in the other one.
+  */
+  $effect(() => {
+    const scroller = extraChatScroller;
+    const activeTab = extraChatTab;
+    const count = visibleExtraChatMessages.length;
+    const newestMessage = visibleExtraChatMessages.at(-1);
+
+    if (!scroller) return;
+
+    const isInitialView = !extraChatScrollInitialized;
+    const didSwitchChannel = extraChatScrollInitialized && activeTab !== previousExtraChatTab;
+    const isNewMessage =
+      extraChatScrollInitialized && !didSwitchChannel && count > previousExtraChatCount;
+    extraChatScrollInitialized = true;
+    previousExtraChatTab = activeTab;
+    previousExtraChatCount = count;
+
+    if (
+      isInitialView ||
+      didSwitchChannel ||
+      (isNewMessage &&
+        shouldAutoScrollForMessage(
+          extraChatScrollingUp,
+          newestMessage?.senderId,
+          data.user.id,
+          alwaysScrollToBottom
+        ))
+    ) {
+      extraChatScrollingUp = false;
+      void tick().then(() => {
+        if (extraChatScroller === scroller) forceChatToBottom(scroller);
       });
     }
   });
@@ -3862,7 +4045,7 @@
   let reconnectToastId: number | null = null;
   let presenterReconnectToastId: number | null = null;
 
-  function mediaServerConnected(reconnected: boolean) {
+  function mediaServerConnected(_reconnected: boolean) {
     isMediaConnected = true;
     /*
       Cleared here, on the socket's `connect`, exactly where the reference clears them — inline in
@@ -4933,7 +5116,6 @@
 
   function setMasterVolume(nextVolume: number) {
     volume = nextVolume;
-    muted = nextVolume === 0;
     setSoundEffectsVolume(nextVolume / 100);
     if (typeof document !== 'undefined') {
       document
@@ -7111,7 +7293,8 @@
     const source = new EventSource(`/sess/${encodeURIComponent(data.room.shortCode)}/events`);
 
     source.addEventListener('message', (event) => {
-      let payload: { channel?: string; data?: Record<string, unknown> } | null = null;
+      // No initialiser: the `catch` returns, so a value here could never be read.
+      let payload: { channel?: string; data?: Record<string, unknown> };
       try {
         payload = JSON.parse((event as MessageEvent<string>).data);
       } catch {
@@ -7141,6 +7324,14 @@
               url?: string;
               /** `focusOnScreen` — the producer id of the screen to move to. */
               screenId?: string;
+              /**
+               * `mtxStartStream` / `mtxStopStream` carry the stream under `muser` — the reference's
+               * own key (byte 1010826), and the reason `mtx-streams.ts` describes an MTX stream as
+               * "simply another muser". Typed `unknown` because `isMtxStream` is what decides.
+               */
+              muser?: unknown;
+              /** `getSessionMTXMediaState`'s full list. Same reason: validated, not asserted. */
+              data?: unknown;
             }
           | undefined;
 
@@ -7291,6 +7482,50 @@
             here the equivalent is simply that only the user-initiated tab click broadcasts.
           */
           if (typeof command.screenId === 'string') selectScreenTabOfId(command.screenId);
+          return;
+        }
+
+        /*
+          The three MediaMTX commands. TWO NAMES HERE ARE NEARLY IDENTICAL AND ARE NOT THE SAME
+          THING — this cost a wrong first draft and is written down so it costs nobody else one:
+
+            `getSessionMTXMediaState`  — MTX in the MIDDLE. The WIRE command, both directions. The
+                                         client SENDS it bare to ask for the list, and the server
+                                         REPLIES with the same name carrying `data`.
+            `getSessionMediaStateMTX`  — MTX at the END. An INTERNAL bus event upstream, emitted
+                                         with no payload after the reply has been stored in
+                                         `globals.roomMediaStateMTX`.
+
+          Decoded at bundle byte 1013960:
+
+            case "getSessionMTXMediaState":
+              this.globals.roomMediaStateMTX = i.data,
+              this.appEventBus.emit("getSessionMediaStateMTX"); break;
+
+          and byte 989729: `subscribe("fetchSessionMediaStateMTX", () => this.send("getSessionMTXMediaState"))`.
+
+          There is no `globals` here, so the payload goes straight to the reducer and the internal
+          event has nothing left to do — one hop instead of three, with no behaviour lost.
+        */
+        if (command?.cmd === 'mtxStartStream') {
+          // `case "mtxStartStream": emit("mtxStartStream", i.muser)` — the key is `muser`, byte 1010826.
+          if (isMtxStream(command.muser)) mtxState = applyMtxStartStream(mtxState, command.muser);
+          return;
+        }
+        if (command?.cmd === 'mtxStopStream') {
+          if (isMtxStream(command.muser)) mtxState = applyMtxStopStream(mtxState, command.muser);
+          return;
+        }
+        if (command?.cmd === 'getSessionMTXMediaState') {
+          /*
+            The full list, and a REPLACE rather than a merge — `this.mtxStreams =
+            this.globals.roomMediaStateMTX`. Non-array payloads are ignored rather than coerced to
+            `[]`, because an empty list is a meaningful state (it renders "No one is streaming right
+            now...") and a malformed frame must not be allowed to assert it.
+          */
+          if (Array.isArray(command.data)) {
+            mtxState = applySessionMediaState(command.data.filter(isMtxStream));
+          }
           return;
         }
 
@@ -8284,6 +8519,13 @@
     return result.data;
   }
 
+  /*
+    Read by `NotesPane` while a presenter has the editor open, to fill the Version History panel.
+
+    A plain GET rather than `submitNoteMutation`: this changes nothing, so it must not go through
+    `invalidateAll()` — doing so would re-run every load function on the page each time a panel
+    was opened, and the route already answers with exactly the rows the panel needs.
+  */
   async function loadNoteVersions(noteId: number): Promise<readonly NoteVersion[]> {
     const response = await fetch(`/api/notes/${noteId}/versions`);
     if (!response.ok) {
@@ -8338,7 +8580,7 @@
 
 {#snippet bodySegmentsPrivate(text: string)}
   {#each text.split(/((?:http|https|ftp):\/\/[\w?=&.@/\-;#~%]+)/gi) as part, index (index)}
-    {#if /^(?:http|https|ftp):\/\//i.test(part)}<!-- svelte-ignore a11y_click_events_have_key_events --><!-- svelte-ignore a11y_no_static_element_interactions --><a
+    {#if /^(?:http|https|ftp):\/\//i.test(part)}<a
         href={part}
         target="_blank"
         rel="noreferrer"
@@ -8722,8 +8964,6 @@
                           </li>
                           <li class="nav-item">
                             <!-- svelte-ignore a11y_missing_attribute -->
-                            <!-- svelte-ignore a11y_click_events_have_key_events -->
-                            <!-- svelte-ignore a11y_no_static_element_interactions -->
                             <a
                               aria-hidden="true"
                               onclick={recPreviewOpen ? hideRecPreview : showRecPreview}
@@ -10612,16 +10852,27 @@
                       </div>
                     </a>
                   </li>
-                  <li role="presentation" class="nav-item" hidden>
+                  <!--
+                    `z('hidden', o.hideStreams)` on the `li` (`app-presentationarea.full.js:5357`),
+                    the same flag the pane below uses. This carried a hardcoded `hidden` and no
+                    click handler until `useMediaMTX` reached the room — a tab that could never
+                    open, in every room, whether or not it had MediaMTX.
+                  -->
+                  <li role="presentation" class="nav-item" hidden={hideStreams}>
                     <a
                       id="streams-tab"
                       class="nav-link"
+                      class:active={mainTab === 'streams'}
                       role="tab"
-                      tabindex="-1"
+                      tabindex={mainTab === 'streams' ? undefined : -1}
                       aria-controls="streams"
-                      aria-selected="false"
+                      aria-selected={mainTab === 'streams'}
                       data-bs-toggle="tab"
                       data-bs-target="#streams"
+                      onclick={() => (mainTab = 'streams')}
+                      onkeydown={(event) => {
+                        if (event.key === 'Enter' || event.key === ' ') mainTab = 'streams';
+                      }}
                     >
                       <div class="d-flex">
                         <div><i class="fas fa-podcast"></i><span class="ml-1">Streams</span></div>
@@ -10920,16 +11171,96 @@
                     </div>
                     {/if}
                   </div>
+                  <!--
+                    The `#streams` pane — `d(40,'div',22)` with `H(41, DSe, 2, 0, 'h3', 23)(42, OSe, 7, 1)`
+                    (`app-presentationarea.full.js:5277-5278`), and its update block at `:5388-5393`:
+
+                      z('ngClass', ut(57, Hr, 'presAreaTabs-streams' == o.selectedMainTab))
+                       ('hidden', o.hideStreams),
+                      m(), O(41, o.appService.globals.preferences.disableVideo ? 41 : 42)
+
+                    `Hr` is `t => ({'show active': t})`, so the pane gets BOTH classes, exactly like
+                    `#screens`.
+
+                    THE SAME `disableVideo` PREFERENCE BLANKS THIS PANE TOO. `DSe` (`:500`) renders
+                    the identical `<h3 class="text-center mt-4">Video off to preserve data...</h3>`
+                    that `eSe` renders for `#screens`. One switch, two panes — a viewer who turns
+                    video off to save data must not keep pulling an HLS playlist here, which is the
+                    whole point of the preference. `disable-video-gate-contract.test.ts` already
+                    pins the polarity: the flag being SET selects the MESSAGE.
+                  -->
                   <div
                     id="streams"
-                    class="tab-pane fade"
+                    class={mainTab === 'streams' ? 'tab-pane fade show active' : 'tab-pane fade'}
                     role="tabpanel"
                     aria-labelledby="streams-tab"
-                    hidden
+                    hidden={hideStreams}
                   >
-                    <h3 class="text-center mt-4">No one is streaming right now...</h3>
-                    <ul id="streamsTabs" class="nav nav-tabs screens-tabs" role="tablist"></ul>
-                    <div id="streamsTabsContent" class="tab-content"></div>
+                    {#if videoDisabled}
+                      <h3 class="text-center mt-4">Video off to preserve data...</h3>
+                    {:else}
+                      <!--
+                        `O(0, 0 == mtxStreams.length ? 0 : -1)` — the empty-state h3 is the ONLY
+                        conditional part. The `ul` and the `div` are always rendered, empty, which is
+                        why this sits beside them rather than replacing them.
+                      -->
+                      {#if mtxState.streams.length === 0}
+                        <h3 class="text-center mt-4">No one is streaming right now...</h3>
+                      {/if}
+                      <StreamTabs
+                        streams={mtxState.streams}
+                        selectedStreamId={mtxState.selectedTabID}
+                        {isPresenter}
+                        onselect={selectStreamTabByUser}
+                        onbringeveryone={bringEveryoneToStream}
+                        ontogglelock={toggleLockStreamMtx}
+                      />
+                      <!--
+                        `d(4,'div',119)` then `ht(5, ISe, 2, 7, 'div', 73, pc)`. Each pane is const
+                        73 — `['role','tabpanel',1,'tab-pane','fade',3,'ngClass','id']` — with
+                        `ngClass` from `Hr` and `aria-labelledby` interpolated as `${_id}-tab`.
+
+                        Every pane stays MOUNTED and only the classes change, which is why
+                        `onStreamTabChange` has no stop/start counterpart: unlike
+                        `onScreenShareTabChange`, which emits `stopWatchScreenOf` /
+                        `startWatchScreenOf`, switching stream tabs upstream touches nothing but the
+                        selection. `StreamingView` owns its own hls.js lifecycle from `active`.
+                      -->
+                      <div id="streamsTabsContent" class="tab-content">
+                        {#each mtxState.streams as mtxStream (mtxStream._id)}
+                          <div
+                            id={mtxStream._id}
+                            role="tabpanel"
+                            class={mtxStream._id === mtxState.selectedTabID
+                              ? 'tab-pane fade show active'
+                              : 'tab-pane fade'}
+                            aria-labelledby="{mtxStream._id}-tab"
+                          >
+                            <!--
+                              `T(1,'app-streaming-view',117)` — const 117 is `[1,'h-inherit',3,'muser']`,
+                              so the HOST element carries `h-inherit` and the component's own root
+                              carries `h-100` (its const 1). Angular has a host element; Svelte has
+                              none, so the host becomes this wrapper `div` and the two nested
+                              elements survive. Dropping it would drop the height chain and the
+                              video would collapse to its intrinsic size.
+                            -->
+                            <div class="h-inherit">
+                              <StreamingView
+                                muser={mtxStream}
+                                {streamServerMTX}
+                                {mtxToken}
+                                {isPresenter}
+                                overlayUserIdOnScreenshare={data.sessData
+                                  .overlayUserIdOnScreenshare === true}
+                                userXrefID={data.user.userXrefID}
+                                audioVolume={volume / 100}
+                                {doNotDisturbOn}
+                              />
+                            </div>
+                          </div>
+                        {/each}
+                      </div>
+                    {/if}
                   </div>
                   <div
                     id="notes"
@@ -10953,9 +11284,13 @@
                         onDelete={async (noteId) => {
                           await submitNoteMutation('deleteSessionNoteTab', { noteId });
                         }}
+                        onLoadVersions={loadNoteVersions}
                         onNewNoteOpenChange={(open) => (newNoteOpen = open)}
                         onRename={async (noteId, newName) => {
                           await submitNoteMutation('renameSessionNoteTab', { noteId, newName });
+                        }}
+                        onRestoreVersion={async (noteId, versionId) => {
+                          await submitNoteMutation('restoreNoteVersion', { noteId, versionId });
                         }}
                         onSave={async (noteId, contentHtml) => {
                           await submitNoteMutation('saveSessionNote', { noteId, contentHtml });
@@ -11008,8 +11343,6 @@
                            target. Ours listened on the <a> alone and that band was dead. The anchor
                            keeps the keydown, so the tab stays operable from the keyboard, which the
                            reference's is not. -->
-                      <!-- svelte-ignore a11y_click_events_have_key_events -->
-                      <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
                       <li class="nav-item" role="presentation" onclick={() => (fileTab = 'files')}>
                         <!-- svelte-ignore a11y_interactive_supports_focus -->
                         <a
@@ -11037,8 +11370,6 @@
                            target. Ours listened on the <a> alone and that band was dead. The anchor
                            keeps the keydown, so the tab stays operable from the keyboard, which the
                            reference's is not. -->
-                      <!-- svelte-ignore a11y_click_events_have_key_events -->
-                      <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
                       <li class="nav-item" role="presentation" onclick={() => (fileTab = 'images')}>
                         <!-- svelte-ignore a11y_interactive_supports_focus -->
                         <a
@@ -11066,8 +11397,6 @@
                            target. Ours listened on the <a> alone and that band was dead. The anchor
                            keeps the keydown, so the tab stays operable from the keyboard, which the
                            reference's is not. -->
-                      <!-- svelte-ignore a11y_click_events_have_key_events -->
-                      <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
                       <li class="nav-item" role="presentation" onclick={() => (fileTab = 'sounds')}>
                         <!-- svelte-ignore a11y_interactive_supports_focus -->
                         <a
@@ -11347,7 +11676,6 @@
                                   class="d-flex justify-content-center align-items-center flex-wrap"
                                 >
                                   {#if item.kind !== 'image'}
-                                    <!-- svelte-ignore a11y_missing_content -->
                                     <!-- svelte-ignore a11y_consider_explicit_label -->
                                     <a
                                       class="fileDowload"
@@ -11523,7 +11851,6 @@
                 {selfMutedUntil}
                 {showPmButton}
                 {canPostImages}
-                {isPresenter}
                 {canUseRTE}
                 {giphyApiKey}
                 {theme}

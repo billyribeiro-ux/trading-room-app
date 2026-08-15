@@ -26,13 +26,23 @@
   interface Props {
     def: RoomSettingDef;
     value: string | number | boolean | null | undefined;
-    /** shown next to the trigger when nothing in the room consumes this yet */
-    markUnwired?: boolean;
+    /*
+      `markUnwired` USED TO BE HERE, and its removal is the second half of a change that stopped
+      halfway. The marker it drove was deleted for the reason recorded down in the template; the
+      prop outlived it, so six call sites kept passing a flag that no line of this component read.
+
+      A prop that is documented, passed everywhere and consumed nowhere is the exact shape this
+      repository calls dead scaffolding — and it survived because it LOOKS wired. ESLint is what
+      found it, on the first run after the tooling was fixed.
+
+      Nothing is lost: `def.wired` still exists, `verify-room-settings-schema.mjs` still gates on it,
+      and `room-config-boundary.test.ts` still fails if a setting crosses to the room while unwired.
+    */
     /** for `select` fields — the reference's `e-ng-options` list */
     options?: readonly { readonly value: string; readonly text: string }[];
   }
 
-  let { def, value, markUnwired = false, options }: Props = $props();
+  let { def, value, options }: Props = $props();
 
   let open = $state(false);
   let draft = $state('');
@@ -143,6 +153,10 @@
 
       Nothing is lost: `def.wired` still exists, `scripts/verify-room-settings-schema.mjs` still
       gates on it, and `room-config-boundary.test.ts` still fails if a setting crosses to the room
-      while marked unwired. The flag keeps working; it just no longer prints itself.
+      while marked unwired.
+
+      The `markUnwired` PROP that used to drive this is gone too, 2026-08-14. Deleting the marker
+      and leaving the prop behind meant six call sites passing a flag nothing read — see the note
+      where it was declared.
     -->
   {/if}
