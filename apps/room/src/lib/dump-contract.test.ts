@@ -336,9 +336,16 @@ describe('part 1 capture contract', () => {
       (match) => match[1]
     );
 
-    expect([...modalHosts, pageSource.includes('<app-privchat') && 'app-privchat']).toEqual(
-      DIRECT_EVIDENCE_CONTRACT.rootHostOrder
-    );
+    expect([
+      ...modalHosts,
+      // `app-privchat` is `PrivateChatPanel.svelte` since 2026-08-15; the page renders it, the
+      // element is declared there, so the host inventory reads both files.
+      text(new URL('components/PrivateChatPanel.svelte', import.meta.url)).includes(
+        '<app-privchat'
+      ) &&
+        pageSource.includes('<PrivateChatPanel') &&
+        'app-privchat'
+    ]).toEqual(DIRECT_EVIDENCE_CONTRACT.rootHostOrder);
   });
 
   it('pins every supplied app-st-message state count without seeding sample identities', () => {
@@ -417,7 +424,14 @@ describe('part 1 capture contract', () => {
     const pageSource = text(new URL('../routes/+page.svelte', import.meta.url));
     const modalHostSource = text(new URL('components/ModalHost.svelte', import.meta.url));
     expect(pageSource).toContain('<span class="badge badge-danger ms-2"');
-    expect(pageSource.match(/<span class="badge badge-danger ml-2"/g)).toHaveLength(2);
+    /*
+      ONE here since the private-chat panel became its own component on 2026-08-15; the second is
+      the panel's own. Counted in both files rather than dropped to 1, because a bare 1 would go
+      green if the panel's badge vanished entirely.
+    */
+    expect(pageSource.match(/<span class="badge badge-danger ml-2"/g)).toHaveLength(1);
+    const privateChatPanel = text(new URL('components/PrivateChatPanel.svelte', import.meta.url));
+    expect(privateChatPanel.match(/<span class="badge badge-danger ml-2"/g)).toHaveLength(1);
     expect(pageSource).toContain('<i class="fas fa-bell-slash"></i> DND');
     expect(pageSource).toContain("typeof loadedSettings.doNotDisturbOn === 'boolean'");
     expect(pageSource).toContain('DEFAULT_ALERT_DELIVERY_PREFERENCES.doNotDisturbOn');

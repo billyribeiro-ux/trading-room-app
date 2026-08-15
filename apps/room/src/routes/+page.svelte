@@ -171,6 +171,7 @@
   import type { MessageBadge } from '$lib/types';
   import { isMentionOf } from '$lib/mention';
   import { trimChatLog } from '$lib/room-scroller';
+  import PrivateChatPanel from '$lib/components/PrivateChatPanel.svelte';
   import ToastHost from '$lib/components/ToastHost.svelte';
   import VideoPlayer from '$lib/components/VideoPlayer.svelte';
   import YoutubePlayerOverlay from '$lib/components/YoutubePlayerOverlay.svelte';
@@ -1239,8 +1240,6 @@
   let privateChatOpen = $state(false);
   // The private-chat gear is a toolbar toggle, not a dropdown: `<li class="nav-item dropdown"
   // (click)="togglePMToolbar()">`, with the toolbar rendered as a sibling of the nav inside
-  // `.bs-component` and gated on `O(14, o.showPMToolbar ? 14 : -1)`.
-  let showPMToolbar = $state(false);
   let pmSearchTerm = $state('');
   /**
    * `app-privchat`'s state, in the capture's own shapes.
@@ -12664,267 +12663,45 @@
       </div>
     {/if}
     <!--
-      Draggable and resizable, exactly as the capture sets it up:
+      `app-privchat` is its own component since 2026-08-15 — the first of the five template
+      regions, and the smallest, chosen to prove the pattern on a floating panel rather than on a
+      pane a member looks at all day.
 
-        un("#privaChatCompHolder")
-          .draggable({ appendTo:"body", containment:".wrapper", cursor:"move", scroll:!1, snap:!0,
-                       cancel:".privChatScroller, .textSendDiv, #pmSearchTermTxt" })
-          .resizable({ handles:"n, e, s, w, ne, se, sw, nw",
-                       maxWidth: un(".wrapper").width(), maxHeight: un(".wrapper").height() })
+      PROPS, not context, and the reasoning is in the component's own header: these state classes
+      are instantiated inside this file, so they are per-request already and there is nothing for
+      `createContext` to protect against. It is a direct child; a context layer for a one-level hop
+      is indirection with no reader.
 
-      The `cancel` list is what keeps the panel usable: without it, scrolling the conversation or
-      selecting text in the composer would pick the whole panel up and move it.
+      `showPMToolbar` did NOT come along as a prop. It was page state that nothing outside that
+      markup read or wrote, so it is component-local now — the part of this extraction that removes
+      a line rather than relocating one.
     -->
-    <app-privchat
-      id="privaChatCompHolder"
-      class="privChatHolder"
-      style={privateChatOpen ? 'display: block;' : undefined}
-      {@attach panelDragResize({
-        containment: '.wrapper',
-        cancel: '.privChatScroller, .textSendDiv, #pmSearchTermTxt',
-        handles: 'n, e, s, w, ne, se, sw, nw',
-        snap: true
-      })}
-    >
-      <div class="chat d-flex flex-column h-100" style="overflow-y: hidden;">
-        <div class="bs-component">
-          <nav class="navbar navbar-expand-lg navbar-light bg-light chat-nav-pm p-1 text-white">
-            <!-- svelte-ignore a11y_missing_attribute -->
-            <a class="navbar-brand ml-1 mr-1"
-              ><i class="fas fa-comments"></i>
-              {#if doNotDisturbOn}
-                <span class="badge badge-danger ml-2"><i class="fas fa-bell-slash"></i> DND</span>
-              {/if}</a
-            >
-            {#if selectedMessageUser}
-              <ul
-                role="tablist"
-                class="nav nav-tabs flex-wrap flex-grow-1 justify-content-center chatTabs"
-              >
-                <li class="nav-item">
-                  <!-- svelte-ignore a11y_missing_attribute -->
-                  <a data-bs-toggle="tab" role="tab" class="nav-link active">
-                    <img
-                      alt="user.name"
-                      class="avatarImg avatarImg-active"
-                      src={selectedMessageUser.pic}
-                    />
-                    {selectedMessageUser.nick}
-                    <!-- svelte-ignore a11y_click_events_have_key_events -->
-                    <!-- svelte-ignore a11y_no_static_element_interactions -->
-                    <span
-                      class="close-tab"
-                      onclick={(event) => {
-                        event.stopPropagation();
-                        selectedMessageUser = null;
-                        selectedMessage = null;
-                      }}
-                    >
-                      <i class="mx-1 fas fa-times"></i>
-                    </span>
-                  </a>
-                </li>
-              </ul>
-            {/if}
-            <ul class="nav ml-auto flex-nowrap align-items-center">
-              {#if selectedMessageUser && isPresenter}
-                <li class="nav-item mr-2">
-                  <!-- svelte-ignore a11y_missing_attribute -->
-                  <!-- svelte-ignore a11y_click_events_have_key_events -->
-                  <!-- svelte-ignore a11y_no_static_element_interactions -->
-                  <a
-                    class="btn btn-outline-secondary btn-sm text-light border-0"
-                    onclick={deleteThisPM}
-                  >
-                    <i class="fas fa-trash"></i> This
-                  </a>
-                </li>
-              {/if}
-              <!-- svelte-ignore a11y_click_events_have_key_events -->
-              <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-              <li
-                class="nav-item dropdown"
-                style="position: static;"
-                onclick={() => (showPMToolbar = !showPMToolbar)}
-              >
-                <!-- svelte-ignore a11y_consider_explicit_label -->
-                <!-- svelte-ignore a11y_missing_attribute -->
-                <a aria-haspopup="true" aria-expanded="false" class="nav-link dropdown-toggle p-0">
-                  <i title="Settings" class="fas fa-cog chat-header-gear"></i>
-                </a>
-              </li>
-              <li class="nav-item ml-2 mr-2">
-                <!-- svelte-ignore a11y_click_events_have_key_events -->
-                <!-- svelte-ignore a11y_no_static_element_interactions -->
-                <i class="fas fa-times" onclick={closePrivateChatPanel}></i>
-              </li>
-            </ul>
-          </nav>
-          {#if showPMToolbar}
-            <div
-              class="shadow p-2 w-100 border-top border-secondary pmToolbar"
-              style="margin-top: 0px;"
-            >
-              <form
-                id="chat-settings"
-                class="w-100"
-                onsubmit={(event) => {
-                  event.preventDefault();
-                }}
-              >
-                <div>
-                  <div class="form-group">
-                    <div class="input-group">
-                      <input
-                        type="text"
-                        name="pmSearchTermTxt"
-                        id="pmSearchTermTxt"
-                        placeholder="Type your search term, then press Enter"
-                        aria-label="Search"
-                        aria-describedby="addon-search"
-                        title="Type your search term, then press Enter"
-                        class="form-control"
-                        bind:value={pmSearchTerm}
-                        onkeydown={(event) => {
-                          if (event.key !== 'Enter') return;
-                          event.preventDefault();
-                          void onEnterSearchPrivateChat(event.currentTarget.value);
-                        }}
-                      />
-                      <!-- svelte-ignore a11y_click_events_have_key_events -->
-                      <!-- svelte-ignore a11y_no_static_element_interactions -->
-                      <span
-                        id="addon-chat-clear"
-                        title="Clear the search"
-                        class="btn btn-outline-secondary pl-2 pr-2 d-inline-flex input-group-text"
-                        onclick={() => void onEnterSearchPrivateChat('')}
-                      >
-                        <i class="fas fa-times"></i>
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </form>
-              <li class="d-inline mr-2">
-                <!-- svelte-ignore a11y_missing_attribute -->
-                <!-- svelte-ignore a11y_click_events_have_key_events -->
-                <!-- svelte-ignore a11y_no_static_element_interactions -->
-                <a class="btn btn-outline-light btn-sm text-light" onclick={setDND}
-                  ><i class="fas fa-bell-slash"></i> Don't Disturb</a
-                >
-                <!-- svelte-ignore a11y_missing_attribute -->
-                <!-- svelte-ignore a11y_click_events_have_key_events -->
-                <!-- svelte-ignore a11y_no_static_element_interactions -->
-                <a
-                  class="btn btn-outline-info btn-sm text-light mx-1"
-                  onclick={downloadPrivateChatLog}><i class="fas fa-download"></i> Download Log</a
-                >
-              </li>
-            </div>
-          {/if}
-        </div>
-        <div class="d-flex h-100 pc-body">
-          {#if chatTabs.length > 0}
-            <!--
-              One row per conversation - `getAllPCLogs` fills this. The row markup is the capture's
-              `tEe`: a `list-group-item` carrying a status dot, the avatar and the name, with
-              `pc-active` on the open one.
-            -->
-            <div class="list-group pc-list">
-              {#each chatTabs as tab (tab.uid)}
-                <button
-                  type="button"
-                  aria-current={currUser === tab.uid}
-                  class="list-group-item list-group-item-light d-flex align-items-center justify-content-between px-1"
-                  class:pc-active={currUser === tab.uid}
-                  onclick={() => switchChatToUser(tab.uid)}
-                >
-                  <span class="user-status-container">
-                    <span class:bg-success={tab.online} class="badge user-status-type">&nbsp;</span>
-                    <img alt="t.avt" class="avatarImg" src={tab.pic} />
-                    <span class="pc-username ms-1">{tab.name}</span>
-                  </span>
-                  {#if tab.unread > 0}
-                    <span class="badge privchatUnread">{tab.unread}</span>
-                  {/if}
-                </button>
-              {/each}
-            </div>
-            <div class="pc-logs">
-              {#if currUser === null}
-                <div class="flex-fill p-3 text-center">No active chat</div>
-              {:else}
-                <!--
-                  `app-privchatscroller`: `.pc-messages` scrolls, with a Load More badge above the
-                  rows while `hasMoreData && !searchTerm`. Rows are `app-st-compactmessage` with
-                  `logType="pc"`.
-                -->
-                <app-privchatscroller class="privChatScroller">
-                  <div class="pc-messages">
-                    {#if privateChatLog.length >= 50 && !pmSearching}
-                      <div class="text-center">
-                        <!-- svelte-ignore a11y_click_events_have_key_events -->
-                        <!-- svelte-ignore a11y_no_static_element_interactions -->
-                        <span
-                          class="badge badge-warning"
-                          onclick={() =>
-                            currUser !== null &&
-                            loadPrivateChatLog(
-                              currUser,
-                              Math.floor(privateChatLog.length / 50)
-                            )}
-                        >
-                          Load More</span
-                        >
-                      </div>
-                    {/if}
-                    {#each privateChatLog as message (message._id)}
-                      <app-st-compactmessage id="pcm-{message._id}">
-                        <div class="msg-box pb-1">
-                          <div class="d-flex justify-content-between align-items-center w-100">
-                            <strong class="username mx-1" class:presUser={message.isA}
-                              >{message.n}</strong
-                            >
-                            <span class="msg-time mr-1">{privateChatTime(message.t)}</span>
-                          </div>
-                          <div class="msg-left text-formated preText ml-2 mr-2 p-0">
-                            {@render bodySegmentsPrivate(message.txt)}
-                          </div>
-                        </div>
-                      </app-st-compactmessage>
-                    {/each}
-                  </div>
-                </app-privchatscroller>
-                <!--
-                  `#textAreaTxtPM`. Enter sends, Shift+Enter and Alt+Enter insert a newline -
-                  `onKey(e)` in the capture, which calls `preventDefault()` on 13 either way.
-                -->
-                <div class="d-flex align-items-center textSendDiv" id="textAreaHolderPM">
-                  <textarea
-                    id="textAreaTxtPM"
-                    class="txt-area w-100"
-                    rows="1"
-                    placeholder="Type your message here.."
-                    bind:value={privateChatDraft}
-                    onkeydown={(event) => {
-                      if (event.key !== 'Enter') return;
-                      event.preventDefault();
-                      if (event.shiftKey || event.altKey) {
-                        privateChatDraft += '\n';
-                        return;
-                      }
-                      void sendPrivateMessage();
-                    }}
-                  ></textarea>
-                </div>
-              {/if}
-            </div>
-          {:else}
-            <div class="flex-fill p-3 text-center">No active chat</div>
-          {/if}
-        </div>
-      </div>
-    </app-privchat>
+    <PrivateChatPanel
+      open={privateChatOpen}
+      doNotDisturb={doNotDisturbOn}
+      {isPresenter}
+      peer={selectedMessageUser}
+      tabs={chatTabs}
+      currentUserId={currUser}
+      log={privateChatLog}
+      searching={pmSearching}
+      bind:searchTerm={pmSearchTerm}
+      bind:draft={privateChatDraft}
+      body={bodySegmentsPrivate}
+      formatTime={privateChatTime}
+      onclosepeer={() => {
+        selectedMessageUser = null;
+        selectedMessage = null;
+      }}
+      ondeletethis={deleteThisPM}
+      onclose={closePrivateChatPanel}
+      onsearch={(term) => void onEnterSearchPrivateChat(term)}
+      ondonotdisturb={setDND}
+      ondownload={downloadPrivateChatLog}
+      onswitchuser={switchChatToUser}
+      onloadmore={(uid, page) => loadPrivateChatLog(uid, page)}
+      onsend={() => void sendPrivateMessage()}
+    />
   </app-room>
   <audio
     {@attach setWebcamAudioAttributes}
