@@ -26,6 +26,17 @@
   import RoomMessage from './RoomMessage.svelte';
   import type { PastedImageSubmission, PostAlertSubmission } from '$lib/post-alert-behavior';
   import {
+    alertFilterConfirm,
+    alertFilterTitle,
+    parseModAlertFilterList,
+    selectAllTraders,
+    toggleTrader,
+    traderRowIconClass,
+    unselectAllTraders,
+    type AlertFilterFor,
+    type AlertFilterTrader
+  } from '$lib/alert-filter';
+  import {
     CAPTURED_TRADERS,
     canSearch,
     checkInputs,
@@ -202,6 +213,19 @@
     onChatModeChange: (mode: string) => void;
     onRteDraftChange: (html: string) => void;
     onRteSend: () => void;
+    /**
+     * `sessData.modAlertFilterList` — a STRING containing JSON, parsed when the modal opens.
+     *
+     * Undefined or blank means the room configured no list, and the reference then has no feature
+     * at all: no entry point, no modal, no filtering. See `alertFilterAvailable`.
+     */
+    modAlertFilterList?: string;
+    /** `globals.user.alertFilterFor` — avatar hash to username. The map IS the selection. */
+    alertFilterFor?: AlertFilterFor;
+    /** `preferences.showAlertsFrom` — INVERTS the filter: true allow-list, false deny-list. */
+    showAlertsFrom?: boolean;
+    /** `updateAlertFilter` — persist the selection. The page owns the round trip. */
+    onsavealertfilter?: (next: { alertFilterFor: AlertFilterFor; showAlertsFrom: boolean }) => void;
   }
 
   let {
@@ -274,7 +298,11 @@
     chatMode = 'g',
     onChatModeChange,
     onRteDraftChange,
-    onRteSend
+    onRteSend,
+    modAlertFilterList,
+    alertFilterFor = $bindable({}),
+    showAlertsFrom = $bindable(false),
+    onsavealertfilter
   }: Props = $props();
 
   /**
@@ -304,6 +332,58 @@
   const advancedSearchHasInput = $derived(
     checkInputs(advancedSearch, advancedSearchResults.length)
   );
+
+  /**
+   * `#alert-filter-modal` — `app-alert-filter-modal`, bundle bytes 1,218,900-1,224,100.
+   *
+   * The list is synced from the ROOM SETTING when the modal opens, not held across the session:
+   * `ngOnInit` subscribes to `doAlertFilterModal` and answers with `syncModAlertFilterList()`
+   * (byte 1,221,830). Reproduced with an effect on `open` so the parse happens at the same moment.
+   *
+   * `parseModAlertFilterList` throws on malformed JSON, deliberately — see its note. The throw
+   * lands here, when the modal opens, and the room keeps running.
+   */
+  const alertFilterTraders = $derived.by<AlertFilterTrader[]>(() => {
+    /*
+      Gated on the modal being the open one, which is what makes this equivalent to the reference's
+      `doAlertFilterModal` subscription rather than merely similar. Two things follow from it:
+
+      the parse does not run for a room that never opens the modal, and — because
+      `parseModAlertFilterList` deliberately does NOT catch, mirroring `syncModAlertFilterList` at
+      byte 1,221,905 — a malformed room setting throws HERE rather than while the page renders.
+
+      Written as a derived rather than an effect assigning state, which is the same reason the rest
+      of this file prefers one: an effect that assigns is a second source of truth.
+    */
+    if (name !== 'alert-filter') return [];
+    return parseModAlertFilterList(modAlertFilterList);
+  });
+
+  /**
+   * `updateAlertFilter()`, byte 1,221,430 — confirm, then recompute `doFilteredAlerts`, send, and
+   * persist the preference. The confirm text depends on BOTH the selection being empty and the
+   * direction, which is why it comes from the module rather than being inlined here.
+   */
+  function saveAlertFilter() {
+    alertFilterConfirmMessage = alertFilterConfirm(alertFilterFor, showAlertsFrom);
+  }
+
+  /** Set while the bootbox confirm is open; `null` when it is not. */
+  let alertFilterConfirmMessage = $state<string | null>(null);
+
+  function confirmAlertFilter() {
+    alertFilterConfirmMessage = null;
+    onsavealertfilter?.({ alertFilterFor, showAlertsFrom });
+  }
+
+  /**
+   * `showAlertsFrom()`, byte 1,221,180 — the checkbox flips the direction and saves immediately,
+   * so the confirm appears on the click rather than on a separate Save.
+   */
+  function toggleShowAlertsFrom() {
+    showAlertsFrom = !showAlertsFrom;
+    saveAlertFilter();
+  }
 
   /** `searchAlerts()` - the early return, then the query. */
   function runAdvancedSearch() {
@@ -5297,29 +5377,119 @@
     id="alert-filter-modal"
     open={name === 'alert-filter'}
     ariaLabelledby="alert-filter-modal"
-    title="Filter out alerts from the following:"
+    title={alertFilterTitle(showAlertsFrom)}
     {onclose}
     bodyClass="pt-1"
     footerClass="d-flex align-items-center justify-content-between"
   >
     <div class="form-check m-2">
+      <!--
+        `je("ngModel", showAlertsFrom)` plus a separate `click` handler, byte 1,222,600. The
+        reference binds the value AND calls `showAlertsFrom()` on click, which flips the flag and
+        immediately opens the save confirm — so the direction is not a pending edit you then Save,
+        it saves on the spot. `bind:checked` covers the model half; the click handler is the other.
+      -->
       <input
         type="checkbox"
         value=""
         id="show-alerts"
         class="form-check-input ng-untouched ng-pristine ng-valid"
+        bind:checked={showAlertsFrom}
+        onclick={toggleShowAlertsFrom}
       />
       <label for="show-alerts" class="form-check-label">
         Only show alerts from these people:
       </label>
     </div>
-    <p>List is empty.</p>
+    <!--
+      `O(14, modAlertFilterList && modAlertFilterList.length > 0 ? 14 : 15)` — the list, or the empty
+      state. Keyed by `avatar`, which is the reference's own trackBy (`Cue = (t, n) => n.avatar`).
+    -->
+    {#if alertFilterTraders.length > 0}
+      <ul class="list-group">
+        <!--
+          The row is `<li class="list-group-item list-group-item-action">` with a bare `click` —
+          const 13, byte 1,222,300. That is the reference's markup and it is reproduced.
+
+          THE ACCESSIBILITY DEFECT IS THE REFERENCE'S, AND IT IS REPRODUCED DELIBERATELY.
+
+          Bootstrap intends `list-group-item-action` for an `<a>` or a `<button>`; the reference puts
+          it on a bare `<li>` and hangs a click on it, so the row cannot be reached from a keyboard.
+          svelte-check says so in three different ways, and it is right every time.
+
+          A first attempt here added `tabindex` and a keydown handler. That was an improvement, and
+          improvements come after — the standing directive is to match identically first. Adding
+          keyboard operability changes the tab order of the modal against the capture, which is
+          exactly the kind of quiet drift a later pixel diff would have to explain.
+
+          So the markup is the capture's, and the warnings are suppressed WITH THIS REASON attached
+          rather than silently. When the improve pass comes, this is a two-line change to a
+          `<button>` carrying the same classes, and Bootstrap renders it identically.
+        -->
+        {#each alertFilterTraders as trader (trader.avatar)}
+          <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+          <!-- svelte-ignore a11y_click_events_have_key_events -->
+          <li
+            class="list-group-item list-group-item-action"
+            onclick={() =>
+              (alertFilterFor = toggleTrader(alertFilterFor, trader.avatar, trader.username))}
+          >
+            <i class={traderRowIconClass(alertFilterFor, trader.avatar)}></i>
+            {' '}{trader.username}{' '}
+          </li>
+        {/each}
+      </ul>
+    {:else}
+      <p>List is empty.</p>
+    {/if}
     {#snippet footer()}
       <button type="button" data-bs-dismiss="modal" class="btn btn-secondary" onclick={onclose}>
-        Close
+        {' '}Close{' '}
       </button>
+      <!--
+        `O(19, modAlertFilterList && modAlertFilterList.length > 0 ? 19 : -1)` — the three buttons
+        render ONLY when the list is non-empty. `-1` is "instantiate nothing", so an empty list gets
+        a Close button and nothing else rather than three controls that would act on no rows.
+      -->
+      {#if alertFilterTraders.length > 0}
+        <div>
+          <button
+            type="button"
+            class="btn btn-warning m-1"
+            onclick={() => (alertFilterFor = unselectAllTraders())}
+          >
+            <i class="fas fa-minus-square me-1"></i>{' '}Unselect All{' '}
+          </button>
+          <button
+            type="button"
+            class="btn btn-info m-1"
+            onclick={() => (alertFilterFor = selectAllTraders(alertFilterFor, alertFilterTraders))}
+          >
+            <i class="fas fa-plus-square me-1"></i>{' '}Select All{' '}
+          </button>
+        </div>
+        <button type="button" class="btn btn-success" onclick={saveAlertFilter}>
+          {' '}Save
+        </button>
+      {/if}
     {/snippet}
   </Modal>
+  {#if alertFilterConfirmMessage}
+    <BootboxDialog
+      mode="confirm"
+      message={alertFilterConfirmMessage}
+      onconfirm={confirmAlertFilter}
+      onclose={() => {
+        /*
+          `bootbox.confirm(..., s => { s ? (...) : (showAlertsFrom = !showAlertsFrom) })`, byte
+          1,221,700. Cancelling REVERTS the direction rather than leaving the checkbox where the
+          user put it — because the click already flipped it before the confirm opened.
+        */
+        alertFilterConfirmMessage = null;
+        showAlertsFrom = !showAlertsFrom;
+      }}
+    />
+  {/if}
 </app-alert-filter-modal>
 <app-webrtc-troubleshooter>
   <Modal
