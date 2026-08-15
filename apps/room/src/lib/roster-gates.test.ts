@@ -713,7 +713,12 @@ describe('a role change restarts the media session', () => {
       code.indexOf('restartMediaSession = async () => {'),
       code.indexOf("media.on('newProducer'")
     );
-    expect(body).toContain('signalling: media');
+    /*
+      `signalling`, not `media` — the local `const media = new SignallingClient(...)` was renamed on
+      2026-08-15 because `RoomMedia` took that identifier at the top of the page and shadowed it,
+      which `svelte-check` caught. The assertion is unchanged in meaning: the SAME client is reused.
+    */
+    expect(body).toContain('signalling,');
     expect(body).not.toContain('new SignallingClient(');
   });
 

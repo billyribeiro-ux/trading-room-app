@@ -35,6 +35,20 @@ const chat = readFileSync(
   'utf8'
 );
 
+/*
+  `app-privchat` became its own component on 2026-08-15 — the first of the five template regions.
+  The assertions read out of the reference bundle are untouched, because the evidence did not move;
+  ours follow the markup into `PrivateChatPanel.svelte`.
+
+  `showPMToolbar` did NOT move with it. It was page state that nothing outside that markup read or
+  wrote, so it is the component's own `toolbarOpen` now — which is why the flag assertion below
+  reads the component and names both facts.
+*/
+const panel = readFileSync(
+  new URL('./components/PrivateChatPanel.svelte', import.meta.url),
+  'utf8'
+);
+
 describe('DND is session-only, by capture', () => {
   it('is never handed to the preference saver', () => {
     expect(main).not.toContain('Preference("doNotDisturbOn');
@@ -66,23 +80,25 @@ describe('the private-chat toolbar', () => {
   it('renders behind the gear, with the captured container classes', () => {
     expect(privchat).toContain('O(14, o.showPMToolbar ? 14 : -1)');
     expect(privchat).toContain('o.togglePMToolbar()');
-    expect(page).toContain('showPMToolbar = !showPMToolbar');
-    expect(page).toContain('shadow p-2 w-100 border-top border-secondary pmToolbar');
+    expect(panel).toContain('toolbarOpen = !toolbarOpen');
+    expect(panel).toContain('shadow p-2 w-100 border-top border-secondary pmToolbar');
+    // Component-local, because the page never read it: `{#if toolbarOpen}` and nothing else.
+    expect(panel).toContain('let toolbarOpen = $state(false);');
   });
 
   it('carries the search field with its captured attributes', () => {
-    expect(page).toContain('id="pmSearchTermTxt"');
-    expect(page).toContain('name="pmSearchTermTxt"');
-    expect(page).toContain('placeholder="Type your search term, then press Enter"');
-    expect(page).toContain('id="addon-chat-clear"');
+    expect(panel).toContain('id="pmSearchTermTxt"');
+    expect(panel).toContain('name="pmSearchTermTxt"');
+    expect(panel).toContain('placeholder="Type your search term, then press Enter"');
+    expect(panel).toContain('id="addon-chat-clear"');
   });
 
   it("carries Don't Disturb and Download Log with their captured classes", () => {
-    expect(page).toContain('btn btn-outline-light btn-sm text-light');
-    expect(page).toContain("Don't Disturb");
-    expect(page).toContain('btn btn-outline-info btn-sm text-light mx-1');
-    expect(page).toContain('Download Log');
-    expect(page).toContain('fas fa-download');
+    expect(panel).toContain('btn btn-outline-light btn-sm text-light');
+    expect(panel).toContain("Don't Disturb");
+    expect(panel).toContain('btn btn-outline-info btn-sm text-light mx-1');
+    expect(panel).toContain('Download Log');
+    expect(panel).toContain('fas fa-download');
   });
 });
 
@@ -90,7 +106,10 @@ describe('all three DND badges', () => {
   it('keep the classes their own components declare', () => {
     // app-chat const 11 and app-privchat const 9 are both `badge badge-danger ml-2`; alerts is ms-2.
     expect(page).toContain('class="badge badge-danger ms-2"');
+    // One of the two `ml-2` badges is the private panel's, and it went with the panel.
     expect(page).toContain('class="badge badge-danger ml-2"');
+    expect(panel).toContain('class="badge badge-danger ml-2"');
     expect(page).toContain('<i class="fas fa-bell-slash"></i> DND');
+    expect(panel).toContain('<i class="fas fa-bell-slash"></i> DND');
   });
 });

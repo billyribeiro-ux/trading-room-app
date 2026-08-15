@@ -180,6 +180,93 @@ through — both are documented in `.env.example` and until now nothing read the
 **Not done:** retiring `ptr_clone_app` (deferred until the cutover is proven in a real deployment),
 and the owner role / database rename `ptr_clone` → `tradingroom`. Both remain in `TODO.md`.
 
+### 2026-08-15 18:54 EDT — Phase 1 complete: `RoomChat` and `RoomMedia`, and a spinner nothing ever started
+
+**Branch `feat/extra-chat-column`, not merged.** Commits `64ffd63` and `8fc98d8`. **Runtime impact:
+yes** — the chat composers and every media control are driven by two more classes, and one dead
+indicator became live.
+
+| | phase start | now |
+|---|---|---|
+| `+page.svelte` | 13,522 | **12,938** |
+| room suite | 1,661 across 124 files | **1,826 across 132 files** |
+
+**EIGHT classes, not the six the plan named.** The evidence redrew the boundaries three times, and
+each refusal is recorded in the class that declined the field rather than in a note nobody reads:
+
+| class | what it owns |
+|---|---|
+| `RoomPolls` · `RoomMenus` · `RoomSplit` | poll lifecycle · eleven floating menus · the nested split geometry |
+| `RoomRoster` · `RoomAlerts` · `RoomLogPages` | roster and draw · toolbar, filter, archive · older-page state for BOTH logs |
+| `RoomChat` · `RoomMedia` | the two columns and the mention router · twenty-one media flags |
+
+`RoomLogPages` was not in the plan at all — it exists because the alerts pane and the chat pane held
+the same machinery twice, in two shapes. The `RoomChat` / `RoomMedia` line moved too: `talkingUsers`
+and `isLimitedPresenter` were filed under `RoomRoster`, refused there with reasons, and collected
+here by the class whose WRITERS they are.
+
+#### `RoomChat` — five fields, 650 lines apart, and one expression that read three of them
+
+```js
+extraChatColumn && (fromExtraColumn || chatInputFocus === 'textAreaTxtExtra')
+```
+
+Two ways to reach the extra column and both matter: the message you clicked was IN that column, or
+you were last typing there. Without the second, clicking a name in the main log while composing in
+the extra column inserts into the pane you are not looking at. Moving five declarations saves few
+lines; naming the thing that reads three of them at once is the whole slice.
+
+`chatInputFocus` was a bare `string` compared against `'textAreaTxtExtra'` to route every mention.
+It is a union now, so a typo there is a compile error instead of every mention silently going to the
+main column forever.
+
+**A quirk pinned rather than fixed.** Two consecutive mentions produce `@Allison  @Bob ` — two
+spaces — because `i.length ? val(i + ' @' + e + ' ')` appends a separator whenever there is content,
+and after the first mention there always is. That is the reference's own output. My expectation was
+written the other way round; the code was faithful and the test was wrong.
+
+#### `RoomMedia` — the boundary is the design, and a control with no writer
+
+**TRANSPORT stayed.** `MediaStream`, `MediaRecorder`, producer ids, the chunk array, the preview
+`Window` — all correctly plain `let`s already, because nothing renders from a handle. A class that
+owned a `MediaRecorder` would have to own its lifecycle, its error paths and its `ondataavailable`,
+and the room would have gained an abstraction over the browser rather than an owner for its state.
+
+**`isRecordingStarting` was declared once, rendered once, and set by NOTHING.** The template branch
+is `recIndicatorStart` — the spinner-plus-REC navbar indicator, consts 92/93/94 — so it was
+unreachable, and a presenter got no feedback at all between pressing record and the room confirming.
+Found by reading every use of the field during the extraction. Wired at the send, and cleared on
+BOTH the confirming frame and the failure path: a spinner left running on a refused command reads as
+"still starting" for the rest of the session, which is worse than no feedback because it is wrong
+feedback.
+
+#### A shadow, and my own rename pass being wrong twice
+
+`svelte-check` caught a local `const media = new SignallingClient(...)` shadowing the class for its
+whole block, with three of the class's own reads — `iceServers`, `connected`, `recordedUrl` —
+silently resolving to a client that has none of them. Renamed to `signalling`. That is the **second**
+time this session an extraction collided with a local named for the domain it took over; the first
+was `const roster = payload.data`.
+
+Two mistakes of mine, both caught by the gate rather than shipped:
+
+1. The `recording` rename rewrote two **import paths** — `$lib/recording-codec` and
+   `./recording-state.remote` — because the lookbehind did not exclude `/`.
+2. Deleting an orphaned docstring took its closing `*/` with it, putting `const rosterViewer` inside
+   an unterminated comment. That is the exact family this repository's standard names.
+
+#### Verified
+
+`svelte-check` **0/0 across 1,126 files** · **1,826 tests across 132 files** · `eslint src` clean ·
+prettier clean · `svelte-autofixer` `issues: []` on both modules · **twelve negative controls run and
+seen red**, six per class.
+
+**Not verified: a browser.** Nothing in Phase 1 has been exercised against a real room — no dragged
+gutter, no sorted roster, no microphone, no camera, no recording. The split geometry is proven
+against the captured flex strings and the const table, which is stronger than it was, but it is not
+a rendered room. This gap stands across all eight commits and is the thing Phase 2 should close,
+because a mounted component is testable in a way a 13,000-line page never was.
+
 ### 2026-08-15 18:44 EDT — Phase 1f: `RoomLogPages`, and a comment that would have dropped a contract from CI
 
 **Branch `feat/extra-chat-column`, not merged.** Commit `45ee562`. **Runtime impact: yes** — both

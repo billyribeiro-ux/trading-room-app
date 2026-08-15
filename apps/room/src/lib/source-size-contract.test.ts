@@ -139,8 +139,28 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       from any one of them: `extraChatColumn && (fromExtraColumn || chatInputFocus === 'textAreaTxtExtra')`
       decides which composer every mention lands in. Moving five declarations saves few lines;
       naming the thing that reads three of them at once is the whole slice.
+
+      `RoomMedia` is the eighth and closes Phase 1: 12,954 -> 12,938. Twenty-one flags, and the
+      boundary is the design — STATE moved, TRANSPORT did not. A class that owned a `MediaRecorder`
+      would have to own its lifecycle, its error paths and its `ondataavailable`, and the room would
+      have gained an abstraction over the browser rather than an owner for its state.
+
+      It also collected the two fields `RoomRoster` refused by name, and it found a control with no
+      writer: `isRecordingStarting` was declared once, rendered once as `recIndicatorStart`, and set
+      by nothing — so the presenter got no feedback at all between pressing record and the room
+      confirming. Wired, including the failure path.
+
+      PHASE 2 STARTS HERE — the template into components, which is where the count actually moves.
+      `PrivateChatPanel` is the first and the smallest of the five: 12,938 -> 12,715, a drop of 223
+      for a 250-line region, because the extraction also took `showPMToolbar` out of this file
+      entirely. State whose only reader is one component belongs to that component.
+
+      PROPS rather than `createContext`, against the plan: the eight state classes are instantiated
+      inside this component, so they are per-request already and there is nothing for context to
+      protect against. The panel is a DIRECT child. Context earns its place when a pane grows
+      children that need the same state, and the note in `PrivateChatPanel.svelte` says so.
     */
-    max: 12954,
+    max: 12715,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {
