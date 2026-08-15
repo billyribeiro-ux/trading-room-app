@@ -1340,16 +1340,16 @@
   let volume = $state(100);
   let previousVolume = $state(100);
   /*
-    WRITTEN AND NEVER READ. `setMasterVolume` keeps it in step with the slider, and every consumer
-    that needs the same answer derives it instead — the screen panes are passed `muted={volume === 0}`
-    directly. So this is a second source of truth for one fact, which is the shape that goes stale.
+    There is no `muted` flag here, deliberately.
 
-    Deleting it was tried and is wrong: the write at `setMasterVolume` is real, so removing the
-    declaration breaks the build. Either the panes should read this, or the write should go — a
-    behaviour decision, recorded in TODO.md rather than guessed at under a lint fix.
+    `setMasterVolume` used to keep one in step with the slider, and nothing ever read it: every
+    consumer derives the same answer instead, and the screen panes are passed `muted={volume === 0}`
+    directly. Two places holding one fact is the shape that goes stale — the day someone sets
+    `volume` without going through `setMasterVolume`, the flag is wrong and the panes are right.
+
+    The first attempt at this deleted the declaration alone and broke the build, because the WRITE
+    was real. The rule reports "assigned but never READ", which is not the same as unreferenced.
   */
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  let muted = $state(false);
   let backgroundVolume = $state(70);
   /**
    * `appService.globals.viewerOnlyMode` — the `vo` query parameter, and the ONLY gate on the screen
@@ -2249,24 +2249,28 @@
   let chatCollapsedByMode = $state(false);
   let splitBeforeCollapse: number | null = null;
   /*
-    WRITTEN AND NEVER READ, which means the behaviour quoted eighteen lines above is not
-    implemented. The capture restores the column from this flag —
-    `this.extraChatColumnWasEnabled && (preferences.extraChatColumn = !0, …)` — and here only the
-    assignment exists, so a column hidden by webinar mode never comes back when it ends.
+    `extraChatColumnWasEnabled` USED TO BE HERE, and its absence is the point.
 
-    A real gap wearing the costume of an unused variable, found by ESLint. Recorded in TODO.md
-    rather than deleted, because deleting it would remove the evidence and leave the comment above
-    describing behaviour nothing performs.
+    Upstream needs that flag because it MUTATES the preference: `preferences.extraChatColumn = !1`
+    on hide, then `extraChatColumnWasEnabled && (preferences.extraChatColumn = !0)` on restore. It
+    has destroyed the viewer's setting and has to remember what it was.
+
+    Here the preference is never written. `extraChatColumnVisible` below derives from
+    `extraChatColumn && !chatCollapsedByMode`, so clearing the collapse restores the column by
+    construction and there is nothing to remember. Keeping a flag that records an answer nothing
+    asks would be a second source of truth for one fact.
+
+    Recorded because an earlier note in this spot claimed the opposite — that the missing read meant
+    "a column hidden by webinar mode never comes back". That was wrong: it comes back the moment
+    `chatCollapsedByMode` goes false. A variable being unread is evidence of nothing on its own; it
+    was the DESIGN, not the wiring, that differed.
   */
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  let extraChatColumnWasEnabled = false;
 
   $effect(() => {
     const shouldHide = !isPresenter && chatMode === 'd';
     if (shouldHide === chatCollapsedByMode) return;
     if (shouldHide) {
       splitBeforeCollapse = chatAlertsSplit;
-      extraChatColumnWasEnabled = extraChatColumn;
       // `chatSize = 0; alertSize = 100` — the alerts pane takes the whole column.
       chatAlertsSplit = 1;
       chatCollapsedByMode = true;
@@ -5060,7 +5064,6 @@
 
   function setMasterVolume(nextVolume: number) {
     volume = nextVolume;
-    muted = nextVolume === 0;
     setSoundEffectsVolume(nextVolume / 100);
     if (typeof document !== 'undefined') {
       document

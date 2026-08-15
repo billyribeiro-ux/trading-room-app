@@ -39,17 +39,36 @@ variable. Both were found by running the tools by hand on 2026-08-14, not by CI.
 `build`, path-filtered the way the backend job already is, plus a required-checks setting so a red
 gate blocks a merge. Note that `main` auto-deploys, which is exactly why this matters.
 
-## Room lint is GREEN — closed 2026-08-14 20:47 EDT, but it left five gaps behind
+## Room lint is GREEN — and of the five gaps it exposed, THREE are real
 
-ESLint reached the room for the first time on 2026-08-14 and reported 123 problems. All 123 are
-resolved and `pnpm lint` exits 0, so the room step of `quality.yml` is green.
+ESLint reached the room for the first time on 2026-08-14 and reported 123 problems. All are
+resolved; `pnpm lint` exits 0 and the room step of `quality.yml` is green.
 
-**Five of them were not lint problems at all.** Each is a real behaviour gap that a style rule
-happened to expose, and each is documented at its declaration rather than deleted, because deleting
-the symbol would erase the only evidence the wiring is half-built:
+**Five of them were not lint problems. Two turned out to be redundancy and are now removed; three
+are genuine missing behaviour and are open.**
 
-| where | what is actually missing |
+### Closed — they were second sources of truth, not missing features
+
+- **`extraChatColumnWasEnabled`** — removed. Upstream needs that flag because it MUTATES
+  `preferences.extraChatColumn` to hide the column and must remember what it destroyed. Ours never
+  writes the preference: `extraChatColumnVisible` derives from `extraChatColumn &&
+  !chatCollapsedByMode`, so clearing the collapse restores the column by construction. **An earlier
+  note here claimed the missing read meant the column "never comes back". That was wrong** — it was
+  the design that differed, not the wiring. A variable being unread is evidence of nothing on its own.
+- **`muted`** — removed, with its write. Every consumer derives `volume === 0`, which the screen
+  panes are passed directly.
+
+### Open — real behaviour that is not implemented
+
+| where | what is missing |
 | --- | --- |
+| `+page.svelte` `extraChatScroller` | **The extra chat column has no autoscroll.** `alertsScroller` and `chatScroller` both drive `forceAlertsToBottom` / `forceChatToBottom`; the extra column's element is handed back by `onscrollerready` and read by nothing, so new messages do not bring it to the bottom. The pattern to copy is at `+page.svelte` around the `chatScroller` effect. |
+| `+page.svelte` `loadNoteVersions` | Nothing calls it, and the route it fetches (`api/notes/[noteId]/versions`) is built and working. Note history is server-complete and client-unreachable. |
+| `ExtraChatPane` `isPresenter` | Declared in `Props`, passed by the parent, read by no line of the component — the same shape as the controller's `markUnwired`. What it should gate has to be established from the capture before it is either wired or removed. |
+
+Each is a behaviour change with a decision behind it, which is why none was made inside a lint pass.
+
+--- | --- |
 | `+page.svelte` `extraChatColumnWasEnabled` | **Written, never read.** The capture quoted eighteen lines above it restores the column with `extraChatColumnWasEnabled && (preferences.extraChatColumn = !0, …)`. Only the assignment exists here, so a column hidden by webinar mode never comes back when webinar mode ends. |
 | `+page.svelte` `extraChatScroller` | Handed back by `onscrollerready` and read by nothing, so the extra chat column has no programmatic scroll while the main chat does. |
 | `+page.svelte` `loadNoteVersions` | Nothing calls it, and the route it fetches (`api/notes/[noteId]/versions`) is real and already built. Note history is server-complete and client-unreachable. |

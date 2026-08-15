@@ -210,11 +210,19 @@ describe('hideChat — the pane collapses for non-presenters while chat is disab
 
   it('the extra column is hidden WITHOUT overwriting the viewer’s setting', () => {
     /*
-      `preferences.extraChatColumn = !1` with no `setPreference` call — a runtime override that is
-      remembered in `extraChatColumnWasEnabled` and restored. Persisting it would silently turn the
-      column off for good the first time a presenter disabled chat.
+      Upstream does this with a REMEMBERED FLAG because it destroys the setting to hide the column:
+      `preferences.extraChatColumn = !1` on hide (no `setPreference`, so it is a runtime override),
+      then `extraChatColumnWasEnabled && (preferences.extraChatColumn = !0)` to put it back.
+
+      Ours reaches the same outcome with no flag at all, and this assertion is the reason it is
+      allowed to: the preference is never written, and visibility is DERIVED from it plus the
+      collapse. Clearing the collapse restores the column by construction.
+
+      This test used to also require `extraChatColumnWasEnabled = extraChatColumn;`. That assignment
+      was never read — it recorded an answer nothing asked, because the derived had already made the
+      question unnecessary — so requiring it pinned a second source of truth for one fact. It was
+      removed 2026-08-14 once ESLint surfaced it. The two assertions below are the actual mechanism.
     */
-    expect(pageCode).toContain('extraChatColumnWasEnabled = extraChatColumn;');
     expect(pageCode).toContain(
       'const extraChatColumnVisible = $derived(extraChatColumn && !chatCollapsedByMode);'
     );

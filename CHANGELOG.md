@@ -24,6 +24,40 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-14
 
+### 2026-08-14 21:01 EDT — two of the five "gaps" were mine to unclaim
+
+**Runtime impact: none.** Two redundant variables removed, one false claim retracted, one contract
+test corrected. On `feat/extra-chat-column`.
+
+**I reported a bug that does not exist, and this entry is the retraction.** An hour earlier I wrote
+that `extraChatColumnWasEnabled` being written-and-never-read meant "a column hidden by webinar mode
+never comes back when it ends". It comes back. Upstream needs that flag because it MUTATES
+`preferences.extraChatColumn` to hide the column and has to remember what it destroyed; this
+application never writes the preference at all, and `extraChatColumnVisible` derives from
+`extraChatColumn && !chatCollapsedByMode`, so clearing the collapse restores the column by
+construction.
+
+**The lesson is narrower than "check before claiming".** An unread variable is evidence of nothing on
+its own — it is equally the signature of a missing feature and of a feature implemented a better way.
+I read it as the first without checking which, on a codebase whose comment three lines below already
+said the derived was the mechanism. Both `extraChatColumnWasEnabled` and `muted` are now removed
+along with their writes: each recorded an answer nothing asked, which is a second source of truth for
+one fact and the shape that goes stale.
+
+**A contract test was pinning the redundancy.** `extra-chat-column-contract.test.ts` required
+`extraChatColumnWasEnabled = extraChatColumn;` to be present in the page — so the dead assignment was
+not merely tolerated, it was enforced, and removing it would have gone red. Its comment described
+UPSTREAM's mechanism while asserting OURS. The test now asserts the two lines that actually do the
+work and records why no flag is needed here.
+
+**Three of the five remain real, and are open in `TODO.md`:** the extra chat column has no autoscroll
+(`alertsScroller` and `chatScroller` both drive one; the extra column's element is captured and never
+read), `loadNoteVersions` is uncalled against a route that is built and working, and
+`ExtraChatPane`'s `isPresenter` is declared, passed and unread.
+
+**Verified.** Room `pnpm lint` exit 0, `svelte-check` 0/0, 1199/1199 — including
+`extra-chat-column-contract` 22/22, which is the file that had to change.
+
 ### 2026-08-14 20:58 EDT — the publish credential stops crossing the wire in the clear
 
 **Runtime impact: yes, and it is a breaking change for any MediaMTX host already serving plaintext.**
