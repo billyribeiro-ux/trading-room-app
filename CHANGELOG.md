@@ -24,6 +24,97 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-15
 
+### 2026-08-15 17:12 EDT — Phase 1d–1e: `RoomRoster` and `RoomAlerts`
+
+**Branch `feat/extra-chat-column`, not merged.** Commits `a9db20d` and `4792f4c`. **Runtime impact:
+yes** — the sidebar roster and the alerts pane are driven by two more classes. No behaviour was
+intended to change; each divergence found on the way is named below.
+
+| | before | after |
+|---|---|---|
+| `+page.svelte` | 13,157 | **12,974** (−183) |
+| room suite | 1,723 across 127 files | **1,772 across 129 files** |
+
+#### The phase plan was wrong about three fields, and the evidence said so each time
+
+The plan's six-row table was a rough grouping written before any of this was read. Three fields it
+assigned have been left where they are, with the reason recorded in the class that declined them:
+
+- **`talkingUsers`** was filed under "roster, presence, talking". It is media: its declaration sits
+  between `micMuted` and `webcamMuted`, its writers are driven by SFU audio-producer announcements,
+  and the comment above it says "talking" means A MICROPHONE IS OPEN rather than anything about
+  presence.
+- **`isLimitedPresenter`** looks like roster state because the roster gates read it. It is what a
+  member BECOMES when a presenter hands them mic and screen, written by a media command.
+- **The alerts PAGING.** Upstream renders ONE roomlog component for both logs, switched on
+  `logType`, so the trigger, the guards, the terminator and both scroll nudges are the same code for
+  chat and alerts. Moving the alerts half would split a thing that is deliberately one thing.
+
+Choosing the wrong owner for the convenience of one reader is a decision you then have to explain
+forever, so all three wait for the class whose writer they belong to.
+
+#### What each slice actually bought
+
+**`RoomRoster`** — the four header controls, every one of which was rendered and inert before it was
+written, now toggle one owner instead of four page-locals. The random draw's three-second reveal and
+its timer came with them.
+
+**`RoomAlerts`** — the Alert Filter's two viewer-owned halves stopped being restated at three call
+sites. `alertFilterFor` and `showAlertsFrom` were passed by hand into `alertPassesFilter` in the
+rendered list, in the search rows and at the live arrival. Two are now
+`.filter(alerts.passesFilter(raw))`; the third stays in the page deliberately, because it reads the
+values inside a microtask as of DELIVERY — reading them in the effect body would make the filter a
+dependency and re-deliver alerts that already arrived.
+
+`alert-filter-contract.test.ts` counted those call sites in `+page.svelte` alone. It would have gone
+**green at one** after the extraction while two vanished, which is the vacuous-guard failure row AE
+predicts. It now counts both files and asserts the shared call shape.
+
+#### Two things preserved rather than tidied
+
+- **The modal edits the alert filter live.** `bind:` means clicking a trader moves the header badge
+  before anything is saved. So `filterFor` and `showFrom` have setters (the draft) alongside
+  `filterChanged` (the commit, which returns what to persist). Read-only getters would have frozen
+  the badge until the modal closed — a UX change dressed as encapsulation.
+- **A `svelte-autofixer` suggestion refused.** It asks for `SvelteDate` in the archive comparison.
+  That Date is parsed from a row, read once and discarded inside a predicate; making it reactive
+  would allocate a signal per alert per render that nothing invalidates. Recorded in the code,
+  because the suggestion returns on every check.
+
+#### A shadow caught by reading, not by a tool
+
+The roster channel handler declared `const roster = payload.data`. After the extraction that would
+have shadowed the class for the whole block and sent every write to a payload object. Renamed to
+`frame`, which is what it always was. `svelte-check` would have passed on it.
+
+#### My own instruments and expectations, four more times
+
+1. **`closeDraw`'s `clearTimeout` does not do what its comment claimed.** Its negative control stayed
+   green twice: `draw` clears the handle before scheduling its own, so there is no resurrection path,
+   and the null check in the reveal callback catches what is left. The two are redundant with each
+   other — delete either alone and the assertion stays green. Both kept, redundancy now named in the
+   test so nobody removes one believing it is covered. Only `draw`'s own cancel is load-bearing, and
+   that one IS controlled.
+2. **The nick sort is case-INSENSITIVE**, so `adam` precedes `Mia`. My expectation was written the
+   other way round.
+3. **The two-candidate minimum is applied AFTER the trials filter**, so a busy room with one trial in
+   it opens no dialog at all on "Yes". A draft read that as a broken draw.
+4. **One expectation was built with the platform's own `.sort()`**, which disagrees with the
+   comparator under test — the same defect as writing a regex over text you do not control.
+
+Also: TypeScript was right that `RoomRoster`'s `$derived` chain is created before the constructor
+assigns its thunks. `$derived` is lazy so the runtime is fine, but the check is about declaration
+order, and swapping that laziness for an eager computation gives an empty roster with a zero count.
+
+#### Verified
+
+`svelte-check` **0/0 across 1,120 files** · **1,772 tests across 129 files** · `eslint src` clean ·
+prettier clean on touched files · `svelte-autofixer` `issues: []` on both modules · **ten negative
+controls run and seen red**, five per class.
+
+**Not verified: a browser.** No screenshot of a sorted roster, a random draw, a collapsed toolbar or
+a filtered alert list.
+
 ### 2026-08-15 16:24 EDT — Phase 1a–1c of the `+page.svelte` decomposition: `RoomPolls`, `RoomMenus`, `RoomSplit`
 
 **Branch `feat/extra-chat-column`, not merged.** Three commits: `d3b24fb` (15:41), `abe9691` (16:00)
