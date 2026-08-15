@@ -65,7 +65,30 @@ jobs:
       MIGRATE_DATABASE_URL: postgres://ptr_clone:ptr_clone_local_development_password@127.0.0.1:5432/ptr_clone
       # The decoded password contains both a quote and a backslash. This is a
       # regression contract for safe psql binding in the role provisioner.
-      DATABASE_URL: postgres://ptr_clone_app:ptr_app_%27%5C_local@127.0.0.1:5432/ptr_clone
+      #
+      # `tradingroom_app`, NOT `ptr_clone_app`, and the difference is the whole
+      # reason 27 integration tests failed the first time this gate actually ran.
+      #
+      # The runtime role changes NAME midway through this job. Provisioning below
+      # creates `ptr_clone_app` because migrations 0001-0006 `GRANT` to that name
+      # and must find it, and then `0009_rename_runtime_roles.sql` renames it to
+      # `tradingroom_app`. So a fresh database ends at the new name having passed
+      # through the old one — 0009 says in as many words that this "reads like a
+      # mistake and is not. Do not 'tidy' it."
+      #
+      # Every connection made AFTER the migrate step therefore has to use the new
+      # name: `cargo test`, the release attestation, and the cross-cluster control
+      # below. This one said `ptr_clone_app`, so all 27 tests died at
+      # `api/tests/support/mod.rs:92` on `28P01 password authentication failed`.
+      # That code is misleading and cost a wrong diagnosis: PostgreSQL reports a
+      # NONEXISTENT role to the client as an authentication failure, and logs the
+      # real reason ("Role does not exist") only server-side. The password was
+      # never wrong — the role by that name was gone.
+      #
+      # The password survives the rename because PostgreSQL 17 stores it as
+      # scram-sha-256; a rename only clears an md5-stored password (0009, "Password
+      # survival").
+      DATABASE_URL: postgres://tradingroom_app:ptr_app_%27%5C_local@127.0.0.1:5432/ptr_clone
 
     steps:
       - name: Check out the immutable revision
@@ -298,7 +321,18 @@ jobs:
         if: steps.scope.outputs.backend == 'true'
         env:
           MIGRATE_DATABASE_URL: postgres://ptr_clone:ptr_clone_local_development_password@127.0.0.1:5432/ptr_clone
-          DATABASE_URL: postgres://ptr_clone_app:ptr_app_%27%5C_local@127.0.0.1:5433/ptr_clone
+          # `tradingroom_app` for the same reason as the job-level URL above: the
+          # 5433 cluster has the migration chain applied to it too (see "Apply the
+          # same chain to the independent negative-control cluster"), so its runtime
+          # role has been renamed as well.
+          #
+          # It matters MORE here than anywhere else. This step asserts a specific
+          # failure — `[target_cluster_mismatch]` on stderr — and a connection that
+          # died earlier on an auth error would also be a non-zero exit with empty
+          # stdout, passing two of the three checks while proving nothing about
+          # cross-cluster mixing. The grep is what stops that, and it would have
+          # started failing here rather than reporting a false pass.
+          DATABASE_URL: postgres://tradingroom_app:ptr_app_%27%5C_local@127.0.0.1:5433/ptr_clone
         run: |
           negative_stdout="${RUNNER_TEMP}/postgres-cross-cluster.stdout"
           negative_stderr="${RUNNER_TEMP}/postgres-cross-cluster.stderr"
