@@ -15,82 +15,7 @@ will fetch it. A gap recorded in only one app's document is a gap the next perso
 
 ---
 
-## ✅ THE FRONTEND GATE IS GREEN — 2026-08-15 12:24 EDT, commit `030a209`
-
-```
-030a209  Frontend quality  completed/success     controller quality: success
-                                                 room quality:       success
-030a209  smoke             completed/success
-```
-
-**It had failed every run since PR #28.** Six root causes, each hidden behind the one before it
-because CI stops at the first red step — which is why the list only became visible one layer at a
-time:
-
-| # | root cause | fix |
-| --- | --- | --- |
-| 1 | flat-config preset ORDER: `svelte.configs.recommended` sat BELOW the overrides and re-enabled two rules that are deliberately `off` (43 errors) | presets first |
-| 2 | the `files:` list stripped Node globals from `gate/` (31 errors) | globals block un-scoped |
-| 3 | `svelte.config 2.js`, a macOS duplicate with a literal space (1 error) | deleted, PR #37 |
-| 4 | three TRACKED tests imported `scripts/lib/const-table.mjs`, evicted with `apps/room/scripts` (3 errors) | parser moved to `src/lib`, PR #38 |
-| 5 | **`src/app.css` imported a gitignored symlink — the room could not be built from its own repository** | stylesheet tracked as the build input it is, PR #40 |
-| 6 | a merge dropped half of `49a536a`: schema said 64 settings wired, verifier said 62 (8 type errors + 3 test failures) | restored, PR #39 |
-
-**The reason it took so long to attribute, recorded so nobody loses a day to it again:**
-`quality.yml` pins no `ref:`, so `pull_request` runs lint the **merge commit**, not the branch head.
-`pnpm run lint` passed locally and failed on CI **at the same commit**, which reads as a broken
-runner rather than a stale branch. `src/lib/eslint-config-resolution.test.ts` now asserts the
-RESOLVED config via `ESLint.calculateConfigForFile` — a grep for `'off'` would have passed
-throughout the entire failure, because the string was always there.
-
-### ✅ CLOSED 2026-08-15 12:56 EDT — CI could accept an UNVERIFIED commit onto a deploying branch
-
-Both closed. **Do not re-open either; the state below is verified, not remembered.**
-
-**Read this first: it took TWO changes, and the first one alone was not enough.** The 12:49 fix set
-`cancel-in-progress: false` for `main`, which protects the run already EXECUTING but does not stop
-GitHub cancelling a QUEUED one — a group holds only one pending run. Measured on the fix's own
-commit: `34e6c09` started at 16:36:20Z and survived four later pushes (the flag working), while
-`4c2dd74` was created at 16:41:33Z, **never started a job**, and was cancelled at 16:50:38Z when a
-newer push arrived. `4c2dd74` is the commit that contains the 12:49 fix. The 12:56 change gives each
-`main` commit its own concurrency group, which removes the queue entirely. If you are tempted to
-"simplify" the group expression back to `${{ github.ref }}`, that is this bug.
-
-1. **`cancel-in-progress` no longer applies to `main`, and each `main` commit has its own group.**
-   All three workflows read
-   `cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}` and a group suffixed with
-   `github.sha` on the default branch. Branch and `pull_request` runs are unchanged — they still
-   share a group and still supersede, which is what keeps a busy branch affordable.
-
-   The evidence that justified it: **11 of the last 40 runs on `main` were `cancelled` — 27%** —
-   including EVERY `Backend quality` run in the 2026-08-15 sequence (`4a79203`, `c1ff436`,
-   `5f03e5f`, `731d232`, `b267143`, `a84f20f`, `41d8de6`, `ffa410d`, `030a209`, `ed3b26f`). The Rust
-   and PostgreSQL security contracts had, in practice, never verified a commit on the default
-   branch. It is also how `060ba72` landed and broke the lint gate with its own run cancelled two
-   minutes later.
-
-   **Enforced, not just applied:** `apps/controller/src/lib/ci-verification-integrity.test.ts`
-   sweeps the workflow directory rather than naming three files, so a fourth is covered the day it
-   is added, and it strips comments first because prose describing a setting is not the setting.
-   Negative control run — reverting `smoke.yml` to `true` turns it red naming the file and the fix.
-
-2. **`main` is protected.** `branches/main/protection` returned 404; it now returns:
-
-   ```
-   required checks : room quality, controller quality, Rust and PostgreSQL security contracts
-   strict          : false        enforce_admins : false
-   force pushes    : blocked      deletions      : blocked
-   ```
-
-   `enforce_admins: false` is deliberate — the owner keeps pushing straight to `main`, which is the
-   documented 2026-08-09 convention. What changed is that `gh pr merge` now refuses on red unless
-   `--admin` is passed, so merging a red commit becomes a deliberate act rather than an accident.
-   Undo with `gh api -X DELETE repos/billyribeiro-ux/trading-room-app/branches/main/protection`.
-
-   Caveat worth knowing: PR #43 merged while its own backend run was still going, so it did NOT
-   clear the new protection. The next PR is the first real test of it.
-
-### Still open — the 78 evicted scripts remain readable in PUBLIC history
+## Still open — the 78 evicted scripts remain readable in PUBLIC history
 
 The one thing untracking could not reach, and the only genuinely outstanding item here.
 
@@ -109,36 +34,12 @@ force-push (every commit SHA changes, and GitHub may cache the old objects until
 them), or make the repository private (instant, erases nothing, ends the exposure). Leaving it is a
 legitimate third answer given what is actually in the files. **Owner's decision; not taken.**
 
-**The wall was architectural, not a bug: 49 of the room's 108 test files read evidence that is
-deliberately not in the repository** — `docs/source`, `second-dump`, `css`, `new-evidence` and the
-other gitignored capture roots. So does `gate/verify-postgres-schema-artifacts.mjs`, step 2 of the
-three commands `test` chains, which `ENOENT`s on `second-dump/db/RECREATE.sql` on every CI checkout
-and always has.
+The evidence-partition work this section used to describe is DONE and is in `CHANGELOG.md`
+(2026-08-15): `gate/evidence-bound-tests.mjs` discovers the evidence-bound set,
+`src/lib/evidence-partition.test.ts` pins the count, and the suite runs whole locally and partitioned
+on CI. Nothing there is outstanding.
 
-**The decision, taken 2026-08-15: partition the suite by what the machine can actually see, and say
-so out loud.** Giving CI the captures was rejected — it puts live-room personal data into a CI
-environment, the one thing every rule in `.gitignore` exists to prevent. Guarding all 49 files
-individually was rejected as the mechanism: 222 of those reads happen at module scope, where a
-`describe.skipIf` cannot reach them, so it would have meant restructuring 49 files rather than
-annotating them.
-
-`gate/evidence-bound-tests.mjs` discovers the evidence-bound set rather than hardcoding it, and
-`vite.config.ts` excludes it only when the capture roots are unreadable. Locally nothing is excluded
-and all 108 files run. On CI the 49 are excluded, the count is **printed**, and
-`src/lib/evidence-partition.test.ts` pins the exact number so over-matching — the direction that
-loses coverage quietly — fails an assertion instead of shrinking a number nobody reads.
-
-Measured both ways: 108 files / 1409 tests pass with the evidence present; 59 files / 679 tests pass
-with a capture root removed, which is the CI shape.
-
-**Already closed, do not re-open:** the eviction of `apps/room/scripts` on 2026-08-15 10:33 broke
-exactly one thing beyond the above, and it was repaired at 10:48 — see CHANGELOG. Six of the seven
-tests reading that directory were already in the 50. `authorization-contract.test.ts` was the only
-one blocked by `scripts/` alone and now skips one case via `it.skipIf`. The two verifiers in `test`
-were never collectors and moved to `apps/room/gate/`; `privacy:verify` passes in a CI-shaped
-checkout, verified by extracting `git write-tree` into a temp directory and running it there.
-
-**Still true and still not decided, separately:** 76 of the 78 evicted files are already on
+**What is still not decided:** 76 of the 78 evicted files are already on
 `origin/main` and stay readable at those commits — including `scripts/compare-capture-states.mjs`,
 which contains the owner's name and is baselined in `ops/privacy-baseline.txt`. Untracking governs
 future commits only. Removing them from GitHub needs a history rewrite and a force-push, which was
@@ -151,44 +52,12 @@ untracked files, and this file's own "run it after every feature lands" instruct
 
 ---
 
-## ⛔ THREE THINGS THE FIRST CI RUN OF THE FRONTEND GATE EXPOSED — 2026-08-14 22:54 EDT
+## What the CI gates left behind
 
-`quality.yml` was built on 2026-08-14 and ran for the first time on PR #28. It is on the branch, NOT
-yet on `main`. Its first run failed both jobs, and everything below is what that bought.
-
-### 1. Room type-check — CLOSED 2026-08-14 22:50, and worth reading before trusting a green
-
-Six `Cannot find module '$env/dynamic/private'`, pre-existing on `main`, invisible locally because a
-stale `.svelte-kit` still held the old ambient types. Fixed in `7ea4b77`.
-
-**The rule that came out of it: `svelte-check` is only evidence after `rm -rf .svelte-kit`.** A green
-local check against a stale generated directory is not a green check, and it was reported as one
-several times before CI contradicted it.
-
-### 2. Controller unit tests — CLOSED 2026-08-14 23:06
-
-Nine tests across five files held absolute paths under `/Users/billyribeiro/Desktop/new-room/`, so
-they passed on the owner's machine and `ENOENT`d anywhere else. Two failed at SUITE level, because
-the read was at module scope and threw during import before any guard could run.
-
-**Copying the captures in was tried and REVERTED.** It works, and `.gitignore:45-47` forbids it in as
-many words — they are dumps of a live room holding real names, addresses and in some cases a live
-JWT. Recorded beside it: `privacy:verify` scans with `git ls-files --exclude-standard`, so it passed
-on the copied dumps **without reading one byte of them**. A green privacy check says nothing about an
-ignored file.
-
-`reference-capture.ts` is the fix: one place that knows where the captures live, `hasCapture` for
-`describe.skipIf`, and `readCapture` that names the file and the override when it throws. The
-module-scope reads are guarded because `skipIf` never runs if the import throws first.
-
-`PTR_CAPTURE_ROOT` overrides the location, which is what made this verifiable **without spending a
-CI run**: pointing it at an empty directory reproduces exactly what a runner sees.
-
-- with the captures: **964 passed**, 91 files
-- as CI sees it: **943 passed, 21 skipped, 0 failed**, 86 files passed and 5 skipped
-
-One silent pass was removed on the way: `account-page-sbs.test.ts` had `if (!existsSync(REFERENCE))
-return;`, which made a missing dump a green test that compared nothing.
+Both frontend items the first `quality.yml` run exposed are CLOSED and their records are in
+`CHANGELOG.md`; the two rules they earned are `docs/reference/working-rules.md` **10** (`svelte-check`
+is only evidence after `rm -rf .svelte-kit`) and **11** (a test that returns early on a missing
+fixture is a silent pass). What is below is only what somebody still has to do.
 
 ### 2b. Local dev secrets — restored 2026-08-15, and one is permanently gone
 
@@ -207,33 +76,21 @@ Vercel is type `Sensitive`, which is **write-only**. No value can be read back b
 CLI or support. **`~/Desktop/new-room-control/.env` and `.env.vercel-pull` are therefore the only
 readable copies of production secrets that exist anywhere.** Back that folder up off this machine.
 
-### 3. Backend quality — the code defects ARE fixed; what remains is CI minutes and the cutover tail
+### 3. Backend quality — GREEN on `main` since 2026-08-15; the cutover tail remains
 
-**Owner, 2026-08-14 23:00: the account has run out of CI minutes, and that is why these jobs fail.**
-Nothing below is being worked on, and CI is not to be triggered again until the app is finished —
-every push against an open PR starts a run and spends minutes that are not there.
+**The backend gate is GREEN end to end as of 2026-08-15** — run `31910327192`, 33m36s, every step
+passing, and again on `main` after the merge. It was never green before that day.
 
-Owner's note 2026-08-14: there may also be a **billing/quota** problem on the runner. Unchanged.
+**The 2026-08-14 attribution was wrong and is corrected here rather than quietly dropped.** It read:
+"the account has run out of CI minutes, and that is why these jobs fail." The jobs were failing on
+four real defects, each hidden behind the one before it, and all four are now fixed — see
+`CHANGELOG.md` 2026-08-15. Minutes were never the cause.
 
-#### ✅ CLOSED 2026-08-15 — the `28P01` failure, and what it actually was
-
-The Rust job failed all 27 integration tests with
-`password authentication failed for user "ptr_clone_app"` (28P01). Two earlier readings of this were
-wrong and both are corrected here.
-
-1. It looked like a `push` vs `pull_request` difference. It was not: the PR runs that appeared green
-   **skipped the entire gate**.
-2. It looked like a password-quoting bug, and it was not that either. **The role did not exist.**
-   PostgreSQL reports a nonexistent role to the client as an authentication failure and logs the
-   real reason server-side only, so the message named the wrong cause. `DATABASE_URL` named
-   `ptr_clone_app`; the API connects as `tradingroom_app`. Provisioning was never the bug —
-   `10-provision-roles.sh` uses `\getenv` and `format(… %L …)`, correct for a password containing
-   both `'` and `\`.
-
-The claim that `services/**` is "a mirror" whose changes are "lost on the next sync" was also false
-and is removed: no sync exists in either direction, this repository is ahead of both siblings, and
-`CLAUDE.md` has been corrected. Run `31905657116` on `main` passed provisioning, the chain on both
-clusters, the fixture, `fmt`, clippy **and the full Rust suite**.
+**The owner's cost constraint stands on its own and is unchanged:** every push against an open PR
+starts a run. The backend gate is ~33 minutes when the diff touches a backend path and ~25 seconds
+when it does not, so batching backend pushes is worth real money and docs pushes are effectively
+free. See `docs/reference/working-rules.md` rule 12 for why a green PR check is not proof the
+backend ran.
 
 #### Still open — the runtime-role cutover is not finished
 
@@ -360,7 +217,6 @@ deployment does not have — which is what the old sentence *meant* and should h
 
 | row | what it needs | who or what unblocks it |
 | --- | --- | --- |
-| **P** | bookkeeping. PRs #20–#27 are MERGED. **#30 is open and must NOT be merged as-is** — it contains the Swing delete that could not delete (fixed on the branch, not in that PR), and its full gate has never run | a clean tree, then the gate |
 | **G** | the Postgres host question — Neon under volume | the owner |
 | **H** | production topology — separating media from the app tier | the owner |
 | **Q** | the WordPress plugin run inside a live WordPress | an environment |
@@ -513,23 +369,6 @@ WHIP sites turned out to be this panel. Both halves of that confusion are now re
 
 **Still not established, and still not claimed:** how the room PLAYS an MTX stream once it exists.
 
-**Row S closed 2026-08-14.** The room owns its login page again, the product has ONE entry form
-rather than two, and the question I put to the owner turned out to have an answer in the bundle:
-`webinarPW` is in no room code at all, so the reference validates the password on its server exactly
-as this now does.
-
-Seven rows were CLOSED today and removed from this file rather than struck through, because a row
-that is not something somebody still has to DO does not belong in it — see the rule at the top. Each
-one's record is in `CHANGELOG.md` under 2026-08-14: **Z** the unbounded chat and alert reads, **Z2**
-the alert-question tenancy leak in both directions, **X2** the extra chat column, **AB** the chat
-mode control, **V** — whose premise did not survive being read — **S** the room's login page, and
-**AA**, which was already closed on 2026-08-12.
-
-**Three of those rows were WRONG about their own subject**, which is the most useful thing this file
-learned today: AB said the producer was not modelled when the consumer was the missing half; V said
-a bandwidth saving was missing when the reference never made one; S framed a design decision that
-the bundle already answered. A row is a hypothesis until it is re-read against the evidence.
-
 ---
 
 ## Where things are written down
@@ -622,24 +461,20 @@ instruction is just a note that something is unfinished.
 
 ### HANDOFF — the SIX still open, and exactly what each needs
 
-Rewritten 2026-08-13 18:21 EDT, recounted 2026-08-14. It said twelve while the template read was
-still running, then fourteen, and the prose disagreed with the tally line above it in BOTH
-directions for a day. The items below count 0 + 1 + 4 + 1 + 0 = **six** after the 2026-08-14 browser session closed six and parked one, which is what the
-tally says and what `evidence-gap-register-counts.test.ts` recounts from the register itself.
+Rewritten 2026-08-13 18:21 EDT, recounted 2026-08-14, pruned 2026-08-15. It said twelve while the
+template read was still running, then fourteen, and the prose disagreed with the tally line above it
+in BOTH directions for a day.
+
+The items below count **B 1 + C 4 + D 1 = six**, which is what the tally says and what
+`evidence-gap-register-counts.test.ts` recounts from the register itself. Three buckets that read
+"Nothing" — the five closed by the 2026-08-14 browser session, both items re-fetched and resolved,
+and one empty bucket — were REMOVED on 2026-08-15 rather than left saying nothing: a bucket whose
+content is "nothing to do" is not something somebody still has to do, which is the rule at the top of
+this file.
+
 Section B reads "two" because one sentence unblocks two EDITS; only one of them (T5-24) is an open
-register row. Every item says WHO does the next step and WHAT it is. **No item here
-is waiting on more reading — the templates are exhausted.**
-
-#### A. Nothing. All five closed 2026-08-14 by one browser session.
-
-**T5-15, T5-21, T2-20, T2-7 and T2-22 are CLOSED.** Captures: `evidence-dumps/stripe-details-2026-08-14.json`,
-`rendered-states-2026-08-14.json`, `rendered-states-welcome-2026-08-14.json`,
-`rendered-states-login-2026-08-14.json`. **The only browser work left is T1-9/T1-10 in section E.**
-
-That session found THREE defects in our own collectors, every one of which had been returning a
-plausible result rather than an error — the scope walk that climbed away from the controller, the
-denylist that matched `post` inside `POST_ROUTE_API_DOCUMENTATION.md`, and the login detector that
-labelled the Add Admin User form as the login form. All three are fixed and asserted.
+register row. Every item says WHO does the next step and WHAT it is. **No item here is waiting on
+more reading — the templates are exhausted.**
 
 #### B. Two need one sentence from the owner, naming the field.
 
@@ -711,34 +546,17 @@ ever registered is not the number ever simultaneously present.
   rebuild has to choose. **Recommendation: omit it and record why**, the same call already taken for
   the Stripe Details link. Moot until T5-16 exists.
 
-#### E. Nothing. Both re-fetched 2026-08-14 and resolved.
-
-**T1-9 CLOSED** — all 8 public-site images fetched, recorded in
-`evidence-dumps/static-asset-manifest-2026-08-14.json` by url + bytes + sha256.
-**T1-10 PARKED to Tier 4** — both room build assets soft-404'd a second time (HTTP 200, 52-byte body), which is
-the condition this bucket set for parking them. Nothing is blocked: the room's real bundle is already in the
-repository at `apps/room/docs/source/`, decoded into 194 component files.
-
-**T1-6 was independently re-confirmed** by the same run — its three glyphicon fonts soft-404 as well, which is
-what its existing "CLOSED AS NOT-DEPLOYED" status already said.
-
-#### F. Nothing. This bucket is empty.
-
-**T5-28 closed 2026-08-14** — it was already built; only a test was missing. Every remaining item
-needs something from outside this repository.
-
 ### Not an evidence gap — missing work, recorded so it is not lost
 
 | #   | what                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | severity                                          | written up                                                                                                                                                          |
 | --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| P   | **STALE ABOVE THE FOLD, CORRECTED 2026-08-14 23:10: PR #22 merged long ago (`f0c2fdd`), and so did #23–#27.** `main` is at `6f4411e`. It is still RED on Backend quality, but for a DIFFERENT reason than this row was written about — the owner confirmed the account is out of CI minutes. The paragraph below is kept because its lesson is permanent and was earned the hard way. **The lesson is bigger than the bookkeeping: a green PR check has not been proving the backend.** That job's scope step skips every step on a pull request whose diff touches no backend path — by design, and documented in its own skip notice — so #19, #20 and #21 were each merged on a SUCCESS that was a skip. The first push to `main` set `backend=true`, the steps ran for the first time ever, and three latent defects fired at once: verifier paths that do not exist at the repository root, a `REPOSITORY_ROOT` computed one level up instead of three, and a `cargo tree --invert` missing `--target all` that reported a target-gated crate as having escaped its graph. All three are fixed in #22, which the gate runs IN FULL because the diff touches the workflow itself. **The characteristic remains after the fix and is worth knowing: a PR that touches no backend path still merges without running that suite, so `main` is where backend rot surfaces.** Treat a red `main` after a merge as expected-by-design and fix forward; do not read a green PR as proof the Rust and PostgreSQL contracts ran. | **HIGH until #22 merges — `main` is red** | this row |
 | Q   | **The WordPress plugin has not been run inside a live WordPress.** The PHP itself is now executed and proven: `php -l` reports no syntax errors under **PHP 8.3.33**, and `tests/mint-golden-token.php` mints a token with the plugin's OWN `tradingroom_sso_entitlements()` and `tradingroom_sso_mint()` — that exact token is committed as `tests/golden-token.json` and verified by our TypeScript verifier in `sso-wordpress-contract.test.ts` (negative control: tampering one signature byte fails it). Both ran in a container, so no local PHP is needed to reproduce. **What remains needs a real site, not a machine here:** boot it inside WordPress against a staging WooCommerce, click through as a paid member, then **cancel the subscription and prove the door closes on the next entry**. Only that exercises `wc_memberships_get_user_active_memberships`, `wcs_get_users_subscriptions`, the settings screen and the cached-page path.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | blocks the first WordPress customer               | **`integrations/wordpress/STAGING-TEST.md`** — a step-by-step checklist; §6 (cancel the subscription, prove the next entry is refused) is the step that closes this |
 | R   | **Screenshare quality and the MP4 question — the RESEARCH was already here; the recorder half is now implemented, three rows remain.** The owner's memory was of `apps/room/docs/streaming-choices.md`, written 2026-08-05 — a measured, evidence-tagged ranking of ten options. It is byte-identical to the copy in `new-room`, so there was nothing to pull. **Done 2026-08-10: row 4.** The recorder was `new MediaRecorder(stream)` with NO options, taking the browser's ~2.5 Mbps default; it now picks VP9 explicitly at 8 Mbps (`src/lib/recording-codec.ts`, 10 tests). Row 4's own table is why — on realistic chart content VP9 produces **3841 kbps at an 8 Mbps cap and 6414 at 16**, while H.264/mp4 **saturates at ~2033 and ignores a higher cap**. 8 rather than 12 Mbps because row 4 warns a second 1080p encode competes with the live encoder. **MP4 arrives automatically on Safari** (it produces `video/mp4` natively and is last in the preference list); making it universal without losing ~1.8 Mbps of detail needs server-side remux, which is row 10 and needs the transcoding workers `MEDIASOUP-DEPLOYMENT-PLAN.md` defers. **Also done 2026-08-10: row 2.** `contentHint = 'detail'` is now set on the captured screen track — the doc's "strongest remaining candidate", chosen on the wire measurement: full 1920x1080 arrives with `qualityLimitationReason: none` and cumulative `bandwidth: 0, cpu: 0`, so nothing is throttling and the only lever left is telling libvpx the content is text rather than camera video. Its COST is still unmeasured (it may raise the bitrate, and under real congestion it trades frame rate for resolution), and it is a divergence — the capture sets the hint on its alert-overlay canvas, never the raw screen track. Reverting is deleting one line. **STILL OPEN:** row 6 raising the 1920 cap for Retina (every member pays the bandwidth, and it diverges from a byte-identical constraint) and row 8 an explicit `maxBitrate` (a floor is exactly what hurts the member on the worst connection). Both were deliberately NOT taken without the measurement, and both need the same one: **`apps/room/docs/MEASURE-SHARE-QUALITY.md`** — a written procedure, ~5 minutes, needing a human because `getDisplayMedia` requires an OS screen-picker dialog that browser automation cannot click. Attempted 2026-08-11 and abandoned: `chrome://webrtc-internals` lists every page in the BROWSER, and six Simpler Trading tabs plus two ChatGPT tabs were each contributing their own connections. The doc says which tabs to close, in what order, and what each possible result would mean. **The measurement that settles all three is one thing: a presenter sharing a REAL desktop with a member attached, reading `outbound-rtp` from `getStats()` before and after each change.** Headless `getDisplayMedia` returns Chrome's synthetic gradient, which compresses too easily to show any difference — which is why the doc's own 525 kbps figure is not the real number. | quality; owner-visible                            | `apps/room/docs/streaming-choices.md`, rows 2, 6, 8                                                                                                                 |
 | S   | **The room-side login page is BUILT, 2026-08-14 — the room renders `app-session-login` on every entry, as the reference does.** The reported divergence is gone: Launch no longer drops you straight into the room. `/session?id&jwtSite` is a PAGE now, not a redirect; it verifies the handoff, prefills name and email from the token, marks the email read-only, and waits for `Login` — because the reference never auto-submits either (`doLoginCheck()` has exactly four callers, all click or submit bindings). **The A/B question I put to the owner was WRONG and the dumps answered it:** `webinarPW` appears NOWHERE in the room bundle, so the reference does not hold the room password in the browser at all — `loginToRoom()` posts the typed value and its SERVER decides. Ours does the same through `internal/room-entry/[code]`, which runs the SAME `decideRoomEntry` the guest door uses, so there is one entry decision rather than two. The five settings that DRIVE the page now cross (`showPasswordField`, `usernameInstructions`, `hasRequiredPhoneInLogin`, `customEnterDisclosure`, `disableEditingUsername`), each read in the bundle at a cited byte offset — the four-edit process, 56 wired. **One deliberate narrowing:** `banIPList` DOES cross to the reference's room and is checked in its browser; ours checks it server-side only, because a ban list in a browser hands every banned address to every visitor and the server decision is authoritative regardless. **STILL OPEN, and it is the guest path:** the controller's `/session/[code]` form and this page are now two forms for a guest, where the reference has one. The room is the reference's only form, so the controller's guest door should become a token-minting step — that is the next unit and it needs no new evidence. | MEDIUM — the launch path matches; the guest path shows two forms | this row |
 | X   | **ONE settings-modal checkbox remains, and it is blocked on architecture rather than on effort.** Row X started at thirteen on 2026-08-14; twelve are closed. **`visibility-change-enabled` was CLOSED 2026-08-14** — item AA had deferred it, and AA's objection was right about the ROSTER half and only that half: `unloadRoster`/`loadRoster` gate a five-second POLL upstream, ours is SSE-pushed, so reproducing it would leave a hidden tab holding a stale roster. The CHAT half is the reverse and was worth more here than upstream: a hidden tab was doing a full page load per message posted, because this room re-reads its log on every SSE event. Now it skips the refetch while hidden, keeps the mention path alive, and catches up once on return — `appHasFocusGetChatLog`. Defaults OFF, a stated divergence: the reference ships `visibilityChangeEnabled:!0`, but upstream's hidden branch skips an array append and ours skips a network read, so nobody is opted in silently. **`app-recording-preview-window` (`recPreviewWindow`) is the last one, and it is BLOCKED — proven, not assumed.** The image src is `${sessData.recPreviewLocation}?${Date.now()}` polled every 1000ms, and `recPreviewLocation` is set by the SERVER on the command channel — `case "setRecPreview": globals.sessData.recPreviewLocation = i.url` (bundle byte 1023704). It is not a manage-page setting and nothing else writes it. The component's OWN gate is `videoOnlyMode || !isPresenter || !recPreviewLocation || !recPreviewWindow` → do nothing, so without a server snapshot it correctly renders nothing. This room records CLIENT-side with `MediaRecorder` — the declared divergence in item R — so no snapshot exists and no `setRecPreview` ever arrives. Building it would ship a component that cannot run; producing the frame locally instead would invent a mechanism the reference does not have, and its own heading says "DELAYED UPTO 20s" because the snapshot is generated server-side. **THE BLOCKER IS NAMED WRONG EVERYWHERE, AND 2026-08-14 FOUND WHAT IT ACTUALLY IS: a MediaMTX cluster.** Every row that touches recording — this one, AC, and row R's row 10 — says "server-side recording", which reads as something to be BUILT. It is not built from scratch either: the reference hands recording to **MediaMTX**, an off-the-shelf media server — `this.useMTX = this.globals.sessData.useMediaMTX` (bundle byte 1115350) — and the manage page carries three settings for it, all inside the reference's own **`dont-touch`** group — `useMediaMTX` ("Use MediaMTX?"), `mediaMTXClusterID` ("MediaMTX ClusterID") and `backupMediaMTXClustterID` (typo upstream's). A ClusterID and a BACKUP ClusterID mean a managed media tier with its own identity, not a process beside the SFU. **And client-side recording is NOT our divergence:** `startRecFromMuser` branches `mtxStreams.length > 0 ? sendServerAdminCommand('startRecMtx', {streams}) : this.mediaService.startRecForMuser(null)` (byte 2524230) — upstream records in the browser too whenever no MTX stream exists, which is exactly what this room does. So `MediaRecorder` here reproduces a real upstream path rather than diverging from it, and item R's description of it as "a declared divergence" is wrong. **CORRECTED 16:20 — there is no client-side publish to write.** An earlier draft of this row said the client publishes to MediaMTX over WHIP. That was inference from two strings in one bundle and reading them disproved it: every `WHIP` site is the OBS-ingest panel ("stream directly from OBS into this room… get your WHIP streaming link", byte 2142400), a different feature. What the MTX path does is narrower — `mtxStartStream`/`mtxStopStream` are SERVER→client notifications, and the room pushes each into `mtxStreams` and renders it as a stream TAB (`selectStreamTabOfId`, byte 1137850). The client only OBSERVES streams the server already holds and asks the server to record them. **How a stream reaches MediaMTX is not established by the client bundle and is not claimed here.** **So this row needs an infrastructure decision and no room code at all:** stand up MediaMTX, at which point `setRecPreview`, `stopRecMsg` and row R's server-side remux become reachable together. | LOW — cannot run without a MediaMTX cluster | this row; `visibility-change-contract.test.ts` |
 | G   | **Postgres host is an open question — Neon may not hold up under volume.** Raised by the owner 2026-08-09, deliberately deferred. Serverless Postgres autoscales compute but the pressure here is sustained CONNECTIONS from long-lived room sessions, which is a different curve. Alternatives to weigh when it comes up: Crunchy Bridge, RDS, or self-managed on the same infrastructure as the app tier. Not urgent — current load is one user.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | decide before real volume                         | not yet written up                                                                                                                                                  |
 | H   | **Production topology should SEPARATE the media plane from the app tier.** The owner's point, and correct: Hetzner earns its place on egress economics, and the rest of the app has the opposite shape. Sharing one box means a shared failure domain, a shared attack surface (~10,000 open UDP ports beside your session cookies), and a shared lifecycle. What is deployed today is a five-day TEST topology, not the target. Separating later is a redeploy, not a migration.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | before real users                                 | supersedes `NEXT-SESSION.md` §4c                                                                                                                                    |
-| E   | **The room↔controller seam cannot be exercised locally: `apps/room/.env` does not exist.** Found 2026-08-12 while trying to produce the RENDER proof for `hideChatAlerts` and `isChatOnlyRoom`. `scripts/room-config-seam-e2e.mjs` is the right instrument and now carries the assertions for both — it flips each setting on the Manage page and reads whether `.alert-chat-box` and `.presentation-box` are in the room's DOM — but it **has not been run**, and the reason is environmental rather than a defect in either application. Three separate things are missing: (1) `apps/room/.env` is absent entirely, and `.env.example` lists nine variables the room needs, of which `CONTROL_BASE_URL` and `ROOM_JWT_SECRET` are the two the seam depends on; (2) `ROOM_JWT_SECRET` is **not in `apps/controller/.env` either** (0 occurrences), so there is no shared HMAC secret on this machine and the room's signed request to `internal/room-config/<code>` could not be verified even if the room were pointed at the controller; (3) the probe's own defaults are stale — it declares `CONTROL=http://localhost:5180`, but the controller's dev port is **5173** (`apps/controller/vite.config.ts:17`, and the comment there says the room's `CONTROL_BASE_URL` must name that exact port). Port 5180 on this machine is a **different project** (`Desktop/trick-trades`), which is what a first run actually reached — `/register` answered 404. **Not fixed here because provisioning a shared secret is an owner decision**, and inventing one to make a probe go green is the opposite of what this file is for. What the gates DO have behind them meanwhile: `chat-alerts-gates-contract.test.ts`, 13 assertions read out of the decoded component at runtime, with four negative controls each seen red and restored. What is missing is only the last mile — a browser observing a column leave the DOM when an owner ticks the box. | MEDIUM — the two gates are tested but not rendered | this row; `apps/room/scripts/room-config-seam-e2e.mjs` §9 |
+| E   | **The seam probe has still never been RUN, and its instrument is no longer in the repository.** The blocker this row was written about is GONE: `apps/room/.env` now exists and its `ROOM_JWT_SECRET` matches the controller's (2026-08-15). What replaced it is smaller and more awkward — `room-config-seam-e2e.mjs` lived in `apps/room/scripts/`, which was evicted on 2026-08-15, so the probe is **untracked and absent from a fresh checkout** (verified: `git ls-files` returns 0, and the path does not exist in a clean worktree). It is one of the 30 npm entries pointing at untracked files, recorded at the top of this file. **Still true and still checkable:** the probe declares `CONTROL=http://localhost:5180` while the controller's dev port is **5173** — `apps/controller/vite.config.ts:17` (`const localPort = 5173`), re-verified 2026-08-15, and the comment there says the room's `CONTROL_BASE_URL` must name that exact port. Port 5180 is a different project (`Desktop/trick-trades`), which a first run actually reached — `/register` answered 404. What the gates DO have behind them meanwhile: `chat-alerts-gates-contract.test.ts`, 13 assertions read out of the decoded component at runtime, with four negative controls each seen red and restored. What is missing is only the last mile — a browser observing a column leave the DOM when an owner ticks the box. | MEDIUM — the two gates are tested but not rendered | this row; the probe, wherever it now lives |
 
 | W   | **The user-info / session-control modals raise the reference's exact alert and send nothing — a family, not a one-off.** Found 2026-08-15 while building `unmuteChat`, by READING `handleUserAction` in `+page.svelte` end to end rather than searching it. The handler ends in a `Record<string, string>` named `exactAlerts` that maps an action straight to its toast; several branches above it do the same with a prompt in front. **`unmute-chat` is now fixed** — it posts to a real action, deletes the live `chat_mutes` row and tells the member on `privCmds` (`unmute-chat-contract.test.ts`, 14 assertions, negative control seen red). **These were read in the same pass and are still toast-only, listed with what each currently does and nothing inferred:** `kick` and `kick-ban` (prompt, then `User kicked OK`); `kick-duplicates` (prompt, then `No duplicates found for …` — a hard-coded negative result, so it reports "none" even when duplicates exist); `admin-notes-password` (prompt, then `Wrong password!` unconditionally, so the correct password is also refused); `session-send-users-url` and `session-send-sales-image` (URL prompt with the real `http`/`https` validation, then `Command send OK.`, the reference's own typo, and no send). Their wire commands are `kickUser`, `sendUsersToURL` and `sendSalesImageToChat` in `docs/decoded/missing-commands-triage.md`, each already carrying payload, byte offsets and verbatim strings — so these are ports, not research. **`mute-chat-24` is the instructive one:** the SERVER half exists and works, reached from the message context menu via `runMessageOperation(…, 'mute24')`; only the modal's copy of the button is inert. That is exactly the shape `unmuteChat` had. **Not claimed here:** whether `save-permissions`, `restart-audio` and `force-reload` are sent from some other path was not checked — only their entry in this table was read, and `forceReload` demonstrably does exist as a `privCmds` command, so at least one of the three has a real wire somewhere. Check before porting. **Severity is about the lie, not the absence:** every one of these reports success, so a presenter believes the kick landed and the member is still in the room. | **HIGH — controls that report success and do nothing** | this row; `docs/decoded/missing-commands-triage.md`; `apps/room/src/lib/unmute-chat-contract.test.ts` |
 
