@@ -21,27 +21,27 @@ will fetch it. A gap recorded in only one app's document is a gap the next perso
 sentence that treats a specific recent change as the reason the gate is red is wrong before it is
 written; this was measured, not assumed.
 
-**The wall is one thing, and it is architectural, not a bug: 50 of the room's 106 test files read
-evidence that is deliberately not in the repository** — `docs/source`, `second-dump`, `css/`,
-`new-evidence` and the other gitignored capture directories. So does
-`gate/verify-postgres-schema-artifacts.mjs`, step 2 of the three commands `test` chains, which
-`ENOENT`s on `second-dump/db/RECREATE.sql` on every CI checkout and always has.
+**The wall was architectural, not a bug: 49 of the room's 108 test files read evidence that is
+deliberately not in the repository** — `docs/source`, `second-dump`, `css`, `new-evidence` and the
+other gitignored capture roots. So does `gate/verify-postgres-schema-artifacts.mjs`, step 2 of the
+three commands `test` chains, which `ENOENT`s on `second-dump/db/RECREATE.sql` on every CI checkout
+and always has.
 
-**The decision nobody has taken:** what is a CI run of this repository allowed to CLAIM when the
-evidence it pins against is, correctly, not in it? Three answers, and this needs the owner rather
-than a guess:
+**The decision, taken 2026-08-15: partition the suite by what the machine can actually see, and say
+so out loud.** Giving CI the captures was rejected — it puts live-room personal data into a CI
+environment, the one thing every rule in `.gitignore` exists to prevent. Guarding all 49 files
+individually was rejected as the mechanism: 222 of those reads happen at module scope, where a
+`describe.skipIf` cannot reach them, so it would have meant restructuring 49 files rather than
+annotating them.
 
-- **Skip loudly.** Extend `apps/controller/src/lib/reference-capture.ts` — `hasCapture` for
-  `describe.skipIf`, `readCapture` that names the file and the `PTR_CAPTURE_ROOT` override when it
-  throws — across the 50 files and the schema verifier. CI then reports honestly on what it can see.
-  The risk is a gate that is green because it ran almost nothing, so the skip count has to be
-  asserted, not just printed.
-- **Give CI the captures.** A private artifact or a runner with the volume mounted. Real coverage;
-  puts live-room dumps into a CI environment, which is the thing every rule in `.gitignore` exists
-  to prevent.
-- **Say the room suite is local-only** and have CI run lint, types and build for the room, with the
-  evidence-bound suite owned by the pre-merge gate on the owner's machine. Honest and cheap; means
-  no CI signal at all on 50 files.
+`gate/evidence-bound-tests.mjs` discovers the evidence-bound set rather than hardcoding it, and
+`vite.config.ts` excludes it only when the capture roots are unreadable. Locally nothing is excluded
+and all 108 files run. On CI the 49 are excluded, the count is **printed**, and
+`src/lib/evidence-partition.test.ts` pins the exact number so over-matching — the direction that
+loses coverage quietly — fails an assertion instead of shrinking a number nobody reads.
+
+Measured both ways: 108 files / 1409 tests pass with the evidence present; 59 files / 679 tests pass
+with a capture root removed, which is the CI shape.
 
 **Already closed, do not re-open:** the eviction of `apps/room/scripts` on 2026-08-15 10:33 broke
 exactly one thing beyond the above, and it was repaired at 10:48 — see CHANGELOG. Six of the seven

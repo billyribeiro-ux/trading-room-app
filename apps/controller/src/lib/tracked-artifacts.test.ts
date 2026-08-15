@@ -67,9 +67,22 @@ const gitAvailable = TRACKED !== null;
  * the word. That is the check being wrong rather than the repository, and it is exactly the trap
  * this file's own header warns about: a sweep that cries wolf gets deleted, and then nothing is
  * guarded at all. A directory is a violation only when a whole path component equals its name.
+ *
+ * Kept as a pure function over a supplied list rather than reaching for `TRACKED` directly, so the
+ * negative control below can exercise the RULE without needing a real file in the repository to
+ * exercise it against. That distinction stopped being academic on 2026-08-15: every file under
+ * `apps/room/scripts` was untracked and gitignored, which removed the last tracked path in the
+ * repository whose name contains "coverage" without being a coverage directory. The control had
+ * hardcoded that exact file, so it went red — correctly reporting that its subject was gone, but
+ * reporting it as a failure of this repository rather than of the fixture. A control whose subject
+ * can be deleted by unrelated work is a control that will eventually be deleted for crying wolf.
  */
+function segmentOffenders(files: readonly string[], name: string): string[] {
+  return files.filter((file) => file.split('/').includes(name));
+}
+
 function offenders(name: string): string[] {
-  return (TRACKED ?? []).filter((file) => file.split('/').includes(name));
+  return segmentOffenders(TRACKED ?? [], name);
 }
 
 describe('generated output is not tracked', () => {
@@ -86,12 +99,29 @@ describe('generated output is not tracked', () => {
 
   it('the segment match does not fire on a source file that merely says "coverage"', () => {
     /*
-      The negative control for the check itself, kept because the broad version of it shipped for
-      one run and failed on this exact file. If `offenders` is ever loosened back to a substring
-      match, this goes red instead of the honest source file.
+      The negative control for the check itself, kept because the broad version of it shipped for one
+      run and failed on a real, honest source file. If `segmentOffenders` is ever loosened back to a
+      substring match, every line below goes red.
+
+      The fixture is the point. This asserts a property of the RULE, so it must not depend on the
+      repository still happening to contain a path that demonstrates it — see the note on
+      `segmentOffenders`. `audit-behavior-coverage.mjs` is named here as the case that actually
+      caused this, and it no longer needs to exist for the assertion to mean what it says.
     */
-    expect(TRACKED ?? []).toContain('apps/room/scripts/audit-behavior-coverage.mjs');
-    expect(offenders('coverage')).not.toContain('apps/room/scripts/audit-behavior-coverage.mjs');
+    const files = [
+      'apps/room/scripts/audit-behavior-coverage.mjs',
+      'apps/controller/src/lib/coverage-report-parser.ts',
+      'docs/test-coverage.md',
+      'apps/controller/coverage/index.html'
+    ];
+
+    // The three that merely CONTAIN the word are untouched...
+    expect(segmentOffenders(files, 'coverage')).not.toContain('apps/room/scripts/audit-behavior-coverage.mjs');
+    expect(segmentOffenders(files, 'coverage')).not.toContain('apps/controller/src/lib/coverage-report-parser.ts');
+    expect(segmentOffenders(files, 'coverage')).not.toContain('docs/test-coverage.md');
+
+    // ...and the one where it is a whole path component is the only thing caught.
+    expect(segmentOffenders(files, 'coverage')).toEqual(['apps/controller/coverage/index.html']);
   });
 
   it('each one is ignored, so it cannot come back by accident', () => {

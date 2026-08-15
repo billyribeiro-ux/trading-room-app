@@ -1,10 +1,82 @@
 import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const evidenceDir = resolve(repoRoot, 'second-dump/db');
+
+/*
+  ## Why this verifier is allowed to decline to run, and why that is not a loophole
+
+  `apps/room/second-dump` is a symlink to the capture set at ~/Desktop/new-room/second-dump, and it
+  is gitignored on purpose. Those files are a dump of a LIVE room — real members, real messages,
+  real addresses — and this repository is public. They are evidence, they are not source, and they
+  are never going to be committed here. `.gitignore` says so twice, at `second-dump/` and at
+  `/apps/room/second-dump`.
+
+  The consequence was that `pnpm test` could only run on the one laptop holding the captures.
+  `package.json` chains three commands — the privacy gate, then this schema gate, then vitest — so
+  on every CI checkout this file threw a bare
+
+      ENOENT: no such file or directory, open '.../second-dump/db/RECREATE.sql'
+
+  at step two and killed the run before a single test executed. `quality.yml` failed all eight runs
+  after PR #28 partly on exactly this. A gate that cannot execute anywhere but one machine is not
+  protecting anything; it is only preventing everything else from being protected, which is the
+  same failure the privacy gate's own header records when it was left in an untracked directory.
+
+  So an absent capture set is a SKIP. It is emphatically not a pass and it must never print like
+  one: the message goes to stderr — the PASS summary at the bottom of this file is the only thing
+  that is allowed on stdout — it says NOTHING WAS VERIFIED in those words, and it names the exact
+  directory it wanted and the exact commands that would make the run real. Somebody scanning a log
+  must not be able to mistake this branch for evidence that the schema contract still holds,
+  because it is evidence of nothing whatsoever.
+
+  ## Absent is a skip. Present-but-wrong is a failure. That distinction IS the gate.
+
+  The condition is `existsSync` on the evidence DIRECTORY and nothing else. It is the one predicate
+  that is false on every checkout that structurally cannot have the captures and true on every
+  machine that does, so it cannot quietly become true on a machine that was supposed to be
+  verifying something.
+
+  Everything past this guard stays exactly as strict as it was before the guard existed. If the
+  directory is there but an artifact inside it is gone, `readFileSync` throws and the process exits
+  non-zero. If an artifact is there but one byte moved, the line-count, byte-length and SHA-256
+  assertions in `readArtifact` fail and the process exits 1. Neither of those is absence. They are
+  a capture set that has been damaged, truncated or edited, which is the precise thing this file
+  was written to catch, and turning them into a green skip would leave a verifier that can no
+  longer fail — worse than no verifier, because it reports.
+
+  That is the "simplification" this comment exists to stop: do not widen the check into a
+  try/catch around the reads, do not turn it into a per-file existence test, and do not add a flag
+  that forces this branch. There is no `--skip` here on purpose, because a skip a human can type
+  is a skip that ends up pasted into a CI workflow and never removed.
+
+  A dangling symlink — the capture folder moved, or an external volume is not mounted — resolves as
+  absent here, and that is correct rather than a hole: the artifacts are unreachable, so no claim
+  can be made from them either way.
+*/
+if (!existsSync(evidenceDir)) {
+  console.error(
+    [
+      'PostgreSQL schema evidence contract: SKIPPED — NOTHING WAS VERIFIED',
+      `- Missing evidence directory: ${evidenceDir}`,
+      '- This is by design: apps/room/second-dump is a gitignored symlink to captures of a LIVE',
+      '  room holding real personal data, and this repository is public, so no checkout of it',
+      '  ever carries them.',
+      '- This run checked NOTHING. Artifact SHA-256s, the table/column/constraint inventory,',
+      '  FORCE and ENABLE ROW LEVEL SECURITY coverage, the 20 policies, the ptr_clone_app grants',
+      '  and the SECURITY DEFINER ordering are all UNVERIFIED here. Do not read this exit code as',
+      '  the schema contract holding.',
+      '- To verify for real, run it where the captures live (~/Desktop/new-room/second-dump):',
+      '    ln -s ~/Desktop/new-room/second-dump apps/room/second-dump',
+      '    cd apps/room && node gate/verify-postgres-schema-artifacts.mjs',
+      '- A capture set that is PRESENT but incomplete or altered is not skipped — it fails.'
+    ].join('\n')
+  );
+  process.exit(0);
+}
 
 const artifactContract = {
   'RECREATE.sql': {
