@@ -316,6 +316,18 @@ export interface RoomSessionSettings {
    * Read by `$lib/alert-labels` and `RoomMessage.svelte`.
    */
   alertLabels?: string;
+  /**
+   * Four per-room gates that `RoomMessage.svelte` already implements.
+   *
+   * Each was a prop defaulting `false` that the page never passed, so the feature was unreachable.
+   * Every occurrence of all four in the reference bundle is `sessData.<name>` — per-room policy,
+   * never local state.
+   */
+  usersPublicReply?: boolean;
+  enableReactions?: boolean;
+  /** Chat and alerts are gated SEPARATELY upstream, which is why this is not one setting. */
+  enableEditMessage?: boolean;
+  enableEditAlerts?: boolean;
 }
 
 /** The connected member's per-room standing, which is per room and not per account. */

@@ -70,8 +70,51 @@ export default defineConfig(
     'css/**',
     'emojis/**'
   ]),
+  /*
+    THE PRESETS COME FIRST, AND THE ORDER IS THE WHOLE POINT.
+
+    In flat config the LAST entry to match a file wins. These three were moved below the override
+    block in `060ba72`, and that silently reversed the two decisions documented inside it:
+    `svelte.configs.recommended` turns `svelte/no-useless-mustaches` and
+    `svelte/prefer-svelte-reactivity` back on, so the fifteen lines of reasoning explaining why they
+    are off sat there being ignored. The `room quality` job reported 43 errors for exactly the
+    patterns those comments say are deliberate.
+
+    The reason it was invisible locally: `pull_request` runs check out `refs/pull/N/merge`, so CI
+    lints the merge of the branch into `main` while a developer lints their branch. A config change
+    on `main` therefore reaches CI before any branch that has not rebased onto it, and the branch
+    passes while CI fails on the same commit. `eslint-config-resolution.test.ts` now asserts the
+    RESOLVED config rather than trusting this ordering, because a comment cannot enforce itself.
+  */
+  js.configs.recommended,
+  ts.configs.recommended,
+  svelte.configs.recommended,
   {
-    files: ['src/**/*.{js,mjs,ts,svelte}', 'scripts/**/*.mjs'],
+    /*
+      DELIBERATELY UNSCOPED, and restored to that after `060ba72` added a two-pattern `files` list to
+      it — one pattern for source extensions under `src`, one for ESM scripts under `scripts`.
+
+      Those patterns are described in words rather than quoted, and that is not fussiness: a glob of
+      that shape contains the two characters that CLOSE a block comment, so pasting one in here ends
+      the comment early and turns the rest of the prose into code. It cost a run to find. Same family
+      as the rule against putting Svelte template syntax in a comment, for the same reason.
+
+      Everything this repository authors runs under Node, the browser, or both, so every file it
+      lints wants these globals. Narrowing the block did not restrict what gets linted — that is
+      `globalIgnores` above, and it was already doing the job — it only removed the globals from
+      whatever the two patterns happened to miss, leaving those files with `no-undef` on and nothing
+      defined.
+
+      What it missed was not hypothetical. `gate/**` did not exist when the patterns were written, so
+      the privacy and schema verifiers produced 31 `no-undef` errors for `process`, `console`, `URL`
+      and `Buffer` the moment they moved there. `scripts/*.js` — the browser-console collectors — are
+      not `.mjs` and were missed too: 524 more errors, invisible on CI only because that directory is
+      untracked and so is not present there to be linted.
+
+      A pattern list that has to be revised every time a directory is added is a gate that breaks on
+      unrelated work. The ignore list decides what is linted; this block decides what those files are
+      allowed to reference, and the answer for first-party code is the same everywhere.
+    */
     languageOptions: {
       globals: {
         ...globals.browser,
@@ -109,9 +152,6 @@ export default defineConfig(
       'svelte/prefer-svelte-reactivity': 'off'
     }
   },
-  js.configs.recommended,
-  ts.configs.recommended,
-  svelte.configs.recommended,
   {
     /*
       The browser-console collectors run pasted into a live page, not under Node. They legitimately

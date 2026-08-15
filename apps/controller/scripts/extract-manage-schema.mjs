@@ -258,7 +258,21 @@ const ROOM_CONSUMED = [
      Read by alert-labels.ts and RoomMessage.svelte.
 
      NO SQUARE BRACKET AND NO APOSTROPHE ANYWHERE ABOVE, for the reason the notes further up give. */
-  'alertLabels'
+  'alertLabels',
+  /* Four gates that RoomMessage.svelte already implements and no room could switch on.
+
+     Every occurrence of all four in the reference bundle is sessData dotted onto the name, so they
+     are room settings and never local state. The room had the props, defaulted false, and the page
+     never passed them, which meant public reply, reactions, edit message and edit alerts were dead
+     in every room regardless of what the owner ticked.
+
+     usersPublicReply and enableReactions gate menu entries through sourceMessageBehavior;
+     enableEditMessage and enableEditAlerts gate the edit entry for chat and for alerts separately,
+     which is why they are two settings and not one. */
+  'usersPublicReply',
+  'enableReactions',
+  'enableEditMessage',
+  'enableEditAlerts'
 ];
 
 /**
@@ -682,7 +696,7 @@ const missingWiredSettings = [...WIRED_SETTINGS].filter((name) => !defs.some((de
 //
 // The literal is a tripwire, not a fact about the schema — it is here so the wired set cannot grow
 // by accident, which is why changing it is a deliberate edit.
-if (WIRED_SETTINGS.size !== 62 || missingWiredSettings.length > 0) {
+if (WIRED_SETTINGS.size !== 66 || missingWiredSettings.length > 0) {
   throw new Error(
     `wired-setting contract invalid: ${WIRED_SETTINGS.size} keys, missing ${missingWiredSettings.join(', ') || 'none'}`
   );

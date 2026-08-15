@@ -24,6 +24,45 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-15
 
+### 2026-08-15 11:22 EDT — four features the room already implemented and no room could switch on
+
+**Runtime impact: four controls become reachable.** Nothing changes for a room that leaves them off,
+because off is what every room had whether it wanted it or not.
+
+`RoomMessage.svelte` has carried `usersPublicReply`, `enableReactions`, `enableEditMessage` and
+`enableEditAlerts` as props since it was written, each defaulting `false`, each feeding
+`sourceMessageBehavior()` — and `+page.svelte` never passed any of them. The behaviour was built,
+the menu entries were built, and the values never arrived. Public reply, reactions and both edit
+entries were dead in every room however the owner configured the Manage page.
+
+**Found by cross-referencing rather than by reading the list.** Of 206 unwired settings, 25 are
+already named somewhere in the room source; these four are the ones where the consumer was complete
+and only the value was missing. That is the cheapest possible class of gap and it is worth looking
+for the rest of it deliberately.
+
+Evidence that they are per-room policy and not something the room may decide: **every** occurrence of
+all four in the reference bundle is `sessData.` dotted onto the name — 2, 9, 2 and 2 occurrences
+respectively, no local state anywhere.
+
+`enableEditMessage` and `enableEditAlerts` stay TWO settings because upstream gates the chat log and
+the alerts log apart. Collapsing them would let a room that allows editing alerts also allow editing
+chat, and `sourceMessageBehavior` already picks between them on `kind`.
+
+Wired through the full pipeline, 62 → 66: `ROOM_CONSUMED` and its size contract, the verifier's
+`EXPECTED_WIRED_SETTINGS` and its prose count, four schema rows and the header, the allow-list,
+`RoomSessData`, and the `consumers` map that records *what reads each one*.
+
+**One self-inflicted red, recorded because the fix was mine and not the code's.** Inserting the four
+props directly after `kind="alert"` pushed `{chatGif}` out of the 120-character window
+`chat-gif-muted-contract.test.ts` slices from `kind`, failing that test and
+`presenter-messages-right-contract.test.ts` with it. The tests were right and the insertion point was
+wrong; the props moved below `{disableStarYears}` and both went green. Nothing about the contract
+changed.
+
+**Verified:** room 1412/1412 (108 files) · controller 964/964 (91 files) · schema verifier
+`269 total; 66 wired` · `svelte-check` 1064 files 0 errors 0 warnings · eslint clean ·
+`svelte-autofixer` `issues: []`.
+
 ### 2026-08-15 11:17 EDT — Benzinga: the decode pass the TODO asked for, which changed nothing
 
 **Runtime impact: none.** No code changed. This entry exists because "we checked and it already

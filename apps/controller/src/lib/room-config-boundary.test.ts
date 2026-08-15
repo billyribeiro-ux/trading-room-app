@@ -317,7 +317,19 @@ describe('the allow-list itself', () => {
         badge — on the ALERTS log only, because `parseSymbols` substitutes nothing over chat.
       */
       alertLabels:
-        'alert-labels.ts — parseAlertLabels() reads the JSON string once per page and splitAlertLabels() turns each #hash into the coloured badge RoomMessage.svelte renders, alerts only'
+        'alert-labels.ts — parseAlertLabels() reads the JSON string once per page and splitAlertLabels() turns each #hash into the coloured badge RoomMessage.svelte renders, alerts only',
+      /*
+        FOUR gates RoomMessage.svelte already implemented and the page never fed. Each was a prop
+        defaulting false, so the feature was unreachable however the room was configured.
+      */
+      usersPublicReply:
+        'RoomMessage.svelte via sourceMessageBehavior() — the Reply menu entry for non-presenters',
+      enableReactions:
+        'RoomMessage.svelte via sourceMessageBehavior() — the reaction picker and the reaction pill',
+      enableEditMessage:
+        'RoomMessage.svelte via sourceMessageBehavior() — the Edit menu entry on CHAT messages',
+      enableEditAlerts:
+        'RoomMessage.svelte via sourceMessageBehavior() — the Edit menu entry on ALERTS, gated apart from chat because the reference gates them apart'
     };
     expect(Object.keys(consumers).sort()).toEqual([...ROOM_VISIBLE_SETTINGS].sort());
   });
