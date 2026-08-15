@@ -24,106 +24,79 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-15
 
-### 2026-08-15 13:05 EDT — a push to `main` is now scoped like a pull request, and stops re-proving nothing
+### 2026-08-15 12:56 EDT — slice 3, and the ratchet caught me making the file BIGGER
 
-**Runtime impact: none.** One workflow step.
+**Runtime impact: none.** Every string and every branch behaves as before. `+page.svelte`
+**13,555 → 13,551**; ceiling lowered to match.
 
-**The owner's constraint, and it is the right one:** CI minutes are finite and a 33-minute job on every
-merge is not affordable. Measured before changing anything, rather than trimming by feel.
+`handleUserAction` is 253 lines and was NOT moved, deliberately. It writes six pieces of `$state`,
+and Svelte's rule that reassigned state cannot be exported from a module means a wholesale move
+becomes a fourteen-setter dependency object — worse coupling than the original, bought purely to
+move line count. Only the DECISIONS came out, into `user-action-intent.ts`: the URL check, the saved
+video-list rule, and the fixed-alert table. Every assignment stayed in the component.
 
-`backend-quality.yml` scoped pull requests by path — a frontend-only PR skipped the Rust and
-PostgreSQL suite in about 30 seconds — but every other event ran the full gate unconditionally:
+**The ratchet did its job on its author.** The first version of this slice left `+page.svelte` at
+**13,561** — six lines LARGER than before, because a four-line import block and two explanatory
+comments cost more than the extraction removed. The ceiling is 13,555 and ceilings only go down, so
+that would have failed the build. It was not a number to edit: the import went to one line and the
+reasoning moved into the module, where it belongs anyway. Without the ratchet this would have
+shipped as "an extraction" that grew the file.
 
-```
-if [ "${{ github.event_name }}" != "pull_request" ]; then
-  echo "backend=true"
-```
+**What is now under test for the first time:**
 
-So every merge to `main` spent the whole ~33-minute suite whether or not it contained a single
-backend file. **Over the last 20 commits on `main`, 4 touched a backend path and 16 did not.** Those
-16 re-verified a tree already verified, at roughly 500 runner-minutes, and it is why this workflow
-was always the one still running when the next push arrived — which is what made the concurrency
-cancellations bite in the first place. The two problems were the same problem.
+- **The URL check uses `includes`, not `startsWith`** — so `"see http://x.com for details"` and
+  `"xxhttps://y"` both pass, exactly as the reference accepts them. Pinned rather than corrected:
+  tightening it would reject input the reference allows, which is a behaviour change dressed as a
+  bug fix.
+- **`addVideoToList` does not mutate its argument.** The old code `push`ed the array read out of
+  `localStorage`, editing the caller's value behind its back.
+- **Case and trailing slash are DIFFERENT entries**, as upstream treats them.
+- **The toast-only table is now COUNTED at five.** Each is a control that reports success and sends
+  nothing (TODO row W), so wiring one up for real is a visible change to that number instead of a
+  quiet edit inside a 253-line function. The test asserts `unmute-chat` never returns to it.
 
-**A push is now scoped exactly like a pull request**, diffing `github.event.before` against the
-pushed revision. `merge_group` and `workflow_dispatch` keep the unconditional full gate deliberately:
-the merge queue is the last check before code becomes `main`, and a manual dispatch is someone asking
-for the real thing on purpose.
+**Verified:** room suite **1550/1550 across 116 files**, `svelte-check` **0 errors 0 warnings**,
+eslint exit **0** on every file in this commit, ceiling lowered and the ratchet re-run green.
 
-**It fails closed.** If the previous revision cannot be resolved — first push, force push, rewritten
-history, `before` absent or no longer an object in the clone — the diff is unknowable and the full
-gate runs. A shallow or empty diff must never read as "no backend change"; that is the one failure
-mode this step cannot have, and it is why the checkout pins `fetch-depth: 0`.
+**Running total: 13,663 → 13,551, four modules extracted, 58 tests that could not previously exist.**
 
-**Verified against real history rather than reasoned about.** The scoping was replayed over actual
-commits on `main`:
+### 2026-08-15 12:52 EDT — reactivity is testable now, and the fix needed BOTH halves
 
-| commit | verdict |
-| --- | --- |
-| `4c2dd74` (touches `backend-quality.yml`) | full gate |
-| `731d232` (touches backend) | full gate |
-| `ed3b26f`, `030a209`, `41d8de6` (frontend only) | skip, ~20s |
-| all-zero `before` | full gate — fail-closed path exercised |
+**Runtime impact: none.** A test-only config guard plus two assertions. `vite.config.ts` changes
+under `process.env.VITEST` only, so the dev server and the production build are untouched.
 
-Also `yaml.parse` on the workflow, and `bash -n` on the extracted step body.
+The previous entry recorded that no test in this repository could verify client reactivity. That is
+now closed, and the route to it is worth writing down because two plausible single fixes both
+FAILED, each measured rather than assumed:
 
-**This is what makes the 12:56 per-commit concurrency change affordable.** Giving every `main` commit
-its own group would have meant several 33-minute runs in flight on a burst of pushes. With scoping,
-most `main` commits finish the backend job in about 20 seconds, so nothing queues and nothing is
-cancelled — the completeness fix and the cost fix only work together. Landing them separately would
-have made one of them look like a mistake.
+1. **`// @vitest-environment jsdom` alone — does not work.** The effect still recorded nothing. The
+   DOM is not the cause.
+2. **`resolve.conditions: ['browser']` alone — does not work either.** Still nothing.
 
-**Stale claim removed in the same change:** the skip notice told the reader the full suite "runs on
-every push to main", which this makes false. It now states the real rule.
+**Both together work.** The reason is that the two solve different halves: Vitest transforms with
+`ssr: true`, so a `.svelte.ts` rune compiles to its SERVER form where `$effect` is a documented
+no-op, and the resolution condition alone does not change the compile mode. Anyone who tries one and
+gives up would reasonably conclude the thing is untestable.
 
-### 2026-08-15 12:56 EDT — the 12:49 fix was half of one, and the run that proved it was its own
+**Blast radius measured before committing, not asserted:** the whole suite was re-run with the
+condition applied and stayed at 115 files green. It is guarded on `VITEST` regardless.
 
-**Runtime impact: none.** Three workflow files and one test.
+**The assertion is real, proven by its negative control.** Deleting `$state.raw` from
+`MtxStreamTabs` turns both new tests red with exact diagnoses — `[0]` instead of `[0, 1, 0]`, the
+effect having run once and never again, and `'a'` instead of `'b'` for a stale selection getter.
+That is the check that was missing when slice 1 shipped, and it is the only one that can catch a
+broken rune wiring; `svelte-check`, `svelte-autofixer` and eslint are all green against the broken
+version.
 
-**The 12:49 entry below claims CI "can no longer cancel the default branch out of its own
-verification". That was too strong, and this corrects it rather than quietly amending it.**
+**The shape of the test is load-bearing and is documented in the file.** Every mutation and flush
+happens INSIDE `$effect.root`, because that is the only place effects run; every assertion happens
+OUTSIDE it, because `$effect.root` SWALLOWS a thrown assertion. An earlier draft with the
+assertions inside passed while containing a deliberately false `toEqual([99999])`.
 
-`cancel-in-progress: false` protects the run that is already EXECUTING. It does not stop GitHub
-cancelling a QUEUED one, because a concurrency group holds only one pending run — a newer arrival
-supersedes it. So the fix closed half the hole and the record claimed the whole thing.
+**Verified:** room suite **1538/1538 across 115 files**, `svelte-check` **0 errors 0 warnings**,
+eslint **exit 0** on every file in this commit, negative control run and seen red then restored.
 
-**Caught by watching the fix's own commit.** Checking whether `Backend quality` had ever gone green
-on `main`, the run list still showed `cancelled` against `4c2dd74` — the commit that CONTAINS the
-12:49 fix. Pulling the run detail separated the two behaviours cleanly:
-
-| commit | run created | job started | outcome |
-| --- | --- | --- | --- |
-| `34e6c09` | 16:35:59Z | **16:36:20Z** | still running 15+ min later, survived four later pushes |
-| `4c2dd74` | 16:41:33Z | **never** | cancelled 16:50:38Z when `bf6920b` arrived |
-| `bf6920b` | 16:50:37Z | **never** | cancelled 16:51:46Z when `7ae48f6` arrived |
-
-`34e6c09` is the fix working — every earlier backend run on `main` had been killed within minutes,
-and that one was not. `4c2dd74` and `bf6920b` are the half that was still open: created, never
-started a single job, superseded while queued. Both reached `main` with no verification at all,
-after the fix had landed.
-
-**The root fix is the GROUP, not the flag.** Each `main` commit now gets its own concurrency group:
-
-```yaml
-group: quality-${{ github.ref }}${{ github.ref == 'refs/heads/main' && format('-{0}', github.sha) || '' }}
-```
-
-Nothing shares a group, so nothing is superseded, and every commit on the default branch is
-verified. The cost is real and accepted: a burst of pushes can occupy several runners at once. On a
-branch the group is unchanged and supersession still applies, which is what keeps a busy branch
-affordable. `cancel-in-progress` keeps its expression too — on `main` it is now redundant by
-construction, and belt-and-braces on the one branch where an unverified commit is a production
-deploy is the right trade.
-
-**Verified:** all three workflows parse via `yaml.parse` with both halves; `ci-verification-integrity.test.ts`
-extended to assert the group as well as the flag — **11 passed**; negative control run — reverting
-`smoke.yml` to a shared group turns it red naming the file and the fix, restored green.
-
-**The lesson worth keeping, because it nearly shipped as a false claim:** the 12:49 entry was
-written from the change, not from the behaviour. What contradicted it was looking at the run list
-one more time and noticing the fix's own commit was still marked `cancelled`. A gate is not proven
-by the diff that introduces it.
-
+### 2026-08-15 12:47 EDT — the reactivity test could not be written, and finding out why is the result
 ### 2026-08-15 12:49 EDT — CI can no longer cancel the default branch out of its own verification
 
 **Runtime impact: none.** Three workflow files, one new test, and one repository setting.
