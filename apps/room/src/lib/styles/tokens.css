@@ -165,6 +165,15 @@
   --split-gutter-horizontal-image: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAB4AAAAFCAMAAABl/6zIAAAABlBMVEUAAADMzMzIT8AyAAAAAXRSTlMAQObYZgAAABRJREFUeAFjYGRkwIMJSeMHlBkOABP7AEGzSuPKAAAAAElFTkSuQmCC');
   --split-gutter-vertical-image: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAUAAAAeCAYAAADkftS9AAAAIklEQVQoU2M4c+bMfxAGAgYYmwGrIIiDjrELjpo5aiZeMwF+yNnOs5KSvgAAAABJRU5ErkJggg==');
   --success: #00bc8c;
+  /*
+   * The Swing Trade Alerts accent — the ONE literal colour on that path.
+   *
+   * `#08668e`, used by both headings (`.swing-alerts-container h4`, component style byte 2,024,836)
+   * and the CSV button (`.download-swing-trades-btn`, byte 2,022,363). It is not a Bootstrap
+   * utility and it is in no stylesheet outside `app-presentationarea`'s own component block, so it
+   * is transcribed here rather than left hardcoded in two component files.
+   */
+  --swing-alerts-heading-bg: #08668e;
   --tab-active-bg: #222;
   --tabs-border-color: #444;
   --tabs-color: #fff;

@@ -406,6 +406,21 @@ export const ROOM_VISIBLE_SETTINGS = [
     infrastructure, the room bundle never reads either, and the room reaches its MediaMTX host
     through `STREAM_SERVER_MTX` on the server rather than through a cluster id in the browser.
   */
+  /*
+    "Enable Swing Trade Alerts Tab?" — "If enabled, the room will have swing alerts tab."
+
+    The entitlement for the Swing Alerts feature, added 2026-08-15 with the pane that reads it. The
+    room resolves it once as `sessData.hasSwingTradeAlerts` and gates three things on it: the nav
+    `li`, the `#swingAlerts` pane, and the initial `getSwingAlertsLog` fetch. Absent means absent —
+    the reference emits `-1`, so a room without it renders no markup at all rather than hidden
+    markup, and the room's own load skips the table entirely.
+
+    `linkedRoomSwingAlertsOther` is deliberately NOT here beside it. Upstream, a non-empty value
+    makes the room fetch ANOTHER room's swing log by substituting that room's sessionID. The room
+    takes its room from the session row so that no value the browser can reach names the room being
+    read; allow-listing this one would put a cross-room read back behind a settings field.
+  */
+  'hasSwingTradeAlerts',
   'useMediaMTX',
   /*
     "Overlay userID on screenshare?" — prints the VIEWER'S OWN `userXrefID` over the video.

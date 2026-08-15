@@ -268,7 +268,18 @@ describe('the allow-list itself', () => {
       useMediaMTX:
         '+page.svelte — `hideStreams = !useMediaMTX`, applied to BOTH the #streams-tab li and the #streams pane, exactly as app-presentationarea.full.js:2293 and :5357/:5388 do. This is the whole Streams tab: without it the room hid the tab in every room, MediaMTX or not',
       overlayUserIdOnScreenshare:
-        'StreamingView.svelte — the `span.overlay-userID-container` printing the viewer’s own userXrefID over the video, gated on this AND !isPresenter (TCe, main bundle byte 1901148)'
+        'StreamingView.svelte — the `span.overlay-userID-container` printing the viewer’s own userXrefID over the video, gated on this AND !isPresenter (TCe, main bundle byte 1901148)',
+      /*
+        THE THIRD PLACE, as the note above records — added here in the same change that put the name
+        on `ROOM_VISIBLE_SETTINGS` and on `ROOM_CONSUMED`, rather than being found red later.
+
+        Verified in the room before being written here: `swingAlertsTabVisible` is imported by
+        `+page.svelte`, where `swingAlertsEnabled` gates the `#swingAlerts-tab` li AND the
+        `#swingAlerts` pane, and by `+page.server.ts`, where it gates the initial log read and all
+        three mutations. The pane re-applies it so the component renders nothing on its own.
+      */
+      hasSwingTradeAlerts:
+        'swingAlertsTabVisible() — the Swing Alerts tab, the #swingAlerts pane, the initial getSwingAlertsLog read and the three mutations, all on one flag'
     };
     expect(Object.keys(consumers).sort()).toEqual([...ROOM_VISIBLE_SETTINGS].sort());
   });

@@ -170,6 +170,39 @@ export function ensureDatabase() {
       ON note_versions(note_id, version);
     CREATE INDEX IF NOT EXISTS note_versions_note_created_idx
       ON note_versions(note_id, created_at);
+    /*
+      Swing Trade Alerts. Room-scoped from the first line rather than by a later ALTER, so it is
+      deliberately NOT in the ROOM_SCOPED_TABLES backfill below: there is no pre-room row to
+      rescue, and that loop's single-column index would only duplicate the leading column of the
+      composite one created here.
+
+      The three price columns are TEXT on purpose — see the swingAlerts comment in schema.ts.
+      They are verbatim transcriptions of what a presenter typed into a text input, nothing
+      computes with them, and rounding them into cents would change what the table shows.
+
+      NO BACKTICKS ANYWHERE IN THIS COMMENT. It sits inside a template literal, so one backtick
+      ends the SQL string and the rest of the schema becomes an expression — which is exactly what
+      happened on the first draft, and svelte-check reported it as eight unrelated type errors.
+      Same family as the rule about template syntax in a Svelte comment.
+    */
+    CREATE TABLE IF NOT EXISTS swing_alerts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      room_short_code TEXT NOT NULL,
+      symbol TEXT NOT NULL,
+      direction TEXT NOT NULL,
+      entry_price TEXT NOT NULL,
+      stop TEXT NOT NULL,
+      target TEXT NOT NULL,
+      image TEXT NOT NULL DEFAULT '',
+      sender_id INTEGER NOT NULL REFERENCES users(id),
+      sender_name TEXT NOT NULL,
+      entry_date INTEGER NOT NULL,
+      alert_id INTEGER REFERENCES alerts(id),
+      deleted_at INTEGER,
+      deleted_by_id INTEGER REFERENCES users(id)
+    );
+    CREATE INDEX IF NOT EXISTS swing_alerts_room_entry_idx
+      ON swing_alerts(room_short_code, entry_date, id);
     CREATE TABLE IF NOT EXISTS chat_mutes (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       target_user_id INTEGER NOT NULL REFERENCES users(id),
@@ -245,6 +278,22 @@ export function ensureDatabase() {
   }
   if (!sharedFileColumns.has('uploaded_by')) {
     sqlite.exec('ALTER TABLE shared_files ADD COLUMN uploaded_by INTEGER REFERENCES users(id)');
+  }
+
+  /*
+    `swing_alerts.alert_id` — the mirrored feed message.
+
+    Guarded rather than assumed, because the table shipped one step before the mirror did and this
+    bootstrap is forward-only: a database created in between has the table without the column, and
+    `CREATE TABLE IF NOT EXISTS` above will not add it.
+  */
+  const swingAlertColumns = new Set(
+    (sqlite.pragma('table_info(swing_alerts)') as Array<{ name: string }>).map(
+      (column) => column.name
+    )
+  );
+  if (swingAlertColumns.size > 0 && !swingAlertColumns.has('alert_id')) {
+    sqlite.exec('ALTER TABLE swing_alerts ADD COLUMN alert_id INTEGER REFERENCES alerts(id)');
   }
 
   // `sessions` predates the handoff, so the room a session belongs to is a late column.

@@ -7,10 +7,14 @@
 // By type: text 35, combodate 1, select 2, textarea 84, checkbox 141, number 5, html 1.
 // By section: room-form 3, sso-setup 1, settings 264, branding 1.
 // 154 extracted settings had a captured value; 114 were unset.
-// roomType has no captured value because its editor is absent from rendered evidence.
+// roomType has no captured value because its editor sits inside an HTML comment in the
+// served DOM (byte 2,377) — PRESENT in the evidence, just not rendered as a control. Said
+// precisely because "absent from evidence" is the phrasing that makes the next reader search,
+// find nothing, and conclude the reference lacks the field. It does not: the property is live,
+// and ng-show="sess.roomType=='webinar'" reads it at byte 2,652 to reveal the Date row.
 //
 // `wired` is the honest bit: false means the controller can store the value but
-// nothing in the room reads it yet. 58 of 269 are wired today.
+// nothing in the room reads it yet. 59 of 269 are wired today.
 // Flip one to true ONLY when a consumer exists, so the UI can mark the rest
 // instead of pretending they do something.
 
@@ -134,7 +138,7 @@ export const ROOM_SETTINGS: readonly RoomSettingDef[] = [
   { name: "pairOKRedirect", section: "settings", type: "textarea", label: "Pair OK Redirect", help: "Where to send users if the pairing succeeds", helpShape: "muted", helpOutside: true, captured: null, capturedIsDisplayOnly: false, group: null, wired: false },
   { name: "pairErrorRedirect", section: "settings", type: "textarea", label: "Pair ERROR Redirect", help: "Where to send users if the pairing fails", helpShape: "muted", helpOutside: true, captured: null, capturedIsDisplayOnly: false, group: null, wired: false },
   { name: "hideChatAlerts", section: "settings", type: "checkbox", label: "Hide Alerts/Chat Section?", help: "If enabled, the room will not have chat/alerts. Just media.", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: true },
-  { name: "hasSwingTradeAlerts", section: "settings", type: "checkbox", label: "Enable Swing Trade Alerts Tab?", help: "If enabled, the room will have swing alerts tab.", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
+  { name: "hasSwingTradeAlerts", section: "settings", type: "checkbox", label: "Enable Swing Trade Alerts Tab?", help: "If enabled, the room will have swing alerts tab.", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: true },
   { name: "hasDayTradeAlerts", section: "settings", type: "checkbox", label: "Enable Day Trade Alerts Tab?", help: "If enabled, the room will have day trade alerts tab.", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
   { name: "usersPublicReply", section: "settings", type: "checkbox", label: "User Public Reply?", help: "If enabled, regular user will be able to do reply", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
   { name: "chatDisabledForTrials", section: "settings", type: "checkbox", label: "Chat Disabled For Trials?", help: "If its set, auto disable the chat (chat disabed) if they are trials", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },

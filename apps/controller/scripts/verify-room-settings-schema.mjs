@@ -13,10 +13,16 @@ const GENERATOR = resolve(SCRIPT_DIR, 'extract-manage-schema.mjs');
 const CANONICAL_SCHEMA = resolve(REPO_ROOT, 'src/lib/room-settings-schema.ts');
 
 /*
-  Eleven consumed by this repository's room-login page, FORTY-FIVE by the room application
+  Eleven consumed by this repository's room-login page, FORTY-SIX by the room application
   through `internal/room-config/[code]`, and six by the WordPress SSO door at `(public)/sso/[code]`.
   `allowUsersToChangeUsername` is on the first two lists, and so now are `showPasswordField`,
-  `usernameInstructions` and `hasRequiredPhoneInLogin`, so the union is 58.
+  `usernameInstructions` and `hasRequiredPhoneInLogin`, so the union is 59.
+
+  45 -> 46 on 2026-08-15: `hasSwingTradeAlerts` joined with the Swing Trade Alerts pane. One flag is
+  the whole feature — the nav item, the pane and the initial log fetch all collapse to nothing
+  without it. Its sibling `linkedRoomSwingAlertsOther` stays unwired deliberately: it redirects the
+  log fetch at another room, and the room takes its room from the session row so that nothing the
+  browser can reach names the room being read.
 
   43 -> 45 on 2026-08-14: `useMediaMTX` and `overlayUserIdOnScreenshare` joined with the Streams
   pane. The first IS the Streams tab — the room derives `hideStreams` by negating it and hides both
@@ -134,7 +140,17 @@ const EXPECTED_WIRED_SETTINGS = [
     non-presenters. Their manage-page neighbours, the two MediaMTX cluster ids, stay unwired.
   */
   'useMediaMTX',
-  'overlayUserIdOnScreenshare'
+  'overlayUserIdOnScreenshare',
+  /*
+    Added 2026-08-15 with the Swing Trade Alerts pane. One flag IS the feature: the nav item, the
+    `#swingAlerts` pane, the initial `getSwingAlertsLog` read and all three mutations are gated on
+    it, and a room without it renders no markup at all rather than hidden markup.
+
+    `linkedRoomSwingAlertsOther` stays unwired beside it, deliberately: upstream it redirects the
+    log fetch at ANOTHER room, and this room takes its room from the session row so that nothing the
+    browser can reach names the room being read.
+  */
+  'hasSwingTradeAlerts'
 ].sort();
 
 const fail = (message) => {

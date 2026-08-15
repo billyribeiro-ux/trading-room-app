@@ -160,6 +160,7 @@ describe('page load contract', () => {
         "sessionHandle",
         "settings",
         "streamRead",
+        "swingAlerts",
         "user",
       ]
     `);

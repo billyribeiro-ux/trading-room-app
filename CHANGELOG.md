@@ -24,6 +24,493 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-15
 
+### 2026-08-15 07:04 EDT — the audit found three more features nobody had decoded
+
+**Runtime impact: none.** One new spec, one NEW-TODO section.
+
+`audit-feature-coverage.mjs` was written because Swing and Day Trade — two entire presentation-area
+tabs — had been in the captured bundle from day one with nothing ever ENUMERATING the reference's
+features. Re-running it after the Swing build reported **47/88 wire commands present, up from
+41/88**, and 152 missing identifiers, down from 163.
+
+Four of the missing commands were alert-related, and **all four returned zero hits across `docs/`,
+`TODO.md` and `NEW-TODO.md`** — no spec, no row, no mention anywhere in the project:
+`alertMsgLater` (1 occurrence), `getScheduledAlerts` (3), `removeScheduledAlert` (4),
+`updateAlertFilter` (6).
+
+Reading those four regions turned up **three separate features**, now specified in
+`docs/decoded/alert-scheduler-filter-labels.md` and tracked as NEW-TODO Part 5. Same failure mode as
+Swing, caught by the same mechanism, eleven hours later.
+
+**1. Alert Scheduler** — `sessData.hasAlertScheduler`, an entitlement flag that is in NO existing
+spec and NOT in `room-settings-schema.ts`. Three commands, a modal table, and repeat semantics. The
+trap: **`ignoreWeekends` is not the checkbox value** — it is sent as
+`"daily" === repeatScheduledAlert && ignoreWeekends`, so a weekly repeat always sends `false`.
+
+**2. Alert Filter** — per-viewer filtering of the alerts feed. **The server owns the filtering**: the
+client sends its selection and re-fetches the alerts log from page zero, and never filters in the
+browser. `preferences.showAlertsFrom` **inverts the whole meaning** — the same selection is an
+allow-list when true and a deny-list when false, so treating it as a display toggle gets the
+semantics backwards.
+
+**3. Alert Labels** — **not a wire feature at all**; `getAlertLabels`, `saveAlertLabels`,
+`updateAlertLabels` and `hasAlertLabels` are all 0 occurrences. `sessData.alertLabels` is a **string
+containing JSON**, trimmed and parsed; `sessData.chatTabsWithBadges` uses the identical shape.
+`processAlertLabels` puts a newline after the last label and a space after the others, and **clears
+every checkbox as a side effect of formatting**.
+
+**Verified:** every offset opened and read, never concluded from a search. Six verbatim strings
+re-counted with python `.count()` — `" Unselect All "`, `" Select All "`, `" Save"`, `"no weekends"`,
+`"Alert scheduled OK."`, `"Please enter some alert text..."`. One byte offset corrected during
+review: the `alertLabels` initialiser statement starts at 981,181, while 981,186 is where the
+identifier begins.
+
+**Honest gaps, recorded rather than filled:** the manage-page control for `hasAlertScheduler` was not
+located and is not invented; the three `ngClass` class names on the repeat badge live in a const
+table that was not decoded; the scheduled-alerts modal's own 27-declaration layout was not decoded;
+and what the server does with `sendLaterAsNick` / `sendLaterAsEmail` / `dontCrossPost` is not in the
+bundle.
+
+**The operational lesson, and it is the reusable one: run `audit-feature-coverage.mjs` after every
+feature lands.** Twice now it has found whole features that no amount of spec-reading would have
+surfaced, because a spec only describes what somebody already thought to look for.
+
+### A note on this entry
+
+It was nearly lost. The script that writes these used an f-string, and the literal braces in a JSON
+payload example were read as a format field — the entry silently did not get written while the
+commit went ahead regardless. Fixed by not interpolating the body at all. Recorded because a
+CHANGELOG that fails open is worse than one that fails loudly.
+
+
+### 2026-08-15 06:53 EDT — the four collector defects the capture exposed, fixed
+
+**Runtime impact: none.** Console tooling only.
+
+`docs/decoded/control-plane-capture.md` §H recorded six defects the 06:47 run exposed. Four are
+fixed here; the remaining two are environmental notes, not code.
+
+**1. `paneOf()` was not per-pane, and that is the one that mattered.** It used
+`heading.closest('.panel, …')`. All four account headings are `div.app > h3` and their nearest
+`.panel` ANCESTOR is one shared container, so all four `panel` objects came back deep-equal — one
+object stored four times, about 17.7% of a 118,757-byte file, with the per-pane structure the
+capture was taken for entirely absent. **Nothing in the output said so.** Four populated objects
+look like four panes.
+
+The fix is evidence-based rather than guessed: in the rendered account page the headings sit at
+lines 492, 611 and 672 and the panes at 586, 613 and 675, so each pane FOLLOWS its heading and none
+contains it. The walk now goes forward through siblings, `closest()` survives only as a last resort
+labelled `MAY BE SHARED BETWEEN PANES`, and `strategy` records which one answered.
+
+**A safety net independent of that fix** compares the serialised panels and emits a gap naming both
+panes when any two are identical, plus `panes.distinctPanelsCaptured`. It was only found last time
+because an agent computed deep-equality across the whole file; nobody should have to do that again
+to know whether a capture is real.
+
+**2. Silent truncation.** `html` was cut at exactly 4,000 chars and `text` at 300 with no ellipsis
+and no marker, so a truncated field was byte-indistinguishable from a complete one — the exact
+defect `collect-manage-gaps.js` exists to fix in ITS predecessor, whose header calls silent
+truncation "the worst kind" of failure. Now marked with the ORIGINAL length, so a reader can tell
+how much is missing rather than only that something is.
+
+**3. `matchingRules` had three faults at once.** Every `styles.css` rule was stored twice (the sheet
+appears more than once in `document.styleSheets` and nothing deduplicated); rules nested inside
+`@media` were never walked at all, because a grouping rule has no `selectorText` and the loop skipped
+it along with everything inside — so **every responsive rule on the page was invisible**; and matches
+are now keyed on href+conditions+selector+css, with the enclosing condition text recorded so a rule
+that only applies at some width cannot be mistaken for an unconditional one.
+
+**4. The unreadable stylesheets were never NAMED.** The capture said "2 stylesheet(s) are
+cross-origin" and gave no href, so there was no way to tell an unreadable sheet from a sheet whose
+rules simply did not match — and it mattered, because no `bootstrap.min.css` rule appears anywhere
+in that file. Now collected by href into `provenance.unreadableStylesheets` and named in the gap
+text.
+
+Also: `heading` objects now carry `rules`. They had 10 keys where panels had 11, so heading CSS was
+uncaptured purely because `withRules` was never passed.
+
+**Verified:** smoke **24 assertions across four runs**, all green; negative control on the truncation
+marker goes red on exactly that assertion and is restored byte-identically; `node --check`; prettier
+clean. **Not run:** the full gate — nothing under `src/` changed.
+
+**Left as notes, not code:** the UA/viewport mismatch (Android Pixel 9 UA at 1989 px — emulation, so
+no rect in the 06:47 capture is desktop truth) and the duplicate `/dashboard` registration by
+`app.dashboard` and `app-dock.dashboard`, which is genuine in the reference and not a capture error.
+
+
+### 2026-08-15 06:48 EDT — the control-plane capture, decoded end to end, and the collector leaked a live credential
+
+**Runtime impact: none.** One new document plus two fixes to console tooling.
+
+The collector was run on the live reference and `docs/decoded/control-plane-capture.md` (272 KB,
+1,244 lines) decodes **all 118,757 bytes / 2,766 lines** of what came back. Six agents each read one
+slice in full; a seventh swept the whole file for anything nobody opened. **418 facts, every one
+carrying its JSON path.**
+
+**The question §D could not answer is now answered.** 31 states are registered in this build and not
+one is an operator surface. The census ran three positive controls which all hit — `session` 20,
+`user` 61, `room` 33 — so the zeros are real absence, not a broken search. §D searched captures taken
+as one tenant owner and correctly said the control plane "cannot be matched, only designed"; a DOM
+capture simply cannot separate *there is no console* from *this account cannot see one*. A
+single-page app registers every screen it can ever show at boot, before it knows who you are, so the
+registry separates them. It holds only tenant-level states.
+
+**The strongest finding is a different one.** `states[*].data` is `null` on **all 31 states, zero
+exceptions** — no `requiresAuth`, no role, no permission tag, no title. **The reference expresses no
+authority at all in its router.** There is no route-level role model to copy, and looking for one is
+wasted effort.
+
+---
+
+### 🔴 The collector wrote eight live JWTs to disk
+
+301 characters each — header, payload **and signature** — in
+`panes.{apiKeys,badges,extraAdminUsers,sessions}.panel.html`, arriving via the Launch anchor
+`ng-href="/session?id={{s.uuid}}&jwtSite={{tokSite}}"` (`views/page.welcome.html:379-381`). The
+payload also base64-encodes the owner's name, email and user id.
+
+The redaction masked emails and 24-hex ids. **A JWT is base64url — no `@`, segments not hex — so it
+matched neither and walked straight through.** `.gitignore` already warned that captures contain "in
+some cases a live JWT"; the warning existed and the script leaked one anyway, which is precisely the
+argument for masking at CAPTURE time instead of trusting whoever handles the file later.
+
+Fixed with two overlapping patterns so the next unpredicted shape is still caught: `maskJwt` for the
+shape, and `maskTokenParams` for any query parameter whose NAME contains jwt/token/key/secret/sig/auth
+regardless of its value. **Asserted against the RAW serialised output, not a named field** — the leak
+did not arrive through a field anybody was watching, it came via `describe().html`, so checking named
+fields would have missed it exactly the way the redaction did.
+
+The capture file is **not** in this repository and must not be. Every value in the new document is
+redacted — JWTs, emails, 24-hex ids, token-shaped parameters — re-verified against the file as
+written to disk: 0, 0, 0.
+
+---
+
+### The second collector defect: the exemption disarmed one guard of two
+
+All five Sessions clicks were refused with `matched: "New"`. `EXEMPT_NG_CLICK` correctly disarmed the
+handler clause and then the WORD denylist fired, because `splitCamel` turns
+`showNewRoom=showNewRoom+1;` into "show New Room=show New Room+1;" and `new` is a deny word. The New
+Room reveal never happened, so its markup is missing from the capture.
+
+Three green smoke runs missed it because **every shape in that file was built to prove a REFUSAL** —
+no run ever exercised the exemption path. A guard suite that only tests refusals cannot see a guard
+that refuses too much. Run D now clicks the exempt expression and asserts 5 delivered, 0 refused.
+
+**Negative controls, both run and both reverted byte-identically:** reverting the short-circuit
+reproduces the live failure exactly (`clicksDelivered=0, refusals=5, matched "New"`); reverting
+`clean()` makes only the two redaction assertions go red.
+
+---
+
+### Six further defects the sweep exposed, recorded in §H of the document
+
+A tool's artefacts read exactly like the site's properties once they are in a JSON file, so they are
+written down rather than quietly fixed:
+
+- **`paneOf()` is not per-pane** — all four `panes.*.panel` objects are deep-equal, one shared
+  ancestor stored four times. About **17.7% of the file is duplicated content** and the per-pane
+  structure is absent. The `heading` objects are genuine.
+- **Silent truncation** — `html` capped at exactly 4,000 chars and `text` at 300, with no marker.
+  The same defect `collect-manage-gaps.js` exists to fix, and whose header calls it "the worst kind".
+- **Every `styles.css` rule stored twice** in every `rules` array; no `bootstrap.min.css` rule ever
+  appears, so the Bootstrap cascade is uncaptured.
+- **Headings carry no `rules` key** — `withRules` was never passed for them.
+- **UA says Android Pixel 9 mobile; viewport is 1989 px wide** — emulation or a spoofed UA, so no
+  rect here is desktop truth.
+- **`app.dashboard` and `app-dock.dashboard` both register `/dashboard`** — a genuine duplicate in
+  the reference, not a capture error.
+
+**Verified:** smoke 20/20 across four runs; both negative controls run and reverted; `node --check`;
+prettier clean; redaction re-verified on the written document. **Not run:** the full gate — nothing
+under `src/` changed.
+
+
+### 2026-08-15 02:36 EDT — Swing Alerts audited as chief architect, not accepted on report
+
+**Runtime impact: none from this entry** — one comment correction in `apps/room/eslint.config.js`.
+The Swing feature itself is the entry below.
+
+The build reported green. `docs/BUILD-AUDIT.md` exists because a build report is a CLAIM, so every
+line below was executed here rather than read from the agent's transcript.
+
+| check | result |
+| --- | --- |
+| Did it edit the spec it was built from? | `docs/decoded/swing-alerts.md` **+27 / −0** — additive only, nothing rewritten |
+| The two offsets it added | **1,983,262** and **1,987,319** opened and read: both exact |
+| `editAlertMessageSwing` / `editAlertMessageDayTrade` in the bundle | **2 / 0** — the shared-name claim holds |
+| `editAlertMessageDayTrade` in our code | 2 hits, both **warnings in comments**, not an invented command |
+| All six wire literals | match the bundle character for character |
+| Every repository query | room predicate present; all three mutations are one atomic conditional `UPDATE … WHERE … RETURNING`, no SELECT-then-UPDATE |
+| Where `room` comes from | `requireRoomShortCode(locals)` in every action; `senderName` from the session. Nothing client-asserted |
+| `alert_questions` delete with no room predicate | **correct** — that table has no room column and is scoped through an `alertId` the same transaction just proved belongs to the room |
+| `svelte-check` after `rm -rf .svelte-kit && sync` | **1046 files, 0 errors** |
+| `pnpm run lint` | clean |
+| `verify-room-settings-schema.mjs` | 268 + 1 deviation = 269 total, 59 wired |
+| `room-config-boundary.test.ts` | 17/17 |
+| `prettier --check` | clean |
+
+**Negative controls run by me, not taken on report.** Both restored and confirmed byte-identical
+with `diff -q`, 19/19 green afterwards:
+
+- `create: 'swingAlertMsg'` → `'newSwingAlertMsg'` — **2 failed / 17 passed**
+- the entitlement gate forced open — **1 failed / 18 passed**, on the case that says it must render
+  NOTHING rather than hidden markup
+
+**Did it weaken any guard to pass?** No. The three test/verifier edits are additive: the wired-count
+expectation moved 58 → 59 because a setting genuinely became wired, and `room-config-boundary.test.ts`
+asserts the consumer map equals `ROOM_VISIBLE_SETTINGS`, so adding the flag FORCED a documented
+consumer entry. No assertion was deleted or loosened.
+
+**`formatSwingAlertTxt` survived intact**, which is the trap most likely to be "tidied": the header
+is `"#SwingTrade \n"` with the space before the newline, and the label **"Exit" renders the STOP
+value**. Not corrected, and commented as deliberate.
+
+**One defect found in the audit and fixed here.** The new eslint ignore comment credited commit
+`19cdc25` with adding both dated capture directories. `19cdc25` added the **v3** one; `37a72c6` added
+**v4**. The lint claim itself is true — `docs/source/**` genuinely does not match
+`docs/source-v4-2026-08-15/**`, both directories predate this work, so the 18,516 errors were
+pre-existing — but a reader running `git show 19cdc25` would have found only half the story.
+Corrected, and the glob left as `source-*` because the next capture will be dated too.
+
+**Not verified, and stated plainly: the pane has never been rendered in a browser.** SSR output and
+assertions are all that stand behind it. The full gate was not run either — the tests covering what
+changed were.
+
+
+### 2026-08-15 02:26 EDT — a collector that asks the application to enumerate itself
+
+**Runtime impact: none.** Two new files under `apps/controller/scripts/`, both console-only tooling.
+
+`docs/decoded/admin-surface.md` §D concluded that the operator/superadmin control plane **cannot be
+matched, only designed** — twelve operator terms return zero across every capture. That conclusion is
+right about the evidence, and it rests entirely on captures taken while signed in as one ordinary
+tenant owner. So it cannot separate the only two possibilities that matter: the product has no
+operator console, or it has one and our account cannot see it. **All eight existing collectors read
+what is on screen, so all eight are blind to that distinction in the same way.**
+
+`collect-control-plane.js` asks a different question. A single-page application must register every
+screen it can ever show at boot, before it knows who you are. In ui-router that registry is
+`$state.get()`, and it lists states this account cannot reach and has no menu entry for. Reading the
+registry separates the two cases in a way no screenshot ever could.
+
+**The framework was confirmed from evidence before a line was written**, not assumed: `ng-app="app"`,
+four nested `ui-view` containers, zero `ng-view`, zero `$routeProvider`, and `$state.includes('page')`
+evaluated live inside an `ng-class` at byte 4,411 of the rendered account page. The script still
+probes for ngRoute and records which one answered, because "the evidence said ui-router" and "this
+build uses ui-router" are different statements.
+
+It also captures what no other collector does: the API-key restrictions control, Marketplace, Extra
+Admin Users, Badges, the Sessions list, account-lifecycle controls, and the server-injected globals —
+including `__disableMarketplace`, which is what actually hides Marketplace and ships as the **string**
+`'true'`, not a boolean.
+
+**Two defects were caught before this could ship, and both are the interesting part.**
+
+**1. The script would have refused its own only click.** The reveal control is not the heading — read
+verbatim at `views/page.welcome.html:333-336` it is a `span` carrying
+`ng-click="showNewRoom=showNewRoom+1;"`, and the guard refuses every element with an `ng-click`. The
+run would have completed, downloaded a file, and reported "New Room did not appear": a clean-looking
+result that was entirely about the tool. Fixed with a single anchored exemption for that exact
+expression. Found by READING the template, which is the only way it could have been found before the
+one trip to the live site.
+
+**2. The guard's own test did not test the guard.** The smoke test asserted the camelCase denylist
+fix by handing it an element with `ng-click="deleteApiKey(k)"`. A negative control — deleting
+`splitCamel` outright — left the suite fully green, because the handler clause was doing all the work
+and the camelCase fix was untested. Run C now uses `class="…deleteApiKeyBtn"` with **no** handler, so
+only `splitCamel` can refuse it. Re-run with `splitCamel` disabled: exactly those two assertions go
+red, everything else stays green.
+
+The design rule the whole thing is built around: **it never concludes that something does not
+exist.** It reports what is REGISTERED in this build and REACHABLE by this account, and the smoke
+test asserts the emitted verdict string cannot claim otherwise. The census runs positive controls and
+marks itself untrustworthy if they fail, because a zero from a broken search and a real absence look
+identical in a JSON file — and the JSON file is all anyone will have.
+
+**Verified:** `node --check`; smoke test 15/15 across three runs; both negative controls run and
+reverted; `prettier --check` clean. **Not run:** the full gate — nothing under `src/` changed.
+
+
+### 2026-08-15 02:23 EDT — Swing Trade Alerts, end to end
+
+**Runtime impact: yes**, but inert until an owner ticks the box. The whole feature is behind the
+per-room `hasSwingTradeAlerts` entitlement, which no room has set; a room without it emits no nav
+item, no pane, no log read and refuses all three mutations. Nothing existing changed behaviour.
+
+Built from `docs/decoded/swing-alerts.md`: the `#swingAlerts` pane, the one form that serves create
+and edit, the eight-column log with its search / limit / CSV strip, the months window, and the
+`swing_alerts` table behind them.
+
+**A swing submit is TWO writes, not one.** `swingAlertMsg` writes the row and `alertMsg` posts
+`formatSwingAlertTxt(…)` into the MAIN alerts feed (bundle byte 1,983,136); edit and delete carry the
+mirror with them. The reference re-finds its own feed message by scanning `alertsLog` for matching
+formatted text, which is linear per edit and silently finds nothing once the feed copy is touched.
+This room records the association as `swing_alerts.alert_id` and does both writes in one
+transaction — same observable behaviour, and it cannot come apart.
+
+**Three traps the decode names, each now pinned by an assertion that was watched going red:**
+
+| trap | why it bites |
+| --- | --- |
+| create is `swingAlertMsg`, **not** `newSwingAlertMsg` | that name is a payload key on the edit command AND the server→client push; two decodes had to correct it |
+| `limitSwingLogs(rows, 0)` returns `[]` | `rows.slice(0, limit \|\| rows.length)` is the tempting rewrite and it inverts the box |
+| the entitlement must render **nothing** | `-1` is "instantiate nothing"; hidden markup tells a member the feature exists |
+
+The three prices are `type="text"` and stored as TEXT, deliberately — no pipe, no `toFixed`, no
+arithmetic anywhere on the path, so the money rule does not reach them and rounding into cents would
+change what a presenter typed. Both the schema and the type say so, at length, because this is the
+edit somebody will otherwise make.
+
+**Two facts added to `docs/decoded/swing-alerts.md`**, each read from the bundle rather than taken on
+report: `editAlertMessageSwing` is shared verbatim by the Day Trade path (only two occurrences in the
+file, 1,983,136 and 1,987,189, differing solely in `swingTradeAlert` vs `dayTradeAlert`), so the port
+must NOT rename it; and the edit branch clears `txtInAlerts` at 1,983,262. Everything else the
+coordinator flagged was already correct in that document and was left alone.
+
+**Controller:** `hasSwingTradeAlerts` joined `ROOM_VISIBLE_SETTINGS`, `ROOM_CONSUMED`, the generated
+schema (regenerated, not hand-edited — 58 → 59 wired) and both duplicate lists that guard them. Its
+sibling `linkedRoomSwingAlertsOther` stays out on purpose: upstream it redirects the log fetch at
+another room, and this room takes its room from the session row precisely so nothing the browser can
+reach names the room being read.
+
+**`pnpm run lint` was already failing** before this work — 18,516 errors, every one inside the two
+minified bundles commit `19cdc25` added as *siblings* of `docs/source/`, which the exact ignore glob
+stopped covering. Widened to `docs/source-*/**`. Not a silenced diagnostic: nothing in those files is
+authored here.
+
+Verified: `svelte-check` 0/0 on a wiped `.svelte-kit`; `eslint .` clean; 19 new assertions plus the
+page-load and room-isolation contracts (32 passed) and the three controller boundary tests (45
+passed); the schema verifier re-run. Three negative controls run and reverted byte-identically. Not
+run: the full suite, and no browser — the pane has not been seen rendered in a real room.
+
+### 2026-08-15 02:09 EDT — the admin surface inventoried, and the control plane is confirmed unmatchable
+
+**Runtime impact: none.** One new document plus a five-line comment correction in a generated header.
+
+`docs/decoded/admin-surface.md` (83 KB) inventories the reference's Manage page, account surface and
+onboarding. I re-derived its three load-bearing numbers myself rather than accept them:
+
+| claim | my independent measurement |
+| --- | --- |
+| 267 live `saveSessField` fields, 9 more inside HTML comments | **267 live / 9 commented / 276 total**, split by masking every `<!-- … -->` region ✅ |
+| 58 of 269 settings wired | **58 `wired: true`, 211 `wired: false`, 269 entries** ✅ |
+| the manage page is 216,609 bytes | **216,609** ✅ |
+
+The 9 comment-only fields are `chatAutoClearTime`, `customRoomURL`, `linkedStreamsToSession`,
+`media_server_audio`, `relay_to_repeaters`, `relay_user_max`, `roomType`, `useV4`, `webinarTZ`.
+**`useV4` appearing there independently confirms the separate v5 finding by a different method** —
+two agents, two techniques, one answer.
+
+**The finding that matters most is a negative one.** Twelve operator-level terms return zero hits
+across every capture, with the search proved sound by a control that does return hits. There is **no
+operator/staff console in any evidence we hold** — the closest artefacts (`modAdminLoginList`, Extra
+Admin Users, `applyToAllSessions()`) are all room- or account-scoped. So the super-admin control
+plane **cannot be matched; it can only be designed.** That is worth knowing before building it, and
+it means the usual "match the reference" bar does not apply to that one surface.
+
+**A trap now written down.** `~/Desktop/new-room/second-dump/db/` is **our own PostgreSQL**, not the
+original's database — verified by reading its README: container `ptr-clone-postgres-1`, database
+`ptr_clone`, PG 17.10, with a `drizzle.__drizzle_migrations` table. Drizzle is our ORM. Treating that
+directory as reference evidence would mean reading our own schema back as though it described the
+original, and the root `CLAUDE.md` line calling `second-dump/**` a capture makes that mistake easy.
+
+**One correction to the agent's headline, and one to my own first reading of it.** The agent called
+`roomType` the single EXTRA-OURS setting. I initially wrote that up as wrong; it is not. The field is
+reference data — `ng-show="sess.roomType=='webinar'"` reads it live at byte 2,652 — while its
+*editor* is commented out at byte 2,377, so shipping an editor for it genuinely is our addition.
+`extract-manage-schema.mjs` already had this exactly right in its own reviewed-deviation comment,
+including a guard that throws if `roomType` ever becomes evidence-extracted.
+
+What was actually wrong was one line of the header that file *emits*: "its editor is absent from
+rendered evidence." The editor is not absent, it is commented out — and "absent from evidence" is the
+precise phrasing that makes the next reader search, find nothing, and conclude the reference lacks
+the field. That is the `st-fileSortBar` failure verbatim. Fixed in the generator, since the schema
+file is generated.
+
+**Verified:** `pnpm schema:extract` re-run — all 269 entries byte-identical, comment-only diff;
+`room-config-boundary.test.ts` **17/17 pass**. **Not run:** the full gate — no application code
+changed.
+
+### 2026-08-15 02:04 EDT — the feature audit was blind to one wire command, and finding it corrected the Swing spec
+
+**Runtime impact: none.** One script and one document. No application code changed.
+
+`audit-feature-coverage.mjs` enumerated client→server commands with a regex over
+`sendServerCommand("…")` — quoted literals only. Measured in the current v4 bundle: **86 send sites
+use a quoted name and exactly one builds its name at runtime**, so the inventory silently
+under-reported the reference by two commands and would have reported full coverage while
+`getSwingAlertsLog` and `getDayTradeAlertsLog` were missing.
+
+The site, read at byte 1,993,765:
+
+```js
+sendServerCommand(`get${e}AlertsLog`, { sessionID: s || globals.sessionID, days: i })
+```
+
+`e` is a parameter, so no pattern can expand it. The two values are pinned in the same expression
+(`"Swing" === e ? 30*swingAlertMonths : 4*dayTradeAlertMonths*7`), which is why the expansions are
+listed by hand — with a **guard that throws if a second runtime-built send site ever appears**, so
+the one hand-maintained list in that file cannot rot silently.
+
+**What the fix then surfaced, which is the actual value here.** With the inventory complete,
+`editAlertMessageSwing` showed as present in the reference and absent from ours. Reading byte
+1,983,136 showed the Swing spec was wrong about the submit path in three ways:
+
+1. **A submit sends TWO commands, not one.** Create sends `swingAlertMsg` *and then* `alertMsg` —
+   a swing alert also posts into the main alerts feed. Edit sends `editSwingAlertMsg` *and then*
+   `editAlertMessageSwing`.
+2. **`newSwingAlertMsg` is also a payload KEY** on `editSwingAlertMsg`, not only a response command
+   name. The string carries two meanings and had already been misread once in this repository.
+3. **`editAlertMessageSwing` is the literal name the Day Trade path uses too** (byte 1,987,189) —
+   only the boolean differs, `swingTradeAlert` vs `dayTradeAlert`. Anyone porting Day Trade later
+   would "obviously" rename it and break it.
+
+Also read verbatim and handed to the build: `formatSwingAlertTxt` (the header is `"#SwingTrade \n"`
+with a space before the newline, and the label **"Exit" renders the STOP value** — not a typo to
+correct), `clearSwingAlertFields` (default direction `"long"`), and `onSwingAlertCancel` (confirms on
+symbol/entry/stop/target/image, deliberately **not** on `alertTxt`).
+
+**Verified:** script re-run, guard exercised, all counts via python `.count()` on the 2,891,205-byte
+bundle. Every byte offset above was opened and read, not searched. **Not run:** the full gate —
+nothing under `src/` changed in this entry.
+
+### 2026-08-15 02:00 EDT — decode gaps closed, and the answers were not in the bundle
+
+**Runtime impact: none.** One new document, `docs/decoded/gaps-closed.md` (62 KB).
+
+The four previous decode agents all read the **JavaScript bundle**. Almost every question they left
+open was a *server-data* or *stylesheet* question, and those answers were in the manage-page HTML
+captures and the browser-computed stylesheets — **three of the sources already inside this
+repository.** The lesson is recorded because it will recur: *when a decode stalls, check whether the
+question is even answerable by the artifact being read.*
+
+What closed, spot-checked by me against the raw bytes rather than accepted from the report:
+
+- **`sessData`** — 268 fields with live values extracted from the manage page, cross-checked against
+  a second room, then censused against the bundle's read side (135 distinct keys, 442 references).
+- **`upload_server` / `cdn_upload_key` are NOT sessData** — hardcoded client constants at bundle byte
+  976,514. **Two live credentials sit in a public bundle**; both are redacted in the document, which
+  I verified by reading the region rather than trusting the claim.
+- **`senderAvt` = `md5(trim(lowercase(email)))`** — derived from the bundle's own `hashEmail` (byte
+  1,026,984, read and confirmed) and its MD5 self-test, without hashing anyone's real email.
+- **`@keyframes flash` was in `styles.ee2a710065b60389.css` in this repository all along** — offset
+  430,183, confirmed. `.animated` has **0** rules in that file, so the class is inert.
+- **The claim "`.fa-` is absent from every capture" was wrong** — FA 4.3.0 and 5.8.1 are both present.
+
+**The negative control that mattered, and why it is recorded.** `swing-alerts.md` cites
+`linkedRoomSwingAlertsOther` at offset 1,993,765; the literal occurs **0** times. Rather than report
+a doc error, the offset was opened — the key is built as `` sessData[`linkedRoom${e}AlertsOther`] ``,
+so the literal can never exist. Stopping at the count would have reported working code as broken.
+**This is the same template-literal blind spot the entry above fixes in the audit script.**
+
+**Three items remain honestly open** and are recorded as gaps, not filled in: the archives HTML body
+(needs one authenticated GET), the mobile PIN's digit count (every captured row has a falsy
+`mobilePairCode`), and — flagged for the owner — **whether `sessData` is redacted per role.** No
+delivered payload exists in any dump, and the client reads `deleteAlertPW`, `roomPublicSecret`,
+`banIPList` and `obsStreamKey` with **no role guard**, comparing `deleteAlertPW` in a browser prompt.
+If the server ships that object whole to members, it is a disclosure bug in the original.
+
 ### 2026-08-15 00:02 EDT — local dev secrets restored, and four "unbuildable" items were not
 
 **Runtime impact: yes, on production configuration** — `API_KEY_ENCRYPTION_KEY` was rotated in Vercel
