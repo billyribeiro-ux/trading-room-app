@@ -13,9 +13,14 @@ on:
 permissions:
   contents: read
 
+# Cancel superseded runs on a BRANCH, never on `main` — the reasoning is in `quality.yml`, and this
+# job is the one it cost the most. EVERY run of this workflow on `main` in the 2026-08-15 sequence
+# was `cancelled` before it finished, so the Rust and PostgreSQL security contracts never actually
+# verified a commit on the default branch. This is also the slowest workflow here, which is precisely
+# why it was the one that always lost the race.
 concurrency:
   group: backend-quality-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 env:
   CARGO_INCREMENTAL: '0'

@@ -24,52 +24,56 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-15
 
-### 2026-08-15 12:47 EDT — the reactivity test could not be written, and finding out why is the result
+### 2026-08-15 12:49 EDT — CI can no longer cancel the default branch out of its own verification
 
-**Runtime impact: none.** One new test file, six assertions. No source changed.
+**Runtime impact: none.** Three workflow files, one new test, and one repository setting.
 
-Slice 1 (`room-mtx.svelte.ts`) shipped with **no test at all** — the audit's own finding against my
-work. `MtxStreamTabs` is a class holding `$state.raw` behind getters, and it landed on
-`svelte-check` clean, `svelte-autofixer` clean, eslint clean and a green suite. None of those can
-see whether reading `mtx.streams` actually re-runs when a stream arrives.
+Closes both items the 12:24 entry below left open. That entry says they "need the owner" — they got
+the owner, and this supersedes it. **`TODO.md` is the current record; the section there is now
+marked CLOSED with the verification.**
 
-Six value assertions now cover the transitions. **The reactivity assertion could not be written,
-and that is the real result of this pass.** Diagnosed rather than assumed:
+**1. `cancel-in-progress` no longer applies to `main`** — `4c2dd74`, PR #43. All three workflows now
+read `cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}`. On a branch, cancelling a
+superseded run is right: a new push makes the previous run irrelevant, and a slow job restarting
+from zero on every push means nothing is learned. On `main` it inverts — a run there is not a
+preview of a merge, it is the only verification a production deploy ever gets.
 
-- `vite.config.ts` has no `resolve.conditions: ['browser']` under VITEST, which the official
-  testing guidance requires for tests exercising runes.
-- Every existing "render" test in this suite imports `render` from **`svelte/server`**. The suite
-  runs SSR, where `$effect` is a documented no-op.
+Measured rather than argued: **11 of the last 40 runs on `main` were `cancelled`, 27%**, including
+EVERY `Backend quality` run in the 2026-08-15 sequence — `4a79203`, `c1ff436`, `5f03e5f`, `731d232`,
+`b267143`, `a84f20f`, `41d8de6`, `ffa410d`, `030a209`, `ed3b26f`. The Rust and PostgreSQL security
+contracts on a multi-tenant fintech application had, in practice, never verified a commit on the
+default branch. It is also the mechanism that let `060ba72` break the lint gate: pushed straight to
+`main`, its own run cancelled two minutes later by a PR merge, and the next eight runs failed for a
+reason nobody could attribute.
 
-So an `$effect` inside `$effect.root` here records nothing, throws nothing and reports nothing.
-**No test in this repository can currently verify client reactivity.**
+`apps/controller/src/lib/ci-verification-integrity.test.ts` asserts it, because the correctness of
+this value is invisible by inspection — `cancel-in-progress: true` reads as a sensible optimisation,
+which is why it was written three times, and the failure never appears in the diff that introduces
+it. It appears later as a run that is simply absent. The sweep reads the directory rather than
+naming three files, and strips comments first: prose describing a setting is not the setting, the
+same trap `ci-package-manager-pin.test.ts` already records. Negative control run — reverting
+`smoke.yml` to `true` turns it red naming the file and the fix; restored green.
 
-**Two drafts of that test were written and BOTH were vacuous — caught by deliberate probing, not by
-the gates.** The first mutated and flushed outside `$effect.root` and recorded nothing. The second
-moved the assertions inside the root and went green *with a deliberately false* `toEqual([99999])`
-in it, because `$effect.root` swallows a thrown assertion. Neither was kept: a test that cannot fail
-is worse than no test, which is the rule the size ratchet was built on two hours ago.
+**2. `main` is protected.** `branches/main/protection` returned `404 Branch not protected`; it now
+requires `room quality`, `controller quality` and `Rust and PostgreSQL security contracts`, with
+`strict: false`, force-pushes blocked and deletions blocked.
 
-**A second finding, pre-existing and left alone.** `applySessionMediaState`'s docstring says an
-empty refresh "leaves the previous selection alone rather than clearing it", quoting an upstream
-`&&` guard. Its signature is `(list) => MtxStreamState` — it never receives the previous state — and
-it returns `selectedTabID: null` for an empty list. `mtx-streams.test.ts` already pins that
-behaviour. **The code and its own comment disagree**, and deciding which is right needs the
-reference bundle read at the offsets the comment cites. Not guessed at here; recorded.
+`enforce_admins: false` is deliberate, not an oversight. The owner pushes straight to `main` — the
+documented 2026-08-09 convention — and `enforce_admins: true` would have ended that outright, since
+checks cannot be green on a commit that does not exist yet. What changes is that `gh pr merge`
+refuses on red unless `--admin` is passed, so merging red becomes a deliberate act rather than an
+accident. Reversible with one `gh api -X DELETE`.
 
-My first draft of the empty-list test believed the docstring and asserted `'b'`. It failed, and the
-test was what was wrong.
+**Verified:** all three workflows parse via `yaml.parse` with the new expression; the new test is
+8 passed; controller lint exit 0, `svelte-check` 1524 files / 0 errors, full unit suite 92 files /
+972 passed, prettier clean. `Frontend quality` and `smoke` both `completed/success` on `4c2dd74`.
 
-**Verified:** room suite **1536/1536 across 115 files**, `svelte-check` **0 errors 0 warnings**,
-eslint **exit 0 on the files in this commit**. `eslint .` across the whole app now reports 26 errors
-in untracked, local-only `scripts/… 2.mjs` duplicate files dated Aug 12 — not in any commit, not
-touched here, and stated rather than glossed as green.
+**Two things stated plainly rather than glossed.** PR #43 edits `backend-quality.yml`, which its own
+path filter at line 143 matches, so it correctly took the full ~33-minute backend run — and it was
+merged while that run was still in flight, so it did NOT clear the new protection. The next PR is
+the first real test of it. And `Backend quality` on `4c2dd74` had not finished at the time of
+writing; it is not claimed green here.
 
-**Still open (TODO row AE):** the reactivity gap needs `resolve.conditions` plus a jsdom
-environment. That changes how all 115 test files resolve Svelte, so it is its own commit with its
-own full gate run — not a rider on an extraction.
-
-### 2026-08-15 12:34 EDT — 131 lines that decided what a user reads, and could not be tested
 ### 2026-08-15 12:24 EDT — the frontend gate is GREEN on `main` for the first time
 
 **Runtime impact: one restoration, see below.** Otherwise configuration, a moved parser, a tracked
