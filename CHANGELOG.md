@@ -24,6 +24,89 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-15
 
+### 2026-08-15 11:23 EDT — why `pnpm run lint` passed locally and failed on CI at the SAME commit
+
+**Runtime impact: none.** ESLint configuration and one new test.
+
+**The symptom was a contradiction, and the contradiction was the evidence.** `room quality` reported
+74 errors at commit `7ad52ba`. That same commit, extracted locally with the same `node_modules`, gave
+`EXIT=0` and **0 problems**. Two rules CI called errors — `svelte/no-useless-mustaches` and
+`svelte/prefer-svelte-reactivity` — are set to `'off'` in `eslint.config.js` with fifteen lines
+explaining why, and nothing after that block can re-enable them. Both cannot be true of the same
+file, so one of them was not the same file.
+
+**Ruled out first, by measurement rather than reasoning.** Dependency drift: `node_modules` was
+deleted outright and reinstalled with `pnpm install --frozen-lockfile`. Every version identical —
+`eslint` 10.8.1, `eslint-plugin-svelte` 3.22.0, `globals` 17.9.0, `typescript-eslint` 8.66.0 — and
+lint still `EXIT=0`, rules still `[0]`. Not the cause.
+
+**Root cause, two faults compounding.**
+
+1. **CI was linting a different file, and the runner log says so outright.** `event=pull_request`,
+   and `quality.yml:49-52` pins no `ref:`, so `actions/checkout` uses its default — for a pull
+   request, `refs/pull/N/merge`. The job log reads
+   `HEAD is now at 6ee3729 Merge 7ad52ba… into c1ff436…`. **CI lints the merge; a developer lints
+   their branch.** `060ba72 fix: restrict ESLint to source files only in apps/room` landed on `main`
+   after this branch was cut, and because the branch never touched that file after the merge base,
+   the three-way merge took main's side wholesale. `origin/main` and `6ee3729` are byte-identical
+   for it.
+
+   **This is not merely a merge-ref artifact, and that distinction matters.** The push-event run
+   `31891961241` checked out `5f03e5f` on `main` **directly, with no merge ref**, and produced the
+   same 74 errors. `main` itself is broken; the merge ref only explains why the branch looked clean.
+2. **That commit's config defeats itself.** It moved `js/ts/svelte.configs.recommended` from above
+   the override block to **below** it. In flat config the last entry to match a file wins, so
+   `svelte.configs.recommended` turned both documented-off rules back on — 43 of the 74 errors were
+   for exactly the patterns the comment above them calls deliberate. It also narrowed that block to
+   two `files` patterns, removing the Node and browser globals from every path they missed. `gate/`
+   did not exist when they were written, which produced the other 31.
+
+**The fix is structural, not another pattern in a list.** Presets restored to the top, overrides
+last — which is what flat-config ordering means. The globals block restored to **unscoped**, because
+the ignore list already decides what gets linted and this block only decides what those files may
+reference; for first-party code the answer is the same everywhere. Adding `gate/**` to the pattern
+list would have fixed 31 errors, left the other 43, and guaranteed a repeat the next time a directory
+appeared — measured, not assumed: presets-first with the narrow list produced **598** errors, because
+`scripts/*.js` are not `.mjs` and were missed too, invisible on CI only because that directory is
+untracked there.
+
+**`src/lib/eslint-config-resolution.test.ts` is what makes it stay fixed.** It asserts the RESOLVED
+config via `ESLint.calculateConfigForFile` — the same cascade ESLint applies — not the text of the
+config. A grep for `'off'` would have passed throughout this entire failure; the string was always
+there. Negative control run: re-adding a preset after the overrides turns it red with a message
+naming the cause. DPE rule 4 applied to the one thing here that had a long comment and no enforcement.
+
+**A landmine hit while writing the fix, recorded because it cost a run.** A glob of the `src` +
+double-star shape pasted into a block comment contains the two characters that CLOSE the comment, so
+it terminated early and the remaining prose became code — `SyntaxError: Unexpected token '.'`, ESLint
+refusing to start. The same family as this repository's existing rule against putting Svelte template
+syntax in a comment. Globs are described in words there now.
+
+**Verified:** `eslint .` 0 errors; `svelte-check` 1070 files, 0 errors from a purged `.svelte-kit`;
+full room suite 109 files / 1416 tests passing; `eslint-config-resolution` 4 passed with its negative
+control exercised.
+
+**The systemic finding, which is worse than the config bug.** `060ba72` was pushed straight to
+`main` — a fintech default branch that auto-deploys — and **its own verification run was
+CANCELLED**: `quality.yml:29-31` sets `concurrency: quality-${{ github.ref }}` with
+`cancel-in-progress: true`, and a PR merge landed on `main` two minutes later and killed it. So the
+commit that broke the gate for every subsequent run was never verified by the gate it broke. Dated
+precisely from the run history: PR #28 (02:35) and PR #30 (11:28) both linted clean; the first run
+containing `060ba72` reported 641 errors, which fell to 74 only because the `apps/room/scripts`
+eviction removed 76 files from the tree.
+
+**Two corrections to my own earlier account**, from reading the history rather than assuming it:
+`5e6175f` did not add the `'off'` lines — it added the `docs/source-*` ignore glob. The `'off'`
+lines date from `5e6980d`, the config's creation, where the presets sat correctly **above** the
+rules block. So this was right when written and was reversed later.
+
+**Flagged, not fixed:** `apps/room/svelte.config 2.js` — a macOS duplicate artifact with a literal
+space in its name — is tracked and on `main`. Proven a victim rather than a cause: the blob is
+identical in all three trees, and a deliberately poisoned copy placed in an isolated probe had zero
+effect on parsing, because the config supplies `svelteConfig` as an explicit object and neither
+`eslint-plugin-svelte@3.22.0` nor `svelte-eslint-parser@1.8.0` ships a filesystem config loader. It
+contributed exactly 1 of the 74 and lints clean now. It remains junk that nothing reads.
+
 ### 2026-08-15 11:22 EDT — four features the room already implemented and no room could switch on
 
 **Runtime impact: four controls become reachable.** Nothing changes for a room that leaves them off,
