@@ -30,7 +30,14 @@ import { describe, expect, it } from 'vitest';
 const PAGE = readFileSync(new URL('../routes/+page.svelte', import.meta.url), 'utf8');
 const MODAL = readFileSync(new URL('./components/ModalHost.svelte', import.meta.url), 'utf8');
 const EDITOR = readFileSync(new URL('./components/RichTextEditor.svelte', import.meta.url), 'utf8');
-const SERVER = readFileSync(new URL('../routes/+page.server.ts', import.meta.url), 'utf8');
+/*
+  The edit path left `+page.server.ts` for `message-actions.remote.ts`. Re-pointed at the file that
+  owns it — a `not.toContain` left behind would have started passing because the whole region moved.
+*/
+const SERVER = readFileSync(
+  new URL('../routes/message-actions.remote.ts', import.meta.url),
+  'utf8'
+);
 const ROOM_CONFIG_CLIENT = readFileSync(
   new URL('./server/room-config-client.ts', import.meta.url),
   'utf8'
@@ -216,6 +223,9 @@ describe('the editor component', () => {
 
 describe('the server', () => {
   it('sanitises an edit exactly as it sanitises a post', () => {
+    expect(serverCode, 'the command must be here for this to guard anything').toContain(
+      'export const messageAction = command('
+    );
     expect(serverCode).toContain(
       "const sanitizedHtml = submittedHtml ? sanitizeChatHtml(submittedHtml) : '';"
     );
@@ -224,9 +234,8 @@ describe('the server', () => {
 
   it('reads the rich field for CHAT only', () => {
     // The alerts table has no such column, and upstream's rich edit branch is chat-only too.
-    expect(serverCode).toContain(
-      "kind === 'chat' ? String(data.get('newBodyHtml') ?? '').trim() : ''"
-    );
+    // The field is on the schema now, so this reads the branch rather than a `FormData` lookup.
+    expect(serverCode).toContain("kind === 'chat' ? (args.newBodyHtml ?? '').trim() : ''");
   });
 
   it('an edit rewrites BOTH columns, so markup cannot outlive the text', () => {
@@ -241,11 +250,23 @@ describe('the server', () => {
       and went red on the ALERT branch three lines above, which is correct as it stands — alerts
       have no such column. An assertion that fails on working code is a defect in the assertion.
     */
-    const edit = serverCode.slice(serverCode.indexOf("if (operation === 'edit') {"));
-    /* Anchored on the EDIT operation first. Anchoring on `const message = db` alone found the
-       DELETE operation's copy of the same select, several hundred lines earlier. */
-    const chatBranch = edit.slice(edit.indexOf('const message = db'));
-    const chatUpdate = chatBranch.slice(0, chatBranch.indexOf('return { success: true };'));
+    const edit = serverCode.slice(serverCode.indexOf("if (args.operation === 'edit') {"));
+    expect(edit, 'the edit branch must be found').toContain('newBodyHtml');
+    /*
+      Anchored on the EDIT operation first. Anchoring on the message lookup alone found the DELETE
+      operation's copy of it, several hundred lines earlier.
+
+      The lookup is `findMessage()` now — one helper both operations call, where each used to write
+      the same room-scoped select out by hand. The old anchor was `const message = db`, which after
+      the move matched NOTHING and silently sliced the guard down to the empty string. Both offsets
+      are asserted found, so it cannot go vacuous that way again.
+    */
+    const chatBranchAt = edit.indexOf('const message = findMessage();');
+    expect(chatBranchAt, 'the chat edit branch must be found').toBeGreaterThan(-1);
+    const chatBranch = edit.slice(chatBranchAt);
+    const endsAt = chatBranch.indexOf('return;');
+    expect(endsAt, 'the branch must end somewhere').toBeGreaterThan(-1);
+    const chatUpdate = chatBranch.slice(0, endsAt);
     expect(chatUpdate).toContain('.set({ body: newBody, bodyHtml: newBodyHtml })');
     expect(chatUpdate).not.toContain('.set({ body: newBody })');
   });
