@@ -24,6 +24,81 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-15
 
+### 2026-08-15 12:24 EDT — the frontend gate is GREEN on `main` for the first time
+
+**Runtime impact: one restoration, see below.** Otherwise configuration, a moved parser, a tracked
+build input and documentation.
+
+```
+030a209  Frontend quality  completed/success     controller quality: success
+                                                 room quality:       success
+030a209  smoke             completed/success
+```
+
+`quality.yml` had failed **every run since PR #28**. Not once did the failure indicate a defect in
+the application.
+
+**Six root causes, each hidden behind the one before it.** CI stops at the first red step, so the
+list could only be discovered one layer at a time — #5 was invisible until #1–#4 were green, and #5
+is the most serious of them.
+
+| # | root cause | landed |
+| --- | --- | --- |
+| 1 | Flat-config preset ORDER. `060ba72` moved `js/ts/svelte.configs.recommended` BELOW the override block; last match wins, so `svelte.configs.recommended` re-enabled `svelte/no-useless-mustaches` and `svelte/prefer-svelte-reactivity` — 43 errors for exactly the patterns the 15-line comment above them calls deliberate. | earlier |
+| 2 | The same commit narrowed that block to two `files` patterns, stripping Node/browser globals from every path they missed. `gate/` did not exist when they were written — 31 errors. | earlier |
+| 3 | `svelte.config 2.js` — a macOS duplicate with a literal SPACE in the name. The follow-up glob `svelte.config.*.js` never matched it, because that pattern needs a dot. 1 error. | PR #37 |
+| 4 | Three TRACKED tests imported `scripts/lib/const-table.mjs`, evicted with `apps/room/scripts`. The vitest partition did not reach it: `svelte-check` type-checks files vitest excludes. 3 errors. | PR #38 |
+| 5 | **`src/app.css:1` imported `../css/complete-app-styles.css`, a gitignored symlink with zero tracked files — the room could not be built from its own repository.** | PR #40 |
+| 6 | A merge dropped half of `49a536a`: `room-settings-schema.ts` said 64 settings wired while the verifier, tripwire and header all still said 62, and `+page.svelte` passed four props that resolved to nothing. 8 type errors + 3 controller failures, one cause. | PR #39 |
+
+**Why it took a day to attribute, and the part worth keeping.** `quality.yml` pins no `ref:`, so
+`pull_request` runs check out `refs/pull/N/merge` — CI lints the MERGE while a developer lints their
+branch. `pnpm run lint` passed locally and failed on CI **at the same commit**. That reads as a
+broken runner, not a stale branch, and it is why dependency drift was chased first: `node_modules`
+was deleted and reinstalled with `--frozen-lockfile`, every version identical, lint still exit 0.
+The runner log settled it — `HEAD is now at 6ee3729 Merge 7ad52ba… into c1ff436…` — and swapping
+only that config blob into a clean tree reproduced the CI output **line-for-line identical**.
+
+**The guard that makes #1 unrepeatable.** `src/lib/eslint-config-resolution.test.ts` asserts the
+RESOLVED config through `ESLint.calculateConfigForFile`, not the text of the file. A grep for
+`'off'` would have passed throughout the entire failure — the string was always there. Negative
+control exercised: re-adding a preset after the overrides turns it red naming the cause.
+
+**#5 deserves its own note, because the category was wrong rather than the rule.** `.gitignore`
+grouped `apps/room/css` with the capture symlinks on the stated grounds that "the evidence-bound
+tests read them by relative path". True and incomplete: that file is not read by a test, it is
+COMPILED INTO THE SHIPPED STYLESHEET. Two facts decided it rather than preference — it is already
+published, since the build inlines it and every visitor to the deployed site is served it; and the
+repository's own detector reports no owner name, no gravatar hashes, no addresses and no identity
+payloads across all 8,086 lines. Tracked at its existing path, so the `@import`, ten test readers
+and the two contract tests that assert `app.css` STARTS WITH that exact string all keep working
+untouched. The rule for anything new here: ask whether the BUILD reads it, not whether a test does.
+
+**Runtime impact, stated plainly:** #6 is a restoration, not a no-op. Four `$derived` values start
+flowing into `RoomMessage` again, so `usersPublicReply`, `enableReactions`, `enableEditMessage` and
+`enableEditAlerts` are honoured once more. Each is read `=== true`, so absent stays off — but a room
+whose stored `sessData` has one set to `true` gains that control on deploy.
+
+**Verified before the merge, on the exact merge result, in an isolated worktree with a real
+`pnpm install --frozen-lockfile`** — not symlinked `node_modules`, which produced a 180-error
+`$types` artifact that was tooling rather than code and was discarded as such:
+
+| | room | controller |
+| --- | --- | --- |
+| lint | exit 0 | exit 0 |
+| type-check | 1073 files, 0 errors | 1523 files, 0 errors |
+| tests | exit 0 — 63 files, 719 passed, 1 skipped | exit 0 — 91 files, 964 passed |
+| build | exit 0 | exit 0 |
+
+**Backend quality was still `in_progress` at the time of writing** (the ~33-minute job, started
+16:22 UTC). Its `Rust and PostgreSQL security contracts` job passed on every PR in this sequence.
+Not claimed as green here, because it had not finished.
+
+**Left open deliberately, both needing the owner** — see TODO.md: `cancel-in-progress: true` applies
+to pushes on `main`, which is how `060ba72` landed with its own verification run cancelled; and
+`branches/main/protection` returns 404, so nothing stops a red commit reaching a branch that
+auto-deploys.
+
 ### 2026-08-15 12:01 EDT — the unmute button reported success and sent nothing
 
 **Runtime impact: a presenter can undo a chat mute.** Until now they could not, in any room, by any
