@@ -24,6 +24,56 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-15
 
+### 2026-08-15 09:30 EDT — proving what is built BEFORE building, and four errors in my own decode
+
+**Runtime impact: none.** Spec corrections and a revert.
+
+**The rule that produced this, from the owner:** prove what is already built, from hard evidence,
+before implementing anything. A previous list claimed the manage-page action surface was entirely
+unbuilt. **It is 42 actions and 7 tabs.** Building from that list would have duplicated working code.
+
+**The Alert Filter / Alert Labels build was stopped mid-flight** and told to write nothing and return
+a gap list instead. It had already edited **two of the four** settings-pipeline files — adding
+`modAlertFilterList` and `alertLabels` to `ROOM_VISIBLE_SETTINGS` and `ROOM_CONSUMED` while leaving
+`EXPECTED_WIRED_SETTINGS`, the boundary test's consumer map and the generated schema untouched. **That
+left the repo red.** Reverted, along with two new modules nothing imported — dead scaffolding by the
+standard's own definition. Verified back to green: 269 total / 60 wired, boundary test 17/17.
+
+#### Four errors in `alert-scheduler-filter-labels.md`, all mine, all verified before correcting
+
+1. **The three filter sites are NOT the same shape.** The predicate is identical term for term; the
+   structure is not. Site 1, the live SSE handler, is **two `continue` guards, not `.filter`** — and
+   it sits **before `alertsLog.push` and before `emit("alertMsg")`, so a filtered-out alert also
+   suppresses the toast and the sound.** In a rebuild that is a separate third call site, not a
+   duplicate of the log one.
+2. **The debug log fires for every alert**, not the filtered ones — it is inside the first `if`'s
+   comma expression, so it prints while the filter is merely engaged.
+3. **`parseSymbols` offset was wrong.** 1,328,216 is where the pipe registers its NAME and lands
+   mid-`parseStock`. The transform starts at **1,326,855**; the `my-1 me-1 badge` literal is at
+   **1,326,988**, once.
+4. **Twelve call sites pass `isQAMsg ? null : alertLabels`, not three.** The first version listed
+   three and implied that was all.
+
+All four re-read at the offsets before being written down.
+
+#### What the verification found in OUR source
+
+- **An `app-alert-filter-modal` shell already exists** at `ModalHost.svelte:5295-5323` — and **nothing
+  opens it.** All 29 `openModal` call sites were enumerated; `'alert-filter'` is not among the 19
+  names. **Dead scaffolding already in the repo.**
+- **Its title is wrong, not merely incomplete.** The reference title is DYNAMIC — `"Show"` /
+  `"Filter out"` chosen by `showAlertsFrom`, then `" alerts from the following: "` with a trailing
+  space. The shell hardcodes the false branch and drops the space.
+- **`modAlertFilterList` and `alertLabels` are BOTH already in the schema**, `wired: false`. The
+  `alertLabels` help text independently corroborates the four-field entry shape.
+- One entry point is **deliberately excluded and must stay excluded** — `alerts-toolbar-contract.test.ts`
+  keeps the toolbar Filter button out with a capture-backed layout reason.
+
+**A verification pass is now running over the whole implementation list** — six areas, every NOT-BUILT
+claim then attacked by an independent refuter, one-directional because a false NOT-BUILT is what
+caused this.
+
+
 ### 2026-08-15 09:17 EDT — the implementation list, and the 209 nobody had counted
 
 **Runtime impact: none.** One document, `docs/IMPLEMENTATION-LIST.md`.

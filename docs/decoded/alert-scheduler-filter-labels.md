@@ -166,11 +166,28 @@ the original claim would have produced a server-side filter the reference does n
 
 ## The filtering is client-side, in THREE places, with one identical guard
 
-| site | byte | what it filters |
-| --- | ---: | --- |
-| the live `/alerts` SSE stream | 1,004,533 | each alert as it arrives — logs `"filtered out alert for " + te.avt` |
-| `case "getAlertsLog"` | 1,017,070 | the paged log on every fetch |
-| the alerts SEARCH results | 1,020,817 | inside the `"alerts" == i.type` branch |
+| site | byte | shape | what it filters |
+| --- | ---: | --- | --- |
+| the live `/alerts` SSE stream | 1,004,533 | **`continue` guard, NOT `.filter`** | each alert as it arrives |
+| `case "getAlertsLog"` | 1,017,070 | `.filter` | the paged log on every fetch |
+| the alerts SEARCH results | 1,020,817 | `.filter` | inside the `"alerts" == i.type` branch |
+
+**CORRECTED 2026-08-15: the three are NOT the same shape, and the difference is behavioural.** An
+earlier version of this section said all three ran the identical expression. The predicate is
+identical term for term; the *structure* is not. Site 1 is two `continue` guards, read verbatim:
+
+```js
+if (P("filtered out alert for " + te.avt), preferences.showAlertsFrom && !user.alertFilterFor[te.avt]) continue;
+if (!preferences.showAlertsFrom && user.alertFilterFor[te.avt]) continue;
+```
+
+It sits **before `alertsLog.push` and before `appEventBus.emit("alertMsg")`**, so on the live path a
+filtered-out alert also **suppresses the toast and the sound**. The other two only shape a list that
+has already arrived. In a rebuild this is a genuinely separate third call site, not a duplicate.
+
+**And the debug log is inside the first `if`'s comma expression**, so upstream prints
+`"filtered out alert for X"` for **every** alert while the filter is engaged, including the ones it
+keeps. Reproduce that only if reproducing the logging; it is a reference quirk, not a signal.
 
 All three run the same expression, read verbatim at 1,017,070:
 
@@ -325,6 +342,47 @@ hardcoded array of `{username, avatar}` with real gravatar MD5 hashes, e.g.
 list compiled into the bundle. Recorded so nobody mistakes it for the configurable list, and **not
 reproduced** — a customer-specific hardcode is the opposite of the theming rule.
 
+## What ALREADY EXISTS in our repository, verified 2026-08-15
+
+Established by reading our source before any build, after a list wrongly claimed a whole surface was
+unbuilt.
+
+| piece | state | evidence |
+| --- | --- | --- |
+| the modal shell | **PARTIALLY BUILT** | `ModalHost.svelte:5295-5323` — the `app-alert-filter-modal` host, `Modal id="alert-filter-modal"`, the `show-alerts` checkbox carrying the captured `ng-untouched ng-pristine ng-valid`, the label, `List is empty.` and a Close button |
+| the modal TITLE | **WRONG, not merely missing** | the shell hardcodes `title="Filter out alerts from the following:"` at `ModalHost.svelte:5300`. **The reference title is DYNAMIC** — `"Show"` / `"Filter out"` selected by `O(5, showAlertsFrom ? 5 : 6)`, then `" alerts from the following: "` **with a trailing space**. The shell carries only the false branch and drops the space |
+| anything that opens it | **NOT BUILT — the modal is unreachable today** | `open={name === 'alert-filter'}` at `ModalHost.svelte:5298` is its only reader. All 29 `openModal` call sites were enumerated; 19 distinct names, `'alert-filter'` not among them. **Dead scaffolding already in the repo** |
+| `alertFilterFor` / `showAlertsFrom` / `doFilteredAlerts` | **NOT BUILT** | zero occurrences in `apps/room/src` and `apps/controller/src`. The only `modAlertFilterList` hits are prose in `alerts-toolbar-contract.test.ts:112,123` |
+| the alerts feed filtering by sender | **NOT BUILT** | `visibleAlerts` (`+page.svelte:2578-2587`) filters on evidence-hidden, a body/name substring search and the archive cutoff. The arrival path (`:3152-3168` → `deliverAlert`) has no sender check |
+| a sender-hash filter that is a DIFFERENT feature | exists, do not confuse them | `alerts-advanced-search.ts:198` — `traders.includes(alert.senderEmailHash)`, allow-list only, no inversion, no `modAlertFilterList` gate |
+| `modAlertFilterList` setting | **PRESENT, `wired: false`** | `room-settings-schema.ts:320`, `group: "dont-touch"`, textarea, label `Alert filter list for mods:` |
+| `alertLabels` setting | **PRESENT, `wired: false`** | `room-settings-schema.ts:185`, textarea, label `Alert Labels`. **Its help text independently corroborates the four-field entry shape** — `{ "name", "hash", "color", "bgcolor" }` |
+| persistence plumbing | **already available** | `savePreference` (`+page.svelte:3875`, action at `+page.server.ts:3110`) already persists arbitrary JSON per user and already carries map-shaped values such as `audioMutedFor` |
+
+**One entry point is deliberately excluded and must stay excluded.**
+`alerts-toolbar-contract.test.ts:110-127` keeps the toolbar Filter button (bundle `N2e`, byte
+2,042,435, `" Filter alerts"`) OUT, with a capture-backed layout reason. The two that are free:
+the alerts-header badge `M2e` (byte 2,041,178 — `span.badge.badge-danger.ms-1.filtered-text`, text
+`" filtered"`, title `Alert Filter`, gated `modAlertFilterList && doFilteredAlerts`) and the
+user-settings button `Fke` (byte 2,233,255 — `btn btn-primary btn-sm mt-4 ml-4`, `fas fa-filter me-1`,
+text `" Filter out alerts "`), which belongs after `ModalHost.svelte:3110` in the `#alertPopup` box.
+
+### For Alert Labels
+
+| piece | state | evidence |
+| --- | --- | --- |
+| parsing `sessData.alertLabels` | **NOT BUILT** | not in `RoomSessionSettings` (`room-config-client.ts`), so it never crosses the boundary |
+| composer checkbox list | **NOT BUILT** | `PostAlertModal.svelte` read end to end, 464 lines: the footer has `keepOpenChk`, `postOnXChk`, `alert-push-label`, `alert-non-trade-label`, `alert-legal-disclosure-label` — no `alert-trade-label-*`. It slots between `:417` and `:418` per the gate order at byte 2,139,108 |
+| `processAlertLabels` | **NOT BUILT** | no prefixing on any of the three composer paths — `+page.svelte:7019`, `:7053`, `post-alert-behavior.ts:73` |
+| the three clear sites | **NOT BUILT** | `PostAlertModal.svelte:48` and `:58` would be two of the three homes; there is no close-time equivalent to `doCloseModal` |
+| badge renderer | **NOT BUILT** | `RoomMessage.svelte:325-351 parseBodySegments` is our `parseStock` equivalent — `$SYMBOL`, links, inline images. No `#` token handling anywhere |
+| the alerts-only / Q&A-excluded gate | **NOT BUILT, but both terms exist as props** | `kind` (`RoomMessage.svelte:21`) and `isQaMessage` (`:48`). The alerts pane renders `kind="alert"` at `+page.svelte:10898`; the Q&A modal renders `kind="chat"` at `ModalHost.svelte:4677` |
+
+**Note for whoever builds this:** `direct-evidence-contract.ts:112-118` lists `'alertLabels'` under
+`postAlert.hiddenCapabilityBranches` — a branch present in the bundle that the DOM capture never
+rendered. Building it does not invalidate that entry, since with no labels configured the section
+still renders nothing.
+
 ## Honest gaps
 
 - **What the server does with `updateAlertFilter` is not in the bundle.** It clearly persists the map
@@ -357,7 +415,7 @@ Proven by the renderer at byte 1,328,216 and the checkbox list at 2,119,605:
 
 ## THE SECOND CONSUMER — `#hash` becomes a badge, in ALERTS only
 
-`parseSymbols`, read verbatim at byte 1,328,216. This is the piece the first version missed entirely:
+`parseSymbols`, read verbatim. **CORRECTED: the transform starts at byte 1,326,855**; 1,328,216 — cited in the first version — is where the pipe REGISTERS ITS NAME and lands mid-`parseStock`. The `my-1 me-1 badge` literal is at byte **1,326,988** and occurs exactly once:
 
 ```js
 transform(e, i, o, s) {
@@ -378,7 +436,9 @@ Five things follow:
 
 1. **`logType` must be `"alerts"`.** Chat messages never get label badges, even if the text contains
    `#hash`. The call sites pass `isQAMsg ? null : globals.alertLabels`, so **Q&A messages are excluded
-   too** — bytes 1,331,842 / 1,332,732 / 1,340,566.
+   too**. **CORRECTED: there are TWELVE call sites, not three** — 1,331,808 · 1,332,698 · 1,332,883 ·
+   1,340,532 · 1,341,346 · 1,341,531 · 1,370,111 · 1,371,001 · 1,371,186 · 1,378,832 · 1,379,646 ·
+   1,379,831. The first version listed three and implied that was all of them.
 2. **The badge shows `name`, the text carries `hash`.** They are different strings and the mapping
    between them is the whole point of the feature. `processAlertLabels` writes ` #hash`;
    `parseSymbols` swaps it for a badge reading `name`.
