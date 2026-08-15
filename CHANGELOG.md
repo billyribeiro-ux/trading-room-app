@@ -24,6 +24,132 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-15
 
+### 2026-08-15 10:48 EDT — repairing what the eviction broke, and finding the gate was already red for a bigger reason
+
+**Runtime impact: none.** Gate infrastructure and one test file.
+
+**The finding that reframed the whole task: `quality.yml` has never passed.** `gh run list` returns
+**failure on all 8 runs**, back to PR #28. The eviction 15 minutes earlier was not what turned the
+gate red, and fixing the eviction was never going to turn it green. Measured before doing any work,
+which is the only reason the fix below stayed small instead of becoming an attempt to green a
+suite that was never green.
+
+**Two of the 78 evicted files were never collectors.** `verify-privacy-boundary.mjs` and
+`verify-postgres-schema-artifacts.mjs` are the first two of the three commands
+`apps/room/package.json` chains into `test`. Read end to end before deciding: **zero** matches for
+`protradingroom`, `tradingroom`, `puppeteer`, `playwright`, `chromium` or any URL in either — they
+reach out to nothing. They were misfiled, and the eviction is what exposed it. Evicting the first
+one silently deleted this repository's only automated check against personal data entering a
+**public** repository.
+
+So they moved to `apps/room/gate/`, which is published, together with `privacy-utils.mjs`, which the
+first imports. The split now has a rule written into `.gitignore` and into the file's own header:
+collectors that reach the reference application live in `scripts/` and are not published; this
+repository's own gate lives in `gate/` and is. Both files compute their root as `<script dir>/..`,
+so `apps/room/gate/` preserves it exactly — no path rewiring, and `pnpm privacy:verify` now scans
+368 files rather than 365, the three moved files having become tracked.
+
+**Checked before moving, not assumed:** `ops/backend-import-provenance.md:114` pins a SHA-256 for a
+`verify-privacy-boundary.mjs`. Neither current file matches it — room hashes `00ffff9d…`, controller
+`3d822749…`, the pin is `befd50ec…` — and the document says four lines above that these are
+"immutable evidence checkpoints, not a current-tree manifest". Nothing enforces it, so editing the
+header was safe. Worth the two minutes: rewriting a hash somebody had deliberately frozen would have
+been an invisible and unrecoverable mistake.
+
+**Of the seven tests reading `scripts/`, exactly one was broken by the eviction.** The other six
+already read gitignored captures (`docs/source`, `second-dump`, `css/`) and so could never run on a
+checkout without them. Only `authorization-contract.test.ts` was blocked by `scripts/` alone. It was
+split rather than skipped: the role-vocabulary case now carries `it.skipIf(!hasProvisioningScript)`,
+while the dead-guard assertion — `role === 'user'`, the one that caught a live defect — became its
+own `it` so it keeps running everywhere. Skipping the whole case would have taken a working
+authorization contract off CI as collateral.
+
+**Verified, each by running it:**
+
+- `node gate/verify-privacy-boundary.mjs` → `PASS … across 368 files`, exit 0.
+- `vitest run src/lib/authorization-contract.test.ts` → 9 passed.
+- **Negative control on the new skip**, because a guard nobody has watched fire is not a guard: with
+  `scripts/set-password.mjs` moved aside, the same file reports **8 passed | 1 skipped**, suite still
+  green. File restored and confirmed back.
+- **A CI-shaped checkout**, built by extracting `git write-tree` into a temp directory and
+  `git init`-ing it so `git ls-files` has something to read: **step 1 now exits 0** where it exited 1
+  with `Cannot find module` before the fix.
+
+**What is NOT fixed, and is not mine to decide.** Step 2 of the same run still fails —
+`ENOENT … apps/room/second-dump/db/RECREATE.sql`. `verify-postgres-schema-artifacts.mjs` reads
+SHA-256-pinned artifacts out of a gitignored capture directory, so it cannot run on CI and never
+could; it fails identically to how it failed before the eviction. That is the same wall the suite
+hits: **50 of the room's 106 test files read off-repo evidence.** Greening this gate means deciding
+what a CI run of this repository is allowed to claim when the evidence it pins against is
+deliberately not in it — an architectural decision, recorded as the first section of TODO.md rather
+than guessed at here.
+
+### 2026-08-15 10:33 EDT — `apps/room/scripts` untracked: 78 files off GitHub going forward, and the gate red on purpose
+
+**Runtime impact: none.** Nothing the site serves changed. **Gate impact: the room's `quality.yml`
+job will fail** — knowingly, see below and TODO.md.
+
+**The instruction, from the owner:** add every file under `apps/room/scripts` to `.gitignore`, then,
+on being told what that alone would accomplish, "these files should not be on github."
+
+**`.gitignore` alone would have accomplished nothing, and that is the part worth recording.** All 78
+files were tracked, and git ignores untracked files only — the rule would have sat there looking
+correct while every one of them kept being committed. So the rule was paired with
+`git rm -r --cached apps/room/scripts` in the same change. The files are untouched on disk; git
+stopped seeing them. `git check-ignore -v` confirms the rule matches, and `git status --short` is 78
+staged deletions plus the modified `.gitignore`, with **zero** untracked entries — nothing leaked
+back in.
+
+**What was checked before doing it, rather than assumed:**
+
+- **Not a secret leak.** Seventeen address-shaped strings, every one of them synthetic and at a
+  reserved TLD: `@two-app.test`, `@handoff-e2e.test`, `@role-authority.test`, `@roster-gates.test`,
+  `connected-user@ptr.invalid`. No real address. **Worth recording how nearly that was got wrong:**
+  the first pass grepped a literal address pattern, found nothing, and was about to be written down
+  as "no email addresses anywhere". All seventeen are template literals —
+  `` `owner-${STAMP}@role-authority.test` `` — so the `$` and `{` broke the character class and the
+  search returned clean on files that were full of them. Exactly the repository's own rule biting:
+  a search only returns what you already guessed the answer looked like. `ROOM_JWT_SECRET` is read
+  from a local env file at runtime (`lib/enter-room.mjs`, `handoff-e2e.mjs`,
+  `role-authority-e2e.mjs`, `room-config-seam-e2e.mjs`), and the `password:` literals in the
+  `*-e2e.mjs` probes are per-run fixtures — `'roster-gates-e2e'`, `'two-app-seam-e2e-probe'`. What
+  the files do carry is the live
+  third-party application: `chat.protradingroom.com`, `cdn1.protradingroom.com`, and its selectors,
+  routes and wire protocol. That makes this the same republication question `.gitignore` already
+  answered for `/apps/room/docs/source`, and it is answered the same way.
+- **Repo visibility, from `gh repo view`, not from memory:** `PUBLIC`.
+- **Already published:** `git ls-tree -r origin/main` finds 76 of the 78. Untracking governs future
+  commits. Those 76 stay readable at the commits already pushed until the history is rewritten,
+  which was not authorised and was not done.
+
+**The breakage was reproduced, not predicted.** It cannot be seen locally — the 78 files are still
+on disk here, so `pnpm test` still passes on this machine and would have gone on passing right up
+until CI contradicted it. So the tree a CI checkout would actually get was materialised and run
+against:
+
+```
+git archive --format=tar "$(git write-tree)" | tar -x -C "$tmp"
+cd "$tmp/apps/room" && node scripts/verify-privacy-boundary.mjs
+→ exit 1 — Error: Cannot find module '…/apps/room/scripts/verify-privacy-boundary.mjs'
+```
+
+Zero of the 78 files are in that tree, and `apps/room/package.json` in it still defines `test` as
+`pnpm privacy:verify && pnpm schema:verify && vitest run` — the exact command `quality.yml:104-109`
+runs for the room. The job dies on the first of three steps, before `vitest` is reached. Seven test
+files under `src/lib/` also read scripts here by path — an earlier count of eleven in this entry was
+wrong, and wrong in an instructive way: it came from grepping `scripts/`, which matched four more
+files that only mention a script in a comment. Reading the eleven hits is what separated them. And
+`verify-privacy-boundary.mjs:69` enumerates via `git ls-files --cached --others --exclude-standard`,
+so it has stopped scanning these 78 files entirely — the same *a green privacy check says nothing
+about an ignored file* trap TODO.md already records, now pointed at the verifier's own directory.
+
+Full detail, and the fix to copy — `reference-capture.ts`, the `hasCapture` / `describe.skipIf`
+pattern that solved this identical shape for the controller on 2026-08-14 — is the first section of
+TODO.md.
+
+**Not committed.** The deletions are staged and the working tree holds them; committing and pushing
+were not asked for.
+
 ### 2026-08-15 09:30 EDT — proving what is built BEFORE building, and four errors in my own decode
 
 **Runtime impact: none.** Spec corrections and a revert.

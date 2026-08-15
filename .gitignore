@@ -111,3 +111,41 @@ new-room-control/
 # Reference dumps captured from the live original. Large, and they carry the
 # original's own bundle text — kept locally, read, never published.
 dumps/
+
+# ---------------------------------------------------------------------------------------------
+# `apps/room/scripts/` — every file under it, at the owner's instruction on 2026-08-15: "these
+# files should not be on github".
+#
+# These are the collectors, decoders and e2e probes for the reference-match work. They carry no
+# credentials — `ROOM_JWT_SECRET` is read from a local env file at runtime in `lib/enter-room.mjs`,
+# `handoff-e2e.mjs`, `role-authority-e2e.mjs` and `room-config-seam-e2e.mjs`, and the `password:`
+# literals in the `*-e2e.mjs` probes are per-run fixtures, not real ones. What they do carry is a
+# live third-party application: `chat.protradingroom.com` and `cdn1.protradingroom.com` appear in
+# them, along with that application's selectors, routes and wire protocol.
+#
+# This repository is public, which makes that the same republication question already answered for
+# `/apps/room/docs/source` above, and it gets the same answer: the artefacts are read from disk
+# locally and never published.
+#
+# A gitignore rule governs UNTRACKED files only, and all 78 of these were tracked when it was
+# written, so it was paired with `git rm -r --cached apps/room/scripts` in the same change. The
+# files are still on disk and still runnable locally; git has simply stopped seeing them. What this
+# does NOT do is remove them from GitHub — 76 of the 78 were already on `origin/main`, and they
+# stay readable at those commits until that history is rewritten.
+#
+# The gate's dependency on this directory was found and dealt with in the same change, recorded here
+# so it is not rediscovered as a mystery.
+#
+# Two files in here were never collectors at all: `verify-privacy-boundary.mjs` and
+# `verify-postgres-schema-artifacts.mjs` are the first two of the three commands
+# `apps/room/package.json` chains into `test`. Evicting them silently deleted this repository's only
+# automated check against personal data entering a PUBLIC repository. They moved to
+# `apps/room/gate/`, which IS published, along with `privacy-utils.mjs`, which the first imports.
+# The split to keep: collectors that reach the reference application live here and are not
+# published; the repository's own gate lives in `gate/` and is.
+#
+# Seven test files under `src/lib/` read scripts from here. Six of them already could not run on a
+# checkout without the off-repo captures, so nothing changed for them. The seventh,
+# `authorization-contract.test.ts`, now skips the single case that needs `set-password.mjs` and
+# keeps the dead-guard assertion running everywhere.
+/apps/room/scripts/

@@ -48,9 +48,9 @@
     "format:check": "prettier --check .",
     "db:generate": "drizzle-kit generate",
     "db:push": "drizzle-kit push",
-    "schema:verify": "node scripts/verify-postgres-schema-artifacts.mjs",
+    "schema:verify": "node gate/verify-postgres-schema-artifacts.mjs",
     "test": "pnpm privacy:verify && pnpm schema:verify && vitest run",
-    "privacy:verify": "node scripts/verify-privacy-boundary.mjs",
+    "privacy:verify": "node gate/verify-privacy-boundary.mjs",
     "lint": "eslint ."
   },
   "dependencies": {

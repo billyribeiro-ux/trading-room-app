@@ -1,10 +1,29 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { isPresenterRole } from './server/auth';
 
 function text(path: URL) {
   return readFileSync(path, 'utf8');
 }
+
+/*
+  The provisioning script, which is the only thing that can write a role other than the column
+  default, and which is NOT in the repository.
+
+  On 2026-08-15 every file under `apps/room/scripts` was untracked and gitignored — that directory
+  is reference-match tooling that drives a live third-party application, and this repository is
+  public. The file is still on disk for anyone who holds it, so the case below still runs here; on a
+  checkout without it the case is SKIPPED rather than failed. That is the same rule
+  `apps/controller/src/lib/reference-capture.ts` states for the captures: a case that cannot see its
+  evidence must not pass, because that reports coverage it never had, and must not fail, because the
+  code under test is fine and the machine simply does not hold the file.
+
+  Only the role-vocabulary assertions need it. The dead-guard assertion does not, and is a separate
+  `it` for exactly that reason — it is the one that caught a live defect, and it must keep running
+  everywhere rather than being skipped as collateral.
+*/
+const PROVISIONING_SCRIPT = new URL('../../scripts/set-password.mjs', import.meta.url);
+const hasProvisioningScript = existsSync(PROVISIONING_SCRIPT);
 
 /**
  * Authorization rules that are easy to write in a way that silently never fires.
@@ -14,19 +33,23 @@ function text(path: URL) {
  * to a guard that works until someone tries it.
  */
 describe('authorization guards', () => {
-  it('never gates on a role that no account can hold', () => {
-    // The roles that actually exist: the column default (schema.ts) plus whatever the
-    // provisioning script can write. `'user'` is in neither, and
-    // media-grant.test.ts says so outright.
-    const schema = text(new URL('./server/db/schema.ts', import.meta.url));
-    const provisioning = text(new URL('../../scripts/set-password.mjs', import.meta.url));
+  it.skipIf(!hasProvisioningScript)('writes only roles the guards already know about', () => {
+    // The other half of the roles that actually exist: whatever the provisioning script can
+    // write. `'user'` is not among them, and media-grant.test.ts says so outright.
+    const provisioning = text(PROVISIONING_SCRIPT);
 
-    expect(schema).toContain("default('staff')");
     expect(provisioning).toContain("role = 'member'");
 
     for (const role of ['admin', 'staff', 'member', 'guest']) {
       expect(provisioning).toContain(role);
     }
+  });
+
+  it('never gates on a role that no account can hold', () => {
+    // One half of the roles that actually exist: the column default. The other half is the
+    // provisioning script, asserted above wherever that file is present.
+    const schema = text(new URL('./server/db/schema.ts', import.meta.url));
+    expect(schema).toContain("default('staff')");
 
     // If a guard compares against a role that cannot exist, the guard is dead code and
     // the action is effectively unguarded.
