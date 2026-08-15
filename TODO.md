@@ -58,11 +58,19 @@ are genuine missing behaviour and are open.**
 - **`muted`** — removed, with its write. Every consumer derives `volume === 0`, which the screen
   panes are passed directly.
 
+### Closed 2026-08-14 21:05 — the extra chat column now follows its own messages
+
+`extraChatScroller` was handed back by `onscrollerready` and read by nothing, so a message arriving
+in the second column left the view where it was while the main chat scrolled — the reader simply did
+not see it. It now has an autoscroll effect that is a deliberate parallel of the main chat's: same
+four conditions, its OWN `extraChatScrollingUp` flag, and its own effect rather than a loop over both
+columns, so a reader scrolled up in one is not yanked by traffic in the other. Four assertions in
+`extra-chat-column-contract.test.ts`, negative-controlled by passing the wrong column's flag.
+
 ### Open — real behaviour that is not implemented
 
 | where | what is missing |
 | --- | --- |
-| `+page.svelte` `extraChatScroller` | **The extra chat column has no autoscroll.** `alertsScroller` and `chatScroller` both drive `forceAlertsToBottom` / `forceChatToBottom`; the extra column's element is handed back by `onscrollerready` and read by nothing, so new messages do not bring it to the bottom. The pattern to copy is at `+page.svelte` around the `chatScroller` effect. |
 | `+page.svelte` `loadNoteVersions` | Nothing calls it, and the route it fetches (`api/notes/[noteId]/versions`) is built and working. Note history is server-complete and client-unreachable. |
 | `ExtraChatPane` `isPresenter` | Declared in `Props`, passed by the parent, read by no line of the component — the same shape as the controller's `markUnwired`. What it should gate has to be established from the capture before it is either wired or removed. |
 

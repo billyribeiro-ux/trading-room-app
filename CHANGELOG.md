@@ -24,6 +24,36 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-14
 
+### 2026-08-14 21:05 EDT — the second chat column follows its own messages
+
+**Runtime impact: yes.** The extra chat column now scrolls to new messages. On
+`feat/extra-chat-column`.
+
+**What was broken.** `onscrollerready` handed the column's scroll container back and nothing read
+it. `alertsScroller` and `chatScroller` each drive a `forceAlertsToBottom` / `forceChatToBottom`
+effect; the second column had neither. A message arrived, the view stayed where it was, and the
+reader did not see it — on a feature whose entire purpose is watching a second channel.
+
+ESLint found it, as an "assigned a value but never used". That is three times in one day the same
+rule surfaced something that was not a style problem, and the reason it kept working is that an
+unread variable is ambiguous: it is equally the signature of a missing feature and of one done a
+better way. Two of the five turned out to be redundancy and were removed; this one was real.
+
+**Built as a parallel, not a new design.** The same four conditions as the main chat — first view,
+channel switch, new message, and the reader's own position through `shouldAutoScrollForMessage` —
+the same `tick()` before measuring, and the same identity re-check after the await so a scroller
+swapped out mid-await is never written to.
+
+**It is its own effect, deliberately.** One effect reading both columns would re-run each column's
+scroll logic whenever the other changed: "a message arrived anywhere" instead of "a message arrived
+here". The visible consequence would be a reader scrolled up in one column getting yanked to the
+bottom by traffic in the other. The contract test asserts the separation, and asserts that the
+condition reads `extraChatScrollingUp` rather than the main column's flag — **negative-controlled by
+substituting `chatScrollingUp` and watching exactly that assertion go red.**
+
+**Verified.** Room `pnpm lint` exit 0, `svelte-check` 0 errors / 0 warnings across 1032 files,
+**1203/1203** (four new assertions), `extra-chat-column-contract` 26/26.
+
 ### 2026-08-14 21:01 EDT — two of the five "gaps" were mine to unclaim
 
 **Runtime impact: none.** Two redundant variables removed, one false claim retracted, one contract

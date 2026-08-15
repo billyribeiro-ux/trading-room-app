@@ -254,3 +254,50 @@ describe('shared shapes, moved rather than copied', () => {
     expect(PAGE).not.toContain('  function sameCalendarDay(');
   });
 });
+
+describe('the second column follows its own messages', () => {
+  /*
+    Until 2026-08-14 it did not. `onscrollerready` handed the element back and nothing read it, so a
+    message arriving in the extra column left the view where it was while the main chat scrolled —
+    the reader simply did not see it. ESLint surfaced the element as "assigned but never used".
+
+    The four conditions below are the main chat's, reproduced rather than reinvented, because the
+    two columns should not disagree about when a reader is left alone.
+  */
+  it('reads the scroller it is handed', () => {
+    expect(pageCode).toContain('const scroller = extraChatScroller;');
+    expect(pageCode).toContain('if (extraChatScroller === scroller) forceChatToBottom(scroller);');
+  });
+
+  it('scrolls on first view, on a channel switch, and on a new message', () => {
+    const from = pageCode.indexOf('const scroller = extraChatScroller;');
+    const effect = pageCode.slice(from, pageCode.indexOf('\n  });', from));
+    expect(effect).toContain('const isInitialView = !extraChatScrollInitialized;');
+    expect(effect).toContain("activeTab !== previousExtraChatTab");
+    expect(effect).toContain('count > previousExtraChatCount');
+  });
+
+  it('honours the reader’s own scroll position, using THIS column’s flag', () => {
+    /*
+      The assertion that matters. Passing `chatScrollingUp` here would let the main column's reader
+      position decide whether the extra column jumps — the two are independent panes and a reader
+      scrolled up in one must not be yanked by traffic in the other.
+    */
+    const from = pageCode.indexOf('const scroller = extraChatScroller;');
+    const effect = pageCode.slice(from, pageCode.indexOf('\n  });', from));
+    expect(effect).toContain('shouldAutoScrollForMessage(\n          extraChatScrollingUp,');
+    expect(effect).not.toContain('chatScrollingUp,\n');
+  });
+
+  it('is its own effect, not folded into the main chat’s', () => {
+    /*
+      One effect reading both columns would re-run each column's scroll logic whenever the other
+      changed — "a message arrived anywhere" instead of "a message arrived here".
+    */
+    const main = pageCode.indexOf('const scroller = chatScroller;');
+    const extra = pageCode.indexOf('const scroller = extraChatScroller;');
+    expect(main).toBeGreaterThan(-1);
+    expect(extra).toBeGreaterThan(main);
+    expect(pageCode.slice(main, extra)).toContain('});');
+  });
+});

@@ -984,14 +984,23 @@
   let extraChatTab: ChatTab = $state('off-topic');
   /** `#textAreaTxtExtra`. */
   let extraComposer = $state('');
-  /*
-    HANDED BACK AND NEVER USED. `onscrollerready` writes this element in, and nothing reads it —
-    so the extra chat column has no programmatic scroll at all, while the main chat does. Found by
-    ESLint, recorded in TODO.md, and deliberately not deleted: removing the capture would erase the
-    only evidence that the wiring is half-built.
-  */
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  /**
+   * The extra chat column's scroll container, and the three trackers its autoscroll needs.
+   *
+   * `onscrollerready` wrote this element in and NOTHING read it until 2026-08-14, so the second
+   * chat column never followed a new message while the first one did — a message arrived, the
+   * column stayed where it was, and the reader saw nothing. ESLint is what surfaced it, as an
+   * "assigned but never used" that turned out to be a missing feature.
+   *
+   * The effect below is a deliberate parallel of the main chat's, not a new design: same four
+   * conditions (first view, channel switch, new message, and the reader's own scroll position via
+   * `shouldAutoScrollForMessage`), same `tick()` before measuring, and the same identity re-check
+   * afterwards so a scroller swapped out mid-await is not written to.
+   */
   let extraChatScroller = $state<HTMLElement | undefined>();
+  let extraChatScrollInitialized = false;
+  let previousExtraChatCount = 0;
+  let previousExtraChatTab: ChatTab | undefined;
   let extraChatScrollingUp = false;
   /**
    * `globals.chatInputFocus` — which composer the viewer last typed in.
@@ -3016,6 +3025,49 @@
       chatScrollingUp = false;
       void tick().then(() => {
         if (chatScroller === scroller) forceChatToBottom(scroller);
+      });
+    }
+  });
+
+  /*
+    The SECOND chat column, following its own messages.
+
+    Deliberately a separate effect rather than a loop over both: the two columns have independent
+    tabs, independent message lists and independent reader scroll positions, so one effect reading
+    both would re-run each column's scroll logic whenever the other changed. That is the difference
+    between "a message arrived here" and "a message arrived anywhere", and it is what would make a
+    reader scrolled up in this column get yanked to the bottom by traffic in the other one.
+  */
+  $effect(() => {
+    const scroller = extraChatScroller;
+    const activeTab = extraChatTab;
+    const count = visibleExtraChatMessages.length;
+    const newestMessage = visibleExtraChatMessages.at(-1);
+
+    if (!scroller) return;
+
+    const isInitialView = !extraChatScrollInitialized;
+    const didSwitchChannel = extraChatScrollInitialized && activeTab !== previousExtraChatTab;
+    const isNewMessage =
+      extraChatScrollInitialized && !didSwitchChannel && count > previousExtraChatCount;
+    extraChatScrollInitialized = true;
+    previousExtraChatTab = activeTab;
+    previousExtraChatCount = count;
+
+    if (
+      isInitialView ||
+      didSwitchChannel ||
+      (isNewMessage &&
+        shouldAutoScrollForMessage(
+          extraChatScrollingUp,
+          newestMessage?.senderId,
+          data.user.id,
+          alwaysScrollToBottom
+        ))
+    ) {
+      extraChatScrollingUp = false;
+      void tick().then(() => {
+        if (extraChatScroller === scroller) forceChatToBottom(scroller);
       });
     }
   });
