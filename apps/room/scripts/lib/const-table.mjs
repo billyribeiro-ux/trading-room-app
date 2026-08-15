@@ -1,3 +1,4 @@
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment -- the WHY is the next four lines:
 // @ts-nocheck - `tsconfig.json` sets checkJs+strict, and importing this file from a test is what
 // drags it into svelte-check. It cannot be answered with annotations: every byte of the function
 // below is pinned, by src/lib/const-table-module.test.ts, to a copy that gets pasted into a

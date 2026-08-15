@@ -178,10 +178,20 @@ describe('WHY the reconcile emits deltas and not the full list', () => {
   const b = mtxStreamFromPath('room__3625__b', ROOM)!;
 
   it('a repeated full-list apply YANKS the selection — which is why it is not used', () => {
-    let state = applySessionMediaState([a, b]);
-    state = { ...state, selectedTabID: b._id }; // the viewer picked the second stream
-    state = applySessionMediaState([a, b]); // a naive reconcile re-sends the same list
-    expect(state.selectedTabID, 'dragged back to the first stream').toBe(a._id);
+    /*
+      The viewer's choice is asserted BEFORE the reconcile, and that is the point of the test rather
+      than set dressing. An earlier version assigned it and then overwrote it without ever reading
+      it — ESLint's `no-useless-assignment` caught that, correctly: the line implied the prior
+      selection was an INPUT to `applySessionMediaState`, and it is not. The function ignores
+      whatever was selected and always takes `list[0]`, which is exactly the behaviour that makes it
+      unusable on a timer.
+    */
+    const chosen = { ...applySessionMediaState([a, b]), selectedTabID: b._id };
+    expect(chosen.selectedTabID, 'the viewer picked the second stream').toBe(b._id);
+
+    // A naive reconcile re-sending the same list, with that choice already made.
+    const afterReconcile = applySessionMediaState([a, b]);
+    expect(afterReconcile.selectedTabID, 'dragged back to the first stream').toBe(a._id);
   });
 
   it('the delta path leaves the viewer where they were', () => {

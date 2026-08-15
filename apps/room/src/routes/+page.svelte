@@ -984,6 +984,13 @@
   let extraChatTab: ChatTab = $state('off-topic');
   /** `#textAreaTxtExtra`. */
   let extraComposer = $state('');
+  /*
+    HANDED BACK AND NEVER USED. `onscrollerready` writes this element in, and nothing reads it —
+    so the extra chat column has no programmatic scroll at all, while the main chat does. Found by
+    ESLint, recorded in TODO.md, and deliberately not deleted: removing the capture would erase the
+    only evidence that the wiring is half-built.
+  */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   let extraChatScroller = $state<HTMLElement | undefined>();
   let extraChatScrollingUp = false;
   /**
@@ -1332,6 +1339,16 @@
   let selectedFileIds = $state<Set<number>>(new Set());
   let volume = $state(100);
   let previousVolume = $state(100);
+  /*
+    WRITTEN AND NEVER READ. `setMasterVolume` keeps it in step with the slider, and every consumer
+    that needs the same answer derives it instead — the screen panes are passed `muted={volume === 0}`
+    directly. So this is a second source of truth for one fact, which is the shape that goes stale.
+
+    Deleting it was tried and is wrong: the write at `setMasterVolume` is real, so removing the
+    declaration breaks the build. Either the panes should read this, or the write should go — a
+    behaviour decision, recorded in TODO.md rather than guessed at under a lint fix.
+  */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   let muted = $state(false);
   let backgroundVolume = $state(70);
   /**
@@ -1415,7 +1432,6 @@
    * `setPreference('audioVolumeFor', …)`, on every toggle and every drag.
    */
   // The stored settings are the intentional one-time seed for editable client preference state.
-  // svelte-ignore state_referenced_locally
   let presenterAudio = $state.raw<PresenterAudioPreferences>({
     audioMutedFor: readPresenterMuteMap(loadedSettings.audioMutedFor),
     audioVolumeFor: readPresenterVolumeMap(loadedSettings.audioVolumeFor)
@@ -2232,6 +2248,17 @@
    */
   let chatCollapsedByMode = $state(false);
   let splitBeforeCollapse: number | null = null;
+  /*
+    WRITTEN AND NEVER READ, which means the behaviour quoted eighteen lines above is not
+    implemented. The capture restores the column from this flag —
+    `this.extraChatColumnWasEnabled && (preferences.extraChatColumn = !0, …)` — and here only the
+    assignment exists, so a column hidden by webinar mode never comes back when it ends.
+
+    A real gap wearing the costume of an unused variable, found by ESLint. Recorded in TODO.md
+    rather than deleted, because deleting it would remove the evidence and leave the comment above
+    describing behaviour nothing performs.
+  */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   let extraChatColumnWasEnabled = false;
 
   $effect(() => {
@@ -7211,7 +7238,8 @@
     const source = new EventSource(`/sess/${encodeURIComponent(data.room.shortCode)}/events`);
 
     source.addEventListener('message', (event) => {
-      let payload: { channel?: string; data?: Record<string, unknown> } | null = null;
+      // No initialiser: the `catch` returns, so a value here could never be read.
+      let payload: { channel?: string; data?: Record<string, unknown> };
       try {
         payload = JSON.parse((event as MessageEvent<string>).data);
       } catch {
@@ -8436,6 +8464,12 @@
     return result.data;
   }
 
+  /*
+    NOTHING CALLS THIS, and the route it fetches (`api/notes/[noteId]/versions`) is real. So the
+    note-history feature is server-complete and client-unreachable. Recorded in TODO.md rather than
+    deleted: the endpoint is the expensive half and it already exists.
+  */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async function loadNoteVersions(noteId: number): Promise<readonly NoteVersion[]> {
     const response = await fetch(`/api/notes/${noteId}/versions`);
     if (!response.ok) {
@@ -8490,7 +8524,7 @@
 
 {#snippet bodySegmentsPrivate(text: string)}
   {#each text.split(/((?:http|https|ftp):\/\/[\w?=&.@/\-;#~%]+)/gi) as part, index (index)}
-    {#if /^(?:http|https|ftp):\/\//i.test(part)}<!-- svelte-ignore a11y_click_events_have_key_events --><!-- svelte-ignore a11y_no_static_element_interactions --><a
+    {#if /^(?:http|https|ftp):\/\//i.test(part)}<a
         href={part}
         target="_blank"
         rel="noreferrer"
@@ -8874,8 +8908,6 @@
                           </li>
                           <li class="nav-item">
                             <!-- svelte-ignore a11y_missing_attribute -->
-                            <!-- svelte-ignore a11y_click_events_have_key_events -->
-                            <!-- svelte-ignore a11y_no_static_element_interactions -->
                             <a
                               aria-hidden="true"
                               onclick={recPreviewOpen ? hideRecPreview : showRecPreview}
@@ -11251,8 +11283,6 @@
                            target. Ours listened on the <a> alone and that band was dead. The anchor
                            keeps the keydown, so the tab stays operable from the keyboard, which the
                            reference's is not. -->
-                      <!-- svelte-ignore a11y_click_events_have_key_events -->
-                      <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
                       <li class="nav-item" role="presentation" onclick={() => (fileTab = 'files')}>
                         <!-- svelte-ignore a11y_interactive_supports_focus -->
                         <a
@@ -11280,8 +11310,6 @@
                            target. Ours listened on the <a> alone and that band was dead. The anchor
                            keeps the keydown, so the tab stays operable from the keyboard, which the
                            reference's is not. -->
-                      <!-- svelte-ignore a11y_click_events_have_key_events -->
-                      <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
                       <li class="nav-item" role="presentation" onclick={() => (fileTab = 'images')}>
                         <!-- svelte-ignore a11y_interactive_supports_focus -->
                         <a
@@ -11309,8 +11337,6 @@
                            target. Ours listened on the <a> alone and that band was dead. The anchor
                            keeps the keydown, so the tab stays operable from the keyboard, which the
                            reference's is not. -->
-                      <!-- svelte-ignore a11y_click_events_have_key_events -->
-                      <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
                       <li class="nav-item" role="presentation" onclick={() => (fileTab = 'sounds')}>
                         <!-- svelte-ignore a11y_interactive_supports_focus -->
                         <a
@@ -11590,7 +11616,6 @@
                                   class="d-flex justify-content-center align-items-center flex-wrap"
                                 >
                                   {#if item.kind !== 'image'}
-                                    <!-- svelte-ignore a11y_missing_content -->
                                     <!-- svelte-ignore a11y_consider_explicit_label -->
                                     <a
                                       class="fileDowload"

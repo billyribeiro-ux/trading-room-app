@@ -24,6 +24,51 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-14
 
+### 2026-08-14 20:47 EDT — the room lints clean, and the last five "unused variables" were features
+
+**Runtime impact: none.** Lint suppressions with citations, dead-code removal, and five gaps
+documented in place. On `feat/extra-chat-column`.
+
+**123 → 0.** `pnpm lint` exits 0 for the room, so the room step of the new `quality.yml` is green
+rather than red-on-arrival, which was the condition for shipping the gate at all.
+
+**The thirteen stale `svelte-ignore` comments were stale for a reason worth knowing.** They were
+STACKED — two `<!-- svelte-ignore … -->` comments in a row above one element. Svelte's supported form
+is a single comment listing several codes; a second stacked comment makes the first apply to a
+comment node instead of the element. That is the same failure as the `eslint-disable-next-line` I
+wrote an hour earlier, which suppressed my own second comment line. Removing all thirteen left
+`svelte-check` at 0 errors / 0 warnings, which is the proof they were suppressing nothing.
+
+**Five "unused variables" turned out to be unfinished features**, and every one is now documented at
+its declaration rather than deleted:
+
+- `extraChatColumnWasEnabled` is **written and never read**, while the capture quoted eighteen lines
+  above it restores the column from exactly that flag. A column hidden by webinar mode never comes
+  back when webinar mode ends.
+- `extraChatScroller` is handed back by `onscrollerready` and read by nothing — the extra chat column
+  has no programmatic scroll while the main chat does.
+- `loadNoteVersions` is called by nothing, and the endpoint it fetches already exists: note history
+  is server-complete and client-unreachable.
+- `muted` is written by `setMasterVolume` and read by nobody, because every consumer derives
+  `volume === 0` instead — two sources of truth for one fact.
+- `ExtraChatPane`'s `isPresenter` is declared, passed by the parent, and read by no line of the
+  component: the controller's `markUnwired` again, in the other app.
+
+**I deleted one of them and the build caught me.** `muted` was reported as "assigned a value but
+never used", which I read as unused — it is written by `setMasterVolume`, so removing the
+declaration broke `svelte-check`. Restored, documented, and left as a decision rather than a lint
+fix. The rule says *never read*, not *never referenced*, and the difference is the whole finding.
+
+**Two suppressions kept because the code is right and the rule is not.** `roster-gates.test.ts`
+casts through `any` to reproduce the reference's comparator returning an OBJECT where a number
+belongs — JavaScript coerces it to `NaN`, `sort` reads that as "leave the pair alone", and that is
+why presenters do not actually sort to the top upstream. TypeScript refuses an object comparator,
+correctly, so the cast is the only way to express the defect being pinned. And `const-table.mjs`
+keeps its `@ts-nocheck`, whose four-line reason was already written above it.
+
+**Verified.** Room `pnpm lint` exit 0, `svelte-check` 0/0, 1196/1196. Controller `pnpm lint` exit 0,
+963/963. The full gate has still not been run; it runs once before the merge.
+
 ### 2026-08-14 20:19 EDT — ESLint was never broken, the room was never linted, and a probe was silently corrupt
 
 **Runtime impact: none.** Lint configuration, dead-code removal, and one genuine bug fix in a

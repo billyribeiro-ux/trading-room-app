@@ -39,14 +39,28 @@ variable. Both were found by running the tools by hand on 2026-08-14, not by CI.
 `build`, path-filtered the way the backend job already is, plus a required-checks setting so a red
 gate blocks a merge. Note that `main` auto-deploys, which is exactly why this matters.
 
-## Room lint debt — 26 problems remain, opened 2026-08-14 20:19 EDT
+## Room lint is GREEN — closed 2026-08-14 20:47 EDT, but it left five gaps behind
 
-ESLint reached the room for the first time on 2026-08-14 and reported 123 problems; 26 are left, and the room lint step of `quality.yml` is RED until they are cleared. The
-reduction so far is real rather than configured away — see the CHANGELOG entry for which rules were
-switched off and why, each with a citation. What remains, by rule:
+ESLint reached the room for the first time on 2026-08-14 and reported 123 problems. All 123 are
+resolved and `pnpm lint` exits 0, so the room step of `quality.yml` is green.
 
-| count | rule | what it is |
-| --- | --- | --- |
+**Five of them were not lint problems at all.** Each is a real behaviour gap that a style rule
+happened to expose, and each is documented at its declaration rather than deleted, because deleting
+the symbol would erase the only evidence the wiring is half-built:
+
+| where | what is actually missing |
+| --- | --- |
+| `+page.svelte` `extraChatColumnWasEnabled` | **Written, never read.** The capture quoted eighteen lines above it restores the column with `extraChatColumnWasEnabled && (preferences.extraChatColumn = !0, …)`. Only the assignment exists here, so a column hidden by webinar mode never comes back when webinar mode ends. |
+| `+page.svelte` `extraChatScroller` | Handed back by `onscrollerready` and read by nothing, so the extra chat column has no programmatic scroll while the main chat does. |
+| `+page.svelte` `loadNoteVersions` | Nothing calls it, and the route it fetches (`api/notes/[noteId]/versions`) is real and already built. Note history is server-complete and client-unreachable. |
+| `+page.svelte` `muted` | Written by `setMasterVolume`, read by nobody — every consumer derives `volume === 0` instead. Two sources of truth for one fact. |
+| `ExtraChatPane` `isPresenter` | Declared in `Props`, passed by the parent, read by no line of the component — the same shape as the controller's `markUnwired`. |
+
+Each needs a decision, not a deletion: implement the missing half, or remove the symbol AND its
+writer. **That is a behaviour change and does not belong inside a lint pass**, which is why all five
+are here.
+
+--- | --- | --- |
 | 8 | `@typescript-eslint/no-unused-vars` | unused imports and locals; **check each** — one in the controller turned out to be a prop passed at six sites and read nowhere |
 | 13 | `svelte/no-unused-svelte-ignore` | stale `svelte-ignore` comments; the Svelte MCP autofixer flags the same ones |
 | 5 | `no-useless-assignment` | initialisers that can never be read |

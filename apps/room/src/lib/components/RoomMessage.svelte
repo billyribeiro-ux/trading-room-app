@@ -468,7 +468,7 @@
 {#snippet bodySegments(segments: BodySegment[])}
   {#each segments as segment, index (index)}
     {#if segment.kind === 'stock'}<span class="stockColor" style={stockStyle}>{segment.text}</span
-      >{:else if segment.kind === 'link' && segment.url}<!-- svelte-ignore a11y_click_events_have_key_events --><a
+      >{:else if segment.kind === 'link' && segment.url}<a
         href={segment.url}
         target="_blank"
         rel="noreferrer"
