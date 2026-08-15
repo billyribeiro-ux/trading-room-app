@@ -21,9 +21,7 @@ use sqlx::postgres::{PgConnectOptions, PgListener};
 use sqlx::{ConnectOptions, Connection, Executor, FromRow, PgConnection};
 use tokio::time::timeout;
 use tracing::log::LevelFilter;
-use tradingroom_api::db::migrate::{
-    EXPECTED_MIGRATOR_ROLE, EXPECTED_RUNTIME_ROLE, MIGRATOR,
-};
+use tradingroom_api::db::migrate::{EXPECTED_MIGRATOR_ROLE, EXPECTED_RUNTIME_ROLE, MIGRATOR};
 use uuid::Uuid;
 
 const ATTESTATION_VERSION: u32 = 1;

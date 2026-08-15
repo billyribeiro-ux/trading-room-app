@@ -662,7 +662,11 @@ mod tests {
             Some(EXPECTED_RUNTIME_ROLE),
             Some(":ptr_clone_app"),
             Some("scram-sha-256:ptr_clone"),
-            Some(concat!("scram-sha-256:", "tradingroom_app", ":forged-suffix")),
+            Some(concat!(
+                "scram-sha-256:",
+                "tradingroom_app",
+                ":forged-suffix"
+            )),
         ] {
             let mut posture = restricted_posture();
             posture.system_user = system_user.map(str::to_owned);
