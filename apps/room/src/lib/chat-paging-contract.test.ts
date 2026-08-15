@@ -294,7 +294,7 @@ describe('the alerts log is paged by the same machinery', () => {
       while a term is set is load-bearing here: asking for page 2 of a filter the server knows
       nothing about would interleave unfiltered history into a filtered view.
     */
-    expect(pageCode).toContain('searchTerm: alertSearch,');
+    expect(pageCode).toContain('searchTerm: alerts.search,');
   });
 
   it('and stops at the first empty page, re-arming at the bottom', () => {

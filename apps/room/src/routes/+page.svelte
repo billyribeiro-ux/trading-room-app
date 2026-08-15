@@ -109,6 +109,7 @@
     locationVisibleTo
   } from '$lib/roster-gates';
   import { RoomRoster } from '$lib/room/roster.svelte';
+  import { RoomAlerts } from '$lib/room/alerts.svelte';
   import { alertSoundButtonFor, filesSectionHidden } from '$lib/files-gates';
   import {
     INITIAL_FILE_SORT,
@@ -154,12 +155,7 @@
   } from '$lib/swing-alerts';
   import type { SwingAlertRow } from '$lib/types';
   import { parseAlertLabels } from '$lib/alert-labels';
-  import {
-    alertFilterAvailable,
-    alertPassesFilter,
-    hasActiveAlertFilter,
-    type AlertFilterFor
-  } from '$lib/alert-filter';
+  import { alertFilterAvailable, alertPassesFilter, type AlertFilterFor } from '$lib/alert-filter';
   import DayTradeAlertsPane from '$lib/components/day-trade-alerts/DayTradeAlertsPane.svelte';
   import type { DayTradeAlertDraft } from '$lib/components/day-trade-alerts/draft';
   import {
@@ -1171,26 +1167,24 @@
   // The captured alerts toolbar (alert-section/datach-alerts-1) is a strip between the alerts
   // header and the scroller. It is absent from the default capture (alert-section/1.html states
   // "No alertsToolbar search strip in this snapshot"), so it is toggled, not permanent.
-  let alertsToolbarOpen = $state(false);
-  /**
-   * The toolbar has TWO states, not one. `app-alerts` carries a second flag and two separate
-   * toggles (`docs/source/components/app-alerts.compiled.js:16-17,134-150`), and its template
-   * gates three regions on the second one
-   * (`docs/source/components/app-alerts.render-helpers.js:160-196`):
-   *
-   *   div.alertsToolbar                      <- showAlertsToolbar
-   *     div.d-flex…justify-content-between   <- showAlertsToolbarExtended   (checkbox, Detach, buttons)
-   *     form#alert-settings                  <- always
-   *       input + span#addon-chat-clear      <- always
-   *       span#addon-chat-save + archive     <- showAlertsToolbarExtended
-   *
-   * So the magnifier opens a search-only strip and the gear opens the full one. This room had a
-   * single flag, so the magnifier opened everything and the gear opened the alert-filter modal
-   * instead of expanding the toolbar.
-   */
-  let alertsToolbarExtended = $state(false);
-  let inlineAlertEntry = $state(false);
-  let alertSearch = $state('');
+  /*
+    The alerts pane's own state, in `$lib/room/alerts.svelte.ts`: the two-state toolbar, this
+    viewer's Alert Filter, the archive cut-off and the search term — with the citations for each.
+
+    The fifth room state class. It deliberately does NOT own `visibleAlerts` / `searchableAlerts`,
+    which thread `data.alerts` through evidence rules and the unread-Q&A set, nor the alerts PAGING,
+    which is the same code as the chat log's because upstream renders one roomlog component for
+    both. What moved is the state and every predicate built on it — the page's filter chain now
+    reads as named filters instead of five inline closures that each restated the filter's two
+    halves.
+  */
+  const alerts = new RoomAlerts({
+    // The stored settings are the intentional one-time seed for editable client preference state.
+    alertFilterFor: RoomAlerts.readFilterFor(loadedSettings.alertFilterFor),
+    showAlertsFrom: loadedSettings.showAlertsFrom === true,
+    archivedAt:
+      typeof loadedSettings.alertsArchivedAt === 'number' ? loadedSettings.alertsArchivedAt : null
+  });
   let alertsDetachedWindow: Window | null = null;
   /*
     The eleven floating menus, in `$lib/room/menus.svelte.ts`.
@@ -2309,28 +2303,6 @@
    * reference sends the map to the server AND calls `setPreference('showAlertsFrom', …)` in the same
    * expression, byte 1,221,491.
    */
-  // The stored settings are the intentional one-time seed for editable client preference state.
-  let alertFilterFor = $state.raw<AlertFilterFor>(readAlertFilterFor(loadedSettings.alertFilterFor));
-  // The stored settings are the intentional one-time seed for editable client preference state.
-  let showAlertsFrom = $state(loadedSettings.showAlertsFrom === true);
-
-  /**
-   * The stored map, taken strictly rather than coerced.
-   *
-   * Same posture as `readPresenterMuteMap`: the value is `avatar hash -> username`, and an entry
-   * whose value is not a string is DROPPED rather than turned into a truthy placeholder. A junk
-   * entry that survived would filter out a trader nobody selected, and in the allow-list direction
-   * it would hide almost every alert in the room.
-   */
-  function readAlertFilterFor(stored: unknown): AlertFilterFor {
-    if (!stored || typeof stored !== 'object' || Array.isArray(stored)) return {};
-    const map: AlertFilterFor = {};
-    for (const [hash, username] of Object.entries(stored as Record<string, unknown>)) {
-      if (typeof username === 'string') map[hash] = username;
-    }
-    return map;
-  }
-
   /**
    * Is the Alert Filter configured for this room at all?
    *
@@ -2390,7 +2362,7 @@
    * A room with a list but no selection shows the buttons and no badge, which is why the two gates
    * are separate values rather than one.
    */
-  const alertFilterActive = $derived(alertFilterConfigured && hasActiveAlertFilter(alertFilterFor));
+  const alertFilterActive = $derived(alertFilterConfigured && alerts.filterSelected);
 
   /**
    * `updateAlertFilter` — the reference persists the map server-side AND sets the preference.
@@ -2400,17 +2372,16 @@
    * the reference's: the selection survives a reload.
    */
   function saveAlertFilter(next: { alertFilterFor: AlertFilterFor; showAlertsFrom: boolean }) {
-    alertFilterFor = next.alertFilterFor;
-    showAlertsFrom = next.showAlertsFrom;
-    savePreference('alertFilterFor', next.alertFilterFor);
-    savePreference('showAlertsFrom', next.showAlertsFrom);
+    const write = alerts.filterChanged(next);
+    savePreference('alertFilterFor', write.alertFilterFor);
+    savePreference('showAlertsFrom', write.showAlertsFrom);
   }
 
   const visibleAlerts = $derived(
     mergeOlderChatMessages(olderAlerts, data.alerts)
       .filter((item) => !isEvidenceMessageHidden(item))
       .map(withEvidenceState)
-      .filter((item) => matchesAlertSearch(item))
+      .filter(alerts.matchesSearch)
       /*
         THE ALERT FILTER — the second of the reference's three sites, `case "getAlertsLog"` at byte
         1,017,070.
@@ -2422,17 +2393,8 @@
         The predicate lives in `$lib/alert-filter` rather than here because it fails OPEN in three
         distinct ways and inlining it would put that logic in three places.
       */
-      .filter((item) =>
-        alertPassesFilter({
-          avatarHash: item.senderEmailHash,
-          alertFilterFor,
-          showAlertsFrom,
-          modAlertFilterListRaw: data.sessData?.modAlertFilterList
-        })
-      )
-      .filter(
-        (item) => alertsArchivedAt === null || new Date(item.createdAt).getTime() > alertsArchivedAt
-      )
+      .filter(alerts.passesFilter(data.sessData?.modAlertFilterList))
+      .filter(alerts.afterArchive)
       .map((item) => ({ ...item, unreadQa: unreadQaAlertIds.has(item.id) }))
   );
 
@@ -2461,36 +2423,7 @@
    * would quietly narrow the search to whatever the list happens to be showing.
    */
   const searchableAlerts = $derived(
-    data.alerts.filter((item) =>
-      alertPassesFilter({
-        avatarHash: item.senderEmailHash,
-        alertFilterFor,
-        showAlertsFrom,
-        modAlertFilterListRaw: data.sessData?.modAlertFilterList
-      })
-    )
-  );
-
-  // The captured search field reads "Type your search term, then press Enter", so the term filters
-  // the alert list. It is applied against the rendered body and the sender name only - the fields
-  // the reader can actually see - rather than against metadata they cannot.
-  function matchesAlertSearch(item: { body: string; senderName: string }) {
-    const term = alertSearch.trim().toLowerCase();
-    if (!term) return true;
-    return item.body.toLowerCase().includes(term) || item.senderName.toLowerCase().includes(term);
-  }
-
-  // "Archive Alerts Messages" records a cut-off rather than deleting anything: alerts at or before
-  // it drop out of the list, and the alerts themselves stay in the database. The capture gives the
-  // control a title and a trash icon but no evidence of its server semantics, so this is the
-  // conservative reading - nothing is destroyed, and clearing the stored preference restores the
-  // full list.
-  // `null` means no archive has been taken, which is not the same as a cut-off of 0: captured
-  // alerts carry `createdAt: new Date(0)` (captured-room.ts), so a 0 default made the
-  // `createdAt > cutoff` test below false for every one of them and silently hid the entire
-  // captured alert list until the reader archived something.
-  let alertsArchivedAt = $state<number | null>(
-    typeof loadedSettings.alertsArchivedAt === 'number' ? loadedSettings.alertsArchivedAt : null
+    data.alerts.filter(alerts.passesFilter(data.sessData?.modAlertFilterList))
   );
 
   function archiveAlerts() {
@@ -2503,9 +2436,9 @@
       message: `Archive ${archivable} alert${archivable === 1 ? '' : 's'} from this list? They stay stored and are not deleted.`,
       onconfirm: () => {
         bootboxConfirmation = null;
-        const cutoff = Date.now();
-        alertsArchivedAt = cutoff;
-        savePreference('alertsArchivedAt', cutoff);
+        // One clock reading for the state and the preference: two calls could straddle an alert
+        // arriving and archive it out of the list while storing a cut-off that does not cover it.
+        savePreference('alertsArchivedAt', alerts.archive(Date.now()));
       }
     };
   }
@@ -2804,7 +2737,7 @@
            `matchesAlertSearch` filters the rendered list by it. Upstream refuses to page while a
            term is set because a filtered log is not a paged one — asking for page 2 of a filter the
            server knows nothing about would interleave unfiltered history into a filtered view. */
-        searchTerm: alertSearch,
+        searchTerm: alerts.search,
         hasMoreData: alertsHasMoreData,
         loadingMore: alertsLoadingMore
       })
@@ -3077,8 +3010,8 @@
         if (
           !alertPassesFilter({
             avatarHash: alert.senderEmailHash,
-            alertFilterFor,
-            showAlertsFrom,
+            alertFilterFor: alerts.filterFor,
+            showAlertsFrom: alerts.showFrom,
             modAlertFilterListRaw: data.sessData?.modAlertFilterList
           })
         ) {
@@ -3708,14 +3641,10 @@
    * closing it, so the two controls do not fight each other.
    */
   function toggleAlertsToolbar() {
-    if (alertsToolbarOpen && !alertsToolbarExtended) {
-      alertsToolbarExtended = true;
-    } else {
-      alertsToolbarOpen = !alertsToolbarOpen;
-      if (alertsToolbarOpen) alertsToolbarExtended = true;
-    }
+    alerts.toggleToolbar();
     // `guiEventBus.emit('scrollAlertLogToBottom')` - the strip changes height, so the log would
-    // otherwise be left scrolled off the newest alert.
+    // otherwise be left scrolled off the newest alert. The scroller is this file's element, which
+    // is why the emit stayed here rather than going into the class with the toggle.
     if (alertsScroller) forceAlertsToBottom(alertsScroller);
   }
 
@@ -3735,14 +3664,11 @@
    * closing, and it always ends with the extended regions hidden.
    */
   function toggleAlertsToolbarSearchOnly() {
-    if (!(alertsToolbarOpen && alertsToolbarExtended)) alertsToolbarOpen = !alertsToolbarOpen;
-    alertsToolbarExtended = false;
-    if (alertsToolbarOpen) {
-      // `setTimeout(...)` in the capture, because the input does not exist until the strip renders.
-      void tick().then(() => {
-        document.querySelector<HTMLInputElement>('#alert-settings .form-control')?.focus();
-      });
-    }
+    if (!alerts.toggleSearchOnly()) return;
+    // `setTimeout(...)` in the capture, because the input does not exist until the strip renders.
+    void tick().then(() => {
+      document.querySelector<HTMLInputElement>('#alert-settings .form-control')?.focus();
+    });
   }
 
   function openModal(name: Exclude<ModalName, null>) {
@@ -10382,7 +10308,7 @@
                         </ul>
                       </nav>
                     </div>
-                    {#if alertsToolbarOpen}
+                    {#if alerts.toolbarOpen}
                       <!--
                         Ported node for node from alert-section/datach-alerts-1. The empty right
                         div is a conditional slot in the capture (an Angular comment anchor pair),
@@ -10395,7 +10321,7 @@
                           `R2e` (const 28), gated on `showAlertsToolbarExtended`. The magnifier
                           collapses this away and leaves only the form below.
                         -->
-                        {#if alertsToolbarExtended}
+                        {#if alerts.toolbarExtended}
                           <div class="d-flex align-items-center justify-content-between flex-wrap">
                             <div class="d-flex align-items-center">
                               <!-- `O(2, e.isPresenter ? 2 : -1)` - const 36, presenter only. -->
@@ -10407,7 +10333,7 @@
                                     value="Show inline alert entry"
                                     id="inline-alert-entry"
                                     class="form-check-input"
-                                    bind:checked={inlineAlertEntry}
+                                    bind:checked={alerts.inlineEntry}
                                   /><label for="inline-alert-entry" class="form-check-label">
                                     Show inline alert entry
                                   </label>
@@ -10522,7 +10448,7 @@
                                   aria-describedby="addon-search"
                                   title="Type your search term, then press Enter"
                                   class="form-control"
-                                  bind:value={alertSearch}
+                                  bind:value={alerts.search}
                                   onkeydown={(event) => {
                                     if (event.key === 'Enter') event.preventDefault();
                                   }}
@@ -10532,7 +10458,7 @@
                                   id="addon-chat-clear"
                                   title="Clear the search"
                                   class="btn btn-outline-secondary pl-2 pr-2 d-inline-flex clear-alert-input input-group-text"
-                                  onclick={() => (alertSearch = '')}
+                                  onclick={() => (alerts.search = '')}
                                   ><i class="fas fa-times"></i></span
                                 >
                                 <!--
@@ -10541,7 +10467,7 @@
                                   `isPresenter && !isLimitedPresenter`. Search-only shows neither -
                                   this room showed both in every state.
                                 -->
-                                {#if alertsToolbarExtended}
+                                {#if alerts.toolbarExtended}
                                   <!-- svelte-ignore a11y_click_events_have_key_events -->
                                   <!-- svelte-ignore a11y_no_static_element_interactions -->
                                   <span
@@ -12494,8 +12420,8 @@
       {mediaIceServers}
       {mobilePin}
       modAlertFilterList={data.sessData?.modAlertFilterList}
-      bind:alertFilterFor
-      bind:showAlertsFrom
+      bind:alertFilterFor={alerts.filterFor}
+      bind:showAlertsFrom={alerts.showFrom}
       onsavealertfilter={saveAlertFilter}
       onopenalertfilter={() => openModal('alert-filter')}
       mobileAndroidUrl={data.sessData?.customMobileAppEnabled

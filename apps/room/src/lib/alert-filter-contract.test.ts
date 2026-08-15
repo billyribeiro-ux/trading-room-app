@@ -252,13 +252,32 @@ describe('the filter is applied at all THREE sites, not just the visible one', (
   const page = readFileSync(new URL('../routes/+page.svelte', import.meta.url), 'utf8');
   const source = page.replace(/\/\*[\s\S]*?\*\//g, '').replace(/<!--[\s\S]*?-->/g, '');
 
-  const callSites = source.match(/alertPassesFilter\(/g) ?? [];
+  /*
+    TWO of the three call sites moved into `RoomAlerts.passesFilter` on 2026-08-15 — the rendered
+    list and the advanced-search rows both went from restating the filter's two viewer-owned halves
+    inline to `.filter(alerts.passesFilter(raw))`. The THIRD, the live arrival guard, stayed in the
+    page, because it reads the values inside a microtask on purpose: as of DELIVERY, not as of the
+    effect body, or toggling the filter would re-run it and re-deliver alerts that already arrived.
 
-  it('calls the shared predicate three times, never re-deriving it inline', () => {
-    expect(callSites).toHaveLength(3);
+    So the count is now 1 here and 1 in the class, and the assertion checks BOTH files rather than
+    dropping to two. A count that only ever looked at the page would have gone green at 1 after this
+    extraction while two sites quietly vanished, which is the exact failure mode this file guards.
+  */
+  const alertsClass = readFileSync(
+    new URL('./room/alerts.svelte.ts', import.meta.url),
+    'utf8'
+  ).replace(/\/\*[\s\S]*?\*\//g, '');
+  const callSites = source.match(/alertPassesFilter\(/g) ?? [];
+  const classCallSites = alertsClass.match(/alertPassesFilter\(/g) ?? [];
+
+  it('calls the shared predicate at every site, never re-deriving it inline', () => {
+    expect(callSites, 'the live arrival guard reads the values at delivery time').toHaveLength(1);
+    expect(classCallSites, 'the rendered list and the search rows share one').toHaveLength(1);
+    expect(source).toContain('.filter(alerts.passesFilter(data.sessData?.modAlertFilterList))');
     // The predicate itself must not be reimplemented at a call site: `showAlertsFrom ? … : …`
     // against the selection map is the exact expression that has to live in one place.
     expect(source).not.toContain('showAlertsFrom ? alertFilterFor[');
+    expect(alertsClass).not.toContain('this.#showFrom ? this.#filterFor[');
   });
 
   it('guards the live arrival BEFORE delivery, so a hidden alert makes no toast and no sound', () => {

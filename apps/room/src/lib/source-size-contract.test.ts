@@ -120,8 +120,15 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       `RoomRoster` is the fourth: 13,157 -> 13,048. The two transcribed pipes and the four gates
       stayed in `$lib/roster-gates` where their truth tables are — what moved is the state they run
       on, plus the random draw and its three-second reveal timer.
+
+      `RoomAlerts` is the fifth: 13,048 -> 12,974. A smaller drop than the two before it, and
+      deliberately so — `visibleAlerts`, `searchableAlerts` and the alerts PAGING all stayed. The
+      paging is not alerts machinery at all: upstream renders one roomlog component for both logs,
+      switched on `logType`, so moving the alerts half would split a thing that is one thing. What
+      the slice bought instead is that the filter's two viewer-owned halves stopped being restated
+      at three call sites.
     */
-    max: 13048,
+    max: 12974,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {
