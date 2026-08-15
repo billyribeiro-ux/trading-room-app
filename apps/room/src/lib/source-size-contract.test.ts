@@ -133,8 +133,14 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       twice, in two shapes — scalars against per-channel maps — and neither shape was wrong, which
       is what let it survive. Upstream keeps the state on the roomlog component and renders one per
       log view, so the arity is the only difference. One keyed class covers both.
+
+      `RoomChat` is the seventh: 12,961 -> 12,954. Small, and the reason is the point — the two
+      columns' state was FIVE fields declared 650 lines apart, and what bound them was not visible
+      from any one of them: `extraChatColumn && (fromExtraColumn || chatInputFocus === 'textAreaTxtExtra')`
+      decides which composer every mention lands in. Moving five declarations saves few lines;
+      naming the thing that reads three of them at once is the whole slice.
     */
-    max: 12961,
+    max: 12954,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {

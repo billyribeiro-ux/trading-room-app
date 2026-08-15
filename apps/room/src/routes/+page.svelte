@@ -111,6 +111,7 @@
   import { RoomRoster } from '$lib/room/roster.svelte';
   import { RoomAlerts } from '$lib/room/alerts.svelte';
   import { ALERTS_LOG, RoomLogPages } from '$lib/room/log-pages.svelte';
+  import { EXTRA_COMPOSER, RoomChat } from '$lib/room/chat.svelte';
   import { alertSoundButtonFor, filesSectionHidden } from '$lib/files-gates';
   import {
     INITIAL_FILE_SORT,
@@ -723,7 +724,20 @@
    * effect without a reload.
    */
   const filesHidden = $derived(filesSectionHidden(data.sessData ?? {}));
-  let chatTab: ChatTab = $state('main');
+  /*
+    The two chat columns, in `$lib/room/chat.svelte.ts`.
+
+    Which channel each shows, what is typed in each, which one the viewer last touched, and the
+    mention routing that reads three of those at once. They were declared 650 lines apart and the
+    thing binding them — `extraChatColumn && (fromExtraColumn || chat.focus === 'textAreaTxtExtra')`
+    — was not visible from any one of them.
+
+    `extraChatColumn` stays a page preference and is passed as a THUNK: it is one of fifteen booleans
+    seeded from the settings snapshot and written through one `savePreference`, and a copy would be
+    the value as of construction, so turning the second column on mid-session would leave every
+    mention routing to the main composer.
+  */
+  const chat = new RoomChat({ extraColumnEnabled: () => extraChatColumn });
   // The page data is the intentional one-time seed for client-managed theme state.
   // svelte-ignore state_referenced_locally
   let theme: Theme = $state(data.settings?.theme === 'dark' ? 'dark' : 'light');
@@ -954,10 +968,6 @@
    * preferences, exactly like `enableRTE`, so a fresh account evaluates the gate on `undefined`.
    */
   let extraChatColumn = $state(loadedSettings.extraChatColumn === true);
-  /** The extra column's own channel. `this.channel = 'offTopic'` in `app-extra-chat`. */
-  let extraChatTab: ChatTab = $state('off-topic');
-  /** `#textAreaTxtExtra`. */
-  let extraComposer = $state('');
   /**
    * The extra chat column's scroll container, and the three trackers its autoscroll needs.
    *
@@ -976,14 +986,6 @@
   let previousExtraChatCount = 0;
   let previousExtraChatTab: ChatTab | undefined;
   let extraChatScrollingUp = false;
-  /**
-   * `globals.chatInputFocus` — which composer the viewer last typed in.
-   *
-   * The mention router reads it: `preferences.extraChatColumn && (extraChatMsg ||
-   * 'textAreaTxtExtra' === chatInputFocus) ? 'doMentionExtra' : 'doMention'`. Without it, clicking
-   * a name while the extra column has focus would insert the mention into the other composer.
-   */
-  let chatInputFocus = $state('textAreaTxt');
 
   /**
    * `preferences.visibilityChangeEnabled`, and `globals.appHasFocus` — pause chat work while the
@@ -1367,7 +1369,6 @@
     who joins after a video started does not see it.
   */
   let scheduledVideoTimer: number | undefined;
-  let composer = $state('');
   let fileSearch = $state('');
   /*
     The Files sort bar's state - ONE field and ONE direction, opening on date/desc.
@@ -2658,7 +2659,7 @@
     badge, and the webinar filter — differing only in which channel it reads. Written as a function
     so the two columns cannot drift: a second derived would be a second copy of six steps.
   */
-  const visibleExtraChatMessages = $derived(chatMessagesFor(extraChatTab));
+  const visibleExtraChatMessages = $derived(chatMessagesFor(chat.extraTab));
 
   function chatMessagesFor(tab: ChatTab) {
     return trimChatLog(
@@ -2708,7 +2709,7 @@
       .map((item) => ({ ...item, badges: badgesForSender(item.senderEmailHash) }));
   }
 
-  const visibleChatMessages = $derived(chatMessagesFor(chatTab));
+  const visibleChatMessages = $derived(chatMessagesFor(chat.tab));
 
   function forceAlertsToBottom(scroller: HTMLElement) {
     if (alertScrollTimer !== undefined) globalThis.clearTimeout(alertScrollTimer);
@@ -2775,7 +2776,7 @@
       reference's own reset, and without it a reader who once hit the end of the history could never
       page again in that session even after the log had grown.
     */
-    if (!chatScrollingUp) chatPages.arm(chatTab);
+    if (!chatScrollingUp) chatPages.arm(chat.tab);
     maybeLoadOlderMessages(scroller);
   }
 
@@ -2800,7 +2801,7 @@
           only honest value it has.
         */
         searchTerm: '',
-        hasMoreData: chatPages.hasMore(chatTab),
+        hasMoreData: chatPages.hasMore(chat.tab),
         loadingMore: chatPages.loading
       })
     ) {
@@ -2812,7 +2813,7 @@
       continuing gesture is not fighting the threshold while the fetch is in flight.
     */
     scroller.scrollTop += CHAT_PAGE_REQUEST_NUDGE;
-    void loadOlderChatMessages(chatTab, scroller);
+    void loadOlderChatMessages(chat.tab, scroller);
   }
 
   /**
@@ -2876,7 +2877,7 @@
 
   $effect(() => {
     const scroller = chatScroller;
-    const activeTab = chatTab;
+    const activeTab = chat.tab;
     const count = visibleChatMessages.length;
     const newestMessage = visibleChatMessages.at(-1);
 
@@ -2918,7 +2919,7 @@
   */
   $effect(() => {
     const scroller = extraChatScroller;
-    const activeTab = extraChatTab;
+    const activeTab = chat.extraTab;
     const count = visibleExtraChatMessages.length;
     const newestMessage = visibleExtraChatMessages.at(-1);
 
@@ -4779,27 +4780,19 @@
    *
    * Two ways to reach the extra column, and both matter: the message you clicked was IN that column
    * (`extraChatMsg`, true for every row it renders), or you were last typing there
-   * (`chatInputFocus`). Without the second, clicking a name in the main log while composing in the
+   * (`chat.focus`). Without the second, clicking a name in the main log while composing in the
    * extra column would insert into the pane you are not looking at.
    *
    * The extra column's insert is upstream's own, and it differs by a space:
    * `i.length ? val(i + ' @' + e + ' ') : val('@' + e + ' ')`.
    */
   function mentionUser(name: string, toExtraColumn = false) {
-    if (toExtraColumn) {
-      extraComposer += `${extraComposer ? ' ' : ''}@${name} `;
-      return;
-    }
-    composer += `${composer ? ' ' : ''}@${name} `;
+    // The insert is the class's; the caret is this file's, because the element is.
+    if (!chat.mention(name, toExtraColumn)) return;
     requestAnimationFrame(() => {
       composerElement?.focus();
-      composerElement?.setSelectionRange(composer.length, composer.length);
+      composerElement?.setSelectionRange(chat.composer.length, chat.composer.length);
     });
-  }
-
-  /** Which composer a mention belongs in, given where the click came from. */
-  function mentionTargetIsExtraColumn(fromExtraColumn: boolean) {
-    return extraChatColumn && (fromExtraColumn || chatInputFocus === 'textAreaTxtExtra');
   }
 
   function handleMessageAction(
@@ -4825,7 +4818,7 @@
 
     if (action === 'user') openModal('user');
     if (action === 'mention'){
-      mentionUser(item.senderName, mentionTargetIsExtraColumn(fromExtraColumn));
+      mentionUser(item.senderName, chat.mentionTargetIsExtra(fromExtraColumn));
     }
     if (action === 'reply') openModal('reply');
     if (action === 'report') openModal('report');
@@ -6375,10 +6368,10 @@
   }
 
   async function sendComposerMessage() {
-    const body = composer.trim();
+    const body = chat.composer.trim();
     if (!body) return;
 
-    if (await sendMessageBody(body)) composer = '';
+    if (await sendMessageBody(body)) chat.clear('textAreaTxt');
   }
 
   /**
@@ -6389,7 +6382,7 @@
    * it and derives its own `body` from the result, so what arrives here as plain text is the
    * optimistic copy and never the stored one.
    */
-  async function sendMessageBody(body: string, bodyHtml?: string, room: ChatTab = chatTab) {
+  async function sendMessageBody(body: string, bodyHtml?: string, room: ChatTab = chat.tab) {
     const trimmedBody = body.trim();
     if (!trimmedBody) return false;
 
@@ -6457,8 +6450,9 @@
     menus.set('giphy', false);
     rteIsEditing = false;
     rteEditTarget = null;
-    rteDraft = textToEditorHtml(composer.trim());
-    composer = '';
+    // One step, so a half-written message cannot exist in the modal AND behind it — which is a
+    // message sent twice.
+    rteDraft = textToEditorHtml(chat.take('textAreaTxt'));
     openModal('rich-text');
   }
 
@@ -6531,9 +6525,9 @@
 
   /** The extra column's composer, sending into the channel that column is showing. */
   async function sendExtraComposerMessage() {
-    const body = extraComposer.trim();
+    const body = chat.extraComposer.trim();
     if (!body) return;
-    if (await sendMessageBody(body, undefined, extraChatTab)) extraComposer = '';
+    if (await sendMessageBody(body, undefined, chat.extraTab)) chat.clear(EXTRA_COMPOSER);
   }
 
   /**
@@ -6546,20 +6540,20 @@
    */
   function trackExtraChatScroll(scroller: HTMLElement) {
     extraChatScrollingUp = isRoomScrollerReadingHistory(scroller);
-    if (!extraChatScrollingUp) chatPages.arm(extraChatTab);
+    if (!extraChatScrollingUp) chatPages.arm(chat.extraTab);
     if (
       !shouldLoadOlderMessages({
         scrollTop: scroller.scrollTop,
         messageCount: visibleExtraChatMessages.length,
         searchTerm: '',
-        hasMoreData: chatPages.hasMore(extraChatTab),
+        hasMoreData: chatPages.hasMore(chat.extraTab),
         loadingMore: chatPages.loading
       })
     ) {
       return;
     }
     scroller.scrollTop += CHAT_PAGE_REQUEST_NUDGE;
-    void loadOlderChatMessages(extraChatTab, scroller);
+    void loadOlderChatMessages(chat.extraTab, scroller);
   }
 
   /**
@@ -6569,8 +6563,7 @@
   function openExtraRTEModal() {
     rteIsEditing = false;
     rteEditTarget = null;
-    rteDraft = textToEditorHtml(extraComposer.trim());
-    extraComposer = '';
+    rteDraft = textToEditorHtml(chat.take(EXTRA_COMPOSER));
     openModal('rich-text');
   }
 
@@ -10561,9 +10554,9 @@
                             <a
                               data-bs-toggle="tab"
                               role="tab"
-                              class:active={chatTab === 'main'}
+                              class:active={chat.tab === 'main'}
                               class="nav-link"
-                              onclick={() => (chatTab = 'main')}>Main Chat</a
+                              onclick={() => (chat.tab = 'main')}>Main Chat</a
                             >
                           </li>
                           <li class="nav-item">
@@ -10573,9 +10566,9 @@
                             <a
                               data-bs-toggle="tab"
                               role="tab"
-                              class:active={chatTab === 'off-topic'}
+                              class:active={chat.tab === 'off-topic'}
                               class="nav-link"
-                              onclick={() => (chatTab = 'off-topic')}>Off Topic</a
+                              onclick={() => (chat.tab = 'off-topic')}>Off Topic</a
                             >
                           </li>
                         </ul>
@@ -10725,8 +10718,8 @@
                             placeholder="Type your message here.."
                             class="txt-area form-control border-0"
                             {@attach captureComposerElement}
-                            bind:value={composer}
-                            onfocus={() => (chatInputFocus = 'textAreaTxt')}
+                            bind:value={chat.composer}
+                            onfocus={() => chat.focused('textAreaTxt')}
                             oninput={(event) => autoExpandComposer(event.currentTarget)}
                             onkeydown={(event) => {
                               if (event.key === 'Enter' && !event.shiftKey) {
@@ -10880,7 +10873,7 @@
                           </span>
                           
                           {#if menus.emoji}
-                            <EmojiPicker onselect={(glyph) => (composer += glyph)} />
+                            <EmojiPicker onselect={(glyph) => (chat.composer += glyph)} />
                           {/if}
                         </div>
                       </div>
@@ -12272,8 +12265,8 @@
               style={split.extraChatAreaStyle}
             >
               <ExtraChatPane
-                bind:tab={extraChatTab}
-                bind:composer={extraComposer}
+                bind:tab={chat.extraTab}
+                bind:composer={chat.extraComposer}
                 messages={visibleExtraChatMessages}
                 {doNotDisturbOn}
                 {chatEnabled}
@@ -12300,7 +12293,7 @@
                 onmenutoggle={(key) => menus.openMessageMenu(key)}
                 onaction={(action, message, event) =>
                   handleMessageAction('chat', action, message, event, true)}
-                onfocus={() => (chatInputFocus = 'textAreaTxtExtra')}
+                onfocus={() => chat.focused(EXTRA_COMPOSER)}
                 onsend={() => void sendExtraComposerMessage()}
                 onscroll={(scroller) => trackExtraChatScroll(scroller)}
                 onscrollerready={(scroller) => (extraChatScroller = scroller)}

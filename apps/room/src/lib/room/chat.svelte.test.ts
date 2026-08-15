@@ -1,0 +1,243 @@
+// @vitest-environment jsdom
+import { flushSync } from 'svelte';
+import { describe, expect, it } from 'vitest';
+
+import { EXTRA_COMPOSER, RoomChat } from './chat.svelte';
+
+/*
+  The seventh room state class. The reactivity block at the bottom is the only gate that can see the
+  thing most likely to go wrong — mutations and flushes INSIDE `$effect.root`, assertions OUTSIDE.
+*/
+
+/** The extra column's preference as a mutable fixture, because it can be toggled mid-session. */
+const roomWith = (extraColumn: boolean) => {
+  const prefs = { extraColumn };
+  const chat = new RoomChat({ extraColumnEnabled: () => prefs.extraColumn });
+  return { chat, prefs };
+};
+
+describe('the mention router, which reads three fields to answer one question', () => {
+  /*
+    `preferences.extraChatColumn && (this.extraChatMsg || 'textAreaTxtExtra' === globals.chatInputFocus)`
+
+    The truth table is small enough to state in full, and stating it in full is the point: the
+    second term is the one that is easy to miss, and missing it puts a mention in the pane the
+    viewer is not looking at.
+  */
+  it('a room with ONE column never routes to the extra composer', () => {
+    const { chat } = roomWith(false);
+    expect(chat.mentionTargetIsExtra(false)).toBe(false);
+    expect(chat.mentionTargetIsExtra(true), 'even when the click came from there').toBe(false);
+
+    chat.focused(EXTRA_COMPOSER);
+    expect(chat.mentionTargetIsExtra(false), 'and even if focus somehow says otherwise').toBe(
+      false
+    );
+  });
+
+  it('a click INSIDE the extra column routes there', () => {
+    // `extraChatMsg` is true for every row that column renders.
+    const { chat } = roomWith(true);
+    expect(chat.mentionTargetIsExtra(true)).toBe(true);
+  });
+
+  it('and so does a click in the MAIN log while you were typing in the extra one', () => {
+    /*
+      The term that is easy to miss. Without it, clicking a name in the main log while composing in
+      the extra column inserts into the pane you are not looking at — which reads as the button
+      doing nothing.
+    */
+    const { chat } = roomWith(true);
+    expect(chat.mentionTargetIsExtra(false), 'focus is still the main composer').toBe(false);
+
+    chat.focused(EXTRA_COMPOSER);
+    expect(chat.mentionTargetIsExtra(false)).toBe(true);
+  });
+
+  it('and focus moving back reverses it', () => {
+    const { chat } = roomWith(true);
+    chat.focused(EXTRA_COMPOSER);
+    chat.focused('textAreaTxt');
+    expect(chat.mentionTargetIsExtra(false)).toBe(false);
+  });
+
+  it('the preference is read LIVE, so turning the column on mid-session works', () => {
+    /*
+      The reason the constructor takes a thunk rather than a boolean. A copy would be the value as
+      of construction, and the settings modal can turn the second column on at any point — after
+      which every mention would keep routing to the main composer, because this class was still
+      holding `false` from page load.
+    */
+    const { chat, prefs } = roomWith(false);
+    chat.focused(EXTRA_COMPOSER);
+    expect(chat.mentionTargetIsExtra(false)).toBe(false);
+
+    prefs.extraColumn = true;
+    expect(chat.mentionTargetIsExtra(false)).toBe(true);
+  });
+});
+
+describe('the insert, which is the reference’s own and differs by a space', () => {
+  it('an empty composer gets no leading space', () => {
+    // `i.length ? val(i + ' @' + e + ' ') : val('@' + e + ' ')`.
+    const { chat } = roomWith(true);
+    chat.mention('Allison', false);
+    expect(chat.composer).toBe('@Allison ');
+  });
+
+  it('a composer with text gets one', () => {
+    const { chat } = roomWith(true);
+    chat.composer = 'hey';
+    chat.mention('Allison', false);
+    expect(chat.composer).toBe('hey @Allison ');
+  });
+
+  it('TWO consecutive mentions produce a double space, which is the reference’s own', () => {
+    /*
+      Pinned rather than fixed, and this test was written the other way round first.
+
+      `i.length ? val(i + ' @' + e + ' ') : val('@' + e + ' ')` appends a separator whenever there is
+      already content — and after the first mention there always is, ending in the trailing space
+      the first insert added. So the reference produces `@Allison  @Bob `, with two spaces, and so
+      does this.
+
+      It looks like a typo and it is not: collapsing it would be a divergence from the capture in
+      the one place a reader would never think to check, and the extra space is invisible in the
+      rendered message anyway. Asserted explicitly so nobody tidies it without deciding to.
+    */
+    const { chat } = roomWith(true);
+    chat.mention('Allison', false);
+    chat.mention('Bob', false);
+    expect(chat.composer).toBe('@Allison  @Bob ');
+  });
+
+  it('writes to the extra composer and leaves the main one alone', () => {
+    const { chat } = roomWith(true);
+    chat.composer = 'main draft';
+    chat.mention('Allison', true);
+
+    expect(chat.extraComposer).toBe('@Allison ');
+    expect(chat.composer, 'the other pane must not be touched').toBe('main draft');
+  });
+
+  it('and REPORTS which composer it wrote to, so only the main one takes the caret', () => {
+    /*
+      The decision/effect split. The class cannot focus an element, and the page should not have to
+      re-derive which composer was the target in order to know whether to. Upstream gives the extra
+      column no focus treatment either.
+    */
+    const { chat } = roomWith(true);
+    expect(chat.mention('Allison', false), 'main').toBe(true);
+    expect(chat.mention('Bob', true), 'extra').toBe(false);
+  });
+});
+
+describe('clearing, and taking', () => {
+  it('a send clears its own composer and never the other', () => {
+    const { chat } = roomWith(true);
+    chat.composer = 'main';
+    chat.extraComposer = 'extra';
+
+    chat.clear('textAreaTxt');
+    expect([chat.composer, chat.extraComposer]).toEqual(['', 'extra']);
+
+    chat.extraComposer = 'extra';
+    chat.clear(EXTRA_COMPOSER);
+    expect([chat.composer, chat.extraComposer]).toEqual(['', '']);
+  });
+
+  it('take() trims and clears in ONE step', () => {
+    /*
+      The rich-text editor opens on the current draft. Two copies of the same half-written message —
+      one in the modal, one behind it — is a message sent twice, so the read and the clear cannot be
+      separated by anything that might return early between them.
+    */
+    const { chat } = roomWith(true);
+    chat.composer = '  hello  ';
+    expect(chat.take('textAreaTxt')).toBe('hello');
+    expect(chat.composer).toBe('');
+  });
+
+  it('and takes from the column it was asked for', () => {
+    const { chat } = roomWith(true);
+    chat.composer = 'main';
+    chat.extraComposer = '  extra  ';
+
+    expect(chat.take(EXTRA_COMPOSER)).toBe('extra');
+    expect(chat.extraComposer).toBe('');
+    expect(chat.composer, 'the main draft survives').toBe('main');
+  });
+});
+
+describe('the two channels', () => {
+  it('open on main and off-topic, which is the reference’s pairing', () => {
+    // `this.channel = 'offTopic'` in `app-extra-chat`; `app-chat` defaults to `main`.
+    const { chat } = roomWith(true);
+    expect([chat.tab, chat.extraTab]).toEqual(['main', 'off-topic']);
+  });
+
+  it('and switch independently, so one column cannot drag the other', () => {
+    const { chat } = roomWith(true);
+    chat.tab = 'off-topic';
+    expect(chat.extraTab, 'still its own channel').toBe('off-topic');
+    chat.extraTab = 'main';
+    expect(chat.tab).toBe('off-topic');
+  });
+});
+
+describe('the getters are REACTIVE, which no other gate can see', () => {
+  it('re-runs a reader as the main composer is typed into', () => {
+    const { chat } = roomWith(true);
+    const seen: string[] = [];
+
+    const stop = $effect.root(() => {
+      $effect(() => {
+        seen.push(chat.composer);
+      });
+      flushSync();
+      chat.mention('Allison', false);
+      flushSync();
+      chat.clear('textAreaTxt');
+      flushSync();
+    });
+    stop();
+
+    expect(seen, 'the composer is not reactive').toEqual(['', '@Allison ', '']);
+  });
+
+  it('and as focus moves between the two, which is what the router reads', () => {
+    const { chat } = roomWith(true);
+    const seen: boolean[] = [];
+
+    const stop = $effect.root(() => {
+      $effect(() => {
+        seen.push(chat.mentionTargetIsExtra(false));
+      });
+      flushSync();
+      chat.focused(EXTRA_COMPOSER);
+      flushSync();
+      chat.focused('textAreaTxt');
+      flushSync();
+    });
+    stop();
+
+    expect(seen, 'the focus flag is not reactive').toEqual([false, true, false]);
+  });
+
+  it('and as a channel changes, which re-derives both message lists', () => {
+    const { chat } = roomWith(true);
+    const seen: string[] = [];
+
+    const stop = $effect.root(() => {
+      $effect(() => {
+        seen.push(chat.extraTab);
+      });
+      flushSync();
+      chat.extraTab = 'main';
+      flushSync();
+    });
+    stop();
+
+    expect(seen, 'the extra channel is not reactive').toEqual(['off-topic', 'main']);
+  });
+});
