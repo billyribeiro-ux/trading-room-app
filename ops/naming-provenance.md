@@ -75,6 +75,28 @@ every grant and every RLS policy membership discovered from `pg_catalog`, never 
 then the application, provisioning and CI cut over to it, and only then is `ptr_clone_app` retired by
 a separate migration that refuses rather than cascades.
 
+### Roles are ADDED; policies are RETARGETED. The asymmetry is the whole lesson.
+
+`0009` does two different things to two kinds of object, and doing the same thing to both is what
+broke the first attempt.
+
+| object | scope | what `0009` does | why |
+| --- | --- | --- | --- |
+| the role | **cluster-global** | ADD beside the baseline | `0001` re-creates `ptr_clone_app` on every new database; a rename meets both names and refuses |
+| the 22 RLS policies | **per-database** | RETARGET onto the runtime role alone | `0001` re-creates each policy on every new database, so `0009` retargets it there too — same end state every time |
+
+The first revision appended the runtime role to each policy instead, leaving both names on every
+tenant policy. That is convergent, compiles, passes the migration's own parity check, and was still
+wrong: `postgres-release-attestation` refuses a `room_events` policy naming more than one role, with
+`[room_events_policy_mismatch]`. It caught the append on `main` — the assertion earning its keep. The
+migration was corrected rather than the assertion relaxed, because a two-role tenant policy is
+precisely the state that check exists to refuse.
+
+Retargeting is also the safer end state. `ptr_clone_app` keeps its object privileges but is named by
+no policy, so under `FORCE ROW LEVEL SECURITY` it reads **zero rows** from all 22 tenant tables while
+it waits to be retired. Verified on PostgreSQL 17: 0 policies name `ptr_clone_app`, 22 name
+`tradingroom_app`, 0 name both — and identically on a second database created on the same cluster.
+
 ## The boundary, and what enforces it
 
 **A `ptr_clone*` literal is allowed in exactly three places.** Anywhere else it is a bug.

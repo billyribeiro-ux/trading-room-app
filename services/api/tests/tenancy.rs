@@ -1,15 +1,19 @@
 //! Row-level security, proven against a real PostgreSQL 17 database.
 //!
-//! Nothing here is mocked. These tests connect as the real `ptr_clone_app` role, which is
+//! Nothing here is mocked. These tests connect as the real `tradingroom_app` role, which is
 //! `NOBYPASSRLS`, so every policy in the schema is genuinely in force. A mock would
 //! cheerfully return whatever it was told to, which is precisely the failure these tests
 //! exist to catch.
+//!
+//! `tradingroom_app`, not `ptr_clone_app`. `0009` retargets all 22 tenant policies onto the runtime
+//! role alone, so the baseline role is named by no policy and reads ZERO rows here - which is the
+//! intended posture, not a regression. Connecting as it would make every assertion below vacuous.
 //!
 //! The fixture is the seeded two-tenant database: `acme-trading` and `beta-trading`, each
 //! with one room. If the tenancy kernel is wrong, one of them can see the other.
 //!
 //! Run with:
-//!   DATABASE_URL='postgres://ptr_clone_app:<pw>@127.0.0.1:5432/ptr_clone' cargo test -p tradingroom-api
+//!   DATABASE_URL='postgres://tradingroom_app:<pw>@127.0.0.1:5432/ptr_clone' cargo test -p tradingroom-api
 
 use sqlx::{PgPool, Row};
 use tradingroom_api::db::{Db, DbError, TenantCtx};
@@ -23,7 +27,7 @@ const ACME_MEMBER_USER: Uuid = uuid!("a0000001-0000-4000-8000-000000000003");
 
 fn database_url() -> String {
     std::env::var("DATABASE_URL").unwrap_or_else(|_| {
-        "postgres://ptr_clone_app:ptr_app_local_dev@127.0.0.1:5432/ptr_clone".into()
+        "postgres://tradingroom_app:ptr_app_local_dev@127.0.0.1:5432/ptr_clone".into()
     })
 }
 
@@ -36,7 +40,7 @@ fn owner_url() -> String {
 async fn db() -> Db {
     Db::connect(&database_url(), 5, limits::DB_ACQUIRE_TIMEOUT)
         .await
-        .expect("the ptr_clone_app role should be able to connect")
+        .expect("the tradingroom_app role should be able to connect")
 }
 
 /// A bare pool, bypassing the kernel entirely, so we can observe what the *database* does
@@ -54,7 +58,7 @@ async fn the_runtime_role_has_no_privilege_expansion_path() {
     db().await
         .assert_runtime_role_is_restricted()
         .await
-        .expect("ptr_clone_app must have the complete restricted runtime posture");
+        .expect("tradingroom_app must have the complete restricted runtime posture");
 }
 
 #[tokio::test]
@@ -65,7 +69,11 @@ async fn an_owner_cannot_impersonate_the_runtime_role_with_session_authorization
     let db = Db::connect(&owner_url(), 1, limits::DB_ACQUIRE_TIMEOUT)
         .await
         .expect("connect as the database owner");
-    sqlx::query("SET SESSION AUTHORIZATION ptr_clone_app")
+    // `tradingroom_app` — the actual runtime role, which is what this test's name claims to be
+    // impersonating. It said `ptr_clone_app` until the cutover, and left that way it would have gone
+    // on passing while testing impersonation of the BASELINE role: a test that still goes green
+    // after it has stopped covering the thing it is named for.
+    sqlx::query("SET SESSION AUTHORIZATION tradingroom_app")
         .execute(db.identity_pool_for_tests())
         .await
         .expect("the owner may assume the runtime session identity");
@@ -75,8 +83,8 @@ async fn an_owner_cannot_impersonate_the_runtime_role_with_session_authorization
             .fetch_one(db.identity_pool_for_tests())
             .await
             .expect("inspect all three PostgreSQL identities");
-    assert_eq!(session_role, "ptr_clone_app");
-    assert_eq!(current_role, "ptr_clone_app");
+    assert_eq!(session_role, "tradingroom_app");
+    assert_eq!(current_role, "tradingroom_app");
     let (method, authenticated_identity) = system_user
         .as_deref()
         .and_then(|identity| identity.split_once(':'))
@@ -90,7 +98,7 @@ async fn an_owner_cannot_impersonate_the_runtime_role_with_session_authorization
         .expect_err("the immutable authenticated owner identity must be rejected")
     {
         DbError::UnsafeRuntimeRole { role, reason } => {
-            assert_eq!(role, "ptr_clone_app");
+            assert_eq!(role, "tradingroom_app");
             assert_eq!(
                 reason,
                 "authentication-cycle identity does not match runtime role"

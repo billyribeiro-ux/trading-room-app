@@ -33,7 +33,12 @@ const REPOSITORY_ROOT = fileURLToPath(new URL('../../../', import.meta.url));
 const EXPECTED_FILE_COUNT = 98;
 const EXPECTED_PATH_LIST_SHA256 = '66ab4696e3d3685daaa5ba27e28137a1cc038a71a32fcf92d30bdd144f35ecef';
 /*
-  The manifest covers the 88 imports that have NEVER been edited here — not all 98.
+  The manifest covers only the imports that have NEVER been edited here — not all 98.
+
+  The count is `EXPECTED_UNTOUCHED_COUNT` directly below and nowhere else in this comment. It has
+  moved four times (88 -> 87 -> 84 -> 83 -> 75) and every prose copy of it went stale within a day,
+  which is the same "a number duplicated into prose is a claim, and an unchecked claim rots" lesson
+  recorded further down this file. Read the constant.
 
   The previous value sealed all 98 as untouched imports, and that had never once been checked: the
   read it depended on resolved to `apps/controller/services/`, a directory that does not exist, so
@@ -44,21 +49,20 @@ const EXPECTED_PATH_LIST_SHA256 = '66ab4696e3d3685daaa5ba27e28137a1cc038a71a32fc
   cannot distinguish reviewed work from an accident, and the next unrecorded edit would land inside
   a green gate. A seal that is always green about a tree nobody checks is worse than no seal.
 
-  Instead the ten are pinned individually in `DIVERGED_FROM_IMPORT` below, so an unrecorded change
-  to any one of them still fails — and fails naming the file — while these 88 stay sealed against
-  the bytes that actually arrived at the import.
-*/
-/*
-  87 -> 84 on 2026-08-15, and the three that left are individually pinned in `DIVERGED_FROM_IMPORT`
-  below, so NOTHING became unsealed by this change — the seal on each simply moved from the
-  aggregate to its own line. `db/mod.rs`, `tests/migrations.rs` and `10-provision-roles.sh` were
-  edited by the runtime-role cutover; the reason for each is recorded beside its hash.
+  Instead each edited import is pinned individually in `DIVERGED_FROM_IMPORT` below, so an
+  unrecorded change to any one of them still fails — and fails naming the file — while the rest stay
+  sealed against the bytes that actually arrived at the import.
 
-  Re-pinning the aggregate is only legitimate BECAUSE of that. A manifest re-pinned to whatever the
-  tree currently contains would be the rubber stamp this file's own header rejects.
+  THE RULE FOR SHRINKING THIS NUMBER, which is the only way it may move: a file that changes leaves
+  the aggregate and gains its own pin, with the reason recorded beside its hash, in the same commit.
+  Nothing becomes unsealed — the seal moves from the aggregate to its own line. Re-pinning the
+  aggregate is legitimate ONLY because of that. A manifest re-pinned to whatever the tree happens to
+  contain would be the rubber stamp this file's own header rejects, and it would be green forever.
+
+  Last moved 2026-08-15, 83 -> 75, by the second half of the runtime-role cutover.
 */
-const EXPECTED_UNTOUCHED_COUNT = 83;
-const EXPECTED_MANIFEST_SHA256 = 'fafb574931851d39813d7a32dfc34f0e5889b462dd3619b8fbc1a948aeaa597d';
+const EXPECTED_UNTOUCHED_COUNT = 75;
+const EXPECTED_MANIFEST_SHA256 = 'f1d59daf09b3ab94eed2a91de0790304bbdb5c0418f97fd47bd70346c2966c1e';
 
 /*
   Files under `services/**` that were AUTHORED HERE and never imported.
@@ -91,7 +95,7 @@ const LOCALLY_AUTHORED = new Map([
   ],
   [
     'services/api/migrations/0009_provision_tradingroom_app.sql',
-    '1e176015ddefd91595fe48b549fd0582f9ff30efcb808cd8e4e78a68cbdf5b23'
+    '20b95d68bac75a698fa4e90502c2e54cc88d475d8b92bc4aada946a57700ce9c'
   ]
 ]);
 
@@ -151,7 +155,7 @@ const DIVERGED_FROM_IMPORT = new Map([
   */
   [
     'services/api/src/bin/postgres-release-attestation.rs',
-    '5694c0e5b6b4d7b8ad0cbb2b309e0d36fbdcb1030ca974cf12c1faf14bd2e285'
+    'fb39c4f0116511d9a9c5094e824efe4d869423a3de0e4d2e22397a37dea6fe2b'
   ],
   // Diverged 2026-08-15 by the runtime-role cutover. Each was an untouched import until then.
   //   db/mod.rs                 EXPECTED_RUNTIME_ROLE -> tradingroom_app, and its unit-test
@@ -166,9 +170,44 @@ const DIVERGED_FROM_IMPORT = new Map([
   // wrong cause. Found by `naming-boundary.test.ts` on the day it was written.
   ['services/.env.example', '67ec3560d9c8e9674f3c3c4c9e18a47023bc245a57036ea00e574e31a1529f0d'],
   ['services/api/src/db/mod.rs', '95294947a9963004ff2204d3e1b305d05d9b26cc19d4c643d48ba7126c0d65d9'],
-  ['services/api/tests/migrations.rs', '94747fe1aeed9c351f22ae9a312ea70842bbab254af54a6659787ab949a61252'],
+  ['services/api/tests/migrations.rs', 'da2739797a45c6eb27beb61d55fd000a500357bfa6ad3b373931bd3ba7165136'],
   ['services/docker/postgres/10-provision-roles.sh', '36031a9f9fb09d597dc58e3b50c59e3c7cb56918cda12dcfce01e959cc406e6d'],
   ['services/api/src/db/migrate.rs', '0df32e9c11c3ace6739f1a6ea9f17610f3263652dc90cc6a07172ba966864e6c'],
+  /*
+    Diverged 2026-08-15 by the SECOND half of the runtime-role cutover — the half the first half
+    missed. Each was an untouched import until now, and each leaves the aggregate for its own pin
+    rather than the aggregate being re-sealed over it.
+
+    The six test files each carried a hardcoded fallback `DATABASE_URL` naming `ptr_clone_app`, used
+    when the variable is unset. CI always sets it, so the fallback was invisible there — but after
+    `0009` retargets the 22 tenant policies onto `tradingroom_app` ALONE, a local run through that
+    fallback connects as a role no policy names and reads ZERO rows from every tenant table. The
+    tenancy suite would have reported a broken tenancy kernel when the kernel was fine.
+
+      tests/tenancy.rs           fallback cut over, and the owner-impersonation test now assumes
+                                 `tradingroom_app`: it is named `..._impersonate_the_runtime_role`
+                                 and was impersonating the BASELINE role, so it would have stayed
+                                 green while no longer covering what its name claims.
+      tests/support/mod.rs       shared fixture fallback.
+      tests/auth_http.rs         fallback only.
+      tests/realtime.rs          fallback only.
+      tests/refresh_rotation.rs  fallback only.
+      tests/room_api.rs          fallback only.
+
+    compose.yml  passes POSTGRES_RUNTIME_USER / POSTGRES_RUNTIME_PASSWORD through to the container.
+                 Both are documented in `.env.example`, and until this change nothing read them
+                 locally: setting either did nothing and the provisioner silently fell back.
+    deny.toml    comment only. It blamed the duplicate `crypto-common` on the mediasoup graph; both
+                 roots are in fact our own direct dependencies, traced with `cargo tree -i`.
+  */
+  ['services/api/tests/tenancy.rs', 'f2f10d1e8b099d115525485e8b5b18957e0cab542e80f7bfa492a1d8c0d97ccb'],
+  ['services/api/tests/support/mod.rs', 'ebdc169b422d4f700a73de6c5ebd2e41f3b452732b11cdf419c76cf3b0664787'],
+  ['services/api/tests/auth_http.rs', '79a5b173119977db1ec1eac94a03b86897d40a42c0f25474d5fbd8cadedac98c'],
+  ['services/api/tests/realtime.rs', '62c6629bed604164b3f9709220f737da51708c794e1b0062210a18d7ee7d0056'],
+  ['services/api/tests/refresh_rotation.rs', '65531ae9d457eacedb87755fd673a6999fa607ea4822e37081d2a553637c49d7'],
+  ['services/api/tests/room_api.rs', 'd4c507b29d7dc8335de398ac0c655941ad8321d0c0abe9385986768e57738e67'],
+  ['services/compose.yml', '22d5aeef341b15ee1ae45041faaa142864a91aba0cb45557d68f9b051a08cc98'],
+  ['services/deny.toml', '57165267aa3ccb0eec647a01232e10c13ab920aa3aaf9293bd2a701e21fa9d14'],
   ['services/media/Dockerfile', 'ae967613fdd0dba2065ec6b488c71d8a61e29eef47fca32f90690066b0eb407a'],
   ['services/media/src/config.rs', 'f9af8fb80a7ccadb1a05b506c14ecd043fae4e5b169e36d403d5d8f1fd4fe449'],
   ['services/media/src/grant.rs', '772f12a8bd9ea55e1d92fa1b460aeb1b451520c1c243c59083a658b4f1989908'],
