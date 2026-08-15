@@ -24,6 +24,53 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-15
 
+### 2026-08-15 07:47 EDT — the full triage of what the reference has and we do not
+
+**Runtime impact: none.** One reference document.
+
+`audit-feature-coverage.mjs` reported 43 wire commands and 2 presentation-area tabs present in the
+reference and absent from `apps/room/src`. `docs/decoded/missing-commands-triage.md` is the result of
+reading **every occurrence of every one of them** in the bundle and then checking each against our own
+source.
+
+| outcome | count |
+| --- | ---: |
+| confirmed missing | **25** |
+| claimed missing, then refuted — we already build it | 7 (plus 1 contested, resolved against it) |
+| built under another name | 9 |
+| framework/library noise | 4 |
+| unclear, needs a product decision | 5 |
+
+**The adversarial pass killed 8 of 34 REAL_GAP claims.** That asymmetry was deliberate — only gap
+claims were refuted, never the other way — because the expensive error is telling the owner something
+is missing when it is built, which sends them reading working code.
+
+**`presAreaTabs-videoplayer` is the instructive kill.** We key that tab `'videoplayer'`; the reference
+keys it `'presAreaTabs-videoplayer'`. The audit's identifier search missed our implementation purely
+because of the prefix, and it was one refuter away from being written up as a missing tab. **The
+coverage audit reports identifiers, not features** — PRESENT is a floor, MISSING is a question.
+
+**`subtitleTrack` (48) and `setPosition` (12) were the two largest MISSING counts in the entire
+report and both are third-party plumbing** — hls.js subtitles and Angular animation internals. Volume
+is not evidence of importance.
+
+**One verdict was contested and resolved by reading, not by majority.** `stopVideoForAll` was judged
+twice with opposite results. The gap is real: `requestStopVideo()` at `VideoPlayer.svelte:156` has the
+right confirm string and the right two callers, and its `onconfirm` clears local state and a timer and
+nothing else — the component makes zero network calls of any kind. The refuter matched the BUTTON; the
+brief asked for the BEHAVIOUR.
+
+**A control that says "For All" and reaches nobody is worse than an absent one, because it reports
+success.** Three such defects are now evidenced and are being fixed: the video play/stop pair, and the
+YouTube overlay where our `onstop` and `onclose` are wired to the same function — collapsing a
+distinction the reference draws deliberately, where "Stop For All" goes to the server and "×" is local.
+
+**Verified:** every table's row count re-counted against its stated total after an internal
+contradiction was found and corrected — `stopVideoForAll` had landed in both the false-gap table and
+the prose refuting that classification, because the dedup kept the first of two disagreeing verdicts.
+All five tables now reconcile.
+
+
 ### 2026-08-15 07:35 EDT — Day Trade audited, and the audit checklist gains the line that would have caught the delete bug
 
 **Runtime impact: one lint fix in console tooling.** The Day Trade feature and the `deleteSwingAlert`
