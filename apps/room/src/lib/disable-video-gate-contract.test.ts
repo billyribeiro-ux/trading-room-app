@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
-import { parseConstTable } from '../../scripts/lib/const-table.mjs';
+import { parseConstTable } from './const-table.mjs';
 
 /*
   `preferences.disableVideo` — the viewer's own "Video off to preserve data" switch.
