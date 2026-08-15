@@ -22,6 +22,49 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ---
 
+## 2026-08-15
+
+### 2026-08-15 00:02 EDT — local dev secrets restored, and four "unbuildable" items were not
+
+**Runtime impact: yes, on production configuration** — `API_KEY_ENCRYPTION_KEY` was rotated in Vercel
+and the controller redeployed. No code changed; the same commit was rebuilt.
+
+**What happened.** `NINJA3.md` walked the owner through creating `apps/room/.env`, and put a
+destructive `cat >` next to a safe `echo >>` for the controller's existing file. The wrong one was
+easier to grab. `apps/controller/.env` went from 1413 bytes to 81 — one variable left of seven.
+
+Six were restored from `~/Desktop/new-room-control/.env`. The seventh, `API_KEY_ENCRYPTION_KEY`,
+**could not be**, and that is the finding worth keeping:
+
+> **Every one of the controller's eleven Vercel variables is type `Sensitive`, which is write-only.**
+> Confirmed by `vercel env ls production` — no value is readable back by the dashboard, the CLI or
+> support, and `vercel env pull` returns them empty.
+
+So `~/Desktop/new-room-control/.env` and `.env.vercel-pull` are the **only readable copies of
+production secrets in existence**. That is now recorded in `TODO.md` with an instruction to back the
+folder up off the machine.
+
+The key was regenerated instead: set in Vercel with `--sensitive --force`, written identically
+locally, and production redeployed (`✓ Ready in 42s`, aliased to `www.tradingroom.app`, `HTTP/2 200`).
+Read from the code before acting rather than assumed: rotating it does **not** break API
+authentication. `secret_hash` authenticates; `secret_ciphertext` exists only so the account page can
+re-display a key. The single cost is that pre-existing keys can no longer be shown until recreated.
+
+**A generated secret was pasted into `NINJA3.md`, committed and pushed to a public repo.** It was
+rotated out of use. History was left alone at the owner's instruction. The doc no longer shows a
+command beside its output, and the destructive branch is gone.
+
+**The correction that matters most came from the owner.** `TODO.md` bucket C said four items "need
+infrastructure that does not exist. Do NOT build them." That was wrong: the original application has
+all four, and this repository's own rule for anything missing is to **write a browser-console script
+that fetches it** — `scripts/ptr-collect.js` is the reference implementation every collector here was
+built from. The bucket now names, per item, exactly what one targeted capture run has to bring back.
+The prohibition that remains is narrower and still right: do not build the features from guesses.
+Capture first.
+
+**Row E is unblocked** as a side effect — `apps/room/.env` now exists with a matching
+`ROOM_JWT_SECRET`, so the room↔controller seam probe can finally be run.
+
 ## 2026-08-14
 
 ### 2026-08-14 23:13 EDT — NINJA.md, the owner's list and only that

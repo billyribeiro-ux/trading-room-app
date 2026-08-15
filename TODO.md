@@ -54,6 +54,23 @@ CI run**: pointing it at an empty directory reproduces exactly what a runner see
 One silent pass was removed on the way: `account-page-sbs.test.ts` had `if (!existsSync(REFERENCE))
 return;`, which made a missing dump a green test that compared nothing.
 
+### 2b. Local dev secrets — restored 2026-08-15, and one is permanently gone
+
+`apps/controller/.env` was overwritten (`cat >` where `>>` was meant) and went from 1413 bytes to
+81. Six of its seven variables were restored from `~/Desktop/new-room-control/.env`.
+
+**`API_KEY_ENCRYPTION_KEY` could not be restored and was regenerated instead.** It is now set in
+Vercel production (`--sensitive`), set identically in the local `.env`, and production has been
+redeployed and verified live. Consequence, stated once: API keys created BEFORE this can no longer
+be re-displayed on the account page. They still **authenticate** — `secret_hash` is what
+authenticates and it is untouched; `secret_ciphertext` only exists so the page can show the value
+again. Delete and recreate any key you want visible.
+
+**The fact that made this unrecoverable, and it applies to all eleven:** every controller variable on
+Vercel is type `Sensitive`, which is **write-only**. No value can be read back by the dashboard, the
+CLI or support. **`~/Desktop/new-room-control/.env` and `.env.vercel-pull` are therefore the only
+readable copies of production secrets that exist anywhere.** Back that folder up off this machine.
+
 ### 3. Backend quality — NOT OURS TO FIX: the runner is out of minutes
 
 **Owner, 2026-08-14 23:00: the account has run out of CI minutes, and that is why these jobs fail.**
@@ -112,7 +129,7 @@ this deployment does not have.
 | **G** | the Postgres host question — Neon under volume | the owner |
 | **H** | production topology — separating media from the app tier | the owner |
 | **Q** | the WordPress plugin run inside a live WordPress | an environment |
-| **E** | `apps/room/.env`, which holds secrets not authored here | an environment |
+| **E** | **UNBLOCKED 2026-08-15.** `apps/room/.env` now exists and its `ROOM_JWT_SECRET` matches the controller's. The seam probe has still never been RUN | nothing — this one is mine to run |
 | **R** | screenshare quality / MP4 — the measurement needs a human at an OS screen-picker dialog; its row 10 needs the same cluster as X and AC | the owner, then a MediaMTX cluster |
 | **X** | `app-recording-preview-window` — `setRecPreview` comes from the MediaMTX path | a MediaMTX cluster |
 | **AC** | `stopRecMsg` — the same producer, the same path | a MediaMTX cluster |
@@ -406,10 +423,36 @@ refused; do not attempt a fifth without the sentence.**
   remains is only the DISPLAY block at `page.manageSession.html:1138-1142`, which is the same
   sentence.
 
-#### C. Four need infrastructure that does not exist. Do NOT build them until it does.
+#### C. Four are NOT CAPTURED YET. Each needs one targeted collection script.
 
-Building any of these means inventing a data source, which the evidence rules forbid. Each is fully
-specified in the register.
+**Corrected 2026-08-15 by the owner, and the correction matters.** This bucket said these needed
+"infrastructure that does not exist" and were not to be built. That was wrong twice over: the
+original application **does** have all four, and this repository's own rule for anything missing is
+not to park it but to **write a browser-console script that fetches it** — `scripts/ptr-collect.js`
+is the working reference implementation and every collector here was built from its shape.
+
+So none of these is blocked on infrastructure. Each is blocked on **one capture run against the live
+original**, and what each script has to bring back is already known:
+
+| item | the script must capture |
+| --- | --- |
+| **T5-16 Recordings** | the response behind `recs` — `vidPath`, `contentType`, `name`, `created`, and `length` in MILLISECONDS (the page renders `length/60000` to two decimals) |
+| **T5-17 Avatars** | the avatar set behind `avatars`, plus the request `selectAvatar(avatar)` posts — URL, method and body |
+| **T5-20 `recorded_max_capacity`** | what actually writes it. Column, reader and reset all exist (migration `0011`); the missing half is the live-occupancy signal the controller never receives. Capture whether the original pushes occupancy on its command channel and under what name |
+| **T5-27 `badges.dark_theme`** | the PICKER that sets it. Storage and display are already proven — `page.welcome.html:1191-1211` shows `ng-if="roomBadge._id === b.darkTheme"`, so it is an ID and not a boolean. Only the control that assigns it is uncaptured |
+
+Rules for those scripts, from `~/CLAUDE.md` §3: one self-contained `.js` file pasted into the console
+on the LIVE app; it detects whether the session is a member or an admin and records what that role
+can and cannot reach; it drives itself to the target and downloads a JSON with no follow-up step; it
+captures markup, computed styles AND the matching stylesheet rules; it records honest gaps when a
+target never rendered; and it checks a hard denylist before every click — **never** delete, upload,
+play, stop, send, save or submit.
+
+**Do NOT build the features from guesses.** The one thing that has not changed is that inventing a
+data source is forbidden. Capture first, then build from what came back.
+
+**T5-20 keeps one specific warning:** do not substitute the roster size for occupancy. The number who
+ever registered is not the number ever simultaneously present.
 
 - **T5-16 — the Recordings page.** Needs an endpoint behind `recs`: `vidPath`, `contentType`, `name`,
   `created`, `length` (MILLISECONDS — the reference renders `length/60000` to two decimals).
