@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { capturePath, hasCapture, readCapture } from './reference-capture';
 import { describe, expect, it } from 'vitest';
 import { render as ssr } from 'svelte/server';
 import Page from '../routes/(app)/account/rooms/[id]/[[tab]]/+page.svelte';
@@ -20,7 +20,7 @@ import { referenceUsers } from './reference-users';
  * The reference lives outside the repo — it carries three real members' names, addresses and
  * gravatar hashes. Absent, this suite says so and stops, rather than passing on nothing.
  */
-const REFERENCE = '/Users/billyribeiro/Desktop/new-room/mising/file2';
+const REFERENCE = 'mising/file2';
 
 /**
  * Line ranges in `file2`, 1-based and inclusive, established by reading its structure.
@@ -111,7 +111,13 @@ const member = (over: Record<string, unknown> = {}) => ({
   which is the useful result: it proves the values are load-bearing rather than decorative. So they
   are parsed from the capture at run time instead — byte-exact for the test, absent from the repo.
 */
-const REFERENCE_USERS = referenceUsers(readFileSync(REFERENCE, 'utf8'));
+/*
+  Guarded, because this runs at MODULE SCOPE. An unguarded read here threw during import and took
+  the whole suite down with a bare ENOENT, so the reason was buried in a stack trace rather than
+  reported as a missing capture. The skipIf on the describe below never runs if this line throws
+  first, which is why the guard has to be here as well as there.
+*/
+const REFERENCE_USERS = hasCapture(REFERENCE) ? referenceUsers(readCapture(REFERENCE)) : [];
 
 const USERS = [
   member({ id: 1, role: 0, ...REFERENCE_USERS[0] }),
@@ -285,12 +291,12 @@ const withoutPaneActive = (nodes: ReturnType<typeof shapeOf>) =>
     n.kind === 'el' && n.classes?.includes('tab-pane') ? { ...n, classes: n.classes.filter((c) => c !== 'active') } : n
   );
 
-describe('manage page, section by section', () => {
+describe.skipIf(!hasCapture(REFERENCE))('manage page, section by section', () => {
   it('has the reference to compare against', () => {
-    expect(existsSync(REFERENCE), `reference markup missing at ${REFERENCE}`).toBe(true);
+    expect(hasCapture(REFERENCE), `reference markup missing at ${capturePath(REFERENCE)}`).toBe(true);
   });
 
-  const lines = existsSync(REFERENCE) ? readFileSync(REFERENCE, 'utf8').split('\n') : [];
+  const lines = hasCapture(REFERENCE) ? readCapture(REFERENCE).split('\n') : [];
   const scoreboard: string[] = [];
 
   for (const section of SECTIONS) {

@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { hasCapture, readCapture } from './reference-capture';
 import { describe, expect, it } from 'vitest';
 
 /**
@@ -21,13 +22,18 @@ import { describe, expect, it } from 'vitest';
  * the evidence instead of against my transcription of it.
  */
 
-const CAPTURE = '/Users/billyribeiro/Desktop/new-room/must-match/important';
+/*
+  Named relative to the capture root rather than as an absolute literal. This file held the full
+  path into the owner's home directory, so it passed there and threw `ENOENT` anywhere else — see
+  `reference-capture.ts` for why the dump itself stays out of the repository.
+*/
+const CAPTURE = 'must-match/important';
 const SERVER = new URL('../routes/(app)/account/rooms/[id]/[[tab]]/+page.server.ts', import.meta.url);
 const PAGE = new URL('../routes/(app)/account/rooms/[id]/[[tab]]/+page.svelte', import.meta.url);
 
 /** The `heading="…"` of every `<li>` in the capture's `ul.nav.nav-tabs`, in document order. */
 function referenceTabs(): string[] {
-  const text = readFileSync(CAPTURE, 'utf8');
+  const text = readCapture(CAPTURE);
   const open = text.indexOf('<ul class="nav nav-tabs"');
   const close = text.indexOf('</ul>', open);
   expect(open, 'the capture must contain the tab strip').toBeGreaterThan(-1);
@@ -41,7 +47,7 @@ function referenceTabs(): string[] {
   return headings;
 }
 
-describe('the manage tab strip', () => {
+describe.skipIf(!hasCapture(CAPTURE))('the manage tab strip', () => {
   it('the capture holds exactly six tabs', () => {
     expect(referenceTabs()).toEqual([
       'Users',

@@ -29,33 +29,38 @@ stale `.svelte-kit` still held the old ambient types. Fixed in `7ea4b77`.
 local check against a stale generated directory is not a green check, and it was reported as one
 several times before CI contradicted it.
 
-### 2. Controller unit tests — OPEN, and the obvious fix is FORBIDDEN
+### 2. Controller unit tests — CLOSED 2026-08-14 23:06
 
-Nine tests across five files read absolute paths under `/Users/billyribeiro/Desktop/new-room/`:
+Nine tests across five files held absolute paths under `/Users/billyribeiro/Desktop/new-room/`, so
+they passed on the owner's machine and `ENOENT`d anywhere else. Two failed at SUITE level, because
+the read was at module scope and threw during import before any guard could run.
 
-| test file | capture it reads |
-| --- | --- |
-| `account-page-sbs.test.ts` | `account-page/ptr-dump-member-1786232518250.json` |
-| `manage-sections-sbs.test.ts` | `mising/file2` |
-| `manage-tab-strip.test.ts` | `must-match/important` |
-| `manage-user-row-sbs.test.ts` | `must-match/match` |
-| `manage-user-table-sbs.test.ts` | `mising/file1` |
+**Copying the captures in was tried and REVERTED.** It works, and `.gitignore:45-47` forbids it in as
+many words — they are dumps of a live room holding real names, addresses and in some cases a live
+JWT. Recorded beside it: `privacy:verify` scans with `git ls-files --exclude-standard`, so it passed
+on the copied dumps **without reading one byte of them**. A green privacy check says nothing about an
+ignored file.
 
-They pass on the owner's machine and `ENOENT` on any runner. Two fail at SUITE level (the read is at
-module scope) and three at test level, which is why a single fix shape does not cover all five.
+`reference-capture.ts` is the fix: one place that knows where the captures live, `hasCapture` for
+`describe.skipIf`, and `readCapture` that names the file and the override when it throws. The
+module-scope reads are guarded because `skipIf` never runs if the import throws first.
 
-**Copying the captures into the repository was tried and REVERTED.** It works — 21/21 passed — and
-`.gitignore:45-47` forbids it in as many words: *"Every one of these is a dump of a LIVE room: real
-names, real addresses, gravatar MD5s, and in some cases a live JWT. They are read from
-`~/Desktop/new-room/`, never copied here."* Note also that `privacy:verify` scans with
-`git ls-files --exclude-standard`, so it does **not** look at ignored files — it passed on the copied
-dumps without reading one byte of them. A green privacy check is not evidence about an ignored file.
+`PTR_CAPTURE_ROOT` overrides the location, which is what made this verifiable **without spending a
+CI run**: pointing it at an empty directory reproduces exactly what a runner sees.
 
-**What closing it means:** the suites skip when the capture is absent, honestly and visibly, rather
-than failing. `quality.yml` already names this boundary in its own comment — a green there means
-lint, types, units and a build, and does not claim the evidence verifiers ran.
+- with the captures: **964 passed**, 91 files
+- as CI sees it: **943 passed, 21 skipped, 0 failed**, 86 files passed and 5 skipped
 
-### 3. Backend quality — OPEN, and NOT fixable from this repository
+One silent pass was removed on the way: `account-page-sbs.test.ts` had `if (!existsSync(REFERENCE))
+return;`, which made a missing dump a green test that compared nothing.
+
+### 3. Backend quality — NOT OURS TO FIX: the runner is out of minutes
+
+**Owner, 2026-08-14 23:00: the account has run out of CI minutes, and that is why these jobs fail.**
+Nothing below is being worked on, and CI is not to be triggered again until the app is finished —
+every push against an open PR starts a run and spends minutes that are not there.
+
+Kept because it was diagnosed rather than guessed, and the diagnosis stands whatever the cause:
 
 The Rust job fails all 27 integration tests with
 `password authentication failed for user "ptr_clone_app"` (28P01).

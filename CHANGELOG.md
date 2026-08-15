@@ -24,6 +24,50 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-14
 
+### 2026-08-14 23:06 EDT — the side-by-side tests stop depending on one machine
+
+**Runtime impact: no.** Five controller test files and one new test-support module. Committed, **not
+pushed** — the account is out of CI minutes, and every push against an open PR spends them.
+
+**What was wrong.** Nine tests across five files held absolute paths under
+`/Users/billyribeiro/Desktop/new-room/`. They passed on the owner's machine and `ENOENT`d anywhere
+else. Two failed at SUITE level rather than test level, because the read ran at module scope and
+threw during import — so the reason arrived as a stack trace rather than as "the capture is missing".
+
+**The obvious fix is forbidden, and was tried anyway.** Copying the captures in works — 21/21 passed
+— and `.gitignore:45-47` rules it out in as many words: they are dumps of a live room holding real
+names, real addresses and in some cases a live JWT. It was reverted. One thing learned in the
+process is worth more than the attempt: **`privacy:verify` scans with
+`git ls-files --exclude-standard`, so it passed on the copied dumps without reading one byte of
+them.** A green privacy check says nothing about an ignored file.
+
+**What landed.** `reference-capture.ts` — one place that knows where the captures live,
+`hasCapture()` to gate `describe.skipIf`, and `readCapture()` that names both the file and the
+override when it throws instead of emitting a bare `ENOENT` into somebody else's home directory. The
+two module-scope reads are guarded explicitly, because `skipIf` never gets to run if the import
+throws first.
+
+`PTR_CAPTURE_ROOT` overrides the location. That is not a convenience — it is what made this
+**verifiable without spending a CI run**, by pointing it at an empty directory and reproducing
+exactly what a runner sees.
+
+A silent pass was removed on the way: `account-page-sbs.test.ts` carried
+`if (!existsSync(REFERENCE)) return;`, which turned a missing dump into a green test that compared
+nothing at all. Absence is now a skipped suite that says so.
+
+**Verified locally, no CI:**
+
+| | result |
+| --- | --- |
+| controller `test:unit`, captures present | **964 passed**, 91 files |
+| controller `test:unit`, `PTR_CAPTURE_ROOT` empty — what CI sees | **943 passed, 21 skipped, 0 failed** |
+| controller lint / `svelte-check` | 0 / 1523 files 0 errors 0 warnings |
+
+**Backend quality is not being worked on.** The owner confirmed the account has run out of CI
+minutes, which is the cause of those failures. The earlier diagnosis stands and is kept in `TODO.md`:
+the "green" PR runs skip the gate entirely, so it is red every time it actually executes, and the
+connect failure is inside `services/**`, a mirror where a fix would be lost on the next sync.
+
 ### 2026-08-14 22:54 EDT — the frontend gate ran for the first time and immediately paid for itself
 
 **Runtime impact: yes.** Six room modules changed how they read configuration, and one environment

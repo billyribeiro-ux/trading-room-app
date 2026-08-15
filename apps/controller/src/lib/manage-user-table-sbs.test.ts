@@ -1,4 +1,4 @@
-import { readFileSync, existsSync } from 'node:fs';
+import { capturePath, hasCapture, readCapture } from './reference-capture';
 import { describe, expect, it } from 'vitest';
 import { render as ssr } from 'svelte/server';
 import Page from '../routes/(app)/account/rooms/[id]/[[tab]]/+page.svelte';
@@ -14,7 +14,7 @@ import { referenceUsers } from './reference-users';
  * reports that and skips rather than passing quietly — a comparison that silently compares nothing
  * is worse than no comparison.
  */
-const REFERENCE = '/Users/billyribeiro/Desktop/new-room/mising/file1';
+const REFERENCE = 'mising/file1';
 
 const member = (over: Record<string, unknown> = {}) => ({
   id: 1,
@@ -60,7 +60,13 @@ const member = (over: Record<string, unknown> = {}) => ({
   which is the useful result: it proves the values are load-bearing rather than decorative. So they
   are parsed from the capture at run time instead — byte-exact for the test, absent from the repo.
 */
-const REFERENCE_USERS = referenceUsers(readFileSync(REFERENCE, 'utf8'));
+/*
+  Guarded, because this runs at MODULE SCOPE. An unguarded read here threw during import and took
+  the whole suite down with a bare ENOENT, which is why the reason was buried in a stack trace
+  rather than reported as a missing capture. The skipIf on the describe below never gets a chance to
+  run if this line throws first, which is why the guard has to be here as well as there.
+*/
+const REFERENCE_USERS = hasCapture(REFERENCE) ? referenceUsers(readCapture(REFERENCE)) : [];
 
 const USERS = [
   member({ id: 1, role: 0, ...REFERENCE_USERS[0] }),
@@ -108,13 +114,13 @@ function ourTable() {
   return body.slice(start, body.indexOf('</table>', start) + 8);
 }
 
-describe('user table, side by side with the reference', () => {
+describe.skipIf(!hasCapture(REFERENCE))('user table, side by side with the reference', () => {
   it('has the reference file to compare against', () => {
-    expect(existsSync(REFERENCE), `reference markup missing at ${REFERENCE}`).toBe(true);
+    expect(hasCapture(REFERENCE), `reference markup missing at ${capturePath(REFERENCE)}`).toBe(true);
   });
 
   it('matches element for element', () => {
-    const reference = shapeOf(readFileSync(REFERENCE, 'utf8'), { angular: true });
+    const reference = shapeOf(readCapture(REFERENCE), { angular: true });
     const ours = shapeOf(ourTable());
 
     const { rows, differing } = sideBySide(reference, ours);
