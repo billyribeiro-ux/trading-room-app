@@ -114,6 +114,12 @@
     swingAlertsTabVisible
   } from '$lib/swing-alerts';
   import type { SwingAlertRow } from '$lib/types';
+  import {
+    alertFilterAvailable,
+    alertPassesFilter,
+    hasActiveAlertFilter,
+    type AlertFilterFor
+  } from '$lib/alert-filter';
   import DayTradeAlertsPane from '$lib/components/day-trade-alerts/DayTradeAlertsPane.svelte';
   import type { DayTradeAlertDraft } from '$lib/components/day-trade-alerts/draft';
   import {
@@ -2575,11 +2581,82 @@
     replaced by every `invalidateAll()`, so older pages held there would be discarded by one new
     alert.
   */
+  /**
+   * `globals.user.alertFilterFor` and `preferences.showAlertsFrom` — the Alert Filter.
+   *
+   * `$state.raw` on the map for the same reason `presenterAudio` uses it: every transition in
+   * `$lib/alert-filter` REPLACES the object rather than mutating it, so a deep proxy would cost a
+   * proxy per key and buy nothing.
+   *
+   * Seeded from the stored preferences, which is where `updateAlertFilter` persists them — the
+   * reference sends the map to the server AND calls `setPreference('showAlertsFrom', …)` in the same
+   * expression, byte 1,221,491.
+   */
+  // The stored settings are the intentional one-time seed for editable client preference state.
+  let alertFilterFor = $state.raw<AlertFilterFor>(readAlertFilterFor(loadedSettings.alertFilterFor));
+  // The stored settings are the intentional one-time seed for editable client preference state.
+  let showAlertsFrom = $state(loadedSettings.showAlertsFrom === true);
+
+  /**
+   * The stored map, taken strictly rather than coerced.
+   *
+   * Same posture as `readPresenterMuteMap`: the value is `avatar hash -> username`, and an entry
+   * whose value is not a string is DROPPED rather than turned into a truthy placeholder. A junk
+   * entry that survived would filter out a trader nobody selected, and in the allow-list direction
+   * it would hide almost every alert in the room.
+   */
+  function readAlertFilterFor(stored: unknown): AlertFilterFor {
+    if (!stored || typeof stored !== 'object' || Array.isArray(stored)) return {};
+    const map: AlertFilterFor = {};
+    for (const [hash, username] of Object.entries(stored as Record<string, unknown>)) {
+      if (typeof username === 'string') map[hash] = username;
+    }
+    return map;
+  }
+
+  /** `doFilteredAlerts`, byte 1,221,430 — gates the header badge. */
+  const doFilteredAlerts = $derived(hasActiveAlertFilter(alertFilterFor));
+  /** The room configured a list at all — the reference gates every entry point on this. */
+  const alertFilterIsAvailable = $derived(alertFilterAvailable(data.sessData?.modAlertFilterList));
+
+  /**
+   * `updateAlertFilter` — the reference persists the map server-side AND sets the preference.
+   *
+   * This room has one mechanism for both: `savePreference` already stores arbitrary JSON per user
+   * and already carries map-shaped values, so no new endpoint is needed. The observable result is
+   * the reference's: the selection survives a reload.
+   */
+  function saveAlertFilter(next: { alertFilterFor: AlertFilterFor; showAlertsFrom: boolean }) {
+    alertFilterFor = next.alertFilterFor;
+    showAlertsFrom = next.showAlertsFrom;
+    savePreference('alertFilterFor', next.alertFilterFor);
+    savePreference('showAlertsFrom', next.showAlertsFrom);
+  }
+
   const visibleAlerts = $derived(
     mergeOlderChatMessages(olderAlerts, data.alerts)
       .filter((item) => !isEvidenceMessageHidden(item))
       .map(withEvidenceState)
       .filter((item) => matchesAlertSearch(item))
+      /*
+        THE ALERT FILTER — the second of the reference's three sites, `case "getAlertsLog"` at byte
+        1,017,070.
+
+        `senderEmailHash` is this room's name for what the reference calls `avt`: the gravatar hash
+        of the sender's email, which is what the selection is keyed by. `alerts-advanced-search.ts`
+        matches on the same field for the same reason.
+
+        The predicate lives in `$lib/alert-filter` rather than here because it fails OPEN in three
+        distinct ways and inlining it would put that logic in three places.
+      */
+      .filter((item) =>
+        alertPassesFilter({
+          avatarHash: item.senderEmailHash,
+          alertFilterFor,
+          showAlertsFrom,
+          modAlertFilterListRaw: data.sessData?.modAlertFilterList
+        })
+      )
       .filter(
         (item) => alertsArchivedAt === null || new Date(item.createdAt).getTime() > alertsArchivedAt
       )
@@ -12797,6 +12874,10 @@
       name={modal}
       {mediaIceServers}
       {mobilePin}
+      modAlertFilterList={data.sessData?.modAlertFilterList}
+      bind:alertFilterFor
+      bind:showAlertsFrom
+      onsavealertfilter={saveAlertFilter}
       mobileAndroidUrl={data.sessData?.customMobileAppEnabled
         ? data.sessData?.customMobileAppAndroidUrl
         : null}
