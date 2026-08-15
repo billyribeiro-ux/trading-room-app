@@ -57,8 +57,8 @@ const EXPECTED_PATH_LIST_SHA256 = '66ab4696e3d3685daaa5ba27e28137a1cc038a71a32fc
   Re-pinning the aggregate is only legitimate BECAUSE of that. A manifest re-pinned to whatever the
   tree currently contains would be the rubber stamp this file's own header rejects.
 */
-const EXPECTED_UNTOUCHED_COUNT = 84;
-const EXPECTED_MANIFEST_SHA256 = 'b5fc02fef764635a2b51c14d6ad5eee00735569342de17775ffa33a722173760';
+const EXPECTED_UNTOUCHED_COUNT = 83;
+const EXPECTED_MANIFEST_SHA256 = 'fafb574931851d39813d7a32dfc34f0e5889b462dd3619b8fbc1a948aeaa597d';
 
 /*
   Files under `services/**` that were AUTHORED HERE and never imported.
@@ -160,6 +160,11 @@ const DIVERGED_FROM_IMPORT = new Map([
   //                             to migrate::EXPECTED_RUNTIME_ROLE so a future cutover cannot leave
   //                             them asserting a role nothing connects as.
   //   10-provision-roles.sh     provisions the RUNTIME role alongside the baseline role.
+  // Diverged 2026-08-15: DATABASE_URL was built from POSTGRES_APP_USER, i.e. the BASELINE role, so
+  // anyone following this file produced a connection string the API's startup check now refuses -
+  // and PostgreSQL reports a nonexistent role as `28P01 password authentication failed`, naming the
+  // wrong cause. Found by `naming-boundary.test.ts` on the day it was written.
+  ['services/.env.example', '67ec3560d9c8e9674f3c3c4c9e18a47023bc245a57036ea00e574e31a1529f0d'],
   ['services/api/src/db/mod.rs', '4dc460c6b4fb8f9f04c24cabe01b0d87765ef6913d376b2470aaf89458a77708'],
   ['services/api/tests/migrations.rs', '94747fe1aeed9c351f22ae9a312ea70842bbab254af54a6659787ab949a61252'],
   ['services/docker/postgres/10-provision-roles.sh', '36031a9f9fb09d597dc58e3b50c59e3c7cb56918cda12dcfce01e959cc406e6d'],
