@@ -43,13 +43,24 @@ runner rather than a stale branch. `src/lib/eslint-config-resolution.test.ts` no
 RESOLVED config via `ESLint.calculateConfigForFile` — a grep for `'off'` would have passed
 throughout the entire failure, because the string was always there.
 
-### ✅ CLOSED 2026-08-15 12:49 EDT — CI could accept an UNVERIFIED commit onto a deploying branch
+### ✅ CLOSED 2026-08-15 12:56 EDT — CI could accept an UNVERIFIED commit onto a deploying branch
 
 Both closed. **Do not re-open either; the state below is verified, not remembered.**
 
-1. **`cancel-in-progress` no longer applies to `main`.** All three workflows now read
-   `cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}` — merged in `4c2dd74` (PR #43).
-   Branch and `pull_request` runs still cancel as before; only the default branch is protected.
+**Read this first: it took TWO changes, and the first one alone was not enough.** The 12:49 fix set
+`cancel-in-progress: false` for `main`, which protects the run already EXECUTING but does not stop
+GitHub cancelling a QUEUED one — a group holds only one pending run. Measured on the fix's own
+commit: `34e6c09` started at 16:36:20Z and survived four later pushes (the flag working), while
+`4c2dd74` was created at 16:41:33Z, **never started a job**, and was cancelled at 16:50:38Z when a
+newer push arrived. `4c2dd74` is the commit that contains the 12:49 fix. The 12:56 change gives each
+`main` commit its own concurrency group, which removes the queue entirely. If you are tempted to
+"simplify" the group expression back to `${{ github.ref }}`, that is this bug.
+
+1. **`cancel-in-progress` no longer applies to `main`, and each `main` commit has its own group.**
+   All three workflows read
+   `cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}` and a group suffixed with
+   `github.sha` on the default branch. Branch and `pull_request` runs are unchanged — they still
+   share a group and still supersede, which is what keeps a busy branch affordable.
 
    The evidence that justified it: **11 of the last 40 runs on `main` were `cancelled` — 27%** —
    including EVERY `Backend quality` run in the 2026-08-15 sequence (`4a79203`, `c1ff436`,

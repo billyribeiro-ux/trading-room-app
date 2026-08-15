@@ -24,6 +24,54 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-15
 
+### 2026-08-15 12:56 EDT — the 12:49 fix was half of one, and the run that proved it was its own
+
+**Runtime impact: none.** Three workflow files and one test.
+
+**The 12:49 entry below claims CI "can no longer cancel the default branch out of its own
+verification". That was too strong, and this corrects it rather than quietly amending it.**
+
+`cancel-in-progress: false` protects the run that is already EXECUTING. It does not stop GitHub
+cancelling a QUEUED one, because a concurrency group holds only one pending run — a newer arrival
+supersedes it. So the fix closed half the hole and the record claimed the whole thing.
+
+**Caught by watching the fix's own commit.** Checking whether `Backend quality` had ever gone green
+on `main`, the run list still showed `cancelled` against `4c2dd74` — the commit that CONTAINS the
+12:49 fix. Pulling the run detail separated the two behaviours cleanly:
+
+| commit | run created | job started | outcome |
+| --- | --- | --- | --- |
+| `34e6c09` | 16:35:59Z | **16:36:20Z** | still running 15+ min later, survived four later pushes |
+| `4c2dd74` | 16:41:33Z | **never** | cancelled 16:50:38Z when `bf6920b` arrived |
+| `bf6920b` | 16:50:37Z | **never** | cancelled 16:51:46Z when `7ae48f6` arrived |
+
+`34e6c09` is the fix working — every earlier backend run on `main` had been killed within minutes,
+and that one was not. `4c2dd74` and `bf6920b` are the half that was still open: created, never
+started a single job, superseded while queued. Both reached `main` with no verification at all,
+after the fix had landed.
+
+**The root fix is the GROUP, not the flag.** Each `main` commit now gets its own concurrency group:
+
+```yaml
+group: quality-${{ github.ref }}${{ github.ref == 'refs/heads/main' && format('-{0}', github.sha) || '' }}
+```
+
+Nothing shares a group, so nothing is superseded, and every commit on the default branch is
+verified. The cost is real and accepted: a burst of pushes can occupy several runners at once. On a
+branch the group is unchanged and supersession still applies, which is what keeps a busy branch
+affordable. `cancel-in-progress` keeps its expression too — on `main` it is now redundant by
+construction, and belt-and-braces on the one branch where an unverified commit is a production
+deploy is the right trade.
+
+**Verified:** all three workflows parse via `yaml.parse` with both halves; `ci-verification-integrity.test.ts`
+extended to assert the group as well as the flag — **11 passed**; negative control run — reverting
+`smoke.yml` to a shared group turns it red naming the file and the fix, restored green.
+
+**The lesson worth keeping, because it nearly shipped as a false claim:** the 12:49 entry was
+written from the change, not from the behaviour. What contradicted it was looking at the run list
+one more time and noticing the fix's own commit was still marked `cancelled`. A gate is not proven
+by the diff that introduces it.
+
 ### 2026-08-15 12:49 EDT — CI can no longer cancel the default branch out of its own verification
 
 **Runtime impact: none.** Three workflow files, one new test, and one repository setting.
