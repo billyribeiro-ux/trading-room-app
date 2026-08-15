@@ -142,8 +142,16 @@ describe('the two entry points', () => {
       Both halves of `openRTEModal()`. Without the clear, the same words sit in two composers and
       can be sent twice.
     */
-    expect(pageCode).toContain('rteDraft = textToEditorHtml(composer.trim());');
-    expect(pageCode).toContain("composer = '';");
+    /*
+      ONE call since the two columns moved to `room/chat.svelte.ts`: `take` trims what is typed and
+      clears it together. Both halves are still load-bearing and are still asserted — the text comes
+      WITH you into the editor, and the composer is left empty so the same words cannot be sent
+      twice from two places — but they can no longer be separated by an early return between them.
+    */
+    expect(pageCode).toContain("rteDraft = textToEditorHtml(chat.take('textAreaTxt'));");
+    const chatClass = readFileSync(new URL('./room/chat.svelte.ts', import.meta.url), 'utf8');
+    expect(chatClass).toContain('take(composer: ChatComposerId): string {');
+    expect(chatClass).toContain('this.clear(composer);');
     expect(pageCode).toContain("openModal('rich-text');");
   });
 

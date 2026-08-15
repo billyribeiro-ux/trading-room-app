@@ -154,9 +154,9 @@ describe('and nothing became unreachable', () => {
     */
     expect(pageCode).toContain('function chatMessagesFor(tab: ChatTab) {');
     expect(pageCode).toContain('mergeOlderChatMessages(chatPages.older(tab), data.messages)');
-    expect(pageCode).toContain('const visibleChatMessages = $derived(chatMessagesFor(chatTab));');
+    expect(pageCode).toContain('const visibleChatMessages = $derived(chatMessagesFor(chat.tab));');
     expect(pageCode).toContain(
-      'const visibleExtraChatMessages = $derived(chatMessagesFor(extraChatTab));'
+      'const visibleExtraChatMessages = $derived(chatMessagesFor(chat.extraTab));'
     );
   });
 
@@ -248,7 +248,7 @@ describe('the client stops asking at the end of history', () => {
       start of `main` also stopped `off-topic` from ever paging. The reference keeps this state on
       the roomlog component, and it renders one per channel.
     */
-    expect(pageCode).toContain('if (!chatScrollingUp) chatPages.arm(chatTab);');
+    expect(pageCode).toContain('if (!chatScrollingUp) chatPages.arm(chat.tab);');
     // PER CHANNEL is now structural: `arm` takes the key, so there is no shared flag to reach for.
     expect(pagesClass).toContain('arm(key: string): void {');
     expect(pagesClass).toContain('this.#hasMore = { ...this.#hasMore, [key]: true };');

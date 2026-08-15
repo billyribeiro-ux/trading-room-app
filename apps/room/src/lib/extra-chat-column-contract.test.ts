@@ -38,6 +38,12 @@ const stripComments = (source: string) =>
   reads. That was my instrument being wrong, not the code, and the fix is the one this file already
   applies to the page: assert on code, never on comments.
 */
+/*
+  The two columns' state moved to `room/chat.svelte.ts` on 2026-08-15 — which channel each shows,
+  what is typed in each, which one has focus, and the mention router that reads three of those at
+  once. The assertions against the reference bundle are untouched; ours follow the code.
+*/
+const chatClass = readFileSync(new URL('./room/chat.svelte.ts', import.meta.url), 'utf8');
 const splitCode = stripComments(SPLIT);
 const pageCode = stripComments(PAGE);
 const paneCode = stripComments(PANE);
@@ -101,13 +107,15 @@ describe('the component', () => {
   it('defaults to the off-topic channel', () => {
     // `this.channel = 'offTopic'`.
     expect(paneCode).toContain("tab = $bindable('off-topic')");
-    expect(pageCode).toContain("let extraChatTab: ChatTab = $state('off-topic');");
+    expect(chatClass).toContain("#extraTab = $state<ChatTab>('off-topic');");
   });
 
   it('has its own composer id, which is what the mention router keys on', () => {
     // `preferences.extraChatColumn && 'textAreaTxtExtra' === chatInputFocus ? 'doMentionExtra' : …`
     expect(paneCode).toContain('id="textAreaTxtExtra"');
-    expect(pageCode).toContain("let chatInputFocus = $state('textAreaTxt');");
+    expect(chatClass).toContain("#focus = $state<ChatComposerId>('textAreaTxt');");
+    // A UNION now, not a bare string: a typo in the comparison would route every mention silently.
+    expect(chatClass).toContain("export type ChatComposerId = 'textAreaTxt' | 'textAreaTxtExtra';");
   });
 
   it('and its own scroller element, per the capture', () => {
@@ -131,8 +139,10 @@ describe('the component', () => {
     expect(paneCode).toContain('{#if canUseRTE}');
     expect(paneCode).toContain('class="fas fa-font"');
     expect(pageCode).toContain('function openExtraRTEModal() {');
-    expect(pageCode).toContain('rteDraft = textToEditorHtml(extraComposer.trim());');
-    expect(pageCode).toContain("extraComposer = '';");
+    // Take-and-clear in ONE call, so the draft cannot exist in the modal and behind it at once.
+    expect(pageCode).toContain('rteDraft = textToEditorHtml(chat.take(EXTRA_COMPOSER));');
+    expect(chatClass).toContain('take(composer: ChatComposerId): string {');
+    expect(chatClass).toContain('this.clear(composer);');
   });
 });
 
@@ -143,9 +153,9 @@ describe('both columns share one pipeline, and that is the point', () => {
       filter — five steps that must agree, in two places that would drift.
     */
     expect(pageCode).toContain('function chatMessagesFor(tab: ChatTab) {');
-    expect(pageCode).toContain('const visibleChatMessages = $derived(chatMessagesFor(chatTab));');
+    expect(pageCode).toContain('const visibleChatMessages = $derived(chatMessagesFor(chat.tab));');
     expect(pageCode).toContain(
-      'const visibleExtraChatMessages = $derived(chatMessagesFor(extraChatTab));'
+      'const visibleExtraChatMessages = $derived(chatMessagesFor(chat.extraTab));'
     );
   });
 
@@ -155,10 +165,10 @@ describe('both columns share one pipeline, and that is the point', () => {
       twice; two columns on different channels get different keys and page independently. That falls
       out of the paging state being a record keyed by channel rather than by column.
     */
-    expect(pageCode).toContain('void loadOlderChatMessages(extraChatTab, scroller);');
-    expect(pageCode).toContain('hasMoreData: chatPages.hasMore(extraChatTab),');
+    expect(pageCode).toContain('void loadOlderChatMessages(chat.extraTab, scroller);');
+    expect(pageCode).toContain('hasMoreData: chatPages.hasMore(chat.extraTab),');
     // ONE instance for both columns, so "keyed by channel rather than by column" is structural.
-    expect(pageCode).toContain('if (!extraChatScrollingUp) chatPages.arm(extraChatTab);');
+    expect(pageCode).toContain('if (!extraChatScrollingUp) chatPages.arm(chat.extraTab);');
   });
 
   it('but each column scrolls independently', () => {
@@ -173,11 +183,11 @@ describe('both columns share one pipeline, and that is the point', () => {
       that way, a message typed in the off-topic column would have landed in main.
     */
     expect(pageCode).toContain(
-      'async function sendMessageBody(body: string, bodyHtml?: string, room: ChatTab = chatTab) {'
+      'async function sendMessageBody(body: string, bodyHtml?: string, room: ChatTab = chat.tab) {'
     );
     // `room` rides on the command's argument now, not on a hand-built `FormData`.
     expect(pageCode).toContain('await sendMessageCommand({ body: trimmedBody, bodyHtml, room });');
-    expect(pageCode).toContain('if (await sendMessageBody(body, undefined, extraChatTab))');
+    expect(pageCode).toContain('if (await sendMessageBody(body, undefined, chat.extraTab))');
   });
 });
 
@@ -189,9 +199,9 @@ describe('mentions reach the column you are in', () => {
       Two ways in, and the second is the one that is easy to miss: clicking a name in the MAIN log
       while composing in the extra column has to insert where you are typing, not where you clicked.
     */
-    expect(pageCode).toContain('function mentionTargetIsExtraColumn(fromExtraColumn: boolean) {');
-    expect(pageCode).toContain(
-      "return extraChatColumn && (fromExtraColumn || chatInputFocus === 'textAreaTxtExtra');"
+    expect(chatClass).toContain('mentionTargetIsExtra(fromExtraColumn: boolean): boolean {');
+    expect(chatClass).toContain(
+      'return this.#extraColumnEnabled() && (fromExtraColumn || this.#focus === EXTRA_COMPOSER);'
     );
   });
 
@@ -201,13 +211,15 @@ describe('mentions reach the column you are in', () => {
   });
 
   it('and both composers report focus, or the flag would never move', () => {
-    expect(pageCode).toContain("onfocus={() => (chatInputFocus = 'textAreaTxt')}");
-    expect(pageCode).toContain("onfocus={() => (chatInputFocus = 'textAreaTxtExtra')}");
+    expect(pageCode).toContain("onfocus={() => chat.focused('textAreaTxt')}");
+    expect(pageCode).toContain('onfocus={() => chat.focused(EXTRA_COMPOSER)}');
   });
 
   it('the insert goes into the composer that was chosen', () => {
     expect(pageCode).toContain('function mentionUser(name: string, toExtraColumn = false) {');
-    expect(pageCode).toContain("extraComposer += `${extraComposer ? ' ' : ''}@${name} `;");
+    expect(chatClass).toContain(
+      "this.#extraComposer += `${this.#extraComposer ? ' ' : ''}@${name} `;"
+    );
   });
 });
 
