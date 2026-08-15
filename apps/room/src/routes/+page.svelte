@@ -1,6 +1,6 @@
 <script lang="ts">
   import { deserialize } from '$app/forms';
-  import { formatChatMutedTill, sameCalendarDay } from '$lib/message-formatters';
+  import { formatChatMutedTill, mediumDate, sameCalendarDay } from '$lib/message-formatters';
   import {
     chatComposerEnabled,
     isChatMode,
@@ -35,6 +35,12 @@
   import { videoForAll, youtubeForAll } from './for-all-broadcast.remote';
   import { recordingState } from './recording-state.remote';
   import { changeChatMode as changeChatModeCommand } from './chat-mode.remote';
+  import {
+    deleteFile as deleteFileCommand,
+    fileMediaCommand,
+    overwriteCashRegisterSound
+  } from './files-pane.remote';
+  import { uploadComposerImage } from './composer-image.remote';
   import { isHttpError } from '@sveltejs/kit';
   import {
     PUBLIC_PTR_CDN_UPLOAD_KEY,
@@ -6662,12 +6668,13 @@
     };
   }
 
+  /** One delete; the loop above drives it, as the capture's `deleteSelected()` does. */
   async function postDeleteFile(fileId: number) {
-    const body = new FormData();
-    body.set('fileID', String(fileId));
-    const response = await fetch('?/deleteFile', { method: 'POST', body });
-    const result = deserialize<{ success?: boolean }, { message?: string }>(await response.text());
-    if (result.type === 'failure') bootboxAlert = result.data?.message ?? 'Delete failed.';
+    try {
+      await deleteFileCommand({ fileId });
+    } catch (cause) {
+      bootboxAlert = isHttpError(cause) ? cause.body.message : 'Delete failed.';
+    }
   }
 
   /**
@@ -6747,13 +6754,15 @@
     await sendPresenterFileCommand('stopMp3ForAll');
   }
 
-  async function sendPresenterFileCommand(cmd: string, url?: string) {
-    const body = new FormData();
-    body.set('cmd', cmd);
-    if (url !== undefined) body.set('url', url);
-    const response = await fetch('?/fileMediaCommand', { method: 'POST', body });
-    const result = deserialize<{ success?: boolean }, { message?: string }>(await response.text());
-    if (result.type === 'failure') bootboxAlert = result.data?.message ?? 'Command failed.';
+  /** The command's own union, so the capture's asymmetric MP3 casing is checked at compile time. */
+  type FileMediaCmd = Parameters<typeof fileMediaCommand>[0]['cmd'];
+
+  async function sendPresenterFileCommand(cmd: FileMediaCmd, url?: string) {
+    try {
+      await fileMediaCommand({ cmd, url });
+    } catch (cause) {
+      bootboxAlert = isHttpError(cause) ? cause.body.message : 'Command failed.';
+    }
   }
 
   /**
@@ -6766,13 +6775,13 @@
    * changing its own label is the failure mode this avoids.
    */
   async function setAlertSound(url: string, on: boolean) {
-    const body = new FormData();
-    body.set('url', url);
-    body.set('on', on ? 'true' : 'false');
-    const response = await fetch('?/overwriteCashRegisterSound', { method: 'POST', body });
-    const result = deserialize<{ success?: boolean }, { message?: string }>(await response.text());
-    if (result.type === 'failure') {
-      bootboxAlert = result.data?.message ?? 'Command failed.';
+    try {
+      // `on` crosses as a real boolean now; the action carried the strings 'true' / 'false'.
+      await overwriteCashRegisterSound({ url, on });
+    } catch (cause) {
+      bootboxAlert = isHttpError(cause) ? cause.body.message : 'Command failed.';
+      // Returned, not fallen through: re-reading after a refusal redraws the button at a setting
+      // the controller never stored, which is the label-only lie this whole path exists to avoid.
       return;
     }
     await invalidate('room:data');
@@ -6789,19 +6798,6 @@
   // trailing space before the closing tag.
   function fileSizeInKb(size: number) {
     return Math.round(size / 1024);
-  }
-
-  // Angular's `date:'medium'` pipe, which for en-US is `MMM d, y, h:mm:ss a`.
-  function mediumDate(value: Date | string | number) {
-    return new Date(value).toLocaleString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: true
-    });
   }
 
   async function sendComposerMessage() {
@@ -7053,22 +7049,21 @@
       return link;
     }
 
-    const body = new FormData();
-    body.append('file', file);
-    body.append('originalname', file.name);
-    // `uploadComposerImage`, NOT `uploadFile`: the Files-pane action is presenter-only, and routing
-    // composer images through it refused every member with "Presenters only." while their own
-    // upload button was visible and enabled.
-    const response = await fetch('?/uploadComposerImage', { method: 'POST', body });
-    const result = deserialize<{ file?: { url?: string } }, { message?: string }>(
-      await response.text()
-    );
-    if (result.type !== 'success' || !result.data?.file?.url) {
-      throw new Error(
-        result.type === 'failure' ? (result.data?.message ?? 'Upload failed.') : 'Upload failed.'
-      );
+    /*
+      `composer-image.remote.ts`, NOT the Files pane's `uploadFile` — that one is presenter-only and
+      refused every member while their own upload button sat there enabled. The `File` goes as
+      itself; that module cites the two functions in Kit that reduce and revive it.
+
+      Re-thrown, not caught: `uploadComposerImages` already turns a failure into the dialog, so
+      swallowing here would post a message with an image that never uploaded.
+    */
+    try {
+      return await uploadComposerImage({ file, originalName: file.name });
+    } catch (cause) {
+      // `{ cause }` because the rejection is the only record of WHY — an `HttpError` re-thrown as a
+      // bare `Error` keeps the sentence and loses the status the server actually answered with.
+      throw new Error(isHttpError(cause) ? cause.body.message : 'Upload failed.', { cause });
     }
-    return result.data.file.url;
   }
 
   async function uploadComposerImages(files: File[], message: string) {

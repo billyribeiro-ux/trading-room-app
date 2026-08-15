@@ -34,19 +34,18 @@ import { loadAlertPage } from '$lib/server/alert-log';
 // `isChatMode` left with `changeChatMode` for `chat-mode.remote.ts`, where it is `z.enum(CHAT_MODES)`.
 import { parseReactions } from '$lib/server/reactions';
 // `requestMobilePin` left with `getMyMobilePin` for `mobile-pin.remote.ts`; this file no longer calls it.
-import {
-  readRoomConfig,
-  requestStreamReadToken,
-  writeRoomSetting
-} from '$lib/server/room-config-client';
-import { alertSoundCommandValue } from '$lib/files-gates';
+// `writeRoomSetting` and `alertSoundCommandValue` left with `overwriteCashRegisterSound` for
+// `files-pane.remote.ts`; nothing else in this file writes a room setting.
+import { readRoomConfig, requestStreamReadToken } from '$lib/server/room-config-client';
 import { memberDeniedArchives } from '$lib/roster-gates';
 import { isBannedFromRoom, isShutOutByRoomState, roomRoleFor } from '$lib/server/room-role';
 import { consumeRateLimit } from '$lib/server/rate-limit';
 import { mediaSignallingUrl } from '$lib/server/media-grant';
 import { publishToRoom } from '$lib/server/room-events';
 import { grantMediaElevation, revokeMediaElevation } from '$lib/server/media-elevation';
-import { deleteStoredFile, storeUpload } from '$lib/server/file-storage';
+// `deleteStoredFile` left with `deleteFile`. `storeUpload` stays: `uploadFile` is still a form
+// action here, because it is submitted from a real `<form>` and degrades without JavaScript.
+import { storeUpload } from '$lib/server/file-storage';
 // `deleteThread`, `insertPrivateMessage`, `loadThread` and `searchThread` left with the trio for
 // `private-chat.remote.ts`. What stays is the CONVERSATION LIST, which the loader still sends.
 import { loadConversations } from '$lib/server/private-chat';
@@ -1768,162 +1767,31 @@ export const actions: Actions = {
     return { success: true, file: row };
   },
 
-  /**
-   * An image posted into chat, an alert, or a private message.
-   *
-   * SEPARATE from `uploadFile`, and deliberately so: that one backs the Files pane, which the
-   * capture gates presenter-only (`O(81, o.isP ? 81 : -1)`). Composer images use a different gate
-   * entirely - the same one that decides whether the button is even drawn:
-   *
-   *   (this.isPresenter || this.appService.globals.sessData.userUploads) && (this.canPostImages = !0)
-   *
-   * Routing composer uploads through the Files action refused every member with "Presenters only."
-   * while their own upload button sat right there, enabled.
-   *
-   * The capture posts these to an external CDN with no server-side role check at all - the button's
-   * visibility IS the gate. Re-checking it here rather than trusting the client is the one
-   * deliberate difference.
-   */
-  uploadComposerImage: async ({ request, locals }) => {
-    ensureDatabase();
-    const user = requireUser(locals);
-    /*
-      The room's own setting, asked of the controller — not an environment variable.
+  /*
+    `deleteFile`, `fileMediaCommand` and `overwriteCashRegisterSound` left together for
+    `src/routes/files-pane.remote.ts` — one module because all three enforced, in three separate
+    hand-written copies, that the file named must be one THIS ROOM HOLDS. That predicate is
+    `roomFileByUrl` there now, declared once and returning the row, so the caller that needs the
+    content type gets it from the same read that proved ownership.
 
-      This read `PTR_USER_UPLOADS`, which was a process-wide switch standing in for a per-room one.
-      Two rooms on one deployment could not disagree about it, which is the whole point of a room
-      setting. The check itself is unchanged and still server-side: in the capture the button's
-      visibility IS the gate, and re-checking here rather than trusting the client is the one
-      deliberate difference.
-    */
-    const { settings } = await readRoomConfig(request, requireRoomShortCode(locals), user.email);
-    if (!isPresenterRole(user.role) && settings.userUploads !== true) {
-      return fail(403, { message: 'Image uploads are turned off for this room.' });
-    }
+    `deleteFile`'s SELECT-then-DELETE became a single conditional `DELETE … RETURNING`, which is a
+    FIX and not a move: two statements with a gap between them is the TOCTOU this repository's
+    standard names, and two presenters deleting the same file both reached `deleteStoredFile` on a
+    path the first had already removed. Zero rows now means somebody else won the race.
 
-    const limit = consumeRateLimit('message', user.id);
-    if (!limit.allowed) return fail(429, { message: 'You are uploading too quickly.' });
+    `overwriteCashRegisterSound`'s `on` is a real `z.boolean()` where the form body carried the
+    strings `'true'`/`'false'`. The action compared against those exact strings so an unrecognised
+    value could not fall through to "remove" and silently clear the room's sound; the schema is that
+    same refusal, enforced before the handler runs.
 
-    const data = await request.formData();
-    const file = data.get('file');
-    if (!(file instanceof File)) return fail(400, { message: 'No file.' });
-    if (!file.type.startsWith('image/')) {
-      return fail(400, { message: 'That is not an image.' });
-    }
+    `uploadComposerImage` did NOT go with them. It is gated by `isPresenter || settings.userUploads`
+    rather than by the presenter role, and a looser gate living in a module whose every other export
+    opens with `presenterRoom()` is how gates drift. `src/routes/composer-image.remote.ts`.
 
-    const originalName = String(data.get('originalname') ?? file.name).trim() || file.name;
-    let stored;
-    try {
-      stored = await storeUpload(file);
-    } catch (cause) {
-      return fail(400, { message: cause instanceof Error ? cause.message : 'Upload failed.' });
-    }
-
-    const row = db
-      .insert(sharedFiles)
-      .values({
-        // The Files pane is per room, so an upload lands in the room it was made from.
-        roomShortCode: requireRoomShortCode(locals),
-        name: originalName,
-        kind: stored.kind,
-        url: stored.url,
-        contentType: stored.contentType,
-        size: stored.size,
-        uploadedBy: user.id,
-        createdAt: new Date()
-      })
-      .returning()
-      .get();
-
-    publishToRoom(requireRoomShortCode(locals), { channel: 'cmds', data: { cmd: 'filesChanged' } });
-    return { success: true, file: row };
-  },
-
-  /**
-   * `deleteFile(name, id)` in the capture: a confirm, then one `deleteFile` command per file
-   * carrying `fileID`, then `getSessionFiles()`. `deleteSelected()` is the same command in a loop
-   * over `#filesDriveList input:checked`, so both share this action and the client drives the loop.
-   *
-   * Presenter-only, matching `O(19, i.isP ? 19 : -1)` on the row button and `O(77, o.isP ? 77 : -1)`
-   * on Delete Selected.
-   */
-  deleteFile: async ({ request, locals }) => {
-    ensureDatabase();
-    const user = requireUser(locals);
-    if (!isPresenterRole(user.role)) return fail(403, { message: 'Presenters only.' });
-
-    const data = await request.formData();
-    const fileId = Number(data.get('fileID') ?? NaN);
-    if (!Number.isInteger(fileId)) return fail(400, { message: 'No file.' });
-
-    // Scoped, so a presenter cannot delete another room's file by naming its id.
-    const row = db
-      .select()
-      .from(sharedFiles)
-      .where(
-        and(eq(sharedFiles.roomShortCode, requireRoomShortCode(locals)), eq(sharedFiles.id, fileId))
-      )
-      .get();
-    if (!row) return fail(404, { message: 'No such file.' });
-
-    db.delete(sharedFiles)
-      .where(
-        and(eq(sharedFiles.roomShortCode, requireRoomShortCode(locals)), eq(sharedFiles.id, fileId))
-      )
-      .run();
-    // The row is the only reference to the blob, so dropping it without the bytes would leak a
-    // file on disk that nothing can ever reach or clean up.
-    await deleteStoredFile(row.url);
-
-    publishToRoom(requireRoomShortCode(locals), { channel: 'cmds', data: { cmd: 'filesChanged' } });
-    return { success: true };
-  },
-
-  /**
-   * `playMp3ForAll(e)` and `stopMp3ForAll()`, both `sendServerAdminCommand`:
-   *
-   * ```js
-   * playMp3ForAll(e) { this.appService.sendServerAdminCommand('playMP3ForAll', { url: e }) }
-   * stopMp3ForAll()  { this.appService.sendServerAdminCommand('stopMp3ForAll') }
-   * ```
-   *
-   * Admin commands, so presenter-only, and the command name is checked against the two the capture
-   * defines rather than forwarded - an unknown string would reach every client and be dispatched by
-   * none, which is a silent no-op dressed as a success.
-   */
-  fileMediaCommand: async ({ request, locals }) => {
-    ensureDatabase();
-    const user = requireUser(locals);
-    if (!isPresenterRole(user.role)) return fail(403, { message: 'Presenters only.' });
-
-    const data = await request.formData();
-    const cmd = String(data.get('cmd') ?? '');
-    if (cmd !== 'playMP3ForAll' && cmd !== 'stopMp3ForAll') {
-      return fail(400, { message: 'Unknown command.' });
-    }
-
-    const url = String(data.get('url') ?? '');
-    // Only a file this room actually holds. A free-text URL broadcast to every peer is an open
-    // redirect that plays whatever the sender names, on everyone's speakers.
-    if (cmd === 'playMP3ForAll') {
-      // The room predicate is what makes the comment above true — without it, "a file this room
-      // holds" was any file on the deployment, playable into this room's speakers.
-      const known = db
-        .select()
-        .from(sharedFiles)
-        .where(
-          and(eq(sharedFiles.roomShortCode, requireRoomShortCode(locals)), eq(sharedFiles.url, url))
-        )
-        .get();
-      if (!known) return fail(400, { message: 'No such file.' });
-    }
-
-    publishToRoom(requireRoomShortCode(locals), {
-      channel: 'cmds',
-      data: cmd === 'playMP3ForAll' ? { cmd, url } : { cmd }
-    });
-    return { success: true };
-  },
+    `uploadFile` STAYS here, and stays a form action: it is submitted from a real `<form>` in the
+    Files-pane modal, so it degrades without JavaScript — the case SvelteKit's guidance says to
+    prefer `form` for.
+  */
 
   /*
     `videoForAll` and `youtubeForAll` left together for
@@ -1934,110 +1802,6 @@ export const actions: Actions = {
     One feature, one decision: a presenter's typed string becomes an `src` attribute in every
     browser in the room. They share the presenter gate and the length bound; they do NOT share the
     URL check, and that module says at each of them why making them consistent would break one.
-  */
-
-  /**
-   * `overwriteCashRegisterSound(url, on)` — the Files pane's two `set-alert-sound-btn` buttons.
-   *
-   * ```js
-   * overwriteCashRegisterSound(e, i) {
-   *   this.appService.sendServerAdminCommand('overwriteCashRegisterSound', { url: i ? e : '' });
-   *   this.appService.globals.sessData.overwriteCashRegisterSound = i ? e : '';
-   * }
-   * ```
-   *
-   * ## Why this is not `fileMediaCommand`
-   *
-   * That action BROADCASTS. `playMP3ForAll` is an event — every browser plays a sound once and
-   * nothing about the room has changed. This is a room SETTING: `overwriteCashRegisterSound` is one
-   * of the controller's 269, edited on the Manage page as "Overwrite Cash Register Sound". Widening
-   * `fileMediaCommand` to carry it would change what the connected browsers believe and persist
-   * nothing, so the next reload would put the old sound back.
-   *
-   * So it is written through to the controller, which owns room settings, and the room reads it
-   * back the same way it reads every other one. No broadcast is needed and none is sent: the page's
-   * five-second `invalidate('room:data')` re-runs `load`, which re-reads the configuration, so every
-   * connected browser converges on the stored value rather than on a message it may have missed.
-   * The reference does not broadcast either — line 3086 sets its own `globals.sessData` and leaves
-   * everyone else to the server.
-   *
-   * ## Gating
-   *
-   * Presenter-only here, and presenter-only AGAIN on the controller: `internal/room-setting`
-   * re-checks that the named member is the owner or a true presenter of that room, because a form
-   * action is not the only way to reach an HTTP endpoint. The url must also be a file THIS room
-   * holds — the same predicate `playMP3ForAll` applies, and for the same reason: without it, "the
-   * sound this room plays for every alert" would be any URL the sender cared to name.
-   */
-  overwriteCashRegisterSound: async ({ request, locals }) => {
-    ensureDatabase();
-    const user = requireUser(locals);
-    if (!isPresenterRole(user.role)) return fail(403, { message: 'Presenters only.' });
-
-    const data = await request.formData();
-    /*
-      `on` is the reference's second argument: true from "Set as alert sound", false from "Remove
-      as alert sound". Compared against the exact string rather than parsed loosely — an
-      unrecognised value must not fall through to "remove" and silently clear the room's sound.
-    */
-    const raw = String(data.get('on') ?? '');
-    if (raw !== 'true' && raw !== 'false') return fail(400, { message: 'Unknown command.' });
-    const on = raw === 'true';
-
-    const url = String(data.get('url') ?? '');
-    if (on) {
-      const known = db
-        .select()
-        .from(sharedFiles)
-        .where(
-          and(eq(sharedFiles.roomShortCode, requireRoomShortCode(locals)), eq(sharedFiles.url, url))
-        )
-        .get();
-      if (!known) return fail(400, { message: 'No such file.' });
-      // The same test the row's own gate applies (`contentType.indexOf('audio/') >= 0`). A pdf set
-      // as the alert sound is a room whose alerts are silent, with nothing on screen saying why.
-      if (known.contentType.indexOf('audio/') < 0) {
-        return fail(400, { message: 'That file is not a sound.' });
-      }
-    }
-
-    try {
-      await writeRoomSetting(
-        requireRoomShortCode(locals),
-        user.email,
-        'overwriteCashRegisterSound',
-        // Removing sends the EMPTY STRING, exactly as the reference does — not the url being
-        // removed, and not an absent field.
-        alertSoundCommandValue(url, on)
-      );
-    } catch (cause) {
-      // Loud. A button that changes its own label while the setting did not move is the defect
-      // this whole path exists to avoid.
-      console.error('[overwriteCashRegisterSound] the controller refused the write', cause);
-      return fail(502, { message: 'Could not change the alert sound right now.' });
-    }
-
-    return { success: true };
-  },
-
-  /*
-    The PRIVATE CHAT trio — `sendPrivateMessage`, `loadPrivateChatLog` and
-    `deletePrivateChatLog` — left together for `src/routes/private-chat.remote.ts`.
-
-    Together on purpose: they share a peer id, a room, the `privChat` channel and one repository
-    module, so converting them one at a time would have meant three copies of the peer-id guard.
-    The unit of conversion is the FEATURE, not the call site. All three are commands, including
-    the READ — that module explains why a thread reopened on every switch must not be cacheable.
-  */
-  /*
-    `loadOlderChatMessages` and `loadOlderAlerts` were actions here and are now
-    `src/routes/log-pages.remote.ts` — the first `query` functions in this application, and the
-    first reads that earn one: two SELECTs with a LIMIT and an OFFSET, no write anywhere on the
-    path. (`getMyMobilePin` is a read that had to stay a command, because it mints.)
-
-    Everything that made them safe moved with them: the channel allow-list, the page bound that
-    stops an unvalidated OFFSET becoming a scan, and the room coming from the SESSION rather than
-    the request. The two hand-written page guards became one shared schema used twice.
   */
 
   /*

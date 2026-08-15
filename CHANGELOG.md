@@ -24,6 +24,89 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-15
 
+### 2026-08-15 14:40 EDT — The harness that unblocks the rest, and the Files pane it proved itself on
+
+**Branch `feat/extra-chat-column`, not merged.** **Runtime impact: yes** — on file delete, play-for-all,
+the alert sound, and composer image uploads.
+
+**The finding that matters more than the conversion.** Every remaining `fetch('?/action')` site was
+blocked on the same thing: a form action is an ordinary function, so its tests call it directly
+against a live SQLite database and assert on what it *wrote* — `files-pane-contract.test.ts` proves
+a member cannot set the room's alert sound **and that nothing reached the controller when it
+refused**. A remote `command` opens with `get_request_store()` and throws outside a request, so
+converting looked like trading real behavioural coverage for string matching.
+
+It is not. **`$lib/server/remote-command-harness.ts`** establishes the store the way Kit's own server
+does. Four files were READ in `@sveltejs/kit@3.0.0-next.16` to build it, each cited in the docstring:
+`with_request_store` is exported from the real `./internal/server` subpath; `command.js` reads
+exactly four fields before running anything; `MUTATIVE_METHODS` is why the request is a POST;
+`run_remote_function` re-enters the store for both validation and handler. `remote-command-harness.test.ts`
+proves it against a real command (`unmuteChat`) — reaches the 403, runs the **schema** first for a
+400, and does not leak a store between calls.
+
+Two honest limits are written into it: it does **not** serialize the argument, so it proves the
+handler and not the wire; and it reproduces Kit's default `handleValidationError` because
+`hooks.server.ts` does not override it — with a test asserting that hook is still absent, so the day
+somebody adds one this goes red instead of silently asserting a body the server stopped returning.
+
+**Also read from Kit source rather than assumed: a `command` CAN carry a `File`.** `stringify_command_arg`
+registers a reducer that turns one into `{ data: ArrayBuffer, name, type, size, lastModified }` and
+the matching reviver rebuilds it with `new File([data], name, meta)`. That is what makes
+`uploadComposerImage` a command at all, and the cost is stated where it belongs: base64 in a JSON
+body is roughly a third larger on the wire than the multipart body it replaced.
+
+**Two modules, split on the GATE.** `files-pane.remote.ts` holds `deleteFile`, `fileMediaCommand`
+and `overwriteCashRegisterSound` — one module because all three enforced, in three hand-written
+copies, that the file named must be one **this room holds**. Without it, a free-text url broadcast
+to every peer plays whatever the sender names on everyone's speakers. It is `roomFileByUrl` now,
+declared once and returning the row, so the caller that needs the content type gets it from the same
+read that proved ownership. `composer-image.remote.ts` is separate because its gate is
+`isPresenter || settings.userUploads`, not the presenter role, and a looser gate living among
+exports that all open with `presenterRoom()` is how gates drift. **`uploadFile` stays a form
+action** — it is submitted from a real `<form>` and degrades without JavaScript.
+
+**Three changes that are not moves:**
+
+- **`deleteFile`'s SELECT-then-DELETE became one `DELETE … RETURNING`.** Two statements with a gap is
+  the TOCTOU this repository's standard names: two presenters deleting together both found a row and
+  both called `deleteStoredFile` on a path the first had removed.
+- **`overwriteCashRegisterSound`'s `on` is a real `z.boolean()`**, where the form body carried the
+  strings `'true'`/`'false'`.
+- **`uploadComposerImage` returns the URL, not the row** — the only caller reads `file.url`, and the
+  row exported the uploader's id and room short code to every browser that pastes an image.
+
+**A negative control caught my own test lying, and that is recorded rather than quietly fixed.** The
+TOCTOU test was behavioural — delete, delete again, expect 404 — and putting the old SELECT-then-DELETE
+back left it **green**. It had to: `better-sqlite3` is synchronous, nothing interleaves inside one
+process, and two sequential calls behave identically either way. The race is across requests and this
+suite cannot stage it. The guard is now a source-text one **and says so**, instead of dressing itself
+up as a behavioural proof that never was.
+
+| | before | after |
+| --- | --- | --- |
+| `+page.svelte` | 13,534 | **13,529** |
+| `+page.server.ts` | 2,709 | **2,473** (3,233 at the start, **−760, −24%**) |
+| room suite | 1,623 / 121 files | **1,636 / 122 files** |
+| remotes registered | 8 | **10** |
+
+**Verified:** `svelte-check` **0/0** · full room suite **1636/1636** across 122 files · `eslint src`
+**clean** — it caught three orphaned imports and a `preserve-caught-error` on a re-thrown upload
+failure, all fixed · prettier clean on every file touched · `vite build` registers ten remotes, with
+`61crsc/deleteFile`, `61crsc/fileMediaCommand`, `61crsc/overwriteCashRegisterSound` and
+`erb7ni/uploadComposerImage` READ out of the built client bundle and matched to their server chunks ·
+`svelte-autofixer` **`issues: []`** on `+page.svelte`.
+
+**Three negative controls run and seen red**, restored with `cp` from `/tmp`: restoring the
+SELECT-then-DELETE (after the guard was fixed — see above); dropping the room predicate from
+`roomFileByUrl`, which reddens both the alert-sound and play-for-all tenancy tests; and making the
+harness stop establishing the store, which reddens all of it at once.
+
+**`@sveltejs/kit/internal/server` ships no types TypeScript can resolve** for that subpath, so
+`kit-internal-server.d.ts` declares the one function used, with its signature transcribed from the
+implementation's own JSDoc and an instruction to delete the file when Kit ships types.
+
+**Still not done:** no browser click-through, now across eight conversions.
+
 ### 2026-08-15 14:20 EDT — Two broadcasts that looked alike, and a confirm that was spelled two ways
 
 **Branch `feat/extra-chat-column`, not merged.** **Runtime impact: yes** — on the recording badge,

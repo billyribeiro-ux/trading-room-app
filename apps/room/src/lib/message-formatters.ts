@@ -45,6 +45,29 @@ export const chatTimeFormatter = new Intl.DateTimeFormat('en-US', {
 });
 
 /**
+ * Angular's `date:'medium'` pipe, which for en-US is `MMM d, y, h:mm:ss a` — the Files pane's
+ * uploaded-at column.
+ *
+ * Moved out of `+page.svelte`, where it called `toLocaleString` with an inline options object. That
+ * constructs a new formatter on EVERY call, once per file per render, and this module exists
+ * precisely because the four beside it are built once at module scope. It belonged here from the
+ * start: a date formatter for this room, living in the file that holds the room's date formatters.
+ */
+export const mediumDateFormatter = new Intl.DateTimeFormat('en-US', {
+  year: 'numeric',
+  month: 'short',
+  day: 'numeric',
+  hour: 'numeric',
+  minute: '2-digit',
+  second: '2-digit',
+  hour12: true
+});
+
+export function mediumDate(value: Date | string | number): string {
+  return mediumDateFormatter.format(new Date(value));
+}
+
+/**
  * `chatMutedTill`, in the reference's own format.
  *
  * ```js

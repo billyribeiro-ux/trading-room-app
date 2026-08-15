@@ -68,8 +68,16 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
 
       That is the ratchet working as designed rather than as an obstacle: the growth was real and it
       was paid for with a real module, not with a shorter comment and not with a bigger number.
+
+      The eighth (the Files pane and the composer upload) went the same way and cost 20: four call
+      sites, each trading a `void fetch(...)` for a `try`/`catch`, plus a five-line import. Paid for
+      by moving `mediumDate` to `$lib/message-formatters.ts` — where the room's four other date
+      formatters already live, and where it stopped constructing a fresh `Intl.DateTimeFormat` on
+      every call. Then two lines back for `{ cause }` on a re-thrown upload failure, which eslint's
+      `preserve-caught-error` was right to demand: an `HttpError` re-thrown as a bare `Error` keeps
+      the sentence and loses the status the server answered with. 13,534 -> 13,529 on the commit.
     */
-    max: 13534,
+    max: 13529,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {
@@ -84,7 +92,7 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
   },
   {
     file: 'routes/+page.server.ts',
-    max: 2709,
+    max: 2474,
     why: 'the loader and every form action left; 3,233 before the remote-function conversions began'
   }
 ];
