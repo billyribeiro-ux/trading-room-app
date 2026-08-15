@@ -131,6 +131,37 @@ the user has actually selected one, that is the one edited. With a single carous
 captured note, the two are identical. Negative-controlled: dropping the selection preference turns
 the suite red.
 
+### Closed 2026-08-14 22:26 — stream tabs are labelled with the presenter's real name
+
+The tab read `Dana_Vero`. `ingestPathFor` collapses everything outside `[a-zA-Z0-9_-]` to `_` before
+the media server sees a name, and `/v3/paths/list` reports paths and nothing else, so the sanitiser's
+underscores were the only name available. That transformation is ONE-WAY — "Dana Vero", "Dana_Vero"
+and "Dana/Vero" all land on the same string — which is why it was never un-mangled by guessing.
+
+**The room already knew, and was throwing it away.** `api/stream-ingest` is the room's own route and
+holds both halves at the moment a key is minted: the connected member, and the `ingestPath` the
+controller answered with. That pairing is now written to `stream_ingest_names`, keyed on
+`(room_short_code, ingest_path)`, and the reconciler reads the whole room in one query per poll.
+
+Two alternatives were considered and rejected, both recorded at the schema:
+
+- **Matching sanitised display names against the roster** — a heuristic that breaks on two members
+  who sanitise alike, and on a presenter whose session expired while OBS kept publishing.
+- **Asking the controller per reconcile** — a network round trip every five seconds per room, for a
+  value that changes only when somebody presses "New Link".
+
+`user_id` is stored rather than the name, so renaming a member relabels their tab. An absent record
+falls back to the path segment, which is exactly what the tab showed before — degraded, never wrong —
+and a whitespace-only display name falls back too rather than rendering a tab with no label.
+
+`stream-names.test.ts`, 11 assertions. Negative-controlled: dropping the room predicate from
+`streamNamesForRoom` turned the cross-room test red.
+
+**Known limitation, stated rather than discovered later:** deltas are keyed on the path, so a
+presenter who renames themselves mid-stream keeps the label they started with until the stream stops
+and restarts. Relabelling would mean emitting a delta, which tears down the `<video>` element and its
+hls.js instance to change a string.
+
 ### Evidence gaps
 
 **Whether a real browser serialises `background:#111` as `rgb(17, 17, 17)` — UNVERIFIED, and it

@@ -26,14 +26,16 @@ import {
   StreamIngestForbidden,
   requestStreamIngestKey
 } from '$lib/server/room-config-client';
+import { recordStreamIngestName } from '$lib/server/stream-names';
 import type { RequestHandler } from './$types';
 
 export const POST: RequestHandler = async ({ locals }) => {
   const user = requireUser(locals);
+  const room = requireRoomShortCode(locals);
 
   let minted;
   try {
-    minted = await requestStreamIngestKey(requireRoomShortCode(locals), user.email);
+    minted = await requestStreamIngestKey(room, user.email);
   } catch (error) {
     if (error instanceof StreamIngestForbidden) {
       // The controller's answer, passed through unchanged. Not logged as an error: a participant
@@ -54,6 +56,24 @@ export const POST: RequestHandler = async ({ locals }) => {
     }
     throw error;
   }
+
+  /*
+    THE ONLY MOMENT the room can learn who a MediaMTX path belongs to.
+
+    From here on the path travels alone: OBS publishes to it, and `/v3/paths/list` reports it back
+    with no identity attached and only the SANITISED name inside it. `Dana Vero`, `Dana_Vero` and
+    `Dana/Vero` all arrive as `…__Dana_Vero`, so the stream tab would be labelled with the
+    sanitiser's underscores unless the pairing is written down here, where both halves are in hand.
+
+    After the mint, deliberately. A record of a key that was never issued would label a tab for a
+    presenter the controller had just refused.
+  */
+  recordStreamIngestName({
+    ingestPath: minted.ingestPath,
+    now: new Date(),
+    room,
+    userId: user.id
+  });
 
   return json(minted, { headers: { 'cache-control': 'no-store' } });
 };

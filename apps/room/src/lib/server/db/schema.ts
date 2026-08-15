@@ -431,6 +431,55 @@ export const mediaElevations = sqliteTable(
   ]
 );
 
+/**
+ * Who is behind a MediaMTX ingest path, so a stream tab can be labelled with a person's real name.
+ *
+ * ## The problem this exists to solve
+ *
+ * A path is `room__{roomKey}__{sanitizedName}`, and the controller's `ingestPathFor` replaces every
+ * character outside `[a-zA-Z0-9_-]` with `_` before the name ever reaches the media server. So a
+ * presenter called "Dana Vero" publishes to `…__Dana_Vero`, and the ONLY name recoverable from a
+ * `/v3/paths/list` response is `Dana_Vero`. The underscores are the sanitiser's, not the person's.
+ *
+ * That is not reversible and must not be guessed at: turning `_` back into a space would rename
+ * anybody who genuinely uses an underscore, which is inventing data to make a tab look tidy.
+ *
+ * ## Why the room can answer it without asking anybody
+ *
+ * `api/stream-ingest` is the room's own route, and it already holds BOTH halves at the moment a key
+ * is minted — the connected member, and the `ingestPath` the controller answered with. Recording
+ * that pairing here is writing down something the room already knew and was throwing away.
+ *
+ * The alternatives were both worse. Matching sanitised display names against the roster is a
+ * heuristic that breaks on two members who sanitise alike and on a presenter whose session expired
+ * while OBS kept streaming. Asking the controller per reconcile is a network round trip every five
+ * seconds per room for a value that changes only when somebody presses "New Link".
+ *
+ * ## `userId`, not the name itself
+ *
+ * Storing the display name would freeze it at mint time. The user id keeps the label current when
+ * somebody renames themselves, and the join is against a table the room already reads constantly.
+ */
+export const streamIngestNames = sqliteTable(
+  'stream_ingest_names',
+  {
+    /** Room-scoped, like every other realtime row — see `messages.roomShortCode`. */
+    roomShortCode: text('room_short_code').notNull(),
+    /** The full MediaMTX path, exactly as the controller built it and as the media server reports it. */
+    ingestPath: text('ingest_path').notNull(),
+    userId: integer('user_id')
+      .notNull()
+      .references(() => users.id),
+    updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull()
+  },
+  /*
+    The room is IN the key, not beside it. The same person in two rooms has two paths and two rows,
+    and a path is only ever meaningful within the room it belongs to — the reconciler looks up by
+    both, so a lookup can never cross a room boundary even if two rooms somehow produced one path.
+  */
+  (table) => [primaryKey({ columns: [table.roomShortCode, table.ingestPath] })]
+);
+
 export const sessions = sqliteTable(
   'sessions',
   {

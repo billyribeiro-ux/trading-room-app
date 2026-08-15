@@ -104,25 +104,38 @@ export function parseMtxPath(path: string): { roomKey: string; producerID: strin
  * and rebuild the `<video>` element — and its hls.js instance — on every single poll. The path is
  * unique per live stream and is already the thing MediaMTX considers the identity, so it is the id.
  *
- * ## The display name is the SANITISED one, and this is an honest gap
+ * ## The display name comes from a LOOKUP, never from the path
  *
  * `ingestPathFor` replaces every character outside `[a-zA-Z0-9_-]` with `_` before the name reaches
  * MediaMTX, so a presenter called "Dana Vero" publishes to `..._Dana_Vero` and the only name
- * recoverable from the path is `Dana_Vero`. The underscores are the sanitiser's, not the person's.
+ * recoverable from the path is `Dana_Vero`. The underscores are the sanitiser's, not the person's,
+ * and that is a one-way transformation: "Dana Vero", "Dana_Vero" and "Dana/Vero" all land on the
+ * same string.
  *
- * It is NOT reconstructed by guessing that `_` was once a space — that would rename anybody who
- * genuinely uses an underscore, and would be inventing data to make a tab look tidy. The real name
- * exists in the controller's `stream_ingest_keys` row, which already maps a path to the user who
- * minted it; resolving it needs that lookup, and until then this shows what the evidence supports.
+ * So it is NOT reconstructed by guessing that `_` was once a space — that would rename anybody who
+ * genuinely uses an underscore, which is inventing data to make a tab look tidy. `names` is the
+ * room's own record of who minted each path, written by `api/stream-ingest` at the one moment both
+ * halves were in hand. An absent entry falls back to the path segment, which is what this showed
+ * before the record existed: degraded, never wrong.
  */
-export function mtxStreamFromPath(path: string, roomKey: string): MtxStream | null {
+export function mtxStreamFromPath(
+  path: string,
+  roomKey: string,
+  names?: ReadonlyMap<string, string>
+): MtxStream | null {
   const parsed = parseMtxPath(path);
   if (!parsed || parsed.roomKey !== roomKey) return null;
+  /*
+    Trimmed and checked for emptiness rather than taken on presence alone. A display name is user
+    input, and a row holding `""` or `"   "` would produce a tab with no label at all — visibly
+    worse than the sanitised fallback it replaced.
+  */
+  const known = names?.get(path)?.trim();
   return {
     _id: path,
     sessionID: parsed.roomKey,
     producerID: parsed.producerID,
-    mediaValue: { name: parsed.producerID }
+    mediaValue: { name: known || parsed.producerID }
   };
 }
 
@@ -134,7 +147,11 @@ export function mtxStreamFromPath(path: string, roomKey: string): MtxStream | nu
  * in the room for streams that play nothing. A missing or non-boolean `available` is treated as not
  * available, which fails closed.
  */
-export function mtxStreamsFromPathList(payload: MtxPathList, roomKey: string): MtxStream[] {
+export function mtxStreamsFromPathList(
+  payload: MtxPathList,
+  roomKey: string,
+  names?: ReadonlyMap<string, string>
+): MtxStream[] {
   const items = Array.isArray(payload.items) ? payload.items : [];
   const streams: MtxStream[] = [];
   for (const item of items) {
@@ -142,7 +159,7 @@ export function mtxStreamsFromPathList(payload: MtxPathList, roomKey: string): M
     const path = item as MtxPath;
     if (path.available !== true) continue;
     if (typeof path.name !== 'string') continue;
-    const stream = mtxStreamFromPath(path.name, roomKey);
+    const stream = mtxStreamFromPath(path.name, roomKey, names);
     if (stream) streams.push(stream);
   }
   return streams;

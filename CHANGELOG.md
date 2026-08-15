@@ -24,6 +24,44 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-14
 
+### 2026-08-14 22:26 EDT — stream tabs carry the presenter's real name
+
+**Runtime impact: yes.** A stream tab is labelled `Dana Vero` instead of `Dana_Vero`. Adds one
+SQLite table, `stream_ingest_names`. On `feat/extra-chat-column`.
+
+**Why it read wrong.** `ingestPathFor` collapses everything outside `[a-zA-Z0-9_-]` to `_` before a
+name reaches the media server, and `/v3/paths/list` returns paths and nothing else. The only name
+recoverable was the sanitiser's output, and that transformation is one-way — "Dana Vero",
+"Dana_Vero" and "Dana/Vero" all produce the same string. It was never un-mangled by guessing,
+because turning `_` back into a space renames anybody who genuinely uses one.
+
+**The room already had the answer and discarded it.** `api/stream-ingest` is the room's own route
+and holds both halves at mint time: the connected member, and the `ingestPath` the controller
+returned. That pairing is now recorded, keyed on `(room_short_code, ingest_path)` with the room IN
+the key rather than beside it, and the reconciler reads the whole room in one query per poll —
+hoisted out of the pagination loop, so it is one query per reconcile and not one per page.
+
+Two alternatives were rejected and the reasons are at the schema: matching sanitised display names
+against the roster is a heuristic that breaks on two members who sanitise alike and on a presenter
+whose session expired while OBS kept publishing; asking the controller per reconcile is a round trip
+every five seconds per room for a value that changes only on "New Link".
+
+`user_id` is stored rather than the name, so a rename relabels the tab. An absent record falls back
+to the path segment — exactly what the tab showed before, degraded rather than wrong — and so does a
+whitespace-only display name, which would otherwise render a tab with no label at all.
+
+**Known limitation, recorded rather than left to be discovered:** deltas are keyed on the path, so a
+presenter renaming themselves mid-stream keeps their original label until the stream restarts.
+Relabelling would mean emitting a delta, which tears down the `<video>` element and its hls.js
+instance to change a string.
+
+**Verified:** `svelte-check` 1038 files, 0 errors 0 warnings; `pnpm lint` exits 0; 108 tests across
+the six stream suites green, 11 of them new. **Negative-controlled:** removing the room predicate
+from `streamNamesForRoom` turned the cross-room assertion red, and was restored. A single-path
+helper was written, found to have no caller but its own test, and deleted. **Not run:** the full
+gate. **Still unproven end to end:** there is no MediaMTX host, so no tab has ever been rendered
+from a real `/v3/paths/list`.
+
 ### 2026-08-14 22:19 EDT — Edit Carousel, and the carousel becomes testable
 
 **Runtime impact: yes.** A carousel already in a note can be reopened and edited. On

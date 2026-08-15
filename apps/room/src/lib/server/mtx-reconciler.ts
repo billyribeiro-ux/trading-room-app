@@ -24,6 +24,11 @@
  * would drag every viewer's tab back to the first stream on every tick. `mtx-reconcile.test.ts`
  * asserts both halves of this — the yank, and that the delta path leaves the viewer alone.
  *
+ * One consequence worth stating: deltas are keyed on the PATH, so a presenter who renames themselves
+ * mid-stream keeps the tab label they started with until the stream stops and starts again. Emitting
+ * a delta to relabel would tear down the `<video>` element and its hls.js instance to change a
+ * string, which is a worse trade than a label that is one rename out of date.
+ *
  * ## Lifecycle
  *
  * One timer per ROOM, not per connection: ten members watching one room must not mean ten polls of
@@ -35,6 +40,7 @@ import { MEDIA_API_URL } from '$app/env/private';
 import { MTX_PAGE_SIZE, mtxStreamDeltas, mtxStreamsFromPathList } from '$lib/mtx-reconcile';
 import type { MtxStream } from '$lib/mtx-streams';
 import { publishToRoom, roomSubscriberCount } from './room-events';
+import { streamNamesForRoom } from './stream-names';
 
 /**
  * How often a room asks MediaMTX what is live.
@@ -73,6 +79,16 @@ async function fetchLiveStreams(room: string): Promise<MtxStream[] | null> {
   const base = MEDIA_API_URL;
   if (!base) return null;
 
+  /*
+    Read ONCE, before the pagination loop, and passed into every page.
+
+    MediaMTX reports paths and nothing else, and a path carries only the sanitised form of a
+    presenter's name — so this is what turns a tab reading `Dana_Vero` into one reading `Dana Vero`.
+    Hoisted out of the loop because it is the same answer for every page of the same room, and a
+    query per page would multiply by a number that grows with the deployment.
+  */
+  const names = streamNamesForRoom(room);
+
   const streams: MtxStream[] = [];
   let page = 0;
   let pageCount = 1;
@@ -92,7 +108,7 @@ async function fetchLiveStreams(room: string): Promise<MtxStream[] | null> {
     }
 
     const payload = (await response.json()) as { pageCount?: unknown };
-    streams.push(...mtxStreamsFromPathList(payload, room));
+    streams.push(...mtxStreamsFromPathList(payload, room, names));
 
     // Trust the server's own count, but never loop forever on a nonsense value.
     if (page === 0 && typeof payload.pageCount === 'number' && payload.pageCount > 1) {
