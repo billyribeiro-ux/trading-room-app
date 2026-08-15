@@ -37,23 +37,27 @@ pub const BASELINE_SHA256: &str =
 /// The only authenticated identity permitted to execute this migration chain.
 pub const EXPECTED_MIGRATOR_ROLE: &str = "ptr_clone";
 
-/// The runtime login that must exist before the pinned baseline is allowed to run.
-pub const EXPECTED_RUNTIME_ROLE: &str = "ptr_clone_app";
+/// The login the application authenticates as at runtime.
+///
+/// `tradingroom_app` since 2026-08-15. It is created by
+/// `0009_provision_tradingroom_app.sql`, which mirrors every grant and every RLS policy membership
+/// from the baseline role, and by the role provisioner so that it exists before the API starts.
+pub const EXPECTED_RUNTIME_ROLE: &str = "tradingroom_app";
 
-/// The name `EXPECTED_RUNTIME_ROLE` is renamed TO by `0009_rename_runtime_roles.sql`.
+/// The role `0001_baseline.sql` creates if it is absent — and the reason this preflight exists.
 ///
-/// The preflight accepts either, and it has to. It runs BEFORE the migration chain, on every start,
-/// so it sees the old name on a cluster that has not migrated yet and the new one on a cluster that
-/// has. Pinning a single name made 0009 rename the role its own preflight requires to exist: the
-/// first migrate succeeded, and every run after it — including `assert_runtime_role_is_restricted`
-/// at `main.rs:74`, and therefore API startup — failed with `RuntimeRoleMissing`.
+/// SEPARATE from [`EXPECTED_RUNTIME_ROLE`], and the split is the point. Until 2026-08-15 they were
+/// one constant because they were one role, and conflating them is what made the previous rename
+/// unlandable.
 ///
-/// Found by the adversarial review of 2026-08-11. The posture checks are unchanged and are applied
-/// to whichever name is present, so a cluster mid-transition is held to exactly the same standard.
+/// This one is a FENCE, not an identity: `0001` carries a forensic branch that creates
+/// `ptr_clone_app` with the placeholder password committed at its line 26. That branch must never
+/// run, so the role has to be properly provisioned before the chain does. The baseline is
+/// byte-identical to the captured schema of the original system and therefore cannot be edited to
+/// remove the branch — see `ops/naming-provenance.md`.
 ///
-/// This constant is the transition and is expected to be deleted. Once no cluster carries
-/// `ptr_clone_app`, `EXPECTED_RUNTIME_ROLE` becomes `tradingroom_app` and this goes with it.
-pub const RENAMED_RUNTIME_ROLE: &str = "tradingroom_app";
+/// The application never authenticates as this role. `EXPECTED_RUNTIME_ROLE` is what it uses.
+pub const BASELINE_PROVISIONED_ROLE: &str = "ptr_clone_app";
 
 #[derive(Debug, thiserror::Error)]
 pub enum MigrateError {
@@ -181,14 +185,18 @@ async fn preflight_for_roles_on_connection(
         expected_migrator,
     )?;
 
-    // Either name. `0009_rename_runtime_roles.sql` renames the runtime role, and this preflight runs
-    // BEFORE the migration chain — so a cluster that has not migrated yet presents the old name and
-    // one that has presents the new one. Matching only the pinned name made the migration break its
-    // own precondition on every run after the first. See `RENAMED_RUNTIME_ROLE`.
+    // EXACTLY ONE NAME, and that is a security property rather than a simplification.
     //
-    // `ORDER BY` keeps it deterministic if a cluster somehow carries both: the renamed name wins,
-    // because that is the post-migration truth. 0009 itself refuses to run in that state and says
-    // so, which is where that situation is meant to be resolved.
+    // This previously matched two names with `WHERE rolname IN ($1, $2) ORDER BY (rolname = $2)
+    // DESC LIMIT 1`, to tolerate a cluster mid-rename. The effect was a FAIL-OPEN: asking about role
+    // X returned role Y's posture whenever Y existed, and `validate_runtime_role_posture` then
+    // reported that posture under the name it had been asked about. A preflight whose entire job is
+    // to refuse an absent or unsafe role answered `Ok` for a role that did not exist — disarming the
+    // fence against `0001`'s committed-password branch, which is the one thing it is here to stop.
+    //
+    // The rename that required the tolerance was withdrawn as non-convergent, so the tolerance goes
+    // with it. `migration_reappliability.rs` asserts on this module's source text that a second
+    // bound name never returns.
     let posture: Option<RuntimeRolePosture> = sqlx::query_as(
         "SELECT runtime_role.rolcanlogin AS can_login, \
                 runtime_role.rolsuper AS is_superuser, \
@@ -201,12 +209,9 @@ async fn preflight_for_roles_on_connection(
                  FROM pg_catalog.pg_auth_members AS membership \
                  WHERE membership.member = runtime_role.oid)::bigint AS membership_count \
          FROM pg_catalog.pg_roles AS runtime_role \
-         WHERE runtime_role.rolname IN ($1, $2) \
-         ORDER BY (runtime_role.rolname = $2) DESC \
-         LIMIT 1",
+         WHERE runtime_role.rolname = $1",
     )
     .bind(expected_runtime)
-    .bind(RENAMED_RUNTIME_ROLE)
     .fetch_optional(&mut *connection)
     .await?;
     validate_runtime_role_posture(expected_runtime, posture.as_ref())?;
@@ -235,10 +240,21 @@ pub async fn preflight_for_tests(
 /// hand that same connection to SQLx. Fresh databases then run `0001` like any other migration.
 pub async fn run(pool: &PgPool) -> Result<(), MigrateError> {
     let mut connection = pool.acquire().await?;
+    // BASELINE_PROVISIONED_ROLE, not EXPECTED_RUNTIME_ROLE, and the distinction is load-bearing.
+    //
+    // This preflight guards one thing: that `0001` never reaches its forensic branch and creates
+    // `ptr_clone_app` with the placeholder password committed at its line 26. So it must check the
+    // role `0001` would create — the baseline role.
+    //
+    // Checking the runtime role here would be a bootstrap deadlock: `tradingroom_app` is created BY
+    // this chain, in `0009`, so on a fresh cluster it does not exist yet and the preflight would
+    // refuse to run the migration that creates it. The runtime role's own posture is asserted twice
+    // elsewhere — by `0009` when it provisions it, and by `assert_runtime_role_is_restricted` at
+    // API startup.
     preflight_for_roles_on_connection(
         &mut connection,
         EXPECTED_MIGRATOR_ROLE,
-        EXPECTED_RUNTIME_ROLE,
+        BASELINE_PROVISIONED_ROLE,
     )
     .await?;
     tracing::info!("migration identity and runtime-role preflight passed");

@@ -48,8 +48,17 @@ const EXPECTED_PATH_LIST_SHA256 = '66ab4696e3d3685daaa5ba27e28137a1cc038a71a32fc
   to any one of them still fails — and fails naming the file — while these 88 stay sealed against
   the bytes that actually arrived at the import.
 */
-const EXPECTED_UNTOUCHED_COUNT = 87;
-const EXPECTED_MANIFEST_SHA256 = '70e62cc904daa01466c7616b71106cde741e05867ea750a2ddf4371ed5169aad';
+/*
+  87 -> 84 on 2026-08-15, and the three that left are individually pinned in `DIVERGED_FROM_IMPORT`
+  below, so NOTHING became unsealed by this change — the seal on each simply moved from the
+  aggregate to its own line. `db/mod.rs`, `tests/migrations.rs` and `10-provision-roles.sh` were
+  edited by the runtime-role cutover; the reason for each is recorded beside its hash.
+
+  Re-pinning the aggregate is only legitimate BECAUSE of that. A manifest re-pinned to whatever the
+  tree currently contains would be the rubber stamp this file's own header rejects.
+*/
+const EXPECTED_UNTOUCHED_COUNT = 83;
+const EXPECTED_MANIFEST_SHA256 = 'fafb574931851d39813d7a32dfc34f0e5889b462dd3619b8fbc1a948aeaa597d';
 
 /*
   Files under `services/**` that were AUTHORED HERE and never imported.
@@ -60,9 +69,13 @@ const EXPECTED_MANIFEST_SHA256 = '70e62cc904daa01466c7616b71106cde741e05867ea750
   happened. That is the reason `TODO.md` row Z refused to bump 98 to 99, and the refusal was right;
   what was missing was the other half, which is this list.
 
-  `0009_rename_runtime_roles.sql` was added 2026-08-10, deployed, and had a preflight defect found
-  and fixed in it, all while this verifier could not run. It is pinned below by its own hash, so it
-  is sealed — just not as an import.
+  `0009_rename_runtime_roles.sql` was added 2026-08-10 and NEVER deployed — a claim this file used
+  to make and which was checked by query on 2026-08-15: no database anywhere had recorded migration
+  version 9. It was withdrawn that day as non-convergent (it renamed a cluster-global role from a
+  per-database chain, so the second database on a cluster could never migrate) and replaced by
+  `0009_provision_tradingroom_app.sql`, which ADDS the runtime role instead. See
+  `ops/naming-provenance.md`. The replacement is pinned below by its own hash, so it is sealed —
+  just not as an import.
 
   A file only belongs here with a CHANGELOG entry saying it was authored in this repository. If you
   are tempted to add an imported file to this list to make the gate green, the gate is telling the
@@ -70,8 +83,15 @@ const EXPECTED_MANIFEST_SHA256 = '70e62cc904daa01466c7616b71106cde741e05867ea750
 */
 const LOCALLY_AUTHORED = new Map([
   [
-    'services/api/migrations/0009_rename_runtime_roles.sql',
-    '6acfec233a6bfc81d0d82954e2147b3e32ccbc6a52095fb167734251ab0f1da4'
+    // Authored here on 2026-08-15. Enforces the rule the withdrawn 0009 broke: the migration chain
+    // must be appliable to any number of databases on one cluster. Nothing in the imported tree
+    // stated that rule, which is why a non-convergent migration passed review and shipped.
+    'services/api/tests/migration_reappliability.rs',
+    '3faadc515e1f228c3abf261cdfc1f30ba7523a8ea181d0adfe293affc8a107a1'
+  ],
+  [
+    'services/api/migrations/0009_provision_tradingroom_app.sql',
+    '1e176015ddefd91595fe48b549fd0582f9ff30efcb808cd8e4e78a68cbdf5b23'
   ]
 ]);
 
@@ -131,9 +151,24 @@ const DIVERGED_FROM_IMPORT = new Map([
   */
   [
     'services/api/src/bin/postgres-release-attestation.rs',
-    '2240bb60f82269981f11aea501209d9ca32ae66336ce33e935addca594f54738'
+    '5694c0e5b6b4d7b8ad0cbb2b309e0d36fbdcb1030ca974cf12c1faf14bd2e285'
   ],
-  ['services/api/src/db/migrate.rs', 'edeb66043c53bcd15af46c05adb5225775716a3861dc93e1b9dd37cdf4729927'],
+  // Diverged 2026-08-15 by the runtime-role cutover. Each was an untouched import until then.
+  //   db/mod.rs                 EXPECTED_RUNTIME_ROLE -> tradingroom_app, and its unit-test
+  //                             fixtures rebuilt from that constant instead of a literal.
+  //   tests/migrations.rs       four assertions that named the old runtime role by hand; now bound
+  //                             to migrate::EXPECTED_RUNTIME_ROLE so a future cutover cannot leave
+  //                             them asserting a role nothing connects as.
+  //   10-provision-roles.sh     provisions the RUNTIME role alongside the baseline role.
+  // Diverged 2026-08-15: DATABASE_URL was built from POSTGRES_APP_USER, i.e. the BASELINE role, so
+  // anyone following this file produced a connection string the API's startup check now refuses -
+  // and PostgreSQL reports a nonexistent role as `28P01 password authentication failed`, naming the
+  // wrong cause. Found by `naming-boundary.test.ts` on the day it was written.
+  ['services/.env.example', '67ec3560d9c8e9674f3c3c4c9e18a47023bc245a57036ea00e574e31a1529f0d'],
+  ['services/api/src/db/mod.rs', '95294947a9963004ff2204d3e1b305d05d9b26cc19d4c643d48ba7126c0d65d9'],
+  ['services/api/tests/migrations.rs', '94747fe1aeed9c351f22ae9a312ea70842bbab254af54a6659787ab949a61252'],
+  ['services/docker/postgres/10-provision-roles.sh', '36031a9f9fb09d597dc58e3b50c59e3c7cb56918cda12dcfce01e959cc406e6d'],
+  ['services/api/src/db/migrate.rs', '0df32e9c11c3ace6739f1a6ea9f17610f3263652dc90cc6a07172ba966864e6c'],
   ['services/media/Dockerfile', 'ae967613fdd0dba2065ec6b488c71d8a61e29eef47fca32f90690066b0eb407a'],
   ['services/media/src/config.rs', 'f9af8fb80a7ccadb1a05b506c14ecd043fae4e5b169e36d403d5d8f1fd4fe449'],
   ['services/media/src/grant.rs', '772f12a8bd9ea55e1d92fa1b460aeb1b451520c1c243c59083a658b4f1989908'],
