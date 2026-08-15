@@ -71,7 +71,7 @@ export default defineConfig(
     'emojis/**'
   ]),
   {
-    files: ['src/**/*.{js,mjs,ts,svelte}', 'scripts/**/*.mjs'],
+    files: ['src/**/*.{js,mjs,ts,svelte}', 'scripts/**/*.mjs', 'gate/**/*.mjs', 'svelte.config.*.js'],
     languageOptions: {
       globals: {
         ...globals.browser,
