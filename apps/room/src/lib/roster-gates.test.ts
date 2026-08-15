@@ -29,7 +29,6 @@ const bundle = readFileSync(
   new URL('../../docs/source/main.d6d3c112b59b7d0d.js', import.meta.url),
   'utf8'
 );
-const pageSource = readFileSync(new URL('../routes/+page.svelte', import.meta.url), 'utf8');
 /*
   `.room-sidebar` became `RoomSidebar.svelte` on 2026-08-15 — the second of the five template
   regions. Assertions read out of the reference bundle are untouched, because the evidence did not
