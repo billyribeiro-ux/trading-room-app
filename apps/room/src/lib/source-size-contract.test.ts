@@ -179,8 +179,13 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       that was overdue anyway: the four captured navbar strings went to `$lib/navbar-labels.ts`,
       where the spacing that has already caused one bug in this repository is documented instead of
       sitting as four bare literals nothing marked as evidence.
+
+      3b merged the TWO `visibilitychange` listeners this page had - one tracking focus and
+      catching the chat up, one pausing the five-second refresh poll - into the single
+      `<svelte:document>` handler. The poll hoisted out of `onMount` to sit beside it, which costs
+      lines here and removes a listener, a teardown and a whole duplicated concern.
     */
-    max: 11599,
+    max: 11621,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {

@@ -1032,13 +1032,64 @@
    * the newest page per channel — the room re-reads itself and is current, which is what upstream's
    * `appHasFocusGetChatLog` does.
    */
+  /*
+    The five-second refresh poll, hoisted here from `onMount` so ONE handler owns visibility.
+
+    Nothing is pushed from the server for a reader's question, alert or chat message, so a presenter
+    sat on a stale tab saw an empty Q&A while the row was already stored. This re-fetches on a
+    timer, and only while the tab is visible, so a backgrounded room is not polling. `invalidate`
+    re-runs the load and patches the data; it is not a navigation, so scroll positions and open
+    modals are left alone.
+
+    Plain `let`/`function`, not `$state`: nothing renders from a timer handle.
+  */
+  const REFRESH_MS = 5000;
+  let refreshTimer: ReturnType<typeof globalThis.setInterval> | undefined;
+
+  /**
+   * A poll that loses the network must not become an unhandled rejection.
+   *
+   * `void invalidate(...)` discards the promise without a handler, so a single dropped request — a
+   * dev-server restart, a laptop waking up — surfaced as an uncaught error in the console with a
+   * stack trace pointing here, and looked like a fault in the room rather than one skipped refresh.
+   * The next tick retries anyway; that is what a poll is for.
+   */
+  function refreshRoom() {
+    void invalidate('room:data').catch((error: unknown) => {
+      console.warn('[room] a refresh was skipped; the next one will retry', error);
+    });
+  }
+
+  function startRefresh() {
+    if (refreshTimer !== undefined) return;
+    refreshTimer = globalThis.setInterval(() => refreshRoom(), REFRESH_MS);
+  }
+
+  function stopRefresh() {
+    if (refreshTimer !== undefined) globalThis.clearInterval(refreshTimer);
+    refreshTimer = undefined;
+  }
+
   function onVisibilityChange() {
     if (document.hidden) {
       appHasFocus = false;
+      stopRefresh();
       return;
     }
     appHasFocus = true;
-    if (!missedChatWhileHidden) return;
+    startRefresh();
+    /*
+      The catch-up and the poll's own immediate refresh are the SAME request, so only one goes out.
+
+      `missedChatWhileHidden` is set while hidden; when it is set this is a catch-up and
+      `invalidateAll()` is the wider re-read. When it is not, the tab was never away long enough to
+      miss anything and `refreshRoom()` — the poll's `invalidate('room:data')` — is all that is
+      owed. Firing both would double every return to the tab.
+    */
+    if (!missedChatWhileHidden) {
+      refreshRoom();
+      return;
+    }
     missedChatWhileHidden = false;
     void invalidateAll();
   }
@@ -7872,42 +7923,14 @@
       mediaServerDisconnected();
     });
 
-    // Nothing is pushed from the server, so a reader's question, alert or chat message only shows
-    // up when this page's load runs again - which is why a presenter sat on a stale tab saw an
-    // empty Q&A while the row was already stored. Re-fetch on a timer, and only while the tab is
-    // visible so a backgrounded room is not polling. `invalidate` re-runs the load and patches the
-    // data; it is not a navigation, so scroll positions and open modals are left alone.
-    const REFRESH_MS = 5000;
     /*
-     * A poll that loses the network must not become an unhandled rejection.
-     *
-     * `void invalidate(...)` discards the promise without a handler, so a single dropped request -
-     * a dev-server restart, a laptop waking up - surfaced as an uncaught error in the console with
-     * a stack trace pointing here, and looked like a fault in the room rather than one skipped
-     * refresh. The next tick retries anyway; that is what a poll is for.
-     */
-    const refreshRoom = () => {
-      void invalidate('room:data').catch((error: unknown) => {
-        console.warn('[room] a refresh was skipped; the next one will retry', error);
-      });
-    };
-    let refreshTimer: ReturnType<typeof globalThis.setInterval> | undefined;
-    const stopRefresh = () => {
-      if (refreshTimer !== undefined) globalThis.clearInterval(refreshTimer);
-      refreshTimer = undefined;
-    };
-    const startRefresh = () => {
-      if (refreshTimer !== undefined) return;
-      refreshTimer = globalThis.setInterval(() => refreshRoom(), REFRESH_MS);
-    };
-    const handleVisibility = () => {
-      if (document.hidden) stopRefresh();
-      else {
-        refreshRoom();
-        startRefresh();
-      }
-    };
-    document.addEventListener('visibilitychange', handleVisibility);
+      The poll and its visibility handling live at component scope now — see `onVisibilityChange`.
+      There were TWO `visibilitychange` listeners on this document, in this component: one tracking
+      focus and catching the chat up, one pausing and resuming this timer. Different concerns, both
+      correct, and still a duplication nobody would have found by reading either one.
+
+      All that is left here is starting it, because a tab that is already hidden at mount must not.
+    */
     if (!document.hidden) startRefresh();
 
     return () => {
@@ -7936,7 +7959,6 @@
       live?.close();
       signalling.close();
       stopRefresh();
-      document.removeEventListener('visibilitychange', handleVisibility);
       if (previousOpenImageModal) imageModalWindow.openImageModal = previousOpenImageModal;
       else delete imageModalWindow.openImageModal;
       if (alertScrollTimer !== undefined) globalThis.clearTimeout(alertScrollTimer);

@@ -113,14 +113,53 @@ describe('and catches up when the tab comes back', () => {
     expect(pageCode).not.toContain("removeEventListener('visibilitychange', onVisibilityChange)");
   });
 
-  it('refetches ONCE, and only when something was missed', () => {
+  it('pauses the poll while hidden and restarts it on return', () => {
     /*
-      `appHasFocusGetChatLog`. One refetch rather than a replay, because the load already returns
-      the newest page per channel — the room re-reads itself and is current. And only when something
-      arrived: returning to a tab where nothing happened should cost nothing.
+      ADDED because its absence was found by a negative control, not by reading: deleting
+      `startRefresh()` from the handler left the whole suite green. A room whose five-second poll
+      never restarts looks fine for exactly as long as nobody else says anything, and then goes
+      quietly stale — the failure this poll exists to prevent, reintroduced with no test to notice.
+
+      Both directions asserted, because pausing without resuming is the same bug wearing a
+      different hat.
     */
-    expect(pageCode).toContain('if (!missedChatWhileHidden) return;');
+    const handler = pageCode.slice(pageCode.indexOf('function onVisibilityChange() {'));
+    const body = handler.slice(0, handler.indexOf('\n  }'));
+
+    expect(body, 'hidden must stop the timer').toContain('stopRefresh();');
+    expect(body, 'visible must start it again').toContain('startRefresh();');
+    // And a tab that is already hidden at mount must not start one.
+    expect(pageCode).toContain('if (!document.hidden) startRefresh();');
+  });
+
+  it('refetches ONCE on return, and the wider re-read only when something was missed', () => {
+    /*
+      REWRITTEN 2026-08-15, and the old wording was a half-truth this file could not see.
+
+      It said "returning to a tab where nothing happened should cost nothing", which was true of the
+      handler it read and false of the page: a SECOND `visibilitychange` listener, `handleVisibility`,
+      called `refreshRoom()` on every return regardless. Two listeners for one event, each correct
+      about its own concern and neither aware of the other.
+
+      Merging them showed what the pair actually did — and that on a return WITH missed chat it
+      fired BOTH `invalidate('room:data')` and `invalidateAll()`, two loads for one event. The
+      merged handler issues exactly one either way:
+
+        nothing missed  -> refreshRoom()      the poll's own `invalidate('room:data')`
+        chat missed     -> invalidateAll()    the wider re-read, and no second request
+
+      `appHasFocusGetChatLog` is still one refetch rather than a replay, because the load already
+      returns the newest page per channel — the room re-reads itself and is current.
+    */
+    expect(pageCode).toContain('if (!missedChatWhileHidden) {');
     expect(pageCode).toContain('missedChatWhileHidden = false;');
+    expect(pageCode).toContain('void invalidateAll();');
+
+    // The branch that fires the cheap refresh must not also fall through to the wide one.
+    const handler = pageCode.slice(pageCode.indexOf('function onVisibilityChange() {'));
+    const body = handler.slice(0, handler.indexOf('\n  }'));
+    expect(body.split('refreshRoom()')).toHaveLength(2);
+    expect(body.split('invalidateAll()')).toHaveLength(2);
   });
 });
 

@@ -223,6 +223,55 @@ through — both are documented in `.env.example` and until now nothing read the
 **Not done:** retiring `ptr_clone_app` (deferred until the cutover is proven in a real deployment),
 and the owner role / database rename `ptr_clone` → `tradingroom`. Both remain in `TODO.md`.
 
+### 2026-08-15 20:00 EDT — Phase 3b: two listeners for one event, and the double load they were hiding
+
+**Branch `feat/extra-chat-column`, not merged.** **Runtime impact: yes** — returning to the tab now
+issues ONE request where it issued two.
+
+Phase 3a's new guard, written unscoped, found a **second `visibilitychange` listener** in the page.
+This merges them, and merging them is what exposed the defect.
+
+#### What the pair actually did
+
+| listener | on return to the tab |
+|---|---|
+| `onVisibilityChange` | sets focus, and `invalidateAll()` **if chat was missed** |
+| `handleVisibility` | `refreshRoom()` — `invalidate('room:data')` — **always** |
+
+Each was correct about its own concern and neither knew about the other. So a return **with** missed
+chat fired **both** — two loads for one event, on every alt-tab back into a busy room. The merged
+handler issues exactly one either way:
+
+```
+nothing missed  ->  refreshRoom()     the poll's own invalidate('room:data')
+chat missed     ->  invalidateAll()   the wider re-read, and no second request
+```
+
+The five-second poll hoisted out of `onMount` to sit beside the handler that drives it. One
+listener, one teardown fewer, one concern instead of two.
+
+#### A contract that documented a half-truth
+
+`visibility-change-contract.test.ts` asserted *"returning to a tab where nothing happened should
+cost nothing."* That was true of the handler it read and **false of the page** — the other listener
+refreshed unconditionally. The test could not see it, because it only ever read one of the two.
+
+Rewritten to state what the pair does now that they are one, with the branch counts asserted so the
+cheap path cannot fall through to the wide one.
+
+#### And a gap in my own change, found by a control rather than by reading
+
+Deleting `startRefresh()` from the merged handler left **the entire suite green**. A room whose
+five-second poll never restarts looks fine for exactly as long as nobody else speaks, then goes
+quietly stale — the failure the poll exists to prevent, reintroduced with nothing to notice. Both
+directions are asserted now, plus the mount-time guard that a tab already hidden must not start one.
+
+#### Verified
+
+`pnpm run check` **0 errors / 0 warnings across 1,131 files** · **1,853 tests across 133 files** ·
+`eslint src` clean · prettier clean · **two negative controls seen red** (a quiet return firing the
+wide re-read; the poll never restarting — the second only after the missing assertion was added).
+
 ### 2026-08-15 19:52 EDT — Phase 3a: the first effect the docs replace outright, and the ratchet refusing a raise
 
 **Branch `feat/extra-chat-column`, not merged.** **Runtime impact: yes** — the `visibilitychange`
