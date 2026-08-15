@@ -72,7 +72,7 @@ const check = (l, ok, x = '') => {
 };
 
 // Capture what window.open is asked for, without actually opening one.
-const opened = await ev(`(()=>{ window.__opened=null;
+await ev(`(()=>{ window.__opened=null;
   const n=window.open; window.open=(u,tgt,feat)=>{window.__opened={u,tgt,feat}; return null;};
   return 'stubbed';})()`);
 

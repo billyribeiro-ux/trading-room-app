@@ -106,7 +106,10 @@
     selfMutedUntil,
     showPmButton,
     canPostImages,
-    isPresenter,
+    // `isPresenter` is DECLARED in Props and passed by the parent, but nothing in this component
+    // reads it -- the same shape as the controller-s markUnwired, found by the same rule. Left
+    // declared so the parent-s prop is still accepted, and recorded in TODO.md rather than
+    // guessed at: removing it is a behaviour question, not a lint one.
     canUseRTE,
     giphyApiKey,
     theme,

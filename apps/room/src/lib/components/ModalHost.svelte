@@ -1,7 +1,6 @@
 <script lang="ts">
   import { ngbTooltip, ngbTooltipWith } from '$lib/ngb-tooltip';
   import { alertDateFormatter } from '$lib/message-formatters';
-  import { panelDragResize } from '$lib/panel-drag';
   import { rtmpIngestUrl, whipIngestUrl, type StreamIngestKey } from '$lib/stream-ingest';
   import { deserialize } from '$app/forms';
   import { invalidateAll } from '$app/navigation';

@@ -51,7 +51,6 @@
    */
   import PresenterMuteRows from '$lib/components/PresenterMuteRows.svelte';
   import {
-    volumeIcon,
     type PresenterAudioPreferences,
     type TalkingPresenter
   } from '$lib/screen-volume';
@@ -97,7 +96,6 @@
     onpresentervolume
   }: Props = $props();
 
-  const icon = $derived(volumeIcon(audioVolume));
 
   /**
    * The master slider is written through an attachment rather than `bind:value`, matching how the

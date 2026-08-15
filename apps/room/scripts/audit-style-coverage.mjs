@@ -22,7 +22,6 @@ const styleSources = await Promise.all(
   }))
 );
 
-const combinedCss = styleSources.map(({ source }) => source).join('\n');
 const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const normalizeCssValue = (value) =>
   String(value)

@@ -16,7 +16,7 @@
     MESSAGE_MENU_LABEL,
     sourceMessageBehavior
   } from '$lib/message-behavior';
-  import type { FollowChatStyle, MessageBadge, MessageReactions } from '$lib/types';
+  import type { FollowChatStyle } from '$lib/types';
 
   type MessageKind = 'alert' | 'chat';
   interface MessageReactionPayload {

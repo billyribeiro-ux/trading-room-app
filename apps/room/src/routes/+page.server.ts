@@ -1,5 +1,4 @@
 import { fail, redirect } from '@sveltejs/kit';
-import { createHash } from 'node:crypto';
 import { and, asc, desc, eq, gt, isNull } from 'drizzle-orm';
 import { isEmptyChatHtml, sanitizeChatHtml } from '$lib/server/chat-html';
 import { pruneDeadPreferenceKeys } from '$lib/dead-preference-keys';
@@ -35,7 +34,7 @@ import {
   loadNewestChatPages
 } from '$lib/server/chat-log';
 import { loadAlertPage } from '$lib/server/alert-log';
-import { isChatMode, type ChatMode } from '$lib/chat-mode';
+import { isChatMode } from '$lib/chat-mode';
 import { parseReactions } from '$lib/server/reactions';
 import {
   readRoomConfig,
@@ -98,7 +97,7 @@ import {
   userSettings
 } from '$lib/server/db/schema';
 import { isChatTab } from '$lib/types';
-import type { ActivePoll, MessageReactions } from '$lib/types';
+import type { ActivePoll } from '$lib/types';
 
 /*
   Body caps. The adapter's request-size limit already stops a multi-megabyte upload, but a

@@ -56,7 +56,7 @@ describe('captured room scroller behavior', () => {
       offsetHeight: 300
     };
     const callback = vi.fn();
-    const schedule = vi.fn((next: () => void, delay: number) => {
+    const schedule = vi.fn((next: () => void, _delay: number) => {
       callback.mockImplementation(next);
       return 1;
     });

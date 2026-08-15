@@ -76,7 +76,7 @@
     const response = await realFetch.apply(this, arguments);
 
     if (RELEVANT.test(url)) {
-      let body = null;
+      let body;
       try {
         body = trim(await response.clone().text());
       } catch {

@@ -36,8 +36,7 @@
     applySessionMediaState,
     emptyMtxState,
     isMtxStream,
-    selectMtxStreamTab,
-    type MtxStream
+    selectMtxStreamTab
   } from '$lib/mtx-streams';
   import ScreenZoomControls from '$lib/components/ScreenZoomControls.svelte';
   import {
@@ -3963,7 +3962,7 @@
   let reconnectToastId: number | null = null;
   let presenterReconnectToastId: number | null = null;
 
-  function mediaServerConnected(reconnected: boolean) {
+  function mediaServerConnected(_reconnected: boolean) {
     isMediaConnected = true;
     /*
       Cleared here, on the socket's `connect`, exactly where the reference clears them — inline in
