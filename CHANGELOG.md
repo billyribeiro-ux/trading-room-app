@@ -24,6 +24,36 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-15
 
+### 2026-08-15 11:17 EDT — Benzinga: the decode pass the TODO asked for, which changed nothing
+
+**Runtime impact: none.** No code changed. This entry exists because "we checked and it already
+matches" is a result, and without it the next person runs the same pass again.
+
+`TODO.md` carried "small; needs one more decode pass for the const-table classes". Done, against the
+component const table at bundle byte **2,533,190**:
+
+| const | capture | ours |
+| --- | --- | --- |
+| 25 | `nav-item py-0` | matches |
+| 40 | `target="_blank" title="Benzinga News" nav-link sidebar-item ps-1` | matches |
+| 41 | `benzinga-logo-alt` | matches |
+| 42 | `fas fa-newspaper` | matches |
+| 22 | `pl-2` | matches |
+
+The only additions are `rel`, `alt` and `width`/`height`, which are this repository's own rules
+rather than drift.
+
+**Worth recording because it nearly went the other way.** A raw read of the bytes around the nav item
+showed an `ms-1` near the span, and the working assumption became that our `pl-2` was wrong.
+Decoding the array BY INDEX proved const 22 is `pl-2` and ours was right. Reading the neighbourhood
+rather than the region is exactly how a "fix" introduces a bug into working markup — the same failure
+the evidence rule in `~/CLAUDE.md` exists to prevent.
+
+Two gaps remain on the row and neither is a port: the reference's DEFAULT url is its own host
+(`ptrv3.protradingroom.com/public/bz/index.html`), so ours renders nothing unless
+`altBenzingaLinkURL` is set, and the default `assets/images/benzinga-logo.png` is not in this
+repository, so the icon form always stands in.
+
 ### 2026-08-15 11:12 EDT — Alert Labels: `#DayTrade` becomes a badge, and the setting is wired through all six places
 
 **Runtime impact: alerts only.** A room that configures no labels renders exactly as before — the
