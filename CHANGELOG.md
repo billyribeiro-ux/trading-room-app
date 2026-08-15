@@ -24,6 +24,48 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-15
 
+### 2026-08-15 09:17 EDT — the implementation list, and the 209 nobody had counted
+
+**Runtime impact: none.** One document, `docs/IMPLEMENTATION-LIST.md`.
+
+Every row generated from the evidence, not from memory, and every block traces to a named source.
+
+**The headline nobody had enumerated: 209 of 269 room settings are stored and read by NOTHING.**
+`wired: false` means neither the room nor the controller consumes it. Each one is a control the room
+owner can set on the manage page that changes nothing. Under match-identically, every one is
+outstanding work.
+
+| block | count |
+| --- | ---: |
+| settings wired to nothing | **209** |
+| reference wire commands confirmed missing | 25 |
+| the manage-page action surface, per-user + bulk | 1 whole surface, none of it built |
+| named features decoded and unbuilt | 5 |
+
+**A near-miss caught before it reached the document, and recorded because it is exactly the class of
+error the list exists to prevent.** A first pass reported **129** unwired. The regex required a
+`help:` field that not every row carries, so **79 rows were silently dropped**. The count is now taken
+with the parse **asserted at 269 rows** (268 extracted + 1 reviewed deviation), so nothing can vanish
+quietly. The grouping was also redone: the first attempt bucketed settings by keywords I invented,
+which is an assumption; it now groups by the schema's own `section` field, which is evidence.
+
+**The role-number trap is carried into the list in a callout**, because it is the one thing on it that
+can cause damage: `10` is *Hide Pers User Data* in the per-user menu and **`Remove All`** in the bulk
+menu. Different commands, different vocabularies. One shared enum would turn a privacy toggle into a
+mass delete. Code `12` is unobserved in either menu and is recorded as a gap.
+
+**Order of work** is set: the two alert features in flight, then the divergence register — which gates
+every match-identically decision and therefore lands before the bulk settings work — then the 209 by
+section, then the manage-page surface, then the wire commands by cluster.
+
+**What is deliberately NOT on the list:** the Part 1 improvements, because they are divergences FROM
+the reference and the directive is match first; the four NOISE identifiers, which were never ours; and
+`vendor.min.js` at 1.25 MB, which is recorded as an unread gap rather than a decision.
+
+The superadmin layer is parked at the owner's instruction. Its decode is complete, with the
+Marketplace pane named as the one surface never opened.
+
+
 ### 2026-08-15 09:12 EDT — the enterprise layer, read from three sources, and the one door nobody has opened
 
 **Runtime impact: none.** One decode document.
