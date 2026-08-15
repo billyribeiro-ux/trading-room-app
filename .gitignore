@@ -174,3 +174,21 @@ dumps/
 # `authorization-contract.test.ts`, now skips the single case that needs `set-password.mjs` and
 # keeps the dead-guard assertion running everywhere.
 /apps/room/scripts/
+
+# Release evidence is a BUILD OUTPUT of the backend gate, not source.
+#
+# `backend-quality.yml` creates `release-evidence/api-<sha>/` to hold the redacted PostgreSQL
+# attestation, and `scripts/build-api-release-evidence.sh` then writes the image digest, SBOM and
+# vulnerability report beside it — it requires that directory to ALREADY exist (its line 75).
+#
+# The same script also refuses to run unless the checkout is clean, and it checks with
+# `--untracked-files=all`. So the attestation step was guaranteed to dirty the tree that the very
+# next step demands be pristine: `[backend:release-artifact] ERROR: release evidence requires a
+# clean checkout`, every time, unconditionally.
+#
+# It went unnoticed because no run had ever got this far — the gate died at an earlier step. It
+# first appeared once the attestation started passing on 2026-08-15. Ignoring the directory is the
+# fix rather than relaxing the cleanliness check: the check exists to prove the artifact was built
+# from exactly the committed revision, and a build output of this run is not evidence against that.
+# The directory is uploaded as a CI artifact, which is where it is meant to be read from.
+/release-evidence/

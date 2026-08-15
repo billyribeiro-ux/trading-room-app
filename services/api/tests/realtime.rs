@@ -32,7 +32,7 @@ const ACME_ENTERPRISE: Uuid = uuid!("a0000000-0000-4000-8000-000000000001");
 
 fn database_url() -> String {
     std::env::var("DATABASE_URL").unwrap_or_else(|_| {
-        "postgres://ptr_clone_app:ptr_app_local_dev@127.0.0.1:5432/ptr_clone".into()
+        "postgres://tradingroom_app:ptr_app_local_dev@127.0.0.1:5432/ptr_clone".into()
     })
 }
 

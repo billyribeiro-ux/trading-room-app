@@ -13,6 +13,12 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-ptr_clone}
       POSTGRES_APP_USER: ${POSTGRES_APP_USER:-ptr_clone_app}
       POSTGRES_APP_PASSWORD: ${POSTGRES_APP_PASSWORD:?set POSTGRES_APP_PASSWORD in services/.env}
+      # The RUNTIME role, passed through so the two variables documented in `.env.example` are
+      # actually consumed by something. Without these lines setting them there does nothing and the
+      # provisioner silently falls back, which is the "config nothing reads" failure in reverse.
+      # The password defaults to the baseline role's so an existing local `.env` keeps working.
+      POSTGRES_RUNTIME_USER: ${POSTGRES_RUNTIME_USER:-tradingroom_app}
+      POSTGRES_RUNTIME_PASSWORD: ${POSTGRES_RUNTIME_PASSWORD:-${POSTGRES_APP_PASSWORD}}
     ports:
       # Local development only. Do not expose PostgreSQL on a public interface.
       - 127.0.0.1:${POSTGRES_PORT:-5432}:5432

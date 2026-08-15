@@ -85,6 +85,34 @@ describe('CI cannot cancel the default branch out of its own verification', () =
     }
   });
 
+  it.each(workflows)('$name gives each default-branch commit its own group', ({ name, text }) => {
+    /*
+      `cancel-in-progress: false` alone was measured and found insufficient, which is why this
+      assertion exists separately from the one above.
+
+      It protects the run that is already EXECUTING — verified: 34e6c09 started at 16:36:20Z and
+      survived four subsequent pushes, where every earlier backend run had been killed within
+      minutes. But GitHub keeps only ONE pending run per concurrency group, so a newer arrival still
+      cancels the QUEUED one. On 2026-08-15 the run for 4c2dd74 was created at 16:41:33Z, never
+      started a single job, and was cancelled at 16:50:38Z when bf6920b arrived — which was itself
+      superseded at 16:51:46Z. Both reached `main` unverified, AFTER the cancel-in-progress fix had
+      landed, and 4c2dd74 is the commit that CONTAINS that fix.
+
+      A per-commit group removes the queue: nothing shares a group, so nothing is superseded.
+      Asserted on `github.sha` rather than the exact expression, so rewording stays free.
+    */
+    const groups = [...code(text).matchAll(/^\s*group:\s*(.+?)\s*$/gm)].map((m) => m[1]);
+
+    for (const group of groups) {
+      expect(
+        group,
+        `${name} shares one concurrency group across all default-branch commits, so a queued run ` +
+          'is cancelled whenever a newer push arrives and that commit is never verified. Include ' +
+          'github.sha in the group for refs/heads/main.'
+      ).toContain('github.sha');
+    }
+  });
+
   it('every workflow that runs on the default branch declares a concurrency policy at all', () => {
     /*
       A workflow with no `concurrency` block never cancels, which is safe for this rule — but it is

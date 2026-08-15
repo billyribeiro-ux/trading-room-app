@@ -43,13 +43,24 @@ runner rather than a stale branch. `src/lib/eslint-config-resolution.test.ts` no
 RESOLVED config via `ESLint.calculateConfigForFile` — a grep for `'off'` would have passed
 throughout the entire failure, because the string was always there.
 
-### ✅ CLOSED 2026-08-15 12:49 EDT — CI could accept an UNVERIFIED commit onto a deploying branch
+### ✅ CLOSED 2026-08-15 12:56 EDT — CI could accept an UNVERIFIED commit onto a deploying branch
 
 Both closed. **Do not re-open either; the state below is verified, not remembered.**
 
-1. **`cancel-in-progress` no longer applies to `main`.** All three workflows now read
-   `cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}` — merged in `4c2dd74` (PR #43).
-   Branch and `pull_request` runs still cancel as before; only the default branch is protected.
+**Read this first: it took TWO changes, and the first one alone was not enough.** The 12:49 fix set
+`cancel-in-progress: false` for `main`, which protects the run already EXECUTING but does not stop
+GitHub cancelling a QUEUED one — a group holds only one pending run. Measured on the fix's own
+commit: `34e6c09` started at 16:36:20Z and survived four later pushes (the flag working), while
+`4c2dd74` was created at 16:41:33Z, **never started a job**, and was cancelled at 16:50:38Z when a
+newer push arrived. `4c2dd74` is the commit that contains the 12:49 fix. The 12:56 change gives each
+`main` commit its own concurrency group, which removes the queue entirely. If you are tempted to
+"simplify" the group expression back to `${{ github.ref }}`, that is this bug.
+
+1. **`cancel-in-progress` no longer applies to `main`, and each `main` commit has its own group.**
+   All three workflows read
+   `cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}` and a group suffixed with
+   `github.sha` on the default branch. Branch and `pull_request` runs are unchanged — they still
+   share a group and still supersede, which is what keeps a busy branch affordable.
 
    The evidence that justified it: **11 of the last 40 runs on `main` were `cancelled` — 27%** —
    including EVERY `Backend quality` run in the 2026-08-15 sequence (`4a79203`, `c1ff436`,
@@ -196,29 +207,43 @@ Vercel is type `Sensitive`, which is **write-only**. No value can be read back b
 CLI or support. **`~/Desktop/new-room-control/.env` and `.env.vercel-pull` are therefore the only
 readable copies of production secrets that exist anywhere.** Back that folder up off this machine.
 
-### 3. Backend quality — NOT OURS TO FIX: the runner is out of minutes
+### 3. Backend quality — the code defects ARE fixed; what remains is CI minutes and the cutover tail
 
 **Owner, 2026-08-14 23:00: the account has run out of CI minutes, and that is why these jobs fail.**
 Nothing below is being worked on, and CI is not to be triggered again until the app is finished —
 every push against an open PR starts a run and spends minutes that are not there.
 
-Kept because it was diagnosed rather than guessed, and the diagnosis stands whatever the cause:
+Owner's note 2026-08-14: there may also be a **billing/quota** problem on the runner. Unchanged.
 
-The Rust job fails all 27 integration tests with
-`password authentication failed for user "ptr_clone_app"` (28P01).
+#### ✅ CLOSED 2026-08-15 — the `28P01` failure, and what it actually was
 
-**An earlier reading of this was wrong and is corrected here.** It looked like a `push` vs
-`pull_request` difference. It is not: the PR runs that appear green **skip the entire gate** —
-`Report a skipped backend gate` ran and both provisioning and tests show `skipped`. The gate is red
-every time it actually executes, and has been on every push to `main`.
+The Rust job failed all 27 integration tests with
+`password authentication failed for user "ptr_clone_app"` (28P01). Two earlier readings of this were
+wrong and both are corrected here.
 
-Provisioning is not the bug. `services/docker/postgres/10-provision-roles.sh` uses `\getenv` and
-`format(… %L …)`, which is correct quoting for a password containing both `'` and `\`, and that step
-reports success. The failure is at connect time in `api/tests/support/mod.rs:92` — inside
-`services/**`, which is **a mirror**: "a change made here is lost on the next sync."
+1. It looked like a `push` vs `pull_request` difference. It was not: the PR runs that appeared green
+   **skipped the entire gate**.
+2. It looked like a password-quoting bug, and it was not that either. **The role did not exist.**
+   PostgreSQL reports a nonexistent role to the client as an authentication failure and logs the
+   real reason server-side only, so the message named the wrong cause. `DATABASE_URL` named
+   `ptr_clone_app`; the API connects as `tradingroom_app`. Provisioning was never the bug —
+   `10-provision-roles.sh` uses `\getenv` and `format(… %L …)`, correct for a password containing
+   both `'` and `\`.
 
-Owner's note 2026-08-14: this may be a **billing/quota** problem on the runner rather than a code
-one. Not investigated further pending that.
+The claim that `services/**` is "a mirror" whose changes are "lost on the next sync" was also false
+and is removed: no sync exists in either direction, this repository is ahead of both siblings, and
+`CLAUDE.md` has been corrected. Run `31905657116` on `main` passed provisioning, the chain on both
+clusters, the fixture, `fmt`, clippy **and the full Rust suite**.
+
+#### Still open — the runtime-role cutover is not finished
+
+`ops/naming-provenance.md` is the authority on all of this; these are the rows it points at.
+
+| # | what | why it is not done yet |
+| --- | --- | --- |
+| 1 | **Retire `ptr_clone_app`** — a forward-only migration that drops the baseline role | Deliberately deferred until the cutover is proven in a real deployment, not just on scratch clusters. Since 2026-08-15 the role is named by no policy and reads zero rows from all 22 tenant tables, so it is inert but still holds object privileges. The migration must REFUSE rather than `CASCADE`: a cascade silently drops whatever still depends on it. `0001_baseline.sql` re-creates it on every new database, so retirement cannot be a rename and cannot assume absence. |
+| 2 | **Owner role and database name `ptr_clone` → `tradingroom`** | Its own change, deliberately not bundled. Different mechanism (ownership and `CREATE DATABASE`, not policy membership) and different blast radius: `EXPECTED_MIGRATOR_ROLE`, the preflight identity check, every `MIGRATE_DATABASE_URL`, and the provisioning scripts. Bundling would mean one failure obscures the other. Same shape as the role: add, prove, cut over, retire — **never rename**, which is the mistake the withdrawn `0009_rename_runtime_roles` made. |
+| 3 | **Prove the chain against a database that predates `0009`** | Every verification so far builds the cluster from scratch. The retarget is written to be idempotent and self-healing, and was shown to repair a hand-widened policy, but no database with real history has run it. |
 
 ### Evidence gaps
 

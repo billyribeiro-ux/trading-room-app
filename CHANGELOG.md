@@ -24,225 +24,161 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-15
 
-### 2026-08-15 17:12 EDT — Phase 1d–1e: `RoomRoster` and `RoomAlerts`
+### 2026-08-15 18:26 EDT — Two steps that could never have passed, found by finally reaching them
 
-**Branch `feat/extra-chat-column`, not merged.** Commits `a9db20d` and `4792f4c`. **Runtime impact:
-yes** — the sidebar roster and the alerts pane are driven by two more classes. No behaviour was
-intended to change; each divergence found on the way is named below.
+**Merged to `main` in `9aee3d9` (PR #55), commits `189bcfd` and `559953d`. Runtime impact: none** —
+both changes are to CI plumbing. Neither defect was introduced by that PR; both had been latent
+since the `services/` reconcile and were unreachable because the backend gate died earlier every
+time. **This is the first time in this repository's history that the backend gate has been green
+end to end**, run `31910327192`, 33m36s.
 
-| | before | after |
-|---|---|---|
-| `+page.svelte` | 13,157 | **12,974** (−183) |
-| room suite | 1,723 across 127 files | **1,772 across 129 files** |
+The pattern is worth naming, because it will happen again the next time a long gate starts getting
+further: **a step that has never executed is not a passing step, it is an unknown one.** Three
+consecutive runs each failed at a different, later place, and each failure was older than the change
+that exposed it.
 
-#### The phase plan was wrong about three fields, and the evidence said so each time
+**1. `189bcfd` — the attestation dirtied the tree the next step demands be pristine.**
 
-The plan's six-row table was a rough grouping written before any of this was read. Three fields it
-assigned have been left where they are, with the reason recorded in the class that declined them:
+`backend-quality.yml` creates `release-evidence/api-<sha>/` to hold the redacted attestation JSON.
+The very next step runs `scripts/build-api-release-evidence.sh`, which refuses to run unless the
+checkout is clean — checked with `--untracked-files=all` — and the directory was not gitignored. So
+the gate was guaranteed to fail there, unconditionally, on every run that got that far:
 
-- **`talkingUsers`** was filed under "roster, presence, talking". It is media: its declaration sits
-  between `micMuted` and `webcamMuted`, its writers are driven by SFU audio-producer announcements,
-  and the comment above it says "talking" means A MICROPHONE IS OPEN rather than anything about
-  presence.
-- **`isLimitedPresenter`** looks like roster state because the roster gates read it. It is what a
-  member BECOMES when a presenter hands them mic and screen, written by a media command.
-- **The alerts PAGING.** Upstream renders ONE roomlog component for both logs, switched on
-  `logType`, so the trigger, the guards, the terminator and both scroll nudges are the same code for
-  chat and alerts. Moving the alerts half would split a thing that is deliberately one thing.
+```
+[backend:release-artifact] ERROR: release evidence requires a clean checkout
+```
 
-Choosing the wrong owner for the convenience of one reader is a decision you then have to explain
-forever, so all three wait for the class whose writer they belong to.
+Reproduced locally before fixing: creating that path makes `git status --porcelain
+--untracked-files=all` non-empty, and ignoring it makes it empty again. Ignoring the directory is
+the fix rather than relaxing the cleanliness check — that check exists to prove the artifact was
+built from exactly the committed revision, and a build output of the same run is not evidence
+against that. It is already uploaded as a CI artifact, which is where it is meant to be read from.
 
-#### What each slice actually bought
+**2. `559953d` — the release evaluator pointed at a file that has never existed here, and then lied
+about why.**
 
-**`RoomRoster`** — the four header controls, every one of which was rendered and inert before it was
-written, now toggle one owner instead of four page-locals. The random draw's three-second reveal and
-its timer came with them.
+```
+Cannot find module '.../trading-room-app/scripts/verify-api-release-artifact.mjs'
+[backend:release-artifact] ERROR: vulnerability policy rejected the builder or release artifact
+```
 
-**`RoomAlerts`** — the Alert Filter's two viewer-owned halves stopped being restated at three call
-sites. `alertFilterFor` and `showAlertsFrom` were passed by hand into `alertPassesFilter` in the
-rendered list, in the search rows and at the live arrival. Two are now
-`.filter(alerts.passesFilter(raw))`; the third stays in the page deliberately, because it reads the
-values inside a microtask as of DELIVERY — reading them in the effect body would make the filter a
-dependency and re-deliver alerts that already arrived.
+Two defects in one line. The verifier lives at `apps/controller/scripts/`; the build script called
+`${repository_root}/scripts/`. **This is the same defect already recorded at the top of
+`verify-backend-provenance.mjs`**, which died on `apps/controller/services/` for exactly the same
+reason: both came from the sibling repository, where `scripts/` sits at the repository root, and
+moving them under `apps/controller/` invalidated the path without changing the name. The workflow's
+own earlier step invokes the verifier correctly, which is why the contract check passed while this
+could not.
 
-`alert-filter-contract.test.ts` counted those call sites in `+page.svelte` alone. It would have gone
-**green at one** after the extraction while two vanished, which is the vacuous-guard failure row AE
-predicts. It now counts both files and asserts the shared call shape.
+The second defect is the message. `set +e; node …; policy_status=$?` treats **any** non-zero exit as
+a policy rejection, so `MODULE_NOT_FOUND` was reported as a vulnerability finding — a message that
+sends whoever reads it hunting CVEs instead of a stale path. There is now a `[[ -f ]]` guard before
+the call, and the rejection branch refuses to claim a finding when the verifier wrote no result
+file. Same family as the `28P01` diagnosis that cost a turn: PostgreSQL reports a nonexistent role
+as an authentication failure, and this reported a missing file as a security finding.
 
-#### Two things preserved rather than tidied
+**The trap in fixing it, recorded because it nearly cost another 33-minute cycle.** The verifier
+*asserts the broken path back*: `verify-api-release-artifact.mjs` anchored its contract check on the
+literal string `node "${repository_root}/scripts/verify-api-release-artifact.mjs" --evaluate`.
+Fixing only the build script would have turned the currently-green contract step red. The anchor
+moved with the invocation, and because a bare `${verifier}` variable pins less than a literal path,
+the `verifier=` assignment is now asserted separately — together pinning what the original pinned:
+which script runs, and that all four vulnerability reports reach it in one bounded invocation.
 
-- **The modal edits the alert filter live.** `bind:` means clicking a trader moves the header badge
-  before anything is saved. So `filterFor` and `showFrom` have setters (the draft) alongside
-  `filterChanged` (the commit, which returns what to persist). Read-only getters would have frozen
-  the badge until the modal closed — a UX change dressed as encapsulation.
-- **A `svelte-autofixer` suggestion refused.** It asks for `SvelteDate` in the archive comparison.
-  That Date is parsed from a row, read once and discarded inside a predicate; making it reactive
-  would allocate a signal per alert per render that nothing invalidates. Recorded in the code,
-  because the suggestion returns on every check.
+**Verified.** `--verify-contract` and `--self-test` both pass locally (pure Node, no Docker). The
+negative control was run: pointing the assignment back at `scripts/` fails with `build script must
+resolve the release-policy evaluator from apps/controller/scripts`. Every
+`${repository_root}`-relative path in the build script was audited and the rest resolve.
 
-#### A shadow caught by reading, not by a tool
+**Stated as an honest limit:** the body of that build step cannot run on this machine — it refuses
+on non-Linux/non-x86_64 and needs Docker — so CI was the only place it could be proven. It is now
+proven there.
 
-The roster channel handler declared `const roster = payload.data`. After the extraction that would
-have shadowed the class for the whole block and sent every write to a payload object. Renamed to
-`frame`, which is what it always was. `svelte-check` would have passed on it.
+### 2026-08-15 16:45 EDT — The attestor refused a two-role tenant policy, and it was right: `0009` now retargets instead of appending
 
-#### My own instruments and expectations, four more times
+**Merged to `main` in `9aee3d9` (PR #55) at 18:20 EDT, on the first fully green backend gate this
+repository has had — run `31910327192`, 33m36s, every step passing.** **Runtime impact: none yet**
+— no database outside the scratch verification clusters and CI has run this. It changes what the
+next migration run does.
 
-1. **`closeDraw`'s `clearTimeout` does not do what its comment claimed.** Its negative control stayed
-   green twice: `draw` clears the handle before scheduling its own, so there is no resurrection path,
-   and the null check in the reveal callback catches what is left. The two are redundant with each
-   other — delete either alone and the assertion stays green. Both kept, redundancy now named in the
-   test so nobody removes one believing it is covered. Only `draw`'s own cancel is load-bearing, and
-   that one IS controlled.
-2. **The nick sort is case-INSENSITIVE**, so `adam` precedes `Mia`. My expectation was written the
-   other way round.
-3. **The two-candidate minimum is applied AFTER the trials filter**, so a busy room with one trial in
-   it opens no dialog at all on "Yes". A draft read that as a broken draw.
-4. **One expectation was built with the platform's own `.sort()`**, which disagrees with the
-   comparator under test — the same defect as writing a regex over text you do not control.
+**What went red.** The full backend gate on `main` (run `31905657116`, merge commit `c83f0f1`) got
+further than it ever had: provisioning, the chain on both clusters, the two-tenant fixture, `fmt`,
+clippy and **the entire Rust suite passed for the first time**. It then failed at the next step:
 
-Also: TypeScript was right that `RoomRoster`'s `$derived` chain is created before the constructor
-assigns its thunks. `$derived` is lazy so the runtime is fine, but the check is about declaration
-order, and swapping that laziness for an eager computation gives an empty roster with a zero count.
+```
+postgres release attestation failed: [room_events_policy_mismatch]
+public.room_events must have exactly the reviewed tenant policy targeted only to the runtime role
+```
 
-#### Verified
+**Why.** `0009_provision_tradingroom_app.sql` **appended** `tradingroom_app` to all 22 RLS policies
+without removing `ptr_clone_app`, so every tenant policy named two roles. The attestor requires the
+`room_events` policy to target exactly one. The migration's own parity assertion was satisfied —
+it compared counts, and both roles had 22 — so nothing upstream caught it.
 
-`svelte-check` **0/0 across 1,120 files** · **1,772 tests across 129 files** · `eslint src` clean ·
-prettier clean on touched files · `svelte-autofixer` `issues: []` on both modules · **ten negative
-controls run and seen red**, five per class.
+**The fix, and why it is not the obvious one.** The obvious fix is to teach the attestor to accept
+both names during the transition, and `tests/migrations.rs` had already been changed that way. That
+was wrong twice over: a two-role tenant policy is precisely the state that assertion exists to
+refuse, and `ptr_clone_app` still exists on every cluster, so tolerating it would let a connection
+as the un-cut-over baseline role attest as the runtime role.
 
-**Not verified: a browser.** No screenshot of a sorted roster, a random draw, a collapsed toolbar or
-a filtered alert list.
+The migration was corrected instead. It now **retargets** each policy onto the runtime role alone.
+This works because of a distinction the withdrawn rename got wrong: **roles are cluster-global,
+policies are per-database.** `0001` re-creates every policy naming the baseline role on each new
+database, and `0009` retargets it there too — identical end state, every time. Retargeting a policy
+costs nothing on the next database; renaming a role broke it. So `0009` adds the role beside the
+baseline and retargets the policies: two different actions, for two different scopes.
 
-### 2026-08-15 16:24 EDT — Phase 1a–1c of the `+page.svelte` decomposition: `RoomPolls`, `RoomMenus`, `RoomSplit`
+It is also the safer end state. `ptr_clone_app` keeps its object privileges but is named by no
+policy, so under `FORCE ROW LEVEL SECURITY` it reads **zero rows** from all 22 tenant tables while
+it waits to be retired.
 
-**Branch `feat/extra-chat-column`, not merged.** Three commits: `d3b24fb` (15:41), `abe9691` (16:00)
-and this one. **Runtime impact: yes** — the room's poll modal, its eleven floating menus and the
-whole split geometry are now driven by three classes instead of thirty-odd loose `let`s. No
-behaviour was intended to change and each divergence found on the way is named below.
+**The consequence that had to be chased down.** Six integration test files carried a hardcoded
+fallback `DATABASE_URL` naming `ptr_clone_app`, used only when the variable is unset. CI always sets
+it, so the fallback was invisible there — but after this change a local run through it connects as a
+role no policy names and reads zero rows, and the tenancy suite would have reported a broken tenancy
+kernel when the kernel was fine. All six now name the runtime role, matching CI.
 
-**Entries for `d3b24fb` and `abe9691` are recorded HERE rather than at the time**, which is a
-deviation from this file's own rule that an entry is appended when a piece of work finishes. Said
-plainly rather than back-dated.
+`tenancy.rs` needed one more: `an_owner_cannot_impersonate_the_runtime_role_with_session_authorization`
+was impersonating `ptr_clone_app`. Left alone it would have stayed green while no longer covering
+the role its own name claims. It now assumes `tradingroom_app`.
 
-#### The measurement
+**Verified on real PostgreSQL 17** — two scratch clusters, CI's exact step order, nothing mocked:
 
-| | before | after |
-|---|---|---|
-| `+page.svelte` | 13,522 | **13,157** (−365) |
-| room suite | 1,661 across 124 files | **1,723 across 127 files** |
+| check | result |
+| --- | --- |
+| policy targets after the chain | 0 name `ptr_clone_app`, 22 name `tradingroom_app`, **0 name both** |
+| `room_events` specifically | `{tradingroom_app}` — what the attestor demands |
+| convergence, 2nd database, same cluster | `{tradingroom_app}` — identical |
+| the attestation that failed on `main` | **`status = pass`**, `roles = ['tradingroom_app']` |
+| full API suite (17 targets) | **294 passed, 0 failed** |
+| `cargo fmt` / clippy `-D warnings` | clean |
+| cross-cluster negative control | fails correctly with `[target_cluster_mismatch]` |
 
-Three modules and three test files under `apps/room/src/lib/room/`: `polls.svelte.ts` (4 fields),
-`menus.svelte.ts` (12), `split.svelte.ts` (7 reactive, 5 plain, 20 derived).
+**Both negative controls were run, because an assertion never seen to fail is not a test:**
 
-#### Why classes, and the trap that would have failed silently
+- Widening `room_events` back to `{ptr_clone_app,tradingroom_app}` — reproducing exactly what `main`
+  had — made the attestor fail with `[room_events_policy_mismatch]`. The check is real, and it is
+  what caught this.
+- A sabotaged copy of `0009` with the `ALTER POLICY` removed failed with its own new message:
+  `RLS retarget incomplete: 1 policies still name ptr_clone_app`.
+- Re-running the real `0009` over the widened policy **healed** it back to `{tradingroom_app}` and
+  the attestation passed again — so it repairs drift, not just fresh installs.
 
-`svelte/svelte-js-files` states that reassigned state cannot be exported from a `.svelte.ts` module,
-and `svelte/context` states that reassigning a shared value *"breaks the link"* for everything
-reading it downstream. Both point the same way: the reactive box lives behind `this`, every reader
-goes through a getter, and each instance is a `const` that is never reassigned.
+**Provenance.** Eleven `services/**` files changed. Three were already individually pinned and were
+repinned after reviewing each diff; the other eight left the sealed aggregate for their own pins
+with the reason recorded beside each hash, dropping `EXPECTED_UNTOUCHED_COUNT` 83 → 75. No file
+became unsealed — the seal moved from the aggregate to its own line. Verified: every modified
+`services/` file is individually pinned, so no file remaining in the aggregate changed.
 
-Getting that wrong produces a room that renders once and then quietly stops updating — and
-`svelte-check`, the suite and `svelte-autofixer` all pass on it. Every one of the three test files
-therefore ends with a reactivity block that reads a getter inside `$effect.root`, mutating and
-flushing INSIDE the root and asserting OUTSIDE it. That shape is not incidental: two earlier drafts
-in this repository proved nothing, one by mutating outside the root and one by asserting inside it
-where the expectation is swallowed.
+**Also corrected, all of it prose that had gone false:** the attestor's comment still described the
+withdrawn rename ("a renamed role keeps its policies"); `ATTESTED_MIGRATION_VERSIONS` still credited
+slot 9 to `0009_rename_runtime_roles`; the CI workflow said the negative-control cluster's role "has
+been renamed"; and three stacked count-comments in the provenance seal disagreed with the constant
+beneath them. `compose.yml` now passes `POSTGRES_RUNTIME_USER` / `POSTGRES_RUNTIME_PASSWORD`
+through — both are documented in `.env.example` and until now nothing read them locally.
 
-#### What reading each set together found
-
-**`RoomMenus` — two closers that never agreed.** `openModal` closed nine menus and left `recording`,
-`soundcloud` and `screen` floating over the modal; `closeFloatingMenus` closed ten and left `emoji`
-and `giphy` open. Neither list is obviously wrong — the pickers live in the composer and arguably
-should survive a top-bar click — but they were never decided, they drifted. **Both behaviours are
-preserved exactly**, as `closeForModal()` and `closeFloating()`, with a test asserting the two
-DIFFER, so making them agree is now a decision somebody records rather than a tidy-up.
-
-**`RoomSplit` — one measurement, two provenances, three lines apart.** `defaultMainSplit` read
-`DIRECT_EVIDENCE_CONTRACT.populatedRoom.primaryPercent`; `defaultChatAlertsSplit` was a bare
-`40.136530587668595` with no stated origin. It could stay bare because the contract records
-`primaryPercent` and has no `alertsPercent` beside it. It is **not** added there — `dump-contract.test.ts:314`
-pins `populatedRoom` with `toEqual`, and editing a pinned evidence object for a reader's convenience
-is not a thing to do. Instead it is named `CAPTURED_ALERTS_PERCENT` in the module and its provenance
-is EXECUTED: the two percentages and the 11px gutter reproduce all four captured flex strings
-exactly — `calc(25.5107% - 2.80618px)`, `calc(74.4893% - 8.19382px)`, `calc(40.1365% - 4.41502px)`,
-`calc(59.8635% - 6.58498px)` — at the precision a browser serialises computed styles to. Change
-either number in its last place and four assertions go red.
-
-#### Two simplifications the evidence refused
-
-- **Collapsing the eleven menu flags to one `open: MenuName | null`.** `toggleTopMenu` enforces
-  exclusivity across four menus by hand and for nothing else; `rosterSort`, `archives`, `notes` and
-  `files` can genuinely be open together today. One field would have made them exclusive, which is a
-  UX change dressed as a refactor.
-- **Replacing `bind:innerWidth` with `svelte/reactivity/window`'s `innerWidth.current`.** It would
-  remove the binding, and `0` here means "never measured", which is load-bearing twice: `isMobileScreen`
-  is false at 0 so SSR renders the desktop tree, and the resize-refetch effect uses the same 0 to skip
-  a refetch on first paint. A value that is `undefined` on the server and live on the client changes
-  both. Recorded in the class rather than left as an omission.
-
-#### One decision that is a real design property, not a style
-
-The twenty geometry values are `$derived` **class fields** behind getters, not plain computing
-getters. `bind:innerWidth` writes on every frame of a resize; `$derived` is push-pull, so an
-unchanged `isMobileScreen` boolean stops the chain and the five flex strings are not rebuilt. Through
-a getter the effect's dependency would be the width itself and all six writes would rebuild
-everything. `split.svelte.test.ts` asserts the effect runs **once** across six width writes, which is
-the assertion that goes red if anyone converts them back.
-
-They are private-with-a-getter rather than public because a `$derived` field is reassignable from
-outside — deriveds are overridable unless declared `const`, which a class field cannot be.
-
-#### The migration, done the way row AE requires
-
-13 assertions across 4 text-reading contract files failed loudly when the regions moved, which is a
-migration telling you where to go. Every one was **re-pointed at the file that now owns the thing**,
-never deleted: `mobile-layout-contract.test.ts` (7), `extra-chat-column-contract.test.ts` (4),
-`split-gutter.test.ts` (1), `source-size-contract.test.ts` (the ceiling). The upstream halves —
-everything read out of `docs/source/**` — are untouched, because the evidence did not move.
-
-One negative assertion was made **stronger** rather than merely relocated: "the collapse must never
-write the preference" was a `slice(indexOf(...))` over the page, which is the exact shape that goes
-vacuous when text moves. It is now structural — `RoomSplit` is constructed with a READER, is handed
-one again on a direction change, and `endDrag` RETURNS the preference write for the page to perform.
-No path through the class can persist anything.
-
-#### Three of my own instruments were wrong, and each is recorded where it failed
-
-1. **`RoomMenus`' exclusivity control stayed GREEN.** Making `archives` close the others changed
-   nothing, because the draft opened `archives` FIRST so it had nothing to close. The test now opens
-   each menu last in turn.
-2. **`RoomSplit`'s "a mobile main drag is never recorded" stayed GREEN.** Deleting the mobile early
-   return changed nothing, because a mobile drag writes the MOBILE field and the unseeded desktop
-   one was still null — so the write was declined for the wrong reason. The split is now seeded.
-3. **A `not.toContain('localStorage')` guard went red on the class's own prose.** It read the raw
-   module, where `resolveSplitSizes` explains which `localStorage` keys upstream reads. Scoped to
-   stripped code, which is what the same file already does for the page.
-
-Two drafts of my own assertions were also simply wrong about the code and were corrected in the
-test, not in the source: a single click on a desktop gutter DOES re-persist the size unchanged (the
-original `finishSplit` only returned early on a double click or a mobile drag), and the memoisation
-test's expected run count was 1, not 2.
-
-#### Verified
-
-`svelte-check --threshold error` **0 errors / 0 warnings across 1,116 files** · `npx vitest run`
-**1,723 passed across 127 files** · `npx eslint src` clean · prettier clean on every touched file
-(12 files elsewhere in `src/` were already warning before this change and are untouched) ·
-`svelte-autofixer` returns `issues: []` **and** `suggestions: []` on all three `.svelte.ts` modules —
-which is the gate that has been unavailable in practice, because the same call on the 13,000-line
-page returns ~100 suggestions with no way to tell new from pre-existing.
-
-**Six negative controls run and seen red:** breaking `CAPTURED_ALERTS_PERCENT` in its last digit;
-making `innerIsVertical` the inverse of `isHorizontal`; replacing a `$derived` geometry field with
-`$state.raw`; letting the class call `savePreference` directly; deleting the mobile no-write rule
-(twice — the first run is failure 2 above); and, from the earlier commits, tidying the two closers
-into agreement and making the independent menus exclusive.
-
-**Not verified: a browser.** No screenshot of a dragged gutter, a rotated phone or a collapsed
-presentation area was taken. The geometry is proven against the captured flex strings and the
-reference's const table, which is stronger than it was, but it is not a rendered room.
+**Not done:** retiring `ptr_clone_app` (deferred until the cutover is proven in a real deployment),
+and the owner role / database rename `ptr_clone` → `tradingroom`. Both remain in `TODO.md`.
 
 ### 2026-08-15 15:25 EDT — The remote-function conversion, finished — and the guard that says I finished it twice wrongly
 

@@ -44,10 +44,27 @@ permissions:
 #
 # The expression evaluates to `false` only for `refs/heads/main`, so branch and pull_request runs
 # keep cancelling as before and nothing gets slower except the default branch, which is the one
-# place the answer matters more than the wall-clock. `ci-verification-integrity.test.ts` asserts
-# this rather than trusting the comment.
+# place the answer matters more than the wall-clock.
+#
+# THE GROUP IS PER-COMMIT ON `main`, AND THAT SECOND HALF IS NOT DECORATION.
+#
+# `cancel-in-progress: false` alone was measured and found insufficient. It protects the run that is
+# already EXECUTING, and that much worked — `34e6c09` started at 16:36:20Z and survived four
+# subsequent pushes where every earlier backend run had been killed within minutes. But GitHub keeps
+# only ONE pending run per concurrency group, so a newer arrival still cancels the QUEUED one. On
+# 2026-08-15 the run for `4c2dd74` was created at 16:41:33Z, never started a single job, and was
+# cancelled at 16:50:38Z when `bf6920b` arrived; `bf6920b` was then superseded the same way at
+# 16:51:46Z. Both commits reached `main` with no verification at all, AFTER the cancel-in-progress
+# fix had landed. `4c2dd74` is the commit that CONTAINS that fix.
+#
+# Giving each `main` commit its own group removes the queue entirely: nothing shares a group, so
+# nothing is superseded, and every commit on the default branch is verified. The cost is real and
+# accepted — several runners can be busy at once on a burst of pushes. On a branch the group is
+# unchanged and supersession still applies, which is what makes a busy branch affordable.
+#
+# `ci-verification-integrity.test.ts` asserts both halves rather than trusting this comment.
 concurrency:
-  group: quality-${{ github.ref }}
+  group: quality-${{ github.ref }}${{ github.ref == 'refs/heads/main' && format('-{0}', github.sha) || '' }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
