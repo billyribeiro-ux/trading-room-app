@@ -19,7 +19,7 @@ permissions:
 # verified a commit on the default branch. This is also the slowest workflow here, which is precisely
 # why it was the one that always lost the race.
 concurrency:
-  group: backend-quality-${{ github.ref }}
+  group: backend-quality-${{ github.ref }}${{ github.ref == 'refs/heads/main' && format('-{0}', github.sha) || '' }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 env:
@@ -128,16 +128,47 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if [ "${{ github.event_name }}" != "pull_request" ]; then
-            echo "reason=event ${{ github.event_name }} always runs the full gate" >> "$GITHUB_OUTPUT"
-            echo "backend=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          git fetch --no-tags --depth=0 origin "${{ github.base_ref }}" >/dev/null 2>&1 || \
-            git fetch --no-tags origin "${{ github.base_ref }}"
-          base="$(git merge-base "origin/${{ github.base_ref }}" HEAD)"
+          # A PUSH is scoped the same way a pull request is, and that is new.
+          #
+          # Every non-pull_request event ran the full gate unconditionally, so every merge to `main`
+          # spent the whole ~33-minute Rust and PostgreSQL suite whether or not it contained a single
+          # backend file. Measured over the last 20 commits on `main`: 4 touched a backend path and
+          # 16 did not, so 16 full runs verified a tree that was byte-identical to one already
+          # verified. That is roughly 500 runner-minutes to re-prove nothing, and it is why this
+          # workflow was always the one still running when the next push arrived.
+          #
+          # `merge_group` and `workflow_dispatch` deliberately keep the unconditional full gate.
+          # The merge queue is the last check before code becomes `main`, and a manual dispatch is
+          # someone asking for the real thing on purpose. Neither is on the hot path.
+          #
+          # It FAILS CLOSED. If the previous revision cannot be resolved — a first push, a force
+          # push, a rewritten history, anything where `github.event.before` is absent or no longer an
+          # object in this clone — the diff is unknowable and the full gate runs. A shallow or empty
+          # diff must never be read as "no backend change"; that is the one failure mode this step
+          # cannot have, which is also why the checkout above pins `fetch-depth: 0`.
+          case "${{ github.event_name }}" in
+            pull_request)
+              git fetch --no-tags --depth=0 origin "${{ github.base_ref }}" >/dev/null 2>&1 || \
+                git fetch --no-tags origin "${{ github.base_ref }}"
+              base="$(git merge-base "origin/${{ github.base_ref }}" HEAD)"
+              ;;
+            push)
+              base="${{ github.event.before }}"
+              if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ] \
+                 || ! git cat-file -e "${base}^{commit}" 2>/dev/null; then
+                echo "reason=push whose previous revision cannot be resolved; running the full gate" >> "$GITHUB_OUTPUT"
+                echo "backend=true" >> "$GITHUB_OUTPUT"
+                exit 0
+              fi
+              ;;
+            *)
+              echo "reason=event ${{ github.event_name }} always runs the full gate" >> "$GITHUB_OUTPUT"
+              echo "backend=true" >> "$GITHUB_OUTPUT"
+              exit 0
+              ;;
+          esac
           changed="$(git diff --name-only "$base" HEAD)"
-          printf 'changed files:\n%s\n' "$changed"
+          printf 'scoping against %s\nchanged files:\n%s\n' "$base" "$changed"
           # The workflow itself is in the list: a change to this file must be
           # proved by the gate it defines, or it could disable itself.
           # The verifier paths are `apps/controller/scripts/…`. They were written as
@@ -157,7 +188,7 @@ jobs:
         if: steps.scope.outputs.backend != 'true'
         shell: bash
         run: |
-          echo "::notice title=Backend gate skipped::${{ steps.scope.outputs.reason }}. The full Rust and PostgreSQL suite runs on every merge_group, every push to main, and any pull request touching services/**, ops/**, the backend verifiers, or this workflow."
+          echo "::notice title=Backend gate skipped::${{ steps.scope.outputs.reason }}. The full Rust and PostgreSQL suite runs on every merge_group, every workflow_dispatch, and any pull request OR push to main whose diff touches services/**, ops/**, the backend verifiers, or this workflow. A push whose previous revision cannot be resolved also runs it."
 
       - name: Install the pinned Docker Buildx and BuildKit
         if: steps.scope.outputs.backend == 'true'
