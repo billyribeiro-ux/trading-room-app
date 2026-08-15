@@ -305,7 +305,7 @@ re-reading, one of which ships a control that looks right and behaves wrong. Bui
    money every day they are open.
 2. **2.1 the sort bar** — spec verified offset by offset, small, and it proves the theming rule end
    to end.
-3. **`presAreaTabs-recordings` — BLOCKED, and I was wrong to call it cheap.** The pane is one iframe
+3. **`presAreaTabs-recordings` — NOT BUILT. Blocker named, and it is not parked.** The pane is one iframe
    onto `${apiROOT}/sessions/v2/archives/recordings/{sessionID}/{token}`, a SERVER archive page.
    Measured: **zero recordings or archive tables in either database** — 22 room tables, 15 controller
    tables, none matching. Our Recordings is a different thing: `recording-codec.ts` records the

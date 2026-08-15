@@ -176,18 +176,24 @@ each gap claim put through an adversarial pass that killed 8 of 34:
 
 | | |
 | --- | ---: |
-| confirmed missing, with payload / gate / verbatim strings recorded | **25** |
+| **NOT BUILT — outstanding work** | **30** |
+| — fully specified, ready to build | 25 |
+| — need a decision first, still outstanding | 5 |
 | claimed missing then refuted — we already build it | 7 (+1 contested, resolved by reading) |
 | built under another name — the audit cannot see these | 9 |
-| third-party noise, not a PTR feature | 4 |
-| unclear, needs a product decision, all media-server admin | 5 |
+| third-party noise, never ours to build | 4 |
+
+**Nothing that is not built gets parked.** An earlier version of this table carried a fifth bucket —
+"unclear, needs a product decision" — which read as resolved and was not. A pending decision is
+outstanding work; the only thing that removes a row is building it or proving we already did. Owner
+directive, 2026-08-15, after the same mistake had already hidden two whole tabs behind a confident
+sentence.
 
 **Ready to build, fully specified:**
 
 | item | spec | note |
 | --- | --- | --- |
-| Files sort bar | `docs/decoded/files-sort-bar.md` | verified offset by offset; NEW-TODO §2.1 had three errors and is superseded |
-| ~~`presAreaTabs-recordings`~~ **BLOCKED** | `docs/decoded/missing-commands-triage.md` | NOT cheap after all. The reference's pane is one iframe onto a SERVER archive page; we have **zero recordings/archive tables** in either database, so the tab would front nothing. Needs an archive service first — a design decision, not a port |
+| `presAreaTabs-recordings` — **NOT BUILT, blocker named** | `docs/decoded/missing-commands-triage.md` | NOT cheap after all. The reference's pane is one iframe onto a SERVER archive page; we have **zero recordings/archive tables** in either database, so the tab would front nothing. Needs an archive service first — a design decision, not a port |
 | Alert Filter | `docs/decoded/alert-scheduler-filter-labels.md` | server owns the filtering; `showAlertsFrom` inverts allow-list vs deny-list |
 | Alert Labels | same | not a wire feature; a JSON-string room setting plus a text transform |
 | Alert Scheduler | same | needs an entitlement whose manage-page control was NOT located, and a server-side scheduler we do not have |

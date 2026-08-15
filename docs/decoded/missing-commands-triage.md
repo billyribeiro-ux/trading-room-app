@@ -16,11 +16,23 @@ the owner reading working code, which `~/CLAUDE.md` records as worse than saying
 
 | outcome | count |
 | --- | ---: |
-| confirmed missing | 25 |
+| **NOT BUILT — outstanding work** | **30** |
+| — of which fully specified and ready | 25 |
+| — of which need a decision FIRST, but are still outstanding | 5 |
 | claimed missing, then REFUTED — we already have it | 7 |
 | classified as built-under-another-name at triage | 9 |
-| framework/library noise, not a PTR feature | 4 |
-| unclear, needs a decision rather than more reading | 5 |
+| framework/library noise, not our work at all | 4 |
+
+**There is no "parked" bucket, and there must never be one.** An earlier version of this document
+filed five commands under "unclear, needs a decision rather than more reading", which read as a
+resolved category and was not one. **A pending decision is outstanding work.** The only thing that
+removes a row from the outstanding count is building it, or proving we already did. The four NOISE
+rows are the sole exception, because they are third-party library internals and were never ours to
+build.
+
+That mistake has now been made twice in this repository in two different shapes: a TODO sentence
+claiming everything buildable was built while two whole tabs sat undiscovered, and this bucket. Both
+hid work behind a confident-sounding category.
 
 ---
 
@@ -177,7 +189,7 @@ internals. **Volume is not evidence of importance.**
 
 ---
 
-## Unclear — these need a decision, not more reading
+## NOT BUILT — the five that need a decision first, and are outstanding regardless
 
 | command | occ | what it does |
 | --- | ---: | --- |
@@ -187,10 +199,22 @@ internals. **Volume is not evidence of importance.**
 | `resetMediaServer` | 3 | Hard-resets ONE media server. Two wrappers send it. hardResetMediaServer(e) at offset 2168026 takes a parameter and then ignores it, sending an empty payload {} — a real upstream quirk, recorded as read. hardResetMediaServerOnServer(e) sends {server:e} where e |
 | `resetAudioBridgeOnServer` | 2 | Resets the audio bridge on one named server. Full method, offset 2166727: resetAudioBridgeOnServer(e){bootbox.confirm(`Are you sure you want to reset the audio on Server: ${e} ?`,i=>{i&&(this.done(),this.appService.sendServerAdminCommand("resetAudioBridgeOnSer |
 
-Every one is a media-server administration command — resetting bridges, repeaters and servers.
-They are operator-adjacent controls that sit INSIDE the room in the reference. Whether we want a
-presenter able to reset shared media infrastructure is a product and safety decision, not a
-porting question.
+**The decision these were waiting on is ANSWERED, by the owner, 2026-08-15.** They are not "should a
+presenter be able to reset shared media infrastructure" — they are the **SaaS operator's toolkit**:
+when a tenant has a problem, the operator resets, diagnoses, and hard-reboots their room. That is
+what this platform is sold as, and these are the controls that do it.
+
+Three things follow, and they raise the priority of every row above rather than lowering it:
+
+1. **They all travel on a SEPARATE channel** — `sendAdminCmd` → `socket.transmit("adminCmd", …)`,
+   distinct from the ordinary command transport. The reference has a dedicated admin command path,
+   which is what an operator toolkit looks like from the client side.
+2. **Six of the wider reset/diagnose family are ALREADY BUILT here** — `hardResetSession`,
+   `softResetSession`, `reloadSessionConfig`, `saveAndCloseSession`, `saveCloseMessage` and
+   `refreshRoster`, in `ModalHost.svelte` and `+page.svelte`. So this is not new ground.
+3. **What is missing is REACH, not the commands.** Ours work inside a room, for that room. The
+   operator need is to invoke them for a tenant's room from a central console. `/admin` already has
+   impersonation, which is half that bridge.
 
 ---
 

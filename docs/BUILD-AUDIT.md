@@ -84,7 +84,24 @@ Every item is derived from a real failure in this repository, not from a templat
       capture" has been reported here when the capture was simply older than the feature.
 - [ ] **Parse JSON, never regex it.**
 
-## 7. Before writing the report
+## 7. Nothing unbuilt is ever parked
+
+- [ ] **Every feature that is not built is on the outstanding list, whatever else is true about it.**
+      Blocked, undecided, unclear, needs-an-environment, waiting-on-the-owner — all of those are
+      NOTES ON a row, never a substitute for one.
+      *Why: a triage of the reference's missing commands filed five under "unclear, needs a decision
+      rather than more reading". It read as a resolved category. It was five unbuilt features, and
+      the decision they were waiting on turned out to be already answered — they are the SaaS
+      operator's reset/diagnose toolkit, which is a core product surface. Parking them made a
+      priority look like a question.*
+- [ ] **The only things that leave the outstanding list are: built, or proven already built.** Not
+      "decided against" without a written decision, and not "unclear".
+- [ ] **Beware any category that sounds resolved.** This repository has now hidden work twice behind
+      confident-sounding labels — a TODO sentence claiming everything buildable was built while two
+      entire tabs sat undiscovered, and an "unclear" bucket. Both read as conclusions and were
+      neither.
+
+## 8. Before writing the report
 
 - [ ] **Everything stated as fact was personally executed.** Anything else is labelled
       **unverified** — including anything an agent claimed and I did not re-run.
@@ -95,13 +112,14 @@ Every item is derived from a real failure in this repository, not from a templat
 
 ---
 
-## The six failures of 2026-08-14/15, each of which produced a line above
+## The seven failures of 2026-08-14/15, each of which produced a line above
 
 | what happened | the line it produced |
 | --- | --- |
 | `grep -c` on a one-line bundle returned 1/1/1 for true counts 2/3/1, and nearly caused a correct agent report to be dismissed | §6 |
 | A stale `.svelte-kit` gave a green `svelte-check` while six real errors existed | §5 |
-| `/v5/` returning 404 was written up as "v5 does not exist" — a narrow measurement stated as a broad conclusion | §7 |
+| `/v5/` returning 404 was written up as "v5 does not exist" — a narrow measurement stated as a broad conclusion | §8 |
 | Instructions told the owner to create a server he already had, because nothing checked first | §1 |
 | `newSwingAlertMsg` was recorded as the create command; it is the response | §2 |
+| Five unbuilt features were filed under "unclear, needs a decision" — a bucket that read as resolved and hid a core product surface | §7 |
 | `deleteSwingAlert` shipped unable to delete anything — a soft delete beside a hard delete across a foreign key. It passed a full audit hours earlier, because nothing in that audit touched a database | §4 |
