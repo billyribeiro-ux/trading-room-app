@@ -150,39 +150,6 @@ A nav `<li>` linking out, beside "Reopen Alerts / Chat" and "Recording" (`mPe`/`
 **Still needed:** the const table entries for exact classes on the `<li>`, `<a>` and `<img>`, and
 where `benzingaUrl` is set.
 
-## 2.3 Swing Trade Alerts — LARGE, needs a decode pass
-
-Its own presentation-area tab: `presAreaTabs-swingAlerts`, labelled **"Swing Alerts"**.
-
-**Four wire commands:** `getSwingAlertsLog` · `newSwingAlertMsg` · `editSwingAlertMsg` ·
-`deleteSwingAlertMsg`
-
-**Form fields:** `swingAlert-symbol` · `swingAlert-long` / `swingAlert-short` ·
-`swingAlert-entryPrice` · `swingAlert-target` · `swingAlert-stop` · `swingAlert-image` ·
-`swingAlert-search` · `swingAlert-limit`
-
-**Two pipes, already read:**
-
-- `searchSwingLogs` — filters on `symbol` OR `senderName`
-- `limitSwingLogs` — `slice(0, n)`
-
-**Empty state, verbatim:** `" No Swing Trade Alerts to display. "`
-**Export:** `Download Swing Trades`, class `download-swing-trades-btn`
-**Containers:** `swing-alerts-container`, `swing-alert-form`, `swing-symbol-container`,
-`swing-alert-btn-edit`, `swing-alert-btn-delete`
-
-**Scale: comparable to the notes editor.** Tab, form, log list, search, limit, export, four commands,
-plus persistence. Not an afternoon.
-
-## 2.4 Day Trade Alerts — LARGE, not yet examined
-
-A parallel feature in the same bundle: `dayTradeAlert-direction`, `dayTradeAlert-long`,
-`dayTradeAlert-short`, `dayTradeAlert-limit`, `dayTradeAlert-search`, `Download Day Trades`,
-`download-day-trades-btn`, `day-trade-alert-btn-edit`, `day-trade-alert-btn-delete`.
-
-Same shape as Swing. **Decode both together** — they will share most of their structure, and finding
-out where they differ is cheaper than doing them separately.
-
 ## 2.5 Mobile app — the other half of the v4 delta
 
 New strings: `mobile-app-container`, `mobile`, `restoreMobileAppTokens`, `fa-mobile-alt`.
@@ -302,12 +269,11 @@ names on the repeat badge, the modal's own 27-declaration layout, and what the s
    money every day they are open.
 2. **2.1 the sort bar** — fully decoded, small, and it proves the theming rule end to end.
 3. **2.2 Benzinga** — small, needs one more decode pass.
-4. **2.3 + 2.4 Swing and Day Trade together** — the big one.
-5. **2.5 Mobile** — after `docs/MOBILE-APP.md` is read.
-6. **Part 3 v5** — when an account is cleared for it.
-7. **5.1 Alert Filter**, then **5.2 Alert Labels** — both small, and 5.1 is the only one of the
+4. **2.5 Mobile** — after `docs/MOBILE-APP.md` is read.
+5. **Part 3 v5** — when an account is cleared for it.
+6. **5.1 Alert Filter**, then **5.2 Alert Labels** — both small, and 5.1 is the only one of the
    three that changes what a member sees.
-8. **5.3 Alert Scheduler** — last of these three; it needs a server-side scheduler that does not
+7. **5.3 Alert Scheduler** — last of these three; it needs a server-side scheduler that does not
    exist here yet.
 
 ## Evidence, all committed

@@ -645,7 +645,7 @@ sendAdminCmd(e,i={}){this.socket.transmit("adminCmd",{cmd:e,data:i})}
 
 | command | channel | payload, verbatim from source | call site |
 | --- | --- | --- | --- |
-| `getDayTradeAlertsLog` | `cmd` | `{sessionID: <linkedRoomDayTradeAlertsOther or own sessionID>, days: 21}` on load; `{sessionID: …, days: 4*dayTradeAlertMonths*7}` on dropdown change | 1010272 (`` `get${e}AlertsLog` ``), 1993797 |
+| `getDayTradeAlertsLog` | `cmd` | `{sessionID: <linkedRoomDayTradeAlertsOther or own sessionID>, days: 21}` on load; `{sessionID: …, days: 4*dayTradeAlertMonths*7}` on dropdown change | 1010272 (`` `get${e}AlertsLog` ``), 1993857 |
 | `dayTradeAlertMsg` | `cmd` | `{alertTxt,direction,symbol,entryPrice,stop,target,image,senderName}` | 1987374 |
 | `editDayTradeAlertMsg` | `cmd` | `{newDayTradeAlertMsg:<same shape>, dayTradeAlertID:<dayTradeAlert._id>}` | **1987010** |
 | `deleteDayTradeAlertMsg` | `cmd` | `{dayTradeAlertID:<row _id>}` | **1988998** |
@@ -743,8 +743,8 @@ scoping attribute (stripped below for readability). **None of them exist in
 | 2024171 | `.day-trade-alerts-container .table, .swing-alerts-container .table` | `font-size:12px` |
 | 2024333 | `.day-trade-alerts-container .table th`, `… td`, `.swing-alerts-container .table th`, `… td` | `text-align:center; vertical-align:middle` |
 | 2024764 | `.day-trade-alerts-container h4, .swing-alerts-container h4` | `background-color:#08668e; color:#fff` |
-| 2024861–2025477 | `.day-trade-alerts-container #dayTradeAlert-search`, `.day-trade-alerts-container #swingAlert-search`, `.day-trade-alerts-container .swingAlert-limit-container`, `.swing-alerts-container #dayTradeAlert-search`, `.swing-alerts-container #swingAlert-search`, `.swing-alerts-container .swingAlert-limit-container` | `width:100%` |
-| 2025478 | `.day-trade-alerts-container #dayTradeAlert-search`, `.day-trade-alerts-container #swingAlert-search`, `.swing-alerts-container #dayTradeAlert-search`, `.swing-alerts-container #swingAlert-search` | `max-width:300px` |
+| 2024939–2025488 | `.day-trade-alerts-container #dayTradeAlert-search`, `.day-trade-alerts-container #swingAlert-search`, `.day-trade-alerts-container .swingAlert-limit-container`, `.swing-alerts-container #dayTradeAlert-search`, `.swing-alerts-container #swingAlert-search`, `.swing-alerts-container .swingAlert-limit-container` | `width:100%` |
+| 2025489 | `.day-trade-alerts-container #dayTradeAlert-search`, `.day-trade-alerts-container #swingAlert-search`, `.swing-alerts-container #dayTradeAlert-search`, `.swing-alerts-container #swingAlert-search` | `max-width:300px` |
 | 2025854 | `.day-trade-alerts-container .dayTradeAlert-limit-container`, `.day-trade-alerts-container .swingAlert-limit-container`, `.swing-alerts-container .dayTradeAlert-limit-container`, `.swing-alerts-container .swingAlert-limit-container` | `max-width:180px` |
 | 2026319 | `.alert-sender-img, .uploaded-alert-image, .uploaded-img-preview` | `width:auto; height:100%; max-height:30px; object-fit:contain` |
 | 2026498 | `.remove-image-btn` | `width:36px!important` |
@@ -755,7 +755,7 @@ scoping attribute (stripped below for readability). **None of them exist in
 Two facts worth carrying into the rebuild:
 
 1. **`.dayTradeAlert-limit-container` is absent from the `width:100%` rule.** That rule (bytes
-   2024861–2025477) lists exactly six selectors and `.swingAlert-limit-container` appears twice —
+   2024939–2025488) lists exactly six selectors and `.swingAlert-limit-container` appears twice —
    once under each container — while `.dayTradeAlert-limit-container` appears in neither. The
    `max-width:180px` rule at 2025854 does list all four. So in the shipped build the Day Trade limit
    box gets `max-width:180px` but no `width:100%`.
@@ -925,7 +925,7 @@ and read in context.
    them `alertTxt`.** The field is sent but has no UI.
 
 5. **Expected: `.dayTradeAlert-limit-container` in the `width:100%` CSS rule**, mirroring
-   `.swingAlert-limit-container`. I read the full rule text at bytes 2024861–2025477 rather than
+   `.swingAlert-limit-container`. I read the full rule text at bytes 2024939–2025488 rather than
    pattern-matching for the class. **Result: six selectors, and `.dayTradeAlert-limit-container` is
    not among them** — while it *is* present in the `max-width:180px` rule 400 bytes later. Difference
    #41 is therefore a read fact, not an artefact of a narrow search.

@@ -14,7 +14,7 @@
 // and ng-show="sess.roomType=='webinar'" reads it at byte 2,652 to reveal the Date row.
 //
 // `wired` is the honest bit: false means the controller can store the value but
-// nothing in the room reads it yet. 59 of 269 are wired today.
+// nothing in the room reads it yet. 60 of 269 are wired today.
 // Flip one to true ONLY when a consumer exists, so the UI can mark the rest
 // instead of pretending they do something.
 
@@ -139,7 +139,7 @@ export const ROOM_SETTINGS: readonly RoomSettingDef[] = [
   { name: "pairErrorRedirect", section: "settings", type: "textarea", label: "Pair ERROR Redirect", help: "Where to send users if the pairing fails", helpShape: "muted", helpOutside: true, captured: null, capturedIsDisplayOnly: false, group: null, wired: false },
   { name: "hideChatAlerts", section: "settings", type: "checkbox", label: "Hide Alerts/Chat Section?", help: "If enabled, the room will not have chat/alerts. Just media.", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: true },
   { name: "hasSwingTradeAlerts", section: "settings", type: "checkbox", label: "Enable Swing Trade Alerts Tab?", help: "If enabled, the room will have swing alerts tab.", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: true },
-  { name: "hasDayTradeAlerts", section: "settings", type: "checkbox", label: "Enable Day Trade Alerts Tab?", help: "If enabled, the room will have day trade alerts tab.", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
+  { name: "hasDayTradeAlerts", section: "settings", type: "checkbox", label: "Enable Day Trade Alerts Tab?", help: "If enabled, the room will have day trade alerts tab.", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: true },
   { name: "usersPublicReply", section: "settings", type: "checkbox", label: "User Public Reply?", help: "If enabled, regular user will be able to do reply", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
   { name: "chatDisabledForTrials", section: "settings", type: "checkbox", label: "Chat Disabled For Trials?", help: "If its set, auto disable the chat (chat disabed) if they are trials", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
   { name: "disablePMForTrials", section: "settings", type: "checkbox", label: "Disable PM For Trials?", help: "If enabled, trial users will not be able to send private messages", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: true },

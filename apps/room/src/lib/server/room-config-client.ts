@@ -235,6 +235,36 @@ export interface RoomSessionSettings {
    */
   hasSwingTradeAlerts?: boolean;
   /**
+   * "Enable Day Trade Alerts Tab?" — whether this room has a Day Trades tab at all.
+   *
+   * The owner's label on the Manage page, verbatim, with the help text "If enabled, the room will
+   * have day trade alerts tab."
+   *
+   * `this.hasDayTradeAlerts = this.appService.globals.sessData.hasDayTradeAlerts` in `ngOnInit`
+   * (bundle byte 1,955,967), and one flag gates three things: the nav `<li>`
+   * (`O(27, o.hasDayTradeAlerts ? 27 : -1)`, byte 2,016,951), the `#dayTradeAlerts` pane
+   * (`O(49, …)`, byte 2,017,748) and the initial fetch in `loadSessionLogs()` (byte 1,009,503).
+   * `-1` is "instantiate nothing", so a room without the setting emits no markup rather than hidden
+   * markup — see `dayTradeAlertsTabVisible` in `$lib/day-trade-alerts`.
+   *
+   * **Note the spelling against its sibling.** The Swing flag doubles the word — `hasSwingTradeAlerts`
+   * — and this one does not. Both were read side by side in `loadSessionLogs()` at bytes 1,009,430
+   * and 1,009,503; the asymmetry is upstream's and `hasDayTradeTradeAlerts` names nothing.
+   *
+   * NOT presenter status. Presenter status gates only the form and the row buttons, inside the pane.
+   *
+   * `linkedRoomDayTradeAlertsOther` is deliberately NOT here beside it, and that is an explicit
+   * decision rather than an omission — the same one taken for its Swing twin. Upstream, a non-empty
+   * value makes both fetches ask for ANOTHER room's log by substituting its `sessionID`: the key is
+   * built by the template literal `` `linkedRoom${e}AlertsOther` `` at bytes 1,010,164 and
+   * 1,993,783, which is why the full name appears NOWHERE in the bundle as a literal. This room
+   * takes the room from the session row precisely so that a client cannot name the room it reads,
+   * and carrying a setting whose whole purpose is to redirect a read across rooms would reopen that
+   * by configuration. If it is ever wanted, it has to arrive as a server-resolved room id with the
+   * controller confirming the link, not as a string the room dereferences.
+   */
+  hasDayTradeAlerts?: boolean;
+  /**
    * "Overlay userID on screenshare?" — the viewer's own id printed over an MTX stream.
    *
    * Read by `StreamingView.svelte` and gated on this AND `!isPresenter`, which is `TCe` (main

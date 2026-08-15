@@ -456,6 +456,129 @@ export const swingAlerts = sqliteTable(
   ]
 );
 
+/**
+ * One Day Trade Alert.
+ *
+ * The log the `#dayTradeAlerts` pane renders, decoded in `docs/decoded/day-trade-alerts.md`. Room
+ * scoped like every other room-content table — see the note on `messages.roomShortCode` — and every
+ * query in `day-trade-alerts-repository.ts` carries the predicate, because this table is per-room
+ * trading information and a missing predicate here is one room reading another room's positions.
+ *
+ * ## Why this is a SECOND table and not a `kind` column on `swing_alerts`
+ *
+ * Because upstream they are two collections behind two sets of commands, and the room's job is to
+ * be that shape. Folding them together would mean every read of either feature carries a
+ * discriminator predicate the reference does not have, every index gains a leading column, and a
+ * bug in one feature's WHERE clause becomes a cross-FEATURE leak on top of the cross-room one.
+ * They also do not stay identical: the two logs already differ in their windows (21 vs 42 days),
+ * their month ranges (15 vs 20) and their conversions (`4 * m * 7` vs `30 * m`), and one shared
+ * table is where those differences go to be forgotten.
+ *
+ * Everything else about it is `swing_alerts`, deliberately, down to the column order — the two
+ * models are character-identical upstream (bytes 1,955,146 and 1,955,394), so an engineer who has
+ * read one table has read both.
+ *
+ * ## Why the three price columns are TEXT
+ *
+ * This repository's rule is that money is `i64` / `BIGINT` end to end, and that rule is not being
+ * waived here — it does not reach these columns, because none of them is money that anything does
+ * arithmetic on:
+ *
+ *   - the inputs are `type="text"`, explicitly and deliberately (consts 224, 225, 226), not
+ *     `type="number"`;
+ *   - the cells are bare `Ze(x)` interpolations — no pipe, no `toFixed`, no currency — so what is
+ *     stored is what the presenter typed and what the table shows.
+ *
+ * There is no multiplication, no summing and no comparison anywhere on this path, including in the
+ * CSV export. Storing cents would mean parsing a free-text field, rounding it, and rendering
+ * something back that the presenter did not type. If a future feature ever computes with these —
+ * a risk/reward ratio, say — that feature adds its own parsed column and leaves these verbatim.
+ *
+ * ## Why `senderName` is stored rather than joined
+ *
+ * The client supplies it on every create AND every edit, from `globals.user.nick || .name` (read at
+ * byte 1,986,885, inside the payload object `h` built at 1,986,780 — the body of the create command and the
+ * `newDayTradeAlertMsg` field of the edit command), so an edit by a different presenter rewrites
+ * the row's sender — the value is a property of the write, not of the account. A join to `users`
+ * would answer with the current display name of the original author instead, which is a different
+ * fact. `senderId` is kept beside it for the avatar and for an audit trail, and it is what
+ * `senderPic` / `senderAvt` are derived from at read time; the client never writes either of those.
+ */
+export const dayTradeAlerts = sqliteTable(
+  'day_trade_alerts',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    /*
+      The room this row belongs to — see the note on `messages.roomShortCode`. Every realtime
+      channel in the original is namespaced by the session, and without this column a new room
+      opened showing another room's content.
+    */
+    roomShortCode: text('room_short_code').notNull(),
+    symbol: text('symbol').notNull(),
+    /** `'long'` | `'short'`, the only two values the radio pair offers (consts 228 and 230). */
+    direction: text('direction', { enum: ['long', 'short'] }).notNull(),
+    entryPrice: text('entry_price').notNull(),
+    stop: text('stop').notNull(),
+    target: text('target').notNull(),
+    /** `''` for a row with no image, which is what leaves the image cell empty. */
+    image: text('image').notNull().default(''),
+    senderId: integer('sender_id')
+      .notNull()
+      .references(() => users.id),
+    senderName: text('sender_name').notNull(),
+    /**
+     * The row's timestamp, named as the decode names it.
+     *
+     * `entryDate`, NOT `created` — the row template formats `e.entryDate` (byte 1,943,723) and the
+     * CSV reads `l.entryDate` (byte 1,989,640), and the string `created` appears on no Day Trade
+     * path. Keeping the reference's name here means the column, the DTO and the template all say
+     * the same word.
+     */
+    entryDate: integer('entry_date', { mode: 'timestamp' }).notNull(),
+    /**
+     * The mirrored message this alert posted into the MAIN alerts feed.
+     *
+     * ## Why there is a mirror at all
+     *
+     * A Day Trade submit sends TWO commands, not one — read at byte 1,985,961 onwards:
+     * `dayTradeAlertMsg` writes the row, then `alertMsg` posts `formatDayTradeAlertTxt(h)` into the
+     * feed. Editing sends `editDayTradeAlertMsg` and then `editAlertMessageSwing`; deleting removes
+     * both. A rebuild that keeps only the row leaves the feed copy orphaned the first time somebody
+     * edits.
+     *
+     * ## Why a column instead of the reference's text scan
+     *
+     * The reference has no key to join on, so `editDayTradeAlert` walks `globals.alertsLog`
+     * comparing `r.txt == formatDayTradeAlertTxt(row)` to recover the feed message's `_id`, and
+     * `deleteDayTradeAlert` repeats that scan. Both loops are a linear walk of the feed, and
+     * NEITHER of them breaks (bytes 1,988,461 and 1,988,885) — where the Swing equivalents stop at
+     * the first match, these run to the end and the LAST match wins. Both also find nothing once
+     * anybody edits the feed copy by hand, leaving `alertLogID` as `""` and the second command a
+     * no-op against an empty id.
+     *
+     * This room owns both tables, so the association is recorded when it is created and the two
+     * writes go in one transaction. The observable behaviour is the reference's; what changes is
+     * that it cannot come apart. NULLABLE because a row whose feed copy a presenter deleted from
+     * the feed itself still has to edit and delete cleanly.
+     */
+    alertId: integer('alert_id').references(() => alerts.id),
+    deletedAt: integer('deleted_at', { mode: 'timestamp' }),
+    deletedById: integer('deleted_by_id').references(() => users.id)
+  },
+  (table) => [
+    /*
+      The log query, whole: room equality first, then the sort the list is displayed in.
+
+      `getDayTradeAlertsLog` reads one room's rows newer than a cutoff and shows them newest first
+      (the reference reverses the server's oldest-first array and prepends new rows). This index
+      answers the room predicate, the `entry_date` range and the ordering in one ordered walk, so
+      the read touches the rows it returns rather than the room's whole history. `id` is last so
+      the tie-break comes from the index instead of a sort of the ties.
+    */
+    index('day_trade_alerts_room_entry_idx').on(table.roomShortCode, table.entryDate, table.id)
+  ]
+);
+
 export const chatMutes = sqliteTable(
   'chat_mutes',
   {
@@ -714,6 +837,7 @@ export type SavedPoll = typeof savedPolls.$inferSelect;
 export type Note = typeof notes.$inferSelect;
 export type NoteVersion = typeof noteVersions.$inferSelect;
 export type SwingAlert = typeof swingAlerts.$inferSelect;
+export type DayTradeAlert = typeof dayTradeAlerts.$inferSelect;
 export type ChatMute = typeof chatMutes.$inferSelect;
 export type Session = typeof sessions.$inferSelect;
 

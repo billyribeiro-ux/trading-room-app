@@ -24,6 +24,189 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-15
 
+### 2026-08-15 07:35 EDT — Day Trade audited, and the audit checklist gains the line that would have caught the delete bug
+
+**Runtime impact: one lint fix in console tooling.** The Day Trade feature and the `deleteSwingAlert`
+fix are the entry below; this is the audit of them.
+
+#### The defect, verified independently before anything was accepted
+
+The build report claimed `deleteSwingAlert` had never been able to delete anything. **Reproduced
+here with plain SQL and no project code:**
+
+```
+PRAGMA foreign_keys = ON;                     -- db/index.ts:12
+swing_alerts.alert_id REFERENCES alerts(id)   -- db/schema.ts:441
+
+UPDATE swing_alerts SET deleted_at=… WHERE id=1;   -- soft-delete the row
+DELETE FROM alerts WHERE id=1;                     -- hard-delete the mirror
+=> FOREIGN KEY constraint failed
+```
+
+With `alert_id` cleared first, the delete succeeds. The claim is exact: **deleting a swing alert
+could not work, in any room, since the feature shipped at 02:23 EDT.**
+
+**The test whose absence was the bug now exists and was negative-controlled here**: reverting the
+fix in the Swing repository makes `trade-alerts-mirror-delete.test.ts` fail with the literal
+`SqliteError: FOREIGN KEY constraint failed`, and restoring it byte-identically returns 3/3.
+
+#### Why the earlier audit missed it, stated plainly
+
+That audit checked the room predicate on every query, the atomicity of every mutation, all six wire
+literals against the bundle, `svelte-check` on a clean `.svelte-kit`, lint, prettier, and two
+negative controls with byte-identical restores. **Every one of those passed, and not one of them
+touches a database.** `swing-alerts-contract.test.ts` never reaches the repository layer.
+
+`CLAUDE.md` already says *"Runtime evidence before done. Compiles + tests pass ≠ done."*
+`docs/BUILD-AUDIT.md` had no line making that concrete for a persistence path, so the check was
+never run. It now has **§4 — Exercise the PERSISTENCE PATH against a real database**, with three
+items: one create/edit/delete round trip against a real SQLite file; treat a soft delete beside a
+hard delete as a foreign-key trap and ask which row holds the reference; and `EXPLAIN QUERY PLAN` on
+every new read path. The failures table records the incident as the sixth.
+
+**PR #30 was corrected** with a comment rather than left standing — it described Swing as audited,
+which was no longer wholly true, and it is the outward-facing artefact.
+
+#### The audit of the Day Trade port, executed here
+
+| check | result |
+| --- | --- |
+| spec diff | **5 insertions, 5 deletions** — offset corrections only, no claim altered |
+| the corrected offsets | old 1,993,797 lands inside `linkedRoom${e}AlertsOther`; new **1,993,857** lands exactly on the log-command template literal ✅ |
+| day conversion | `"Swing"===e?30*swingAlertMonths:4*dayTradeAlertMonths*7` read at 1,993,612/1,993,637 ✅ |
+| months options | Swing `[1…20]`, Day Trade **`[1…15]`** ✅ |
+| months defaults | `swingAlertMonths=2`, `dayTradeAlertMonths=1` ✅ |
+| `editAlertMessageDayTrade` in our code | 4 hits, **all comments or a `.not.toBe()` assertion** — no invention ✅ |
+| `linkedRoomDayTradeAlertsOther` | **0** — correctly unwired ✅ |
+| room predicate | present on every statement, including the new FK-release UPDATE ✅ |
+| `svelte-check`, clean `.svelte-kit` | **1056 files, 0 errors** ✅ |
+| room lint · prettier · schema verifier · boundary test | clean · clean · 269 total/**60 wired** · 17/17 ✅ |
+
+#### One defect found in my own file during the audit
+
+`apps/controller/scripts/collect-control-plane.js:518` failed `no-useless-assignment` — `let mod =
+null` where every path either reassigns or returns. The controller lint gate had been red on it.
+Mine, from earlier today, and fixed here.
+
+#### Not verified, and stated
+
+**Neither pane has been rendered in a browser.** SSR output, assertions and SQLite round trips are
+all that stand behind them. The full `pnpm test` gate was not run.
+
+**Left for the owner rather than changed:** the `svelte.config 2.js` stray in `apps/room` is a macOS
+duplicate of a file deliberately deleted in `ff948db` when the app adopted SvelteKit 3 — untracked,
+read by nothing, harmless. And template syntax still appears inside comments in roughly nine
+pre-existing places in `+page.svelte`, which `CLAUDE.md` forbids; the new files carry none.
+
+
+### 2026-08-15 07:24 EDT — Day Trade Alerts, end to end, and the delete that never worked
+
+**Runtime impact: yes, in two separate ways, and the second one is a fix to code that shipped five
+hours ago.**
+
+1. The whole Day Trade feature is behind the per-room `hasDayTradeAlerts` entitlement, which no room
+   has set; a room without it emits no nav item, no pane, no log read and refuses all three
+   mutations. Nothing existing changes behaviour.
+2. **`deleteSwingAlert` could not delete anything and now can.** That is live behaviour, in a
+   feature already deployed. See below.
+
+#### The port
+
+Built from `docs/decoded/day-trade-alerts.md` as a port of the Swing build, file for file: the
+`#dayTradeAlerts` pane, the one form that serves create and edit, the eight-column log with its
+search / limit / CSV strip, the months window, and the `day_trade_alerts` table behind them.
+
+**The six values that had to be CARRIED across rather than copied**, each read at its own offset in
+`main.d1d09071be31f1ba.js` and each one still compiling if it were wrong:
+
+| | Swing | Day Trade | read at |
+| --- | --- | --- | --- |
+| gate flag | `hasSwingTradeAlerts` | `hasDayTradeAlerts` — no doubled word | 1,009,430 / 1,009,503 |
+| months options | 1–20 | **1–15** | 1,916,549 / 1,916,648 |
+| months default | 2 | **1** | 1,955,344 / 1,955,601 |
+| months → days | `30 * m` | **`4 * m * 7`** | 1,993,612 / 1,993,637 |
+| first fetch | `days: 42` | **`days: 21`** | 1,010,116 |
+| search pipe | no optional chaining | **optional chaining at every hop** | 1,915,251 / 1,915,738 |
+
+**And one that must NOT be renamed.** `editAlertMessageSwing` is the command the DAY TRADE edit path
+sends — the literal occurs at exactly two offsets, 1,983,136 and **1,987,189**, and both spell it
+`…Swing`; the two payloads differ only in `swingTradeAlert:!0` versus `dayTradeAlert:!0`.
+`editAlertMessageDayTrade` occurs at **zero** offsets. It is pinned in the contract test for that
+reason.
+
+`newDayTradeAlertMsg` is not the create command — it is a payload key on the edit command and the
+server→client push. Create is `dayTradeAlertMsg`. Same trap as Swing, one word different.
+
+The create action spends `consumeRateLimit('alert', user.id)` **from the first line**, unlike the
+Swing action, which shipped without it and had it added after a diff re-read: the action posts into
+the main alerts feed as its second write, so without the limiter it is a way past the composer's.
+One shared bucket, not two, so alternating tabs cannot double the rate.
+
+#### The defect this found, which was not mine
+
+The Day Trade repository was a faithful port, so it inherited a defect nobody knew about. A runtime
+create/edit/delete round trip against a real SQLite file — not a type check, not a render assertion —
+produced:
+
+```
+SqliteError: FOREIGN KEY constraint failed
+```
+
+Both trade-alert tables SOFT-delete their own row and HARD-delete the mirrored message in `alerts`,
+both carry `alert_id REFERENCES alerts(id)`, and `db/index.ts` sets `PRAGMA foreign_keys = ON`. The
+surviving row still pointed at the alert being removed, so the transaction rolled back and a
+presenter clicking the bin icon got a 500 with the row still there.
+
+**Running the identical probe against the untouched Swing repository threw the identical error**, so
+this was pre-existing in the feature that shipped at 02:23 EDT and was reproduced here rather than
+introduced. Nothing caught it: it type-checks, it lints, `svelte-check` is clean, and
+`swing-alerts-contract.test.ts` never reaches the repository. Both are fixed by clearing `alert_id`
+inside the same transaction before the mirror is deleted, and
+`src/lib/server/trade-alerts-mirror-delete.test.ts` is the test whose absence was the bug.
+
+#### Verified here, by running it
+
+| check | result |
+| --- | --- |
+| `rm -rf .svelte-kit && svelte-kit sync`, then `svelte-check` | **1056 files, 0 errors, 0 warnings** |
+| `day-trade-alerts-contract.test.ts` | 29/29 |
+| `trade-alerts-mirror-delete.test.ts` | 3/3 |
+| `swing-alerts-contract.test.ts` + `page-load-contract.test.ts` | 27/27 |
+| all four together, thirteen consecutive runs | 59/59 |
+| `pnpm run lint` (room) | clean |
+| `prettier --check` on all 18 touched files | clean |
+| `verify-room-settings-schema.mjs` | 268 + 1 deviation = 269 total, **60 wired** |
+| `room-config-boundary.test.ts` | 17/17 |
+| `dont-touch-block.test.ts` + `room-settings-profile.test.ts` | 35/35 |
+| table, columns and index | read back from SQLite; `EXPLAIN QUERY PLAN` reports `SEARCH day_trade_alerts USING INDEX day_trade_alerts_room_entry_idx (room_short_code=? AND entry_date>?)` |
+| cross-room reads and writes | probed: read of another room 0 rows, edit and delete naming another room both `null` |
+
+**Ten negative controls, every one restored and confirmed byte-identical with `diff -q`:** the create
+command name (3 failed), the entitlement gate forced open (1), the day conversion swapped for Swing's
+(2), `editAlertMessageSwing` renamed (1), the rate limiter removed (1), the initial window set to 42
+(1), a sixteenth month option (3), the FK clearing statement removed from the Swing repository (1)
+and from the Day Trade one (2), and the room predicate dropped from the Day Trade delete (1).
+
+**One test failure was mine, found and fixed before reporting:** the id-prefix case asserted the
+limit and search boxes against an empty pane, and those live behind the empty-state branch.
+
+**Three offsets in `docs/decoded/day-trade-alerts.md` were wrong and were corrected**, each verified
+by opening the bundle at the offset first: the `getDayTradeAlertsLog` send site (1,993,797 →
+1,993,857 — the old value pointed into the neighbouring `linkedRoom${e}AlertsOther` expression), and
+the two CSS rule ranges 2,024,861 → 2,024,939 and 2,025,478 → 2,025,489, both of which had pointed
+inside the preceding rule. Five lines, offsets only; no claim was changed.
+
+**One run, once, reported `Test Files 1 failed | 3 passed` with `51 passed | 8 skipped` and no named
+failing test** — a file bailing early rather than an assertion going red. It came immediately after a
+sequence of rapid rewrites of the two repository files during the negative controls. It did not
+recur in sixteen subsequent runs, including three that deliberately rewrote a repository file
+immediately beforehand. Root cause not established, and recorded here rather than dropped because it
+was never explained.
+
+**Not verified, and stated plainly: the pane has never been rendered in a browser.** SSR output,
+assertions and SQLite round trips are all that stand behind it. The full gate was not run — the tests
+covering what changed were.
+
 ### 2026-08-15 07:04 EDT — the audit found three more features nobody had decoded
 
 **Runtime impact: none.** One new spec, one NEW-TODO section.

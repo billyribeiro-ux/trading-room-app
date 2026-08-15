@@ -421,6 +421,26 @@ export const ROOM_VISIBLE_SETTINGS = [
     read; allow-listing this one would put a cross-room read back behind a settings field.
   */
   'hasSwingTradeAlerts',
+  /*
+    "Enable Day Trade Alerts Tab?" — "If enabled, the room will have day trade alerts tab."
+
+    The entitlement for the Day Trade Alerts feature, added 2026-08-15 with the pane that reads it,
+    one step after its Swing twin. The room resolves it once as `sessData.hasDayTradeAlerts` and
+    gates four things on it: the nav `li`, the `#dayTradeAlerts` pane, the initial
+    `getDayTradeAlertsLog` read, and all three mutations. Absent means absent — the reference emits
+    `-1`, so a room without it renders no markup at all rather than hidden markup, and the room's
+    own load skips the table entirely.
+
+    Note the spelling. The Swing flag doubles the word (`hasSwingTradeAlerts`) and this one does
+    not. Both are read side by side in the reference at bundle bytes 1,009,430 and 1,009,503.
+
+    `linkedRoomDayTradeAlertsOther` is deliberately NOT here beside it, exactly as
+    `linkedRoomSwingAlertsOther` is not. Upstream, a non-empty value makes the room fetch ANOTHER
+    room's day trade log by substituting that room's sessionID. The room takes its room from the
+    session row so that no value the browser can reach names the room being read; allow-listing this
+    one would put a cross-room read back behind a settings field.
+  */
+  'hasDayTradeAlerts',
   'useMediaMTX',
   /*
     "Overlay userID on screenshare?" — prints the VIEWER'S OWN `userXrefID` over the video.

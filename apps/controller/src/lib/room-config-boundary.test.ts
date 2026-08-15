@@ -279,7 +279,24 @@ describe('the allow-list itself', () => {
         three mutations. The pane re-applies it so the component renders nothing on its own.
       */
       hasSwingTradeAlerts:
-        'swingAlertsTabVisible() — the Swing Alerts tab, the #swingAlerts pane, the initial getSwingAlertsLog read and the three mutations, all on one flag'
+        'swingAlertsTabVisible() — the Swing Alerts tab, the #swingAlerts pane, the initial getSwingAlertsLog read and the three mutations, all on one flag',
+      /*
+        THE THIRD PLACE again, added in the same change that put the name on
+        `ROOM_VISIBLE_SETTINGS` and on `ROOM_CONSUMED` — the lesson the notes above record, applied
+        rather than re-learned.
+
+        Verified in the room before being written here: `dayTradeAlertsTabVisible` is imported by
+        `+page.svelte`, where `dayTradeAlertsEnabled` gates the `#dayTradeAlerts-tab` li AND the
+        `#dayTradeAlerts` pane, by `+page.server.ts`, where it gates the initial log read and all
+        three mutations, and by `api/day-trade-alerts/+server.ts`. The pane re-applies it so the
+        component renders nothing on its own.
+
+        The name is spelled WITHOUT the doubled word its Swing sibling carries. That is upstream's,
+        read at bundle bytes 1,009,430 and 1,009,503, and it is why this entry cannot be derived
+        from the one above by substitution.
+      */
+      hasDayTradeAlerts:
+        'dayTradeAlertsTabVisible() — the Day Trades tab, the #dayTradeAlerts pane, the initial getDayTradeAlertsLog read and the three mutations, all on one flag'
     };
     expect(Object.keys(consumers).sort()).toEqual([...ROOM_VISIBLE_SETTINGS].sort());
   });

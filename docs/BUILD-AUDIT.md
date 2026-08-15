@@ -45,7 +45,27 @@ Every item is derived from a real failure in this repository, not from a templat
 - [ ] **Entitlement gates render NOTHING when false**, not hidden markup. Verify by rendering with
       the flag off and reading the output.
 
-## 4. Run it yourself. Do not read a transcript.
+## 4. Exercise the PERSISTENCE PATH against a real database
+
+- [ ] **Create, edit and delete one row end to end, against a real SQLite file.** Not a mock, not a
+      unit test of the shape — the actual repository functions, in order, on a real database with
+      the project's real pragmas.
+      *Why: `deleteSwingAlert` shipped on 2026-08-15 and could not delete anything, in any room,
+      ever. It soft-deletes its row and hard-deletes the mirrored feed message in one transaction,
+      while `alert_id REFERENCES alerts(id)` and `PRAGMA foreign_keys = ON` — so the surviving row
+      still points at the alert being removed, SQLite refuses, and the whole transaction rolls back.
+      The feature passed a full audit hours earlier: room predicate on every query, atomic
+      conditional UPDATEs, all six wire literals matched to the bundle, clean `svelte-check`, lint,
+      prettier, and two negative controls. **None of that touches a database.** The contract test
+      never reaches the repository layer. One create/edit/delete round trip would have caught it in
+      seconds.*
+- [ ] **A soft delete beside a hard delete is a foreign-key trap.** Whenever one row survives and
+      another is removed, ask which one holds the reference, and release it inside the same
+      transaction.
+- [ ] **`EXPLAIN QUERY PLAN` on every new read path**, and confirm it names an index rather than
+      SCAN.
+
+## 5. Run it yourself. Do not read a transcript.
 
 - [ ] **`rm -rf .svelte-kit && pnpm exec svelte-kit sync` FIRST**, then `svelte-check`.
       *Why: a stale `.svelte-kit` produced a green check across 1038 files while six real errors
@@ -56,7 +76,7 @@ Every item is derived from a real failure in this repository, not from a templat
       not known to be able to fail.
 - [ ] `prettier --check` the new files.
 
-## 5. Counting and searching
+## 6. Counting and searching
 
 - [ ] **Never conclude from `grep -c` on a minified bundle.** It counts LINES; the bundle is one
       line, so every answer is 1 or 0. Use python `.count()`.
@@ -64,7 +84,7 @@ Every item is derived from a real failure in this repository, not from a templat
       capture" has been reported here when the capture was simply older than the feature.
 - [ ] **Parse JSON, never regex it.**
 
-## 6. Before writing the report
+## 7. Before writing the report
 
 - [ ] **Everything stated as fact was personally executed.** Anything else is labelled
       **unverified** — including anything an agent claimed and I did not re-run.
@@ -75,12 +95,13 @@ Every item is derived from a real failure in this repository, not from a templat
 
 ---
 
-## The five failures of 2026-08-14/15, each of which produced a line above
+## The six failures of 2026-08-14/15, each of which produced a line above
 
 | what happened | the line it produced |
 | --- | --- |
-| `grep -c` on a one-line bundle returned 1/1/1 for true counts 2/3/1, and nearly caused a correct agent report to be dismissed | §5 |
-| A stale `.svelte-kit` gave a green `svelte-check` while six real errors existed | §4 |
-| `/v5/` returning 404 was written up as "v5 does not exist" — a narrow measurement stated as a broad conclusion | §6 |
+| `grep -c` on a one-line bundle returned 1/1/1 for true counts 2/3/1, and nearly caused a correct agent report to be dismissed | §6 |
+| A stale `.svelte-kit` gave a green `svelte-check` while six real errors existed | §5 |
+| `/v5/` returning 404 was written up as "v5 does not exist" — a narrow measurement stated as a broad conclusion | §7 |
 | Instructions told the owner to create a server he already had, because nothing checked first | §1 |
 | `newSwingAlertMsg` was recorded as the create command; it is the response | §2 |
+| `deleteSwingAlert` shipped unable to delete anything — a soft delete beside a hard delete across a foreign key. It passed a full audit hours earlier, because nothing in that audit touched a database | §4 |

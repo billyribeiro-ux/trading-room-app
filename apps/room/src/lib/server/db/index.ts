@@ -203,6 +203,49 @@ export function ensureDatabase() {
     );
     CREATE INDEX IF NOT EXISTS swing_alerts_room_entry_idx
       ON swing_alerts(room_short_code, entry_date, id);
+    /*
+      Day Trade Alerts. The same shape as swing_alerts above and a SEPARATE table on purpose, for
+      the reason the dayTradeAlerts comment in schema.ts gives: upstream they are two collections
+      behind two sets of commands, they already differ in their windows and month ranges, and one
+      shared table with a discriminator turns a WHERE-clause slip into a cross-feature leak on top
+      of a cross-room one.
+
+      Room-scoped from the first line rather than by a later ALTER, so it is deliberately NOT in
+      the ROOM_SCOPED_TABLES backfill below: there is no pre-room row to rescue, and that loop's
+      single-column index would only duplicate the leading column of the composite one created
+      here.
+
+      alert_id is declared here rather than added by a guarded ALTER the way swing_alerts needed
+      one. That guard exists because the swing table shipped one step before its mirror did; this
+      table ships with the mirror, so no database can exist that has it without the column.
+
+      The three price columns are TEXT on purpose — see the dayTradeAlerts comment in schema.ts.
+      They are verbatim transcriptions of what a presenter typed into a text input, nothing
+      computes with them, and rounding them into cents would change what the table shows.
+
+      NO BACKTICKS ANYWHERE IN THIS COMMENT. It sits inside a template literal, so one backtick
+      ends the SQL string and the rest of the schema becomes an expression — which is exactly what
+      happened on the first draft of the swing block above, and svelte-check reported it as eight
+      unrelated type errors. Same family as the rule about template syntax in a Svelte comment.
+    */
+    CREATE TABLE IF NOT EXISTS day_trade_alerts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      room_short_code TEXT NOT NULL,
+      symbol TEXT NOT NULL,
+      direction TEXT NOT NULL,
+      entry_price TEXT NOT NULL,
+      stop TEXT NOT NULL,
+      target TEXT NOT NULL,
+      image TEXT NOT NULL DEFAULT '',
+      sender_id INTEGER NOT NULL REFERENCES users(id),
+      sender_name TEXT NOT NULL,
+      entry_date INTEGER NOT NULL,
+      alert_id INTEGER REFERENCES alerts(id),
+      deleted_at INTEGER,
+      deleted_by_id INTEGER REFERENCES users(id)
+    );
+    CREATE INDEX IF NOT EXISTS day_trade_alerts_room_entry_idx
+      ON day_trade_alerts(room_short_code, entry_date, id);
     CREATE TABLE IF NOT EXISTS chat_mutes (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       target_user_id INTEGER NOT NULL REFERENCES users(id),

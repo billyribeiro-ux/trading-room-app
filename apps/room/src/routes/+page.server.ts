@@ -94,6 +94,18 @@ import {
 } from '$lib/swing-alerts-command';
 import { SWING_ALERT_INITIAL_DAYS, swingAlertsTabVisible } from '$lib/swing-alerts';
 import {
+  createDayTradeAlert,
+  deleteDayTradeAlert,
+  editDayTradeAlert,
+  getDayTradeAlerts
+} from '$lib/server/day-trade-alerts-repository';
+import {
+  dayTradeAlertMsgSchema,
+  deleteDayTradeAlertMsgSchema,
+  editDayTradeAlertMsgSchema
+} from '$lib/day-trade-alerts-command';
+import { DAY_TRADE_ALERT_INITIAL_DAYS, dayTradeAlertsTabVisible } from '$lib/day-trade-alerts';
+import {
   alertQuestions,
   alerts,
   capturedItemOverrides,
@@ -163,6 +175,64 @@ async function refuseSwingAlert(
  * verbatim.
  */
 function swingAlertFieldsFrom(formData: FormData) {
+  return {
+    symbol: String(formData.get('symbol') ?? ''),
+    direction: String(formData.get('direction') ?? ''),
+    entryPrice: String(formData.get('entryPrice') ?? ''),
+    stop: String(formData.get('stop') ?? ''),
+    target: String(formData.get('target') ?? ''),
+    image: String(formData.get('image') ?? '')
+  };
+}
+
+/**
+ * The two gates every Day Trade Alerts mutation passes, in cost order.
+ *
+ * The port of {@link refuseSwingAlert}, and a SEPARATE function rather than a parameterised one:
+ * the entitlement it consults is a different room setting, the message it returns names a different
+ * feature, and a shared guard taking a predicate would be one place where turning Swing off could
+ * be made to turn Day Trade off too.
+ *
+ * **Presenter first, entitlement second.** The role check is a field read on a row already in
+ * memory; the entitlement is a call to the controller with a two-second timeout. Asking the cheap
+ * question first means a member who should never have reached this action does not cost a round
+ * trip, and it means a controller outage cannot be used to probe for it.
+ *
+ * The entitlement is re-asked here rather than trusted from the page load, because the load ran
+ * against a different request: a presenter whose owner turned the feature off mid-session must stop
+ * being able to write, and this is the only place that can know. `readRoomConfig` throws when the
+ * controller cannot be reached, which fails the action closed — the correct direction for a feature
+ * switch, and the same behaviour the page load has.
+ */
+async function refuseDayTradeAlert(
+  request: Request,
+  locals: App.Locals,
+  verb: string
+): Promise<ReturnType<typeof fail> | null> {
+  const user = requireUser(locals);
+  if (!isPresenterRole(user.role)) {
+    return fail(403, { message: `You cannot ${verb}.` });
+  }
+  const { settings } = await readRoomConfig(request, requireRoomShortCode(locals), user.email);
+  if (!dayTradeAlertsTabVisible(settings)) {
+    // 404 rather than 403: in a room without the entitlement the feature does not exist, and
+    // saying "forbidden" would confirm that it exists somewhere and this member is not allowed it.
+    return fail(404, { message: 'Day Trade Alerts are not enabled for this room.' });
+  }
+  return null;
+}
+
+/**
+ * The six typed fields, read off the form untouched.
+ *
+ * Identical in shape to `swingAlertFieldsFrom` and deliberately not shared with it: the two forms
+ * post the same six field names today, and the day one of them gains a seventh is the day a shared
+ * reader starts silently dropping it for the other. No coercion and no defaulting beyond `''` for
+ * an absent field — the zod schema trims, bounds and refuses, and doing any of that twice in two
+ * places is how the two get to disagree. In particular the three price fields stay strings: they
+ * came from `type="text"` inputs and are rendered back verbatim.
+ */
+function dayTradeAlertFieldsFrom(formData: FormData) {
   return {
     symbol: String(formData.get('symbol') ?? ''),
     direction: String(formData.get('direction') ?? ''),
@@ -656,6 +726,27 @@ export const load: PageServerLoad = async ({ depends, locals, request, cookies }
     swingAlerts: swingAlertsTabVisible(roomConfig.settings)
       ? getSwingAlerts(requireRoomShortCode(locals), SWING_ALERT_INITIAL_DAYS, new Date())
       : [],
+    /**
+     * `loadTradeAlerts("DayTrade")` — the log, fetched with the page as the reference fetches it on
+     * session load.
+     *
+     * Gated on the SAME room setting that gates the tab, so a room without the entitlement does not
+     * read the table, does not serialise a log into its SSR HTML, and cannot have one recovered
+     * from `__sveltekit` data by a member who edits the DOM. `loadSessionLogs()` gates its own
+     * fetch identically, on the line immediately after the Swing one (byte 1,009,503):
+     * `sessData.hasDayTradeAlerts && this.loadTradeAlerts("DayTrade")`.
+     *
+     * **21 days, not 42 and not `4 * dayTradeAlertMonths * 7`.** `loadTradeAlerts` builds
+     * `{ sessionID, days: 21 }` and then overrides it only for Swing — 21 is the DEFAULT and 42 is
+     * the special case, which is the opposite of what the sibling feature makes you expect. With
+     * the select initialising to 1 month the dropdown would ask for 28, so the first list is 21
+     * days of data under a label reading "Last 1 Months". That mismatch is the reference's and
+     * changing the select once reconciles it. Reproduced rather than corrected — see
+     * `DAY_TRADE_ALERT_INITIAL_DAYS`.
+     */
+    dayTradeAlerts: dayTradeAlertsTabVisible(roomConfig.settings)
+      ? getDayTradeAlerts(requireRoomShortCode(locals), DAY_TRADE_ALERT_INITIAL_DAYS, new Date())
+      : [],
     notesEnabled: true,
     /*
       The PERMISSION, not the role.
@@ -1048,6 +1139,164 @@ export const actions: Actions = {
       userId: user.id
     });
     if (deleted === null) return fail(404, { message: 'That swing alert was not found.' });
+    return { success: true };
+  },
+
+  /*
+    ── Day Trade Alerts ────────────────────────────────────────────────────────────────────────
+
+    The three mutations, named for the wire commands they reproduce — `dayTradeAlertMsg`,
+    `editDayTradeAlertMsg`, `deleteDayTradeAlertMsg`. `DAY_TRADE_ALERT_COMMANDS` in
+    `$lib/day-trade-alerts` holds those three plus the log read and the two feed-mirror commands,
+    and `day-trade-alerts-contract.test.ts` asserts that the actions declared here still match it,
+    because a renamed action is a 404 the browser reports only as "Unable to save".
+
+    **Create is `dayTradeAlertMsg`, never `newDayTradeAlertMsg`.** That name is a payload KEY on the
+    edit command and, separately, the server→client push. It is the same trap the Swing build hit,
+    with the same shape and a different word in the middle.
+
+    **The edit's second command keeps the word `Swing`.** `editAlertMessageSwing` is sent by this
+    feature too (byte 1,987,189); `editAlertMessageDayTrade` exists nowhere in the bundle. The
+    repository does both halves of that edit in one transaction rather than sending two commands, so
+    no action here is named for it — but the name is pinned in the contract test, because inventing
+    the analogous one is the port's most tempting mistake.
+
+    Every one of the three is gated twice and neither gate is the browser's: the room must have the
+    entitlement, and the caller must be a presenter. A hidden form is not a check.
+  */
+
+  /**
+   * `dayTradeAlertMsg` — post a day trade alert.
+   *
+   * Two writes, in one transaction: the row, and the mirrored message the reference also posts into
+   * the main alerts feed with `alertMsg`. See `day-trade-alerts-repository.ts`.
+   */
+  dayTradeAlertMsg: async ({ request, locals }) => {
+    ensureDatabase();
+    const user = requireUser(locals);
+    const guard = await refuseDayTradeAlert(request, locals, 'post day trade alerts');
+    if (guard) return guard;
+
+    /*
+      The SAME bucket `postAlert` and `swingAlertMsg` spend, and that is the point rather than a
+      copy-paste.
+
+      This action posts into the main alerts feed — that is the second of its two writes — so
+      without this it is a way to post alerts at any rate the network allows, straight past the
+      limiter guarding the composer that posts the identical row. The Swing action was written
+      WITHOUT it and the omission was found by re-reading the diff against `postAlert`, not by a
+      test; it is here from the first line for that reason. Only the create needs it: edit rewrites
+      a message that already exists and delete removes one.
+
+      One bucket for both features and not two, deliberately: `alert` names the feed being written,
+      and two buckets would mean a presenter could post at twice the rate by alternating tabs.
+    */
+    const limit = consumeRateLimit('alert', user.id);
+    if (!limit.allowed) {
+      return fail(429, {
+        message: `You are posting alerts too quickly. Try again in ${Math.ceil(limit.retryAfterMs / 1000)}s.`
+      });
+    }
+
+    const formData = await request.formData();
+    const command = dayTradeAlertMsgSchema.safeParse({
+      cmd: 'dayTradeAlertMsg',
+      data: dayTradeAlertFieldsFrom(formData)
+    });
+    if (!command.success) return fail(400, { message: 'That day trade alert is not valid.' });
+
+    const created = createDayTradeAlert({
+      room: requireRoomShortCode(locals),
+      alert: command.data.data,
+      now: new Date(),
+      // `senderName: globals.user.nick || globals.user.name` — taken from the session, never sent
+      // by the client, because a client-supplied author is a client-supplied identity.
+      senderName: user.displayName,
+      userId: user.id
+    });
+
+    /*
+      Tell the room about the mirrored message, on the same channel and in the same shape as
+      `postAlert` — writing the row made the alert exist, it did not make anyone see it.
+
+      Only the CREATE announces. Edits and deletes of an alert are not published anywhere in this
+      room today (`messageAction`'s delete branch writes and returns), so they reach other members
+      on their next load. Publishing an edit on this channel would append a SECOND copy of the alert
+      to every open feed, which is worse than the delay. Named here rather than left as a surprise.
+    */
+    if (created.mirror.alertId !== null) {
+      publishToRoom(requireRoomShortCode(locals), {
+        channel: 'alerts',
+        data: {
+          id: created.mirror.alertId,
+          senderId: user.id,
+          senderName: user.displayName,
+          body: created.mirror.body ?? '',
+          kind: 'text',
+          nonTrade: false
+        }
+      });
+    }
+    return { success: true, dayTradeAlert: created.row };
+  },
+
+  /**
+   * `editDayTradeAlertMsg` — rewrite a day trade alert and its mirrored feed message.
+   *
+   * The reference sends `editAlertMessageSwing` as a second command to update the mirror — that
+   * exact literal, on this path — while here the repository does both halves in one transaction,
+   * keyed by the recorded `alert_id` rather than by re-deriving the old text and scanning the feed
+   * for it. That scan is worse on this feature than on Swing: its loop has no `break`, so it walks
+   * the whole feed and the last match wins.
+   */
+  editDayTradeAlertMsg: async ({ request, locals }) => {
+    ensureDatabase();
+    const user = requireUser(locals);
+    const guard = await refuseDayTradeAlert(request, locals, 'edit day trade alerts');
+    if (guard) return guard;
+
+    const formData = await request.formData();
+    const command = editDayTradeAlertMsgSchema.safeParse({
+      cmd: 'editDayTradeAlertMsg',
+      data: {
+        dayTradeAlertID: Number(formData.get('dayTradeAlertID')),
+        ...dayTradeAlertFieldsFrom(formData)
+      }
+    });
+    if (!command.success) return fail(400, { message: 'That day trade alert is not valid.' });
+
+    const updated = editDayTradeAlert({
+      room: requireRoomShortCode(locals),
+      dayTradeAlertID: command.data.data.dayTradeAlertID,
+      alert: command.data.data,
+      senderName: user.displayName,
+      userId: user.id
+    });
+    if (updated === null) return fail(404, { message: 'That day trade alert was not found.' });
+    return { success: true, dayTradeAlert: updated.row };
+  },
+
+  /** `deleteDayTradeAlertMsg` — soft-delete the row, hard-delete its mirrored feed message. */
+  deleteDayTradeAlertMsg: async ({ request, locals }) => {
+    ensureDatabase();
+    const user = requireUser(locals);
+    const guard = await refuseDayTradeAlert(request, locals, 'delete day trade alerts');
+    if (guard) return guard;
+
+    const formData = await request.formData();
+    const command = deleteDayTradeAlertMsgSchema.safeParse({
+      cmd: 'deleteDayTradeAlertMsg',
+      data: { dayTradeAlertID: Number(formData.get('dayTradeAlertID')) }
+    });
+    if (!command.success) return fail(400, { message: 'A valid day trade alert is required.' });
+
+    const deleted = deleteDayTradeAlert({
+      room: requireRoomShortCode(locals),
+      dayTradeAlertID: command.data.data.dayTradeAlertID,
+      now: new Date(),
+      userId: user.id
+    });
+    if (deleted === null) return fail(404, { message: 'That day trade alert was not found.' });
     return { success: true };
   },
 

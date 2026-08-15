@@ -107,6 +107,14 @@
     swingAlertsTabVisible
   } from '$lib/swing-alerts';
   import type { SwingAlertRow } from '$lib/types';
+  import DayTradeAlertsPane from '$lib/components/day-trade-alerts/DayTradeAlertsPane.svelte';
+  import type { DayTradeAlertDraft } from '$lib/components/day-trade-alerts/draft';
+  import {
+    DAY_TRADE_ALERT_INITIAL_DAYS,
+    dayTradeAlertLogDays,
+    dayTradeAlertsTabVisible
+  } from '$lib/day-trade-alerts';
+  import type { DayTradeAlertRow } from '$lib/types';
   import RoomMessage from '$lib/components/RoomMessage.svelte';
   import type { MessageBadge } from '$lib/types';
   import { isMentionOf } from '$lib/mention';
@@ -8709,6 +8717,169 @@
     }
   }
 
+  /* ── Day Trade Alerts ────────────────────────────────────────────────────────────────────── */
+
+  /**
+   * `hasDayTradeAlerts` — the per-room entitlement, gating the nav item AND the pane.
+   *
+   * `$derived` rather than copied into a `let`, so a room whose configuration is re-read mid-session
+   * cannot leave the tab showing after the owner turned the feature off. The reference reads it once
+   * in `ngOnInit` (byte 1,955,967) and therefore does NOT react; reacting is the safer direction of
+   * that divergence and costs nothing.
+   */
+  const dayTradeAlertsEnabled = $derived(dayTradeAlertsTabVisible(data.sessData ?? {}));
+
+  /**
+   * `globals.dayTradeAlertsLog`.
+   *
+   * `$state.raw` because it is only ever REPLACED — by the page load's seed and by
+   * `refreshDayTradeAlerts` — and never mutated in place. A deep proxy over a list of a few hundred
+   * rows would cost on every read of every cell and buy nothing.
+   *
+   * Seeded from `data.dayTradeAlerts` and thereafter owned here. It deliberately does NOT track
+   * `data.dayTradeAlerts` afterwards: the load always answers the 21-day window, so a `$derived`
+   * would throw away the presenter's chosen months window the next time anything else on the page
+   * called `invalidateAll()`. Every day trade mutation refetches this list itself instead.
+   */
+  // The page data is the intentional one-time seed; every later value comes from the refetch below.
+  // svelte-ignore state_referenced_locally
+  let dayTradeAlertsLog = $state.raw<readonly DayTradeAlertRow[]>(data.dayTradeAlerts);
+  /** The window currently displayed, so a refetch after a mutation asks for the same one. */
+  let dayTradeAlertsDays = $state(DAY_TRADE_ALERT_INITIAL_DAYS);
+
+  /** A pending image upload for the day trade form, and its `resolve`. `imgUpload('dayTrade')`. */
+  let dayTradeImageUpload = $state.raw<{ resolve: (url: string | null) => void } | null>(null);
+  /** A pasted image awaiting the confirmation `onImagePaste` shows before uploading. */
+  let dayTradeImagePaste = $state.raw<{
+    file: File;
+    previewUrl: string;
+    resolve: (url: string | null) => void;
+  } | null>(null);
+
+  /**
+   * `getDayTradeAlertsLog` — refetch the log for the current window.
+   *
+   * A plain GET rather than a form action, for the reason `refreshSwingAlerts` gives: this changes
+   * nothing, so it must not go through `invalidateAll()` and re-run every load function on the page
+   * to answer a question about one table.
+   */
+  async function refreshDayTradeAlerts(): Promise<void> {
+    const response = await fetch(`/api/day-trade-alerts?days=${dayTradeAlertsDays}`);
+    if (!response.ok) throw new Error('Unable to load day trade alerts.');
+    dayTradeAlertsLog = (await response.json()) as readonly DayTradeAlertRow[];
+  }
+
+  /**
+   * The three day trade mutations. Named for the wire commands, which are the action names.
+   *
+   * No `invalidateAll()`: the only page data these change is the day trade log, and re-running
+   * every load function would additionally reset the log to the 21-day window the load always
+   * returns. The explicit refetch below keeps the presenter's chosen window.
+   */
+  async function submitDayTradeCommand(
+    action: 'dayTradeAlertMsg' | 'editDayTradeAlertMsg' | 'deleteDayTradeAlertMsg',
+    values: Record<string, string | number>
+  ): Promise<void> {
+    const body = new FormData();
+    for (const [key, value] of Object.entries(values)) body.set(key, String(value));
+    const response = await fetch(`?/${action}`, { method: 'POST', body });
+    const result = deserialize<Record<string, unknown>, { message?: string }>(await response.text());
+
+    if (result.type === 'failure') throw new Error(result.data?.message ?? 'Unable to save.');
+    if (result.type === 'error') throw new Error(result.error.message ?? 'Unable to save.');
+    if (result.type !== 'success') throw new Error('Unable to save.');
+
+    await refreshDayTradeAlerts();
+  }
+
+  function dayTradeAlertPayload(draft: DayTradeAlertDraft): Record<string, string> {
+    return {
+      symbol: draft.symbol,
+      direction: draft.direction,
+      entryPrice: draft.entryPrice,
+      stop: draft.stop,
+      target: draft.target,
+      image: draft.image
+    };
+  }
+
+  /** `onTradeAlertWeeksChange('DayTrade')` — clear the list, then refetch for the new window. */
+  async function changeDayTradeAlertMonths(months: number): Promise<void> {
+    dayTradeAlertsDays = dayTradeAlertLogDays(months);
+    /*
+      The reference empties `globals.dayTradeAlertsLog` BEFORE sending the command (byte
+      1,993,666), so the list is blank while the refetch is in flight rather than showing the
+      previous window under the new label. Reproduced, including the flash of the empty-state
+      heading that comes with it.
+    */
+    dayTradeAlertsLog = [];
+    await refreshDayTradeAlerts();
+  }
+
+  function requestDayTradeImageUpload(): Promise<string | null> {
+    return new Promise((resolve) => {
+      dayTradeImageUpload = { resolve };
+    });
+  }
+
+  async function completeDayTradeImageUpload(files: readonly File[]): Promise<void> {
+    const pending = dayTradeImageUpload;
+    dayTradeImageUpload = null;
+    if (!pending) return;
+    /*
+      One file. The reference's own dialog sets `multiple='false'`; `ImageUploadDialog` is shared
+      with the chat composer, which does allow several, so the extras are dropped here rather than
+      by forking the component.
+    */
+    const [file] = files;
+    if (!file) {
+      pending.resolve(null);
+      return;
+    }
+    try {
+      const [url] = await uploadAlertFiles([file]);
+      pending.resolve(url ?? null);
+    } catch (error) {
+      console.error(error);
+      bootboxAlert = 'Upload Failed...';
+      pending.resolve(null);
+    }
+  }
+
+  /**
+   * `onImagePaste(event, 'dayTrade')` — confirm the pasted image, then upload it.
+   *
+   * The object URL is created for the confirmation's preview and revoked when the dialog closes,
+   * whichever way it closes. Leaking one per paste would pin the image bytes for the life of the
+   * tab.
+   */
+  function requestDayTradeImagePaste(file: File): Promise<string | null> {
+    return new Promise((resolve) => {
+      dayTradeImagePaste = { file, previewUrl: URL.createObjectURL(file), resolve };
+    });
+  }
+
+  function closeDayTradeImagePaste(): { file: File; resolve: (url: string | null) => void } | null {
+    const pending = dayTradeImagePaste;
+    dayTradeImagePaste = null;
+    if (!pending) return null;
+    URL.revokeObjectURL(pending.previewUrl);
+    return { file: pending.file, resolve: pending.resolve };
+  }
+
+  async function confirmDayTradeImagePaste(): Promise<void> {
+    const pending = closeDayTradeImagePaste();
+    if (!pending) return;
+    try {
+      const [url] = await uploadAlertFiles([pending.file]);
+      pending.resolve(url ?? null);
+    } catch (error) {
+      console.error(error);
+      bootboxAlert = 'Upload Failed...';
+      pending.resolve(null);
+    }
+  }
+
   function mountUploadFileLink(menu: HTMLUListElement) {
     const item = document.createElement('li');
     const link = document.createElement('a');
@@ -11180,6 +11351,46 @@
                     </li>
                   {/if}
                   <!--
+                    Day Trades — `JCe`, byte 1,917,906, the `<li>` immediately after the Swing one
+                    and gated the same way, on its own room setting rather than on presenter status:
+
+                      O(27, o.hasDayTradeAlerts ? 27 : -1)
+
+                    A conditional block and not a `hidden` attribute, because `-1` is
+                    `ɵɵconditional`'s "instantiate nothing". An entitlement that ships hidden markup has
+                    already told the member the feature exists, and this one is what a room pays for.
+
+                    The label is `Day Trades` (byte 1,918,110), NOT "Day Trade Alerts" — the pane's
+                    own heading says "Latest Day Trade Alerts" and the tab says the short form. The
+                    icon is `fas fa-bell` (const 64), the same tuple the Swing tab uses.
+                  -->
+                  {#if dayTradeAlertsEnabled}
+                    <li role="presentation" class="nav-item">
+                      <a
+                        id="dayTradeAlerts-tab"
+                        class="nav-link"
+                        class:active={mainTab === 'dayTradeAlerts'}
+                        data-bs-toggle="tab"
+                        data-bs-target="#dayTradeAlerts"
+                        role="tab"
+                        aria-controls="dayTradeAlerts"
+                        aria-selected={mainTab === 'dayTradeAlerts'}
+                        tabindex={mainTab === 'dayTradeAlerts' ? undefined : -1}
+                        onclick={() => (mainTab = 'dayTradeAlerts')}
+                        onkeydown={(event) => {
+                          if (event.key === 'Enter' || event.key === ' ')
+                            mainTab = 'dayTradeAlerts';
+                        }}
+                      >
+                        <div class="d-flex align-items-center">
+                          <div>
+                            <i class="fas fa-bell"></i><span class="mx-1">Day Trades</span>
+                          </div>
+                        </div>
+                      </a>
+                    </li>
+                  {/if}
+                  <!--
                     "Hide Files Section?" - `z('hidden', o.hideFiles)` on this `li`
                     (app-presentationarea.full.js:5375) and on the `#files` pane (5410-5413). Both,
                     because either one alone leaves a tab that opens nothing or a pane still
@@ -11554,6 +11765,53 @@
                         onMonthsChange={(months) => void changeSwingAlertMonths(months)}
                         onPasteImage={requestSwingImagePaste}
                         onUploadImage={requestSwingImageUpload}
+                        sessionHandle={data.sessionHandle}
+                      />
+                    </div>
+                  {/if}
+                  <!--
+                    The `#dayTradeAlerts` pane — `Iwe`, slot 49, carrying the SAME gate as the nav
+                    item above (`O(49, o.hasDayTradeAlerts ? 49 : -1)`, byte 2,017,748). Both,
+                    because either one alone leaves a tab that opens nothing or a pane reachable
+                    from a tab that is gone.
+
+                    The pane re-applies the gate itself, which is not redundancy for its own sake:
+                    it is what lets the contract test prove the component renders nothing on a false
+                    entitlement without standing up this whole page.
+                  -->
+                  {#if dayTradeAlertsEnabled}
+                    <div
+                      id="dayTradeAlerts"
+                      class={mainTab === 'dayTradeAlerts'
+                        ? 'tab-pane position-relative show active'
+                        : 'tab-pane position-relative'}
+                      role="tabpanel"
+                      aria-labelledby="dayTradeAlerts-tab"
+                    >
+                      <DayTradeAlertsPane
+                        alerts={dayTradeAlertsLog}
+                        hasDayTradeAlerts={dayTradeAlertsEnabled}
+                        {isPresenter}
+                        onCreate={async (draft) => {
+                          await submitDayTradeCommand(
+                            'dayTradeAlertMsg',
+                            dayTradeAlertPayload(draft)
+                          );
+                        }}
+                        onDelete={async (dayTradeAlertID) => {
+                          await submitDayTradeCommand('deleteDayTradeAlertMsg', {
+                            dayTradeAlertID
+                          });
+                        }}
+                        onEdit={async (draft) => {
+                          await submitDayTradeCommand('editDayTradeAlertMsg', {
+                            ...dayTradeAlertPayload(draft),
+                            dayTradeAlertID: draft.dayTradeAlertID ?? 0
+                          });
+                        }}
+                        onMonthsChange={(months) => void changeDayTradeAlertMonths(months)}
+                        onPasteImage={requestDayTradeImagePaste}
+                        onUploadImage={requestDayTradeImageUpload}
                         sessionHandle={data.sessionHandle}
                       />
                     </div>
@@ -12341,6 +12599,41 @@
       >
         <div class="text-center">
           <img src={pastePreviewUrl} class="img-fluid" alt="Pasted screenshot" />
+        </div>
+      </BootboxDialog>
+    {/if}
+    <!--
+      `imgUpload('dayTrade')` — the day trade form's own upload dialog.
+
+      A THIRD instance rather than a share of the composer's or the swing form's: `imgUpload` takes
+      the feature name as an argument and `doImggurUpload` dispatches on it deny-by-default —
+      `"swing" === i ? swingAlert.image = F : "dayTrade" === i && (dayTradeAlert.image = F)` at byte
+      1,992,037 — so the completion belongs to exactly one feature. Routing this through either of
+      the others would put the URL in the wrong box or post the image into chat.
+    -->
+    {#if dayTradeImageUpload}
+      <ImageUploadDialog
+        onclose={() => {
+          dayTradeImageUpload?.resolve(null);
+          dayTradeImageUpload = null;
+        }}
+        onupload={(files) => void completeDayTradeImageUpload(files)}
+      />
+    {/if}
+    <!--
+      `onImagePaste(event, 'dayTrade')` puts the pasted image in a `bootbox.confirm` before
+      uploading, so a stray paste cannot silently push bytes to the upload server.
+    -->
+    {#if dayTradeImagePaste}
+      {@const dayTradePastePreviewUrl = dayTradeImagePaste.previewUrl}
+      <BootboxDialog
+        mode="confirm"
+        message=""
+        onclose={() => closeDayTradeImagePaste()?.resolve(null)}
+        onconfirm={() => void confirmDayTradeImagePaste()}
+      >
+        <div class="text-center">
+          <img src={dayTradePastePreviewUrl} class="img-fluid" alt="Pasted screenshot" />
         </div>
       </BootboxDialog>
     {/if}

@@ -6,7 +6,14 @@ export type MainTab =
   | 'videoplayer'
   | 'files'
   /** `presAreaTabs-swingAlerts`. Present only in rooms with `hasSwingTradeAlerts`. */
-  | 'swingAlerts';
+  | 'swingAlerts'
+  /**
+   * `presAreaTabs-dayTradeAlerts`. Present only in rooms with `hasDayTradeAlerts`.
+   *
+   * The tab key the reference passes to `onMainTabChange` (bundle byte 1,918,012); the visible
+   * label on it is the shorter `Day Trades` (byte 1,918,110), which is why the two do not match.
+   */
+  | 'dayTradeAlerts';
 export type FileTab = 'files' | 'images' | 'sounds';
 export type ChatTab = 'main' | 'off-topic';
 
@@ -166,6 +173,68 @@ export interface SwingAlertRow {
   /**
    * The sender's avatar, preferred over the Gravatar fallback exactly as the row template has it:
    * `row.senderPic || 'https://secure.gravatar.com/avatar/' + row.senderAvt + '?d=mm&s=30'`.
+   *
+   * The client never writes either of these — both occur only as reads inside the two row
+   * templates — so both are produced server-side here too.
+   */
+  senderPic: string;
+  /** The md5 of the sender's email, i.e. the Gravatar hash the fallback URL is built from. */
+  senderAvt: string;
+}
+
+/**
+ * `long` or `short` — the Day Trade radio pair, const indices 228 and 230.
+ *
+ * A separate type from {@link SwingAlertDirection} even though the two unions are identical today,
+ * because they are two independent closed sets upstream: two `name="…-direction"` groups, two pairs
+ * of `value=` attributes, two models each defaulting to `"long"`. Aliasing one to the other would
+ * make a future change to either silently change both, and the whole risk of this port is exactly
+ * that kind of accidental coupling.
+ */
+export type DayTradeAlertDirection = 'long' | 'short';
+
+/**
+ * One row of the Day Trade Alerts log, as the table, the pipes and the CSV read it.
+ *
+ * Field names are the decode's, from `docs/decoded/day-trade-alerts.md` §1.5 and §1.7 — including
+ * `entryDate`, which the row template formats (byte 1,943,736) and the CSV builder reads (byte
+ * 1,989,640). The string `created` appears on no Day Trade path.
+ *
+ * Structurally identical to {@link SwingAlertRow}, and separate for the same reason
+ * {@link DayTradeAlertDirection} is: `_we` and `Pwe` are two row templates, and the day the server
+ * adds a column to one of the two tables this type must be able to move without the other.
+ *
+ * ## Why the prices are strings
+ *
+ * `entryPrice`, `stop` and `target` are `type="text"` inputs (consts 224, 225, 226) whose values
+ * are rendered back through bare `Ze(x)` interpolations — no pipe, no `toFixed`, no currency. No
+ * arithmetic is performed on them anywhere on this path, so there is nothing for the repository's
+ * money rule to protect: they are transcribed strings, and storing them as cents would round what a
+ * presenter typed and change what the table shows. See the `dayTradeAlerts` table comment for the
+ * same note on the column type.
+ *
+ * ## `id` rather than `_id`
+ *
+ * The reference is Mongo-backed and the row carries `_id`; this room's rows come from its own
+ * SQLite table with an integer primary key. The wire field is still called `dayTradeAlertID`, which
+ * is what the three mutation payloads name.
+ */
+export interface DayTradeAlertRow {
+  id: number;
+  symbol: string;
+  direction: DayTradeAlertDirection;
+  /** ISO 8601. Rendered through `date:'YYYY-MM-dd hh:mm:ss'`; the only formatted cell. */
+  entryDate: string;
+  entryPrice: string;
+  stop: string;
+  target: string;
+  /** `''` when the row has no image, which is what empties the image cell. */
+  image: string;
+  senderName: string;
+  /**
+   * The sender's avatar, preferred over the Gravatar fallback exactly as the row template has it:
+   * `e.senderPic || "https://secure.gravatar.com/avatar/" + e.senderAvt + "?d=mm&s=30"`
+   * (byte 1,943,900).
    *
    * The client never writes either of these — both occur only as reads inside the two row
    * templates — so both are produced server-side here too.
