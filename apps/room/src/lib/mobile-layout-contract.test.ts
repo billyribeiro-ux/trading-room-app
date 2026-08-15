@@ -28,6 +28,17 @@ const ROOM_COMPILED = readFileSync(
   'utf8'
 );
 const PAGE = readFileSync(new URL('../routes/+page.svelte', import.meta.url), 'utf8');
+/*
+  The split geometry left `+page.svelte` for `room/split.svelte.ts` on 2026-08-15, so half the
+  assertions below moved with it. The upstream halves — everything read out of `docs/source/**` —
+  are untouched, because the evidence did not move; only our side of each pair did.
+
+  Re-pointed rather than deleted, and that distinction is the reason `source-size-contract.test.ts`
+  polices this file: after an extraction a `toContain` fails loudly and tells you where to look,
+  which is what happened here, while a `not.toContain` would have gone GREEN for the wrong reason —
+  the text absent because the region left, not because the guard still holds.
+*/
+const SPLIT = readFileSync(new URL('./room/split.svelte.ts', import.meta.url), 'utf8');
 const compact = (source: string) => source.replace(/\s+/g, '');
 
 describe('the 601px threshold selects a template, and is read not chosen', () => {
@@ -42,8 +53,12 @@ describe('the 601px threshold selects a template, and is read not chosen', () =>
   });
 
   it('binds the same number here', () => {
-    expect(PAGE).toContain('windowWidth > 0 && windowWidth <= 601');
-    expect(PAGE).toContain('bind:innerWidth={windowWidth}');
+    expect(SPLIT).toContain('export const MOBILE_BREAKPOINT_WIDTH = 601;');
+    expect(SPLIT).toContain(
+      'this.#viewportWidth > 0 && this.#viewportWidth <= MOBILE_BREAKPOINT_WIDTH'
+    );
+    // Still a binding and not a listener, and still the page's, because the window is the page's.
+    expect(PAGE).toContain('bind:innerWidth={split.viewportWidth}');
   });
 });
 
@@ -67,7 +82,7 @@ describe('K4e reverses the child order, which is why the DOM is reordered', () =
     const source = compact(PAGE);
     // Mobile: presentation, gutter, chat/alerts.
     expect(source).toContain(
-      '{#ifisMobileScreen}{#if!hidePresentation}{@renderpresentationPane()}{/if}{@rendermainGutter()}{#if!hideChatAlerts}{@renderchatAlertsPane()}{/if}{#if!hideChatAlerts&&extraChatColumnVisible}{@renderextraChatPane()}{/if}'
+      '{#ifsplit.isMobileScreen}{#if!hidePresentation}{@renderpresentationPane()}{/if}{@rendermainGutter()}{#if!hideChatAlerts}{@renderchatAlertsPane()}{/if}{#if!hideChatAlerts&&extraChatColumnVisible}{@renderextraChatPane()}{/if}'
     );
     // Desktop: chat/alerts, the extra column, presentation, gutter.
     expect(source).toContain(
@@ -108,11 +123,11 @@ describe('both mobile splits are vertical, as a static attribute', () => {
       obvious implementation reuses `splitIsHorizontal` and puts alerts BESIDE chat in a phone-width
       column. Const 228 says vertical outright, so `innerSplitIsVertical` is an OR, not a negation.
     */
-    expect(PAGE).toContain(
-      'const splitIsHorizontal = $derived(roomSplitIsHorizontal && !isMobileScreen)'
+    expect(SPLIT).toContain(
+      '#isHorizontal = $derived(this.#roomIsHorizontal && !this.#isMobileScreen);'
     );
-    expect(PAGE).toContain(
-      'const innerSplitIsVertical = $derived(roomSplitIsHorizontal || isMobileScreen)'
+    expect(SPLIT).toContain(
+      '#innerIsVertical = $derived(this.#roomIsHorizontal || this.#isMobileScreen);'
     );
   });
 });
@@ -122,13 +137,15 @@ describe('the mobile geometry is its own, and is never written down', () => {
     // `chatAlertsSizeMobile = 50`, `presAreaSizeMobile = 50` — `app-room.full.js:1852-1853`.
     const source = compact(ROOM_FULL);
     expect(source).toContain('(this.chatAlertsSizeMobile=50),(this.presAreaSizeMobile=50)');
-    expect(PAGE).toContain('const MOBILE_CHAT_ALERTS_SPLIT = 0.5');
+    expect(SPLIT).toContain('export const MOBILE_CHAT_ALERTS_SPLIT = 0.5;');
   });
 
   it('keeps the desktop 70/30 in a separate field, so neither overwrites the other', () => {
     expect(compact(ROOM_FULL)).toContain('(this.presAreaSize=70),(this.chatAlertsSize=30)');
-    expect(PAGE).toContain('let mobileSplit = $state(MOBILE_CHAT_ALERTS_SPLIT)');
-    expect(PAGE).toContain('isMobileScreen ? mobileSplit : (mainSplit ?? defaultMainSplit)');
+    expect(SPLIT).toContain('#mobile = $state(MOBILE_CHAT_ALERTS_SPLIT);');
+    expect(SPLIT).toContain(
+      'this.#isMobileScreen ? this.#mobile : (this.#main ?? this.#defaultMainSplit)'
+    );
   });
 
   it('never persists a mobile drag, because K4e has no dragEnd', () => {
@@ -140,7 +157,7 @@ describe('the mobile geometry is its own, and is never written down', () => {
     expect(source).toContain(
       "d(0,'as-split',224),x('gutterDblClick',function(){return(D(e),E(g().hideShowPresentationArea()));})('dragStart',function(){return(D(e),E(g().resizeStart()));})"
     );
-    expect(PAGE).toContain("if (splitTarget === 'main' && isMobileScreen)");
+    expect(SPLIT).toContain('if (this.isMobileScreen) return null;');
   });
 
   it('drops the order property, because the mobile areas carry none', () => {
@@ -149,7 +166,7 @@ describe('the mobile geometry is its own, and is never written down', () => {
     expect(source).toContain("['minSize','0',1,'presentation-box',3,'size']");
     expect(source).toContain("['minSize','0',1,'alert-chat-box',3,'size']");
     expect(source).toContain("['minSize','0',1,'alert-chat-box',3,'size','order']");
-    expect(PAGE).toContain('isMobileScreen\n      ? `flex: 0 0 ${primaryColumn};`');
+    expect(SPLIT).toContain('this.#isMobileScreen\n      ? `flex: 0 0 ${this.#primaryColumn};`');
   });
 });
 

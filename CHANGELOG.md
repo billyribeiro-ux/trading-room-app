@@ -24,6 +24,135 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-15
 
+### 2026-08-15 16:24 EDT — Phase 1a–1c of the `+page.svelte` decomposition: `RoomPolls`, `RoomMenus`, `RoomSplit`
+
+**Branch `feat/extra-chat-column`, not merged.** Three commits: `d3b24fb` (15:41), `abe9691` (16:00)
+and this one. **Runtime impact: yes** — the room's poll modal, its eleven floating menus and the
+whole split geometry are now driven by three classes instead of thirty-odd loose `let`s. No
+behaviour was intended to change and each divergence found on the way is named below.
+
+**Entries for `d3b24fb` and `abe9691` are recorded HERE rather than at the time**, which is a
+deviation from this file's own rule that an entry is appended when a piece of work finishes. Said
+plainly rather than back-dated.
+
+#### The measurement
+
+| | before | after |
+|---|---|---|
+| `+page.svelte` | 13,522 | **13,157** (−365) |
+| room suite | 1,661 across 124 files | **1,723 across 127 files** |
+
+Three modules and three test files under `apps/room/src/lib/room/`: `polls.svelte.ts` (4 fields),
+`menus.svelte.ts` (12), `split.svelte.ts` (7 reactive, 5 plain, 20 derived).
+
+#### Why classes, and the trap that would have failed silently
+
+`svelte/svelte-js-files` states that reassigned state cannot be exported from a `.svelte.ts` module,
+and `svelte/context` states that reassigning a shared value *"breaks the link"* for everything
+reading it downstream. Both point the same way: the reactive box lives behind `this`, every reader
+goes through a getter, and each instance is a `const` that is never reassigned.
+
+Getting that wrong produces a room that renders once and then quietly stops updating — and
+`svelte-check`, the suite and `svelte-autofixer` all pass on it. Every one of the three test files
+therefore ends with a reactivity block that reads a getter inside `$effect.root`, mutating and
+flushing INSIDE the root and asserting OUTSIDE it. That shape is not incidental: two earlier drafts
+in this repository proved nothing, one by mutating outside the root and one by asserting inside it
+where the expectation is swallowed.
+
+#### What reading each set together found
+
+**`RoomMenus` — two closers that never agreed.** `openModal` closed nine menus and left `recording`,
+`soundcloud` and `screen` floating over the modal; `closeFloatingMenus` closed ten and left `emoji`
+and `giphy` open. Neither list is obviously wrong — the pickers live in the composer and arguably
+should survive a top-bar click — but they were never decided, they drifted. **Both behaviours are
+preserved exactly**, as `closeForModal()` and `closeFloating()`, with a test asserting the two
+DIFFER, so making them agree is now a decision somebody records rather than a tidy-up.
+
+**`RoomSplit` — one measurement, two provenances, three lines apart.** `defaultMainSplit` read
+`DIRECT_EVIDENCE_CONTRACT.populatedRoom.primaryPercent`; `defaultChatAlertsSplit` was a bare
+`40.136530587668595` with no stated origin. It could stay bare because the contract records
+`primaryPercent` and has no `alertsPercent` beside it. It is **not** added there — `dump-contract.test.ts:314`
+pins `populatedRoom` with `toEqual`, and editing a pinned evidence object for a reader's convenience
+is not a thing to do. Instead it is named `CAPTURED_ALERTS_PERCENT` in the module and its provenance
+is EXECUTED: the two percentages and the 11px gutter reproduce all four captured flex strings
+exactly — `calc(25.5107% - 2.80618px)`, `calc(74.4893% - 8.19382px)`, `calc(40.1365% - 4.41502px)`,
+`calc(59.8635% - 6.58498px)` — at the precision a browser serialises computed styles to. Change
+either number in its last place and four assertions go red.
+
+#### Two simplifications the evidence refused
+
+- **Collapsing the eleven menu flags to one `open: MenuName | null`.** `toggleTopMenu` enforces
+  exclusivity across four menus by hand and for nothing else; `rosterSort`, `archives`, `notes` and
+  `files` can genuinely be open together today. One field would have made them exclusive, which is a
+  UX change dressed as a refactor.
+- **Replacing `bind:innerWidth` with `svelte/reactivity/window`'s `innerWidth.current`.** It would
+  remove the binding, and `0` here means "never measured", which is load-bearing twice: `isMobileScreen`
+  is false at 0 so SSR renders the desktop tree, and the resize-refetch effect uses the same 0 to skip
+  a refetch on first paint. A value that is `undefined` on the server and live on the client changes
+  both. Recorded in the class rather than left as an omission.
+
+#### One decision that is a real design property, not a style
+
+The twenty geometry values are `$derived` **class fields** behind getters, not plain computing
+getters. `bind:innerWidth` writes on every frame of a resize; `$derived` is push-pull, so an
+unchanged `isMobileScreen` boolean stops the chain and the five flex strings are not rebuilt. Through
+a getter the effect's dependency would be the width itself and all six writes would rebuild
+everything. `split.svelte.test.ts` asserts the effect runs **once** across six width writes, which is
+the assertion that goes red if anyone converts them back.
+
+They are private-with-a-getter rather than public because a `$derived` field is reassignable from
+outside — deriveds are overridable unless declared `const`, which a class field cannot be.
+
+#### The migration, done the way row AE requires
+
+13 assertions across 4 text-reading contract files failed loudly when the regions moved, which is a
+migration telling you where to go. Every one was **re-pointed at the file that now owns the thing**,
+never deleted: `mobile-layout-contract.test.ts` (7), `extra-chat-column-contract.test.ts` (4),
+`split-gutter.test.ts` (1), `source-size-contract.test.ts` (the ceiling). The upstream halves —
+everything read out of `docs/source/**` — are untouched, because the evidence did not move.
+
+One negative assertion was made **stronger** rather than merely relocated: "the collapse must never
+write the preference" was a `slice(indexOf(...))` over the page, which is the exact shape that goes
+vacuous when text moves. It is now structural — `RoomSplit` is constructed with a READER, is handed
+one again on a direction change, and `endDrag` RETURNS the preference write for the page to perform.
+No path through the class can persist anything.
+
+#### Three of my own instruments were wrong, and each is recorded where it failed
+
+1. **`RoomMenus`' exclusivity control stayed GREEN.** Making `archives` close the others changed
+   nothing, because the draft opened `archives` FIRST so it had nothing to close. The test now opens
+   each menu last in turn.
+2. **`RoomSplit`'s "a mobile main drag is never recorded" stayed GREEN.** Deleting the mobile early
+   return changed nothing, because a mobile drag writes the MOBILE field and the unseeded desktop
+   one was still null — so the write was declined for the wrong reason. The split is now seeded.
+3. **A `not.toContain('localStorage')` guard went red on the class's own prose.** It read the raw
+   module, where `resolveSplitSizes` explains which `localStorage` keys upstream reads. Scoped to
+   stripped code, which is what the same file already does for the page.
+
+Two drafts of my own assertions were also simply wrong about the code and were corrected in the
+test, not in the source: a single click on a desktop gutter DOES re-persist the size unchanged (the
+original `finishSplit` only returned early on a double click or a mobile drag), and the memoisation
+test's expected run count was 1, not 2.
+
+#### Verified
+
+`svelte-check --threshold error` **0 errors / 0 warnings across 1,116 files** · `npx vitest run`
+**1,723 passed across 127 files** · `npx eslint src` clean · prettier clean on every touched file
+(12 files elsewhere in `src/` were already warning before this change and are untouched) ·
+`svelte-autofixer` returns `issues: []` **and** `suggestions: []` on all three `.svelte.ts` modules —
+which is the gate that has been unavailable in practice, because the same call on the 13,000-line
+page returns ~100 suggestions with no way to tell new from pre-existing.
+
+**Six negative controls run and seen red:** breaking `CAPTURED_ALERTS_PERCENT` in its last digit;
+making `innerIsVertical` the inverse of `isHorizontal`; replacing a `$derived` geometry field with
+`$state.raw`; letting the class call `savePreference` directly; deleting the mobile no-write rule
+(twice — the first run is failure 2 above); and, from the earlier commits, tidying the two closers
+into agreement and making the independent menus exclusive.
+
+**Not verified: a browser.** No screenshot of a dragged gutter, a rotated phone or a collapsed
+presentation area was taken. The geometry is proven against the captured flex strings and the
+reference's const table, which is stronger than it was, but it is not a rendered room.
+
 ### 2026-08-15 15:25 EDT — The remote-function conversion, finished — and the guard that says I finished it twice wrongly
 
 **Branch `feat/extra-chat-column`, not merged.** Five commits: `3046973`, `0d41993`, `99f37f2`, plus

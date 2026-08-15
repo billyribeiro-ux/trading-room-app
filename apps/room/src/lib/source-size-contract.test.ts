@@ -104,8 +104,20 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
 
       `RoomMenus` is the second, and the first to move the number properly: eleven floating-menu
       flags and 82 assignment sites out, 13,520 -> 13,496.
+
+      `RoomSplit` is the third and the largest so far: 13,496 -> 13,157, a drop of 339. Seven pieces
+      of reactive state, five plain ones and twenty derived geometry values that ran from the seed
+      at the top of the file to the drag handlers 5,500 lines below — one domain, spread over a
+      distance nobody could hold in their head.
+
+      It is also the first slice where the extraction paid for itself twice. Reading the two default
+      fractions together showed the same kind of measurement sourced two different ways three lines
+      apart: one cited `DIRECT_EVIDENCE_CONTRACT`, the other was a bare seventeen-figure literal.
+      Naming it and PROVING it — the constant and the 11px gutter reproduce all four captured flex
+      strings exactly — is four assertions that could not have been written while the number had no
+      name.
     */
-    max: 13496,
+    max: 13157,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {

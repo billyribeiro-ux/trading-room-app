@@ -158,10 +158,22 @@ describe('it is the reference’s handler, its number and its binding', () => {
       The defect being closed: the attribute shipped and `hideShowPresentationArea` had zero
       occurrences. An export nothing calls would be the same defect wearing a test.
     */
-    expect(PAGE).toContain("from '$lib/split-gutter'");
-    expect(PAGE).toContain('function hideShowPresentationArea()');
-    expect(PAGE).toContain('mainSplit = togglePresentationSplit(resolvedMainSplit)');
-    expect(PAGE).toContain('gutterRelease(lastGutterClickAt, performance.now(), splitMoved)');
+    const split = readFileSync(new URL('./room/split.svelte.ts', import.meta.url), 'utf8');
+
+    /*
+      The consumer moved to `room/split.svelte.ts` on 2026-08-15 and the chain is asserted end to
+      end rather than at one link, because "an export nothing calls" can hide at any of them: the
+      module imports both decisions, the toggle uses one, the release uses the other, and the PAGE
+      still reaches the release on a real pointer event. Drop any link and the attribute is
+      decorative again, which is the defect this file was written to close.
+    */
+    expect(split).toContain("from '$lib/split-gutter'");
+    expect(split).toContain('togglePresentation(): void {');
+    expect(split).toContain('this.#main = togglePresentationSplit(this.resolvedMainSplit);');
+    expect(split).toContain('const release = gutterRelease(this.#lastClickAt, now, this.#moved);');
+    // `now` is a parameter so the 400ms window is drivable by a test; the page supplies the clock.
+    expect(PAGE).toContain('const write = split.endDrag(performance.now());');
+    expect(PAGE).toContain('onpointerup={finishSplit}');
   });
 
   it('does not persist, because printSizes only logs', () => {
