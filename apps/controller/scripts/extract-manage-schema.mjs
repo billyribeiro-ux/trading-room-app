@@ -272,7 +272,14 @@ const ROOM_CONSUMED = [
   'usersPublicReply',
   'enableReactions',
   'enableEditMessage',
-  'enableEditAlerts'
+  'enableEditAlerts',
+  /* "Recording Reminder If Speaking?" - the room POLICY term of the reminder banner.
+
+     Two different values share this name upstream and only one is a setting. The gate at bundle
+     byte 2,477,770 reads sessData dotted onto the name AND a separate local flag of the same name,
+     plus mic state and recording state. The room already has the local flag and already renders the
+     banner; the policy term was the missing half, so an owner could not switch the reminder off. */
+  'recordingReminder'
 ];
 
 /**
@@ -696,7 +703,7 @@ const missingWiredSettings = [...WIRED_SETTINGS].filter((name) => !defs.some((de
 //
 // The literal is a tripwire, not a fact about the schema — it is here so the wired set cannot grow
 // by accident, which is why changing it is a deliberate edit.
-if (WIRED_SETTINGS.size !== 66 || missingWiredSettings.length > 0) {
+if (WIRED_SETTINGS.size !== 67 || missingWiredSettings.length > 0) {
   throw new Error(
     `wired-setting contract invalid: ${WIRED_SETTINGS.size} keys, missing ${missingWiredSettings.join(', ') || 'none'}`
   );

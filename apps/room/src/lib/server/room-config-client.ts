@@ -328,6 +328,14 @@ export interface RoomSessionSettings {
   /** Chat and alerts are gated SEPARATELY upstream, which is why this is not one setting. */
   enableEditMessage?: boolean;
   enableEditAlerts?: boolean;
+  /**
+   * "Recording Reminder If Speaking?" — the ROOM POLICY half of the reminder banner.
+   *
+   * Not the same value as the room's own `recordingReminder` state, despite the shared name: the
+   * gate at bundle byte 2,477,770 requires BOTH, and the local one is a runtime flag the recorder
+   * raises. This is the owner's term, and it was the missing half.
+   */
+  recordingReminder?: boolean;
 }
 
 /** The connected member's per-room standing, which is per room and not per account. */

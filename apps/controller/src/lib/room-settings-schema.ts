@@ -14,7 +14,7 @@
 // and ng-show="sess.roomType=='webinar'" reads it at byte 2,652 to reveal the Date row.
 //
 // `wired` is the honest bit: false means the controller can store the value but
-// nothing in the room reads it yet. 66 of 269 are wired today.
+// nothing in the room reads it yet. 67 of 269 are wired today.
 // Flip one to true ONLY when a consumer exists, so the UI can mark the rest
 // instead of pretending they do something.
 
@@ -243,7 +243,7 @@ export const ROOM_SETTINGS: readonly RoomSettingDef[] = [
   { name: "autoRecord", section: "settings", type: "checkbox", label: "Auto record presenters?", help: null, helpShape: null, helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
   { name: "blinkingRec", section: "settings", type: "checkbox", label: "Blinking [REC]?", help: null, helpShape: null, helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
   { name: "hideRecs", section: "settings", type: "checkbox", label: "Hide Recordings?", help: "If enabled, recordings will be hidden in archives", helpShape: "plain", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: true },
-  { name: "recordingReminder", section: "settings", type: "checkbox", label: "Recording Reminder If Speaking?", help: "If enabled, will show recording reminder popup", helpShape: "plain", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
+  { name: "recordingReminder", section: "settings", type: "checkbox", label: "Recording Reminder If Speaking?", help: "If enabled, will show recording reminder popup", helpShape: "plain", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: true },
   { name: "recsInRoom", section: "settings", type: "checkbox", label: "Show Recordings tab in the room?", help: "If enabled, will show recordings tab in the room", helpShape: "plain", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
   { name: "downloadRecordingsDisabled", section: "settings", type: "checkbox", label: "Disable download button for Recordings for users?", help: "If enabled, will disable download button for Recordings for users", helpShape: "plain", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
   { name: "hasSpeechRecognitionDisabled", section: "settings", type: "checkbox", label: "Disable Closed Captioning?", help: "If enabled, will disable closed captioning for the room", helpShape: "plain", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },

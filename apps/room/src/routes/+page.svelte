@@ -2647,6 +2647,18 @@
     `sourceMessageBehavior` already picks between them on `kind`. Collapsing them would let a
     room that allows editing alerts also allow editing chat.
   */
+  /*
+    The OWNER term of the recording-reminder banner, byte 2,477,770.
+
+    Upstream shares this name between a room setting and a local runtime flag, and the gate needs
+    BOTH. The room already had the flag and the banner, so this is the missing half rather than a
+    new feature: without it an owner cannot switch the reminder off at all.
+
+    HONEST GAP: the captured gate also requires mic state -
+    !micDisabled && !micMuted - which this room does not model on that banner. Named here rather
+    than silently approximated.
+  */
+  const recordingReminderAllowed = $derived(data.sessData?.recordingReminder === true);
   const usersPublicReply = $derived(data.sessData?.usersPublicReply === true);
   const enableReactions = $derived(data.sessData?.enableReactions === true);
   const enableEditMessage = $derived(data.sessData?.enableEditMessage === true);
@@ -9688,7 +9700,7 @@
                       <i class="far fa-2x fa-dot-circle"></i>
                       <span class="ml-2 mainNavItem">Start/Stop Recording</span>
                     </a>
-                    {#if recordingReminder && (!recording || recordingPaused)}
+                    {#if recordingReminderAllowed && recordingReminder && (!recording || recordingPaused)}
                       <div class="recording-reminder">
                         <span class="recording-reminder-arrow"></span>
                         <span>You are not recording!</span>

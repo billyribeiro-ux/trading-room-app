@@ -509,7 +509,17 @@ export const ROOM_VISIBLE_SETTINGS = [
   'usersPublicReply',
   'enableReactions',
   'enableEditMessage',
-  'enableEditAlerts'
+  'enableEditAlerts',
+  /*
+    "Recording Reminder If Speaking?" - the POLICY half of the reminder banner.
+
+    TWO values share this name upstream and only one of them is a setting. The gate at bundle byte
+    2,477,770 requires `sessData.recordingReminder` AND a local flag of the same name, plus mic and
+    recording state. The room already carries the local flag and already renders the banner, so this
+    is the missing term rather than a new feature - without it an owner cannot switch the reminder
+    off at all.
+  */
+  'recordingReminder'
 ] as const satisfies readonly (keyof RoomSettings)[];
 
 const ROOM_VISIBLE = new Set<string>(ROOM_VISIBLE_SETTINGS);

@@ -24,6 +24,44 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-15
 
+### 2026-08-15 11:31 EDT — the recording reminder obeyed the recorder but never the owner
+
+**Runtime impact: one banner becomes switchable.** A room that leaves the setting off now suppresses
+the reminder, which it previously could not do at all.
+
+`recordingReminder` is ONE NAME holding TWO VALUES upstream, and that is the whole finding. The gate
+at bundle byte **2,477,770**:
+
+```
+O(5, !sessData.recordingReminder || !e.recordingReminder || e.micDisabled
+     || micMuted || (!isRecordingPaused && isRecording) ? -1 : 5)
+```
+
+`sessData.recordingReminder` is the room POLICY; `e.recordingReminder` is a local runtime flag the
+recorder raises. Only 1 of the 11 occurrences in the bundle is the setting. This room had the flag,
+raised it in four places and rendered the banner from it alone — so the banner worked and the
+owner's switch did nothing.
+
+**This is the item I refused to guess at an hour ago**, and the refusal was right: wiring the setting
+onto the existing `recordingReminder` identifier would have collapsed the two values into one and
+made the runtime flag unsettable. The names are kept distinct — `recordingReminderAllowed` for the
+policy — and a contract test asserts they stay that way.
+
+**HONEST GAP, named rather than approximated:** the captured gate also requires `!micDisabled &&
+!micMuted`. This room does not model mic state on that banner, so those two terms are absent. The
+banner can therefore show while the mic is muted, which upstream would suppress.
+
+Wired 66 → 67 through the six places.
+
+New: `apps/room/src/lib/recording-reminder-contract.test.ts`. Its fourth assertion counts gated
+sites against policy-carrying sites, so a second ungated copy of the banner cannot reintroduce the
+bug.
+
+**Verified:** room 1432/1432 → 1436/1436 with the new file · controller 964/964 · schema verifier
+`269 total; 67 wired` · `svelte-check` 1071 files 0 errors 0 warnings · eslint clean ·
+`svelte-autofixer` `issues: []` · **negative control**: removing the policy term from the banner gate
+failed two assertions, restored green.
+
 ### 2026-08-15 11:23 EDT — why `pnpm run lint` passed locally and failed on CI at the SAME commit
 
 **Runtime impact: none.** ESLint configuration and one new test.

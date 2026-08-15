@@ -329,7 +329,13 @@ describe('the allow-list itself', () => {
       enableEditMessage:
         'RoomMessage.svelte via sourceMessageBehavior() — the Edit menu entry on CHAT messages',
       enableEditAlerts:
-        'RoomMessage.svelte via sourceMessageBehavior() — the Edit menu entry on ALERTS, gated apart from chat because the reference gates them apart'
+        'RoomMessage.svelte via sourceMessageBehavior() — the Edit menu entry on ALERTS, gated apart from chat because the reference gates them apart',
+      /*
+        The POLICY half of a name the room already uses for a runtime flag. The gate upstream needs
+        both, and the room had only the flag.
+      */
+      recordingReminder:
+        '+page.svelte — the owner term of the recording-reminder banner, ANDed with the local runtime flag and the recording state'
     };
     expect(Object.keys(consumers).sort()).toEqual([...ROOM_VISIBLE_SETTINGS].sort());
   });
