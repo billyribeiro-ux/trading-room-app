@@ -24,6 +24,78 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-15
 
+### 2026-08-15 11:07 EDT — the frontend gate goes green for the first time, by deciding what a CI run is allowed to claim
+
+**Runtime impact: none.** Test partitioning, one gate script, one controller test. No application code.
+
+**`pnpm test` now exits 0 on a checkout that does not hold the reference captures — proven by
+running all three chained commands in one, not by reasoning about them.** The tree was materialised
+with `git archive` of `git write-tree`, `git init`-ed so `git ls-files` had something to read, and
+given a symlinked `node_modules`. All 14 capture roots absent, exactly as CI sees it:
+
+```
+step 1 privacy:verify  exit=0
+step 2 schema:verify   exit=0   stdout-bytes=0   banner="NOTHING WAS VERIFIED" on stderr
+step 3 vitest run      exit=0   58 files, 662 passed, 1 skipped
+CHAIN EXIT = 0
+```
+
+**The problem was never a defect.** 49 of the room's 108 test files read evidence that is
+deliberately not in this repository, and step 2 reads SHA-256-pinned artifacts out of the same
+gitignored capture set. `quality.yml` had failed all 8 runs since PR #28. No amount of fixing code
+was going to change that; the open question was what a CI run of this repository is allowed to
+CLAIM when the evidence it pins against is, correctly, absent.
+
+**Answer: partition the suite by what the machine can actually see, and say so out loud.** Giving CI
+the captures was rejected — it puts live-room personal data into a CI environment, the one thing
+every rule in `.gitignore` exists to prevent. Guarding all 49 files individually was rejected as the
+mechanism: **222 of those reads happen at module scope**, where `describe.skipIf` cannot reach them
+because the file throws during import before any skip is consulted. That would have meant
+restructuring 49 files, not annotating them.
+
+So `gate/evidence-bound-tests.mjs` DISCOVERS the evidence-bound set (DPE rule 4 — a catalog that
+finds its own subjects, not a list of 49 paths that rots the first time somebody adds one), and
+`vite.config.ts` excludes it only when the roots are unreadable, only under Vitest, and **prints the
+count every time**. Locally nothing is excluded: 108 files / 1409 tests still run and pass.
+
+**The failure modes are deliberately asymmetric, and that is the whole design.** Discovery missing a
+file means that file runs on CI and dies loudly naming its path — self-announcing. Discovery
+over-matching means a test is silently dropped while the suite reports green, which is the direction
+that actually hurts. So `src/lib/evidence-partition.test.ts` pins the exact count and asserts every
+excluded path really does read a capture root; over-matching fails an assertion in a diff rather
+than shrinking a number nobody reads. It also asserts it does not exclude *itself* — it builds root
+names from parts, the same trick and the same recorded reason as `verify-privacy-boundary.mjs`
+constructing the owner's name, because a gate that reports itself gets excluded and then watches
+nothing.
+
+**`schema:verify` skips when the capture directory is absent and FAILS when it is present but
+wrong.** That distinction is the gate. Independently re-verified rather than taken on report: a
+directory containing a junk `RECREATE.sql` exits 1 and prints no `SKIPPED` on either stream. The
+skip banner goes to stderr with stdout at 0 bytes, so nothing pass-shaped reaches a log scraper.
+
+**A real breakage this surfaced, from the 10:33 eviction:** `apps/controller/tracked-artifacts.test.ts`
+hardcoded `apps/room/scripts/audit-behavior-coverage.mjs` as its negative control for "a path
+containing 'coverage' that is not a coverage directory" — and untracking `apps/room/scripts` removed
+the last tracked file in the repository with that property, so the control went red. There was no
+substitute file to swap in. Fixed properly: the matcher is now a pure function over a supplied list
+and the control uses a fixture, so it tests the RULE and cannot be broken again by unrelated work
+deleting its subject. Negative control run — loosened to a substring match it goes red, restored it
+is green.
+
+**Two counts in the 10:48 entry below were wrong and are corrected there.** It said 50 of 106; it is
+49 of 108. The 50 came from a grep matching `docs/source-v4-2026-08-15/`, a prefix of a capture root
+that is actually 5 files tracked in this repository and readable on CI. The 106 came from
+`grep -rl ""`, which is not a way to count files. `find` and vitest independently say 108, and
+58 + 49 + 1 untracked work-in-progress file reconciles the CI tree exactly.
+
+**Also verified:** `svelte-check` 1064 files, 0 errors from a purged `.svelte-kit` (it type-checks
+the new `.mjs` because `vite.config.ts` imports it — four implicit `any`s failed the first run and
+are fixed with JSDoc); `eslint` clean; `prettier --check` clean; controller `tracked-artifacts`
+7 passed; room `evidence-partition` 6 passed.
+
+**Not claimed:** this does not mean the 49 are covered anywhere except the owner's machine. That is
+the honest cost of the decision, it is printed on every CI run, and it is why the count is pinned.
+
 ### 2026-08-15 10:48 EDT — repairing what the eviction broke, and finding the gate was already red for a bigger reason
 
 **Runtime impact: none.** Gate infrastructure and one test file. Landed with the 10:33 entry below in
@@ -86,7 +158,11 @@ authorization contract off CI as collateral.
 `ENOENT … apps/room/second-dump/db/RECREATE.sql`. `verify-postgres-schema-artifacts.mjs` reads
 SHA-256-pinned artifacts out of a gitignored capture directory, so it cannot run on CI and never
 could; it fails identically to how it failed before the eviction. That is the same wall the suite
-hits: **50 of the room's 106 test files read off-repo evidence.** Greening this gate means deciding
+hits: **49 of the room's 108 test files read off-repo evidence** — this entry first said 50 of 106,
+and both numbers were wrong. The 50 came from a grep matching `docs/source-v4-2026-08-15/`, which is
+a prefix of a capture root but is 5 files tracked in this repository; the 106 came from
+`grep -rl ""`, which is not a way to count files. `find` and vitest independently say 108. Greening
+this gate means deciding
 what a CI run of this repository is allowed to claim when the evidence it pins against is
 deliberately not in it — an architectural decision, recorded as the first section of TODO.md rather
 than guessed at here.

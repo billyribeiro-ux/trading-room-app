@@ -2,6 +2,11 @@ import { sveltekit } from '@sveltejs/kit/vite';
 import vercel from '@sveltejs/adapter-vercel';
 import node from '@sveltejs/adapter-node';
 import { vitePreprocess } from '@sveltejs/vite-plugin-svelte';
+import {
+  EVIDENCE_ROOTS,
+  discoverEvidenceBoundTests,
+  missingEvidenceRoots
+} from './gate/evidence-bound-tests.mjs';
 
 /*
   Two adapters, selected by `ADAPTER`, defaulting to Vercel.
@@ -53,6 +58,39 @@ const API = process.env.TRADINGROOM_API_URL ?? 'http://127.0.0.1:8080';
 const localHost = '127.0.0.1';
 const localPort = 5174;
 
+/*
+  Which tests this machine is able to run, decided by what it can actually see.
+
+  49 of this suite's test files read the reference captures, which are gitignored on purpose and
+  symlinked in from `~/Desktop/new-room/` — they are dumps of a live room and this repository is
+  public. On the owner's machine every symlink resolves, `missing` is empty, and NOTHING is excluded:
+  the full suite runs exactly as it always has. On CI none of them resolve, and those 49 files are
+  excluded rather than left to die on `ENOENT`, which is why `quality.yml` had failed every run since
+  PR #28.
+
+  Computed only under Vitest. `vite build` has no use for it, and reading 108 files on every
+  production build to answer a question nobody asked is the kind of cost that gets added once and
+  never noticed again.
+
+  The count is PRINTED, never silent. A suite that quietly tests half of itself and reports green is
+  worse than one that fails, because the green is what gets believed. `gate/evidence-bound-tests.mjs`
+  carries the reasoning, and `src/lib/evidence-partition.test.ts` pins the exact list so that
+  over-matching — the failure mode that loses coverage quietly — shows up as a failed assertion in a
+  diff rather than as a smaller number nobody read.
+*/
+const evidenceBoundExclusions = (() => {
+  if (!process.env.VITEST) return [];
+  const missing = missingEvidenceRoots();
+  if (missing.length === 0) return [];
+  const excluded = discoverEvidenceBoundTests();
+  console.info(
+    `[vitest] ${excluded.length} evidence-bound test file(s) excluded: this checkout is missing ` +
+      `${missing.length} of ${EVIDENCE_ROOTS.length} reference-capture roots (${missing.join(', ')}). ` +
+      'They are gitignored by design; see gate/evidence-bound-tests.mjs. This run does NOT cover them.'
+  );
+  return excluded;
+})();
+
 export default defineConfig({
   // Kit 3 takes configuration through the plugin; `svelte.config.js` is gone and the `kit` namespace
   // with it, so these sit at the top level.
@@ -88,6 +126,12 @@ export default defineConfig({
     // files resolve `$lib` against ITS src, so collecting them from this root fails at import with
     // "Cannot find module '$lib/sanitize-html'" - five red files that are not this app's tests. It
     // has its own runner; this one stops at this project's boundary.
-    exclude: ['**/node_modules/**', '**/dist/**', '**/build/**', 'new-room-control/**']
+    exclude: [
+      '**/node_modules/**',
+      '**/dist/**',
+      '**/build/**',
+      'new-room-control/**',
+      ...evidenceBoundExclusions
+    ]
   }
 });
