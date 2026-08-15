@@ -24,6 +24,65 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-15
 
+### 2026-08-15 07:04 EDT — the audit found three more features nobody had decoded
+
+**Runtime impact: none.** One new spec, one NEW-TODO section.
+
+`audit-feature-coverage.mjs` was written because Swing and Day Trade — two entire presentation-area
+tabs — had been in the captured bundle from day one with nothing ever ENUMERATING the reference's
+features. Re-running it after the Swing build reported **47/88 wire commands present, up from
+41/88**, and 152 missing identifiers, down from 163.
+
+Four of the missing commands were alert-related, and **all four returned zero hits across `docs/`,
+`TODO.md` and `NEW-TODO.md`** — no spec, no row, no mention anywhere in the project:
+`alertMsgLater` (1 occurrence), `getScheduledAlerts` (3), `removeScheduledAlert` (4),
+`updateAlertFilter` (6).
+
+Reading those four regions turned up **three separate features**, now specified in
+`docs/decoded/alert-scheduler-filter-labels.md` and tracked as NEW-TODO Part 5. Same failure mode as
+Swing, caught by the same mechanism, eleven hours later.
+
+**1. Alert Scheduler** — `sessData.hasAlertScheduler`, an entitlement flag that is in NO existing
+spec and NOT in `room-settings-schema.ts`. Three commands, a modal table, and repeat semantics. The
+trap: **`ignoreWeekends` is not the checkbox value** — it is sent as
+`"daily" === repeatScheduledAlert && ignoreWeekends`, so a weekly repeat always sends `false`.
+
+**2. Alert Filter** — per-viewer filtering of the alerts feed. **The server owns the filtering**: the
+client sends its selection and re-fetches the alerts log from page zero, and never filters in the
+browser. `preferences.showAlertsFrom` **inverts the whole meaning** — the same selection is an
+allow-list when true and a deny-list when false, so treating it as a display toggle gets the
+semantics backwards.
+
+**3. Alert Labels** — **not a wire feature at all**; `getAlertLabels`, `saveAlertLabels`,
+`updateAlertLabels` and `hasAlertLabels` are all 0 occurrences. `sessData.alertLabels` is a **string
+containing JSON**, trimmed and parsed; `sessData.chatTabsWithBadges` uses the identical shape.
+`processAlertLabels` puts a newline after the last label and a space after the others, and **clears
+every checkbox as a side effect of formatting**.
+
+**Verified:** every offset opened and read, never concluded from a search. Six verbatim strings
+re-counted with python `.count()` — `" Unselect All "`, `" Select All "`, `" Save"`, `"no weekends"`,
+`"Alert scheduled OK."`, `"Please enter some alert text..."`. One byte offset corrected during
+review: the `alertLabels` initialiser statement starts at 981,181, while 981,186 is where the
+identifier begins.
+
+**Honest gaps, recorded rather than filled:** the manage-page control for `hasAlertScheduler` was not
+located and is not invented; the three `ngClass` class names on the repeat badge live in a const
+table that was not decoded; the scheduled-alerts modal's own 27-declaration layout was not decoded;
+and what the server does with `sendLaterAsNick` / `sendLaterAsEmail` / `dontCrossPost` is not in the
+bundle.
+
+**The operational lesson, and it is the reusable one: run `audit-feature-coverage.mjs` after every
+feature lands.** Twice now it has found whole features that no amount of spec-reading would have
+surfaced, because a spec only describes what somebody already thought to look for.
+
+### A note on this entry
+
+It was nearly lost. The script that writes these used an f-string, and the literal braces in a JSON
+payload example were read as a format field — the entry silently did not get written while the
+commit went ahead regardless. Fixed by not interpolating the body at all. Recorded because a
+CHANGELOG that fails open is worse than one that fails loudly.
+
+
 ### 2026-08-15 06:53 EDT — the four collector defects the capture exposed, fixed
 
 **Runtime impact: none.** Console tooling only.

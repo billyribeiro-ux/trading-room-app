@@ -233,6 +233,69 @@ custom properties**, and every colour in the new sort-bar rules is a `var(--…)
 
 ---
 
+# PART 5 — Three alert features found 2026-08-15 by ENUMERATION, not by asking
+
+Full spec: `docs/decoded/alert-scheduler-filter-labels.md`.
+
+**How they were found is the point.** `audit-feature-coverage.mjs` was written after Swing and Day
+Trade — two whole tabs — turned out to have been in the bundle from day one with nothing ever
+enumerating the reference's features. Running it after the Swing build reported 47/88 wire commands
+present, and four of the missing ones were alert-related. All four returned **zero hits across
+`docs/`, `TODO.md` and `NEW-TODO.md`**: no spec, no row, no mention anywhere.
+
+Same failure mode as Swing, caught by the same mechanism, eleven hours later. **Run that audit after
+every feature lands.**
+
+## 5.1 Alert Filter — each viewer chooses whose alerts they see 🟡
+
+Smallest of the three and the only one that changes what an ordinary member sees. One command in
+both directions, one modal, no entitlement flag found.
+
+- `updateAlertFilter` — send `{alertFilterFor, userXrefID}` (byte 1,221,491); the response sets
+  `user.alertFilterFor` and **re-fetches `getAlertsLog {page:0}`** (byte 1,017,535).
+- **The SERVER owns the filtering.** The client sends its selection and asks for the log again; it
+  never filters the log in the browser. Reproduce that shape.
+- `preferences.showAlertsFrom` **inverts the meaning** — the same selection is an allow-list when
+  true and a deny-list when false. Treating it as a display toggle gets the semantics backwards.
+- Buttons verbatim, spaces included: `" Unselect All "`, `" Select All "`, `" Save"` — the last has a
+  leading space and no trailing one, unlike its neighbours.
+
+## 5.2 Alert Labels — per-room hashtags prefixed onto alert text 🟢
+
+**Not a wire feature at all**: `getAlertLabels` / `saveAlertLabels` / `updateAlertLabels` /
+`hasAlertLabels` are all 0 occurrences. Configuration plus a text transform.
+
+- `sessData.alertLabels` is a **string containing JSON**, trimmed then `JSON.parse`d, every entry
+  given `checked = false` (byte 1,147,292). `sessData.chatTabsWithBadges` uses the identical shape.
+- `processAlertLabels` prefixes `" #" + hash` per checked label, **newline after the last and a space
+  after the others**, prepends the result to `txt`, and **clears every checkbox as a side effect of
+  formatting** (byte 2,131,206).
+
+## 5.3 Alert Scheduler — post an alert later, optionally repeating 🔴
+
+The largest. An entitlement, three commands, a modal with a table, repeat semantics, and a
+**server-side scheduler this project has no equivalent for** — that part is a design decision, not a
+port.
+
+- **Entitlement `sessData.hasAlertScheduler`** (8 occurrences). It is NOT in `room-settings-schema.ts`
+  and its manage-page control was not located. Per the per-client-entitlement pattern one should
+  exist — **not invented; recorded as a gap.**
+- `alertMsgLater` (byte 2,130,937) · `getScheduledAlerts`, null payload (bytes 1,009,797 / 1,021,836)
+  · `removeScheduledAlert` `{scheduledAlertID}` (byte 2,407,145), whose response splices by id.
+- **`ignoreWeekends` is not the checkbox value** — it is sent as
+  `"daily" === repeatScheduledAlert && ignoreWeekends`, so a weekly repeat always sends false.
+- Component `app-scheduled-alerts-modal`, modal id `scheduledAlertsModal`, `decls: 27`. Row cells:
+  `sendOn | date:"short"`, `alert.n`, `alert.txt`, `repeat || "off"`, a `" Remove "` button, plus a
+  conditional `"no weekends"` span when daily and ignoring weekends.
+- Strings verbatim: `"Alert scheduled OK."`, `"Please enter some alert text..."`, and a remove
+  confirm built by CONCATENATION with a full stop before `text:` and **no closing question mark**.
+
+**Honest gaps** (also in the spec): the `hasAlertScheduler` manage control, the three `ngClass` class
+names on the repeat badge, the modal's own 27-declaration layout, and what the server does with
+`sendLaterAsNick` / `sendLaterAsEmail` / `dontCrossPost`.
+
+---
+
 # Suggested order
 
 1. **1.1 + 1.2 together** — they share the SSE revocation plumbing, and they are the two that cost
@@ -242,6 +305,10 @@ custom properties**, and every colour in the new sort-bar rules is a `var(--…)
 4. **2.3 + 2.4 Swing and Day Trade together** — the big one.
 5. **2.5 Mobile** — after `docs/MOBILE-APP.md` is read.
 6. **Part 3 v5** — when an account is cleared for it.
+7. **5.1 Alert Filter**, then **5.2 Alert Labels** — both small, and 5.1 is the only one of the
+   three that changes what a member sees.
+8. **5.3 Alert Scheduler** — last of these three; it needs a server-side scheduler that does not
+   exist here yet.
 
 ## Evidence, all committed
 
