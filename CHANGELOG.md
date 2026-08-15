@@ -24,6 +24,278 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-15
 
+### 2026-08-15 12:01 EDT — the unmute button reported success and sent nothing
+
+**Runtime impact: a presenter can undo a chat mute.** Until now they could not, in any room, by any
+route — and the UI told them they had.
+
+The mute was built end to end and the unmute was a string. `mute24` writes the `chat_mutes` row,
+`sendMessage` refuses while one is live, and the loader hands the viewer their own `chatMutedTill`
+so the composer can explain itself. All of that works. The way back did not exist: `ModalHost.svelte`
+renders **Unmute Chat**, it calls `onUserAction('unmute-chat', …)`, and the handler matched it in a
+`Record<string, string>` of action-to-toast strings whose only effect was to raise the capture's own
+alert text.
+
+**This is the worst-behaved kind of gap, because the control reported success.** A presenter who
+muted the wrong person saw `user chat unmuted`, believed it, and the member stayed silenced for the
+full 24 hours. Nothing threw, nothing logged, and no test that rendered the modal noticed — the
+button was there and it was wired to a function.
+
+It survived an audit for a specific and repeatable reason: **upstream has no button bound to
+`unmuteChat`.** It is a command of its own on the wire — `{user}`, bundle bytes 996325, 1430505,
+2080257, 2376996 — reached only through `muteChat(-1)`. An identifier search of our source for
+`unmuteChat` therefore found nothing to match, and the triage listed it as missing while our repo
+appeared to have the feature. It was found by READING `handleUserAction` end to end.
+
+**Built:**
+
+- `unmuteChat` as a form action of its own, not another `messageAction` operation — that one
+  returns 400 without a message id, and this is addressed to a user the presenter picked out of the
+  roster, where no message exists.
+- Authority decided on the server from the session role, `403` otherwise. A member who posts the
+  form directly cannot unmute themselves the moment a presenter mutes them.
+- One conditional `DELETE`, scoped to the room and to mutes that are still live. No `SELECT` first —
+  read-then-delete is the TOCTOU this repository removes everywhere else, and one statement makes a
+  double click a no-op rather than a race. Expired rows are already inert to both readers, so
+  deleting them would erase the record of past mutes and change nothing observable.
+- The member is told on `privCmds`, the per-user private channel `forceReload` already uses, and the
+  branch calls `invalidateAll()` — `chatMutedTill` is server-read, so a toast alone would tell the
+  member their chat is back while the composer stayed disabled. That is the same class of lie the
+  original bug was.
+- The two strings stay two strings: the presenter sees `user chat unmuted`, the member sees
+  `Chat enabled`. Both are the capture's, on two different screens.
+
+**The wider finding, recorded as TODO row W.** `unmute-chat` was not alone in that table. Read in
+the same pass and still toast-only: `kick`, `kick-ban`, `kick-duplicates` (which answers
+`No duplicates found` unconditionally), `admin-notes-password` (which answers `Wrong password!`
+unconditionally, so the correct password is refused too), `session-send-users-url` and
+`session-send-sales-image`. Their wire commands are already decoded with payloads and byte offsets,
+so they are ports rather than research. `mute-chat-24` is the instructive one — its server half
+works from the message context menu, and only the modal's copy of the button is inert, which is
+exactly the shape this fix had. **Not claimed:** whether `save-permissions`, `restart-audio` and
+`force-reload` are sent from some other path was not checked, and `forceReload` demonstrably is a
+real `privCmds` command, so at least one of those three has a wire somewhere.
+
+**Verified:** `unmute-chat-contract.test.ts`, 14 assertions. **Negative control run and seen red:**
+putting `unmute-chat` back into the toast table failed exactly the assertion that guards the
+original bug (`is no longer one of the toast-only controls`), then restored to green. Full room
+suite **1450/1450 across 112 files**, `svelte-check` **0 errors 0 warnings**, `eslint` exit **0**.
+**Not run:** `svelte-autofixer` on `+page.svelte` — the file is ~12,000 lines and could not be fed
+to the tool in this session; `svelte-check` covered it with the same compiler instead, and the edit
+adds no template markup, only script.
+
+### 2026-08-15 11:53 EDT — a merge had quietly un-wired four settings, and the markers didn't say so
+
+**Runtime impact: none by itself — it restores runtime behaviour that a previous merge removed.**
+Four capability gates and the recording-reminder policy term were live on the branch, were backed
+out by `8464191`, and are live again at `ace994b`. Nothing new ships here.
+
+The branch and the remote had each merged `main` independently, producing two merge commits with the
+**same two parents** (`b8410a7` + `b267143`). Landing this looked like a three-way conflict across
+the wired-count contract, and the previous session stopped rather than resolve it blind. That
+caution was right about the stakes and wrong about the cause. `main`'s side touched **one file**:
+
+```
+git diff --stat $(git merge-base b8410a7 b267143) b267143
+  apps/room/eslint.config.js | 7 ++++---
+```
+
+`main` never touched `CHANGELOG.md` or either controller script, so those could not have conflicted
+with it. They conflicted with a **reversion**:
+
+```
+git diff --stat b8410a7 8464191
+  9 files changed, 11 insertions(+), 238 deletions(-)
+```
+
+`8464191` backed out `49a536a` and `b8410a7`. `usersPublicReply`, `enableReactions`,
+`enableEditMessage` and `enableEditAlerts` left `ROOM_VISIBLE_SETTINGS`, their schema rows returned
+to `wired: false`, the generator's size contract returned to **62**, the reminder banner lost its
+policy term, and 122 lines of this file went with them. Those four settings were already proven dead
+on arrival in every room — the props existed, defaulted `false`, and were never passed — so this is
+restoring a fix, not preferring a style.
+
+**The reason this is worth an entry: the conflict markers did not cover the damage.** Nine files
+conflicted, but in `room-settings-schema.ts` the `enableEditMessage` and `enableEditAlerts` rows
+flipped back to `wired: false` **outside any marker** — a clean auto-merge with no warning — because
+the reversion changed lines this branch had not touched since `49a536a`. Resolving only what git
+marked would have shipped two settings silently unwired while the header above them still read
+`67 of 269`. The check that catches this is not reading the markers; it is diffing the **whole tree**
+against the last verified commit afterwards.
+
+Resolved as a real three-way merge rather than `-s ours`, deliberately: the strategy flag produces
+the identical tree but hides which hunks were dropped, and this needed to be reviewable. All thirteen
+lines `8464191` adds over the branch were read. Twelve are the reversion. The thirteenth is `main`'s
+`files` list on the ESLint globals block, which `3173707` already superseded with the unscoped block
+— measured on a clean checkout, it fixes the 31 `no-undef` under `gate/` and cannot touch the other
+47, which come from preset ORDER, and its second pattern never matches the file in the tree (named
+with a space, not a dot). Nothing `b267143` intended is lost.
+
+**Verified:** tree byte-identical to `8f08952`, which was already green, so nothing was re-run to
+claim its results. What was re-run is what this merge could have broken: the schema verifier —
+`268 extracted + 1 reviewed deviation = 269 total; 67 wired`, exit 0 — and
+`room-config-boundary.test.ts`, 17/17.
+
+### 2026-08-15 11:31 EDT — the recording reminder obeyed the recorder but never the owner
+
+**Runtime impact: one banner becomes switchable.** A room that leaves the setting off now suppresses
+the reminder, which it previously could not do at all.
+
+`recordingReminder` is ONE NAME holding TWO VALUES upstream, and that is the whole finding. The gate
+at bundle byte **2,477,770**:
+
+```
+O(5, !sessData.recordingReminder || !e.recordingReminder || e.micDisabled
+     || micMuted || (!isRecordingPaused && isRecording) ? -1 : 5)
+```
+
+`sessData.recordingReminder` is the room POLICY; `e.recordingReminder` is a local runtime flag the
+recorder raises. Only 1 of the 11 occurrences in the bundle is the setting. This room had the flag,
+raised it in four places and rendered the banner from it alone — so the banner worked and the
+owner's switch did nothing.
+
+**This is the item I refused to guess at an hour ago**, and the refusal was right: wiring the setting
+onto the existing `recordingReminder` identifier would have collapsed the two values into one and
+made the runtime flag unsettable. The names are kept distinct — `recordingReminderAllowed` for the
+policy — and a contract test asserts they stay that way.
+
+**HONEST GAP, named rather than approximated:** the captured gate also requires `!micDisabled &&
+!micMuted`. This room does not model mic state on that banner, so those two terms are absent. The
+banner can therefore show while the mic is muted, which upstream would suppress.
+
+Wired 66 → 67 through the six places.
+
+New: `apps/room/src/lib/recording-reminder-contract.test.ts`. Its fourth assertion counts gated
+sites against policy-carrying sites, so a second ungated copy of the banner cannot reintroduce the
+bug.
+
+**Verified:** room 1432/1432 → 1436/1436 with the new file · controller 964/964 · schema verifier
+`269 total; 67 wired` · `svelte-check` 1071 files 0 errors 0 warnings · eslint clean ·
+`svelte-autofixer` `issues: []` · **negative control**: removing the policy term from the banner gate
+failed two assertions, restored green.
+
+### 2026-08-15 11:23 EDT — why `pnpm run lint` passed locally and failed on CI at the SAME commit
+
+**Runtime impact: none.** ESLint configuration and one new test.
+
+**The symptom was a contradiction, and the contradiction was the evidence.** `room quality` reported
+74 errors at commit `7ad52ba`. That same commit, extracted locally with the same `node_modules`, gave
+`EXIT=0` and **0 problems**. Two rules CI called errors — `svelte/no-useless-mustaches` and
+`svelte/prefer-svelte-reactivity` — are set to `'off'` in `eslint.config.js` with fifteen lines
+explaining why, and nothing after that block can re-enable them. Both cannot be true of the same
+file, so one of them was not the same file.
+
+**Ruled out first, by measurement rather than reasoning.** Dependency drift: `node_modules` was
+deleted outright and reinstalled with `pnpm install --frozen-lockfile`. Every version identical —
+`eslint` 10.8.1, `eslint-plugin-svelte` 3.22.0, `globals` 17.9.0, `typescript-eslint` 8.66.0 — and
+lint still `EXIT=0`, rules still `[0]`. Not the cause.
+
+**Root cause, two faults compounding.**
+
+1. **CI was linting a different file, and the runner log says so outright.** `event=pull_request`,
+   and `quality.yml:49-52` pins no `ref:`, so `actions/checkout` uses its default — for a pull
+   request, `refs/pull/N/merge`. The job log reads
+   `HEAD is now at 6ee3729 Merge 7ad52ba… into c1ff436…`. **CI lints the merge; a developer lints
+   their branch.** `060ba72 fix: restrict ESLint to source files only in apps/room` landed on `main`
+   after this branch was cut, and because the branch never touched that file after the merge base,
+   the three-way merge took main's side wholesale. `origin/main` and `6ee3729` are byte-identical
+   for it.
+
+   **This is not merely a merge-ref artifact, and that distinction matters.** The push-event run
+   `31891961241` checked out `5f03e5f` on `main` **directly, with no merge ref**, and produced the
+   same 74 errors. `main` itself is broken; the merge ref only explains why the branch looked clean.
+2. **That commit's config defeats itself.** It moved `js/ts/svelte.configs.recommended` from above
+   the override block to **below** it. In flat config the last entry to match a file wins, so
+   `svelte.configs.recommended` turned both documented-off rules back on — 43 of the 74 errors were
+   for exactly the patterns the comment above them calls deliberate. It also narrowed that block to
+   two `files` patterns, removing the Node and browser globals from every path they missed. `gate/`
+   did not exist when they were written, which produced the other 31.
+
+**The fix is structural, not another pattern in a list.** Presets restored to the top, overrides
+last — which is what flat-config ordering means. The globals block restored to **unscoped**, because
+the ignore list already decides what gets linted and this block only decides what those files may
+reference; for first-party code the answer is the same everywhere. Adding `gate/**` to the pattern
+list would have fixed 31 errors, left the other 43, and guaranteed a repeat the next time a directory
+appeared — measured, not assumed: presets-first with the narrow list produced **598** errors, because
+`scripts/*.js` are not `.mjs` and were missed too, invisible on CI only because that directory is
+untracked there.
+
+**`src/lib/eslint-config-resolution.test.ts` is what makes it stay fixed.** It asserts the RESOLVED
+config via `ESLint.calculateConfigForFile` — the same cascade ESLint applies — not the text of the
+config. A grep for `'off'` would have passed throughout this entire failure; the string was always
+there. Negative control run: re-adding a preset after the overrides turns it red with a message
+naming the cause. DPE rule 4 applied to the one thing here that had a long comment and no enforcement.
+
+**A landmine hit while writing the fix, recorded because it cost a run.** A glob of the `src` +
+double-star shape pasted into a block comment contains the two characters that CLOSE the comment, so
+it terminated early and the remaining prose became code — `SyntaxError: Unexpected token '.'`, ESLint
+refusing to start. The same family as this repository's existing rule against putting Svelte template
+syntax in a comment. Globs are described in words there now.
+
+**Verified:** `eslint .` 0 errors; `svelte-check` 1070 files, 0 errors from a purged `.svelte-kit`;
+full room suite 109 files / 1416 tests passing; `eslint-config-resolution` 4 passed with its negative
+control exercised.
+
+**The systemic finding, which is worse than the config bug.** `060ba72` was pushed straight to
+`main` — a fintech default branch that auto-deploys — and **its own verification run was
+CANCELLED**: `quality.yml:29-31` sets `concurrency: quality-${{ github.ref }}` with
+`cancel-in-progress: true`, and a PR merge landed on `main` two minutes later and killed it. So the
+commit that broke the gate for every subsequent run was never verified by the gate it broke. Dated
+precisely from the run history: PR #28 (02:35) and PR #30 (11:28) both linted clean; the first run
+containing `060ba72` reported 641 errors, which fell to 74 only because the `apps/room/scripts`
+eviction removed 76 files from the tree.
+
+**Two corrections to my own earlier account**, from reading the history rather than assuming it:
+`5e6175f` did not add the `'off'` lines — it added the `docs/source-*` ignore glob. The `'off'`
+lines date from `5e6980d`, the config's creation, where the presets sat correctly **above** the
+rules block. So this was right when written and was reversed later.
+
+**Flagged, not fixed:** `apps/room/svelte.config 2.js` — a macOS duplicate artifact with a literal
+space in its name — is tracked and on `main`. Proven a victim rather than a cause: the blob is
+identical in all three trees, and a deliberately poisoned copy placed in an isolated probe had zero
+effect on parsing, because the config supplies `svelteConfig` as an explicit object and neither
+`eslint-plugin-svelte@3.22.0` nor `svelte-eslint-parser@1.8.0` ships a filesystem config loader. It
+contributed exactly 1 of the 74 and lints clean now. It remains junk that nothing reads.
+
+### 2026-08-15 11:22 EDT — four features the room already implemented and no room could switch on
+
+**Runtime impact: four controls become reachable.** Nothing changes for a room that leaves them off,
+because off is what every room had whether it wanted it or not.
+
+`RoomMessage.svelte` has carried `usersPublicReply`, `enableReactions`, `enableEditMessage` and
+`enableEditAlerts` as props since it was written, each defaulting `false`, each feeding
+`sourceMessageBehavior()` — and `+page.svelte` never passed any of them. The behaviour was built,
+the menu entries were built, and the values never arrived. Public reply, reactions and both edit
+entries were dead in every room however the owner configured the Manage page.
+
+**Found by cross-referencing rather than by reading the list.** Of 206 unwired settings, 25 are
+already named somewhere in the room source; these four are the ones where the consumer was complete
+and only the value was missing. That is the cheapest possible class of gap and it is worth looking
+for the rest of it deliberately.
+
+Evidence that they are per-room policy and not something the room may decide: **every** occurrence of
+all four in the reference bundle is `sessData.` dotted onto the name — 2, 9, 2 and 2 occurrences
+respectively, no local state anywhere.
+
+`enableEditMessage` and `enableEditAlerts` stay TWO settings because upstream gates the chat log and
+the alerts log apart. Collapsing them would let a room that allows editing alerts also allow editing
+chat, and `sourceMessageBehavior` already picks between them on `kind`.
+
+Wired through the full pipeline, 62 → 66: `ROOM_CONSUMED` and its size contract, the verifier's
+`EXPECTED_WIRED_SETTINGS` and its prose count, four schema rows and the header, the allow-list,
+`RoomSessData`, and the `consumers` map that records *what reads each one*.
+
+**One self-inflicted red, recorded because the fix was mine and not the code's.** Inserting the four
+props directly after `kind="alert"` pushed `{chatGif}` out of the 120-character window
+`chat-gif-muted-contract.test.ts` slices from `kind`, failing that test and
+`presenter-messages-right-contract.test.ts` with it. The tests were right and the insertion point was
+wrong; the props moved below `{disableStarYears}` and both went green. Nothing about the contract
+changed.
+
+**Verified:** room 1412/1412 (108 files) · controller 964/964 (91 files) · schema verifier
+`269 total; 66 wired` · `svelte-check` 1064 files 0 errors 0 warnings · eslint clean ·
+`svelte-autofixer` `issues: []`.
+
 ### 2026-08-15 11:17 EDT — Benzinga: the decode pass the TODO asked for, which changed nothing
 
 **Runtime impact: none.** No code changed. This entry exists because "we checked and it already

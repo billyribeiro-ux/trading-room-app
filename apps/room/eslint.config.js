@@ -90,7 +90,39 @@ export default defineConfig(
   ts.configs.recommended,
   svelte.configs.recommended,
   {
-    files: ['src/**/*.{js,mjs,ts,svelte}', 'scripts/**/*.mjs', 'gate/**/*.mjs', 'svelte.config.*.js'],
+    /*
+      DELIBERATELY UNSCOPED, and restored to that after `060ba72` added a two-pattern `files` list to
+      it — one pattern for source extensions under `src`, one for ESM scripts under `scripts`.
+
+      Those patterns are described in words rather than quoted, and that is not fussiness: a glob of
+      that shape contains the two characters that CLOSE a block comment, so pasting one in here ends
+      the comment early and turns the rest of the prose into code. It cost a run to find. Same family
+      as the rule against putting Svelte template syntax in a comment, for the same reason.
+
+      Everything this repository authors runs under Node, the browser, or both, so every file it
+      lints wants these globals. Narrowing the block did not restrict what gets linted — that is
+      `globalIgnores` above, and it was already doing the job — it only removed the globals from
+      whatever the two patterns happened to miss, leaving those files with `no-undef` on and nothing
+      defined.
+
+      What it missed was not hypothetical. `gate/**` did not exist when the patterns were written, so
+      the privacy and schema verifiers produced 31 `no-undef` errors for `process`, `console`, `URL`
+      and `Buffer` the moment they moved there. `scripts/*.js` — the browser-console collectors — are
+      not `.mjs` and were missed too: 524 more errors, invisible on CI only because that directory is
+      untracked and so is not present there to be linted.
+
+      A pattern list that has to be revised every time a directory is added is a gate that breaks on
+      unrelated work. The ignore list decides what is linted; this block decides what those files are
+      allowed to reference, and the answer for first-party code is the same everywhere.
+
+      The list was tried once more before this landed. `b267143` extended it with a pattern for
+      `gate` ESM files and one for dotted `svelte.config` variants, and it was measured against a
+      clean checkout: still 48 errors. It fixes the 31 `no-undef` and cannot touch the other 47,
+      because those come from preset ORDER and no `files` entry can reach them. Its second pattern
+      also never matches: the file in the tree is `svelte.config 2.js`, with a SPACE, while the glob
+      requires a literal dot — which is the last remaining `no-undef` in that run, and a fair
+      illustration of why this block does not enumerate paths.
+    */
     languageOptions: {
       globals: {
         ...globals.browser,

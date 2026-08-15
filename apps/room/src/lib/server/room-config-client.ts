@@ -316,6 +316,26 @@ export interface RoomSessionSettings {
    * Read by `$lib/alert-labels` and `RoomMessage.svelte`.
    */
   alertLabels?: string;
+  /**
+   * Four per-room gates that `RoomMessage.svelte` already implements.
+   *
+   * Each was a prop defaulting `false` that the page never passed, so the feature was unreachable.
+   * Every occurrence of all four in the reference bundle is `sessData.<name>` — per-room policy,
+   * never local state.
+   */
+  usersPublicReply?: boolean;
+  enableReactions?: boolean;
+  /** Chat and alerts are gated SEPARATELY upstream, which is why this is not one setting. */
+  enableEditMessage?: boolean;
+  enableEditAlerts?: boolean;
+  /**
+   * "Recording Reminder If Speaking?" — the ROOM POLICY half of the reminder banner.
+   *
+   * Not the same value as the room's own `recordingReminder` state, despite the shared name: the
+   * gate at bundle byte 2,477,770 requires BOTH, and the local one is a runtime flag the recorder
+   * raises. This is the owner's term, and it was the missing half.
+   */
+  recordingReminder?: boolean;
 }
 
 /** The connected member's per-room standing, which is per room and not per account. */

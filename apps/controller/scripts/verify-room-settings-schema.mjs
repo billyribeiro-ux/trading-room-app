@@ -13,10 +13,20 @@ const GENERATOR = resolve(SCRIPT_DIR, 'extract-manage-schema.mjs');
 const CANONICAL_SCHEMA = resolve(REPO_ROOT, 'src/lib/room-settings-schema.ts');
 
 /*
-  Eleven consumed by this repository's room-login page, FORTY-NINE by the room application
+  Eleven consumed by this repository's room-login page, FIFTY-FOUR by the room application
   through `internal/room-config/[code]`, and six by the WordPress SSO door at `(public)/sso/[code]`.
   `allowUsersToChangeUsername` is on the first two lists, and so now are `showPasswordField`,
-  `usernameInstructions` and `hasRequiredPhoneInLogin`, so the union is 62.
+  `usernameInstructions` and `hasRequiredPhoneInLogin`, so the union is 67.
+
+  53 -> 54 on 2026-08-15: recordingReminder, the POLICY half of the reminder banner. The name is
+  shared upstream by a room setting and a local runtime flag, and the gate at bundle byte 2,477,770
+  requires both. The room had the local flag and the banner already; without the setting an owner
+  could not turn the reminder off at all.
+
+  49 -> 53 on 2026-08-15: usersPublicReply, enableReactions, enableEditMessage and
+  enableEditAlerts joined together. RoomMessage.svelte already implemented all four gates and the
+  page never passed them, so each defaulted false and the feature was unreachable however the owner
+  configured the room. Wiring the value was the whole fix.
 
   48 -> 49 on 2026-08-15: `alertLabels` joined with Alert Labels — the SECOND non-boolean entry, a
   string containing JSON holding name, hash, color and bgcolor objects, parsed at bundle byte
@@ -203,7 +213,12 @@ const EXPECTED_WIRED_SETTINGS = [
     It crosses because every rendered byte of the badge - the text and both colours - is a value the
     owner typed, with nothing to default from.
   */
-  'alertLabels'
+  'alertLabels',
+  'usersPublicReply',
+  'enableReactions',
+  'enableEditMessage',
+  'enableEditAlerts',
+  'recordingReminder'
 ].sort();
 
 const fail = (message) => {

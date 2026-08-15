@@ -492,7 +492,34 @@ export const ROOM_VISIBLE_SETTINGS = [
 
     Read by alert-labels.ts and RoomMessage.svelte.
   */
-  'alertLabels'
+  'alertLabels',
+  /*
+    FOUR gates the room already implemented and could never switch on.
+
+    `RoomMessage.svelte` has carried all four props since it was written, each defaulting false,
+    and `+page.svelte` never passed them - so public reply, reactions, edit-message and edit-alerts
+    were dead in every room no matter what the owner ticked. Every occurrence of all four in the
+    reference bundle is `sessData.<name>`, so they are per-room policy and nothing the room could
+    infer for itself.
+
+    `enableEditMessage` and `enableEditAlerts` are TWO settings because the reference gates the
+    chat log and the alerts log separately; collapsing them would let a room that allows editing
+    alerts also allow editing chat.
+  */
+  'usersPublicReply',
+  'enableReactions',
+  'enableEditMessage',
+  'enableEditAlerts',
+  /*
+    "Recording Reminder If Speaking?" - the POLICY half of the reminder banner.
+
+    TWO values share this name upstream and only one of them is a setting. The gate at bundle byte
+    2,477,770 requires `sessData.recordingReminder` AND a local flag of the same name, plus mic and
+    recording state. The room already carries the local flag and already renders the banner, so this
+    is the missing term rather than a new feature - without it an owner cannot switch the reminder
+    off at all.
+  */
+  'recordingReminder'
 ] as const satisfies readonly (keyof RoomSettings)[];
 
 const ROOM_VISIBLE = new Set<string>(ROOM_VISIBLE_SETTINGS);
