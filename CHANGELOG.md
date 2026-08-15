@@ -66,8 +66,17 @@ why presenters do not actually sort to the top upstream. TypeScript refuses an o
 correctly, so the cast is the only way to express the defect being pinned. And `const-table.mjs`
 keeps its `@ts-nocheck`, whose four-line reason was already written above it.
 
-**Verified.** Room `pnpm lint` exit 0, `svelte-check` 0/0, 1196/1196. Controller `pnpm lint` exit 0,
-963/963. The full gate has still not been run; it runs once before the merge.
+**Verified, and this time ALL FOUR steps of the new gate were run locally on both apps** — which is
+the point of shipping it green rather than red: `lint` exit 0, `check` 0/0, tests 1196/1196 (room)
+and 963/963 (controller), `build` exit 0. The `quality.yml` matrix should therefore pass on its first
+run rather than arriving broken.
+
+One caveat recorded because it will bite somebody else: the room build failed once with
+`ETIMEDOUT: connection timed out, copyfile …` inside the adapter's copy step, and passed on retry
+with no change. Vite had already emitted every server chunk before it failed, so it is the working
+tree rather than the code — this repository lives under `~/Desktop`, which is iCloud-synced, the same
+cause as the `eslint 2` / `svelte.config 2.js` duplicate-name artifacts found earlier today. A CI
+runner has neither problem.
 
 ### 2026-08-14 20:19 EDT — ESLint was never broken, the room was never linted, and a probe was silently corrupt
 
