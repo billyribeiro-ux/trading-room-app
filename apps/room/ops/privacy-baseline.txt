@@ -91,6 +91,26 @@ rawEmail docs/generated/runtime-vs-capture-states.json
 rawEmail docs/source/components/app-session-login.compiled.js
 rawEmail docs/source/components/app-session-login.full.js
 rawEmail docs/source/main.d6d3c112b59b7d0d.js
+# Added 2026-08-15, with the reviewer agreeing in this change, as the header requires.
+#
+# These are the v3 and current-v4 room bundles, fetched from the reference's public site and
+# committed as SHA-256 pinned evidence. They carry personal data for the same reason the line above
+# does: the reference ships one email address inside its own JavaScript, and we are storing that
+# JavaScript byte-for-byte because every decode cites offsets into it.
+#
+# VERIFIED BEFORE ADDING, not assumed: all three bundles contain exactly ONE unique address and it
+# is the SAME one in each -- compared by SHA-256 of the address rather than by printing it. So this
+# is not new personal data entering the repository; it is the already-accepted value appearing in
+# two more copies of the same artifact.
+#
+# `--update` was deliberately NOT used, because the header says to run it only after REMOVING data.
+# These lines are hand-written so the reasoning above travels with them.
+#
+# Redacting the bundles is not an option: they are hash-pinned by `dump-contract.test.ts`, every
+# decoded document cites byte offsets into them, and `CLAUDE.md` forbids reformatting anything in a
+# capture directory. Removing them would delete the evidence the project is built against.
+rawEmail docs/source-v3-2026-08-15/main.99a5781d1d7a7775.js
+rawEmail docs/source-v4-2026-08-15/main.d1d09071be31f1ba.js
 rawEmail docs/website-ptr1-prt2-full-read.md
 rawEmail enterprise/ptr1.json
 rawEmail preview/clean.html
