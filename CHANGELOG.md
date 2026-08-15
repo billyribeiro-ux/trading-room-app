@@ -24,6 +24,61 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-15
 
+### 2026-08-15 06:53 EDT — the four collector defects the capture exposed, fixed
+
+**Runtime impact: none.** Console tooling only.
+
+`docs/decoded/control-plane-capture.md` §H recorded six defects the 06:47 run exposed. Four are
+fixed here; the remaining two are environmental notes, not code.
+
+**1. `paneOf()` was not per-pane, and that is the one that mattered.** It used
+`heading.closest('.panel, …')`. All four account headings are `div.app > h3` and their nearest
+`.panel` ANCESTOR is one shared container, so all four `panel` objects came back deep-equal — one
+object stored four times, about 17.7% of a 118,757-byte file, with the per-pane structure the
+capture was taken for entirely absent. **Nothing in the output said so.** Four populated objects
+look like four panes.
+
+The fix is evidence-based rather than guessed: in the rendered account page the headings sit at
+lines 492, 611 and 672 and the panes at 586, 613 and 675, so each pane FOLLOWS its heading and none
+contains it. The walk now goes forward through siblings, `closest()` survives only as a last resort
+labelled `MAY BE SHARED BETWEEN PANES`, and `strategy` records which one answered.
+
+**A safety net independent of that fix** compares the serialised panels and emits a gap naming both
+panes when any two are identical, plus `panes.distinctPanelsCaptured`. It was only found last time
+because an agent computed deep-equality across the whole file; nobody should have to do that again
+to know whether a capture is real.
+
+**2. Silent truncation.** `html` was cut at exactly 4,000 chars and `text` at 300 with no ellipsis
+and no marker, so a truncated field was byte-indistinguishable from a complete one — the exact
+defect `collect-manage-gaps.js` exists to fix in ITS predecessor, whose header calls silent
+truncation "the worst kind" of failure. Now marked with the ORIGINAL length, so a reader can tell
+how much is missing rather than only that something is.
+
+**3. `matchingRules` had three faults at once.** Every `styles.css` rule was stored twice (the sheet
+appears more than once in `document.styleSheets` and nothing deduplicated); rules nested inside
+`@media` were never walked at all, because a grouping rule has no `selectorText` and the loop skipped
+it along with everything inside — so **every responsive rule on the page was invisible**; and matches
+are now keyed on href+conditions+selector+css, with the enclosing condition text recorded so a rule
+that only applies at some width cannot be mistaken for an unconditional one.
+
+**4. The unreadable stylesheets were never NAMED.** The capture said "2 stylesheet(s) are
+cross-origin" and gave no href, so there was no way to tell an unreadable sheet from a sheet whose
+rules simply did not match — and it mattered, because no `bootstrap.min.css` rule appears anywhere
+in that file. Now collected by href into `provenance.unreadableStylesheets` and named in the gap
+text.
+
+Also: `heading` objects now carry `rules`. They had 10 keys where panels had 11, so heading CSS was
+uncaptured purely because `withRules` was never passed.
+
+**Verified:** smoke **24 assertions across four runs**, all green; negative control on the truncation
+marker goes red on exactly that assertion and is restored byte-identically; `node --check`; prettier
+clean. **Not run:** the full gate — nothing under `src/` changed.
+
+**Left as notes, not code:** the UA/viewport mismatch (Android Pixel 9 UA at 1989 px — emulation, so
+no rect in the 06:47 capture is desktop truth) and the duplicate `/dashboard` registration by
+`app.dashboard` and `app-dock.dashboard`, which is genuine in the reference and not a capture error.
+
+
 ### 2026-08-15 06:48 EDT — the control-plane capture, decoded end to end, and the collector leaked a live credential
 
 **Runtime impact: none.** One new document plus two fixes to console tooling.

@@ -181,7 +181,8 @@ function buildContext({ healthy, camelOnly = false, exemptClick = false }) {
         Redaction was written against emails and hex, and a base64url token matched neither.
       */
       makeElement('a', {
-        text: 'Manage',
+        /* 400 chars, so `text` (capped at 300) truncates and must SAY it truncated. */
+        text: 'Manage ' + 'x'.repeat(400),
         attrs: {
           href: '#/page/manageSession/652882112ad80b3e7c5132d5?jwtSite=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkFkYSBMb3ZlbGFjZSJ9.dBjftJeZ4CVPmB92K27uhbUJU1p1r_wW1gFWFOEjXkw'
         }
@@ -381,6 +382,25 @@ check(
   'neither marker found — the JWT element may not have been serialised at all, so this proves nothing'
 );
 check('the 24-hex room id was masked too', !/652882112ad80b3e7c5132d5/.test(aRaw));
+
+/*
+  TRUNCATION must announce itself.
+
+  The 06:47 capture cut `html` at exactly 4000 chars and `text` at exactly 300 with no ellipsis and
+  no marker, so a truncated field was byte-indistinguishable from a complete one. That is the defect
+  collect-manage-gaps.js was written to fix in ITS predecessor, and its header calls silent
+  truncation the worst kind of failure.
+*/
+check(
+  'truncation is marked, with the original length',
+  /«TRUNCATED at \d+ of \d+ chars»/.test(aRaw),
+  'a field was cut with no marker — a short capture looks identical to a complete one'
+);
+check(
+  'the pane-collision check ran',
+  typeof a.panes.distinctPanelsCaptured === 'number',
+  `got ${a.panes.distinctPanelsCaptured}`
+);
 
 console.log('\nrun D: the EXEMPT expression — it must be CLICKED, not refused');
 const { out: dRun } = await run({ healthy: true, exemptClick: true });

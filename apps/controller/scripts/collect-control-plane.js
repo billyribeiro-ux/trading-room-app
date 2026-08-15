@@ -282,7 +282,22 @@
       (_all, name, value) => `${name}«redacted ${value.length} chars»`
     );
 
-  const clean = (s, cap = 400) => maskTokenParams(maskJwt(maskHex(maskEmail(s)))).slice(0, cap);
+  /**
+   * Redact, then truncate — and SAY SO when truncation happened.
+   *
+   * The 06:47 capture cut `html` at exactly 4,000 characters and `text` at exactly 300 with no
+   * ellipsis and no marker, so a truncated field was byte-indistinguishable from a complete one.
+   * `collect-manage-gaps.js` exists partly to fix that exact defect in ITS predecessor, and its
+   * header calls silent truncation "the worst kind" of failure — and it was reintroduced here.
+   *
+   * The marker carries the original length, so anyone reading the capture can tell how much is
+   * missing rather than only that something is.
+   */
+  const clean = (s, cap = 400) => {
+    const redacted = maskTokenParams(maskJwt(maskHex(maskEmail(s))));
+    if (redacted.length <= cap) return redacted;
+    return `${redacted.slice(0, cap)}…«TRUNCATED at ${cap} of ${redacted.length} chars»`;
+  };
 
   const STYLE_PROPS = [
     'display',
@@ -314,27 +329,65 @@
     return out;
   }
 
-  /** Every CSS rule that actually matches this element — so "this class has no rule" is provable. */
+  /**
+   * Every CSS rule that actually matches this element — so "this class has no rule" is provable.
+   *
+   * Three defects the 06:47 capture exposed, all fixed here:
+   *
+   * 1. **Every `styles.css` rule was stored TWICE** in every `rules` array. The sheet is present
+   *    more than once in `document.styleSheets`, and nothing deduplicated. Now keyed on
+   *    href+selector+css, so a genuinely repeated declaration in one sheet still collapses to one
+   *    entry — which is what a reader wants from a "which rules match" list.
+   * 2. **Rules nested inside `@media` were never walked.** A grouping rule has no `selectorText`,
+   *    so the old loop skipped it and everything inside it. Every responsive rule on the page was
+   *    therefore invisible. `walk()` now recurses, and records the enclosing conditional text so a
+   *    rule that only applies at some width cannot be mistaken for an unconditional one.
+   * 3. **The unreadable sheets were never NAMED.** The capture said "2 stylesheets are cross-origin"
+   *    and gave no href, so nobody could tell which cascade was missing. They are collected by href
+   *    into `provenance.unreadableStylesheets`.
+   */
+  const unreadableSheets = new Set();
+
   function matchingRules(element) {
     const found = [];
+    const seen = new Set();
+
+    const walk = (rules, conditions) => {
+      for (const rule of Array.from(rules)) {
+        /* A grouping rule (@media, @supports) has child rules and no selector of its own. */
+        if (rule.cssRules && rule.cssRules.length) {
+          const text = rule.conditionText || rule.media?.mediaText || null;
+          walk(rule.cssRules, text ? [...conditions, text] : conditions);
+          continue;
+        }
+        if (!rule.selectorText) continue;
+        try {
+          if (!element.matches(rule.selectorText)) continue;
+        } catch {
+          continue; /* a selector this browser cannot evaluate against an element */
+        }
+        const entry = {
+          selector: rule.selectorText,
+          css: rule.style.cssText,
+          href: rule.parentStyleSheet?.href ?? null,
+          conditions: conditions.length ? conditions.slice() : undefined
+        };
+        const key = `${entry.href}|${conditions.join('&')}|${entry.selector}|${entry.css}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        found.push(entry);
+      }
+    };
+
     for (const sheet of Array.from(document.styleSheets)) {
       let rules;
       try {
         rules = sheet.cssRules;
       } catch {
-        continue; /* cross-origin; counted once, in the census */
+        unreadableSheets.add(sheet.href ?? '(inline or unnamed sheet)');
+        continue;
       }
-      if (!rules) continue;
-      for (const rule of Array.from(rules)) {
-        if (!rule.selectorText) continue;
-        try {
-          if (element.matches(rule.selectorText)) {
-            found.push({ selector: rule.selectorText, css: rule.style.cssText, href: sheet.href });
-          }
-        } catch {
-          /* a selector this browser cannot evaluate against an element; skip it */
-        }
-      }
+      if (rules) walk(rules, []);
     }
     return found;
   }
@@ -515,21 +568,31 @@
 
   const domText = document.documentElement.outerHTML;
   let cssText = '';
-  let unreadableSheets = 0;
   for (const sheet of Array.from(document.styleSheets)) {
     try {
       const rules = sheet.cssRules;
       if (!rules) continue;
       for (const rule of Array.from(rules)) cssText += rule.cssText + '\n';
     } catch {
-      unreadableSheets += 1;
+      /* Recorded by href in `unreadableSheets`, which `matchingRules` also feeds. */
+      unreadableSheets.add(sheet.href ?? '(inline or unnamed sheet)');
     }
   }
-  if (unreadableSheets) {
+
+  /*
+    NAME the unreadable sheets. The 06:47 capture reported "2 stylesheet(s) are cross-origin" and
+    never said WHICH, so nobody could tell which cascade was missing from the capture — and it turned
+    out to matter: no rule from `bootstrap.min.css` appears anywhere in that file, and with no list
+    of unreadable sheets there was no way to tell an unreadable sheet from a sheet whose rules simply
+    did not match.
+  */
+  OUT.provenance.unreadableStylesheets = Array.from(unreadableSheets);
+  if (unreadableSheets.size) {
     gap(
-      `${unreadableSheets} stylesheet(s) are cross-origin and unreadable, so any rule they carry ` +
-        'is absent from the css surface of the census below. A zero in that column is therefore ' +
-        'weaker evidence than a zero in the others.'
+      `${unreadableSheets.size} stylesheet(s) are cross-origin and unreadable, so any rule they ` +
+        'carry is absent from both the css census surface and every `rules` array. A zero in those ' +
+        'is therefore weaker evidence than a zero elsewhere. Named in ' +
+        `provenance.unreadableStylesheets: ${Array.from(unreadableSheets).join(', ')}`
     );
   }
 
@@ -608,11 +671,65 @@
 
   /* ─── 7. the account-level panes no other collector captures ────────────── */
 
+  /**
+   * A pane, found from its heading.
+   *
+   * ## The defect this replaces, because it produced a capture that looked complete and was not
+   *
+   * The 06:47 run used `heading.closest('.panel, .card, …')`. All four account headings are
+   * `div.app > h3` and their nearest `.panel` ANCESTOR is one shared container, so
+   * `panes.apiKeys.panel`, `panes.badges.panel`, `panes.extraAdminUsers.panel` and
+   * `panes.sessions.panel` all came back **deep-equal** — one object stored four times, about 17.7%
+   * of a 118,757-byte file, with the per-pane structure it was taken for entirely absent. Nothing in
+   * the output said so; four populated objects look like four panes.
+   *
+   * ## Why a FOLLOWING SIBLING is the right relationship, from evidence
+   *
+   * Read in the rendered account page (`evidence-dumps/login-page/logged-in-page`): the headings sit
+   * at lines 492 (Badges), 611 (Extra Admin Users) and 672 (API Keys), and the panes at 586, 613 and
+   * 675. Each pane FOLLOWS its heading; none contains it. The panes also use `panel pane-default`,
+   * not Bootstrap's `panel-default` — a trap recorded by the reader that went through that file line
+   * by line.
+   *
+   * So the walk goes forward from the heading. `closest()` is kept only as a last resort, and
+   * `strategy` records which one answered, because a capture that silently changed method is a
+   * capture nobody can compare against the previous one.
+   */
+  const PANE_SELECTOR = '.pane-default, .panel, .card, .box, .well';
   const paneOf = (re) => {
     const heading = byText('h1, h2, h3, h4, h5, legend, .panel-heading, .card-header', re);
     if (!heading) return null;
-    const panel = heading.closest('.panel, .card, .box, section, .well') || heading.parentElement;
-    return { heading: describe(heading), panel: describe(panel, { withRules: true }) };
+
+    let panel = null;
+    let strategy = null;
+
+    /* 1. the heading's own following siblings — the shape the evidence shows */
+    for (let node = heading.nextElementSibling; node; node = node.nextElementSibling) {
+      if (node.matches?.(PANE_SELECTOR)) {
+        panel = node;
+        strategy = 'following sibling of the heading';
+        break;
+      }
+      /* a following sibling that CONTAINS a pane, e.g. a wrapping row */
+      const inner = node.querySelector?.(PANE_SELECTOR);
+      if (inner) {
+        panel = inner;
+        strategy = 'pane inside a following sibling of the heading';
+        break;
+      }
+    }
+
+    /* 2. last resort, and explicitly labelled, because this is what produced the shared container */
+    if (!panel) {
+      panel = heading.closest(PANE_SELECTOR);
+      strategy = panel ? 'ancestor via closest() — MAY BE SHARED BETWEEN PANES' : null;
+    }
+
+    return {
+      strategy,
+      heading: describe(heading, { withRules: true }),
+      panel: panel ? describe(panel, { withRules: true }) : null
+    };
   };
 
   const PANES = [
@@ -631,6 +748,34 @@
       gap(`pane "${key}" did not render for this account — not captured, and not to be inferred`);
     }
   }
+
+  /*
+    Did two panes resolve to the SAME element?
+
+    This is the safety net for the defect above, and it is deliberately independent of the fix: it
+    compares the serialised results rather than trusting the strategy that produced them, so it
+    catches a collision arising some other way too.
+
+    It exists because the 06:47 capture had this exact failure and said nothing. Four populated
+    objects look like four panes, and the duplication was only found later by an agent computing
+    deep-equality across the whole file. Nobody should have to do that again to know whether a
+    capture is real.
+  */
+  const paneFingerprints = new Map();
+  for (const [key] of PANES) {
+    const html = OUT.panes[key]?.panel?.html;
+    if (!html) continue;
+    if (paneFingerprints.has(html)) {
+      gap(
+        `panes."${key}" and panes."${paneFingerprints.get(html)}" resolved to the SAME element — ` +
+          `their panel objects are identical, so the per-pane structure was NOT captured for either. ` +
+          `Treat both as one shared container, not as two panes.`
+      );
+    } else {
+      paneFingerprints.set(html, key);
+    }
+  }
+  OUT.panes.distinctPanelsCaptured = paneFingerprints.size;
 
   /*
     The API-key restrictions editor is `docs/decoded/admin-surface.md` §G item 1, the highest-value
