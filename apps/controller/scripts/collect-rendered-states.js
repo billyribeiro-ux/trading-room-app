@@ -88,7 +88,9 @@
   const splitCamel = (s) => String(s).replace(/([a-z0-9])([A-Z])/g, '$1 $2');
 
   /** Present so any future click inherits the guard. The automatic phases below call nothing. */
-  // eslint-disable-next-line no-unused-vars
+  // The TypeScript-aware rule is the one that fires here; the base `no-unused-vars` is switched off
+  // by the shared config, so naming it suppressed nothing AND was itself reported as a stale directive.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   function safeClick(el, why) {
     if (!el) return false;
     const desc = splitCamel(

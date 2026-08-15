@@ -474,8 +474,22 @@
   });
 
   $effect(() => {
+    /*
+      Three bare reads, and they are the DEPENDENCY LIST — not leftovers.
+
+      `drawPieChart` paints to a canvas, so nothing in this effect's body touches `panelWidth`,
+      `panelHeight` or `pieData` through the template. Without reading them here the effect would
+      never re-run when the panel is resized or a vote arrives, and the chart would freeze at
+      whatever it drew first.
+
+      ESLint reads a bare identifier as a statement with no effect, which is true of the expression
+      and false of the program: in runes mode the read IS the subscription.
+    */
+    // eslint-disable-next-line @typescript-eslint/no-unused-expressions
     panelWidth;
+    // eslint-disable-next-line @typescript-eslint/no-unused-expressions
     panelHeight;
+    // eslint-disable-next-line @typescript-eslint/no-unused-expressions
     pieData;
     if (!open || total === 0 || mode !== 'results') return;
     const frame = requestAnimationFrame(drawPieChart);

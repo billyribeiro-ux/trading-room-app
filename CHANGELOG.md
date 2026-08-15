@@ -24,6 +24,75 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-14
 
+### 2026-08-14 20:19 EDT — ESLint was never broken, the room was never linted, and a probe was silently corrupt
+
+**Runtime impact: none.** Lint configuration, dead-code removal, and one genuine bug fix in a
+verification script. On `feat/extra-chat-column`.
+
+**FIRST, A CORRECTION.** This session and the one before it both recorded that ESLint was broken
+repo-wide — first as `ConfigCommentParser is not a constructor`, then as `parseLevn is not a
+function`. **Both were wrong, and so was the conclusion drawn from them.** ESLint 10.8.1 runs fine.
+The `parseLevn` error only ever appeared under `npx`, which the gate does not use; the real
+`pnpm lint` failures were a stale `.svelte-kit`, cleared the moment `pnpm install` re-ran
+`svelte-kit sync`. Nothing was ever wrong with the dependency tree.
+
+**Along the way I "found" a corrupted package and was wrong about that too.** `svelte-eslint-parser`
+appeared to ship an `element.js` that did not export `convertChildren`, in both installed copies. It
+does export it — as `export function*`, a generator, which the regex I built (`^export function
+convertChildren`) cannot match. That is the exact failure `~/CLAUDE.md` describes: a search returns
+only what you already guessed the answer looked like, so it confirms the guess. The package was
+intact the whole time.
+
+**What the working linter actually found — a real bug, silent since it was written.**
+`scripts/room-config-seam-e2e.mjs` builds a browser probe as a template literal. A prose comment
+INSIDE that literal quoted a gate using backticks, which **terminated the string early** and left the
+remainder parsing as live JavaScript — the probe was evaluating `<the string> || isPresenter` against
+a page with no such variable. ESLint reported it as two unrelated-looking errors: a constant truthy
+left-hand side, and an undefined `isPresenter`. This is precisely the "never put template syntax in a
+comment" rule in `CLAUDE.md`, which was written after the same mistake broke a tab bar. **Writing the
+warning about it reintroduced it once**, because the warning quoted the expression.
+
+**The controller: 17 problems, now zero.** Three deserve naming. `collect-rendered-states.js` carried
+an `eslint-disable-next-line no-unused-vars` while the rule firing was
+`@typescript-eslint/no-unused-vars` — it suppressed nothing AND was itself reported as stale.
+`statsWhen` in the manage page was a byte-for-byte duplicate of the formatter in `$lib/stats-csv`,
+called by nothing. And `markUnwired` was a documented prop, passed at six call sites, asserted in a
+test, and **read by no line of the component**: the marker it drove was deliberately deleted earlier
+for being invented visible text, and the prop outlived it. A prop that is documented, passed
+everywhere and consumed nowhere is this repository's own definition of dead scaffolding, and it
+survived because it looks wired.
+
+**The room had NO linting at all** — no config, no dependency, no script. The controller's config
+ignored `apps/**` on the stated grounds that the room "brings its own toolchain … and its own gate
+(the `room` job in `.github/workflows/quality.yml`)". **Neither half was true**: there was no
+toolchain, and there is no `quality.yml` in this repository — only `backend-quality.yml`, which
+gates Rust, and `smoke.yml`, which runs after a deployment. **Neither frontend app has a CI quality
+gate at all.** That is now the largest open gap and is recorded in `TODO.md`.
+
+The room's first lint run reported **123 problems; 53 remain**, and the reduction is mostly real
+rather than configured away:
+
+- `no-undef` is off for TYPE-CHECKED files only, which is typescript-eslint's own guidance — it does
+  not know `RTCIceServer` or `PermissionDescriptor`. Deliberately still ON for `.js`/`.mjs`, because
+  it is the rule that caught the corrupted probe above.
+- Nineteen `no-useless-escape` reports were checked against the bundle and **every one is a verbatim
+  transcription** — `watch\?v=|\&v=` appears at bytes 1503474, 1977968 and 2295405 (which is also
+  why it is duplicated across three components: the reference duplicates it too), and the phone
+  class at 1194841. They keep their escapes and carry the citation. One more, `<\/script>`, is not
+  redundant at all: removing it would truncate a generated HTML page at that point.
+- `svelte/no-useless-mustaches` and `svelte/prefer-svelte-reactivity` are off, with reasons. The
+  first objects to `{' '}` holding whitespace the reference emits; the second objects to every plain
+  `Map`, each of which is a deliberate non-reactive collection whose declaration already says so —
+  `localScreenStreams` literally reads "nothing renders from it … making it reactive would buy a
+  dependency and no redraw". Neither signal is lost: the Svelte MCP autofixer reports both as
+  suggestions on every run, which is the right severity for a per-declaration judgement.
+- Three bare reads in `PollPanel`'s `$effect` are the dependency list, not leftovers. Deleting them
+  would freeze the pie chart at its first paint.
+
+**Verified.** Controller: lint exit 0, `svelte-check` 0/0, 963/963. Room: `svelte-check` 0/0,
+1196/1196. The room's lint run also surfaced a type error in my own `mtx-reconciler.test.ts` — a
+zero-argument `vi.fn` has no `calls[0][0]` — now typed. The full gate has still not been run.
+
 ### 2026-08-14 19:30 EDT — hooks for latency, reconciliation for truth: the MediaMTX half closes
 
 **Runtime impact: yes.** A new route reachable without a cookie, a per-room polling timer on the SSE

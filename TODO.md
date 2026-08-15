@@ -15,6 +15,53 @@ will fetch it. A gap recorded in only one app's document is a gap the next perso
 
 ---
 
+## ⛔ NEITHER FRONTEND APP HAS A CI QUALITY GATE — opened 2026-08-14 20:19 EDT
+
+This is the largest open gap in the repository and it is not about any one feature.
+
+`.github/workflows/` contains exactly two workflows: `backend-quality.yml`, which gates Rust and
+skips itself when a revision does not touch `services/**`, and `smoke.yml`, which runs AFTER a
+deployment. **Nothing runs `lint`, `check`, `test` or `build` for `apps/controller` or `apps/room` on
+a push or a pull request.** The controller has a `quality` script that chains all of them; nothing
+invokes it.
+
+It was believed otherwise, in writing: `apps/controller/eslint.config.js` justified ignoring
+`apps/**` on the grounds that the room has "its own gate (the `room` job in
+`.github/workflows/quality.yml`)". **That file has never existed in this repository.** The comment
+has been corrected.
+
+Consequences already observed rather than predicted: the room had no linting at all, and a
+verification probe (`room-config-seam-e2e.mjs`) shipped a template literal terminated early by
+backticks inside a comment — evaluating `<string> || isPresenter` against a page with no such
+variable. Both were found by running the tools by hand on 2026-08-14, not by CI.
+
+**What closing it means:** a `quality.yml` with a job per app running `lint`, `check`, `test` and
+`build`, path-filtered the way the backend job already is, plus a required-checks setting so a red
+gate blocks a merge. Note that `main` auto-deploys, which is exactly why this matters.
+
+## Room lint debt — 53 problems remain, opened 2026-08-14 20:19 EDT
+
+ESLint reached the room for the first time on 2026-08-14 and reported 123 problems; 53 are left. The
+reduction so far is real rather than configured away — see the CHANGELOG entry for which rules were
+switched off and why, each with a citation. What remains, by rule:
+
+| count | rule | what it is |
+| --- | --- | --- |
+| 27 | `@typescript-eslint/no-unused-vars` | unused imports and locals; **check each** — one in the controller turned out to be a prop passed at six sites and read nowhere |
+| 13 | `svelte/no-unused-svelte-ignore` | stale `svelte-ignore` comments; the Svelte MCP autofixer flags the same ones |
+| 5 | `no-useless-assignment` | initialisers that can never be read |
+| 2 | `no-regex-spaces` | literal runs of spaces in a regex |
+| 2 | `@typescript-eslint/no-this-alias` | in the browser-console collectors |
+| 2 | `@typescript-eslint/no-explicit-any` | plus one stale disable directive beside them |
+| 1 | `@typescript-eslint/ban-ts-comment` | a `@ts-nocheck` in `scripts/lib/const-table.mjs` |
+
+Not one is a lint-config question; they are all real edits. **`no-unused-vars` in particular must be
+read rather than auto-deleted** — the same rule in the controller surfaced `markUnwired`, a
+documented prop with six call sites and no consumer, which is a feature gap wearing the costume of a
+style warning.
+
+---
+
 ## State, 2026-08-14 15:44 EDT
 
 Eight rows remain, and **not one of them is blocked on effort**. Every item that could be built from

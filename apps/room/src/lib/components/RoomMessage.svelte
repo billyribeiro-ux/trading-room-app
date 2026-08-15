@@ -275,6 +275,14 @@
    * and `:`. Copied as written rather than "tidied", because narrowing it would stop matching URLs
    * the real room links today.
    */
+  /*
+    The name is the reason: this is the reference's own linkifier, reproduced character for
+    character. Its `\/` escapes inside the character classes are redundant to a regex engine, and
+    tidying them would make this no longer a transcription — including the `\/-;` run, which a
+    reader should notice is a RANGE from `/` to `;` rather than three literals. That is upstream's,
+    and it is reproduced rather than corrected.
+  */
+  // eslint-disable-next-line no-useless-escape
   const CAPTURED_URL = /((http|https|ftp):\/\/[\w?=&.@\/-;#~%-]+(?![\w\s?&.@\/;#~%"=-]*>))/gi;
 
   /**

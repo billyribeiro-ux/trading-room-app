@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { render as ssr } from 'svelte/server';
 import Page from '../routes/(app)/account/rooms/[id]/[[tab]]/+page.svelte';
 import { ROOM_SETTINGS } from './room-settings-schema';
-import { shapeOf, render as line, sideBySide } from './dom-shape';
+import { shapeOf, sideBySide } from './dom-shape';
 import { referenceUsers } from './reference-users';
 
 /**

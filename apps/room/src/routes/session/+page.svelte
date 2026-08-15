@@ -50,6 +50,8 @@
   let showDisclosure = $state(false);
 
   /** `/^[+]*[(]{0,1}[0-9]{1,3}[)]{0,1}[-\s\./0-9]*$/g`, character for character. */
+  /* Verbatim from the bundle (byte 1194841). The `\.` inside the class is redundant and kept. */
+  // eslint-disable-next-line no-useless-escape
   const PHONE = /^[+]*[(]{0,1}[0-9]{1,3}[)]{0,1}[-\s\./0-9]*$/;
 
   /**

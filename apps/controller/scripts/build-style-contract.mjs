@@ -171,7 +171,8 @@ try {
 /* ── every live collector run on the Desktop ───────────────────────────────── */
 const SEARCH = ['/Users/billyribeiro/Desktop/new-room', '/Users/billyribeiro/Desktop/new-room/scripts'];
 for (const dir of SEARCH) {
-  let entries = [];
+  // No initialiser: the `catch` always continues, so a value here could never be read.
+  let entries;
   try {
     entries = readdirSync(dir).filter((f) => /^collect-.*\.json$/.test(f));
   } catch {

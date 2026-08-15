@@ -240,11 +240,14 @@ describe('pagination', () => {
   });
 
   it('asks for the documented page size', async () => {
-    const fetchMock = vi.fn(async () => new Response(JSON.stringify(page([]))));
+    // The parameter is declared so the recorded call is TYPED — a zero-arg `vi.fn` gives
+    // `calls[0]` the type `[]`, and reading `[0]` off it is an error rather than a string.
+    const fetchMock = vi.fn(async (_url: string) => new Response(JSON.stringify(page([]))));
     vi.stubGlobal('fetch', fetchMock as unknown as typeof fetch);
     startMtxReconcile(ROOM);
     await vi.waitFor(() => expect(fetchMock).toHaveBeenCalled());
-    expect(String(fetchMock.mock.calls[0][0])).toContain('itemsPerPage=100');
-    expect(String(fetchMock.mock.calls[0][0])).toContain('/v3/paths/list');
+    const requested = fetchMock.mock.calls[0][0];
+    expect(requested).toContain('itemsPerPage=100');
+    expect(requested).toContain('/v3/paths/list');
   });
 });

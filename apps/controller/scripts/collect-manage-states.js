@@ -119,7 +119,8 @@
       }
       for (const rule of rules ?? []) {
         if (!rule.selectorText) continue;
-        let matches = false;
+        // No initialiser: the `catch` always continues, so a value here could never be read.
+        let matches;
         try {
           matches = el.matches(rule.selectorText);
         } catch {

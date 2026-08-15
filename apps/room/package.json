@@ -50,7 +50,8 @@
     "db:push": "drizzle-kit push",
     "schema:verify": "node scripts/verify-postgres-schema-artifacts.mjs",
     "test": "pnpm privacy:verify && pnpm schema:verify && vitest run",
-    "privacy:verify": "node scripts/verify-privacy-boundary.mjs"
+    "privacy:verify": "node scripts/verify-privacy-boundary.mjs",
+    "lint": "eslint ."
   },
   "dependencies": {
     "@fortawesome/fontawesome-free": "5.8.1",
@@ -73,6 +74,7 @@
     "zod": "4.4.3"
   },
   "devDependencies": {
+    "@eslint/js": "10.0.1",
     "@sveltejs/adapter-node": "6.0.0-next.8",
     "@sveltejs/adapter-vercel": "7.0.0-next.6",
     "@sveltejs/kit": "3.0.0-next.16",
@@ -82,6 +84,10 @@
     "@types/node": "26.2.0",
     "@types/sanitize-html": "2.16.1",
     "drizzle-kit": "0.31.10",
+    "eslint": "10.8.1",
+    "eslint-config-prettier": "10.1.8",
+    "eslint-plugin-svelte": "3.22.0",
+    "globals": "17.9.0",
     "jsdom": "^30.0.1",
     "parse5": "^8.0.1",
     "postcss": "^8.5.25",
@@ -90,6 +96,7 @@
     "svelte": "5.56.8",
     "svelte-check": "4.7.5",
     "typescript": "6.0.3",
+    "typescript-eslint": "8.66.0",
     "vite": "8.2.1",
     "vitest": "4.1.10"
   }
