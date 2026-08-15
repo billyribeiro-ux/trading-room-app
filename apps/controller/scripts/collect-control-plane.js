@@ -611,9 +611,14 @@
     the panes use `panel pane-default` — NOT bootstrap's `panel-default` — which is a trap recorded
     by the reader that went through the rendered page line by line.
 
-    NONE of these is clicked. They are serialised so the controls, their computed styles and their
-    matching rules are captured; the handlers behind them are already covered by
-    `collect-rendered-states.js`, which reads the function SOURCE via scope introspection.
+    NONE of these is clicked, and that is not caution for its own sake. `page.welcome.html` is a
+    TEMPLATE — it contains no function bodies at all, so for every handler here the question "does
+    invoking this mutate anything?" is genuinely unanswered by the evidence. An adversarial review
+    of the first selector list marked `toggleArchivedRooms`, `sortByUUID`, `sortByName`,
+    `exportBadges`, `exportListToCSV` and `editBadge` as "read-only" from their LABELS, and every
+    one of those judgements was correctly refuted: a name is not a body. They are serialised for
+    their markup, styles and matching rules; what they DO is already covered by
+    `collect-rendered-states.js`, which reads the function source via scope introspection.
   */
   const NAMED_CONTROLS = {
     marketplacePerSession: '[ng-click^="manageMarketplaceSession"]' /* :385-387 */,
@@ -639,16 +644,27 @@
   }
 
   /*
-    The server-injected globals.
+    The server-injected globals, and the SCOPE flag they are suspected of feeding.
 
-    `manageMarketplaceSession` renders but is HIDDEN, and what hides it is not a role and not a room
-    setting — it is `window.__disableMarketplace`, written into an inline script tag on the rendered
-    account page (line 839, among the globals at 830-839), and the live page ships it as the STRING
-    'true'. That is `docs/decoded/admin-surface.md` §G item 2: the Marketplace pane is unreachable on
-    the captured account for a reason that is now nameable and checkable rather than mysterious.
+    Two separate facts, and the gap between them is the point of capturing both:
 
-    Read as strings deliberately. `__disableMarketplace` is 'true', not `true`, and recording the
-    type is how the next person avoids writing a falsy check against a non-empty string.
+      1. The Marketplace control is hidden by a SCOPE variable: `ng-hide="disableMarketplace"`,
+         read verbatim at `views/page.welcome.html:385-387`. That variable is never assigned
+         anywhere in the template.
+      2. A GLOBAL named `__disableMarketplace` exists in an inline script on the rendered account
+         page (line 839, among the globals at 830-839) and ships the STRING 'true'.
+
+    It is obvious that 1 is fed by 2. It is also NOT PROVEN by anything we hold: the assignment
+    would live in `/public/dist/app.min.js`, which is not in our evidence. An adversarial review
+    caught this stated as established fact and was right to — "obvious" is how a plausible guess
+    gets into a document and then into code.
+
+    So the script records BOTH sides and lets the capture settle it: the global's value and type,
+    and the scope flag itself, read off the live scope where it is finally resolvable. If they
+    disagree, something else is hiding the button and we would rather find that out here.
+
+    Read as strings deliberately. 'true' is not `true`, and recording the type is how the next
+    person avoids writing a falsy check against a non-empty string.
   */
   const GLOBALS = ['__disableMarketplace', '__disableMobile', '__disableSSO', '__disableTextList', 'tokSite'];
   OUT.panes.serverInjectedGlobals = {};
@@ -657,6 +673,32 @@
     OUT.panes.serverInjectedGlobals[name] = present
       ? { present: true, type: typeof window[name], value: clean(String(window[name]), 120) }
       : { present: false, type: null, value: null };
+  }
+
+  /* The scope side of the same question — the only place the two can be compared. */
+  OUT.panes.marketplaceScopeFlag = { readable: false, value: null, how: null };
+  const marketplaceNode = document.querySelector('[ng-hide="disableMarketplace"]');
+  if (marketplaceNode && window.angular) {
+    try {
+      const scope = window.angular.element(marketplaceNode).scope();
+      if (scope) {
+        OUT.panes.marketplaceScopeFlag = {
+          readable: true,
+          value: String(scope.disableMarketplace),
+          type: typeof scope.disableMarketplace,
+          how: 'angular.element(node).scope().disableMarketplace'
+        };
+      }
+    } catch (error) {
+      gap(`Could not read the disableMarketplace scope flag: ${error && error.message}`);
+    }
+  }
+  if (!OUT.panes.marketplaceScopeFlag.readable) {
+    gap(
+      'The disableMarketplace SCOPE flag could not be read, so whether the __disableMarketplace ' +
+        'global is what hides the Marketplace control remains UNPROVEN — it is an inference, not ' +
+        'a finding, and must not be written up as one.'
+    );
   }
 
   /* ─── 8. account lifecycle — §G item 8 ──────────────────────────────────── */
