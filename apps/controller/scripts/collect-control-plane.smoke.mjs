@@ -173,6 +173,19 @@ function buildContext({ healthy, camelOnly = false, exemptClick = false }) {
     children: [
       sessionsLabel,
       makeElement('a', { text: 'New Room', attrs: { href: '#/new' } }),
+      /*
+        The Launch link, carrying a REAL-SHAPED site token.
+
+        The 06:47 live run wrote 8 live JWTs into the downloaded file through exactly this element:
+        ng-href="/session?id={{s.uuid}}&jwtSite={{tokSite}}" (views/page.welcome.html:379-381).
+        Redaction was written against emails and hex, and a base64url token matched neither.
+      */
+      makeElement('a', {
+        text: 'Manage',
+        attrs: {
+          href: '#/page/manageSession/652882112ad80b3e7c5132d5?jwtSite=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkFkYSBMb3ZlbGFjZSJ9.dBjftJeZ4CVPmB92K27uhbUJU1p1r_wW1gFWFOEjXkw'
+        }
+      }),
       makeElement('a', { text: 'Suspend Account', attrs: { title: 'Suspend Account' } }),
       makeElement('div', { attrs: { 'ui-view': '' } }),
       makeElement('a', { attrs: { 'ui-sref': 'page.welcome' }, text: 'Account' }),
@@ -262,7 +275,7 @@ async function run({ healthy, camelOnly = false, exemptClick = false }) {
   await new Promise((r) => setImmediate(r));
   const raw = context.result();
   if (!raw) throw new Error(`run(healthy=${healthy}) never reached the download step`);
-  return { out: JSON.parse(raw), context };
+  return { out: JSON.parse(raw), raw, context };
 }
 
 /* ── assertions ───────────────────────────────────────────────────────────── */
@@ -280,7 +293,7 @@ const check = (label, condition, detail = '') => {
 console.log('collect-control-plane.js — smoke\n');
 
 console.log('run A: a healthy page');
-const { out: a } = await run({ healthy: true });
+const { out: a, raw: aRaw } = await run({ healthy: true });
 
 check('reached the download step', !!a);
 check('detected ui-router', a.router.kind === 'ui-router', `got ${a.router.kind}`);
@@ -351,6 +364,23 @@ check(
   c.refusedClicks.some((r) => /delete/i.test(r.matched || '')),
   JSON.stringify(c.refusedClicks.slice(0, 1))
 );
+
+/*
+  REDACTION — the regression test for the 06:47 live run, which wrote 8 live JWTs to disk.
+
+  Asserted against the RAW serialised output rather than a field, because the leak did not arrive
+  through a field anybody was watching: it came in via `describe().html`, the serialised outerHTML
+  of four panes, each of which happened to contain the Launch anchor. Checking named fields would
+  have missed it exactly the way the original redaction did.
+*/
+const JWT_SHAPE = /\beyJ[A-Za-z0-9_-]{4,}\.[A-Za-z0-9_-]{4,}\.[A-Za-z0-9_-]{4,}\b/;
+check('no JWT survives anywhere in the output', !JWT_SHAPE.test(aRaw), 'a JWT reached the downloaded file');
+check(
+  'the redaction marker is present, so masking ran rather than the element being absent',
+  /«jwt \d+ chars — REDACTED AT CAPTURE»|«redacted \d+ chars»/.test(aRaw),
+  'neither marker found — the JWT element may not have been serialised at all, so this proves nothing'
+);
+check('the 24-hex room id was masked too', !/652882112ad80b3e7c5132d5/.test(aRaw));
 
 console.log('\nrun D: the EXEMPT expression — it must be CLICKED, not refused');
 const { out: dRun } = await run({ healthy: true, exemptClick: true });

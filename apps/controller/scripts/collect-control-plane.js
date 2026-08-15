@@ -247,7 +247,42 @@
   const maskEmail = (s) =>
     String(s ?? '').replace(/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g, (m) => `«email ${m.length} chars»`);
   const maskHex = (s) => String(s ?? '').replace(/\b[a-f0-9]{24,}\b/gi, (m) => `«hex ${m.length}»`);
-  const clean = (s, cap = 400) => maskHex(maskEmail(s)).slice(0, cap);
+
+  /*
+    JWTs, and this one is written from a REAL FAILURE of this very script.
+
+    The 2026-08-15 06:47 run wrote **8 live JWTs** into the downloaded file — 301 characters each,
+    segments 36/220/43, i.e. header.payload.signature complete with the signature — across
+    `panes.{apiKeys,badges,extraAdminUsers,sessions}.panel.html`. They come from the Launch link,
+    whose template is `ng-href="/session?id={{s.uuid}}&jwtSite={{tokSite}}"`
+    (`views/page.welcome.html:379-381`), so every serialised pane containing that anchor carried a
+    usable site token. The payload also base64-encodes the owner's name, email and user id.
+
+    Neither `maskEmail` nor `maskHex` could see it: a JWT is base64url, so it has no `@` and its
+    segments are not hex. The redaction was written against the two shapes I had thought of, and a
+    token that matched neither passed straight through into a file meant to be shared.
+
+    `.gitignore` in this repository already warns that captures contain "in some cases a live JWT".
+    That warning existed and this script still leaked one, which is the argument for masking at
+    CAPTURE time rather than trusting the operator to remember.
+
+    Two patterns, deliberately overlapping:
+      1. the JWT shape itself, wherever it appears;
+      2. any query parameter whose NAME contains jwt/token/key/secret/sig/auth, whatever its value
+         looks like — so the next credential shape nobody predicted is caught by its label instead.
+  */
+  const maskJwt = (s) =>
+    String(s ?? '').replace(
+      /\beyJ[A-Za-z0-9_-]{4,}\.[A-Za-z0-9_-]{4,}\.[A-Za-z0-9_-]{4,}\b/g,
+      (m) => `«jwt ${m.length} chars — REDACTED AT CAPTURE»`
+    );
+  const maskTokenParams = (s) =>
+    String(s ?? '').replace(
+      /([?&][A-Za-z0-9_-]*(?:jwt|token|key|secret|sig|auth)[A-Za-z0-9_-]*=)([^&"'\s>]+)/gi,
+      (_all, name, value) => `${name}«redacted ${value.length} chars»`
+    );
+
+  const clean = (s, cap = 400) => maskTokenParams(maskJwt(maskHex(maskEmail(s)))).slice(0, cap);
 
   const STYLE_PROPS = [
     'display',
