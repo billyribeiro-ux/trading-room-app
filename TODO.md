@@ -154,15 +154,58 @@ Three consequences, all real and none of them papered over in code:
 
 ---
 
-## State, 2026-08-14 15:44 EDT
+## State, 2026-08-15 08:11 EDT
 
-Eight rows remain, and **not one of them is blocked on effort**. Every item that could be built from
-the evidence has been; what is left is blocked on a decision, an environment, or an architecture
-this deployment does not have.
+**The previous version of this section said "Eight rows remain, and not one of them is blocked on
+effort. Every item that could be built from the evidence has been." That was false when it was
+written, and it is worth understanding why before trusting any similar sentence.**
+
+At the moment it was written, Swing Trade Alerts and Day Trade Alerts — two entire
+presentation-area tabs — were sitting in the captured bundle unbuilt, and had been since day one.
+`presAreaTabs-swingAlerts` occurs 3 times in v3, 3 times in our 2026-07-30 capture and 3 times in
+current v4. Nothing had ever ENUMERATED the reference's features, so "everything buildable is built"
+was a statement about what somebody had thought to look for.
+
+`apps/room/scripts/audit-feature-coverage.mjs` now asks the bundle directly. Since it was written it
+has found, three separate times, work nobody knew existed. **Run it after every feature lands.**
+
+### What the enumeration says today
+
+`docs/decoded/missing-commands-triage.md` — every missing identifier read at every occurrence, then
+each gap claim put through an adversarial pass that killed 8 of 34:
+
+| | |
+| --- | ---: |
+| confirmed missing, with payload / gate / verbatim strings recorded | **25** |
+| claimed missing then refuted — we already build it | 7 (+1 contested, resolved by reading) |
+| built under another name — the audit cannot see these | 9 |
+| third-party noise, not a PTR feature | 4 |
+| unclear, needs a product decision, all media-server admin | 5 |
+
+**Ready to build, fully specified:**
+
+| item | spec | note |
+| --- | --- | --- |
+| Files sort bar | `docs/decoded/files-sort-bar.md` | verified offset by offset; NEW-TODO §2.1 had three errors and is superseded |
+| `presAreaTabs-recordings` | `docs/decoded/missing-commands-triage.md` | a whole tab. Gate is `archivesAvailableTo() && sessData.recsInRoom`; we already have the first at `roster-gates.ts:54` |
+| Alert Filter | `docs/decoded/alert-scheduler-filter-labels.md` | server owns the filtering; `showAlertsFrom` inverts allow-list vs deny-list |
+| Alert Labels | same | not a wire feature; a JSON-string room setting plus a text transform |
+| Alert Scheduler | same | needs an entitlement whose manage-page control was NOT located, and a server-side scheduler we do not have |
+| Benzinga | `NEW-TODO.md` §2.2 | small; needs one more decode pass for the const-table classes |
+
+**The control-plane question is answered.** `docs/decoded/control-plane-capture.md`: the reference
+registers **31 ui-router states and not one is an operator surface**, and `states[*].data` is `null`
+on all 31 — the reference expresses no authority in its router at all. There is no route-level role
+model to copy, and the super-admin portal can only be designed, not matched.
+
+### The rows below
+
+What is left in the table is blocked on a decision, an environment, or an architecture this
+deployment does not have — which is what the old sentence *meant* and should have said.
 
 | row | what it needs | who or what unblocks it |
 | --- | --- | --- |
-| **P** | bookkeeping. PRs #20–#27 are MERGED. **#28 is open and NOT green** — see the CI section at the top of this file | the two open items there |
+| **P** | bookkeeping. PRs #20–#27 are MERGED. **#30 is open and must NOT be merged as-is** — it contains the Swing delete that could not delete (fixed on the branch, not in that PR), and its full gate has never run | a clean tree, then the gate |
 | **G** | the Postgres host question — Neon under volume | the owner |
 | **H** | production topology — separating media from the app tier | the owner |
 | **Q** | the WordPress plugin run inside a live WordPress | an environment |

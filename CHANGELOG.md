@@ -24,6 +24,42 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-15
 
+### 2026-08-15 08:15 EDT — both TODO files reconciled against what is actually true
+
+**Runtime impact: none.** Bookkeeping, and one deleted sentence that mattered.
+
+**The sentence.** `TODO.md` opened its state section with *"Eight rows remain, and not one of them is
+blocked on effort. Every item that could be built from the evidence has been."*
+
+**That was false when it was written.** At that moment Swing Trade Alerts and Day Trade Alerts — two
+entire presentation-area tabs — were sitting in the captured bundle unbuilt and had been since day
+one. `presAreaTabs-swingAlerts` occurs 3 times in v3, 3 in our 2026-07-30 capture and 3 in current
+v4. The sentence was not a claim about the evidence; it was a claim about what somebody had thought
+to look for, phrased as though it were the former.
+
+Replaced with the measured position, and with the reason the old one was wrong, so the next person
+distrusts the shape of that sentence rather than just this instance of it.
+
+**What the state section now records:** the triage totals (25 confirmed missing, 7+1 refuted, 9 built
+under another name, 4 noise, 5 parked on a product decision), a table of the six items that are
+fully specified and ready to build, and the control-plane answer — 31 registered states, none an
+operator surface, `states[*].data` null on all 31, so there is no route-level role model to copy.
+
+**Row P corrected.** It still said PR #28 was the open one. PR #30 is open, and it **must not be
+merged as-is**: it carries the Swing delete that could not delete, whose fix is on the branch but not
+in that PR, and its full gate has never run.
+
+**`NEW-TODO.md`:** §2.3 and §2.4 were already removed rather than struck through when Swing and Day
+Trade shipped — the rule was followed and nothing was left orphaned. The suggested order is rewritten
+around what is actually next: the sort bar, then `presAreaTabs-recordings` — the cheapest remaining
+tab-level gap, since its pane holds one iframe and half its gate already exists at
+`roster-gates.ts:54` — then Alert Filter and Alert Labels. The 25 confirmed gaps are pointed at as
+the only complete list of what is left.
+
+**The reusable part:** a TODO row that says a thing is done is checkable. A TODO *sentence* that says
+everything is done is not, and this one survived three weeks and two whole missing tabs.
+
+
 ### 2026-08-15 08:11 EDT — the "For All" controls audited, and one undocumented reasoning dependency closed
 
 **Runtime impact: none from this entry** — one added test. The broadcast fix itself is the entry

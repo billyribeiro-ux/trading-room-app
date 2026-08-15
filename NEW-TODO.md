@@ -279,16 +279,35 @@ names on the repeat badge, the modal's own 27-declaration layout, and what the s
 
 # Suggested order
 
+**Built since this list was written, and removed from it:** 2.3 Swing Alerts, 2.4 Day Trade Alerts,
+and the four "For All" broadcast commands — which were not a missing feature but three SHIPPED
+controls that said "For All" and moved one browser. See `CHANGELOG.md`.
+
+**Re-specified because "fully decoded" was not:** 2.1, the Files sort bar. Three errors found on
+re-reading, one of which ships a control that looks right and behaves wrong. Build from
+`docs/decoded/files-sort-bar.md`, not from §2.1.
+
 1. **1.1 + 1.2 together** — they share the SSE revocation plumbing, and they are the two that cost
    money every day they are open.
-2. **2.1 the sort bar** — fully decoded, small, and it proves the theming rule end to end.
-3. **2.2 Benzinga** — small, needs one more decode pass.
-4. **2.5 Mobile** — after `docs/MOBILE-APP.md` is read.
-5. **Part 3 v5** — when an account is cleared for it.
-6. **5.1 Alert Filter**, then **5.2 Alert Labels** — both small, and 5.1 is the only one of the
-   three that changes what a member sees.
-7. **5.3 Alert Scheduler** — last of these three; it needs a server-side scheduler that does not
-   exist here yet.
+2. **2.1 the sort bar** — spec verified offset by offset, small, and it proves the theming rule end
+   to end.
+3. **`presAreaTabs-recordings`** — a whole missing TAB, and the cheapest of the three tab-level gaps:
+   the pane holds exactly one iframe, and we already have half its gate at `roster-gates.ts:54`. Only
+   `sessData.recsInRoom` and the surface are missing. Spec in
+   `docs/decoded/missing-commands-triage.md`.
+4. **5.1 Alert Filter**, then **5.2 Alert Labels** — both small, and 5.1 is the only one of the
+   three that changes what an ordinary member sees.
+5. **2.2 Benzinga** — small, needs one more decode pass for the const-table classes.
+6. **2.5 Mobile** — after `docs/MOBILE-APP.md` is read.
+7. **5.3 Alert Scheduler** — needs an entitlement whose manage-page control was NOT located, and a
+   server-side scheduler that does not exist here.
+8. **Part 3 v5** — when an account is cleared for it.
+
+**Then the 25 confirmed gaps in `docs/decoded/missing-commands-triage.md`**, which is the only
+complete list of what the reference has and we do not. Moderation (`kickUser`, `unmuteChat`,
+`lockSession`) and the archives pair (`archiveLogs` / `unarchiveLogs`) are the largest clusters left.
+Five media-server admin commands are deliberately parked as UNCLEAR: whether a presenter should be
+able to reset shared media infrastructure is a product and safety decision, not a porting question.
 
 ## Evidence, all committed
 
