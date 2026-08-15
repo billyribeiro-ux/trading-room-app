@@ -101,9 +101,13 @@ Also read from Kit source rather than assumed: **a `command` can carry a `File`*
 every client id read out of the built bundle and matched to its server chunk · `svelte-autofixer`
 `issues: []` · **eleven negative controls** run and seen red.
 
-**Still open:** seventeen form actions behind four dispatchers (notes, polls, swing and day-trade
-alerts) are converted in name only — they are guarded now, not converted. And no browser
-click-through, which needs the backend migration.
+**Browser verification CLOSED 2026-08-15 15:30**, by the owner: *"everything is working on the app"*.
+That is the runtime evidence these twelve conversions were missing — every converted path exercised
+in a real room, including the `presenterCommand` revoke that was dead for three commits. Recorded as
+the owner's report, which is what it is, not as a capture.
+
+**Still open, now tracked as `TODO.md` row AG:** seventeen form actions behind four dynamic
+dispatchers (notes, polls, swing and day-trade alerts). Guarded, not converted.
 
 ### 2026-08-15 14:40 EDT — The harness that unblocks the rest, and the Files pane it proved itself on
 
