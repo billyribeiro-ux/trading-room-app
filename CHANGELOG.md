@@ -24,6 +24,91 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-15
 
+### 2026-08-15 15:25 EDT — The remote-function conversion, finished — and the guard that says I finished it twice wrongly
+
+**Branch `feat/extra-chat-column`, not merged.** Five commits: `3046973`, `0d41993`, `99f37f2`, plus
+this one. **Runtime impact: yes**, across chat, alerts, message actions, account settings, uploads
+and presenter moderation — **including one live defect fixed**.
+
+**Every `fetch('?/action')` in `+page.svelte` is gone.** Twelve conversions, sixteen remote
+functions, `+page.server.ts` **3,233 → 1,617 lines (−50%)**, room suite **1,530 → 1,661 across 124
+files**.
+
+#### What the conversion was actually for
+
+Reading paired handlers side by side is what found the defects. Every one below was invisible while
+the two halves sat eighty lines apart in one 3,233-line file:
+
+- **`mute24` did not mute.** `sendMessage` refused while a live `chat_mutes` row existed;
+  `replyMessage` never looked. A muted member could not send and **could reply**, into the same log.
+- **Length bounds applied to one path of three.** `MAX_MESSAGE_BODY` was checked on send, not on
+  reply; `askQuestion` and the message-edit path had no bound at all. All four bounded now from
+  `$lib/message-bounds.ts`.
+- **The chat-mode confirm was spelled two ways.** The settings radio built the capture's label; the
+  session radio interpolated the raw letter and asked *"change the chat mode to p"*.
+- **`kind` accepted any string** in `messageAction` and every non-`'alert'` value — a typo, the empty
+  string — fell through to the chat branch.
+- **`deleteFile` was a TOCTOU:** SELECT then DELETE, so two presenters both reached `deleteStoredFile`
+  on a path the first had removed. One conditional `DELETE … RETURNING` now.
+- **`saveTheme` silently coerced** every unrecognised value to `light` and reported success.
+- **Three copies of the reaction toggle** and **three of the html-to-plain-text derivation**, none of
+  which any test had ever executed.
+
+#### The defect I shipped, and the two times I got the sweep wrong
+
+`presenterCommand`'s action was removed in `e708a0f`. **`ModalHost.svelte` kept posting
+`fetch('?/presenterCommand')` to an action that no longer existed for three commits** — revoking a
+member's mic, camera or screens did nothing. I missed it because I checked `+page.svelte` and
+concluded from that.
+
+Then I claimed **"zero call sites remain"**, and that was false too. My sweep matched `fetch('?/` —
+a single-quoted literal. **Four dispatchers build the endpoint with a template literal**,
+`fetch(\`?/${action}\`)`, reaching **seventeen** actions. Searching for the shape I expected, twice.
+
+**`remote-call-sites-contract.test.ts`** is the answer, and it is the real deliverable of this entry.
+It walks all of `src/` and asks the whole-application questions the six per-feature files could not:
+
+1. the four surviving dispatchers are exactly four, and the list only ever shrinks;
+2. **every action name each union can produce still exists** — the `presenterCommand` defect in the
+   one form the compiler can never catch, because the name is assembled at runtime;
+3. every exported remote function has a consumer;
+4. every imported name still exists on the server.
+
+Negative-controlled both ways: renaming `savePoll` and reintroducing a dead `fetch` each go red.
+
+**The lesson is not "click through in a browser."** A browser would have found it — and so does a
+source walk that runs in two seconds on every commit. The browser is for what source cannot answer,
+not for what nobody bothered to ask.
+
+#### Also in these commits
+
+**`$lib/server/remote-command-harness.ts`** unblocked everything: it establishes the request store
+Kit's own server does, so a remote `command` is EXECUTABLE by a test against a live database exactly
+as a form action was. Built by READING four files in `@sveltejs/kit@3.0.0-next.16`, each cited. Two
+limits written into it: it does not serialize the argument, and it reproduces Kit's default
+`handleValidationError` with a test asserting `hooks.server.ts` still does not override it. **~90
+behavioural assertions were rewritten onto it rather than lost** — and gained coverage the actions
+never had.
+
+Also read from Kit source rather than assumed: **a `command` can carry a `File`**.
+
+**The ratchet moved once, up, on the first conversion.** Every round since paid with a real module:
+`chat-plain-text.ts`, `message-formatters.mediumDate`, `mirrorPreferenceToLocalStorage`,
+`file-sort.fileSizeInKb`, `message-bounds.ts`, `reaction-toggle.ts`, `refusal-message.ts`.
+
+**Verified:** svelte-check **0/0** (1,110 files) · suite **1661/1661 across 124 files** ·
+`eslint src` clean · prettier clean on every file touched · `vite build` registers **16** remotes,
+every client id read out of the built bundle and matched to its server chunk · `svelte-autofixer`
+`issues: []` · **eleven negative controls** run and seen red.
+
+**Browser verification CLOSED 2026-08-15 15:30**, by the owner: *"everything is working on the app"*.
+That is the runtime evidence these twelve conversions were missing — every converted path exercised
+in a real room, including the `presenterCommand` revoke that was dead for three commits. Recorded as
+the owner's report, which is what it is, not as a capture.
+
+**Still open, now tracked as `TODO.md` row AG:** seventeen form actions behind four dynamic
+dispatchers (notes, polls, swing and day-trade alerts). Guarded, not converted.
+
 ### 2026-08-15 14:40 EDT — The harness that unblocks the rest, and the Files pane it proved itself on
 
 **Branch `feat/extra-chat-column`, not merged.** **Runtime impact: yes** — on file delete, play-for-all,
