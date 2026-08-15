@@ -156,7 +156,9 @@ describe('both columns share one pipeline, and that is the point', () => {
       out of the paging state being a record keyed by channel rather than by column.
     */
     expect(pageCode).toContain('void loadOlderChatMessages(extraChatTab, scroller);');
-    expect(pageCode).toContain('hasMoreData: chatHasMoreData[extraChatTab] ?? true,');
+    expect(pageCode).toContain('hasMoreData: chatPages.hasMore(extraChatTab),');
+    // ONE instance for both columns, so "keyed by channel rather than by column" is structural.
+    expect(pageCode).toContain('if (!extraChatScrollingUp) chatPages.arm(extraChatTab);');
   });
 
   it('but each column scrolls independently', () => {

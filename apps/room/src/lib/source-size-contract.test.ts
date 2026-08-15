@@ -127,8 +127,14 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       switched on `logType`, so moving the alerts half would split a thing that is one thing. What
       the slice bought instead is that the filter's two viewer-owned halves stopped being restated
       at three call sites.
+
+      `RoomLogPages` is the sixth, and the first that removed a DUPLICATE rather than moving a
+      slice: 12,974 -> 12,961. The alerts log and the chat log held the same older-page machinery
+      twice, in two shapes — scalars against per-channel maps — and neither shape was wrong, which
+      is what let it survive. Upstream keeps the state on the roomlog component and renders one per
+      log view, so the arity is the only difference. One keyed class covers both.
     */
-    max: 12974,
+    max: 12961,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {

@@ -114,8 +114,9 @@ describe('the empty answer is still the terminator', () => {
   });
 
   it('is what the client reads to stop asking', () => {
-    expect(pageCode).toContain('alertsHasMoreData = false;');
-    expect(pageCode).toContain('chatHasMoreData = { ...chatHasMoreData, [channel]: false };');
+    // One terminator for both logs since the paging state was unified — `room/log-pages.svelte.ts`.
+    expect(pageCode).toContain('alertPages.exhausted(ALERTS_LOG);');
+    expect(pageCode).toContain('chatPages.exhausted(channel);');
   });
 });
 
@@ -128,13 +129,19 @@ describe('a failed page is non-fatal and retried, not swallowed', () => {
     pane never pages again.
   */
   it('clears the loading flag in a `finally`, so a failure cannot wedge paging', () => {
-    expect(pageCode).toContain('alertsLoadingMore = false;\n    }');
-    expect(pageCode).toContain('chatLoadingMore = false;\n    }');
+    /*
+      Still asserted with the closing brace attached, which is the whole point of the assertion: the
+      call has to be the LAST thing in the `finally`, not a line that happens to appear somewhere in
+      the function. Moving it into the `catch` would clear on failure and leave success wedged.
+    */
+    expect(pageCode).toContain('alertPages.settled();\n    }');
+    expect(pageCode).toContain('chatPages.settled();\n    }');
   });
 
   it('leaves hasMoreData alone on the failure path', () => {
     const fn = pageCode.slice(pageCode.indexOf('async function loadOlderAlerts(scroller'));
     const failure = fn.slice(fn.indexOf('} catch {'), fn.indexOf('} finally {'));
-    expect(failure).not.toContain('alertsHasMoreData');
+    expect(failure, 'the failure path must be findable').not.toBe('');
+    expect(failure).not.toContain('exhausted');
   });
 });

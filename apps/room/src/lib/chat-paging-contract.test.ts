@@ -110,6 +110,24 @@ describe('the read is bounded', () => {
   });
 });
 
+/*
+  The paging STATE moved to `room/log-pages.svelte.ts` on 2026-08-15, where the alerts half and the
+  chat half stopped being two shapes of the same machinery. The assertions below follow it; the ones
+  read out of the reference dumps are untouched, because the evidence did not move.
+
+  THAT LAST SENTENCE USED TO NAME THE DUMP DIRECTORY, and `evidence-partition.test.ts` went red on
+  it — correctly, and this is worth recording where it happened. Discovery marks a test file as
+  evidence-bound by looking for a capture root followed by a slash ANYWHERE in it, comments
+  included, and `vite.config.ts` then excludes those files on every CI checkout because the captures
+  are off-repo. So one path in one comment would have dropped this entire contract from CI while the
+  suite went on reporting green: coverage lost with nobody informed, which is the failure that file
+  exists to hold shut. It is the same trap its own header records about itself.
+*/
+const pagesClass = readFileSync(
+  new URL('./room/log-pages.svelte.ts', import.meta.url),
+  'utf8'
+).replace(/\/\*[\s\S]*?\*\//g, '');
+
 describe('and nothing became unreachable', () => {
   it('there is a query that serves older pages', () => {
     expect(remoteCode).toContain('export const loadOlderChatMessages = query(');
@@ -118,9 +136,8 @@ describe('and nothing became unreachable', () => {
 
   it('the client asks for them, and folds them in', () => {
     expect(pageCode).toContain('await loadOlderChatPage({ channel, page })');
-    expect(pageCode).toContain(
-      'mergeOlderChatMessages(incoming, olderChatMessages[channel] ?? [])'
-    );
+    expect(pageCode).toContain('chatPages.arrived(channel, incoming, page);');
+    expect(pagesClass).toContain('mergeOlderChatMessages(incoming, this.older(key))');
   });
 
   it('older pages survive the invalidateAll that every SSE event triggers', () => {
@@ -136,9 +153,7 @@ describe('and nothing became unreachable', () => {
       a second copy of six steps, and the copies drift.
     */
     expect(pageCode).toContain('function chatMessagesFor(tab: ChatTab) {');
-    expect(pageCode).toContain(
-      'mergeOlderChatMessages(olderChatMessages[tab] ?? [], data.messages)'
-    );
+    expect(pageCode).toContain('mergeOlderChatMessages(chatPages.older(tab), data.messages)');
     expect(pageCode).toContain('const visibleChatMessages = $derived(chatMessagesFor(chatTab));');
     expect(pageCode).toContain(
       'const visibleExtraChatMessages = $derived(chatMessagesFor(extraChatTab));'
@@ -220,7 +235,8 @@ describe('the client stops asking at the end of history', () => {
   it('an EMPTY page is the terminator, as it is upstream', () => {
     // `0 == o.length && (this.hasMoreData = !1)`.
     expect(pageCode).toContain('if (incoming.length === 0) {');
-    expect(pageCode).toContain('chatHasMoreData = { ...chatHasMoreData, [channel]: false };');
+    expect(pageCode).toContain('chatPages.exhausted(channel);');
+    expect(pagesClass).toContain('this.#hasMore = { ...this.#hasMore, [key]: false };');
   });
 
   it('and paging is re-armed when the reader returns to the bottom', () => {
@@ -232,9 +248,10 @@ describe('the client stops asking at the end of history', () => {
       start of `main` also stopped `off-topic` from ever paging. The reference keeps this state on
       the roomlog component, and it renders one per channel.
     */
-    expect(pageCode).toContain(
-      'if (!chatScrollingUp) chatHasMoreData = { ...chatHasMoreData, [chatTab]: true };'
-    );
+    expect(pageCode).toContain('if (!chatScrollingUp) chatPages.arm(chatTab);');
+    // PER CHANNEL is now structural: `arm` takes the key, so there is no shared flag to reach for.
+    expect(pagesClass).toContain('arm(key: string): void {');
+    expect(pagesClass).toContain('this.#hasMore = { ...this.#hasMore, [key]: true };');
   });
 });
 
@@ -272,7 +289,7 @@ describe('the alerts log is paged by the same machinery', () => {
   it('older pages are fetched and survive the invalidate', () => {
     expect(remoteCode).toContain('export const loadOlderAlerts = query(pageNumber,');
     expect(pageCode).toContain('await loadOlderAlertsPage(page)');
-    expect(pageCode).toContain('mergeOlderChatMessages(olderAlerts, data.alerts)');
+    expect(pageCode).toContain('mergeOlderChatMessages(alertPages.older(ALERTS_LOG), data.alerts)');
   });
 
   it('and it refuses page 0 and an unbounded offset, like the chat query', () => {
@@ -298,8 +315,8 @@ describe('the alerts log is paged by the same machinery', () => {
   });
 
   it('and stops at the first empty page, re-arming at the bottom', () => {
-    expect(pageCode).toContain('alertsHasMoreData = false;');
-    expect(pageCode).toContain('if (!alertsScrollingUp) alertsHasMoreData = true;');
+    expect(pageCode).toContain('alertPages.exhausted(ALERTS_LOG);');
+    expect(pageCode).toContain('if (!alertsScrollingUp) alertPages.arm(ALERTS_LOG);');
   });
 });
 

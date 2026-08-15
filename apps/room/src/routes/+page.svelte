@@ -110,6 +110,7 @@
   } from '$lib/roster-gates';
   import { RoomRoster } from '$lib/room/roster.svelte';
   import { RoomAlerts } from '$lib/room/alerts.svelte';
+  import { ALERTS_LOG, RoomLogPages } from '$lib/room/log-pages.svelte';
   import { alertSoundButtonFor, filesSectionHidden } from '$lib/files-gates';
   import {
     INITIAL_FILE_SORT,
@@ -2281,11 +2282,20 @@
     nudges are the same code there and are the same code here. What differs is only that alerts have
     no channel — `getAlertsLog {page}` against `getChatLog {channel, page}`.
   */
-  /** Older alert pages, oldest-first. */
-  let olderAlerts = $state.raw<(typeof data.alerts)[number][]>([]);
-  let alertsPage = $state.raw(0);
-  let alertsHasMoreData = $state(true);
-  let alertsLoadingMore = $state(false);
+  /*
+    Older-page state for BOTH logs, in `$lib/room/log-pages.svelte.ts`.
+
+    The room held this machinery twice and in two shapes — scalars for alerts, per-channel maps for
+    chat — and neither was wrong, which is what let the duplication survive. Upstream keeps the
+    state on the roomlog COMPONENT and renders one per log view, so the alerts pane has one set and
+    the chat pane has one set per channel it renders. Same machinery at two arities. One keyed class
+    covers both: alerts passes a fixed key, chat passes its tab.
+
+    Two instances rather than one, because the two logs hold different row types and a single
+    instance would have to be typed as their union — at which point every read needs narrowing that
+    the key already decides.
+  */
+  const alertPages = new RoomLogPages<(typeof data.alerts)[number]>();
   /*
     The live tail from the load, with whatever older pages the reader has scrolled back to in front
     of it — the same two-lifetime split the chat log uses, and for the same reason: `data.alerts` is
@@ -2378,7 +2388,7 @@
   }
 
   const visibleAlerts = $derived(
-    mergeOlderChatMessages(olderAlerts, data.alerts)
+    mergeOlderChatMessages(alertPages.older(ALERTS_LOG), data.alerts)
       .filter((item) => !isEvidenceMessageHidden(item))
       .map(withEvidenceState)
       .filter(alerts.matchesSearch)
@@ -2628,28 +2638,14 @@
    * `$state.raw`: these arrays are only ever REPLACED, never mutated in place, so a deep proxy over
    * every message row would cost a proxy read per field on every render and buy nothing.
    */
-  let olderChatMessages = $state.raw<Record<string, (typeof data.messages)[number][]>>({});
-  /** `this.currPage`, per channel. Page 0 is what the load already sent. */
-  let chatPage = $state.raw<Record<string, number>>({});
-
-  /**
-   * `this.hasMoreData`, PER CHANNEL — cleared when a page comes back empty, re-armed at the bottom.
-   *
-   * Per channel because the reference's state lives on the roomlog COMPONENT, and it renders one
-   * per channel; a single shared flag here meant that reaching the start of `main` also stopped
-   * `off-topic` from ever paging, however much history it had. Absent means true: a channel nobody
-   * has paged yet has more data until it says otherwise.
-   */
-  let chatHasMoreData = $state.raw<Record<string, boolean>>({});
-  /** `this.loadingMore` — one request at a time. */
-  let chatLoadingMore = $state(false);
+  const chatPages = new RoomLogPages<(typeof data.messages)[number]>();
 
   /*
     The live tail from the load, with whatever older pages the reader has scrolled back to in front
     of it.
 
     The two halves have different lifetimes on purpose: `data.messages` is replaced by every
-    `invalidateAll()`, which is every SSE event, while `olderChatMessages` survives them. Merging
+    `invalidateAll()`, which is every SSE event, while the held older pages survive them. Merging
     rather than concatenating because offset paging over a live tail can hand the boundary row back
     twice — see `mergeOlderChatMessages`, which matches on identity and never on order.
 
@@ -2666,7 +2662,7 @@
 
   function chatMessagesFor(tab: ChatTab) {
     return trimChatLog(
-      mergeOlderChatMessages(olderChatMessages[tab] ?? [], data.messages),
+      mergeOlderChatMessages(chatPages.older(tab), data.messages),
       trimChatLogs
     )
       .filter((item) => item.room === tab && !isEvidenceMessageHidden(item))
@@ -2728,7 +2724,7 @@
     const scroller = event.currentTarget as HTMLElement;
     alertsScrollingUp = isRoomScrollerReadingHistory(scroller);
     // Back at the bottom, so paging is armed again — `hasMoreData = !0` on the way down.
-    if (!alertsScrollingUp) alertsHasMoreData = true;
+    if (!alertsScrollingUp) alertPages.arm(ALERTS_LOG);
     if (
       !shouldLoadOlderMessages({
         scrollTop: scroller.scrollTop,
@@ -2738,8 +2734,8 @@
            term is set because a filtered log is not a paged one — asking for page 2 of a filter the
            server knows nothing about would interleave unfiltered history into a filtered view. */
         searchTerm: alerts.search,
-        hasMoreData: alertsHasMoreData,
-        loadingMore: alertsLoadingMore
+        hasMoreData: alertPages.hasMore(ALERTS_LOG),
+        loadingMore: alertPages.loading
       })
     ) {
       return;
@@ -2750,8 +2746,7 @@
 
   /** `loadMoreLogs({type: 'alerts', page})` -> `getAlertsLog {page}`. */
   async function loadOlderAlerts(scroller: HTMLElement) {
-    alertsLoadingMore = true;
-    const page = alertsPage + 1;
+    const page = alertPages.requesting(ALERTS_LOG);
 
     let incoming: Awaited<ReturnType<typeof loadOlderAlertsPage>>;
     try {
@@ -2760,16 +2755,15 @@
       // Non-fatal by design, not swallowed: `hasMoreData` stays true and the next scroll retries.
       return; // `log-pages.remote.ts` carries why, and why the `finally` below must not move.
     } finally {
-      alertsLoadingMore = false;
+      alertPages.settled();
     }
 
     if (incoming.length === 0) {
-      alertsHasMoreData = false;
+      alertPages.exhausted(ALERTS_LOG);
       return;
     }
 
-    alertsPage = page;
-    olderAlerts = mergeOlderChatMessages(incoming, olderAlerts);
+    alertPages.arrived(ALERTS_LOG, incoming, page);
     scroller.scrollTop += CHAT_PAGE_ARRIVAL_NUDGE;
   }
 
@@ -2781,7 +2775,7 @@
       reference's own reset, and without it a reader who once hit the end of the history could never
       page again in that session even after the log had grown.
     */
-    if (!chatScrollingUp) chatHasMoreData = { ...chatHasMoreData, [chatTab]: true };
+    if (!chatScrollingUp) chatPages.arm(chatTab);
     maybeLoadOlderMessages(scroller);
   }
 
@@ -2806,8 +2800,8 @@
           only honest value it has.
         */
         searchTerm: '',
-        hasMoreData: chatHasMoreData[chatTab] ?? true,
-        loadingMore: chatLoadingMore
+        hasMoreData: chatPages.hasMore(chatTab),
+        loadingMore: chatPages.loading
       })
     ) {
       return;
@@ -2829,8 +2823,7 @@
    * and does not need to, because running out is something you discover by asking once too often.
    */
   async function loadOlderChatMessages(channel: ChatTab, scroller: HTMLElement) {
-    chatLoadingMore = true;
-    const page = (chatPage[channel] ?? 0) + 1;
+    const page = chatPages.requesting(channel);
 
     let incoming: Awaited<ReturnType<typeof loadOlderChatPage>>;
     try {
@@ -2838,19 +2831,15 @@
     } catch {
       return; // Non-fatal and retried, exactly as the alerts sibling above.
     } finally {
-      chatLoadingMore = false;
+      chatPages.settled();
     }
 
     if (incoming.length === 0) {
-      chatHasMoreData = { ...chatHasMoreData, [channel]: false };
+      chatPages.exhausted(channel);
       return;
     }
 
-    chatPage = { ...chatPage, [channel]: page };
-    olderChatMessages = {
-      ...olderChatMessages,
-      [channel]: mergeOlderChatMessages(incoming, olderChatMessages[channel] ?? [])
-    };
+    chatPages.arrived(channel, incoming, page);
     /*
       The SECOND nudge. The reference does two and they are not duplicates: `+30` the instant the
       request goes out, which is above, and `+1` when a page greater than zero arrives, which is
@@ -6557,16 +6546,14 @@
    */
   function trackExtraChatScroll(scroller: HTMLElement) {
     extraChatScrollingUp = isRoomScrollerReadingHistory(scroller);
-    if (!extraChatScrollingUp) {
-      chatHasMoreData = { ...chatHasMoreData, [extraChatTab]: true };
-    }
+    if (!extraChatScrollingUp) chatPages.arm(extraChatTab);
     if (
       !shouldLoadOlderMessages({
         scrollTop: scroller.scrollTop,
         messageCount: visibleExtraChatMessages.length,
         searchTerm: '',
-        hasMoreData: chatHasMoreData[extraChatTab] ?? true,
-        loadingMore: chatLoadingMore
+        hasMoreData: chatPages.hasMore(extraChatTab),
+        loadingMore: chatPages.loading
       })
     ) {
       return;
