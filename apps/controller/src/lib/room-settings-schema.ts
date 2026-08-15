@@ -14,7 +14,7 @@
 // and ng-show="sess.roomType=='webinar'" reads it at byte 2,652 to reveal the Date row.
 //
 // `wired` is the honest bit: false means the controller can store the value but
-// nothing in the room reads it yet. 60 of 269 are wired today.
+// nothing in the room reads it yet. 61 of 269 are wired today.
 // Flip one to true ONLY when a consumer exists, so the UI can mark the rest
 // instead of pretending they do something.
 
@@ -317,7 +317,7 @@ export const ROOM_SETTINGS: readonly RoomSettingDef[] = [
   { name: "altCodeAppJS", section: "settings", type: "textarea", label: "Alt AppJS", help: "(name if alt vendorJS. ie. 'app2.min.js'", helpShape: "muted", helpOutside: false, captured: null, capturedIsDisplayOnly: false, group: "dont-touch", wired: false },
   { name: "customJanus", section: "settings", type: "textarea", label: "Alt JanusJS", help: "(name if alt janusJS. ie. 'janus4.js'", helpShape: "muted", helpOutside: false, captured: null, capturedIsDisplayOnly: false, group: "dont-touch", wired: false },
   { name: "alt_roomjs", section: "settings", type: "textarea", label: "Alt Room.js", help: "(name if alt Room.js. ie. 'RoomRemoteRec.js'", helpShape: "muted", helpOutside: false, captured: null, capturedIsDisplayOnly: false, group: "dont-touch", wired: false },
-  { name: "modAlertFilterList", section: "settings", type: "textarea", label: "Alert filter list for mods:", help: "i.e. [{\"username\":\"John\",\"avatar\":\"john@example.com\"}]", helpShape: "muted", helpOutside: false, captured: null, capturedIsDisplayOnly: false, group: "dont-touch", wired: false },
+  { name: "modAlertFilterList", section: "settings", type: "textarea", label: "Alert filter list for mods:", help: "i.e. [{\"username\":\"John\",\"avatar\":\"john@example.com\"}]", helpShape: "muted", helpOutside: false, captured: null, capturedIsDisplayOnly: false, group: "dont-touch", wired: true },
   { name: "customCSS", section: "settings", type: "textarea", label: "Custom CSS", help: "Custom CSS to custimize colors, etc...", helpShape: "muted", helpOutside: false, captured: null, capturedIsDisplayOnly: false, group: "dont-touch", wired: false },
   { name: "darkThemeStyle", section: "settings", type: "textarea", label: "Dark Theme Style", help: "Dark theme style to custimize colors.", helpShape: "muted", helpOutside: false, captured: null, capturedIsDisplayOnly: false, group: "dont-touch", wired: false },
   { name: "hideLogo", section: "settings", type: "checkbox", label: "Hide Logo", help: null, helpShape: null, helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: "dont-touch", wired: false },

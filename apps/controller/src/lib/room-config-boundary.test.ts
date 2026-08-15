@@ -195,8 +195,7 @@ describe('the allow-list itself', () => {
       hasRequiredPhoneInLogin: 'app-session-login — whether a phone number is collected and required',
       customEnterDisclosure: 'app-session-login — the disclosure dialog shown before entry',
       disableEditingUsername: 'app-session-login — whether a non-presenter may change their name',
-      enableRTE:
-        '+page.svelte `canUseRTE` — the composer rich-text button, the editor, and the send, all three',
+      enableRTE: '+page.svelte `canUseRTE` — the composer rich-text button, the editor, and the send, all three',
       presenterMsgsOnTheRight:
         'RoomMessage — `presenter-msg-right` on the body and `presenter-reactions-right` on the reactions',
       allowUsersToChangeUsername: 'O(9) fallback — a member renaming themselves',
@@ -296,7 +295,17 @@ describe('the allow-list itself', () => {
         from the one above by substitution.
       */
       hasDayTradeAlerts:
-        'dayTradeAlertsTabVisible() — the Day Trades tab, the #dayTradeAlerts pane, the initial getDayTradeAlertsLog read and the three mutations, all on one flag'
+        'dayTradeAlertsTabVisible() — the Day Trades tab, the #dayTradeAlerts pane, the initial getDayTradeAlertsLog read and the three mutations, all on one flag',
+      /*
+        THE THIRD PLACE, added in the same change that put the name on `ROOM_VISIBLE_SETTINGS` and
+        on `ROOM_CONSUMED`, rather than being found red afterwards.
+
+        Not a boolean like its neighbours. `alertFilterAvailable()` in `alert-filter.ts` treats a
+        truthy, non-whitespace value as "the feature exists at all", which is the reference's own
+        gate at bundle bytes 2,042,979 and 2,286,654.
+      */
+      modAlertFilterList:
+        'alert-filter.ts — alertFilterAvailable() gates the whole feature, and parseModAlertFilterList() turns the JSON string into the {username, avatar} rows the filter modal lists'
     };
     expect(Object.keys(consumers).sort()).toEqual([...ROOM_VISIBLE_SETTINGS].sort());
   });

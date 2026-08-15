@@ -171,7 +171,14 @@ const EXPECTED_WIRED_SETTINGS = [
     upstream it redirects the log fetch at ANOTHER room, and this room takes its room from the
     session row so that nothing the browser can reach names the room being read.
   */
-  'hasDayTradeAlerts'
+  'hasDayTradeAlerts',
+  /*
+    Added 2026-08-15 with the Alert Filter. Not a boolean gate like its neighbours: a STRING
+    CONTAINING JSON, an array of {username, avatar}, which the reference parses at bundle byte
+    1,221,905 with no try/catch. The whole feature is gated on it being truthy, so a room that
+    configures no list has no entry point and no modal.
+  */
+  'modAlertFilterList'
 ].sort();
 
 const fail = (message) => {

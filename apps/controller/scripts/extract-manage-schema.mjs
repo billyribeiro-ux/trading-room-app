@@ -223,7 +223,23 @@ const ROOM_CONSUMED = [
      give. The boundary test reads this array with a regex that stops at the first closing bracket
      and matches single-quoted runs, so either character silently truncates the whole list. That has
      gone red three times, which is why the word for the punctuation is spelled out instead. */
-  'hasDayTradeAlerts'
+  'hasDayTradeAlerts',
+  /* "Alert filter list for mods:" — added 2026-08-15 with the Alert Filter.
+
+     Not a boolean gate like every flag above it. This one is a STRING CONTAINING JSON, holding a
+     list of username and avatar pairs, which the reference parses at bundle byte 1,221,905 with no
+     try around it. It is the third room setting shipped that way, after alertLabels and
+     chatTabsWithBadges.
+
+     It has to cross because the reference gates the WHOLE feature on it being truthy, at bytes
+     2,042,979 and 2,286,654. A room that configures no list gets no entry point, no modal and no
+     filtering, and the room cannot decide that for itself.
+
+     The avatars are gravatar hashes of emails the owner already administers, and every alert
+     already carries senderAvt so the room can draw the avatar. Nothing new crosses.
+
+     NO SQUARE BRACKET AND NO APOSTROPHE ANYWHERE ABOVE, for the reason the notes further up give. */
+  'modAlertFilterList'
 ];
 
 /**
@@ -639,9 +655,15 @@ const missingWiredSettings = [...WIRED_SETTINGS].filter((name) => !defs.some((de
 // for non-presenters. Their two manage-page neighbours, the MediaMTX cluster ids, stay unwired:
 // they name infrastructure, the room bundle reads neither, and the room finds its host server-side.
 //
+// 61 since 2026-08-15: `modAlertFilterList` joined with the Alert Filter. It is the first entry on
+// this list that is NOT a boolean gate — a string containing JSON, a list of username and avatar
+// pairs, parsed at bundle byte 1,221,905. The reference gates the entire feature on it being
+// truthy, so a room that configures no list has no entry point and no modal, and the room cannot
+// decide that for itself.
+//
 // The literal is a tripwire, not a fact about the schema — it is here so the wired set cannot grow
 // by accident, which is why changing it is a deliberate edit.
-if (WIRED_SETTINGS.size !== 60 || missingWiredSettings.length > 0) {
+if (WIRED_SETTINGS.size !== 61 || missingWiredSettings.length > 0) {
   throw new Error(
     `wired-setting contract invalid: ${WIRED_SETTINGS.size} keys, missing ${missingWiredSettings.join(', ') || 'none'}`
   );

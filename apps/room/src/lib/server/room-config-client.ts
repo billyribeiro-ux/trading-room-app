@@ -276,6 +276,29 @@ export interface RoomSessionSettings {
    * naming, kept so the setting matches the label an owner ticks on the Manage page.
    */
   overlayUserIdOnScreenshare?: boolean;
+  /**
+   * "Alert filter list for mods:" — the people a viewer may filter their own alerts by.
+   *
+   * **A STRING CONTAINING JSON, not an array.** `syncModAlertFilterList()` at bundle byte 1,221,905
+   * does `JSON.parse(sessData.modAlertFilterList) || []` — with **no try/catch**, unlike the filter
+   * guard, which has one. That asymmetry is reproduced in `parseModAlertFilterList`: a malformed
+   * setting throws when the modal opens and the room keeps running.
+   *
+   * The parsed shape is `{ username, avatar }`, proven by `selectAll()` at byte 1,220,674. It is the
+   * third room setting shipped as a JSON string, after `alertLabels` and `chatTabsWithBadges`.
+   *
+   * **It gates the whole feature, not just the list.** The reference hangs its entry points on this
+   * value being truthy — bytes 2,042,979 and 2,286,654 — so a room that configures nothing has no
+   * button, no modal and no filtering. There is nothing to default from, which is why the room
+   * cannot decide it locally.
+   *
+   * The avatars are gravatar hashes of emails the owner already administers, and every alert already
+   * carries `senderAvt` so the feed can draw the avatar — so nothing crosses here that the alerts
+   * feed does not already carry.
+   *
+   * Read by `$lib/alert-filter`.
+   */
+  modAlertFilterList?: string;
 }
 
 /** The connected member's per-room standing, which is per room and not per account. */
