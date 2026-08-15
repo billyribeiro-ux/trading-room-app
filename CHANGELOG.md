@@ -24,6 +24,85 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-15
 
+### 2026-08-15 02:04 EDT — the feature audit was blind to one wire command, and finding it corrected the Swing spec
+
+**Runtime impact: none.** One script and one document. No application code changed.
+
+`audit-feature-coverage.mjs` enumerated client→server commands with a regex over
+`sendServerCommand("…")` — quoted literals only. Measured in the current v4 bundle: **86 send sites
+use a quoted name and exactly one builds its name at runtime**, so the inventory silently
+under-reported the reference by two commands and would have reported full coverage while
+`getSwingAlertsLog` and `getDayTradeAlertsLog` were missing.
+
+The site, read at byte 1,993,765:
+
+```js
+sendServerCommand(`get${e}AlertsLog`, { sessionID: s || globals.sessionID, days: i })
+```
+
+`e` is a parameter, so no pattern can expand it. The two values are pinned in the same expression
+(`"Swing" === e ? 30*swingAlertMonths : 4*dayTradeAlertMonths*7`), which is why the expansions are
+listed by hand — with a **guard that throws if a second runtime-built send site ever appears**, so
+the one hand-maintained list in that file cannot rot silently.
+
+**What the fix then surfaced, which is the actual value here.** With the inventory complete,
+`editAlertMessageSwing` showed as present in the reference and absent from ours. Reading byte
+1,983,136 showed the Swing spec was wrong about the submit path in three ways:
+
+1. **A submit sends TWO commands, not one.** Create sends `swingAlertMsg` *and then* `alertMsg` —
+   a swing alert also posts into the main alerts feed. Edit sends `editSwingAlertMsg` *and then*
+   `editAlertMessageSwing`.
+2. **`newSwingAlertMsg` is also a payload KEY** on `editSwingAlertMsg`, not only a response command
+   name. The string carries two meanings and had already been misread once in this repository.
+3. **`editAlertMessageSwing` is the literal name the Day Trade path uses too** (byte 1,987,189) —
+   only the boolean differs, `swingTradeAlert` vs `dayTradeAlert`. Anyone porting Day Trade later
+   would "obviously" rename it and break it.
+
+Also read verbatim and handed to the build: `formatSwingAlertTxt` (the header is `"#SwingTrade \n"`
+with a space before the newline, and the label **"Exit" renders the STOP value** — not a typo to
+correct), `clearSwingAlertFields` (default direction `"long"`), and `onSwingAlertCancel` (confirms on
+symbol/entry/stop/target/image, deliberately **not** on `alertTxt`).
+
+**Verified:** script re-run, guard exercised, all counts via python `.count()` on the 2,891,205-byte
+bundle. Every byte offset above was opened and read, not searched. **Not run:** the full gate —
+nothing under `src/` changed in this entry.
+
+### 2026-08-15 02:00 EDT — decode gaps closed, and the answers were not in the bundle
+
+**Runtime impact: none.** One new document, `docs/decoded/gaps-closed.md` (62 KB).
+
+The four previous decode agents all read the **JavaScript bundle**. Almost every question they left
+open was a *server-data* or *stylesheet* question, and those answers were in the manage-page HTML
+captures and the browser-computed stylesheets — **three of the sources already inside this
+repository.** The lesson is recorded because it will recur: *when a decode stalls, check whether the
+question is even answerable by the artifact being read.*
+
+What closed, spot-checked by me against the raw bytes rather than accepted from the report:
+
+- **`sessData`** — 268 fields with live values extracted from the manage page, cross-checked against
+  a second room, then censused against the bundle's read side (135 distinct keys, 442 references).
+- **`upload_server` / `cdn_upload_key` are NOT sessData** — hardcoded client constants at bundle byte
+  976,514. **Two live credentials sit in a public bundle**; both are redacted in the document, which
+  I verified by reading the region rather than trusting the claim.
+- **`senderAvt` = `md5(trim(lowercase(email)))`** — derived from the bundle's own `hashEmail` (byte
+  1,026,984, read and confirmed) and its MD5 self-test, without hashing anyone's real email.
+- **`@keyframes flash` was in `styles.ee2a710065b60389.css` in this repository all along** — offset
+  430,183, confirmed. `.animated` has **0** rules in that file, so the class is inert.
+- **The claim "`.fa-` is absent from every capture" was wrong** — FA 4.3.0 and 5.8.1 are both present.
+
+**The negative control that mattered, and why it is recorded.** `swing-alerts.md` cites
+`linkedRoomSwingAlertsOther` at offset 1,993,765; the literal occurs **0** times. Rather than report
+a doc error, the offset was opened — the key is built as `` sessData[`linkedRoom${e}AlertsOther`] ``,
+so the literal can never exist. Stopping at the count would have reported working code as broken.
+**This is the same template-literal blind spot the entry above fixes in the audit script.**
+
+**Three items remain honestly open** and are recorded as gaps, not filled in: the archives HTML body
+(needs one authenticated GET), the mobile PIN's digit count (every captured row has a falsy
+`mobilePairCode`), and — flagged for the owner — **whether `sessData` is redacted per role.** No
+delivered payload exists in any dump, and the client reads `deleteAlertPW`, `roomPublicSecret`,
+`banIPList` and `obsStreamKey` with **no role guard**, comparing `deleteAlertPW` in a browser prompt.
+If the server ships that object whole to members, it is a disclosure bug in the original.
+
 ### 2026-08-15 00:02 EDT — local dev secrets restored, and four "unbuildable" items were not
 
 **Runtime impact: yes, on production configuration** — `API_KEY_ENCRYPTION_KEY` was rotated in Vercel

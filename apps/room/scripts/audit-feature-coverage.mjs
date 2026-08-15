@@ -65,6 +65,27 @@ function readOurSource(dir) {
 const bundle = readFileSync(BUNDLE, 'utf8');
 const ours = readOurSource(new URL(SRC).pathname);
 
+/**
+ * The expansions of the one send site whose command name is built at runtime. See the long comment
+ * on the "Wire commands" inventory for why these cannot be derived by pattern.
+ */
+const TEMPLATE_BUILT_COMMANDS = ['getSwingAlertsLog', 'getDayTradeAlertsLog'];
+
+/*
+  A guard, not a formality. The list above is the one hand-maintained thing in this file, so it is
+  the one thing that can silently rot. If upstream ever adds a second runtime-built send site — a
+  third alert family, or any other `sendServerCommand(`…${…}…`)` — this throws instead of quietly
+  under-reporting, which is the exact failure the list was added to fix.
+*/
+const templateSendSites = bundle.match(/sendServer(?:Admin)?Command\(`[^`]+`/g) ?? [];
+if (templateSendSites.length !== 1) {
+  throw new Error(
+    `Expected exactly 1 template-literal send site (the one expanded by TEMPLATE_BUILT_COMMANDS), ` +
+      `found ${templateSendSites.length}: ${templateSendSites.join(', ')}. ` +
+      `Read each one and update TEMPLATE_BUILT_COMMANDS before trusting this report.`
+  );
+}
+
 /*
   The three inventories. Each is read out of the bundle rather than listed here, so a feature added
   upstream appears in this report without anybody editing this file — which is the entire point.
@@ -81,10 +102,32 @@ const inventories = [
       Read from the send sites, NOT from `case` labels. The two differ and the difference matters:
       `swingAlertMsg` is sent while `newSwingAlertMsg` is the response, and building from the case
       label would produce a command the server rejects. Found 2026-08-15 by two agents independently.
+
+      ## Why the template-literal branch below exists
+
+      The quoted-literal pattern alone is INCOMPLETE, and the gap was invisible until 2026-08-15.
+      Measured in the current v4 bundle: 86 send sites use a double-quoted name and exactly ONE
+      builds its name at runtime —
+
+          this.appService.sendServerCommand(`get${e}AlertsLog`, {...})   // byte 1,993,765
+
+      where `e` is `"Swing"` or `"DayTrade"`. A regex over quoted strings can never see those two
+      commands, so an inventory built from it under-reports the reference and reports full coverage
+      while two real commands are missing.
+
+      They are listed explicitly rather than resolved by pattern because `e` is a parameter, not a
+      constant: nothing in the file can expand it. The two values were obtained by READING the
+      enclosing method — the same line computes `"Swing" === e ? 30 * swingAlertMonths : 4 *
+      dayTradeAlertMonths * 7`, which is what fixes the alternatives at exactly two. If a third
+      alert family is ever added upstream, this list must be re-read; the count check below is what
+      makes that failure loud instead of silent.
     */
-    items: distinct(bundle, /sendServer(?:Admin)?Command\("[a-zA-Z]+"/g).map((m) =>
-      m.replace(/.*"([a-zA-Z]+)"/, '$1')
-    )
+    items: [
+      ...distinct(bundle, /sendServer(?:Admin)?Command\("[a-zA-Z]+"/g).map((m) =>
+        m.replace(/.*"([a-zA-Z]+)"/, '$1')
+      ),
+      ...TEMPLATE_BUILT_COMMANDS
+    ].sort()
   },
   {
     title: 'Server commands handled (server -> client)',
