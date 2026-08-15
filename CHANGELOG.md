@@ -24,6 +24,27 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-14
 
+### 2026-08-14 23:13 EDT — NINJA.md, the owner's list and only that
+
+**Runtime impact: no.** One new file at the repository root.
+
+Everything left in `TODO.md` that is blocked on the OWNER rather than on effort, in one place and in
+the order that unblocks the most: stand up MediaMTX (four rows at once), say the one sentence that
+clears the credential guard on T5-24/25, create `apps/room/.env`, run the WordPress plugin inside a
+live WordPress, measure screen-share quality at a real desktop, and read one style attribute in
+DevTools.
+
+It does not duplicate the runbooks that already exist — `ops/mediamtx/README.md`,
+`integrations/wordpress/STAGING-TEST.md`, `apps/room/docs/MEASURE-SHARE-QUALITY.md` and the two
+OBS/XSplit documents. It points at each and carries the shape, the exact values, and the traps: the
+UDP/8189 port everyone forgets, the self-signed certificate that reads as a wrong stream key, the
+`- action: read` exclusion that would serve every room's video to anyone who guesses a path, and the
+5180-vs-5173 port that sent an earlier probe into a different project on the same machine.
+
+Two CI facts are recorded there for the same reason — that the account is out of minutes is the
+cause of the red backend job, and that a green PR check has never proven the backend, because that
+job skips itself on a diff touching no backend path.
+
 ### 2026-08-14 23:06 EDT — the side-by-side tests stop depending on one machine
 
 **Runtime impact: no.** Five controller test files and one new test-support module. Committed, **not
