@@ -618,7 +618,11 @@ const body = `// GENERATED — do not edit by hand.
   .map(([k, v]) => `${k} ${v}`)
   .join(', ')}.
 // ${capturedSetCount} extracted settings had a captured value; ${extractedUnsetCount} were unset.
-// roomType has no captured value because its editor is absent from rendered evidence.
+// roomType has no captured value because its editor sits inside an HTML comment in the
+// served DOM (byte 2,377) — PRESENT in the evidence, just not rendered as a control. Said
+// precisely because "absent from evidence" is the phrasing that makes the next reader search,
+// find nothing, and conclude the reference lacks the field. It does not: the property is live,
+// and ng-show="sess.roomType=='webinar'" reads it at byte 2,652 to reveal the Date row.
 //
 // \`wired\` is the honest bit: false means the controller can store the value but
 // nothing in the room reads it yet. ${wiredCount} of ${defs.length} are wired today.

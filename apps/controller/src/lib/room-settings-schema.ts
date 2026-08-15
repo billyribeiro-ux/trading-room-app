@@ -7,7 +7,11 @@
 // By type: text 35, combodate 1, select 2, textarea 84, checkbox 141, number 5, html 1.
 // By section: room-form 3, sso-setup 1, settings 264, branding 1.
 // 154 extracted settings had a captured value; 114 were unset.
-// roomType has no captured value because its editor is absent from rendered evidence.
+// roomType has no captured value because its editor sits inside an HTML comment in the
+// served DOM (byte 2,377) — PRESENT in the evidence, just not rendered as a control. Said
+// precisely because "absent from evidence" is the phrasing that makes the next reader search,
+// find nothing, and conclude the reference lacks the field. It does not: the property is live,
+// and ng-show="sess.roomType=='webinar'" reads it at byte 2,652 to reveal the Date row.
 //
 // `wired` is the honest bit: false means the controller can store the value but
 // nothing in the room reads it yet. 58 of 269 are wired today.

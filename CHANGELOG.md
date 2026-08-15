@@ -24,6 +24,54 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-15
 
+### 2026-08-15 02:09 EDT — the admin surface inventoried, and the control plane is confirmed unmatchable
+
+**Runtime impact: none.** One new document plus a five-line comment correction in a generated header.
+
+`docs/decoded/admin-surface.md` (83 KB) inventories the reference's Manage page, account surface and
+onboarding. I re-derived its three load-bearing numbers myself rather than accept them:
+
+| claim | my independent measurement |
+| --- | --- |
+| 267 live `saveSessField` fields, 9 more inside HTML comments | **267 live / 9 commented / 276 total**, split by masking every `<!-- … -->` region ✅ |
+| 58 of 269 settings wired | **58 `wired: true`, 211 `wired: false`, 269 entries** ✅ |
+| the manage page is 216,609 bytes | **216,609** ✅ |
+
+The 9 comment-only fields are `chatAutoClearTime`, `customRoomURL`, `linkedStreamsToSession`,
+`media_server_audio`, `relay_to_repeaters`, `relay_user_max`, `roomType`, `useV4`, `webinarTZ`.
+**`useV4` appearing there independently confirms the separate v5 finding by a different method** —
+two agents, two techniques, one answer.
+
+**The finding that matters most is a negative one.** Twelve operator-level terms return zero hits
+across every capture, with the search proved sound by a control that does return hits. There is **no
+operator/staff console in any evidence we hold** — the closest artefacts (`modAdminLoginList`, Extra
+Admin Users, `applyToAllSessions()`) are all room- or account-scoped. So the super-admin control
+plane **cannot be matched; it can only be designed.** That is worth knowing before building it, and
+it means the usual "match the reference" bar does not apply to that one surface.
+
+**A trap now written down.** `~/Desktop/new-room/second-dump/db/` is **our own PostgreSQL**, not the
+original's database — verified by reading its README: container `ptr-clone-postgres-1`, database
+`ptr_clone`, PG 17.10, with a `drizzle.__drizzle_migrations` table. Drizzle is our ORM. Treating that
+directory as reference evidence would mean reading our own schema back as though it described the
+original, and the root `CLAUDE.md` line calling `second-dump/**` a capture makes that mistake easy.
+
+**One correction to the agent's headline, and one to my own first reading of it.** The agent called
+`roomType` the single EXTRA-OURS setting. I initially wrote that up as wrong; it is not. The field is
+reference data — `ng-show="sess.roomType=='webinar'"` reads it live at byte 2,652 — while its
+*editor* is commented out at byte 2,377, so shipping an editor for it genuinely is our addition.
+`extract-manage-schema.mjs` already had this exactly right in its own reviewed-deviation comment,
+including a guard that throws if `roomType` ever becomes evidence-extracted.
+
+What was actually wrong was one line of the header that file *emits*: "its editor is absent from
+rendered evidence." The editor is not absent, it is commented out — and "absent from evidence" is the
+precise phrasing that makes the next reader search, find nothing, and conclude the reference lacks
+the field. That is the `st-fileSortBar` failure verbatim. Fixed in the generator, since the schema
+file is generated.
+
+**Verified:** `pnpm schema:extract` re-run — all 269 entries byte-identical, comment-only diff;
+`room-config-boundary.test.ts` **17/17 pass**. **Not run:** the full gate — no application code
+changed.
+
 ### 2026-08-15 02:04 EDT — the feature audit was blind to one wire command, and finding it corrected the Swing spec
 
 **Runtime impact: none.** One script and one document. No application code changed.
