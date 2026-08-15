@@ -194,10 +194,10 @@ realtime feature has this, `focusOnScreen` included. The reconcile is what keeps
 correct regardless; the durable fix is TODO entry 5 (PostgreSQL `room_events`, already listened on by
 `services/api`).
 
-**Two dead files found on the way, not yet removed:** `apps/room/svelte.config 2.js` and
-`apps/controller/svelte.config 2.js` are tracked in git and read by nothing — Kit 3 takes its
-configuration through the Vite plugin, which both `vite.config.ts` files say in their own comments.
-The room's real adapter selection lives there. Deleting them is a separate, trivial change.
+**The two dead `svelte.config 2.js` files were REMOVED 2026-08-14**, along with `TODO 2.md`. Kit 3
+takes its configuration through the Vite plugin and **errors** on a real `svelte.config.js`, so only
+the `" 2"` in those names kept them harmless — renaming one back would have broken the build. Zero
+tracked duplicate-named files remain.
 
 **The "not ours to author" blocker this row used to claim was WRONG, and it is retracted.** The
 `muser` shape is fully determined by the bundle: `_id` (identity, tab id `${_id}-tab`, pane id, and

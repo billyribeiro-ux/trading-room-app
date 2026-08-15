@@ -139,7 +139,23 @@ Two divergences, both deliberate and both visually identical:
    invalid HTML with no effect.
 
 One addition the reference has no equivalent for: when `STREAM_SERVER_MTX` is unset the panel says
-so, rather than composing `http://:8889/…`. An absent value is reported, never filled in.
+so, rather than composing `https://:8889/…`. An absent value is reported, never filled in.
+
+**One deliberate divergence, and the only one in this feature: the SCHEMES.** The reference builds
+`http://…:8889/…/whip` and `rtmp://…?jwt=…` (both quoted verbatim above, from byte 2157950). This
+application builds `https://` and `rtmps://…:1936`.
+
+Those URLs carry a **publish** token — thirty days, write access to a named room path. On plain HTTP
+the WHIP `Authorization: Bearer` header is readable by anything on the network path; on plain RTMP
+the token is *in the URL*, inside the connection handshake, where an observer need only watch.
+Presenters stream from hotel and conference networks routinely, and this is a multi-tenant fintech
+application: the failure mode is one tenant publishing into another tenant's room.
+
+It is the same rule `ScreenTabs` already applies to `aria-selected` and `tabindex` — a capture is
+reproduced unless reproducing it locks a real person out — applied to the stronger case.
+`stream-ingest.test.ts` pins both halves: that the reference really is cleartext, so this is a
+decision and not a misreading, and that ours never emits a cleartext scheme. The server half is
+`webrtcEncryption: yes` and `rtmpEncryption: strict` in `ops/mediamtx/mediamtx.yml.example`.
 
 ## 5. Authorising the publish — MediaMTX's side
 
@@ -185,11 +201,15 @@ the other; the crossover is refused as `wrong-scope` and has a test each way.
 authMethod: http
 authHTTPAddress: https://<controller-host>/internal/media-auth
 
-# WHIP. 8889 is the port in the reference's own ingest URL.
+# WHIP. 8889 is the port in the reference's own ingest URL. TLS is OURS — see the divergence note
+# in section 4: the publish credential is a thirty-day Bearer and may not cross a network in clear.
 webrtcAddress: :8889
+webrtcEncryption: yes
 
-# RTMP, standard port, which is why the reference's rtmp:// URL carries none.
-rtmpAddress: :1935
+# RTMPS. `strict` refuses plaintext outright. 1936 is MediaMTX's TLS listener and is NAMED in the
+# publish URL, unlike plain RTMP's 1935 which every encoder assumes.
+rtmpEncryption: strict
+rtmpsAddress: :1936
 
 # HLS is the PLAYBACK path — `index.m3u8`, served over TLS on 443 by the proxy in front of this.
 hls: yes

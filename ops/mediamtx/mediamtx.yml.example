@@ -42,8 +42,17 @@ apiAddress: 127.0.0.1:9997
 # Ingest.
 
 # WHIP/WebRTC. 8889 is the port in the reference's own ingest URL.
+#
+# TLS IS REQUIRED HERE, and it is the one place this deployment diverges from the reference. The
+# WHIP credential is a THIRTY-DAY PUBLISH token presented as an `Authorization: Bearer` header, and
+# on plain HTTP anything on the network path can read it — presenters stream from hotel and
+# conference Wi-Fi routinely. `apps/room/src/lib/stream-ingest.ts` therefore emits `https://`, and
+# without these three lines that URL will not connect.
 webrtc: yes
 webrtcAddress: :8889
+webrtcEncryption: yes
+webrtcServerKey: /etc/tradingroom-mediamtx/tls/server.key
+webrtcServerCert: /etc/tradingroom-mediamtx/tls/server.crt
 # WebRTC needs a UDP media path as well as the HTTP handshake port. This is the ICE listener, and
 # UDP/8189 must be open in the firewall or a WHIP publish completes its handshake and sends nothing.
 webrtcLocalUDPAddress: :8189
@@ -51,9 +60,17 @@ webrtcLocalUDPAddress: :8189
 # interface addresses are private, so name the public one explicitly.
 webrtcAdditionalHosts: [<STATIC_PUBLIC_IPV4>]
 
-# RTMP, standard port, which is why the reference's rtmp:// URL carries none.
+# RTMPS. `strict` refuses plaintext outright rather than accepting both — the sharper case of the
+# same rule, because RTMP puts the token IN THE URL, so on plaintext it crosses inside the
+# connection handshake where an observer need only watch. There is no upgrade path and no SNI.
+#
+# 1936 is MediaMTX's own default RTMPS listener and it is NAMED in the publish URL, unlike plain
+# RTMP's 1935 which every encoder assumes.
 rtmp: yes
-rtmpAddress: :1935
+rtmpEncryption: strict
+rtmpsAddress: :1936
+rtmpServerKey: /etc/tradingroom-mediamtx/tls/server.key
+rtmpServerCert: /etc/tradingroom-mediamtx/tls/server.crt
 
 ###############################################
 # Playback — HLS, served to Caddy on loopback and reaching browsers on 443.

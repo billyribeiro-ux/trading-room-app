@@ -19,6 +19,7 @@ Pinned reference release at the time of writing: **v1.20.0**, published 2026-08-
 | --- | --- |
 | A host with a **static public IPv4** | WebRTC announces an address to clients; a changing one breaks ICE. `ops/mediasoup` already requires this for the SFU. |
 | A DNS name for playback, e.g. `stream.<domain>` | Becomes `STREAM_SERVER_MTX`, and browsers fetch `https://<that>/…/index.m3u8`. |
+| A **certificate for that same name** | Both ingest listeners terminate TLS themselves (§6). OBS reports a bad handshake in the same way it reports a bad stream key, so a self-signed certificate costs an hour of looking in the wrong place. |
 | Caddy on the same host | Terminates TLS for HLS. The pattern is `ops/mediasoup/Caddyfile.example`. |
 | The controller reachable over HTTPS | MediaMTX calls it for **every** publish and **every** read. |
 | The room reachable over HTTPS | The `runOnAvailable` hook POSTs to it. |
@@ -33,9 +34,9 @@ diagnose from either side.
 
 | port | proto | exposure | what |
 | --- | --- | --- | --- |
-| 8889 | TCP | **public** | WHIP handshake |
+| 8889 | TCP | **public** | WHIP handshake, **TLS** |
 | 8189 | **UDP** | **public** | WebRTC ICE / media |
-| 1935 | TCP | **public** | RTMP ingest |
+| 1936 | TCP | **public** | RTMPS ingest, **TLS** |
 | 443 | TCP | **public** | HLS, via Caddy |
 | 8888 | TCP | **loopback** | HLS origin, Caddy only |
 | 9997 | TCP | **loopback** | Control API, the room only |
@@ -63,8 +64,13 @@ then sends no media, which looks like a broken encoder rather than a closed port
    `/etc/tradingroom-mediamtx`, `chmod 600` and root-owned for anything holding the secret.
 5. **Install the unit** at `/etc/systemd/system/tradingroom-mediamtx.service`, then
    `systemctl daemon-reload && systemctl enable --now tradingroom-mediamtx`.
-6. **Open the firewall** for 8889/tcp, 8189/udp, 1935/tcp and 443/tcp. Nothing else.
-7. **Set the application environment** and restart both apps:
+6. **Provision the ingest certificate.** Both ingest listeners terminate TLS themselves, so
+   MediaMTX needs a key and certificate at `/etc/tradingroom-mediamtx/tls/`, readable by the
+   container and by nothing else. Use a real certificate for the ingest hostname — a self-signed one
+   makes OBS fail with an opaque handshake error that reads like a wrong stream key.
+7. **Open the firewall** for 8889/tcp, 8189/udp, 1936/tcp and 443/tcp. Nothing else. **Not 1935** —
+   plaintext RTMP is refused by `rtmpEncryption: strict` and its listener is not started.
+8. **Set the application environment** and restart both apps:
 
    | app | variable | value |
    | --- | --- | --- |
@@ -137,17 +143,24 @@ correct. If the hook stops working entirely the feature degrades to ~5s latency;
 
 ---
 
-## 6. Two gaps this deployment does NOT close
+## 6. The one place this deployment diverges from the reference
 
-Both are in the ingest URLs the room hands a presenter, both are faithful transcriptions of the
-reference, and neither is acceptable for a fintech application. They are named here because the
-person standing up this host is the one who will notice them first.
+**Both ingest paths are encrypted, and the reference's are not.** Byte 2157950 builds
+`http://…:8889/…/whip` and `rtmp://…?jwt=…`, in the clear. This deployment serves `https://…:8889`
+and `rtmps://…:1936`, and `apps/room/src/lib/stream-ingest.ts` emits URLs to match.
 
-1. **WHIP is `http://<host>:8889/…`** (`apps/room/src/lib/stream-ingest.ts`). The publish credential
-   travels as an HTTP `Bearer` over **cleartext**. That token is valid for 30 days.
-2. **RTMP is `rtmp://…?jwt=…`**, not `rtmps://`. The publish token is in the query string of a
-   cleartext protocol.
+The reason is the credential, not the protocol. What these URLs carry is a **publish** token: it
+authorises writing video into a named room path and it lives for thirty days. On plain HTTP the WHIP
+`Authorization: Bearer` header is readable by anything on the path; on plain RTMP the token is in the
+URL itself, inside the connection handshake, where an observer need only watch. Presenters stream
+from hotel and conference networks as a matter of course, and this is a multi-tenant fintech
+application — the failure mode is one tenant publishing into another tenant's room.
 
-Closing them means `webrtcEncryption: yes` with a certificate (or Caddy in front of 8889) and
-`rtmpEncryption` with `rtmpsAddress`, plus changing both URL builders. Until then, treat a publish
-token as interceptable by anything on the network path between the encoder and this host.
+That is the same rule the room already applies to captured markup: a capture is reproduced unless
+reproducing it locks a real person out. `stream-ingest.test.ts` pins BOTH halves — that the reference
+really is cleartext, so this is a decision rather than a misreading, and that ours never emits a
+cleartext scheme.
+
+**The operational consequence, stated plainly:** a deployment that skips step 6 gets publish URLs
+that refuse to connect. That is the correct direction to fail. Refusing to publish is recoverable in
+a minute; a publish credential read off a conference network is not.

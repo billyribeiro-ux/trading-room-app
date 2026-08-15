@@ -24,6 +24,58 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-14
 
+### 2026-08-14 20:58 EDT — the publish credential stops crossing the wire in the clear
+
+**Runtime impact: yes, and it is a breaking change for any MediaMTX host already serving plaintext.**
+The OBS / XSplit publish URLs become `https://` and `rtmps://`. On `feat/extra-chat-column`.
+
+**The defect.** `whipIngestUrl` emitted `http://{host}:8889/{path}/whip` and `rtmpIngestUrl` emitted
+`rtmp://{host}/{path}?jwt={token}`. Both were faithful transcriptions of byte 2157950, and both put
+a **thirty-day publish token** on an unencrypted connection — as a readable `Authorization: Bearer`
+header on WHIP, and *inside the URL* on RTMP, where it crosses in the connection handshake with no
+upgrade path, no SNI and nothing for an observer to do but watch. Presenters stream from hotel and
+conference networks as a matter of course.
+
+What that token authorises is writing video into a named room path. Read off the wire, it lets a
+stranger publish into that presenter's room until it is rotated, and the room renders whatever
+arrives. In a multi-tenant fintech application that is one tenant publishing into another's room.
+
+**Why diverging is right here.** The rule this repository already applies to captured markup is that
+a capture is reproduced unless reproducing it locks a real person out — `ScreenTabs` diverges on
+`aria-selected` and `tabindex` on exactly that basis. This is the stronger case: reproducing it hands
+out a credential.
+
+**Both halves are pinned**, which is the part that matters for a divergence. `stream-ingest.test.ts`
+asserts that the REFERENCE really is cleartext — so this is a decision and not a misreading of the
+bundle — and that ours never emits a cleartext scheme, including a check that no `http://` hides
+later in a string that merely starts with `https://`. A third assertion states the property rather
+than the strings: wherever the token appears, nothing before it is a plaintext scheme.
+
+**The port became explicit as a consequence.** Plain RTMP could omit 1935 because every encoder
+assumes it; nothing assumes MediaMTX's 1936 for its TLS listener, so omitting it would produce a URL
+that silently never connects. `MEDIAMTX_RTMPS_PORT` is named and asserted.
+
+**The server half shipped with it**, or the URLs would be dead on arrival:
+`webrtcEncryption: yes` and `rtmpEncryption: strict` in `ops/mediamtx/mediamtx.yml.example`, a
+certificate step added to the install procedure, the ports table corrected to 1936, and the firewall
+step now says **not** 1935 — `strict` refuses plaintext rather than accepting both, so that listener
+never starts. `OBS-XSPLIT-SETUP.md` shows presenters the URLs they will actually be given.
+
+**A deployment that skips the certificate gets publish URLs that refuse to connect.** That is the
+correct direction to fail: refusing to publish is recoverable in a minute, a publish credential read
+off a conference network is not.
+
+**Also removed: three tracked files nothing reads.** `svelte.config 2.js` in both apps and
+`TODO 2.md` — macOS duplicate-name artifacts from the iCloud-synced working tree. The two configs
+were more than clutter: Kit 3 **errors** on a real `svelte.config.js`, so only the `" 2"` in the name
+kept them harmless, and renaming one back would break the build. `TODO 2.md` was worse — a stale
+snapshot whose unique lines still asserted that "the reference publishes to MediaMTX over WHIP", a
+claim retracted in `TODO.md` after being disproved. Zero tracked duplicate-named files remain.
+
+**Verified.** Room `pnpm lint` exit 0, `svelte-check` 0/0, **1199/1199** (three new assertions).
+Controller `pnpm lint` exit 0, 963/963. `privacy:verify` and `schema:verify` both pass after the
+deletions. The full gate has still not been run.
+
 ### 2026-08-14 20:47 EDT — the room lints clean, and the last five "unused variables" were features
 
 **Runtime impact: none.** Lint suppressions with citations, dead-code removal, and five gaps
