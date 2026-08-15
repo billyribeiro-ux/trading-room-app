@@ -10,7 +10,7 @@ import {
   type User
 } from '$lib/server/db/schema';
 import { resetRateLimits } from '$lib/server/rate-limit';
-import { actions } from '../routes/+page.server';
+import { callRemote } from '$lib/server/remote-command-harness';
 
 /*
   Characterization tests for the four actions that create content: sendMessage, replyMessage,
@@ -26,21 +26,29 @@ import { actions } from '../routes/+page.server';
   429 that has nothing to do with what it is asserting.
 */
 
-type ActionArgs = Parameters<(typeof actions)['sendMessage']>[0];
+/*
+  REWRITTEN, not re-pointed, when these four became remote commands. Every assertion still EXECUTES
+  against the live database through `callRemote`, which establishes the request store a command's
+  wrapper reads — `remote-command-harness.ts` records which fields Kit needs and where each was read.
 
-function event(user: User, fields: Record<string, string>) {
-  const body = new FormData();
-  for (const [key, value] of Object.entries(fields)) body.set(key, value);
-  return {
-    request: new Request('http://localhost/', { method: 'POST', body }),
-    /*
-      `roomShortCode` is on the session because the room's realtime channel is keyed by room now.
-      It used to be the constant `'ptr-room'`, which was correct while the build had one room and
-      became a cross-room leak the moment the controller could create many.
-    */
-    locals: { user, sessionId: 'message-alert-contract', roomShortCode: '3625' }
-  } as unknown as ActionArgs;
-}
+  Three shapes changed, and each is the conversion rather than a weakening: a refusal REJECTS instead
+  of returning `fail()`; success returns `undefined`, so what proves a write is the ROW; and
+  arguments are TYPED, so a case that used to send a bad string has to reach around the compiler —
+  which is the improvement, and the cast is how the test says so.
+*/
+const { replyMessage, sendMessage } = await import('../routes/chat-messages.remote');
+const { askQuestion } = await import('../routes/alert-questions.remote');
+const { postAlert } = await import('../routes/post-alert.remote');
+
+const ROOM = '3625';
+
+/*
+  `roomShortCode` is on the session because the room's realtime channel is keyed by room now. It used
+  to be the constant `'ptr-room'`, which was correct while the build had one room and became a
+  cross-room leak the moment the controller could create many.
+*/
+const locals = (user: User) =>
+  ({ user, sessionId: 'message-alert-contract', roomShortCode: ROOM }) as App.Locals;
 
 function account(email: string, role: string): User {
   const existing = db.select().from(users).where(eq(users.email, email)).get();
@@ -75,13 +83,22 @@ beforeEach(() => {
   db.delete(alerts).run();
 });
 
+const muteMember = (expiresAt: Date) =>
+  db
+    .insert(chatMutes)
+    .values({
+      // A mute is granted in one room; it must not follow somebody into another.
+      roomShortCode: ROOM,
+      targetUserId: member.id,
+      mutedByUserId: presenter.id,
+      expiresAt,
+      createdAt: new Date()
+    })
+    .run();
+
 describe('sendMessage', () => {
-  it('trims the body and marks a presenter’s message as admin', async () => {
-    expect(
-      await actions.sendMessage(event(presenter, { body: '  hello  ', room: 'main' }))
-    ).toEqual({
-      success: true
-    });
+  it('trims the body and marks a presenter\u2019s message as admin', async () => {
+    await callRemote(locals(presenter), () => sendMessage({ body: '  hello  ', room: 'main' }));
 
     const [stored] = db.select().from(messages).all();
     expect(stored.body).toBe('hello');
@@ -91,8 +108,8 @@ describe('sendMessage', () => {
     expect(stored.room).toBe('main');
   });
 
-  it('does not mark a member’s message as admin', async () => {
-    await actions.sendMessage(event(member, { body: 'hi', room: 'main' }));
+  it('does not mark a member\u2019s message as admin', async () => {
+    await callRemote(locals(member), () => sendMessage({ body: 'hi', room: 'main' }));
     expect(db.select().from(messages).all()[0].isAdmin).toBe(false);
   });
 
@@ -102,90 +119,80 @@ describe('sendMessage', () => {
     `messages.room` is a label, not a foreign key, so without this check a crafted request could
     park messages in a channel the client never renders - invisible content that still occupies
     the table and still reaches every reader's payload.
+
+    It is a schema check now, so the compiler refuses `'not-a-channel'` before the runtime does —
+    hence the cast, which is what lets this keep proving the runtime guard is still there.
   */
   it('refuses a channel outside CHAT_TABS', async () => {
-    expect(
-      await actions.sendMessage(event(member, { body: 'hidden', room: 'not-a-channel' }))
-    ).toMatchObject({ status: 400 });
+    await expect(
+      callRemote(locals(member), () =>
+        sendMessage({ body: 'hidden', room: 'not-a-channel' as 'main' })
+      )
+    ).rejects.toMatchObject({ status: 400 });
     expect(db.select().from(messages).all()).toHaveLength(0);
 
     // Both real channels are accepted.
-    for (const room of ['main', 'off-topic']) {
-      expect(await actions.sendMessage(event(member, { body: 'ok', room }))).toEqual({
-        success: true
-      });
+    for (const room of ['main', 'off-topic'] as const) {
+      await expect(
+        callRemote(locals(member), () => sendMessage({ body: 'ok', room }))
+      ).resolves.toBeUndefined();
     }
   });
 
   it('refuses an empty body and one over 4,000 characters', async () => {
-    expect(await actions.sendMessage(event(member, { body: '   ', room: 'main' }))).toMatchObject({
-      status: 400
-    });
-    expect(
-      await actions.sendMessage(event(member, { body: 'x'.repeat(4_001), room: 'main' }))
-    ).toMatchObject({ status: 400 });
-    expect(
-      await actions.sendMessage(event(member, { body: 'x'.repeat(4_000), room: 'main' }))
-    ).toEqual({ success: true });
+    for (const body of ['   ', 'x'.repeat(4_001)]) {
+      await expect(
+        callRemote(locals(member), () => sendMessage({ body, room: 'main' })),
+        `${body.length} chars`
+      ).rejects.toMatchObject({ status: 400 });
+    }
+    await expect(
+      callRemote(locals(member), () => sendMessage({ body: 'x'.repeat(4_000), room: 'main' }))
+    ).resolves.toBeUndefined();
   });
 
-  it('refuses a muted sender with a flag the client can act on', async () => {
-    db.insert(chatMutes)
-      .values({
-        // A mute is granted in one room; it must not follow somebody into another.
-        roomShortCode: '3625',
-        targetUserId: member.id,
-        mutedByUserId: presenter.id,
-        expiresAt: new Date(Date.now() + 60_000),
-        createdAt: new Date()
-      })
-      .run();
+  it('refuses a muted sender, and writes nothing', async () => {
+    muteMember(new Date(Date.now() + 60_000));
 
-    const refused = await actions.sendMessage(event(member, { body: 'let me in', room: 'main' }));
-    // `{muted: true}` rather than a message: the client renders its own copy for this case.
-    expect(refused).toMatchObject({ status: 403, data: { muted: true } });
+    /*
+      `fail(403, { muted: true })` carried a flag rather than a sentence, because the composer
+      renders its own captured "Chat Disabled" block for this case. A command has no `data`, so the
+      403 is the whole signal — which is what the client reads either way.
+    */
+    await expect(
+      callRemote(locals(member), () => sendMessage({ body: 'let me in', room: 'main' }))
+    ).rejects.toMatchObject({ status: 403 });
     expect(db.select().from(messages).all()).toHaveLength(0);
   });
 
   it('lets an expired mute through', async () => {
-    db.insert(chatMutes)
-      .values({
-        // A mute is granted in one room; it must not follow somebody into another.
-        roomShortCode: '3625',
-        targetUserId: member.id,
-        mutedByUserId: presenter.id,
-        expiresAt: new Date(Date.now() - 1_000),
-        createdAt: new Date()
-      })
-      .run();
-
-    expect(await actions.sendMessage(event(member, { body: 'served', room: 'main' }))).toEqual({
-      success: true
-    });
+    muteMember(new Date(Date.now() - 1_000));
+    await expect(
+      callRemote(locals(member), () => sendMessage({ body: 'served', room: 'main' }))
+    ).resolves.toBeUndefined();
   });
 
   it('rate limits at 30 in the window', async () => {
     for (let sent = 0; sent < 30; sent += 1) {
-      expect(await actions.sendMessage(event(member, { body: `m${sent}`, room: 'main' }))).toEqual({
-        success: true
-      });
+      await expect(
+        callRemote(locals(member), () => sendMessage({ body: `m${sent}`, room: 'main' })),
+        `message ${sent}`
+      ).resolves.toBeUndefined();
     }
-    expect(
-      await actions.sendMessage(event(member, { body: 'one too many', room: 'main' }))
-    ).toMatchObject({ status: 429 });
+    await expect(
+      callRemote(locals(member), () => sendMessage({ body: 'one too many', room: 'main' }))
+    ).rejects.toMatchObject({ status: 429 });
   });
 });
 
 describe('replyMessage', () => {
-  it('copies the original’s channel and snapshots its author and body', async () => {
-    await actions.sendMessage(event(member, { body: 'original', room: 'off-topic' }));
+  it('copies the original\u2019s channel and snapshots its author and body', async () => {
+    await callRemote(locals(member), () => sendMessage({ body: 'original', room: 'off-topic' }));
     const [original] = db.select().from(messages).all();
 
-    expect(
-      await actions.replyMessage(
-        event(presenter, { body: 'a reply', messageId: String(original.id) })
-      )
-    ).toEqual({ success: true });
+    await expect(
+      callRemote(locals(presenter), () => replyMessage({ body: 'a reply', messageId: original.id }))
+    ).resolves.toBeUndefined();
 
     const reply = db
       .select()
@@ -200,33 +207,81 @@ describe('replyMessage', () => {
     expect(reply?.replyToBody).toBe('original');
   });
 
-  it('is a 404 for a message that does not exist, and 400 for a non-numeric id', async () => {
-    expect(
-      await actions.replyMessage(event(member, { body: 'hi', messageId: '999999' }))
-    ).toMatchObject({ status: 404 });
-    expect(
-      await actions.replyMessage(event(member, { body: 'hi', messageId: 'abc' }))
-    ).toMatchObject({ status: 400 });
+  it('is a 404 for a message that does not exist, and 400 for an id that is not an integer', async () => {
+    await expect(
+      callRemote(locals(member), () => replyMessage({ body: 'hi', messageId: 999999 }))
+    ).rejects.toMatchObject({ status: 404 });
+    await expect(
+      callRemote(locals(member), () =>
+        replyMessage({ body: 'hi', messageId: 'abc' as unknown as number })
+      )
+    ).rejects.toMatchObject({ status: 400 });
+  });
+
+  /*
+    THE TWO ASYMMETRIES THE CONVERSION FOUND, pinned in the direction they were fixed.
+
+    `sendMessage` and `replyMessage` sat eighty lines apart in `+page.server.ts` and had drifted:
+    the mute check and the length bound were on the first and not on the second. A muted member
+    could not send and COULD reply, into the same log — so `mute24`, a control that says it stops
+    somebody posting for a day, did not.
+
+    Both are behaviour changes and both are asserted here rather than left to a comment, because a
+    comment is what the old code had.
+  */
+  it('now refuses a MUTED member, where the reply path used to let them through', async () => {
+    await callRemote(locals(presenter), () => sendMessage({ body: 'original', room: 'main' }));
+    const [original] = db.select().from(messages).all();
+    muteMember(new Date(Date.now() + 60_000));
+
+    await expect(
+      callRemote(locals(member), () =>
+        replyMessage({ body: 'around the mute', messageId: original.id })
+      )
+    ).rejects.toMatchObject({ status: 403 });
+    expect(db.select().from(messages).all(), 'no reply was written').toHaveLength(1);
+  });
+
+  it('now refuses a reply over 4,000 characters, where it had no bound at all', async () => {
+    await callRemote(locals(presenter), () => sendMessage({ body: 'original', room: 'main' }));
+    const [original] = db.select().from(messages).all();
+
+    await expect(
+      callRemote(locals(member), () =>
+        replyMessage({ body: 'x'.repeat(4_001), messageId: original.id })
+      )
+    ).rejects.toMatchObject({ status: 400 });
+    await expect(
+      callRemote(locals(member), () =>
+        replyMessage({ body: 'x'.repeat(4_000), messageId: original.id })
+      )
+    ).resolves.toBeUndefined();
   });
 });
 
 describe('postAlert', () => {
+  const post = (user: User, args: Parameters<typeof postAlert>[0]) =>
+    callRemote(locals(user), () => postAlert(args));
+
   it('is presenter-only', async () => {
-    expect(await actions.postAlert(event(member, { kind: 'text', body: 'mine' }))).toMatchObject({
+    await expect(
+      post(member, { kind: 'text', body: 'mine', nonTradeAlert: false })
+    ).rejects.toMatchObject({
       status: 403
     });
     expect(db.select().from(alerts).all()).toHaveLength(0);
   });
 
   it('accepts the three kinds and refuses anything else', async () => {
-    for (const kind of ['text', 'url', 'media']) {
-      expect(await actions.postAlert(event(presenter, { kind, body: `a ${kind} alert` }))).toEqual({
-        success: true
-      });
+    for (const kind of ['text', 'url', 'media'] as const) {
+      await expect(
+        post(presenter, { kind, body: `a ${kind} alert`, nonTradeAlert: false }),
+        kind
+      ).resolves.toBeUndefined();
     }
-    expect(
-      await actions.postAlert(event(presenter, { kind: 'video', body: 'nope' }))
-    ).toMatchObject({ status: 400 });
+    await expect(
+      post(presenter, { kind: 'video' as 'text', body: 'nope', nonTradeAlert: false })
+    ).rejects.toMatchObject({ status: 400 });
   });
 
   /*
@@ -236,16 +291,18 @@ describe('postAlert', () => {
     look like a rendering bug rather than a dropped field.
   */
   it('keeps targetUrl for media and drops it for every other kind', async () => {
-    await actions.postAlert(
-      event(presenter, {
-        kind: 'media',
-        body: 'with media',
-        targetUrl: 'https://example.test/a.png'
-      })
-    );
-    await actions.postAlert(
-      event(presenter, { kind: 'url', body: 'with url', targetUrl: 'https://example.test/b' })
-    );
+    await post(presenter, {
+      kind: 'media',
+      body: 'with media',
+      targetUrl: 'https://example.test/a.png',
+      nonTradeAlert: false
+    });
+    await post(presenter, {
+      kind: 'url',
+      body: 'with url',
+      targetUrl: 'https://example.test/b',
+      nonTradeAlert: false
+    });
 
     const stored = db.select().from(alerts).all();
     expect(stored.find((row) => row.kind === 'media')?.targetUrl).toBe(
@@ -255,18 +312,36 @@ describe('postAlert', () => {
   });
 
   it('refuses an empty body and one over 8,000 characters', async () => {
-    expect(await actions.postAlert(event(presenter, { kind: 'text', body: '' }))).toMatchObject({
-      status: 400
-    });
-    expect(
-      await actions.postAlert(event(presenter, { kind: 'text', body: 'x'.repeat(8_001) }))
-    ).toMatchObject({ status: 400 });
+    for (const body of ['', 'x'.repeat(8_001)]) {
+      await expect(
+        post(presenter, { kind: 'text', body, nonTradeAlert: false }),
+        `${body.length} chars`
+      ).rejects.toMatchObject({ status: 400 });
+    }
+  });
+
+  it('refuses `dontPush`, which the action accepted and never read', async () => {
+    /*
+      `z.strictObject` refusing an unknown field is the honest shape: accepting one implies
+      something consumes it. Nothing does — the suppression it names has no consumer in this room —
+      so the client stopped sending it.
+    */
+    await expect(
+      post(presenter, {
+        kind: 'text',
+        body: 'a',
+        nonTradeAlert: false,
+        dontPush: true
+      } as unknown as Parameters<typeof postAlert>[0])
+    ).rejects.toMatchObject({ status: 400 });
   });
 });
 
 describe('askQuestion', () => {
   async function alertBy(user: User) {
-    await actions.postAlert(event(user, { kind: 'text', body: 'an alert' }));
+    await callRemote(locals(user), () =>
+      postAlert({ kind: 'text', body: 'an alert', nonTradeAlert: false })
+    );
     return db.select().from(alerts).all()[0];
   }
 
@@ -280,7 +355,7 @@ describe('askQuestion', () => {
       another room's alert thread, and that room would display it. `alert_questions` has no room
       column of its own, so nothing downstream could catch it either.
 
-      Asserted on the ROWS, not just the return value: an action that refuses politely and inserts
+      Asserted on the ROWS, not just the rejection: a command that refuses politely and inserts
       anyway is the exact shape of the bug.
     */
     const foreign = db
@@ -288,25 +363,23 @@ describe('askQuestion', () => {
       .values({
         roomShortCode: '9999',
         senderId: presenter.id,
-        body: 'an alert in somebody else’s room',
+        body: 'an alert in somebody else\u2019s room',
         createdAt: new Date()
       })
       .returning()
       .get();
 
     const before = db.select().from(alertQuestions).all().length;
-    const result = await actions.askQuestion(
-      event(member, { body: 'let me in', alertId: String(foreign.id) })
-    );
-
-    expect(result).toMatchObject({ status: 404 });
+    await expect(
+      callRemote(locals(member), () => askQuestion({ body: 'let me in', alertId: foreign.id }))
+    ).rejects.toMatchObject({ status: 404 });
     expect(db.select().from(alertQuestions).all().length, 'no row was written').toBe(before);
   });
 
-  it('records the question and keeps the alert’s counters in step', async () => {
+  it('records the question and keeps the alert\u2019s counters in step', async () => {
     const alert = await alertBy(presenter);
 
-    await actions.askQuestion(event(member, { body: 'why?', alertId: String(alert.id) }));
+    await callRemote(locals(member), () => askQuestion({ body: 'why?', alertId: alert.id }));
 
     const stored = db.select().from(alerts).where(eq(alerts.id, alert.id)).get();
     // Derived from the rows rather than incremented, so the badge cannot drift from the list.
@@ -322,11 +395,11 @@ describe('askQuestion', () => {
     deliberately: an earlier build promoted every visitor to `staff`, so a role check would have
     marked questions answered the moment they were asked.
   */
-  it('marks every outstanding question answered when the alert’s author replies', async () => {
+  it('marks every outstanding question answered when the alert\u2019s author replies', async () => {
     const alert = await alertBy(presenter);
 
-    await actions.askQuestion(event(member, { body: 'first?', alertId: String(alert.id) }));
-    await actions.askQuestion(event(member, { body: 'second?', alertId: String(alert.id) }));
+    await callRemote(locals(member), () => askQuestion({ body: 'first?', alertId: alert.id }));
+    await callRemote(locals(member), () => askQuestion({ body: 'second?', alertId: alert.id }));
 
     let stored = db.select().from(alerts).where(eq(alerts.id, alert.id)).get();
     expect(stored?.questionCount).toBe(2);
@@ -334,7 +407,7 @@ describe('askQuestion', () => {
 
     // The author replies once; both outstanding questions are settled, and the reply itself is
     // stored as an answered row - hence three.
-    await actions.askQuestion(event(presenter, { body: 'because', alertId: String(alert.id) }));
+    await callRemote(locals(presenter), () => askQuestion({ body: 'because', alertId: alert.id }));
 
     stored = db.select().from(alerts).where(eq(alerts.id, alert.id)).get();
     expect(stored?.questionCount).toBe(3);
@@ -348,25 +421,32 @@ describe('askQuestion', () => {
     expect(unanswered).toHaveLength(0);
   });
 
-  it('does not let a different presenter answer on the author’s behalf', async () => {
+  it('does not let a different presenter answer on the author\u2019s behalf', async () => {
     const other = account('content-other-presenter@example.test', 'staff');
     const alert = await alertBy(presenter);
 
-    await actions.askQuestion(event(member, { body: 'why?', alertId: String(alert.id) }));
-    await actions.askQuestion(event(other, { body: 'I reckon', alertId: String(alert.id) }));
+    await callRemote(locals(member), () => askQuestion({ body: 'why?', alertId: alert.id }));
+    await callRemote(locals(other), () => askQuestion({ body: 'I reckon', alertId: alert.id }));
 
     const stored = db.select().from(alerts).where(eq(alerts.id, alert.id)).get();
     // Still outstanding: `other` is staff but did not post the alert.
     expect(stored?.questionAnswered).toBe(false);
   });
 
-  it('refuses an empty body and a non-numeric alert id', async () => {
+  it('refuses an empty body, an over-long one, and an id that is not an integer', async () => {
     const alert = await alertBy(presenter);
-    expect(
-      await actions.askQuestion(event(member, { body: '  ', alertId: String(alert.id) }))
-    ).toMatchObject({ status: 400 });
-    expect(
-      await actions.askQuestion(event(member, { body: 'why?', alertId: 'abc' }))
-    ).toMatchObject({ status: 400 });
+    await expect(
+      callRemote(locals(member), () => askQuestion({ body: '  ', alertId: alert.id }))
+    ).rejects.toMatchObject({ status: 400 });
+    // NEW: this path accepted a body of any size, where a question lands in a thread every reader
+    // of that alert loads.
+    await expect(
+      callRemote(locals(member), () => askQuestion({ body: 'x'.repeat(4_001), alertId: alert.id }))
+    ).rejects.toMatchObject({ status: 400 });
+    await expect(
+      callRemote(locals(member), () =>
+        askQuestion({ body: 'why?', alertId: 'abc' as unknown as number })
+      )
+    ).rejects.toMatchObject({ status: 400 });
   });
 });

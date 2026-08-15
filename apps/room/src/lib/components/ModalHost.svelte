@@ -2,7 +2,6 @@
   import { ngbTooltip, ngbTooltipWith } from '$lib/ngb-tooltip';
   import { alertDateFormatter } from '$lib/message-formatters';
   import { rtmpIngestUrl, whipIngestUrl, type StreamIngestKey } from '$lib/stream-ingest';
-  import { deserialize } from '$app/forms';
   import { invalidateAll } from '$app/navigation';
   import { resolve } from '$app/paths';
   import { onMount, untrack } from 'svelte';
@@ -24,6 +23,13 @@
   import PostAlertModal from './PostAlertModal.svelte';
   import RichTextEditor from './RichTextEditor.svelte';
   import RoomMessage from './RoomMessage.svelte';
+  import { chatModeConfirmPrompt, type ChatMode } from '$lib/chat-mode';
+  import { refusalMessage, refusalOrTransportMessage } from '$lib/refusal-message';
+  import { uploadFile } from '../../routes/files-pane.remote';
+  import {
+    giveMicScreen as giveMicScreenCommand,
+    presenterCommand
+  } from '../../routes/presenter-commands.remote';
   import type { PastedImageSubmission, PostAlertSubmission } from '$lib/post-alert-behavior';
   import {
     alertFilterAvailable,
@@ -209,9 +215,9 @@
     /** `Save` when editing an existing message, `Send` otherwise — the reference's two labels. */
     rteIsEditing?: boolean;
     /** The room's chat mode — `g`, `p` or `d` — read from `room_state` by the page load. */
-    chatMode?: string;
-    /** `changeChatMode` — a presenter act that changes the room for everyone. */
-    onChatModeChange: (mode: string) => void;
+    chatMode?: ChatMode;
+    /** `changeChatMode` — a presenter act that changes the room; `$lib/chat-mode.ts` says why typed. */
+    onChatModeChange: (mode: ChatMode) => void;
     onRteDraftChange: (html: string) => void;
     onRteSend: () => void;
     /**
@@ -1230,22 +1236,12 @@
 
     for (const [index, file] of uploadQueue.entries()) {
       uploadStatus = `Uploading ${index}/${total}: ${file.name}.`;
-      const body = new FormData();
-      body.append('file', file);
-      body.append('originalname', file.name);
-
+      // One `catch` where there were two: an action's refusal came back as a 200 with the reason
+      // in the body. A command rejects for both, and `refusalOrTransportMessage` tells them apart.
       try {
-        const response = await fetch('?/uploadFile', { method: 'POST', body });
-        const result = deserialize<{ success?: boolean }, { message?: string }>(
-          await response.text()
-        );
-        if (result.type !== 'success') {
-          failures.push(
-            `${file.name}: ${result.type === 'failure' ? (result.data?.message ?? 'refused') : 'upload failed'}`
-          );
-        }
+        await uploadFile({ file, originalName: file.name });
       } catch (cause) {
-        failures.push(`${file.name}: ${cause instanceof Error ? cause.message : 'network error'}`);
+        failures.push(`${file.name}: ${refusalOrTransportMessage(cause, 'network error')}`);
       }
     }
 
@@ -1336,12 +1332,11 @@
       micScreenAlert = `Can't ${give ? 'give' : 'take'} 'Mic/Screenshare' to yourself.`;
       return;
     }
-    const body = new FormData();
-    body.set('targetUserId', String(targetUser.id));
-    body.set('give', String(give));
-    const response = await fetch('?/giveMicScreen', { method: 'POST', body });
-    if (!response.ok) {
-      console.error('[room] giveMicScreen failed', response.status);
+    try {
+      await giveMicScreenCommand({ targetUserId: targetUser.id, give });
+    } catch (cause) {
+      // Shown, not swallowed: this used to `console.error` a status and tell the presenter nothing.
+      micScreenAlert = refusalMessage(cause, 'That did not work.');
       return;
     }
     micScreenAlert = give ? 'Mic/Screenshare given OK' : 'Mic/Screen taken away OK';
@@ -1349,11 +1344,16 @@
 
   async function revokePermission(subCmd: 'mutemic' | 'mutecam' | 'mutescreens') {
     if (!targetUser?.id) return;
-    const body = new FormData();
-    body.set('subCmd', subCmd);
-    body.set('targetUserId', String(targetUser.id));
-    const response = await fetch('?/presenterCommand', { method: 'POST', body });
-    if (!response.ok) console.error('[room] presenter command failed', response.status);
+    /*
+      THIS WAS BROKEN: `presenterCommand`'s action was removed on 2026-08-15 and this call site was
+      missed — it is in ModalHost, not `+page.svelte`, and only that file was checked. It posted to
+      an action that no longer existed, so revoking a member's mic or camera did nothing at all.
+    */
+    try {
+      await presenterCommand({ subCmd, targetUserId: targetUser.id });
+    } catch (cause) {
+      console.error('[room] presenter command failed', cause);
+    }
   }
 
   function updateSettingCheck(event: Event) {
@@ -1442,34 +1442,31 @@
   }
 
   /*
-    `sendServerAdminCommand('changeChatMode', {mode})`.
+    `sendServerAdminCommand('changeChatMode', {mode})`. This used to be
+    `onPreferenceChange('chatMode', mode)` — a per-user preference nothing in the room ever read, at
+    the wrong LEVEL besides; `$lib/chat-mode.ts` carries that history.
 
-    This used to be `onPreferenceChange('chatMode', mode)` — a per-user preference that nothing in
-    the room ever read. The control confirmed itself with a dialog, persisted a value, and changed
-    nothing for anybody. It was also the wrong LEVEL: upstream reads `sessData.chatMode`, so the
-    mode belongs to the ROOM and a presenter changes it for everyone. A preference could not have
-    expressed that even if something had read it.
-
-    No local assignment either. `groupChatMode` is a prop now, fed from the row the server just
-    wrote, so the radio shows what the room IS rather than what this browser last clicked.
+    What matters HERE is that there is no local assignment. `groupChatMode` is a prop, fed from the
+    row the server just wrote, so the radio shows what the room IS rather than what this browser
+    last clicked.
   */
-  function applyGroupChatMode(mode: string) {
+  function applyGroupChatMode(mode: ChatMode) {
     onChatModeChange(mode);
   }
 
-  function requestSettingsChatMode(mode: string) {
+  function requestSettingsChatMode(mode: ChatMode) {
     if (groupChatMode === mode) return;
-    const label = mode === 'p' ? '"Webinar Mode"?' : mode === 'd' ? '"Disabled"?' : '"Group Chat"?';
-    onConfirm(`Are you sure you want to change the chat mode to ${label}`, () =>
-      applyGroupChatMode(mode)
-    );
+    onConfirm(chatModeConfirmPrompt(mode), () => applyGroupChatMode(mode));
   }
 
-  function requestSessionChatMode(mode: string) {
+  /*
+    The same prompt as the settings radio, which it was NOT: this one interpolated the raw letter
+    and asked "are you sure you want to change the chat mode to p". `chatModeConfirmPrompt` owns the
+    capture's wording now, so there is one spelling instead of a right one and a wrong one.
+  */
+  function requestSessionChatMode(mode: ChatMode) {
     if (groupChatMode === mode) return;
-    onConfirm(`Are you sure you want to change the chat mode to ${mode}`, () =>
-      applyGroupChatMode(mode)
-    );
+    onConfirm(chatModeConfirmPrompt(mode), () => applyGroupChatMode(mode));
   }
 
   function requestPmWindowLayout(event: Event) {

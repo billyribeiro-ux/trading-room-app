@@ -4,6 +4,7 @@ import { eq } from 'drizzle-orm';
 import { db, ensureDatabase } from '$lib/server/db';
 import { notes, sessions, userSettings, users, type User } from '$lib/server/db/schema';
 import { actions } from '../routes/+page.server';
+import { callRemote } from '$lib/server/remote-command-harness';
 
 /*
   Characterization tests for the last nine actions: the six session-note commands, plus
@@ -200,14 +201,35 @@ describe('the six session-note commands', () => {
   });
 });
 
+/*
+  REWRITTEN, not re-pointed, when `editUsername`, `saveTheme` and `savePreference` became remote
+  commands. Every assertion below still EXECUTES against the live database; `callRemote` establishes
+  the request store a command's wrapper reads, and `remote-command-harness.ts` records which fields
+  Kit needs and where each was read from.
+
+  Three shapes changed, and each is the conversion rather than a weakening:
+
+    - a refusal REJECTS instead of returning `fail()`, so `toMatchObject({ status })` became
+      `rejects.toMatchObject({ status })`;
+    - success returns `undefined` rather than `{ success: true }`, so what proves a write is the ROW,
+      which is what mattered all along;
+    - arguments are TYPED, so the "non-numeric id" and "not JSON" cases have to reach around the
+      compiler to prove the runtime still refuses them. That the compiler now refuses them first is
+      the improvement; the cast is how the test says so.
+*/
+const { editUsername } = await import('../routes/username.remote');
+const { savePreference, saveTheme } = await import('../routes/user-settings.remote');
+
+const locals = (user: User) =>
+  ({ user, sessionId: `acct-${user.id}`, roomShortCode: '3625' }) as App.Locals;
+
 describe('editUsername', () => {
   it('lets anyone rename themselves', async () => {
-    expect(
-      await actions.editUsername(
-        event(member, { userId: String(member.id), username: ' Renamed ' })
-      )
-    ).toEqual({ success: true });
+    await expect(
+      callRemote(locals(member), () => editUsername({ userId: member.id, username: ' Renamed ' }))
+    ).resolves.toBeUndefined();
 
+    // `.trim()` is the schema's now, not the handler's, and the stored value proves it still runs.
     expect(db.select().from(users).where(eq(users.id, member.id)).get()?.displayName).toBe(
       'Renamed'
     );
@@ -228,40 +250,52 @@ describe('editUsername', () => {
     const target = account('notes-rename-target@example.test', 'admin');
     const originalName = target.displayName;
 
-    expect(
-      await actions.editUsername(event(member, { userId: String(target.id), username: 'hijacked' }))
-    ).toMatchObject({ status: 403 });
+    await expect(
+      callRemote(locals(member), () => editUsername({ userId: target.id, username: 'hijacked' }))
+    ).rejects.toMatchObject({ status: 403, body: { message: 'You cannot edit this username.' } });
+    // The status alone would pass with the row already renamed. This is the half that matters.
     expect(db.select().from(users).where(eq(users.id, target.id)).get()?.displayName).toBe(
       originalName
     );
 
-    expect(
-      await actions.editUsername(
-        event(presenter, { userId: String(target.id), username: 'Renamed by staff' })
+    await expect(
+      callRemote(locals(presenter), () =>
+        editUsername({ userId: target.id, username: 'Renamed by staff' })
       )
-    ).toEqual({ success: true });
+    ).resolves.toBeUndefined();
   });
 
-  it('refuses a non-numeric id and an empty username', async () => {
-    expect(
-      await actions.editUsername(event(member, { userId: 'abc', username: 'x' }))
-    ).toMatchObject({ status: 400 });
-    expect(
-      await actions.editUsername(event(member, { userId: String(member.id), username: '   ' }))
-    ).toMatchObject({ status: 400 });
+  it('refuses a bad id and an empty username, at the SCHEMA now', async () => {
+    /*
+      `Number.isInteger` let 0 and negatives through to match no row and report success;
+      `z.number().int().positive()` refuses them. The non-numeric case is a compile error before it
+      is a runtime one, which is why it is cast.
+    */
+    for (const userId of ['abc', 0, -1, 1.5]) {
+      await expect(
+        callRemote(locals(member), () =>
+          editUsername({ userId, username: 'x' } as unknown as { userId: number; username: string })
+        ),
+        String(userId)
+      ).rejects.toMatchObject({ status: 400 });
+    }
+    await expect(
+      callRemote(locals(member), () => editUsername({ userId: member.id, username: '   ' }))
+    ).rejects.toMatchObject({ status: 400 });
   });
 
   /*
     NOTE for the cutover: renaming an id that does not exist reports success.
 
-    The update affects zero rows and the action does not check. The API's
+    The update affects zero rows and the command does not check — unchanged by the conversion, and
+    pinned so the conversion cannot be blamed for it later. The API's
     PUT /rooms/{id}/me/display-name renames the CALLER and cannot be pointed at another id at
     all, which removes the case rather than answering it - worth knowing before translating.
   */
   it('currently succeeds for a presenter renaming an id that does not exist', async () => {
-    expect(
-      await actions.editUsername(event(presenter, { userId: '999999', username: 'ghost' }))
-    ).toEqual({ success: true });
+    await expect(
+      callRemote(locals(presenter), () => editUsername({ userId: 999999, username: 'ghost' }))
+    ).resolves.toBeUndefined();
   });
 });
 
@@ -279,23 +313,37 @@ describe('saveTheme', () => {
       .run();
   });
 
-  it('stores dark, and coerces everything else to light', async () => {
-    await actions.saveTheme(event(member, { theme: 'dark' }));
-    expect(
-      db.select().from(userSettings).where(eq(userSettings.userId, member.id)).get()?.theme
-    ).toBe('dark');
-
-    // Anything that is not exactly "dark" is light - there is no validation and no 400. A
-    // typo'd theme silently resets the user to light rather than being refused.
-    for (const theme of ['light', 'solarized', '']) {
-      await actions.saveTheme(event(member, { theme }));
+  it('stores dark, and stores light', async () => {
+    for (const theme of ['dark', 'light'] as const) {
+      await callRemote(locals(member), () => saveTheme(theme));
       expect(
         db.select().from(userSettings).where(eq(userSettings.userId, member.id)).get()?.theme
-      ).toBe('light');
+      ).toBe(theme);
     }
   });
 
-  it('writes only the acting user’s row', async () => {
+  it('REFUSES anything else, where it used to silently coerce to light', async () => {
+    /*
+      The behaviour change this conversion made, pinned in its new form. The action read
+      `data.get('theme') === 'dark' ? 'dark' : 'light'`, so a typo'd theme reset the user to light
+      and reported success. `z.enum(['light', 'dark'])` refuses it.
+
+      The row is asserted unchanged as well: a 400 with the write already made would be the failure
+      that matters, and the status alone would not catch it.
+    */
+    await callRemote(locals(member), () => saveTheme('dark'));
+    for (const theme of ['solarized', '', 'DARK']) {
+      await expect(
+        callRemote(locals(member), () => saveTheme(theme as 'dark')),
+        theme
+      ).rejects.toMatchObject({ status: 400 });
+      expect(
+        db.select().from(userSettings).where(eq(userSettings.userId, member.id)).get()?.theme
+      ).toBe('dark');
+    }
+  });
+
+  it('writes only the acting user\u2019s row', async () => {
     db.insert(userSettings)
       .values({
         userId: presenter.id,
@@ -306,7 +354,7 @@ describe('saveTheme', () => {
       })
       .run();
 
-    await actions.saveTheme(event(member, { theme: 'dark' }));
+    await callRemote(locals(member), () => saveTheme('dark'));
 
     expect(
       db.select().from(userSettings).where(eq(userSettings.userId, presenter.id)).get()?.theme
@@ -384,30 +432,70 @@ describe('savePreference', () => {
     that replaces the document instead of merging is the exact bug this catches.
   */
   it('merges a key rather than replacing the document', async () => {
-    await actions.savePreference(event(member, { key: 'chatTextSize', value: '18' }));
-    await actions.savePreference(event(member, { key: 'chatBgColor', value: '"#e8e8e8"' }));
+    await callRemote(locals(member), () => savePreference({ key: 'chatTextSize', value: 18 }));
+    await callRemote(locals(member), () =>
+      savePreference({ key: 'chatBgColor', value: '#e8e8e8' })
+    );
 
     expect(stored()).toEqual({ chatTextSize: 18, chatBgColor: '#e8e8e8' });
   });
 
   it('overwrites a key it already holds, and preserves JSON types', async () => {
-    await actions.savePreference(event(member, { key: 'soundEnabled', value: 'true' }));
+    /*
+      The values are REAL values now. The action took a string and ran `JSON.parse`; devalue carries
+      the boolean itself, so `'true'` vs `true` is no longer a thing a caller can get wrong.
+    */
+    await callRemote(locals(member), () => savePreference({ key: 'soundEnabled', value: true }));
     expect(stored().soundEnabled).toBe(true);
 
-    await actions.savePreference(event(member, { key: 'soundEnabled', value: 'false' }));
+    await callRemote(locals(member), () => savePreference({ key: 'soundEnabled', value: false }));
     expect(stored().soundEnabled).toBe(false);
 
     // Not stringified: `false` must not become "false", or every truthiness check inverts.
     expect(typeof stored().soundEnabled).toBe('boolean');
   });
 
-  it('refuses an empty key and a value that is not JSON', async () => {
-    expect(await actions.savePreference(event(member, { key: '   ', value: '1' }))).toMatchObject({
-      status: 400
+  it('stores the shapes this room actually saves', async () => {
+    // Objects and arrays cross intact — `chatStyle` is an object and the split sizes are a pair.
+    await callRemote(locals(member), () =>
+      savePreference({ key: 'chatStyle', value: { bold: true, size: 14 } })
+    );
+    await callRemote(locals(member), () => savePreference({ key: 'chatSplit', value: [40, 60] }));
+    await callRemote(locals(member), () => savePreference({ key: 'sessionOpen', value: null }));
+
+    expect(stored()).toEqual({
+      chatStyle: { bold: true, size: 14 },
+      chatSplit: [40, 60],
+      sessionOpen: null
     });
-    expect(
-      await actions.savePreference(event(member, { key: 'ok', value: 'not json' }))
-    ).toMatchObject({ status: 400 });
+  });
+
+  it('refuses an empty key, an over-long one, and a value JSON cannot hold', async () => {
+    /*
+      The empty key was `fail(400)`; it is `z.string().trim().min(1)` now. The 100-character bound
+      is NEW — this blob is parsed and rewritten on every preference write, so an unbounded key is a
+      cost every later write for that account pays.
+
+      "Not JSON" changed meaning, and that is the point. The action received a STRING and could only
+      fail when `JSON.parse` threw. `z.json()` refuses values JSON cannot represent at all — a
+      function, a `Date`, `undefined` — which is a stronger check than the one it replaced, applied
+      to the real value rather than to somebody's stringification of it.
+    */
+    await expect(
+      callRemote(locals(member), () => savePreference({ key: '   ', value: 1 }))
+    ).rejects.toMatchObject({ status: 400 });
+    await expect(
+      callRemote(locals(member), () => savePreference({ key: 'k'.repeat(101), value: 1 }))
+    ).rejects.toMatchObject({ status: 400 });
+
+    for (const value of [() => {}, new Date(0), undefined]) {
+      await expect(
+        callRemote(locals(member), () =>
+          savePreference({ key: 'ok', value } as unknown as { key: string; value: null })
+        ),
+        String(value)
+      ).rejects.toMatchObject({ status: 400 });
+    }
 
     expect(stored()).toEqual({});
   });
@@ -417,7 +505,9 @@ describe('savePreference', () => {
 
     Both the parse and the shape check fall back to `{}`, so one bad write cannot lock a user out
     of changing any preference afterwards. Silent recovery is right here and wrong almost
-    everywhere else, which is why it is pinned rather than assumed.
+    everywhere else, which is why it is pinned rather than assumed — and why the command now says
+    so in a comment beside the `catch` instead of leaving it to look like the swallowed error this
+    repository forbids.
   */
   it('recovers from a corrupt settings document instead of failing every later write', async () => {
     db.update(userSettings)
@@ -425,9 +515,31 @@ describe('savePreference', () => {
       .where(eq(userSettings.userId, member.id))
       .run();
 
-    expect(
-      await actions.savePreference(event(member, { key: 'chatTextSize', value: '14' }))
-    ).toEqual({ success: true });
+    await expect(
+      callRemote(locals(member), () => savePreference({ key: 'chatTextSize', value: 14 }))
+    ).resolves.toBeUndefined();
     expect(stored()).toEqual({ chatTextSize: 14 });
+  });
+
+  it('prunes the nineteen dead element-id keys on the way past', async () => {
+    /*
+      Executed rather than read. The prune is idempotent and converge-on-use, so what proves it is a
+      blob that HELD one and no longer does after any unrelated write.
+
+      `chat-always-scroll` is taken from `DEAD_PREFERENCE_KEYS` itself rather than invented — my
+      first attempt used `chat-text-size`, which is not on that list, and the test failed for being
+      wrong about its own fixture rather than about the code.
+    */
+    db.update(userSettings)
+      .set({ settingsJson: JSON.stringify({ 'chat-always-scroll': true, keepMe: 1 }) })
+      .where(eq(userSettings.userId, member.id))
+      .run();
+
+    await callRemote(locals(member), () => savePreference({ key: 'chatTextSize', value: 15 }));
+
+    const after = stored();
+    expect(after.keepMe, 'a real preference must survive the prune').toBe(1);
+    expect(after.chatTextSize).toBe(15);
+    expect(Object.keys(after)).not.toContain('chat-always-scroll');
   });
 });

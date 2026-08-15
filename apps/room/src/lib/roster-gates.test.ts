@@ -555,7 +555,8 @@ describe('locationVisibleTo', () => {
  * "tidying" one of the strings so the two halves stop agreeing.
  */
 describe('giveMicScreen wiring', () => {
-  const serverSource = readFileSync('src/routes/+page.server.ts', 'utf8');
+  // `serverSource` is gone: `+page.server.ts` no longer holds `giveMicScreen`, and a reader
+  // that nothing reads is the next person's dead end.
   const pageSource = readFileSync('src/routes/+page.svelte', 'utf8');
   const modalSource = readFileSync('src/lib/components/ModalHost.svelte', 'utf8');
 
@@ -570,7 +571,17 @@ describe('giveMicScreen wiring', () => {
     // would otherwise switch their own presenter flag off with no control left to switch it back.
     const refusal = "Can't ${give ? 'give' : 'take'} 'Mic/Screenshare' to yourself.";
     expect(modalSource).toContain(refusal);
-    expect(serverSource).toContain(refusal);
+    /*
+      The server half moved to `presenter-commands.remote.ts` with the command. BOTH sides is the
+      whole claim, so re-pointing one of them without asserting the file holds the command would
+      have left this passing on the modal alone.
+    */
+    const presenterCommands = readFileSync(
+      new URL('../routes/presenter-commands.remote.ts', import.meta.url),
+      'utf8'
+    );
+    expect(presenterCommands).toContain('export const giveMicScreen = command(');
+    expect(presenterCommands).toContain(refusal);
   });
 
   it('confirms with the capture’s two strings, not a paraphrase', () => {
@@ -587,7 +598,9 @@ describe('giveMicScreen wiring', () => {
 
   it('is its own top-level command, never a remotePresCommand subCmd', () => {
     // An earlier version dispatched it as a subCmd, which no sender would ever have matched.
-    expect(serverSource).toContain("cmd: 'giveMicScreen'");
+    expect(
+      readFileSync(new URL('../routes/presenter-commands.remote.ts', import.meta.url), 'utf8')
+    ).toContain("cmd: 'giveMicScreen'");
     expect(pageSource).toContain("command?.cmd === 'giveMicScreen'");
   });
 });

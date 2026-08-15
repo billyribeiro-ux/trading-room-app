@@ -1,11 +1,12 @@
 <script lang="ts">
   import { deserialize } from '$app/forms';
-  import { formatChatMutedTill, sameCalendarDay } from '$lib/message-formatters';
+  import { formatChatMutedTill, mediumDate, sameCalendarDay } from '$lib/message-formatters';
   import {
     chatComposerEnabled,
     isChatMode,
     isWebinarMode,
-    webinarMessageVisible
+    webinarMessageVisible,
+    type ChatMode
   } from '$lib/chat-mode';
   import {
     CHAT_PAGE_ARRIVAL_NUDGE,
@@ -13,6 +14,8 @@
     mergeOlderChatMessages,
     shouldLoadOlderMessages
   } from '$lib/chat-paging';
+  import { stripHtmlToText } from '$lib/chat-plain-text';
+  import { toggleReaction } from '$lib/reaction-toggle';
   import { chooseRecordingOptions } from '$lib/recording-codec';
   import { page } from '$app/state';
   import { panelDragResize, readPanelBounds } from '$lib/panel-drag';
@@ -31,6 +34,20 @@
   } from './private-chat.remote';
   import { focusOnScreen, presenterCommand } from './presenter-commands.remote';
   import { videoForAll, youtubeForAll } from './for-all-broadcast.remote';
+  import { recordingState } from './recording-state.remote';
+  import { changeChatMode as changeChatModeCommand } from './chat-mode.remote';
+  import {
+    deleteFile as deleteFileCommand,
+    fileMediaCommand,
+    overwriteCashRegisterSound
+  } from './files-pane.remote';
+  import { uploadComposerImage } from './composer-image.remote';
+  import { savePreference as savePreferenceCommand, saveTheme } from './user-settings.remote';
+  import { editUsername } from './username.remote';
+  import { replyMessage, sendMessage as sendMessageCommand } from './chat-messages.remote';
+  import { askQuestion } from './alert-questions.remote';
+  import { postAlert as postAlertCommand } from './post-alert.remote';
+  import { messageAction } from './message-actions.remote';
   import { isHttpError } from '@sveltejs/kit';
   import {
     PUBLIC_PTR_CDN_UPLOAD_KEY,
@@ -72,7 +89,7 @@
   } from '$lib/screen-zoom';
   import ScreenVolumeControl from '$lib/components/ScreenVolumeControl.svelte';
   import PresenterMuteRows from '$lib/components/PresenterMuteRows.svelte';
-  import { DEAD_PREFERENCE_KEYS } from '$lib/dead-preference-keys';
+  import { mirrorPreferenceToLocalStorage } from '$lib/dead-preference-keys';
   import {
     adjustVolumeForPresenter,
     toggleTalkingPresenter,
@@ -98,6 +115,7 @@
   import {
     INITIAL_FILE_SORT,
     type FileSortField,
+    fileSizeInKb,
     fileSortTitle,
     sortFiles,
     toggleFileSort
@@ -3707,14 +3725,17 @@
     openModal('user');
   }
 
+  /** `invalidateAll()` only on the resolved path — the roster is this route's `load`, not a query. */
   async function updateUsername(user: ModalTargetUser, username: string) {
     const trimmed = username.trim();
     if (!trimmed) return;
-    const body = new FormData();
-    body.set('userId', String(user.id));
-    body.set('username', trimmed);
-    const response = await fetch('?/editUsername', { method: 'POST', body });
-    if (response.ok) await invalidateAll();
+    try {
+      await editUsername({ userId: user.id, username: trimmed });
+    } catch (cause) {
+      bootboxAlert = isHttpError(cause) ? cause.body.message : 'Could not change that username.';
+      return;
+    }
+    await invalidateAll();
   }
 
   /**
@@ -4104,9 +4125,8 @@
 
   function setTheme(nextTheme: Theme) {
     theme = nextTheme;
-    const body = new FormData();
-    body.set('theme', nextTheme);
-    void fetch('?/saveTheme', { method: 'POST', body });
+    // Optimistic as always; the catch is here because a `void`-ed rejection is a swallowed error.
+    void saveTheme(nextTheme).catch((cause) => console.error('saveTheme', nextTheme, cause));
   }
 
   function savePreference(key: string, value: unknown) {
@@ -4186,20 +4206,13 @@
         soundChecks['presentation-subtitles'] = value;
       }
     }
-    if (typeof localStorage !== 'undefined') {
-      localStorage.setItem(key, JSON.stringify(value));
-      /*
-        The same nineteen dead keys are in localStorage too, and the server's prune cannot reach
-        them: `savePreference` writes both stores, so the element-id fallback left a copy in each.
-        Removed here on the next preference change of any kind, which is the same converge-on-use
-        rule the server side uses — no startup pass, nothing to run, and idempotent once clean.
-      */
-      for (const dead of DEAD_PREFERENCE_KEYS) localStorage.removeItem(dead);
-    }
-    const body = new FormData();
-    body.set('key', key);
-    body.set('value', JSON.stringify(value));
-    void fetch('?/savePreference', { method: 'POST', body });
+    mirrorPreferenceToLocalStorage(key, value);
+    // The value goes as a VALUE — devalue carries it, and `z.json()` is the schema for what the
+    // settings blob can hold. It used to be stringified for the wire and parsed back in a `try`.
+    void savePreferenceCommand({
+      key,
+      value: value as Parameters<typeof savePreferenceCommand>[0]['value']
+    }).catch((cause) => console.error('savePreference', key, cause));
   }
 
   function closeFloatingMenus() {
@@ -5064,21 +5077,27 @@
     item: MessageActionItem,
     operation: 'delete' | 'markAnswered' | 'mute24' | 'showMsgToAll'
   ) {
-    const form = new FormData();
-    form.set('kind', kind);
-    form.set('id', String(item.id));
-    form.set('operation', operation);
-    form.set('targetUserId', String(item.senderId));
-    const response = await fetch('?/messageAction', { method: 'POST', body: form });
-    // A refused action still answers 200 - SvelteKit puts the failure in the body, not the status -
-    // so `response.ok` reports "the request arrived", not "the operation happened". Anything that
-    // undoes an optimistic update on failure has to read the result itself.
-    const result = deserialize<{ success?: boolean }, { message?: string }>(await response.text());
-    const succeeded = result.type === 'success';
-    if (succeeded && (operation === 'delete' || operation === 'markAnswered')) {
-      await invalidateAll();
+    /*
+      `targetUserId` rides ONLY on `mute24` now. The action took it on every operation and read it on
+      one, so a delete carried a field nothing looked at; `z.discriminatedUnion` refuses it on the
+      other three, which is what makes the shape honest.
+
+      A rejection is the refusal. The old `response.ok` reported "the request arrived" and not "the
+      operation happened" — SvelteKit put a `fail` in the BODY with a 200 status — so anything
+      undoing an optimistic update had to read the result itself.
+    */
+    try {
+      await messageAction(
+        operation === 'mute24'
+          ? { kind, id: item.id, operation, targetUserId: item.senderId }
+          : { kind, id: item.id, operation }
+      );
+    } catch (cause) {
+      bootboxAlert = isHttpError(cause) ? cause.body.message : 'That did not work.';
+      return false;
     }
-    return succeeded;
+    if (operation === 'delete' || operation === 'markAnswered') await invalidateAll();
+    return true;
   }
 
   /**
@@ -5094,19 +5113,14 @@
     newBody: string,
     newBodyHtml?: string
   ) {
-    const form = new FormData();
-    form.set('kind', kind);
-    form.set('id', String(item.id));
-    form.set('operation', 'edit');
-    form.set('newBody', newBody);
-    if (newBodyHtml) form.set('newBodyHtml', newBodyHtml);
-    const response = await fetch('?/messageAction', { method: 'POST', body: form });
-    // As in runMessageOperation: a refused action answers 200 with the failure in the body, so the
-    // status alone cannot tell an edit that was applied from one that was rejected.
-    const result = deserialize<{ success?: boolean }, { message?: string }>(await response.text());
-    const succeeded = result.type === 'success';
-    if (succeeded) await invalidateAll();
-    return succeeded;
+    try {
+      await messageAction({ kind, id: item.id, operation: 'edit', newBody, newBodyHtml });
+    } catch (cause) {
+      bootboxAlert = isHttpError(cause) ? cause.body.message : 'That edit did not save.';
+      return false;
+    }
+    await invalidateAll();
+    return true;
   }
 
   async function toggleMessageReaction(
@@ -5114,63 +5128,60 @@
     item: MessageActionItem,
     reaction: MessageReactionPayload
   ) {
-    const form = new FormData();
-    form.set('kind', kind);
-    form.set('id', String(item.id));
-    form.set('operation', 'reaction');
-    form.set('reactionKey', reaction.key);
-    form.set('reactionEmoji', reaction.emoji);
-    const response = await fetch('?/messageAction', { method: 'POST', body: form });
-    // As in runMessageOperation: a refused action answers 200 with the failure in the body.
-    const result = deserialize<{ success?: boolean }, { message?: string }>(await response.text());
-    const succeeded = result.type === 'success';
-    if (succeeded) await invalidateAll();
-    return succeeded;
+    try {
+      await messageAction({
+        kind,
+        id: item.id,
+        operation: 'reaction',
+        reactionKey: reaction.key,
+        reactionEmoji: reaction.emoji
+      });
+    } catch (cause) {
+      bootboxAlert = isHttpError(cause) ? cause.body.message : 'That reaction did not save.';
+      return false;
+    }
+    await invalidateAll();
+    return true;
   }
 
   function toggleEvidenceReaction(
     item: MessageActionItem,
     reactionPayload: MessageReactionPayload
   ) {
-    const reactions = structuredClone(item.reactions ?? {});
-    const reaction = reactions[reactionPayload.key] ?? {
-      emoji: reactionPayload.emoji,
-      clickedBy: []
-    };
-    const index = reaction.clickedBy.indexOf(data.user.emailHash);
-
-    if (index >= 0) reaction.clickedBy.splice(index, 1);
-    else reaction.clickedBy.push(data.user.emailHash);
-
-    if (reaction.clickedBy.length === 0) delete reactions[reactionPayload.key];
-    else reactions[reactionPayload.key] = reaction;
-
+    // The same four rules the server applies, from the same function — see `$lib/reaction-toggle`.
+    const reactions = toggleReaction(
+      item.reactions ?? {},
+      reactionPayload.key,
+      reactionPayload.emoji,
+      data.user.emailHash
+    );
     updateEvidenceMessage(item, { reactions });
   }
 
-  async function sendAlertQuestion(body: string) {
+  /**
+   * The two sends that act on the modal's selected message. One helper because they differed only in
+   * the command called — two copies of a refusal path is how one of them ends up refetching anyway.
+   */
+  async function sendAgainstSelectedMessage(
+    send: (id: number) => Promise<void>,
+    failure: string
+  ): Promise<boolean> {
     if (!selectedMessage) return false;
-    const form = new FormData();
-    form.set('body', body);
-    form.set('alertId', String(selectedMessage.id));
-    const response = await fetch('?/askQuestion', { method: 'POST', body: form });
-    if (!response.ok) return false;
+    try {
+      await send(selectedMessage.id);
+    } catch (cause) {
+      bootboxAlert = isHttpError(cause) ? cause.body.message : failure;
+      return false;
+    }
     await invalidateAll();
     return true;
   }
 
-  async function sendReplyMessage(body: string) {
-    if (!selectedMessage) return false;
-    const form = new FormData();
-    form.set('body', body);
-    form.set('messageId', String(selectedMessage.id));
-    const response = await fetch('?/replyMessage', { method: 'POST', body: form });
-    if (response.ok) {
-      await invalidateAll();
-      return true;
-    }
-    return false;
-  }
+  const sendAlertQuestion = (body: string) =>
+    sendAgainstSelectedMessage((alertId) => askQuestion({ body, alertId }), 'Question not sent.');
+
+  const sendReplyMessage = (body: string) =>
+    sendAgainstSelectedMessage((messageId) => replyMessage({ body, messageId }), 'Reply not sent.');
 
   /**
    * `doMention` / `doMentionExtra` — the SAME insert, into whichever composer is the target.
@@ -6324,6 +6335,22 @@
   }
 
   /**
+   * Tells the room what this presenter's recorder is doing. `recording-state.remote.ts` carries the
+   * reasoning for all of it: why the room is told rather than each browser reading its own flag, why
+   * `cmd` is the command's schema instead of four restated strings, and why the catch is here once
+   * rather than at each of the four `void`-ed call sites.
+   */
+  type RecordingTransition = Parameters<typeof recordingState>[0]['cmd'];
+
+  async function broadcastRecordingState(cmd: RecordingTransition, recName = '') {
+    try {
+      await recordingState({ cmd, recName });
+    } catch (error) {
+      console.error('recordingState', cmd, error);
+    }
+  }
+
+  /**
    * Records the shared screen to a file on this machine.
    *
    * NOT what the capture does, and the divergence is deliberate. The original records
@@ -6343,21 +6370,6 @@
    *      It existed only at the moment it became invisible.
    *   3. NEVER SAVED. A blob URL was created and nothing ever downloaded it.
    */
-  /**
-   * Tells the room what this presenter's recorder is doing.
-   *
-   * The capture's recording is server-side, so the server is the one that emits `startRec`. Ours
-   * records in the browser, so the presenter announces it instead - but the SHAPE is the capture's:
-   * every peer, including this one, learns the state from the `cmds` channel rather than from a
-   * local flag. That is what makes the badge appear for members.
-   */
-  async function broadcastRecordingState(cmd: string, recName = '') {
-    const body = new FormData();
-    body.set('cmd', cmd);
-    if (recName) body.set('recName', recName);
-    await fetch('?/recordingState', { method: 'POST', body });
-  }
-
   function startRecording() {
     if (!screenStream || !screenSharing || typeof MediaRecorder === 'undefined') return;
 
@@ -6657,12 +6669,13 @@
     };
   }
 
+  /** One delete; the loop above drives it, as the capture's `deleteSelected()` does. */
   async function postDeleteFile(fileId: number) {
-    const body = new FormData();
-    body.set('fileID', String(fileId));
-    const response = await fetch('?/deleteFile', { method: 'POST', body });
-    const result = deserialize<{ success?: boolean }, { message?: string }>(await response.text());
-    if (result.type === 'failure') bootboxAlert = result.data?.message ?? 'Delete failed.';
+    try {
+      await deleteFileCommand({ fileId });
+    } catch (cause) {
+      bootboxAlert = isHttpError(cause) ? cause.body.message : 'Delete failed.';
+    }
   }
 
   /**
@@ -6742,13 +6755,15 @@
     await sendPresenterFileCommand('stopMp3ForAll');
   }
 
-  async function sendPresenterFileCommand(cmd: string, url?: string) {
-    const body = new FormData();
-    body.set('cmd', cmd);
-    if (url !== undefined) body.set('url', url);
-    const response = await fetch('?/fileMediaCommand', { method: 'POST', body });
-    const result = deserialize<{ success?: boolean }, { message?: string }>(await response.text());
-    if (result.type === 'failure') bootboxAlert = result.data?.message ?? 'Command failed.';
+  /** The command's own union, so the capture's asymmetric MP3 casing is checked at compile time. */
+  type FileMediaCmd = Parameters<typeof fileMediaCommand>[0]['cmd'];
+
+  async function sendPresenterFileCommand(cmd: FileMediaCmd, url?: string) {
+    try {
+      await fileMediaCommand({ cmd, url });
+    } catch (cause) {
+      bootboxAlert = isHttpError(cause) ? cause.body.message : 'Command failed.';
+    }
   }
 
   /**
@@ -6761,13 +6776,13 @@
    * changing its own label is the failure mode this avoids.
    */
   async function setAlertSound(url: string, on: boolean) {
-    const body = new FormData();
-    body.set('url', url);
-    body.set('on', on ? 'true' : 'false');
-    const response = await fetch('?/overwriteCashRegisterSound', { method: 'POST', body });
-    const result = deserialize<{ success?: boolean }, { message?: string }>(await response.text());
-    if (result.type === 'failure') {
-      bootboxAlert = result.data?.message ?? 'Command failed.';
+    try {
+      // `on` crosses as a real boolean now; the action carried the strings 'true' / 'false'.
+      await overwriteCashRegisterSound({ url, on });
+    } catch (cause) {
+      bootboxAlert = isHttpError(cause) ? cause.body.message : 'Command failed.';
+      // Returned, not fallen through: re-reading after a refusal redraws the button at a setting
+      // the controller never stored, which is the label-only lie this whole path exists to avoid.
       return;
     }
     await invalidate('room:data');
@@ -6778,25 +6793,6 @@
     if (selected) next.add(id);
     else next.delete(id);
     selectedFileIds = next;
-  }
-
-  // `round(e.size / 1024)` then the literal 'Kb ' - the capture reports kilobytes, rounded, with a
-  // trailing space before the closing tag.
-  function fileSizeInKb(size: number) {
-    return Math.round(size / 1024);
-  }
-
-  // Angular's `date:'medium'` pipe, which for en-US is `MMM d, y, h:mm:ss a`.
-  function mediumDate(value: Date | string | number) {
-    return new Date(value).toLocaleString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: true
-    });
   }
 
   async function sendComposerMessage() {
@@ -6818,17 +6814,14 @@
     const trimmedBody = body.trim();
     if (!trimmedBody) return false;
 
-    const form = new FormData();
-    form.set('body', trimmedBody);
-    if (bodyHtml) form.set('bodyHtml', bodyHtml);
-    form.set('room', room);
-    const response = await fetch('?/sendMessage', { method: 'POST', body: form });
-
-    if (response.ok) {
-      await invalidateAll();
-      return true;
+    try {
+      await sendMessageCommand({ body: trimmedBody, bodyHtml, room });
+    } catch (cause) {
+      bootboxAlert = isHttpError(cause) ? cause.body.message : 'Message not sent.';
+      return false;
     }
-    return false;
+    await invalidateAll();
+    return true;
   }
 
   /* ── The chat rich text editor ────────────────────────────────────────────────────────────────
@@ -6941,32 +6934,19 @@
   }
 
   /**
-   * The plain-text twin of a rich message, for every reader that never learns about `body_html`.
-   *
-   * The mention rule, the chat popup, the log search and the copy-to-clipboard all read `body`. The
-   * server derives it the same way and its derivation is the authoritative one — this is the
-   * optimistic copy, so the two must agree, and `chat-rich-text-contract` pins the server's.
-   */
-  function stripHtmlToText(html: string) {
-    return html
-      .replace(/<[^>]*>/g, '')
-      .replace(/&nbsp;/g, ' ')
-      .trim();
-  }
-
-  /**
    * `sendServerAdminCommand('changeChatMode', {mode})` — presenter-only, and re-checked there.
    *
-   * No optimistic update. The mode is room state, so the answer that matters is the row the server
-   * wrote; `invalidateAll()` re-reads it, and the same broadcast reaches every other tab in the
-   * room. Assuming success here would show this presenter a mode nobody else had.
+   * No optimistic update; `chat-mode.remote.ts` says why the command hands back nothing to assign.
+   * The `return` in the catch is what `if (result.type !== 'success') return` used to buy: a refetch
+   * after a refusal re-reads the unchanged row and redraws the radio at the mode nobody picked.
    */
-  async function changeChatMode(mode: string) {
-    const body = new FormData();
-    body.set('mode', mode);
-    const response = await fetch('?/changeChatMode', { method: 'POST', body });
-    const result = deserialize<{ mode?: string }, { message?: string }>(await response.text());
-    if (result.type !== 'success') return;
+  async function changeChatMode(mode: ChatMode) {
+    try {
+      await changeChatModeCommand(mode);
+    } catch (error) {
+      console.error('changeChatMode', mode, error);
+      return;
+    }
     await invalidateAll();
   }
 
@@ -7061,22 +7041,21 @@
       return link;
     }
 
-    const body = new FormData();
-    body.append('file', file);
-    body.append('originalname', file.name);
-    // `uploadComposerImage`, NOT `uploadFile`: the Files-pane action is presenter-only, and routing
-    // composer images through it refused every member with "Presenters only." while their own
-    // upload button was visible and enabled.
-    const response = await fetch('?/uploadComposerImage', { method: 'POST', body });
-    const result = deserialize<{ file?: { url?: string } }, { message?: string }>(
-      await response.text()
-    );
-    if (result.type !== 'success' || !result.data?.file?.url) {
-      throw new Error(
-        result.type === 'failure' ? (result.data?.message ?? 'Upload failed.') : 'Upload failed.'
-      );
+    /*
+      `composer-image.remote.ts`, NOT the Files pane's `uploadFile` — that one is presenter-only and
+      refused every member while their own upload button sat there enabled. The `File` goes as
+      itself; that module cites the two functions in Kit that reduce and revive it.
+
+      Re-thrown, not caught: `uploadComposerImages` already turns a failure into the dialog, so
+      swallowing here would post a message with an image that never uploaded.
+    */
+    try {
+      return await uploadComposerImage({ file, originalName: file.name });
+    } catch (cause) {
+      // `{ cause }` because the rejection is the only record of WHY — an `HttpError` re-thrown as a
+      // bare `Error` keeps the sentence and loses the status the server actually answered with.
+      throw new Error(isHttpError(cause) ? cause.body.message : 'Upload failed.', { cause });
     }
-    return result.data.file.url;
   }
 
   async function uploadComposerImages(files: File[], message: string) {
@@ -7127,15 +7106,16 @@
     nonTradeAlert: boolean,
     dontPush: boolean
   ) {
-    const form = new FormData();
-    form.set('kind', kind);
-    form.set('body', body);
-    if (targetUrl) form.set('targetUrl', targetUrl);
-    form.set('nonTradeAlert', String(nonTradeAlert));
-    form.set('dontPush', String(dontPush));
-
-    const response = await fetch('?/postAlert', { method: 'POST', body: form });
-    if (!response.ok) return false;
+    // `dontPush` is NOT sent: the action received it and never read it, and `post-alert.remote.ts`
+    // refuses it rather than accept a field nothing consumes. The parameter stays; the caller
+    // computes it, and the push suppression it names has no consumer in this room yet.
+    void dontPush;
+    try {
+      await postAlertCommand({ kind, body, targetUrl, nonTradeAlert });
+    } catch (cause) {
+      bootboxAlert = isHttpError(cause) ? cause.body.message : 'Alert not posted.';
+      return false;
+    }
     await invalidateAll();
     return true;
   }

@@ -160,7 +160,8 @@ describe('both columns share one pipeline, and that is the point', () => {
     expect(pageCode).toContain(
       'async function sendMessageBody(body: string, bodyHtml?: string, room: ChatTab = chatTab) {'
     );
-    expect(pageCode).toContain("form.set('room', room);");
+    // `room` rides on the command's argument now, not on a hand-built `FormData`.
+    expect(pageCode).toContain('await sendMessageCommand({ body: trimmedBody, bodyHtml, room });');
     expect(pageCode).toContain('if (await sendMessageBody(body, undefined, extraChatTab))');
   });
 });
@@ -273,7 +274,7 @@ describe('the second column follows its own messages', () => {
     const from = pageCode.indexOf('const scroller = extraChatScroller;');
     const effect = pageCode.slice(from, pageCode.indexOf('\n  });', from));
     expect(effect).toContain('const isInitialView = !extraChatScrollInitialized;');
-    expect(effect).toContain("activeTab !== previousExtraChatTab");
+    expect(effect).toContain('activeTab !== previousExtraChatTab');
     expect(effect).toContain('count > previousExtraChatCount');
   });
 

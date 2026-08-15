@@ -27,10 +27,47 @@
  */
 
 export const CHAT_MODES = ['g', 'p', 'd'] as const;
+
+/**
+ * Why the whole path from the radio to the server is typed `ChatMode` rather than `string`.
+ *
+ * `chat-mode.remote.ts` validates with `z.enum(CHAT_MODES)` — this constant, not a restatement of
+ * it. Typing the modal prop, the two request handlers and the page's wrapper the same way means a
+ * fourth mode added here cannot be offered by a radio and refused by the server: the compiler
+ * reaches every one of them from this one line.
+ */
 export type ChatMode = (typeof CHAT_MODES)[number];
 
 export function isChatMode(value: string): value is ChatMode {
   return (CHAT_MODES as readonly string[]).includes(value);
+}
+
+/**
+ * The confirm a presenter is shown before the room's chat mode changes under everybody.
+ *
+ * ```js
+ * let o = '"Group Chat"?';
+ * 'p' == e ? (o = '"Webinar Mode"?') : 'd' == e && (o = '"Disabled"?');
+ * bootbox.confirm('Are you sure you want to change the chat mode to ' + o, s => { … })
+ * ```
+ *
+ * Transcribed whole, quotes and trailing question mark included — the sentence reads
+ * `…change the chat mode to "Webinar Mode"?`, so the `?` belongs to the label and not to the
+ * sentence, and the prefix carries none of its own.
+ *
+ * ## Why it is here and not in the modal
+ *
+ * There were TWO of these and only one was right. The settings-modal radio built the label with the
+ * ternary above; the session-modal radio interpolated the raw letter, so it asked "are you sure you
+ * want to change the chat mode to p". Same control, same three values, two spellings — which is the
+ * duplication that lets one copy be fixed and the other left wrong. Both call this now.
+ *
+ * It lives beside `CHAT_MODES` because this is copy ABOUT the three modes, and the module that owns
+ * what a mode means is the one that should own what it is called.
+ */
+export function chatModeConfirmPrompt(mode: ChatMode): string {
+  const label = mode === 'p' ? '"Webinar Mode"?' : mode === 'd' ? '"Disabled"?' : '"Group Chat"?';
+  return `Are you sure you want to change the chat mode to ${label}`;
 }
 
 /** `this.chatEnabled = 'd' != e` — whether the composer is offered at all. */
@@ -99,7 +136,6 @@ export function webinarMessageVisible(
      arithmetic on an id, and this survives ids becoming uuids unchanged. */
   const isMine = message.senderId === viewer.id;
   const dropped =
-    (!message.isAdmin && !isMine) ||
-    (message.body.includes('@') && !message.isMention && !isMine);
+    (!message.isAdmin && !isMine) || (message.body.includes('@') && !message.isMention && !isMine);
   return !dropped;
 }

@@ -1,7 +1,9 @@
-import { command } from '$app/server';
+import { error } from '@sveltejs/kit';
+import { command, getRequestEvent } from '$app/server';
 import { z } from 'zod';
-import { presenterRoom } from '$lib/server/auth';
+import { presenterRoom, requireUser } from '$lib/server/auth';
 import { ensureDatabase } from '$lib/server/db';
+import { grantMediaElevation, revokeMediaElevation } from '$lib/server/media-elevation';
 import { publishToRoom } from '$lib/server/room-events';
 
 /*
@@ -82,3 +84,62 @@ export const focusOnScreen = command(z.string().trim().min(1), async (screenId) 
   ensureDatabase();
   publishToRoom(presenterRoom(), { channel: 'cmds', data: { cmd: 'focusOnScreen', screenId } });
 });
+
+/**
+ * `giveMicScreen` — a presenter hands a member mic and screenshare, or takes them back.
+ *
+ * ```js
+ * giveMicScreen(e) {
+ *   if (this.user.userXrefID == this.appService.globals.user.userXrefID)
+ *     return bootbox.alert(`Can't ${e ? 'give' : 'take'} 'Mic/Screenshare' to yourself.`), !1;
+ *   this.appService.sendServerAdminCommand('giveMicScreen', { user: this.user._id, give: e });
+ *   bootbox.alert(e ? 'Mic/Screenshare given OK' : 'Mic/Screen taken away OK');
+ * }
+ * ```
+ *
+ * It is a COMMAND, not a stored permission. The recipient's own client flips
+ * `isPresenter`/`isLimitedPresenter` and reinitialises its media — which is why
+ * `is_limited_presenter` was correctly removed as a column: it is transient state, not a property of
+ * an account.
+ *
+ * ## The elevation row IS written, and that is the one thing that is not transient
+ *
+ * Recorded on the SERVER before it is announced — `TODO.md` gap 22. The SFU decides who may produce
+ * from the grant's role, and `/api/media/grant` reads this row when it mints. Without it the
+ * recipient restarts its media and is refused `forbidden`, because a runtime hand-over never touches
+ * the controller's membership.
+ *
+ * Written here rather than trusted from the client: the reference achieves the same thing by letting
+ * the browser re-join asserting its own `isP`, which is the privilege escalation removed on
+ * 2026-08-07. `presenterRoom()` establishes the authority before the row is written.
+ *
+ * ## The self-target refusal is enforced HERE as well as in the UI
+ *
+ * The reference checks it only in the browser, and a presenter who reached this endpoint directly
+ * would otherwise flip their own presenter flag off and have no control left to flip it back.
+ *
+ * Returns nothing. The action returned the sentence for the caller to display; the modal owns its
+ * own copy of both strings and always did — it never read the one it was sent.
+ */
+export const giveMicScreen = command(
+  z.strictObject({
+    // `users.id` is an autoincrement primary key, so every real target is >= 1. `Number.isInteger`
+    // let 0 and negatives through to elevate nobody and announce it anyway.
+    targetUserId: z.number().int().positive(),
+    give: z.boolean()
+  }),
+  async ({ targetUserId, give }) => {
+    ensureDatabase();
+    const room = presenterRoom();
+    const actor = requireUser(getRequestEvent().locals);
+
+    if (targetUserId === actor.id) {
+      error(400, `Can't ${give ? 'give' : 'take'} 'Mic/Screenshare' to yourself.`);
+    }
+
+    if (give) grantMediaElevation(room, targetUserId, actor.id);
+    else revokeMediaElevation(room, targetUserId);
+
+    publishToRoom(room, { channel: 'cmds', data: { cmd: 'giveMicScreen', targetUserId, give } });
+  }
+);

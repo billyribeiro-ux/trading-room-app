@@ -85,3 +85,28 @@ export function pruneDeadPreferenceKeys(settings: Record<string, unknown>): numb
 export function isDeadPreferenceKey(key: string): boolean {
   return DEAD.has(key);
 }
+
+/**
+ * The BROWSER half of a preference write: mirror the value, and evict the dead keys on the way past.
+ *
+ * The same nineteen keys are in `localStorage` too, and the server's prune cannot reach them —
+ * `savePreference` writes both stores, so the old element-id fallback left a copy in each. Removed
+ * here on the next preference change of any kind, which is the same converge-on-use rule the server
+ * side uses: no startup pass, nothing to run, and idempotent once clean.
+ *
+ * `JSON.stringify` here and NOT on the wire. The remote command takes the value itself now
+ * (`z.json()` in `user-settings.remote.ts`); this store only holds strings, so it is the one place
+ * the stringify still belongs.
+ *
+ * It lives beside the list rather than in `+page.svelte` because the module that owns which keys are
+ * dead should own the eviction. The page had the loop inline, four lines from the server write it
+ * pairs with, and the two halves could drift apart without anything noticing.
+ *
+ * A no-op where there is no `localStorage` — server-side rendering, and any environment that has
+ * turned it off — because a preference failing to mirror is not a reason to fail the write.
+ */
+export function mirrorPreferenceToLocalStorage(key: string, value: unknown): void {
+  if (typeof localStorage === 'undefined') return;
+  localStorage.setItem(key, JSON.stringify(value));
+  for (const dead of DEAD_PREFERENCE_KEYS) localStorage.removeItem(dead);
+}

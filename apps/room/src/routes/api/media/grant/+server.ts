@@ -56,7 +56,12 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 
       The reference makes it work by letting the client re-join asserting its own `isP`. That is the
       privilege escalation removed on 2026-08-07, so the decision stays here: the row is written by
-      the staff-gated `giveMicScreen` action and simply read back. `TODO.md` gap 22.
+      the presenter-gated `giveMicScreen` COMMAND — `routes/presenter-commands.remote.ts` since
+      2026-08-15, an action before that — and simply read back. `TODO.md` gap 22.
+
+      Note what this line does NOT do: it never sets `isPresenter`. A member handed a microphone is
+      a member with a microphone, for the session, and nothing else — no alerts, no polls, no
+      moderation. `media-elevation-contract.test.ts` asserts the absence.
     */
     const elevated = hasMediaElevation(requireRoomShortCode(locals), user.id);
 

@@ -58,18 +58,71 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       explanation to the code it explains is the extraction itself. The first is why the ceiling
       moved once; the second is why it has not moved since — through five conversions and down to
       13,550, which is BELOW where it stood before the raise.
+
+      The seventh conversion (`recordingState`, `changeChatMode`) is the first where moving the
+      reasoning was NOT enough on its own: it landed 15 over, because a `try`/`catch` around a
+      command is three lines where a `void fetch(...)` was one, twice over, plus the two imports.
+      What paid for it was an EXTRACTION, which is what this file is supposed to provoke —
+      `stripHtmlToText` and its docstring left for `$lib/chat-plain-text.ts`. Pure, twinned with a
+      server derivation it has to agree with, and untestable in here without mounting the page.
+
+      That is the ratchet working as designed rather than as an obstacle: the growth was real and it
+      was paid for with a real module, not with a shorter comment and not with a bigger number.
+
+      The eighth (the Files pane and the composer upload) went the same way and cost 20: four call
+      sites, each trading a `void fetch(...)` for a `try`/`catch`, plus a five-line import. Paid for
+      by moving `mediumDate` to `$lib/message-formatters.ts` — where the room's four other date
+      formatters already live, and where it stopped constructing a fresh `Intl.DateTimeFormat` on
+      every call. Then two lines back for `{ cause }` on a re-thrown upload failure, which eslint's
+      `preserve-caught-error` was right to demand: an `HttpError` re-thrown as a bare `Error` keeps
+      the sentence and loses the status the server answered with. 13,534 -> 13,529 on the commit.
+
+      The ninth (the account and settings writes) cost 14 and was paid the same way, with the piece
+      of `savePreference` that never belonged in a component: `mirrorPreferenceToLocalStorage` now
+      sits beside the dead-key list it evicts, where the module that owns WHICH keys are dead owns
+      the eviction. The page had that loop inline, four lines from the server write it pairs with.
+
+      The tenth (the four message and alert posts) is the largest single drop this file has recorded
+      on the server side — `+page.server.ts` 2,405 -> 2,084 — and cost the component 5. Paid with
+      `fileSizeInKb`, which went to `$lib/file-sort.ts` where the module that owns how the Files pane
+      sorts and labels its rows now owns how it formats them; and with the two selected-message sends
+      collapsed into one, because they differed only in which command they called.
+
+      The eleventh and last — `messageAction`, 314 lines and six operations — cost 4, and paid with a
+      duplication the conversion exposed: the reaction toggle existed THREE times, twice on the server
+      and once as the page's optimistic copy, and no test had ever read the result of any of them.
+      `$lib/reaction-toggle.ts` states the four rules once, both sides call it, and it is executed.
+
+      Eleven conversions, and the ceiling has moved once — up, early, on the first one. Everything
+      since has been paid for with a module.
     */
-    max: 13542,
+    max: 13522,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {
     file: 'lib/components/ModalHost.svelte',
-    max: 5985,
+    /*
+      Moved for the first time, and DOWN, by the chat-mode conversion. The two radios each built the
+      confirm sentence themselves and only one of them built it right; `chatModeConfirmPrompt` in
+      `$lib/chat-mode.ts` owns the capture's wording now and both call it.
+
+      Down again on the last conversion. `uploadFile` was the eleventh call site and the one I did
+      not know about — it lived HERE, not in `+page.svelte`, and a comment of mine had asserted it
+      was a progressive `<form>` that degraded without JavaScript. It was a JS-driven loop over a
+      queue. Converting it took `deserialize` out of this file entirely.
+
+      `presenterCommand` and `giveMicScreen` were called from here too, and `presenterCommand`'s
+      call site was BROKEN — its action had been removed three commits earlier while this file went
+      on posting to it. Both are commands now. Held at the same number: the three command imports and
+      the bug's explanation were paid for by `$lib/refusal-message.ts`, which eleven call sites had
+      been writing out by hand.
+    */
+    max: 5982,
     why: 'every modal in the room, in one component'
   },
   {
     file: 'routes/+page.server.ts',
-    max: 2776,
+    max: 1617,
     why: 'the loader and every form action left; 3,233 before the remote-function conversions began'
   }
 ];

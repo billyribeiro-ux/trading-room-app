@@ -1,8 +1,16 @@
 import { readFileSync } from 'node:fs';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
+import { eq } from 'drizzle-orm';
+import { callRemote } from '$lib/server/remote-command-harness';
 import { db, ensureDatabase } from '$lib/server/db';
 import { sharedFiles, users } from '$lib/server/db/schema';
-import { INITIAL_FILE_SORT, fileSortTitle, sortFiles, toggleFileSort } from '$lib/file-sort';
+import {
+  INITIAL_FILE_SORT,
+  fileSizeInKb,
+  fileSortTitle,
+  sortFiles,
+  toggleFileSort
+} from '$lib/file-sort';
 
 /*
   The controller, stubbed — for the ONE action in this pane that talks to it.
@@ -150,8 +158,22 @@ describe('files table', () => {
   });
 
   it('reports size the way the capture does', () => {
+    /*
+      `fileSizeInKb` moved to `$lib/file-sort.ts` — the module that already owns how this pane sorts
+      and labels its rows. Asserting the expression as a STRING here only ever proved the text
+      existed; it is EXECUTED now, which is what the move bought.
+    */
     expect(bundle).toContain('i.round(e.size / 1024)');
-    expect(page).toContain('Math.round(size / 1024)');
+    expect(fileSizeInKb(1024)).toBe(1);
+    expect(fileSizeInKb(1536), 'rounds, per `i.round`').toBe(2);
+    expect(fileSizeInKb(0)).toBe(0);
+    /*
+      The template supplies the literal `Kb` and the function returns a number. Asserted WITHOUT the
+      capture's trailing space, because prettier puts the newline there — my first attempt asserted
+      `'Kb '` and failed for being wrong about the formatter, not about the markup. The space is
+      still rendered; it is whitespace between the text and the closing tag.
+    */
+    expect(page).toContain('>{fileSizeInKb(item.size)}Kb');
   });
 });
 
@@ -825,13 +847,28 @@ describe('the alert-sound row buttons', () => {
     expect(roomConfig).toContain('overwriteCashRegisterSound?: string | null;');
     expect(roomConfig).toContain('export async function writeRoomSetting(');
 
+    /*
+      Both left `+page.server.ts` for `files-pane.remote.ts`. Re-pointed rather than deleted, and
+      the file it now reads is asserted to CONTAIN the pair first — an extraction is exactly when a
+      `toContain` can start passing against the wrong file, or a `not.toContain` against a file that
+      never held the thing.
+    */
+    const filesPane = readFileSync(
+      new URL('../routes/files-pane.remote.ts', import.meta.url),
+      'utf8'
+    );
+    expect(filesPane).toContain("cmd: z.enum(['playMP3ForAll', 'stopMp3ForAll'])");
+    expect(filesPane).toContain('export const overwriteCashRegisterSound = command(');
+    // The two are still SEPARATE. Folding the setting into the broadcast would persist nothing.
+    expect(filesPane).toContain('export const fileMediaCommand = command(');
+
     const server = readFileSync(new URL('../routes/+page.server.ts', import.meta.url), 'utf8');
-    expect(server).toContain("if (cmd !== 'playMP3ForAll' && cmd !== 'stopMp3ForAll')");
-    expect(server).toContain('overwriteCashRegisterSound: async ({ request, locals }) => {');
+    expect(server).toContain('export const actions: Actions = {');
+    expect(server).not.toContain('overwriteCashRegisterSound: async ({ request, locals }) => {');
 
     expect(page).toContain('onclick={() => setAlertSound(item.url, true)}');
     expect(page).toContain('onclick={() => setAlertSound(item.url, false)}');
-    expect(page).toContain("fetch('?/overwriteCashRegisterSound', { method: 'POST', body })");
+    expect(page).toContain('await overwriteCashRegisterSound({ url, on });');
   });
 
   it('gates the Files tab AND the pane on hideFiles, as the reference gates both', () => {
@@ -909,7 +946,6 @@ describe('the Files pane stylesheet', () => {
   prove a single thing about authorization: a `{#if isPresenter}` in the template says who sees a
   button, not who may use it. This block calls the action.
 */
-const { actions } = await import('../routes/+page.server');
 
 const ROOM = '3625';
 const OTHER_ROOM = '9999';
@@ -966,24 +1002,39 @@ beforeAll(() => {
   file(OTHER_ROOM, OTHER_ROOMS_MP3, 'audio/mpeg');
 });
 
-/** The action's own argument type is SvelteKit-internal; this is the subset it reads. */
-type ActionArgs = Parameters<(typeof actions)['overwriteCashRegisterSound']>[0];
+/*
+  REWRITTEN, not re-pointed, when `overwriteCashRegisterSound` became a remote command.
 
-async function setAlertSound(locals: App.Locals, fields: Record<string, string>) {
-  const body = new FormData();
-  for (const [key, value] of Object.entries(fields)) body.set(key, value);
-  return actions.overwriteCashRegisterSound({
-    request: new Request('http://room.test/', { method: 'POST', body }),
-    locals
-  } as unknown as ActionArgs);
-}
+  Every assertion below still EXECUTES the write path against a live database and the fake
+  controller — which was the whole point of this block and the reason the conversion was deferred
+  until there was a way to keep it. A `command` cannot be called as a plain function: its wrapper
+  opens with `get_request_store()`. `callRemote` establishes that store, and
+  `remote-command-harness.ts` records which four fields Kit reads and where each was read from.
+
+  Two things changed shape, and both are the conversion rather than a weakening:
+
+    - a refusal REJECTS instead of returning a `fail()`, so `expect(result).toMatchObject({status})`
+      became `rejects.toMatchObject({ status, body: { message } })`. The message is still asserted;
+      it now rides on `body` because that is where Kit's `HttpError` puts it.
+    - success returns `undefined` rather than `{ success: true }`. The command hands back nothing,
+      so `expect(result).toEqual({ success: true })` would have been asserting a value invented for
+      the test. What proves success is the CONTROLLER WRITE, which is what mattered all along.
+
+  The `on: 'yes'` case became a schema test rather than a hand-written one: `z.boolean()` refuses a
+  string before the handler runs, so the message is Kit's `Bad Request` and not `Unknown command.`
+  Same refusal, moved one layer out, and the assertion says which layer it now lives in.
+*/
+const { deleteFile, fileMediaCommand, overwriteCashRegisterSound } =
+  await import('../routes/files-pane.remote');
+
+const setAlertSound = (locals: App.Locals, args: { url: string; on: boolean }) =>
+  callRemote(locals, () => overwriteCashRegisterSound(args));
 
 describe('setting the alert sound', () => {
   it('writes the url through to the controller, where it survives a reload', async () => {
     controller.writes.length = 0;
-    const result = await setAlertSound(presenterLocals, { url: MP3, on: 'true' });
+    await setAlertSound(presenterLocals, { url: MP3, on: true });
 
-    expect(result).toEqual({ success: true });
     /*
       This is the assertion the whole write path exists for. `publishToRoom` would also have made
       the buttons swap labels — and would have persisted nothing, so the next load would serve the
@@ -1003,17 +1054,17 @@ describe('setting the alert sound', () => {
   it('sends the EMPTY STRING to remove, exactly as the reference does', async () => {
     controller.writes.length = 0;
     // `{ url: i ? e : '' }` — full.js:3085. Not the url being removed, and not an absent field.
-    const result = await setAlertSound(presenterLocals, { url: MP3, on: 'false' });
+    await setAlertSound(presenterLocals, { url: MP3, on: false });
 
-    expect(result).toEqual({ success: true });
     expect(controller.writes[0]?.value).toBe('');
   });
 
   it('refuses a member, and writes NOTHING when it does', async () => {
     controller.writes.length = 0;
-    const result = await setAlertSound(memberLocals, { url: MP3, on: 'true' });
-
-    expect(result).toMatchObject({ status: 403, data: { message: 'Presenters only.' } });
+    await expect(setAlertSound(memberLocals, { url: MP3, on: true })).rejects.toMatchObject({
+      status: 403,
+      body: { message: 'Presenters only.' }
+    });
     // The status alone would pass with the write already sent. This is the half that matters.
     expect(controller.writes).toEqual([]);
   });
@@ -1021,27 +1072,38 @@ describe('setting the alert sound', () => {
   it("refuses a file this room does not hold, so the room's alerts cannot be pointed anywhere", async () => {
     controller.writes.length = 0;
     for (const url of [OTHER_ROOMS_MP3, 'https://example.com/evil.mp3']) {
-      const result = await setAlertSound(presenterLocals, { url, on: 'true' });
-      expect(result, url).toMatchObject({ status: 400, data: { message: 'No such file.' } });
+      await expect(setAlertSound(presenterLocals, { url, on: true }), url).rejects.toMatchObject({
+        status: 400,
+        body: { message: 'No such file.' }
+      });
     }
     expect(controller.writes).toEqual([]);
   });
 
   it('refuses a file that is not audio, even though this room holds it', async () => {
     controller.writes.length = 0;
-    const result = await setAlertSound(presenterLocals, { url: PDF, on: 'true' });
-
-    expect(result).toMatchObject({ status: 400, data: { message: 'That file is not a sound.' } });
+    await expect(setAlertSound(presenterLocals, { url: PDF, on: true })).rejects.toMatchObject({
+      status: 400,
+      body: { message: 'That file is not a sound.' }
+    });
     expect(controller.writes).toEqual([]);
   });
 
-  it('refuses an unrecognised `on`, rather than falling through to remove', async () => {
-    // A loose parse would read anything that is not "true" as false and silently clear the room's
-    // alert sound.
+  it('refuses a non-boolean `on` at the SCHEMA, rather than falling through to remove', async () => {
+    /*
+      A loose parse would read anything that is not "true" as false and silently clear the room's
+      alert sound. The action compared against the exact strings to prevent that; `z.boolean()` now
+      refuses before the handler runs, which is the same guarantee one layer earlier.
+
+      Cast because TypeScript would not let these through — which IS the improvement, and is why the
+      test has to reach around the compiler to prove the runtime still refuses them.
+    */
     controller.writes.length = 0;
-    for (const on of ['', 'yes', '1']) {
-      const result = await setAlertSound(presenterLocals, { url: MP3, on });
-      expect(result, on).toMatchObject({ status: 400, data: { message: 'Unknown command.' } });
+    for (const on of ['', 'yes', '1', 0, null]) {
+      await expect(
+        setAlertSound(presenterLocals, { url: MP3, on } as unknown as { url: string; on: boolean }),
+        String(on)
+      ).rejects.toMatchObject({ status: 400 });
     }
     expect(controller.writes).toEqual([]);
   });
@@ -1049,10 +1111,138 @@ describe('setting the alert sound', () => {
   it('fails LOUDLY when the controller refuses, rather than reporting success', async () => {
     controller.refuse = true;
     try {
-      const result = await setAlertSound(presenterLocals, { url: MP3, on: 'true' });
-      expect(result).toMatchObject({ status: 502 });
+      await expect(setAlertSound(presenterLocals, { url: MP3, on: true })).rejects.toMatchObject({
+        status: 502
+      });
     } finally {
       controller.refuse = false;
     }
+  });
+});
+
+/*
+  The other two Files-pane commands, which had NO executed coverage at all before this — only
+  source-text assertions. Both enforce the same "a file this room holds" predicate, and that is
+  precisely the sort of claim a string match cannot make.
+*/
+describe('playing a sound to the room', () => {
+  it('refuses a member', async () => {
+    await expect(
+      callRemote(memberLocals, () => fileMediaCommand({ cmd: 'playMP3ForAll', url: MP3 }))
+    ).rejects.toMatchObject({ status: 403, body: { message: 'Presenters only.' } });
+  });
+
+  it("refuses another room's file, so a url cannot be played into this room's speakers", async () => {
+    for (const url of [OTHER_ROOMS_MP3, 'https://example.com/evil.mp3', '']) {
+      await expect(
+        callRemote(presenterLocals, () => fileMediaCommand({ cmd: 'playMP3ForAll', url })),
+        url
+      ).rejects.toMatchObject({ status: 400, body: { message: 'No such file.' } });
+    }
+  });
+
+  it('allows a file this room does hold', async () => {
+    await expect(
+      callRemote(presenterLocals, () => fileMediaCommand({ cmd: 'playMP3ForAll', url: MP3 }))
+    ).resolves.toBeUndefined();
+  });
+
+  it('and a STOP carries no url, so it is not gated on one', async () => {
+    // `stopMp3ForAll() { sendServerAdminCommand('stopMp3ForAll') }` — no payload at all.
+    await expect(
+      callRemote(presenterLocals, () => fileMediaCommand({ cmd: 'stopMp3ForAll' }))
+    ).resolves.toBeUndefined();
+  });
+
+  it('refuses a command name that is not one of the two', async () => {
+    // An unknown string would reach every client in the room and be dispatched by none.
+    await expect(
+      callRemote(presenterLocals, () =>
+        fileMediaCommand({ cmd: 'playMp3ForAll' } as unknown as { cmd: 'stopMp3ForAll' })
+      ),
+      'the capture capitalises MP3 on play and not on stop; a tidied-up name dispatches nowhere'
+    ).rejects.toMatchObject({ status: 400 });
+  });
+});
+
+describe('deleting a file', () => {
+  it('refuses a member', async () => {
+    await expect(callRemote(memberLocals, () => deleteFile({ fileId: 1 }))).rejects.toMatchObject({
+      status: 403,
+      body: { message: 'Presenters only.' }
+    });
+  });
+
+  it("refuses another room's file by id, and leaves the row where it was", async () => {
+    const other = db.select().from(sharedFiles).where(eq(sharedFiles.url, OTHER_ROOMS_MP3)).get();
+    expect(other, 'the fixture must exist for this to mean anything').toBeTruthy();
+
+    await expect(
+      callRemote(presenterLocals, () => deleteFile({ fileId: other!.id }))
+    ).rejects.toMatchObject({ status: 404, body: { message: 'No such file.' } });
+
+    // The half that matters: a 404 with the row already gone would be the breach, not the refusal.
+    expect(db.select().from(sharedFiles).where(eq(sharedFiles.id, other!.id)).get()).toBeTruthy();
+  });
+
+  it('deletes one this room holds, and a second attempt loses the race rather than repeating', async () => {
+    const row = db
+      .insert(sharedFiles)
+      .values({
+        roomShortCode: ROOM,
+        name: 'doomed.mp3',
+        kind: 'sound',
+        url: '/uploads/doomed.mp3',
+        contentType: 'audio/mpeg',
+        size: 1,
+        createdAt: new Date()
+      })
+      .returning()
+      .get();
+
+    await expect(
+      callRemote(presenterLocals, () => deleteFile({ fileId: row.id }))
+    ).resolves.toBeUndefined();
+    expect(db.select().from(sharedFiles).where(eq(sharedFiles.id, row.id)).get()).toBeUndefined();
+
+    // A second delete finds nothing. True of both shapes, which is exactly the point made below.
+    await expect(
+      callRemote(presenterLocals, () => deleteFile({ fileId: row.id }))
+    ).rejects.toMatchObject({ status: 404 });
+  });
+
+  it('closes the TOCTOU in ONE statement — and this guard is textual, deliberately', () => {
+    /*
+      Honest about what it can prove, because the first version of this was not.
+
+      The claim: the action SELECTed the row, then DELETEd by the same predicate. Two presenters
+      pressing delete together both find a row, both proceed, and both call `deleteStoredFile` on a
+      path the first has already removed. One conditional `DELETE … RETURNING` makes zero rows the
+      whole answer.
+
+      I wrote this as a behavioural test first — delete, then delete again, expect 404 — and ran the
+      negative control: putting the SELECT-then-DELETE back left it GREEN. It had to. `better-sqlite3`
+      is SYNCHRONOUS, so nothing can interleave between the two statements inside one process, and
+      two sequential calls behave identically either way. The race is across requests, which this
+      suite cannot stage.
+
+      So the guard is a source-text one, and it says so rather than dressing itself up as a
+      behavioural proof that never was. A `db.select()` reappearing in `deleteFile` fails here.
+    */
+    const filesPane = readFileSync(
+      new URL('../routes/files-pane.remote.ts', import.meta.url),
+      'utf8'
+    );
+    const from = filesPane.indexOf('export const deleteFile = command(');
+    expect(from, 'the command must exist for this to guard anything').toBeGreaterThan(-1);
+    const body = filesPane.slice(from, filesPane.indexOf('\n);', from));
+
+    expect(body).toContain('.delete(sharedFiles)');
+    expect(body).toContain('.returning()');
+    expect(body).not.toContain('.select()');
+    // And the blob goes only after the row is provably gone, never before.
+    expect(body.indexOf('await deleteStoredFile(row.url);')).toBeGreaterThan(
+      body.indexOf("if (!row) error(404, 'No such file.');")
+    );
   });
 });
