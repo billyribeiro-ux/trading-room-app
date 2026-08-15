@@ -26,7 +26,14 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ### 2026-08-15 10:48 EDT — repairing what the eviction broke, and finding the gate was already red for a bigger reason
 
-**Runtime impact: none.** Gate infrastructure and one test file.
+**Runtime impact: none.** Gate infrastructure and one test file. Landed with the 10:33 entry below in
+a single commit, `bceb3b3` (10:51 EDT) — the two are one change and separating them would have left
+a commit on `main` in which the privacy gate did not exist. The times above are measurements taken
+when each piece of work completed, not the commit timestamp.
+
+**Safe to auto-deploy, checked rather than assumed:** `main` auto-deploys, so this merge is a
+production release. Nothing under `src/` outside test files references `scripts/`, and neither
+`vite.config.ts` nor `svelte.config.js` does — the 75 deleted files are not in the build graph.
 
 **The finding that reframed the whole task: `quality.yml` has never passed.** `gh run list` returns
 **failure on all 8 runs**, back to PR #28. The eviction 15 minutes earlier was not what turned the
