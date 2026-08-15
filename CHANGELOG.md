@@ -24,6 +24,58 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-15
 
+### 2026-08-15 11:53 EDT — a merge had quietly un-wired four settings, and the markers didn't say so
+
+**Runtime impact: none by itself — it restores runtime behaviour that a previous merge removed.**
+Four capability gates and the recording-reminder policy term were live on the branch, were backed
+out by `8464191`, and are live again at `ace994b`. Nothing new ships here.
+
+The branch and the remote had each merged `main` independently, producing two merge commits with the
+**same two parents** (`b8410a7` + `b267143`). Landing this looked like a three-way conflict across
+the wired-count contract, and the previous session stopped rather than resolve it blind. That
+caution was right about the stakes and wrong about the cause. `main`'s side touched **one file**:
+
+```
+git diff --stat $(git merge-base b8410a7 b267143) b267143
+  apps/room/eslint.config.js | 7 ++++---
+```
+
+`main` never touched `CHANGELOG.md` or either controller script, so those could not have conflicted
+with it. They conflicted with a **reversion**:
+
+```
+git diff --stat b8410a7 8464191
+  9 files changed, 11 insertions(+), 238 deletions(-)
+```
+
+`8464191` backed out `49a536a` and `b8410a7`. `usersPublicReply`, `enableReactions`,
+`enableEditMessage` and `enableEditAlerts` left `ROOM_VISIBLE_SETTINGS`, their schema rows returned
+to `wired: false`, the generator's size contract returned to **62**, the reminder banner lost its
+policy term, and 122 lines of this file went with them. Those four settings were already proven dead
+on arrival in every room — the props existed, defaulted `false`, and were never passed — so this is
+restoring a fix, not preferring a style.
+
+**The reason this is worth an entry: the conflict markers did not cover the damage.** Nine files
+conflicted, but in `room-settings-schema.ts` the `enableEditMessage` and `enableEditAlerts` rows
+flipped back to `wired: false` **outside any marker** — a clean auto-merge with no warning — because
+the reversion changed lines this branch had not touched since `49a536a`. Resolving only what git
+marked would have shipped two settings silently unwired while the header above them still read
+`67 of 269`. The check that catches this is not reading the markers; it is diffing the **whole tree**
+against the last verified commit afterwards.
+
+Resolved as a real three-way merge rather than `-s ours`, deliberately: the strategy flag produces
+the identical tree but hides which hunks were dropped, and this needed to be reviewable. All thirteen
+lines `8464191` adds over the branch were read. Twelve are the reversion. The thirteenth is `main`'s
+`files` list on the ESLint globals block, which `3173707` already superseded with the unscoped block
+— measured on a clean checkout, it fixes the 31 `no-undef` under `gate/` and cannot touch the other
+47, which come from preset ORDER, and its second pattern never matches the file in the tree (named
+with a space, not a dot). Nothing `b267143` intended is lost.
+
+**Verified:** tree byte-identical to `8f08952`, which was already green, so nothing was re-run to
+claim its results. What was re-run is what this merge could have broken: the schema verifier —
+`268 extracted + 1 reviewed deviation = 269 total; 67 wired`, exit 0 — and
+`room-config-boundary.test.ts`, 17/17.
+
 ### 2026-08-15 11:31 EDT — the recording reminder obeyed the recorder but never the owner
 
 **Runtime impact: one banner becomes switchable.** A room that leaves the setting off now suppresses
