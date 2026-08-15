@@ -78,6 +78,13 @@
   } from '$lib/roster-gates';
   import { alertSoundButtonFor, filesSectionHidden } from '$lib/files-gates';
   import {
+    INITIAL_FILE_SORT,
+    type FileSortField,
+    fileSortTitle,
+    sortFiles,
+    toggleFileSort
+  } from '$lib/file-sort';
+  import {
     MUTE_ALL_CONFIRM,
     MUTE_STAGGER_MS,
     nonAdminTalkingUsers
@@ -1399,17 +1406,21 @@
   let scheduledVideoTimer: number | undefined;
   let composer = $state('');
   let fileSearch = $state('');
-  // The sort bar is the one part of the Files pane with no counterpart in the pinned capture -
-  // `st-fileSortBar`, `st-fileSortName`, `st-fileSortDate`, `fa-sort` and `fa-sort-amount-up` are
-  // absent from main.d6d3c112b59b7d0d.js, from complete-app-styles.css and from the rendered Files
-  // dump, so the deployment we hold predates it. These class names come from the owner's own
-  // markup rather than from the bundle.
-  let fileSortKey = $state<'name' | 'date'>('name');
-  // Each button keeps its own direction, which is why the capture's inactive Date button still
-  // says "Sorted newest to oldest". Name defaults A-to-Z and Date defaults newest-first, matching
-  // the rendered titles in the owner's markup.
-  let nameAscending = $state(true);
-  let dateNewestFirst = $state(true);
+  /*
+    The Files sort bar's state - ONE field and ONE direction, opening on date/desc.
+
+    This used to be three variables (`fileSortKey`, `nameAscending`, `dateNewestFirst`) built from
+    the owner's pasted markup, because the capture we held at the time contained no sort bar at all.
+    The v4 bundle does contain it, and it disagrees on two points that a per-button direction cannot
+    express: both icons read the same `fileSortDir` (bytes 1,946,450 and 1,946,605), and switching
+    field RESETS that direction to the new field's default rather than restoring a remembered one
+    (byte 1,975,308). `$lib/file-sort` holds the decode and the reasoning.
+
+    `$state.raw`, not `$state`: this object is only ever REPLACED, by `toggleFileSort` returning a
+    new pair, so a deep proxy over it would be per-read overhead buying nothing. The pair is one
+    value rather than two so the field and the direction cannot drift apart.
+  */
+  let fileSort = $state.raw(INITIAL_FILE_SORT);
   // The row checkboxes that feed "Delete Selected"; `#filesDriveList input:checked` in the capture.
   let selectedFileIds = $state<Set<number>>(new Set());
   let volume = $state(100);
@@ -6442,25 +6453,37 @@
   function searchedFiles() {
     const query = fileSearch.trim().toLowerCase();
     const matching = data.files.filter((item) =>
-      Object.values(item).some((field) => typeof field === 'string' && field.toLowerCase().includes(query))
+      Object.values(item).some(
+        (field) => typeof field === 'string' && field.toLowerCase().includes(query)
+      )
     );
-    return matching.sort((a, b) =>
-      fileSortKey === 'name'
-        ? (nameAscending ? 1 : -1) * a.name.localeCompare(b.name)
-        : // "newest to oldest" is descending, so the default direction is the reverse of name's.
-          (dateNewestFirst ? -1 : 1) *
-          (new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
-    );
+    /*
+      SEARCH FIRST, THEN SORT, which is the order the reference composes its two pipes in - read at
+      byte 1,951,076:
+
+          pt(rg(16,9,Ct(15,6,e.sessionFiles,e.filesSearch),e.fileSortField,e.fileSortDir))
+
+      `Ct` binds the two-argument `filter`, and its result is the FIRST argument to the
+      three-argument `sortFiles`. Sorting first and filtering after would give the same rows here,
+      but it is not what the reference does and it costs a comparison pass over rows that are about
+      to be discarded.
+
+      `sortFiles` copies before it sorts, so the array `filter` just allocated is not sorted in
+      place either; see property 1 in `$lib/file-sort`.
+    */
+    return sortFiles(matching, fileSort.field, fileSort.direction);
   }
 
   /**
-   * Both titles read "Sorted X (click to sort Y)", on the active button and the inactive one alike,
-   * so a click flips that button's own direction and makes it the governing sort.
+   * One click on one of the two sort buttons.
+   *
+   * The whole transition lives in `$lib/file-sort` so it can be exercised without rendering this
+   * component; all this does is hand the current pair in and store the pair that comes back. The
+   * single assignment is deliberate - `$state.raw` reacts to reassignment, and assigning field and
+   * direction separately is what would let a stale direction survive a field change.
    */
-  function toggleFileSort(key: 'name' | 'date') {
-    if (key === 'name') nameAscending = !nameAscending;
-    else dateNewestFirst = !dateNewestFirst;
-    fileSortKey = key;
+  function applyFileSort(field: FileSortField) {
+    fileSort = toggleFileSort(fileSort, field);
   }
 
   /**
@@ -12298,59 +12321,10 @@
                       </div>
                     </div>
                     <!--
-                      The sort bar, from the owner's own rendered markup. Angular's structural
-                      anchors are dropped; every class, its ORDER, and both titles are verbatim.
-
-                      Each button carries three icon variants (the two empty anchors after each `i`
-                      are collapsed ngIfs): `fa-sort` when it is not the governing sort, and an
-                      up/down pair when it is. Note the class order genuinely differs between the
-                      two states in the capture - `fas ml-2 fa-sort-alpha-down` when active,
-                      `fas fa-sort ml-2` when not - so they are written out rather than composed.
-                    -->
-                    <div
-                      class="d-flex flex-wrap justify-content-center align-items-center mt-2 st-fileSortBar"
-                    >
-                      <span class="mr-2">Sorting by:</span>
-                      <button
-                        class="btn btn-sm m-1 st-fileSortName"
-                        class:active={fileSortKey === 'name'}
-                        title={nameAscending
-                          ? 'Sorted A to Z (click to sort Z to A)'
-                          : 'Sorted Z to A (click to sort A to Z)'}
-                        onclick={() => toggleFileSort('name')}
-                      >
-                        {' '}Name{' '}
-                        {#if fileSortKey === 'name'}
-                          <i class="fas ml-2 {nameAscending
-                              ? 'fa-sort-alpha-down'
-                              : 'fa-sort-alpha-up'}"></i>
-                        {:else}
-                          <i class="fas fa-sort ml-2"></i>
-                        {/if}
-                      </button>
-                      <button
-                        class="btn btn-sm m-1 st-fileSortDate"
-                        class:active={fileSortKey === 'date'}
-                        title={dateNewestFirst
-                          ? 'Sorted newest to oldest (click to sort oldest to newest)'
-                          : 'Sorted oldest to newest (click to sort newest to oldest)'}
-                        onclick={() => toggleFileSort('date')}
-                      >
-                        {' '}Date{' '}
-                        {#if fileSortKey === 'date'}
-                          <i class="fas ml-2 {dateNewestFirst
-                              ? 'fa-sort-amount-down'
-                              : 'fa-sort-amount-up'}"></i>
-                        {:else}
-                          <i class="fas fa-sort ml-2"></i>
-                        {/if}
-                      </button>
-                    </div>
-                    <!--
-                      An EMPTY room renders neither the heading nor the table.
+                      An EMPTY room renders no heading, no SORT BAR and no table.
 
                       The two gates are `O(84, o.sessionFiles ? -1 : 84)` for the `<h4>` and
-                      `O(85, o.sessionFiles && o.sessionFiles.length > 0 ? 85 : -1)` for the table.
+                      `O(85, o.sessionFiles && o.sessionFiles.length > 0 ? 85 : -1)` for node 85.
                       They are not complements: the heading needs `sessionFiles` to be FALSY, and an
                       empty array is truthy, so a room with zero files shows nothing at all. Both
                       rendered captures confirm it — the badges read 0 and after the toolbar there
@@ -12361,8 +12335,94 @@
                       array, so that state cannot arise here and the heading is not rendered at all
                       rather than kept as a branch nothing can reach. Ours previously showed it
                       whenever the list was empty, which is the one case the reference stays silent.
+
+                      THE SORT BAR IS INSIDE THIS GATE, and that was read rather than assumed. Node
+                      85 is the view `t2e` (byte 2,016,231, `H(84,Bwe,2,0,"h4",48)(85,t2e,17,17)`),
+                      and `t2e` opens with the sort bar div and closes with the files table — one
+                      view holding both, read at byte 1,950,099. Its gate is the one quoted above,
+                      read at byte 2,018,251. So the two elements share a single condition, and a
+                      room with no files shows no "Sorting by:" strip either. Ours rendered the bar
+                      unconditionally, which put a sort control above an absent table.
                     -->
                     {#if data.files.length > 0}
+                      <!--
+                        The sort bar. Every class comes from the const table read at bytes
+                        2,011,253-2,011,600:
+
+                          242 [1,"d-flex","flex-wrap","justify-content-center","align-items-center","mt-2","st-fileSortBar"]
+                          243 [1,"mr-2"]
+                          244 [1,"btn","btn-sm","m-1","st-fileSortName",3,"click","ngClass","title"]
+                          245 [1,"fas","ml-2",3,"ngClass"]
+                          246 [1,"btn","btn-sm","m-1","st-fileSortDate",3,"click","ngClass","title"]
+                          249 [1,"fas","fa-sort","ml-2"]
+
+                        Both labels keep their LEADING AND TRAILING space - `v(4," Name ")` at byte
+                        1,950,263 and `v(8," Date ")` at 1,950,396. Svelte trims whitespace at the
+                        edges of an element's children, so each pad has to be an expression to
+                        survive into the DOM text node, exactly as the other padded labels in this
+                        pane already are.
+
+                        The icon class ORDER differs by state and is not a typo. Const 245 is static
+                        `fas ml-2` with the glyph appended by ngClass, so the active icon renders
+                        `fas ml-2 fa-sort-alpha-down`; const 249 is entirely static, so the inactive
+                        one renders `fas fa-sort ml-2`. Both variants key off the SAME direction.
+                      -->
+                      <div
+                        class="d-flex flex-wrap justify-content-center align-items-center mt-2 st-fileSortBar"
+                      >
+                        <span class="mr-2">Sorting by:</span>
+                        <!--
+                          `.active` is CAPTURED, not derived. The binding is
+                          `z("ngClass",ct(13,mo,"name"===e.fileSortField))` at byte 1,950,577, and
+                          `mo` is the shared pure function read at byte 1,916,345 — it takes one
+                          argument and returns an object whose only key is `active`, set to that
+                          argument. So the class is present exactly when this button's field is the
+                          governing field, and it depends on the field alone, never on the
+                          direction. `docs/decoded/files-sort-bar.md` listed this expression as an
+                          honest gap; it was opened and the gap is closed.
+
+                          `mo` is quoted verbatim in `$lib/file-sort`, and asserted verbatim against
+                          the bundle in `files-pane-contract.test.ts`. It is written out in words
+                          HERE because its body is brace-delimited, and a brace-delimited construct
+                          inside a Svelte comment is prose to a human and a mustache to a parser.
+                          That exact shape has already turned a contract test red in this repository
+                          while `svelte-check` stayed green.
+                        -->
+                        <button
+                          class="btn btn-sm m-1 st-fileSortName"
+                          class:active={fileSort.field === 'name'}
+                          title={fileSortTitle('name', fileSort)}
+                          onclick={() => applyFileSort('name')}
+                        >
+                          {' '}Name{' '}
+                          {#if fileSort.field === 'name'}
+                            <i
+                              class="fas ml-2 {fileSort.direction === 'asc'
+                                ? 'fa-sort-alpha-down'
+                                : 'fa-sort-alpha-up'}"
+                            ></i>
+                          {:else}
+                            <i class="fas fa-sort ml-2"></i>
+                          {/if}
+                        </button>
+                        <button
+                          class="btn btn-sm m-1 st-fileSortDate"
+                          class:active={fileSort.field === 'date'}
+                          title={fileSortTitle('date', fileSort)}
+                          onclick={() => applyFileSort('date')}
+                        >
+                          {' '}Date{' '}
+                          {#if fileSort.field === 'date'}
+                            <i
+                              class="fas ml-2 {fileSort.direction === 'asc'
+                                ? 'fa-sort-amount-down'
+                                : 'fa-sort-amount-up'}"
+                            ></i>
+                          {:else}
+                            <i class="fas fa-sort ml-2"></i>
+                          {/if}
+                        </button>
+                      </div>
                       <table class="table table-striped m-auto w-100 mt-3 st-fileTable">
                         <tbody id="filesDriveList">
                           {#each searchedFiles() as item (item.id)}

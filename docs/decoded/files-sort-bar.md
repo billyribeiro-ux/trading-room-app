@@ -71,9 +71,12 @@ The Files pane opens **newest first**. A build that starts unsorted diverges on 
 
 ### The classes, from the const table
 
+Re-read at bytes 2,011,253-2,011,600 during the build; corrected where this table had dropped the
+leading `1` from the bar's const.
+
 | element | consts, verbatim |
 | --- | --- |
-| bar | `["d-flex","flex-wrap","justify-content-center","align-items-center","mt-2","st-fileSortBar"]` |
+| bar | `[1,"d-flex","flex-wrap","justify-content-center","align-items-center","mt-2","st-fileSortBar"]` |
 | label span | `[1,"mr-2"]` |
 | Name button | `[1,"btn","btn-sm","m-1","st-fileSortName",3,"click","ngClass","title"]` |
 | Date button | `[1,"btn","btn-sm","m-1","st-fileSortDate",3,"click","ngClass","title"]` |
@@ -82,12 +85,33 @@ The Files pane opens **newest first**. A build that starts unsorted diverges on 
 
 ### The four title strings, verbatim and at their offsets
 
+The four strings and their four byte offsets are right. **The `condition` column was wrong and is
+corrected below**: each title tests the FIELD before it tests the direction. Read verbatim in the
+`t2e` update block at bytes 1,950,560-1,951,040:
+
+```js
+z("ngClass",ct(13,mo,"name"===e.fileSortField))("title","name"===e.fileSortField&&"desc"===e.fileSortDir
+  ?"Sorted Z to A (click to sort A to Z)"
+  :"Sorted A to Z (click to sort Z to A)")
+
+z("ngClass",ct(15,mo,"date"===e.fileSortField))("title","date"===e.fileSortField&&"asc"===e.fileSortDir
+  ?"Sorted oldest to newest (click to sort newest to oldest)"
+  :"Sorted newest to oldest (click to sort oldest to newest)")
+```
+
 | button | condition | title | byte |
 | --- | --- | --- | ---: |
-| Name | `desc` | `Sorted Z to A (click to sort A to Z)` | 1,950,683 |
+| Name | field is `name` AND dir is `desc` | `Sorted Z to A (click to sort A to Z)` | 1,950,683 |
 | Name | otherwise | `Sorted A to Z (click to sort Z to A)` | 1,950,722 |
-| Date | `asc` | `Sorted oldest to newest (click to sort newest to oldest)` | 1,950,910 |
+| Date | field is `date` AND dir is `asc` | `Sorted oldest to newest (click to sort newest to oldest)` | 1,950,910 |
 | Date | otherwise | `Sorted newest to oldest (click to sort oldest to newest)` | 1,950,969 |
+
+The conjunct is not cosmetic. Tabulated on direction alone, an INACTIVE Name button announces
+"Sorted Z to A" whenever the direction happens to be `desc` — while Date is the sort actually in
+force. With the conjunct, an inactive button always shows its own default-state string. That is
+also the real explanation for the thing this document notes further down: the rendered capture
+shows an inactive Date button still claiming "Sorted newest to oldest". It is not remembered state,
+it is the `else` arm.
 
 ### The comparator, verbatim
 
@@ -120,8 +144,13 @@ Four properties that matter, and only the third is in §2.1:
 
 ## The button labels carry spaces
 
-Read at byte 1,975,308 in the template: `v(4," Name ")` and `v(8," Date ")` — **leading AND trailing
-space on both**. §2.1's table renders them as `Name` and `Date`. Keep the spaces.
+`v(4," Name ")` at byte **1,950,263** and `v(8," Date ")` at byte **1,950,396** — **leading AND
+trailing space on both**. §2.1's table renders them as `Name` and `Date`. Keep the spaces.
+
+**The offset previously given here, 1,975,308, was wrong** — it is the offset of `toggleFileSort`,
+copied from the fact above, and it sits about 25 KB away from the template. The labels themselves
+are inside `t2e`, which begins at byte 1,950,099. The claim about the spaces was correct; only the
+citation was.
 
 The label before them is `Sorting by:` (1 occurrence) inside `<span class="mr-2">`.
 
@@ -158,13 +187,63 @@ assumption that is what it means.
 
 ---
 
-## Honest gaps
+## Honest gaps — BOTH CLOSED during the build, by reading
 
-- **The `.active` class application was not read at its binding site.** The const table shows the
-  buttons bind `ngClass` and `title` in the same slot group, and the CSS proves `.active` exists and
-  is styled, but the exact expression that adds it was not opened. Do not guess it; read it before
-  building, or derive it from `fileSortField` and state in a comment that it is derived.
-- **The sort bar's position within the Files pane** — which sibling it sits between — was not
-  established here. Only its own markup and behaviour were.
+### `.active` — closed. It is captured, not derived.
+
+The binding was opened at byte **1,950,577** (Name) and **1,950,805** (Date):
+
+```js
+z("ngClass",ct(13,mo,"name"===e.fileSortField))
+z("ngClass",ct(15,mo,"date"===e.fileSortField))
+```
+
+and `mo` is the shared pure function read at byte **1,916,345**, in the same const run as `Hr` and
+`jCe`:
+
+```js
+mo=t=>({active:t})
+```
+
+So `ngClass` resolves to `{active: <this button's field is the governing field>}`. `.active`
+depends on the FIELD ALONE and never on the direction. Nothing here needed to be derived or
+guessed.
+
+### The bar's position — closed. It is inside the table's gate.
+
+The bar and the table are ONE embedded view. `t2e`, read at byte **1,950,099**, opens with the sort
+bar div and closes with `st-fileTable`:
+
+```js
+function t2e(t,n){if(1&t){const e=Y();d(0,"div",242)(1,"span",243),v(2,"Sorting by:"),u(),
+  d(3,"button",244)…d(7,"button",246)…u()(),
+  d(11,"table",247)(12,"tbody",248),ht(13,e2e,2,1,"tr",null,pc),Xe(15,"filter"),Xe(16,"sortFiles"),u()()}
+```
+
+and `t2e` is node 85 (byte **2,016,231**, `H(84,Bwe,2,0,"h4",48)(85,t2e,17,17)`), whose gate is read
+at byte **2,018,251**:
+
+```js
+O(85,o.sessionFiles&&o.sessionFiles.length>0?85:-1)
+```
+
+**So a room with no files renders no sort bar**, exactly as it renders no table. A build that puts
+the bar above the gate shows a "Sorting by:" strip over an absent table in every empty room. Its
+immediate siblings are the `h4` (node 84, the never-fetched message) before it and nothing after.
+
+### Still true
+
 - `st-fileSortBar`, `st-fileSortName` and `st-fileSortDate` each occur **exactly once** in the
   bundle, so there is one instance and no second usage to cross-check against.
+
+### One more thing the build read that this document did not record
+
+The two pipes compose **filter first, then sort** — byte **1,951,076**:
+
+```js
+pt(rg(16,9,Ct(15,6,e.sessionFiles,e.filesSearch),e.fileSortField,e.fileSortDir))
+```
+
+`Ct` binds the two-argument `filter`, and its result is the FIRST argument to the three-argument
+`sortFiles`. Sorting before filtering yields the same rows and pays for comparisons on rows about to
+be discarded.

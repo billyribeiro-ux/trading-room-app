@@ -24,6 +24,108 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-15
 
+### 2026-08-15 08:42 EDT — the parking bucket is deleted, and the rule is written down
+
+**Runtime impact: none.** Owner directive, 2026-08-15: **nothing that is not built ever gets parked.**
+
+`missing-commands-triage.md` filed five commands under *"unclear, needs a decision rather than more
+reading"*. That read as a resolved category. It was **five unbuilt features**, and the totals table
+carried them in a separate row from the 25 "confirmed missing" — so the outstanding count looked like
+25 when it was 30.
+
+**Worse: the decision they were waiting on was already answered.** They are not "should a presenter be
+able to reset shared media infrastructure". They are the **SaaS operator's toolkit** — when a tenant
+has a problem, the operator resets, diagnoses and hard-reboots their room. Parking them made a core
+product surface look like an open question.
+
+**What changed**
+
+- The triage's summary now leads with **NOT BUILT — outstanding work: 30**, split into 25 ready and
+  5 needing a decision first, with both still counted. The `NOISE` rows are the only exception,
+  because third-party library internals were never ours to build.
+- The section formerly headed "Unclear — these need a decision, not more reading" is now
+  **"NOT BUILT — the five that need a decision first, and are outstanding regardless"**.
+- `presAreaTabs-recordings` was struck through and labelled BLOCKED in `TODO.md`. Struck-through
+  reads as done. It is now **"NOT BUILT, blocker named"**, still on the list.
+- Both TODO files carry the rule inline so it is read where the counting happens.
+
+**Three things recorded from the same conversation, which raise the priority of all five:**
+
+1. They travel on a **separate channel** — `sendAdminCmd` → `socket.transmit("adminCmd", …)`,
+   distinct from the ordinary command transport. The reference has a dedicated admin path.
+2. **Six of the wider reset/diagnose family are already built here** — `hardResetSession`,
+   `softResetSession`, `reloadSessionConfig`, `saveAndCloseSession`, `saveCloseMessage`,
+   `refreshRoster`.
+3. **What is missing is REACH, not the commands.** Ours work inside a room for that room; the
+   operator need is to invoke them for a tenant's room from a central console, and `/admin` already
+   has impersonation as half that bridge.
+
+**`docs/BUILD-AUDIT.md` gains §7 — "Nothing unbuilt is ever parked."** Blocked, undecided, unclear,
+needs-an-environment, waiting-on-the-owner are **notes on a row, never a substitute for one**. The
+only exits from the outstanding list are: built, or proven already built.
+
+**This is the second time a confident-sounding category has hidden work here.** The first was a TODO
+sentence claiming everything buildable was built, while Swing and Day Trade Alerts sat in the bundle
+undiscovered. The failures table now records both, and §7 exists so the next one is caught by a
+checklist rather than by the owner.
+
+
+### 2026-08-15 08:41 EDT — Files sort bar built, and both of its "honest gaps" turned out to be readable
+
+**Runtime impact: yes.** The Files pane's sort bar was rebuilt against
+`docs/source-v4-2026-08-15/main.d1d09071be31f1ba.js` (sha256 `40796ca8…bab87524`, re-checked against
+that directory's `sha256sums.txt` before reading). New module `apps/room/src/lib/file-sort.ts`;
+`+page.svelte` and `app.css` changed; `files-pane-contract.test.ts` extended from 3 sort-bar tests
+to 21.
+
+**What was already here was built from the owner's pasted markup**, because the capture we held then
+(`docs/source/main.d6d3c112b59b7d0d.js`) contains `st-fileSortBar` **0 times** and the v4 bundle
+contains it **1 time** — python `.count()` over bytes, never `grep -c`, which on a one-line bundle
+can only answer 1 or 0. That older build diverged in five ways, each now fixed and each pinned:
+
+1. **Two direction variables became one.** `nameAscending` and `dateNewestFirst` are gone. Both icon
+   views read the same `fileSortDir` — bytes 1,946,450 and 1,946,605.
+2. **Switching field now RESETS the direction** to that field's default (`date`→`desc`,
+   `name`→`asc`) instead of restoring a remembered one. `toggleFileSort`, byte 1,975,308.
+3. **The pane opens `date`/`desc`**, not `name`/`asc`. Byte 1,954,640.
+4. **The comparator is the reference's**, not a `localeCompare` rewrite: copies before sorting,
+   passes the list through when the field is falsy (contrast `limitSwingLogs` at byte 1,915,553,
+   which returns `[]`), returns 0 for ties, defaults `""`/`"asc"`. Byte 1,914,860.
+5. **The titles carry a FIELD conjunct**, so an inactive button shows its own default-state string.
+
+**Both of the spec's honest gaps were closed by reading, not derived:**
+
+- `.active` is captured. `mo` at byte 1,916,345 wraps its argument as an object keyed `active`, and
+  the two bindings are at 1,950,577 / 1,950,805. It depends on the field alone.
+- **The bar sits INSIDE the table's gate.** Node 85 is the view `t2e` (byte 2,016,231), `t2e` holds
+  the sort bar *and* the table (byte 1,950,099), and node 85 is gated
+  `o.sessionFiles && o.sessionFiles.length > 0` (byte 2,018,251). Ours rendered the bar
+  unconditionally, so an empty room showed a "Sorting by:" strip above an absent table. Fixed.
+
+**The CSS was four-fifths invented and is now captured** — bytes 435,538-435,767 of
+`styles.ee2a710065b60389.css`. A `:hover` rule, a `font-size`, a `border-color`+`color` on `.active`
+and a transparent border all came out; the real border is `1px solid var(--file-see-more-bg)` on
+both buttons at all times. Written against the token names, never the resolved colours.
+
+**`docs/decoded/files-sort-bar.md` was corrected in four places** — the title table's condition
+column (it omitted the field conjunct), the label byte offset (1,975,308 was `toggleFileSort`'s
+offset; the labels are at 1,950,263 and 1,950,396), the bar's const (missing its leading `1`), and
+both gap sections, now closed with offsets.
+
+**Verified:** `rm -rf .svelte-kit && svelte-kit sync` then `svelte-check` — 1058 files, 0 errors,
+0 warnings. 55/55 in `files-pane-contract.test.ts`. `eslint .` clean, `prettier --check` clean.
+Svelte MCP autofixer: 0 issues (its four `{' '}` suggestions are declined — that is the captured
+whitespace, and nine sibling labels in this pane already use the same construct).
+
+**14 negative controls, each mutating the SOURCE and re-running:** all 14 went red and the tree
+restored byte-identically (`diff -q` plus sha256). One of them earned its keep — deleting
+`.toLowerCase()` from the name comparator left the case-insensitivity test GREEN, because the
+`Alpha`/`beta`/`gamma` fixture sorts the same either way ('A' is 65, 'b' is 98). It is now written
+against `apple`/`Banana`, which straddles the case boundary and does fail.
+
+**Not verified:** no browser screenshot of the rendered bar, and no test drives a real click through
+the DOM — the transition is exercised as a pure function instead. The room was not run.
+
 ### 2026-08-15 08:33 EDT — Alert Labels had a whole second consumer nobody had found
 
 **Runtime impact: none.** Two documents. Four for four on specs re-verified before building.

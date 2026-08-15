@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { db, ensureDatabase } from '$lib/server/db';
 import { sharedFiles, users } from '$lib/server/db/schema';
+import { INITIAL_FILE_SORT, fileSortTitle, sortFiles, toggleFileSort } from '$lib/file-sort';
 
 /*
   The controller, stubbed — for the ONE action in this pane that talks to it.
@@ -55,12 +56,20 @@ vi.mock('$lib/server/room-config-client', () => ({
      an `st-fileDownload` anchor, and `<h4>No room files found.</h4>` when the list is empty
      (`O(84, o.sessionFiles ? -1 : 84)`).
 
-  3. THE SORT BAR. `st-fileSortBar` / `st-fileSortName` / `st-fileSortDate` / `fa-sort` /
-     `fa-sort-amount-up` appear NOWHERE in the evidence we hold - not in the bundle, not in
-     complete-app-styles.css (where `.fa-sort-amount-up` is only FontAwesome's glyph table), not in
-     the rendered Files dump. The deployment we captured predates the feature. These class names
-     come from the owner's own markup, and this file records that provenance so nobody later
-     "corrects" them against a bundle that has never contained them.
+  3. THE SORT BAR. This note used to say the sort bar appeared NOWHERE in the evidence we hold, and
+     that its class names came from the owner's pasted markup rather than from a bundle. The first
+     half is still true of `docs/source/`; the second half is no longer true of the repository.
+     `docs/source-v4-2026-08-15/main.d1d09071be31f1ba.js` is a NEWER capture of the same
+     application and it contains the whole control - markup, titles, comparator, state transition
+     and CSS. Measured with python `.count()` over the files' bytes, because both are one line and
+     `grep -c` on a one-line file can only ever answer 1 or 0:
+
+         st-fileSortBar   in docs/source/main.d6d3c112b59b7d0d.js   0
+         st-fileSortBar   in docs/source-v4-2026-08-15/main....js   1
+
+     So the search that once reported "not in the capture" was not wrong; our evidence was simply
+     older than the feature. Evidence has a date. Both facts are pinned below, because the older
+     capture's silence is still the reason the first build of this bar was built from a paste.
 */
 
 const page = readFileSync(new URL('../routes/+page.svelte', import.meta.url), 'utf8');
@@ -146,10 +155,57 @@ describe('files table', () => {
   });
 });
 
-describe('files sort bar', () => {
-  it('is absent from the pinned capture, so its provenance is the owner not the bundle', () => {
-    // Still true, and worth keeping: our deployment of the app has no sort bar at all. The markup
-    // below came from the owner's live room, which is a NEWER build than main.d6d3c112b59b7d0d.js.
+/*
+  The v4 capture — a NEWER deployment of the same application than `docs/source/`.
+
+  Read as bytes-as-text and asserted against with `toContain`, never counted with `grep -c`: the
+  file is 2,891,205 bytes on ONE line, so a line count of it is 1 no matter what it holds. Its
+  sha256 is the digest `docs/source-v4-2026-08-15/sha256sums.txt` pins.
+*/
+const v4 = readFileSync(
+  new URL('../../docs/source-v4-2026-08-15/main.d1d09071be31f1ba.js', import.meta.url),
+  'utf8'
+);
+
+/*
+  The template with HTML comments removed.
+
+  Mandatory for this block rather than stylistic. The notes above the sort bar QUOTE the reference's
+  const table and its rendered icon classes in order to explain them — `fas fa-sort ml-2` appears in
+  prose two lines above the element that carries it. A `toContain` over the raw file cannot tell an
+  attribute from a sentence about that attribute, which is the trap already documented four times in
+  this file, and it would let every markup assertion below pass against its own documentation.
+*/
+const template = page.replace(/<!--[\s\S]*?-->/g, '');
+
+/*
+  The same file with the SCRIPT's block comments stripped as well.
+
+  `template` only removes HTML comments, which is enough for markup but not for an assertion that an
+  identifier is GONE: the note above the sort-bar state names all three variables it replaced, in
+  order to explain what they were, and a `not.toContain('nameAscending')` over the raw file finds
+  that explanation and fails. The same shape caught `st-fileTable`, whose only other occurrence is a
+  JSDoc about the striping rule. Strip the prose; never stop writing it.
+*/
+const code = template.replace(/\/\*[\s\S]*?\*\//g, '');
+
+/** One CSS rule, from its selector to its closing brace. */
+function ruleFor(css: string, selector: string) {
+  const at = css.indexOf(selector);
+  expect(at, selector).toBeGreaterThan(-1);
+  return css.slice(at, css.indexOf('}', at) + 1);
+}
+
+/**
+ * Whitespace and the optional final semicolon removed, so a prettier-formatted rule here can be
+ * compared against the minified rule in the capture as a single string.
+ */
+const squash = (css: string) => css.replace(/\s+/g, '').replace(/;}/g, '}');
+
+const fileSort = readFileSync(new URL('file-sort.ts', import.meta.url), 'utf8');
+
+describe('files sort bar: the evidence it is pinned to', () => {
+  it('was genuinely absent from the OLDER capture, which is why it was first built from a paste', () => {
     const captured = readFileSync(
       new URL('../../css/complete-app-styles.css', import.meta.url),
       'utf8'
@@ -162,29 +218,343 @@ describe('files sort bar', () => {
     expect(captured).not.toContain('.st-fileSortBar');
   });
 
-  it("reproduces the owner's rendered markup exactly", () => {
-    // <div class="d-flex flex-wrap justify-content-center align-items-center mt-2 st-fileSortBar">
-    //   <span class="mr-2">Sorting by:</span>
-    //   <button class="btn btn-sm m-1 st-fileSortName active"
-    //           title="Sorted A to Z (click to sort Z to A)"> Name <i class="fas ml-2 fa-sort-alpha-down"></i></button>
-    //   <button class="btn btn-sm m-1 st-fileSortDate"
-    //           title="Sorted newest to oldest (click to sort oldest to newest)"> Date <i class="fas fa-sort ml-2"></i></button>
-    // </div>
-    expect(page).toContain(
-      'd-flex flex-wrap justify-content-center align-items-center mt-2 st-fileSortBar'
+  it('is present in the v4 capture, which is where every fact below now comes from', () => {
+    /*
+      If any of these vanish, every assertion in the blocks below is pinned to nothing and has to be
+      re-derived from a fresh read rather than trusted.
+    */
+
+    // ONE direction for the whole bar. Both icon views read the SAME `fileSortDir` — bytes
+    // 1,946,450 and 1,946,605. A per-button direction cannot be expressed by these two lines.
+    expect(v4).toContain('"asc"===g(2).fileSortDir?"fa-sort-alpha-down":"fa-sort-alpha-up"');
+    expect(v4).toContain('"asc"===g(2).fileSortDir?"fa-sort-amount-down":"fa-sort-amount-up"');
+
+    // The state transition, byte 1,975,308.
+    expect(v4).toContain(
+      'toggleFileSort(e){this.fileSortField===e?this.fileSortDir="asc"===this.fileSortDir?"desc":"asc":' +
+        '(this.fileSortField=e,this.fileSortDir="date"===e?"desc":"asc")}'
     );
-    expect(page).toContain('<span class="mr-2">Sorting by:</span>');
-    expect(page).toContain('btn btn-sm m-1 st-fileSortName');
-    expect(page).toContain('btn btn-sm m-1 st-fileSortDate');
-    expect(page).toContain('Sorted A to Z (click to sort Z to A)');
-    expect(page).toContain('Sorted newest to oldest (click to sort oldest to newest)');
+
+    // The opening state, byte 1,954,640.
+    expect(v4).toContain('this.fileSortField="date",this.fileSortDir="desc"');
+
+    // The comparator, byte 1,914,860 — and its neighbour, whose degenerate argument returns `[]`
+    // where this one returns the list. The contrast is the whole point of property 2.
+    expect(v4).toContain(
+      'transform(e,i="",o="asc"){return e&&i?[...e].sort((s,r)=>{' +
+        'const a="date"===i?new Date(s.created).getTime():(s.name||"").toLowerCase(),' +
+        'l="date"===i?new Date(r.created).getTime():(r.name||"").toLowerCase();' +
+        'if(a===l)return 0;const c=a>l?1:-1;return"asc"===o?c:-c}):e}'
+    );
+    expect(v4).toContain('transform(e,i){return e&&0!==i?e.slice(0,i):[]}');
+
+    // `.active`, which `docs/decoded/files-sort-bar.md` listed as an honest gap. It is not a gap:
+    // `mo` is read at byte 1,916,345 and both bindings at 1,950,577 and 1,950,805.
+    expect(v4).toContain('mo=t=>({active:t})');
+    expect(v4).toContain('z("ngClass",ct(13,mo,"name"===e.fileSortField))');
+    expect(v4).toContain('z("ngClass",ct(15,mo,"date"===e.fileSortField))');
+
+    // The labels, with their leading AND trailing spaces — bytes 1,950,263 and 1,950,396.
+    expect(v4).toContain('v(4," Name ")');
+    expect(v4).toContain('v(8," Date ")');
+
+    // Search FIRST, then sort — byte 1,951,076. `Ct` binds `filter`; its result is `sortFiles`'
+    // first argument.
+    expect(v4).toContain(
+      'rg(16,9,Ct(15,6,e.sessionFiles,e.filesSearch),e.fileSortField,e.fileSortDir)'
+    );
+
+    // The bar's PLACEMENT, which the spec also listed as a gap. Node 85 is the view `t2e`
+    // (byte 2,016,231), `t2e` holds the sort bar and the table together (byte 1,950,099), and the
+    // gate on node 85 is the file-count one (byte 2,018,251).
+    expect(v4).toContain('(85,t2e,17,17)');
+    expect(v4).toContain(
+      'function t2e(t,n){if(1&t){const e=Y();d(0,"div",242)(1,"span",243),v(2,"Sorting by:")'
+    );
+    expect(v4).toContain('O(85,o.sessionFiles&&o.sessionFiles.length>0?85:-1)');
   });
 
-  it('keeps the icon class ORDER the capture uses, which differs by state', () => {
-    // Active is `fas ml-2 fa-sort-alpha-down`; inactive is `fas fa-sort ml-2`. Not a typo - the
-    // active icon is composed by ngClass and the inactive one is static, so the order flips.
-    expect(page).toContain("'fa-sort-alpha-down'");
-    expect(page).toContain('fas fa-sort ml-2');
+  it('pins the three CAPTURED css rules, so app.css cannot drift back to invented ones', () => {
+    /*
+      Bytes 435,538-435,767 of the v4 stylesheet. The build these replaced had four declarations
+      that were nobody's capture: a `:hover` rule, a `font-size` on the buttons, a transparent
+      border where the reference uses the accent, and a `border-color` plus `color` on `.active`.
+    */
+    const capturedCss = readFileSync(
+      new URL('../../docs/source-v4-2026-08-15/styles.ee2a710065b60389.css', import.meta.url),
+      'utf8'
+    );
+    const captured = {
+      bar: '.st-fileSortBar{font-size:12px}',
+      buttons:
+        '.st-fileSortName,.st-fileSortDate{color:var(--tabs-color);background-color:transparent;' +
+        'border:1px solid var(--file-see-more-bg)}',
+      active:
+        '.st-fileSortName.active,.st-fileSortDate.active{background-color:var(--file-see-more-bg)}'
+    };
+    for (const rule of Object.values(captured)) expect(capturedCss).toContain(rule);
+
+    /*
+      Ours, compared WHOLE RULE AT A TIME rather than declaration by declaration.
+
+      An `expect(css).toContain('border: 1px solid var(--file-see-more-bg)')` proves a declaration
+      is present and says nothing about the ones beside it, which is how four invented declarations
+      survived here in the first place. Comparing the entire rule means any extra one fails. It also
+      avoids the other trap: `border: 1px solid transparent` is a perfectly ordinary declaration
+      that four unrelated rules in this stylesheet legitimately use, so a whole-file `not.toContain`
+      for it fails on `.chat-tabs button` and says nothing at all about the sort bar.
+    */
+    const appCss = readFileSync(new URL('../app.css', import.meta.url), 'utf8');
+    const declarations = appCss.replace(/\/\*[\s\S]*?\*\//g, '');
+    expect(squash(ruleFor(declarations, '.st-fileSortBar {'))).toBe(squash(captured.bar));
+    expect(squash(ruleFor(declarations, '.st-fileSortName,'))).toBe(squash(captured.buttons));
+    expect(squash(ruleFor(declarations, '.st-fileSortName.active,'))).toBe(squash(captured.active));
+
+    // The invented hover rule had a selector of its own, so its absence is a whole-file check.
+    expect(declarations).not.toContain('.st-fileSortName:hover');
+
+    // TOKENS, not resolved colours — another customer re-themes by setting these two.
+    const tokens = readFileSync(new URL('styles/tokens.css', import.meta.url), 'utf8');
+    expect(tokens).toContain('--tabs-color:');
+    expect(tokens).toContain('--file-see-more-bg:');
+    expect(ruleFor(declarations, '.st-fileSortName,')).not.toMatch(/#[0-9a-f]{3,6}/i);
+    expect(ruleFor(declarations, '.st-fileSortName.active,')).not.toMatch(/#[0-9a-f]{3,6}/i);
+  });
+});
+
+describe('files sort bar: the markup', () => {
+  it('carries every class from consts 242-249, in the capture`s order', () => {
+    expect(template).toContain(
+      'd-flex flex-wrap justify-content-center align-items-center mt-2 st-fileSortBar'
+    );
+    expect(template).toContain('<span class="mr-2">Sorting by:</span>');
+    expect(template).toContain('btn btn-sm m-1 st-fileSortName');
+    expect(template).toContain('btn btn-sm m-1 st-fileSortDate');
+  });
+
+  it('keeps both labels` LEADING AND TRAILING space', () => {
+    // `v(4," Name ")` and `v(8," Date ")`. Svelte trims whitespace at the edges of an element's
+    // children, so each pad has to survive as an expression — the same construct the nine other
+    // padded labels in this pane use.
+    expect(template).toContain("{' '}Name{' '}");
+    expect(template).toContain("{' '}Date{' '}");
+    // ...and NOT the unpadded form the spec's own table renders them as.
+    expect(template).not.toMatch(/>\s*Name\s*</);
+    expect(template).not.toMatch(/>\s*Date\s*</);
+  });
+
+  it('keeps the icon class ORDER, which differs by state and is not a typo', () => {
+    // Const 245 is static `fas ml-2` with the glyph appended by ngClass; const 249 is entirely
+    // static. So the active icon renders `fas ml-2 fa-sort-alpha-down` and the inactive one
+    // `fas fa-sort ml-2`.
+    expect(template).toContain("'fa-sort-alpha-down'");
+    expect(template).toContain("'fa-sort-amount-down'");
+    expect(template).toContain('fas fa-sort ml-2');
+  });
+
+  it('keys BOTH icons off the ONE shared direction, never a per-button flag', () => {
+    /*
+      The bug this forbids: `nameAscending` and `dateNewestFirst`, one per button, which is what
+      this pane shipped before the v4 capture existed. Two buttons, one `fileSortDir`.
+    */
+    expect(template.split("fileSort.direction === 'asc'").length - 1).toBe(2);
+    // Against the comment-stripped copy: the note above the state QUOTES all three of these to
+    // explain what they were, so a raw-file check would match its own documentation.
+    expect(code).not.toContain('nameAscending');
+    expect(code).not.toContain('dateNewestFirst');
+    expect(code).not.toContain('fileSortKey');
+  });
+
+  it('applies `.active` from the FIELD alone, which is captured rather than derived', () => {
+    // `mo=t=>({active:t})` applied as `ct(13,mo,"name"===e.fileSortField)` — the direction is not
+    // part of it.
+    expect(template).toContain("class:active={fileSort.field === 'name'}");
+    expect(template).toContain("class:active={fileSort.field === 'date'}");
+  });
+
+  it('renders the bar INSIDE the file-count gate, beside the table it sorts', () => {
+    /*
+      Node 85 is one view holding the bar and the table, gated
+      `O(85, o.sessionFiles && o.sessionFiles.length > 0 ? 85 : -1)`. Ours rendered the bar
+      unconditionally, which put a "Sorting by:" strip above an absent table in every empty room.
+    */
+    expect(
+      guardsFor('d-flex flex-wrap justify-content-center align-items-center mt-2 st-fileSortBar')
+    ).toContain('data.files.length > 0');
+
+    /*
+      ...and it precedes the table, as it does inside `t2e`.
+
+      Against `code`, not `template`: the only other `st-fileTable` in this file is a JSDoc in the
+      script explaining the `nth-of-type` striping, and it sits 230,000 characters EARLIER, so the
+      comparison ran against a sentence and reported a correctly-placed bar as misplaced.
+    */
+    expect(code.indexOf('st-fileSortBar')).toBeLessThan(code.indexOf('st-fileTable'));
+  });
+});
+
+describe('files sort bar: the behaviour', () => {
+  const at = (iso: string) => new Date(iso);
+  const rows = [
+    { name: 'beta.png', createdAt: at('2026-08-01T00:00:00Z') },
+    { name: 'Alpha.mp3', createdAt: at('2026-08-03T00:00:00Z') },
+    { name: 'gamma.pdf', createdAt: at('2026-08-02T00:00:00Z') }
+  ];
+  // `name` is optional and nullable here for the same reason it is in `SortableFile`: one fixture
+  // below carries a null name to exercise the `(s.name||"")` guard, and typing this narrowly forced
+  // a cast at that call site that `svelte-check` then rejected as a non-overlapping conversion.
+  const names = (list: readonly { name?: string | null }[]) => list.map((row) => row.name);
+
+  it('opens on date/desc — newest first, not unsorted and not on name', () => {
+    expect(INITIAL_FILE_SORT).toEqual({ field: 'date', direction: 'desc' });
+    expect(names(sortFiles(rows, INITIAL_FILE_SORT.field, INITIAL_FILE_SORT.direction))).toEqual([
+      'Alpha.mp3',
+      'gamma.pdf',
+      'beta.png'
+    ]);
+  });
+
+  it('COPIES before sorting, rather than sorting the caller`s array in place', () => {
+    const before = [...rows];
+    const sorted = sortFiles(rows, 'name', 'asc');
+    expect(sorted).not.toBe(rows);
+    expect(rows).toEqual(before);
+  });
+
+  it('PASSES THE LIST THROUGH when there is no field, rather than returning empty', () => {
+    // `e && i ? … : e`. The same reference, not a copy and not `[]` — the contrast the sibling
+    // `limitSwingLogs` pipe draws, where a limit of 0 does return `[]`.
+    expect(sortFiles(rows, '')).toBe(rows);
+    expect(sortFiles(rows)).toBe(rows);
+  });
+
+  it('defaults to an empty field and `asc`, exactly as `transform(e,i="",o="asc")` does', () => {
+    expect(sortFiles(rows)).toBe(rows);
+    expect(names(sortFiles(rows, 'name'))).toEqual(['Alpha.mp3', 'beta.png', 'gamma.pdf']);
+  });
+
+  it('returns 0 for ties, so equal values do NOT fall back to the other field', () => {
+    const sameInstant = [
+      { name: 'zebra.png', createdAt: at('2026-08-01T00:00:00Z') },
+      { name: 'apple.png', createdAt: at('2026-08-01T00:00:00Z') }
+    ];
+    // A name tiebreaker would reorder these to apple/zebra. The reference leaves them alone, and
+    // `Array.prototype.sort` is stable, so input order survives in BOTH directions.
+    expect(names(sortFiles(sameInstant, 'date', 'desc'))).toEqual(['zebra.png', 'apple.png']);
+    expect(names(sortFiles(sameInstant, 'date', 'asc'))).toEqual(['zebra.png', 'apple.png']);
+  });
+
+  it('sorts by name in both directions', () => {
+    expect(names(sortFiles(rows, 'name', 'asc'))).toEqual(['Alpha.mp3', 'beta.png', 'gamma.pdf']);
+    expect(names(sortFiles(rows, 'name', 'desc'))).toEqual(['gamma.pdf', 'beta.png', 'Alpha.mp3']);
+  });
+
+  it('compares names case-insensitively, as `(s.name||"").toLowerCase()` does', () => {
+    /*
+      The fixture has to be chosen to DISCRIMINATE, and the first one here did not.
+
+      `Alpha.mp3` / `beta.png` / `gamma.pdf` sort identically with and without `toLowerCase`,
+      because 'A' is 65 and 'b' is 98 — the capital already leads on a raw comparison. Deleting the
+      `.toLowerCase()` from the comparator left this test GREEN, which the negative control caught
+      and which is the only reason it is now written against a pair that straddles the case
+      boundary: 'B' is 66 and 'a' is 97, so a case-sensitive compare puts `Banana` first and a
+      case-insensitive one puts `apple` first.
+    */
+    const straddling = [
+      { name: 'apple.png', createdAt: at('2026-08-01T00:00:00Z') },
+      { name: 'Banana.png', createdAt: at('2026-08-02T00:00:00Z') }
+    ];
+    expect(names(sortFiles(straddling, 'name', 'asc'))).toEqual(['apple.png', 'Banana.png']);
+    expect(names(sortFiles(straddling, 'name', 'desc'))).toEqual(['Banana.png', 'apple.png']);
+  });
+
+  it('treats a missing name as the empty string, as `(s.name||"")` does', () => {
+    // Our column is `.notNull()`, so this only exercises the transcribed guard — but a comparator
+    // that drops it throws on the first nullish name rather than sorting it to the front.
+    const missing = [
+      { name: 'apple.png', createdAt: at('2026-08-01T00:00:00Z') },
+      { name: null, createdAt: at('2026-08-02T00:00:00Z') }
+    ];
+    expect(names(sortFiles(missing, 'name', 'asc'))).toEqual([null, 'apple.png']);
+  });
+
+  it('flips the direction when the ALREADY-ACTIVE field is clicked', () => {
+    expect(toggleFileSort({ field: 'date', direction: 'desc' }, 'date')).toEqual({
+      field: 'date',
+      direction: 'asc'
+    });
+    expect(toggleFileSort({ field: 'date', direction: 'asc' }, 'date')).toEqual({
+      field: 'date',
+      direction: 'desc'
+    });
+  });
+
+  it('RESETS the direction to the new field`s default when the other field is clicked', () => {
+    // `date` resets to `desc`, `name` resets to `asc` — never to whatever was in force.
+    expect(toggleFileSort({ field: 'date', direction: 'asc' }, 'name')).toEqual({
+      field: 'name',
+      direction: 'asc'
+    });
+    expect(toggleFileSort({ field: 'name', direction: 'desc' }, 'date')).toEqual({
+      field: 'date',
+      direction: 'desc'
+    });
+  });
+
+  it('cannot carry a direction across a field change and back', () => {
+    /*
+      THE test for this control. Sort Name Z-to-A, go to Date, come back to Name: the reference
+      gives A-to-Z, because the trip through Date discarded the direction. A build that remembers a
+      direction per button gives Z-to-A here and is wrong in a way nothing else notices.
+    */
+    let state = toggleFileSort({ field: 'name', direction: 'asc' }, 'name');
+    expect(state).toEqual({ field: 'name', direction: 'desc' });
+    state = toggleFileSort(state, 'date');
+    expect(state).toEqual({ field: 'date', direction: 'desc' });
+    state = toggleFileSort(state, 'name');
+    expect(state).toEqual({ field: 'name', direction: 'asc' });
+  });
+
+  it('renders the four title strings VERBATIM', () => {
+    expect(fileSortTitle('name', { field: 'name', direction: 'desc' })).toBe(
+      'Sorted Z to A (click to sort A to Z)'
+    );
+    expect(fileSortTitle('name', { field: 'name', direction: 'asc' })).toBe(
+      'Sorted A to Z (click to sort Z to A)'
+    );
+    expect(fileSortTitle('date', { field: 'date', direction: 'asc' })).toBe(
+      'Sorted oldest to newest (click to sort newest to oldest)'
+    );
+    expect(fileSortTitle('date', { field: 'date', direction: 'desc' })).toBe(
+      'Sorted newest to oldest (click to sort oldest to newest)'
+    );
+  });
+
+  it('asks whether THIS button is the governing sort before it looks at the direction', () => {
+    /*
+      The FIELD CONJUNCT, which `docs/decoded/files-sort-bar.md` tabulated away. Each of these two
+      cases is decided by it and by nothing else: drop the conjunct and the inactive Name button
+      announces "Sorted Z to A" while Date is the sort actually in force.
+    */
+    expect(fileSortTitle('name', { field: 'date', direction: 'desc' })).toBe(
+      'Sorted A to Z (click to sort Z to A)'
+    );
+    expect(fileSortTitle('date', { field: 'name', direction: 'asc' })).toBe(
+      'Sorted newest to oldest (click to sort oldest to newest)'
+    );
+  });
+
+  it('keeps the four strings in the module the markup reads them from', () => {
+    // They moved out of `+page.svelte` when the conjunct did, so this is where they are pinned now.
+    for (const title of [
+      'Sorted Z to A (click to sort A to Z)',
+      'Sorted A to Z (click to sort Z to A)',
+      'Sorted oldest to newest (click to sort newest to oldest)',
+      'Sorted newest to oldest (click to sort oldest to newest)'
+    ]) {
+      expect(fileSort).toContain(title);
+      expect(v4).toContain(title);
+    }
   });
 });
 
