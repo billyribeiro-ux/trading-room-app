@@ -92,8 +92,8 @@ const REVIEWED_FORWARD_MIGRATIONS = Object.freeze([
     every later migrate and API start out of the database.
   */
   Object.freeze({
-    path: 'services/api/migrations/0009_rename_runtime_roles.sql',
-    sha256: '6acfec233a6bfc81d0d82954e2147b3e32ccbc6a52095fb167734251ab0f1da4'
+    path: 'services/api/migrations/0009_provision_tradingroom_app.sql',
+    sha256: '1e176015ddefd91595fe48b549fd0582f9ff30efcb808cd8e4e78a68cbdf5b23'
   })
 ]);
 

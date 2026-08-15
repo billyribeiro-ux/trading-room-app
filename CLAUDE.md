@@ -178,4 +178,16 @@ working code.
 - **The capture directories are evidence.** `second-dump/**` and its siblings are SHA-256 pinned and
   enforced inside `pnpm test`. Never reformat, rename or "fix" anything in them — including the
   `ptr_clone` naming, which is what the original system was called.
-- **`services/**` is a mirror**, not authored here. A change made here is lost on the next sync.
+- **`services/**` is authored HERE.** This repository is its authority. The rule that used to sit on
+  this line — "a mirror, not authored here; a change made here is lost on the next sync" — was
+  **false and cost real time**: it is contradicted by
+  `apps/controller/scripts/verify-backend-provenance.mjs:97-118`, which searched for a sync in
+  either direction, found none, and records the owner confirming on 2026-08-12 that the siblings are
+  reference only. Fourteen imported files have since been edited here and are individually pinned;
+  `0009` and two tests were authored here outright. Changes are **governed**, not provisional: edit
+  a `services/**` file and you re-pin it in that verifier, with a CHANGELOG entry saying why.
+- **The runtime database role is `tradingroom_app`.** `ptr_clone*` is the REFERENCE name — what the
+  original system called things. Both exist on purpose and `ops/naming-provenance.md` is the mapping;
+  `apps/controller/src/lib/naming-boundary.test.ts` enforces it. `0001_baseline.sql` is
+  byte-identical to the captured schema, so the old name stays in the applied migrations permanently
+  and that is correct, not debt.

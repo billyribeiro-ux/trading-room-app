@@ -22,7 +22,7 @@ use sqlx::{ConnectOptions, Connection, Executor, FromRow, PgConnection};
 use tokio::time::timeout;
 use tracing::log::LevelFilter;
 use tradingroom_api::db::migrate::{
-    EXPECTED_MIGRATOR_ROLE, EXPECTED_RUNTIME_ROLE, MIGRATOR, RENAMED_RUNTIME_ROLE,
+    EXPECTED_MIGRATOR_ROLE, EXPECTED_RUNTIME_ROLE, MIGRATOR,
 };
 use uuid::Uuid;
 
@@ -891,7 +891,7 @@ fn elevated_capabilities(flags: &RoleFlags) -> Vec<&'static str> {
 /// 0009 — which is every cluster from now on — and it would have done so with a
 /// `runtime_role_mismatch`, a message that reads like a security finding rather than a stale pin.
 fn runtime_role_name_is_expected(name: &str) -> bool {
-    name == EXPECTED_RUNTIME_ROLE || name == RENAMED_RUNTIME_ROLE
+    name == EXPECTED_RUNTIME_ROLE
 }
 
 fn validate_runtime_role(row: &RoleRow) -> Result<RuntimeRoleEvidence, AttestationError> {
@@ -2055,34 +2055,45 @@ mod tests {
 
     /// A cluster that has applied `0009` must still be attestable.
     ///
-    /// `0009_rename_runtime_roles` renames `ptr_clone_app` -> `tradingroom_app`. `db::migrate`
-    /// learned to accept both names on 2026-08-11; this binary did not, and nothing caught it
-    /// because the name only appears in a live-database check. Left alone it would have refused
-    /// every migrated cluster with `runtime_role_mismatch` — a message that reads like a security
-    /// finding rather than a stale pin, which is the expensive way to be wrong.
+    /// Exactly ONE runtime role name is attestable, and the old one is now refused.
     ///
-    /// The posture half is deliberately re-asserted under the NEW name too: a rename must not buy a
-    /// role a single capability, so `BYPASSRLS` on `tradingroom_app` has to fail exactly as it does
-    /// on `ptr_clone_app`.
+    /// This test previously asserted the opposite - that either `ptr_clone_app` or
+    /// `tradingroom_app` was acceptable - to tolerate a cluster mid-rename. That tolerance was
+    /// withdrawn with the rename itself: `0009_rename_runtime_roles.sql` was non-convergent (it
+    /// mutated a cluster-global role from a per-database chain, so the second database on a cluster
+    /// could never migrate) and was replaced by `0009_provision_tradingroom_app.sql`, which ADDS
+    /// the role instead.
+    ///
+    /// A two-name tolerance in an attestor is a fail-open waiting to happen: the same shape in
+    /// `db::migrate`'s preflight returned one role's posture under another role's name. One name,
+    /// compared exactly.
+    ///
+    /// The posture half is unchanged and still the point: a name is not a capability, so
+    /// `BYPASSRLS` must fail regardless of what the role is called.
     #[test]
-    fn the_runtime_role_is_accepted_under_either_name_but_never_with_a_weaker_posture() {
-        let mut renamed = restricted_runtime_row();
-        renamed.name = RENAMED_RUNTIME_ROLE.into();
+    fn exactly_one_runtime_role_name_is_attestable_and_never_with_a_weaker_posture() {
+        let mut expected = restricted_runtime_row();
+        expected.name = EXPECTED_RUNTIME_ROLE.into();
         let evidence =
-            validate_runtime_role(&renamed).expect("a migrated cluster must still be attestable");
-        assert_eq!(evidence.name, RENAMED_RUNTIME_ROLE);
+            validate_runtime_role(&expected).expect("the provisioned runtime role must attest");
+        assert_eq!(evidence.name, EXPECTED_RUNTIME_ROLE);
 
-        for name in [EXPECTED_RUNTIME_ROLE, RENAMED_RUNTIME_ROLE] {
-            let mut row = restricted_runtime_row();
-            row.name = name.into();
-            row.bypasses_rls = true;
-            assert!(
-                validate_runtime_role(&row).is_err(),
-                "{name} must not pass with BYPASSRLS"
-            );
-        }
+        // The pre-cutover name is no longer the runtime identity and must not attest as one.
+        let mut superseded = restricted_runtime_row();
+        superseded.name = "ptr_clone_app".into();
+        assert!(
+            validate_runtime_role(&superseded).is_err(),
+            "ptr_clone_app is the baseline-provisioned role, not the runtime identity"
+        );
 
-        // And no third name is smuggled in by the tolerance.
+        let mut bypassing = restricted_runtime_row();
+        bypassing.name = EXPECTED_RUNTIME_ROLE.into();
+        bypassing.bypasses_rls = true;
+        assert!(
+            validate_runtime_role(&bypassing).is_err(),
+            "{EXPECTED_RUNTIME_ROLE} must not pass with BYPASSRLS"
+        );
+
         let mut impostor = restricted_runtime_row();
         impostor.name = "tradingroom_app_v2".into();
         assert!(validate_runtime_role(&impostor).is_err());

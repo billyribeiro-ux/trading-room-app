@@ -35,7 +35,7 @@ use uuid::Uuid;
 
 pub use error::DbError;
 
-const EXPECTED_RUNTIME_ROLE: &str = "ptr_clone_app";
+const EXPECTED_RUNTIME_ROLE: &str = "tradingroom_app";
 
 /// Who is asking. Constructed by the auth layer, never by a handler.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -586,9 +586,12 @@ mod tests {
 
     fn restricted_posture() -> RuntimeRolePosture {
         RuntimeRolePosture {
-            system_user: Some("scram-sha-256:ptr_clone_app".into()),
-            session_role: "ptr_clone_app".into(),
-            current_role: "ptr_clone_app".into(),
+            // Built from the constant, not a literal: these fixtures describe THE runtime role,
+            // so they must follow it through any rename rather than pinning a name that the
+            // deployment no longer authenticates as.
+            system_user: Some(format!("scram-sha-256:{EXPECTED_RUNTIME_ROLE}")),
+            session_role: EXPECTED_RUNTIME_ROLE.into(),
+            current_role: EXPECTED_RUNTIME_ROLE.into(),
             can_login: true,
             is_superuser: false,
             can_create_database: false,
@@ -603,7 +606,7 @@ mod tests {
     fn assert_posture_rejected(posture: RuntimeRolePosture, expected_reason: &'static str) {
         match validate_runtime_role_posture(&posture) {
             Err(DbError::UnsafeRuntimeRole { role, reason }) => {
-                assert_eq!(role, "ptr_clone_app");
+                assert_eq!(role, EXPECTED_RUNTIME_ROLE);
                 assert_eq!(reason, expected_reason);
             }
             other => panic!("expected an unsafe runtime-role error, got {other:?}"),
@@ -656,10 +659,10 @@ mod tests {
     fn the_immutable_authentication_identity_is_required_and_parsed_exactly() {
         for system_user in [
             None,
-            Some("ptr_clone_app"),
+            Some(EXPECTED_RUNTIME_ROLE),
             Some(":ptr_clone_app"),
             Some("scram-sha-256:ptr_clone"),
-            Some("scram-sha-256:ptr_clone_app:forged-suffix"),
+            Some(concat!("scram-sha-256:", "tradingroom_app", ":forged-suffix")),
         ] {
             let mut posture = restricted_posture();
             posture.system_user = system_user.map(str::to_owned);

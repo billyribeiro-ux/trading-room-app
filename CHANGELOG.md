@@ -24,6 +24,100 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-15
 
+### 2026-08-15 15:32 EDT — the runtime role is `tradingroom_app`, added rather than renamed, and the backend suite passes for the first time in its recorded history
+
+**Runtime impact: the API now authenticates as `tradingroom_app`.** No schema or behaviour change;
+the new role holds byte-identical privileges to the old one, proven below.
+
+**The backend gate had never passed.** Every "success" in the run history was a 23–50s path-filter
+skip; all five runs that actually executed the Rust and PostgreSQL suite failed. `main` now runs
+**294 tests across 17 targets, 0 failures**, on a virgin PostgreSQL 17 cluster provisioned by this
+repository's own script.
+
+**Root cause: `0009_rename_runtime_roles.sql` was not convergent.** PostgreSQL roles are
+CLUSTER-global; the sqlx ledger is PER-DATABASE. `0001_baseline.sql` re-creates `ptr_clone_app`
+whenever it is absent, so the SECOND database migrated on one cluster reached `0009` with both names
+present and it refused by its own design — `P0001 both ptr_clone_app and tradingroom_app exist`.
+**The chain was applicable exactly once per cluster.** Reproduced across seven databases.
+
+Two consequences were measured, and either alone disqualifies a rename:
+
+- **It would have taken production down on deploy.** `db/mod.rs` pins the expected runtime role and
+  `main.rs:73` asserts it at boot as "the single most important startup check". On a cluster where
+  the rename had succeeded, the API refuses to start — reproduced as
+  `UnsafeRuntimeRole { role: "tradingroom_app" }`.
+- **It manufactured a credential.** On such a cluster the next database's `0001` re-created
+  `ptr_clone_app` through its forensic branch — a working TCP login whose password `CHANGE_ME_APP` is
+  committed at `0001_baseline.sql:26`, holding DML on the tenant tables. Demonstrated end to end,
+  reading another tenant's room name.
+
+**A rename is structurally impossible here, and that is now written down rather than rediscovered.**
+`0001_baseline.sql` is **byte-identical to the captured schema** —
+`c8baed85…27d9`, 1960 lines, `cmp` reports identical against `second-dump/db/RECREATE.sql`. It is
+pinned from two directions: as a migration by `verify-backend.mjs:47`, as evidence by
+`verify-postgres-schema-artifacts.mjs:82`. **That identity is the proof the reconstruction is
+faithful**, so the file cannot be edited to drop the old name, and `0003`–`0007` grant to that
+literal. `10-provision-roles.sh:33` independently hard-refuses any other name.
+
+**So the role is ADDED.** `0009_provision_tradingroom_app.sql` creates `tradingroom_app` and mirrors
+parity from the catalogue — never a hand-typed list, because parity here is **142 privilege-bearing
+facts**: 87 relation, 26 explicit column (922 effective), 6 routine, 1 schema, and membership of 22
+RLS policies.
+
+**The failure mode that decided the design, and it fails open in exactly one place.** A role with
+byte-identical grants but no policy membership sees ZERO rows on the 22 protected tables — deny by
+default, merely broken. But `users`, `enterprises` and `refresh_tokens` carry grants and **no RLS at
+all**, so there **the column grant is the entire tenant boundary**. Writing `GRANT SELECT ON users`
+instead of the exact columns would expose `email_hash`, `phone` and `discord_id` cluster-wide with
+nothing failing. Column privileges are therefore replayed at column precision, and the migration's
+own assertion compares column counts separately. Verified column-for-column identical on all three.
+
+**Proven, each by running it:**
+
+| claim | evidence |
+| --- | --- |
+| convergent | chain applied to 3 databases on one cluster, identical ledgers; the old `0009` died on the 2nd |
+| parity | 87 relation / 922 effective column / 22 policy, and behavioural parity — 10 identical probes under both roles |
+| tenant isolation | 0 cross-tenant rows **including by primary key**; `UPDATE 0`, `DELETE 0`, `INSERT 0`; `rolbypassrls = false` |
+| the assertion is a fence | deleting the column-grant block makes the migration **RAISE**, naming the three unprotected tables |
+| the invariant has a test | `migration_reappliability.rs` — negative control fired with the old `0009` present, on PG 16.13 **and** 17.11 |
+
+**A fail-open removed rather than patched.** `migrate.rs` matched two role names with
+`ORDER BY (rolname = $2) DESC LIMIT 1`, so asking about role X returned role Y's posture whenever Y
+existed — the preflight that exists to refuse an absent role answered `Ok` for one that did not,
+disarming the fence against `0001`'s committed-password branch. The rename that required that
+tolerance is gone, so the tolerance is gone: one bound name, compared exactly. The same two-name
+tolerance is removed from the attestor, whose test now asserts the old name is **refused**.
+
+**`EXPECTED_RUNTIME_ROLE` split in two**, because it meant two things that used to be one role:
+`EXPECTED_RUNTIME_ROLE` is the identity the API authenticates as; `BASELINE_PROVISIONED_ROLE` is the
+fence that stops `0001`'s placeholder branch. Conflating them is what made the rename unlandable.
+
+**Nothing is deleted before its replacement is proven.** `ptr_clone_app` is untouched — still
+provisioned, still named by every policy. A separate retirement migration drops it only after the
+cutover is proven in production, and must refuse rather than cascade.
+
+**The naming boundary is now mechanical.** `ops/naming-provenance.md` records the mapping;
+`naming-boundary.test.ts` enforces it with an allow-list that **may shrink and must never grow**. It
+earned its place immediately by finding `services/.env.example` building `DATABASE_URL` from the
+baseline role — a connection string the API would now refuse, with PostgreSQL reporting it as
+`28P01 password authentication failed`, naming the wrong cause.
+
+**`CLAUDE.md`'s "services/** is a mirror" rule was false and is corrected.**
+`verify-backend-provenance.mjs:97-118` searched for a sync in either direction, found none, and
+records the owner confirming on 2026-08-12 that the siblings are reference only. That stale line
+nearly sent this work upstream to a repository that has no `0009` at all.
+
+**Verified:** Rust 294/0 · controller 979/0 · room 868 passed, 1 skipped · both backend verifiers
+PASS · provenance seal 98 imported (84 untouched + 14 pinned) + 2 authored · baseline hash unchanged.
+
+**Five of my own mistakes were caught by running rather than reasoning**, and are recorded because
+each is a reusable lesson: a `||` array-literal cast; a psql harness without transactions that made
+`0005` look broken; an over-applied patch that would have broken a deliberate `SET SESSION
+AUTHORIZATION` fixture; a `'static` borrow; and a guessed allow-list ceiling of 36 against a real 39.
+A sixth was blocked by tooling — an attempt to auto-repin every provenance hash from the verifier's
+own error output, which is the rubber stamp that file's header explicitly rejects.
+
 ### 2026-08-15 13:58 EDT — "For All", and the gate that had to move a second time
 
 **Runtime impact: yes, on the four "For All" broadcasts.** `videoForAll` and `youtubeForAll` move to
