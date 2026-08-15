@@ -19,7 +19,7 @@ import type { MessageBadge } from '$lib/types';
  * invisibly, at the moment the two halves of the product had stopped agreeing.
  */
 import { createHmac } from 'node:crypto';
-import { env as privateEnv } from '$env/dynamic/private';
+import { ROOM_JWT_SECRET } from '$app/env/private';
 import {
   controlPlaneOrigin,
   mobilePinUrl,
@@ -339,7 +339,7 @@ export async function readRoomConfig(
 }
 
 async function fetchRoomConfig(shortCode: string, memberEmail?: string): Promise<RoomConfig> {
-  const secret = privateEnv.ROOM_JWT_SECRET;
+  const secret = ROOM_JWT_SECRET;
   if (!secret) throw new RoomConfigUnavailable('ROOM_JWT_SECRET is not configured');
   if (!controlPlaneOrigin()) throw new RoomConfigUnavailable('CONTROL_BASE_URL is not configured');
 
@@ -382,7 +382,7 @@ async function fetchRoomConfig(shortCode: string, memberEmail?: string): Promise
  * whose expiry had already moved on.
  */
 export async function requestMobilePin(shortCode: string, memberEmail: string): Promise<string> {
-  const secret = privateEnv.ROOM_JWT_SECRET;
+  const secret = ROOM_JWT_SECRET;
   if (!secret) throw new RoomConfigUnavailable('ROOM_JWT_SECRET is not configured');
 
   const base = mobilePinUrl(shortCode);
@@ -440,7 +440,7 @@ export async function writeRoomSetting(
   name: string,
   value: string
 ): Promise<void> {
-  const secret = privateEnv.ROOM_JWT_SECRET;
+  const secret = ROOM_JWT_SECRET;
   if (!secret) throw new RoomConfigUnavailable('ROOM_JWT_SECRET is not configured');
 
   const base = roomSettingUrl(shortCode);
@@ -498,7 +498,7 @@ export async function requestStreamIngestKey(
   shortCode: string,
   memberEmail: string
 ): Promise<StreamIngestKey> {
-  const secret = privateEnv.ROOM_JWT_SECRET;
+  const secret = ROOM_JWT_SECRET;
   if (!secret) throw new RoomConfigUnavailable('ROOM_JWT_SECRET is not configured');
 
   const base = streamIngestUrl(shortCode);
@@ -584,7 +584,7 @@ export async function requestStreamReadToken(
   shortCode: string,
   memberEmail: string
 ): Promise<StreamReadToken | null> {
-  const secret = privateEnv.ROOM_JWT_SECRET;
+  const secret = ROOM_JWT_SECRET;
   if (!secret) return null;
 
   const base = streamReadUrl(shortCode);
@@ -662,7 +662,7 @@ export async function decideRoomEntryRemotely(
     remoteIp: string;
   }
 ): Promise<RoomEntryDecision> {
-  const secret = privateEnv.ROOM_JWT_SECRET;
+  const secret = ROOM_JWT_SECRET;
   if (!secret) throw new RoomConfigUnavailable('ROOM_JWT_SECRET is not configured');
 
   const base = roomEntryUrl(shortCode);

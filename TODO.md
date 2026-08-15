@@ -15,152 +15,85 @@ will fetch it. A gap recorded in only one app's document is a gap the next perso
 
 ---
 
-## ⛔ NEITHER FRONTEND APP HAS A CI QUALITY GATE — opened 2026-08-14 20:19 EDT
+## ⛔ THREE THINGS THE FIRST CI RUN OF THE FRONTEND GATE EXPOSED — 2026-08-14 22:54 EDT
 
-This is the largest open gap in the repository and it is not about any one feature.
+`quality.yml` was built on 2026-08-14 and ran for the first time on PR #28. It is on the branch, NOT
+yet on `main`. Its first run failed both jobs, and everything below is what that bought.
 
-`.github/workflows/` contains exactly two workflows: `backend-quality.yml`, which gates Rust and
-skips itself when a revision does not touch `services/**`, and `smoke.yml`, which runs AFTER a
-deployment. **Nothing runs `lint`, `check`, `test` or `build` for `apps/controller` or `apps/room` on
-a push or a pull request.** The controller has a `quality` script that chains all of them; nothing
-invokes it.
+### 1. Room type-check — CLOSED 2026-08-14 22:50, and worth reading before trusting a green
 
-It was believed otherwise, in writing: `apps/controller/eslint.config.js` justified ignoring
-`apps/**` on the grounds that the room has "its own gate (the `room` job in
-`.github/workflows/quality.yml`)". **That file has never existed in this repository.** The comment
-has been corrected.
+Six `Cannot find module '$env/dynamic/private'`, pre-existing on `main`, invisible locally because a
+stale `.svelte-kit` still held the old ambient types. Fixed in `7ea4b77`.
 
-Consequences already observed rather than predicted: the room had no linting at all, and a
-verification probe (`room-config-seam-e2e.mjs`) shipped a template literal terminated early by
-backticks inside a comment — evaluating `<string> || isPresenter` against a page with no such
-variable. Both were found by running the tools by hand on 2026-08-14, not by CI.
+**The rule that came out of it: `svelte-check` is only evidence after `rm -rf .svelte-kit`.** A green
+local check against a stale generated directory is not a green check, and it was reported as one
+several times before CI contradicted it.
 
-**What closing it means:** a `quality.yml` with a job per app running `lint`, `check`, `test` and
-`build`, path-filtered the way the backend job already is, plus a required-checks setting so a red
-gate blocks a merge. Note that `main` auto-deploys, which is exactly why this matters.
+### 2. Controller unit tests — CLOSED 2026-08-14 23:06
 
-## Room lint is GREEN — and of the five gaps it exposed, THREE are real
+Nine tests across five files held absolute paths under `/Users/billyribeiro/Desktop/new-room/`, so
+they passed on the owner's machine and `ENOENT`d anywhere else. Two failed at SUITE level, because
+the read was at module scope and threw during import before any guard could run.
 
-ESLint reached the room for the first time on 2026-08-14 and reported 123 problems. All are
-resolved; `pnpm lint` exits 0 and the room step of `quality.yml` is green.
+**Copying the captures in was tried and REVERTED.** It works, and `.gitignore:45-47` forbids it in as
+many words — they are dumps of a live room holding real names, addresses and in some cases a live
+JWT. Recorded beside it: `privacy:verify` scans with `git ls-files --exclude-standard`, so it passed
+on the copied dumps **without reading one byte of them**. A green privacy check says nothing about an
+ignored file.
 
-**Five of them were not lint problems. Two turned out to be redundancy and were removed; three were
-genuine missing behaviour and are now all three built.**
+`reference-capture.ts` is the fix: one place that knows where the captures live, `hasCapture` for
+`describe.skipIf`, and `readCapture` that names the file and the override when it throws. The
+module-scope reads are guarded because `skipIf` never runs if the import throws first.
 
-### Closed — they were second sources of truth, not missing features
+`PTR_CAPTURE_ROOT` overrides the location, which is what made this verifiable **without spending a
+CI run**: pointing it at an empty directory reproduces exactly what a runner sees.
 
-- **`extraChatColumnWasEnabled`** — removed. Upstream needs that flag because it MUTATES
-  `preferences.extraChatColumn` to hide the column and must remember what it destroyed. Ours never
-  writes the preference: `extraChatColumnVisible` derives from `extraChatColumn &&
-  !chatCollapsedByMode`, so clearing the collapse restores the column by construction. **An earlier
-  note here claimed the missing read meant the column "never comes back". That was wrong** — it was
-  the design that differed, not the wiring. A variable being unread is evidence of nothing on its own.
-- **`muted`** — removed, with its write. Every consumer derives `volume === 0`, which the screen
-  panes are passed directly.
+- with the captures: **964 passed**, 91 files
+- as CI sees it: **943 passed, 21 skipped, 0 failed**, 86 files passed and 5 skipped
 
-### Closed 2026-08-14 21:05 — the extra chat column now follows its own messages
+One silent pass was removed on the way: `account-page-sbs.test.ts` had `if (!existsSync(REFERENCE))
+return;`, which made a missing dump a green test that compared nothing.
 
-`extraChatScroller` was handed back by `onscrollerready` and read by nothing, so a message arriving
-in the second column left the view where it was while the main chat scrolled — the reader simply did
-not see it. It now has an autoscroll effect that is a deliberate parallel of the main chat's: same
-four conditions, its OWN `extraChatScrollingUp` flag, and its own effect rather than a loop over both
-columns, so a reader scrolled up in one is not yanked by traffic in the other. Four assertions in
-`extra-chat-column-contract.test.ts`, negative-controlled by passing the wrong column's flag.
+### 2b. Local dev secrets — restored 2026-08-15, and one is permanently gone
 
-### Closed 2026-08-14 22:03 — note Version History is reachable, and it is the LAST of the five
+`apps/controller/.env` was overwritten (`cat >` where `>>` was meant) and went from 1413 bytes to
+81. Six of its seven variables were restored from `~/Desktop/new-room-control/.env`.
 
-`loadNoteVersions` now has a consumer. All five gaps ESLint exposed are closed: two were redundancy
-and were removed, three were real behaviour and are built.
+**`API_KEY_ENCRYPTION_KEY` could not be restored and was regenerated instead.** It is now set in
+Vercel production (`--sensitive`), set identically in the local `.env`, and production has been
+redeployed and verified live. Consequence, stated once: API keys created BEFORE this can no longer
+be re-displayed on the account page. They still **authenticate** — `secret_hash` is what
+authenticates and it is untouched; `secret_ciphertext` only exists so the page can show the value
+again. Delete and recreate any key you want visible.
 
-**The evidence turned out to be one file, not a bundle offset.** An earlier note here located the UI
-at `main.d6d3c112b59b7d0d.js` byte 1460764 and listed const indices 16, 17 and 21-25 as "the only
-remaining unknown". `docs/source/components/app-note.full.js` is that same component already
-extracted — 1287 readable lines including its whole `consts` table — and reading it end to end
-settled every open question at once, plus two the note had got wrong:
+**The fact that made this unrecoverable, and it applies to all eleven:** every controller variable on
+Vercel is type `Sensitive`, which is **write-only**. No value can be read back by the dashboard, the
+CLI or support. **`~/Desktop/new-room-control/.env` and `.env.vercel-pull` are therefore the only
+readable copies of production secrets that exist anywhere.** Back that folder up off this machine.
 
-- **No server action was needed.** The note said "`revertToVersion(v)` needs a server action; the
-  read route exists, the write does not." Both already existed: `restoreNoteVersion` in
-  `notes-repository.ts`, its Zod command, its form action at `+page.server.ts:706`, and tests. The
-  reference does not use a bespoke endpoint either — it reverts by writing the note back through the
-  ordinary `saveSessionNote`. **The whole feature was one client surface away from done.**
-- **The reference's history is `localStorage`, not a server.** `loadVersionsFromStorage` reads
-  `note_versions_${tab._id}` and `maxVersions = 3`. Ours is a room-scoped, presenter-gated table with
-  no cap — strictly stronger, and the reason our rows key on a primary key where the reference tracks
-  by `timestamp`.
+### 3. Backend quality — NOT OURS TO FIX: the runner is out of minutes
 
-Built from that file and nothing else: consts 13 and 16-25 for every class, `C0e` for the toggle
-(absent rather than disabled when there is no history, label carrying the count, `active` while
-open), `w0e` for the panel as a SIBLING of the button bar, `S0e` for a row, and the five
-`.version-history-panel` rules transcribed value for value from `app-note.component.css`.
+**Owner, 2026-08-14 23:00: the account has run out of CI minutes, and that is why these jobs fail.**
+Nothing below is being worked on, and CI is not to be triggered again until the app is finished —
+every push against an open PR starts a run and spends minutes that are not there.
 
-**Two deliberate divergences, both recorded in the code:**
+Kept because it was diagnosed rather than guessed, and the diagnosis stands whatever the cause:
 
-1. The preview goes through `safeNoteHtml`, not the reference's `noSanitize` → `innerHTML`. Its
-   `getVersionPreview` strips tags with a regex, which leaves entity-encoded markup completely
-   intact — that string is not sanitised and was never meant to be.
-2. The panel's state lives in `NotesPane`, not `NoteEditor`, because the editor sits inside a
-   `{#key}` on `updatedAt` and its own three-second autosave changes `updatedAt`. State kept in the
-   editor would close the panel under a presenter mid-read.
+The Rust job fails all 27 integration tests with
+`password authentication failed for user "ptr_clone_app"` (28P01).
 
-`note-version-history.test.ts` — 17 assertions pinning BOTH halves, what the capture contains and
-what we render. Negative-controlled twice: removing `class:active` and changing the tag substitution
-from a space to the empty string each turned it red.
+**An earlier reading of this was wrong and is corrected here.** It looked like a `push` vs
+`pull_request` difference. It is not: the PR runs that appear green **skip the entire gate** —
+`Report a skipped backend gate` ran and both provisioning and tests show `skipped`. The gate is red
+every time it actually executes, and has been on every push to `main`.
 
-### Closed 2026-08-14 22:19 — Edit Carousel, and the carousel is now testable
+Provisioning is not the bug. `services/docker/postgres/10-provision-roles.sh` uses `\getenv` and
+`format(… %L …)`, which is correct quoting for a password containing both `'` and `\`, and that step
+reports success. The failure is at connect time in `api/tests/support/mod.rs:92` — inside
+`services/**`, which is **a mirror**: "a change made here is lost on the next sync."
 
-The same `T0e` renders an **Edit Carousel** button (const 14, `fas fa-images`) when `carouselInNote`
-is true, calling `editCarousel()` to reopen an existing carousel. Ours could insert one and never
-re-open it. Built, along with `M0e`'s two label swings — the heading between `Insert`/`Edit Image
-Carousel` and the submit button between `Insert Carousel`/`Save Changes`.
-
-**The heading was wrong before this and is corrected.** It read "Insert an image carousel", which is
-the text of the TOOLBAR BUTTON's tooltip in `carouselButton()`, not of the modal title in `M0e`.
-
-**The node moved out of the component**, into `components/notes/carousel.ts`: the Tiptap node, the
-three parsers, `numericRange`, and two document queries (`hasCarousel`, `findCarousel`). None of it
-was ever component state, and inside a `.svelte` file the round trip that actually matters — stored
-HTML → node attributes → stored HTML — could only be checked by eye. `note-carousel.test.ts` now
-builds a **real Tiptap document under jsdom** and reads it back: 22 assertions covering the
-reference's own emitted markup, the malformed-attribute fallbacks, in-place replacement leaving the
-surrounding paragraphs untouched, and a carousel nested in a blockquote that a top-level scan misses.
-
-**One deliberate divergence.** The reference takes the FIRST carousel — `querySelector` returns it,
-and `replaceCarouselInEditor` replaces it — so in a note holding two, the second can never be edited
-and trying to edit it silently overwrites the first. That is data loss, not a missing feature. When
-the user has actually selected one, that is the one edited. With a single carousel, which is every
-captured note, the two are identical. Negative-controlled: dropping the selection preference turns
-the suite red.
-
-### Closed 2026-08-14 22:26 — stream tabs are labelled with the presenter's real name
-
-The tab read `Dana_Vero`. `ingestPathFor` collapses everything outside `[a-zA-Z0-9_-]` to `_` before
-the media server sees a name, and `/v3/paths/list` reports paths and nothing else, so the sanitiser's
-underscores were the only name available. That transformation is ONE-WAY — "Dana Vero", "Dana_Vero"
-and "Dana/Vero" all land on the same string — which is why it was never un-mangled by guessing.
-
-**The room already knew, and was throwing it away.** `api/stream-ingest` is the room's own route and
-holds both halves at the moment a key is minted: the connected member, and the `ingestPath` the
-controller answered with. That pairing is now written to `stream_ingest_names`, keyed on
-`(room_short_code, ingest_path)`, and the reconciler reads the whole room in one query per poll.
-
-Two alternatives were considered and rejected, both recorded at the schema:
-
-- **Matching sanitised display names against the roster** — a heuristic that breaks on two members
-  who sanitise alike, and on a presenter whose session expired while OBS kept publishing.
-- **Asking the controller per reconcile** — a network round trip every five seconds per room, for a
-  value that changes only when somebody presses "New Link".
-
-`user_id` is stored rather than the name, so renaming a member relabels their tab. An absent record
-falls back to the path segment, which is exactly what the tab showed before — degraded, never wrong —
-and a whitespace-only display name falls back too rather than rendering a tab with no label.
-
-`stream-names.test.ts`, 11 assertions. Negative-controlled: dropping the room predicate from
-`streamNamesForRoom` turned the cross-room test red.
-
-**Known limitation, stated rather than discovered later:** deltas are keyed on the path, so a
-presenter who renames themselves mid-stream keeps the label they started with until the stream stops
-and restarts. Relabelling would mean emitting a delta, which tears down the `<video>` element and its
-hls.js instance to change a string.
+Owner's note 2026-08-14: this may be a **billing/quota** problem on the runner rather than a code
+one. Not investigated further pending that.
 
 ### Evidence gaps
 
@@ -182,21 +115,6 @@ speculative change this file exists to prevent.
   `server/notes.ts:123`, and the jsdom output pinned in `note-carousel.test.ts`.
 - **What it blocks:** nothing today. It decides whether the allow-lists need a second accepted form.
 
-| count | rule | what they were |
-| --- | --- | --- |
-| 8 | `@typescript-eslint/no-unused-vars` | unused imports and locals; **check each** — one in the controller turned out to be a prop passed at six sites and read nowhere |
-| 13 | `svelte/no-unused-svelte-ignore` | stale `svelte-ignore` comments; the Svelte MCP autofixer flags the same ones |
-| 5 | `no-useless-assignment` | initialisers that can never be read |
-| 2 | `no-regex-spaces` | literal runs of spaces in a regex |
-| 2 | `@typescript-eslint/no-this-alias` | in the browser-console collectors |
-| 2 | `@typescript-eslint/no-explicit-any` | plus one stale disable directive beside them |
-| 1 | `@typescript-eslint/ban-ts-comment` | a `@ts-nocheck` in `scripts/lib/const-table.mjs` |
-
-Not one is a lint-config question; they are all real edits. **`no-unused-vars` in particular must be
-read rather than auto-deleted** — the same rule in the controller surfaced `markUnwired`, a
-documented prop with six call sites and no consumer, which is a feature gap wearing the costume of a
-style warning.
-
 ---
 
 ## State, 2026-08-14 15:44 EDT
@@ -207,16 +125,15 @@ this deployment does not have.
 
 | row | what it needs | who or what unblocks it |
 | --- | --- | --- |
-| **P** | nothing — bookkeeping. PR #20 is MERGED; PR #21 is open and green | the owner merges #21 |
+| **P** | bookkeeping. PRs #20–#27 are MERGED. **#28 is open and NOT green** — see the CI section at the top of this file | the two open items there |
 | **G** | the Postgres host question — Neon under volume | the owner |
 | **H** | production topology — separating media from the app tier | the owner |
 | **Q** | the WordPress plugin run inside a live WordPress | an environment |
-| **E** | `apps/room/.env`, which holds secrets not authored here | an environment |
+| **E** | **UNBLOCKED 2026-08-15.** `apps/room/.env` now exists and its `ROOM_JWT_SECRET` matches the controller's. The seam probe has still never been RUN | nothing — this one is mine to run |
 | **R** | screenshare quality / MP4 — the measurement needs a human at an OS screen-picker dialog; its row 10 needs the same cluster as X and AC | the owner, then a MediaMTX cluster |
 | **X** | `app-recording-preview-window` — `setRecPreview` comes from the MediaMTX path | a MediaMTX cluster |
 | **AC** | `stopRecMsg` — the same producer, the same path | a MediaMTX cluster |
-
-| **AD** | **OBS / XSplit ingest — INGEST BUILT 2026-08-14. Two things remain: a MediaMTX host, and the playback half.** | a MediaMTX host at `STREAM_SERVER_MTX` |
+| **AD** | **OBS / XSplit — BOTH HALVES BUILT 2026-08-14.** Ingest and playback are complete: StreamTabs, the `#streams` pane, StreamingView with hls.js, the three wire commands, `/internal/media-hook`, the reconcile loop, and real presenter names on the tabs. ONE thing remains, and it is not code | a MediaMTX host at `STREAM_SERVER_MTX` |
 
 **Row AD, built 2026-08-14 16:41.** The owner's requirement is that a presenter can stream from the
 BROWSER (works today, mediasoup) **and** from OBS / XSplit. The ingest half now exists end to end:
@@ -506,10 +423,36 @@ refused; do not attempt a fifth without the sentence.**
   remains is only the DISPLAY block at `page.manageSession.html:1138-1142`, which is the same
   sentence.
 
-#### C. Four need infrastructure that does not exist. Do NOT build them until it does.
+#### C. Four are NOT CAPTURED YET. Each needs one targeted collection script.
 
-Building any of these means inventing a data source, which the evidence rules forbid. Each is fully
-specified in the register.
+**Corrected 2026-08-15 by the owner, and the correction matters.** This bucket said these needed
+"infrastructure that does not exist" and were not to be built. That was wrong twice over: the
+original application **does** have all four, and this repository's own rule for anything missing is
+not to park it but to **write a browser-console script that fetches it** — `scripts/ptr-collect.js`
+is the working reference implementation and every collector here was built from its shape.
+
+So none of these is blocked on infrastructure. Each is blocked on **one capture run against the live
+original**, and what each script has to bring back is already known:
+
+| item | the script must capture |
+| --- | --- |
+| **T5-16 Recordings** | the response behind `recs` — `vidPath`, `contentType`, `name`, `created`, and `length` in MILLISECONDS (the page renders `length/60000` to two decimals) |
+| **T5-17 Avatars** | the avatar set behind `avatars`, plus the request `selectAvatar(avatar)` posts — URL, method and body |
+| **T5-20 `recorded_max_capacity`** | what actually writes it. Column, reader and reset all exist (migration `0011`); the missing half is the live-occupancy signal the controller never receives. Capture whether the original pushes occupancy on its command channel and under what name |
+| **T5-27 `badges.dark_theme`** | the PICKER that sets it. Storage and display are already proven — `page.welcome.html:1191-1211` shows `ng-if="roomBadge._id === b.darkTheme"`, so it is an ID and not a boolean. Only the control that assigns it is uncaptured |
+
+Rules for those scripts, from `~/CLAUDE.md` §3: one self-contained `.js` file pasted into the console
+on the LIVE app; it detects whether the session is a member or an admin and records what that role
+can and cannot reach; it drives itself to the target and downloads a JSON with no follow-up step; it
+captures markup, computed styles AND the matching stylesheet rules; it records honest gaps when a
+target never rendered; and it checks a hard denylist before every click — **never** delete, upload,
+play, stop, send, save or submit.
+
+**Do NOT build the features from guesses.** The one thing that has not changed is that inventing a
+data source is forbidden. Capture first, then build from what came back.
+
+**T5-20 keeps one specific warning:** do not substitute the roster size for occupancy. The number who
+ever registered is not the number ever simultaneously present.
 
 - **T5-16 — the Recordings page.** Needs an endpoint behind `recs`: `vidPath`, `contentType`, `name`,
   `created`, `length` (MILLISECONDS — the reference renders `length/60000` to two decimals).
@@ -553,7 +496,7 @@ needs something from outside this repository.
 
 | #   | what                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | severity                                          | written up                                                                                                                                                          |
 | --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| P   | **`main` is RED on Backend quality, and PR [#22](https://github.com/billyribeiro-ux/trading-room-app/pull/22) is the fix. Merge it before anything else.** PRs #20 and #21 are merged. **The lesson is bigger than the bookkeeping: a green PR check has not been proving the backend.** That job's scope step skips every step on a pull request whose diff touches no backend path — by design, and documented in its own skip notice — so #19, #20 and #21 were each merged on a SUCCESS that was a skip. The first push to `main` set `backend=true`, the steps ran for the first time ever, and three latent defects fired at once: verifier paths that do not exist at the repository root, a `REPOSITORY_ROOT` computed one level up instead of three, and a `cargo tree --invert` missing `--target all` that reported a target-gated crate as having escaped its graph. All three are fixed in #22, which the gate runs IN FULL because the diff touches the workflow itself. **The characteristic remains after the fix and is worth knowing: a PR that touches no backend path still merges without running that suite, so `main` is where backend rot surfaces.** Treat a red `main` after a merge as expected-by-design and fix forward; do not read a green PR as proof the Rust and PostgreSQL contracts ran. | **HIGH until #22 merges — `main` is red** | this row |
+| P   | **STALE ABOVE THE FOLD, CORRECTED 2026-08-14 23:10: PR #22 merged long ago (`f0c2fdd`), and so did #23–#27.** `main` is at `6f4411e`. It is still RED on Backend quality, but for a DIFFERENT reason than this row was written about — the owner confirmed the account is out of CI minutes. The paragraph below is kept because its lesson is permanent and was earned the hard way. **The lesson is bigger than the bookkeeping: a green PR check has not been proving the backend.** That job's scope step skips every step on a pull request whose diff touches no backend path — by design, and documented in its own skip notice — so #19, #20 and #21 were each merged on a SUCCESS that was a skip. The first push to `main` set `backend=true`, the steps ran for the first time ever, and three latent defects fired at once: verifier paths that do not exist at the repository root, a `REPOSITORY_ROOT` computed one level up instead of three, and a `cargo tree --invert` missing `--target all` that reported a target-gated crate as having escaped its graph. All three are fixed in #22, which the gate runs IN FULL because the diff touches the workflow itself. **The characteristic remains after the fix and is worth knowing: a PR that touches no backend path still merges without running that suite, so `main` is where backend rot surfaces.** Treat a red `main` after a merge as expected-by-design and fix forward; do not read a green PR as proof the Rust and PostgreSQL contracts ran. | **HIGH until #22 merges — `main` is red** | this row |
 | Q   | **The WordPress plugin has not been run inside a live WordPress.** The PHP itself is now executed and proven: `php -l` reports no syntax errors under **PHP 8.3.33**, and `tests/mint-golden-token.php` mints a token with the plugin's OWN `tradingroom_sso_entitlements()` and `tradingroom_sso_mint()` — that exact token is committed as `tests/golden-token.json` and verified by our TypeScript verifier in `sso-wordpress-contract.test.ts` (negative control: tampering one signature byte fails it). Both ran in a container, so no local PHP is needed to reproduce. **What remains needs a real site, not a machine here:** boot it inside WordPress against a staging WooCommerce, click through as a paid member, then **cancel the subscription and prove the door closes on the next entry**. Only that exercises `wc_memberships_get_user_active_memberships`, `wcs_get_users_subscriptions`, the settings screen and the cached-page path.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | blocks the first WordPress customer               | **`integrations/wordpress/STAGING-TEST.md`** — a step-by-step checklist; §6 (cancel the subscription, prove the next entry is refused) is the step that closes this |
 | R   | **Screenshare quality and the MP4 question — the RESEARCH was already here; the recorder half is now implemented, three rows remain.** The owner's memory was of `apps/room/docs/streaming-choices.md`, written 2026-08-05 — a measured, evidence-tagged ranking of ten options. It is byte-identical to the copy in `new-room`, so there was nothing to pull. **Done 2026-08-10: row 4.** The recorder was `new MediaRecorder(stream)` with NO options, taking the browser's ~2.5 Mbps default; it now picks VP9 explicitly at 8 Mbps (`src/lib/recording-codec.ts`, 10 tests). Row 4's own table is why — on realistic chart content VP9 produces **3841 kbps at an 8 Mbps cap and 6414 at 16**, while H.264/mp4 **saturates at ~2033 and ignores a higher cap**. 8 rather than 12 Mbps because row 4 warns a second 1080p encode competes with the live encoder. **MP4 arrives automatically on Safari** (it produces `video/mp4` natively and is last in the preference list); making it universal without losing ~1.8 Mbps of detail needs server-side remux, which is row 10 and needs the transcoding workers `MEDIASOUP-DEPLOYMENT-PLAN.md` defers. **Also done 2026-08-10: row 2.** `contentHint = 'detail'` is now set on the captured screen track — the doc's "strongest remaining candidate", chosen on the wire measurement: full 1920x1080 arrives with `qualityLimitationReason: none` and cumulative `bandwidth: 0, cpu: 0`, so nothing is throttling and the only lever left is telling libvpx the content is text rather than camera video. Its COST is still unmeasured (it may raise the bitrate, and under real congestion it trades frame rate for resolution), and it is a divergence — the capture sets the hint on its alert-overlay canvas, never the raw screen track. Reverting is deleting one line. **STILL OPEN:** row 6 raising the 1920 cap for Retina (every member pays the bandwidth, and it diverges from a byte-identical constraint) and row 8 an explicit `maxBitrate` (a floor is exactly what hurts the member on the worst connection). Both were deliberately NOT taken without the measurement, and both need the same one: **`apps/room/docs/MEASURE-SHARE-QUALITY.md`** — a written procedure, ~5 minutes, needing a human because `getDisplayMedia` requires an OS screen-picker dialog that browser automation cannot click. Attempted 2026-08-11 and abandoned: `chrome://webrtc-internals` lists every page in the BROWSER, and six Simpler Trading tabs plus two ChatGPT tabs were each contributing their own connections. The doc says which tabs to close, in what order, and what each possible result would mean. **The measurement that settles all three is one thing: a presenter sharing a REAL desktop with a member attached, reading `outbound-rtp` from `getStats()` before and after each change.** Headless `getDisplayMedia` returns Chrome's synthetic gradient, which compresses too easily to show any difference — which is why the doc's own 525 kbps figure is not the real number. | quality; owner-visible                            | `apps/room/docs/streaming-choices.md`, rows 2, 6, 8                                                                                                                 |
 | S   | **The room-side login page is BUILT, 2026-08-14 — the room renders `app-session-login` on every entry, as the reference does.** The reported divergence is gone: Launch no longer drops you straight into the room. `/session?id&jwtSite` is a PAGE now, not a redirect; it verifies the handoff, prefills name and email from the token, marks the email read-only, and waits for `Login` — because the reference never auto-submits either (`doLoginCheck()` has exactly four callers, all click or submit bindings). **The A/B question I put to the owner was WRONG and the dumps answered it:** `webinarPW` appears NOWHERE in the room bundle, so the reference does not hold the room password in the browser at all — `loginToRoom()` posts the typed value and its SERVER decides. Ours does the same through `internal/room-entry/[code]`, which runs the SAME `decideRoomEntry` the guest door uses, so there is one entry decision rather than two. The five settings that DRIVE the page now cross (`showPasswordField`, `usernameInstructions`, `hasRequiredPhoneInLogin`, `customEnterDisclosure`, `disableEditingUsername`), each read in the bundle at a cited byte offset — the four-edit process, 56 wired. **One deliberate narrowing:** `banIPList` DOES cross to the reference's room and is checked in its browser; ours checks it server-side only, because a ban list in a browser hands every banned address to every visitor and the server decision is authoritative regardless. **STILL OPEN, and it is the guest path:** the controller's `/session/[code]` form and this page are now two forms for a guest, where the reference has one. The room is the reference's only form, so the controller's guest door should become a token-minting step — that is the next unit and it needs no new evidence. | MEDIUM — the launch path matches; the guest path shows two forms | this row |

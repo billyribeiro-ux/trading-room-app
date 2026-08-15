@@ -9,17 +9,22 @@
  * The mirror image of the controller's `ROOM_BASE_URL`, and blank by the same logic: a room that
  * has not been told where its controller is should say so rather than guess at a hostname.
  */
-import { env as privateEnv } from '$env/dynamic/private';
+import { CONTROL_BASE_URL } from '$app/env/private';
 
 /*
-  `$env/dynamic/private`, never `process.env`.
+  `$app/env/private`, never `process.env`.
 
   SvelteKit does not copy `.env` into `process.env` — it loads the file with Vite's `loadEnv` and
-  exposes the result only through the `$env/*` modules. `src/lib/server/media-grant.ts` documents
+  exposes the result only through its own env modules. `src/lib/server/media-grant.ts` documents
   this in detail because the same mistake there made every media grant 503 under `vite dev`. Read
   at runtime, so one built artefact still works across environments.
+
+  This was `$env/dynamic/private` until 2026-08-15. Kit 3 makes that module a five-line shim over
+  this one which logs "`$env/dynamic/private` is deprecated, use `$app/env/private` instead" in dev,
+  and it stops emitting the ambient types, so `svelte-check` cannot resolve it at all. The variable
+  must be declared in `src/env.ts` to exist here — see the note at the top of that file.
 */
-const RAW = () => privateEnv.CONTROL_BASE_URL?.trim() ?? '';
+const RAW = () => CONTROL_BASE_URL?.trim() ?? '';
 
 /** The controller's origin, or null when this room has not been pointed at one. */
 export function controlPlaneOrigin(): string | null {

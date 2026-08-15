@@ -17,7 +17,12 @@
   import { page } from '$app/state';
   import { panelDragResize, readPanelBounds } from '$lib/panel-drag';
   import { invalidate, invalidateAll } from '$app/navigation';
-  import { env } from '$env/dynamic/public';
+  import {
+    PUBLIC_PTR_CDN_UPLOAD_KEY,
+    PUBLIC_PTR_GIPHY_API_KEY,
+    PUBLIC_PTR_TAWK_PROPERTY_ID,
+    PUBLIC_PTR_UPLOAD_SERVER
+  } from '$app/env/public';
   import { onMount, tick, untrack } from 'svelte';
   import { SvelteMap, SvelteSet } from 'svelte/reactivity';
   import BootboxDialog from '$lib/components/BootboxDialog.svelte';
@@ -2162,7 +2167,7 @@
    */
   const selfMutedUntil = $derived(data.chatMutedTill ? new Date(data.chatMutedTill) : null);
   const chatEnabled = $derived(chatComposerEnabled(chatMode) && selfMutedUntil === null);
-  const giphyApiKey = env.PUBLIC_PTR_GIPHY_API_KEY ?? '';
+  const giphyApiKey = PUBLIC_PTR_GIPHY_API_KEY ?? '';
   const primaryIsFirst = $derived(roomSplitDir === 'ltr' || roomSplitDir === 'ttb');
   const defaultMainSplit = $derived(
     splitIsHorizontal ? DIRECT_EVIDENCE_CONTRACT.populatedRoom.primaryPercent / 100 : 0.5
@@ -3306,7 +3311,7 @@
     tawkSupportAvailable(
       { isPresenter },
       data.sessData ?? {},
-      env.PUBLIC_PTR_TAWK_PROPERTY_ID
+      PUBLIC_PTR_TAWK_PROPERTY_ID
     )
   );
   /** `this.tawkWidgetOpen` — attributes are set once, on the first open. */
@@ -3333,7 +3338,7 @@
    * the API object is created by the script rather than at load time.
    */
   function loadTawkSupport() {
-    const script = tawkScript(env.PUBLIC_PTR_TAWK_PROPERTY_ID);
+    const script = tawkScript(PUBLIC_PTR_TAWK_PROPERTY_ID);
     if (!script) return () => {};
 
     const element = document.createElement('script');
@@ -6829,8 +6834,8 @@
    * The captured path is kept and still wins when the environment provides it.
    */
   async function uploadOneImage(file: File): Promise<string> {
-    const uploadServer = env.PUBLIC_PTR_UPLOAD_SERVER ?? '';
-    const uploadKey = env.PUBLIC_PTR_CDN_UPLOAD_KEY ?? '';
+    const uploadServer = PUBLIC_PTR_UPLOAD_SERVER ?? '';
+    const uploadKey = PUBLIC_PTR_CDN_UPLOAD_KEY ?? '';
 
     if (uploadServer && uploadKey) {
       const upload = new FormData();

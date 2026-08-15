@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { hasCapture, readCapture } from './reference-capture';
 import { describe, expect, it } from 'vitest';
 import { render } from 'svelte/server';
 import Page from '../routes/(app)/account/rooms/[id]/[[tab]]/+page.svelte';
@@ -21,7 +21,7 @@ import { ROOM_SETTINGS } from './room-settings-schema';
  * two different users, which is why the fixture below is an owner.
  */
 
-const REFERENCE = '/Users/billyribeiro/Desktop/new-room/must-match/match';
+const REFERENCE = 'must-match/match';
 
 /**
  * Tags in document order, skipping any element hidden by `ng-hide`/`hidden` AND its whole subtree —
@@ -136,9 +136,9 @@ function ourRow(): string {
   return tbody.slice(from);
 }
 
-describe('the manage user row, side by side with must-match/match', () => {
+describe.skipIf(!hasCapture(REFERENCE))('the manage user row, side by side with must-match/match', () => {
   it('has the capture to compare against', () => {
-    expect(() => readFileSync(REFERENCE, 'utf8')).not.toThrow();
+    expect(() => readCapture(REFERENCE)).not.toThrow();
   });
 
   it('reads a real shape out of the capture', () => {
@@ -148,12 +148,12 @@ describe('the manage user row, side by side with must-match/match', () => {
       comparing nothing at all. These are the elements that survive `ng-hide` in that row,
       counted by hand off `must-match/match`.
     */
-    const reference = shapeOf(readFileSync(REFERENCE, 'utf8'), 'ng-hide');
+    const reference = shapeOf(readCapture(REFERENCE), 'ng-hide');
     expect(reference).toEqual(['tr', 'td', 'td', 'img.thumb24', 'br', 'td', 'td', 'span', 'td']);
   });
 
   it('paints the same elements, in the same order', () => {
-    const reference = shapeOf(readFileSync(REFERENCE, 'utf8'), 'ng-hide');
+    const reference = shapeOf(readCapture(REFERENCE), 'ng-hide');
     const ours = shapeOf(ourRow(), 'hidden');
 
     expect(ours.length, 'the rendered row must not be empty').toBeGreaterThan(0);

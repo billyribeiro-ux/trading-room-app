@@ -22,7 +22,170 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ---
 
+## 2026-08-15
+
+### 2026-08-15 00:02 EDT — local dev secrets restored, and four "unbuildable" items were not
+
+**Runtime impact: yes, on production configuration** — `API_KEY_ENCRYPTION_KEY` was rotated in Vercel
+and the controller redeployed. No code changed; the same commit was rebuilt.
+
+**What happened.** `NINJA3.md` walked the owner through creating `apps/room/.env`, and put a
+destructive `cat >` next to a safe `echo >>` for the controller's existing file. The wrong one was
+easier to grab. `apps/controller/.env` went from 1413 bytes to 81 — one variable left of seven.
+
+Six were restored from `~/Desktop/new-room-control/.env`. The seventh, `API_KEY_ENCRYPTION_KEY`,
+**could not be**, and that is the finding worth keeping:
+
+> **Every one of the controller's eleven Vercel variables is type `Sensitive`, which is write-only.**
+> Confirmed by `vercel env ls production` — no value is readable back by the dashboard, the CLI or
+> support, and `vercel env pull` returns them empty.
+
+So `~/Desktop/new-room-control/.env` and `.env.vercel-pull` are the **only readable copies of
+production secrets in existence**. That is now recorded in `TODO.md` with an instruction to back the
+folder up off the machine.
+
+The key was regenerated instead: set in Vercel with `--sensitive --force`, written identically
+locally, and production redeployed (`✓ Ready in 42s`, aliased to `www.tradingroom.app`, `HTTP/2 200`).
+Read from the code before acting rather than assumed: rotating it does **not** break API
+authentication. `secret_hash` authenticates; `secret_ciphertext` exists only so the account page can
+re-display a key. The single cost is that pre-existing keys can no longer be shown until recreated.
+
+**A generated secret was pasted into `NINJA3.md`, committed and pushed to a public repo.** It was
+rotated out of use. History was left alone at the owner's instruction. The doc no longer shows a
+command beside its output, and the destructive branch is gone.
+
+**The correction that matters most came from the owner.** `TODO.md` bucket C said four items "need
+infrastructure that does not exist. Do NOT build them." That was wrong: the original application has
+all four, and this repository's own rule for anything missing is to **write a browser-console script
+that fetches it** — `scripts/ptr-collect.js` is the reference implementation every collector here was
+built from. The bucket now names, per item, exactly what one targeted capture run has to bring back.
+The prohibition that remains is narrower and still right: do not build the features from guesses.
+Capture first.
+
+**Row E is unblocked** as a side effect — `apps/room/.env` now exists with a matching
+`ROOM_JWT_SECRET`, so the room↔controller seam probe can finally be run.
+
 ## 2026-08-14
+
+### 2026-08-14 23:13 EDT — NINJA.md, the owner's list and only that
+
+**Runtime impact: no.** One new file at the repository root.
+
+Everything left in `TODO.md` that is blocked on the OWNER rather than on effort, in one place and in
+the order that unblocks the most: stand up MediaMTX (four rows at once), say the one sentence that
+clears the credential guard on T5-24/25, create `apps/room/.env`, run the WordPress plugin inside a
+live WordPress, measure screen-share quality at a real desktop, and read one style attribute in
+DevTools.
+
+It does not duplicate the runbooks that already exist — `ops/mediamtx/README.md`,
+`integrations/wordpress/STAGING-TEST.md`, `apps/room/docs/MEASURE-SHARE-QUALITY.md` and the two
+OBS/XSplit documents. It points at each and carries the shape, the exact values, and the traps: the
+UDP/8189 port everyone forgets, the self-signed certificate that reads as a wrong stream key, the
+`- action: read` exclusion that would serve every room's video to anyone who guesses a path, and the
+5180-vs-5173 port that sent an earlier probe into a different project on the same machine.
+
+Two CI facts are recorded there for the same reason — that the account is out of minutes is the
+cause of the red backend job, and that a green PR check has never proven the backend, because that
+job skips itself on a diff touching no backend path.
+
+### 2026-08-14 23:06 EDT — the side-by-side tests stop depending on one machine
+
+**Runtime impact: no.** Five controller test files and one new test-support module. Committed, **not
+pushed** — the account is out of CI minutes, and every push against an open PR spends them.
+
+**What was wrong.** Nine tests across five files held absolute paths under
+`/Users/billyribeiro/Desktop/new-room/`. They passed on the owner's machine and `ENOENT`d anywhere
+else. Two failed at SUITE level rather than test level, because the read ran at module scope and
+threw during import — so the reason arrived as a stack trace rather than as "the capture is missing".
+
+**The obvious fix is forbidden, and was tried anyway.** Copying the captures in works — 21/21 passed
+— and `.gitignore:45-47` rules it out in as many words: they are dumps of a live room holding real
+names, real addresses and in some cases a live JWT. It was reverted. One thing learned in the
+process is worth more than the attempt: **`privacy:verify` scans with
+`git ls-files --exclude-standard`, so it passed on the copied dumps without reading one byte of
+them.** A green privacy check says nothing about an ignored file.
+
+**What landed.** `reference-capture.ts` — one place that knows where the captures live,
+`hasCapture()` to gate `describe.skipIf`, and `readCapture()` that names both the file and the
+override when it throws instead of emitting a bare `ENOENT` into somebody else's home directory. The
+two module-scope reads are guarded explicitly, because `skipIf` never gets to run if the import
+throws first.
+
+`PTR_CAPTURE_ROOT` overrides the location. That is not a convenience — it is what made this
+**verifiable without spending a CI run**, by pointing it at an empty directory and reproducing
+exactly what a runner sees.
+
+A silent pass was removed on the way: `account-page-sbs.test.ts` carried
+`if (!existsSync(REFERENCE)) return;`, which turned a missing dump into a green test that compared
+nothing at all. Absence is now a skipped suite that says so.
+
+**Verified locally, no CI:**
+
+| | result |
+| --- | --- |
+| controller `test:unit`, captures present | **964 passed**, 91 files |
+| controller `test:unit`, `PTR_CAPTURE_ROOT` empty — what CI sees | **943 passed, 21 skipped, 0 failed** |
+| controller lint / `svelte-check` | 0 / 1523 files 0 errors 0 warnings |
+
+**Backend quality is not being worked on.** The owner confirmed the account has run out of CI
+minutes, which is the cause of those failures. The earlier diagnosis stands and is kept in `TODO.md`:
+the "green" PR runs skip the gate entirely, so it is red every time it actually executes, and the
+connect failure is inside `services/**`, a mirror where a fix would be lost on the next sync.
+
+### 2026-08-14 22:54 EDT — the frontend gate ran for the first time and immediately paid for itself
+
+**Runtime impact: yes.** Six room modules changed how they read configuration, and one environment
+variable that was silently unreadable is now declared. On `feat/extra-chat-column`, PR #28.
+
+**What happened.** `quality.yml` — built earlier the same day and never yet executed by CI — ran for
+the first time on PR #28 and failed both jobs. Neither failure was caused by the 21 commits under
+review. Both were pre-existing conditions that nothing had ever looked for.
+
+**Room type-check: six `Cannot find module '$env/dynamic/private'`.** `origin/main` carries the
+identical import, so this fails on `main` too — `main` has simply never been type-checked. Kit 3
+answers what to do in its own source: that module is now a five-line shim that logs
+"`$env/dynamic/private` is deprecated, use `$app/env/private` instead", still resolves at runtime,
+and no longer has ambient types emitted for it. Six files moved to `$app/env/private` and
+`$app/env/public`, joining two that already used them.
+
+Two things fell out of that migration which matter more than the type error:
+
+1. **`TRADINGROOM_API_URL` was never declared in `src/env.ts`.** `$app/env/private` exports exactly
+   what that file declares, so a deployment setting the variable would have been silently ignored
+   and every call would have gone to `127.0.0.1:8080` — the same shape as the `ROOM_JWT_SECRET`
+   failure that file was written to prevent. Nothing calls it yet; that is the only reason it was
+   not live. Declared now.
+2. **`media-grant.test.ts` mocked the old specifier.** Left untouched it would have kept passing
+   while silently no longer intercepting, sending two tests back to depending on the developer's
+   machine — which its own comment records as having already happened once. Retargeted, with all
+   five imported names listed, because a named import the factory omits is a hard loader error and
+   therefore checks that list on every run. Observed live: with the mock on the old specifier, those
+   two tests failed.
+
+**The rule this bought, and it corrects several claims made earlier the same day.** The room's
+`svelte-check` was reported as "1038 files, 0 errors, 0 warnings" repeatedly. That was measured
+against a **stale `.svelte-kit`**. On a clean tree it was six errors. **A green `svelte-check` is
+only evidence after `rm -rf .svelte-kit && svelte-kit sync`**, and that is now how it is run.
+
+**Controller unit tests: nine tests read `/Users/billyribeiro/Desktop/new-room/`.** Copying those
+captures into the repository was tried, worked (21/21), and was **reverted** — `.gitignore:45-47`
+forbids it in as many words, because they are dumps of a live room holding real names, addresses and
+in some cases a live JWT. Worth recording alongside it: `privacy:verify` scans with
+`git ls-files --exclude-standard`, so it passed on the copied dumps **without reading one byte of
+them**. A green privacy check says nothing about an ignored file. Left open in `TODO.md`.
+
+**Backend quality, and a correction.** It was first read here as a `push` vs `pull_request`
+credentials difference. That was wrong: the PR runs that look green **skip the entire gate**, with
+provisioning and tests both reporting `skipped`. The Rust job is red every time it actually runs.
+Provisioning is not the cause — `10-provision-roles.sh` uses `\getenv` and `format(… %L …)`, correct
+for a password containing `'` and `\`, and reports success. The failure is at connect in
+`api/tests/support/mod.rs:92`, inside `services/**`, which is a mirror where a fix would be lost on
+the next sync. The owner notes it may be a billing/quota problem on the runner; not pursued further.
+
+**Verified on a clean `.svelte-kit`:** room `svelte-check` 1037 files 0 errors 0 warnings, lint 0,
+**1253** tests across 101 files, build exit 0. Controller untouched and re-verified: 1522 files
+0/0, lint 0, **964** tests across 91 files, build exit 0. **Not merged:** PR #28 is open and two
+checks are red, and `main` auto-deploys, so merging red is a production release.
 
 ### 2026-08-14 22:26 EDT — stream tabs carry the presenter's real name
 

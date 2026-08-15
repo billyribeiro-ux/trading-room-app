@@ -5,8 +5,12 @@
 	}
 }
 
-# TLS for the PLAYBACK path only. Ingest does not come through here: WHIP is 8889 and RTMP is 1935,
-# both spoken directly to MediaMTX by the encoder.
+# TLS for the PLAYBACK path only. Ingest does not come through here: WHIP is 8889 and RTMPS is
+# 1936, both spoken directly to MediaMTX by the encoder, which terminates their TLS itself.
+#
+# This said 1935 until 2026-08-14. That is PLAIN RTMP, and this deployment refuses it outright —
+# `rtmpEncryption: strict` in mediamtx.yml means that listener is never started. Anybody following
+# the old comment would have opened a port nothing listens on and left 1936 closed.
 {$MEDIA_STREAM_HOSTNAME} {
 	header {
 		Strict-Transport-Security "max-age=31536000"

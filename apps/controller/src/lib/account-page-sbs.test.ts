@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { capturePath, hasCapture, readCapture } from './reference-capture';
 import { describe, expect, it } from 'vitest';
 import { render as ssr } from 'svelte/server';
 import Page from '../routes/(app)/account/+page.svelte';
@@ -16,7 +16,7 @@ import { shapeOf, sideBySide } from './dom-shape';
  * It starts at `.container.container-sm` (node 43). Everything above that is `<head>`, the loader
  * scripts and the navbar, none of which this page component renders.
  */
-const REFERENCE = '/Users/billyribeiro/Desktop/new-room/account-page/ptr-dump-member-1786232518250.json';
+const REFERENCE = 'account-page/ptr-dump-member-1786232518250.json';
 
 /** The worst this is allowed to be. Lower it when it improves; never raise it. */
 const BASELINE = 999;
@@ -95,14 +95,19 @@ function ourPage() {
   }).body;
 }
 
-describe('account page, side by side with the post-login dump', () => {
+describe.skipIf(!hasCapture(REFERENCE))('account page, side by side with the post-login dump', () => {
   it('has the dump to compare against', () => {
-    expect(existsSync(REFERENCE), `dump missing at ${REFERENCE}`).toBe(true);
+    expect(hasCapture(REFERENCE), `dump missing at ${capturePath(REFERENCE)}`).toBe(true);
   });
 
   it('matches element for element', () => {
-    if (!existsSync(REFERENCE)) return;
-    const dump = JSON.parse(readFileSync(REFERENCE, 'utf8')) as { nodes: DumpNode[] };
+    /*
+      The `if (!existsSync(REFERENCE)) return;` that stood here is gone, and its removal is the
+      point rather than tidying. It made a missing dump a SILENTLY PASSING test — the suite reported
+      green while comparing nothing at all. Absence is now a skipped suite that says so, which is
+      the whole reason `describe.skipIf` is on the line above.
+    */
+    const dump = JSON.parse(readCapture(REFERENCE)) as { nodes: DumpNode[] };
 
     /*
       `.center-block.mt-xl` — where THIS COMPONENT's output begins.

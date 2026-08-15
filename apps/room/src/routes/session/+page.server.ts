@@ -1,5 +1,5 @@
 import { error, fail, redirect } from '@sveltejs/kit';
-import { env as privateEnv } from '$env/dynamic/private';
+import { ROOM_JWT_SECRET } from '$app/env/private';
 import { eq } from 'drizzle-orm';
 import { db, ensureDatabase } from '$lib/server/db';
 import { users } from '$lib/server/db/schema';
@@ -94,8 +94,9 @@ type Prefill = {
  * own rules let them, and those rules are checked by the controller.
  */
 async function verifyEntry(request: Request, token: string | null, shortCode: string | undefined) {
-  // `$env/dynamic/private`, not `process.env` — SvelteKit never copies `.env` into the latter.
-  const secret = privateEnv.ROOM_JWT_SECRET;
+  // `$app/env/private`, not `process.env` — SvelteKit never copies `.env` into the latter, and
+  // under Kit 3 this is the module `$env/dynamic/private` is now merely a deprecated shim over.
+  const secret = ROOM_JWT_SECRET;
   if (!secret) {
     // No fallback: a default secret here would let anyone who can read this file mint entry.
     console.error('[session] ROOM_JWT_SECRET is not configured; refusing every handoff');

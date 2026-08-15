@@ -64,6 +64,24 @@ export const variables = defineEnvVars({
     schema: optionalText
   },
   /*
+    UNDECLARED UNTIL 2026-08-15, and that was the exact bug this file was written to prevent.
+
+    `lib/server/tradingroom-api.ts` reads it and falls back to `http://127.0.0.1:8080`. Under Kit 2
+    it came through `$env/dynamic/private` as a live view of the real environment, so setting it
+    worked. Under Kit 3 that module is a shim over `$app/env/private`, which exports EXACTLY what is
+    declared here — so a deployment that set `TRADINGROOM_API_URL` would have been silently ignored
+    and every call would have gone to localhost, in the same shape as the `ROOM_JWT_SECRET` failure
+    described at the top of this file.
+
+    Nothing depended on it yet (`tradingroom-api.ts` says so in its own header), which is why the
+    room was not visibly broken. Declaring it is what makes it work when the first caller arrives.
+  */
+  TRADINGROOM_API_URL: {
+    description:
+      'Origin of the Rust API, e.g. http://127.0.0.1:8080. Defaults to that when unset, which is the dev topology in vite.config.ts.',
+    schema: optionalUrl
+  },
+  /*
     The bearer MediaMTX presents on `/internal/media-hook`.
 
     A SEPARATE secret from `ROOM_JWT_SECRET`, deliberately. That one is the controller↔room signing

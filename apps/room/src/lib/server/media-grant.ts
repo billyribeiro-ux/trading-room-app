@@ -37,7 +37,13 @@
  */
 
 import { createHmac, createPrivateKey, createPublicKey, sign, type KeyObject } from 'node:crypto';
-import { env as privateEnv } from '$env/dynamic/private';
+import {
+  MEDIA_GRANT_PRIVATE_KEY,
+  MEDIA_STUN_URLS,
+  MEDIA_TURN_SECRET,
+  MEDIA_TURN_URLS,
+  MEDIA_WS_URL
+} from '$app/env/private';
 import { joinsMediaAsProducer, type MediaPermissions } from '$lib/roster-gates';
 import type { User } from './db/schema';
 
@@ -51,16 +57,28 @@ import type { User } from './db/schema';
  * `undefined`, `loadSigningKey` threw `GrantConfigError`, and `/api/media/grant` answered 503 -
  * with the room unable to reach mediasoup at all.
  *
- * `$env/dynamic/private` is the correct source in both environments: in dev it is the parsed
- * `.env`, and under `adapter-node` it is the real process environment, so a deployment that
- * exports these variables for real keeps working unchanged. It is also read at runtime rather
- * than inlined at build time, which is what lets one built artefact run in several environments.
+ * `$app/env/private` is the correct source in both environments: in dev it is the parsed `.env`,
+ * and under `adapter-node` it is the real process environment, so a deployment that exports these
+ * variables for real keeps working unchanged. It is also read at runtime rather than inlined at
+ * build time, which is what lets one built artefact run in several environments.
  *
  * Every entry point below still takes an `env` argument so the tests can inject one; this is
  * only what they default to.
+ *
+ * This read `$env/dynamic/private` and returned that whole module's `env` object until 2026-08-15.
+ * Kit 3 makes it a shim that logs "use `$app/env/private` instead" and stops emitting its types, so
+ * the five variables are now imported by name and reassembled into the bag the signatures expect.
+ * NAMING THEM IS THE IMPROVEMENT: the module's entire environment surface is these five, and it is
+ * now stated here rather than implied by whatever the object happened to contain.
  */
 function serverEnv(): NodeJS.ProcessEnv {
-  return privateEnv as NodeJS.ProcessEnv;
+  return {
+    MEDIA_GRANT_PRIVATE_KEY,
+    MEDIA_STUN_URLS,
+    MEDIA_TURN_SECRET,
+    MEDIA_TURN_URLS,
+    MEDIA_WS_URL
+  };
 }
 
 /** The only wire version this build speaks (`grant.rs:195`, `GRANT_VERSION`). */
