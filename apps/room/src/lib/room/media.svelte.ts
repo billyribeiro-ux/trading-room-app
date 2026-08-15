@@ -66,9 +66,13 @@ export class RoomMedia {
    * keeps it.
    *
    * `$state.raw`, and the writers below replace it. That is a change from the page, where
-   * `startTalking` did `talkingUsers.push(...)` on a deep-proxied array: the list is rendered in an
-   * `{#each}` and never mutated field-by-field, so the proxy was paying for granularity nobody
+   * `startTalking` did `talkingUsers.push(...)` on a deep-proxied array: the list is rendered by an
+   * each block and never mutated field-by-field, so the proxy was paying for granularity nobody
    * reads. Replacing is also what `stopTalking` already did, so the two writers now agree.
+   *
+   * (An each block, described rather than quoted. This repository forbids template syntax inside a
+   * comment: it is prose to a human and an unclosed block to any parser reading the file, and it
+   * has already shipped once with `svelte-check` green and a contract test red.)
    */
   #talking = $state.raw<TalkingUser[]>([]);
 
