@@ -30,14 +30,22 @@ const page = readFileSync(new URL('../routes/+page.svelte', import.meta.url), 'u
 const stripComments = (source: string) =>
   source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/<!--[\s\S]*?-->/g, '');
 const markup = stripComments(page);
+/*
+  The two toolbar flags and the two togglers moved to `room/alerts.svelte.ts` on 2026-08-15. The
+  assertions against the CAPTURE — everything read out of `docs/source/**` — are untouched, because
+  the evidence did not move; only our half of each pair did.
+*/
+const alertsClass = stripComments(
+  readFileSync(new URL('./room/alerts.svelte.ts', import.meta.url), 'utf8')
+);
 
 describe('alerts toolbar: two states, two controls', () => {
   it('has both captured flags', () => {
     // The per-component file is prettified, so the minified `=!1` carries spaces here.
     expect(component).toContain('this.showAlertsToolbar = !1');
     expect(component).toContain('this.showAlertsToolbarExtended = !1');
-    expect(markup).toContain('let alertsToolbarOpen = $state(false)');
-    expect(markup).toContain('let alertsToolbarExtended = $state(false)');
+    expect(alertsClass).toContain('#toolbarOpen = $state(false);');
+    expect(alertsClass).toContain('#toolbarExtended = $state(false);');
   });
 
   it('wires the magnifier to search-only and the gear to the full toolbar', () => {
@@ -59,17 +67,18 @@ describe('alerts toolbar: two states, two controls', () => {
 
   it('keeps the gear expanding rather than closing a search-only strip', () => {
     // `showAlertsToolbar && !showAlertsToolbarExtended ? extended = true : toggle(...)`
-    const body = markup.slice(
-      markup.indexOf('function toggleAlertsToolbar()'),
-      markup.indexOf('function toggleAlertsToolbarSearchOnly()')
+    const body = alertsClass.slice(
+      alertsClass.indexOf('toggleToolbar(): void {'),
+      alertsClass.indexOf('toggleSearchOnly(): boolean {')
     );
-    expect(body).toMatch(/if \(alertsToolbarOpen && !alertsToolbarExtended\)/);
-    expect(body).toContain('alertsToolbarExtended = true');
+    expect(body, 'the toggler must still be findable').not.toBe('');
+    expect(body).toMatch(/if \(this\.#toolbarOpen && !this\.#toolbarExtended\)/);
+    expect(body).toContain('this.#toolbarExtended = true;');
   });
 
   it('always ends search-only with the extended regions hidden', () => {
-    const body = markup.slice(markup.indexOf('function toggleAlertsToolbarSearchOnly()'));
-    expect(body.slice(0, 600)).toContain('alertsToolbarExtended = false');
+    const body = alertsClass.slice(alertsClass.indexOf('toggleSearchOnly(): boolean {'));
+    expect(body.slice(0, 600)).toContain('this.#toolbarExtended = false;');
   });
 });
 
@@ -77,7 +86,7 @@ describe('alerts toolbar: what each state renders', () => {
   it('gates the top row on the extended flag', () => {
     // `O(1, e.showAlertsToolbarExtended ? 1 : -1)` in N2e.
     expect(helpers).toContain('showAlertsToolbarExtended');
-    expect(markup).toContain('{#if alertsToolbarExtended}');
+    expect(markup).toContain('{#if alerts.toolbarExtended}');
   });
 
   it('keeps the search input and its clear button in BOTH states', () => {
@@ -96,7 +105,7 @@ describe('alerts toolbar: what each state renders', () => {
     // O2e renders const 47 (save); inside it I2e is gated on isPresenter && !isLimitedPresenter.
     expect(helpers).toContain('isPresenter');
     const tail = markup.slice(markup.indexOf('id="addon-chat-clear"'));
-    const gate = tail.indexOf('{#if alertsToolbarExtended}');
+    const gate = tail.indexOf('{#if alerts.toolbarExtended}');
     const save = tail.indexOf('id="addon-chat-save"');
     const presenterGate = tail.indexOf('{#if isPresenter}');
     const archive = tail.indexOf('id="addon-chat-messages-archive"');
@@ -119,7 +128,7 @@ describe('alerts toolbar: what each state renders', () => {
     // Const 45, the Filter alerts icon.
     expect(markup).toContain('fas fa-filter me-1');
 
-    const row = markup.slice(markup.indexOf('{#if alertsToolbarExtended}'));
+    const row = markup.slice(markup.indexOf('{#if alerts.toolbarExtended}'));
     const slot = row.slice(0, row.indexOf('id="alert-settings"'));
 
     /*
@@ -171,13 +180,15 @@ describe('alerts toolbar: what each state renders', () => {
 
     // The conjunction lives in the derived rather than the template, so assert it there.
     expect(markup).toContain(
-      'const alertFilterActive = $derived(alertFilterConfigured && hasActiveAlertFilter(alertFilterFor))'
+      'const alertFilterActive = $derived(alertFilterConfigured && alerts.filterSelected)'
     );
+    // The viewer half of the conjunction is the class's; the room half is session config and stays.
+    expect(alertsClass).toContain('return hasActiveAlertFilter(this.#filterFor);');
   });
 
   it('gates the inline-alert-entry checkbox on presenter and Detach on chat-only mode', () => {
     // `O(2, e.isPresenter ? 2 : -1)` and `O(3, chatOnlyMode ? -1 : 3)` in R2e.
-    const row = markup.slice(markup.indexOf('{#if alertsToolbarExtended}'));
+    const row = markup.slice(markup.indexOf('{#if alerts.toolbarExtended}'));
     const presenter = row.indexOf('{#if isPresenter}');
     const checkbox = row.indexOf('id="inline-alert-entry"');
     const notChatOnly = row.indexOf('{#if !chatOnlyMode}');

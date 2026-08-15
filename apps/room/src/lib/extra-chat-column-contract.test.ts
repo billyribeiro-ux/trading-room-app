@@ -22,10 +22,23 @@ import { describe, expect, it } from 'vitest';
 const PAGE = readFileSync(new URL('../routes/+page.svelte', import.meta.url), 'utf8');
 const PANE = readFileSync(new URL('./components/ExtraChatPane.svelte', import.meta.url), 'utf8');
 const MODAL = readFileSync(new URL('./components/ModalHost.svelte', import.meta.url), 'utf8');
+/*
+  The `hideChat` collapse left `+page.svelte` for `room/split.svelte.ts` on 2026-08-15 — it writes
+  the chat/alerts split, so it belongs with the geometry. What stayed in the page is WHO collapses,
+  which is a room-authority question. Both halves are asserted, in their new homes.
+*/
+const SPLIT = readFileSync(new URL('./room/split.svelte.ts', import.meta.url), 'utf8');
 
 const stripComments = (source: string) =>
   source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/<!--[\s\S]*?-->/g, '');
 
+/*
+  Stripped, because the first draft of the `localStorage` guard below read the RAW module and went
+  red on the class's own prose — `resolveSplitSizes` explains which `localStorage` keys upstream
+  reads. That was my instrument being wrong, not the code, and the fix is the one this file already
+  applies to the page: assert on code, never on comments.
+*/
+const splitCode = stripComments(SPLIT);
 const pageCode = stripComments(PAGE);
 const paneCode = stripComments(PANE);
 const modalCode = stripComments(MODAL);
@@ -69,7 +82,7 @@ describe('the column is its own split area', () => {
     expect(from, 'the snippet must exist').toBeGreaterThan(-1);
     const snippet = pageCode.slice(from, pageCode.indexOf('{/snippet}', from));
     expect(snippet).toContain('<as-split-area');
-    expect(snippet).toContain('style={extraChatAreaStyle}');
+    expect(snippet).toContain('style={split.extraChatAreaStyle}');
     expect(snippet).toContain('<ExtraChatPane');
   });
 });
@@ -198,15 +211,21 @@ describe('mentions reach the column you are in', () => {
 
 describe('hideChat — the pane collapses for non-presenters while chat is disabled', () => {
   it('presenters keep their pane', () => {
-    // `this.isPresenter || guiEventBus.emit('hideChat', 'd' == e)` — emitted only for everyone else.
-    expect(pageCode).toContain("const shouldHide = !isPresenter && chatMode === 'd';");
+    /*
+      `this.isPresenter || guiEventBus.emit('hideChat', 'd' == e)` — emitted only for everyone else.
+
+      The predicate stays in the page deliberately: `RoomSplit` owns the geometry and has no business
+      knowing what a presenter is, so the page answers WHO and the class answers WHAT MOVES.
+    */
+    expect(pageCode).toContain("split.collapseChatForMode(!isPresenter && chatMode === 'd');");
   });
 
   it('chat goes to 0 and alerts take the column', () => {
     // `this.chatSize = 0; this.alertSize = 100`.
-    expect(pageCode).toContain('chatAlertsSplit = 1;');
-    expect(pageCode).toContain('splitBeforeCollapse = chatAlertsSplit;');
-    expect(pageCode).toContain('chatAlertsSplit = splitBeforeCollapse;');
+    expect(SPLIT).toContain('collapseChatForMode(shouldHide: boolean): void {');
+    expect(SPLIT).toContain('this.#chatAlerts = 1;');
+    expect(SPLIT).toContain('this.#beforeCollapse = this.#chatAlerts;');
+    expect(SPLIT).toContain('this.#chatAlerts = this.#beforeCollapse;');
   });
 
   it('the extra column is hidden WITHOUT overwriting the viewer’s setting', () => {
@@ -225,16 +244,25 @@ describe('hideChat — the pane collapses for non-presenters while chat is disab
       removed 2026-08-14 once ESLint surfaced it. The two assertions below are the actual mechanism.
     */
     expect(pageCode).toContain(
-      'const extraChatColumnVisible = $derived(extraChatColumn && !chatCollapsedByMode);'
+      'const extraChatColumnVisible = $derived(extraChatColumn && !split.chatCollapsed);'
     );
     expect(pageCode).toContain(
       '{#if !hideChatAlerts && extraChatColumnVisible}{@render extraChatPane()}'
     );
-    // The collapse must never write the preference.
-    const from = pageCode.indexOf("const shouldHide = !isPresenter && chatMode === 'd';");
-    const effect = pageCode.slice(from, pageCode.indexOf('});', from));
-    expect(effect).not.toContain('savePreference');
-    expect(effect).not.toContain('onPreferenceChange');
+    /*
+      The collapse must never write the preference — now a STRUCTURAL guarantee rather than a slice.
+
+      `RoomSplit` is constructed with a READER and is handed one again on a direction change; it has
+      no writer at all, and `endDrag` returns the preference write for the page to perform instead
+      of performing it. So no path through the class can persist anything, which is a stronger
+      statement than "this particular effect body does not", and it cannot go vacuous the way a
+      `slice(indexOf(...))` does when the text it looks for moves.
+    */
+    expect(splitCode).not.toContain('savePreference(');
+    expect(splitCode).not.toContain('onPreferenceChange');
+    expect(splitCode, 'the class must have no way to write a preference').not.toContain(
+      'localStorage'
+    );
   });
 });
 
