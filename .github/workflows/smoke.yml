@@ -34,9 +34,12 @@ on:
 
 # A newer push supersedes an older run: smoking a deployment that has already been replaced tells
 # you nothing, and cancelling keeps the minutes for the run that matters.
+# Cancel superseded runs on a BRANCH, never on `main` — reasoning in `quality.yml`. This one checks a
+# DEPLOYED origin, so a cancelled run on `main` means nobody confirmed the deploy that is already
+# serving traffic.
 concurrency:
   group: smoke-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   smoke:

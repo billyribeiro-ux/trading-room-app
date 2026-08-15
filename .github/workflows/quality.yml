@@ -26,9 +26,29 @@ on:
 permissions:
   contents: read
 
+# Cancel superseded runs on a BRANCH. Never on `main`.
+#
+# `cancel-in-progress: true` was unconditional here, and on a branch it is exactly right: pushing
+# again makes the previous run irrelevant, and a slow job restarting from zero on every push means
+# nothing is ever learned. On `main` it is the opposite, because a run on `main` is not a preview of
+# a merge — it is the only verification a production deploy ever gets.
+#
+# What that cost, measured rather than argued. `060ba72` was pushed straight to `main`, broke the
+# lint gate for every subsequent run, and its own verification run was CANCELLED when a PR merge
+# landed two minutes later. The gate never checked the commit that broke it, and the next 8 runs
+# failed for a reason nobody could attribute. Across the last 40 runs on `main`, 11 were `cancelled`
+# — 27% — and that included EVERY `Backend quality` run in the 2026-08-15 sequence: 4a79203,
+# c1ff436, 5f03e5f, 731d232, b267143, a84f20f, 41d8de6, ffa410d, 030a209, ed3b26f. The Rust and
+# PostgreSQL security contracts on a multi-tenant fintech application were, in practice, unverified
+# on the default branch.
+#
+# The expression evaluates to `false` only for `refs/heads/main`, so branch and pull_request runs
+# keep cancelling as before and nothing gets slower except the default branch, which is the one
+# place the answer matters more than the wall-clock. `ci-verification-integrity.test.ts` asserts
+# this rather than trusting the comment.
 concurrency:
   group: quality-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   frontend:
