@@ -70,7 +70,12 @@
   import type { MtxStream } from '../mtx-streams';
 
   type Props = {
-    streams: MtxStream[];
+    /*
+      `readonly` because the list is owned by `room-mtx.svelte.ts` and reaches here through a
+      getter. A tab bar has no business mutating the list it renders, and saying so in the type is
+      what lets the owner hand out its own array instead of defensively copying it on every read.
+    */
+    streams: readonly MtxStream[];
     /** `selectedMTXStreamTab`. Upstream's initial value is `''`, not null; either compares false. */
     selectedStreamId?: string | null;
     /** `forcedScreenMTXID` — the eye badge. Upstream has no writer for it; see the header. */

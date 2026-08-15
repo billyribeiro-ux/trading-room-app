@@ -24,6 +24,51 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-15
 
+### 2026-08-15 12:28 EDT — the first `.svelte.ts` module, and the proof the pattern holds
+
+**Runtime impact: none intended.** The MediaMTX stream list moved out of `+page.svelte` into a
+module; the behaviour, the transitions and the reference notes are unchanged. `+page.svelte` is
+**13,663 → 13,651** and the ceiling moved down with it.
+
+Twelve lines is a small number and that is the honest framing: this slice was chosen to prove the
+pattern end to end, not to move mass. **There were zero `.svelte.ts` files in this repository**, so
+there was no house pattern to copy and the first one had to be right.
+
+**What the official guidance decided, and it is not a detail:** reassigned state cannot be exported
+from a `.svelte.ts` module — the importing side binds the value, not the reactive box. Every
+transition here REPLACES the whole state object rather than mutating it, so `export let mtxState`
+would have compiled and then silently stopped updating. A stream would simply never appear, with
+nothing to debug. `MtxStreamTabs` is therefore a class: the box stays behind `this` and
+`+page.svelte` reads through getters.
+
+**The boundary drawn, and why it is not "all the media code":** the module owns the reactive list
+and every transition of it. `bringEveryoneToStream` and `toggleLockStreamMtx` stayed in the
+component — one is a `fetch`, the other a documented upstream stub, and neither reads or writes this
+state. Dragging them along would have traded a large component for a module doing two unrelated
+jobs.
+
+**Comments moved WITH the code.** The reasoning for `$state.raw`, and the warning that this list
+must never be merged with `sharedScreens`, now sit in the module. Leaving them behind would have
+left `+page.svelte` explaining something no longer in it — the exact way comments go stale.
+
+**The compiler caught the one real hazard.** `svelte-check` rejected `readonly MtxStream[]` against
+`StreamTabs`'s mutable `MtxStream[]` prop. Fixed at the CONSUMER — the prop is now `readonly`,
+because a tab bar has no business mutating the list it renders, and saying so is what lets the owner
+hand out its own array instead of defensively copying on every read.
+
+**And the point the owner made, demonstrated:** `svelte-autofixer` ran on `room-mtx.svelte.ts` and
+returned `issues: []`. That is the gate this repository mandates on every Svelte change and which I
+reported an hour ago as impossible — because a 13,663-line file cannot be fed to it. An 80-line
+module can. Small files are not a style preference here; they are the difference between a gate
+running and a gate being skipped.
+
+**Verified:** `svelte-check` **0 errors 0 warnings** (after fixing the one it found), room suite
+**1507/1507 across 113 files**, `eslint` exit **0**, autofixer `issues: []`, ceiling lowered
+13,663 → 13,651 and the ratchet re-run green.
+
+**Next slices** (TODO row AE): media/mic/screen orchestration, then modal + user actions, then SSE
+dispatch, then the template. Each one migrates its own contract assertions and lowers the ceiling.
+
 ### 2026-08-15 12:22 EDT — a 13,663-line component is a breach of the standard, and now it cannot grow
 
 **Runtime impact: none.** One new test file. Nothing the site serves changed.
