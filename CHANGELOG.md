@@ -24,6 +24,53 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-14
 
+### 2026-08-14 22:03 EDT — note Version History, and the evidence that was one file away
+
+**Runtime impact: yes.** Presenters editing a note now get the Version History toggle and panel, and
+can revert to an earlier version. On `feat/extra-chat-column`.
+
+**The server half was already finished.** `restoreNoteVersion` (repository, Zod command, form action
+at `+page.server.ts:706`, tests), `getNoteVersions`, and the presenter-gated
+`api/notes/[noteId]/versions` route all existed and were tested. `loadNoteVersions` in `+page.svelte`
+fetched that route and nothing called it, carrying an `eslint-disable` for the unused-symbol warning.
+This change is the client surface, and only that.
+
+**A prior note in `TODO.md` was wrong on two points, and reading the evidence corrected both.** It
+said a server action still had to be written for the revert — it did not, and the reference does not
+use a bespoke endpoint either: `revertToVersion` writes the note back through the ordinary
+`saveSessionNote`. It also implied the history was server-side upstream; `loadVersionsFromStorage`
+reads `localStorage` under `note_versions_${tab._id}` with `maxVersions = 3`. Ours is a room-scoped,
+presenter-gated table with no cap, which is why our rows key on a primary key where the reference
+tracks by `timestamp`.
+
+**Where the evidence actually was.** The note pointed at `main.d6d3c112b59b7d0d.js` byte 1460764 and
+listed const indices 16, 17 and 21-25 as the last unknown.
+`docs/source/components/app-note.full.js` is that component already extracted — 1287 readable lines,
+its whole `consts` table included. Reading it end to end answered every question in one pass. This is
+the second time this week that reading a whole file beat resuming a search at an offset.
+
+**Built:** `C0e` as the toggle (absent rather than disabled when there is no history, label carrying
+the count, `active` while open, consts 16/17), `w0e` as a panel that is a SIBLING of the button bar,
+`S0e` as one row per version, and the five `.version-history-panel` rules transcribed value for value
+from `app-note.component.css`.
+
+**Two deliberate divergences, both commented at the code:**
+
+1. The preview reaches the DOM through `safeNoteHtml`, not the reference's `noSanitize` →
+   `innerHTML`. `getVersionPreview` strips tags with a regex, which leaves entity-encoded markup
+   fully intact — it is not a sanitiser and was never meant to be one.
+2. The panel's open state and its rows live in `NotesPane`, not `NoteEditor`. The editor sits inside
+   a `{#key}` on `updatedAt` and its own three-second autosave moves `updatedAt`, so state held in
+   the editor would close the panel under a presenter mid-read.
+
+**Verified:** `svelte-check` 1034 files, 0 errors 0 warnings; `pnpm lint` exits 0;
+`note-version-history.test.ts` 17/17 plus the five neighbouring note suites, 26 tests, all green.
+**Negative-controlled twice** — removing `class:active` and changing the tag substitution from a
+space to the empty string each turned the suite red, and each was restored. The Svelte MCP autofixer
+reported no issues on `NotesPane`; its one substantive suggestion (state assigned inside `$effect`)
+led to collapsing the rows and their note id into a single `$state.raw` value so the two cannot
+drift. **Not run:** the full gate, and no browser — the panel has not been seen rendered.
+
 ### 2026-08-14 21:05 EDT — the second chat column follows its own messages
 
 **Runtime impact: yes.** The extra chat column now scrolls to new messages. On

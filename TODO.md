@@ -44,8 +44,8 @@ gate blocks a merge. Note that `main` auto-deploys, which is exactly why this ma
 ESLint reached the room for the first time on 2026-08-14 and reported 123 problems. All are
 resolved; `pnpm lint` exits 0 and the room step of `quality.yml` is green.
 
-**Five of them were not lint problems. Two turned out to be redundancy and are now removed; three
-are genuine missing behaviour and are open.**
+**Five of them were not lint problems. Two turned out to be redundancy and were removed; three were
+genuine missing behaviour and are now all three built.**
 
 ### Closed — they were second sources of truth, not missing features
 
@@ -67,62 +67,52 @@ four conditions, its OWN `extraChatScrollingUp` flag, and its own effect rather 
 columns, so a reader scrolled up in one is not yanked by traffic in the other. Four assertions in
 `extra-chat-column-contract.test.ts`, negative-controlled by passing the wrong column's flag.
 
-### Open — real behaviour that is not implemented
+### Closed 2026-08-14 22:03 — note Version History is reachable, and it is the LAST of the five
 
-| where | what is missing |
-| --- | --- |
-| `+page.svelte` `loadNoteVersions` | Nothing calls it, and the route it fetches (`api/notes/[noteId]/versions`) is built and working. Note history is server-complete and client-unreachable. **This is the only remaining item that is a BUILD rather than a deletion — and the evidence blocking it is now DECODED, below.** |
+`loadNoteVersions` now has a consumer. All five gaps ESLint exposed are closed: two were redundancy
+and were removed, three were real behaviour and are built.
 
-Each is a behaviour change with a decision behind it, which is why none was made inside a lint pass.
+**The evidence turned out to be one file, not a bundle offset.** An earlier note here located the UI
+at `main.d6d3c112b59b7d0d.js` byte 1460764 and listed const indices 16, 17 and 21-25 as "the only
+remaining unknown". `docs/source/components/app-note.full.js` is that same component already
+extracted — 1287 readable lines including its whole `consts` table — and reading it end to end
+settled every open question at once, plus two the note had got wrong:
 
-#### The note-history UI, decoded 2026-08-14 21:12 — `main.d6d3c112b59b7d0d.js` byte 1460764
+- **No server action was needed.** The note said "`revertToVersion(v)` needs a server action; the
+  read route exists, the write does not." Both already existed: `restoreNoteVersion` in
+  `notes-repository.ts`, its Zod command, its form action at `+page.server.ts:706`, and tests. The
+  reference does not use a bespoke endpoint either — it reverts by writing the note back through the
+  ordinary `saveSessionNote`. **The whole feature was one client surface away from done.**
+- **The reference's history is `localStorage`, not a server.** `loadVersionsFromStorage` reads
+  `note_versions_${tab._id}` and `maxVersions = 3`. Ours is a room-scoped, presenter-gated table with
+  no cap — strictly stronger, and the reason our rows key on a primary key where the reference tracks
+  by `timestamp`.
 
-Read from the bundle so the build no longer waits on evidence. It lives in the note-editor modal
-region (its neighbours are `carouselModal` and `fileBrowserModal`).
+Built from that file and nothing else: consts 13 and 16-25 for every class, `C0e` for the toggle
+(absent rather than disabled when there is no history, label carrying the count, `active` while
+open), `w0e` for the panel as a SIBLING of the button bar, `S0e` for a row, and the five
+`.version-history-panel` rules transcribed value for value from `app-note.component.css`.
 
-**The toggle — `C0e`:**
+**Two deliberate divergences, both recorded in the code:**
 
-```js
-d(0,"button",16), x("click", () => toggleVersionHistory()), T(1,"i",17), v(2)
-// update: Et("active", e.showVersionHistory), Ne(" Version History (", e.prevVersions.length, ") ")
-```
+1. The preview goes through `safeNoteHtml`, not the reference's `noSanitize` → `innerHTML`. Its
+   `getVersionPreview` strips tags with a regex, which leaves entity-encoded markup completely
+   intact — that string is not sanitised and was never meant to be.
+2. The panel's state lives in `NotesPane`, not `NoteEditor`, because the editor sits inside a
+   `{#key}` on `updatedAt` and its own three-second autosave changes `updatedAt`. State kept in the
+   editor would close the panel under a presenter mid-read.
 
-So: one button carrying an `active` class while open, and a label that PRINTS THE COUNT —
-`Version History (3)`. The count comes from `prevVersions.length`, which is what
-`loadNoteVersions` already returns.
+`note-version-history.test.ts` — 17 assertions pinning BOTH halves, what the capture contains and
+what we render. Negative-controlled twice: removing `class:active` and changing the tag substitution
+from a space to the empty string each turned it red.
 
-**One row per version — `S0e`, tracked by `b0e = (t, n) => n.timestamp`:**
+**Still open in the same file, and NOT built:** the reference's `T0e` also renders an **Edit
+Carousel** button (const 14, `fas fa-images`) when `carouselInNote` is true, which calls
+`editCarousel()` to reopen an existing carousel for editing. Ours can insert a carousel but not
+re-open one. That is a separate gap, evidenced and unbuilt.
 
-```js
-d(0,"li",21)(1,"div")(2,"span",22), v(3),        // the date
-T(4,"div",23), Je(5,"noSanitize"),               // the preview, innerHTML
-d(6,"button",24), x("click", () => revertToVersion(o)), T(7,"i",25), v(8," Revert ")
-// update: Ze(e.date), z("innerHTML", Ct(5, 2, i.getVersionPreview(e.content), "html"), wn)
-```
-
-**What that settles, and what it does not:**
-
-- Each version carries `date`, `content` and `timestamp` (the track key). Our route already returns
-  a version list — check its field names against these three before writing the markup.
-- The preview is `getVersionPreview(content)` piped through `noSanitize` into `innerHTML`. **Ours
-  must go through `safeChatHtml` instead** — `noSanitize` is the reference handing raw stored HTML
-  to the DOM, and this repository already refuses that everywhere else.
-- `revertToVersion(v)` needs a server action; the read route exists, the write does not.
-- Const indices 16, 17, 21-25 still need decoding from the note-editor component's own `consts`
-  table for the exact classes and icons. That is the only remaining unknown.
-
---- | --- |
-| `+page.svelte` `extraChatColumnWasEnabled` | **Written, never read.** The capture quoted eighteen lines above it restores the column with `extraChatColumnWasEnabled && (preferences.extraChatColumn = !0, …)`. Only the assignment exists here, so a column hidden by webinar mode never comes back when webinar mode ends. |
-| `+page.svelte` `extraChatScroller` | Handed back by `onscrollerready` and read by nothing, so the extra chat column has no programmatic scroll while the main chat does. |
-| `+page.svelte` `loadNoteVersions` | Nothing calls it, and the route it fetches (`api/notes/[noteId]/versions`) is real and already built. Note history is server-complete and client-unreachable. |
-| `+page.svelte` `muted` | Written by `setMasterVolume`, read by nobody — every consumer derives `volume === 0` instead. Two sources of truth for one fact. |
-| `ExtraChatPane` `isPresenter` | Declared in `Props`, passed by the parent, read by no line of the component — the same shape as the controller's `markUnwired`. |
-
-Each needs a decision, not a deletion: implement the missing half, or remove the symbol AND its
-writer. **That is a behaviour change and does not belong inside a lint pass**, which is why all five
-are here.
-
---- | --- | --- |
+| count | rule | what they were |
+| --- | --- | --- |
 | 8 | `@typescript-eslint/no-unused-vars` | unused imports and locals; **check each** — one in the controller turned out to be a prop passed at six sites and read nowhere |
 | 13 | `svelte/no-unused-svelte-ignore` | stale `svelte-ignore` comments; the Svelte MCP autofixer flags the same ones |
 | 5 | `no-useless-assignment` | initialisers that can never be read |

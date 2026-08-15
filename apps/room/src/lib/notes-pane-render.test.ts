@@ -7,8 +7,10 @@ import type { RoomNote } from './types';
 const callbacks = {
   onCreate: () => undefined,
   onDelete: () => undefined,
+  onLoadVersions: async () => [],
   onNewNoteOpenChange: () => undefined,
   onRename: () => undefined,
+  onRestoreVersion: () => undefined,
   onSave: () => undefined,
   onSetWelcomeMat: () => undefined,
   onUploadImages: async () => []

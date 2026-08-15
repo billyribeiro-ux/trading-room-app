@@ -18,6 +18,9 @@
   import BootboxDialog from '$lib/components/BootboxDialog.svelte';
   import EmojiPicker from '$lib/components/EmojiPicker.svelte';
   import GiphyPicker from '$lib/components/GiphyPicker.svelte';
+  import type { NoteVersion } from '$lib/types';
+  import { safeNoteHtml } from './safe-html';
+  import { noteVersionDate, noteVersionPreview } from './version-history';
 
   type ToolbarMenu =
     'align' | 'color' | 'emoji' | 'font' | 'fontSize' | 'lineHeight' | 'style' | 'table';
@@ -40,9 +43,25 @@
     readonly onBringEveryone: () => void;
     readonly onDirtyChange: (dirty: boolean) => void;
     readonly onDone: () => void;
+    /*
+      The revert is REQUESTED here and confirmed by the pane, exactly as `onSetWelcomeMat` is.
+      `revertToVersion` in the reference opens a `bootbox.confirm` before it touches anything, and
+      every other destructive note action in this app raises that dialog from `NotesPane`.
+    */
+    readonly onRequestRestore: (version: NoteVersion) => void;
     readonly onSave: (contentHtml: string) => void | Promise<void>;
     readonly onSetWelcomeMat: (allRooms: boolean) => void;
     readonly onUploadImages: (files: readonly File[]) => Promise<readonly string[]>;
+    /*
+      The panel's open state and its list both live in `NotesPane`, not here.
+
+      This component is re-created whenever the note's `updatedAt` changes — that is what the
+      `{#key}` around it is for — and the three-second autosave changes `updatedAt`. State kept
+      here would therefore close the panel underneath a presenter who is reading it.
+    */
+    readonly onVersionHistoryOpenChange: (open: boolean) => void;
+    readonly showVersionHistory: boolean;
+    readonly versions: readonly NoteVersion[];
   }
 
   let {
@@ -52,9 +71,13 @@
     onBringEveryone,
     onDirtyChange,
     onDone,
+    onRequestRestore,
     onSave,
     onSetWelcomeMat,
-    onUploadImages
+    onUploadImages,
+    onVersionHistoryOpenChange,
+    showVersionHistory,
+    versions
   }: Props = $props();
 
   const componentId = $props.id();
@@ -612,10 +635,81 @@
     <button class="btn btn-success text-center m-1" type="button" onclick={onBringEveryone}
       ><i class="fas fa-eye"></i> Bring Everyone here
     </button>
+    <!--
+      `C0e` in `docs/source/components/app-note.full.js`, rendered by `T0e` only when
+      `prevVersions.length > 0` — a note with no history offers no button at all, rather than a
+      disabled one. Consts 16 and 17 of that component's own table give the classes and the icon;
+      the label carries the count, and `active` tracks the open panel.
+
+      WHEN that becomes non-empty differs from the reference, and only in our favour: it stores the
+      content a version is replacing, so nothing exists until a second edit, while `saveNote` here
+      writes a row on every save including the first.
+    -->
+    {#if versions.length > 0}
+      <button
+        class="btn btn-warning text-center m-1"
+        class:active={showVersionHistory}
+        type="button"
+        onclick={() => onVersionHistoryOpenChange(!showVersionHistory)}
+        ><i class="fas fa-history"></i> Version History ({versions.length})
+      </button>
+    {/if}
     <button class="btn btn-primary text-center m-1" type="button" onclick={() => void done()}
       ><i class="fas fa-check"></i> {saving ? 'Saving…' : 'Done'}
     </button>
   </div>
+
+  <!--
+    `w0e`, a SIBLING of the button bar rather than a child of it: the reference closes the bar with
+    a double `u()()` before declaring this panel. Consts 13 and 18-25 give every class below.
+  -->
+  {#if showVersionHistory}
+    <div class="version-history-panel card mt-2 mb-2">
+      <div class="card-header">
+        <strong><i class="fas fa-history"></i> Previous Versions</strong>
+        <button
+          type="button"
+          class="close float-right"
+          aria-label="Close version history"
+          onclick={() => onVersionHistoryOpenChange(false)}
+        >
+          <span>×</span>
+        </button>
+      </div>
+      <ul class="list-group list-group-flush">
+        <!--
+          Keyed on the row id. The reference tracks by `timestamp` because its versions are
+          localStorage objects with no identity of their own; ours are rows, so the primary key is
+          the same idea said properly.
+        -->
+        {#each versions as version (version.id)}
+          <li class="list-group-item d-flex justify-content-between align-items-center">
+            <div>
+              <span class="badge bg-secondary text-light">{noteVersionDate(version.createdAt)}</span
+              >
+              <!--
+                The reference pipes this preview through `noSanitize` into `innerHTML`. We do not:
+                `noteVersionPreview` strips tags with a regex, which leaves entity-encoded markup
+                untouched, so the string still reaches the DOM through the allowlist every other
+                note body uses. Same rendering for real content, and no path for the other kind.
+              -->
+              <div
+                class="version-preview"
+                {@attach safeNoteHtml(noteVersionPreview(version.contentHtml ?? ''))}
+              ></div>
+            </div>
+            <button
+              class="btn btn-sm btn-outline-primary"
+              type="button"
+              onclick={() => onRequestRestore(version)}
+            >
+              <i class="fas fa-undo"></i> Revert
+            </button>
+          </li>
+        {/each}
+      </ul>
+    </div>
+  {/if}
 
   <div id={`summernoteEdit-${noteId}`} class="note-view" hidden></div>
   <div
@@ -1419,5 +1513,42 @@
     margin-bottom: 12px;
     padding-bottom: 12px;
     border-bottom: 1px solid #ddd;
+  }
+
+  /*
+    Transcribed from `docs/source/components/app-note.component.css`, which is this component's own
+    stylesheet in the reference. Those five rules are the last five in that file, written there with
+    Angular's `[_ngcontent-%COMP%]` scoping — the same component scoping Svelte gives a `<style>`
+    block, so they are reproduced value for value with the attribute selectors dropped.
+
+    `max-height` plus `overflow-y` is what makes the panel a scroller rather than a page-pusher; the
+    preview's three ellipsis properties are what keep a long note to a single line.
+  */
+  .version-history-panel {
+    max-height: 300px;
+    overflow-y: auto;
+    border: 1px solid #ddd;
+  }
+
+  .version-history-panel .card-header {
+    padding: 0.5rem 1rem;
+    background-color: #f8f9fa;
+  }
+
+  .version-history-panel .version-preview {
+    max-width: 400px;
+    overflow: hidden;
+    color: #666;
+    font-size: 0.85em;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .version-history-panel .list-group-item {
+    padding: 0.5rem 1rem;
+  }
+
+  .version-history-panel .list-group-item:hover {
+    background-color: #f8f9fa;
   }
 </style>

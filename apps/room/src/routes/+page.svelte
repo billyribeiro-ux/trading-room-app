@@ -8520,11 +8520,12 @@
   }
 
   /*
-    NOTHING CALLS THIS, and the route it fetches (`api/notes/[noteId]/versions`) is real. So the
-    note-history feature is server-complete and client-unreachable. Recorded in TODO.md rather than
-    deleted: the endpoint is the expensive half and it already exists.
+    Read by `NotesPane` while a presenter has the editor open, to fill the Version History panel.
+
+    A plain GET rather than `submitNoteMutation`: this changes nothing, so it must not go through
+    `invalidateAll()` — doing so would re-run every load function on the page each time a panel
+    was opened, and the route already answers with exactly the rows the panel needs.
   */
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async function loadNoteVersions(noteId: number): Promise<readonly NoteVersion[]> {
     const response = await fetch(`/api/notes/${noteId}/versions`);
     if (!response.ok) {
@@ -11283,9 +11284,13 @@
                         onDelete={async (noteId) => {
                           await submitNoteMutation('deleteSessionNoteTab', { noteId });
                         }}
+                        onLoadVersions={loadNoteVersions}
                         onNewNoteOpenChange={(open) => (newNoteOpen = open)}
                         onRename={async (noteId, newName) => {
                           await submitNoteMutation('renameSessionNoteTab', { noteId, newName });
+                        }}
+                        onRestoreVersion={async (noteId, versionId) => {
+                          await submitNoteMutation('restoreNoteVersion', { noteId, versionId });
                         }}
                         onSave={async (noteId, contentHtml) => {
                           await submitNoteMutation('saveSessionNote', { noteId, contentHtml });
