@@ -70,10 +70,8 @@ export default defineConfig(
     'css/**',
     'emojis/**'
   ]),
-  js.configs.recommended,
-  ts.configs.recommended,
-  svelte.configs.recommended,
   {
+    files: ['src/**/*.{js,mjs,ts,svelte}', 'scripts/**/*.mjs'],
     languageOptions: {
       globals: {
         ...globals.browser,
@@ -111,6 +109,9 @@ export default defineConfig(
       'svelte/prefer-svelte-reactivity': 'off'
     }
   },
+  js.configs.recommended,
+  ts.configs.recommended,
+  svelte.configs.recommended,
   {
     /*
       The browser-console collectors run pasted into a live page, not under Node. They legitimately
