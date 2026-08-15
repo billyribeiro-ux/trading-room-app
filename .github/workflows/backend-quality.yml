@@ -366,8 +366,9 @@ jobs:
           MIGRATE_DATABASE_URL: postgres://ptr_clone:ptr_clone_local_development_password@127.0.0.1:5432/ptr_clone
           # `tradingroom_app` for the same reason as the job-level URL above: the
           # 5433 cluster has the migration chain applied to it too (see "Apply the
-          # same chain to the independent negative-control cluster"), so its runtime
-          # role has been renamed as well.
+          # same chain to the independent negative-control cluster"), so `0009` has
+          # provisioned the runtime role there as well. Not renamed — ADDED beside
+          # the baseline role, which is what makes the chain re-appliable at all.
           #
           # It matters MORE here than anywhere else. This step asserts a specific
           # failure — `[target_cluster_mismatch]` on stderr — and a connection that

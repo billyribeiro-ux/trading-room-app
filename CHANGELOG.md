@@ -24,6 +24,90 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-15
 
+### 2026-08-15 16:45 EDT — The attestor refused a two-role tenant policy, and it was right: `0009` now retargets instead of appending
+
+**Branch `fix/backout-0009-nonconvergent`, not merged.** **Runtime impact: none yet** — no database
+outside the scratch verification clusters has run this. It changes what the next migration run does.
+
+**What went red.** The full backend gate on `main` (run `31905657116`, merge commit `c83f0f1`) got
+further than it ever had: provisioning, the chain on both clusters, the two-tenant fixture, `fmt`,
+clippy and **the entire Rust suite passed for the first time**. It then failed at the next step:
+
+```
+postgres release attestation failed: [room_events_policy_mismatch]
+public.room_events must have exactly the reviewed tenant policy targeted only to the runtime role
+```
+
+**Why.** `0009_provision_tradingroom_app.sql` **appended** `tradingroom_app` to all 22 RLS policies
+without removing `ptr_clone_app`, so every tenant policy named two roles. The attestor requires the
+`room_events` policy to target exactly one. The migration's own parity assertion was satisfied —
+it compared counts, and both roles had 22 — so nothing upstream caught it.
+
+**The fix, and why it is not the obvious one.** The obvious fix is to teach the attestor to accept
+both names during the transition, and `tests/migrations.rs` had already been changed that way. That
+was wrong twice over: a two-role tenant policy is precisely the state that assertion exists to
+refuse, and `ptr_clone_app` still exists on every cluster, so tolerating it would let a connection
+as the un-cut-over baseline role attest as the runtime role.
+
+The migration was corrected instead. It now **retargets** each policy onto the runtime role alone.
+This works because of a distinction the withdrawn rename got wrong: **roles are cluster-global,
+policies are per-database.** `0001` re-creates every policy naming the baseline role on each new
+database, and `0009` retargets it there too — identical end state, every time. Retargeting a policy
+costs nothing on the next database; renaming a role broke it. So `0009` adds the role beside the
+baseline and retargets the policies: two different actions, for two different scopes.
+
+It is also the safer end state. `ptr_clone_app` keeps its object privileges but is named by no
+policy, so under `FORCE ROW LEVEL SECURITY` it reads **zero rows** from all 22 tenant tables while
+it waits to be retired.
+
+**The consequence that had to be chased down.** Six integration test files carried a hardcoded
+fallback `DATABASE_URL` naming `ptr_clone_app`, used only when the variable is unset. CI always sets
+it, so the fallback was invisible there — but after this change a local run through it connects as a
+role no policy names and reads zero rows, and the tenancy suite would have reported a broken tenancy
+kernel when the kernel was fine. All six now name the runtime role, matching CI.
+
+`tenancy.rs` needed one more: `an_owner_cannot_impersonate_the_runtime_role_with_session_authorization`
+was impersonating `ptr_clone_app`. Left alone it would have stayed green while no longer covering
+the role its own name claims. It now assumes `tradingroom_app`.
+
+**Verified on real PostgreSQL 17** — two scratch clusters, CI's exact step order, nothing mocked:
+
+| check | result |
+| --- | --- |
+| policy targets after the chain | 0 name `ptr_clone_app`, 22 name `tradingroom_app`, **0 name both** |
+| `room_events` specifically | `{tradingroom_app}` — what the attestor demands |
+| convergence, 2nd database, same cluster | `{tradingroom_app}` — identical |
+| the attestation that failed on `main` | **`status = pass`**, `roles = ['tradingroom_app']` |
+| full API suite (17 targets) | **294 passed, 0 failed** |
+| `cargo fmt` / clippy `-D warnings` | clean |
+| cross-cluster negative control | fails correctly with `[target_cluster_mismatch]` |
+
+**Both negative controls were run, because an assertion never seen to fail is not a test:**
+
+- Widening `room_events` back to `{ptr_clone_app,tradingroom_app}` — reproducing exactly what `main`
+  had — made the attestor fail with `[room_events_policy_mismatch]`. The check is real, and it is
+  what caught this.
+- A sabotaged copy of `0009` with the `ALTER POLICY` removed failed with its own new message:
+  `RLS retarget incomplete: 1 policies still name ptr_clone_app`.
+- Re-running the real `0009` over the widened policy **healed** it back to `{tradingroom_app}` and
+  the attestation passed again — so it repairs drift, not just fresh installs.
+
+**Provenance.** Eleven `services/**` files changed. Three were already individually pinned and were
+repinned after reviewing each diff; the other eight left the sealed aggregate for their own pins
+with the reason recorded beside each hash, dropping `EXPECTED_UNTOUCHED_COUNT` 83 → 75. No file
+became unsealed — the seal moved from the aggregate to its own line. Verified: every modified
+`services/` file is individually pinned, so no file remaining in the aggregate changed.
+
+**Also corrected, all of it prose that had gone false:** the attestor's comment still described the
+withdrawn rename ("a renamed role keeps its policies"); `ATTESTED_MIGRATION_VERSIONS` still credited
+slot 9 to `0009_rename_runtime_roles`; the CI workflow said the negative-control cluster's role "has
+been renamed"; and three stacked count-comments in the provenance seal disagreed with the constant
+beneath them. `compose.yml` now passes `POSTGRES_RUNTIME_USER` / `POSTGRES_RUNTIME_PASSWORD`
+through — both are documented in `.env.example` and until now nothing read them locally.
+
+**Not done:** retiring `ptr_clone_app` (deferred until the cutover is proven in a real deployment),
+and the owner role / database rename `ptr_clone` → `tradingroom`. Both remain in `TODO.md`.
+
 ### 2026-08-15 15:25 EDT — The remote-function conversion, finished — and the guard that says I finished it twice wrongly
 
 **Branch `feat/extra-chat-column`, not merged.** Five commits: `3046973`, `0d41993`, `99f37f2`, plus

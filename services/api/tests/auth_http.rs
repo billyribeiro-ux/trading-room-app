@@ -24,7 +24,7 @@ const TEST_PASSWORD_HASH: &str = "$argon2id$v=19$m=19456,t=2,p=1$EJefu4A54Tj4roA
 
 fn database_url() -> String {
     std::env::var("DATABASE_URL").unwrap_or_else(|_| {
-        "postgres://ptr_clone_app:ptr_app_local_dev@127.0.0.1:5432/ptr_clone".into()
+        "postgres://tradingroom_app:ptr_app_local_dev@127.0.0.1:5432/ptr_clone".into()
     })
 }
 

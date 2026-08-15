@@ -821,9 +821,28 @@ async function verifyContract() {
   if (/\bdocker build\s/.test(buildScript)) {
     fail('release artifacts must use the explicitly selected Buildx builder');
   }
-  const evaluatorStart = buildScript.indexOf(
-    'node "${repository_root}/scripts/verify-api-release-artifact.mjs" --evaluate'
-  );
+  /*
+    The invocation moved behind a `verifier` variable on 2026-08-15, so this anchor moved with it.
+
+    The old anchor pinned a path — `${repository_root}/scripts/…` — that has never existed in this
+    repository. The script came from the sibling, where `scripts/` sits at the root, and moving it
+    under `apps/controller/` invalidated the path without changing the name. Nothing caught it
+    because the build script's evaluator line was never reached: the backend gate died at an earlier
+    step every time, and this contract check was asserting the presence of a string that named a
+    file Node could not load.
+
+    Anchoring on the variable alone would pin less than before, so the assignment is asserted
+    separately below. Together they pin the same two facts the original did — WHICH script is
+    invoked, and that all four reports are passed to it in one bounded invocation.
+  */
+  if (
+    !buildScript.includes(
+      'verifier="${repository_root}/apps/controller/scripts/verify-api-release-artifact.mjs"'
+    )
+  ) {
+    fail('build script must resolve the release-policy evaluator from apps/controller/scripts');
+  }
+  const evaluatorStart = buildScript.indexOf('node "${verifier}" --evaluate');
   const evaluatorEnd = buildScript.indexOf('policy_status=$?', evaluatorStart);
   if (evaluatorStart === -1 || evaluatorEnd === -1) {
     fail('build script does not contain the bounded release-policy evaluator invocation');

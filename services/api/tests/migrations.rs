@@ -33,7 +33,7 @@ const MIGRATE_MODULE_SOURCE: &str = include_str!("../src/db/migrate.rs");
 
 fn runtime_url() -> String {
     std::env::var("DATABASE_URL").unwrap_or_else(|_| {
-        "postgres://ptr_clone_app:ptr_app_local_dev@127.0.0.1:5432/ptr_clone".into()
+        "postgres://tradingroom_app:ptr_app_local_dev@127.0.0.1:5432/ptr_clone".into()
     })
 }
 
@@ -675,11 +675,20 @@ async fn the_baseline_applies_cleanly_to_an_empty_database() {
     .expect("read room_events policy roles");
     assert_eq!(
         policy_roles,
-        // BOTH during the transition. `0009_provision_tradingroom_app.sql` adds the runtime role to
-        // every policy WITHOUT removing the baseline role, because `0001` re-creates the baseline
-        // role on every new database and a policy that stopped naming it would silently deny it.
-        // The retirement migration that drops `ptr_clone_app` is what reduces this to one name.
-        ["ptr_clone_app", migrate::EXPECTED_RUNTIME_ROLE],
+        // EXACTLY ONE name, and it is the runtime role.
+        //
+        // An earlier revision of this assertion expected BOTH names, because `0009` appended the
+        // runtime role rather than retargeting, and the comment here argued that a policy which
+        // stopped naming `ptr_clone_app` would "silently deny" it. That reasoning was backwards on
+        // both counts. Denying the baseline role is the POINT — nothing connects as it after
+        // cutover, and a role named by no policy reads zero rows under FORCE ROW LEVEL SECURITY,
+        // which is the safe direction. And appending was not even convergent-neutral: it produced a
+        // two-role tenant policy, which `postgres-release-attestation` rejects outright with
+        // `room_events_policy_mismatch`.
+        //
+        // Retargeting is convergent because policies are PER-DATABASE: `0001` re-creates each one
+        // naming the baseline role on every new database, and `0009` retargets it there too.
+        [migrate::EXPECTED_RUNTIME_ROLE],
         "the outbox policy must apply to exactly the runtime roles, and no others"
     );
 

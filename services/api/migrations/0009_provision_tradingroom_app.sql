@@ -21,8 +21,11 @@
 -- is faithful. `ptr_clone_app` therefore stays in the migration TEXT permanently while the live role
 -- becomes `tradingroom_app`. `ops/naming-provenance.md` records that mapping.
 --
--- So: ADD, never rename. This migration is convergent - `0001` re-creating `ptr_clone_app` on the
--- next database is harmless, because nothing here depends on that role being absent.
+-- So: ADD the role, never rename it. This migration is convergent - `0001` re-creating
+-- `ptr_clone_app` on the next database is harmless, because nothing here depends on that role being
+-- absent. Note the asymmetry, which is the whole lesson: ROLES are cluster-global and are therefore
+-- added beside the baseline, while POLICIES are per-database and are therefore RETARGETED onto the
+-- runtime role alone. Both halves reach the same end state on every database. See the policy block.
 --
 -- ## Why catalogue-driven rather than a list
 --
@@ -171,15 +174,43 @@ BEGIN
 END
 $$;
 
--- RLS policy membership.
+-- RLS policy membership: RETARGET, not append.
 --
 -- The half that grants alone cannot buy. A policy names its roles; a role no policy names gets
--- nothing under FORCE ROW LEVEL SECURITY. `ALTER POLICY ... TO` REPLACES the role list, so the
--- existing roles are read back and the new one appended - never assumed to be a single name.
+-- nothing under FORCE ROW LEVEL SECURITY.
+--
+-- Each policy is retargeted to the runtime role ALONE, and the baseline role is dropped from it.
+-- Two reasons, and the first is a contract this repository already enforces:
+--
+--   * `postgres-release-attestation` requires the tenant policy to target ONLY the runtime role -
+--     `[room_events_policy_mismatch] public.room_events must have exactly the reviewed tenant policy
+--     targeted only to the runtime role`. An earlier draft of this migration appended instead of
+--     replacing, and that check caught it on CI. Widening a policy to two roles to make a migration
+--     easier is exactly the kind of quiet weakening that assertion exists to refuse.
+--   * It is strictly safer. After this runs, `ptr_clone_app` holds object privileges but is named by
+--     no policy, so under FORCE ROW LEVEL SECURITY it reads zero rows from every tenant table. The
+--     baseline role becomes inert with respect to tenant data while it waits to be retired.
+--
+-- This is still convergent, and the reason is worth stating because it is the exact distinction the
+-- withdrawn rename got wrong: POLICIES ARE PER-DATABASE OBJECTS, roles are cluster-global. On every
+-- new database `0001` re-creates each policy targeting the baseline role and this migration
+-- retargets it, reaching the identical end state every time. Retargeting a policy costs nothing on
+-- the next database; renaming a role broke it.
 DO $$
 DECLARE
   entry record;
+  expected_policies bigint;
+  targeted_policies bigint;
+  residual_policies bigint;
 BEGIN
+  -- Counted BEFORE the loop, and counted over EITHER role, which is what makes the assertion below
+  -- hold identically on a first run and on a re-run. On a fresh database this is the 22 policies
+  -- `0001` created naming the baseline role; on a re-run it is the same 22, already retargeted.
+  SELECT count(*) INTO expected_policies
+    FROM pg_catalog.pg_policy AS policy
+   WHERE 'ptr_clone_app'::regrole::oid   = ANY (policy.polroles)
+      OR 'tradingroom_app'::regrole::oid = ANY (policy.polroles);
+
   FOR entry IN
     SELECT policy.polname                         AS policy_name,
            policy.polrelid::regclass              AS relation_name,
@@ -195,19 +226,34 @@ BEGIN
     GROUP BY policy.polname, policy.polrelid
     ORDER BY 2, 1
   LOOP
-    IF NOT ('tradingroom_app' = ANY (entry.role_names)) THEN
-      EXECUTE format('ALTER POLICY %I ON %s TO %s',
+    -- Idempotent: a policy already targeting exactly the runtime role is left alone, so a re-run
+    -- and a second database both reach the same place without churning the catalogue.
+    IF entry.role_names <> ARRAY['tradingroom_app'::name] THEN
+      EXECUTE format('ALTER POLICY %I ON %s TO %I',
                      entry.policy_name,
                      entry.relation_name,
-                     array_to_string(
-                       -- `::name` is load-bearing: without the cast PostgreSQL reads the right
-                       -- operand of `||` as an ARRAY LITERAL and fails with
-                       -- "malformed array literal", rather than appending one element.
-                       ARRAY(SELECT quote_ident(role_name)
-                             FROM unnest(entry.role_names || 'tradingroom_app'::name) AS role_name),
-                       ', '));
+                     'tradingroom_app');
     END IF;
   END LOOP;
+
+  SELECT count(*) FILTER (WHERE 'tradingroom_app'::regrole::oid = ANY (policy.polroles)),
+         count(*) FILTER (WHERE 'ptr_clone_app'::regrole::oid   = ANY (policy.polroles))
+    INTO targeted_policies, residual_policies
+    FROM pg_catalog.pg_policy AS policy;
+
+  -- FAIL LOUD, and the residual check is the one that matters. A policy still naming the baseline
+  -- role is a two-role tenant policy, which is exactly what `postgres-release-attestation` refuses
+  -- with `room_events_policy_mismatch`. Catching it here means the migration refuses to commit
+  -- rather than leaving a widened boundary for the attestation step to discover later.
+  IF residual_policies <> 0 THEN
+    RAISE EXCEPTION 'RLS retarget incomplete: % policies still name %. A tenant policy naming two roles is a widened boundary',
+      residual_policies, 'ptr_clone_app';
+  END IF;
+
+  IF targeted_policies <> expected_policies THEN
+    RAISE EXCEPTION 'RLS retarget incomplete: % of % policies name %. A role no policy names sees nothing under FORCE ROW LEVEL SECURITY',
+      targeted_policies, expected_policies, 'tradingroom_app';
+  END IF;
 END
 $$;
 
@@ -223,7 +269,6 @@ DECLARE
   target_relations  bigint;
   source_columns    bigint;
   target_columns    bigint;
-  source_policies   bigint;
   target_policies   bigint;
   bypasses_rls      boolean;
   memberships       bigint;
@@ -245,9 +290,11 @@ BEGIN
     CROSS JOIN LATERAL aclexplode(attribute.attacl) AS acl
    WHERE schema_entry.nspname = 'public';
 
-  SELECT count(*) FILTER (WHERE 'ptr_clone_app'::regrole::oid   = ANY (policy.polroles)),
-         count(*) FILTER (WHERE 'tradingroom_app'::regrole::oid = ANY (policy.polroles))
-    INTO source_policies, target_policies
+  -- Policies are asserted in the retarget block above, not here: after retargeting, the baseline
+  -- role is named by ZERO policies, so comparing the two counts would compare 0 against 22 and
+  -- fail on a correct migration. Read here only for the NOTICE.
+  SELECT count(*) FILTER (WHERE 'tradingroom_app'::regrole::oid = ANY (policy.polroles))
+    INTO target_policies
     FROM pg_catalog.pg_policy AS policy;
 
   IF target_relations <> source_relations THEN
@@ -258,11 +305,6 @@ BEGIN
   IF target_columns <> source_columns THEN
     RAISE EXCEPTION 'column privilege parity incomplete: % has %, % has %. On users, enterprises and refresh_tokens the column grant IS the tenant boundary',
       'ptr_clone_app', source_columns, 'tradingroom_app', target_columns;
-  END IF;
-
-  IF target_policies <> source_policies THEN
-    RAISE EXCEPTION 'RLS policy parity incomplete: % is named by % policies, % by %. A role no policy names sees nothing under FORCE ROW LEVEL SECURITY',
-      'ptr_clone_app', source_policies, 'tradingroom_app', target_policies;
   END IF;
 
   SELECT rolbypassrls INTO bypasses_rls

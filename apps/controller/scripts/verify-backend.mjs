@@ -93,7 +93,7 @@ const REVIEWED_FORWARD_MIGRATIONS = Object.freeze([
   */
   Object.freeze({
     path: 'services/api/migrations/0009_provision_tradingroom_app.sql',
-    sha256: '1e176015ddefd91595fe48b549fd0582f9ff30efcb808cd8e4e78a68cbdf5b23'
+    sha256: '20b95d68bac75a698fa4e90502c2e54cc88d475d8b92bc4aada946a57700ce9c'
   })
 ]);
 
