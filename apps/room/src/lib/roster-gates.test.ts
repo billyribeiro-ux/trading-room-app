@@ -417,10 +417,26 @@ describe('the sidebar renders what the gates decide', () => {
   });
 
   it('is rendered by the page, and handed the gates it renders from', () => {
-    expect(pageSource).toContain('<RoomSidebar');
-    expect(pageSource).toContain('{rosterVisible}');
-    expect(pageSource).toContain('{rosterCountVisible}');
-    expect(pageSource).toContain('{rowVisible}');
+    /*
+      READS THE PAGE ITSELF, inside this block, and that is not a style choice.
+
+      When `.room-sidebar` moved to a component every gate assertion above followed it, which left
+      this file with no positive claim about `+page.svelte` — so `source-size-contract.test.ts`
+      requires one, for the failure mode where a guard is green because the feature LEFT rather than
+      because it still holds. The first version of this assertion read a module-scope
+      `const pageSource`, and a merge from `main` deleted that declaration while keeping this usage:
+      `svelte-check` went red on CI with "Cannot find name 'pageSource'" against a merge commit that
+      exists nowhere in this branch, so the branch itself checked clean.
+
+      Declared here, the assertion carries its own reader and cannot be decapitated by a merge that
+      touches lines it does not own. The CHANGELOG lost two entries to the same mechanism earlier
+      today; this is the shape that survives it.
+    */
+    const page = readFileSync(new URL('../routes/+page.svelte', import.meta.url), 'utf8');
+    expect(page).toContain('<RoomSidebar');
+    expect(page).toContain('{rosterVisible}');
+    expect(page).toContain('{rosterCountVisible}');
+    expect(page).toContain('{rowVisible}');
   });
 
   it('applies both roster gates, not just the outer one', () => {
