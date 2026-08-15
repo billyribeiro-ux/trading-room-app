@@ -107,7 +107,7 @@ describe('alerts toolbar: what each state renders', () => {
     expect(archive).toBeGreaterThan(presenterGate);
   });
 
-  it('fills the right-hand div with the Advanced Search link, and only that one', () => {
+  it('fills the right-hand div with Filter alerts and Advanced Search, in that order', () => {
     // The capture declares two buttons for this slot, const 38/44 (#alert-filter-modal, gated on
     // `sessData.modAlertFilterList`) and const 39 (#alerts-advanced-search-modal).
     expect(component).toContain('alert-filter-modal');
@@ -116,14 +116,63 @@ describe('alerts toolbar: what each state renders', () => {
     expect(markup).toContain('data-bs-target="#alerts-advanced-search-modal"');
     expect(markup).toContain('fas fa-search me-1');
     expect(markup).toContain('btn btn-outline-light btn-sm m-1');
+    // Const 45, the Filter alerts icon.
+    expect(markup).toContain('fas fa-filter me-1');
 
-    // Alert Filter is deliberately NOT here: it never rendered in either captured state of this
-    // toolbar, and putting both buttons in the slot wrapped them onto a second row - a layout the
-    // capture never produces. Its modal keeps a separate entry point (const 8/21, the
-    // `badge.filtered-text` in the alerts header), which is recorded as open work.
     const row = markup.slice(markup.indexOf('{#if alertsToolbarExtended}'));
-    const slotEnd = row.indexOf('id="alert-settings"');
-    expect(row.slice(0, slotEnd)).not.toContain('data-bs-target="#alert-filter-modal"');
+    const slot = row.slice(0, row.indexOf('id="alert-settings"'));
+
+    /*
+      THE GATE IS THE WHOLE CONTRACT HERE, and this assertion replaced one that said the opposite.
+
+      Alert Filter never rendered in either captured state of this toolbar, and the earlier reading
+      of that was "leave the button out" - which put a real divergence in the room, because what
+      the captures actually show is a room with no `modAlertFilterList`. That is precisely the case
+      `alertFilterConfigured` is false in, so the gated button reproduces both captures exactly and
+      the ungated omission did not.
+
+      What must never come back is the button WITHOUT the gate: unconditional, it wraps the slot
+      onto a second row, a layout neither capture produces. So the gate is asserted to sit between
+      the row and the button rather than merely to exist somewhere in the file.
+    */
+    const gate = slot.indexOf('{#if alertFilterConfigured}');
+    const filterButton = slot.indexOf('data-bs-target="#alert-filter-modal"');
+    const advancedSearch = slot.indexOf('data-bs-target="#alerts-advanced-search-modal"');
+
+    expect(gate).toBeGreaterThan(-1);
+    expect(filterButton).toBeGreaterThan(gate);
+    // `H(5, N2e, …, "button", 38)` precedes `H(6, L2e, …, "button", 39)`.
+    expect(advancedSearch).toBeGreaterThan(filterButton);
+  });
+
+  it('puts the filtered badge in the alerts header, behind the conjunction gate', () => {
+    /*
+      `M2e`, const 21, and its gate at byte 2,056,460 of the v4 bundle:
+
+        O(6, sessData.modAlertFilterList && doFilteredAlerts ? 6 : -1)
+
+      TWO conditions, not one. A room that configured a list but whose reader has selected nobody
+      shows the toolbar button and NO badge — collapsing this to `alertFilterConfigured` would put
+      a permanent "filtered" badge on every such room, and collapsing it to the selection alone
+      would show it where the feature is switched off.
+    */
+    const header = markup.slice(markup.indexOf('alertHeader'));
+    const brandEnd = header.indexOf('</ul>');
+    const brand = header.slice(0, brandEnd);
+
+    expect(brand).toContain('{#if alertFilterActive}');
+    expect(brand).toContain('badge badge-danger ms-1 filtered-text');
+    expect(brand).toContain('title="Alert Filter"');
+
+    // Capture order inside the brand: H(6, M2e) "filtered" precedes H(7, A2e) "DND".
+    expect(brand.indexOf('{#if alertFilterActive}')).toBeLessThan(
+      brand.indexOf('{#if doNotDisturbOn}')
+    );
+
+    // The conjunction lives in the derived rather than the template, so assert it there.
+    expect(markup).toContain(
+      'const alertFilterActive = $derived(alertFilterConfigured && hasActiveAlertFilter(alertFilterFor))'
+    );
   });
 
   it('gates the inline-alert-entry checkbox on presenter and Detach on chat-only mode', () => {

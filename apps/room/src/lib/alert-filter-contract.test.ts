@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
   ALERT_FILTER_TITLE_SUFFIX,
@@ -227,5 +228,59 @@ describe('the row icon', () => {
     const selection: AlertFilterFor = { aaaa1111: 'Allison' };
     expect(traderRowIconClass(selection, 'aaaa1111')).toBe('fas me-1 fa-check-square text-success');
     expect(traderRowIconClass(selection, 'bbbb2222')).toBe('fas me-1 fa-square text-opacity');
+  });
+});
+
+/*
+  ALL THREE CALL SITES, because two of them are invisible in a screenshot.
+
+  `alert-filter.ts` documents a table of three, and the whole reason it is a table is that they are
+  not interchangeable. The paged log is the one anybody would find; the other two are the ones that
+  get dropped in a refactor and are never noticed:
+
+    - the LIVE arrival guard also suppresses the toast and the sound. Delete it and the room still
+      LOOKS filtered — the list is right — while popping and beeping for every alert the reader
+      asked not to see.
+    - the SEARCH results are a separate list entirely. Delete it and a filtered-out trader's alerts
+      come straight back through the advanced-search modal.
+
+  Asserted against the page source rather than by rendering, for the same reason the toolbar
+  contract is: the failure being guarded is a call site going missing, which is a property of the
+  source and survives no matter what the component tree looks like.
+*/
+describe('the filter is applied at all THREE sites, not just the visible one', () => {
+  const page = readFileSync(new URL('../routes/+page.svelte', import.meta.url), 'utf8');
+  const source = page.replace(/\/\*[\s\S]*?\*\//g, '').replace(/<!--[\s\S]*?-->/g, '');
+
+  const callSites = source.match(/alertPassesFilter\(/g) ?? [];
+
+  it('calls the shared predicate three times, never re-deriving it inline', () => {
+    expect(callSites).toHaveLength(3);
+    // The predicate itself must not be reimplemented at a call site: `showAlertsFrom ? … : …`
+    // against the selection map is the exact expression that has to live in one place.
+    expect(source).not.toContain('showAlertsFrom ? alertFilterFor[');
+  });
+
+  it('guards the live arrival BEFORE delivery, so a hidden alert makes no toast and no sound', () => {
+    const effect = source.slice(source.indexOf('const unseenAlerts'));
+    const body = effect.slice(0, effect.indexOf('$effect', 1));
+
+    const guard = body.indexOf('alertPassesFilter(');
+    const deliver = body.indexOf('deliverAlert(alert)');
+
+    expect(guard).toBeGreaterThan(-1);
+    expect(deliver).toBeGreaterThan(guard);
+    // The reference's shape is a `continue`, and it matters that the skip is total rather than a
+    // narrower "no sound but still toast".
+    expect(body).toContain('continue;');
+  });
+
+  it('feeds the advanced-search modal the filtered rows, not the raw log', () => {
+    expect(source).toContain('alerts={searchableAlerts}');
+    expect(source).not.toContain('alerts={data.alerts}');
+    // `searchableAlerts` must come off `data.alerts` rather than off `visibleAlerts`, or the search
+    // silently inherits the toolbar search term and the archive cut-off.
+    const derived = source.slice(source.indexOf('const searchableAlerts'));
+    expect(derived.slice(0, derived.indexOf(');'))).toContain('data.alerts.filter(');
   });
 });

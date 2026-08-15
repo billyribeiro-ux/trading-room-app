@@ -239,7 +239,26 @@ const ROOM_CONSUMED = [
      already carries senderAvt so the room can draw the avatar. Nothing new crosses.
 
      NO SQUARE BRACKET AND NO APOSTROPHE ANYWHERE ABOVE, for the reason the notes further up give. */
-  'modAlertFilterList'
+  'modAlertFilterList',
+  /* "Alert Labels" — a hash tag inside an alert body renders as a coloured badge.
+
+     The fourth room setting shipped as a STRING CONTAINING JSON, and the one the note on
+     modAlertFilterList above already names. Objects of name, hash, color and bgcolor. The room
+     parses it at bundle byte 1,147,290, stamping checked=false onto every entry, and the
+     parseSymbols transform at byte 1,326,855 swaps the first occurrence of each hash for a badge.
+
+     It crosses because every rendered byte of that badge is a value the owner typed. The text, the
+     background and the border colour have no defaults to fall back to, and a room that configures
+     none renders the hash as ordinary text, which is exactly what the transform does when the list
+     is empty.
+
+     ALERTS ONLY. The same transform runs over chat and substitutes nothing there, so this value
+     changes no chat message.
+
+     Read by alert-labels.ts and RoomMessage.svelte.
+
+     NO SQUARE BRACKET AND NO APOSTROPHE ANYWHERE ABOVE, for the reason the notes further up give. */
+  'alertLabels'
 ];
 
 /**
@@ -663,7 +682,7 @@ const missingWiredSettings = [...WIRED_SETTINGS].filter((name) => !defs.some((de
 //
 // The literal is a tripwire, not a fact about the schema — it is here so the wired set cannot grow
 // by accident, which is why changing it is a deliberate edit.
-if (WIRED_SETTINGS.size !== 61 || missingWiredSettings.length > 0) {
+if (WIRED_SETTINGS.size !== 62 || missingWiredSettings.length > 0) {
   throw new Error(
     `wired-setting contract invalid: ${WIRED_SETTINGS.size} keys, missing ${missingWiredSettings.join(', ') || 'none'}`
   );

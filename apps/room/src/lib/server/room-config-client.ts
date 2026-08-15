@@ -299,6 +299,23 @@ export interface RoomSessionSettings {
    * Read by `$lib/alert-filter`.
    */
   modAlertFilterList?: string;
+  /**
+   * "Alert Labels" — `#DayTrade` inside an alert body renders as a coloured badge.
+   *
+   * **A STRING CONTAINING JSON**, the fourth one, and the one the note above already names. Entries
+   * are `{ name, hash, color, bgcolor }` — proven by the transform at bundle byte 1,326,855, which
+   * reads all four, and independently by the Manage page's own help text on this setting.
+   *
+   * Read at byte 1,147,290, which also stamps `checked = false` onto every entry. That field is the
+   * post-alert composer's picker state, not a render input, and the composer branch is one of the
+   * `hiddenCapabilityBranches` the capture never renders.
+   *
+   * **`JSON.parse` with no try/catch**, exactly as `modAlertFilterList` above — a malformed setting
+   * throws rather than silently rendering no labels.
+   *
+   * Read by `$lib/alert-labels` and `RoomMessage.svelte`.
+   */
+  alertLabels?: string;
 }
 
 /** The connected member's per-room standing, which is per room and not per account. */

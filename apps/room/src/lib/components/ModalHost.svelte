@@ -26,6 +26,7 @@
   import RoomMessage from './RoomMessage.svelte';
   import type { PastedImageSubmission, PostAlertSubmission } from '$lib/post-alert-behavior';
   import {
+    alertFilterAvailable,
     alertFilterConfirm,
     alertFilterTitle,
     parseModAlertFilterList,
@@ -226,6 +227,19 @@
     showAlertsFrom?: boolean;
     /** `updateAlertFilter` — persist the selection. The page owns the round trip. */
     onsavealertfilter?: (next: { alertFilterFor: AlertFilterFor; showAlertsFrom: boolean }) => void;
+    /**
+     * `openAlertFilterModal()` — the settings modal's own entry point into the Alert Filter.
+     *
+     * Single-purpose rather than a general `openModal(name)`, because that is the shape the
+     * reference has: TWO components declare a method by this exact name and both bodies are
+     * `guiEventBus.emit("doAlertFilterModal")` — bytes 2,051,809 and 2,256,592. A generic
+     * navigation callback would be a wider API than anything captured asks for, and `name` is
+     * owned by the page.
+     *
+     * Bootstrap does the switch declaratively upstream via `data-bs-target`; here the page changes
+     * `name`, which closes this modal and opens that one.
+     */
+    onopenalertfilter?: () => void;
   }
 
   let {
@@ -302,7 +316,8 @@
     modAlertFilterList,
     alertFilterFor = $bindable({}),
     showAlertsFrom = $bindable(false),
-    onsavealertfilter
+    onsavealertfilter,
+    onopenalertfilter
   }: Props = $props();
 
   /**
@@ -3188,6 +3203,33 @@
               >Longer alert popup <span>{longerAlertPopup ? 'on' : 'off'}</span></label
             >
           </div>
+          <!--
+            `Fke`, slot 195 of the settings modal, const 159 — the THIRD entry point into
+            `#alert-filter-modal`, and the one whose label differs from the other two.
+
+            Nesting is the capture's and is easy to get wrong: the creation block reads
+            `d(189,"div",17) … u()(), H(195, Fke, 3, 0, "button", 89), u()()`, so the button is a
+            child of the `p-2 text-mode-box` box (const 52) and a SIBLING AFTER the `ml-5` div
+            that holds the checkbox — not inside it.
+
+            The three entry points do NOT share a label or a class, so none of them is a copy of
+            another:
+              header badge    `badge badge-danger ms-1 filtered-text`   " filtered"
+              alerts toolbar  `btn btn-outline-light btn-sm m-1`        " Filter alerts"
+              here            `btn btn-primary btn-sm mt-4 ml-4`        " Filter out alerts "
+
+            The trailing space after "alerts" is in `v(2," Filter out alerts ")` and is kept.
+          -->
+          {#if alertFilterAvailable(modAlertFilterList)}
+            <button
+              data-bs-toggle="modal"
+              data-bs-target="#alert-filter-modal"
+              class="btn btn-primary btn-sm mt-4 ml-4"
+              onclick={() => onopenalertfilter?.()}
+            >
+              <i class="fas fa-filter me-1"></i>{' '}Filter out alerts{' '}
+            </button>
+          {/if}
         </div>
       </div>
 

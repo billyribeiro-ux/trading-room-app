@@ -3,6 +3,12 @@
   import EmojiPicker from '$lib/components/EmojiPicker.svelte';
   import type { EmojiDumpEntry } from '$lib/emoji-data';
   import { isMentionOf } from '$lib/mention';
+  import {
+    ALERT_LABEL_BADGE_CLASS,
+    alertLabelBadgeStyle,
+    splitAlertLabels,
+    type AlertLabel
+  } from '$lib/alert-labels';
   import { safeChatHtml } from './chat-safe-html';
   import { calculateMessageMenuPosition } from '$lib/message-menu-position';
   import { ngbTooltipWith } from '$lib/ngb-tooltip';
@@ -34,6 +40,16 @@
     menuOpen: boolean;
     showDateSeparator: boolean;
     currentUserName?: string;
+    /**
+     * The room's configured Alert Labels, already parsed by the page.
+     *
+     * Parsed once there rather than per message: `parseAlertLabels` runs `JSON.parse` and this
+     * component instantiates one copy PER RENDERED MESSAGE. The same reasoning the three date
+     * formatters below are hoisted for.
+     *
+     * Only consulted when `kind === 'alert'` — see `parseBodySegments`.
+     */
+    alertLabels?: readonly AlertLabel[];
     followedStyle?: FollowChatStyle;
     chatStyle?: FollowChatStyle;
     allowDeleteOwnMessage?: boolean;
@@ -82,6 +98,7 @@
     menuOpen,
     showDateSeparator,
     currentUserName = '',
+    alertLabels = [],
     followedStyle,
     chatStyle,
     allowDeleteOwnMessage = false,
@@ -307,7 +324,12 @@
   /** `urlwrapImg` renders these inline instead of as an anchor. */
   const IMAGE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.gif', '.jfif'];
 
-  type BodySegment = { kind: 'text' | 'stock' | 'link' | 'image'; text: string; url?: string };
+  type BodySegment = {
+    kind: 'text' | 'stock' | 'link' | 'image' | 'label';
+    text: string;
+    url?: string;
+    label?: AlertLabel;
+  };
 
   /**
    * Splits a message body into tickers, links, inline images and plain text.
@@ -322,7 +344,32 @@
    * means the message text can never be parsed as markup in the first place, and the rendered DOM
    * is the same.
    */
+  /**
+   * Alert Labels, then tickers and links — and that ORDER is the capture's, not a preference.
+   *
+   * `parseSymbols` (bundle byte 1,326,855) substitutes its labels into the string FIRST and only
+   * then hands the result to `parseStock`, so the `$` pass only ever sees text the label pass has
+   * already rewritten. Running them the other way round would let a ticker match inside a label.
+   *
+   * `"alerts" === i` in that transform is the whole reason `kind` is consulted here: the same pipe
+   * runs over the chat log and substitutes nothing there, so a `#DayTrade` typed in chat stays
+   * literal text. Passing the labels in unconditionally and filtering at the badge would have been
+   * the easy mistake.
+   */
   function parseBodySegments(value: string): BodySegment[] {
+    const labelled =
+      kind === 'alert' && alertLabels.length > 0
+        ? splitAlertLabels(value, alertLabels)
+        : [{ kind: 'text' as const, text: value }];
+
+    return labelled.flatMap<BodySegment>((piece) =>
+      piece.kind === 'label'
+        ? [{ kind: 'label', text: piece.text, label: piece.label }]
+        : parseTickersAndLinks(piece.text)
+    );
+  }
+
+  function parseTickersAndLinks(value: string): BodySegment[] {
     const segments: BodySegment[] = [];
 
     for (const chunk of value.split(/(\s*\$[A-Za-z_?]+\b)/g).filter(Boolean)) {
@@ -467,7 +514,11 @@
 
 {#snippet bodySegments(segments: BodySegment[])}
   {#each segments as segment, index (index)}
-    {#if segment.kind === 'stock'}<span class="stockColor" style={stockStyle}>{segment.text}</span
+    {#if segment.kind === 'label' && segment.label}<span
+        class={ALERT_LABEL_BADGE_CLASS}
+        style={alertLabelBadgeStyle(segment.label)}>{segment.label.name}</span
+      >{:else if segment.kind === 'stock'}<span class="stockColor" style={stockStyle}
+        >{segment.text}</span
       >{:else if segment.kind === 'link' && segment.url}<a
         href={segment.url}
         target="_blank"

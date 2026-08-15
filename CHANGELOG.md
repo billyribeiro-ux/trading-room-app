@@ -24,6 +24,130 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-15
 
+### 2026-08-15 11:17 EDT — Benzinga: the decode pass the TODO asked for, which changed nothing
+
+**Runtime impact: none.** No code changed. This entry exists because "we checked and it already
+matches" is a result, and without it the next person runs the same pass again.
+
+`TODO.md` carried "small; needs one more decode pass for the const-table classes". Done, against the
+component const table at bundle byte **2,533,190**:
+
+| const | capture | ours |
+| --- | --- | --- |
+| 25 | `nav-item py-0` | matches |
+| 40 | `target="_blank" title="Benzinga News" nav-link sidebar-item ps-1` | matches |
+| 41 | `benzinga-logo-alt` | matches |
+| 42 | `fas fa-newspaper` | matches |
+| 22 | `pl-2` | matches |
+
+The only additions are `rel`, `alt` and `width`/`height`, which are this repository's own rules
+rather than drift.
+
+**Worth recording because it nearly went the other way.** A raw read of the bytes around the nav item
+showed an `ms-1` near the span, and the working assumption became that our `pl-2` was wrong.
+Decoding the array BY INDEX proved const 22 is `pl-2` and ours was right. Reading the neighbourhood
+rather than the region is exactly how a "fix" introduces a bug into working markup — the same failure
+the evidence rule in `~/CLAUDE.md` exists to prevent.
+
+Two gaps remain on the row and neither is a port: the reference's DEFAULT url is its own host
+(`ptrv3.protradingroom.com/public/bz/index.html`), so ours renders nothing unless
+`altBenzingaLinkURL` is set, and the default `assets/images/benzinga-logo.png` is not in this
+repository, so the icon form always stands in.
+
+### 2026-08-15 11:12 EDT — Alert Labels: `#DayTrade` becomes a badge, and the setting is wired through all six places
+
+**Runtime impact: alerts only.** A room that configures no labels renders exactly as before — the
+transform already does nothing with an empty list, so the absent case needed no new branch.
+
+Decoded from `main.d1d09071be31f1ba.js`: the setting is read at byte **1,147,290** and the
+`parseSymbols` transform is at byte **1,326,855**. The shape `{name, hash, color, bgcolor}` is proven
+twice — the transform reads all four, and the Manage page's own help text on the setting spells the
+same four out.
+
+**Three shipped behaviours that look like defects, reproduced and pinned by tests**, because each one
+would be "fixed" by a well-meaning refactor:
+
+- **`"alerts" === i`** — the same pipe runs over the chat log and substitutes nothing there, so a
+  `#DayTrade` typed in chat stays literal text. The guard is `kind === 'alert'` in
+  `parseBodySegments`, and a contract test asserts it is there.
+- **`String.replace(string, string)` replaces the FIRST occurrence only** — a body containing
+  `#DayTrade` twice gets one badge and one piece of literal text.
+- **No word boundary** — it is `includes`/`replace` on `#${hash}`, so `foo#DayTrade` matches and
+  `#DayTraderX` matches on its prefix, leaving `rX` behind.
+
+`checked = false`, stamped onto every entry on read, is carried even though nothing renders it: it is
+the post-alert composer picker's state, and dropping it would silently change the shape that picker
+will need. The picker itself is NOT built and is not parked — see `TODO.md`. It is one of
+`direct-evidence-contract.ts`'s `hiddenCapabilityBranches`, so no capture we hold ever rendered it.
+
+**One deliberate divergence, recorded rather than hidden.** The reference builds an HTML string, so a
+label whose `hash` appears inside an EARLIER label's name or colour can be matched and corrupted by
+the next iteration, producing broken markup. We emit real elements, so there is nothing to match
+into. Reproducing that would mean reintroducing string-built HTML in order to reproduce a way of
+breaking it. Documented in `alert-labels.ts`.
+
+**The wiring is the six-place pipeline, and two of the trackers went red exactly as designed:**
+`ROOM_CONSUMED` in the generator → its `WIRED_SETTINGS.size` contract 61→62 → the verifier's
+`EXPECTED_WIRED_SETTINGS` → the generated schema row `wired: true` and its header `62 of 269` →
+`ROOM_VISIBLE_SETTINGS` → `RoomSessData`. `room-config-boundary.test.ts` demanded the new name be
+listed with *what reads it*, and `sso-boundary.test.ts` demanded the verifier's prose count agree.
+Both comment blocks honour the local rule that no square bracket and no apostrophe may appear in
+them — a bracket in prose terminates the regex that reads those lists.
+
+New: `apps/room/src/lib/alert-labels.ts`, `apps/room/src/lib/alert-labels-contract.test.ts`.
+
+**Verified:** room 1412/1412 (108 files) · controller 964/964 (91 files) · schema verifier
+`269 total; 62 wired` · `svelte-check` 1064 files 0 errors 0 warnings · eslint clean in both apps ·
+`svelte-autofixer` `issues: []` · **negative controls on both new guards** — making a label claim
+every occurrence went red, and deleting the `kind === 'alert'` gate went red; restored green.
+
+### 2026-08-15 11:12 EDT — the Alert Filter is reachable, and filters all three places instead of one
+
+**Runtime impact: alerts only, and gated.** Every control is behind
+`sessData.modAlertFilterList` being configured, so a room without a list is unchanged.
+
+**Three entry points, each with different markup — none is a copy of another:**
+
+| entry point | evidence | markup |
+| --- | --- | --- |
+| header badge `M2e` | const 21, gate at byte 2,056,460 | `badge badge-danger ms-1 filtered-text` → `" filtered"` |
+| alerts toolbar `N2e` | const 44/45, gated in `B2e` | `btn btn-outline-light btn-sm m-1` → `" Filter alerts"` |
+| settings modal `Fke` | const 159/160, slot 195 | `btn btn-primary btn-sm mt-4 ml-4` → `" Filter out alerts "` |
+
+The earlier note recording the settings button as `btn btn-outline-light btn-sm m-1` was wrong — that
+is the toolbar button. `openAlertFilterModal` has FIVE sites, not two: the three above plus two
+identical `guiEventBus.emit("doAlertFilterModal")` methods.
+
+The badge's gate is a CONJUNCTION, `modAlertFilterList && doFilteredAlerts`, so a room that has a
+list but a reader who has selected nobody shows the buttons and no badge. `alertFilterConfigured` and
+`alertFilterActive` are separate derived values for that reason.
+
+**The toolbar button had been left out deliberately, and that decision was superseded rather than
+overruled.** It never appears in either DOM capture of that toolbar, and rendering it
+UNCONDITIONALLY wrapped the slot onto a second row the capture never produces. But both captures are
+of rooms with no `modAlertFilterList` — precisely when the gate is false — so the gated button
+reproduces both captures exactly and the omission was the divergence. The contract test that asserted
+its ABSENCE now asserts it is present *behind its gate*.
+
+**The two remaining filter sites, which are not duplicates of the paged log:**
+
+- **live SSE arrival, byte 1,004,533.** The reference's two `continue`s sit before both
+  `alertsLog.push` and `emit("alertMsg")`, so a filtered-out alert makes **no toast and no sound**.
+  Filtering only at render would have left the room looking filtered while still popping and beeping.
+- **alerts search, byte 1,020,817.** A separate list; `searchableAlerts` comes off `data.alerts`
+  rather than `visibleAlerts`, or the advanced search would silently inherit the toolbar search term
+  and the archive cut-off.
+
+NOT reproduced: the reference logs `"filtered out alert for …"` before both conditionals, so it
+claims to have filtered every alert once a selection exists, including the ones it keeps. A defect in
+a debug line, and there is no `P()` here to carry it.
+
+**Verified:** 1412/1412 · `svelte-check` 1064 files 0 errors 0 warnings · eslint clean ·
+`svelte-autofixer` `issues: []` · **negative controls on every new assertion** — collapsing the
+badge's conjunction, neutralising the toolbar gate, neutralising the arrival guard (2 failures) and
+reverting the search modal to the raw log each went red, then green on restore. The first attempt at
+one control was a false green from a bad regex of mine and was redone with an exact replacement.
+
 ### 2026-08-15 11:07 EDT — the frontend gate goes green for the first time, by deciding what a CI run is allowed to claim
 
 **Runtime impact: none.** Test partitioning, one gate script, one controller test. No application code.
