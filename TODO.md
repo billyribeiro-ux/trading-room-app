@@ -187,7 +187,7 @@ each gap claim put through an adversarial pass that killed 8 of 34:
 | item | spec | note |
 | --- | --- | --- |
 | Files sort bar | `docs/decoded/files-sort-bar.md` | verified offset by offset; NEW-TODO §2.1 had three errors and is superseded |
-| `presAreaTabs-recordings` | `docs/decoded/missing-commands-triage.md` | a whole tab. Gate is `archivesAvailableTo() && sessData.recsInRoom`; we already have the first at `roster-gates.ts:54` |
+| ~~`presAreaTabs-recordings`~~ **BLOCKED** | `docs/decoded/missing-commands-triage.md` | NOT cheap after all. The reference's pane is one iframe onto a SERVER archive page; we have **zero recordings/archive tables** in either database, so the tab would front nothing. Needs an archive service first — a design decision, not a port |
 | Alert Filter | `docs/decoded/alert-scheduler-filter-labels.md` | server owns the filtering; `showAlertsFrom` inverts allow-list vs deny-list |
 | Alert Labels | same | not a wire feature; a JSON-string room setting plus a text transform |
 | Alert Scheduler | same | needs an entitlement whose manage-page control was NOT located, and a server-side scheduler we do not have |

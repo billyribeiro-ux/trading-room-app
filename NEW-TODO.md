@@ -291,10 +291,17 @@ re-reading, one of which ships a control that looks right and behaves wrong. Bui
    money every day they are open.
 2. **2.1 the sort bar** — spec verified offset by offset, small, and it proves the theming rule end
    to end.
-3. **`presAreaTabs-recordings`** — a whole missing TAB, and the cheapest of the three tab-level gaps:
-   the pane holds exactly one iframe, and we already have half its gate at `roster-gates.ts:54`. Only
-   `sessData.recsInRoom` and the surface are missing. Spec in
-   `docs/decoded/missing-commands-triage.md`.
+3. **`presAreaTabs-recordings` — BLOCKED, and I was wrong to call it cheap.** The pane is one iframe
+   onto `${apiROOT}/sessions/v2/archives/recordings/{sessionID}/{token}`, a SERVER archive page.
+   Measured: **zero recordings or archive tables in either database** — 22 room tables, 15 controller
+   tables, none matching. Our Recordings is a different thing: `recording-codec.ts` records the
+   presenter's screen locally to a download. That is the ACT of recording; this tab is PLAYBACK of
+   past archives. Building the surface now yields an iframe pointing at nothing, which is the dead
+   scaffolding the standard forbids. **Needs an archive service first, which is a design decision.**
+
+   Two corrections to the triage's own claims, measured here: `recsInRoom` is NOT absent from the
+   repo — it is in `room-settings-schema.ts:247` unwired and `room-settings-profile.ts:78` — and
+   `hideRecs` is already in `ROOM_VISIBLE_SETTINGS` at `room-config.ts:214`.
 4. **5.1 Alert Filter**, then **5.2 Alert Labels** — both small, and 5.1 is the only one of the
    three that changes what an ordinary member sees.
 5. **2.2 Benzinga** — small, needs one more decode pass for the const-table classes.
