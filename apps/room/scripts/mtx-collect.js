@@ -47,7 +47,16 @@
     role: {},
     steps: [],
     /** The three server commands, as they actually arrive. This is the prize. */
-    wire: { frames: [], attachedVia: null, socketsSeen: 0 },
+    /*
+      `framesSeen` counts EVERY frame the hooks observed; `frames` keeps only the MTX-related ones.
+
+      Both are needed to read the result honestly. With only `frames`, an empty array has two
+      completely different meanings — a quiet room with the hooks working, or hooks that never
+      attached to the transport actually in use — and they call for opposite next steps. This was a
+      real defect in the first version of this collector: it reported `frames: 0` for a run whose
+      socket was never wrapped, and that read as evidence about the app.
+    */
+    wire: { frames: [], framesSeen: 0, attachedVia: null, socketsSeen: 0 },
     globals: {},
     /** Every `.m3u8` / `.ts` / whip / rtmp URL the page actually requested. */
     network: [],
@@ -228,6 +237,9 @@
   const recordFrame = (direction, raw, via) => {
     let text = typeof raw === 'string' ? raw : null;
     if (!text) return;
+    // Counted BEFORE the filter, and that order is the whole point: this is what separates
+    // "nothing MTX happened" from "these hooks saw nothing at all".
+    log.wire.framesSeen += 1;
     if (!INTERESTING.test(text)) return; // keep the file about MTX, not the whole chat
     let parsed = null;
     try {
@@ -468,9 +480,13 @@
   if (log.wire.frames.length === 0) {
     gap(
       'mtxStartStream / mtxStopStream / getSessionMTXMediaState',
-      'no matching socket frame was seen in the window. Either no stream started, or the inbound ' +
-        'listener could not be attached to the already-open socket (see the socket gap above). ' +
-        'Reload the page, re-paste this script IMMEDIATELY, then start the stream.'
+      log.wire.framesSeen === 0
+        ? 'the hooks saw ZERO frames of any kind, so this run is evidence about the COLLECTOR, not ' +
+          'about MTX. The listener never attached to the socket actually in use. Reload the page, ' +
+          're-paste this script IMMEDIATELY, then start the stream.'
+        : `the hooks saw ${log.wire.framesSeen} frames and none of them were MTX-related, so the ` +
+          'socket was wrapped correctly and no stream started during the window. Start a stream ' +
+          'while this is running.'
     );
   }
   if (log.network.length === 0) {
@@ -496,7 +512,10 @@
       '',
       `[mtx] downloaded ${name}`,
       `  role         : ${role}`,
-      `  wire frames  : ${log.wire.frames.length} (attached via ${log.wire.attachedVia ?? 'nothing'})`,
+      `  wire frames  : ${log.wire.frames.length} MTX of ${log.wire.framesSeen} seen (attached via ${log.wire.attachedVia ?? 'nothing'})`,
+      log.wire.framesSeen === 0
+        ? '  ^^ ZERO frames of ANY kind: the hooks saw no traffic, so this run says nothing about MTX.'
+        : '',
       `  network      : ${log.network.length} playlist/segment requests`,
       `  gaps         : ${log.gaps.length}`,
       '',

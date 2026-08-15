@@ -71,7 +71,7 @@ columns, so a reader scrolled up in one is not yanked by traffic in the other. F
 
 | where | what is missing |
 | --- | --- |
-| `+page.svelte` `loadNoteVersions` | Nothing calls it, and the route it fetches (`api/notes/[noteId]/versions`) is built and working. Note history is server-complete and client-unreachable. |
+| `+page.svelte` `loadNoteVersions` | Nothing calls it, and the route it fetches (`api/notes/[noteId]/versions`) is built and working. Note history is server-complete and client-unreachable. **This is the only remaining item that is a BUILD rather than a deletion** — it needs the reference's note-history UI read out of the bundle first. |
 
 Each is a behaviour change with a decision behind it, which is why none was made inside a lint pass.
 
