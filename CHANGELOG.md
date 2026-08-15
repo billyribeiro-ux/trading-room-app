@@ -24,6 +24,49 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-15
 
+### 2026-08-15 19:16 EDT — `TODO.md` pruned to what is actually left, 809 → 627 lines
+
+**Merged to `main` in `526074a` (PR #61). Runtime impact: none** — `TODO.md` and
+`docs/reference/working-rules.md` only.
+
+`TODO.md`'s own first rule is *"If a section here is not something somebody still has to DO, it does
+not belong."* It had drifted into a record of closed work — six sections and two table rows whose
+task was finished, several of them still headed with a tick.
+
+**Every removal was verified before it was made, not trusted from a "CLOSED" heading.** Row P was
+removed only after `gh` confirmed PRs #22, #23–27 and #30 are all merged and `main` is green rather
+than the red the row described.
+
+**Nothing was deleted that was not preserved.** Four rules were living inside closed sections and
+would have gone with them, so they moved to `docs/reference/working-rules.md`, which is where that
+file's own header says process rules belong: **10** `svelte-check` is only evidence after
+`rm -rf .svelte-kit`; **11** a test that returns early on a missing fixture is a silent pass, with
+the companion that a green privacy check says nothing about an ignored file; **12** a green PR check
+does not prove the backend, re-confirmed the same day when PR #56 reported pass in 23 seconds
+because the scope filter skipped it; **13** a `TODO.md` row is a hypothesis until it is re-read
+against the evidence.
+
+**Three things were CORRECTED rather than removed, because they were false:**
+
+- *"the account has run out of CI minutes, and that is why these jobs fail."* The jobs were failing
+  on four real defects, every one fixed on 2026-08-15, and the gate is now green end to end. Minutes
+  were never the cause. The owner's cost constraint is kept, on its own terms.
+- **Row E asserted `apps/room/.env` does not exist while a newer entry fifteen lines above it said
+  it does.** Reconciled — and it gained a fact neither carried: `room-config-seam-e2e.mjs` is no
+  longer in the repository at all (`git ls-files` returns 0, and it is absent from a clean
+  worktree), because it went with the 2026-08-15 scripts eviction. The probe cannot be run by anyone
+  cloning the repository.
+- the handoff bucket arithmetic still counted the three buckets removed in the same change.
+
+**One citation was checked and deliberately left alone:** row E's `apps/controller/vite.config.ts:17`
+still reads `const localPort = 5173`, so the 5180-vs-5173 mismatch it reports is real. It was
+verified rather than assumed to have rotted along with everything around it — the opposite error to
+the one this prune exists to fix.
+
+**Verified:** `evidence-gap-register-counts.test.ts`, `naming-boundary.test.ts` and
+`ci-verification-integrity.test.ts` all read `TODO.md`; run before and after, 19 assertions green
+both times. All four gates green on PR #61, with the backend gate correctly skipping in 23s.
+
 ### 2026-08-15 18:26 EDT — Two steps that could never have passed, found by finally reaching them
 
 **Merged to `main` in `9aee3d9` (PR #55), commits `189bcfd` and `559953d`. Runtime impact: none** —
