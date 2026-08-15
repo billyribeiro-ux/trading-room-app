@@ -24,6 +24,43 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-15
 
+### 2026-08-15 12:52 EDT — reactivity is testable now, and the fix needed BOTH halves
+
+**Runtime impact: none.** A test-only config guard plus two assertions. `vite.config.ts` changes
+under `process.env.VITEST` only, so the dev server and the production build are untouched.
+
+The previous entry recorded that no test in this repository could verify client reactivity. That is
+now closed, and the route to it is worth writing down because two plausible single fixes both
+FAILED, each measured rather than assumed:
+
+1. **`// @vitest-environment jsdom` alone — does not work.** The effect still recorded nothing. The
+   DOM is not the cause.
+2. **`resolve.conditions: ['browser']` alone — does not work either.** Still nothing.
+
+**Both together work.** The reason is that the two solve different halves: Vitest transforms with
+`ssr: true`, so a `.svelte.ts` rune compiles to its SERVER form where `$effect` is a documented
+no-op, and the resolution condition alone does not change the compile mode. Anyone who tries one and
+gives up would reasonably conclude the thing is untestable.
+
+**Blast radius measured before committing, not asserted:** the whole suite was re-run with the
+condition applied and stayed at 115 files green. It is guarded on `VITEST` regardless.
+
+**The assertion is real, proven by its negative control.** Deleting `$state.raw` from
+`MtxStreamTabs` turns both new tests red with exact diagnoses — `[0]` instead of `[0, 1, 0]`, the
+effect having run once and never again, and `'a'` instead of `'b'` for a stale selection getter.
+That is the check that was missing when slice 1 shipped, and it is the only one that can catch a
+broken rune wiring; `svelte-check`, `svelte-autofixer` and eslint are all green against the broken
+version.
+
+**The shape of the test is load-bearing and is documented in the file.** Every mutation and flush
+happens INSIDE `$effect.root`, because that is the only place effects run; every assertion happens
+OUTSIDE it, because `$effect.root` SWALLOWS a thrown assertion. An earlier draft with the
+assertions inside passed while containing a deliberately false `toEqual([99999])`.
+
+**Verified:** room suite **1538/1538 across 115 files**, `svelte-check` **0 errors 0 warnings**,
+eslint **exit 0** on every file in this commit, negative control run and seen red then restored.
+
+### 2026-08-15 12:47 EDT — the reactivity test could not be written, and finding out why is the result
 ### 2026-08-15 12:49 EDT — CI can no longer cancel the default branch out of its own verification
 
 **Runtime impact: none.** Three workflow files, one new test, and one repository setting.

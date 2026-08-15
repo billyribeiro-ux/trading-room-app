@@ -1,3 +1,5 @@
+// @vitest-environment jsdom
+import { flushSync } from 'svelte';
 import { describe, expect, it } from 'vitest';
 
 import { MtxStreamTabs } from './room-mtx.svelte';
@@ -92,28 +94,67 @@ describe('a session refresh REPLACES the list', () => {
   });
 });
 
-/*
-  THE REACTIVITY TEST IS NOT HERE, AND THAT IS A FINDING RATHER THAN AN OMISSION.
+describe('it is actually reactive — the part no other gate could prove', () => {
+  /*
+    This block is why `resolve.conditions: ['browser']` is in `vite.config.ts`.
 
-  The point of extracting `MtxStreamTabs` as a CLASS was that reassigned state cannot be exported
-  from a `.svelte.ts` module, so the reactive box has to live behind `this`. The assertion that
-  matters is therefore: does reading `mtx.streams` re-run when a stream arrives? Everything above
-  would pass against a plain object.
+    Extracting `MtxStreamTabs` as a CLASS was forced by Svelte's rule that reassigned state cannot
+    be exported from a `.svelte.ts` module, so the reactive box lives behind `this`. The assertion
+    that matters is therefore whether reading `mtx.streams` re-runs when a stream arrives -
+    everything above would pass against a plain object.
 
-  It cannot be written under this project's current test configuration, diagnosed rather than
-  assumed:
+    THE SHAPE HERE IS LOAD-BEARING, and two earlier drafts got it wrong:
 
-  - `vite.config.ts` has no `resolve.conditions: ['browser']` under VITEST, which the official
-    testing guidance requires for tests that exercise runes.
-  - Every existing "render" test in this suite imports `render` from `svelte/server`. The suite runs
-    in SSR mode, where `$effect` is a documented no-op.
+    - Draft 1 registered the effect inside `$effect.root` and then mutated and flushed OUTSIDE it.
+      It recorded nothing.
+    - Draft 2 moved the assertions INSIDE the root, and `$effect.root` swallows a thrown assertion.
+      That draft passed with a deliberately false `toEqual([99999])` in it - green no matter what
+      the class did, which is the exact vacuous-test failure the size ratchet exists to catch.
 
-  So an `$effect` inside `$effect.root` never runs here: it records nothing, throws nothing, and
-  reports nothing. Two drafts of that test were written and BOTH were vacuous - the second passed
-  with a deliberately false `toEqual([99999])` inside it, because `$effect.root` also swallows a
-  thrown assertion. A test that cannot fail is worse than no test, so neither was kept.
+    So: every mutation and flush happens INSIDE the root, because that is the only place effects
+    run; every assertion happens OUTSIDE it, because that is the only place vitest can see one fail.
+    The negative control is deleting `$state.raw` from the class, which turns both of these red.
+  */
+  it('re-runs a reader as the stream list changes', () => {
+    const mtx = new MtxStreamTabs();
+    const seen: number[] = [];
 
-  Closing this needs `resolve.conditions` plus a jsdom environment, which changes how all 114 test
-  files resolve Svelte. That is a build-config change and gets its own commit and its own full gate
-  run - not a rider on an extraction. Recorded as TODO row AE.
-*/
+    const stop = $effect.root(() => {
+      $effect(() => {
+        seen.push(mtx.streams.length);
+      });
+      flushSync();
+      mtx.started(stream('a'));
+      flushSync();
+      mtx.stopped(stream('a'));
+      flushSync();
+    });
+    stop();
+
+    expect(seen, 'the effect did not re-run as the stream list changed').toEqual([0, 1, 0]);
+  });
+
+  it('re-runs a reader when only the SELECTION changes', () => {
+    /*
+      Separate from the case above because both getters read the same underlying object. A wiring
+      that made `streams` reactive but left `selectedTabID` stale would pass the first test and
+      still highlight the wrong tab.
+    */
+    const mtx = new MtxStreamTabs();
+    mtx.replaceFromSession([stream('a'), stream('b')]);
+
+    const seen: (string | null)[] = [];
+    const stop = $effect.root(() => {
+      $effect(() => {
+        seen.push(mtx.selectedTabID);
+      });
+      flushSync();
+      mtx.selectByUser('b');
+      flushSync();
+    });
+    stop();
+
+    expect(seen.at(-1), 'the selection getter is not reactive').toBe('b');
+    expect(seen.length, 'the effect did not re-run on selection change').toBeGreaterThan(1);
+  });
+});
