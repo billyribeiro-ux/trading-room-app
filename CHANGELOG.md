@@ -24,6 +24,94 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-15
 
+### 2026-08-15 06:48 EDT — the control-plane capture, decoded end to end, and the collector leaked a live credential
+
+**Runtime impact: none.** One new document plus two fixes to console tooling.
+
+The collector was run on the live reference and `docs/decoded/control-plane-capture.md` (272 KB,
+1,244 lines) decodes **all 118,757 bytes / 2,766 lines** of what came back. Six agents each read one
+slice in full; a seventh swept the whole file for anything nobody opened. **418 facts, every one
+carrying its JSON path.**
+
+**The question §D could not answer is now answered.** 31 states are registered in this build and not
+one is an operator surface. The census ran three positive controls which all hit — `session` 20,
+`user` 61, `room` 33 — so the zeros are real absence, not a broken search. §D searched captures taken
+as one tenant owner and correctly said the control plane "cannot be matched, only designed"; a DOM
+capture simply cannot separate *there is no console* from *this account cannot see one*. A
+single-page app registers every screen it can ever show at boot, before it knows who you are, so the
+registry separates them. It holds only tenant-level states.
+
+**The strongest finding is a different one.** `states[*].data` is `null` on **all 31 states, zero
+exceptions** — no `requiresAuth`, no role, no permission tag, no title. **The reference expresses no
+authority at all in its router.** There is no route-level role model to copy, and looking for one is
+wasted effort.
+
+---
+
+### 🔴 The collector wrote eight live JWTs to disk
+
+301 characters each — header, payload **and signature** — in
+`panes.{apiKeys,badges,extraAdminUsers,sessions}.panel.html`, arriving via the Launch anchor
+`ng-href="/session?id={{s.uuid}}&jwtSite={{tokSite}}"` (`views/page.welcome.html:379-381`). The
+payload also base64-encodes the owner's name, email and user id.
+
+The redaction masked emails and 24-hex ids. **A JWT is base64url — no `@`, segments not hex — so it
+matched neither and walked straight through.** `.gitignore` already warned that captures contain "in
+some cases a live JWT"; the warning existed and the script leaked one anyway, which is precisely the
+argument for masking at CAPTURE time instead of trusting whoever handles the file later.
+
+Fixed with two overlapping patterns so the next unpredicted shape is still caught: `maskJwt` for the
+shape, and `maskTokenParams` for any query parameter whose NAME contains jwt/token/key/secret/sig/auth
+regardless of its value. **Asserted against the RAW serialised output, not a named field** — the leak
+did not arrive through a field anybody was watching, it came via `describe().html`, so checking named
+fields would have missed it exactly the way the redaction did.
+
+The capture file is **not** in this repository and must not be. Every value in the new document is
+redacted — JWTs, emails, 24-hex ids, token-shaped parameters — re-verified against the file as
+written to disk: 0, 0, 0.
+
+---
+
+### The second collector defect: the exemption disarmed one guard of two
+
+All five Sessions clicks were refused with `matched: "New"`. `EXEMPT_NG_CLICK` correctly disarmed the
+handler clause and then the WORD denylist fired, because `splitCamel` turns
+`showNewRoom=showNewRoom+1;` into "show New Room=show New Room+1;" and `new` is a deny word. The New
+Room reveal never happened, so its markup is missing from the capture.
+
+Three green smoke runs missed it because **every shape in that file was built to prove a REFUSAL** —
+no run ever exercised the exemption path. A guard suite that only tests refusals cannot see a guard
+that refuses too much. Run D now clicks the exempt expression and asserts 5 delivered, 0 refused.
+
+**Negative controls, both run and both reverted byte-identically:** reverting the short-circuit
+reproduces the live failure exactly (`clicksDelivered=0, refusals=5, matched "New"`); reverting
+`clean()` makes only the two redaction assertions go red.
+
+---
+
+### Six further defects the sweep exposed, recorded in §H of the document
+
+A tool's artefacts read exactly like the site's properties once they are in a JSON file, so they are
+written down rather than quietly fixed:
+
+- **`paneOf()` is not per-pane** — all four `panes.*.panel` objects are deep-equal, one shared
+  ancestor stored four times. About **17.7% of the file is duplicated content** and the per-pane
+  structure is absent. The `heading` objects are genuine.
+- **Silent truncation** — `html` capped at exactly 4,000 chars and `text` at 300, with no marker.
+  The same defect `collect-manage-gaps.js` exists to fix, and whose header calls it "the worst kind".
+- **Every `styles.css` rule stored twice** in every `rules` array; no `bootstrap.min.css` rule ever
+  appears, so the Bootstrap cascade is uncaptured.
+- **Headings carry no `rules` key** — `withRules` was never passed for them.
+- **UA says Android Pixel 9 mobile; viewport is 1989 px wide** — emulation or a spoofed UA, so no
+  rect here is desktop truth.
+- **`app.dashboard` and `app-dock.dashboard` both register `/dashboard`** — a genuine duplicate in
+  the reference, not a capture error.
+
+**Verified:** smoke 20/20 across four runs; both negative controls run and reverted; `node --check`;
+prettier clean; redaction re-verified on the written document. **Not run:** the full gate — nothing
+under `src/` changed.
+
+
 ### 2026-08-15 02:36 EDT — Swing Alerts audited as chief architect, not accepted on report
 
 **Runtime impact: none from this entry** — one comment correction in `apps/room/eslint.config.js`.
