@@ -24,6 +24,220 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-15
 
+### 2026-08-15 13:42 EDT — the private-chat trio, converted as a FEATURE, and the coverage gap that proved itself
+
+**Runtime impact: yes, on private chat.** `sendPrivateMessage`, `loadPrivateChatLog` and
+`deletePrivateChatLog` move together to `src/routes/private-chat.remote.ts`. Every capture string,
+every scope and both publishes are preserved; one bound was added that did not exist.
+
+**Converted as a group, on purpose, and this is the shape the remaining conversions should take.**
+One action at a time would have produced three files, three copies of the peer-id guard and three
+chances to write the room scope slightly differently. They are one feature — one peer id, one room,
+one `privChat` channel, one repository module — so they are one module and what they share is
+declared once. **The unit of conversion is the FEATURE, not the call site.** That directly answers
+the owner's note at 13:35 about the harder files ahead: the ones with six to ten call sites are not
+harder because of the count, they are harder because the shared invariants are currently written out
+once per call site.
+
+**All three are commands, including the read, and that sharpens the rule rather than breaking it.**
+`loadThread` and `searchThread` are pure SELECTs, so by the rule set at 13:33 the read would be a
+`query`. It is not. `log-pages.remote.ts` is safe under caching because the client asks for each page
+exactly once; this one is the opposite — `switchChatToUser` calls it with the SAME argument every
+time a conversation is opened, and the answer REPLACES the held log. A cache hit is a stale
+conversation. So: **`query` is for a pure read that is also safe to SERVE AGAIN. A read asked
+repeatedly with the same argument, whose freshness is what it is for, is a command** — because
+`command` runs every time by construction, and correctness that depends on when a cache entry
+happens to be released is not correctness.
+
+**THE COVERAGE GAP, AND HOW IT PROVED ITSELF.** All three were rewritten end to end — moved,
+re-validated, re-scoped, three `FormData` parsers collapsed into one schema — **and the suite stayed
+at 1578/1578.** Not one assertion moved, because there were none: searching every test file for
+those three names returns a drag-handle selector in `panel-drag.test.ts` and nothing else. Three
+commands carrying private messages between users of a multi-tenant application, with a rate limit,
+an identity check, a recipient lookup and a cross-tenant read scope between them, had no test at all.
+A green suite across a rewrite of all three is the proof, not a reassurance.
+`private-chat-remote-contract.test.ts` closes it: **20 assertions, four negative controls, each seen
+red** — accepting a client-supplied `recvdNick`, taking the room from the argument instead of the
+session, dropping the sender's own echo publish, and removing the new page bound.
+
+**A bound that did not exist — a fix, not a move, and flagged as one.** `loadPrivateChatLog` read
+`Number(data.get('page') ?? 0) || 0` with **no upper limit**, so a caller could ask for page
+10,000,000 and make SQLite walk and discard that many rows. `MAX_CHAT_LOG_PAGE` is the bound already
+on the room log and the alerts log for exactly this reason; the private thread was the one log
+without it. Same constant reused, not a second one declared. `.min(0)` here rather than `.min(1)`,
+because unlike the room log nothing else supplies page 0.
+
+**The capture's own strings are raised with `error()` rather than left to the schema**, because the
+client renders `body.message` verbatim and `Chatting with yourself again?` is
+`bootbox.alert("Chatting with yourself again?")` from the reference. A schema rejection would have
+replaced it with a generic 400.
+
+**Ceilings lowered again, no raise.** `+page.svelte` 13,556 → **13,550** — **below where it stood
+before the one raise**, through five conversions. `+page.server.ts` 3,096 → **2,997**, which is
+**−236 from 3,233**.
+
+**Verified:** `svelte-check` 0/0 (1,087 files) · suite **1599/1599 across 119 files** · `eslint`
+clean outside the untracked gitignored `scripts/… 2.*` · `prettier --check` clean · `vite build`
+succeeds and the manifest registers **four** remotes, the newest (`'1f324z4'`) called by the client
+as `1f324z4/loadPrivateChatLog`, `1f324z4/sendPrivateMessage` and `1f324z4/deletePrivateChatLog`.
+`deleteThread`, `insertPrivateMessage`, `loadThread` and `searchThread` removed from
+`+page.server.ts`'s imports — no callers there now. **One check of mine was wrong and was fixed
+rather than the code:** a count of `/^\s+peerId,$/gm` failed at 1 of 2 because prettier had collapsed
+one schema to a single line. A guard that depends on where a formatter puts a line break cries wolf;
+it now asks each slice directly. **Not verified:** no browser test of a live private conversation.
+
+### 2026-08-15 13:33 EDT — the first two reads that earn a `query`, and a contract test that had to move with them
+
+**Runtime impact: yes, on both log panes.** `loadOlderChatMessages` and `loadOlderAlerts` move from
+`?/`-actions to `src/routes/log-pages.remote.ts` as this application's first `query` functions.
+Every guard moved with them.
+
+**These earn `query` where `getMyMobilePin` could not.** The rule set an hour ago holds: `query` is
+for reads that are PURE. `loadChatPage` and `loadAlertPage` are two SELECTs with a LIMIT and an
+OFFSET and no write anywhere on the path, so they qualify; the pin mints, so it did not.
+
+**Why the cache is safe under pagination**, which is the question that had to be answered before
+converting rather than after. A query's cache key is its serialised argument, so page 2 and page 3
+are separate entries. Then: the client asks for each page exactly ONCE (`alertsPage` /
+`chatPage[channel]` only advance on a non-empty answer), and every page it receives is already
+merged into `olderAlerts` / `olderChatMessages` and held in component state for the life of the
+page — `+page.server.ts` says so where it explains why `invalidateAll()` cannot disturb them. **The
+client has been caching these pages permanently since long before this conversion; a per-request
+query cache released when nothing holds it is strictly shorter-lived than the state it feeds.**
+
+**Two hand-written guards became one schema.** Each action carried its own
+`Number.isInteger(page) || page < 1 || page > MAX_CHAT_LOG_PAGE`. There is now a single `pageNumber`
+schema referenced by both — which matters because the old contract test carries a comment recording
+a negative control that **stayed green when it should have gone red**, precisely because the two
+actions had identical lines and a whole-file `toContain` could not tell them apart. That risk is now
+structural rather than watched: they cannot drift because there is one of them.
+
+**A type error caught a real hole.** `z.custom<ChatChannel>(isChatChannel)` does not compile:
+`z.custom` hands its predicate `unknown` (the argument comes off the wire and could be a number or
+an object) while `isChatChannel` is declared over `string`. Casting the error away would have meant
+handing a non-string to `.includes` and trusting the answer. It is now
+`typeof value === 'string' && isChatChannel(value)`, and a test pins the `typeof`.
+
+**`chat-paging-contract.test.ts` went red — seven assertions — and that is the system working.**
+Positive assertions fail loudly when a region is extracted; that is the migration telling you where
+it needs to go. All seven were re-pointed at `log-pages.remote.ts` in the same commit, including the
+`between()` slicer, whose markers changed shape (`X: async` → `export const X = query(`). Getting
+that wrong would not fail loudly — it would return an empty slice every `not.toContain` passes
+against, which is the exact defect this suite shipped at 12:56 today. `between` asserts both markers
+were found. Three `not.toContain` guards were re-expressed rather than deleted, because the thing
+they refused changed shape too: `data.get('roomShortCode')` has no meaning without `FormData`, so
+the equivalent is a `roomShortCode` FIELD, refused by `z.strictObject`.
+
+**Both ceilings lowered again, no raise.** `+page.svelte` 13,558 → **13,556** (it first went to
+13,562; the fix was moving the failure-handling reasoning into `log-pages.remote.ts`, not shaving
+it). `+page.server.ts` 3,162 → **3,096** — that is **−137 from 3,233** across the three conversions.
+
+**Verified:** `svelte-check` 0/0 (1,085 files) · suite **1578/1578 across 118 files** · `eslint`
+clean outside the untracked gitignored `scripts/… 2.*` · `prettier --check` clean · `vite build`
+succeeds and the manifest registers **three** remotes, the newest (`'6pjrlz'`) called by the client
+bundle as `6pjrlz/loadOlderAlerts` and `6pjrlz/loadOlderChatMessages`. Three negative controls run
+and seen red: dropping the page bound, dropping the `typeof` guard, and moving the loading-flag
+reset out of `finally`. `MAX_CHAT_LOG_PAGE`, `isChatChannel` and `loadChatPage` removed from
+`+page.server.ts`'s imports — no callers there now. **Not verified:** no browser scrollback test in
+a live room.
+
+### 2026-08-15 13:23 EDT — the read that must not be a `query`
+
+**Runtime impact: yes, on one control.** `getMyMobilePin` moves from `?/getMyMobilePin` to
+`src/routes/mobile-pin.remote.ts`. The gate, the controller call and both user-facing messages are
+unchanged.
+
+**The finding is worth more than the conversion.** `getMyMobilePin` is a READ: no argument, returns
+data, mutates nothing the room can see. Every instinct maps a read to `query`. That would have been
+a bug. `query` is CACHED — SvelteKit keys on the serialised argument, dedupes concurrent callers onto
+one instance, and holds the resolved value while the query is in active use. With **no argument, one
+key covers the whole application.** This read MINTS: the pin comes from
+`room_users.mobile_pair_code` and is issued fresh per request. As a query, the second open of the
+mobile modal would return the first pin out of cache — possibly one the controller had already
+rotated — and it would look completely correct. A plausible number, in the right place, silently
+stale.
+
+**So the rule, written into the module and pinned by a test: `query` is for reads that are PURE. A
+read with a server-side side effect is a `command`, whatever the verb in its name says.** The test
+asserts `not.toContain('query(')` so that "this is a read, it should be a query" cannot be applied
+later as a tidy-up.
+
+**The rejection shape was read, not assumed.** The client needs the server's own message so the
+409 ("this room has no mobile app configured") stays distinct from the 502 ("could not get an app
+pin right now"). Kit's docs do not state what a command rejects with, so
+`src/runtime/client/remote-functions/shared.svelte.js` was read instead: `remote_request` throws
+`new HttpError({ status, ...result.error })`, and `HttpError` (in `exports/internal/shared.js`)
+carries `.status` and `.body`, the `App.Error`. `isHttpError` narrows it. Guessing here would have
+collapsed two different facts into one string.
+
+**The ceiling promise held.** The previous entry raised `+page.svelte` to 13,561 and said it would
+not move again. This conversion first pushed it to **13,569** — and the answer was the one the rule
+asks for, not another raise: the reasoning went into `mobile-pin.remote.ts` rather than being
+duplicated at the call site, and the file came out at **13,558**, below the raised ceiling. Both
+ceilings lowered to measured: `+page.svelte` **13,558**, `+page.server.ts` **3,162** (from 3,233
+before the conversions began, −71).
+
+**Verified:** `svelte-check` 0/0 (1,082 files) · suite **1565/1565 across 117 files** · `eslint`
+clean outside the untracked gitignored `scripts/… 2.*` · `prettier --check` clean · `vite build`
+succeeds and the manifest now registers **two** remotes, `'8152qc'` and `'1dg50ok'`, whose ids the
+client bundle calls as `8152qc/unmuteChat` and `1dg50ok/getMyMobilePin`. Two negative controls run
+and seen red: turning it into a `query`, and collapsing both server messages into the fallback.
+`requestMobilePin` was removed from `+page.server.ts`'s imports — it has no caller there now.
+**Not verified:** no browser click-through of the mobile modal.
+
+### 2026-08-15 13:14 EDT — the first remote function, and the first ceiling I raised
+
+**Runtime impact: yes, on one control.** `Unmute Chat` now reaches the server through a remote
+command instead of a hand-written `fetch('?/unmuteChat')`, and a refusal is now VISIBLE where it was
+previously dropped. The delete, the room scope, the role gate and the `privCmds` publish are
+byte-for-byte the same logic, moved.
+
+**What changed.** `?/unmuteChat` left `+page.server.ts` for `src/routes/chat-mute.remote.ts`, this
+application's first `.remote.ts` file. `kit.experimental.remoteFunctions` is switched on in the same
+commit as its first consumer, never on its own — a flag nothing reads is the dead configuration this
+repository forbids by name. The flag lives in `vite.config.ts`, because `apps/room` has no
+`svelte.config.js`: Kit 3 takes its options through the plugin, which is worth knowing before anyone
+goes looking for the usual file.
+
+**Why it is worth an experimental API.** The thing it replaces names its endpoint in a string nothing
+type-checks, hands it a `FormData` of stringified numbers that the server parses back with `Number()`,
+and reports failure as a boolean on a `Response` that the call site was free to ignore — and did:
+`void unmuteChat(user)` with no handler at all. That is the exact shape of the bug this control was
+built to fix in the first place (a button that said "user chat unmuted" while the member stayed
+silenced), reintroduced one layer down. A command rejects, so a refusal has to be caught to be
+dropped. The argument is now validated once, by a zod schema, on the server. `zod@4.4.3` was already
+a dependency and already used this way by `notes-command.ts` and its siblings; nothing was added.
+
+`compilerOptions.experimental.async` is deliberately NOT set alongside it, and a test asserts that it
+stays off. That option is what allows `await` in a component TEMPLATE; every call here is `await`
+inside an ordinary event handler, which is plain JavaScript. Turning it on would change how a
+13,000-line component compiles to buy nothing.
+
+**A vacuous assertion, found and fixed.** `unmute-chat-contract.test.ts` proved the unmute had left
+the toast-only table by slicing `+page.svelte` for `const exactAlerts`. That table was extracted to
+`user-action-intent.ts` at 12:56 today, so the slice found nothing, the "body" it checked was the
+empty string, and the guard went green having stopped guarding. It shipped that way. This is exactly
+the failure mode `source-size-contract.test.ts` was written to warn about four hours earlier, and no
+test caught it — it was caught by reading the file. It now reads the file that owns the table and
+asserts the table was FOUND before asserting what is absent from it.
+
+**The ceiling went UP, once, and it is recorded rather than quietly edited.** `+page.svelte`
+**13,551 → 13,561**; `+page.server.ts` **3,233 → 3,181**. Net across the two capped files is −42,
+plus a 99-line documented module — but the per-file rule in `source-size-contract.test.ts` says
+ceilings only go down, and this commit costs the component nine lines of comment explaining, at the
+first call site in the codebase, why a refusal is now caught. Shaving that to fit the number would
+have been the tail wagging the dog. The raise is written into the file with its reason.
+
+**Verified:** `svelte-check` 0 errors / 0 warnings (1,081 files) · full room suite **1555/1555 across
+116 files** (was 1550/116) · `eslint .` clean outside the untracked, gitignored `scripts/… 2.*`
+duplicates · `prettier --check` clean · **`vite build` succeeds**, and the built server manifest
+registers exactly one remote module (`remotes: { '8152qc': … }`) whose id the client bundle calls as
+`8152qc/unmuteChat` — client and server agree on the endpoint by construction, which is the thing the
+string `'?/unmuteChat'` never gave us. Three negative controls were run and each went red for the
+right reason: reintroducing `unmute-chat` to `EXACT_ALERTS`, switching `remoteFunctions` off, and
+deleting the `.catch`. **Not verified:** no browser click-through of the unmute in a live room, and
+`svelte-autofixer` still cannot be run on a 13,561-line component.
+
 ### 2026-08-15 12:56 EDT — slice 3, and the ratchet caught me making the file BIGGER
 
 **Runtime impact: none.** Every string and every branch behaves as before. `+page.svelte`

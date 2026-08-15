@@ -23,6 +23,14 @@ import {
 
 const SERVER = readFileSync(new URL('../routes/+page.server.ts', import.meta.url), 'utf8');
 const PAGE = readFileSync(new URL('../routes/+page.svelte', import.meta.url), 'utf8');
+/*
+  Added 2026-08-15: the two paging ACTIONS became remote `query` functions and moved out of
+  `+page.server.ts`. Every assertion below that named an action was re-pointed here in the same
+  commit rather than deleted — an extraction that leaves them behind turns `not.toContain` guards
+  green at the exact moment they stop guarding, which is the failure this suite has already shipped
+  once (see `source-size-contract.test.ts`).
+*/
+const REMOTE = readFileSync(new URL('../routes/log-pages.remote.ts', import.meta.url), 'utf8');
 const CHAT_LOG = readFileSync(new URL('./server/chat-log.ts', import.meta.url), 'utf8');
 const ALERT_LOG = readFileSync(new URL('./server/alert-log.ts', import.meta.url), 'utf8');
 const DB = readFileSync(new URL('./server/db/index.ts', import.meta.url), 'utf8');
@@ -32,25 +40,32 @@ const stripComments = (source: string) =>
 
 const serverCode = stripComments(SERVER);
 const pageCode = stripComments(PAGE);
+const remoteCode = stripComments(REMOTE);
 const chatLogCode = stripComments(CHAT_LOG);
 const alertLogCode = stripComments(ALERT_LOG);
 
 /*
-  The two paging actions, sliced apart by their own boundaries.
+  The two paging queries, sliced apart by their own boundaries.
 
-  They sit next to each other and carry identical guards, so any assertion that searches the whole
-  file proves nothing about either. `loadOlderChatMessages` runs to `loadOlderAlerts`, and
-  `loadOlderAlerts` runs to `deletePrivateChatLog`, which is the next action after it.
+  They sit next to each other and carry near-identical guards, so any assertion that searches the
+  whole file proves nothing about either. `loadOlderChatMessages` runs to `loadOlderAlerts`, and
+  `loadOlderAlerts` runs to the end of the module, which is why its end marker is the final `});`.
+
+  This used to slice `+page.server.ts`; it slices `log-pages.remote.ts` now. The boundaries changed
+  shape with the conversion — `X: async` became `export const X = query(` — and getting that wrong
+  would not fail loudly, it would return an empty slice that every `not.toContain` below passes
+  against. So `between` asserts BOTH markers were found, and it did before the move too.
 */
 const between = (start: string, end: string) => {
-  const from = serverCode.indexOf(start);
-  const to = serverCode.indexOf(end, from);
+  const from = remoteCode.indexOf(start);
+  const to = end === '' ? remoteCode.length : remoteCode.indexOf(end, from);
   expect(from, `${start} must exist`).toBeGreaterThan(-1);
   expect(to, `${end} must follow ${start}`).toBeGreaterThan(from);
-  return serverCode.slice(from, to);
+  return remoteCode.slice(from, to);
 };
-const chatAction = () => between('loadOlderChatMessages: async', 'loadOlderAlerts: async');
-const alertsAction = () => between('loadOlderAlerts: async', 'deletePrivateChatLog: async');
+const chatAction = () =>
+  between('export const loadOlderChatMessages = query(', 'export const loadOlderAlerts = query(');
+const alertsAction = () => between('export const loadOlderAlerts = query(', '');
 
 describe('the read is bounded', () => {
   it('the page size is the reference constant', () => {
@@ -96,13 +111,13 @@ describe('the read is bounded', () => {
 });
 
 describe('and nothing became unreachable', () => {
-  it('there is an action that serves older pages', () => {
-    expect(serverCode).toContain('loadOlderChatMessages: async ({ request, locals }) => {');
-    expect(serverCode).toContain('loadChatPage(requireRoomShortCode(locals), channel, page)');
+  it('there is a query that serves older pages', () => {
+    expect(remoteCode).toContain('export const loadOlderChatMessages = query(');
+    expect(remoteCode).toContain('loadChatPage(requireRoomShortCode(locals), channel, page)');
   });
 
   it('the client asks for them, and folds them in', () => {
-    expect(pageCode).toContain("await fetch('?/loadOlderChatMessages'");
+    expect(pageCode).toContain('await loadOlderChatPage({ channel, page })');
     expect(pageCode).toContain(
       'mergeOlderChatMessages(incoming, olderChatMessages[channel] ?? [])'
     );
@@ -152,17 +167,28 @@ describe('the action refuses what it should', () => {
     expect(isChatChannel('off-topic')).toBe(true);
     expect(isChatChannel('admin')).toBe(false);
     expect(isChatChannel('')).toBe(false);
-    expect(serverCode).toContain('if (!isChatChannel(channel)) return fail(400,');
+    /*
+      The allow-list survived the move into the schema. `typeof value === 'string'` is not padding:
+      `z.custom` hands its predicate `unknown` off the wire, and `isChatChannel` is declared over
+      `string`, so without it a non-string reaches `.includes` and its answer is trusted.
+    */
+    expect(chatAction()).toContain("typeof value === 'string' && isChatChannel(value)");
   });
 
   it('page 0 is refused, because the load already sent it', () => {
     /*
-      SCOPED to the chat action. A bare `toContain` over the whole file passed while the guard was
-      deleted from this action, because the alerts action added later carries the identical line —
-      caught by a negative control that stayed green when it should have gone red. Two actions with
-      the same guard need two assertions that can tell them apart.
+      SCOPED to the chat query. A bare `toContain` over the whole file once passed while the guard
+      was deleted from this action, because the alerts action carries the identical line — caught by
+      a negative control that stayed green when it should have gone red.
+
+      The conversion changed the shape of that risk rather than removing it. There is now ONE
+      `pageNumber` schema and both queries reference it, so they cannot drift apart the way two
+      hand-written guards could. What has to be asserted is therefore different: that each query
+      really uses the shared schema, and that the schema really carries the bound.
     */
-    expect(chatAction()).toContain('page < 1 || page > MAX_CHAT_LOG_PAGE');
+    expect(chatAction()).toContain('page: pageNumber');
+    expect(alertsAction()).toContain('query(pageNumber,');
+    expect(remoteCode).toContain('z.number().int().min(1).max(MAX_CHAT_LOG_PAGE)');
   });
 
   it('and the offset is capped, because OFFSET is a scan', () => {
@@ -180,7 +206,13 @@ describe('the action refuses what it should', () => {
       place: one tenant reading another tenant's chat log by editing a form field.
     */
     expect(chatAction()).toContain('requireRoomShortCode(locals)');
-    expect(chatAction()).not.toContain("data.get('roomShortCode')");
+    /*
+      `data.get('roomShortCode')` was the shape to refuse while this was a `FormData` action. There
+      is no `FormData` now, so the equivalent is a `roomShortCode` FIELD on the schema — and
+      `strictObject` is what makes adding one a validation error rather than a silently ignored key.
+    */
+    expect(chatAction()).not.toContain('roomShortCode:');
+    expect(chatAction()).toContain('z.strictObject({');
   });
 });
 
@@ -238,15 +270,21 @@ describe('the alerts log is paged by the same machinery', () => {
   });
 
   it('older pages are fetched and survive the invalidate', () => {
-    expect(serverCode).toContain('loadOlderAlerts: async ({ request, locals }) => {');
-    expect(pageCode).toContain("await fetch('?/loadOlderAlerts'");
+    expect(remoteCode).toContain('export const loadOlderAlerts = query(pageNumber,');
+    expect(pageCode).toContain('await loadOlderAlertsPage(page)');
     expect(pageCode).toContain('mergeOlderChatMessages(olderAlerts, data.alerts)');
   });
 
-  it('and it refuses page 0 and an unbounded offset, like the chat action', () => {
-    expect(alertsAction()).toContain('page < 1 || page > MAX_CHAT_LOG_PAGE');
+  it('and it refuses page 0 and an unbounded offset, like the chat query', () => {
+    /*
+      Both bounds now come from the one `pageNumber` schema — see the chat assertion above for why
+      that changes what is worth asserting. The alerts query takes the page as its WHOLE argument
+      rather than a field, so there is no object for a `roomShortCode` to be smuggled onto at all;
+      what remains to prove is that the room still comes from the session.
+    */
+    expect(alertsAction()).toContain('query(pageNumber,');
     expect(alertsAction()).toContain('requireRoomShortCode(locals)');
-    expect(alertsAction()).not.toContain("data.get('roomShortCode')");
+    expect(alertsAction()).not.toContain('roomShortCode:');
   });
 
   it('the alerts search term REALLY gates paging, unlike the chat one', () => {

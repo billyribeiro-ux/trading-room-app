@@ -27,18 +27,15 @@ import {
   noCapturedRoomItems
 } from '$lib/server/captured-room';
 import { hashEmail, publicSessionHandle } from '$lib/server/connection';
-import {
-  MAX_CHAT_LOG_PAGE,
-  isChatChannel,
-  loadChatPage,
-  loadNewestChatPages
-} from '$lib/server/chat-log';
+// `MAX_CHAT_LOG_PAGE`, `isChatChannel` and `loadChatPage` left with the paging queries for
+// `log-pages.remote.ts`. What stays is the FIRST page, which the loader still sends with the room.
+import { loadNewestChatPages } from '$lib/server/chat-log';
 import { loadAlertPage } from '$lib/server/alert-log';
 import { isChatMode } from '$lib/chat-mode';
 import { parseReactions } from '$lib/server/reactions';
+// `requestMobilePin` left with `getMyMobilePin` for `mobile-pin.remote.ts`; this file no longer calls it.
 import {
   readRoomConfig,
-  requestMobilePin,
   requestStreamReadToken,
   writeRoomSetting
 } from '$lib/server/room-config-client';
@@ -50,13 +47,9 @@ import { mediaSignallingUrl } from '$lib/server/media-grant';
 import { publishToRoom } from '$lib/server/room-events';
 import { grantMediaElevation, revokeMediaElevation } from '$lib/server/media-elevation';
 import { deleteStoredFile, storeUpload } from '$lib/server/file-storage';
-import {
-  deleteThread,
-  insertPrivateMessage,
-  loadConversations,
-  loadThread,
-  searchThread
-} from '$lib/server/private-chat';
+// `deleteThread`, `insertPrivateMessage`, `loadThread` and `searchThread` left with the trio for
+// `private-chat.remote.ts`. What stays is the CONVERSATION LIST, which the loader still sends.
+import { loadConversations } from '$lib/server/private-chat';
 
 /**
  * The single room this build serves.
@@ -2198,183 +2191,25 @@ export const actions: Actions = {
     return { success: true };
   },
 
-  /**
-   * `sendPrivChat(peerID, msg, recvdUser)` in the capture, which puts
-   * `{peerID, msg, n, recvdNick, recvdAvt, recvdPic, recvdIsA}` on the wire as `privMsg`.
-   *
-   * Everything after `peerID` and `msg` is display data about the recipient that the SENDER
-   * supplies. None of it is trusted here: the row stores ids, and both names and avatars are read
-   * back from `users` when the thread is loaded. A client that lies about `recvdNick` changes
-   * nothing.
-   *
-   * Published to BOTH parties, matching the capture's channel semantics - see `RoomEvent`.
-   */
-  sendPrivateMessage: async ({ request, locals }) => {
-    ensureDatabase();
-    const user = requireUser(locals);
+  /*
+    The PRIVATE CHAT trio — `sendPrivateMessage`, `loadPrivateChatLog` and
+    `deletePrivateChatLog` — left together for `src/routes/private-chat.remote.ts`.
 
-    const data = await request.formData();
-    const peerId = Number(data.get('peerID') ?? NaN);
-    const body = String(data.get('msg') ?? '').trim();
-    if (!Number.isInteger(peerId)) return fail(400, { message: 'No recipient.' });
-    if (!body) return fail(400, { message: 'Empty message.' });
-    // Talking to yourself is the capture's own guard: `bootbox.alert("Chatting with yourself again?")`.
-    if (peerId === user.id) return fail(400, { message: 'Chatting with yourself again?' });
+    Together on purpose: they share a peer id, a room, the `privChat` channel and one repository
+    module, so converting them one at a time would have meant three copies of the peer-id guard.
+    The unit of conversion is the FEATURE, not the call site. All three are commands, including
+    the READ — that module explains why a thread reopened on every switch must not be cacheable.
+  */
+  /*
+    `loadOlderChatMessages` and `loadOlderAlerts` were actions here and are now
+    `src/routes/log-pages.remote.ts` — the first `query` functions in this application, and the
+    first reads that earn one: two SELECTs with a LIMIT and an OFFSET, no write anywhere on the
+    path. (`getMyMobilePin` is a read that had to stay a command, because it mints.)
 
-    const peer = db.select().from(users).where(eq(users.id, peerId)).get();
-    if (!peer) return fail(404, { message: 'No such user.' });
-
-    // The same bucket public chat uses. A private message is a message; giving it its own quota
-    // would let one user spend both budgets at once.
-    const limit = consumeRateLimit('message', user.id);
-    if (!limit.allowed) {
-      return fail(429, { message: 'You are sending messages too quickly.' });
-    }
-
-    const row = insertPrivateMessage(requireRoomShortCode(locals), user.id, peerId, body);
-    const message = {
-      _id: String(row.id),
-      t: row.createdAt.getTime(),
-      n: user.displayName,
-      txt: row.body,
-      uid: user.id,
-      recvdID: peerId,
-      avt: user.email,
-      pic: user.avatarUrl,
-      isA: isPresenterRole(user.role)
-    };
-
-    // Both parties. The sender's own copy is how their message reaches their log.
-    publishToRoom(requireRoomShortCode(locals), {
-      channel: 'privChat',
-      data: { toUserId: peerId, fromUserId: user.id, message }
-    });
-    publishToRoom(requireRoomShortCode(locals), {
-      channel: 'privChat',
-      data: { toUserId: user.id, fromUserId: user.id, message }
-    });
-
-    return { success: true, message };
-  },
-
-  /** `getPCLog {page, peerID}`, and `doPCLogSearch {searchTerm, peerID}` when a term is given. */
-  loadPrivateChatLog: async ({ request, locals }) => {
-    ensureDatabase();
-    const user = requireUser(locals);
-
-    const data = await request.formData();
-    const peerId = Number(data.get('peerID') ?? NaN);
-    if (!Number.isInteger(peerId)) return fail(400, { message: 'No peer.' });
-
-    const searchTerm = String(data.get('searchTerm') ?? '').trim();
-    if (searchTerm) {
-      return {
-        success: true,
-        peerId,
-        page: 0,
-        messages: searchThread(requireRoomShortCode(locals), user.id, peerId, searchTerm)
-      };
-    }
-    const page = Number(data.get('page') ?? 0) || 0;
-    return {
-      success: true,
-      peerId,
-      page,
-      messages: loadThread(requireRoomShortCode(locals), user.id, peerId, page)
-    };
-  },
-
-  /**
-   * `getChatLog {channel, page}` — one page of older history for the main chat log.
-   *
-   * The reference's own command, minus the socket. Its client asks for page N when the reader
-   * scrolls near the top, and the server answers with that page and nothing else; an EMPTY answer
-   * is what tells the client to stop asking (`0 == o.length && (this.hasMoreData = !1)`).
-   *
-   * ## The channel is validated, not trusted
-   *
-   * `isChatChannel` is an allow-list of the two channels this room renders. Without it the field
-   * would be an arbitrary string reaching a WHERE clause — parameterised, so not injectable, but it
-   * would let a caller enumerate whether messages exist under any label they cared to guess. Deny
-   * by default costs one line.
-   *
-   * ## Scoped like every other read here
-   *
-   * `requireRoomShortCode(locals)` — the room comes from the session, never from the request. A
-   * `roomShortCode` field on this form would be the 2026-08-07 privilege escalation again, in a
-   * new place.
-   */
-  loadOlderChatMessages: async ({ request, locals }) => {
-    ensureDatabase();
-    requireUser(locals);
-
-    const data = await request.formData();
-    const channel = String(data.get('channel') ?? '');
-    if (!isChatChannel(channel)) return fail(400, { message: 'No such channel.' });
-
-    /*
-      Page 0 is the newest page and the page load already sent it, so asking for it here would
-      duplicate what the client holds rather than reach further back. Bounded at the top too: a
-      caller cannot ask for page 10,000,000 and make SQLite count its way there, which is what an
-      unvalidated OFFSET is.
-    */
-    const page = Number(data.get('page') ?? 0);
-    if (!Number.isInteger(page) || page < 1 || page > MAX_CHAT_LOG_PAGE) {
-      return fail(400, { message: 'No such page.' });
-    }
-
-    return {
-      success: true,
-      channel,
-      page,
-      messages: loadChatPage(requireRoomShortCode(locals), channel, page)
-    };
-  },
-
-  /**
-   * `getAlertsLog {page}` — one page of older alerts.
-   *
-   * The sibling of `loadOlderChatMessages`, minus the channel: alerts are one stream per room, so
-   * upstream's command carries a page and nothing else. An EMPTY answer is what stops the client
-   * asking, and the arrival handler that reads it is literally the same component for both log
-   * types, switched on `logType`.
-   */
-  loadOlderAlerts: async ({ request, locals }) => {
-    ensureDatabase();
-    requireUser(locals);
-
-    const data = await request.formData();
-    /* Page 0 is the newest page and the load already sent it; the upper bound caps the OFFSET
-       walk, which is a scan. Same reasoning as the chat action, same constant. */
-    const page = Number(data.get('page') ?? 0);
-    if (!Number.isInteger(page) || page < 1 || page > MAX_CHAT_LOG_PAGE) {
-      return fail(400, { message: 'No such page.' });
-    }
-
-    return {
-      success: true,
-      page,
-      alerts: loadAlertPage(requireRoomShortCode(locals), page)
-    };
-  },
-
-  /** `deletePeerPCLog {peerID}` - the whole conversation, both directions. */
-  deletePrivateChatLog: async ({ request, locals }) => {
-    ensureDatabase();
-    const user = requireUser(locals);
-
-    const data = await request.formData();
-    const peerId = Number(data.get('peerID') ?? NaN);
-    if (!Number.isInteger(peerId)) return fail(400, { message: 'No peer.' });
-
-    deleteThread(requireRoomShortCode(locals), user.id, peerId);
-    // The peer's copy is gone too, so their open tab is now lying to them.
-    publishToRoom(requireRoomShortCode(locals), {
-      channel: 'privChat',
-      data: { toUserId: peerId, fromUserId: user.id }
-    });
-    return { success: true };
-  },
+    Everything that made them safe moved with them: the channel allow-list, the page bound that
+    stops an unvalidated OFFSET becoming a scan, and the room coming from the SESSION rather than
+    the request. The two hand-written page guards became one shared schema used twice.
+  */
 
   /**
    * Broadcasts the room's recording state.
@@ -2461,34 +2296,15 @@ export const actions: Actions = {
     return { success: true, mode };
   },
 
-  /**
-   * `sendServerCommand("getMyMobilePin", null)`.
-   *
-   * The room has never held the pin: the reference sends this on the command channel and the
-   * server answers with one. Here the controller is that server - the code lives on
-   * `room_users.mobile_pair_code`, which is per room, and it is minted fresh per request.
-   *
-   * Gated the same way the button is, and re-gated here because a hidden button is not an
-   * authorization check.
-   */
-  getMyMobilePin: async ({ request, locals }) => {
-    ensureDatabase();
-    const user = requireUser(locals);
-    const shortCode = requireRoomShortCode(locals);
+  /*
+    `getMyMobilePin` — `sendServerCommand("getMyMobilePin", null)` upstream — was an action here and
+    is now `src/routes/mobile-pin.remote.ts`. The gate, the controller call and both messages moved
+    with it unchanged; `fail(409)`/`fail(502)` became `error(409)`/`error(502)`, because a command
+    has no form-action caller to understand a `fail`.
 
-    const { settings } = await readRoomConfig(request, shortCode, user.email);
-    const appEnabled =
-      settings.ptrMobileAppEnabled === true || settings.customMobileAppEnabled === true;
-    if (!appEnabled) return fail(409, { message: 'This room has no mobile app configured.' });
-
-    try {
-      return { pin: await requestMobilePin(shortCode, user.email) };
-    } catch (cause) {
-      // Loud, not a placeholder: showing a pin that was never issued is worse than saying so.
-      console.error('[getMyMobilePin] the controller could not issue a pin', cause);
-      return fail(502, { message: 'Could not get an app pin right now.' });
-    }
-  },
+    It is a `command` and NOT a `query` despite being a read, and that module explains why at length:
+    the pin is minted fresh per request, and a query would cache it.
+  */
 
   presenterCommand: async ({ request, locals }) => {
     ensureDatabase();
@@ -3095,74 +2911,22 @@ export const actions: Actions = {
   },
 
   /*
-    `unmuteChat` — the lift, and the half of the pair that was never built.
+    `unmuteChat` was an action here and is now `src/routes/chat-mute.remote.ts` — the first remote
+    function in this application. The DATABASE half is unchanged and carried across intact: the same
+    single conditional DELETE, the same room scope, the same live-mutes-only clause, the same
+    per-user `privCmds` publish, and the reasoning for each.
 
-    The mute existed end to end: `mute24` above writes the row, `sendMessage` refuses while one is
-    live, and the loader exposes the viewer's own `chatMutedTill` so the composer can say why. The
-    UNMUTE existed only as a button. `ModalHost.svelte` renders "Unmute Chat", it calls
-    `onUserAction('unmute-chat', …)`, and the handler's only effect was to raise the reference's
-    alert string. A presenter could mute somebody permanently-by-accident and had no way back
-    except waiting out the 24 hours, while the UI told them the unmute had worked.
+    Three things at the BOUNDARY did change, and are named here so nobody reads "moved" as "identical":
+    `Number.isInteger` became a zod schema (which also refuses 0 and negatives, where the old guard
+    let them through to match nothing); `fail(400)` became the schema's own rejection; and `fail(403)`
+    became `error(403)`, because `fail` returns a value only a form action's caller understands and a
+    command has no such caller.
 
-    Upstream it is a command of its own on the wire (`{user}`, main bundle bytes 996325, 1430505,
-    2080257 and 2376996) reached only through `muteChat(-1)` — there is no button bound directly to
-    it, which is why an identifier search for `unmuteChat` in our source found nothing to match.
-
-    It is an action of its own rather than another `messageAction` operation because
-    `messageAction` requires a message id and returns 400 without one (see its guard above), and
-    this is addressed to a USER — the presenter is looking at a roster entry, not a message.
-
-    One conditional DELETE, no SELECT first: reading the row and then deleting it is the TOCTOU
-    this repository fixes everywhere else, and the delete is already idempotent, so a double click
-    is a no-op rather than a race.
-
-    It removes only LIVE mutes. Rows whose `expiresAt` has passed are already inert — the loader
-    and `sendMessage` both compare against `now` — so deleting them would destroy the record of
-    past mutes to no effect.
+    What the move bought is that boundary. As an action it was reached by `fetch('?/unmuteChat')` with
+    a hand-built `FormData`, so the endpoint name, the argument's type and the meaning of a failure
+    were all agreements nothing checked. This note is left here because `mute24` is still in this file
+    and the pair should not have to be searched for.
   */
-  unmuteChat: async ({ request, locals }) => {
-    ensureDatabase();
-    const data = await request.formData();
-    const targetUserId = Number(data.get('targetUserId'));
-    if (!Number.isInteger(targetUserId)) {
-      return fail(400, { message: 'A target user ID is required.' });
-    }
-
-    /*
-      Server-side authority, from data the server owns. `role` comes off the session, never from
-      the client — a member who posts this form directly gets a 403 rather than the power to
-      unmute themselves the moment a presenter mutes them.
-    */
-    const isPresenter =
-      requireUser(locals).role === 'staff' || requireUser(locals).role === 'admin';
-    if (!isPresenter) return fail(403);
-
-    db.delete(chatMutes)
-      .where(
-        and(
-          /*
-            Room-scoped for the same reason the mute is: authority here is per room, and a
-            presenter of this room must not reach into a room they hold nothing in.
-          */
-          eq(chatMutes.roomShortCode, requireRoomShortCode(locals)),
-          eq(chatMutes.targetUserId, targetUserId),
-          gt(chatMutes.expiresAt, new Date())
-        )
-      )
-      .run();
-
-    /*
-      `/privCmdsIn/{uid}-{id}/` — the per-user private channel, the same one `forceReload` uses.
-      Without this the unmuted member keeps the disabled composer until they happen to reload,
-      which is the same silence the mute already had: the state changed and nobody was told.
-    */
-    publishToRoom(requireRoomShortCode(locals), {
-      channel: 'privCmds',
-      data: { cmd: 'unmuteChat', targetUserId }
-    });
-
-    return { success: true };
-  },
 
   saveTheme: async ({ request, locals }) => {
     ensureDatabase();

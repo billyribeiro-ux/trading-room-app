@@ -103,6 +103,26 @@ export default defineConfig({
         unreviewable. Migrating to `#lib` is its own change.
       */
       alias: { $lib: 'src/lib' },
+      /*
+        Remote functions — `.remote.ts` files exporting `query` / `command` / `form`, called with a
+        real signature on the client and executed on the server.
+
+        Opted into with a consumer in the same commit, never on its own: a flag nothing reads is the
+        dead configuration this repository forbids. The first consumer is
+        `src/routes/chat-mute.remote.ts`.
+
+        It is EXPERIMENTAL and the docs say so in as many words — "likely to contain bugs and
+        subject to change without notice". It is taken anyway because the thing it replaces is
+        worse: `fetch('?/unmuteChat')` names its endpoint in a string nothing type-checks, hands it
+        `FormData` of stringified numbers, and reports failure as a boolean on a `Response`. The
+        argument is validated once, on the server, by a schema — not parsed twice and trusted once.
+
+        `compilerOptions.experimental.async` is deliberately NOT set alongside it. That option is
+        what allows `await` in a component's template; every call here is `await` inside an ordinary
+        event handler, which is plain JavaScript and needs no compiler support. Turning it on would
+        change how a 13,000-line component compiles to buy nothing.
+      */
+      experimental: { remoteFunctions: true },
       preprocess: vitePreprocess(),
       adapter: target === 'node' ? node() : vercel()
     })

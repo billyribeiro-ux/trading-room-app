@@ -17,74 +17,106 @@ import { describe, expect, it } from 'vitest';
   1430505, 2080257, 2376996), reached only through `muteChat(-1)`. There is no button bound directly
   to `unmuteChat`, which is why searching our source for that identifier found nothing to match and
   the gap survived an audit.
+
+  It is now a REMOTE COMMAND rather than a `?/unmuteChat` form action, and the assertions below moved
+  with it. That migration is the reason this file is worth re-reading rather than skimming: the old
+  version sliced `+page.svelte` for `const exactAlerts` to prove the action had left the toast-only
+  table, and when that table was extracted to `user-action-intent.ts` the slice returned an empty
+  string and the assertion passed against nothing. It is now pointed at the file that owns the table
+  AND asserts the table was found, which is the difference between a guard and a decoration.
 */
 
 const server = readFileSync(new URL('../routes/+page.server.ts', import.meta.url), 'utf8');
 const page = readFileSync(new URL('../routes/+page.svelte', import.meta.url), 'utf8');
+const remote = readFileSync(new URL('../routes/chat-mute.remote.ts', import.meta.url), 'utf8');
 const events = readFileSync(new URL('./server/room-events.ts', import.meta.url), 'utf8');
+const viteConfig = readFileSync(new URL('../../vite.config.ts', import.meta.url), 'utf8');
+const intent = readFileSync(new URL('./user-action-intent.ts', import.meta.url), 'utf8');
 const strip = (source: string) =>
   source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/<!--[\s\S]*?-->/g, '');
 const serverCode = strip(server);
 const pageCode = strip(page);
+const remoteCode = strip(remote);
 const eventsCode = strip(events);
+const viteCode = strip(viteConfig);
+const intentCode = strip(intent);
 
 describe('the unmute reaches the server', () => {
-  it('exists as an action of its own', () => {
+  it('is a remote command with its argument validated by a schema', () => {
     /*
-      Not another `messageAction` operation: that one returns 400 without a message id, and this is
-      addressed to a user the presenter picked out of the roster, where no message exists.
+      `command(schema, fn)` — the two-argument form. The one-argument form takes no input at all and
+      the `'unchecked'` form skips validation, so asserting the schema is passed is what proves the
+      exposed endpoint is not simply trusting whatever the client sends it.
     */
-    expect(serverCode).toContain('unmuteChat: async ({ request, locals }) => {');
+    expect(remoteCode).toContain('export const unmuteChat = command(unmuteChatArgs,');
+    expect(remoteCode).toContain('const unmuteChatArgs = z.strictObject({');
   });
 
-  it('is the action the modal button actually posts to', () => {
-    expect(pageCode).toContain("await fetch('?/unmuteChat', { method: 'POST', body });");
-    expect(pageCode).toContain("body.set('targetUserId', String(user.id));");
+  it('is no longer ALSO a form action, so there is one way in and not two', () => {
+    /*
+      The migration's real risk. Leaving `?/unmuteChat` behind would keep an unvalidated,
+      role-checked-by-hand endpoint alive next to the validated one, and a later fix to either would
+      silently miss the other.
+    */
+    expect(serverCode).not.toContain('unmuteChat: async');
+  });
+
+  it('is the command the modal button actually calls, by name and not by string', () => {
+    expect(pageCode).toContain(
+      "import { unmuteChat as unmuteChatCommand } from './chat-mute.remote';"
+    );
+    expect(pageCode).toContain('await unmuteChatCommand({ targetUserId: user.id });');
+    // The endpoint-as-a-magic-string this replaced. Its return is what nobody had to check.
+    expect(pageCode).not.toContain("fetch('?/unmuteChat'");
   });
 
   it('is no longer one of the toast-only controls', () => {
     /*
-      The negative half, and the one that would have caught the original bug. `exactAlerts` maps an
-      action straight to a string; while `unmute-chat` was a key in it, the button could not have
-      been doing anything else.
+      The negative half, and the one that would have caught the original bug: while `unmute-chat`
+      was a key in the action-to-alert table, the button could not have been doing anything else.
+
+      The table now lives in `user-action-intent.ts`, and this asserts it was FOUND before asserting
+      what is absent from it. Without that first line this passes just as happily against an empty
+      string — which is what it did, silently, for one commit after the table was extracted.
     */
-    const table = pageCode.slice(pageCode.indexOf('const exactAlerts'));
-    const body = table.slice(0, table.indexOf('};'));
+    const start = intentCode.indexOf('const EXACT_ALERTS');
+    expect(start).toBeGreaterThan(-1);
+    const body = intentCode.slice(start, intentCode.indexOf('};', start));
+    expect(body).toContain("'mute-chat-24'");
     expect(body).not.toContain('unmute-chat');
   });
 });
 
 describe('who is allowed to lift a mute', () => {
-  const action = serverCode.slice(serverCode.indexOf('unmuteChat: async'));
-  const body = action.slice(0, action.indexOf('saveTheme:'));
-
   it('decides on the server from the session role', () => {
-    expect(body).toContain("requireUser(locals).role === 'staff'");
-    expect(body).toContain("requireUser(locals).role === 'admin'");
-    expect(body).toContain('if (!isPresenter) return fail(403);');
+    expect(remoteCode).toContain('const { locals } = getRequestEvent();');
+    expect(remoteCode).toContain('if (!isPresenterRole(requireUser(locals).role))');
+    expect(remoteCode).toContain("error(403, 'Presenters only.');");
   });
 
   it('scopes the lift to the room it was issued in', () => {
     // Authority here is per room; a presenter of one room must not reach into another.
-    expect(body).toContain('eq(chatMutes.roomShortCode, requireRoomShortCode(locals))');
+    expect(remoteCode).toContain('const roomShortCode = requireRoomShortCode(locals);');
+    expect(remoteCode).toContain('eq(chatMutes.roomShortCode, roomShortCode)');
   });
 
-  it('validates the target before touching the table', () => {
-    expect(body).toContain('if (!Number.isInteger(targetUserId))');
+  it('validates the target as a positive integer before touching the table', () => {
+    /*
+      Tighter than the `Number.isInteger` guard it replaces, which admitted 0 and negatives. Every
+      `users.id` is an autoincrement primary key, so nothing legitimate is refused.
+    */
+    expect(remoteCode).toContain('targetUserId: z.number().int().positive()');
   });
 });
 
 describe('how the row is removed', () => {
-  const action = serverCode.slice(serverCode.indexOf('unmuteChat: async'));
-  const body = action.slice(0, action.indexOf('saveTheme:'));
-
   it('is one conditional delete, not a read followed by a write', () => {
     /*
       SELECT-then-DELETE is the TOCTOU this repository removes everywhere else. One statement is
       also what makes a double click a no-op instead of a race.
     */
-    expect(body).toContain('db.delete(chatMutes)');
-    expect(body).not.toContain('db.select');
+    expect(remoteCode).toContain('db.delete(chatMutes)');
+    expect(remoteCode).not.toContain('db.select');
   });
 
   it('removes only mutes that are still live', () => {
@@ -92,16 +124,14 @@ describe('how the row is removed', () => {
       Expired rows are already inert — the loader and `sendMessage` both compare against now — so
       deleting them would erase the record of past mutes and change nothing a member can observe.
     */
-    expect(body).toContain('gt(chatMutes.expiresAt, new Date())');
+    expect(remoteCode).toContain('gt(chatMutes.expiresAt, new Date())');
   });
 });
 
 describe('the member is told, on the channel meant for one member', () => {
   it('publishes on the per-user private command channel', () => {
-    const action = serverCode.slice(serverCode.indexOf('unmuteChat: async'));
-    const body = action.slice(0, action.indexOf('saveTheme:'));
-    expect(body).toContain("channel: 'privCmds'");
-    expect(body).toContain("data: { cmd: 'unmuteChat', targetUserId }");
+    expect(remoteCode).toContain("channel: 'privCmds'");
+    expect(remoteCode).toContain("data: { cmd: 'unmuteChat', targetUserId }");
   });
 
   it('is a command the event type admits', () => {
@@ -122,6 +152,54 @@ describe('the member is told, on the channel meant for one member', () => {
     const branch = pageCode.slice(pageCode.indexOf("command?.cmd === 'unmuteChat'"));
     expect(branch.slice(0, branch.indexOf('}'))).toBeTruthy();
     expect(branch.slice(0, 400)).toContain('void invalidateAll();');
+  });
+});
+
+describe('a refusal is visible', () => {
+  /*
+    The one behavioural change the migration makes, and the point of it. A form action answered with
+    `response.ok === false`, which the call site was free to ignore and did — `void unmuteChat(user)`
+    with no handler at all. That is the original bug's exact shape, reintroduced at a different
+    layer. A remote command rejects, so the refusal has to be caught to be dropped.
+  */
+  it('catches the rejection and says so, rather than dropping it', () => {
+    const branch = pageCode.slice(pageCode.indexOf("if (action === 'unmute-chat') {"));
+    const body = branch.slice(0, branch.indexOf('return;'));
+    expect(body).toContain('void unmuteChat(user).catch(() => {');
+    expect(body).toContain("bootboxAlert = 'Command failed.';");
+  });
+
+  it('still awaits the command inside the wrapper, so a 403 cannot reach invalidateAll', () => {
+    // Refreshing the roster after a refused mutation would show the presenter an unchanged list
+    // and no reason for it.
+    const fn = pageCode.slice(pageCode.indexOf('async function unmuteChat(user: ModalTargetUser)'));
+    const body = fn.slice(0, fn.indexOf('\n  }'));
+    expect(body.indexOf('await unmuteChatCommand(')).toBeLessThan(
+      body.indexOf('await invalidateAll()')
+    );
+  });
+});
+
+describe('the experimental flag and its consumer travel together', () => {
+  /*
+    Remote functions are opt-in behind `kit.experimental.remoteFunctions`, and the flag lives in
+    `vite.config.ts` because this app has no `svelte.config.js` — Kit 3 takes its options through
+    the plugin. Two failure modes are worth one assertion each: the flag switched off while a
+    `.remote.ts` file still exists (every call 404s at runtime, and nothing here would notice), and
+    the flag left behind after the last consumer is deleted, which is the dead configuration this
+    repository forbids by name.
+  */
+  it('has the flag on while a remote file exists', () => {
+    expect(viteCode).toContain('experimental: { remoteFunctions: true }');
+  });
+
+  it('does not turn on the async compiler option, which nothing here needs', () => {
+    /*
+      `compilerOptions.experimental.async` is what allows `await` in a component TEMPLATE. Every
+      call in this app is `await` inside an event handler, which is ordinary JavaScript. Turning it
+      on would change how a 13,000-line component compiles to buy nothing.
+    */
+    expect(viteCode).not.toContain('async: true');
   });
 });
 

@@ -17,6 +17,19 @@
   import { page } from '$app/state';
   import { panelDragResize, readPanelBounds } from '$lib/panel-drag';
   import { invalidate, invalidateAll } from '$app/navigation';
+  // The first remote function in this app. Aliased because the local wrapper below keeps the name.
+  import { unmuteChat as unmuteChatCommand } from './chat-mute.remote';
+  import { getMyMobilePin } from './mobile-pin.remote';
+  import {
+    loadOlderAlerts as loadOlderAlertsPage,
+    loadOlderChatMessages as loadOlderChatPage
+  } from './log-pages.remote';
+  import {
+    deletePrivateChatLog as deletePrivateChatLogCommand,
+    loadPrivateChatLog as loadPrivateChatLogCommand,
+    sendPrivateMessage as sendPrivateMessageCommand
+  } from './private-chat.remote';
+  import { isHttpError } from '@sveltejs/kit';
   import {
     PUBLIC_PTR_CDN_UPLOAD_KEY,
     PUBLIC_PTR_GIPHY_API_KEY,
@@ -2098,17 +2111,12 @@
     // before anything appears.
     openModal('mobile');
     mobilePin = 'N/A';
-
-    const response = await fetch('?/getMyMobilePin', { method: 'POST', body: new FormData() });
-    const result = deserialize(await response.text());
-    if (result.type === 'success' && typeof result.data?.pin === 'string') {
-      mobilePin = result.data.pin;
-    } else {
-      // No invented placeholder. `N/A` is the captured value for "no pin", and a failed request is
-      // a case of not having one.
-      bootboxAlert =
-        (result.type === 'failure' ? (result.data?.message as string) : null) ??
-        'Could not get an app pin right now.';
+    try {
+      mobilePin = await getMyMobilePin();
+    } catch (cause) {
+      // `N/A` stays as set above — no invented placeholder. `isHttpError` narrows Kit's rejection so
+      // the 409 and 502 wordings stay distinct; `mobile-pin.remote.ts` says why that shape is known.
+      bootboxAlert = isHttpError(cause) ? cause.body.message : 'Could not get an app pin right now.';
     }
   }
 
@@ -3099,18 +3107,16 @@
     alertsLoadingMore = true;
     const page = alertsPage + 1;
 
-    const body = new FormData();
-    body.set('page', String(page));
-    const response = await fetch('?/loadOlderAlerts', { method: 'POST', body });
-    const result = deserialize<
-      { page?: number; alerts?: (typeof data.alerts)[number][] },
-      { message?: string }
-    >(await response.text());
+    let incoming: Awaited<ReturnType<typeof loadOlderAlertsPage>>;
+    try {
+      incoming = await loadOlderAlertsPage(page);
+    } catch {
+      // Non-fatal by design, not swallowed: `hasMoreData` stays true and the next scroll retries.
+      return; // `log-pages.remote.ts` carries why, and why the `finally` below must not move.
+    } finally {
+      alertsLoadingMore = false;
+    }
 
-    alertsLoadingMore = false;
-    if (result.type !== 'success' || !result.data?.alerts) return;
-
-    const incoming = result.data.alerts;
     if (incoming.length === 0) {
       alertsHasMoreData = false;
       return;
@@ -3180,19 +3186,15 @@
     chatLoadingMore = true;
     const page = (chatPage[channel] ?? 0) + 1;
 
-    const body = new FormData();
-    body.set('channel', channel);
-    body.set('page', String(page));
-    const response = await fetch('?/loadOlderChatMessages', { method: 'POST', body });
-    const result = deserialize<
-      { channel?: string; page?: number; messages?: (typeof data.messages)[number][] },
-      { message?: string }
-    >(await response.text());
+    let incoming: Awaited<ReturnType<typeof loadOlderChatPage>>;
+    try {
+      incoming = await loadOlderChatPage({ channel, page });
+    } catch {
+      return; // Non-fatal and retried, exactly as the alerts sibling above.
+    } finally {
+      chatLoadingMore = false;
+    }
 
-    chatLoadingMore = false;
-    if (result.type !== 'success' || !result.data?.messages) return;
-
-    const incoming = result.data.messages;
     if (incoming.length === 0) {
       chatHasMoreData = { ...chatHasMoreData, [channel]: false };
       return;
@@ -3725,12 +3727,19 @@
    * raised the reference's alert and stopped. `invalidateAll()` refreshes the presenter's own view
    * of the roster; the MEMBER learns about it on the `privCmds` channel, because their gate is
    * server-read and nothing local to them changed.
+   *
+   * That `invalidateAll()` runs by hand and has to: single-flight mutations refresh remote QUERIES,
+   * and the presenter's roster is not one — it comes from this route's `load`. Converting it is its
+   * own change, and doing it here would be claiming a refresh that never happens.
+   *
+   * The caller does not await this — `handleUserAction` is synchronous — but it DOES catch it. A
+   * remote command rejects where the old `fetch('?/unmuteChat')` returned `response.ok === false`
+   * for anyone who bothered to look, and nobody did; that is the same silent success this whole
+   * path was built to fix. `chat-mute.remote.ts` carries the rest of the reasoning.
    */
   async function unmuteChat(user: ModalTargetUser) {
-    const body = new FormData();
-    body.set('targetUserId', String(user.id));
-    const response = await fetch('?/unmuteChat', { method: 'POST', body });
-    if (response.ok) await invalidateAll();
+    await unmuteChatCommand({ targetUserId: user.id });
+    await invalidateAll();
   }
 
   function handleUserAction(action: string, user: ModalTargetUser) {
@@ -3961,16 +3970,17 @@
     }
 
     /*
-      `unmute-chat` is handled ahead of the table below because it is no longer only a string.
-
-      Everything in `exactAlerts` is a control whose whole effect is its own toast, which is the
-      shape this repository calls out by name. The unmute has left that table because it now sends
-      something: the entry stayed while the wire was missing, and its presence made the button look
-      finished. The alert text is unchanged and still the capture's, lower-case and all.
+      Ahead of `userActionAlert` below because this one sends something — see `EXACT_ALERTS` in
+      `user-action-intent.ts` for why leaving it in that table was the bug. The alert is raised
+      first because the reference raises it immediately; `Command failed.` is inherited from the
+      sibling handlers in this file, not captured, because the reference never showed us a failure
+      for this control.
     */
     if (action === 'unmute-chat') {
-      void unmuteChat(user);
       bootboxAlert = 'user chat unmuted';
+      void unmuteChat(user).catch(() => {
+        bootboxAlert = 'Command failed.';
+      });
       return;
     }
 
@@ -5664,18 +5674,13 @@
 
   /** `loadPClogForUID(uid, page)` -> `getPCLog {page, peerID}`; with a term it is `doPCLogSearch`. */
   async function loadPrivateChatLog(peerId: number, page = 0, searchTerm = '') {
-    const body = new FormData();
-    body.set('peerID', String(peerId));
-    body.set('page', String(page));
-    if (searchTerm) body.set('searchTerm', searchTerm);
-    const response = await fetch('?/loadPrivateChatLog', { method: 'POST', body });
-    const result = deserialize<
-      { peerId?: number; page?: number; messages?: PrivateChatMessage[] },
-      { message?: string }
-    >(await response.text());
-    if (result.type !== 'success' || !result.data?.messages) return;
+    let incoming: PrivateChatMessage[];
+    try {
+      incoming = await loadPrivateChatLogCommand({ peerId, page, searchTerm });
+    } catch {
+      return; // Non-fatal: the held log stays as it was. See `private-chat.remote.ts`.
+    }
 
-    const incoming = result.data.messages;
     // Page 0 replaces; a later page is older history and goes in front of what is already there.
     privChatLog = {
       ...privChatLog,
@@ -5689,15 +5694,11 @@
     const text = privateChatDraft.trim();
     if (!text || currUser === null) return;
 
-    const body = new FormData();
-    body.set('peerID', String(currUser));
-    body.set('msg', text);
-    const response = await fetch('?/sendPrivateMessage', { method: 'POST', body });
-    const result = deserialize<{ message?: PrivateChatMessage }, { message?: string }>(
-      await response.text()
-    );
-    if (result.type === 'failure') {
-      bootboxAlert = result.data?.message ?? 'Message not sent.';
+    try {
+      await sendPrivateMessageCommand({ peerId: currUser, body: text });
+    } catch (cause) {
+      // The server's own wording, which includes the capture's `Chatting with yourself again?`.
+      bootboxAlert = isHttpError(cause) ? cause.body.message : 'Message not sent.';
       return;
     }
     privateChatDraft = '';
@@ -5713,9 +5714,7 @@
       message: 'Are you sure you want to delete all messages in this chat?',
       onconfirm: async () => {
         bootboxConfirmation = null;
-        const body = new FormData();
-        body.set('peerID', String(peerId));
-        await fetch('?/deletePrivateChatLog', { method: 'POST', body });
+        await deletePrivateChatLogCommand({ peerId });
         const { [peerId]: _dropped, ...remainingLog } = privChatLog;
         privChatLog = remainingLog;
         const { [peerId]: _unread, ...remainingUnread } = unreadByPeer;
