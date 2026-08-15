@@ -151,7 +151,7 @@ const DIVERGED_FROM_IMPORT = new Map([
   */
   [
     'services/api/src/bin/postgres-release-attestation.rs',
-    'b99b51e25495efff0d60cc2f0e4ac9e082829075c58250c4b5c215facb0d6a01'
+    '5694c0e5b6b4d7b8ad0cbb2b309e0d36fbdcb1030ca974cf12c1faf14bd2e285'
   ],
   // Diverged 2026-08-15 by the runtime-role cutover. Each was an untouched import until then.
   //   db/mod.rs                 EXPECTED_RUNTIME_ROLE -> tradingroom_app, and its unit-test
@@ -165,7 +165,7 @@ const DIVERGED_FROM_IMPORT = new Map([
   // and PostgreSQL reports a nonexistent role as `28P01 password authentication failed`, naming the
   // wrong cause. Found by `naming-boundary.test.ts` on the day it was written.
   ['services/.env.example', '67ec3560d9c8e9674f3c3c4c9e18a47023bc245a57036ea00e574e31a1529f0d'],
-  ['services/api/src/db/mod.rs', '4dc460c6b4fb8f9f04c24cabe01b0d87765ef6913d376b2470aaf89458a77708'],
+  ['services/api/src/db/mod.rs', '95294947a9963004ff2204d3e1b305d05d9b26cc19d4c643d48ba7126c0d65d9'],
   ['services/api/tests/migrations.rs', '94747fe1aeed9c351f22ae9a312ea70842bbab254af54a6659787ab949a61252'],
   ['services/docker/postgres/10-provision-roles.sh', '36031a9f9fb09d597dc58e3b50c59e3c7cb56918cda12dcfce01e959cc406e6d'],
   ['services/api/src/db/migrate.rs', '0df32e9c11c3ace6739f1a6ea9f17610f3263652dc90cc6a07172ba966864e6c'],
