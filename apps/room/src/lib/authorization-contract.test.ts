@@ -152,12 +152,30 @@ describe('write-action input validation', () => {
     expect(isChatTab('MAIN')).toBe(false);
   });
 
-  it('caps message and alert bodies', () => {
-    const pageServer = text(new URL('../routes/+page.server.ts', import.meta.url));
-    // Stored forever and re-sent to every reader on every poll, so an unbounded body is
-    // a storage and bandwidth problem as much as an input-validation one.
-    expect(pageServer).toContain('MAX_MESSAGE_BODY');
-    expect(pageServer).toContain('MAX_ALERT_BODY');
-    expect(pageServer).toContain('isChatTab(room)');
+  it('caps message, question and alert bodies', () => {
+    /*
+      Stored forever and re-sent to every reader on every poll, so an unbounded body is a storage
+      and bandwidth problem as much as an input-validation one.
+
+      All three moved out of `+page.server.ts` when the commands did. `$lib/message-bounds.ts` holds
+      the numbers — a `.remote.ts` file cannot export a constant, so the alternative was the same
+      value written three times. Two of the three bounds are NEW: only `sendMessage` ever checked a
+      length, and `replyMessage` and `askQuestion` accepted a body of any size.
+    */
+    const bounds = text(new URL('message-bounds.ts', import.meta.url));
+    expect(bounds).toContain('export const MAX_MESSAGE_BODY = 4_000;');
+    expect(bounds).toContain('export const MAX_QUESTION_BODY = 4_000;');
+    expect(bounds).toContain('export const MAX_ALERT_BODY = 8_000;');
+
+    const chat = text(new URL('../routes/chat-messages.remote.ts', import.meta.url));
+    expect(chat).toContain('export const sendMessage = command(');
+    // Checked on BOTH paths now, where the reply path had no bound at all.
+    expect((chat.match(/body\.length > MAX_MESSAGE_BODY/g) ?? []).length).toBe(2);
+    expect(chat).toContain('isChatTab(value)');
+
+    const questions = text(new URL('../routes/alert-questions.remote.ts', import.meta.url));
+    expect(questions).toContain('body.length > MAX_QUESTION_BODY');
+    const alert = text(new URL('../routes/post-alert.remote.ts', import.meta.url));
+    expect(alert).toContain('body: z.string().min(1).max(MAX_ALERT_BODY)');
   });
 });

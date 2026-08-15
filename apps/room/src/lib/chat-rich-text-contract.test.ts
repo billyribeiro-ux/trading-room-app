@@ -25,14 +25,15 @@ const BROWSER_SANITIZER = readFileSync(
   'utf8'
 );
 const MESSAGE = readFileSync(new URL('./components/RoomMessage.svelte', import.meta.url), 'utf8');
-const SERVER = readFileSync(new URL('../routes/+page.server.ts', import.meta.url), 'utf8');
+// `SERVER` is gone with `serverCode`: `+page.server.ts` no longer holds any of this.
 const SCHEMA = readFileSync(new URL('./server/db/schema.ts', import.meta.url), 'utf8');
 const DB = readFileSync(new URL('./server/db/index.ts', import.meta.url), 'utf8');
 
 const stripComments = (source: string) =>
   source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/<!--[\s\S]*?-->/g, '');
 
-const serverCode = stripComments(SERVER);
+// `serverCode` is gone: everything this file asserted about the server moved to the remote
+// modules, and a reader that nothing reads is the next person's dead end.
 const messageCode = stripComments(MESSAGE);
 
 /** The tag list each sanitiser actually enforces, read out of its own source. */
@@ -78,17 +79,40 @@ describe('the row records which kind of message it is', () => {
 });
 
 describe('the server is the control', () => {
+  /*
+    `sendMessage` moved to `chat-messages.remote.ts`. Re-pointed there, and that file is asserted to
+    hold the command first — after an extraction a `toContain` can otherwise pass against a file
+    that never held the thing, and a `not.toContain` almost certainly will.
+  */
+  const chatCommands = readFileSync(
+    new URL('../routes/chat-messages.remote.ts', import.meta.url),
+    'utf8'
+  );
+
   it('sanitises what was submitted and stores only the result', () => {
-    expect(serverCode).toContain(
-      "const sanitizedHtml = submittedHtml ? sanitizeChatHtml(submittedHtml) : '';"
+    expect(chatCommands).toContain('export const sendMessage = command(');
+    expect(chatCommands).toContain(
+      "const sanitizedHtml = submittedHtml?.trim() ? sanitizeChatHtml(submittedHtml.trim()) : '';"
     );
-    // The submitted value is never what gets written.
-    expect(serverCode).not.toMatch(/bodyHtml:\s*submittedHtml/);
-    expect(serverCode).toContain('bodyHtml,');
+    /*
+      The submitted value is never what gets WRITTEN — scoped to the insert, which is what that has
+      always meant. Left unscoped it now matches the command's own parameter destructuring
+      (`{ bodyHtml: submittedHtml }`), which is a rename and not a write: the guard would have gone
+      red for a reason that had nothing to do with what it guards.
+    */
+    const insert = chatCommands.slice(
+      chatCommands.indexOf('db.insert(messages)'),
+      chatCommands.indexOf('.run();', chatCommands.indexOf('db.insert(messages)'))
+    );
+    expect(insert, 'the insert must be found for this to guard anything').toContain(
+      'roomShortCode'
+    );
+    expect(insert).not.toMatch(/bodyHtml:\s*submittedHtml/);
+    expect(insert).toContain('bodyHtml,');
   });
 
   it('treats an all-stripped message as empty rather than posting a blank', () => {
-    expect(serverCode).toContain('!isEmptyChatHtml(sanitizedHtml) ? sanitizedHtml : null');
+    expect(chatCommands).toContain('!isEmptyChatHtml(sanitizedHtml) ? sanitizedHtml : null');
   });
 
   it('still writes a plain-text body, so every existing reader keeps working', () => {
@@ -96,8 +120,16 @@ describe('the server is the control', () => {
       The mention rule, the popup, search and any client that never learns about `body_html` all
       read `body`. Deriving it from the sanitised HTML means there is never an HTML-only message.
     */
-    expect(serverCode).toContain('const body = bodyHtml');
-    expect(serverCode).toContain(".replace(/<[^>]*>/g, '')");
+    expect(chatCommands).toContain('const body = bodyHtml ? stripHtmlToText(bodyHtml)');
+    /*
+      It is `stripHtmlToText` now and no longer three lines written out here. The composer's
+      optimistic copy already used that function and its docstring said "the two must agree" with no
+      way to enforce it; one function is the enforcement. The regex itself is asserted where it now
+      lives, so this still pins the derivation and not just a call.
+    */
+    const plainText = readFileSync(new URL('chat-plain-text.ts', import.meta.url), 'utf8');
+    expect(plainText).toContain(".replace(/<[^>]*>/g, '')");
+    expect(plainText).toContain(".replace(/&nbsp;/g, ' ')");
   });
 
   it('end to end: a hostile submission stores nothing renderable', () => {

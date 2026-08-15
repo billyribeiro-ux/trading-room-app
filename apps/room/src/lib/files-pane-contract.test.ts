@@ -4,7 +4,13 @@ import { eq } from 'drizzle-orm';
 import { callRemote } from '$lib/server/remote-command-harness';
 import { db, ensureDatabase } from '$lib/server/db';
 import { sharedFiles, users } from '$lib/server/db/schema';
-import { INITIAL_FILE_SORT, fileSortTitle, sortFiles, toggleFileSort } from '$lib/file-sort';
+import {
+  INITIAL_FILE_SORT,
+  fileSizeInKb,
+  fileSortTitle,
+  sortFiles,
+  toggleFileSort
+} from '$lib/file-sort';
 
 /*
   The controller, stubbed — for the ONE action in this pane that talks to it.
@@ -152,8 +158,22 @@ describe('files table', () => {
   });
 
   it('reports size the way the capture does', () => {
+    /*
+      `fileSizeInKb` moved to `$lib/file-sort.ts` — the module that already owns how this pane sorts
+      and labels its rows. Asserting the expression as a STRING here only ever proved the text
+      existed; it is EXECUTED now, which is what the move bought.
+    */
     expect(bundle).toContain('i.round(e.size / 1024)');
-    expect(page).toContain('Math.round(size / 1024)');
+    expect(fileSizeInKb(1024)).toBe(1);
+    expect(fileSizeInKb(1536), 'rounds, per `i.round`').toBe(2);
+    expect(fileSizeInKb(0)).toBe(0);
+    /*
+      The template supplies the literal `Kb` and the function returns a number. Asserted WITHOUT the
+      capture's trailing space, because prettier puts the newline there — my first attempt asserted
+      `'Kb '` and failed for being wrong about the formatter, not about the markup. The space is
+      still rendered; it is whitespace between the text and the closing tag.
+    */
+    expect(page).toContain('>{fileSizeInKb(item.size)}Kb');
   });
 });
 
