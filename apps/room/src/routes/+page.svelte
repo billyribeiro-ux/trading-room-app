@@ -11136,6 +11136,10 @@
                             {enableBadges}
                             {showBadgesToPresentersOnly}
                             {disableStarYears}
+                            {usersPublicReply}
+                            {enableReactions}
+                            {enableEditMessage}
+                            {enableEditAlerts}
                             currentUserId={data.user.id}
                             currentUserEmailHash={data.user.emailHash}
                             currentUserName={data.user.displayName}
@@ -11268,6 +11272,10 @@
                             {enableBadges}
                             {showBadgesToPresentersOnly}
                             {disableStarYears}
+                            {usersPublicReply}
+                            {enableReactions}
+                            {enableEditMessage}
+                            {enableEditAlerts}
                             currentUserId={data.user.id}
                             currentUserEmailHash={data.user.emailHash}
                             currentUserName={data.user.displayName}
