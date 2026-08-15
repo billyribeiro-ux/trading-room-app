@@ -43,20 +43,60 @@ runner rather than a stale branch. `src/lib/eslint-config-resolution.test.ts` no
 RESOLVED config via `ESLint.calculateConfigForFile` — a grep for `'off'` would have passed
 throughout the entire failure, because the string was always there.
 
-### Still open — CI can accept an UNVERIFIED commit onto a deploying branch
+### ✅ CLOSED 2026-08-15 12:49 EDT — CI could accept an UNVERIFIED commit onto a deploying branch
 
-Not a leftover; the mechanism that let #1 land in the first place.
+Both closed. **Do not re-open either; the state below is verified, not remembered.**
 
-1. **`quality.yml:29-31` sets `concurrency` with `cancel-in-progress: true`, and it applies to
-   pushes on `main`.** `060ba72` — the commit that broke the gate — had its own verification run
-   CANCELLED when a PR merge landed two minutes later. The gate never checked the commit that broke
-   it. Fix: `cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}`. On a branch, cancelling a
-   superseded run is right; on `main`, where every commit is a production deploy, it is not.
-2. **`gh api repos/billyribeiro-ux/trading-room-app/branches/main/protection` returns 404.** There
-   is no branch protection and no required status check, so nothing stops a red commit reaching an
-   auto-deploying default branch. That is the whole reason this list exists.
+1. **`cancel-in-progress` no longer applies to `main`.** All three workflows now read
+   `cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}` — merged in `4c2dd74` (PR #43).
+   Branch and `pull_request` runs still cancel as before; only the default branch is protected.
 
-Both need the owner: one edits a workflow, the other changes repository settings.
+   The evidence that justified it: **11 of the last 40 runs on `main` were `cancelled` — 27%** —
+   including EVERY `Backend quality` run in the 2026-08-15 sequence (`4a79203`, `c1ff436`,
+   `5f03e5f`, `731d232`, `b267143`, `a84f20f`, `41d8de6`, `ffa410d`, `030a209`, `ed3b26f`). The Rust
+   and PostgreSQL security contracts had, in practice, never verified a commit on the default
+   branch. It is also how `060ba72` landed and broke the lint gate with its own run cancelled two
+   minutes later.
+
+   **Enforced, not just applied:** `apps/controller/src/lib/ci-verification-integrity.test.ts`
+   sweeps the workflow directory rather than naming three files, so a fourth is covered the day it
+   is added, and it strips comments first because prose describing a setting is not the setting.
+   Negative control run — reverting `smoke.yml` to `true` turns it red naming the file and the fix.
+
+2. **`main` is protected.** `branches/main/protection` returned 404; it now returns:
+
+   ```
+   required checks : room quality, controller quality, Rust and PostgreSQL security contracts
+   strict          : false        enforce_admins : false
+   force pushes    : blocked      deletions      : blocked
+   ```
+
+   `enforce_admins: false` is deliberate — the owner keeps pushing straight to `main`, which is the
+   documented 2026-08-09 convention. What changed is that `gh pr merge` now refuses on red unless
+   `--admin` is passed, so merging a red commit becomes a deliberate act rather than an accident.
+   Undo with `gh api -X DELETE repos/billyribeiro-ux/trading-room-app/branches/main/protection`.
+
+   Caveat worth knowing: PR #43 merged while its own backend run was still going, so it did NOT
+   clear the new protection. The next PR is the first real test of it.
+
+### Still open — the 78 evicted scripts remain readable in PUBLIC history
+
+The one thing untracking could not reach, and the only genuinely outstanding item here.
+
+`apps/room/scripts` holds **0** files on `main` today. At `be239b2` — before the 2026-08-15
+eviction — it holds **78**, and the repository is `public`, so they are readable at that commit by
+anyone. Untracking governs future commits only.
+
+Measured rather than assumed, with the repository's own detector in `apps/room/gate/privacy-utils.mjs`:
+no email addresses, no gravatar hashes, no tokens across all 78. **One** occurrence of the owner's
+name, in `scripts/compare-capture-states.mjs`. What they do carry is the third-party application
+they were built to match — `chat.protradingroom.com`, its selectors and wire protocol — which makes
+this the republication question, not a credential leak.
+
+Two ways to actually resolve it, and only these two: rewrite history with `git filter-repo` and
+force-push (every commit SHA changes, and GitHub may cache the old objects until support purges
+them), or make the repository private (instant, erases nothing, ends the exposure). Leaving it is a
+legitimate third answer given what is actually in the files. **Owner's decision; not taken.**
 
 **The wall was architectural, not a bug: 49 of the room's 108 test files read evidence that is
 deliberately not in the repository** — `docs/source`, `second-dump`, `css`, `new-evidence` and the

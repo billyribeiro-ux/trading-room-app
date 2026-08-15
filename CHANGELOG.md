@@ -24,6 +24,56 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-15
 
+### 2026-08-15 12:49 EDT — CI can no longer cancel the default branch out of its own verification
+
+**Runtime impact: none.** Three workflow files, one new test, and one repository setting.
+
+Closes both items the 12:24 entry below left open. That entry says they "need the owner" — they got
+the owner, and this supersedes it. **`TODO.md` is the current record; the section there is now
+marked CLOSED with the verification.**
+
+**1. `cancel-in-progress` no longer applies to `main`** — `4c2dd74`, PR #43. All three workflows now
+read `cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}`. On a branch, cancelling a
+superseded run is right: a new push makes the previous run irrelevant, and a slow job restarting
+from zero on every push means nothing is learned. On `main` it inverts — a run there is not a
+preview of a merge, it is the only verification a production deploy ever gets.
+
+Measured rather than argued: **11 of the last 40 runs on `main` were `cancelled`, 27%**, including
+EVERY `Backend quality` run in the 2026-08-15 sequence — `4a79203`, `c1ff436`, `5f03e5f`, `731d232`,
+`b267143`, `a84f20f`, `41d8de6`, `ffa410d`, `030a209`, `ed3b26f`. The Rust and PostgreSQL security
+contracts on a multi-tenant fintech application had, in practice, never verified a commit on the
+default branch. It is also the mechanism that let `060ba72` break the lint gate: pushed straight to
+`main`, its own run cancelled two minutes later by a PR merge, and the next eight runs failed for a
+reason nobody could attribute.
+
+`apps/controller/src/lib/ci-verification-integrity.test.ts` asserts it, because the correctness of
+this value is invisible by inspection — `cancel-in-progress: true` reads as a sensible optimisation,
+which is why it was written three times, and the failure never appears in the diff that introduces
+it. It appears later as a run that is simply absent. The sweep reads the directory rather than
+naming three files, and strips comments first: prose describing a setting is not the setting, the
+same trap `ci-package-manager-pin.test.ts` already records. Negative control run — reverting
+`smoke.yml` to `true` turns it red naming the file and the fix; restored green.
+
+**2. `main` is protected.** `branches/main/protection` returned `404 Branch not protected`; it now
+requires `room quality`, `controller quality` and `Rust and PostgreSQL security contracts`, with
+`strict: false`, force-pushes blocked and deletions blocked.
+
+`enforce_admins: false` is deliberate, not an oversight. The owner pushes straight to `main` — the
+documented 2026-08-09 convention — and `enforce_admins: true` would have ended that outright, since
+checks cannot be green on a commit that does not exist yet. What changes is that `gh pr merge`
+refuses on red unless `--admin` is passed, so merging red becomes a deliberate act rather than an
+accident. Reversible with one `gh api -X DELETE`.
+
+**Verified:** all three workflows parse via `yaml.parse` with the new expression; the new test is
+8 passed; controller lint exit 0, `svelte-check` 1524 files / 0 errors, full unit suite 92 files /
+972 passed, prettier clean. `Frontend quality` and `smoke` both `completed/success` on `4c2dd74`.
+
+**Two things stated plainly rather than glossed.** PR #43 edits `backend-quality.yml`, which its own
+path filter at line 143 matches, so it correctly took the full ~33-minute backend run — and it was
+merged while that run was still in flight, so it did NOT clear the new protection. The next PR is
+the first real test of it. And `Backend quality` on `4c2dd74` had not finished at the time of
+writing; it is not claimed green here.
+
 ### 2026-08-15 12:24 EDT — the frontend gate is GREEN on `main` for the first time
 
 **Runtime impact: one restoration, see below.** Otherwise configuration, a moved parser, a tracked
