@@ -101,8 +101,11 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       all six. The line count is not the point of this first slice; the pattern is, and it is proven:
       `svelte-autofixer` returns `issues: []` AND `suggestions: []` on the 115-line class, where the
       same call on this file returns ~100 suggestions with no way to tell new from pre-existing.
+
+      `RoomMenus` is the second, and the first to move the number properly: eleven floating-menu
+      flags and 82 assignment sites out, 13,520 -> 13,496.
     */
-    max: 13520,
+    max: 13496,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {

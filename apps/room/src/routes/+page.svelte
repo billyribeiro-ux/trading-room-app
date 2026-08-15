@@ -16,6 +16,7 @@
   } from '$lib/chat-paging';
   import { stripHtmlToText } from '$lib/chat-plain-text';
   import { toggleReaction } from '$lib/reaction-toggle';
+  import { RoomMenus } from '$lib/room/menus.svelte';
   import { RoomPolls } from '$lib/room/polls.svelte';
   import { chooseRecordingOptions } from '$lib/recording-codec';
   import { page } from '$app/state';
@@ -1266,17 +1267,16 @@
   let inlineAlertEntry = $state(false);
   let alertSearch = $state('');
   let alertsDetachedWindow: Window | null = null;
-  let volumeOpen = $state(false);
-  let recordingMenuOpen = $state(false);
-  let soundCloudMenuOpen = $state(false);
-  let screenShareMenuOpen = $state(false);
-  let rosterSortOpen = $state(false);
-  let archivesMenuOpen = $state(false);
-  let notesMenuOpen = $state(false);
+  /*
+    The eleven floating menus, in `$lib/room/menus.svelte.ts`.
+
+    They were eleven separate flags closed by TWO functions with two different lists — `openModal`
+    left the top-bar dropdowns open, `closeFloatingMenus` left the emoji and GIF pickers open. Both
+    behaviours are preserved exactly and are now named `closeForModal` and `closeFloating`, so the
+    difference is a decision somebody can read rather than a divergence nobody can see.
+  */
+  const menus = new RoomMenus();
   let newNoteOpen = $state(false);
-  let filesMenuOpen = $state(false);
-  let userMenuId = $state<number | null>(null);
-  let messageMenuId = $state<string | null>(null);
   let evidenceMessageState = $state<
     Record<
       string,
@@ -1398,8 +1398,6 @@
   let privateChatDraft = $state('');
   const privateChatLog = $derived(currUser === null ? [] : (privChatLog[currUser] ?? []));
   let previewWindowsVisible = $state(true);
-  let emojiOpen = $state(false);
-  let giphyOpen = $state(false);
   let showMessageOptions = $state(false);
   let sendingGif = $state(false);
   let pendingGifUrl = $state<string | null>(null);
@@ -2465,7 +2463,7 @@
     selectedUserId = user.id;
     selectedMessageUser = rosterUserTarget(user);
     selectedMessage = null;
-    userMenuId = null;
+    menus.openUserMenu(null);
   }
 
   function openRosterUserInfo(user: (typeof data.connectedUsers)[number]) {
@@ -2500,7 +2498,7 @@
 
   function openRosterPrivateChat(user: (typeof data.connectedUsers)[number]) {
     const start = resolveRosterPrivateChatStart(data.user.id, user.id);
-    userMenuId = null;
+    menus.openUserMenu(null);
 
     if (start.kind === 'self') {
       bootboxAlert = start.message;
@@ -4065,15 +4063,7 @@
   function openModal(name: Exclude<ModalName, null>) {
     if (name === 'muted' || name === 'followed' || name === 'user') loadManagedUsers();
     modal = name;
-    volumeOpen = false;
-    rosterSortOpen = false;
-    archivesMenuOpen = false;
-    notesMenuOpen = false;
-    filesMenuOpen = false;
-    userMenuId = null;
-    messageMenuId = null;
-    emojiOpen = false;
-    giphyOpen = false;
+    menus.closeForModal();
   }
 
   function openPollUI() {
@@ -4213,18 +4203,7 @@
     }).catch((cause) => console.error('savePreference', key, cause));
   }
 
-  function closeFloatingMenus() {
-    volumeOpen = false;
-    recordingMenuOpen = false;
-    soundCloudMenuOpen = false;
-    screenShareMenuOpen = false;
-    rosterSortOpen = false;
-    archivesMenuOpen = false;
-    notesMenuOpen = false;
-    filesMenuOpen = false;
-    userMenuId = null;
-    messageMenuId = null;
-  }
+  const closeFloatingMenus = () => menus.closeFloating();
 
   function openImageModal(event: MouseEvent | undefined, url: string) {
     const ctrlClick = (event as (MouseEvent & { ctrlClick?: boolean }) | undefined)?.ctrlClick;
@@ -5226,7 +5205,7 @@
     /** True when the click came from the extra chat column — upstream's `extraChatMsg`. */
     fromExtraColumn = false
   ) {
-    if (action !== 'reaction') messageMenuId = null;
+    if (action !== 'reaction') menus.openMessageMenu(null);
     selectedMessage = item;
     selectedMessageUser = {
       id: item.senderId,
@@ -5396,7 +5375,7 @@
           updateEvidenceMessage(item, { reactions: previousReactions });
         }
         window.setTimeout(() => {
-          messageMenuId = null;
+          menus.openMessageMenu(null);
         }, 500);
       });
     }
@@ -6103,7 +6082,7 @@
 
   /** The navbar's stop control: ends every screen this presenter is sharing. */
   function stopScreenSharing() {
-    screenShareMenuOpen = false;
+    menus.set('screen', false);
     stopRecording();
     for (const producerId of [...localScreenStreams.keys()]) stopLocalScreen(producerId);
     // A share that never reached the SFU has no producer id to key on, so it is not in the map.
@@ -6155,7 +6134,7 @@
     // says nothing about whether the socket is currently up.
     if (!mediaSession || !mediaSignalling?.connected) {
       bootboxAlert = MEDIA_NOT_CONNECTED_ALERT;
-      screenShareMenuOpen = false;
+      menus.set('screen', false);
       return;
     }
     bootboxPrompt = {
@@ -6224,7 +6203,7 @@
             });
       screenStream = stream;
       screenSharing = true;
-      screenShareMenuOpen = false;
+      menus.set('screen', false);
       const track = stream.getVideoTracks()[0];
 
       /*
@@ -6423,7 +6402,7 @@
     void broadcastRecordingState('startRec', `room-recording-${new Date().toISOString()}`);
     recordingPaused = false;
     recordingReminder = true;
-    recordingMenuOpen = false;
+    menus.set('recording', false);
   }
 
   /**
@@ -6456,7 +6435,7 @@
     if (!recordedScreenUrl) return;
     recPreviewWindow?.close();
     recPreviewWindow = window.open(recordedScreenUrl, 'RecPreview', 'width=960,height=600');
-    recordingMenuOpen = false;
+    menus.set('recording', false);
 
     // `window.open` returns null when the popup is blocked. Flipping the label to "Hide" anyway
     // would claim a window that is not there, and staying silent looks like a dead button - which
@@ -6474,7 +6453,7 @@
     recPreviewWindow?.close();
     recPreviewWindow = null;
     recPreviewOpen = false;
-    recordingMenuOpen = false;
+    menus.set('recording', false);
   }
 
   function downloadRecording() {
@@ -6499,7 +6478,7 @@
     void broadcastRecordingState('pauseRec');
     recordingPaused = true;
     recordingReminder = true;
-    recordingMenuOpen = false;
+    menus.set('recording', false);
   }
 
   function resumeRecording() {
@@ -6508,7 +6487,7 @@
     void broadcastRecordingState('resumeRec');
     recordingPaused = false;
     recordingReminder = false;
-    recordingMenuOpen = false;
+    menus.set('recording', false);
   }
 
   function promptForSoundCloud() {
@@ -6525,7 +6504,7 @@
         }
         soundCloudUrl = value;
         soundCloudPlaying = true;
-        soundCloudMenuOpen = false;
+        menus.set('soundcloud', false);
         if (typeof window !== 'undefined') {
           window.dispatchEvent(new CustomEvent('playSoundCloudForAll', { detail: { url: value } }));
         }
@@ -6535,7 +6514,7 @@
 
   function stopSoundCloud() {
     soundCloudPlaying = false;
-    soundCloudMenuOpen = false;
+    menus.set('soundcloud', false);
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('stopSoundCloudForAll', { detail: { url: null } }));
     }
@@ -6543,14 +6522,11 @@
 
   function stopSoundCloudForMe() {
     soundCloudPlaying = false;
-    soundCloudMenuOpen = false;
+    menus.set('soundcloud', false);
   }
 
   function toggleTopMenu(menu: 'recording' | 'soundcloud' | 'screen') {
-    recordingMenuOpen = menu === 'recording' ? !recordingMenuOpen : false;
-    soundCloudMenuOpen = menu === 'soundcloud' ? !soundCloudMenuOpen : false;
-    screenShareMenuOpen = menu === 'screen' ? !screenShareMenuOpen : false;
-    volumeOpen = false;
+    menus.toggleTop(menu);
   }
 
   function requestReload() {
@@ -6872,8 +6848,8 @@
    * composer is left empty so the same words cannot be sent twice from two places.
    */
   function openRTEModal() {
-    emojiOpen = false;
-    giphyOpen = false;
+    menus.set('emoji', false);
+    menus.set('giphy', false);
     rteIsEditing = false;
     rteEditTarget = null;
     rteDraft = textToEditorHtml(composer.trim());
@@ -6996,8 +6972,8 @@
   }
 
   function openImageUpload() {
-    emojiOpen = false;
-    giphyOpen = false;
+    menus.set('emoji', false);
+    menus.set('giphy', false);
     openModal('image-upload');
   }
 
@@ -7179,7 +7155,7 @@
 
   function selectGif(_title: string, url: string) {
     if (sendingGif) return;
-    giphyOpen = false;
+    menus.set('giphy', false);
     sendingGif = true;
     pendingGifUrl = url;
   }
@@ -8623,8 +8599,8 @@
     const applyWidthRule = () => {
       if (node.offsetWidth >= 400) return;
       showMessageOptions = false;
-      emojiOpen = false;
-      giphyOpen = false;
+      menus.set('emoji', false);
+      menus.set('giphy', false);
     };
     const observer = new ResizeObserver(applyWidthRule);
     observer.observe(node);
@@ -8865,7 +8841,7 @@
     link.append(icon, document.createTextNode(' New Note'));
     link.addEventListener('click', (event) => {
       event.preventDefault();
-      notesMenuOpen = false;
+      menus.set('notes', false);
       mainTab = 'notes';
       newNoteOpen = noteGates.editorMounted;
     });
@@ -9257,7 +9233,7 @@
     link.append(icon, document.createTextNode(' Upload File'));
     link.addEventListener('click', (event) => {
       event.preventDefault();
-      filesMenuOpen = false;
+      menus.set('files', false);
       openModal('file-upload');
     });
     item.append(link);
@@ -9308,8 +9284,8 @@
   onclick={(event) => {
     const target = event.target instanceof Element ? event.target : null;
     if (!target?.closest('.textAreaBtns, .popOverDiv')) {
-      emojiOpen = false;
-      giphyOpen = false;
+      menus.set('emoji', false);
+      menus.set('giphy', false);
     }
     if (target?.closest('.dropdown')) return;
     closeFloatingMenus();
@@ -9338,9 +9314,9 @@
       closes on Escape as well as on an outside click - the click half was already handled
       above, this is the other half.
     */
-    if (emojiOpen || giphyOpen) {
-      emojiOpen = false;
-      giphyOpen = false;
+    if (menus.emoji || menus.giphy) {
+      menus.set('emoji', false);
+      menus.set('giphy', false);
       return;
     }
     if (selectedImageUrl) selectedImageUrl = null;
@@ -9591,7 +9567,7 @@
                       id="dropdownRecording"
                       data-bs-toggle="dropdown"
                       aria-haspopup="true"
-                      aria-expanded={recordingMenuOpen}
+                      aria-expanded={menus.recording}
                       class="nav-link dropdown-toggle d-flex align-items-center"
                       class:muted={!screenSharing}
                       onclick={() => toggleTopMenu('recording')}
@@ -9613,10 +9589,10 @@
                     {/if}
                     <ul
                       aria-labelledby="dropdownRecording"
-                      data-bs-popper={recordingMenuOpen ? 'static' : undefined}
+                      data-bs-popper={menus.recording ? 'static' : undefined}
                       class="screen-options-start-screen dropdown-menu dropdown-menu-end"
-                      class:show={recordingMenuOpen}
-                      style={recordingMenuOpen ? 'display: block;' : undefined}
+                      class:show={menus.recording}
+                      style={menus.recording ? 'display: block;' : undefined}
                     >
                       {#if !screenSharing}
                         <li class="nav-item">Can't start recording without screenshare</li>
@@ -9702,7 +9678,7 @@
                       id="soundcloudDropdown"
                       data-bs-toggle="dropdown"
                       aria-haspopup="true"
-                      aria-expanded={soundCloudMenuOpen}
+                      aria-expanded={menus.soundcloud}
                       class="nav-link dropdown-toggle d-flex align-items-center"
                       class:text-white={soundCloudPlaying}
                       onclick={() => toggleTopMenu('soundcloud')}
@@ -9717,10 +9693,10 @@
                     </a>
                     <ul
                       aria-labelledby="soundcloudDropdown"
-                      data-bs-popper={soundCloudMenuOpen ? 'static' : undefined}
+                      data-bs-popper={menus.soundcloud ? 'static' : undefined}
                       class="dropdown-menu dropdown-menu-end soundcloud-options"
-                      class:show={soundCloudMenuOpen}
-                      style={soundCloudMenuOpen ? 'display: block;' : undefined}
+                      class:show={menus.soundcloud}
+                      style={menus.soundcloud ? 'display: block;' : undefined}
                     >
                       <!-- svelte-ignore a11y_click_events_have_key_events -->
                       <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
@@ -9785,7 +9761,7 @@
                       id="dropdownScreenSharing"
                       data-bs-toggle="dropdown"
                       aria-haspopup="true"
-                      aria-expanded={screenShareMenuOpen}
+                      aria-expanded={menus.screen}
                       class="nav-link dropdown-toggle d-flex align-items-center"
                       class:muted={!screenSharing}
                       class:text-white={screenSharing}
@@ -9796,10 +9772,10 @@
                     </a>
                     <ul
                       aria-labelledby="dropdownScreenSharing"
-                      data-bs-popper={screenShareMenuOpen ? 'static' : undefined}
+                      data-bs-popper={menus.screen ? 'static' : undefined}
                       class="screen-options-start-screen dropdown-menu dropdown-menu-end"
-                      class:show={screenShareMenuOpen}
-                      style={screenShareMenuOpen ? 'display: block;' : undefined}
+                      class:show={menus.screen}
+                      style={menus.screen ? 'display: block;' : undefined}
                     >
                       <!-- svelte-ignore a11y_click_events_have_key_events -->
                       <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
@@ -9890,7 +9866,7 @@
                     id="dropdownVolume"
                     data-bs-toggle="dropdown"
                     class="nav-link d-flex align-items-center"
-                    onclick={() => (volumeOpen = !volumeOpen)}
+                    onclick={() => menus.toggle('volume')}
                   >
 <!--
                       Consts 105/106/107 of `app-room` — `['fas','fa-2x','fa-volume-up']`,
@@ -9912,11 +9888,11 @@
                   </a>
                   <div
                     aria-labelledby="dropdownVolume"
-                    data-bs-popper={volumeOpen ? 'static' : undefined}
-                    class={volumeOpen
+                    data-bs-popper={menus.volume ? 'static' : undefined}
+                    class={menus.volume
                       ? 'dropdown-menu volumeControl show'
                       : 'dropdown-menu volumeControl'}
-                    style={volumeOpen ? 'display: block;' : undefined}
+                    style={menus.volume ? 'display: block;' : undefined}
                   >
                     <h4>
                       Volume
@@ -9925,7 +9901,7 @@
                       <span
                         data-bs-toggle="dropdown"
                         class="float-right mr-2"
-                        onclick={() => (volumeOpen = false)}
+                        onclick={() => menus.set('volume', false)}
                       >
                         <i class="fas fa-times"></i>
                       </span>
@@ -10354,11 +10330,11 @@
                     title="Archives"
                     data-bs-toggle="dropdown"
                     aria-haspopup="true"
-                    aria-expanded={archivesMenuOpen}
+                    aria-expanded={menus.archives}
                     class="nav-link sidebar-item dropdown-toggle"
                     onclick={(event) => {
                       event.stopPropagation();
-                      archivesMenuOpen = !archivesMenuOpen;
+                      menus.toggle('archives');
                     }}
                   >
                     <i class="fas fa-archive"></i>
@@ -10366,10 +10342,10 @@
                   </a>
                   <div
                     aria-labelledby="archivesDropdown"
-                    class={archivesMenuOpen
+                    class={menus.archives
                       ? 'dropdown-menu users-dropdown-options show'
                       : 'dropdown-menu users-dropdown-options'}
-                    style={archivesMenuOpen ? 'display: block;' : undefined}
+                    style={menus.archives ? 'display: block;' : undefined}
                   >
                     <!-- `O(6, isPresenter || !sessData.hideRecs ? 6 : -1)` -->
                     {#if isPresenter || !data.sessData?.hideRecs}
@@ -10496,19 +10472,19 @@
                         <button
                           id="user-options-btn"
                           data-bs-toggle="dropdown"
-                          aria-expanded={rosterSortOpen}
+                          aria-expanded={menus.rosterSort}
                           class="btn btn-sm btn-dark ml-1 float-right border-0 dropdown-toggle"
                           onclick={(event) => {
                             event.stopPropagation();
-                            rosterSortOpen = !rosterSortOpen;
+                            menus.toggle('rosterSort');
                           }}
                         >
                           <i class="fas fa fa-cog"></i>
                         </button>
                         <ul
                           aria-labelledby="user-options-btn"
-                          class={rosterSortOpen ? 'dropdown-menu show' : 'dropdown-menu'}
-                          style={rosterSortOpen ? 'display: block;' : undefined}
+                          class={menus.rosterSort ? 'dropdown-menu show' : 'dropdown-menu'}
+                          style={menus.rosterSort ? 'display: block;' : undefined}
                         >
                           <!--
                             const 65 is `[1,"dropdown-item","d-flex","align-items-center","justify-content-between",3,"click"]`
@@ -10618,23 +10594,23 @@
                                         id="dropdownMenuLink"
                                         data-bs-toggle="dropdown"
                                         aria-haspopup="true"
-                                        aria-expanded={userMenuId === user.id}
+                                        aria-expanded={menus.userId === user.id}
                                         class="msgMenu dropright d-inline-block float-right"
                                         onclick={(event) => {
                                           event.stopPropagation();
                                           selectedUserId = user.id;
-                                          userMenuId = userMenuId === user.id ? null : user.id;
+                                          menus.toggleUserMenu(user.id);
                                         }}>⠇</a
                                       >
                                       <div
                                         aria-labelledby="dropdownMenuLink"
-                                        class={userMenuId === user.id
+                                        class={menus.userId === user.id
                                           ? 'dropdown-menu users-dropdown-options show'
                                           : 'dropdown-menu users-dropdown-options'}
-                                        data-bs-popper={userMenuId === user.id
+                                        data-bs-popper={menus.userId === user.id
                                           ? 'static'
                                           : undefined}
-                                        style={userMenuId === user.id
+                                        style={menus.userId === user.id
                                           ? 'display: block;'
                                           : undefined}
                                       >
@@ -11076,7 +11052,7 @@
                             viewerIsPresenter={data.user.role === 'staff' ||
                               data.user.role === 'admin'}
                             {theme}
-                            menuOpen={messageMenuId === `alert:${item.id}`}
+                            menuOpen={menus.messageId === `alert:${item.id}`}
                             showDateSeparator={'evidenceSeparatorText' in item
                               ? item.evidenceSeparatorText !== null
                               : index === 0 ||
@@ -11086,7 +11062,7 @@
                                 )}
                             ontoggle={(id) => {
                               const key = `alert:${id}`;
-                              messageMenuId = messageMenuId === key ? null : key;
+                              menus.toggleMessageMenu(key);
                             }}
                             onaction={(action, message, event) =>
                               handleMessageAction('alert', action, message, event)}
@@ -11212,7 +11188,7 @@
                             viewerIsPresenter={data.user.role === 'staff' ||
                               data.user.role === 'admin'}
                             {theme}
-                            menuOpen={messageMenuId === `chat:${item.id}`}
+                            menuOpen={menus.messageId === `chat:${item.id}`}
                             showDateSeparator={'evidenceSeparatorText' in item
                               ? item.evidenceSeparatorText !== null
                               : index === 0 ||
@@ -11222,7 +11198,7 @@
                                 )}
                             ontoggle={(id) => {
                               const key = `chat:${id}`;
-                              messageMenuId = messageMenuId === key ? null : key;
+                              menus.toggleMessageMenu(key);
                             }}
                             onaction={(action, message, event) =>
                               handleMessageAction('chat', action, message, event)}
@@ -11319,10 +11295,10 @@
                                 popoverclass: 'popOverDiv'
                               } as Record<string, string>}
                               class="textAreaBtns"
-                              aria-describedby={emojiOpen ? 'ngb-popover-3' : undefined}
+                              aria-describedby={menus.emoji ? 'ngb-popover-3' : undefined}
                               onclick={() => {
-                                giphyOpen = false;
-                                emojiOpen = !emojiOpen;
+                                menus.set('giphy', false);
+                                menus.toggle('emoji');
                               }}
                             >
                               <i
@@ -11380,19 +11356,19 @@
                                 {@attach ngbTooltip}
                                 class="textAreaBtns"
                                 style="font-size: 12px;"
-                                aria-describedby={giphyOpen ? 'ngb-popover-giphy' : undefined}
+                                aria-describedby={menus.giphy ? 'ngb-popover-giphy' : undefined}
                                 onclick={() => {
-                                  emojiOpen = false;
-                                  giphyOpen = !giphyOpen;
+                                  menus.set('emoji', false);
+                                  menus.toggle('giphy');
                                 }}
                               >
                                 <span>GIF</span>
                               </span>
-                              {#if giphyOpen}
+                              {#if menus.giphy}
                                 <GiphyPicker
                                   apiKey={giphyApiKey}
                                   popoverId="ngb-popover-giphy"
-                                  onclose={() => (giphyOpen = false)}
+                                  onclose={() => menus.set('giphy', false)}
                                   onselect={selectGif}
                                 />
                               {/if}
@@ -11441,7 +11417,7 @@
                             ></i>
                           </span>
                           
-                          {#if emojiOpen}
+                          {#if menus.emoji}
                             <EmojiPicker onselect={(glyph) => (composer += glyph)} />
                           {/if}
                         </div>
@@ -11675,16 +11651,16 @@
                           <span
                             id="dropdownMenuNotes"
                             data-bs-toggle="dropdown"
-                            aria-expanded={notesMenuOpen}
+                            aria-expanded={menus.notes}
                             class="dropdown-toggle"
                             onclick={(event) => {
                               event.preventDefault();
                               event.stopPropagation();
-                              notesMenuOpen = !notesMenuOpen;
+                              menus.toggle('notes');
                             }}
                             onkeydown={(event) => {
                               if (event.key === 'Enter' || event.key === ' ')
-                                notesMenuOpen = !notesMenuOpen;
+                                menus.toggle('notes');
                             }}
                           >
                             <i class="fas fa-cog"></i>
@@ -11692,7 +11668,7 @@
                           <ul
                             aria-labelledby="dropdownMenuButton"
                             class="dropdown-menu"
-                            class:show={notesMenuOpen}
+                            class:show={menus.notes}
                             {@attach mountNewNoteLink}
                           ></ul>
                         </div>
@@ -11855,20 +11831,20 @@
                           <span
                             id="dropdownMenuFiles"
                             data-bs-toggle="dropdown"
-                            aria-expanded={filesMenuOpen}
+                            aria-expanded={menus.files}
                             class="dropdown-toggle"
                             onclick={(event) => {
                               event.preventDefault();
                               event.stopPropagation();
                               mainTab = 'files';
-                              notesMenuOpen = false;
-                              filesMenuOpen = !filesMenuOpen;
+                              menus.set('notes', false);
+                              menus.toggle('files');
                             }}
                             onkeydown={(event) => {
                               if (event.key === 'Enter' || event.key === ' ') {
                                 mainTab = 'files';
-                                notesMenuOpen = false;
-                                filesMenuOpen = !filesMenuOpen;
+                                menus.set('notes', false);
+                                menus.toggle('files');
                               }
                             }}
                           >
@@ -11877,7 +11853,7 @@
                           <ul
                             aria-labelledby="dropdownMenuFiles"
                             class="dropdown-menu"
-                            class:show={filesMenuOpen}
+                            class:show={menus.files}
                             {@attach mountUploadFileLink}
                           ></ul>
                         </div>
@@ -12857,8 +12833,8 @@
                 currentUserName={data.user.displayName}
                 viewerIsPresenter={data.user.role === 'staff' || data.user.role === 'admin'}
                 {followedUsers}
-                openMenuKey={messageMenuId}
-                onmenutoggle={(key) => (messageMenuId = key)}
+                openMenuKey={menus.messageId}
+                onmenutoggle={(key) => menus.openMessageMenu(key)}
                 onaction={(action, message, event) =>
                   handleMessageAction('chat', action, message, event, true)}
                 onfocus={() => (chatInputFocus = 'textAreaTxtExtra')}
