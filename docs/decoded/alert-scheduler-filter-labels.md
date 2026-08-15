@@ -157,13 +157,56 @@ A sixth element is conditional — a `span` reading **`"no weekends"`**, rendere
 
 # 2. Alert Filter — each viewer chooses whose alerts they see
 
-No entitlement flag was found for this one; it appears to be always available. **Stated as a
-measurement, not a conclusion** — `hasAlertFilter` and similar return 0, but absence of a flag name
-is weaker evidence than presence of one.
+**CORRECTED 2026-08-15, and the correction is architectural.** The first version of this section said
+*"The SERVER owns the filtering. The client sends its selection and asks for the log again; it does
+not filter `alertsLog` in the browser. That is the correct shape and the one to reproduce."*
 
-## The command, both directions
+**That is wrong.** The filtering is done **in the browser**, in three separate places, and building to
+the original claim would have produced a server-side filter the reference does not have.
 
-**Send**, byte **1,221,491**:
+## The filtering is client-side, in THREE places, with one identical guard
+
+| site | byte | what it filters |
+| --- | ---: | --- |
+| the live `/alerts` SSE stream | 1,004,533 | each alert as it arrives — logs `"filtered out alert for " + te.avt` |
+| `case "getAlertsLog"` | 1,017,070 | the paged log on every fetch |
+| the alerts SEARCH results | 1,020,817 | inside the `"alerts" == i.type` branch |
+
+All three run the same expression, read verbatim at 1,017,070:
+
+```js
+try {
+  this.globals.sessData.modAlertFilterList?.trim()?.length > 0 &&
+    Object.keys(this.globals.user.alertFilterFor).length > 0 &&
+    (i.data = i.data.filter((se) =>
+      this.globals.preferences.showAlertsFrom
+        ? this.globals.user.alertFilterFor[se.avt]
+        : !this.globals.user.alertFilterFor[se.avt]
+    ));
+} catch {}
+```
+
+Three things follow, and each one matters for a rebuild:
+
+1. **`showAlertsFrom` inverts the whole meaning.** True keeps only the selected people (allow-list);
+   false removes them (deny-list). The original section had this right and it is the one claim that
+   survives unchanged.
+2. **The match key is `se.avt`** — the alert's avatar hash, not a user id and not a name. Which is why
+   `alertFilterFor` is keyed by avatar.
+3. **The guard is doubly gated and it fails OPEN.** Nothing is filtered unless BOTH
+   `sessData.modAlertFilterList` is a non-empty string AND the selection is non-empty; and the whole
+   thing sits in a `try/catch {}` that swallows silently. A malformed list means every alert shows.
+
+**The privacy consequence, stated because it changes what this feature IS.** Every alert reaches
+every browser and some are hidden after arrival. This is a display preference, **not** an access
+control, and nothing about it prevents a member reading a filtered-out alert from the network tab.
+If we ever filter server-side instead, that is a deliberate divergence and must be recorded as one —
+it would be a genuine improvement, and it would not be a match.
+
+## What `updateAlertFilter` is actually for
+
+Since the browser does the filtering, the command is for **persistence**, not for effect. Send site,
+byte 1,221,491:
 
 ```js
 this.appService.globals.doFilteredAlerts =
@@ -175,7 +218,8 @@ this.appService.sendServerCommand("updateAlertFilter", {
 this.appService.setPreference("showAlertsFrom", this.appService.globals.preferences.showAlertsFrom)
 ```
 
-**Receive**, byte **1,017,535** — and note it re-fetches the whole log rather than filtering locally:
+Receive, byte 1,017,535 — it re-fetches so the newly stored selection is re-applied by the client
+code above:
 
 ```js
 case "updateAlertFilter":
@@ -185,32 +229,62 @@ case "updateAlertFilter":
   break;
 ```
 
-**The server owns the filtering.** The client sends its selection and asks for the log again; it does
-not filter `alertsLog` in the browser. That is the correct shape and the one to reproduce.
+## Two things called `modAlertFilterList`, and they are different types
 
-## The state
+**Corrected:** the first version described one array. There are two.
 
-| name | shape | meaning |
-| --- | --- | --- |
-| `globals.user.alertFilterFor` | object, **avatar hash → username** | who is selected |
-| `globals.modAlertFilterList` | array of `{ avatar, username }` | the people offered |
-| `globals.doFilteredAlerts` | boolean | `Object.keys(alertFilterFor).length > 0` |
-| `globals.preferences.showAlertsFrom` | boolean | **inverts the whole meaning** — see below |
+| name | type | byte |
+| --- | --- | ---: |
+| `sessData.modAlertFilterList` | a **string containing JSON** — `.trim()?.length` is tested on it | 1,004,533 |
+| `globals.modAlertFilterList` | the **parsed array**, initialised `[]` | 977,658 |
 
-`showAlertsFrom` flips the filter between an allow-list and a deny-list. The same selection means
-"only show these people" when true and "filter out these people" when false. A rebuild that treats it
-as a display toggle gets the semantics backwards.
+Bridged by `syncModAlertFilterList()`, byte 1,221,905:
 
-`toggleTraders(e, i)` deletes the key when set and assigns it otherwise, so the map is the selection.
-`syncModAlertFilterList()` seeds it from `modAlertFilterList`, assigning `alertFilterFor[e.avatar] =
-e.username` for anyone not already present.
+```js
+syncModAlertFilterList() {
+  const e = JSON.parse(this.appService.globals.sessData.modAlertFilterList) || [];
+  this.appService.globals.modAlertFilterList = e;
+}
+```
 
-The modal is opened by the GUI event **`doAlertFilterModal`**, which the component subscribes to in
-`ngOnInit` and answers by calling `syncModAlertFilterList()`.
+**Note the `JSON.parse` is NOT inside a try/catch** — unlike the filter guard. A malformed setting
+throws here. This is the third room setting shipped as a JSON string, after `alertLabels` and
+`chatTabsWithBadges`.
 
-## The controls, verbatim
+Each entry is `{ username, avatar }` — proven by `selectAll()`, byte 1,220,674:
 
-Byte **1,220,064** — three buttons, and the leading and trailing spaces are part of the strings:
+```js
+selectAll() {
+  for (const e of this.appService.globals.modAlertFilterList)
+    this.appService.globals.user.alertFilterFor[e.avatar] ||
+      (this.appService.globals.user.alertFilterFor[e.avatar] = e.username);
+}
+```
+
+## The whole feature is gated on the room configuring a list
+
+`sessData.modAlertFilterList` being truthy gates the entry points themselves — bytes 2,042,979 and
+2,286,654 (`O(5, …modAlertFilterList ? 5 : -1)` and `O(195, … ? 195 : -1)`), and byte 2,056,417 gates
+an indicator on `modAlertFilterList && doFilteredAlerts`. A room that configures no list has no
+feature, and there is nothing to build a default from.
+
+## The component
+
+Selector **`app-alert-filter-modal`**, `decls: 20, vars: 4`. Modal attributes verbatim:
+
+```
+id="alert-filter-modal" tabIndex="-1" role="dialog" aria-labelledby="alert-filter-modal" aria-hidden="true" class="modal fade"
+```
+
+Note `tabIndex` with a capital I, and `aria-labelledby` pointing at the modal's own id rather than a
+title element. Both are the reference's; reproduce them.
+
+The list renders when `modAlertFilterList.length > 0`, else the empty state **`List is empty.`**
+(byte 1,219,660). Component style block includes `.text-opacity{opacity:.1}`.
+
+## The controls, verbatim — spaces are part of the strings
+
+Byte 1,220,064:
 
 | text | handler |
 | --- | --- |
@@ -218,13 +292,15 @@ Byte **1,220,064** — three buttons, and the leading and trailing spaces are pa
 | `" Select All "` | `selectAll()` |
 | `" Save"` | `updateAlertFilter()` |
 
-**`" Save"` has a leading space and no trailing space**, unlike its two neighbours. That asymmetry is
-in the bundle; keep it.
+**`" Save"` has a leading space and no trailing space**, unlike its two neighbours. Keep the asymmetry.
+
+`toggleTraders(e, i)` deletes the key when set and assigns it otherwise, so the map IS the selection.
+The modal is opened by the GUI event **`doAlertFilterModal`**, which the component subscribes to in
+`ngOnInit` and answers with `syncModAlertFilterList()`.
 
 ## The two confirm strings, verbatim
 
-Both are template literals with an interpolation inside, and the branch is on whether the selection
-is empty (byte 1,220,940):
+Byte 1,220,940, branching on whether the selection is empty:
 
 ```js
 // when Object.keys(alertFilterFor).length === 0
@@ -234,14 +310,28 @@ is empty (byte 1,220,940):
 `Are you sure you want to ${showAlertsFrom ? "only show " : "filter out "} alerts from the selected people?`
 ```
 
-Note the inner spacing: `"only show alert "` carries a trailing space and `"alert"` does not, so the
-first string renders with a double space in one branch and not the other. That is the reference's,
-and it is the kind of detail that is "tidied" by accident.
+The inner spacing is uneven — `"only show alert "` has a trailing space and `"alert"` does not — so
+one branch renders a double space and the other does not. That is the reference's, and it is exactly
+the kind of thing that gets "tidied" by accident.
 
 **On cancel the component reverts `showAlertsFrom`** rather than leaving the toggle where the user
 put it.
 
----
+## A hardcoded per-client list sits beside this, and it is NOT this feature
+
+At byte 977,658, immediately after `modAlertFilterList = []`, the globals carry `stTraders` — a
+hardcoded array of `{username, avatar}` with real gravatar MD5 hashes, e.g.
+`{username: "Allison", avatar: "c90b7e877c17de66ff99477ffa260e5f"}`. It is a Simpler Trading trader
+list compiled into the bundle. Recorded so nobody mistakes it for the configurable list, and **not
+reproduced** — a customer-specific hardcode is the opposite of the theming rule.
+
+## Honest gaps
+
+- **What the server does with `updateAlertFilter` is not in the bundle.** It clearly persists the map
+  against `userXrefID`, since the response echoes `alertFilterFor` back, but the storage and its
+  lifetime are not established here.
+- **The per-entry list item markup** (template `Tue`, byte 1,219,660) was not decoded — only that the
+  list exists, its empty state, and the three buttons.
 
 # 3. Alert Labels — per-room hashtags prefixed onto alert text
 

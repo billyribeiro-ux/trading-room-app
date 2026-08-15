@@ -24,6 +24,57 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-15
 
+### 2026-08-15 08:22 EDT — verifying the Alert Filter spec before building it found an architectural error in my own work
+
+**Runtime impact: none.** Two documents.
+
+The Files sort bar was called "fully decoded, ready to build" and re-reading it found three errors.
+So the Alert Filter spec — written by me eight hours ago — got the same treatment before anyone
+built from it. **It contained a worse error than the sort bar did.**
+
+**It said: "The SERVER owns the filtering. The client sends its selection and asks for the log again;
+it does not filter `alertsLog` in the browser. That is the correct shape and the one to reproduce."**
+
+The filtering is **client-side**, and in three separate places, each with the identical guard:
+
+| site | byte |
+| --- | ---: |
+| the live `/alerts` SSE stream — logs `"filtered out alert for " + te.avt` | 1,004,533 |
+| `case "getAlertsLog"` | 1,017,070 |
+| the alerts SEARCH results, inside the `"alerts" == i.type` branch | 1,020,817 |
+
+Building to the original claim would have produced a server-side filter the reference does not have.
+The command exists for **persistence**, not for effect — which is why its response re-fetches the log
+so the client-side code can re-apply the newly stored selection.
+
+**And a consequence that changes what the feature IS:** every alert reaches every browser and some
+are hidden after arrival. **This is a display preference, not an access control.** Nothing stops a
+member reading a filtered-out alert from the network tab. Filtering server-side would be a genuine
+improvement AND a deliberate divergence, and is now recorded as a decision to take rather than a
+shape to copy.
+
+**Three further corrections in the same pass:**
+
+- **`modAlertFilterList` is two different things.** `sessData.modAlertFilterList` is a **string
+  containing JSON**; `globals.modAlertFilterList` is the parsed array. Bridged by
+  `syncModAlertFilterList()` at 1,221,905 — whose `JSON.parse` is **not** inside a try/catch, unlike
+  the filter guard. Third room setting shipped as a JSON string, after `alertLabels` and
+  `chatTabsWithBadges`.
+- **The guard fails OPEN and silently.** It needs both a non-empty setting AND a non-empty selection,
+  and sits inside `try {} catch {}`. A malformed list means every alert shows.
+- **The whole feature is gated on the room configuring a list** — `sessData.modAlertFilterList` being
+  truthy gates the entry points at 2,042,979 and 2,286,654. A room with no list has no feature.
+
+**Recorded and deliberately NOT reproduced:** at byte 977,658, beside the empty
+`modAlertFilterList`, the globals carry `stTraders` — a hardcoded array of `{username, avatar}` with
+real gravatar MD5 hashes, a Simpler Trading trader list compiled into the bundle. A customer-specific
+hardcode is the opposite of the theming rule.
+
+**The pattern is now three for three.** Every spec that has been re-verified before building has
+contained at least one error, and in two cases an error that would have shipped. Verification before
+implementation is not ceremony here; it has a 100 per cent hit rate.
+
+
 ### 2026-08-15 08:15 EDT — both TODO files reconciled against what is actually true
 
 **Runtime impact: none.** Bookkeeping, and one deleted sentence that mattered.

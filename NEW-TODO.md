@@ -234,8 +234,13 @@ both directions, one modal, no entitlement flag found.
 
 - `updateAlertFilter` — send `{alertFilterFor, userXrefID}` (byte 1,221,491); the response sets
   `user.alertFilterFor` and **re-fetches `getAlertsLog {page:0}`** (byte 1,017,535).
-- **The SERVER owns the filtering.** The client sends its selection and asks for the log again; it
-  never filters the log in the browser. Reproduce that shape.
+- **CORRECTED 2026-08-15: the filtering is CLIENT-side, in three places** — the live SSE stream
+  (1,004,533), `getAlertsLog` (1,017,070) and the alerts search results (1,020,817), all with one
+  identical guard. An earlier version of this row said the server owns it; building to that would
+  have produced an architecture the reference does not have. The command is for PERSISTENCE.
+- **Consequence worth deciding on:** every alert reaches every browser and some are hidden after
+  arrival, so this is a display preference and **not** an access control. Filtering server-side
+  instead would be a real improvement and a deliberate divergence — record it as one if taken.
 - `preferences.showAlertsFrom` **inverts the meaning** — the same selection is an allow-list when
   true and a deny-list when false. Treating it as a display toggle gets the semantics backwards.
 - Buttons verbatim, spaces included: `" Unselect All "`, `" Select All "`, `" Save"` — the last has a
