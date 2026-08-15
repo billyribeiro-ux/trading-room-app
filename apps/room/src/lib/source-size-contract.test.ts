@@ -116,8 +116,12 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       Naming it and PROVING it — the constant and the 11px gutter reproduce all four captured flex
       strings exactly — is four assertions that could not have been written while the number had no
       name.
+
+      `RoomRoster` is the fourth: 13,157 -> 13,048. The two transcribed pipes and the four gates
+      stayed in `$lib/roster-gates` where their truth tables are — what moved is the state they run
+      on, plus the random draw and its three-second reveal timer.
     */
-    max: 13157,
+    max: 13048,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {

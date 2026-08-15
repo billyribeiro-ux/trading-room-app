@@ -99,20 +99,16 @@
     type TalkingPresenter as PresenterAudioUser
   } from '$lib/screen-volume';
   import {
-    RANDOM_USER_MINIMUM,
     archivesAvailableTo,
-    filterRosterToTrials,
-    randomUserCandidates,
     rosterBlockVisible,
     rosterCountVisibleTo,
     rosterRowClass,
     rosterRowVisible,
     formatUserLocation,
     joinsMediaAsProducer,
-    locationVisibleTo,
-    searchRoster,
-    sortRosterByNick
+    locationVisibleTo
   } from '$lib/roster-gates';
+  import { RoomRoster } from '$lib/room/roster.svelte';
   import { alertSoundButtonFor, filesSectionHidden } from '$lib/files-gates';
   import {
     INITIAL_FILE_SORT,
@@ -483,113 +479,34 @@
   let reconnectedFlash = $state(false);
   /** `setTimeout(…, 3e3)`. */
   const RECONNECTED_FLASH_MS = 3000;
-  let rosterCount = $state<number | null>(null);
-  /**
-   * `globals.roster` - who is actually in the room, pushed by the hub.
-   *
-   * The page load can only ever describe THIS connection (`connectedUsers: [connectedUser]`), so
-   * the list is seeded from it and then replaced by the first `getRoster` frame. Until this
-   * existed, the badge counted every subscriber while the list rendered one hard-coded entry - a
-   * presenter saw "Users: 2" over a list containing only themselves.
-   */
+  /*
+    Who is in the room, in `$lib/room/roster.svelte.ts`.
+
+    The fourth room state class: the live roster, the four header controls that sort and search it,
+    the badge count and the random-user draw. The two transcribed pipes and the four gates stay in
+    `$lib/roster-gates`, where their truth tables are; this class holds the state they run on.
+
+    Two thunks rather than a snapshot, which is the shape `$state`'s "passing state into functions"
+    documents: `data` is a `$props()` value, so passing `data.connectedUsers` would hand over the
+    ARRAY and the class would still be showing it after a navigation replaced it. Reading a thunk
+    inside a `$derived` tracks whatever it touches.
+  */
   // Typed off the load's own entry rather than re-listed, so the stream and the page load cannot
   // drift into two different shapes for the same person.
   type RosterEntry = (typeof data.connectedUsers)[number];
-  let liveRoster = $state<RosterEntry[]>([]);
-  const rosterUsers = $derived(liveRoster.length > 0 ? liveRoster : data.connectedUsers);
-
-  /**
-   * The roster header's four controls, every one of which was rendered and inert.
-   *
-   * `isSortUsers` / `isSortFTUsers` are the two pipe arguments the capture applies to the list -
-   * `roster | sortUsers:isSortUsers | sortFTUsers:isSortFTUsers` - and `showUserSearch` /
-   * `userSearchTermTxt` drive the search input that `O(22, showUserSearch ? 22 : -1)` reveals.
-   */
-  let isSortUsers = $state(false);
-  let isSortFTUsers = $state(false);
-  let showUserSearch = $state(false);
-  let userSearchTermTxt = $state('');
-  /**
-   * `visibleRoster` as a SNAPSHOT, which is what the capture holds.
-   *
-   * `searchUsers()` assigns `visibleRoster = globals.roster.filter(...)` once; the filtered list
-   * then stays put until `clearUserSearch()` or the next `getRoster` frame resets it. Deriving it
-   * live instead would silently re-run the filter as people join and leave, which reads as results
-   * appearing under the cursor. Null means no search is active.
-   */
-  let searchedRoster = $state<RosterEntry[] | null>(null);
-  const visibleRoster = $derived(searchedRoster ?? rosterUsers);
-
-  /**
-   * The two pipes, transcribed:
-   *
-   * ```js
-   * sortUsers:   transform(e,i){ return i ? e.sort((o,s) => o.isP ? o : s.isP ? s : (o.nick.toLowerCase() > s.nick.toLowerCase() ? 1 : -1)) : e }
-   * sortFTUsers: transform(e,i){ return i ? e.filter(s => s.isFT).sort((s,r) => s.nick.toLowerCase() > r.nick.toLowerCase() ? 1 : -1) : e }
-   * ```
-   *
-   * Two faithful-to-a-fault details worth naming. The first comparator returns an OBJECT when
-   * either side is a presenter; `Array.prototype.sort` coerces a non-number to NaN and treats it as
-   * 0, so a presenter compares equal to everyone and only non-presenters actually sort by nick.
-   * That is the observable behaviour, so it is what `0` reproduces here - not a tidied-up version
-   * that would reorder presenters the capture leaves alone.
-   *
-   * The second is that both pipes call `.sort()` on the array they were handed, mutating
-   * `globals.roster` in place. Doing that to a `$state` array would make the sort toggle rewrite
-   * the roster itself, so each pipe copies first.
-   */
-  const displayRoster = $derived(
-    filterRosterToTrials(sortRosterByNick(visibleRoster, isSortUsers), isSortFTUsers)
-  );
-
-  /** `sortUsers(){ this.isSortUsers = !this.isSortUsers; emit("sortUsers", …) }` */
-  function sortUsers() {
-    isSortUsers = !isSortUsers;
-  }
-
-  /** `sortFTUsers(){ this.isSortFTUsers = !this.isSortFTUsers; emit("sortFTUsers", …) }` */
-  function sortFTUsers() {
-    isSortFTUsers = !isSortFTUsers;
-  }
-
-  /**
-   * `toggleUserSearch(){ this.showUserSearch = !this.showUserSearch;
-   *   this.showUserSearch && setTimeout(() => document.getElementById("userSearchTermInput").focus(), 300) }`
-   *
-   * The 300ms is the input's reveal; focusing before it exists does nothing. An attachment on the
-   * input focuses it when it is actually in the DOM, which is the same intent without the timer.
-   */
-  function toggleUserSearch() {
-    showUserSearch = !showUserSearch;
-  }
+  const roster = new RoomRoster<RosterEntry>({
+    seed: () => data.connectedUsers,
+    simUserCount: () => data.sessData?.simUserCount ?? 0
+  });
 
   function focusUserSearch(node: HTMLInputElement) {
     node.focus();
   }
 
-  /**
-   * `searchUsers(){ let e = this.userSearchTermTxt.toLocaleLowerCase();
-   *   this.visibleRoster = globals.roster.filter(i => i.nick.toLowerCase().indexOf(e) >= 0
-   *                                              || i.emailHash && i.emailHash === this.appService.hashEmail(e)) }`
-   *
-   * The second clause hashes the search term because the capture's roster entries carry only
-   * `emailHash`, never the address. Ours carry `email`, so an exact address match is compared
-   * directly - same observable result, and no md5 in the browser to get there.
-   */
-  function searchUsers() {
-    searchedRoster = searchRoster(rosterUsers, userSearchTermTxt);
-  }
-
-  /** `clearUserSearch(){ this.visibleRoster = globals.roster }` */
-  function clearUserSearch() {
-    searchedRoster = null;
-  }
-
   /** `doUserSearch(e){ 13 == e.keyCode && (this.userSearchTermTxt ? this.searchUsers() : this.clearUserSearch()) }` */
   function doUserSearch(event: KeyboardEvent) {
     if (event.key !== 'Enter') return;
-    if (userSearchTermTxt) searchUsers();
-    else clearUserSearch();
+    roster.submitSearch();
   }
 
   /**
@@ -1941,25 +1858,6 @@
    * The three-second suspense is the point of the dialog: the giphy spinner shows, then the name
    * replaces it and only then does "User Info" become clickable.
    */
-  const RANDOM_USER_REVEAL_MS = 3000;
-  let randomUserPick = $state<{ entry: RosterEntry; revealed: boolean } | null>(null);
-  let randomUserRevealTimer: ReturnType<typeof globalThis.setTimeout> | undefined;
-
-  function randomUser(candidates: RosterEntry[]) {
-    if (candidates.length < RANDOM_USER_MINIMUM) return;
-    const picked = candidates[Math.floor(Math.random() * candidates.length)];
-    randomUserPick = { entry: picked, revealed: false };
-    globalThis.clearTimeout(randomUserRevealTimer);
-    randomUserRevealTimer = globalThis.setTimeout(() => {
-      if (randomUserPick) randomUserPick = { ...randomUserPick, revealed: true };
-    }, RANDOM_USER_REVEAL_MS);
-  }
-
-  function closeRandomUser() {
-    globalThis.clearTimeout(randomUserRevealTimer);
-    randomUserPick = null;
-  }
-
   /**
    * `getRandomUser()`, transcribed:
    *
@@ -1976,20 +1874,16 @@
    * Presenters only, and it draws from NON-presenters. Both answers run the SAME code path - "Yes"
    * only adds the `isFT` filter - so the No branch is not a dismissal to be ignored.
    */
-  function drawRandomUser(trialsOnly: boolean) {
-    randomUser(randomUserCandidates(rosterUsers, trialsOnly));
-  }
-
   function getRandomUser() {
     bootboxConfirmation = {
       message: 'Only select from Trials?',
       onconfirm: () => {
         bootboxConfirmation = null;
-        drawRandomUser(true);
+        roster.draw(true);
       },
       // `bootbox.confirm`'s callback receives false for No AND for a dismissal, and this call site
       // acts on it: the draw still runs, just without the trials filter.
-      ondismiss: () => drawRandomUser(false)
+      ondismiss: () => roster.draw(false)
     };
   }
 
@@ -2087,15 +1981,6 @@
    */
   const benzingaUrl = $derived(data.sessData?.altBenzingaLinkURL?.trim() || null);
   const benzingaVisible = $derived(Boolean(data.sessData?.hasBenzingaNews) && benzingaUrl !== null);
-
-  /**
-   * `globals.rosterCount + this.simUserCount` - the one number the navbar and the sidebar badge
-   * both show. `rosterCount` is null until the first `getRosterCount` frame lands, so the
-   * server-rendered roster stands in until then rather than the badge flashing through zero.
-   */
-  const connectedCount = $derived(
-    (rosterCount ?? rosterUsers.length) + (data.sessData?.simUserCount ?? 0)
-  );
 
   /** `O(32, e.archivesAvailableTo() ? 32 : -1)` */
   const archivesAvailable = $derived(archivesAvailableTo(rosterViewer, rosterSession));
@@ -3372,7 +3257,7 @@
       message: MUTE_ALL_CONFIRM,
       onconfirm: () => {
         bootboxConfirmation = null;
-        const targets = nonAdminTalkingUsers(talkingUsers, rosterUsers);
+        const targets = nonAdminTalkingUsers(talkingUsers, roster.users);
         // `0 !== r.length &&` — an empty selection sends nothing, which is the case where every
         // open microphone belongs to a presenter.
         targets.forEach((entry, index) => {
@@ -7550,18 +7435,25 @@
         Its sibling `getRosterQueue` logs and does nothing else, so it is not reproduced.
       */
       if (payload.channel === 'roster') {
-        const roster = payload.data as
+        /*
+          `frame`, not `roster` — the name it had until 2026-08-15, when `RoomRoster` took that
+          identifier at the top of the file. A local `const roster` here would have shadowed the
+          class for the whole block, and every write below would have gone to a payload object
+          instead of the room. Renamed rather than aliased, because the payload is a frame and was
+          never the roster.
+        */
+        const frame = payload.data as
           | {
               cmd?: string;
               data?: number;
-              users?: typeof liveRoster;
+              users?: RosterEntry[];
               /** `onUserJoin` / `onUserLeave` carry the person, not a count. */
               userId?: number;
               nick?: string;
             }
           | undefined;
-        if (roster?.cmd === 'getRosterCount' && typeof roster.data === 'number') {
-          rosterCount = roster.data;
+        if (frame?.cmd === 'getRosterCount' && typeof frame.data === 'number') {
+          roster.countArrived(frame.data);
         }
         /*
           `onUserJoin` / `onUserLeave` — `app-room.full.js:2134-2155`, verbatim in shape:
@@ -7589,12 +7481,12 @@
           preference is per-direction. Transcribed rather than tidied.
         */
         if (
-          (roster?.cmd === 'onUserJoin' || roster?.cmd === 'onUserLeave') &&
-          typeof roster.userId === 'number'
+          (frame?.cmd === 'onUserJoin' || frame?.cmd === 'onUserLeave') &&
+          typeof frame.userId === 'number'
         ) {
-          const joined = roster.cmd === 'onUserJoin';
-          if (!isPresenter || roster.userId === data.user.id) return;
-          const nick = typeof roster.nick === 'string' ? roster.nick : '';
+          const joined = frame.cmd === 'onUserJoin';
+          if (!isPresenter || frame.userId === data.user.id) return;
+          const nick = typeof frame.nick === 'string' ? frame.nick : '';
 
           if (
             data.sessData?.userJoinAndLeavePopup &&
@@ -7617,17 +7509,16 @@
         }
         // `getRoster` -> `globals.roster`, which is what the sidebar list and
         // `checkUserOnlineStatus` both read in the capture.
-        if (roster?.cmd === 'getRoster' && Array.isArray(roster.users)) {
-          liveRoster = roster.users;
+        if (frame?.cmd === 'getRoster' && Array.isArray(frame.users)) {
           /*
             `subscribe("getRoster", () => { this.visibleRoster = globals.roster; this.userSearchTermTxt = "" })`
 
-            A fresh roster clears the search rather than re-filtering it. Without this, a search run
-            once would pin the sidebar to that snapshot for the rest of the session - people who
-            joined afterwards would never appear, because nothing else ever reassigns it.
+            The list, the search snapshot and the term are ONE method, because a fresh roster clears
+            the search rather than re-filtering it. Without that, a search run once would pin the
+            sidebar to that snapshot for the rest of the session — people who joined afterwards
+            would never appear, because nothing else ever reassigns it.
           */
-          searchedRoster = null;
-          userSearchTermTxt = '';
+          roster.rosterArrived(frame.users);
         }
         return;
       }
@@ -9092,7 +8983,7 @@
               now computed the same way.
             -->
             <span title="Users Connected" class="users ml-1 mr-1 d-flex align-items-center">
-              <i class="fas fa-user"></i><span class="ml-1">{connectedCount}</span>
+              <i class="fas fa-user"></i><span class="ml-1">{roster.connectedCount}</span>
             </span>
             <!--
               `FPe`, const 137: the same action as the sidebar button, reachable without opening
@@ -10120,7 +10011,7 @@
                       -->
                       {#if rosterCountVisible}
                         <span class="badge badge-primary d-inline-block ml-1"
-                          >{connectedCount}</span
+                          >{roster.connectedCount}</span
                         >
                       {/if}
                     </div>
@@ -10146,7 +10037,7 @@
                         >
                           <!--
                             const 65 is `[1,"dropdown-item","d-flex","align-items-center","justify-content-between",3,"click"]`
-                            and `H(15, fPe, 1, 0, "i", 66)` with `O(15, isSortFTUsers ? 15 : -1)`
+                            and `H(15, fPe, 1, 0, "i", 66)` with `O(15, roster.trialsOnly ? 15 : -1)`
                             puts a `fas fa-check-circle` (const 66) on the right when the filter is
                             on. `justify-content-between` exists FOR that tick; the item had neither
                             the handler nor the icon, so it was a label in a menu.
@@ -10155,10 +10046,10 @@
                           <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
                           <li
                             class="dropdown-item d-flex align-items-center justify-content-between"
-                            onclick={sortFTUsers}
+                            onclick={() => roster.toggleTrialsOnly()}
                           >
                             <span>Sort by Trials</span>
-                            {#if isSortFTUsers}
+                            {#if roster.trialsOnly}
                               <i class="fas fa-check-circle"></i>
                             {/if}
                           </li>
@@ -10179,27 +10070,27 @@
                       <button
                         title="Sort Users"
                         class="btn btn-sm btn-secondary float-right border-0 ms-1"
-                        class:btn-dark={isSortUsers}
-                        onclick={sortUsers}
+                        class:btn-dark={roster.sortByNick}
+                        onclick={() => roster.toggleSortByNick()}
                       >
                         <i class="fas fa-sort-alpha-down"></i>
                       </button>
                       <button
                         title="Search Users"
                         class="btn btn-sm btn-default float-right search-room-users border-0"
-                        onclick={toggleUserSearch}
+                        onclick={() => roster.toggleSearch()}
                       >
                         <i class="fas fa fa-search"></i>
                       </button>
                     </div>
                   </a>
                   <!--
-                    `H(22, mPe, 1, 1, "input", 73)` gated by `O(22, showUserSearch ? 22 : -1)`. Every
+                    `H(22, mPe, 1, 1, "input", 73)` gated by `O(22, roster.searchOpen ? 22 : -1)`. Every
                     attribute is const 73 verbatim. The capture binds `search` (the clear "x" a
                     `type=search` input fires) to `searchUsers()` and `keyup` to `doUserSearch`,
                     which acts on Enter alone.
                   -->
-                  {#if showUserSearch}
+                  {#if roster.searchOpen}
                     <input
                       type="search"
                       id="userSearchTermInput"
@@ -10207,8 +10098,8 @@
                       aria-label="Search"
                       aria-describedby="addon-search"
                       class="form-control"
-                      bind:value={userSearchTermTxt}
-                      onsearch={searchUsers}
+                      bind:value={roster.searchTerm}
+                      onsearch={() => roster.search()}
                       onkeyup={doUserSearch}
                       {@attach focusUserSearch}
                     />
@@ -10217,7 +10108,7 @@
                     <app-room-roster>
                       <div class="room-roster-list">
                         {#if sidebarOpen}
-                          {#each displayRoster as user (user.id)}
+                          {#each roster.display as user (user.id)}
                             <!--
                               Two gates and a class map, all of which were missing: the per-row
                               visibility test, and `{regUser: !isP, presUser: isP || hasAdminChat}`,
@@ -12788,16 +12679,16 @@
       `alt=""` and `class="random-user-modal"` are the capture's own. The image is fixed 480x270 so
       the dialog does not resize around it as it loads.
     -->
-    {#if randomUserPick}
+    {#if roster.pick}
       <BootboxDialog
         mode="alert"
         message=""
         title="Random User"
         className="random-user-modal"
-        onclose={closeRandomUser}
+        onclose={() => roster.closeDraw()}
       >
-        {#if randomUserPick.revealed}
-          <h2 class="text-center flash animated">{randomUserPick.entry.displayName}</h2>
+        {#if roster.pick.revealed}
+          <h2 class="text-center flash animated">{roster.pick.entry.displayName}</h2>
         {:else}
           <p class="text-center">
             <img
@@ -12813,16 +12704,16 @@
             The User Info handler ends in `!0` inverted - it returns `false`, which is bootbox's
             "do not dismiss". So the dialog stays open behind the user-info modal.
           -->
-          {#if randomUserPick?.revealed}
+          {#if roster.pick?.revealed}
             <button
               type="button"
               class="btn btn-warning btn-random-user"
-              onclick={() => randomUserPick && openRosterUserInfo(randomUserPick.entry)}
+              onclick={() => roster.pick && openRosterUserInfo(roster.pick.entry)}
             >
               User Info
             </button>
           {/if}
-          <button type="button" class="btn btn-danger" onclick={closeRandomUser}>Close</button>
+          <button type="button" class="btn btn-danger" onclick={() => roster.closeDraw()}>Close</button>
         {/snippet}
       </BootboxDialog>
     {/if}

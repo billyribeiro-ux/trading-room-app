@@ -397,11 +397,18 @@ describe('searchRoster', () => {
 
 describe('the sidebar renders what the gates decide', () => {
   it('wires every roster-header control that used to be inert', () => {
-    expect(pageSource).toContain('onclick={sortFTUsers}');
-    expect(pageSource).toContain('onclick={sortUsers}');
-    expect(pageSource).toContain('onclick={toggleUserSearch}');
-    expect(pageSource).toContain('class:btn-dark={isSortUsers}');
+    /*
+      The four controls moved to `RoomRoster` on 2026-08-15, so these read the methods rather than
+      four page-local togglers. The point of the assertion is unchanged and is the reason it exists:
+      every one of these was RENDERED and did nothing before it was written.
+    */
+    expect(pageSource).toContain('onclick={() => roster.toggleTrialsOnly()}');
+    expect(pageSource).toContain('onclick={() => roster.toggleSortByNick()}');
+    expect(pageSource).toContain('onclick={() => roster.toggleSearch()}');
+    expect(pageSource).toContain('class:btn-dark={roster.sortByNick}');
     expect(pageSource).toContain('<i class="fas fa-check-circle"></i>');
+    // The search input is the fourth, and it is a two-way binding onto the class's own term.
+    expect(pageSource).toContain('bind:value={roster.searchTerm}');
   });
 
   it('applies both roster gates, not just the outer one', () => {
@@ -412,8 +419,14 @@ describe('the sidebar renders what the gates decide', () => {
   });
 
   it('renders the list through the pipes rather than raw', () => {
-    expect(pageSource).toContain('{#each displayRoster as user (user.id)}');
-    expect(pageSource).not.toContain('{#each rosterUsers as user (user.id)}');
+    /*
+      `roster.display` is searched, then sorted, then narrowed to trials; `roster.users` is the raw
+      list. Rendering the second would leave all four header controls decorative again, which is
+      the state this whole block was written to end.
+    */
+    expect(pageSource).toContain('{#each roster.display as user (user.id)}');
+    expect(pageSource).not.toContain('{#each roster.users as user (user.id)}');
+    expect(pageSource).not.toContain('{#each roster.visible as user (user.id)}');
   });
 });
 
