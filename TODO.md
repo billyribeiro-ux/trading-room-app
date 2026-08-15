@@ -15,6 +15,54 @@ will fetch it. A gap recorded in only one app's document is a gap the next perso
 
 ---
 
+## ⛔ THE ONE DECISION BLOCKING A GREEN FRONTEND GATE — restated 2026-08-15 10:48 EDT
+
+**`quality.yml` has never passed. `gh run list` returns failure on all 8 runs, back to PR #28.** Any
+sentence that treats a specific recent change as the reason the gate is red is wrong before it is
+written; this was measured, not assumed.
+
+**The wall is one thing, and it is architectural, not a bug: 50 of the room's 106 test files read
+evidence that is deliberately not in the repository** — `docs/source`, `second-dump`, `css/`,
+`new-evidence` and the other gitignored capture directories. So does
+`gate/verify-postgres-schema-artifacts.mjs`, step 2 of the three commands `test` chains, which
+`ENOENT`s on `second-dump/db/RECREATE.sql` on every CI checkout and always has.
+
+**The decision nobody has taken:** what is a CI run of this repository allowed to CLAIM when the
+evidence it pins against is, correctly, not in it? Three answers, and this needs the owner rather
+than a guess:
+
+- **Skip loudly.** Extend `apps/controller/src/lib/reference-capture.ts` — `hasCapture` for
+  `describe.skipIf`, `readCapture` that names the file and the `PTR_CAPTURE_ROOT` override when it
+  throws — across the 50 files and the schema verifier. CI then reports honestly on what it can see.
+  The risk is a gate that is green because it ran almost nothing, so the skip count has to be
+  asserted, not just printed.
+- **Give CI the captures.** A private artifact or a runner with the volume mounted. Real coverage;
+  puts live-room dumps into a CI environment, which is the thing every rule in `.gitignore` exists
+  to prevent.
+- **Say the room suite is local-only** and have CI run lint, types and build for the room, with the
+  evidence-bound suite owned by the pre-merge gate on the owner's machine. Honest and cheap; means
+  no CI signal at all on 50 files.
+
+**Already closed, do not re-open:** the eviction of `apps/room/scripts` on 2026-08-15 10:33 broke
+exactly one thing beyond the above, and it was repaired at 10:48 — see CHANGELOG. Six of the seven
+tests reading that directory were already in the 50. `authorization-contract.test.ts` was the only
+one blocked by `scripts/` alone and now skips one case via `it.skipIf`. The two verifiers in `test`
+were never collectors and moved to `apps/room/gate/`; `privacy:verify` passes in a CI-shaped
+checkout, verified by extracting `git write-tree` into a temp directory and running it there.
+
+**Still true and still not decided, separately:** 76 of the 78 evicted files are already on
+`origin/main` and stay readable at those commits — including `scripts/compare-capture-states.mjs`,
+which contains the owner's name and is baselined in `ops/privacy-baseline.txt`. Untracking governs
+future commits only. Removing them from GitHub needs a history rewrite and a force-push, which was
+not authorised. This is the same pending decision `gate/verify-privacy-boundary.mjs`'s own header
+already describes.
+
+**Smaller, and genuinely outstanding:** 30 npm script entries in `apps/room/package.json` point at
+untracked files, and this file's own "run it after every feature lands" instruction for
+`apps/room/scripts/audit-feature-coverage.mjs` cannot be followed by anyone cloning the repository.
+
+---
+
 ## ⛔ THREE THINGS THE FIRST CI RUN OF THE FRONTEND GATE EXPOSED — 2026-08-14 22:54 EDT
 
 `quality.yml` was built on 2026-08-14 and ran for the first time on PR #28. It is on the branch, NOT
