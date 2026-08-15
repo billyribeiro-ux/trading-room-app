@@ -84,7 +84,7 @@ function makeElement(tag, { attrs = {}, text = '', children = [], html = null } 
 }
 
 /**
- * Deliberately crude: tag, `.class`, `[attr]`, `[attr=value]` and `[attr*=value]` only.
+ * Deliberately crude: tag, `.class`, `[attr]`, and `[attr=]` / `[attr*=]` / `[attr^=]` / `[attr$=]`.
  *
  * **No descendant support.** `nav a` matches nothing here, which is correct for this stub and
  * wrong for a browser. Do not "fix" the collector because a pane comes back null in this run.
@@ -111,6 +111,11 @@ function queryAll(pool, selector) {
       if (!op) return true;
       if (op === '=') return actual === value;
       if (op === '*=') return actual.includes(value);
+      /* `^=` is not decoration: the collector finds the reveal control with
+         [ng-click^="showNewRoom=showNewRoom+1"], and without this the stub silently fell through to
+         the text fallback and run D failed on an artefact of this file rather than the collector. */
+      if (op === '^=') return actual.startsWith(value);
+      if (op === '$=') return actual.endsWith(value);
       return false;
     }
     if (part.startsWith('.')) return String(node.className).split(/\s+/).includes(part.slice(1));
@@ -119,9 +124,9 @@ function queryAll(pool, selector) {
   return flat.filter((node) => parts.some((part) => hit(node, part)));
 }
 
-/* ── the three runs ───────────────────────────────────────────────────────── */
+/* ── the four runs ────────────────────────────────────────────────────────── */
 
-function buildContext({ healthy, camelOnly = false }) {
+function buildContext({ healthy, camelOnly = false, exemptClick = false }) {
   /*
     Run A registers states whose names contain the census control words, so the controls hit.
     Run B registers a single state with none of them, so every control returns zero and the
@@ -154,7 +159,13 @@ function buildContext({ healthy, camelOnly = false }) {
   */
   const sessionsLabel = makeElement('h4', {
     text: 'Sessions',
-    attrs: camelOnly ? { class: 'panel-heading deleteApiKeyBtn' } : healthy ? { 'ng-click': 'deleteApiKey(k)' } : {}
+    attrs: exemptClick
+      ? { 'ng-click': 'showNewRoom=showNewRoom+1;' }
+      : camelOnly
+        ? { class: 'panel-heading deleteApiKeyBtn' }
+        : healthy
+          ? { 'ng-click': 'deleteApiKey(k)' }
+          : {}
   });
 
   const body = makeElement('body', {
@@ -243,8 +254,8 @@ function buildContext({ healthy, camelOnly = false }) {
   return context;
 }
 
-async function run({ healthy, camelOnly = false }) {
-  const context = createContext(buildContext({ healthy, camelOnly }));
+async function run({ healthy, camelOnly = false, exemptClick = false }) {
+  const context = createContext(buildContext({ healthy, camelOnly, exemptClick }));
   runInContext(CODE, context, { filename: SOURCE });
   await new Promise((r) => setImmediate(r));
   await new Promise((r) => setImmediate(r));
@@ -339,6 +350,37 @@ check(
   'the refusal matched the camelCase word itself',
   c.refusedClicks.some((r) => /delete/i.test(r.matched || '')),
   JSON.stringify(c.refusedClicks.slice(0, 1))
+);
+
+console.log('\nrun D: the EXEMPT expression — it must be CLICKED, not refused');
+const { out: dRun } = await run({ healthy: true, exemptClick: true });
+
+/*
+  THE REGRESSION TEST for the 2026-08-15 06:47 live run.
+
+  That run refused all five clicks with `matched: "New"`. The exemption had correctly disarmed the
+  handler clause, and then the WORD denylist fired instead: splitCamel turns
+  `showNewRoom=showNewRoom+1;` into "show New Room=show New Room+1;", and `new` is a deny word. The
+  reveal never happened and the capture came back with an honest gap instead of the markup.
+
+  The bug survived three green runs of this file because NO run exercised the exemption path — every
+  shape here was built to prove a REFUSAL. A guard suite that only tests refusals cannot see a guard
+  that refuses too much.
+*/
+check(
+  'CLICKED the exempt showNewRoom expression',
+  (dRun.panes.newRoomReveal?.clicksDelivered ?? 0) === 5,
+  `clicksDelivered=${dRun.panes.newRoomReveal?.clicksDelivered} refusals=${dRun.refusedClicks.length}`
+);
+check(
+  'no refusal recorded for the exempt expression',
+  dRun.refusedClicks.length === 0,
+  JSON.stringify(dRun.refusedClicks.slice(0, 1))
+);
+check(
+  'found the control by its ng-click, not by text',
+  /ng-click attribute/.test(dRun.panes.newRoomRevealFoundBy ?? ''),
+  String(dRun.panes.newRoomRevealFoundBy)
 );
 
 console.log(

@@ -191,11 +191,27 @@
       downloaded a file, reported "New Room did not appear", and looked like a finding about the
       product. Found by reading the template rather than by running the script, which is the only
       way it could have been found before the one trip to the live site.
+
+      ## The 06:47 run, and why the exemption now short-circuits BOTH tests
+
+      The first live run refused all five clicks anyway, with `matched: "New"`. The exemption
+      correctly disarmed the handler clause — and then the WORD denylist fired instead, because
+      `splitCamel("showNewRoom=showNewRoom+1;")` produces "show New Room=show New Room+1;", and
+      `new` is one of the deny words. The reveal never happened and the run recorded an honest gap
+      saying so.
+
+      That is the same lesson twice in one file: an exemption that only covers one of two guards is
+      not an exemption. The proven-safe expression is now checked FIRST and returns early, so
+      neither test can refuse it. Nothing else changes — an element whose `ng-click` is not exactly
+      this expression still goes through both.
     */
     const ngClick = (element.getAttribute('ng-click') || '').trim();
     const EXEMPT_NG_CLICK = /^showNewRoom\s*=\s*showNewRoom\s*\+\s*1\s*;?$/;
-    const handlerBlocks = ngClick && !EXEMPT_NG_CLICK.test(ngClick);
-    if (DENY.test(description) || handlerBlocks) {
+    if (EXEMPT_NG_CLICK.test(ngClick)) {
+      element.click();
+      return true;
+    }
+    if (DENY.test(description) || ngClick) {
       OUT.refusedClicks.push({
         why,
         text: (element.textContent || '').trim().slice(0, 80),
