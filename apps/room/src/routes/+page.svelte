@@ -36,6 +36,14 @@
   import StreamTabs from '$lib/components/StreamTabs.svelte';
   import StreamingView from '$lib/components/StreamingView.svelte';
   import { isMtxStream } from '$lib/mtx-streams';
+  import {
+    captureErrorMessage,
+    captureErrorName,
+    checkPermissionState,
+    mediaCaptureErrorMessage,
+    permissionForCapture,
+    type MediaCaptureKind
+  } from '$lib/media-capture-error';
   import { MtxStreamTabs } from '$lib/room-mtx.svelte';
   import ScreenZoomControls from '$lib/components/ScreenZoomControls.svelte';
   import {
@@ -225,8 +233,6 @@
   }
 
   type RoomSplitDir = 'ltr' | 'ttb' | 'rtl' | 'btt';
-  type MediaPermissionKind = 'microphone' | 'camera' | 'display-capture';
-  type MediaCaptureKind = 'microphone' | 'camera' | 'screen';
   type TalkingUser = {
     userID: number;
     mediaValue: {
@@ -5851,136 +5857,34 @@
   }
 
 
-  function getBrowserPermissionGuidance(permission: MediaPermissionKind) {
-    const userAgent = navigator.userAgent.toLowerCase();
-    const isChrome = userAgent.includes('chrome') && !userAgent.includes('edg');
-    const isFirefox = userAgent.includes('firefox');
-    const isSafari = userAgent.includes('safari') && !userAgent.includes('chrome');
-    const isEdge = userAgent.includes('edg');
-    const permissionLabel =
-      permission === 'microphone'
-        ? 'Microphone'
-        : permission === 'camera'
-          ? 'Camera'
-          : 'Screen capture';
-    let browserName = 'your browser';
-    let settingsPath = '';
-
-    if (isChrome) {
-      browserName = 'Chrome';
-      settingsPath = `Settings > Privacy and security > Site Settings > ${permissionLabel}`;
-    } else if (isFirefox) {
-      browserName = 'Firefox';
-      settingsPath = `Settings > Privacy & Security > Permissions > ${permissionLabel}`;
-    } else if (isSafari) {
-      browserName = 'Safari';
-      settingsPath = `Safari > Preferences > Websites > ${permissionLabel}`;
-    } else if (isEdge) {
-      browserName = 'Edge';
-      settingsPath = `Settings > Cookies and site permissions > ${permissionLabel}`;
-    }
-
-    const mediaLabel =
-      permission === 'microphone'
-        ? 'microphone'
-        : permission === 'camera'
-          ? 'camera'
-          : 'screen sharing';
-    return `Permission denied. To enable ${mediaLabel}, go to ${browserName} ${settingsPath} and allow access for this site.`;
-  }
-
-  async function checkPermissionState(permission: MediaPermissionKind) {
-    if (!navigator.permissions?.query) return 'Permissions API not supported in this browser';
-
-    try {
-      const result = await navigator.permissions.query({
-        name: permission
-      } as PermissionDescriptor);
-      if (result.state === 'granted') return 'permission_granted';
-      if (result.state === 'denied') return getBrowserPermissionGuidance(permission);
-      if (result.state === 'prompt') return 'permission_prompt';
-      return 'permission_unknown';
-    } catch {
-      return 'permission_check_failed';
-    }
-  }
-
-  function captureErrorName(error: unknown) {
-    return error && typeof error === 'object' && 'name' in error ? String(error.name) : '';
-  }
-
-  function captureErrorMessage(error: unknown) {
-    return error && typeof error === 'object' && 'message' in error
-      ? String(error.message)
-      : 'Unknown error occurred';
-  }
-
+  /**
+   * Turn a capture failure into the one sentence the user sees.
+   *
+   * The DECISION moved to `media-capture-error.ts`; what stays here is the part that is genuinely
+   * the page's: the async permission round trip and the assignment to `bootboxAlert`.
+   *
+   * The `NotAllowedError` path is why this is still async. `mediaCaptureErrorMessage` returns null
+   * for it because the answer depends on what the Permissions API says, and the room deliberately
+   * stays SILENT unless that comes back denied - somebody who just dismissed the prompt themselves
+   * does not need to be told they dismissed it. The `Permission denied` prefix is the test, because
+   * every other state comes back as a sentinel rather than prose.
+   */
   async function reportMediaCaptureError(kind: MediaCaptureKind, error: unknown) {
     const errorName = captureErrorName(error);
-    const errorMessage = captureErrorMessage(error);
-    const permission: MediaPermissionKind = kind === 'screen' ? 'display-capture' : kind;
 
     if (errorName === 'NotAllowedError') {
-      const guidance = await checkPermissionState(permission);
+      const guidance = await checkPermissionState(permissionForCapture(kind), navigator.userAgent);
       if (guidance.startsWith('Permission denied')) bootboxAlert = guidance;
       return;
     }
 
-    if (errorName === 'AbortError') return;
-
-    if (kind === 'microphone') {
-      if (errorName === 'NotSupportedError') {
-        bootboxAlert =
-          'Your browser does not support microphone access. Please use Chrome, Firefox, or Safari.';
-      } else if (errorName === 'NotFoundError') {
-        bootboxAlert =
-          'No microphone detected. Please ensure you have a microphone connected and try again.';
-      } else if (errorName === 'SecurityError') {
-        bootboxAlert = window.isSecureContext
-          ? 'Security error accessing microphone. Please check your browser settings.'
-          : 'Microphone access requires a secure connection (HTTPS). Please check your browser settings or contact your administrator.';
-      } else if (errorName === 'OverconstrainedError') {
-        bootboxAlert =
-          'The selected microphone does not meet the required specifications. Please try a different microphone.';
-      } else {
-        bootboxAlert = `Error enabling microphone: ${errorMessage}`;
-      }
-      return;
-    }
-
-    if (kind === 'camera') {
-      if (errorName === 'NotSupportedError') {
-        bootboxAlert =
-          'Your browser does not support camera access. Please use Chrome, Firefox, or Safari.';
-      } else if (errorName === 'NotFoundError') {
-        bootboxAlert =
-          'No camera detected. Please ensure you have a camera connected and try again.';
-      } else if (errorName === 'SecurityError') {
-        bootboxAlert = window.isSecureContext
-          ? 'Security error accessing camera. Please check your browser settings.'
-          : 'Camera access requires a secure connection (HTTPS). Please check your browser settings or contact your administrator.';
-      } else if (errorName === 'OverconstrainedError') {
-        bootboxAlert =
-          'The selected camera does not meet the required specifications. Please try a different camera.';
-      } else {
-        bootboxAlert = `Error enabling camera: ${errorMessage}`;
-      }
-      return;
-    }
-
-    if (errorName === 'NotSupportedError') {
-      bootboxAlert =
-        'Your browser does not support screen sharing. Please use Chrome, Firefox, or Safari.';
-    } else if (errorName === 'NotFoundError') {
-      bootboxAlert =
-        'No screens or windows available for sharing. Please ensure you have a screen connected.';
-    } else if (errorName === 'SecurityError') {
-      bootboxAlert = window.isSecureContext
-        ? 'Security error accessing screen sharing. Please check your browser settings.'
-        : 'Screen sharing requires a secure connection (HTTPS). Please check your browser settings or contact your administrator.';
-    } else {
-      bootboxAlert = `Screen sharing error: ${errorMessage}`;
-    }
+    const message = mediaCaptureErrorMessage({
+      kind,
+      errorName,
+      errorMessage: captureErrorMessage(error),
+      isSecureContext: window.isSecureContext
+    });
+    if (message) bootboxAlert = message;
   }
 
   async function enableMicrophone(retryCount = 0) {

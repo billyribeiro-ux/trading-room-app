@@ -24,6 +24,52 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-15
 
+### 2026-08-15 12:34 EDT — 131 lines that decided what a user reads, and could not be tested
+
+**Runtime impact: none intended.** Every user-facing string is reproduced to the character. What
+changed is where the decision lives. `+page.svelte` **13,651 → 13,555**; ceiling lowered to match.
+
+Slice 2. `getBrowserPermissionGuidance`, `checkPermissionState`, `captureErrorName`,
+`captureErrorMessage` and the 67-line `reportMediaCaptureError` were one cluster inside the
+component, and **exactly one line of the 131 was stateful** — the final `bootboxAlert = …`.
+Everything else decided which sentence to show when a microphone, camera or screen capture fails.
+
+**The argument for the extraction, in one sentence: those decisions could not be tested.** Exercising
+any branch meant mounting the whole room page and provoking a real `getUserMedia` rejection, so
+nothing did. `media-capture-error.test.ts` now covers 23 cases that were previously unreachable.
+
+**A plain `.ts`, not a `.svelte.ts`** — there is no reactive state here, and a `.svelte.ts` would
+advertise runes that do not exist and invite somebody to add some. The component keeps the async
+Permissions API round trip and the assignment, which are genuinely the page's job.
+
+**Three behaviours the tests now pin, all of which were invisible before and easy to "tidy up"
+wrongly:**
+
+1. **Screen sharing has no `OverconstrainedError` branch.** Microphone and camera each answer it
+   with their own sentence; screen falls through to the generic one. The module records the absence
+   explicitly so nobody supplies the missing case — that would be inventing product copy.
+2. **`checkPermissionState` returns SENTINELS, not prose,** for every state except denied —
+   `permission_granted`, `permission_prompt`, `permission_unknown`, `permission_check_failed`. The
+   caller distinguishes them by testing for the `Permission denied` prefix. Return a friendly
+   sentence for `prompt` and the room starts telling people they were denied before the browser has
+   even asked. There is now a test asserting that prefix holds for every user agent.
+3. **The unknown-browser sentence contains a double space** — `go to your browser  and allow` —
+   because the settings path is empty and the template joins around it. That is shipped copy. It is
+   reproduced exactly and the test locks it, rather than being silently corrected under cover of a
+   refactor.
+
+The user-agent sniffing came across intact, including the two orderings that matter: Chrome's test
+excludes `edg` because every Chromium browser claims `chrome`, and Safari's excludes `chrome` for
+the mirror reason. Both now have a test that fails if the exclusion is dropped — previously an Edge
+user could have been sent to a Chrome menu that does not exist, with nothing to catch it.
+
+**Verified:** `svelte-check` **0 errors 0 warnings**, room suite **1530/1530 across 114 files**
+(1507 → 1530, the 23 new), `eslint` exit **0**, ceiling lowered 13,651 → 13,555 and the ratchet
+re-run green.
+
+**Running total for the decomposition: 13,663 → 13,555, two modules extracted, 23 tests that could
+not previously exist.**
+
 ### 2026-08-15 12:28 EDT — the first `.svelte.ts` module, and the proof the pattern holds
 
 **Runtime impact: none intended.** The MediaMTX stream list moved out of `+page.svelte` into a
