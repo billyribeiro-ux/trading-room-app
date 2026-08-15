@@ -15,152 +15,63 @@ will fetch it. A gap recorded in only one app's document is a gap the next perso
 
 ---
 
-## ⛔ NEITHER FRONTEND APP HAS A CI QUALITY GATE — opened 2026-08-14 20:19 EDT
+## ⛔ THREE THINGS THE FIRST CI RUN OF THE FRONTEND GATE EXPOSED — 2026-08-14 22:54 EDT
 
-This is the largest open gap in the repository and it is not about any one feature.
+`quality.yml` was built on 2026-08-14 and ran for the first time on PR #28. It is on the branch, NOT
+yet on `main`. Its first run failed both jobs, and everything below is what that bought.
 
-`.github/workflows/` contains exactly two workflows: `backend-quality.yml`, which gates Rust and
-skips itself when a revision does not touch `services/**`, and `smoke.yml`, which runs AFTER a
-deployment. **Nothing runs `lint`, `check`, `test` or `build` for `apps/controller` or `apps/room` on
-a push or a pull request.** The controller has a `quality` script that chains all of them; nothing
-invokes it.
+### 1. Room type-check — CLOSED 2026-08-14 22:50, and worth reading before trusting a green
 
-It was believed otherwise, in writing: `apps/controller/eslint.config.js` justified ignoring
-`apps/**` on the grounds that the room has "its own gate (the `room` job in
-`.github/workflows/quality.yml`)". **That file has never existed in this repository.** The comment
-has been corrected.
+Six `Cannot find module '$env/dynamic/private'`, pre-existing on `main`, invisible locally because a
+stale `.svelte-kit` still held the old ambient types. Fixed in `7ea4b77`.
 
-Consequences already observed rather than predicted: the room had no linting at all, and a
-verification probe (`room-config-seam-e2e.mjs`) shipped a template literal terminated early by
-backticks inside a comment — evaluating `<string> || isPresenter` against a page with no such
-variable. Both were found by running the tools by hand on 2026-08-14, not by CI.
+**The rule that came out of it: `svelte-check` is only evidence after `rm -rf .svelte-kit`.** A green
+local check against a stale generated directory is not a green check, and it was reported as one
+several times before CI contradicted it.
 
-**What closing it means:** a `quality.yml` with a job per app running `lint`, `check`, `test` and
-`build`, path-filtered the way the backend job already is, plus a required-checks setting so a red
-gate blocks a merge. Note that `main` auto-deploys, which is exactly why this matters.
+### 2. Controller unit tests — OPEN, and the obvious fix is FORBIDDEN
 
-## Room lint is GREEN — and of the five gaps it exposed, THREE are real
+Nine tests across five files read absolute paths under `/Users/billyribeiro/Desktop/new-room/`:
 
-ESLint reached the room for the first time on 2026-08-14 and reported 123 problems. All are
-resolved; `pnpm lint` exits 0 and the room step of `quality.yml` is green.
+| test file | capture it reads |
+| --- | --- |
+| `account-page-sbs.test.ts` | `account-page/ptr-dump-member-1786232518250.json` |
+| `manage-sections-sbs.test.ts` | `mising/file2` |
+| `manage-tab-strip.test.ts` | `must-match/important` |
+| `manage-user-row-sbs.test.ts` | `must-match/match` |
+| `manage-user-table-sbs.test.ts` | `mising/file1` |
 
-**Five of them were not lint problems. Two turned out to be redundancy and were removed; three were
-genuine missing behaviour and are now all three built.**
+They pass on the owner's machine and `ENOENT` on any runner. Two fail at SUITE level (the read is at
+module scope) and three at test level, which is why a single fix shape does not cover all five.
 
-### Closed — they were second sources of truth, not missing features
+**Copying the captures into the repository was tried and REVERTED.** It works — 21/21 passed — and
+`.gitignore:45-47` forbids it in as many words: *"Every one of these is a dump of a LIVE room: real
+names, real addresses, gravatar MD5s, and in some cases a live JWT. They are read from
+`~/Desktop/new-room/`, never copied here."* Note also that `privacy:verify` scans with
+`git ls-files --exclude-standard`, so it does **not** look at ignored files — it passed on the copied
+dumps without reading one byte of them. A green privacy check is not evidence about an ignored file.
 
-- **`extraChatColumnWasEnabled`** — removed. Upstream needs that flag because it MUTATES
-  `preferences.extraChatColumn` to hide the column and must remember what it destroyed. Ours never
-  writes the preference: `extraChatColumnVisible` derives from `extraChatColumn &&
-  !chatCollapsedByMode`, so clearing the collapse restores the column by construction. **An earlier
-  note here claimed the missing read meant the column "never comes back". That was wrong** — it was
-  the design that differed, not the wiring. A variable being unread is evidence of nothing on its own.
-- **`muted`** — removed, with its write. Every consumer derives `volume === 0`, which the screen
-  panes are passed directly.
+**What closing it means:** the suites skip when the capture is absent, honestly and visibly, rather
+than failing. `quality.yml` already names this boundary in its own comment — a green there means
+lint, types, units and a build, and does not claim the evidence verifiers ran.
 
-### Closed 2026-08-14 21:05 — the extra chat column now follows its own messages
+### 3. Backend quality — OPEN, and NOT fixable from this repository
 
-`extraChatScroller` was handed back by `onscrollerready` and read by nothing, so a message arriving
-in the second column left the view where it was while the main chat scrolled — the reader simply did
-not see it. It now has an autoscroll effect that is a deliberate parallel of the main chat's: same
-four conditions, its OWN `extraChatScrollingUp` flag, and its own effect rather than a loop over both
-columns, so a reader scrolled up in one is not yanked by traffic in the other. Four assertions in
-`extra-chat-column-contract.test.ts`, negative-controlled by passing the wrong column's flag.
+The Rust job fails all 27 integration tests with
+`password authentication failed for user "ptr_clone_app"` (28P01).
 
-### Closed 2026-08-14 22:03 — note Version History is reachable, and it is the LAST of the five
+**An earlier reading of this was wrong and is corrected here.** It looked like a `push` vs
+`pull_request` difference. It is not: the PR runs that appear green **skip the entire gate** —
+`Report a skipped backend gate` ran and both provisioning and tests show `skipped`. The gate is red
+every time it actually executes, and has been on every push to `main`.
 
-`loadNoteVersions` now has a consumer. All five gaps ESLint exposed are closed: two were redundancy
-and were removed, three were real behaviour and are built.
+Provisioning is not the bug. `services/docker/postgres/10-provision-roles.sh` uses `\getenv` and
+`format(… %L …)`, which is correct quoting for a password containing both `'` and `\`, and that step
+reports success. The failure is at connect time in `api/tests/support/mod.rs:92` — inside
+`services/**`, which is **a mirror**: "a change made here is lost on the next sync."
 
-**The evidence turned out to be one file, not a bundle offset.** An earlier note here located the UI
-at `main.d6d3c112b59b7d0d.js` byte 1460764 and listed const indices 16, 17 and 21-25 as "the only
-remaining unknown". `docs/source/components/app-note.full.js` is that same component already
-extracted — 1287 readable lines including its whole `consts` table — and reading it end to end
-settled every open question at once, plus two the note had got wrong:
-
-- **No server action was needed.** The note said "`revertToVersion(v)` needs a server action; the
-  read route exists, the write does not." Both already existed: `restoreNoteVersion` in
-  `notes-repository.ts`, its Zod command, its form action at `+page.server.ts:706`, and tests. The
-  reference does not use a bespoke endpoint either — it reverts by writing the note back through the
-  ordinary `saveSessionNote`. **The whole feature was one client surface away from done.**
-- **The reference's history is `localStorage`, not a server.** `loadVersionsFromStorage` reads
-  `note_versions_${tab._id}` and `maxVersions = 3`. Ours is a room-scoped, presenter-gated table with
-  no cap — strictly stronger, and the reason our rows key on a primary key where the reference tracks
-  by `timestamp`.
-
-Built from that file and nothing else: consts 13 and 16-25 for every class, `C0e` for the toggle
-(absent rather than disabled when there is no history, label carrying the count, `active` while
-open), `w0e` for the panel as a SIBLING of the button bar, `S0e` for a row, and the five
-`.version-history-panel` rules transcribed value for value from `app-note.component.css`.
-
-**Two deliberate divergences, both recorded in the code:**
-
-1. The preview goes through `safeNoteHtml`, not the reference's `noSanitize` → `innerHTML`. Its
-   `getVersionPreview` strips tags with a regex, which leaves entity-encoded markup completely
-   intact — that string is not sanitised and was never meant to be.
-2. The panel's state lives in `NotesPane`, not `NoteEditor`, because the editor sits inside a
-   `{#key}` on `updatedAt` and its own three-second autosave changes `updatedAt`. State kept in the
-   editor would close the panel under a presenter mid-read.
-
-`note-version-history.test.ts` — 17 assertions pinning BOTH halves, what the capture contains and
-what we render. Negative-controlled twice: removing `class:active` and changing the tag substitution
-from a space to the empty string each turned it red.
-
-### Closed 2026-08-14 22:19 — Edit Carousel, and the carousel is now testable
-
-The same `T0e` renders an **Edit Carousel** button (const 14, `fas fa-images`) when `carouselInNote`
-is true, calling `editCarousel()` to reopen an existing carousel. Ours could insert one and never
-re-open it. Built, along with `M0e`'s two label swings — the heading between `Insert`/`Edit Image
-Carousel` and the submit button between `Insert Carousel`/`Save Changes`.
-
-**The heading was wrong before this and is corrected.** It read "Insert an image carousel", which is
-the text of the TOOLBAR BUTTON's tooltip in `carouselButton()`, not of the modal title in `M0e`.
-
-**The node moved out of the component**, into `components/notes/carousel.ts`: the Tiptap node, the
-three parsers, `numericRange`, and two document queries (`hasCarousel`, `findCarousel`). None of it
-was ever component state, and inside a `.svelte` file the round trip that actually matters — stored
-HTML → node attributes → stored HTML — could only be checked by eye. `note-carousel.test.ts` now
-builds a **real Tiptap document under jsdom** and reads it back: 22 assertions covering the
-reference's own emitted markup, the malformed-attribute fallbacks, in-place replacement leaving the
-surrounding paragraphs untouched, and a carousel nested in a blockquote that a top-level scan misses.
-
-**One deliberate divergence.** The reference takes the FIRST carousel — `querySelector` returns it,
-and `replaceCarouselInEditor` replaces it — so in a note holding two, the second can never be edited
-and trying to edit it silently overwrites the first. That is data loss, not a missing feature. When
-the user has actually selected one, that is the one edited. With a single carousel, which is every
-captured note, the two are identical. Negative-controlled: dropping the selection preference turns
-the suite red.
-
-### Closed 2026-08-14 22:26 — stream tabs are labelled with the presenter's real name
-
-The tab read `Dana_Vero`. `ingestPathFor` collapses everything outside `[a-zA-Z0-9_-]` to `_` before
-the media server sees a name, and `/v3/paths/list` reports paths and nothing else, so the sanitiser's
-underscores were the only name available. That transformation is ONE-WAY — "Dana Vero", "Dana_Vero"
-and "Dana/Vero" all land on the same string — which is why it was never un-mangled by guessing.
-
-**The room already knew, and was throwing it away.** `api/stream-ingest` is the room's own route and
-holds both halves at the moment a key is minted: the connected member, and the `ingestPath` the
-controller answered with. That pairing is now written to `stream_ingest_names`, keyed on
-`(room_short_code, ingest_path)`, and the reconciler reads the whole room in one query per poll.
-
-Two alternatives were considered and rejected, both recorded at the schema:
-
-- **Matching sanitised display names against the roster** — a heuristic that breaks on two members
-  who sanitise alike, and on a presenter whose session expired while OBS kept publishing.
-- **Asking the controller per reconcile** — a network round trip every five seconds per room, for a
-  value that changes only when somebody presses "New Link".
-
-`user_id` is stored rather than the name, so renaming a member relabels their tab. An absent record
-falls back to the path segment, which is exactly what the tab showed before — degraded, never wrong —
-and a whitespace-only display name falls back too rather than rendering a tab with no label.
-
-`stream-names.test.ts`, 11 assertions. Negative-controlled: dropping the room predicate from
-`streamNamesForRoom` turned the cross-room test red.
-
-**Known limitation, stated rather than discovered later:** deltas are keyed on the path, so a
-presenter who renames themselves mid-stream keeps the label they started with until the stream stops
-and restarts. Relabelling would mean emitting a delta, which tears down the `<video>` element and its
-hls.js instance to change a string.
+Owner's note 2026-08-14: this may be a **billing/quota** problem on the runner rather than a code
+one. Not investigated further pending that.
 
 ### Evidence gaps
 
@@ -182,21 +93,6 @@ speculative change this file exists to prevent.
   `server/notes.ts:123`, and the jsdom output pinned in `note-carousel.test.ts`.
 - **What it blocks:** nothing today. It decides whether the allow-lists need a second accepted form.
 
-| count | rule | what they were |
-| --- | --- | --- |
-| 8 | `@typescript-eslint/no-unused-vars` | unused imports and locals; **check each** — one in the controller turned out to be a prop passed at six sites and read nowhere |
-| 13 | `svelte/no-unused-svelte-ignore` | stale `svelte-ignore` comments; the Svelte MCP autofixer flags the same ones |
-| 5 | `no-useless-assignment` | initialisers that can never be read |
-| 2 | `no-regex-spaces` | literal runs of spaces in a regex |
-| 2 | `@typescript-eslint/no-this-alias` | in the browser-console collectors |
-| 2 | `@typescript-eslint/no-explicit-any` | plus one stale disable directive beside them |
-| 1 | `@typescript-eslint/ban-ts-comment` | a `@ts-nocheck` in `scripts/lib/const-table.mjs` |
-
-Not one is a lint-config question; they are all real edits. **`no-unused-vars` in particular must be
-read rather than auto-deleted** — the same rule in the controller surfaced `markUnwired`, a
-documented prop with six call sites and no consumer, which is a feature gap wearing the costume of a
-style warning.
-
 ---
 
 ## State, 2026-08-14 15:44 EDT
@@ -207,7 +103,7 @@ this deployment does not have.
 
 | row | what it needs | who or what unblocks it |
 | --- | --- | --- |
-| **P** | nothing — bookkeeping. PR #20 is MERGED; PR #21 is open and green | the owner merges #21 |
+| **P** | bookkeeping. PRs #20–#27 are MERGED. **#28 is open and NOT green** — see the CI section at the top of this file | the two open items there |
 | **G** | the Postgres host question — Neon under volume | the owner |
 | **H** | production topology — separating media from the app tier | the owner |
 | **Q** | the WordPress plugin run inside a live WordPress | an environment |
@@ -215,8 +111,7 @@ this deployment does not have.
 | **R** | screenshare quality / MP4 — the measurement needs a human at an OS screen-picker dialog; its row 10 needs the same cluster as X and AC | the owner, then a MediaMTX cluster |
 | **X** | `app-recording-preview-window` — `setRecPreview` comes from the MediaMTX path | a MediaMTX cluster |
 | **AC** | `stopRecMsg` — the same producer, the same path | a MediaMTX cluster |
-
-| **AD** | **OBS / XSplit ingest — INGEST BUILT 2026-08-14. Two things remain: a MediaMTX host, and the playback half.** | a MediaMTX host at `STREAM_SERVER_MTX` |
+| **AD** | **OBS / XSplit — BOTH HALVES BUILT 2026-08-14.** Ingest and playback are complete: StreamTabs, the `#streams` pane, StreamingView with hls.js, the three wire commands, `/internal/media-hook`, the reconcile loop, and real presenter names on the tabs. ONE thing remains, and it is not code | a MediaMTX host at `STREAM_SERVER_MTX` |
 
 **Row AD, built 2026-08-14 16:41.** The owner's requirement is that a presenter can stream from the
 BROWSER (works today, mediasoup) **and** from OBS / XSplit. The ingest half now exists end to end:

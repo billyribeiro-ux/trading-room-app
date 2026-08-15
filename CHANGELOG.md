@@ -24,6 +24,61 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-14
 
+### 2026-08-14 22:54 EDT — the frontend gate ran for the first time and immediately paid for itself
+
+**Runtime impact: yes.** Six room modules changed how they read configuration, and one environment
+variable that was silently unreadable is now declared. On `feat/extra-chat-column`, PR #28.
+
+**What happened.** `quality.yml` — built earlier the same day and never yet executed by CI — ran for
+the first time on PR #28 and failed both jobs. Neither failure was caused by the 21 commits under
+review. Both were pre-existing conditions that nothing had ever looked for.
+
+**Room type-check: six `Cannot find module '$env/dynamic/private'`.** `origin/main` carries the
+identical import, so this fails on `main` too — `main` has simply never been type-checked. Kit 3
+answers what to do in its own source: that module is now a five-line shim that logs
+"`$env/dynamic/private` is deprecated, use `$app/env/private` instead", still resolves at runtime,
+and no longer has ambient types emitted for it. Six files moved to `$app/env/private` and
+`$app/env/public`, joining two that already used them.
+
+Two things fell out of that migration which matter more than the type error:
+
+1. **`TRADINGROOM_API_URL` was never declared in `src/env.ts`.** `$app/env/private` exports exactly
+   what that file declares, so a deployment setting the variable would have been silently ignored
+   and every call would have gone to `127.0.0.1:8080` — the same shape as the `ROOM_JWT_SECRET`
+   failure that file was written to prevent. Nothing calls it yet; that is the only reason it was
+   not live. Declared now.
+2. **`media-grant.test.ts` mocked the old specifier.** Left untouched it would have kept passing
+   while silently no longer intercepting, sending two tests back to depending on the developer's
+   machine — which its own comment records as having already happened once. Retargeted, with all
+   five imported names listed, because a named import the factory omits is a hard loader error and
+   therefore checks that list on every run. Observed live: with the mock on the old specifier, those
+   two tests failed.
+
+**The rule this bought, and it corrects several claims made earlier the same day.** The room's
+`svelte-check` was reported as "1038 files, 0 errors, 0 warnings" repeatedly. That was measured
+against a **stale `.svelte-kit`**. On a clean tree it was six errors. **A green `svelte-check` is
+only evidence after `rm -rf .svelte-kit && svelte-kit sync`**, and that is now how it is run.
+
+**Controller unit tests: nine tests read `/Users/billyribeiro/Desktop/new-room/`.** Copying those
+captures into the repository was tried, worked (21/21), and was **reverted** — `.gitignore:45-47`
+forbids it in as many words, because they are dumps of a live room holding real names, addresses and
+in some cases a live JWT. Worth recording alongside it: `privacy:verify` scans with
+`git ls-files --exclude-standard`, so it passed on the copied dumps **without reading one byte of
+them**. A green privacy check says nothing about an ignored file. Left open in `TODO.md`.
+
+**Backend quality, and a correction.** It was first read here as a `push` vs `pull_request`
+credentials difference. That was wrong: the PR runs that look green **skip the entire gate**, with
+provisioning and tests both reporting `skipped`. The Rust job is red every time it actually runs.
+Provisioning is not the cause — `10-provision-roles.sh` uses `\getenv` and `format(… %L …)`, correct
+for a password containing `'` and `\`, and reports success. The failure is at connect in
+`api/tests/support/mod.rs:92`, inside `services/**`, which is a mirror where a fix would be lost on
+the next sync. The owner notes it may be a billing/quota problem on the runner; not pursued further.
+
+**Verified on a clean `.svelte-kit`:** room `svelte-check` 1037 files 0 errors 0 warnings, lint 0,
+**1253** tests across 101 files, build exit 0. Controller untouched and re-verified: 1522 files
+0/0, lint 0, **964** tests across 91 files, build exit 0. **Not merged:** PR #28 is open and two
+checks are red, and `main` auto-deploys, so merging red is a production release.
+
 ### 2026-08-14 22:26 EDT — stream tabs carry the presenter's real name
 
 **Runtime impact: yes.** A stream tab is labelled `Dana Vero` instead of `Dana_Vero`. Adds one
