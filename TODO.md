@@ -72,7 +72,6 @@ columns, so a reader scrolled up in one is not yanked by traffic in the other. F
 | where | what is missing |
 | --- | --- |
 | `+page.svelte` `loadNoteVersions` | Nothing calls it, and the route it fetches (`api/notes/[noteId]/versions`) is built and working. Note history is server-complete and client-unreachable. |
-| `ExtraChatPane` `isPresenter` | Declared in `Props`, passed by the parent, read by no line of the component — the same shape as the controller's `markUnwired`. What it should gate has to be established from the capture before it is either wired or removed. |
 
 Each is a behaviour change with a decision behind it, which is why none was made inside a lint pass.
 

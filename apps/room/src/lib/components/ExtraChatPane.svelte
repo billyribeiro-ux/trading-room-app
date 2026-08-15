@@ -63,7 +63,20 @@
     /** `O(9, o.showPMBtn ? 9 : -1)`. */
     showPmButton: boolean;
     canPostImages: boolean;
-    isPresenter: boolean;
+    /*
+      `isPresenter` USED TO BE HERE and is gone, 2026-08-14.
+
+      Upstream's `app-extra-chat` reads it six times — the admin-chat tab (`isPresenter ||
+      user.hasAdminChat`), image posting (`isPresenter || sessData.userUploads`), the mention badge,
+      the limited-presenter branch and the mic check. It is genuinely load-bearing THERE because the
+      component computes its own gates.
+
+      This one does not. The parent computes each gate once and passes the RESULT —
+      `showPmButton`, `canPostImages`, `canUseRTE` — which is the better shape: authority is decided
+      in one place instead of re-derived per component. Passing the raw flag as well meant a second
+      input that no line read, and a future reader could have gated something on it directly and
+      quietly disagreed with the parent.
+    */
     canUseRTE: boolean;
     giphyApiKey: string;
     theme: Theme;
@@ -106,10 +119,6 @@
     selfMutedUntil,
     showPmButton,
     canPostImages,
-    // `isPresenter` is DECLARED in Props and passed by the parent, but nothing in this component
-    // reads it -- the same shape as the controller-s markUnwired, found by the same rule. Left
-    // declared so the parent-s prop is still accepted, and recorded in TODO.md rather than
-    // guessed at: removing it is a behaviour question, not a lint one.
     canUseRTE,
     giphyApiKey,
     theme,

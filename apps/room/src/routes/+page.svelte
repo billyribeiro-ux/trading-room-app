@@ -11846,7 +11846,6 @@
                 {selfMutedUntil}
                 {showPmButton}
                 {canPostImages}
-                {isPresenter}
                 {canUseRTE}
                 {giphyApiKey}
                 {theme}
