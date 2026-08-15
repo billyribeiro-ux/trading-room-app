@@ -24,6 +24,58 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-15
 
+### 2026-08-15 13:05 EDT — a push to `main` is now scoped like a pull request, and stops re-proving nothing
+
+**Runtime impact: none.** One workflow step.
+
+**The owner's constraint, and it is the right one:** CI minutes are finite and a 33-minute job on every
+merge is not affordable. Measured before changing anything, rather than trimming by feel.
+
+`backend-quality.yml` scoped pull requests by path — a frontend-only PR skipped the Rust and
+PostgreSQL suite in about 30 seconds — but every other event ran the full gate unconditionally:
+
+```
+if [ "${{ github.event_name }}" != "pull_request" ]; then
+  echo "backend=true"
+```
+
+So every merge to `main` spent the whole ~33-minute suite whether or not it contained a single
+backend file. **Over the last 20 commits on `main`, 4 touched a backend path and 16 did not.** Those
+16 re-verified a tree already verified, at roughly 500 runner-minutes, and it is why this workflow
+was always the one still running when the next push arrived — which is what made the concurrency
+cancellations bite in the first place. The two problems were the same problem.
+
+**A push is now scoped exactly like a pull request**, diffing `github.event.before` against the
+pushed revision. `merge_group` and `workflow_dispatch` keep the unconditional full gate deliberately:
+the merge queue is the last check before code becomes `main`, and a manual dispatch is someone asking
+for the real thing on purpose.
+
+**It fails closed.** If the previous revision cannot be resolved — first push, force push, rewritten
+history, `before` absent or no longer an object in the clone — the diff is unknowable and the full
+gate runs. A shallow or empty diff must never read as "no backend change"; that is the one failure
+mode this step cannot have, and it is why the checkout pins `fetch-depth: 0`.
+
+**Verified against real history rather than reasoned about.** The scoping was replayed over actual
+commits on `main`:
+
+| commit | verdict |
+| --- | --- |
+| `4c2dd74` (touches `backend-quality.yml`) | full gate |
+| `731d232` (touches backend) | full gate |
+| `ed3b26f`, `030a209`, `41d8de6` (frontend only) | skip, ~20s |
+| all-zero `before` | full gate — fail-closed path exercised |
+
+Also `yaml.parse` on the workflow, and `bash -n` on the extracted step body.
+
+**This is what makes the 12:56 per-commit concurrency change affordable.** Giving every `main` commit
+its own group would have meant several 33-minute runs in flight on a burst of pushes. With scoping,
+most `main` commits finish the backend job in about 20 seconds, so nothing queues and nothing is
+cancelled — the completeness fix and the cost fix only work together. Landing them separately would
+have made one of them look like a mistake.
+
+**Stale claim removed in the same change:** the skip notice told the reader the full suite "runs on
+every push to main", which this makes false. It now states the real rule.
+
 ### 2026-08-15 12:56 EDT — the 12:49 fix was half of one, and the run that proved it was its own
 
 **Runtime impact: none.** Three workflow files and one test.
