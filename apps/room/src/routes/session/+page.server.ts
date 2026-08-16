@@ -63,8 +63,15 @@ import type { Actions, PageServerLoad } from './$types';
  *
  * Deny-by-default: `sanitize-html` drops every tag and every attribute not named here, so widening
  * this is a deliberate edit with a reason, never an accident.
+ *
+ * NOT exported, and that is SvelteKit's rule rather than a style choice: a `+page.server.ts` may
+ * export only `load`, `actions`, `prerender`, `csr`, `ssr`, `trailingSlash`, `config`, `entries`
+ * and `_`-prefixed names, and anything else fails the BUILD — `Invalid export
+ * 'sanitizeRoomDescription'`. It had been exported since it was written and nothing ever imported
+ * it; the build only reached this check on 2026-08-16, after a lint failure that had been stopping
+ * CI earlier in the pipeline was cleared. The single caller is `load`, forty lines below.
  */
-export function sanitizeRoomDescription(html: string): string {
+function sanitizeRoomDescription(html: string): string {
   return sanitizeHtml(html, {
     allowedTags: [
       'p', 'br', 'hr', 'div', 'span',
