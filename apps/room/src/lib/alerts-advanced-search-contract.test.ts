@@ -70,7 +70,7 @@ describe('alerts advanced search: reachability', () => {
 
     // …and the page is what hands the pane the real opener. Without this line the assertion above
     // would pass against a component whose callback nothing supplies.
-    expect(pageMarkup).toContain('onopenmodal={openModal}');
+    expect(pageMarkup).toContain('onopenmodal={(name) => modals.open(name)}');
   });
 
   it('keeps the captured button classes and icon', () => {

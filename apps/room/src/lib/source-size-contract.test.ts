@@ -260,7 +260,7 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       What the slice actually proves is the pattern, which is why it was chosen first: state and the
       functions that write it leaving TOGETHER, where Phase 1 moved fields and left 248 bodies here.
     */
-    max: 3936,
+    max: 3837,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {
@@ -329,6 +329,32 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     why: 'the scroll and paging mechanism - three feeds, one set of moving parts'
   },
   {
+    file: 'lib/room/modals.svelte.ts',
+    /*
+      Which overlay is showing, and how it is configured.
+
+      The STATE moved with the functions, which is why this slice has no shared fields — an
+      earlier measurement of the same ten functions reported three written on both sides, because
+      the functions were leaving and their state was not. That difference is what the dependency
+      scan makes visible before the code is written rather than after.
+    */
+    max: 244,
+    why: 'the overlay state machine - five fields the template reads and this class alone writes'
+  },
+  {
+    file: 'lib/room/notes.svelte.ts',
+    /*
+      The notes tab actions, and the two links that mount into rendered markup.
+
+      The phase plan named this seam as the one it was least sure of, grouping notes with the
+      page's DOM attachment helpers. Measured, they do NOT read as one thing: the capture helpers
+      hold handles the whole page reads, while these two mount links into note content. Only the
+      note pair came, which is what that plan said to do if the reading came out this way.
+    */
+    max: 153,
+    why: 'the notes tab - four actions, one flag, and the two link mounts that belong to them'
+  },
+  {
     file: 'lib/room/recording.ts',
     /*
       The recorder, and the speech recognition that shares its microphone.
@@ -371,7 +397,7 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       were costed at ~218 rather than an optimistic ~140. Nineteen of the thirty-six props are
       state classes handed over whole; the rest are page state and callbacks.
     */
-    max: 471,
+    max: 462,
     why: 'the overlay layer - modal host, seven dialogs, toasts, the lightbox and the audio sinks'
   },
   {

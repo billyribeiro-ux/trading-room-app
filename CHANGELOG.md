@@ -24,6 +24,113 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-16
 
+### 2026-08-16 17:16 EDT — Phase 5 slice 25: `RoomNotes`, and the seam the plan was least sure of
+
+**`+page.svelte` 3,836 → 3,771 (−65).** Suite 2,318 → 2,324 across 158 files. `svelte-check` 1,187
+files, 0 errors, 0 warnings. All four CI steps green locally.
+**Runtime impact: yes** — the notes tab's actions moved. No behaviour changed.
+
+**`src/lib/room/notes.svelte.ts` (153).** Creating a tab, the mutation every note action goes
+through, the version history behind one, and the two `{@attach}` handlers that wire a link inside
+content the server rendered.
+
+**THE SEAM THE PLAN NAMED AS ITS LEAST CERTAIN, resolved by measuring it.** §6 grouped notes with
+the page's DOM attachment helpers and said: *"If at slice 16 they do not read as one thing they go
+to `room/attachments.ts` as a second file and I say so."* They do not read as one thing.
+`captureMainElement` and its five siblings hold DOM handles the WHOLE PAGE reads — the split
+geometry, the scroll follow, the window handlers — while `mountNewNoteLink` and
+`mountUploadFileLink` wire links inside note and file markup, content this class is responsible for.
+Only the note pair came; the capture helpers stay on the page, and the dependency scan is what
+settled it — three shared fields on that group against one here.
+
+**`mainTab` is SHARED and crosses as a receiver.** Creating a note moves the room to the Notes tab,
+and four features write that field. A field written on four sides is not one this class may own.
+
+**`noteGates` arrives as a THUNK, on svelte-check's warning.** It is `$derived` on the page, so
+passing it by value captured the first computation and never saw another — *"This reference only
+captures the initial value"*, in as many words. A derived collaborator has to arrive as a function,
+which is the rule `session: () => data` already follows everywhere here.
+
+**`bind:` hit the same wall as slice 24, and got a different answer.** `bind:notes.newNoteOpen` is
+not valid — a binding target must be state or a prop, not a member expression. Slice 24 answered it
+by handing `RoomOverlays` the facade whole; here the consumer is `PresentationArea`, which takes
+ninety-odd props and is slice 19's subject, so adding a facade to it now would be doing that slice
+badly and early. The flag is passed by value and written back through a callback the pane forwards
+from `NotesPane` — which is what that pane already did internally.
+
+**A FOURTH NEGATIVE CONTROL THAT CAME BACK GREEN.** Removing `this.#showNotesTab()` from the create
+path — so a note is made and nobody is taken to the tab holding it — broke nothing in 2,321
+assertions. `notes.svelte.test.ts` now drives the mounted link, asserts the receiver is called, and
+asserts the page supplies it; the control is red.
+
+The other three were slice 22's detach receiver, the client half of the mention bit, and slice 24's
+modal rune. **All four are the same shape** — a receiver or a rune whose two ends each read
+correctly in isolation, so no source-text contract can see the join — and all four were found by
+running the control before committing rather than after. That is now the most productive check in
+this phase, and it is worth saying plainly: a slice is not finished when its tests are green, it is
+finished when its control is red.
+
+**One jsdom detail worth recording:** under `@vitest-environment jsdom`, `import.meta.url` is not a
+`file:` URL, so `new URL(path, import.meta.url)` gives `readFileSync` something it refuses. The
+source-reading contracts in `src/lib` are all node-environment files, which is why none of them had
+hit it. A repo-relative path works.
+
+Not verified: no browser run.
+
+### 2026-08-16 17:07 EDT — Phase 5 slice 24: `RoomModals`, and a third control that was invisible
+
+**`+page.svelte` 3,936 → 3,836 (−100).** `RoomOverlays.svelte` 471 → 462. Suite 2,308 → 2,318
+across 157 files. `svelte-check` 1,185 files, 0 errors, 0 warnings. All four CI steps green locally.
+**Runtime impact: yes** — the overlay state machine moved. No behaviour changed.
+
+**`src/lib/room/modals.svelte.ts` (244).** Which overlay is showing and how it is configured: the
+modal name, the tab each modal opens on, the image the lightbox holds, and the two actions — poll
+submission and image download — reached only from inside one.
+
+**The STATE moved with the functions, which is why this slice has no shared fields.** An earlier
+measurement of the same ten functions reported `modal`, `sessionControlInitialTab` and
+`selectedImageUrl` as written on both sides — because the functions were leaving and their state was
+not. Taking both makes this class the single writer, and three reader-plus-receiver crossings simply
+do not exist. That is the difference between extracting a DOMAIN and extracting a list of functions,
+and the dependency scan is what makes it visible before the code is written.
+
+**`theme` deliberately did NOT come.** `setTheme` writes it, so it looked like part of this — but
+thirteen other places read it, including the sidebar, the feeds and the modal host. It crosses as a
+receiver instead.
+
+**`RoomOverlays` now takes `modals` WHOLE, replacing five props and two binds** — the facade payoff
+the plan costed for, arriving one slice after the component. Slice 17 moved the markup while the
+state was still five `let`s, so it took five props and bound two back. `bind:` is what forced the
+change rather than a preference: `bind:modals.modal` is not valid, because a binding target must be
+state or a prop and not a member expression.
+
+**A THIRD NEGATIVE CONTROL THAT WAS INVISIBLE TO EVERY GATE**, and that is the finding. Demoting
+`#modal` from `$state` to a plain field — so the room renders whichever overlay was showing at load
+and never changes again — broke nothing: `svelte-check` reports 0 errors and 0 warnings, because
+Svelte's `non_reactive_update` warning is about a `let` in a COMPONENT and says nothing about a class
+field, and all 2,311 assertions passed. `modals.svelte.test.ts` now holds one assertion per
+independently reactive field — five different elements render from them — and the control is red.
+
+The other two were slice 22's detach receiver and the client half of the mention bit. All three were
+missing tests rather than missing behaviour, and all three were found by running the control before
+committing rather than after.
+
+**Twelve methods passed by reference, caught by the prototype contract** — the same finding as
+slices 20 and 22, and it sees them together rather than one per click.
+
+**Two rewriter/generator gaps closed, both first hit here.** An OPTIONAL property key is `name?:`,
+which the `name:` guard did not exclude: `openImageModal?: (event, url) => void` inside a type
+literal became `modals.openImage?: …`, 346 parse errors from one match. And a MULTI-LINE TEMPLATE
+LITERAL is data the line scanner cannot see across — `openImageModal` writes a 60-line HTML document
+into a popup — so `xform` tracks them now and ABORTS if a skipped line interpolates a name being
+renamed, rather than silently dropping a rewrite.
+
+**Two errors of my own cleanup, caught by the gate before the commit:** `ModalName` removed one step
+too far while `openModal`'s parameter still named it, and a `toggleTopMenu()` wrapper that dropped
+the menu argument it was handed.
+
+Not verified: no browser run.
+
 ### 2026-08-16 16:52 EDT — Phase 5 slice 23: `RoomFeedScroll`, and a flag with two writers
 
 **`+page.svelte` 4,083 → 3,936 (−147).** Suite 2,305 → 2,308 across 156 files. `svelte-check` 1,183
