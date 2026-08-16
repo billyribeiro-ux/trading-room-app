@@ -199,8 +199,16 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       to pass by mistake. Two contract tests were re-pointed rather than deleted, and the preference
       one got stronger for it - it now asserts on how the column is CONSTRUCTED, which is where the
       rule went, instead of regexing a call for an argument that no longer exists.
+
+      Then `RoomMessageChrome`: the SIXTEEN props that are identical for every message in the room,
+      spelled at each call site and drilled through every component standing between the page and a
+      message. One `$derived` object now, spread at both lists. The line saving here is small; the
+      point is that the alert/chat column stops being a ninety-prop component when it is extracted,
+      which is what has kept it last. THREE contract tests were re-pointed and all three got a
+      stronger guarantee: "passed at both call sites" was two spellings that had to agree, and is now
+      one object reaching two spreads.
     */
-    max: 11594,
+    max: 11584,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {

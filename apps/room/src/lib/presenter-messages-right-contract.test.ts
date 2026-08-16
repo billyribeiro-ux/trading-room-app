@@ -63,8 +63,19 @@ describe('the room consumes the setting it asked the controller for', () => {
     const alert = pageCode.indexOf('kind="alert"');
     expect(chat, 'the chat list must exist').toBeGreaterThan(-1);
     expect(alert, 'the alert list must exist').toBeGreaterThan(-1);
-    expect(pageCode.slice(chat, chat + 200)).toContain('{presenterMessagesOnTheRight}');
-    expect(pageCode.slice(alert, alert + 200)).toContain('{presenterMessagesOnTheRight}');
+    /*
+      RE-POINTED 2026-08-15: the prop is one of the sixteen in `messageChrome` now, spread at both
+      sites. The concern above is unchanged — it must reach both lists — and both halves are still
+      asserted, one at the spread and one at the chrome that supplies it.
+    */
+    expect(pageCode.slice(chat, chat + 200)).toContain('{...messageChrome}');
+    expect(pageCode.slice(alert, alert + 200)).toContain('{...messageChrome}');
+
+    const from = pageCode.indexOf('const messageChrome');
+    expect(from, 'messageChrome is not built in +page.svelte').toBeGreaterThan(-1);
+    expect(pageCode.slice(from, pageCode.indexOf('\n  });', from))).toContain(
+      'presenterMessagesOnTheRight'
+    );
   });
 
   it('and both consumers are still in the component', () => {

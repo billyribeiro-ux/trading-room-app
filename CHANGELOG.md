@@ -223,6 +223,57 @@ through — both are documented in `.env.example` and until now nothing read the
 **Not done:** retiring `ptr_clone_app` (deferred until the cutover is proven in a real deployment),
 and the owner role / database rename `ptr_clone` → `tradingroom`. Both remain in `TODO.md`.
 
+### 2026-08-15 20:26 EDT — `RoomMessageChrome`: the sixteen props every message shares, and a second column missing four of them
+
+**Branch `feat/extra-chat-column`, not merged.** **Runtime impact: none** — the same sixteen values
+reach the same two lists; they are built once instead of spelled twice.
+
+`RoomMessage` takes just over thirty props. **Sixteen do not vary from one message to the next** —
+they describe the room's configuration and the viewer, not the row. Spelled individually they were
+sixteen lines at each call site, and *any component standing between the page and a message had to
+declare all sixteen, destructure all sixteen and forward all sixteen* — three spellings apiece to
+pass a value through untouched. `ExtraChatPane` does exactly that with thirteen of them today.
+
+**That cost is what has kept the alert/chat column last.** It is a 730-line region, and roughly
+thirteen of the ~90 identifiers it needs were these. One `$derived` chrome object, spread at both
+call sites, is groundwork for that extraction more than it is a line saving.
+
+**Two call sites deliberately left alone, and each for a reason found by reading them:**
+
+- **`ModalHost`'s Q&A entries** pass FOUR of the sixteen — no badges, no reactions, no edit controls.
+  Spreading the full chrome there would silently switch those on inside a modal that has never shown
+  them. It keeps spelling its four.
+- **`ExtraChatPane`** is missing four the main column has, and that is recorded as a finding rather
+  than fixed — see below.
+
+**`viewerIsPresenter` is copied verbatim, not shortened.** Both sites pass
+`data.user.role === 'staff' || data.user.role === 'admin'` rather than the page's `isPresenter`, and
+that difference is load-bearing: a member handed mic and screen is elevated for MEDIA only and must
+not thereby gain a presenter's controls on every message in the room. See `media-elevation.ts`.
+
+**THREE CONTRACT TESTS RE-POINTED, AND ALL THREE GOT STRONGER.** They asserted "this prop is passed
+at BOTH call sites" by counting two spellings that had to agree. That is now one object reaching two
+spreads — a thing that *cannot* drift rather than a thing that happens not to have. Both halves are
+still asserted: the spread at each site, and membership in the chrome that supplies it.
+
+**A ceiling raise refused, and paid the way the ratchet asks.** The first version put the whole
+explanation at the call site and the file grew by 6. The reasoning moved into
+`room-message-chrome.ts`, where the thing it explains lives, and the page kept a one-line pointer.
+
+**A finding recorded, not fixed — `TODO.md` row AI.** `ExtraChatPane`'s `Props` declares thirteen of
+the sixteen and **does not declare `usersPublicReply`, `enableReactions`, `enableEditMessage` or
+`enableEditAlerts` at all**, so the same chat message renders with reactions and edit controls in the
+main column and without them in the second one. `message-gates-contract.test.ts` was written against
+exactly this class of defect — its own header calls it *"reactions work in chat but not on alerts"* —
+but it reads the page's two call sites and cannot see a third list one component out. Passing the
+chrome there would close it in one line and would be a **behaviour change**, so it is the owner's
+call, not mine.
+
+**Verified:** `pnpm run check` 0 errors / 0 warnings across 1,137 files; suite **1,883 across 136
+files**; eslint clean; prettier clean on every touched file. Two negative controls seen red — a gate
+dropped from the chrome, and one call site stopped spreading it. `+page.svelte` **11,593 → 11,583**,
+ceiling lowered in the same commit.
+
 ### 2026-08-15 20:17 EDT — Phase 3d: the last three latches, and a term that could never change an answer
 
 **Branch `feat/extra-chat-column`, not merged.** **Runtime impact: none intended** — the three

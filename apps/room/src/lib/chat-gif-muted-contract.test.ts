@@ -106,10 +106,20 @@ describe('ours', () => {
   });
 
   it('reaches BOTH message lists — the pipe is shared upstream', () => {
+    /*
+      RE-POINTED 2026-08-15. `chatGif` used to be spelled at each call site; it is now one of the
+      sixteen in `messageChrome`, which both lists spread. Same guarantee by a shorter route — one
+      value reaching two spreads instead of two spellings that have to agree.
+    */
     const chat = pageCode.indexOf('kind="chat"');
     const alert = pageCode.indexOf('kind="alert"');
-    expect(pageCode.slice(alert, alert + 120)).toContain('{chatGif}');
-    expect(pageCode.slice(chat, chat + 120)).toContain('{chatGif}');
+    expect(alert, 'the alert call site is not in +page.svelte').toBeGreaterThan(-1);
+    expect(chat, 'the chat call site is not in +page.svelte').toBeGreaterThan(-1);
+    expect(pageCode.slice(alert, alert + 200)).toContain('{...messageChrome}');
+    expect(pageCode.slice(chat, chat + 200)).toContain('{...messageChrome}');
+
+    const from = pageCode.indexOf('const messageChrome');
+    expect(pageCode.slice(from, pageCode.indexOf('\n  });', from))).toContain('chatGif');
   });
 
   it('carries the captured CSS verbatim, including the hover that makes it look clickable', () => {
