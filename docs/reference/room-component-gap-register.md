@@ -41,16 +41,45 @@ recorded. **Never mark a row closed on reasoning alone.**
 `docs/decoded/mobile-app-decoded.md` establishes the difference by counting across both, and it is
 not cosmetic — see **R-15**, a whole surface that exists only in the current build.
 
-**What this does and does not invalidate.** Every Part A citation is still a real offset in a real
-deployed bundle, and the presence table in `mobile-app-decoded.md:80-99` shows most mobile strings
-identical across both builds. But **every `MATCH` verdict in Part A means "matches the older
-build"**, and only a re-run against `main.d1d09071be31f1ba.js` can promote that to "matches what is
-deployed". **Only 51 components were decoded, and they were decoded from the older bundle** — so the
-component count itself is a claim about that build too.
+**Owner instruction, 2026-08-16: "we have to be all v4."** So v4 is the corpus. What that costs was
+**measured before acting**, and the answer is: very little.
 
-**Action: re-decode from `source-v4-2026-08-15` and diff the component set before trusting any
-`MATCH` above.** Recorded rather than quietly corrected, because I audited nine components against
-the wrong baseline and reported them as done.
+**The component sets are IDENTICAL.** Both bundles hold **68** single-selector component
+definitions and the sets differ by nothing — **51 first-party `app-*`** (exactly the decoded set, so
+the decode is complete) and **17 third-party** correctly excluded: `as-split`, `pan-zoom`,
+`re-captcha`, `router-outlet`, `ng-component`, `option`, five `ngb-*` and six
+`emoji-mart`/`ngx-emoji`. **Nothing was added or removed between the builds**, so the inventory
+above — 51 / 42 rendered / 9 absent — **holds unchanged for v4.**
+
+Every component body was then extracted from both bundles and compared:
+
+| result | count | meaning |
+|---|---|---|
+| byte-identical | 10 | unchanged |
+| differ, **same length** | 39 | **minifier identifier renames only** |
+| differ, **different length** | **2** | **real content change** |
+
+The 39 are proven renames rather than assumed: `app-root` is 454 bytes in both and the only
+difference is `H(1,DRe,5,1)` → `H(1,IRe,5,1)`, one minified symbol. Each build assigns short names in
+its own order.
+
+**Only two components genuinely changed:**
+
+| component | old → v4 | what |
+|---|---|---|
+| `app-webrtc-troubleshooter` | 12,346 → 12,897 (**+551**) | the Mobile App tab — **R-15** |
+| `app-presentationarea` | 37,843 → 38,142 (**+299**) | **not yet read** |
+
+**So Part A's findings survive the corpus change**, and the honest residue is narrow: promote the
+nine `MATCH` verdicts once re-decoded, and genuinely re-read those two. Recorded rather than quietly
+corrected, because I audited nine components against the older baseline and reported them as done
+without noticing there was a newer one.
+
+**⚠ Instrument note, because the first answer was wrong.** The comparison initially returned "51
+unresolved" — it searched for `dt({`, the helper name in the *decoded* files, while the raw v4 bundle
+uses `ut({`; the minified helper name itself differs per build. Rewritten to match `cmp=<ident>({`
+and bracket-match, then validated against a known answer (`app-webrtc-troubleshooter` had to come
+back changed, and did). **The first result was the tool failing, not a finding.**
 
 The decode is proven complete by `pull-everything-contract.test.ts`, which asserts the extractor
 finds every `selectors:[` definition in the bundle rather than a hardcoded list, and names
@@ -90,6 +119,7 @@ status table below carries an explicit `NOT AUDITED` count rather than implying 
 | R-12 | `app-root`'s page switch and subscriptions | **OPEN — fully captured** | See below. We render the tag; the shell behind it is absent. |
 | R-13 | `app-scplayer`'s undeclared bug-fix | **OPEN — decision needed, not code** | See below. We corrected a reference defect without recording it. |
 | R-14 | `app-ytplayer`'s late-join seek | **OPEN — already declared, blocked** | See below. Declared at `+page.svelte:7183-7201`; blocked on persisted room video state. |
+| R-15 | the v4 **Mobile App tab** in `app-webrtc-troubleshooter` | **OPEN — real gap, fully captured** | Ours is the OLDER build's troubleshooter (`ModalHost.svelte:5588`). Written up in `todo-next.md` §2 from `docs/decoded/mobile-app-decoded.md` §2.5. **This is one of the only two components that changed in v4**, and it is the member's sole self-service fix for stopped notifications — so it belongs to P-1 as much as to Part A. |
 
 ---
 

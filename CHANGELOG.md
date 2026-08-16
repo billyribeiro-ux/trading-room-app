@@ -244,6 +244,66 @@ which accounts for all 45. `eslint` clean; `prettier --check` clean, and the fil
 too, so the formatting pass was fixing what this change introduced rather than pre-existing drift.
 **Not verified:** nothing runtime, because nothing runtime changed.
 
+### 2026-08-16 08:05 EDT — The corpus moves to v4, the push-notification root cause is FOUND, and the work queue moves to `todo-next.md`
+
+**Branch `feat/extra-chat-column`. Runtime impact: none** — `todo-next.md` (new),
+`docs/reference/room-component-gap-register.md`, `TODO.md`, `CHANGELOG.md`. No source file changed.
+
+**`todo-next.md` is new and deliberately separate from `TODO.md`** (owner, 2026-08-16): a concurrent
+session is running the `+page.svelte` decomposition against `TODO.md`, and two sessions writing one
+file is how a merge conflict eats a finding. `TODO.md` keeps a pointer and nothing else.
+
+**P-1 ROOT CAUSE FOUND, and it is in the reference's own settings.** `room-settings-schema.ts:289-290`
+carries `mobileAppExpireNotificationsDays` — label **"Push expire days"**, help text verbatim *"If
+user does not log in this many days, we'll stop sending push notifications"*, captured default
+**14** — and `ptrMobileAppExpirePairCodeDays` (**7**). **The reference's automatic stop is keyed on
+`lastLogin`, not on subscription state.** Cancel → the member can no longer log in → fourteen days
+later push stops. **That is a fourteen-day paid-content leak by construction, and it is what the
+owner is seeing. It is not a defect this rebuild introduced**, and "stop immediately" is a
+requirement the original never met. Both settings are `wired: false` here; every *manual* control
+(`pauseUserNotifs`→`notificationsState`, `resetFCMForuser`, `sendTestFCM`) **is** built. Reached by
+reading two files nobody had opened: `docs/MOBILE-APP.md` (495 lines) and
+`docs/decoded/mobile-app-decoded.md`.
+
+**THE CORPUS IS NOW v4** (owner: *"we have to be all v4"*), and the cost was **measured before
+acting** rather than assumed. Three captures exist; the audit had been reading the OLDEST.
+
+- **Component sets are identical.** Both bundles hold **68** single-selector definitions, same set —
+  **51 first-party `app-*`** (exactly the decoded set, so the decode is complete) and 17 third-party
+  (`as-split`, `pan-zoom`, `re-captcha`, `router-outlet`, `ng-component`, `option`, five `ngb-*`, six
+  `emoji-mart`/`ngx-emoji`). **The 51 / 42 / 9 inventory holds unchanged for v4.**
+- **Body-level diff: 10 byte-identical, 39 differing by exactly ZERO length, 2 with real change.**
+  The 39 are proven renames, not assumed — `app-root` is 454 bytes in both and differs only by
+  `H(1,DRe,…)` → `H(1,IRe,…)`, one minified symbol whose name each build assigns in its own order.
+- **Only `app-webrtc-troubleshooter` (+551) and `app-presentationarea` (+299) actually changed.** So
+  "all v4" costs a re-decode plus two genuine re-reads, and Part A's findings survive.
+
+**New row R-15** — the +551 is v4's **Mobile App tab**: a third troubleshooter tab, ungated where
+every other mobile control carries the `ptrMobileAppEnabled || customMobileAppEnabled` gate, whose
+`Restore Connectivity` button fires `restoreMobileAppTokens` and whose default now lands a
+non-presenter on it as their **only** tab. Ours is the older build (`ModalHost.svelte:5588` renders
+the single-literal title). **It is the member's only self-service fix for stopped notifications**, so
+it belongs to P-1 as much as to the reference match.
+
+**MY OWN INSTRUMENT FAILED FIRST AND IS RECORDED AS SUCH.** The body comparison initially returned
+"51 unresolved". It searched for `dt({` — the helper name in the *decoded* files — while the raw v4
+bundle uses `ut({`; the minified helper name itself differs per build. Rewritten to match
+`cmp=<ident>({` and bracket-match, then validated against a known answer before being believed.
+**The first result was the tool failing, not a finding**, and reporting it would have been a claim
+about the evidence that was really a claim about my regex.
+
+**Also recorded: the evidence I do NOT have**, named in `todo-next.md` §4 so nobody assumes it was
+checked — the reference's **server** (uncaptured entirely, so what `restoreMobileAppTokens` does is
+unknown), the manage-page bundle `/public/dist/app.min.js` (**not in this repo**, and it holds
+`pauseUserNotifs`, `getFCMTokens`, `resetFCMForuser`, the `ptrMobileAppCaseByCaseEnabled` branches
+and `customMobileAppLaunchWord`), the v3 bundle, and two unread files that likely answer P-3 and
+P-1's billing seam.
+
+**Verified:** the bundle comparison twice, the second time with a corrected and validated
+instrument; every "what exists today" claim by opening the cited file. **Not verified:** what the
+reference server does with `restoreMobileAppTokens`; the contents of `app-presentationarea`'s +299
+bytes. **Not run:** any test — no source file was touched.
+
 ### 2026-08-16 07:24 EDT — Five owner requirements added to the room register as Part B, and the push-notification one has a decisive finding
 
 **Branch `feat/extra-chat-column`. Runtime impact: none** —
