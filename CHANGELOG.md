@@ -223,6 +223,44 @@ through — both are documented in `.env.example` and until now nothing read the
 **Not done:** retiring `ptr_clone_app` (deferred until the cutover is proven in a real deployment),
 and the owner role / database rename `ptr_clone` → `tradingroom`. Both remain in `TODO.md`.
 
+### 2026-08-15 21:38 EDT — The db cases run green, a claim in `952e152` corrected, and `.env` found pointing at a database seven migrations behind
+
+**Runtime impact: none** — records and a configuration finding. No database was written to.
+
+**Row AJ's db cases are executed: 55 tests across 9 files, green.** They stand up their own
+PostgreSQL — `initdb` into a temp directory, a random high port bound to 127.0.0.1 only, then
+`pg_ctl stop` and delete — so no real database is touched, and migration `0013` is applied to a fresh
+cluster on every run. Those four `darkThemeBadgeId` cases could not pass against a schema without the
+column, which is what makes the migration proven rather than assumed.
+
+**CORRECTING `952e152`, whose message is now permanent and wrong on one point.** It says a `\d badges`
+against "the local dev database" showed no `dark_theme_badge_id` because that database "simply has
+not been migrated". I had connected to **`newroom_control_dev`**, taken from `apps/controller/.env`.
+That is not this repository's current database. Reading the actual cluster:
+
+```
+tradingroom_dev        applied_migrations up to 12  (stream_ingest_keys)
+newroom_control_dev    applied_migrations up to  5  (open_existing_rooms)
+```
+
+`tradingroom_dev` is the live one and is seven migrations ahead. Neither has `dark_theme_badge_id`,
+and for `tradingroom_dev` that is simply because `0013` is new and nothing has run the migrator since
+it was written — expected, not a defect. The defect was my conclusion, drawn from the wrong database
+because I read a connection string instead of asking which database this repository actually uses.
+**The runtime role is `tradingroom_app` and the database is `tradingroom_dev`; `newroom_control_dev`
+is a legacy name in the same family as `ptr_clone`** — `ops/naming-provenance.md` is the mapping.
+
+**AND THAT IS A REAL FINDING, not only my error.** `apps/controller/.env` sets
+`DATABASE_URL=postgres://…/newroom_control_dev`, so anything run locally against `.env` — the app, a
+manual check, a seed — talks to a schema stuck at migration 5, missing `room_sessions`,
+`recorded_max_capacity`, `stream_ingest_keys` and four others. It reads as a working database and
+answers with a seven-migration-old shape. Recorded as row AL rather than repointed here: which
+database a developer's `.env` should name is the owner's call, and `.env` is not mine to edit.
+
+**Also in this commit: three struck-through rows removed from `TODO.md`.** That file's own rule is
+that closed items are REMOVED and their history lives here — I struck AH, AI and AJ through instead,
+three times in one session, which is the exact drift the rule exists to stop.
+
 ### 2026-08-15 21:26 EDT — Row AH closed: the third unbounded read, bounded by the alert page it belongs to
 
 **Branch `feat/extra-chat-column`. Runtime impact: YES** — the page load stops serialising every
