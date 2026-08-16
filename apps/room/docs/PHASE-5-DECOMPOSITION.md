@@ -9,23 +9,29 @@ five ways a mechanical extraction silently breaks this file, each of which has a
 
 ## 1. Where it stands
 
-`+page.svelte` **9,605 → 8,899**. Script 8,627 → 7,733. **Template 983, untouched.**
+`+page.svelte` **9,605 → 8,699**. Script 8,627 → 7,729. Template 978 → 970.
 
-| slice | module | commit | page after |
-| --- | --- | --- | ---: |
-| 0 | the three gates (no extraction) | `e972418` | 9,605 |
-| 1 | `RoomToasts` | `dc87d13` | 9,532 |
-| 2 | `RoomDialogs` | `7bdc4ef` | 9,519 |
-| 3 | `RoomPrefs` | `d9d1187` | 9,247 |
-| 4b | `RoomVolume` | `2330597` | 9,057 |
-| 12 | `RoomBroadcasts` | `a4480c4` | 8,899 |
+| slice | module                          | commit    | page after |
+| ----- | ------------------------------- | --------- | ---------: |
+| 0     | the three gates (no extraction) | `e972418` |      9,605 |
+| 1     | `RoomToasts`                    | `dc87d13` |      9,532 |
+| 2     | `RoomDialogs`                   | `7bdc4ef` |      9,519 |
+| 3     | `RoomPrefs`                     | `d9d1187` |      9,247 |
+| 4b    | `RoomVolume`                    | `2330597` |      9,057 |
+| 12    | `RoomBroadcasts`                | `a4480c4` |      8,899 |
+| 6     | `RoomFiles`                     | `9d5a5fb` |      8,699 |
 
-Suite 1,954/138 → **2,071/144**. `svelte-check` 0 errors, 0 warnings throughout.
+Suite 1,954/138 → **2,093/145**. `svelte-check` 0 errors, 0 warnings throughout.
 
-**The template has not moved at all**, and that is on plan rather than a miss: every line so far came
-off the script. It also means slices 17–19 carry the ENTIRE template reduction, and the projection of
-~785 depends on them completely. Anyone measuring progress by the page count alone will conclude this
-is nearly done when the hardest third is untouched.
+**The template moved for the first time in slice 6**, and only because that slice collapsed a prop
+list: 984 → 970. Everything before it came off the script alone. Slices 17–19 still carry almost all
+of the template reduction, and the projection of ~785 depends on them completely — anyone measuring
+progress by the page count alone will conclude this is nearly done when the hardest third is
+untouched.
+
+What slice 6 did establish is that a domain extraction pays TWICE where a prop is drilled twice.
+Fifteen props left the page, and the same fifteen left `PresentationArea`. Slices 11, 15 and 16 all
+touch `PresentationArea`'s surface, so the same arithmetic applies to them.
 
 ---
 
@@ -35,19 +41,18 @@ is nearly done when the hardest third is untouched.
 reordering of `RoomVolume` and `RoomBroadcasts` ahead of media transport is why six slices landed
 rather than three.
 
-| # | module | ~script lines | note |
-| --- | --- | ---: | --- |
-| 6 | `RoomFiles` | 330 | **scoped, generator written, not landed** — see §5 |
-| 15 | `RoomTradeAlerts` | 330 | swing + day-trade are near-identical; one keyed module, two instances, the `RoomLogPages` precedent |
-| 16 | `RoomNotes` + attachments | 340 | the seam I am least sure of — split if it does not read as one thing |
-| 8 | `RoomMessageActions` | 380 | `handleMessageAction` + evidence state |
-| 7 | `RoomPrivateChat` | 430 | |
-| 11 | `RoomScreens` | 450 | tabs, zoom, popouts, detach |
-| 10 | `RoomComposer` | 520 | sending, RTE, uploads, post-alert |
-| 5 | `RoomEventStream` | 650 | `subscribeToRoomEvents`; `createSubscriber` applies to `roomEventsConnected` ONLY |
-| 9 | `RoomFeeds` | 700 | the three scroll effects go to the panes that own the scrollers |
-| 13 | `RoomUserActions` | 700 | `handleUserAction` (249 lines) |
-| 4 | media transport | 1,700 | largest; `RoomMedia` keeps the state, transport goes to a sibling |
+| #   | module                    | ~script lines | note                                                                                                |
+| --- | ------------------------- | ------------: | --------------------------------------------------------------------------------------------------- |
+| 15  | `RoomTradeAlerts`         |           330 | swing + day-trade are near-identical; one keyed module, two instances, the `RoomLogPages` precedent |
+| 16  | `RoomNotes` + attachments |           340 | the seam I am least sure of — split if it does not read as one thing                                |
+| 8   | `RoomMessageActions`      |           380 | `handleMessageAction` + evidence state                                                              |
+| 7   | `RoomPrivateChat`         |           430 |                                                                                                     |
+| 11  | `RoomScreens`             |           450 | tabs, zoom, popouts, detach                                                                         |
+| 10  | `RoomComposer`            |           520 | sending, RTE, uploads, post-alert                                                                   |
+| 5   | `RoomEventStream`         |           650 | `subscribeToRoomEvents`; `createSubscriber` applies to `roomEventsConnected` ONLY                   |
+| 9   | `RoomFeeds`               |           700 | the three scroll effects go to the panes that own the scrollers                                     |
+| 13  | `RoomUserActions`         |           700 | `handleUserAction` (249 lines)                                                                      |
+| 4   | media transport           |         1,700 | largest; `RoomMedia` keeps the state, transport goes to a sibling                                   |
 
 **Group C — the template.** 17 `RoomOverlays.svelte`, 18 document/window handlers, 19 `RoomShell.svelte`.
 
@@ -114,7 +119,19 @@ rewriting `foo.bar` also stops you rewriting a spread. Handle `\.\.\.name` expli
 `this.#fileTab = $state('files')`. Rewriting it in place produces
 `this.#fileTab: FileTab = $state(...)`, which is a parse error.
 
-### 4.5 Shorthand — three separate forms, all parse errors
+### 4.5 A REMOVED region leaves its own indent behind
+
+`svelte.parse` reports a statement's start at the statement, not at the start of its line, so a part
+that opens with a block comment arrives flush left while the page has it at two spaces. Removing
+`part.text` alone therefore leaves those two spaces, and where two parts are ADJACENT the orphans
+accumulate — `fileTab` and `filesHidden` sit on consecutive lines, so the comment after them ended
+up indented by six.
+
+It compiles, it type-checks, every test passes, and it is wrong. Nothing but reading the diff finds
+it. Remove `indentOf(part) + part.text + '\n'`, and apply the same guard when GENERATING, or every
+method's leading JSDoc lands at column 0 above a body at column 4.
+
+### 4.6 Shorthand — three separate forms, all parse errors
 
 - Object literal: `{ chatGif }` → must become `{ chatGif: prefs.chatGif }`, and the KEY must not be
   renamed.
@@ -127,38 +144,56 @@ rewritten in slice 3 and 7 were correct.
 
 ---
 
-## 5. Slice 6 (`RoomFiles`) — scoped, not landed
+## 5. Slice 6 (`RoomFiles`) — LANDED, `9d5a5fb`, and what it cost
 
-Extraction is 16 declarations/functions, **212 lines**, all located. A class was generated that
-type-checked clean with citations 5/5 and was then REMOVED rather than left unimported.
+212 lines out of the page, 382 into `lib/room/files.svelte.ts`, and the number that mattered was
+not either of those: **fifteen props collapsed at TWO call sites**, so thirty declarations went.
+`PresentationArea` 1,186 → 1,142 and `FilesPane` 573 → 556.
 
-**Why it was not landed, and what it will cost:** the props it collapses are drilled TWICE —
-`+page.svelte` hands ~18 to `PresentationArea`, which passes ~20 straight through to `FilesPane`. So
-landing it rewrites the `$props` block and internal references of **two components**, and
-`files-pane-contract.test.ts` alone carries **28 negative assertions and 59 slice calls**. That is
-the largest test migration of any remaining Group B slice; budget for it accordingly.
+The estimate above said 330 script lines and it delivered 186. The estimate was counting the
+functions; what actually left is the functions minus the plumbing that had to stay.
 
-**Design decisions already taken and worth keeping:**
+**`bind:fileTab` disappeared as a side effect**, and that generalises: a bindable that exists only
+to carry a write back up through a component that never reads it has no reason to survive its props.
 
-- `files` and `sessData` as THUNKS, never arrays — `data` is a `$props()` value, so a copy goes stale
-  after navigation. `RoomRoster` sets this precedent.
+**What the test migration actually cost.** `files-pane-contract.test.ts` was re-pointed in 13
+places and grew a third source constant. Two NEGATIVES had to move with their positives — left on
+`page`, they would have been green forever, because the page no longer contains `searchedFiles`
+in any form.
+
+**And it found a stale assertion in a file it did not touch.**
+`for-all-broadcast-contract.test.ts` asserted the broadcast refusal wording against
+`+page.svelte`. That wording moved to `RoomBroadcasts` in slice 12; the assertion did not move with
+it and kept passing, because the page still held a line spelled identically — the Files pane's
+`setAlertSound`. Slice 6 moved that line out and it went red.
+
+**So a positive `toContain` can be stale in exactly the way a negative can be vacuous**, and the
+extraction that exposes it is usually a LATER one. Before landing a slice, grep the other contract
+tests for any string this slice is moving, not just for the identifiers it renames.
+
+**Design decisions worth reusing:**
+
+- `files` and `sessData` as THUNKS, never arrays — `data` is a `$props()` value, so a copy goes
+  stale after navigation. `RoomRoster` set this precedent and `RoomFiles` confirms it.
 - `filesHidden` as a **getter, not a `$derived` field** — a derived class field initialises before
-  the constructor assigns the thunk it reads, so it would cache a value computed against `undefined`.
-- `fileSort` stays ONE `$state.raw` pair. Two fields is the drift `$lib/file-sort` exists to close.
-- Only `fileTab` keeps a setter, because the pane binds it.
-
----
+  the constructor assigns the thunk it reads, so it would cache a value computed against
+  `undefined`. This is now an executable test with a negative control, not a comment.
+- A field with NO accessor at all is a real answer. `fileSearch` is written by the box and read
+  only from inside, so it has a `search()` receiver and no getter.
+- Annotate the FIELD when a generic initializer moves into a constructor. `this.#x = new Set()`
+  elsewhere in the class reads as `Set<unknown>` otherwise, and annotating leaves the moved line
+  byte-exact where editing it would not.
 
 ## 6. The gates this phase added, and what each caught
 
 All four caught something real, usually within one slice of being written.
 
-| gate | caught |
-| --- | --- |
-| catalog-driven `EXTRACTION_SOURCES` + reader floor | a test that stopped naming `+page.svelte` stayed policed — the `day-separator` failure, third occurrence, closed structurally |
-| per-module `CEILINGS` + 800 backstop, discovered from disk | fired on `toasts.svelte.ts` twenty minutes after being written, and again when prettier reflowed it |
-| comment + citation floors (6,329 / 220) | the `screen-volume.ts` docstring corruption, before it was written |
-| `unbound-method-contract.test.ts` | see below |
+| gate                                                       | caught                                                                                                                        |
+| ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| catalog-driven `EXTRACTION_SOURCES` + reader floor         | a test that stopped naming `+page.svelte` stayed policed — the `day-separator` failure, third occurrence, closed structurally |
+| per-module `CEILINGS` + 800 backstop, discovered from disk | fired on `toasts.svelte.ts` twenty minutes after being written, and again when prettier reflowed it                           |
+| comment + citation floors (6,329 / 220)                    | the `screen-volume.ts` docstring corruption, before it was written                                                            |
+| `unbound-method-contract.test.ts`                          | see below                                                                                                                     |
 
 **The unbound-method trap deserves its own note.** A class method passed as a prop loses `this` and
 throws on first click. It happened **fifteen times in four slices** — ten in one commit — and
