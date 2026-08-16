@@ -223,7 +223,7 @@ through — both are documented in `.env.example` and until now nothing read the
 **Not done:** retiring `ptr_clone_app` (deferred until the cutover is proven in a real deployment),
 and the owner role / database rename `ptr_clone` → `tradingroom`. Both remain in `TODO.md`.
 
-### 2026-08-15 21:09 EDT — Row AJ: the dark-theme control stops being a toggle and starts storing a badge id
+### 2026-08-15 21:07 EDT — Row AJ: the dark-theme control stops being a toggle and starts storing a badge id
 
 **Branch `feat/extra-chat-column`, not merged. Runtime impact: YES** — migration `0013`, a new column,
 a rewritten action and a rewritten control on the account page.
