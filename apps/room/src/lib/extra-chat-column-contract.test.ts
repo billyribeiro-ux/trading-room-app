@@ -313,11 +313,23 @@ describe('the second column follows its own messages', () => {
   });
 
   it('scrolls on first view, on a channel switch, and on a new message', () => {
+    /*
+      RE-POINTED 2026-08-15. The three conditions used to be spelled out inline here as
+      `!extraChatScrollInitialized`, `activeTab !== previousExtraChatTab` and
+      `count > previousExtraChatCount`. All three moved into `RoomScrollFollow`, which is where they
+      are now EXECUTED rather than read as text — `scroll-follow.test.ts` asserts each of the three
+      by calling it.
+
+      What remains this file's business is that the extra column still asks the question, and asks it
+      with its own tab and its own count. Deleting the assertions instead would have been the
+      vacuous-guard failure this repository has already shipped twice.
+    */
     const from = pageCode.indexOf('const scroller = extraChatScroller;');
+    expect(from, 'the extra column scroll effect is not in +page.svelte').toBeGreaterThan(-1);
     const effect = pageCode.slice(from, pageCode.indexOf('\n  });', from));
-    expect(effect).toContain('const isInitialView = !extraChatScrollInitialized;');
-    expect(effect).toContain('activeTab !== previousExtraChatTab');
-    expect(effect).toContain('count > previousExtraChatCount');
+    expect(effect).toContain('extraChatFollow.follows({');
+    expect(effect).toContain('tab: activeTab');
+    expect(effect).toContain('count,');
   });
 
   it('honours the reader’s own scroll position, using THIS column’s flag', () => {
@@ -325,11 +337,28 @@ describe('the second column follows its own messages', () => {
       The assertion that matters. Passing `chatScrollingUp` here would let the main column's reader
       position decide whether the extra column jumps — the two are independent panes and a reader
       scrolled up in one must not be yanked by traffic in the other.
+
+      Still a text assertion after the move, and deliberately so: `RoomScrollFollow` cannot check
+      this. Which flag is handed in is the CALLER's decision, and the class would answer a question
+      about the main column just as happily.
     */
     const from = pageCode.indexOf('const scroller = extraChatScroller;');
+    expect(from, 'the extra column scroll effect is not in +page.svelte').toBeGreaterThan(-1);
     const effect = pageCode.slice(from, pageCode.indexOf('\n  });', from));
-    expect(effect).toContain('shouldAutoScrollForMessage(\n          extraChatScrollingUp,');
-    expect(effect).not.toContain('chatScrollingUp,\n');
+    expect(effect).toContain('readingHistory: extraChatScrollingUp');
+    expect(effect).not.toContain('readingHistory: chatScrollingUp');
+  });
+
+  it('has its OWN RoomScrollFollow, not the main column’s', () => {
+    /*
+      Three instances, one per column. A shared instance would make "a message arrived here" into "a
+      message arrived anywhere" through the marker state rather than through the effect graph —
+      the same defect the separate-effect test below guards, arriving by a different door.
+    */
+    expect(pageCode).toContain('const alertsFollow = new RoomScrollFollow(');
+    expect(pageCode).toContain('const chatFollow = new RoomScrollFollow<ChatTab>(');
+    expect(pageCode).toContain('const extraChatFollow = new RoomScrollFollow<ChatTab>(');
+    expect(pageCode.match(/new RoomScrollFollow/g) ?? []).toHaveLength(3);
   });
 
   it('is its own effect, not folded into the main chat’s', () => {

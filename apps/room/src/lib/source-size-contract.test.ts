@@ -184,8 +184,23 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       catching the chat up, one pausing the five-second refresh poll - into the single
       `<svelte:document>` handler. The poll hoisted out of `onMount` to sit beside it, which costs
       lines here and removes a listener, a teardown and a whole duplicated concern.
+
+      3c: `RoomArrivals`. Three effects each answered "which rows in this wholesale-replaced list are
+      new?" with their own set and their own priming boolean - `seenAlertIds`/`alertDeliveryInitialized`,
+      `seenQuestionIds`/`qaNoticesPrimed`, `seenMessageIds`/`chatSoundPrimed` - two thousand lines
+      apart, restating the rule that the first pass announces NOTHING three times. One class now, so
+      the rule is tested once instead of being re-implemented where two of the three could drift.
+
+      Then the SCROLLERS, which were the last latches: `RoomScrollFollow`. The alerts column, the
+      chat column and the second chat column each ran the same twenty lines with their own three
+      markers - eight identifiers for one question asked three times. Three instances now, and the
+      rule that the alerts column must NOT take the viewer's `alwaysScrollToBottom` override became
+      STRUCTURAL rather than remembered: it is a constructor capability, so there is no argument left
+      to pass by mistake. Two contract tests were re-pointed rather than deleted, and the preference
+      one got stronger for it - it now asserts on how the column is CONSTRUCTED, which is where the
+      rule went, instead of regexing a call for an argument that no longer exists.
     */
-    max: 11621,
+    max: 11594,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {
