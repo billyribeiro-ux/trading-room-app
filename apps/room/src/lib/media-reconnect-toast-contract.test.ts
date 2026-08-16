@@ -156,7 +156,13 @@ describe('both are cleared by the event that makes them false', () => {
     // Defined once, and that once is the definition itself.
     expect((BUNDLE.match(/clearReconnectToasts/g) ?? []).length).toBe(1);
 
-    const at = code.indexOf('serverConnected(');
+    /*
+      Anchored on the DECLARATION, not on the first mention. `connect` wires
+      `signalling.on('socketopen', … => this.serverConnected(reconnected))` two hundred lines above
+      the method itself since slice 26, so `indexOf` found the CALL and sliced a region that never
+      contained the dismissals.
+    */
+    const at = code.indexOf('\n  serverConnected(');
     // Positive first: a slice that moves this handler must fail here rather than slicing from -1
     // and asserting against the whole rest of the file, which is how `chat-mode-contract` went
     // green against an end marker that had ceased to exist.
@@ -165,9 +171,16 @@ describe('both are cleared by the event that makes them false', () => {
       'serverConnected has left the transport - re-point this at the file that owns it'
     ).toBeGreaterThan(-1);
 
-    const connected = code.slice(at);
+    /*
+      Sliced to the HANDLER, not to the rest of the file. `serverConnected` sits beside `connect`
+      since slice 26, and an open-ended slice from it now runs through 200 lines of wiring — which
+      would pass on any `dismiss` call anywhere below it.
+    */
+    const connected = code.slice(at, code.indexOf('\n  }', at));
     expect(connected.slice(0, 700)).toContain('this.#toasts.dismiss(this.#reconnectToastId)');
-    expect(connected.slice(0, 700)).toContain('this.#toasts.dismiss(this.#presenterReconnectToastId)');
+    expect(connected.slice(0, 700)).toContain(
+      'this.#toasts.dismiss(this.#presenterReconnectToastId)'
+    );
     expect(connected.slice(0, 700)).toContain('this.#reconnectToastId = null');
     expect(connected.slice(0, 700)).toContain('this.#presenterReconnectToastId = null');
   });

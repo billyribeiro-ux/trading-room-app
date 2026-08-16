@@ -24,6 +24,54 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-16
 
+### 2026-08-16 18:05 EDT — Phase 5 slice 26: the SFU wiring goes home, and a teardown that finally pairs
+
+**`+page.svelte` 3,771 → 3,529 (−242).** Suite 2,324 across 158 files. `svelte-check` 1,187 files,
+0 errors, 0 warnings. All four CI steps green locally.
+**Runtime impact: yes** — the SFU session setup moved. No behaviour changed.
+
+**236 lines of signalling wiring left `onMount` for `RoomMediaTransport.connect()`**, plus
+`restartMediaSession`, which became `restart()`. Slice 4 moved the transport's state and its 51
+regions and had to leave this behind, because it referenced page-level things that had not moved.
+Nothing about that was permanent — it was an ORDERING constraint, and `roomEvents`, `recording` and
+`modals` are all in place now. Measured before moving: 227 lines reaching EIGHT page names, and 37
+of the references were `mediaTransport` itself.
+
+**`connect()` returns its own teardown, and that is the point rather than a tidy-up.** The session
+opened there is the session closed there; the streams started there are the streams stopped there.
+Those two halves sat 240 lines apart in `onMount`, and the adversarial review of 2026-08-11 found
+exactly the gap between them — the teardown closed the session CAPTURED at build time, so leaving a
+room after a role change left the REBUILT session's transports open, holding the SFU peer slot with
+the microphone light on. That is now one method, and the negative control for this slice is putting
+the defect back: seen red.
+
+**`isPresenter` came back, and the removal that took it out was still right.** Slice 4 dropped it as
+a collaborator with no reader, which was true of everything that moved then. `connect` reads it —
+it is one of the four flags `joinsMediaAsProducer` is asked about when the grant is requested. Both
+facts are recorded on the field, because "this had no reader" and "this has a reader again" are
+different statements and the first one is still true of slice 4.
+
+**The caption list stayed on the page and crosses as a receiver.** The speech handler knows a line
+arrived; the overlay renders the list and the transcript page reads it.
+
+**`restart()` refuses rather than rebuilding against nothing.** It reaches the socket through
+`#mediaSignalling` now instead of a closure, and returns early when there is none — a rebuild with
+no socket is a session that can never connect.
+
+**Four contract files re-pointed, and two of them had SLICE BOUNDARIES that had quietly stopped
+working.** `roster-gates` sliced the restart body up to `media.on('newProducer'`, which was the next
+thing on the page and is now inside `connect()` ABOVE it — so the slice ran backwards and produced
+an empty string that any negative assertion would have passed against. `media-reconnect-toast`
+anchored on `serverConnected(`, which since this slice matches the CALL two hundred lines above the
+declaration. Both are bounded by the method's own end now. This is the third and fourth time in the
+phase that a moved subject turned a positional assertion vacuous rather than red.
+
+**The transport is 768 CODE lines against a backstop of 800**, up from 615. That is close, and the
+ceiling note says so rather than leaving it to be noticed later: the next thing to arrive there
+should be weighed against splitting rather than added on the grounds that it fits.
+
+Not verified: no browser run. Nothing here proves a real room connects.
+
 ### 2026-08-16 17:16 EDT — Phase 5 slice 25: `RoomNotes`, and the seam the plan was least sure of
 
 **`+page.svelte` 3,836 → 3,771 (−65).** Suite 2,318 → 2,324 across 158 files. `svelte-check` 1,187
