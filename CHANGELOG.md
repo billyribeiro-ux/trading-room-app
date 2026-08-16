@@ -223,6 +223,70 @@ through — both are documented in `.env.example` and until now nothing read the
 **Not done:** retiring `ptr_clone_app` (deferred until the cutover is proven in a real deployment),
 and the owner role / database rename `ptr_clone` → `tradingroom`. Both remain in `TODO.md`.
 
+### 2026-08-15 20:52 EDT — T5-27 CLOSED: the dark-theme setter is a bootbox text field, and two tools lied on the way to finding it
+
+**Branch `feat/extra-chat-column`, not merged. Runtime impact: none** — evidence and records only. The
+code defect it exposes is row AJ and is deliberately not fixed in the same pass.
+
+**The gap said the control that assigns `badges.dark_theme` was uncaptured, and that no collector had
+reached it.** It is captured now, verbatim, from `$scope.addBadgeDarkTheme` at byte 202828 of the live
+`app.min.js` — the bundle the welcome page's own `scripts` array lists:
+
+```js
+$scope.addBadgeDarkTheme = function (badgeID, text, imgURL, darkThemeID) {
+  var b = imgURL ? '<img class="user-badge-img" src="' + imgURL + '" alt="' + imgURL + '"/>' : text,
+    dialog = bootbox.dialog({
+      message: "<p>Add a badge id to show in the dark theme instead of this badge: " + b +
+        '</p><p><input type="text" value="' + darkThemeID + '" id="darkThemeID" class="form-control"/></p>',
+      closeButton: !0, onEscape: !0,
+      buttons: {
+        cancel:  { label: "Cancel", callback: function () { dialog.modal("hide") } },
+        confirm: { label: "Set", className: "btn btn-inverse", callback: function () {
+          var args = $scope.makeReqTokenForCmd("addBadgeDarkTheme");
+          args && (args.badgeID = badgeID, args.darkTheme = $("#darkThemeID").val(), …)
+        }}
+      }
+    })
+}
+```
+
+**It is not a picker and it is not a toggle.** It is a free-text input seeded with the current value,
+and the admin types a badge id into it. Three things stop being inferences:
+
+1. `darkTheme` is whatever string is typed — `$("#darkThemeID").val()` — confirming this row's
+   earlier conclusion from `ng-if="roomBadge._id === b.darkTheme"` that it holds an ID.
+2. Being handed the current value **seeds the field** (`value="' + darkThemeID + '"`). Both rebuilds
+   read that as "which is what makes it a toggle". That reading is wrong.
+3. Nothing appears in the page DOM because bootbox builds the dialog at click time — checked and
+   confirmed: **zero `class="modal"` elements** anywhere in the captured welcome page.
+
+**And it explains a second captured detail that made no sense alone.** The badge table header is
+`<th ng-dblclick="showBadgeID=!showBadgeID;">Badge</th>`, and each row carries
+`<span class="room-badge-id" ng-show="showBadgeID">&nbsp;&nbsp;(6a6f27a09cb16975cc8f132a)</span>`.
+Double-clicking the header reveals the badge ids — **that is how an admin gets the id to paste into
+this dialog.** Two details that only make sense together.
+
+**TWO OF MY INSTRUMENTS LIED, and both were caught before anything was reported.**
+
+- **A recursive `grep -rl` returned nothing** for `badgesList` across the reference folders — a string
+  I had just read with my own eyes in two of their files. Re-run as an explicit byte-level walk it
+  found **40 files**, including two welcome-page captures nobody had opened.
+- **`WebFetch` on `app.min.js` answered "NOT PRESENT"** for `addBadgeDarkTheme`. Asked to count
+  strings instead, it reported **0** occurrences of `editBadge`, `deleteBadge` and `badgesList` and
+  a content length of **149,847 characters**. `curl` returned **455,313 bytes** and every one of them.
+  It converts to markdown and truncates. **A tool that says "not present" about a file it only partly
+  received is not evidence of absence** — and "NOT PRESENT" would have been recorded as a finding.
+
+**Records updated, once each:** the register carries the verbatim source and the closure; `TODO.md`
+moves from `67 CLOSED, 6 OPEN` to `68 CLOSED, 5 OPEN`, drops T5-27 from the "needs a capture run"
+table and re-counts bucket C from four to three. `evidence-gap-register-counts.test.ts` recomputes all
+four numbers from the register itself and passes.
+
+**Row AJ opened, not fixed.** `apps/controller/src/routes/(app)/account/+page.server.ts:370-382` sets
+`darkTheme` to `NOT darkTheme` on a shipped `BOOLEAN` column. The migration plan was already written
+against the day this evidence arrived; executing it is a shipped-column migration plus a UI change in
+another app, and that earns its own pass rather than the tail of this one.
+
 ### 2026-08-15 20:39 EDT — The capture answered row AI: the second chat column was missing four gates, and that was a defect
 
 **Branch `feat/extra-chat-column`, not merged.** **Runtime impact: YES** — reactions, both edit

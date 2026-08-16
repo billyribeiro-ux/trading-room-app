@@ -451,7 +451,7 @@ Every gap from the full read of `apps/controller/evidence-dumps/` now lives ther
 five tiers. **That file is the tracker — this section is only the index to it.** Do not record a
 gap's status in both places; one of them will go stale.
 
-As of 2026-08-14 09:21 EDT: **67 CLOSED, 6 OPEN, 14 parked/won't-fix, 87 total.**
+As of 2026-08-15 20:52 EDT: **68 CLOSED, 5 OPEN, 14 parked/won't-fix, 87 total.**
 
 **Everything closable by READING is closed.** The six that remain need something no source file
 can give. Each is written out below with the exact next action, because "blocked" without an
@@ -465,7 +465,7 @@ Rewritten 2026-08-13 18:21 EDT, recounted 2026-08-14, pruned 2026-08-15. It said
 template read was still running, then fourteen, and the prose disagreed with the tally line above it
 in BOTH directions for a day.
 
-The items below count **B 1 + C 4 + D 1 = six**, which is what the tally says and what
+The items below count **B 1 + C 3 + D 1 = five**, which is what the tally says and what
 `evidence-gap-register-counts.test.ts` recounts from the register itself. Three buckets that read
 "Nothing" — the five closed by the 2026-08-14 browser session, both items re-fetched and resolved,
 and one empty bucket — were REMOVED on 2026-08-15 rather than left saying nothing: a bucket whose
@@ -493,7 +493,11 @@ refused; do not attempt a fifth without the sentence.**
   remains is only the DISPLAY block at `page.manageSession.html:1138-1142`, which is the same
   sentence.
 
-#### C. Four are NOT CAPTURED YET. Each needs one targeted collection script.
+#### C. Three are NOT CAPTURED YET. Each needs one targeted collection script.
+
+**T5-27 left this bucket on 2026-08-15** - its setter was captured verbatim out of the live
+`app.min.js` and the row is CLOSED in the register. It was never a script problem: the handler builds
+a `bootbox.dialog` at click time, so no collector reading the DOM could ever have found it.
 
 **Corrected 2026-08-15 by the owner, and the correction matters.** This bucket said these needed
 "infrastructure that does not exist" and were not to be built. That was wrong twice over: the
@@ -509,7 +513,6 @@ original**, and what each script has to bring back is already known:
 | **T5-16 Recordings** | the response behind `recs` — `vidPath`, `contentType`, `name`, `created`, and `length` in MILLISECONDS (the page renders `length/60000` to two decimals) |
 | **T5-17 Avatars** | the avatar set behind `avatars`, plus the request `selectAvatar(avatar)` posts — URL, method and body |
 | **T5-20 `recorded_max_capacity`** | what actually writes it. Column, reader and reset all exist (migration `0011`); the missing half is the live-occupancy signal the controller never receives. Capture whether the original pushes occupancy on its command channel and under what name |
-| **T5-27 `badges.dark_theme`** | the PICKER that sets it. Storage and display are already proven — `page.welcome.html:1191-1211` shows `ng-if="roomBadge._id === b.darkTheme"`, so it is an ID and not a boolean. Only the control that assigns it is uncaptured |
 
 Rules for those scripts, from `~/CLAUDE.md` §3: one self-contained `.js` file pasted into the console
 on the LIVE app; it detects whether the session is a member or an admin and records what that role
@@ -520,6 +523,16 @@ play, stop, send, save or submit.
 
 **Do NOT build the features from guesses.** The one thing that has not changed is that inventing a
 data source is forbidden. Capture first, then build from what came back.
+
+**CHECKED 2026-08-15 — the two live collections on disk do NOT cover three of these four, and that
+is now verified rather than assumed.** `collect-manage-2026-08-08T20-16-32-687Z.json` and
+`scripts/collect-account-2026-08-08T20-19-23-396Z.json` (both in `Desktop/new-room`, both real
+captures of `protradingroom.com`, all six manage tabs twice each) were read end to end for these
+gaps. `selectAvatar`, `vidPath`, `recs`, `maxCapacity` and `recorded_max`: **zero occurrences in any
+capture in either file.** The only two `avatar` hits are the `hideAvatars` and `altChatRender`
+setting labels on the manage page, not the Avatars page. So T5-16, T5-17 and T5-20 genuinely need a
+new run against routes these two never visited — they are `manage` and `welcome` only. T5-27 is the
+one they DO reach, and what it needs is a room precondition rather than a better script.
 
 **T5-20 keeps one specific warning:** do not substitute the roster size for occupancy. The number who
 ever registered is not the number ever simultaneously present.
@@ -569,6 +582,8 @@ ever registered is not the number ever simultaneously present.
 
 | AH  | **The `alertQuestions` read in the page load has NO `LIMIT` — it returns every question the room has ever had, on every SSE event.** Found 2026-08-15 20:00 by READING `+page.server.ts:481-520` while deciding whether `RoomArrivals` could bound its marker set. The query is `db.select({...}).from(alertQuestions).innerJoin(alerts, ...).innerJoin(users, ...).where(eq(alerts.roomShortCode, ...)).orderBy(asc(createdAt), asc(id)).all()` — read in full, from `.select` to the trailing `.map`; there is no `.limit()` and no `.offset()` anywhere in it. **This is the SAME defect that was found and fixed for the other two logs on 2026-08-14, and the third list was not covered.** The comments left at lines 464 and 475 describe it in those words for `messages` (*"no LIMIT, `.all()`, and every SSE event calls `invalidateAll()`"*) and for `alerts`; both now page through `CHAT_LOG_PAGE_SIZE = 50`. Questions were missed. **The cost:** every `invalidateAll()` — which is every message and every alert posted in the room — re-reads and re-serialises the entire question history into the SSR HTML and the `__sveltekit` payload, with each question's body, sender name, avatar and role. **What it blocks right now:** bounding `RoomArrivals`'s `#seen`, which grows one id per row for the life of the page. A bound is provably safe for messages and alerts (both server-bounded at 50 a page) and NOT for questions, because evicting an id still present in the list re-announces it — a toast and a sound for a question from last week. The honest order is the server read first, then the marker set; a number picked because it looked big enough is the thing this repository forbids. **Not fixed here, and deliberately not bundled:** paging questions needs a decision the delivery refactor has no business taking, because the Q&A modal reads them BY ALERT while the load reads them by room. | MEDIUM — a read that grows without bound, on the hottest path in the room | this row; `apps/room/src/routes/+page.server.ts:481-520`; `apps/room/src/lib/room/arrivals.ts` |
 ## Scope — what is NOT being matched
+
+| AJ  | **`addBadgeDarkTheme` in the controller is a BOOLEAN TOGGLE, and the original stores a typed badge ID.** Proven 2026-08-15 by reading `$scope.addBadgeDarkTheme` at byte 202828 of the live `app.min.js` (455,313 bytes, fetched from the URL the welcome page's own `scripts` array lists). It opens a `bootbox.dialog` whose body is a free-text `<input id="darkThemeID" value="{current}">` and posts `args.darkTheme = $("#darkThemeID").val()` - a STRING the admin types, seeded with the current value. Ours is `apps/controller/src/routes/(app)/account/+page.server.ts:370-382`, setting `darkTheme` to `NOT darkTheme` against a `BOOLEAN NOT NULL DEFAULT false` column (migration `0002`, shipped). Its docstring says the current value being passed in *"is what makes it a toggle"* - that inference is exactly what the evidence refutes; the value is passed in to SEED THE FIELD. **The plan is already written and is now unblocked** (register T5-27): a new migration adds `dark_theme_badge_id` nullable referencing `badges(id)`; `dark_theme` stays as a superseded column because migrations are forward-only; `true` backfills to `null`, since the boolean never recorded WHICH badge. The account page's action and its "Dark Theme" control change with it - the original's dialog reads `"Add a badge id to show in the dark theme instead of this badge: "` with `Cancel` and a `btn btn-inverse` `Set`. **Deliberately not done in the same pass as the evidence work:** it is a shipped-column migration plus a UI change in another app, and it deserves its own careful pass rather than the tail of a long session. | MEDIUM - a control that writes the wrong shape; storage proven wrong 2026-08-14, setter proven 2026-08-15 | this row; `docs/reference/evidence-gap-register.md` T5-27 |
 
 | ~~AI~~ | **CLOSED 2026-08-15 20:39 — it was a DEFECT, not a product decision, and the capture said so.** Recorded as "the owner's call" and that was wrong; the answer was in the dump files. **(1)** The rendered staff capture cannot answer it — `baseline-room`'s full DOM has `app-chat` x1, `app-roomscroller` x2 and NO `app-extra-chat`, because the captured room did not have the preference on. **(2)** The bundle has the component, gated on `preferences.extraChatColumn` plus `roomSplitDir`, declared with the SAME const 212 as `app-chat`. **(3)** Decisive: the message component's code appears TWICE, 37,954 bytes apart, byte-identical, and both copies read the four gates off `globals.sessData` keyed on **`logType` alone** — `sessData.enableReactions && "chat" === logType`, `sessData.enableEditMessage && "chat" === logType`, `canPublicReply = "chat" === logType && … && (isPresenter || sessData.usersPublicReply)`. Never a per-column input. A message in the second column is `logType === "chat"` exactly as one in the first. Fixed by giving `ExtraChatPane` the `chrome` prop, which removed twelve drilled props and closed the four-gate gap in the same line. Guarded by `extra-chat-column-contract.test.ts` with the bundle quoted, two controls seen red. | CLOSED | `apps/room/src/lib/extra-chat-column-contract.test.ts` |
 
