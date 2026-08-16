@@ -24,6 +24,87 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-16
 
+### 2026-08-16 06:52 EDT — The decomposition's gates land BEFORE the decomposition, and one of them was structurally blind
+
+**Branch `feat/extra-chat-column`. Runtime impact: none** — `apps/room/src/lib/source-size-contract.test.ts`
+only. No source file changed; `+page.svelte` is byte-identical to its parent commit.
+
+**Slice 0 of the `+page.svelte` decomposition (9,605 → under 1,000), and it deliberately extracts
+nothing.** `apps/room/AGENTS.md` DPE rule 2 says the gate comes before the hand-written artifact, not
+after the bug. Nineteen slices are about to move ~5,500 lines of function bodies out of one file, and
+the three failure modes that work has — a guard going vacuous, the mass relocating into an uncapped
+module, and an explanation being shed — are all invisible to `svelte-check`, to the suite and to
+`svelte-autofixer`. So they are executable first, and each was seen red before being trusted.
+
+**THE FINDING, and it is why this could not have been per-slice discipline.** `EXTRACTION_SOURCES`
+listed five `.svelte` paths. It could see a region moving into a COMPONENT and was **structurally
+blind to a region moving into a `.svelte.ts` MODULE** — which is the entire shape of the phase that
+follows. A test re-pointed from `+page.svelte` to `room/toasts.svelte.ts` would have stopped naming
+any entry, silently left the filter, and gone unpoliced while staying green: the
+`day-separator-contract.test.ts` failure for a third time, by the one route two previous retrofits
+had still not closed. Both retrofits were added *after* a dropped test count gave the game away.
+
+**Now catalog-driven** (DPE rule 4 — "prefer a catalog-driven test that discovers its own subjects
+over a hardcoded list"), over `routes/+page.*`, `lib/components/*.svelte` and `lib/room/*.svelte.ts`.
+**Measured before the change, because widening a filter can only add subjects and subjects can only
+add failures: the hand-kept list policed 54 files, the catalog polices 63, and all 9 newly-policed
+files already assert something positive.** The widening cost nothing and closed a hole. A floor was
+added with it — the policed count only ever rises, because twice it fell by exactly one and both
+times the only thing that noticed was a person thinking a number looked small.
+
+**A NEGATIVE CONTROL CAME BACK GREEN AND THE FAULT WAS MINE**, recorded because it cost a turn and
+because this repository's own count is now six such controls with four faulty instruments. The
+control re-pointed `id-opacity-contract.test.ts`'s `readFileSync` away from the page; the count did
+not move. The gate was right: that file names `routes/+page.svelte` **three** times — once as the
+read, once as an `ALLOWED` map key, once inside its own assertion — and my replace covered one, which
+is the `lastIndexOf` trap in miniature. Re-run against a file whose only mention *is* its read
+(`recording-codec.test.ts`), the gate went red at 62 against the floor of 63, and the suite total fell
+71 → 70 as a second independent signal. **The limitation it exposed is now recorded in the file:
+`source.includes(target)` matches a MENTION, not a READ.** It is inherited rather than introduced —
+the hand-kept list matched identically — and is deliberately not tightened, because requiring the
+path to sit inside a `readFileSync` call means parsing the test rather than reading it, and a guard
+cleverer than it is trustworthy is how the last three vacuous assertions got written.
+
+**Ceilings now cover the destination, not just the source** (owner decision, 2026-08-16). A ceiling on
+`+page.svelte` and none on `lib/room/` is not a ratchet, it is a funnel. The ten existing room
+modules are capped at their measured sizes, discovered from disk so the twentieth is covered by
+nobody remembering, with a test that **fails if a module exists with no ceiling**. The entries mean
+something different from the three above them and the file says so: those three are RATCHETS on files
+that outgrew the standard, where growth is the disease; these are CAPS on files that exist to receive
+an extraction, where growth is the treatment. `alerts`, `chat`, `log-pages`, `roster` and `media` are
+named destinations and will each rise once, in the commit that moves code in, with that commit saying
+what arrived — the conversation the rule asks for, held where it belongs.
+
+**A backstop of 800 under all of them**, because a per-file number can be raised one commit at a time
+until it means nothing and nineteen commits is enough for that. 800 is the honest maximum plus room
+for one slice: **`split.svelte.ts` is 724 today** — the largest module by 350 lines, and legitimately
+so, since twenty derived geometry values and two nested splits are one subject. Recorded rather than
+rounded down, because a limit nothing meets is a wish. This also corrects the phase plan, which had
+said "≤700 per module" without checking that the largest existing module already exceeds it.
+
+**The comment gate is the one a diff review cannot replace**, because a slice that sheds an
+explanation looks exactly like a slice that tidied up. Two whole-tree floors across 43 files: **6,329
+comment lines and 220 capture citations** (`full.js:`, `byte 1,221,430`, `main.d6d3c112b59b7d0d.js`).
+Whole-tree rather than per-file precisely because comments are *meant* to move — a relocation is
+level, a deletion is a fall. The line count is named in the file as a PROXY and not a census: it
+over-counts a string containing `//`, which is harmless for a ratchet and is deliberately not a
+structural claim, since a hand-rolled scanner making structural claims about this file is what once
+reported "0 directives" for a file with five. It also enforces that extractions land inside the
+catalog — move a region to some new corner of `$lib` and the total falls and the gate asks why the
+room's reasoning just left the room.
+
+**Every control seen RED, each with the mutation verified to have landed first:** an uncapped
+903-line module failed both the missing-ceiling and the backstop assertions; deleting one 8-line
+docstring carrying two byte offsets took the counts to 6,321/218 and failed both floors with the exact
+arithmetic. All three controls were reverted and `git diff` confirms `+page.svelte`,
+`id-opacity-contract.test.ts` and `recording-codec.test.ts` are byte-identical to HEAD.
+
+**Verified:** `svelte-check` **1,144 files, 0 errors, 0 warnings, 0 files with problems**; `vitest`
+**1,954 across 138**, up from 1,909 — +10 readers and the floor, +32 module caps, +3 comment gates,
+which accounts for all 45. `eslint` clean; `prettier --check` clean, and the file was clean at HEAD
+too, so the formatting pass was fixing what this change introduced rather than pre-existing drift.
+**Not verified:** nothing runtime, because nothing runtime changed.
+
 ### 2026-08-16 06:50 EDT — The room gets its first gap register, and its own re-run corrects two of its rows
 
 **Branch `feat/extra-chat-column`. Runtime impact: none** — `docs/reference/room-component-gap-register.md`
