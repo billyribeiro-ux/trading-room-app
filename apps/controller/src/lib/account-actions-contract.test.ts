@@ -97,6 +97,33 @@ describe('a row can only be written by the account that owns it', () => {
       expect(code).toMatch(/changed\.length === 0/);
     });
   }
+
+  it('addBadgeDarkTheme scopes the TARGET badge too, not only the one it writes', () => {
+    /*
+      THE SECOND ROW THIS ACTION TOUCHES, and the one the table above cannot see.
+
+      It writes badge A and stores a reference to badge B, where B is an id typed into a free-text
+      box by whoever is at the keyboard. Scoping only the write would let an admin type any id in
+      the deployment and have their badge point at another tenant's row — the account page would
+      then report "Shows badge 4102 in the dark theme" for a badge that is not theirs.
+
+      This exists because a control DELETING the account term from that subquery left the whole
+      default suite green. The executable cross-tenant coverage lives in
+      `account-row-scope.db.test.ts`, and `*.db.test.ts` is excluded from the default vitest run
+      because it needs a database — so in CI this assertion is the only thing watching.
+    */
+    const code = codeOf('addBadgeDarkTheme');
+    expect(code, 'the target is resolved by a subquery').toContain('SELECT b.id FROM badges b');
+    expect(code, 'and that subquery must carry the account').toContain('b.account_id = ${accountId}');
+  });
+
+  it('addBadgeDarkTheme refuses a badge that nominates itself', () => {
+    // Nothing upstream forbids it, but the display is a lookup of ANOTHER row: a badge pointed at
+    // itself renders as its own replacement, permanently, with nothing on screen saying so.
+    const code = codeOf('addBadgeDarkTheme');
+    expect(code).toContain('asNumber === id');
+    expect(code).toContain('A badge cannot be its own dark theme.');
+  });
 });
 
 describe('editing a badge edits it', () => {

@@ -43,7 +43,9 @@
     restoreFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     document.body.classList.add('modal-open');
 
-    promptValue = '';
+    // Seeded, not blanked: the captured dark-theme dialog renders its input with the current
+    // value already in it, so pressing Set without typing keeps what was there.
+    promptValue = bootbox.current?.value ?? '';
     const frame = requestAnimationFrame(() => {
       shown = true;
       // bootbox focuses a prompt's input and a confirm's OK button

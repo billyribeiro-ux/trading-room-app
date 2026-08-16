@@ -223,6 +223,66 @@ through — both are documented in `.env.example` and until now nothing read the
 **Not done:** retiring `ptr_clone_app` (deferred until the cutover is proven in a real deployment),
 and the owner role / database rename `ptr_clone` → `tradingroom`. Both remain in `TODO.md`.
 
+### 2026-08-15 21:07 EDT — Row AJ: the dark-theme control stops being a toggle and starts storing a badge id
+
+**Branch `feat/extra-chat-column`, not merged. Runtime impact: YES** — migration `0013`, a new column,
+a rewritten action and a rewritten control on the account page.
+
+The evidence landed an hour earlier; this is the code catching up. `dark_theme BOOLEAN` was always
+labelled a placeholder in `schema.ts`, which said exactly what would settle it: *"if that markup is
+captured later and shows an id, that is a new migration, not a rewrite."* Both halves are now
+captured — the display (`ng-if="roomBadge._id === b.darkTheme"`) and the setter (a bootbox dialog
+with a free-text field) — so this is that migration.
+
+**`0013-badge-dark-theme-badge-id.js`** adds `dark_theme_badge_id INTEGER REFERENCES badges(id) ON
+DELETE SET NULL`, nullable. `dark_theme` **stays**, superseded, because migrations are forward-only
+and `0002` is shipped. The backfill is `true → NULL` and there is no `UPDATE` in the file: the boolean
+never recorded WHICH badge, so there is nothing to derive, and inventing one would be a fabricated
+value that renders. `ON DELETE SET NULL` is a choice and says so — the reference has no foreign key at
+all, and without an action PostgreSQL would refuse to delete any badge another badge points at.
+
+**The action is one statement.** The obvious shape — SELECT to check the target is yours, then UPDATE
+— is the SELECT-then-UPDATE this repository forbids, and `account-actions-contract.test.ts` refuses it
+by reading the source. So the target is resolved *by* the write, through a subquery that carries the
+account, and the outcome is compared against intent afterwards because a NULL result means either
+"cleared, as asked" or "that id is not yours".
+
+**Three refusals, each a reachable input:** empty clears it (the captured field can be emptied and Set
+pressed); a badge cannot be its own dark variant (it would render as its own replacement forever); and
+the target must be a badge in this account.
+
+**A CONTROL CAME BACK GREEN ON THE CROSS-TENANT CASE, and the reason is worth recording.** Deleting
+the account term from that subquery left the entire default suite passing. The executable coverage
+lives in `account-row-scope.db.test.ts` — and **`*.db.test.ts` is excluded from the default vitest
+run** because it needs a database. So in CI nothing was watching. Closed both ways: a source-level
+guard that runs everywhere, and three new db-backed cases including the one the write's own `WHERE`
+can never catch — the row being written is mine and only the TARGET belongs to someone else.
+
+**Two of my own mistakes, both caught by the gate rather than by review:**
+
+- The first draft kept a `Map` of form elements keyed by badge id. eslint's `prefer-svelte-reactivity`
+  objected, and it was right — not because the map needed to be reactive, but because **it never
+  needed to exist**: a button inside a form already knows it, as `event.currentTarget.form`.
+- The self-referencing foreign key typed the whole `badges` table `any` — TypeScript gives up when a
+  table is defined in terms of itself — which silently un-typed every badge read in the application.
+  Four errors, fixed with the `(): AnyPgColumn =>` annotation Drizzle documents for exactly this.
+
+**AND I BROKE AN UNRELATED TEST BY FORMATTING.** `+page.server.ts` was not prettier-clean before this
+change; running the formatter collapsed `.from(rooms)\n.where(...)` onto one line, and
+`api-key-session-restrictions.test.ts` asserted on that line break. Relaxing the whitespace then
+exposed something worse, found by running the control: the file has **two** `.from(rooms)` reads, so
+"somewhere there is a scoped rooms read" passed with the scope **deleted** from one of them. It is
+anchored to the `ownRooms` statement now, and the control goes red.
+
+**Verified:** `npm run check` 0 errors / 0 warnings across 1,526 files; suite **981 across 93 files**;
+eslint clean; prettier clean on all eleven touched files — the 18 it still warns about were 20 before
+this change, confirmed by re-checking with the work stashed. Four negative controls seen red.
+
+**What is NOT verified, stated plainly:** the db-backed cases have not been executed here, because
+`*.db.test.ts` needs a PostgreSQL this session did not have. They are written and typed; they run
+wherever that suite runs. The room-side display of a dark-theme badge is unchanged and remains
+unbuilt — no rule in any capture describes what a dark-theme chip looks like.
+
 ### 2026-08-15 20:52 EDT — T5-27 CLOSED: the dark-theme setter is a bootbox text field, and two tools lied on the way to finding it
 
 **Branch `feat/extra-chat-column`, not merged. Runtime impact: none** — evidence and records only. The

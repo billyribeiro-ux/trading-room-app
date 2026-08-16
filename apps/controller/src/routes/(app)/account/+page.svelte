@@ -219,6 +219,55 @@
   };
 
   /**
+   * "Dark Theme" — the dialog, then the post.
+   *
+   * The captured handler is `bootbox.dialog(...)` with a free-text input seeded with the current
+   * value, a Cancel and a Set. `bootbox.prompt` is this repository's primitive for exactly that
+   * shape and it gained a fourth argument for this call site, because every prompt before it opened
+   * empty and this one must not.
+   *
+   * The message is the reference's, to the character: *"Add a badge id to show in the dark theme
+   * instead of this badge: "* followed by the badge itself. Upstream that suffix is raw HTML — the
+   * badge's `<img>` or its text — and it is NOT rendered as markup here: this passes the label
+   * through as text. A dialog is the last place to start interpolating a stored value into HTML, and
+   * nothing about which badge you are editing is lost by naming it instead of drawing it.
+   *
+   * The button is `type="button"` and the form is submitted from here, because the dialog has to be
+   * answered BEFORE anything is posted. A submit button would have to be cancelled and re-fired.
+   *
+   * No registry of form elements: a button inside a form already knows it, as `event.currentTarget.form`.
+   * The first draft kept a `Map` keyed by badge id and eslint's `prefer-svelte-reactivity` was right
+   * to object — not because the map needed to be reactive, but because it never needed to exist.
+   */
+  let darkThemeValue = '';
+
+  async function askDarkTheme(
+    badge: { id: number; label: string; darkThemeBadgeId: number | null },
+    form: HTMLFormElement | null
+  ) {
+    const typed = await bootbox.prompt(
+      `Add a badge id to show in the dark theme instead of this badge: ${badge.label}`,
+      'Set',
+      'text',
+      badge.darkThemeBadgeId === null ? '' : String(badge.darkThemeBadgeId)
+    );
+    // null is Cancel, the ×, Escape or the backdrop. An empty STRING is a deliberate clear.
+    if (typed === null) return;
+
+    darkThemeValue = typed;
+    form?.requestSubmit();
+  }
+
+  const saveDarkTheme: SubmitFunction = ({ formData }) => {
+    // Written into the outgoing payload rather than into a hidden input: `requestSubmit()` runs in
+    // the same microtask that received the dialog's answer, so a DOM update would not have landed.
+    formData.set('darkThemeBadgeId', darkThemeValue);
+    return async ({ update }) => {
+      await update({ reset: false });
+    };
+  };
+
+  /**
    * The badge editor's own submit.
    *
    * Identical to `save` except for the last line: the reference's edit submit is
@@ -966,31 +1015,35 @@
                     </form></span
                   >
                   &nbsp; | &nbsp;
-                  <!-- `addBadgeDarkTheme(b._id, b.text, b.imgURL, b.darkTheme)` (#759/#760/#761).
-                       It is handed the badge's CURRENT value, so it toggles; the server flips the
-                       column in the UPDATE itself.
+                  <!-- `$scope.addBadgeDarkTheme`, captured verbatim at byte 202828 of the live
+                       `app.min.js`: a dialog with a free-text field SEEDED with the current value,
+                       posting whatever was typed.
 
-                       HONEST GAP, and the reason nothing here changes how the chip looks: no rule
-                       in our evidence describes a dark-theme badge. The reference stylesheet has
-                       `.dark-theme-badge-id { font-size: 10px }` (sheet-9.css:2564) beside
-                       `.room-badge-id`, which hints the value may be a variant badge's ID rather
-                       than a flag — but the badges <tbody> is empty in the capture, so the row
-                       markup cannot settle it and none of it is guessed at. What the control does
-                       is real and complete on its own terms: it writes the column, the page reloads
-                       it, `aria-pressed` reports what came back, and Export Badges carries it.
+                         message: "<p>Add a badge id to show in the dark theme instead of this
+                                   badge: " + b + '</p><p><input type="text" value="' + darkThemeID
+                                   + '" id="darkThemeID" class="form-control"/></p>'
+                         buttons: cancel "Cancel"; confirm "Set", className "btn btn-inverse"
 
-                       The `title` is OURS. The reference's is not in the capture, and a toggle whose
-                       only state cue is `aria-pressed` is unreadable to somebody using a mouse. -->
+                       It was an aria-pressed TOGGLE here until 2026-08-15, because the current value
+                       being handed back was read as proof of a toggle. It is handed back to seed the
+                       field. The value is the id of ANOTHER badge.
+
+                       `b` in that message is the badge itself — its image when it has one, its text
+                       when it does not — so the dialog shows you which badge you are replacing.
+
+                       The id to type comes from the table header: double-clicking "Badge" reveals
+                       every row's id, which is what that control is for. -->
                   <span class="acc-row-action"
-                    ><form method="POST" action="?/addBadgeDarkTheme" use:enhance={save}>
+                    ><form method="POST" action="?/addBadgeDarkTheme" use:enhance={saveDarkTheme}>
                       <input type="hidden" name="id" value={badge.id} />
                       <button
                         class="acc-link"
-                        type="submit"
-                        aria-pressed={badge.darkTheme}
-                        title={badge.darkTheme
-                          ? 'Marked for the dark theme — press to unmark'
-                          : 'Mark this badge for the dark theme'}>Dark Theme</button
+                        type="button"
+                        title={badge.darkThemeBadgeId === null
+                          ? 'Set a badge to show instead of this one in the dark theme'
+                          : `Shows badge ${badge.darkThemeBadgeId} in the dark theme`}
+                        onclick={(event) =>
+                          void askDarkTheme(badge, event.currentTarget.form)}>Dark Theme</button
                       >
                     </form></span
                   >

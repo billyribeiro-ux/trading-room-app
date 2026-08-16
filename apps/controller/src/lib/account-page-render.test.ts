@@ -47,7 +47,10 @@ const badge = (over: Record<string, unknown> = {}) => ({
   backgroundColor: '#000000',
   emoji: '*',
   imageUrl: null,
+  /* Superseded by the column below, kept because the load still selects the row. */
   darkTheme: false,
+  /** NULL = no dark variant nominated, which is every badge until an admin types an id. */
+  darkThemeBadgeId: null,
   createdAt: new Date(),
   ...over
 });
@@ -135,11 +138,22 @@ describe('the Badges table as rendered', () => {
     expect((out.match(SEPARATOR) ?? []).length).toBeGreaterThanOrEqual(4);
   });
 
-  it('reports the stored dark-theme flag as the control pressed state', () => {
-    const out = html([], [badge({ id: 11, darkTheme: true }), badge({ id: 12, darkTheme: false })]);
+  it('reports the badge nominated for the dark theme, and says so when there is none', () => {
+    /*
+      RE-POINTED 2026-08-15. This asserted `aria-pressed="true"` / `"false"`, which was correct for
+      the toggle this control used to be and is wrong for what the capture shows it is: a dialog with
+      a free-text field holding ANOTHER badge's id. A pressed state cannot express "shows badge 12".
+
+      The title carries it now, because that is the only visible cue on a control whose label never
+      changes — and unlike the old `aria-pressed`, it names which badge, which is the whole fact.
+    */
+    const out = html([], [badge({ id: 11, darkThemeBadgeId: 12 }), badge({ id: 12, darkThemeBadgeId: null })]);
     expect(out).toContain('?/addBadgeDarkTheme');
-    expect(out).toMatch(/aria-pressed="true"/);
-    expect(out).toMatch(/aria-pressed="false"/);
+    expect(out).toContain('Shows badge 12 in the dark theme');
+    expect(out).toContain('Set a badge to show instead of this one in the dark theme');
+    // The toggle is gone, not merely relabelled: a pressed state would be a second, contradictory
+    // model of the same column living beside the id.
+    expect(out).not.toMatch(/aria-pressed/);
   });
 
   it('opens in add mode, so the edit-only submit is not on screen', () => {
