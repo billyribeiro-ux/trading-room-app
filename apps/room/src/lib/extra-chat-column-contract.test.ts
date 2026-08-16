@@ -57,6 +57,11 @@ const splitCode = stripComments(SPLIT);
   NEGATIVES below still point at something that could hold the wrong version.
 */
 const composerModule = readFileSync(new URL('room/composer.svelte.ts', import.meta.url), 'utf8');
+/*
+  The read pipelines left the page for `RoomFeeds` in Phase 5 slice 9. Read as their own source, so
+  an assertion about what a pane renders cannot pass against a file that no longer builds it.
+*/
+const feedsModule = readFileSync(new URL('room/feeds.svelte.ts', import.meta.url), 'utf8');
 const pageCode = stripComments(PAGE);
 const prefsCode = stripComments(PREFS_SOURCE);
 const paneCode = stripComments(PANE);
@@ -167,11 +172,9 @@ describe('both columns share one pipeline, and that is the point', () => {
       A second derived would have been a second copy of merge, trim, hide, badge and the webinar
       filter — five steps that must agree, in two places that would drift.
     */
-    expect(pageCode).toContain('function chatMessagesFor(tab: ChatTab) {');
-    expect(pageCode).toContain('const visibleChatMessages = $derived(chatMessagesFor(chat.tab));');
-    expect(pageCode).toContain(
-      'const visibleExtraChatMessages = $derived(chatMessagesFor(chat.extraTab));'
-    );
+    expect(feedsModule).toContain('chatMessagesFor(tab: ChatTab) {');
+    expect(feedsModule).toContain('return this.chatMessagesFor(this.#chat.tab);');
+    expect(feedsModule).toContain('return this.chatMessagesFor(this.#chat.extraTab);');
   });
 
   it('the paging state is shared, because it is keyed by CHANNEL', () => {

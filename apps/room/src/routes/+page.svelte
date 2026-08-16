@@ -4,13 +4,11 @@
     chatComposerEnabled,
     isChatMode,
     isWebinarMode,
-    webinarMessageVisible,
     type ChatMode
   } from '$lib/chat-mode';
   import {
     CHAT_PAGE_ARRIVAL_NUDGE,
     CHAT_PAGE_REQUEST_NUDGE,
-    mergeOlderChatMessages,
     shouldLoadOlderMessages
   } from '$lib/chat-paging';
   import { toggleReaction } from '$lib/reaction-toggle';
@@ -105,6 +103,7 @@
     RoomPrivateChat
   } from '$lib/room/private-chat.svelte';
   import { RoomComposer } from '$lib/room/composer.svelte';
+  import { RoomFeeds } from '$lib/room/feeds.svelte';
   import { RoomUserActions } from '$lib/room/user-actions.svelte';
   import {
     DAY_TRADE_ALERT_FEED,
@@ -143,9 +142,7 @@
   import { alertFilterAvailable, alertPassesFilter, type AlertFilterFor } from '$lib/alert-filter';
   import { dayTradeAlertsTabVisible } from '$lib/day-trade-alerts';
   import type { DayTradeAlertRow } from '$lib/types';
-  import type { MessageBadge } from '$lib/types';
   import { isMentionOf } from '$lib/mention';
-  import { trimChatLog } from '$lib/room-scroller';
   import PrivateChatPanel from '$lib/components/PrivateChatPanel.svelte';
   import {
     NO_SPEAKER_TEXT,
@@ -175,7 +172,6 @@
     MainTab,
     MessageActionItem,
     MessageReactionPayload,
-    MessageReactions,
     ModalName,
     NoteVersion,
     SettingsTab,
@@ -828,54 +824,6 @@
   const showBadgesToPresentersOnly = $derived(data.sessData?.showBadgesToPresentersOnly === true);
   const disableStarYears = $derived(data.sessData?.disableStarYears === true);
 
-  /**
-   * A sender's badges, resolved the way `app-st-message.full.js` byte 28120 resolves them.
-   *
-   * ```js
-   * for (let o = 0; o < this.msg.b.length; o++) {
-   *   let r = sessData.badgesH[this.msg.b[o]];
-   *   r && r.darkTheme && 'darkTheme' === preferences.theme && (r = sessData.badgesH[r.darkTheme]);
-   *   r && (this.badges += r.imgURL ? '<img …>' : '<span class="badge …">' + r.text + '</span>');
-   * }
-   * ```
-   *
-   * Three things carried across exactly:
-   *
-   * * **The dark-theme swap is a LOOKUP, not a flag.** `r.darkTheme` holds the id of a variant
-   *   badge and the whole definition is replaced with it. This is the render-site proof of T5-27,
-   *   which had been established from the manage page alone.
-   * * **An id with no definition renders nothing.** `r &&` — a badge deleted from the account while
-   *   still assigned to a member is skipped, not drawn as a blank chip.
-   * * **A missing variant falls back to the original.** `badgesH[r.darkTheme]` can itself be
-   *   undefined if the variant was deleted; upstream would then render nothing, so the `?? badge`
-   *   here is a deliberate divergence — losing a badge because its DARK variant was deleted is a
-   *   worse outcome than showing the light one.
-   *
-   * Returns `[]` rather than undefined so `RoomMessage`'s own gate chain does the deciding; this
-   * function answers "which badges", never "should badges show".
-   */
-  function badgesForSender(emailHash: string | null | undefined): MessageBadge[] {
-    if (!emailHash) return [];
-    const ids = data.badges?.byEmailHash?.[emailHash];
-    if (!ids?.length) return [];
-    const definitions = data.badges?.definitions ?? {};
-    const resolved: MessageBadge[] = [];
-    for (const id of ids) {
-      const badge = definitions[String(id)];
-      if (!badge) continue;
-      const variant =
-        theme === 'dark' && typeof badge.darkTheme === 'number'
-          ? (definitions[String(badge.darkTheme)] ?? badge)
-          : badge;
-      resolved.push({
-        text: variant.text,
-        color: variant.color,
-        backgroundColor: variant.backgroundColor,
-        imageUrl: variant.imageUrl
-      });
-    }
-    return resolved;
-  }
   
   
 
@@ -1115,17 +1063,6 @@
   */
   const menus = new RoomMenus();
   let newNoteOpen = $state(false);
-  let evidenceMessageState = $state<
-    Record<
-      string,
-      {
-        hidden?: boolean;
-        answered?: boolean;
-        body?: string;
-        reactions?: MessageReactions;
-      }
-    >
-  >({});
   let selectedMessage = $state<MessageActionItem | null>(null);
   let selectedImageUrl = $state<string | null>(null);
   /*
@@ -1963,46 +1900,8 @@
 
 
 
-  function withEvidenceState<T extends MessageActionItem>(item: T): T {
-    if (!item.evidenceKey) return item;
-    const state = evidenceMessageState[item.evidenceKey];
-    if (!state) return item;
 
-    return {
-      ...item,
-      ...(state.answered === undefined ? {} : { answered: state.answered }),
-      ...(state.body === undefined
-        ? {}
-        : {
-            body: state.body,
-            evidenceBodySegments: undefined
-          }),
-      ...(state.reactions === undefined ? {} : { reactions: state.reactions })
-    } as T;
-  }
 
-  function isEvidenceMessageHidden(item: MessageActionItem) {
-    return Boolean(item.evidenceKey && evidenceMessageState[item.evidenceKey]?.hidden);
-  }
-
-  function updateEvidenceMessage(
-    item: MessageActionItem,
-    patch: {
-      hidden?: boolean;
-      answered?: boolean;
-      body?: string;
-      reactions?: MessageReactions;
-    }
-  ) {
-    if (!item.evidenceKey) return;
-    evidenceMessageState = {
-      ...evidenceMessageState,
-      [item.evidenceKey]: {
-        ...evidenceMessageState[item.evidenceKey],
-        ...patch
-      }
-    };
-  }
 
   // `unreadQA` is a transient per-viewer marker in the source, not a property of the alert: it is
   // set when a Q&A update arrives (`o.unreadQA = !0` in updateAlertMsg) and deleted when this
@@ -2143,57 +2042,10 @@
     prefs.save('showAlertsFrom', write.showAlertsFrom);
   }
 
-  const visibleAlerts = $derived(
-    mergeOlderChatMessages(alertPages.older(ALERTS_LOG), data.alerts)
-      .filter((item) => !isEvidenceMessageHidden(item))
-      .map(withEvidenceState)
-      .filter(alerts.matchesSearch)
-      /*
-        THE ALERT FILTER — the second of the reference's three sites, `case "getAlertsLog"` at byte
-        1,017,070.
 
-        `senderEmailHash` is this room's name for what the reference calls `avt`: the gravatar hash
-        of the sender's email, which is what the selection is keyed by. `alerts-advanced-search.ts`
-        matches on the same field for the same reason.
-
-        The predicate lives in `$lib/alert-filter` rather than here because it fails OPEN in three
-        distinct ways and inlining it would put that logic in three places.
-      */
-      .filter(alerts.passesFilter(data.sessData?.modAlertFilterList))
-      .filter(alerts.afterArchive)
-      .map((item) => ({ ...item, unreadQa: unreadQaAlertIds.has(item.id) }))
-  );
-
-  /**
-   * THE ALERT FILTER, site three of three — the alerts SEARCH results, byte 1,020,817.
-   *
-   * `case "doChatLogSearch"`, in the `"alerts" == i.type` branch:
-   *
-   * ```js
-   * try {
-   *   sessData.modAlertFilterList?.trim()?.length > 0 &&
-   *     Object.keys(user.alertFilterFor).length > 0 &&
-   *     (i.data = i.data.filter(se =>
-   *       preferences.showAlertsFrom ? user.alertFilterFor[se.avt] : !user.alertFilterFor[se.avt]))
-   * } catch {}
-   * globals.alertsSearchResults = i.data.reverse();
-   * ```
-   *
-   * The reference filters the RESULTS the server sent back; `#alerts-advanced-search-modal` here
-   * searches the rows this room already holds, so the filter is applied to the input instead. Same
-   * observable result — a filtered-out trader's alerts cannot appear in a search — and it keeps the
-   * predicate in one place rather than reaching into `filterAlerts`.
-   *
-   * Separate from `visibleAlerts` because the advanced search deliberately does NOT inherit the
-   * toolbar's search term, the archive cut-off or the evidence-hidden rules; sharing that chain
-   * would quietly narrow the search to whatever the list happens to be showing.
-   */
-  const searchableAlerts = $derived(
-    data.alerts.filter(alerts.passesFilter(data.sessData?.modAlertFilterList))
-  );
 
   function archiveAlerts() {
-    const archivable = visibleAlerts.length;
+    const archivable = feeds.visibleAlerts.length;
     if (archivable === 0) {
       dialogs.alert = 'There are no alerts to archive.';
       return;
@@ -2211,11 +2063,11 @@
 
   // "Save alerts messages" exports what is currently listed, mirroring how a note is downloaded.
   function saveAlerts() {
-    if (visibleAlerts.length === 0) {
+    if (feeds.visibleAlerts.length === 0) {
       dialogs.alert = 'There are no alerts to save.';
       return;
     }
-    const lines = visibleAlerts.map((item) => {
+    const lines = feeds.visibleAlerts.map((item) => {
       // Captured alerts carry the timestamp text exactly as it was rendered; database rows do not.
       const stamp =
         'evidenceTimestampText' in item && item.evidenceTimestampText
@@ -2379,76 +2231,37 @@
    * every message row would cost a proxy read per field on every render and buy nothing.
    */
   const chatPages = new RoomLogPages<(typeof data.messages)[number]>();
-
   /*
-    The live tail from the load, with whatever older pages the reader has scrolled back to in front
-    of it.
+    What each pane actually RENDERS, in `$lib/room/feeds.svelte.ts`.
 
-    The two halves have different lifetimes on purpose: `data.messages` is replaced by every
-    `invalidateAll()`, which is every SSE event, while the held older pages survive them. Merging
-    rather than concatenating because offset paging over a live tail can hand the boundary row back
-    twice — see `mergeOlderChatMessages`, which matches on identity and never on order.
+    Phase 5 slice 9. The read pipelines and the client-side evidence overlay, which look separate
+    and are one thing: every pipeline filters on the overlay and maps it, so a class holding the
+    state without the pipelines would be a field with four readers across a boundary.
 
-    The trim runs AFTER the merge, so `prefs.trimChatLogs` still caps what is held at the reference's 300
-    however far back somebody paged. Trimming first would let the cap be exceeded by exactly the
-    pages this feature adds.
+    Generic over BOTH row types. `RoomAlerts`'s predicates take `AlertRow` — body, sender, hash,
+    timestamp — which is narrower than `MessageActionItem`, and widening it to make one type fit
+    would have loosened a contract four other call sites depend on.
+
+    The unbounded `visibleAlerts` pass is recorded in the class and in `TODO.md` and deliberately
+    NOT fixed here: it changes behaviour, and that belongs in its own change with its own
+    measurement rather than inside a move.
   */
-  /*
-    The extra column's rows, through the SAME pipeline as the main column's — merge, trim, hide,
-    badge, and the webinar filter — differing only in which channel it reads. Written as a function
-    so the two columns cannot drift: a second derived would be a second copy of six steps.
-  */
-  const visibleExtraChatMessages = $derived(chatMessagesFor(chat.extraTab));
+  const feeds = new RoomFeeds<(typeof data.alerts)[number], (typeof data.messages)[number]>({
+    alerts,
+    chat,
+    alertPages,
+    chatPages,
+    session: () => data,
+    prefs,
+    isPresenter: () => isPresenter,
+    webinarMode: () => webinarMode,
+    theme: () => theme,
+    unreadQa: unreadQaAlertIds,
+    alertsLogKey: ALERTS_LOG
+  });
 
-  function chatMessagesFor(tab: ChatTab) {
-    return trimChatLog(
-      mergeOlderChatMessages(chatPages.older(tab), data.messages),
-      prefs.trimChatLogs
-    )
-      .filter((item) => item.room === tab && !isEvidenceMessageHidden(item))
-      /*
-        WEBINAR MODE. Upstream applies this as messages ARRIVE, dropping them before they ever reach
-        the log; applied here as a view filter instead, because this room re-reads its log from the
-        server on every invalidate and a drop-on-arrival would be undone by the next load.
 
-        The rule is the reference's, term for term — see `webinarMessageVisible`, including the
-        asymmetry that a message containing an `@` is dropped even when it is an admin message.
 
-        `isMention` is computed with the SAME rule the highlight and the popup use, rather than the
-        loose `indexOf('@')` upstream tests separately: one mention rule, in `$lib/mention`.
-      */
-      .filter((item) =>
-        !webinarMode
-          ? true
-          : webinarMessageVisible(
-              {
-                isAdmin: item.isAdmin === true,
-                senderId: item.senderId,
-                body: item.body,
-                isMention: isMentionOf(item.body, data.user.displayName, item.isAdmin === true)
-              },
-              {
-                id: data.user.id,
-                isPresenter,
-                hasAdminChat: data.user.hasAdminChat === true
-              }
-            )
-      )
-      .map(withEvidenceState)
-      /*
-        `msg.b` — the sender's badges, attached here rather than stored on the row.
-
-        Upstream they ride on the message itself, because that server owns both the chat log and
-        the badge assignments. Ours do not: badges live in the controller and messages in the room's
-        own database, so they are joined at render time on `senderEmailHash`, which every message
-        already carries. A member given a badge mid-session sees it on their NEXT message upstream
-        and on ALL of them here — a divergence in our favour, and the alternative would be
-        denormalising controller state into room rows that then go stale.
-      */
-      .map((item) => ({ ...item, badges: badgesForSender(item.senderEmailHash) }));
-  }
-
-  const visibleChatMessages = $derived(chatMessagesFor(chat.tab));
 
   function forceAlertsToBottom(scroller: HTMLElement) {
     if (alertScrollTimer !== undefined) globalThis.clearTimeout(alertScrollTimer);
@@ -2468,7 +2281,7 @@
     if (
       !shouldLoadOlderMessages({
         scrollTop: scroller.scrollTop,
-        messageCount: visibleAlerts.length,
+        messageCount: feeds.visibleAlerts.length,
         /* REAL here, unlike the chat log: the alerts pane has a live search field, and
            `matchesAlertSearch` filters the rendered list by it. Upstream refuses to page while a
            term is set because a filtered log is not a paged one — asking for page 2 of a filter the
@@ -2530,7 +2343,7 @@
     if (
       !shouldLoadOlderMessages({
         scrollTop: scroller.scrollTop,
-        messageCount: visibleChatMessages.length,
+        messageCount: feeds.visibleChat.length,
         /*
           Always empty HERE, and deliberately not invented. The reference's roomlog component has
           its own `searchTerm` that filters the live log in place, and refuses to page while one is
@@ -2592,8 +2405,8 @@
 
   $effect(() => {
     const scroller = alertsScroller;
-    const count = visibleAlerts.length;
-    const newestMessage = visibleAlerts.at(-1);
+    const count = feeds.visibleAlerts.length;
+    const newestMessage = feeds.visibleAlerts.at(-1);
 
     if (!scroller) return;
 
@@ -2615,8 +2428,8 @@
   $effect(() => {
     const scroller = chatScroller;
     const activeTab = chat.tab;
-    const count = visibleChatMessages.length;
-    const newestMessage = visibleChatMessages.at(-1);
+    const count = feeds.visibleChat.length;
+    const newestMessage = feeds.visibleChat.at(-1);
 
     if (!scroller) return;
 
@@ -2648,8 +2461,8 @@
   $effect(() => {
     const scroller = extraChatScroller;
     const activeTab = chat.extraTab;
-    const count = visibleExtraChatMessages.length;
-    const newestMessage = visibleExtraChatMessages.at(-1);
+    const count = feeds.visibleExtraChat.length;
+    const newestMessage = feeds.visibleExtraChat.at(-1);
 
     if (!scroller) return;
 
@@ -3798,7 +3611,7 @@
       reactionPayload.emoji,
       data.user.emailHash
     );
-    updateEvidenceMessage(item, { reactions });
+    feeds.patchEvidence(item, { reactions });
   }
 
   /**
@@ -3922,12 +3735,12 @@
         // from the fixture on every poll, forever. The local hide stays as the optimistic update,
         // because the server round-trip and its invalidate take a moment and the row should not
         // linger under the cursor; the server call is what makes it stick for the room.
-        if (item.evidenceKey) updateEvidenceMessage(item, { hidden: true });
+        if (item.evidenceKey) feeds.patchEvidence(item, { hidden: true });
         void runMessageOperation(kind, item, 'delete').then((succeeded) => {
           // A member may only delete what the capture attributes to them, and the server is what
           // decides that. Put a refused item back rather than leaving it hidden for this viewer
           // alone - that is the same one-sided disappearance this change exists to remove.
-          if (!succeeded && item.evidenceKey) updateEvidenceMessage(item, { hidden: false });
+          if (!succeeded && item.evidenceKey) feeds.patchEvidence(item, { hidden: false });
         });
       };
       if (event?.shiftKey) {
@@ -3968,9 +3781,9 @@
       // Optimistic for the captured case, then persisted - the same shape the delete uses. Marking
       // answered in this browser alone left the ✅ invisible to everyone else, which is the whole
       // point of the marker.
-      if (item.evidenceKey) updateEvidenceMessage(item, { answered: true });
+      if (item.evidenceKey) feeds.patchEvidence(item, { answered: true });
       void runMessageOperation(kind, item, 'markAnswered').then((succeeded) => {
-        if (!succeeded && item.evidenceKey) updateEvidenceMessage(item, { answered: false });
+        if (!succeeded && item.evidenceKey) feeds.patchEvidence(item, { answered: false });
       });
     }
     if (action === 'copy' && typeof navigator !== 'undefined') {
@@ -4013,9 +3826,9 @@
           if (!newBody) return;
           dialogs.prompt = null;
           const previousBody = item.body;
-          if (item.evidenceKey) updateEvidenceMessage(item, { body: newBody });
+          if (item.evidenceKey) feeds.patchEvidence(item, { body: newBody });
           void editMessage(kind, item, newBody).then((succeeded) => {
-            if (!succeeded && item.evidenceKey) updateEvidenceMessage(item, { body: previousBody });
+            if (!succeeded && item.evidenceKey) feeds.patchEvidence(item, { body: previousBody });
           });
         }
       };
@@ -4027,7 +3840,7 @@
       if (item.evidenceKey) toggleEvidenceReaction(item, payload);
       void toggleMessageReaction(kind, item, payload).then((succeeded) => {
         if (!succeeded && previousReactions) {
-          updateEvidenceMessage(item, { reactions: previousReactions });
+          feeds.patchEvidence(item, { reactions: previousReactions });
         }
         window.setTimeout(() => {
           menus.openMessageMenu(null);
@@ -4874,7 +4687,7 @@
     if (
       !shouldLoadOlderMessages({
         scrollTop: scroller.scrollTop,
-        messageCount: visibleExtraChatMessages.length,
+        messageCount: feeds.visibleExtraChat.length,
         searchTerm: '',
         hasMoreData: chatPages.hasMore(chat.extraTab),
         loadingMore: chatPages.loading
@@ -6757,8 +6570,8 @@
               canUseRTE={composer.canUseRTE}
               {giphyApiKey}
               bind:showMessageOptions
-              {visibleAlerts}
-              {visibleChatMessages}
+              visibleAlerts={feeds.visibleAlerts}
+              visibleChatMessages={feeds.visibleChat}
               {alertLabels}
               {messageChrome}
               followedUsers={userActions.followedUsers}
@@ -6896,7 +6709,7 @@
               <ExtraChatPane
                 bind:tab={chat.extraTab}
                 bind:composer={chat.extraComposer}
-                messages={visibleExtraChatMessages}
+                messages={feeds.visibleExtraChat}
                 doNotDisturbOn={prefs.doNotDisturbOn}
                 {chatEnabled}
                 {webinarMode}
@@ -7031,7 +6844,7 @@
       hideMobileCredentials={Boolean(data.sessData?.hideMobileCredentials)}
       isLimitedPresenter={media.limitedPresenter}
       canEditUsername={Boolean(data.sessData?.allowUsersToChangeUsername)}
-      alerts={searchableAlerts}
+      alerts={feeds.searchableAlerts}
       {chatMode}
       onChatModeChange={(mode) => void changeChatMode(mode)}
       canUseRTE={composer.canUseRTE}

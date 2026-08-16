@@ -24,6 +24,124 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-16
 
+### 2026-08-16 12:05 EDT — Phase 5 slice 9: `RoomFeeds`, and a rewriter that can tell code from prose
+
+**`+page.svelte` 7,349 → 7,162.** Script 6,397 → 6,210, template unchanged at 952.
+Suite 2,197 → 2,212 across 150 files. `svelte-check` 1,167 files, 0 errors, 0 warnings.
+`eslint` at the pre-existing 27.
+
+**`src/lib/room/feeds.svelte.ts` (359).** What each pane actually renders, and the client-side
+evidence overlay every pipeline consults. Ten declarations and functions, 211 lines.
+
+**THE TOOL HAD TO CHANGE BEFORE THE SLICE COULD LAND, and that is the finding.** Every previous
+rewiring used a flat string swap with an asserted count, which worked because every identifier
+those slices moved appeared only in code. `visibleAlerts`, `searchableAlerts` and `enableBadges`
+appear in PROSE as well — `RoomAlerts`'s own docstring says it *"deliberately does NOT own
+`visibleAlerts` / `searchableAlerts`\"*, and there are eight more such mentions. A blind replace
+rewrites those sentences into nonsense, **and the citation gate cannot see it, because the count
+does not change.**
+
+So the rewiring is comment-aware now: block comments, line comments and the template’s HTML
+comments are skipped, and the expected count per identifier comes from a measurement of the CODE
+rather than from a grep that cannot tell a sentence from a statement. It caught two shorthand
+forms on the way — the object-literal one and the Svelte attribute one, where `{visibleAlerts}`
+cannot become `{feeds.visibleAlerts}` because a shorthand attribute must be a bare identifier.
+
+**A scope correction, made because svelte-check refused the alternative.** `enableBadges` and
+`showBadgesToPresentersOnly` were in the first cut and are not in the slice. `badgesForSender`
+never reads them; their only reader is `messageChrome`, which is declared 300 lines above where
+`RoomFeeds` can be constructed. Moving them created a use-before-declaration that would have been
+"fixed" by shuffling two unrelated constructions up the file. A field whose only reader is
+somewhere else was never part of this domain.
+
+**Generic over BOTH row types.** `RoomAlerts`’s predicates take `AlertRow` — body, sender, hash,
+timestamp — which is narrower than `MessageActionItem`. Widening `AlertRow` to make one type fit
+would have loosened a contract four other call sites depend on.
+
+**A performance finding recorded and deliberately NOT fixed.** `visibleAlerts` runs six chained
+passes over a list nothing bounds — `data.alerts` plus every older page scrolled back to.
+`trimChatLog` caps the chat columns at the reference’s 300; alerts have no equivalent. At 10,000
+alerts that is 60,000 operations per render. Pre-existing; fixing it changes behaviour and belongs
+in its own change with its own measurement.
+
+**Thirteen assertions re-pointed across six contract files.** One of them now asserts on the three
+ARGUMENTS of a call rather than on one line, because prettier wraps it and a test that breaks on a
+reformat is a test about formatting.
+
+**Five negative controls, all seen red**: the rune off the overlay; hidden rows not hidden; the
+captured segments surviving an edit; a chip drawn for a badge id with no definition; the webinar
+filter let through.
+
+**Three harness bugs of mine, each caught before it could be reported as a defect**: the wrong
+`RoomAlerts` constructor shape, a `make()` argument referencing its own result, and a "change" to
+`extraTab` that set it to the value it already had. The last one is the useful one — the assertion
+was on a LENGTH, and both channels hold one row, so it could not have told them apart either way.
+
+### 2026-08-16 13:42 EDT — Q-1 closed: `app-alert-qa-modal` read end to end, and the capture alone would have shipped it wrong
+
+**No runtime impact.** `todo-next.md` only, +285 lines (7,353 -> 7,638). Documentation phase.
+
+**Sec 16.12 carried Q-1 as "the alert-qa ASK button". There is no ask button.** One modal serves
+both roles and the only thing that differs is a string:
+
+```
+placeholder = globals.isPresenter ? "Type your answer here..." : "Type your question here..."
+```
+
+The DOM capture in `new-room/app-modals/app-alert-qa-modal` shows the presenter string **because it
+was taken while logged in as a presenter**. Building from the capture alone would have shipped a
+room that invites members to answer their own questions. There is also no send button at all --
+sending is the Enter key -- and the modal is opened by a `guiEventBus` event carrying
+`{msg, openModal}`, not by `data-bs-toggle`, with the alert's `_id` written onto the host element as
+a class so the `hidden.bs.modal` handler can find it.
+
+**Read:** bundle bytes 2,331,000-2,350,400, bracketed before the component's first view function and
+after its last style rule (the window closes inside `app-muted-users-modal`, which proves the
+boundary). All 38 consts, every view function, every handler and the complete stylesheet.
+
+**Six reference defects, each recorded as an owner decision rather than silently fixed:**
+
+- **`clas`, not `class`** -- and it is in the CONST TABLE, so it is authored rather than a capture
+  slip. That div has no classes at all. The double space inside the value is the reference's too.
+- **`alt="qaMsg.avt"` is a literal string**; only `src` is bound. Screen readers announce the
+  variable name for every avatar in the modal.
+- **Shift+Enter is a no-op** -- it sets the textarea value to itself. **Alt+Enter** is what inserts a
+  newline. The universal convention is broken and an undiscoverable one replaces it.
+- **An unguarded `hasOwnProperty`**: `qaMsg && qaMsg.hasOwnProperty("avt") || qaMsg.hasOwnProperty("pic")`
+  throws on a null `qaMsg` because `&&` binds tighter. The three sibling slots are guarded correctly,
+  which is what proves it a slip.
+- **The popover arrow rules cannot match.** They are component-scoped, but the popover is created
+  with `container="body"`, so it is appended outside the component's subtree and never carries the
+  `_ngcontent` attribute.
+- **An off-by-one**: after uploading `o` files, `_c.splice(0, o-1)` leaves the last one buffered.
+
+**A correction to the capture's own header, so nobody chases it.** The file opens with "KNOWN CSS
+GAPS - HONEST" listing four selectors that "match NOTHING". **All four exist in the reference
+stylesheet** -- I read them. That note describes the capture tool's de-scoping step, not a missing
+rule. Two of the four are dead in the reference for a different reason (no `#form-upload-img`
+element) and the other two are the popover-scoping defect above. This is a note about the tool, not
+about the app.
+
+**Also found:** `secure.gravatar.com` here versus `www.gravatar.com` in the login component -- two
+hosts for one service in one application, both read, with per-surface size params (`s=50` here,
+`s=30` in muted-users, none in login). Ours must pick one and say which.
+
+**Unplanned bonus:** `app-muted-users-modal` fell inside the same read window and is now complete --
+markup, empty state, the unmute confirm and its wire call.
+
+**One new open item, R-1:** six custom properties consumed by this component's CSS
+(`--textarea-color`, `--modal-content-bg-color` and four others) are outside the portion of the
+`:root` block read in Sec 17.11. They are recorded as UNREAD, **not asserted absent**.
+
+**Verification.** No source file changed, so no suite was run. `git status apps/room/docs/` confirms
+the SHA-256-pinned evidence directory is clean.
+
+**Not mine, flagged for the owner:** `apps/room/docs/PHASE-5-DECOMPOSITION.md` and
+`apps/room/src/routes/+page.svelte` carry uncommitted changes from the parallel Phase 5
+decomposition work (slice 10 `RoomComposer`, commit `6535c98`, plus an untracked
+`lib/room/composer.svelte.ts`). I have not touched any of them.
+
+
 ### 2026-08-16 11:52 EDT — Phase 5 slice 10: `RoomComposer`, five entry points and one refusal
 
 **`+page.svelte` 7,664 → 7,349.** Script 6,712 → 6,397, template unchanged at 952.
