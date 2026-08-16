@@ -223,6 +223,116 @@ through — both are documented in `.env.example` and until now nothing read the
 **Not done:** retiring `ptr_clone_app` (deferred until the cutover is proven in a real deployment),
 and the owner role / database rename `ptr_clone` → `tradingroom`. Both remain in `TODO.md`.
 
+### 2026-08-15 20:00 EDT — Phase 3b: two listeners for one event, and the double load they were hiding
+
+**Branch `feat/extra-chat-column`, not merged.** **Runtime impact: yes** — returning to the tab now
+issues ONE request where it issued two.
+
+Phase 3a's new guard, written unscoped, found a **second `visibilitychange` listener** in the page.
+This merges them, and merging them is what exposed the defect.
+
+#### What the pair actually did
+
+| listener | on return to the tab |
+|---|---|
+| `onVisibilityChange` | sets focus, and `invalidateAll()` **if chat was missed** |
+| `handleVisibility` | `refreshRoom()` — `invalidate('room:data')` — **always** |
+
+Each was correct about its own concern and neither knew about the other. So a return **with** missed
+chat fired **both** — two loads for one event, on every alt-tab back into a busy room. The merged
+handler issues exactly one either way:
+
+```
+nothing missed  ->  refreshRoom()     the poll's own invalidate('room:data')
+chat missed     ->  invalidateAll()   the wider re-read, and no second request
+```
+
+The five-second poll hoisted out of `onMount` to sit beside the handler that drives it. One
+listener, one teardown fewer, one concern instead of two.
+
+#### A contract that documented a half-truth
+
+`visibility-change-contract.test.ts` asserted *"returning to a tab where nothing happened should
+cost nothing."* That was true of the handler it read and **false of the page** — the other listener
+refreshed unconditionally. The test could not see it, because it only ever read one of the two.
+
+Rewritten to state what the pair does now that they are one, with the branch counts asserted so the
+cheap path cannot fall through to the wide one.
+
+#### And a gap in my own change, found by a control rather than by reading
+
+Deleting `startRefresh()` from the merged handler left **the entire suite green**. A room whose
+five-second poll never restarts looks fine for exactly as long as nobody else speaks, then goes
+quietly stale — the failure the poll exists to prevent, reintroduced with nothing to notice. Both
+directions are asserted now, plus the mount-time guard that a tab already hidden must not start one.
+
+#### Verified
+
+`pnpm run check` **0 errors / 0 warnings across 1,131 files** · **1,853 tests across 133 files** ·
+`eslint src` clean · prettier clean · **two negative controls seen red** (a quiet return firing the
+wide re-read; the poll never restarting — the second only after the missing assertion was added).
+
+### 2026-08-15 19:52 EDT — Phase 3a: the first effect the docs replace outright, and the ratchet refusing a raise
+
+**Branch `feat/extra-chat-column`, not merged.** **Runtime impact: yes** — the `visibilitychange`
+listener is now bound by Svelte instead of by hand.
+
+`svelte/best-practices`, read the same day, names this case by itself: *"If you need to attach
+listeners to `window` or `document` you can use `<svelte:window>` and `<svelte:document>` … **Avoid
+using `onMount` or `$effect` for this**."*
+
+The comment that sat there had weighed `{@attach}` and kept the effect, on the grounds that the
+listener must exist whether or not an element is mounted. **That was true of an attachment and
+irrelevant to an event ATTRIBUTE** — `<svelte:document>` is present for the component's whole
+lifetime, which is exactly as long as the listener should be. Twelve lines of manual
+`addEventListener` / teardown are gone. **13 effects → 12.**
+
+#### The ratchet refused a raise, and that is the system working
+
+The conversion cost the file **more** lines than it removed: the reasoning is longer than twelve
+lines of listener plumbing. The two easy answers — raise the ceiling, or shorten the explanation —
+are the two things `source-size-contract.test.ts` exists to refuse. So it was paid for with an
+extraction that was overdue anyway.
+
+**`$lib/navbar-labels.ts`.** The four captured navbar strings were bare literals in `+page.svelte`
+with nothing marking them as evidence, and since Phase 2c they are also *props* on `RoomNavbar` —
+a string in one file and a prop type in another, with nothing saying which is right. They now live
+in a module with the warning they have earned:
+
+```
+' ( No one is speaking )'          leading space, and spaces inside the parentheses
+'Share Screen '                    TRAILING space, no leading one
+' OBS / XSPLIT/ Share Virtual Cam' a space before the first slash and none before the second
+' Stop Sharing All Screens'        leading space
+```
+
+That third one is why the module carries a rule rather than just values: **a menu item once went
+unclicked in this repository because a regex was built out of that exact label.** Compare with
+`===`; never build a pattern from one. Both spacing quirks are negative-controlled.
+
+#### A finding the new assertion made while it was still too broad
+
+Written unscoped, the "no hand-managed listener" guard went red — because there is a **second**
+`visibilitychange` listener in the page, `handleVisibility`, which pauses and resumes the
+five-second refresh poll. It is a different concern with a real teardown that also clears an
+interval, so it is not a leftover — but **two listeners for one event on one document, in one
+component**, is a duplication worth naming rather than discovering later. The guard is scoped to the
+handler that moved, and the duplication is recorded for the next Phase 3 step.
+
+#### The effect that deliberately did NOT move
+
+The `noselect` body class stays an effect, and now says why on the docs' own terms. It looks like
+the listener and is not: that one was a LISTENER, which the docs put on the element; this is direct
+DOM manipulation of a node no element in this component owns, which `$effect` documents as one of
+its legitimate uses — *"useful for things like analytics and direct DOM manipulation"*. There is
+nothing to attach to, and `<svelte:body>` takes listeners rather than classes.
+
+#### Verified — with the project's own gate
+
+`pnpm run check` **0 errors / 0 warnings across 1,131 files** · **1,852 tests across 133 files** ·
+`eslint src` clean · prettier clean · `svelte-autofixer` `issues: []` on `+page.svelte` · **three
+negative controls seen red**.
+
 ### 2026-08-15 19:32 EDT — Phase 2c: `RoomNavbar`, a prop that would not have moved anything, and a CI lint I caused
 
 **Branch `feat/extra-chat-column`, not merged.** **Runtime impact: yes** — the top bar is its own

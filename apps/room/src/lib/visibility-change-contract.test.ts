@@ -79,27 +79,87 @@ describe('the hidden tab stops refetching', () => {
 
 describe('and catches up when the tab comes back', () => {
   it('listens for visibilitychange and tracks focus', () => {
-    expect(pageCode).toContain(
-      "document.addEventListener('visibilitychange', onVisibilityChange);"
-    );
+    /*
+      BOUND ON `<svelte:document>` since 2026-08-15, not added by hand in an effect.
+      `svelte/best-practices` names this case: *"If you need to attach listeners to `window` or
+      `document` you can use `<svelte:window>` and `<svelte:document>` … Avoid using `onMount` or
+      `$effect` for this."*
+    */
+    expect(pageCode).toContain('<svelte:document onvisibilitychange={onVisibilityChange} />');
+    expect(pageCode).toContain('function onVisibilityChange() {');
     expect(pageCode).toContain('appHasFocus = false;');
     expect(pageCode).toContain('appHasFocus = true;');
   });
 
-  it('removes the listener, because a detached one holds the page alive', () => {
-    expect(pageCode).toContain(
-      "return () => document.removeEventListener('visibilitychange', onVisibilityChange);"
-    );
+  it('cannot leak the listener, because it is no longer hand-managed', () => {
+    /*
+      What the old pair of assertions guarded was a manual `addEventListener` matched by a manual
+      `removeEventListener` in a teardown — a detached listener holding a closure over `data` is how
+      a single-page app leaks a page. That risk is now STRUCTURAL rather than asserted: Svelte adds
+      the handler when the component mounts and removes it when it unmounts, and there is no hand
+      call on either side to forget.
+
+      Asserted as the absence of the hand-rolled pair FOR THIS HANDLER, which is the thing that
+      could come back.
+
+      SCOPED TO `onVisibilityChange` DELIBERATELY, and the reason is a finding this assertion made
+      when it was written unscoped: there is a SECOND `visibilitychange` listener in the page, at
+      `handleVisibility`, which pauses and resumes the five-second refresh poll. It is a different
+      concern with a real teardown that also clears an interval, so it is not a leftover — but two
+      listeners for one event on one document, in one component, is a duplication worth naming
+      rather than discovering later. Merging them is Phase 3 work and is recorded in TODO row AE.
+    */
+    expect(pageCode).not.toContain("addEventListener('visibilitychange', onVisibilityChange)");
+    expect(pageCode).not.toContain("removeEventListener('visibilitychange', onVisibilityChange)");
   });
 
-  it('refetches ONCE, and only when something was missed', () => {
+  it('pauses the poll while hidden and restarts it on return', () => {
     /*
-      `appHasFocusGetChatLog`. One refetch rather than a replay, because the load already returns
-      the newest page per channel — the room re-reads itself and is current. And only when something
-      arrived: returning to a tab where nothing happened should cost nothing.
+      ADDED because its absence was found by a negative control, not by reading: deleting
+      `startRefresh()` from the handler left the whole suite green. A room whose five-second poll
+      never restarts looks fine for exactly as long as nobody else says anything, and then goes
+      quietly stale — the failure this poll exists to prevent, reintroduced with no test to notice.
+
+      Both directions asserted, because pausing without resuming is the same bug wearing a
+      different hat.
     */
-    expect(pageCode).toContain('if (!missedChatWhileHidden) return;');
+    const handler = pageCode.slice(pageCode.indexOf('function onVisibilityChange() {'));
+    const body = handler.slice(0, handler.indexOf('\n  }'));
+
+    expect(body, 'hidden must stop the timer').toContain('stopRefresh();');
+    expect(body, 'visible must start it again').toContain('startRefresh();');
+    // And a tab that is already hidden at mount must not start one.
+    expect(pageCode).toContain('if (!document.hidden) startRefresh();');
+  });
+
+  it('refetches ONCE on return, and the wider re-read only when something was missed', () => {
+    /*
+      REWRITTEN 2026-08-15, and the old wording was a half-truth this file could not see.
+
+      It said "returning to a tab where nothing happened should cost nothing", which was true of the
+      handler it read and false of the page: a SECOND `visibilitychange` listener, `handleVisibility`,
+      called `refreshRoom()` on every return regardless. Two listeners for one event, each correct
+      about its own concern and neither aware of the other.
+
+      Merging them showed what the pair actually did — and that on a return WITH missed chat it
+      fired BOTH `invalidate('room:data')` and `invalidateAll()`, two loads for one event. The
+      merged handler issues exactly one either way:
+
+        nothing missed  -> refreshRoom()      the poll's own `invalidate('room:data')`
+        chat missed     -> invalidateAll()    the wider re-read, and no second request
+
+      `appHasFocusGetChatLog` is still one refetch rather than a replay, because the load already
+      returns the newest page per channel — the room re-reads itself and is current.
+    */
+    expect(pageCode).toContain('if (!missedChatWhileHidden) {');
     expect(pageCode).toContain('missedChatWhileHidden = false;');
+    expect(pageCode).toContain('void invalidateAll();');
+
+    // The branch that fires the cheap refresh must not also fall through to the wide one.
+    const handler = pageCode.slice(pageCode.indexOf('function onVisibilityChange() {'));
+    const body = handler.slice(0, handler.indexOf('\n  }'));
+    expect(body.split('refreshRoom()')).toHaveLength(2);
+    expect(body.split('invalidateAll()')).toHaveLength(2);
   });
 });
 

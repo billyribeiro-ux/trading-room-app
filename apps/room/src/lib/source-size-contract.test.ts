@@ -168,8 +168,24 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       `RoomNavbar` is the third: 12,236 -> 11,585, a drop of 651 for a 711-line region. Seventy-odd
       identifiers, two thirds of them handlers, and almost every piece of state belonging to
       `RoomMedia` or `RoomMenus` — three instances replacing about thirty scalars.
+
+      PHASE 3 STARTS HERE — the effects. The `visibilitychange` listener became a
+      `<svelte:document>` handler, which `svelte/best-practices` names by itself: listeners on
+      window or document belong on those elements, not in an effect. 13 effects -> 12.
+
+      The conversion cost the file MORE lines than it removed, because the reasoning is longer than
+      twelve lines of `addEventListener` plumbing. Rather than raise the ceiling or shorten the
+      explanation - the two things this file exists to refuse - it was paid for with an extraction
+      that was overdue anyway: the four captured navbar strings went to `$lib/navbar-labels.ts`,
+      where the spacing that has already caused one bug in this repository is documented instead of
+      sitting as four bare literals nothing marked as evidence.
+
+      3b merged the TWO `visibilitychange` listeners this page had - one tracking focus and
+      catching the chat up, one pausing the five-second refresh poll - into the single
+      `<svelte:document>` handler. The poll hoisted out of `onMount` to sit beside it, which costs
+      lines here and removes a listener, a teardown and a whole duplicated concern.
     */
-    max: 11585,
+    max: 11621,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {

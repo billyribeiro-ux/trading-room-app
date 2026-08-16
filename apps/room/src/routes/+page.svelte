@@ -171,6 +171,12 @@
   import { isMentionOf } from '$lib/mention';
   import { trimChatLog } from '$lib/room-scroller';
   import PrivateChatPanel from '$lib/components/PrivateChatPanel.svelte';
+  import {
+    NO_SPEAKER_TEXT,
+    SHARE_SCREEN_TEXT,
+    STOP_SHARING_ALL_TEXT,
+    VIRTUAL_CAM_TEXT
+  } from '$lib/navbar-labels';
   import RoomNavbar from '$lib/components/RoomNavbar.svelte';
   import RoomSidebar from '$lib/components/RoomSidebar.svelte';
   import ToastHost from '$lib/components/ToastHost.svelte';
@@ -277,10 +283,6 @@
     | 'streaming-selection'
     | 'session-history'
     | 'webinar-tools';
-  const noSpeakerText = ' ( No one is speaking )';
-  const shareScreenText = 'Share Screen ';
-  const virtualCamText = ' OBS / XSPLIT/ Share Virtual Cam';
-  const stopSharingAllText = ' Stop Sharing All Screens';
 
   let { data }: PageProps = $props();
 
@@ -1013,31 +1015,84 @@
   let missedChatWhileHidden = false;
 
   /**
-   * The `visibilitychange` listener — `globals.appHasFocus`, and the catch-up on the way back.
+   * `visibilitychange` — `globals.appHasFocus`, and the catch-up on the way back.
    *
-   * An attachment on `<svelte:document>` would be tidier, but this listener has to exist whether or
-   * not any element is mounted, and it must be removed on teardown: a detached listener holding a
-   * closure over `data` is how a single-page app leaks a page.
+   * NO LONGER AN EFFECT. `svelte/best-practices` names this case by itself: *"If you need to attach
+   * listeners to `window` or `document` you can use `<svelte:window>` and `<svelte:document>` …
+   * Avoid using `onMount` or `$effect` for this."* The handler is bound on `<svelte:document>` at
+   * the bottom of this file and Svelte owns the add and the remove, so the twelve lines of manual
+   * `addEventListener` / teardown are gone with them.
    *
-   * The catch-up is `appHasFocusGetChatLog`, and it fires ONCE rather than replaying what was
-   * missed, because the load already returns the newest page per channel — the room re-reads itself
-   * and is current, which is exactly what upstream's `getChatLog` on that event does.
+   * The comment that used to sit here weighed `{@attach}` and kept the effect, on the grounds that
+   * the listener must exist whether or not an element is mounted. That was true of an attachment
+   * and irrelevant to an event ATTRIBUTE: `<svelte:document>` is present for the component's whole
+   * lifetime, which is exactly as long as the listener should be.
+   *
+   * The catch-up fires ONCE rather than replaying what was missed, because the load already returns
+   * the newest page per channel — the room re-reads itself and is current, which is what upstream's
+   * `appHasFocusGetChatLog` does.
    */
-  $effect(() => {
-    if (typeof document === 'undefined') return;
-    const onVisibilityChange = () => {
-      if (document.hidden) {
-        appHasFocus = false;
-        return;
-      }
-      appHasFocus = true;
-      if (!missedChatWhileHidden) return;
-      missedChatWhileHidden = false;
-      void invalidateAll();
-    };
-    document.addEventListener('visibilitychange', onVisibilityChange);
-    return () => document.removeEventListener('visibilitychange', onVisibilityChange);
-  });
+  /*
+    The five-second refresh poll, hoisted here from `onMount` so ONE handler owns visibility.
+
+    Nothing is pushed from the server for a reader's question, alert or chat message, so a presenter
+    sat on a stale tab saw an empty Q&A while the row was already stored. This re-fetches on a
+    timer, and only while the tab is visible, so a backgrounded room is not polling. `invalidate`
+    re-runs the load and patches the data; it is not a navigation, so scroll positions and open
+    modals are left alone.
+
+    Plain `let`/`function`, not `$state`: nothing renders from a timer handle.
+  */
+  const REFRESH_MS = 5000;
+  let refreshTimer: ReturnType<typeof globalThis.setInterval> | undefined;
+
+  /**
+   * A poll that loses the network must not become an unhandled rejection.
+   *
+   * `void invalidate(...)` discards the promise without a handler, so a single dropped request — a
+   * dev-server restart, a laptop waking up — surfaced as an uncaught error in the console with a
+   * stack trace pointing here, and looked like a fault in the room rather than one skipped refresh.
+   * The next tick retries anyway; that is what a poll is for.
+   */
+  function refreshRoom() {
+    void invalidate('room:data').catch((error: unknown) => {
+      console.warn('[room] a refresh was skipped; the next one will retry', error);
+    });
+  }
+
+  function startRefresh() {
+    if (refreshTimer !== undefined) return;
+    refreshTimer = globalThis.setInterval(() => refreshRoom(), REFRESH_MS);
+  }
+
+  function stopRefresh() {
+    if (refreshTimer !== undefined) globalThis.clearInterval(refreshTimer);
+    refreshTimer = undefined;
+  }
+
+  function onVisibilityChange() {
+    if (document.hidden) {
+      appHasFocus = false;
+      stopRefresh();
+      return;
+    }
+    appHasFocus = true;
+    startRefresh();
+    /*
+      The catch-up and the poll's own immediate refresh are the SAME request, so only one goes out.
+
+      `missedChatWhileHidden` is set while hidden; when it is set this is a catch-up and
+      `invalidateAll()` is the wider re-read. When it is not, the tab was never away long enough to
+      miss anything and `refreshRoom()` — the poll's `invalidate('room:data')` — is all that is
+      owed. Firing both would double every return to the tab.
+    */
+    if (!missedChatWhileHidden) {
+      refreshRoom();
+      return;
+    }
+    missedChatWhileHidden = false;
+    void invalidateAll();
+  }
 
   /**
    * `preferences.disableVideo` - the viewer's own "turn the video off to preserve data" switch.
@@ -1804,6 +1859,13 @@
 
     It touches `document.body`, which is outside this component, so it cleans up after itself rather
     than leaving state behind on navigation.
+
+    STAYS AN EFFECT, deliberately, while the `visibilitychange` listener above became a
+    `<svelte:document>` handler. The two look alike and are not: that one was a LISTENER, which the
+    docs say belongs on the element; this one is direct DOM manipulation of a node no element in
+    this component owns, which `$effect` documents as one of its legitimate uses — *"useful for
+    things like analytics and direct DOM manipulation"*. There is no element to attach to, and
+    `<svelte:body>` takes listeners rather than classes.
   */
   $effect(() => {
     if (!shouldDisableSelection({ disableCopy, isPresenter })) return;
@@ -7861,42 +7923,14 @@
       mediaServerDisconnected();
     });
 
-    // Nothing is pushed from the server, so a reader's question, alert or chat message only shows
-    // up when this page's load runs again - which is why a presenter sat on a stale tab saw an
-    // empty Q&A while the row was already stored. Re-fetch on a timer, and only while the tab is
-    // visible so a backgrounded room is not polling. `invalidate` re-runs the load and patches the
-    // data; it is not a navigation, so scroll positions and open modals are left alone.
-    const REFRESH_MS = 5000;
     /*
-     * A poll that loses the network must not become an unhandled rejection.
-     *
-     * `void invalidate(...)` discards the promise without a handler, so a single dropped request -
-     * a dev-server restart, a laptop waking up - surfaced as an uncaught error in the console with
-     * a stack trace pointing here, and looked like a fault in the room rather than one skipped
-     * refresh. The next tick retries anyway; that is what a poll is for.
-     */
-    const refreshRoom = () => {
-      void invalidate('room:data').catch((error: unknown) => {
-        console.warn('[room] a refresh was skipped; the next one will retry', error);
-      });
-    };
-    let refreshTimer: ReturnType<typeof globalThis.setInterval> | undefined;
-    const stopRefresh = () => {
-      if (refreshTimer !== undefined) globalThis.clearInterval(refreshTimer);
-      refreshTimer = undefined;
-    };
-    const startRefresh = () => {
-      if (refreshTimer !== undefined) return;
-      refreshTimer = globalThis.setInterval(() => refreshRoom(), REFRESH_MS);
-    };
-    const handleVisibility = () => {
-      if (document.hidden) stopRefresh();
-      else {
-        refreshRoom();
-        startRefresh();
-      }
-    };
-    document.addEventListener('visibilitychange', handleVisibility);
+      The poll and its visibility handling live at component scope now — see `onVisibilityChange`.
+      There were TWO `visibilitychange` listeners on this document, in this component: one tracking
+      focus and catching the chat up, one pausing and resuming this timer. Different concerns, both
+      correct, and still a duplication nobody would have found by reading either one.
+
+      All that is left here is starting it, because a tab that is already hidden at mount must not.
+    */
     if (!document.hidden) startRefresh();
 
     return () => {
@@ -7925,7 +7959,6 @@
       live?.close();
       signalling.close();
       stopRefresh();
-      document.removeEventListener('visibilitychange', handleVisibility);
       if (previousOpenImageModal) imageModalWindow.openImageModal = previousOpenImageModal;
       else delete imageModalWindow.openImageModal;
       if (alertScrollTimer !== undefined) globalThis.clearTimeout(alertScrollTimer);
@@ -8714,6 +8747,9 @@
 {/snippet}
 
 
+<!-- Not an effect: see `onVisibilityChange`. Svelte owns the add and the remove. -->
+<svelte:document onvisibilitychange={onVisibilityChange} />
+
 <svelte:window
   bind:innerWidth={split.viewportWidth}
   onclick={(event) => {
@@ -8878,10 +8914,10 @@
           {youtubeForAllUrl}
           {backgroundVolume}
           {soundChecks}
-          {noSpeakerText}
-          {shareScreenText}
-          {virtualCamText}
-          {stopSharingAllText}
+          noSpeakerText={NO_SPEAKER_TEXT}
+          shareScreenText={SHARE_SCREEN_TEXT}
+          virtualCamText={VIRTUAL_CAM_TEXT}
+          stopSharingAllText={STOP_SHARING_ALL_TEXT}
           {setInputChecked}
           {setRangeValue}
           ontoggletopmenu={toggleTopMenu}
