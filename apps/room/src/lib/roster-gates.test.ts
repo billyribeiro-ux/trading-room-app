@@ -631,10 +631,13 @@ describe('giveMicScreen wiring', () => {
   });
 
   it('tells the RECIPIENT, success for a grant and error for a revoke', () => {
-    expect(pageSource).toContain("'You can now Talk / Screenshare'");
-    expect(pageSource).toContain("'You can no longer Talk / Screenshare'");
+    // The receiving dispatch moved to `RoomEventStream` in Phase 5 slice 5; the SENDER, and the
+    // presenter's own confirmation strings above, stayed where they were.
+    const eventsSource = readFileSync(new URL('./room/events.svelte.ts', import.meta.url), 'utf8');
+    expect(eventsSource).toContain("'You can now Talk / Screenshare'");
+    expect(eventsSource).toContain("'You can no longer Talk / Screenshare'");
     // Two skins, not one: losing a capability is not good news and the capture colours it so.
-    expect(pageSource).toMatch(/kind: command\.give === true \? 'success' : 'error'/);
+    expect(eventsSource).toMatch(/kind: command\.give === true \? 'success' : 'error'/);
   });
 
   it('is its own top-level command, never a remotePresCommand subCmd', () => {
@@ -642,7 +645,9 @@ describe('giveMicScreen wiring', () => {
     expect(
       readFileSync(new URL('../routes/presenter-commands.remote.ts', import.meta.url), 'utf8')
     ).toContain("cmd: 'giveMicScreen'");
-    expect(pageSource).toContain("command?.cmd === 'giveMicScreen'");
+    expect(
+      readFileSync(new URL('./room/events.svelte.ts', import.meta.url), 'utf8')
+    ).toContain("command?.cmd === 'giveMicScreen'");
   });
 });
 
@@ -657,8 +662,10 @@ describe('room-wide sound', () => {
   const pageSource = readFileSync('src/routes/+page.svelte', 'utf8');
 
   it('receives both commands, not just sends them', () => {
-    expect(pageSource).toContain("command?.cmd === 'playMP3ForAll'");
-    expect(pageSource).toContain("command?.cmd === 'stopMp3ForAll'");
+    // Receiving is the stream's; sending is still the page's.
+    const eventsSource = readFileSync(new URL('./room/events.svelte.ts', import.meta.url), 'utf8');
+    expect(eventsSource).toContain("command?.cmd === 'playMP3ForAll'");
+    expect(eventsSource).toContain("command?.cmd === 'stopMp3ForAll'");
   });
 
   it('binds the audio element to the url, so something actually plays', () => {
@@ -765,8 +772,18 @@ describe('a role change restarts the media session', () => {
 
   it("waits the capture's 3 seconds before re-initialising", () => {
     // Reconnecting into a teardown that has not finished is how you get two peers for one person.
-    const handler = code.slice(code.indexOf("command?.cmd === 'giveMicScreen'"));
-    expect(handler.slice(0, 2000)).toContain('setTimeout(() => void restart(), 3000)');
+    /*
+      COMMENTS STRIPPED before slicing, and that is the fix rather than a bigger window.
+
+      The branch carries a 30-line citation about why giving mic/screen is still half a feature, so
+      a fixed character window over the raw source either misses the line or has to be widened until
+      it spans branches it was never meant to read. Stripping first makes the window describe CODE.
+    */
+    const eventsCode = readFileSync(new URL('./room/events.svelte.ts', import.meta.url), 'utf8')
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/^\s*\/\/.*$/gm, '');
+    const handler = eventsCode.slice(eventsCode.indexOf("command?.cmd === 'giveMicScreen'"));
+    expect(handler.slice(0, 900)).toContain('setTimeout(() => void restart(), 3000)');
   });
 
   it('drops everything it was consuming, not just the screens', () => {

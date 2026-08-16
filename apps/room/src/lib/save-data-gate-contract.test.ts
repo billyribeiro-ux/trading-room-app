@@ -52,7 +52,13 @@ const PANE = readFileSync(new URL('./components/ScreenPane.svelte', import.meta.
 const stripComments = (source: string) =>
   source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/<!--[\s\S]*?-->/g, '');
 
+const transportCode = stripComments(
+  readFileSync(new URL('./room/media-transport.svelte.ts', import.meta.url), 'utf8')
+);
 const pageCode = stripComments(PAGE);
+const overlaysCode = stripComments(
+  readFileSync(new URL('./components/RoomOverlays.svelte', import.meta.url), 'utf8')
+);
 const modalCode = stripComments(MODAL);
 const paneCode = stripComments(PANE);
 
@@ -97,9 +103,13 @@ describe('ours: the switch reaches the media layer', () => {
   });
 
   it('the page owns it, unpersisted, matching a writer that calls no setPreference', () => {
-    expect(pageCode).toContain('let saveData = $state(false);');
-    expect(pageCode).not.toMatch(/saveData\s*=\s*\$state\([^)]*loadedSettings/);
-    expect(pageCode).toContain('onSaveDataChange={setSaveData}');
+    expect(transportCode).toContain('this.#saveData = $state(false);');
+    expect(transportCode).not.toMatch(/saveData\s*=\s*\$state\([^)]*loadedSettings/);
+        // The modal host moved into `RoomOverlays.svelte` in Phase 5 slice 17; the room state it renders
+  // from is handed to that component whole, so the prop is assembled there now.
+    expect(overlaysCode).toContain(
+      'onSaveDataChange={(enabled) => mediaTransport.setSaveData(enabled)}'
+    );
   });
 
   it('THE POINT: the producer is not consumed while it is on', () => {
@@ -107,8 +117,8 @@ describe('ours: the switch reaches the media layer', () => {
       If this line goes, every other assertion in this file still passes and the feature silently
       becomes a class toggle that saves nothing. It is the one that matters.
     */
-    expect(pageCode).toContain('if (saveData) {');
-    expect(pageCode).toContain('deferredScreens.set(info.producerId, info);');
+    expect(transportCode).toContain('if (this.#saveData) {');
+    expect(transportCode).toContain('this.#deferredScreens.set(info.producerId, info);');
   });
 
   it('the gate sits AFTER the tab is added, so the pane still exists to show the message', () => {
@@ -119,12 +129,12 @@ describe('ours: the switch reaches the media layer', () => {
       `addRemoteScreen`, so `indexOf` found the re-consume loop instead of the arrival path. The
       check was wrong, not the code. A positional assertion has to own its region.
     */
-    const from = pageCode.indexOf('async function addRemoteScreen(');
+    const from = transportCode.indexOf('async addRemoteScreen(');
     expect(from, 'addRemoteScreen must exist').toBeGreaterThan(-1);
-    const body = pageCode.slice(from, pageCode.indexOf('\n  }', from));
+    const body = transportCode.slice(from, transportCode.indexOf('\n  }', from));
 
-    const tab = body.indexOf('selectScreenTabOfId(info.producerId);');
-    const gate = body.indexOf('if (saveData) {');
+    const tab = body.indexOf('this.selectScreenTabOfId(info.producerId);');
+    const gate = body.indexOf('if (this.#saveData) {');
     const consume = body.indexOf('const remote = await session.consume(info);');
 
     expect(tab, 'the tab is added inside addRemoteScreen').toBeGreaterThan(-1);
@@ -139,9 +149,9 @@ describe('ours: the switch reaches the media layer', () => {
       `ProducerInfo`, turning video back on would show nothing until the presenter restarted their
       share. Item V in `TODO.md` records the same retention problem for per-presenter mute.
     */
-    expect(pageCode).toContain('async function setSaveData(enabled: boolean)');
-    expect(pageCode).toContain('deferredScreens.delete(producerId);');
-    expect(pageCode).toContain('screenStreams.set(producerId, remote.stream);');
+    expect(transportCode).toContain('async setSaveData(enabled: boolean)');
+    expect(transportCode).toContain('this.#deferredScreens.delete(producerId);');
+    expect(transportCode).toContain('this.#screenStreams.set(producerId, remote.stream);');
   });
 
   it('the pane hides the video and shows the reference message', () => {

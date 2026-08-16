@@ -24,6 +24,240 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-16
 
+### 2026-08-16 15:53 EDT — Phase 5 slice 20: `RoomRecording`, and a file extension that was lying
+
+**`+page.svelte` 4,708 → 4,485 (−223).** Suite 2,280 → 2,283 across 154 files. `svelte-check`
+1,177 files, 0 errors, 0 warnings. `eslint` clean.
+**Runtime impact: yes** — the recorder moved. No behaviour changed; two contract files were
+re-pointed at the file that now owns their subject.
+
+**`src/lib/room/recording.ts` (341).** `MediaRecorder`, the preview window, the room-wide
+broadcast that tells everyone else a recording started, and the two speech-recognition calls that
+share the recorder's microphone. Ten functions and four fields.
+
+**Speech recognition travels with the RECORDER, not with the transport**, and the reason is the
+microphone. `RoomMediaTransport` owns the track — acquiring one and producing it into the SFU is a
+single act, which is why that class is one module — but recognition is a second consumer of the
+DEVICE, not of the wire. It starts and stops on the same events the recorder does and writes into
+the caption list rather than onto a producer. Putting it in the transport would have meant a class
+that both publishes media and transcribes it.
+
+**A plain `.ts`, not `.svelte.ts`, and the rename was the point rather than a detail.** The class
+holds no rune: its four fields are a `MediaRecorder`, a chunk list, a `Window` and a teardown
+function, and nothing renders from any of them — what the UI shows comes from `RoomMedia.recording`,
+which this class writes and that class owns. `.svelte.ts` tells the compiler to look for runes and
+tells a reader the module is reactive, so on a module with neither it is a lie. `arrivals.ts` and
+`scroll-follow.ts` sit in `lib/room/` on the same footing, and the size contract already caps
+plain `.ts` modules for exactly this reason.
+
+**Five methods passed by reference, caught by the unbound-method contract rather than by review.**
+`onpauserecording={recording.pauseRecording}` and four siblings were correct as page functions and
+lose `this` as methods. That contract decides from the PROTOTYPE, which is why it found all five at
+once instead of the one somebody happens to click.
+
+**A forward `let` replaced with a `const`, on svelte-check's warning.** The recorder and the
+transport point at each other, and the first draft forward-declared `let recording` — which drew
+"`recording` is updated, but is not declared with `$state(...)`". The warning is right and the fix
+is not a rune: the instance is assigned once. The transport reaches it through ARROWS, which are not
+called during construction, so a `const` declared afterwards is legal and the ordering only has to
+satisfy the compiler — the same shape `screens` and `mediaTransport` already use.
+
+**A generator bug of mine, fixed at the source.** The constructor rewrite matched a field's type
+annotation with `[^=]+`, which stops dead at the `=` inside `=>`. `stopSpeechReco` is
+`(() => void) | null`, so its `let` survived into the class body and TypeScript read it as a
+variable declaration onto a private field. It is a lazy match up to a space-equals-space now, which
+an arrow cannot produce.
+
+**No reactivity test, stated rather than skipped quietly.** The class carries no `$state`, so
+there is no reactive group to assert; the runtime property it does have is the announcement
+sequence, and the negative control run was removing the `wasRecording` guard on the stop broadcast
+— seen red, then restored.
+
+Not verified: no browser run. Nothing here proves a real recorder starts.
+
+### 2026-08-16 15:44 EDT — Phase 5 slice 17: `RoomOverlays.svelte`, the layer above the room
+
+**`+page.svelte` 4,973 → 4,708 (−265).** Suite 2,277 → 2,280 across 154 files. `svelte-check`
+1,176 files, 0 errors, 0 warnings. `eslint` clean on both files.
+**Runtime impact: yes** — 310 lines of the page's template moved. Nothing changed behaviourally;
+three contract files were re-pointed at the file that now owns each subject.
+
+**`src/lib/components/RoomOverlays.svelte` (471).** The modal host, the seven dialog blocks, the
+toast host, the image lightbox, the hidden remote-audio sinks and the "Conected" overlay — the
+largest single template region left after Phase 2 took the five panes out.
+
+**They are one LAYER, not one feature**, and that is the boundary: every node is positioned over the
+room rather than in it, none participates in the split layout, and each is conditional on state the
+page already owns. A reader looking for why a dialog appears now has one file to open.
+
+**Nineteen of the thirty-six props are state classes handed over whole.** `ModalHost` still takes
+its 85, but they are assembled beside it instead of being drilled through the page. Only `modal`
+and `selectedImageUrl` are `$bindable`, because only they are written on the other side — making
+the rest bindable would invent a second writer for state that has exactly one.
+
+**The unions are the children's own, never widened to `string`.** `ModalHost` takes a
+`ModalName`; a component promising `string` to a child expecting a seven-member union moves the
+type error rather than removing it, and makes its own call site uncheckable. Eight prop types were
+corrected this way after svelte-check refused the first draft, including `submitPollAction`, which
+returns `Promise<boolean>` and not `Promise<void>`.
+
+**`SessionControlTab` moved to `$lib/types.ts`.** It was declared in `+page.svelte`, and
+`RoomNavbar.svelte` records why it had not moved: "moving it would be a change to a file this
+extraction is trying to shrink." A second consumer has now arrived and the page is the file being
+shrunk, so that objection is the opposite of true.
+
+**310 lines arrived and 265 left**, and the 45-line difference is the props list. That is what a
+facade boundary costs, and it is why the phase plan costed template savings at ~218 rather than an
+optimistic ~140 — recorded because the arithmetic held.
+
+**Two tooling faults of mine, both fixed at the source.** The component head was held in a template
+literal inside a generator, so its citation's backticks needed three levels of escaping — it is a
+plain `.txt` file now, the same fix slice 4 made for the same reason. And the region bounds were
+hardcoded line numbers, which the `SessionControlTab` move silently shifted; both the builder and
+the rewirer find their own bounds by marker now.
+
+Not verified: no browser run. The dialogs are asserted as source against the reference bundle by the
+contract files that own them; nothing here proves one opens in a real room.
+
+### 2026-08-16 15:32 EDT — Phase 5 slice 5: `RoomEventStream`, and a contract that could never have failed
+
+**`+page.svelte` 5,635 → 4,979 (−656), under 5,000 for the first time.** Suite 2,266 → 2,277 across
+154 files. `svelte-check` 1,175 files, 0 errors, 0 warnings. **`eslint` on the page: 13 → 0.**
+**Runtime impact: yes** — the room's realtime channel moved. No behaviour changed; ten contract
+files were re-pointed at the file that owns each subject.
+
+**`src/lib/room/events.svelte.ts` (864 — 351 code, 468 citation).** `subscribeToRoomEvents` was
+575 lines, the largest single function left after slice 4, and the browser-side geolocation travels
+with it because the page starts and stops both at the same two moments.
+
+**It is a ROUTER and owns almost nothing**, which is the shape rather than an accident: fourteen
+collaborators injected, four fields travelling, and all four describe the CONNECTION rather than the
+room. A frame about a poll answer does not teach this class what a poll is — it calls
+`invalidateAll()` and the loader decides. Hence 351 code lines under 468 of transcription.
+
+**Three collaborators arrive as the NARROW SURFACE the stream calls, not as their whole class.**
+`RoomRoster`, `RoomPrivateChat` and `RoomUserActions` are each generic over a user shape and this
+router reads none of it — it hands the roster a list it never inspects, the private chat one message,
+and reads a single boolean off a follow style. Threading three unrelated type parameters through a
+class that reads no field of any of them would have made the signature describe work the file does
+not do, and would have made the router untestable without the whole object graph.
+
+**`createSubscriber` was evaluated here and REJECTED — the opposite of what the phase plan
+proposed, so the reason is recorded rather than the conclusion.** `roomEventsConnected` is a getter
+over an external source and was the one honest candidate in the file. The docs decide it: *"the
+returned teardown function will only be called when all effects are destroyed."* Correct for
+`MediaQuery`, whose `matchMedia` is free to re-create; wrong here, because it would tie the life
+of the room's realtime connection to whether anything happens to be reading the sidebar's indicator.
+The stream must run whether or not anyone is watching the light.
+
+**A CONTRACT THAT COULD NEVER HAVE FAILED, and the divergence it was hiding.**
+`visibility-change-contract` asserted "the gate is AFTER the mention path, so a mention still
+reaches you" by comparing the SOURCE POSITION of the hidden-tab gate against the position of
+`mentionArrivals.fresh(`. Two things are wrong with that. Where an `$effect` is DECLARED says
+nothing about when it RUNS. And the effect reads `data.messages`, which only changes when the
+loader runs — exactly what the gate's early return skips. **So on a hidden tab a mention is deferred
+to the catch-up, not delivered**, and the comment on the gate ("the MENTION path above has already
+run") described an ordering that does not exist: there is no mention branch on that handler.
+
+Moving the handler into another file is what exposed it — a cross-file index comparison is obviously
+meaningless where the same comparison inside one file had looked like a check. **The behaviour is
+unchanged by this slice.** The comment now says what the code does, the test now asserts what IS
+ordered in execution (the chat ding runs before the return, so a followed user is still heard on a
+hidden tab), and the divergence is written up in `TODO.md` — closing it honestly needs the SERVER
+to decide "this is a mention of you", because the chat frame deliberately carries no message text.
+
+**Thirteen dead imports removed from the page, and a correction to yesterday's entry.** Ten of them
+(`untrack`, `SvelteMap`, `ScreenTab`, `legacyUserId`, `ProducerInfo`, `captureErrorMessage`,
+`captureErrorName`, `mediaCaptureErrorMessage`, `permissionForCapture`, `MediaCaptureKind`)
+were left behind by **slice 4**, whose entry above says "eslint at the pre-existing 27". That was
+checked on the new module and not on the page, and it was wrong: the page went from 0 to 10. All
+thirteen are gone and the page now lints clean.
+
+**A dependency scanner, because slice 4 paid for guessing twice.** `/tmp/deps.mjs` reports, per
+name a slice reads, whether it is a collaborator (declared outside), travelling (declared inside),
+or SHARED (written on both sides — a thunk plus a receiver, never extracted). Validated against
+slice 4's known answer before being trusted on this one. It is what found that `mainTab` and
+`missedChatWhileHidden` are shared and had to cross as receivers.
+
+**`src/lib/room/events.svelte.test.ts` (8 tests).** The class EXECUTED against a stand-in
+`EventSource` — jsdom has none — supplying exactly the three events the class registers, so a
+rename of `open` would not pass. Two reactivity assertions, one per independently reactive group
+(the sidebar indicator and the "Conected" overlay are different elements), plus the RE-connect rule:
+the flash stays down on the first open and rises on the open after a drop. **Three negative controls
+seen red:** both runes demoted, and `chatMissedWhileHidden` removed.
+
+Not verified: no browser run. The eight contract files pin this against the reference bundle and the
+new test executes the connection lifecycle, but nothing here proves a real room receives a frame —
+that remains the owner's report.
+
+### 2026-08-16 15:12 EDT — Phase 5 slice 4: `RoomMediaTransport`, the largest slice of the phase
+
+**`+page.svelte` 6,738 → 5,635 (−1,103).** Suite 2,255 → 2,266 across 153 files.
+`svelte-check` 1,173 files, 0 errors, 0 warnings. `eslint` at the pre-existing 27.
+**Runtime impact: yes** — every media path on the page moved. Nothing changed behaviourally; the
+seven contract files that pin this behaviour against the reference bundle all still pass, and each
+was re-pointed at the file that now owns its subject rather than left matching whatever remained.
+
+**`src/lib/room/media-transport.svelte.ts` (1,416 — 615 code, 699 citation).** The SFU transport:
+the session, the producers this browser publishes, the consumers it subscribes to, and every stream
+on either side. Fifty-one regions moved byte-exact.
+
+`RoomMedia` holds what the UI ASKS FOR; this holds what the wire did about it. That boundary is
+`media.svelte.ts`’s own recorded decision — “STATE moved, TRANSPORT did not” — and this is the
+other half of that sentence rather than a revision of it.
+
+**It is ONE module, and that was measured rather than assumed.** The 800-line backstop refused it,
+correctly, so the seam was looked for before the number was touched. There isn’t one:
+
+- **capture / transport** cuts through `#mediaSession`. Every one of `#enableMicrophone`,
+  `toggleMicrophone`, `toggleWebcam`, `startScreenSharing`, `promptForScreenName`,
+  `stopLocalScreen` and `#addLocalScreen` reads it, because acquiring a track and producing it
+  into the session is one act. The members touching no session state are `#stopStream`,
+  `#setStreamEnabled`, `#reportCaptureError` and `selectedVideoDeviceId` — 67 lines.
+- **local / remote** cuts through `#sharedScreens` and `#screenStreams`, which both paths write.
+  `dropRemoteMedia`’s own citation records what happened the last time two collections holding one
+  truth drifted apart: the room reconnected to silence and a blank tab bar.
+
+**So the BACKSTOP was corrected instead, and it got stricter.** It counted total lines, which in a
+repository that is 49% citation by design pays an author to delete the evidence — strip 620 lines
+from this module and it passed, having become strictly worse. It now counts CODE lines against the
+same 800, so deleting a comment changes the number by nothing at all. Measured, and the reason it
+matters: `split` 724 total / 300 code, `files` 382 / 165, this module 1,416 / 615. A control
+test asserts the counter can tell the two apart, because a scanner silently returning zero would
+make every backstop assertion vacuous.
+
+**Four dead collaborators removed, each found by a gate rather than by reading.** `closeMenu`,
+`onSaveDataChanged` and `onCaptureError` came from the dependency scan and had no reader —
+svelte-check found them by refusing the page’s attempt to supply them. `isPresenter` was the
+fourth, found by `no-unused-private-class-members`. Every authority decision in the transport is
+made from `session().user.role` or refused by the server; none of them needed a client-side flag.
+
+**`dropRemoteMedia` became a receiver, not five setters.** The five collections carry one truth
+between them and have to clear together; five public setters would let a caller clear four of them,
+which is precisely the 2026-08-11 defect the method’s citation records.
+
+**`src/lib/room/media-transport.svelte.test.ts` (226).** Seven assertions, one per independently
+reactive group — webcam cards, screen tabs, screen streams, remote audio sinks, the save-data flag —
+plus the receiver invariant. `room-mtx`’s shape: mutate and flush inside `$effect.root`, assert
+outside it. **Four negative controls seen red**, each hitting only its own assertion:
+`#webcamPresenters` demoted to a plain array, `#screenStreams` to a plain `Map`,
+`#sharedScreens` and `#saveData` off their runes. The other five stayed green each time, which
+is the independence the shape exists for.
+
+**One unbound method caught by the contract, not by review.** `onSaveDataChange={setSaveData}` was
+correct as a page function and loses `this` as a method; it is now called rather than passed.
+
+**Two bugs in my own tooling, both mine, both fixed at the source.** The rename guard
+`(?<![\w.#$])` rejected the SPREAD operator — `...screenStream` puts a dot before the name too —
+so three real sites were skipped and only found when svelte-check refused them. And the code-span
+scanner cannot reach a Svelte interpolation inside a QUOTED attribute value, which it reads as a
+string literal; the one site that needed it (`id="msRemAudio-{…}"`) is a whole-line rule with an
+asserted count, the same mechanism `await invalidate(room:data)` needed for the same reason.
+
+Not verified: no browser run. The seven contract files pin this against the reference bundle and the
+new test executes the reactivity, but nothing here proves a real room reconnects — that remains the
+owner’s report.
+
 ### 2026-08-16 12:35 EDT — Phase 5 slice 11: `RoomScreens`, and nine unbound methods in one run
 
 **`+page.svelte` 6,895 → 6,738.** Suite 2,233 → 2,255 across 152 files.

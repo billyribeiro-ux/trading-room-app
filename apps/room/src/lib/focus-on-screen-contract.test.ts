@@ -29,6 +29,7 @@ const BUNDLE = readFileSync(
 );
 const SERVER = readFileSync(new URL('../routes/+page.server.ts', import.meta.url), 'utf8');
 const PAGE = readFileSync(new URL('../routes/+page.svelte', import.meta.url), 'utf8');
+const EVENTS = readFileSync(new URL('./room/events.svelte.ts', import.meta.url), 'utf8');
 /*
   Added 2026-08-15: both actions became remote commands in `presenter-commands.remote.ts`. The
   assertions below were re-pointed in the same commit, not deleted — and the one that matters most
@@ -62,6 +63,7 @@ const serverCode = stripComments(SERVER);
 */
 const screensModule = readFileSync(new URL('room/screens.svelte.ts', import.meta.url), 'utf8');
 const pageCode = stripComments(PAGE);
+const eventsCode = stripComments(EVENTS);
 const remoteCode = stripComments(REMOTE);
 
 /*
@@ -189,9 +191,10 @@ describe('the client', () => {
       `selectScreenTabOfId` honours `lockedScreenId`; assigning `selectedScreenTab` directly would
       drag a member off a screen they deliberately locked.
     */
-    expect(pageCode).toContain("if (command?.cmd === 'focusOnScreen') {");
-    expect(pageCode).toContain(
-      "if (typeof command.screenId === 'string') selectScreenTabOfId(command.screenId);"
+    // The dispatch moved to `RoomEventStream` in slice 5; the viewer it calls stayed put.
+    expect(eventsCode).toContain("if (command?.cmd === 'focusOnScreen') {");
+    expect(eventsCode).toContain(
+      "if (typeof command.screenId === 'string')\n            this.#mediaTransport.selectScreenTabOfId(command.screenId);"
     );
   });
 

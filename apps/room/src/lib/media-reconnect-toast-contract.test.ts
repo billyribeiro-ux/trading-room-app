@@ -24,20 +24,25 @@ import { describe, expect, it } from 'vitest';
 
 const cwd = process.cwd();
 const BUNDLE = readFileSync(resolve(cwd, 'docs/source/main.d6d3c112b59b7d0d.js'), 'utf8');
-const PAGE = readFileSync(resolve(cwd, 'src/routes/+page.svelte'), 'utf8');
 /*
-  TWO SOURCE CONSTANTS since 2026-08-16, because this control is now split across two files and
-  saying so is the point.
+  TWO SOURCE CONSTANTS since 2026-08-16, because this control is split across two files and saying
+  so is the point.
 
   The QUEUE — how a toast is raised, whether it expires, what `show` hands back — moved to
-  `RoomToasts` in Phase 5 slice 1. What RAISES these two particular toasts did not: they are raised
-  by `mediaServerDisconnected` and cleared by `mediaServerConnected`, both of which are media
-  transport and stay in the page until slice 4.
+  `RoomToasts` in Phase 5 slice 1. What RAISES these two particular toasts moved in slice 4: they
+  are raised by `mediaServerDisconnected` and cleared by `mediaServerConnected`, and both are media
+  transport, so both are now `RoomMediaTransport.serverDisconnected` / `.serverConnected`.
+
+  The block that stood here until then said they "stay in the page until slice 4", and the
+  re-pointing below is that sentence coming due rather than a new decision. It was found by the
+  test failing with its own message — "`mediaServerConnected` has left the page, re-point this at
+  the file that owns it" — which is the whole reason that message was written into the assertion.
 
   So each assertion below points at the file that owns its subject, and the hand-off between them is
-  asserted as well rather than assumed. A page that called a method the class does not define, or a
-  class whose method the page never calls, would otherwise pass every individual expectation here.
+  asserted as well rather than assumed. A caller invoking a method the class does not define, or a
+  class whose method nothing calls, would otherwise pass every individual expectation here.
 */
+const TRANSPORT = readFileSync(resolve(cwd, 'src/lib/room/media-transport.svelte.ts'), 'utf8');
 const TOASTS = readFileSync(resolve(cwd, 'src/lib/room/toasts.svelte.ts'), 'utf8');
 
 /* Comments stripped: the page quotes the bundle in its own docblock, and a test reading the raw
@@ -48,7 +53,7 @@ const stripComments = (source: string) =>
     .replace(/\/\*[\s\S]*?\*\//g, '')
     .replace(/^\s*\/\/.*$/gm, '');
 
-const code = stripComments(PAGE);
+const code = stripComments(TRANSPORT);
 const queue = stripComments(TOASTS);
 
 describe('the bundle still says what this was built from', () => {
@@ -96,7 +101,7 @@ describe('the member toast matches the captured call', () => {
     */
     const at = BUNDLE.indexOf('Reconnecting to media...');
     expect(BUNDLE.slice(at, at + 220)).toContain('disableTimeOut');
-    expect(code).toContain('if (reconnectToastId === null)');
+    expect(code).toContain('if (this.#reconnectToastId === null)');
     // `0` is this room's spelling of `disableTimeOut` — see `RoomToasts.show`.
     const raise = code.slice(code.indexOf("title: 'Media'"));
     expect(raise.slice(0, 400)).toMatch(/\n\s*0\n\s*\)/);
@@ -109,8 +114,10 @@ describe('the presenter toast matches, including being undismissable', () => {
     const at = BUNDLE.indexOf('Reconnecting media (presenter)');
     expect(BUNDLE.slice(at - 220, at)).toContain('liveMicTrack');
     expect(code).toContain('const holdsLiveTrack = Boolean(');
-    expect(code).toContain('localMicProducerId || webcamStream || localScreenStreams.size > 0');
-    expect(code).toContain('if (holdsLiveTrack && presenterReconnectToastId === null)');
+    expect(code).toContain(
+      'this.#localMicProducerId || this.#webcamStream || this.#localScreenStreams.size > 0'
+    );
+    expect(code).toContain('if (holdsLiveTrack && this.#presenterReconnectToastId === null)');
   });
 
   it('carries the Presenter title and plain text', () => {
@@ -149,20 +156,20 @@ describe('both are cleared by the event that makes them false', () => {
     // Defined once, and that once is the definition itself.
     expect((BUNDLE.match(/clearReconnectToasts/g) ?? []).length).toBe(1);
 
-    const at = code.indexOf('function mediaServerConnected');
+    const at = code.indexOf('serverConnected(');
     // Positive first: a slice that moves this handler must fail here rather than slicing from -1
     // and asserting against the whole rest of the file, which is how `chat-mode-contract` went
     // green against an end marker that had ceased to exist.
     expect(
       at,
-      'mediaServerConnected has left the page - re-point this at the file that owns it'
+      'serverConnected has left the transport - re-point this at the file that owns it'
     ).toBeGreaterThan(-1);
 
     const connected = code.slice(at);
-    expect(connected.slice(0, 700)).toContain('toasts.dismiss(reconnectToastId)');
-    expect(connected.slice(0, 700)).toContain('toasts.dismiss(presenterReconnectToastId)');
-    expect(connected.slice(0, 700)).toContain('reconnectToastId = null');
-    expect(connected.slice(0, 700)).toContain('presenterReconnectToastId = null');
+    expect(connected.slice(0, 700)).toContain('this.#toasts.dismiss(this.#reconnectToastId)');
+    expect(connected.slice(0, 700)).toContain('this.#toasts.dismiss(this.#presenterReconnectToastId)');
+    expect(connected.slice(0, 700)).toContain('this.#reconnectToastId = null');
+    expect(connected.slice(0, 700)).toContain('this.#presenterReconnectToastId = null');
   });
 
   it('a sticky toast is never handed to the removal timer', () => {
@@ -186,9 +193,16 @@ describe('both are cleared by the event that makes them false', () => {
       re-pointed constant would otherwise hide - `presenterCommand` was posted to a removed action
       for three commits on precisely this shape.
     */
-    expect(code, 'the page no longer constructs the queue it dismisses toasts on').toContain(
+    // THREE files now, so the chain is asserted link by link: the page builds the queue, hands it
+    // to the transport, and the transport calls methods the queue actually defines.
+    const page = stripComments(readFileSync(resolve(cwd, 'src/routes/+page.svelte'), 'utf8'));
+    expect(page, 'the page no longer constructs the queue it dismisses toasts on').toContain(
       'new RoomToasts()'
     );
+    expect(page, 'the page no longer hands the queue to the transport').toMatch(
+      /new RoomMediaTransport\(\{[^}]*\btoasts\b/
+    );
+    expect(code, 'the transport no longer receives a queue').toContain('toasts: RoomToasts;');
     for (const method of ['dismiss(', 'show(', 'dismissMatching(']) {
       expect(queue, `RoomToasts does not define ${method}`).toContain(`  ${method}`);
     }

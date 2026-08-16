@@ -27,6 +27,9 @@ const stripComments = (source: string) =>
 
 const commandCode = stripComments(COMMAND);
 const pageCode = stripComments(PAGE);
+const recorderCode = stripComments(
+  readFileSync(new URL('./room/recording.ts', import.meta.url), 'utf8')
+);
 const serverCode = stripComments(SERVER);
 
 describe('the command', () => {
@@ -93,9 +96,9 @@ describe('the page announces rather than inferring', () => {
       promise that can reject is an unhandled rejection, and a dropped one is the swallowed catch
       this repository forbids — so the catch is inside the wrapper, once, and it LOGS.
     */
-    const from = pageCode.indexOf('async function broadcastRecordingState(');
+    const from = recorderCode.indexOf('async #broadcastRecordingState(');
     expect(from, 'the wrapper must exist').toBeGreaterThan(-1);
-    const wrapper = pageCode.slice(from, pageCode.indexOf('\n  }', from));
+    const wrapper = recorderCode.slice(from, recorderCode.indexOf('\n  }', from));
     expect(wrapper).toContain('await recordingState({ cmd, recName });');
     expect(wrapper).toContain("console.error('recordingState', cmd, error);");
     expect(wrapper).not.toContain("fetch('?/recordingState'");
@@ -107,18 +110,20 @@ describe('the page announces rather than inferring', () => {
       client. A typo at a call site is now a compile error instead of a 400 nobody sees, and the
       allow-list has exactly one home.
     */
-    expect(pageCode).toContain(
+    expect(recorderCode).toContain(
       "type RecordingTransition = Parameters<typeof recordingState>[0]['cmd'];"
     );
-    expect(pageCode).toContain('async function broadcastRecordingState(cmd: RecordingTransition');
+    expect(recorderCode).toContain('async #broadcastRecordingState(cmd: RecordingTransition');
   });
 
   it('every transition the recorder makes is announced', () => {
     // The badge and its pause state are driven entirely by these; a missed one desyncs the room.
-    expect(pageCode).toContain("void broadcastRecordingState('startRec'");
-    expect(pageCode).toContain("void broadcastRecordingState('stopRec')");
-    expect(pageCode).toContain("void broadcastRecordingState('pauseRec')");
-    expect(pageCode).toContain("void broadcastRecordingState('resumeRec')");
+    expect(recorderCode).toMatch(
+      /void this\.#broadcastRecordingState\(\s*'startRec'/
+    );
+    expect(recorderCode).toContain("void this.#broadcastRecordingState('stopRec')");
+    expect(recorderCode).toContain("void this.#broadcastRecordingState('pauseRec')");
+    expect(recorderCode).toContain("void this.#broadcastRecordingState('resumeRec')");
   });
 
   it('and a stop is announced only when a start was', () => {
@@ -126,6 +131,8 @@ describe('the page announces rather than inferring', () => {
       `stopScreenSharing()` calls `stopRecording()` unconditionally, so an unguarded announcement
       would clear the badge for a room that is still recording.
     */
-    expect(pageCode).toContain("if (wasRecording) void broadcastRecordingState('stopRec');");
+    expect(recorderCode).toContain(
+      "if (wasRecording) void this.#broadcastRecordingState('stopRec');"
+    );
   });
 });

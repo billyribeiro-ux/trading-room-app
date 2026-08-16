@@ -26,6 +26,24 @@ export function isChatTab(value: string): value is ChatTab {
 export type SettingsTab = 'app' | 'alerts' | 'chat' | 'presenter';
 export type AlertTab = 'text' | 'url' | 'media';
 
+/**
+ * The Session Control modal's seven tabs.
+ *
+ * Declared here since 2026-08-16 because a SECOND consumer arrived. It lived in `+page.svelte`
+ * until `RoomOverlays.svelte` took the modal host, and `RoomNavbar.svelte` records the reason it
+ * had not moved before: "moving it would be a change to a file this extraction is trying to
+ * shrink." That objection is now the opposite of true — the page is the file being shrunk, and a
+ * type two components share does not belong in either of them.
+ */
+export type SessionControlTab =
+  | 'reset-session'
+  | 'close-session'
+  | 'lock-session'
+  | 'av-device-selection'
+  | 'streaming-selection'
+  | 'session-history'
+  | 'webinar-tools';
+
 export interface FollowChatStyle {
   color: string;
   tickerColor: string;

@@ -51,8 +51,13 @@ describe('alert and sound source contract', () => {
   needs an EventSource, a room config and a live SSE frame to execute.
 */
 describe('the sound on an incoming chat message', () => {
-  const page = readFileSync(new URL('../routes/+page.svelte', import.meta.url), 'utf8');
-  const code = page.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+  const events = readFileSync(new URL('./room/events.svelte.ts', import.meta.url), 'utf8');
+  /*
+    The ROUTER, not the page: the chat channel's ding moved with `subscribeToRoomEvents` in
+    Phase 5 slice 5, and so did the `senderId` guard above it that makes it unreachable for your
+    own post. Both assertions below depend on their relative ORDER, so they have to read one file.
+  */
+  const code = events.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
   /*
     The end marker is searched FROM the start position, not from the beginning of the file.
 
@@ -60,13 +65,13 @@ describe('the sound on an incoming chat message', () => {
     elsewhere in the dispatch — so the slice came out empty and three assertions failed against
     code that was correct. A test that slices source has to anchor both ends.
   */
-  const start = code.indexOf("payload.channel === 'chat' && !prefs.doNotDisturbOn");
+  const start = code.indexOf("payload.channel === 'chat' && !this.#prefs.doNotDisturbOn");
   const block = code.slice(start, code.indexOf('void invalidateAll()', start));
 
   it('is gated on do-not-disturb AND the chat-sound preference', () => {
     // The reference's outer condition, both halves. Dropping either makes the room noisy for
     // somebody who explicitly asked it not to be.
-    expect(block).toContain('!prefs.doNotDisturbOn && prefs.chatSoundOn');
+    expect(block).toContain('!this.#prefs.doNotDisturbOn && this.#prefs.chatSoundOn');
   });
 
   it('plays `pling` for a FOLLOWED user and `followed` for everyone else', () => {
@@ -91,7 +96,7 @@ describe('the sound on an incoming chat message', () => {
   it('never fires for your own message', () => {
     // The reference compares `hashEmail(user.email) !== e.avt`. Here the senderId guard above the
     // block already returns, so the sound is unreachable for your own post.
-    const dispatch = code.slice(code.indexOf('payload.data?.senderId === data.user.id'));
+    const dispatch = code.slice(code.indexOf('payload.data?.senderId === this.#session().user.id'));
     expect(dispatch.indexOf('return;')).toBeLessThan(
       dispatch.indexOf("payload.channel === 'chat'")
     );
