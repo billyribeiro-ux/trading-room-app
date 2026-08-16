@@ -1,6 +1,29 @@
 # todo-next — the room audit, the v4 corpus decision, and the owner's 2026-08-16 requirements
 
-# ⛔ THE DUMPS ARE BEING DELETED. WRITE VALUES, NOT LOCATIONS.
+# ⏳ THE DUMPS ARE **NOT** BEING DELETED YET — that happens AFTER the implementation phases.
+
+**Owner clarification, 2026-08-16:** *"we're not removing anything right now. That will only get
+done after we finish the implementation phases."*
+
+**Read this before the block below, because it changes what that block means.** The deletion is
+real, but it is **downstream of implementation, not a deadline hanging over it.** Three consequences:
+
+1. **Do NOT prioritise the reading queue by deletion risk.** §16.10's register (11 evidence dirs,
+   37 `.less` files with no repo counterpart) stays true and stays useful — but it is a
+   *pre-deletion checklist for later*, **not** a reason to read `account-page` before something that
+   unblocks a phase. **Priority is implementation value.** Nothing is disappearing this week.
+2. **Nothing gets copied into the repo yet.** §16.10's three tiers are a recommendation for the
+   moment the owner decides to delete. Acting on them now would add ~585 KB to a git-tracked
+   fintech repo to solve a problem that does not exist yet.
+3. **The transcription already done was not wasted, and the discipline stands.** §16.8, §16.11 and
+   §16.12 transcribe their evidence verbatim, which is worth having regardless — a value written
+   into this file is one the next reader does not have to re-derive from a 3 MB capture. **Keep
+   transcribing values rather than bare offsets**, because it is better documentation, not because
+   the source is about to vanish. Offsets into git-tracked files (§16.7) are permanent either way.
+
+---
+
+# ⛔ WHEN THAT TIME COMES: WRITE VALUES, NOT LOCATIONS.
 
 **Owner plan, 2026-08-16: *"as soon as we close all the gaps and implementation i will get rid of
 every single node dump, file reference and everything else and then get a fresh pull to then audit
@@ -58,6 +81,11 @@ or the owner. **Apply rule 6 to every item — check our source before recording
 
 **Then run the audit twice**, per the owner: re-verify every gap claim in **both** directions
 (present in reference / absent from our source), and diff the second pass against the first.
+
+⚠️ **ORDERING, per the 2026-08-16 clarification at the top of this file.** The queue above is
+ordered by *what unblocks implementation*, not by what is at risk of deletion — deletion happens
+after the implementation phases, so `account-page` and the 37 `.less` sources are not urgent merely
+for being uncopied. **The fresh pull is still the second audit**, and it still comes last.
 
 **Do NOT re-read:** `app.min.js` (§6, all 17 lines), `evidence-page.manageSession.html` (§8, all
 2,718), `api-post-routes.md` (§13, all 729), `missing-commands-triage.md` (§11/§12),
@@ -5824,3 +5852,327 @@ most likely to contain something missing contains nothing missing at all.
 ⚠️ **It is still a §16.10 tier-1 copy-in candidate.** 16 KB, no PII, cited by name in the standing
 instructions, and the *only* record of the 30-empty-row striping behaviour in its original form.
 This section transcribes it; the file itself is still worth keeping.
+
+---
+
+## §16.12 — ⭐ `start-up/start-up-login` + `q&a/*` READ IN FULL. **REAL GAPS FOUND — five in the v4 login form, one Q&A control.**
+
+**2026-08-16.** Two more §16.10 at-risk artefacts (3,532 B and 6,624 B), read end to end and
+transcribed here so they survive the deletion. **Unlike §16.11, these are NOT fully consumed.**
+
+### The reference login form — `start-up/start-up-login`, rendered v4 DOM, transcribed
+
+Container and heading:
+```html
+<div class="row login-row">
+  <div class="col-md-6 offset-md-3 col-sm-6 offset-sm-3 col-xs-12 login-form-container animated fadeInRight faster">
+    <h1 class="room-title"> Welcome to the Room 3625 </h1><!---->
+    <p class="text-center authenticate-info">Please complete this form:</p>
+    <form novalidate class="mb-3 login-form">
+```
+Avatar block:
+```html
+<div class="loginGravatar"><div class="text-center user-avatar">
+  <img src="https://www.gravatar.com/avatar/6ee71e550a8c162767abf7d2dc8eea84?d=mm">
+  <span title="Setup Avatar" class="setup-avatar"><i class="fas fa-cog"></i></span>
+  <div class="user-nick">@Billy Ribeiro</div>
+</div></div>
+```
+Fields, footer row and links:
+```html
+<label for="login-nickname-new">Name</label>
+<input type="text" id="login-nickname-new" name="login-nickname-new" placeholder="Name or Nickname"
+       aria-label="Name" aria-describedby="nickHelpBlock" class="form-control">
+<span id="addon-admin" class="input-group-text pl-2 pr-2"><i class="fas fa-user"></i></span>
+
+<label for="login-email">Email</label>
+<input type="email" id="login-email" name="login-email" placeholder="Email"
+       aria-label="email" aria-describedby="addon-email" class="form-control" disabled="">
+<span id="addon-email" class="input-group-text pl-2 pr-2"><i class="fas fa-envelope"></i></span>
+
+<div class="error text-danger small"></div>
+<div class="d-flex p-2 justify-content-between mt-3 align-items-center">
+  <div class="form-check">
+    <input type="checkbox" id="remember-me" class="form-check-input">
+    <label for="remember-me" class="form-check-label">Keep me logged in</label>
+  </div>
+  <div><button type="submit" class="btn-login btn btn-primary buttonload text-center pl-2 pr-2"><span>Login</span></button></div>
+</div>
+<div class="mt-1 text-right"><a class="session-login-link">Not you? clear form</a></div>
+<div class="mt-3 t text-center"><a class="session-login-link">Have a password?<br>Click here</a></div>
+
+<div class="login-footer">
+  <p class="text-center"> Powered by: <a href="https://protradingroom.com" target="_blank">ProTradingRoom.com</a></p>
+  <p class="text-center"> Version: v4.0.1-61268ec1 </p>
+</div>
+```
+
+### ⛔ FIVE CONFIRMED GAPS — both halves of rule 6 proven
+
+Present in the capture above (READ, not searched); count over `apps/room/src` on the right. **A zero
+here is over OUR OWN SOURCE, which is what rule 6b permits** — it is not a zero from a rendered state.
+
+| # | missing from `apps/room/src/routes/session/+page.svelte` | our count |
+|---|---|---|
+| **L-1** | `<p class="text-center authenticate-info">Please complete this form:</p>` | **`authenticate-info` = 0** |
+| **L-2** | the **"Keep me logged in" checkbox UI** — `<div class="form-check"><input type="checkbox" id="remember-me" class="form-check-input"><label for="remember-me" class="form-check-label">` | **`remember-me` = 0.** ⚠️ The *behaviour* exists server-side (`lib/server/auth.ts:94`, `lib/server/connection.ts:134` both name it in comments) — **so this is a control with no UI, the exact inverse of a UI with no consumer** |
+| **L-3** | `<div class="mt-1 text-right"><a class="session-login-link">Not you? clear form</a></div>` | **`session-login-link` = 0**, `Not you? clear form` = 0 |
+| **L-4** | `<div class="mt-3 t text-center"><a class="session-login-link">Have a password?<br>Click here</a></div>` — note the **stray single-letter class `t`** | `Have a password` = 0 |
+| **L-5** | the centering offsets `offset-md-3 offset-sm-3` with `col-sm-6` | **`offset-md-3` appears ONLY inside bundled CSS, in no template** — ours is `col-md-6 col-sm-12 col-xs-12`, uncentered |
+
+### ⚠️ TWO DIVERGENCES I CANNOT RESOLVE — do not "fix" either without reading the bundle first
+
+**D-1 — where `room-title` lives, and whether there are two layouts.** The capture puts
+`<h1 class="room-title">` **inside** `.login-form-container`, with **no left column at all** and the
+single column centered by `offset-md-3 offset-sm-3`. Ours (`+page.svelte:82-87`) renders a **separate
+left column** `col-md-6 col-sm-6 d-xs-none animated fadeInLeft faster room-message` holding the `h1`,
+citing bundle **const 33/34/36**. Both cannot be one template unless the reference branches. The
+`<!---->` immediately after the `h1` in the capture is an Angular conditional marker, which is
+consistent with a branch. **Rule 4 says rendered DOM outranks the bundle** — but ours cites the
+bundle and this capture is one render, so the honest reading is *there are probably two layouts and
+we implemented the other one.* **Resolve by reading bundle consts 33–36 before touching it.**
+
+**D-2 — `.user-nick`.** Capture: `<div class="user-nick">@Billy Ribeiro</div>` — no `text-center`,
+content is `@` + the **nickname**. Ours (`:132`): `<div class="user-nick text-center">{data.email}</div>`
+— an extra class, and it renders the **email**. Two differences in one element. **Not filed as a
+defect** because I have not read what const 70 binds; filed as a divergence to check.
+
+### `q&a/answer` — the Q&A ask button, transcribed, and one more gap
+
+```html
+<button title="Ask a question" class="btn btn-sm btn-secondary me-1 alert-qa">
+  <span class="me-1 ng-star-inserted"> (2) </span><!---->
+  <i class="fas fa-question-circle"></i>
+  <span class="ng-star-inserted"> ✅</span><!---->
+</button>
+<span class="created-at mr-2">7/30/26, 2:01 PM</span>
+```
+
+- **Q-1: `alert-qa` = 0 in `apps/room/src`.** The only `alert-qa` hits are the component TAG
+  `app-alert-qa-modal` (`direct-evidence-contract.ts:28`, the generated CSS, an `app.css` comment) —
+  **the modal is known; this ASK BUTTON is not built.**
+- The unanswered/answered states are two independent `ng-star-inserted` spans: a **count `" (2) "`**
+  (parenthesised, space either side) and a **`" ✅"`** (leading space) — so a question can show a
+  count, a tick, both, or neither.
+- ⭐ **`me-1` and `mr-2` appear on sibling elements** — Bootstrap **5** and Bootstrap **4** spacing
+  utilities in the same subtree. Recorded because "normalising" them to one generation would be a
+  silent visual change, and it is the room's own markup doing it, not a capture artefact.
+- Date format `7/30/26, 2:01 PM` = Angular `date:'short'` (`M/d/yy, h:mm a`) — **distinct from the
+  Files pane's `date:'medium'`** (§16.11). Two different formats in one app; do not unify them.
+
+### Already built — checked, not assumed (rule 6)
+
+`v4.0.1-61268ec1` is already pinned in `lib/dump-contract.ts:37`. `login-nickname-new`, `addon-admin`,
+`nickHelpBlock`, `addon-email`, `room-title`, `login-form-container`, `loginGravatar`,
+`text-center user-avatar`, `btn-login btn btn-primary buttonload text-center pl-2 pr-2`,
+`login-footer`, `Powered by`, `?d=mm` and the `mb-3 login-form` form are all present, and
+`lib/session-login-contract.test.ts` pins several of them. **The gaps above are the residue after
+that check, not a first impression.**
+
+---
+
+## §16.13 — ✅ SIX OF THE §16.12 ITEMS CLOSED IN CODE. Both divergences resolved from the bundle — one of them was a shipped guess.
+
+**2026-08-16 11:15 EDT.** Not recorded as gaps this time — **built**, with tests, negative controls run.
+
+### Both divergences RESOLVED — read, not inferred
+
+**D-1 — there are TWO layouts, and both are real.** Read verbatim:
+```js
+function Wde(t,n){if(1&t&&(d(0,"div",7)(1,"div",33),H(2,vde,2,1,"h1",34),T(3,"di…   // two-column
+```
+const 7 `[1,"row","login-row"]` → const 33 `[…,"room-message"]` → const 34 `[1,"room-title"]`.
+**That is exactly what we ship.** The capture shows the OTHER branch — const
+`[1,"col-md-6","offset-md-3","col-sm-6","offset-sm-3","col-xs-12","login-form-container",…]`, whose
+view `bue` renders the `h1` INSIDE the form container:
+`H(0,eue,2,1,"h1",34),d(1,"p",63),v(2,"Please complete this form:"),u(),d(3,"form",64)`.
+**Our implementation was never wrong.** ⚠️ **The condition selecting between the two is still
+unread** — see the open list below.
+
+**D-2 — a shipped guess, now corrected.** const 70 is `[1,"user-nick"]` — **one class** — and the
+component's own scoped CSS is `.user-nick{font-style:italic;font-size:15px;margin-left:0}`, **no
+`text-align` at all**. We shipped `class="user-nick text-center"` rendering `data.email`. The
+reference renders `@` + `e.nick`, guarded by `O(9,e.nick?9:-1)`. Both halves fixed.
+
+### The handlers, read rather than invented
+
+```js
+doLoginFormClear(){"jwt"==this.authMode&&(this.readOnlyEmail=!1),
+  this.appService.clearSavedToken(this.appService.globals.sessionID),
+  this.nick="",this.email="",this.pw="",this.phoneNumber="",
+  …savePreferences(),window.location.reload()}                        // byte 1,199,998
+function gue(…){…x("click",function(){return D(e),E(g(4).showPresenter=!0)}),
+  d(1,"a",113),v(2,"Have a password?"),T(3,"br"),v(4,"Click here")}
+function mue(t,n){1&t&&(d(0,"span"),v(1," Connecting "),T(2,"i",110),u())}
+function pue(…){…Ve("ngModelChange",…s.rememberMe=o…),d(2,"label",108),v(3,"Keep me logged in")}
+```
+
+⭐ **`mue` was a defect nobody had filed:** the busy label is **" Connecting "**, not "Login".
+Slots 27/28 swap the whole word on `globals.logginIn`, not just the spinner. We rendered "Login".
+
+⭐ **L-2 was worse than "missing UI".** `setSessionCookie` has **always** branched
+`THIRTY_DAYS : ONE_DAY` on its `remember` argument — and `+page.server.ts:322` passed a **hardcoded
+`false`**. The server half was complete and the switch that drives it did not exist, so **every
+session was capped at one day regardless**. Checkbox added, posted as `name="remember"`, read.
+
+### Closed
+
+| | what | where |
+|---|---|---|
+| **L-1** ✅ | `<p class="text-center authenticate-info">Please complete this form:</p>` | const 63, `bue` |
+| **L-2** ✅ | remember-me checkbox **+ the cookie-lifetime wire** | `pue`, `auth.ts:88-99` |
+| **L-3** ✅ | "Not you? clear form" → identity cleared, room kept | `doLoginFormClear` |
+| **L-4** ✅ | "Have a password?<br>Click here" → reveals the password field | `gue` |
+| **D-2** ✅ | `.user-nick` — class and content | const 70 + component CSS |
+| **+1** ✅ | " Connecting " busy label | `mue` |
+
+Two deliberate departures, both stated in the code: the reference's bare `<a>` with a click handler
+became a `<button type="button">` carrying the same class list (an anchor with no href is not
+keyboard-operable, and semantic accessible HTML is this repository's floor); and `clearForm` drops
+`jwtSite`/`name`/`email` from the query while keeping `id`, because our token rides the URL where the
+reference's rides a service — **the same act against a different transport.**
+
+**Verified:** `svelte-autofixer` → `issues: []`. `svelte-check` → **0 errors in this file** (6 remain
+in `lib/room/private-chat.svelte.ts`, the concurrent session's work, untouched here).
+`session-login-contract.test.ts` **12 → 20 tests, all passing**. **Negative controls RUN AND SEEN
+RED:** restoring the hardcoded `false` and re-adding `text-center` failed exactly the two guards
+written for them, 2 failed / 18 passed; both restored, back to 20/20.
+
+### ⛔ STILL OPEN — the honest remainder from this pass
+
+1. **L-5 — the centered layout branch.** Both const entries and both view functions are proven to
+   exist; **the condition that selects between them is NOT read.** Do not guess it.
+2. **Q-1 — the `alert-qa` ask button** (§16.12). Untouched.
+3. ⭐ **NEW, from the const array — five surfaces this page does not have at all:** the
+   `non-presenter` checkbox labelled **"Non Presenter Admin"** (`_ue`); `avatar-options` with the
+   gravatar links (`https://en.gravatar.com/`, `fas fa-file-upload`,
+   `btn btn-danger btn-sm rounded-pill`); the **forgot-password** view (`forgot-email`,
+   `addon-forgot-email`, recaptcha, `fas fa-paper-plane me-1`); the **change-password** view
+   (`change-password` + `repeat-password` + their addons); and the browser-upgrade notice
+   (firefox/opera links, `btn btn-danger btn-link mb`). **These were found by reading the const
+   array — the capture shows none of them**, which is rule 6b in the other direction.
+
+### §16.13a — L-5 narrowed to a single unread expression (2026-08-16 11:18)
+
+The parent that chooses the layout is **`yue`**, read verbatim at byte 1,187,700:
+
+```js
+function yue(t,n){if(1&t&&(d(0,"div",4)(1,"div",5),
+  H(2,bde,22,1,"div",6)(3,Wde,16,7,"div",7)(4,vue,12,2),u()(),
+  d(5,"div",8)(6,"div",9)…                      // ← the avatar modals follow
+```
+
+Three conditional slots on the login wrapper: **slot 2 = `bde` (const 6)**, **slot 3 = `Wde`
+(const 7 = `row login-row`, the TWO-COLUMN layout we ship)**, **slot 4 = `vue`**. Our own page
+comment already names consts 4/5/7 as `login-wrapper`, `container-fluid`, `row login-row`, so the
+mapping is consistent from both ends.
+
+**What is still unread is one expression:** the `2&t` update block of `yue`, which contains the
+`O(2,…)` / `O(3,…)` / `O(4,…)` selectors deciding which of the three renders. It sits *after* all of
+`yue`'s create code — and that create code is long, because the Gmail-avatar and Facebook-avatar
+modals are inside it (`"Avatar from gmail address"`, `"Enter your Gmail address"`,
+`"Facebook profile image as avatar"`, `"Enter your facebook username"`, with Close/Save buttons).
+
+**Next action, precisely:** slice forward from 1,187,700 until the `if(2&t){` of `yue` and read the
+three `O(...)` calls. **Do not guess the condition** — the two layouts differ in whether a whole
+column exists, so picking wrong swaps the page for every member.
+
+⭐ **Found on the way, and not previously recorded:** the login page owns **two avatar-source
+modals** — Gmail and Facebook — with labels "Enter your Gmail address" and "Enter your facebook
+username" and `Close` / `Save` buttons. That is what `avatar-options` (const, §16.13's open list)
+opens. Neither exists in `apps/room/src`.
+
+### §16.13b — `ngOnInit` read (byte ~1,190,400). One comment I wrote was FALSE; six more facts recorded (2026-08-16 11:22)
+
+Read while slicing forward for L-5's selector. **The selector was not in this region — L-5 stays
+open** — but the component's `ngOnInit` was, and it corrects something I shipped an hour ago.
+
+### ⛔ MY OWN DEFECT, caught by reading rather than by a test
+
+§16.13 shipped `let rememberMe = $state(false)` with the comment *"`pue`'s `ngModelChange` writes
+`rememberMe` and nothing else does, so it starts unchecked."* **The second half is false.**
+`ngOnInit` writes it too:
+
+```js
+if("jwt"!=this.authMode&&!this.appService.globals.passedToken||this.pw)
+  this.appService.globals.preferences&&(this.rememberMe=!0,
+    this.appService.globals.preferences.savedNick&&(this.nick=…savedNick,this.forgetMe=!0),
+    this.appService.globals.preferences.savedEmail&&(this.email=…savedEmail,this.calculateAvatar()),
+    this.appService.globals.preferences.phoneNumber&&(this.phoneNumber=…phoneNumber));
+else if(("jwt"==this.authMode||this.appService.globals.passedToken)&&!this.pw){ … }
+```
+
+**The VALUE is still right and the REASON was wrong**, which is the more dangerous half: `rememberMe=!0`
+sits in the **first arm** — no token, no jwt, restoring saved preferences — and every arrival on this
+page carries a token, so we are always in the **second arm**, which never assigns it. Unchecked is
+correct *for this path*. The comment now says that instead. **This is precisely the failure
+`CLAUDE.md` names — "every comment claiming X still matches the next line" — and I introduced it in
+the same session that quotes the rule.**
+
+### Six facts recorded from the same region, none previously written down
+
+| fact, verbatim | why it matters |
+|---|---|
+| `this.forgetMe=!0` when `preferences.savedNick` exists | **a SECOND flag beside `rememberMe`** — `forgetMe` is not in our source at all |
+| `disableEditingUsername="a"!==decodedPassedToken.perms&&sessData.disableEditingUsername` | **`perms === 'a'` BYPASSES the lock** — an admin can always edit their name. Ours reads `data.disableEditingUsername` with no perms term |
+| `this.email&&e&&(this.readOnlyEmail=!0)` | `readOnlyEmail` is derived from *email AND token both present*, not configured |
+| `isPlayer=decodedPassedToken.isPTRPlayer` | a claim on the token we do not read |
+| `i=window.top===window.self, i&&(…removeUrlParam("tok"))` | ⭐ **the reference STRIPS the token from the URL** when not framed — directly relevant to `clearForm`, which currently drops `jwtSite` only on an explicit click |
+| `bootbox.alert(sessData.loginErrorMsg\|\|"There was an error login in, please try again or contact support",()=>{sessData.loginErrorURL&&(window.location.href=sessData.loginErrorURL)})` | the login-failure message **and redirect**, verbatim including the reference's own "error login in" wording — neither is in our source |
+
+**Also confirmed:** `this.nick=preferences.savedNick`, falling back to `decodedPassedToken.name`, and
+`this.email` falling back to `decodedPassedToken.email` — which is the same `nick`/`email` split
+§16.13 used to fix `.user-nick`, now corroborated from a second site.
+
+### §16.13c — the component's FULL state model, read from its constructor (byte ~1,188,950) — 2026-08-16 11:26
+
+Still hunting L-5's selector; found the class field initializers instead. **This is the spec for the
+whole login component's state**, which is worth more than the selector was.
+
+```js
+this.authMode="reg", this.showPW=!1, this.readOnlyEmail=!1, this.hasSTHelpLink=!0,
+this.strictBrowserMode=!1, this.disclosureDone=!1, this.avatarOptions=!1,
+this.customEnterDisclosure="", this.dataurl=null, this.dataBlob=null,
+this.disableEditingUsername=!1, this.usernameInstructions="", this.forgotPassword=!1,
+this.forgotPasswordStatus=null, this.changePasswordStatus=null, this.roomLoginURL=""
+```
+
+⭐ **`rememberMe` is NOT in this list**, so it initialises `undefined` — falsy. **That independently
+confirms §16.13b's corrected conclusion** (unchecked on the token path) from a second site, which is
+the check I should have done before writing the first version of that comment.
+
+**Six state fields we have no equivalent for**, each gating a surface from §16.13's open list:
+
+| field | default | gates |
+|---|---|---|
+| `strictBrowserMode` | `false` | the **browser-upgrade notice** (firefox/opera links) |
+| `avatarOptions` | `false` | the **avatar-options** block + the Gmail/Facebook modals |
+| `forgotPassword` | `false` | the **forgot-password view** |
+| `forgotPasswordStatus` | `null` | its result banner |
+| `changePasswordStatus` | `null` | the **change-password view**'s result banner |
+| `hasSTHelpLink` | **`true`** | a support/help link — **defaults ON**, so it renders unless turned off |
+
+`dataurl` / `dataBlob` are the avatar upload's in-flight image. `authMode` defaults to **`"reg"`**;
+the four values seen across the component are **`reg`, `jwt`, `sso`, `pw`**.
+
+**Confirmed, not new:** `globalsLoaded` sets `this.showPresenter=sessData.showPasswordField` — which
+is exactly the seed §16.13 built `showPresenter` from, now corroborated.
+
+### ⚠️ CORRECTION to §16.13b — there are TWO login-error paths, not one
+
+§16.13b recorded a single failure path with the fallback string *"There was an error login in,
+please try again or contact support"*. **That is the missing-token branch.** The `loginFailed`
+SUBSCRIPTION is a different site with a different fallback:
+
+```js
+this.appService.appEventBus.subscribe("loginFailed",e=>{
+  this.appService.globals.logginIn=!1,
+  bootbox.alert(this.appService.globals.sessData.loginErrorMsg||e.message,()=>{
+    try{this.appService.globals.sessData.loginErrorURL&&(window.location.href=…loginErrorURL),
+        e.reload&&window.location.reload()}catch{}})})
+```
+
+**`loginErrorMsg || e.message`** — the event's own message, not a literal — and it additionally
+honours **`e.reload`** by reloading the page. Both paths share `loginErrorMsg` and `loginErrorURL`;
+they differ in the fallback and in the reload. **Implementing one and calling it done would drop the
+other**, which is why the distinction is written here rather than left to a reader to notice.

@@ -160,3 +160,84 @@ describe('there is ONE form in the product', () => {
     expect(redirectBlock).not.toContain('HandoffToken');
   });
 });
+
+/*
+  The five controls the rendered v4 capture (`new-room/start-up/start-up-login`) carries and this
+  page did not, plus the two values it carried WRONGLY. Every expectation below cites the view
+  function or const entry it came from, because the capture shows one render and the bundle shows
+  what the template can do — and on `.user-nick` those two disagreed with what we had shipped.
+
+  `stripComments` runs first throughout, so a class named only in an explanatory comment cannot
+  satisfy any of these.
+*/
+describe('the login form controls decoded from the v4 bundle', () => {
+  it('renders the authenticate-info sub-heading between the title and the form', () => {
+    // `bue`: `d(1,"p",63),v(2,"Please complete this form:")`, const 63 = text-center authenticate-info.
+    expect(pageCode).toContain('<p class="text-center authenticate-info">Please complete this form:</p>');
+  });
+
+  it('has the "Keep me logged in" checkbox, and POSTS it', () => {
+    /*
+      `pue`: const 81 form-check, 107 the input bound to `rememberMe`, 108 the label.
+
+      `name="remember"` is asserted because the whole point of this control is that the server reads
+      it. A checkbox that renders and posts nothing is the dead scaffolding this repository forbids.
+    */
+    expect(pageCode).toContain('id="remember-me"');
+    expect(pageCode).toContain('name="remember"');
+    expect(pageCode).toContain('class="form-check-input"');
+    expect(pageCode).toContain('<label for="remember-me" class="form-check-label">Keep me logged in</label>');
+  });
+
+  it('WIRES that checkbox to the cookie lifetime — the half that was missing', () => {
+    /*
+      NEGATIVE CONTROL, and the reason this test exists: `setSessionCookie` has always branched
+      THIRTY_DAYS vs ONE_DAY on its `remember` argument, and the action passed a hardcoded `false`,
+      so every session was capped at a day no matter what the member asked for. Re-introducing the
+      literal is the regression this catches.
+    */
+    expect(serverCode).toContain("form.get('remember') === 'on'");
+    expect(serverCode).not.toContain('createSessionFor(cookies, account.id, false');
+  });
+
+  it('has both session-login-link controls, with the reference texts', () => {
+    // const 84 (click → doLoginFormClear) and `gue` (click → showPresenter = !0), const 113.
+    expect(pageCode).toContain('Not you? clear form');
+    expect(pageCode).toContain('Have a password?<br />Click here');
+    // const 83 `mt-1 text-right` and const 112 `mt-3 t text-center` — the stray `t` is the reference's.
+    expect(pageCode).toContain('<div class="mt-1 text-right">');
+    expect(pageCode).toContain('<div class="mt-3 t text-center">');
+  });
+
+  it('clears the IDENTITY and keeps the ROOM, which is what doLoginFormClear does', () => {
+    /*
+      `doLoginFormClear` passes `globals.sessionID` to `clearSavedToken` — the room survives; only
+      nick/email/pw/phone are blanked. Dropping `id` here would strand the member on a login page
+      that no longer knows which room they were entering.
+    */
+    expect(pageCode).toContain("['jwtSite', 'name', 'email']");
+    expect(pageCode).not.toContain("'jwtSite', 'name', 'email', 'id'");
+  });
+
+  it('reveals the password field on request, not only when the room asks for one', () => {
+    // `gue`'s only effect is `showPresenter = !0`; slot 32 hides the link once it is true.
+    expect(pageCode).toContain('passwordRevealed || data.showPasswordField');
+    expect(pageCode).toContain('{#if !showPresenter}');
+  });
+
+  it('says " Connecting " while submitting, not "Login"', () => {
+    // `mue` is `d(0,"span"),v(1," Connecting "),T(2,"i",110)`. The WORD changes, not just the spinner.
+    expect(pageCode).toContain('Connecting <i class="ml-2 fas fa-spinner fa-spin"></i>');
+  });
+
+  it('does NOT centre the user-nick, and shows the nick rather than the email', () => {
+    /*
+      THE NEGATIVE CONTROL THAT CAUGHT A SHIPPED GUESS. const 70 is `[1,"user-nick"]` — one class —
+      and the component's own CSS is `.user-nick{font-style:italic;font-size:15px;margin-left:0}`
+      with no `text-align` at all. We had shipped `class="user-nick text-center"` rendering
+      `data.email`; the reference renders `@` + `e.nick`, guarded by `O(9, e.nick ? 9 : -1)`.
+    */
+    expect(pageCode).not.toContain('user-nick text-center');
+    expect(pageCode).toContain('<div class="user-nick">@{name}</div>');
+  });
+});

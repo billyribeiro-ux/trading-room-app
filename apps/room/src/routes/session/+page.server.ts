@@ -318,8 +318,16 @@ export const actions: Actions = {
           .returning()
           .get();
 
-    // The room goes on the session, so a reload does not need the query string to remember it.
-    createSessionFor(cookies, account.id, false, shortCode ?? null);
+    /*
+      The room goes on the session, so a reload does not need the query string to remember it.
+
+      The third argument used to be a hardcoded `false`, which quietly capped every session at
+      ONE_DAY. `createSessionFor` → `setSessionCookie` has always branched THIRTY_DAYS vs ONE_DAY on
+      it; what was missing was the switch. The reference's `pue` view binds a checkbox to
+      `rememberMe` and posts it, and that checkbox now exists — so this reads it rather than
+      deciding for the member.
+    */
+    createSessionFor(cookies, account.id, form.get('remember') === 'on', shortCode ?? null);
     redirect(303, shortCode ? `/?room=${encodeURIComponent(shortCode)}` : '/');
   }
 };
