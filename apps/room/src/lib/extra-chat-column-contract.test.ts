@@ -349,6 +349,47 @@ describe('the second column follows its own messages', () => {
     expect(effect).not.toContain('readingHistory: chatScrollingUp');
   });
 
+  it('gets the SAME message chrome as the main column, which the capture requires', () => {
+    /*
+      CLOSED 2026-08-15, and it was a real defect rather than a tidy-up.
+
+      `ExtraChatPane` declared twelve of the sixteen shared props and did NOT declare
+      `usersPublicReply`, `enableReactions`, `enableEditMessage` or `enableEditAlerts` at all, so they
+      fell to their `false` defaults. The same chat message carried a reaction bar and an edit entry
+      in the main column and neither in this one.
+
+      THE CAPTURE SETTLES IT, from the bundle rather than from an opinion about what a second column
+      ought to be. `app-chat` and `app-extra-chat` are declared with the SAME const 212 in the room
+      template, and the message component reads all four gates off the shared service keyed on
+      `logType` alone — never off a per-column input:
+
+        O(19, sessData.enableReactions && "chat" === logType || … ? 19 : -1)
+        sessData.enableEditMessage && "chat" === logType && (this.canEditMessage = …)
+        canPublicReply = "chat" === logType && … && (isPresenter || sessData.usersPublicReply)
+
+      A message here is `logType === "chat"` exactly as one in the main column is. There is no
+      per-column narrowing upstream to reproduce, so passing anything less than the whole chrome is
+      the divergence.
+    */
+    expect(pageCode).toContain('chrome={messageChrome}');
+
+    const component = readFileSync(
+      new URL('./components/ExtraChatPane.svelte', import.meta.url),
+      'utf8'
+    );
+    expect(component).toContain('chrome: RoomMessageChrome;');
+    expect(component).toContain('{...chrome}');
+    // The four that were missing cannot come back as narrowed props without this going red.
+    for (const gate of [
+      'usersPublicReply',
+      'enableReactions',
+      'enableEditMessage',
+      'enableEditAlerts'
+    ]) {
+      expect(component).not.toContain(`${gate}:`);
+    }
+  });
+
   it('has its OWN RoomScrollFollow, not the main column’s', () => {
     /*
       Three instances, one per column. A shared instance would make "a message arrived here" into "a
