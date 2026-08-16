@@ -203,10 +203,14 @@ describe('both columns share one pipeline, and that is the point', () => {
     */
     expect(scrollCode).toContain('void this.loadOlderChatMessages(this.#chat.extraTab, scroller);');
     expect(scrollCode).toContain('hasMoreData: this.#chatPages.hasMore(this.#chat.extraTab),');
-    // ONE instance for both columns, so "keyed by channel rather than by column" is structural.
-    expect(scrollCode).toContain(
-      'if (!this.#extraChatScrollingUp) this.#chatPages.arm(this.#chat.extraTab);'
-    );
+    /*
+      ONE instance for both columns, so "keyed by channel rather than by column" is structural — and
+      that now covers the history RELEASE as well as the re-arm, both keyed by `extraTab`. If this
+      column released by COLUMN rather than by channel it would drop history the main column is
+      still scrolled up into.
+    */
+    expect(scrollCode).toContain('this.#chatPages.arm(this.#chat.extraTab);');
+    expect(scrollCode).toContain('this.#chatPages.releaseHistory(this.#chat.extraTab);');
   });
 
   it('but each column scrolls independently', () => {

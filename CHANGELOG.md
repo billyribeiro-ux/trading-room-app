@@ -24,6 +24,77 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-16
 
+### 2026-08-16 19:55 EDT — `trimFat()`: the unbounded alerts list was a missing HALF of an upstream branch
+
+**Suite 2,389 across 162 files** (+11, one new contract). `svelte-check` 1,192 files, 0 errors,
+0 warnings. All four CI steps green locally.
+**Runtime impact: yes** — a reader who scrolls back to the bottom now releases the history they
+paged in, as the reference does.
+
+`RoomFeeds` has carried a recorded performance finding since Phase 5 slice 9: `visibleAlerts` runs
+six chained passes over `data.alerts` merged with every older page the reader pulled, and nothing
+bounded the second half — it grew for the life of the session and never shrank. At 10,000 alerts
+that is 60,000 operations per render.
+
+**It was not a missing cap. It was a missing half of an expression this room already implemented.**
+Read from `docs/source-v3-2026-08-15/main.99a5781d1d7a7775.js` byte 1,318,297, `app-roomscroller`'s
+scroll handler:
+
+```js
+i.scrollHeight - i.scrollTop <= i.offsetHeight + 20
+  ? (this.isScrollingUp = !1, this.shouldtrimFat = !0, this.hasMoreData = !0,
+     this.currPage > 0 && this.trimFat())
+  : this.isScrollingUp = !0
+```
+
+This room implemented `hasMoreData = !0` — our `arm()` — in all three feed handlers, and never
+implemented `trimFat()`. The re-arm worked perfectly while the held pages accumulated beside it.
+
+**The bound is 50, and the obvious guess was wrong by 250 rows.** `trimFat` emits `trimAlertsLog` /
+`trimChatLog`, and both handlers splice the log back to `globals.chatLogPageSize` — **50** (byte
+1,051,216). `globals.trimLogSize` is **300** and caps the chat log ON ARRIVAL (byte 928,060); it
+says nothing about paged-in history. Two constants, two mechanisms. Reusing the familiar `trimChatLog`
+here would have looked right and been wrong.
+
+**Why clearing the held pages IS that splice.** Upstream keeps one array per log and splices it.
+This room keeps two halves with different lifetimes — `data.alerts`, the server's newest page and
+already bounded server-side, plus the paged-in older pages. Splicing back to one page-size window is
+therefore exactly "drop the held older pages", and the live tail is untouched.
+
+`RoomLogPages.releaseHistory(key)` carries the transcription; `RoomFeedScroll` calls it beside the
+`arm()` it always called, in **all three** handlers, because upstream's `trimFat` is one function
+serving both log types. The extra column releases by CHANNEL, not by column, which is why two
+columns on one channel cannot discard each other's history.
+
+**`currPage > 0` is reproduced and is load-bearing**, not defensive: this runs on every scroll event
+that ends at the bottom, and `$state.raw` compares by reference — an unguarded write would hand
+every reader a new record object per frame for no change at all. The same reason `arm` reads through
+its accessor.
+
+**One inherited race, reproduced rather than quietly improved on.** `trimFat` sets
+`this.loadingMore = !1`, so a request already in flight can land and re-populate what was just
+released. Stated in the method rather than "fixed", because diverging from the capture on a path
+nobody has measured is the larger risk.
+
+**Both halves tested, because four negative controls in this phase came back green on exactly this
+shape** — a receiver nobody calls, a rune nobody reads. `log-pages.svelte.test.ts` proves the
+release drops the rows, resets the page, leaves the OTHER key alone, and is REACTIVE (the half that
+matters: a release that did not notify would leave the six passes iterating released rows).
+`feed-scroll-release-contract.test.ts` proves it is wired in all three handlers, guarded on the way
+down only, and reads the two constants out of the bundle at runtime so a reference that changes
+tomorrow makes this file say so. Negative control seen RED on both halves.
+
+**Two of my own assertions were wrong first** and are recorded in the file rather than smoothed
+over: `compact()` strips whitespace inside string literals too, so quoting across
+`U("Trimming the fat a little")` asserts a string that exists nowhere; and counting `releaseHistory(`
+gave four because the structural `LogPages` interface declares it.
+
+**Three ceilings rose**, each with its measured reason: `log-pages` 173 → 237 (64 lines for a
+seven-line method — the citation is the change), `feed-scroll` 319 → 343, `feeds` 365 → 372. Three
+existing contracts were RE-POINTED, not relaxed: they pinned the old single-line `if`, and now
+assert the re-arm and the release as the pair they are upstream.
+
+
 ### 2026-08-16 19:44 EDT — `$lib` → `#lib`: the room moves to Node subpath imports, and the codemod is reviewed rather than trusted
 
 **`+page.svelte` unchanged at 3,021.** Suite 2,378 across 161 files (+4, one new gate).

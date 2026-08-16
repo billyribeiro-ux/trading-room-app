@@ -305,7 +305,14 @@ describe('the client stops asking at the end of history', () => {
       start of `main` also stopped `off-topic` from ever paging. The reference keeps this state on
       the roomlog component, and it renders one per channel.
     */
-    expect(pageCode).toContain('if (!this.#chatScrollingUp) this.#chatPages.arm(this.#chat.tab);');
+    /*
+      The re-arm, which since 2026-08-16 shares its guard with the history RELEASE — upstream puts
+      both in one expression (`hasMoreData = !0, this.currPage > 0 && this.trimFat()`) and this room
+      had only ever implemented the first. Asserted as the two statements rather than the old single
+      line, so the pair cannot drift apart; `feed-scroll-release-contract.test.ts` owns the release.
+    */
+    expect(pageCode).toContain('this.#chatPages.arm(this.#chat.tab);');
+    expect(pageCode).toContain('if (!this.#chatScrollingUp) {');
     // PER CHANNEL is now structural: `arm` takes the key, so there is no shared flag to reach for.
     expect(pagesClass).toContain('arm(key: string): void {');
     expect(pagesClass).toContain('this.#hasMore = { ...this.#hasMore, [key]: true };');
@@ -375,7 +382,9 @@ describe('the alerts log is paged by the same machinery', () => {
 
   it('and stops at the first empty page, re-arming at the bottom', () => {
     expect(pageCode).toContain('alertPages.exhausted(ALERTS_LOG);');
-    expect(pageCode).toContain('if (!this.#alertsScrollingUp) this.#alertPages.arm(ALERTS_LOG);');
+    /* Same pairing as the chat log above — the re-arm and the release share one guard. */
+    expect(pageCode).toContain('this.#alertPages.arm(ALERTS_LOG);');
+    expect(pageCode).toContain('if (!this.#alertsScrollingUp) {');
   });
 });
 

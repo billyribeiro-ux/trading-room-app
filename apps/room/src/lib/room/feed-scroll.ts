@@ -56,6 +56,7 @@ interface LogPages<Row> {
   readonly loading: boolean;
   hasMore(key: string): boolean;
   arm(key: string): void;
+  releaseHistory(key: string): boolean;
   requesting(key: string): number;
   settled(): void;
   exhausted(key: string): void;
@@ -170,8 +171,17 @@ export class RoomFeedScroll {
   trackAlertsScroll(event: Event) {
     const scroller = event.currentTarget as HTMLElement;
     this.#alertsScrollingUp = isRoomScrollerReadingHistory(scroller);
-    // Back at the bottom, so paging is armed again — `hasMoreData = !0` on the way down.
-    if (!this.#alertsScrollingUp) this.#alertPages.arm(ALERTS_LOG);
+    /*
+      Back at the bottom: BOTH of the reference's actions, which sit in one expression upstream —
+      `hasMoreData = !0` re-arms paging, and `currPage > 0 && this.trimFat()` releases the history
+      that was paged in. Only the first was implemented here until 2026-08-16, which is what left
+      `visibleAlerts` iterating over a list that never shrank. `RoomLogPages.releaseHistory` carries
+      the transcription and the `chatLogPageSize` bound it reproduces.
+    */
+    if (!this.#alertsScrollingUp) {
+      this.#alertPages.arm(ALERTS_LOG);
+      this.#alertPages.releaseHistory(ALERTS_LOG);
+    }
     if (
       !shouldLoadOlderMessages({
         scrollTop: scroller.scrollTop,
@@ -199,7 +209,17 @@ export class RoomFeedScroll {
       reference's own reset, and without it a reader who once hit the end of the history could never
       page again in that session even after the log had grown.
     */
-    if (!this.#chatScrollingUp) this.#chatPages.arm(this.#chat.tab);
+    if (!this.#chatScrollingUp) {
+      this.#chatPages.arm(this.#chat.tab);
+      /*
+        And the same release, because upstream's `trimFat` is ONE function serving both log types —
+        `'chat' == this.logType ? emit('trimChatLog', this.channel) : emit('trimAlertsLog')`, and
+        both handlers splice back to `chatLogPageSize`. `trimChatLog`'s 300 caps the live tail on
+        arrival and says nothing about paged-in history, so without this the chat columns grew the
+        same way the alerts pane did, just more slowly.
+      */
+      this.#chatPages.releaseHistory(this.#chat.tab);
+    }
     this.#maybeLoadOlderMessages(scroller);
   }
 
@@ -213,7 +233,11 @@ export class RoomFeedScroll {
    */
   trackExtraChatScroll(scroller: HTMLElement) {
     this.#extraChatScrollingUp = isRoomScrollerReadingHistory(scroller);
-    if (!this.#extraChatScrollingUp) this.#chatPages.arm(this.#chat.extraTab);
+    if (!this.#extraChatScrollingUp) {
+      this.#chatPages.arm(this.#chat.extraTab);
+      /* Keyed by channel, so this releases the same history the main column would. */
+      this.#chatPages.releaseHistory(this.#chat.extraTab);
+    }
     if (
       !shouldLoadOlderMessages({
         scrollTop: scroller.scrollTop,

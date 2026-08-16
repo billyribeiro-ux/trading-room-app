@@ -324,8 +324,12 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       tracker that sets it, and a paging arm disarmed while it is set. The three flags moved here
       rather than staying shared, which is a change of OWNERSHIP: they were written from two
       sides, and two writers of one flag is how a feed follows while its reader is up the log.
+
+      +24, 2026-08-16: the second half of upstream's bottom-of-scroll branch. All three handlers had
+      `arm()` and none had the release beside it, so each one-line `if` became a block carrying both
+      calls and the citation for why they belong together. Three feeds, one mechanism, again.
     */
-    max: 319,
+    max: 343,
     why: 'the scroll and paging mechanism - three feeds, one set of moving parts'
   },
   {
@@ -500,8 +504,20 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
   },
   {
     file: 'lib/room/log-pages.svelte.ts',
-    max: 173,
-    why: 'older-page paging for both logs, one keyed class at two arities'
+    /*
+      173 -> 237, 2026-08-16, and 64 lines for one seven-line method is the ratio this repository is
+      supposed to produce rather than apologise for.
+
+      `releaseHistory` is `trimFat()`, transcribed. What it carries is the reason the bound is
+      `chatLogPageSize` (50) and NOT the `trimLogSize` (300) that caps the chat log on arrival —
+      two constants, two mechanisms, and the obvious guess wrong by 250 rows — plus why clearing the
+      held pages IS upstream's splice given this room's two-lifetime split, and why the
+      `currPage > 0` guard is load-bearing rather than defensive.
+
+      None of that is recoverable from seven lines of code, and it is the whole value of the change.
+    */
+    max: 237,
+    why: 'older-page paging for both logs, one keyed class at two arities; and the trimFat release'
   },
   {
     file: 'lib/room/media.svelte.ts',
@@ -606,8 +622,12 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       +6, slice 27: the ALERTS tail note, which slice 9 wrote for the chat tail and never wrote for
       the alerts one — `visibleAlerts` had no explanation at all of why it merges rather than
       concatenates, which is the same two-lifetime split with an unbounded list behind it.
+
+      +7 later the same day, when that "unbounded list" stopped being one. The header's "a
+      performance finding this class does NOT fix" became a record of where the fix went and why it
+      is not here: the bound belongs to whatever holds the pages, and this class only pays for them.
     */
-    max: 365,
+    max: 372,
     why: 'what each pane renders, and the evidence overlay every pipeline consults'
   },
   {
