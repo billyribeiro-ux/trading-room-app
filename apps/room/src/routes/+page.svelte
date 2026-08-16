@@ -111,6 +111,7 @@
   import { RoomAlerts } from '$lib/room/alerts.svelte';
   import { ALERTS_LOG, RoomLogPages } from '$lib/room/log-pages.svelte';
   import { RoomArrivals } from '$lib/room/arrivals';
+  import { RoomScrollFollow } from '$lib/room/scroll-follow';
   import { EXTRA_COMPOSER, RoomChat } from '$lib/room/chat.svelte';
   import { RoomMedia } from '$lib/room/media.svelte';
   import { alertSoundButtonFor, filesSectionHidden } from '$lib/files-gates';
@@ -192,11 +193,9 @@
     type PastedImageSubmission,
     type PostAlertSubmission
   } from '$lib/post-alert-behavior';
-  import {
-    isRoomScrollerReadingHistory,
-    scrollRoomScrollerToBottom,
-    shouldAutoScrollForMessage
-  } from '$lib/room-scroller';
+  // `shouldAutoScrollForMessage` is no longer imported here: `RoomScrollFollow` calls it, which is
+  // where the rule about the alerts column not taking the override now lives with it.
+  import { isRoomScrollerReadingHistory, scrollRoomScrollerToBottom } from '$lib/room-scroller';
   import {
     canShowRosterPrivateChat,
     resolveRosterPrivateChatStart
@@ -976,9 +975,6 @@
    * afterwards so a scroller swapped out mid-await is not written to.
    */
   let extraChatScroller = $state<HTMLElement | undefined>();
-  let extraChatScrollInitialized = false;
-  let previousExtraChatCount = 0;
-  let previousExtraChatTab: ChatTab | undefined;
   let extraChatScrollingUp = false;
 
   /**
@@ -1756,11 +1752,26 @@
   let chatScroller = $state<HTMLElement | undefined>();
   let alertsScrollingUp = false;
   let chatScrollingUp = false;
-  let alertsScrollInitialized = false;
-  let chatScrollInitialized = false;
-  let previousAlertCount = 0;
-  let previousChatCount = 0;
-  let previousChatTab: ChatTab | undefined;
+  /*
+    ONE INSTANCE PER COLUMN, and that is the whole point rather than an implementation detail: the
+    three columns have independent tabs, independent lists and independent reader scroll positions,
+    so a shared set of markers would let traffic in one column yank a reader out of another.
+
+    The two chat columns take the viewer's `alwaysScrollToBottom` override; the alerts column is
+    constructed WITHOUT one, because `shouldAutoScrollForMessage` records that the alerts scroller
+    shares the function and must not take it. Here that rule is structural — there is no argument to
+    forget.
+
+    A thunk, not a value, so the preference is read when a scroll is decided rather than captured at
+    construction and stale for the rest of the session.
+  */
+  const alertsFollow = new RoomScrollFollow();
+  const chatFollow = new RoomScrollFollow<ChatTab>({
+    alwaysScrollToBottom: () => alwaysScrollToBottom
+  });
+  const extraChatFollow = new RoomScrollFollow<ChatTab>({
+    alwaysScrollToBottom: () => alwaysScrollToBottom
+  });
   /**
    * Which alerts are NEW since the last load — see `RoomArrivals` for why the three lists that ask
    * this question share one implementation, and why it is a plain class rather than a rune module.
@@ -2895,15 +2906,13 @@
 
     if (!scroller) return;
 
-    const isInitialView = !alertsScrollInitialized;
-    const isNewMessage = alertsScrollInitialized && count > previousAlertCount;
-    alertsScrollInitialized = true;
-    previousAlertCount = count;
-
     if (
-      isInitialView ||
-      (isNewMessage &&
-        shouldAutoScrollForMessage(alertsScrollingUp, newestMessage?.senderId, data.user.id))
+      alertsFollow.follows({
+        count,
+        newestSenderId: newestMessage?.senderId,
+        viewerId: data.user.id,
+        readingHistory: alertsScrollingUp
+      })
     ) {
       alertsScrollingUp = false;
       void tick().then(() => {
@@ -2920,23 +2929,14 @@
 
     if (!scroller) return;
 
-    const isInitialView = !chatScrollInitialized;
-    const didSwitchChannel = chatScrollInitialized && activeTab !== previousChatTab;
-    const isNewMessage = chatScrollInitialized && !didSwitchChannel && count > previousChatCount;
-    chatScrollInitialized = true;
-    previousChatTab = activeTab;
-    previousChatCount = count;
-
     if (
-      isInitialView ||
-      didSwitchChannel ||
-      (isNewMessage &&
-        shouldAutoScrollForMessage(
-          chatScrollingUp,
-          newestMessage?.senderId,
-          data.user.id,
-          alwaysScrollToBottom
-        ))
+      chatFollow.follows({
+        count,
+        tab: activeTab,
+        newestSenderId: newestMessage?.senderId,
+        viewerId: data.user.id,
+        readingHistory: chatScrollingUp
+      })
     ) {
       chatScrollingUp = false;
       void tick().then(() => {
@@ -2962,24 +2962,16 @@
 
     if (!scroller) return;
 
-    const isInitialView = !extraChatScrollInitialized;
-    const didSwitchChannel = extraChatScrollInitialized && activeTab !== previousExtraChatTab;
-    const isNewMessage =
-      extraChatScrollInitialized && !didSwitchChannel && count > previousExtraChatCount;
-    extraChatScrollInitialized = true;
-    previousExtraChatTab = activeTab;
-    previousExtraChatCount = count;
-
     if (
-      isInitialView ||
-      didSwitchChannel ||
-      (isNewMessage &&
-        shouldAutoScrollForMessage(
-          extraChatScrollingUp,
-          newestMessage?.senderId,
-          data.user.id,
-          alwaysScrollToBottom
-        ))
+      extraChatFollow.follows({
+        count,
+        tab: activeTab,
+        newestSenderId: newestMessage?.senderId,
+        viewerId: data.user.id,
+        // THIS column's flag. Passing `chatScrollingUp` would let the main column's reader position
+        // decide whether this one jumps, which is the defect its own contract test guards.
+        readingHistory: extraChatScrollingUp
+      })
     ) {
       extraChatScrollingUp = false;
       void tick().then(() => {

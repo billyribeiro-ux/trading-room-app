@@ -223,6 +223,72 @@ through — both are documented in `.env.example` and until now nothing read the
 **Not done:** retiring `ptr_clone_app` (deferred until the cutover is proven in a real deployment),
 and the owner role / database rename `ptr_clone` → `tradingroom`. Both remain in `TODO.md`.
 
+### 2026-08-15 20:17 EDT — Phase 3d: the last three latches, and a term that could never change an answer
+
+**Branch `feat/extra-chat-column`, not merged.** **Runtime impact: none intended** — the three
+scroll decisions are unchanged; they are made in one tested place instead of three untested ones.
+
+The alerts column, the chat column and the second chat column each ran the same twenty lines with
+their own three markers — **eight identifiers for one question asked three times**:
+
+```
+  alerts       alertsScrollInitialized      previousAlertCount        (no tab)
+  chat         chatScrollInitialized        previousChatCount         previousChatTab
+  extra chat   extraChatScrollInitialized   previousExtraChatCount    previousExtraChatTab
+```
+
+Now `RoomScrollFollow`, three instances. **Three instances and not one shared marker is the
+load-bearing part** — the columns have independent tabs, lists and reader scroll positions, so a
+shared marker set would let traffic in one column yank a reader out of another. The class returns
+the decision; the page does the scrolling and clears its own flag, the same split `RoomSplit.endDrag()`
+uses.
+
+**A RULE THAT WAS REMEMBERED IS NOW STRUCTURAL.** `shouldAutoScrollForMessage` carries the note that
+*"the alerts scroller shares this function but must NOT take the override"* — the viewer's
+`alwaysScrollToBottom` belongs to chat, and applying it to alerts would drag a reader out of the
+alert history they were scrolled into from a checkbox whose label says "chat". It used to be a
+defaulted fourth argument you had to remember not to pass. It is now a **constructor capability**:
+the alerts column is built without one, so there is no argument left to pass by mistake. The contract
+test that guarded it got stronger rather than merely relocated — it asserts on construction, which is
+where the rule went.
+
+**A TERM THAT COULD NEVER CHANGE AN ANSWER, found by a control that stayed green.** Both chat effects
+computed `isNewMessage = initialized && !didSwitchChannel && count > previousCount`. Removing
+`!didSwitchChannel` left the whole suite green, and checking why rather than writing a test to cover
+it showed the term is **dead**: `didSwitchChannel ||` short-circuits the return, so `isNewMessage` is
+only ever consulted when `didSwitchChannel` is already false. It is `A || B || (C && !B && D)`
+reduced to `A || B || (C && D)` — the same function. The term is gone and the class says why.
+
+**A CONTROL THAT STAYED GREEN FOR A WORSE REASON — my test was wrong.** Changing
+`count > previousCount` to `count !== previousCount`, which makes a **deletion** scroll the column,
+also left the suite green. That one was not a redundant term: both count tests were written with
+`readingHistory: true`, so `shouldAutoScrollForMessage` had already refused to move the reader and the
+count comparison never decided anything. They passed without testing what they claimed to test. Both
+now use `readingHistory: false`, which leaves the count as the only thing that can decide, and the
+control goes red.
+
+**Two contract tests migrated rather than deleted**, per the standing rule. `extra-chat-column-contract`
+asserted on the three inline conditions by name; those moved into the class where they are now
+*executed* rather than read as text, so it asserts what remains its business — that the extra column
+still asks, with its own tab and **its own scroll flag**. That last one deliberately stays a text
+assertion: which flag is handed in is the caller's decision, and the class would answer a question
+about the main column just as happily.
+
+**Verified:** `pnpm run check` 0 errors / 0 warnings across 1,136 files; suite **1,882 across 136
+files**; eslint clean; prettier clean on every touched file — the 11 files it warns about were
+confirmed pre-existing by re-running the check with this work stashed. Four negative controls seen
+red (own-flag, alerts-override, deletion-as-arrival, switch-no-longer-scrolls). `+page.svelte`
+**11,601 → 11,593**, ceiling lowered in the same commit.
+
+**Counted rather than claimed: the page still has 12 `$effect`s, the same 12 it had after 3a.** 3c and
+3d removed *latches*, not effects — the delivery and scroll effects still exist and now call a tested
+class instead of carrying their own state machine. Six of the plan's latch identifiers are gone
+(`alertDeliveryInitialized`, `qaNoticesPrimed`, `chatSoundPrimed`, `seenAlertIds`, `previousAlertCount`,
+`previousChatCount`) plus the eight scroller markers. **What remains is the mention popup's
+`popupSeeded` / `lastPopupChatId`**, and it is deliberately not folded into `RoomArrivals`: it marks a
+POSITION in the server's ordering and re-seeds silently when that marker has been trimmed away, where
+an identity set would announce the whole log. Two algorithms that look alike and are not.
+
 ### 2026-08-15 20:12 EDT — Phase 3c: one arrival rule instead of three, and a plan corrected by reading the code it was written about
 
 **Branch `feat/extra-chat-column`, not merged.** **Runtime impact: none intended** — three effects

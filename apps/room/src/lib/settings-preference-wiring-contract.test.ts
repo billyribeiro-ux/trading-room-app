@@ -368,13 +368,25 @@ describe('the wire has no silent break points', () => {
       'let alwaysScrollToBottom = $state(loadedSettings.alwaysScrollToBottom !== false);'
     );
 
-    const alerts = /shouldAutoScrollForMessage\(\s*alertsScrollingUp[\s\S]{0,140}?\)/.exec(
-      pageCode
-    )?.[0];
-    expect(alerts, 'the alerts scroller call must be findable').toBeTruthy();
-    expect(alerts, 'the alerts scroller must NOT take the chat override').not.toContain(
-      'alwaysScrollToBottom'
-    );
+    /*
+      RE-POINTED 2026-08-15, and the guard got STRONGER rather than merely relocated.
+
+      It used to regex the alerts scroller's `shouldAutoScrollForMessage(...)` call and assert the
+      override was not among its arguments. That call now lives in `RoomScrollFollow`, and the
+      override is a CONSTRUCTOR capability instead of an argument: the alerts column is built without
+      one, so there is no argument left for anyone to add by mistake.
+
+      So the assertion is about construction, which is where the rule now is. Positive first — the
+      three columns are found by name — then the scope: the alerts column takes no override, and
+      both chat columns do. `scroll-follow.test.ts` proves the behaviour that follows from it, by
+      calling an alerts column and watching it refuse to move a reader.
+    */
+    expect(pageCode).toContain('const alertsFollow = new RoomScrollFollow();');
+    expect(pageCode).toContain('const chatFollow = new RoomScrollFollow<ChatTab>({');
+    expect(pageCode).toContain('const extraChatFollow = new RoomScrollFollow<ChatTab>({');
+
+    const overrideTakers = pageCode.match(/alwaysScrollToBottom: \(\) => alwaysScrollToBottom/g);
+    expect(overrideTakers, 'the two chat columns must take the override').toHaveLength(2);
   });
 
   it('small-image-preview stays UNWIRED, because its class has no rule anywhere', () => {
