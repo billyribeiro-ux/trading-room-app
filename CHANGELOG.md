@@ -24,6 +24,121 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-16
 
+### 2026-08-16 08:06 EDT — `app.min.js` read: six of sixteen slices, and the P-1 contract in full
+
+**Runtime impact: none** — `todo-next.md` only; no source, test or config was touched. `app.min.js`
+itself is a live-site capture and stays in `~/Downloads`, per `.gitignore`.
+
+The manage-page bundle (455,329 B, pulled 07:51 with `apps/room/scripts/ptr-pull-manage-bundle.js`)
+was **read, not searched** — lines 9–14 of its 17, in order, end to end. `todo-next.md` gains **§6**
+as the read log, with a byte-offset table so the next session can resume exactly where this stopped.
+
+**What it settled:**
+
+- **P-1's server contract, complete.** All six push actions post to a single relative endpoint,
+  `/users/v1/sessions`. **`updateUserFCMTok` with `tokcmd` is the revocation primitive** the
+  subscription-lapse work needs. Two previously unknown siblings — `sendTestAlert` and
+  `manageMobileApp` (plus `manageFileAccess`) — were found in the same statement neighbourhood.
+- **P-2 is not a green field.** The reference already carries a per-user mobile flag (`isM`), a
+  stable cross-room identity (the roster's `email` is an **md5 hash**), and a manual remedy
+  (`kickDuplicates`). What it lacks is enforcement — and **`isM` is client-asserted**, as is the
+  `bannedcookie` localStorage ban, so neither can be built on.
+- **P-5 has a precedent.** `doSoundCloudEmbed` / `stopSoundCloudEmbed` already broadcast an embedded
+  player room-wide, next to `playYTForAll` and `playSoundFile`. Spotify is a fourth member of an
+  existing family.
+- **R-1's data model** — typing state is per-channel, keyed `data.c`, entries carrying `uid` + `ts`.
+- **R-14 is buildable.** `recStartTime` is not invented: `roomState` carries `isRecording`, `recUser`
+  and `recStartTime` on every `getRoomState`. The warning at `+page.svelte:7183-7201` was right to
+  refuse to guess it; the value exists and is server-sourced.
+
+**Two things written earlier were corrected against this evidence:** `APIURL` is the **empty string**
+(every API call is same-origin relative), and every localStorage key is **namespaced by room id**, so
+nothing stored there is account-wide.
+
+**A security finding about the reference is recorded, with the values deliberately not transcribed:**
+`appVars.globals` ships the Verto password, TURN username and password, and a Giphy API key to every
+browser. Naming the exposed keys is enough to act on; copying them into a git-tracked file would move
+the leak rather than close it.
+
+**Also logged: eleven reference bugs** — among them a `changePerm` handler that iterates objects as
+arrays and so never promotes anyone, a postMessage origin check placed in a comma expression where it
+logs but cannot block, and two typo'd identifiers (`useHSL`, `lastSlowLinkAdjus`) that disable the
+guards they belong to. Each is recorded so a port does not silently inherit it.
+
+**Not done, and named as such:** lines 2–8 — 224 KB, the manage page proper — remain unread, and by
+elimination that is where `sendFcmAlertsNew`, `invalidTokens`, `diasableFCMAlerts`,
+`customMobileAppLaunchWord` and the Twilio/Protexting channels must be. Nothing in the six slices read
+ties push delivery to entitlement, which leaves §3's finding standing: the reference stops push on
+`lastLogin` decay, not on subscription state.
+
+### 2026-08-16 08:11 EDT — `RoomVolume`, and the fifteenth unbound method finally gets a gate
+
+**Branch `feat/extra-chat-column`. Runtime impact: yes** — every volume in the room moved, and **ten
+handler props were fixed that would have thrown on first click.**
+
+**`+page.svelte` 9,247 → 9,057.** Phase 5 slice 4b.
+
+**REORDERED, and stated rather than done quietly.** The plan put media transport (~1,700 lines) next.
+The Group B slices do not depend on each other, so the order is free, and banking a small
+self-contained slice is worth more than starting the largest one. `RoomVolume` also exercises the
+`RoomPrefs` seam built an hour earlier — it is the first class in this repository to take another as
+a dependency.
+
+**Why it takes `RoomPrefs` rather than a callback:** `mute()`/`unmute()` set
+`preferences.doNotDisturbOn` in the reference itself, so the coupling is captured behaviour rather
+than one invented here, and `app-room`'s pair additionally drags `subtitles` and the background music
+along. Those two are the only preferences that kept a public setter after slice 3, and this class is
+one of the two reasons they did. The per-presenter pair goes the other way, through `prefs.save` —
+after slice 3 there is no other way to write a preference at all.
+
+**THE FIFTEENTH UNBOUND METHOD, AND NOW A GATE FOR IT.** A mechanical rename turned **ten** handler
+props into `onthing={roomVolume.method}` in one commit. A class method passed as a value loses
+`this`; the body reaches for a private field on `undefined` and throws the first time a user clicks.
+Counting slices 2 and 3, that is **fifteen instances in four slices**, every one found by reading a
+diff.
+
+**Every gate in this toolchain passes on it.** `svelte-check` — the types line up, a method *is* a
+function of that signature. `eslint` — nothing unused, nothing shadowed. `svelte-autofixer` — no
+opinion about `this`. Every text-reading contract test — the text is exactly what they expect. The
+suite — nothing mounts the component and clicks.
+
+So `room/unbound-method-contract.test.ts` now decides it **from the prototype, not from source
+text**: for each known room-class instance, an accessor is a value and safe to pass, a data property
+holding a function is a method and is not. It needs no list of method names, cannot go stale when a
+class gains one, and reports the file, line and prop. It parses with `svelte.parse` and never a
+regex — a hand-rolled scanner on this file once stopped after three tags on an apostrophe and
+reported a clean run with a wrong answer. **Negative control: reinstating one unbound method turns it
+red with `routes/+page.svelte:8298 — ontogglemute={roomVolume.toggleMute} passes a METHOD by
+reference`,** on code all four other gates accept. `AGENTS.md` DPE rule 2 — the gate comes before the
+bug, and this one is four slices late.
+
+**MY GENERATOR CORRUPTED A CITATION, AND THAT IS WHY THE COMMENT GATE EXISTS.** The first transform
+pass rewrote `screen-volume.ts` to `screen-this.#volume.ts` **inside a docstring**, because it did
+not distinguish code from comments. Caught before it was written by counting citations in and out
+(5 → 5 only after the fix). It then did the same thing to two import *paths* —
+`'$lib/screen-volume'` became `'$lib/screen-roomVolume.volume'` — which `svelte-check` caught, because
+string literals are not comments. Both are the same lesson: a mechanical rename must know what it is
+allowed to touch, and "skip comments" is only half of it.
+
+**MY TEST WAS WRONG AND THE SOURCE HAD ALREADY ANSWERED IT.** I asserted that the screen overlay's
+mute does not touch captions — `app-presentationarea`'s `mute()` genuinely is the shorter of the two.
+It fails, because the overlay reaches captions *transitively*: `muteScreenAudio` calls
+`setMasterVolume`, which carries `subtitles = true` at zero, a divergence the class records in as
+many words. The test now asserts what the room does and names why, and keeps the part that IS still
+shorter — the overlay leaves the background music alone. Recorded because the answer was in the file
+before I wrote the test.
+
+**Zero contract-test regressions**, which is worth noting after slice 3's forty-four:
+`screen-volume-contract.test.ts` asserts on the pure module and the overlay component, never on the
+page's wiring, so the extraction passed straight through it.
+
+**Verified:** `svelte-check` **1,153 files, 0 errors, 0 warnings**. `vitest` **2,056 across 143**, up
+from 2,009/141 — +10 `RoomVolume` tests, +34 for the unbound-method guard, +3 ceilings.
+`svelte-autofixer` on the new module: zero issues, zero suggestions. `eslint` clean (it caught four
+orphaned imports whose consumers moved). Ceiling lowered 9,248 → 9,058, `volume.svelte.ts` declared
+at 297. **Not verified:** no browser — and the ten wrapped handlers are exactly what a real click
+would have proven.
+
 ### 2026-08-16 07:57 EDT — `RoomPrefs`: 27 preferences, one write path, and 25 of them can no longer be written any other way
 
 **Branch `feat/extra-chat-column`. Runtime impact: yes** — every viewer preference in the room moved,

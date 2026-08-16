@@ -260,7 +260,7 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       What the slice actually proves is the pattern, which is why it was chosen first: state and the
       functions that write it leaving TOGETHER, where Phase 1 moved fields and left 248 bodies here.
     */
-    max: 9248,
+    max: 9058,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {
@@ -400,6 +400,11 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     file: 'lib/room/dialogs.svelte.ts',
     max: 115,
     why: 'the three bootbox dialogs, which STACK and therefore stay three fields'
+  },
+  {
+    file: 'lib/room/volume.svelte.ts',
+    max: 297,
+    why: 'the master, background and per-presenter volumes; the first class to depend on another'
   },
   {
     file: 'lib/room/prefs.svelte.ts',
