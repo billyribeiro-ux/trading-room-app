@@ -5,15 +5,15 @@
 
     ## Why it is one component and not seven
 
-    The panes that HAVE their own component already have one — `NotesPane`, `SwingAlertsPane`,
-    `DayTradeAlertsPane`, `ScreenTabs`, `ScreenPane`, `StreamTabs`, `StreamingView`, `VideoPlayer`.
-    What is left inline is the WIRING between the tab strip and those components, and wiring is one
-    concern: `mainTab` is a single value that every tab reads and every tab writes.
+    EVERY pane has its own component — `NotesPane`, `SwingAlertsPane`, `DayTradeAlertsPane`,
+    `FilesPane`, `ScreenTabs`, `ScreenPane`, `StreamTabs`, `StreamingView`, `VideoPlayer`. What is
+    left here is the WIRING between the tab strip and those components, and wiring is one concern:
+    `mainTab` is a single value that every tab reads and every tab writes.
 
-    The Files pane is the exception and is recorded as such rather than hidden. It is the one pane
-    with no component of its own — roughly 480 lines and 25 identifiers of toolbar, sort bar and
-    table, sitting inline. It is a `FilesPane` waiting to happen and it is written up in `TODO.md`;
-    it was not done here because two extractions in one pass is how a mangle ships.
+    `FilesPane` was the last of them and landed on 2026-08-16, one pass after this component did.
+    Splitting it out separately was deliberate — two extractions at once is how a mangle ships, and
+    this one had already re-pointed 40 assertions across 11 contract files. Its 22 props are still
+    declared below and passed straight through, because the PAGE owns the handlers behind them.
 
     ## The prop list came from the COMPILER, as it did for `AlertChatArea`
 
@@ -39,12 +39,10 @@
     computed once on the page from data the server owns. Nothing here opens a device, starts a
     stream, or writes a file.
   */
-  import { invalidate } from '$app/navigation';
-  import { alertSoundButtonFor } from '$lib/files-gates';
-  import { fileSizeInKb, fileSortTitle, type FileSortField } from '$lib/file-sort';
-  import { mediumDate } from '$lib/message-formatters';
+  import type { FileSortField } from '$lib/file-sort';
   import { NEUTRAL_PAN, captureVideoImage, type Pan } from '$lib/screen-zoom';
   import DayTradeAlertsPane from '$lib/components/day-trade-alerts/DayTradeAlertsPane.svelte';
+  import FilesPane from '$lib/components/FilesPane.svelte';
   import NotesPane from '$lib/components/notes/NotesPane.svelte';
   import ScreenPane from '$lib/components/ScreenPane.svelte';
   import ScreenTabs, { type ScreenTab } from '$lib/components/ScreenTabs.svelte';
@@ -1117,488 +1115,30 @@
                     it; the note there records that the two selectors are equally specific and it is
                     the order that decides.
                   -->
-        <div
-          id="files"
-          class={mainTab === 'files' ? 'tab-pane fade active show' : 'tab-pane fade'}
-          hidden={filesHidden}
-          role="tabpanel"
-          aria-labelledby="files-tab"
-        >
-          <ul
-            id="myTab"
-            class="nav nav-tabs files-tabs d-flex justify-content-center"
-            role="tablist"
-          >
-            <!-- The click handler sits on the <li>, as the reference has it: its const puts the
-                           listener there, and `.files-tabs li.nav-item { cursor: pointer }` is
-                           measured on the li — so the 5px margin band around each tab is part of the
-                           target. Ours listened on the <a> alone and that band was dead. The anchor
-                           keeps the keydown, so the tab stays operable from the keyboard, which the
-                           reference's is not. -->
-            <li class="nav-item" role="presentation" onclick={() => (fileTab = 'files')}>
-              <!-- svelte-ignore a11y_interactive_supports_focus -->
-              <a
-                id="files-tab"
-                class="nav-link d-flex align-items-center justify-content-between"
-                class:active={fileTab === 'files'}
-                data-bs-toggle="tab"
-                role="tab"
-                aria-controls="files"
-                aria-selected={fileTab === 'files'}
-                onclick={() => (fileTab = 'files')}
-                onkeydown={(event) => {
-                  if (event.key === 'Enter' || event.key === ' ') fileTab = 'files';
-                }}
-              >
-                <span>Files</span>
-                <span class="badge rounded-pill bg-danger files-badge">{countFiles('files')}</span>
-              </a>
-            </li>
-            <!-- The click handler sits on the <li>, as the reference has it: its const puts the
-                           listener there, and `.files-tabs li.nav-item { cursor: pointer }` is
-                           measured on the li — so the 5px margin band around each tab is part of the
-                           target. Ours listened on the <a> alone and that band was dead. The anchor
-                           keeps the keydown, so the tab stays operable from the keyboard, which the
-                           reference's is not. -->
-            <li class="nav-item" role="presentation" onclick={() => (fileTab = 'images')}>
-              <!-- svelte-ignore a11y_interactive_supports_focus -->
-              <a
-                id="image-tab"
-                class="nav-link d-flex align-items-center justify-content-between"
-                class:active={fileTab === 'images'}
-                data-bs-toggle="tab"
-                role="tab"
-                aria-controls="image"
-                aria-selected={fileTab === 'images'}
-                onclick={() => (fileTab = 'images')}
-                onkeydown={(event) => {
-                  if (event.key === 'Enter' || event.key === ' ') fileTab = 'images';
-                }}
-              >
-                <span>Images</span>
-                <span class="badge rounded-pill bg-danger files-badge">{countFiles('images')}</span>
-              </a>
-            </li>
-            <!-- The click handler sits on the <li>, as the reference has it: its const puts the
-                           listener there, and `.files-tabs li.nav-item { cursor: pointer }` is
-                           measured on the li — so the 5px margin band around each tab is part of the
-                           target. Ours listened on the <a> alone and that band was dead. The anchor
-                           keeps the keydown, so the tab stays operable from the keyboard, which the
-                           reference's is not. -->
-            <li class="nav-item" role="presentation" onclick={() => (fileTab = 'sounds')}>
-              <!-- svelte-ignore a11y_interactive_supports_focus -->
-              <a
-                id="sounds-tab"
-                class="nav-link d-flex align-items-center justify-content-between"
-                class:active={fileTab === 'sounds'}
-                data-bs-toggle="tab"
-                role="tab"
-                aria-controls="sounds"
-                aria-selected={fileTab === 'sounds'}
-                onclick={() => (fileTab = 'sounds')}
-                onkeydown={(event) => {
-                  if (event.key === 'Enter' || event.key === ' ') fileTab = 'sounds';
-                }}
-              >
-                <span>Sounds</span>
-                <span class="badge rounded-pill bg-danger files-badge">{countFiles('sounds')}</span>
-              </a>
-            </li>
-          </ul>
-          <div
-            class="mt-3 mb-3 text-center d-flex flex-wrap justify-content-center align-items-center w-75 m-auto"
-          >
-            <div class="flex-fill mb-1">
-              <div class="input-group st-searchbar">
-                <!--
-                            No `id` and no `name`. Const 39 - the search input's own attribute
-                            table - is
-                            `["type","text","placeholder","Search files...","aria-label","search",
-                             "aria-describedby","addon-wrapping",1,"form-control",3,"ngModelChange","ngModel"]`
-                            and carries neither. We had invented `id="files-search"` and
-                            `name="filesSearch"`; nothing in this repo targeted either, and no
-                            `<label for=...>` points at it - `aria-label="search"` is what names it.
-                            (`filesSearch` is the reference's COMPONENT FIELD, bound through
-                            `ngModel`, not an attribute that reaches the DOM.)
-                          -->
-                <input
-                  class="form-control ng-untouched ng-pristine ng-valid"
-                  type="text"
-                  placeholder="Search files..."
-                  aria-label="search"
-                  aria-describedby="addon-wrapping"
-                  oninput={(event) => onfilesearch(event.currentTarget.value)}
-                />
-                <span
-                  id="basic-addon1"
-                  class="input-group-text st-searchbar-icon btn btn-outline-secondary"
-                >
-                  <i class="fas fa-search"></i>
-                </span>
-              </div>
-            </div>
-            <div class="d-flex flex-wrap justify-content-center align-items-center ml-2">
-              <!--
-                          Delete Selected and Upload File are gated on `isP` in the capture -
-                          `O(77, o.isP ? 77 : -1)` and `O(81, o.isP ? 81 : -1)` - while Refresh
-                          (node 78) is unconditional. A member seeing only the list and Refresh is
-                          the captured behaviour, not a bug; showing these two to everyone was.
-
-                          The bare-space expressions in this pane are the capture's own text nodes:
-                          `v(2, 'Delete Selected ')`, `v(79, ' Refresh')`, `v(2, ' Upload File ')`,
-                          `v(2, 'Stop Playing For All ')`, `v(18, 'Download ')`, `v(2, 'Delete ')`,
-                          `v(2, 'Play ')` / `v(2, 'Stop ')` and `v(2, 'Play For All ')` — every one
-                          of them padded (full.js:1778-1888, and `Download ` at 1937). Svelte trims
-                          whitespace at the edges of an element's children, so written as plain
-                          source text those spaces are dropped and the DOM text node stops matching
-                          the capture - checked against the compiler, not assumed. They collapse at
-                          the edge of the line box and change no pixel; the expressions are here so
-                          a byte-for-byte comparison of the two DOMs comes back clean.
-                        -->
-              {#if isPresenter}
-                <button
-                  class="btn m-2 st-fileDeleteSelected"
-                  title="Delete Selected"
-                  onclick={deleteSelectedFiles}
-                >
-                  <i class="fa fa-trash fa-check mr-2"></i>Delete Selected{' '}
-                </button>
-              {/if}
-              <!--
-                          Refresh re-runs THIS page's load, not every loader on the page.
-
-                          The reference's handler is `getSessionFiles()`, which posts one
-                          `getSessionFiles` command and replaces `sessionFiles` alone
-                          (app-presentationarea.full.js:2967-2978). Ours called `invalidateAll()`,
-                          which re-runs every load function belonging to the active page.
-
-                          `invalidate('room:data')` is the narrowest refetch SvelteKit offers here:
-                          the load registers `depends('room:data')` (+page.server.ts:122) and the
-                          five-second poll already uses this identifier. It is not a files-only
-                          refetch and cannot be - this route has a single `+page.server.ts` load that
-                          builds messages, alerts, polls, notes and files together, so the two calls
-                          re-run exactly the same work today. What changes is the blast radius: a
-                          layout load added later would be re-run by `invalidateAll()` and is not by
-                          this. A genuinely files-only refetch would need its own endpoint and a
-                          second, client-owned source of truth for `data.files`, which no other
-                          control in this file has.
-                        -->
-              <button
-                class="btn mt-2 mr-2 mb-2 st-fileSeeMore"
-                title="Reload list"
-                onclick={() => invalidate('room:data')}
-              >
-                {' '}Refresh<i class="fas fa-sync ml-2"></i>
-              </button>
-              {#if isPresenter}
-                <button
-                  class="btn btn-secondary mt-2 mr-2 mb-2 st-fileUpload"
-                  title="Upload New File"
-                  onclick={() => openModal('file-upload')}
-                >
-                  <i class="fas fa-plus"></i> Upload File{' '}
-                </button>
-              {/if}
-            </div>
-            <!--
-                        "Stop Playing For All" belongs HERE, once, not in every row.
-
-                        The reference puts it in this otherwise-empty div after the upload row —
-                        node 82 in the capture holds node 83, gated `O(83, o.isP && o.mp3Playing)`.
-                        Ours rendered it inside each row's action cell, so a room with ten sounds
-                        showed ten identical Stop buttons, all stopping the same single playback.
-
-                        Label and icon are the reference's too: "Stop Playing For All " with
-                        `fa fa-play-circle mr-2` (its const 158 — the play glyph, not a stop glyph;
-                        transcribed, not corrected). Ours read "Stop For All" with `fa-stop-circle`.
-                      -->
-            <div>
-              {#if isPresenter && mp3Playing}
-                <button
-                  type="button"
-                  title="Stop For All"
-                  class="btn ml-2 st-fileDelete"
-                  onclick={() => void stopMp3ForAll()}
-                >
-                  <i class="fa fa-play-circle mr-2"></i>Stop Playing For All{' '}
-                </button>
-              {/if}
-            </div>
-          </div>
-          <!--
-                      An EMPTY room renders no heading, no SORT BAR and no table.
-
-                      The two gates are `O(84, o.sessionFiles ? -1 : 84)` for the `<h4>` and
-                      `O(85, o.sessionFiles && o.sessionFiles.length > 0 ? 85 : -1)` for node 85.
-                      They are not complements: the heading needs `sessionFiles` to be FALSY, and an
-                      empty array is truthy, so a room with zero files shows nothing at all. Both
-                      rendered captures confirm it — the badges read 0 and after the toolbar there
-                      are two collapsed anchors and no `h4`, no table.
-
-                      So "No room files found." is not the empty-list message it looks like; it is
-                      the never-fetched message. Our loader ends in `.all()`, which always returns an
-                      array, so that state cannot arise here and the heading is not rendered at all
-                      rather than kept as a branch nothing can reach. Ours previously showed it
-                      whenever the list was empty, which is the one case the reference stays silent.
-
-                      THE SORT BAR IS INSIDE THIS GATE, and that was read rather than assumed. Node
-                      85 is the view `t2e` (byte 2,016,231, `H(84,Bwe,2,0,"h4",48)(85,t2e,17,17)`),
-                      and `t2e` opens with the sort bar div and closes with the files table — one
-                      view holding both, read at byte 1,950,099. Its gate is the one quoted above,
-                      read at byte 2,018,251. So the two elements share a single condition, and a
-                      room with no files shows no "Sorting by:" strip either. Ours rendered the bar
-                      unconditionally, which put a sort control above an absent table.
-                    -->
-          {#if data.files.length > 0}
-            <!--
-                        The sort bar. Every class comes from the const table read at bytes
-                        2,011,253-2,011,600:
-
-                          242 [1,"d-flex","flex-wrap","justify-content-center","align-items-center","mt-2","st-fileSortBar"]
-                          243 [1,"mr-2"]
-                          244 [1,"btn","btn-sm","m-1","st-fileSortName",3,"click","ngClass","title"]
-                          245 [1,"fas","ml-2",3,"ngClass"]
-                          246 [1,"btn","btn-sm","m-1","st-fileSortDate",3,"click","ngClass","title"]
-                          249 [1,"fas","fa-sort","ml-2"]
-
-                        Both labels keep their LEADING AND TRAILING space - `v(4," Name ")` at byte
-                        1,950,263 and `v(8," Date ")` at 1,950,396. Svelte trims whitespace at the
-                        edges of an element's children, so each pad has to be an expression to
-                        survive into the DOM text node, exactly as the other padded labels in this
-                        pane already are.
-
-                        The icon class ORDER differs by state and is not a typo. Const 245 is static
-                        `fas ml-2` with the glyph appended by ngClass, so the active icon renders
-                        `fas ml-2 fa-sort-alpha-down`; const 249 is entirely static, so the inactive
-                        one renders `fas fa-sort ml-2`. Both variants key off the SAME direction.
-                      -->
-            <div
-              class="d-flex flex-wrap justify-content-center align-items-center mt-2 st-fileSortBar"
-            >
-              <span class="mr-2">Sorting by:</span>
-              <!--
-                          `.active` is CAPTURED, not derived. The binding is
-                          `z("ngClass",ct(13,mo,"name"===e.fileSortField))` at byte 1,950,577, and
-                          `mo` is the shared pure function read at byte 1,916,345 — it takes one
-                          argument and returns an object whose only key is `active`, set to that
-                          argument. So the class is present exactly when this button's field is the
-                          governing field, and it depends on the field alone, never on the
-                          direction. `docs/decoded/files-sort-bar.md` listed this expression as an
-                          honest gap; it was opened and the gap is closed.
-
-                          `mo` is quoted verbatim in `$lib/file-sort`, and asserted verbatim against
-                          the bundle in `files-pane-contract.test.ts`. It is written out in words
-                          HERE because its body is brace-delimited, and a brace-delimited construct
-                          inside a Svelte comment is prose to a human and a mustache to a parser.
-                          That exact shape has already turned a contract test red in this repository
-                          while `svelte-check` stayed green.
-                        -->
-              <button
-                class="btn btn-sm m-1 st-fileSortName"
-                class:active={fileSort.field === 'name'}
-                title={fileSortTitle('name', fileSort)}
-                onclick={() => applyFileSort('name')}
-              >
-                {' '}Name{' '}
-                {#if fileSort.field === 'name'}
-                  <i
-                    class="fas ml-2 {fileSort.direction === 'asc'
-                      ? 'fa-sort-alpha-down'
-                      : 'fa-sort-alpha-up'}"
-                  ></i>
-                {:else}
-                  <i class="fas fa-sort ml-2"></i>
-                {/if}
-              </button>
-              <button
-                class="btn btn-sm m-1 st-fileSortDate"
-                class:active={fileSort.field === 'date'}
-                title={fileSortTitle('date', fileSort)}
-                onclick={() => applyFileSort('date')}
-              >
-                {' '}Date{' '}
-                {#if fileSort.field === 'date'}
-                  <i
-                    class="fas ml-2 {fileSort.direction === 'asc'
-                      ? 'fa-sort-amount-down'
-                      : 'fa-sort-amount-up'}"
-                  ></i>
-                {:else}
-                  <i class="fas fa-sort ml-2"></i>
-                {/if}
-              </button>
-            </div>
-            <table class="table table-striped m-auto w-100 mt-3 st-fileTable">
-              <tbody id="filesDriveList">
-                {#each searchedFiles() as item (item.id)}
-                  <tr>
-                    {#if !matchesFileTab(item)}
-                      <!--
-                                  Deliberately empty. The capture emits this row for every file in
-                                  the room and collapses its cells when the file belongs to another
-                                  tab; the row still counts for `nth-of-type` striping.
-                                -->
-                    {:else}
-                      <!--
-                                  Resolved ONCE per row. The two alert-sound buttons are complements
-                                  of one another, so asking twice invites the two answers to drift.
-                                -->
-                      {@const alertSoundButton = alertSoundButtonFor(
-                        { isPresenter },
-                        data.sessData ?? {},
-                        item
-                      )}
-                      {#if isPresenter}
-                        <td>
-                          <input
-                            type="checkbox"
-                            value={item.id}
-                            checked={selectedFileIds.has(item.id)}
-                            onchange={(event) =>
-                              toggleFileSelection(item.id, event.currentTarget.checked)}
-                          />
-                        </td>
-                      {/if}
-                      <td>
-                        <div class="d-flex flex-column">
-                          <div>
-                            <span class="st-fileName">{item.name} </span>
-                            <span class="st-fileSize ml-2">{fileSizeInKb(item.size)}Kb </span>
-                            <div class="st-fileName">
-                              <i>{mediumDate(item.createdAt)}</i>
-                            </div>
-                          </div>
-                          {#if item.kind === 'image'}
-                            <a
-                              target="_blank"
-                              href={item.url}
-                              type={item.contentType}
-                              download={item.name}
-                            >
-                              <!-- No width/height attributes. The reference's const carries
-                                           only alt, class, style and src, and the sole sizing rule
-                                           is `.fileDriveImg { max-width: 200px }` — it CLAMPS the
-                                           thumbnail and lets each upload keep its own aspect ratio.
-                                           A fixed 120x90 box letterboxed or distorted every image
-                                           that was not 4:3. -->
-                              <!-- svelte-ignore a11y_img_redundant_alt -->
-                              <img
-                                alt="Image"
-                                class="fileDriveImg"
-                                style="background-color: #000;"
-                                src={item.url}
-                              />
-                            </a>
-                          {/if}
-                        </div>
-                      </td>
-                      <td>
-                        <div class="d-flex justify-content-center align-items-center flex-wrap">
-                          {#if item.kind !== 'image'}
-                            <!-- svelte-ignore a11y_consider_explicit_label -->
-                            <a
-                              class="fileDowload"
-                              href={item.url}
-                              type={item.contentType}
-                              download={item.name}
-                            ></a>
-                          {/if}
-                          <a
-                            title="Download File"
-                            target="_blank"
-                            class="btn st-fileDownload"
-                            href={item.url}
-                            type={item.contentType}
-                            download={item.name}
-                          >
-                            <i class="fas fa-download mr-2"></i>Download{' '}
-                          </a>
-                          {#if isPresenter}
-                            <button
-                              type="button"
-                              title="Delete File"
-                              class="btn ml-2 st-fileDelete"
-                              onclick={() => deleteFile(item)}
-                            >
-                              <i class="fa fa-trash mr-2"></i>Delete{' '}
-                            </button>
-                          {/if}
-                          {#if item.kind === 'sound'}
-                            <button
-                              type="button"
-                              title="Play"
-                              class="btn ml-2 st-fileDownload btn-success"
-                              onclick={() => playMp3ForMe(item)}
-                            >
-                              {#if playingForMe.has(item.id)}
-                                <span><i class="fa fa-stop-circle mr-2"></i>Stop{' '}</span>
-                              {:else}
-                                <span><i class="fa fa-play-circle mr-2"></i>Play{' '}</span>
-                              {/if}
-                            </button>
-                          {/if}
-                          {#if isPresenter && item.kind === 'sound'}
-                            <button
-                              type="button"
-                              title="Play For All"
-                              class="btn ml-2 st-fileDelete"
-                              onclick={() => playMp3ForAll(item.url)}
-                            >
-                              <i class="fa fa-play-circle mr-2"></i>Play For All{' '}
-                            </button>
-                          {/if}
-                          <!--
-                                    Nodes 22 and 23 of the row (full.js:1889-1916), consts
-                                    261/262/263, both `btn ml-2 btn-info set-alert-sound-btn` - the
-                                    class whose rule already ships at
-                                    `src/lib/styles/captured-runtime-components.css:6972`
-                                    (`font-size: 12px`).
-
-                                    ONE `{#if}` with an `{:else if}`, not two independent blocks.
-                                    The two gates at full.js:1972-1991 are complements over the same
-                                    three terms, and written separately a room that never received
-                                    `overwriteCashRegisterSound` would render both at once.
-                                    `alertSoundButtonFor` in `$lib/files-gates` resolves them to one
-                                    answer and is tested there.
-
-                                    TRANSCRIPTION NOTE: const 263 spells the type attribute
-                                    `pe="button"` - `["pe","button","title","Remove Overwrited Cash
-                                    Register Sound",...]` - where every sibling row button spells it
-                                    `type`. That is a typo in the original. It is harmless where it
-                                    stands, because the files table sits in no `form` and the
-                                    implicit `submit` a missing type gives a button has nothing to
-                                    submit; copied forward it would plant a latent bug for anyone
-                                    who later wraps this pane in one. So `type="button"` is written
-                                    here. The TITLE is verbatim, misspelling included.
-                                  -->
-                          {#if alertSoundButton === 'set'}
-                            <button
-                              type="button"
-                              title="Overwrite Cash Register Sound"
-                              class="btn ml-2 btn-info set-alert-sound-btn"
-                              onclick={() => setAlertSound(item.url, true)}
-                            >
-                              <i class="fa fa-bell mr-2"></i>Set as alert sound{' '}
-                            </button>
-                          {:else if alertSoundButton === 'remove'}
-                            <button
-                              type="button"
-                              title="Remove Overwrited Cash Register Sound"
-                              class="btn ml-2 btn-info set-alert-sound-btn"
-                              onclick={() => setAlertSound(item.url, false)}
-                            >
-                              <i class="fa fa-trash mr-2"></i>Remove as alert sound{' '}
-                            </button>
-                          {/if}
-                        </div>
-                      </td>
-                    {/if}
-                  </tr>
-                {/each}
-              </tbody>
-            </table>
-          {/if}
-        </div>
+        <FilesPane
+          {data}
+          {isPresenter}
+          {filesHidden}
+          {mainTab}
+          bind:fileTab
+          {fileSort}
+          {selectedFileIds}
+          {playingForMe}
+          {mp3Playing}
+          {countFiles}
+          {searchedFiles}
+          {matchesFileTab}
+          {applyFileSort}
+          {onfilesearch}
+          {toggleFileSelection}
+          {deleteSelectedFiles}
+          {deleteFile}
+          {playMp3ForMe}
+          {playMp3ForAll}
+          {stopMp3ForAll}
+          {setAlertSound}
+          {openModal}
+        />
       </div>
       {#if youtubeForAllUrl}
         <!--

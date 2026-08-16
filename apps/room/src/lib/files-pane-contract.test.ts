@@ -86,7 +86,16 @@ vi.mock('$lib/server/room-config-client', () => ({
   `deleteFile`, `searchedFiles` and the rest are still declared on the page, which is why this file
   reads two sources and each assertion points at the one that owns its subject.
 */
-const pane = readFileSync(new URL('./components/PresentationArea.svelte', import.meta.url), 'utf8');
+const pane = readFileSync(new URL('./components/FilesPane.svelte', import.meta.url), 'utf8');
+/*
+  The `#files` TAB stayed in the main tab strip when the PANE became its own component on
+  2026-08-16, so the two halves of the `hideFiles` gate are now in two files and each is read
+  from the one that renders it.
+*/
+const presentationArea = readFileSync(
+  new URL('./components/PresentationArea.svelte', import.meta.url),
+  'utf8'
+);
 const page = readFileSync(new URL('../routes/+page.svelte', import.meta.url), 'utf8');
 const bundle = readFileSync(
   new URL('../../docs/source/components/app-presentationarea.full.js', import.meta.url),
@@ -893,10 +902,30 @@ describe('the alert-sound row buttons', () => {
     );
     expect(roomConfig).toContain('hideFiles?: boolean;');
 
-    // The two elements, by their own markup rather than by a count of the word `hidden`.
-    expect(pane).toContain('<li role="presentation" class="nav-item" hidden={filesHidden}>');
+    /*
+      The two elements, by their own markup rather than by a count of the word `hidden` — and since
+      2026-08-16 they are in two FILES. The tab is in the main strip, which stayed in
+      `PresentationArea`; the pane is `FilesPane` itself. Reading both is what keeps the pair
+      honest: either one alone leaves a tab that opens nothing or a pane still reachable from a tab
+      that is gone, which is the whole point of the assertion.
+    */
+    expect(presentationArea).toContain(
+      '<li role="presentation" class="nav-item" hidden={filesHidden}>'
+    );
     const filesPaneEl = pane.slice(pane.indexOf('id="files"'));
     expect(filesPaneEl.slice(0, filesPaneEl.indexOf('>'))).toContain('hidden={filesHidden}');
+    /*
+      ...and the flag reaches the pane from the component that also gates the tab on it.
+
+      SLICED TO THE INVOCATION, not searched whole-file, and that is not fussiness: the first
+      version of this line was `expect(presentationArea).toContain('{filesHidden}')`, which the
+      TAB's own `hidden={filesHidden}` satisfies as a substring. It could never fail, and a negative
+      control proved it — deleting the hand-off entirely left this file green.
+    */
+    const invocation = presentationArea.slice(presentationArea.indexOf('<FilesPane'));
+    const handoff = invocation.slice(0, invocation.indexOf('/>'));
+    expect(handoff, 'the FilesPane invocation must be findable').not.toBe('');
+    expect(handoff).toContain('{filesHidden}');
 
     // ...and the pane's `display: none` is declared, because `#files.active` would otherwise win.
     const appCss = readFileSync(new URL('../app.css', import.meta.url), 'utf8');

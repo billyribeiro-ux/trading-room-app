@@ -349,7 +349,14 @@ describe('the contract tests that read source as text cannot pass vacuously', ()
       count dropping is the only signal that happens, so it is worth saying plainly — a file leaves
       this list silently and stays green while it does.
     */
-    'components/PresentationArea.svelte'
+    'components/PresentationArea.svelte',
+    /*
+      Added in the SAME commit that created the component, which is the point. The two entries
+      above were both added after the fact, once a dropped test count gave the game away. This one
+      went in before `files-pane-contract` was re-pointed, so the list never lost it — that is the
+      habit the two retrofits above exist to teach.
+    */
+    'components/FilesPane.svelte'
   ];
 
   const readers = readdirSync(testDir)
