@@ -24,6 +24,56 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-16
 
+### 2026-08-16 14:14 EDT — R-1 closed, Q-1 audited against our code, and a false comment found in `ModalHost.svelte`
+
+**No runtime impact.** `todo-next.md` only, +130 lines (7,638 -> 7,768). Documentation phase.
+
+**Scope narrowed on the owner's instruction: a gap counts only if the implementation needs it.** This
+entry is therefore driven from `apps/room/src`, not from the dump pile -- which is what turned an
+open-ended reading queue into a bounded list.
+
+**R-1 closed.** The whole `:root` block plus `.lightTheme` and `.darkTheme`, read end to end.
+`--modal-content-bg-color:#303030`, `--modal-content-color:#fff`, `--modal-input-group-bg:#444`,
+`--modal-upload-files-color:#555`. The other two are defects, not values:
+
+- **`--textarea-color` is not in `:root`** -- only inside the two theme classes -- so the Q&A
+  textarea has no colour of its own when no theme class is on an ancestor.
+- **`--textarea-holder-btns-hover-color` is defined in none of the three blocks**, so
+  `.textAreaBtns:hover{color:var(...)!important}` does nothing. Its non-hover twin IS defined, which
+  is what makes it a slip rather than a convention. Scope stated precisely: absent from the three
+  blocks where this sheet declares custom properties, each read in full -- not asserted absent from
+  all 444 KB.
+
+**Q-1 audited. Our implementation is substantially faithful** -- the role-dependent placeholder was
+already right, and three reference defects (`clas` for `class`, `alt="qaMsg.avt"`, the double space)
+are already reproduced deliberately. The unguarded `hasOwnProperty` crash is deliberately NOT
+reproduced, which is the correct call and is now recorded as a decision rather than left to look
+like an oversight. The back end is stronger than the reference's: one transaction, counts derived
+rather than incremented, a room-scoped lookup, its own rate-limit bucket and a length bound.
+
+**A false comment in our source, and it is load-bearing.** `ModalHost.svelte:1760` says *"The
+captured textarea had no handler at all, so pressing Enter did nothing."* The captured textarea has
+**two** handlers -- const 17 carries `3,"keyup","paste","placeholder"` and the template binds
+`(keyup)="onKey($event)"` and `(paste)="onImagePaste($event)"`. That comment is the stated
+justification for our keyboard behaviour, so the next engineer would believe the divergence is free
+when it is not. The line above it is wrong a second way: it says "Shift+Enter is ignored" while the
+code falls through and inserts a newline. **The behaviour should stay** -- the reference's
+`preventDefault()` on `keyup` cannot stop a character being typed, so ours is genuinely better --
+**but the justification must be replaced with the evidence.**
+
+**Ten implementation items** where ours needs the reference and does not have it, each with its
+locator: the image button misses the `sessData.userUploads` half of `canPostImages` (the comment
+beside it cites the right expression but the code implements only half of it); no paste-to-upload;
+no textarea auto-expand and therefore not the `calc(70vh - {h} + 37px)` body shrink; the alert body
+rendered as text rather than through `parseSymbols`/`parseLinks`; no trade-copy; no compact display
+mode; the alert id not written onto the host element as a class, which is what the upstream
+`hidden.bs.modal` unread-clear binds to; no image-upload flow; no scroll-to-bottom; and mention
+targeting the chat composer rather than the Q&A one.
+
+**Verification.** No source file changed, so no suite was run. The timestamp in `todo-next.md` Sec 19
+was written as 13:52 and corrected to the measured 14:14 before this entry.
+
+
 ### 2026-08-16 12:05 EDT — Phase 5 slice 9: `RoomFeeds`, and a rewriter that can tell code from prose
 
 **`+page.svelte` 7,349 → 7,162.** Script 6,397 → 6,210, template unchanged at 952.

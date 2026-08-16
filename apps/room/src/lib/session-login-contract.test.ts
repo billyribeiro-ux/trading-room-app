@@ -230,6 +230,88 @@ describe('the login form controls decoded from the v4 bundle', () => {
     expect(pageCode).toContain('Connecting <i class="ml-2 fas fa-spinner fa-spin"></i>');
   });
 
+  it('greets rather than labelling — the h1 is "Welcome to the <name>"', () => {
+    /*
+      `vde` AND `eue` — the h1 of each layout arm — carry the identical interpolation:
+        Ne(" Welcome to the ",e.appService.globals.sessData.name," ")
+      Both were read; neither was assumed from the other. The capture's
+      "Welcome to the Room 3625" is that string with `sessData.name` = "Room 3625", which is why
+      rendering the bare name looked plausible and was wrong.
+    */
+    const greetings = pageCode.match(/Welcome to the \{data\.roomTitle\}/g) ?? [];
+    expect(greetings, 'one h1 per layout arm').toHaveLength(2);
+    expect(pageCode).not.toContain('<h1 class="room-title">{data.roomTitle}</h1>');
+  });
+
+  it('strips the token from the address bar, as ngOnInit does', () => {
+    /*
+      `let i=!0; i=window.top===window.self, i&&(P("removing tok from url"),
+       this.appService.removeUrlParam("tok"))` — byte ~1,192,100.
+
+      A JWT in the URL is written to history, offered in `Referer`, and copied whenever somebody
+      pastes "the link they were sent". It is verified server-side and already on `data.token`.
+
+      Three assertions, and the LAST TWO are the ones that matter:
+        - the iframe guard is the reference's and must survive;
+        - `replaceState`, never `goto` — a goto re-runs the load without the token and blanks the
+          prefill this page exists to show;
+        - the `has()` check is what stops the effect re-triggering itself, since it reads `page.url`
+          and replaceState writes it. Removing it spins.
+    */
+    expect(pageCode).toContain('window.top !== window.self');
+    expect(pageCode).toContain('replaceState(');
+    expect(pageCode).toContain("stripped.searchParams.has('jwtSite')");
+    expect(pageCode).not.toContain("goto(`${stripped.pathname}");
+  });
+
+  it('picks the layout on sessData.description, which is the whole of L-5', () => {
+    /*
+      `yue`'s update block at byte 1,188,490:
+        O(2, e.browserOK||e.browserOKDismissed ? -1 : 2)
+        O(3, e.appService.globals.sessData.description ? 3 : 4)
+
+      Slot 3 is `Wde` — `row login-row` + the `room-message` column. Slot 4 is `vue` — one column
+      centred by `offset-md-3 offset-sm-3`. The offsets belong to the NO-description arm only;
+      applying them unconditionally would centre a form that has a left column beside it.
+    */
+    expect(pageCode).toContain('{#if data.roomDescription}');
+    expect(pageCode).toContain("'col-md-6 offset-md-3 col-sm-6 offset-sm-3 col-xs-12'");
+    expect(pageCode).toContain("'col-md-6 col-sm-12 col-xs-12'");
+    // The h1 moves INSIDE the form container on the centred arm — `bue`'s `H(0,eue,2,1,"h1",34)`.
+    expect(pageCode).toContain('{#if !data.roomDescription && data.roomTitle}');
+  });
+
+  it('renders room-description as HTML, and SANITISES it on the server', () => {
+    /*
+      The const binds `innerHtml`, so this is rich text, and `.room-description img` in the
+      component's CSS proves images render. `{@html}` is therefore correct — but this page is
+      reachable WITHOUT a session, so the sanitiser has to run before the value ever leaves the
+      server. NEGATIVE CONTROL: the raw settings value must never reach the payload.
+    */
+    expect(pageCode).toContain('{@html data.roomDescription}');
+    expect(serverCode).toContain('roomDescription: sanitizeRoomDescription(');
+    expect(serverCode).not.toContain("roomDescription: String(settings.description");
+    // Deny-by-default, and no `data:` — an SVG data URL is script delivery dressed as an image.
+    expect(serverCode).toContain("allowedSchemes: ['http', 'https', 'mailto']");
+    expect(serverCode).not.toContain("'data'");
+  });
+
+  it('has "Keep me logged in" CHECKED by default, because the reference does', () => {
+    /*
+      The constructor at byte 1,188,545 sets `this.rememberMe=!0` before any branch runs, and
+      nothing anywhere sets it false:
+
+        constructor(e,i){…this.loginReady=!1,this.browserOK=!0,this.browserOKDismissed=!1,
+          this.disableLoginForm=!1,this.rememberMe=!0,this.forgetMe=!1,…}
+
+      Pinned because the safe-LOOKING default is the opposite one. Shipping `false` gives every
+      member a ONE_DAY session while showing them an unticked box they never chose — which is what
+      this page did for the first two attempts at this line.
+    */
+    expect(pageCode).toContain('let rememberMe = $state(true)');
+    expect(pageCode).not.toContain('let rememberMe = $state(false)');
+  });
+
   it('does NOT centre the user-nick, and shows the nick rather than the email', () => {
     /*
       THE NEGATIVE CONTROL THAT CAUGHT A SHIPPED GUESS. const 70 is `[1,"user-nick"]` — one class —
