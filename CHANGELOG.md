@@ -303,6 +303,50 @@ database a developer's `.env` should name is the owner's call, and `.env` is not
 that closed items are REMOVED and their history lives here — I struck AH, AI and AJ through instead,
 three times in one session, which is the exact drift the rule exists to stop.
 
+### 2026-08-15 21:40 EDT — Migration `0013` applied and read back, and two things I recorded wrongly
+
+**Branch `feat/extra-chat-column`. Runtime impact: the local dev database only** — `0013` applied to
+`tradingroom_dev`.
+
+**The evidence, read back from PostgreSQL rather than asserted:**
+
+```
+ dark_theme_badge_id | integer  |  |  |
+ "badges_dark_theme_badge_id_fkey" FOREIGN KEY (dark_theme_badge_id)
+     REFERENCES badges(id) ON DELETE SET NULL
+```
+
+Nullable, self-referencing, with the delete action the migration specifies. The db suite is green
+alongside it — **55 tests across 9 files**, each run standing up its own throwaway cluster (`initdb`
+to a temp directory, a random high port bound to 127.0.0.1, then `pg_ctl stop` and delete), so the
+whole migration chain including `0013` runs from scratch every time. The four `darkThemeBadgeId`
+cases cannot pass without the column, which is what makes that suite proof rather than coverage.
+
+**TWO THINGS I WROTE DOWN WRONGLY, both corrected here.**
+
+1. **I checked the wrong database.** `psql -d newroom_control_dev` showed no `dark_theme_badge_id`,
+   and I recorded that the dev database "simply has not been migrated". True of that one — it is
+   **stale, sitting at migration 5**. The live controller database is **`tradingroom_dev`**, which
+   was at 12. Two databases, similar names, and I never checked which one the application uses.
+2. **I connected as the wrong role.** `billyribeiro`, where the runtime role is **`tradingroom_app`**
+   — `ptr_clone*` being the REFERENCE name, with `ops/naming-provenance.md` as the mapping. Both
+   exist on purpose and `naming-boundary.test.ts` enforces the distinction.
+
+Neither error touched the code; both went into the record, which is worse in one specific way — the
+code gets re-read, and a written claim gets trusted.
+
+**And a false alarm that did not ship, recorded because it was one step away.** Searching for
+`tradingroom_app` across `services ops apps docs` returned nothing, and I was about to report the
+backend role cutover missing. I had run it from `apps/room`, where those directories do not exist.
+From the repository root it is **24 files**, including
+`services/api/migrations/0009_provision_tradingroom_app.sql`, which names the role 23 times. The
+cutover is entirely present and the 16:45 entry documents it verified on real PostgreSQL 17 with the
+attestor passing.
+
+That is the fourth false-negative search today. The others: `grep -rl` missing 40 files across the
+reference folders, `WebFetch` answering NOT PRESENT about a bundle it had truncated to a third, and
+two `perl` mutations that matched nothing because prettier had wrapped the line they targeted.
+
 ### 2026-08-15 21:26 EDT — Row AH closed: the third unbounded read, bounded by the alert page it belongs to
 
 **Branch `feat/extra-chat-column`. Runtime impact: YES** — the page load stops serialising every
