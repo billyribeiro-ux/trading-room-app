@@ -223,6 +223,40 @@ through — both are documented in `.env.example` and until now nothing read the
 **Not done:** retiring `ptr_clone_app` (deferred until the cutover is proven in a real deployment),
 and the owner role / database rename `ptr_clone` → `tradingroom`. Both remain in `TODO.md`.
 
+### 2026-08-15 21:16 EDT — `AlertChatArea` extracted, proven, and reverted on purpose
+
+**Branch `feat/extra-chat-column`. Runtime impact: none — nothing was kept.** The tree is exactly
+where `8fc6aff` left it, verified: `svelte-check` 0 errors across 1,137 files.
+
+**The extraction works, and that is now measured rather than assumed.** 696 lines came out cleanly;
+`+page.svelte` went **11,550 → 10,870 (−680)**, `AlertChatArea.svelte` came to 842, and the whole
+tree type-checked at **0 errors across 1,138 files** with the component wired in.
+
+**The prop list came from the compiler, and that mattered twice.** Written with an empty `<script>`,
+`svelte-check` named all 45 unbound identifiers. Two things a hand scan would have got wrong:
+
+- **`data` appears twelve times in that markup and never as the variable** — every hit is a
+  `data-bs-toggle` or `data-bs-target` attribute. That is the exact false positive that produced four
+  invented props earlier in this session.
+- **`alertLabels` is invisible to the compiler** while `RoomMessage` is unresolved, because its props
+  go unchecked. Found by reading, confirmed by the tool once the import landed.
+
+`showMessageOptions` is the only `$bindable()`. `MessageActionItem` had to move to `$lib/types`, and
+moving it found the page's local `MessageReactionPayload` to be character-identical to the one
+`$lib/types` already exports.
+
+**WHY IT WAS REVERTED.** Moving the region breaks **24 assertions across 13 files**, and a blanket
+re-point of their source read does not work: several assert on BOTH the page's script (`const
+presenterMessagesOnTheRight = $derived(...)`, `let chatGif = $state(...)`) and the pane's markup
+(`kind="chat"`, `{...messageChrome}`). Those need two source constants with each assertion pointed at
+the right one — per-file judgement across roughly a dozen files.
+
+I did not have the context left to do that well, and **a half-migrated set of contract files is worse
+than an unextracted page**: text guards that silently start passing for the wrong reason are the
+failure mode this repository has already shipped twice. So the work was reverted rather than
+committed, and everything learned is written into `TODO.md` row AK so the next pass starts from the
+measurements instead of repeating them.
+
 ### 2026-08-15 21:07 EDT — Row AJ: the dark-theme control stops being a toggle and starts storing a badge id
 
 **Branch `feat/extra-chat-column`, not merged. Runtime impact: YES** — migration `0013`, a new column,
