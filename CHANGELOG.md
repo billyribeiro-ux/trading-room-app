@@ -24,6 +24,50 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-16
 
+### 2026-08-16 16:17 EDT — Phase 5 slice 22: `RoomAlertsPane`, a negative control that stayed green, and two CI gates I was not running
+
+**`+page.svelte` 4,323 → 4,151 (−172).** Suite 2,286 → 2,294 across 155 files. `svelte-check`
+1,180 files, 0 errors, 0 warnings. **All four CI steps run locally and green: `lint`, `check`,
+`test`, `build`.**
+**Runtime impact: yes** — the alerts pane's actions moved. No behaviour changed.
+
+**`src/lib/room/alerts-pane.ts` (291).** Archive, export, detach, reattach, open the transcript, and
+the two toolbar toggles — what a viewer DOES to the alerts pane, as against what `RoomAlerts` and
+`RoomFeeds` know about the alerts themselves. Both of those stay put and are read from here.
+
+**`chatAlertsDetached` did not travel, and only the RECEIVER crosses.** It is written on both sides:
+this class detaches, the page lays out from it. A reader thunk was supplied first and eslint refused
+it — nothing here consumes the value — so the class only writes. That is the shared-field rule slice
+13 paid for with `followedUsers`, and the dependency scanner found it rather than a reading of the
+code.
+
+**A NEGATIVE CONTROL THAT STAYED GREEN, which is the finding.** Deleting
+`this.#setChatAlertsDetached(true)` from `detach()` — so the alerts column opens in its own window
+and the room's layout is never told — broke nothing in 2,289 assertions. That is a missing TEST, not
+a missing behaviour, and it is the same shape as the gap slice 8 found: a receiver whose two ends
+are each plausible alone. `src/lib/room/alerts-pane.test.ts` now asserts all three writers and the
+page's supply of the receiver; the control is red.
+
+**Two CI gates I was not running, and both went red on the branch before I noticed.**
+
+1. **`eslint .`, not `eslint <the files I think I touched>`.** Re-pointing an assertion at a new
+   module orphans the source constant it used to read, and three of those (which cascaded to four
+   more) failed CI's lint step. The verification step for a re-pointing is the whole tree.
+2. **`vite build`.** A `+page.server.ts` may export only `load`, `actions`, `prerender`, `csr`,
+   `ssr`, `trailingSlash`, `config`, `entries` and `_`-prefixed names. `sanitizeRoomDescription` had
+   carried `export` since it was written, nothing ever imported it, and svelte-check is green over
+   it because the rule is SvelteKit's rather than TypeScript's. The build had simply never reached
+   that check while lint was failing earlier in the pipeline.
+
+**And a third, fixed here rather than left for the next push:** `{@html data.roomDescription}` on
+the session page had no suppression, so `svelte/no-at-html-tags` failed lint. It is safe —
+`sanitizeRoomDescription` runs server-side, deny-by-default — and now says so next to a directive.
+The first attempt at that directive did not work either: an eslint justification is written after a
+double hyphen, and a double hyphen inside an HTML comment is not legal markup, so the reason lives
+in its own comment above the directive.
+
+Not verified: no browser run. Nothing here proves the pane detaches.
+
 ### 2026-08-16 16:01 EDT — Phase 5 slice 21: `RoomWebcams`, and a generator that judged a rule before running it
 
 **`+page.svelte` 4,485 → 4,323 (−162).** Suite 2,283 → 2,286 across 154 files. `svelte-check`

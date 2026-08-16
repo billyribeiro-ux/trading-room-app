@@ -78,6 +78,7 @@
   import { RoomFiles } from '$lib/room/files.svelte';
   import { RoomPrivateChat } from '$lib/room/private-chat.svelte';
   import { RoomComposer } from '$lib/room/composer.svelte';
+  import { RoomAlertsPane } from '$lib/room/alerts-pane';
   import { RoomFeeds } from '$lib/room/feeds.svelte';
   import { RoomMessageActions } from '$lib/room/message-actions.svelte';
   import { RoomEventStream } from '$lib/room/events.svelte';
@@ -122,7 +123,7 @@
   import { swingAlertsTabVisible } from '$lib/swing-alerts';
   import type { SwingAlertRow } from '$lib/types';
   import { parseAlertLabels } from '$lib/alert-labels';
-  import { alertFilterAvailable, alertPassesFilter, type AlertFilterFor } from '$lib/alert-filter';
+  import { alertFilterAvailable, alertPassesFilter } from '$lib/alert-filter';
   import { dayTradeAlertsTabVisible } from '$lib/day-trade-alerts';
   import type { DayTradeAlertRow } from '$lib/types';
   import { isMentionOf } from '$lib/mention';
@@ -738,7 +739,6 @@
     archivedAt:
       typeof prefs.loaded.alertsArchivedAt === 'number' ? prefs.loaded.alertsArchivedAt : null
   });
-  let alertsDetachedWindow: Window | null = null;
   /*
     The eleven floating menus, in `$lib/room/menus.svelte.ts`.
 
@@ -1819,163 +1819,16 @@
    */
   const alertFilterActive = $derived(alertFilterConfigured && alerts.filterSelected);
 
-  /**
-   * `updateAlertFilter` — the reference persists the map server-side AND sets the preference.
-   *
-   * This room has one mechanism for both: `savePreference` already stores arbitrary JSON per user
-   * and already carries map-shaped values, so no new endpoint is needed. The observable result is
-   * the reference's: the selection survives a reload.
-   */
-  function saveAlertFilter(next: { alertFilterFor: AlertFilterFor; showAlertsFrom: boolean }) {
-    const write = alerts.filterChanged(next);
-    prefs.save('alertFilterFor', write.alertFilterFor);
-    prefs.save('showAlertsFrom', write.showAlertsFrom);
-  }
 
 
 
-  function archiveAlerts() {
-    const archivable = feeds.visibleAlerts.length;
-    if (archivable === 0) {
-      dialogs.alert = 'There are no alerts to archive.';
-      return;
-    }
-    dialogs.confirmation = {
-      message: `Archive ${archivable} alert${archivable === 1 ? '' : 's'} from this list? They stay stored and are not deleted.`,
-      onconfirm: () => {
-        dialogs.confirmation = null;
-        // One clock reading for the state and the preference: two calls could straddle an alert
-        // arriving and archive it out of the list while storing a cut-off that does not cover it.
-        prefs.save('alertsArchivedAt', alerts.archive(Date.now()));
-      }
-    };
-  }
 
-  // "Save alerts messages" exports what is currently listed, mirroring how a note is downloaded.
-  function saveAlerts() {
-    if (feeds.visibleAlerts.length === 0) {
-      dialogs.alert = 'There are no alerts to save.';
-      return;
-    }
-    const lines = feeds.visibleAlerts.map((item) => {
-      // Captured alerts carry the timestamp text exactly as it was rendered; database rows do not.
-      const stamp =
-        'evidenceTimestampText' in item && item.evidenceTimestampText
-          ? item.evidenceTimestampText
-          : alertExportFormatter.format(new Date(item.createdAt));
-      return `[${stamp}] ${item.senderName}: ${item.body}`;
-    });
-    const blob = new Blob([`${lines.join('\n')}\n`], { type: 'text/plain;charset=utf-8' });
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `alerts-${data.sessionHandle}.txt`;
-    link.style.display = 'none';
-    document.body.append(link);
-    link.click();
-    link.remove();
-    window.URL.revokeObjectURL(url);
-  }
 
-  const alertExportFormatter = new Intl.DateTimeFormat('en-US', {
-    year: '2-digit',
-    month: 'numeric',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit'
-  });
 
-  // Exact copy from the captured detach bootbox (alert-section/modal-content); do not paraphrase.
-  const DETACHED_ALERTS_MESSAGE =
-    'Chat/Alerts detached to a new browser window...You can reopen the chat in this window from the side menu.';
 
-  /**
-   * "Detach Alerts", transcribed from the capture's `detachChat` handler:
-   *
-   * ```js
-   * appEventBus.subscribe("detachChat", () => {
-   *   const e = window.innerWidth, i = window.innerHeight;
-   *   this.detachedChatWindow = window.open(
-   *     window.location.href + `&co=1&sl=1&tok=${globals.sesionToken}`, "_blank",
-   *     `toolbar=no,location=no,directories=no,status=no,menubar=no,titlebar=no,
-   *      fullscreen=no,width=${e / 2},height=${i}`);
-   *   window.addEventListener("message", o =>
-   *     "windowClosing" === o.data && appEventBus.emit("reatachChat")) })
-   * ```
-   *
-   * `co=1` is the whole point and was missing: the capture parses it as `chatOnlyMode`
-   * (`const F = s.get("co")`, and `globals.chatOnlyMode` even changes the socket's query to
-   * `{detachedChat:"1"}`). This opened `window.location.href` with NO query string, so the popout
-   * was a second copy of the ENTIRE room rather than the alerts and chat.
-   *
-   * `tok` is not carried: the capture passes a session token in the URL because its popout
-   * authenticates from the query string. This app authenticates from the session cookie, which the
-   * new window already has, so putting a credential in a URL here would add an exposure the
-   * original needed and this one does not.
-   *
-   * The other half is in the room component, and matters as much: detaching HIDES the chat and
-   * alerts in this window and offers a control to bring them back -
-   * `subscribe("detachChat", () => { this.hideChatAlerts = !0; this.reopenAlertsChatBtn = !0 })`.
-   * Without it a reader ends up with the same panel twice.
-   */
-  function detachAlerts() {
-    if (alertsDetachedWindow && !alertsDetachedWindow.closed) {
-      alertsDetachedWindow.focus();
-      return;
-    }
-    const query = new URLSearchParams(window.location.search);
-    query.set('co', '1');
-    query.set('sl', '1');
-    alertsDetachedWindow = window.open(
-      `${window.location.pathname}?${query}`,
-      '_blank',
-      `toolbar=no,location=no,directories=no,status=no,menubar=no,titlebar=no,fullscreen=no,width=${Math.round(window.innerWidth / 2)},height=${window.innerHeight}`
-    );
-    if (!alertsDetachedWindow) {
-      dialogs.alert =
-        'Your browser blocked the detached window. Please allow pop-ups for this site.';
-      return;
-    }
-    chatAlertsDetached = true;
-    // `"windowClosing" === o.data && emit("reatachChat")` - closing the popout puts them back.
-    alertsDetachedWindow.addEventListener('beforeunload', () => {
-      chatAlertsDetached = false;
-      alertsDetachedWindow = null;
-    });
-    dialogs.alert = DETACHED_ALERTS_MESSAGE;
-  }
 
-  /**
-   * `openTranscriptPage()`, and the sidebar's `toggleSpeechRecoHistory()` - byte-for-byte the same
-   * body on two different components, so "Transcript History" in the Archives menu and "Full
-   * Transcript History" on the caption overlay are one action:
-   *
-   * ```js
-   * const e = globals.sesionToken;
-   * if (!e) return void P("No session token available for transcript");
-   * window.open(`${location.origin + location.pathname}#/session-transcript?token=${encodeURIComponent(e)}&name=${encodeURIComponent(globals.sessionName)}`, "_blank");
-   * ```
-   *
-   * Both controls were dead links - no handler at all on the menu item, no button on the overlay.
-   * They now report the same thing, honestly: there is no transcript page to open, because nothing
-   * in this repo produces a transcript. `currentCaption` is never assigned (the Web Speech API runs
-   * on the presenter's machine in the capture and the results are relayed over the socket; neither
-   * half is wired here), so `lastSpeechReco` has no source and the page would render an empty
-   * document. Recorded in TODO.md rather than papered over with a route that always says "empty".
-   */
-  const TRANSCRIPT_UNAVAILABLE =
-    'The transcript page is not available in this room: speech recognition results are not being captured, so there is nothing to open.';
 
-  function openTranscriptPage() {
-    dialogs.alert = TRANSCRIPT_UNAVAILABLE;
-  }
 
-  /** `reopenAlertsChat()` - the side-menu control the bootbox message points at. */
-  function reopenAlertsChat() {
-    chatAlertsDetached = false;
-    if (alertsDetachedWindow && !alertsDetachedWindow.closed) alertsDetachedWindow.close();
-    alertsDetachedWindow = null;
-  }
   /**
    * The mention popup — `prefs.chatPopup`'s half of the reference's notification block.
    *
@@ -2048,6 +1901,27 @@
     theme: () => theme,
     unreadQa: unreadQaAlertIds,
     alertsLogKey: ALERTS_LOG
+  });
+
+  /*
+    THE ALERTS PANE's own actions, in `$lib/room/alerts-pane.ts`.
+
+    Phase 5 slice 22: archive, export, detach and the two toolbar toggles — what a viewer DOES to
+    the pane, as against what `RoomAlerts` and `RoomFeeds` know about the alerts themselves.
+
+    `chatAlertsDetached` is written on both sides of this boundary, so only the RECEIVER crosses:
+    the class writes it and this file reads it to lay out. A reader thunk was supplied at first and
+    eslint refused it as a collaborator nothing consumes.
+  */
+  const alertsPane = new RoomAlertsPane<(typeof data.alerts)[number]>({
+    alerts,
+    dialogs,
+    prefs,
+    feeds,
+    alertsScroller: () => alertsScroller ?? null,
+    forceAlertsToBottom,
+    sessionHandle: () => data.sessionHandle,
+    setChatAlertsDetached: (next) => (chatAlertsDetached = next)
   });
 
 
@@ -2471,52 +2345,7 @@
 
 
 
-  /**
-   * `toggleAlertsToolbar()` - the gear (`app-alerts.compiled.js:134-140`):
-   *
-   * ```js
-   * toggleAlertsToolbar() {
-   *   this.showAlertsToolbar && !this.showAlertsToolbarExtended
-   *     ? (this.showAlertsToolbarExtended = !0)
-   *     : ((this.showAlertsToolbar = !this.showAlertsToolbar),
-   *        this.showAlertsToolbar && (this.showAlertsToolbarExtended = !0)),
-   *   this.appService.guiEventBus.emit('scrollAlertLogToBottom');
-   * }
-   * ```
-   *
-   * Note the first branch: with a search-only strip already open the gear EXPANDS it rather than
-   * closing it, so the two controls do not fight each other.
-   */
-  function toggleAlertsToolbar() {
-    alerts.toggleToolbar();
-    // `guiEventBus.emit('scrollAlertLogToBottom')` - the strip changes height, so the log would
-    // otherwise be left scrolled off the newest alert. The scroller is this file's element, which
-    // is why the emit stayed here rather than going into the class with the toggle.
-    if (alertsScroller) forceAlertsToBottom(alertsScroller);
-  }
 
-  /**
-   * `toggleAlertsToolbarSearchOnly()` - the magnifier (`app-alerts.compiled.js:141-150`):
-   *
-   * ```js
-   * toggleAlertsToolbarSearchOnly() {
-   *   (this.showAlertsToolbar && this.showAlertsToolbarExtended) ||
-   *     (this.showAlertsToolbar = !this.showAlertsToolbar),
-   *   this.showAlertsToolbarExtended = !1,
-   *   this.showAlertsToolbar && setTimeout(() => { … focus the search box … });
-   * }
-   * ```
-   *
-   * The mirror of the above: from the FULL toolbar it collapses to search-only instead of
-   * closing, and it always ends with the extended regions hidden.
-   */
-  function toggleAlertsToolbarSearchOnly() {
-    if (!alerts.toggleSearchOnly()) return;
-    // `setTimeout(...)` in the capture, because the input does not exist until the strip renders.
-    void tick().then(() => {
-      document.querySelector<HTMLInputElement>('#alert-settings .form-control')?.focus();
-    });
-  }
 
   function openModal(name: Exclude<ModalName, null>) {
     if (name === 'muted' || name === 'followed' || name === 'user') userActions.loadManaged();
@@ -3923,8 +3752,8 @@
           onusersearchkey={doUserSearch}
           ongetmobilepin={() => void getMyPinAndDoInfo()}
           ongetrandomuser={getRandomUser}
-          onopentranscript={openTranscriptPage}
-          onreopenalertschat={reopenAlertsChat}
+          onopentranscript={alertsPane.openTranscript}
+          onreopenalertschat={alertsPane.reopen}
           onreload={() => void invalidateAll()}
         />
         {@render mainNavigation()}
@@ -4003,11 +3832,11 @@
               {observeComposerWidth}
               onopenmodal={openModal}
               onopenpoll={openPollUI}
-              ontogglealertstoolbar={toggleAlertsToolbar}
-              ontogglealertssearch={toggleAlertsToolbarSearchOnly}
-              ondetachalerts={detachAlerts}
-              onsavealerts={saveAlerts}
-              onarchivealerts={archiveAlerts}
+              ontogglealertstoolbar={() => alertsPane.toggleToolbar()}
+              ontogglealertssearch={() => alertsPane.toggleToolbarSearchOnly()}
+              ondetachalerts={alertsPane.detach}
+              onsavealerts={alertsPane.save}
+              onarchivealerts={alertsPane.archive}
               onalertsscroll={trackAlertsScroll}
               onchatscroll={trackChatScroll}
               onmessageaction={(kind, action, item, payload) =>
@@ -4049,7 +3878,7 @@
               {captionHistory}
               bind:speechRecoHistoryMode
               {archivesAvailable}
-              {openTranscriptPage}
+              openTranscriptPage={alertsPane.openTranscript}
               {previewWindowsVisible}
               webcamPresenters={mediaTransport.webcamPresenters}
               webcamCard={webcams.card}
@@ -4266,7 +4095,7 @@
       {downloadImage}
       {minimizePoll}
       {openModal}
-      {saveAlertFilter}
+      saveAlertFilter={alertsPane.saveFilter}
       {setTheme}
       {submitPollAction}
     />

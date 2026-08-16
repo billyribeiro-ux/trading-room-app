@@ -219,6 +219,20 @@
             that needs no session.
           -->
           <div class="room-description" style="height: 100%; overflow-x: hidden;">
+            <!--
+              WHY the rule is suppressed on the next line, kept separate from the directive because
+              an eslint justification is written after a double hyphen and a double hyphen inside an
+              HTML comment is not legal markup. The first attempt did exactly that and the directive
+              was silently not recognised.
+
+              `sanitizeRoomDescription` runs on the SERVER in `+page.server.ts`'s load,
+              deny-by-default through `sanitize-html`: every tag and attribute not on its allow-list
+              is dropped, and links are forced to `rel="noopener noreferrer nofollow"` and
+              `target="_blank"`. The value reaching this template has already been through it. The
+              rule is right in general, and a future edit that moves the sanitisation has to come
+              past this block.
+            -->
+            <!-- eslint-disable-next-line svelte/no-at-html-tags -->
             {@html data.roomDescription}
           </div>
         </div>

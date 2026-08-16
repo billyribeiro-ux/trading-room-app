@@ -31,6 +31,14 @@ const stripComments = (source: string) =>
   source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/<!--[\s\S]*?-->/g, '');
 const markup = stripComments(page);
 /*
+  The two TOGGLES moved to `room/alerts-pane.ts` in Phase 5 slice 22 - they are actions on the pane,
+  which is what that class holds. The markup that calls them stayed in `AlertChatArea.svelte`, so
+  this file reads four of ours now and each assertion points at the one that owns its subject.
+*/
+const paneActions = stripComments(
+  readFileSync(new URL('./room/alerts-pane.ts', import.meta.url), 'utf8')
+);
+/*
   The toolbar's MARKUP moved to `AlertChatArea.svelte` on 2026-08-15 while the two togglers stayed
   on the page, so this file now reads three of ours instead of two — and each assertion below points
   at whichever one owns its subject. A single re-pointed constant would have been the wrong fix:
@@ -62,8 +70,8 @@ describe('alerts toolbar: two states, two controls', () => {
     expect(component).toContain('toggleAlertsToolbarSearchOnly()');
     expect(component).toContain('toggleAlertsToolbar()');
 
-    expect(markup).toContain('function toggleAlertsToolbarSearchOnly()');
-    expect(markup).toContain('function toggleAlertsToolbar()');
+    expect(paneActions).toContain('toggleToolbarSearchOnly()');
+    expect(paneActions).toContain('toggleToolbar()');
 
     // The magnifier (title="Search") must call the search-only toggle…
     const magnifier = paneMarkup.slice(paneMarkup.indexOf('title="Search"'));
@@ -79,8 +87,8 @@ describe('alerts toolbar: two states, two controls', () => {
       could pass while the pane's callbacks arrived from nothing — the magnifier calling a prop the
       page never supplies is exactly the failure a source-text contract is blind to otherwise.
     */
-    expect(markup).toContain('ontogglealertssearch={toggleAlertsToolbarSearchOnly}');
-    expect(markup).toContain('ontogglealertstoolbar={toggleAlertsToolbar}');
+    expect(markup).toContain('ontogglealertssearch={() => alertsPane.toggleToolbarSearchOnly()}');
+    expect(markup).toContain('ontogglealertstoolbar={() => alertsPane.toggleToolbar()}');
   });
 
   it('keeps the gear expanding rather than closing a search-only strip', () => {
