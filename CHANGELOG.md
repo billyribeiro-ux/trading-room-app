@@ -24,6 +24,456 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-16
 
+### 2026-08-16 10:36 EDT — `admin-surface.md` §G-1 CLOSED: the API-key restrictions editor, transcribed in full
+
+**Runtime impact: none** — `todo-next.md` only (4,960 → 5,126 lines).
+
+**`control-plane-capture.md` §E and §F read (lines 930–1,119 of 1,243).**
+
+**§G item 1 — "the entire editor is Unknown" — is closed, and it closes in our favour.** That
+document flags a comment in **our own** `account.css:1995` — *"the reference opens a bootbox for
+it"* — as unsupported, noting `manageApiKeyRestrictions` is not among its four known bootbox
+handlers. **The flag is wrong and our comment is right:** that document never had `app.min.js`, and
+§6.13 read the handler directly. It is `bootbox.dialog({title:"Manage API Key Restrictions", size:"large", buttons:{clear:"Clear All", cancel:"Cancel", save:"Save"}})`.
+
+**The editor is now transcribed rather than cited**, per the dump-deletion rule: two scrollable
+`list-group` checkbox lists at `max-height:260px`, headed verbatim **"Restrict to Sessions (leave
+none selected for no restriction)"** and the endpoints twin; rows labelled
+`(s.name||s.uuid||s._id) + " (" + (s.uuid||s._id) + ")"`; pre-checked from `restrictToSessions` /
+`restrictToEndpoints`; endpoints fetched by `listAllApiEndpoints` and cached; saved sequentially
+through `restrictApiSessions` then `restrictApiEndpoints`; **"Clear All" saves `([], [])`
+immediately**; and **an unrestricted key is all-access — deny-by-default inverted, which our build
+must not copy.**
+
+**This is the two corpora completing each other** — the site captures cannot see the manage bundle,
+and the manage bundle has no rendered DOM.
+
+**A causal claim explicitly refused.** `window.__disableMarketplace` is the **string** `"true"` while
+the Angular scope property is the **boolean** `true`. The capture's own words: *"Correlation of two
+truthy values on one page is not a causal chain, and the coercion function, if any, is not in the
+evidence."* Recorded as two observations, not one mechanism. Three independent signals do agree the
+marketplace is off for that account. **Our gate must be a real boolean decided server-side** — the
+string `"false"` is truthy.
+
+**Four absent globals recorded as evidence of nothing:** `__disableMobile`, `__disableSSO`,
+`__disableTextList`, `tokSite`. *"Do not build a feature-flag surface on this absence."* Likewise
+`lifecycleControls = []` is weaker than it reads — **the capture never records what the probe looked
+for**, so a too-narrow probe cannot be ruled out. Our active/suspended pair stays a **design**, not a
+match.
+
+**Three audit results against our build, from the capture itself:** our `restrictions` trigger label
+matches exactly and our `.acc-link` matches every computed value — with the reference's own
+font-weight 700 **confirming** the `.acc-api-label` mechanism we had only inferred; our restrictions
+**panel** is now diffable against the transcribed editor, and notably **the reference has no IP list**
+— that part is ours. One cheap pixel check owed: our button's computed `display` and rect against
+`inline`, **75.6875 × 16.5**.
+
+**Also transcribed from §E** so it survives dump deletion: the complete sessions-row markup —
+`icon fa fa-<name>` two-class icons, state labels as `<div>` not `<span>`, the non-stock
+`label-orange`, `" Launch"`/`" Manage"`/`" Marketplace"` leading spaces, Marketplace with **no href**,
+and both sort headers rendering `fa-sort-alpha-asc` **simultaneously** — the glyph is bound to
+nothing and cannot reflect sort state.
+
+**And rule 6c earned its place again:** §15.9 recorded *"`showNewRoom` does more than reveal New
+Room"* as a finding. **It was already known and already built** — `account/+page.svelte:77` says so
+in a comment and `account-new-room-reveal.test.ts` covers it. Auditing in the same pass caught it
+before it became a fourth false gap.
+
+### 2026-08-16 10:32 EDT — Account page audited as a faithful reproduction; site JWT lifetime found; docs re-scoped for dump deletion
+
+**Runtime impact: none** — `todo-next.md` only (4,837 → 4,960 lines).
+
+**Owner plan recorded as a standing constraint:** *"as soon as we close all the gaps and
+implementation i will get rid of every single node dump, file reference and everything else and then
+get a fresh pull to then audit against ours."* **That changes the standard for every line written
+from here on** — a byte offset is a provenance note, never the only record of a fact. **These
+documents must stand alone once the captures are deleted**, so verbatim strings, values, class lists,
+payloads and gates get transcribed, not just located. A sweep for offset-only claims is now owed
+before deletion. **And the fresh pull is the stronger of the two audit passes** — an independent
+second observation beats re-reading the same dumps twice.
+
+**`control-plane-capture.md` §D read (lines 651–800 of 1,243).**
+
+**A collector defect makes the API Keys and Badges panes unusable from this capture:** `paneOf()`
+resolved to the same DOM element for all four panes, so their `panel` objects are **byte-identical —
+one object stored four times**, the page-level ui-view container rather than a pane body. `panel.html`
+is hard-truncated at 4,000 characters. **The resulting zero API-key rows and zero badge rows are a
+truncation artefact, not a fact about the account** — §15.8's `apiKeyDelete` found one key through a
+different selector. Rule 6b again, from a third direction.
+
+**A live site JWT sits unredacted in that capture, and it dates the token policy:** `iat`
+2026-08-14T13:16:15Z → `exp` 2027-08-09T13:16:15Z — **a lifetime of exactly 360.0 days.** Hard
+evidence for our own token policy, and the redaction inconsistency is the defect already logged.
+
+**Three sessions-table findings worth carrying:** `showNewRoom` does more than reveal New Room — it
+also unhides each room's internal ObjectId **and ownerID**, so the five-click counter is a
+developer-info toggle; the **Launch anchor uses the numeric id `3627` while the adjacent Manage
+anchor uses the 24-hex ObjectId** — two identifiers for one room; and the room is named **`Tarzan`**,
+the same string as the v4 room's `<title>`, so **the account capture and the room bundle are the same
+room** and can be cross-read.
+
+**Implementation audit — our account page is already a faithful reproduction**, down to the
+non-obvious names: **`pane-default`** (not Bootstrap's `panel-default`), the exact `sessSearch` model
+name, the custom **`label-orange`** state label, `table-striped`, `fa-sort-alpha-asc`, `fa-cogs`,
+`fa-external-link`, and `fa-credit-card` (the last with
+`manage-user-row-reference-fields.test.ts` over it). **§15.9 is a verification spec, not a gap
+list** — what remains is checking *values* (the `0 / 2` seat display, the `showNewRoom` id reveal,
+the deliberately commented-out Refresh button), not whether the surface exists.
+
+### 2026-08-16 10:30 EDT — A zero is a statement about STATE; and the Account page turns out to be fully built
+
+**Runtime impact: none** — `todo-next.md` only (4,747 → 4,837 lines). Three new rules in the agent
+brief.
+
+**Owner correction: *"sometimes it may show 0 but its not because it doesn't exist, because there was
+a member or an extra admin added."*** Correct, and the hard evidence is on the exact control I got
+wrong.
+
+I recorded `adminUserRemove` — DOM count **0** — as "not captured, not proven absent". **Too weak.
+The control demonstrably exists**, and §6.13 had already read its body out of `app.min.js`:
+`removeAdminUser(adminUserId, name)` with the confirm string *'Remove admin user "X"? This cannot be
+undone.'* posting `cmd:"remove"` to `/users/v1/adminusers`. Counted: `removeAdminUser` **1**,
+`listAdminUsers` **8**, `adminUsers` **3**. **The DOM zero is because the captured account had no
+extra admin users** — `listAdminUsers` populates the list, the control renders per row, zero rows
+renders zero controls. **The zero measured the account's data, not the product's surface.**
+
+The same now applies to every count in that capture: one API key row, one session row, zero admin
+users, marketplace hidden by a per-account flag, and a `revealed:false` caused by the collector
+refusing its own clicks. **No claim about multi-row rendering, striping or empty states may be drawn
+from it.**
+
+**And the audit the owner asked for changes the picture entirely: the Account page is BUILT.**
+`routes/(app)/account/+page.svelte` is **1,382 lines**, `+page.server.ts` **612**, with **eight**
+dedicated test files. **All eleven reference controls are implemented** — `createApiKey`,
+`deleteApiKey`, `rotateApiKey`, `addAdminUser`, `removeAdminUser` (with `admin-users-row.test.ts`),
+`toggleArchivedRooms`, `sortByUUID`, `sortByName`, `createNew` (with `account-new-room-reveal.test.ts`),
+`manageMarketplaceSession`, and **`listAdminUsers` built under another name** as a Drizzle select
+scoped `.where(eq(adminUsers.accountId, accountId))`.
+
+**Ours is scoped where the reference is not.** §15.2 established the reference's router carries no
+authority at all; our load function enforces the account boundary in the query.
+
+**So §15.8's control inventory is not a gap list — it is a specification to verify our existing
+implementation against**: exact labels (`"New Api key"`, `"Close Add Admin User"`), exact tokens
+(`#e6e9ee`, `#363f45`, gutter `x=440.5`), and five accessibility defects we should have **diverged**
+from. That comparison has not been run and is the real outstanding work.
+
+**Three rules added to the agent brief**, each earned by a failure in this session:
+**6b** a zero from a rendered capture is a statement about state, not existence — state the
+precondition or the zero says nothing; **6c** audit our implementation in the same pass that decodes
+a reference control, not after; **6d** the corpus is v4 — never take a v3-era behaviour as current
+without checking it against v4.
+
+### 2026-08-16 10:26 EDT — The Account page's eleven controls read in full; the `adminusers` perms gap closed as unanswerable
+
+**Runtime impact: none** — `todo-next.md` only (4,652 → 4,747 lines).
+
+**`control-plane-capture.md` §C read (lines 448–650 of 1,243)** — the eleven named Account-page
+controls, each with its handler, verbatim markup, computed style and full CSS rule chain. **This is
+the surface P-3 is rebuilding**, and it is now specified to the pixel at 1989×1265.
+
+**§4's open gap — the `perms` vocabulary for `/users/v1/adminusers` — is closed, and the answer is
+that it cannot be recovered from any client artefact.** The add-admin form collects **exactly Name,
+Email and Password**. `perms` exists on the `adminUser` model (visible in Cancel's reset:
+`adminUser={name:'',email:'',password:'',perms:{}}`) and **no control anywhere populates it**, so
+every `addAdminUser` posts `perms: {}`. §6.13 saw the send; this shows why it is always empty.
+**If P-3 needs admin roles, we are designing them, not matching them** — which is a different and
+more useful state than "not yet found".
+
+**Exact account-page tokens now recorded**, including two that would be wrong if assumed:
+`.btn-default`'s border is **`#e6e9ee`, not Bootstrap's `#ccc`**, and **`.btn-inverse` exists only in
+`styles.css`** — Bootstrap 3 has no such class. Content gutter `x=440.5`; sessions-table header
+**60.5px** tall via a `styles.css !important` override.
+
+**Two reading traps in that capture, recorded so they are not tripped:** every `styles.css` rule
+appears **exactly twice** in every node's rules array (halve the counts), and the arrays are ordered
+by **stylesheet source order, not specificity** — *"Do not read cascade winners off the array order;
+read the computed block."*
+
+**Five accessibility defects in the reference are flagged as do-not-copy**, including a site-wide
+`outline: none !important` on buttons and anchors, sortable `<th>`s with no button/role/tabindex, and
+**`.btn-secondary` as a dead class** in a Bootstrap-3 build — the "Close Add Admin User" button
+renders as UA-default grey, so *"reproducing it faithfully means reproducing a bug."*
+
+**Sample-size caveat recorded:** the captured account had **one** API key and **one** non-archived
+session, so there is no evidence of multi-row layout or table striping. And `adminUserRemove` matched
+**zero** elements — not captured, not proven absent.
+
+### 2026-08-16 10:24 EDT — Owner correction: stop assuming. Two premature "ANSWERED" headings withdrawn, one fabricated fact corrected
+
+**Runtime impact: none** — `todo-next.md` only (4,553 → 4,652 lines).
+
+**Owner, 2026-08-16 10:22: *"stop assuming, and only work based off of hard evidence and you will
+only have the entire picture once you finish reading all the files."*** Correct, and it caught two
+real errors.
+
+**1. Two section headings were withdrawn.** §13 read *"P-1 IS ANSWERED"* and §15 read
+*"P-3 ANSWERED"*. Both were written from partial reads — §15 from **280 of 1,243 lines of one
+document**, with six artefacts still unread. **What is established is narrower:** a documented
+endpoint exists that unsubscribes FCM (§13), and no operator-level token is registered in this
+build's 31 routes (§15). *"P-1 is answered"* and *"the console does not exist"* are larger claims
+that presume nothing in the unread files changes the picture, and there is no evidence for that.
+
+**2. A fabricated fact, corrected.** §15 listed **`admin`** as one of the swept census terms.
+**It is not in the list.** The 20 terms are all compounds — `superadmin`, `platformAdmin`, `ptrAdmin`,
+`sysadmin` and so on — **there is no bare `admin`.** I assumed it was there because it belonged.
+
+The source document warns against exactly the conclusion I drew: *"A reader skimming twenty zeros
+would conclude there is no admin concept in this build, **which is flatly wrong**."* The same capture
+holds `panes.extraAdminUsers.heading.text = "Extra Admin Users"` and controls labelled
+**"Add Admin User"**. **The zeros must be quoted as "no SUPER/PLATFORM/SYS-admin token", never as
+"no admin concept".**
+
+**Reading lines 281–480 also weakened the sweep further, on the document's own evidence:**
+
+- **Two of the seven census surfaces are worthless.** `stateControllers` is 0 for all 23 entries
+  *including the positive controls* — the haystack is three values and two distinct strings.
+  `modules` searched ~216 **vendor** module names, no application source at all. *"Its zeros must
+  never be quoted as 'no operator code in the bundle'."*
+- **The term list omits** `presenter`, `moderator`, `host`, `owner`, `role`, `permission`, `ban`,
+  `kick`, `refund`, `invoice`, `subscription`, `audit`, `log`.
+- `accounts` (plural) scores 0 while the nav item is `Account` (singular); `allSessions` scores 0
+  while the page renders `"Total Sessions: 1"`.
+- **`room` scores 25 DOM + 8 CSS and 0 on every route surface** — in an app called ProTradingRoom.
+  That row is the calibration: **a route-registry zero does not mean the concept is absent.**
+- **The verdict's own scope:** *"not evidence about other accounts, other builds, a different UA, or
+  a **separate operator origin/subdomain** — none of which were probed."*
+
+**Two corrections to my §15 sub-findings:**
+
+- **"New Room" exists in the markup** — `page.welcome.html:333-336`,
+  `<a ng-click="createNew()" class="btn btn btn-warning mb btn-block">New Room</a>`, captured
+  statically with its computed styles. Only the *reveal* is untested, and the five refused clicks
+  were a **collector defect**: the denylist matched `New` as a **substring inside `showNewRoom`**,
+  on an element whose own text is "Sessions" and whose handler is a pure counter increment.
+- **`statesWithNoLinkOnThisPage` counts `ui-sref` only** and has a **proven false negative**:
+  `page.manageSession` is listed as unlinked while the same capture holds a rendered
+  `a[href^="#/page/manageSession/"]` labelled **"Manage"**.
+
+**No P-item is closed. The reading continues.**
+
+### 2026-08-16 10:21 EDT — P-3 ANSWERED: the enterprise console does not exist in the reference
+
+**Runtime impact: none** — `todo-next.md` only (4,392 → 4,553 lines).
+
+**`docs/decoded/control-plane-capture.md` read (lines 1–280 of 1,243).** P-3 is a **design task, not
+a reconstruction**, and that is now established on the strongest evidence short of the operator's own
+machine.
+
+**31 states were read from the LIVE injector** (`injector.get('$state').get()`) on `#/page/welcome`
+signed in as the account owner. Twenty operator terms swept — `admin`, `billing`, `operator`,
+`tenant`, `impersonat`, `suspend`, `quota`, `superadmin`, `platformAdmin` … — **0 hits** across state
+names, URLs, templates and controllers, with three positive controls hitting so the zeros are real
+absence rather than a broken search. A single-page app must register every screen at boot before it
+knows who you are, **which is why the route registry settles what a DOM capture could not.**
+
+**The strongest finding is not the headline.** `states[*].data` is `null` on **all 31 states with
+zero exceptions** — no `requiresAuth`, no role, no permission tag anywhere. **The legacy application
+expresses no authority whatsoever in its router.** There is no route-level role model to copy. That
+is a direct instruction for P-2 and P-3: authority is server-side by necessity, and the reference
+agrees with this repository's standard by omission.
+
+**What P-3 has to work with is pane-level, not route-level.** An admin-user concept exists as
+**`panes.extraAdminUsers` on `page.welcome` with no route of its own** — alongside `apiKeys`,
+`badges`, `sessions` and `marketplace`. Searching the route registry alone would have concluded "no
+admin concept" and been wrong. That matches the endpoints found in §6.12/§6.13 exactly.
+
+**Negative results, recorded rather than inferred:** no cross-account view is registered; **0
+occurrences of `billing`** anywhere, so payment happens entirely outside the SPA;
+`lifecycleControls = []` — no suspend/close/downgrade/delete; the marketplace pane never rendered
+(`disableMarketplace: true`). **And "New Room" is gated behind a five-click counter on the word
+"Sessions"** (`showNewRoom=showNewRoom+1`), not behind a route or a permission — the collector
+refused those clicks, so whether it reveals the control is untested.
+
+**Also confirmed from a second direction:** 16 of the 31 routes are **dead theme leftovers** —
+including `app.users` and `app.chat`, which look alarming and are demos. That corroborates §6.7's
+dead-mailbox finding.
+
+**Two things carried forward as caveats on that capture's own evidence:** its UA is a Pixel 9 mobile
+string at a 1989×1265 desktop viewport, so if the app branches on UA every DOM/CSS claim in it may be
+the mobile path; and resolve function bodies are uncaptured, so `data: null` proves only that no
+*declarative* route metadata exists.
+
+**A collector defect is recorded rather than quietly fixed:** the capture file contains **eight live
+HS256 JWTs** because redaction masked emails and 24-hex ids and walked past base64url. Fixed in
+`4928f47`. **The file must never enter this repository.**
+
+### 2026-08-16 10:18 EDT — R-15 CLOSED with byte citations; six more gaps closed; §6.10 corrected — there are THREE apps
+
+**Runtime impact: none** — `todo-next.md` only (4,241 → 4,392 lines).
+
+**`docs/decoded/mobile-app-decoded.md` read (590 of 758 lines).** It already held R-15's complete
+specification, byte-cited, from 2026-08-15. **All three of §3c's divergences — taken from the owner's
+pasted DOM — are confirmed against the bundle**, plus the fourth (the two-branch modal title).
+
+**R-15 is now fully specified and confirmed NOT BUILT:** the pane is `PAe` @ 2,438,242 — one
+paragraph and one button, nothing else; `fa-mobile-alt` occurs **exactly once** in the bundle and it
+is this tab (the navbar uses `fa-mobile`, a different glyph); the footer is Close-only; the tab strip
+was **presenter-gated in its entirety** in the older build, so a non-presenter previously saw no tabs
+at all.
+
+**A reference inconsistency to decide on:** the Mobile App tab is gated by **nothing**.
+`ptrMobileAppEnabled`, `customMobileAppEnabled` and `freeTrialsGetApp` are absent from the whole
+troubleshooter component (2,433,700–2,465,684, read in full), while every other mobile control
+carries all three. **A member of a room with the app disabled still sees the tab and a working
+button.**
+
+**Correction to my own §6.10 — there are THREE mobile apps, not two.** The v4 room bundle hardcodes
+a third: **`com.bellesoft.protradingroomv3` / `id1587924329`**, alongside the
+`com.bellesoft.protradingroom` and **`com.bellesoft.ptrAlerter`** pair found in the manage bundle.
+The v4 room defaults to the **v3-named** app.
+
+**Six of that document's own seven open items are now closed or narrowed** by §6/§8 of
+`todo-next.md` — because it decodes the room bundle and `todo-next.md` decodes the manage app, and
+the two halves answer each other:
+
+- **`customMobileAppLaunchWord`** = the custom **URL scheme**, `<word>://?t=<jwt>&s=<roomID>&pc=<pairCode>`
+- **`ptrMobileAppCaseByCaseEnabled`** = *"App for Some Members?"* → `manageMobileApp('enable'|'disable')` → `user.hasMobileApp`
+- **`hasAppPairLink` + `pairSecretKey`** = the `addUser` pair URL and the v2 REST API
+- **`alerterAppTokens` / `alerterAppFCMUserOff`** = manage user-row fields belonging to the **ptrAlerter** app
+- the two expiry-day settings, with verbatim help text
+- `restoreMobileAppTokens`'s server behaviour narrowed by §3a's live capture (it **does** acknowledge)
+
+**A fourth instance of the same failure, found in a document written by a different pass.**
+`mobile-app-decoded.md` claimed `freeTrialsGetApp` was missing from our repo; its own correction
+block records that as false. **Independently re-verified today:** `room-settings-schema.ts` **2**,
+`room-config-client.ts` **1**. Rule 6 — *nothing is missing without a check* — now has four
+independent instances behind it.
+
+**Carried forward as explicitly unsettled:** that document flags three of its own
+`MOBILE-APP.md` contradictions as *"claims, not findings"* — the pin transport being socket rather
+than HTTP, and custom-app **overwriting** rather than coexisting. **Not to be acted on until
+re-verified against their cited offsets.**
+
+### 2026-08-16 10:13 EDT — R-15/R-14/R-1 re-verified as REAL gaps (I had said otherwise), API doc read in full
+
+**Runtime impact: none** — `todo-next.md` only (4,126 → 4,241 lines).
+
+**I corrected my own error, and it was one I had reported to the owner.** At 09:58 I wrote that
+`restoreMobileAppTokens` was *"decoded **and built**"*, citing `ModalHost.svelte:5327-5362`. **That
+was false.** I read it out of a table cell that is **truncated mid-word in the source document
+itself** — `"Ours: src/lib/components/ModalHost.svelte:5327-5362 has exa"` — and completed the
+sentence from memory. Two hard checks settle it:
+
+1. The row sits in `missing-commands-triage.md`'s **`## Confirmed missing`** table, not the refuted one.
+2. Counted across all of `apps/room/src`, twice: **`restoreMobileAppTokens` 0 · `"Restore
+   Connectivity"` 0 · `mobilePairCode` 0 · `recUser` 0 · `usersTyping` 0.** Line 5327 today holds
+   the advanced-search UI.
+
+**All three R-items are REAL GAPS and all three are fully specified:**
+
+| item | spec |
+|---|---|
+| **R-15** Mobile App tab | `triage:112` verbatim strings + `:140` payload/offsets + §3a empty ack + §3c three-tab structure and presenter gating |
+| **R-14** recording start time | `roomState` carries `isRecording`, `recUser`, `recStartTime` (§6.5). Units/epoch still uncaptured |
+| **R-1** typing indicator | §6.9 both directions, `data.c` channel, `n.n` name field; §3d the `.users-typing` text line and three host variants. **CSS is already harvested; no component consumes it** |
+
+**A second standing rule, earned here:** rule 6 says *nothing is missing without a check*; its twin
+is **nothing is BUILT without a check.** I made the opposite error inside the same section.
+**Never complete a truncated citation from memory — open the file.**
+
+**`api-post-routes.md` read in full, all 729 lines.** It closes P-1's server side:
+
+- **`POST /session/users` returns each member's "roles and FCM status"** — so billing↔push can be
+  *reconciled*, not just written.
+- **`emailHash()` is server-side and emails are lowercased on ingest** — the same
+  `md5(trim(lowercase(email)))` identity proven client-side in `gaps-closed.md` §B.1. **One identity,
+  both tiers, server-enforced. This is the key P-2 should use.**
+- **`addUsers` is an upsert**; `delUsers` removes **and** unsubscribes FCM (stated three times).
+- **A QA mode exists that skips FCM side effects** — P-1 can be tested without pushing to real devices.
+- Auth: 403 on bad session/secret/command, 503 on internal. **Rate limit: 15 attempts / 15 minutes,
+  keyed on IP+sessionID, reset on success, violations email administrators.**
+- **The server's data model, named:** `Session`, `SessionUserXref`, **`SessionTokenXref`** (where push
+  tokens almost certainly live), `SessionUserStats`, `ChatLogs`, `AlertLogs`,
+  `SessionDeletedMessages`, `SessionLogs`, `Recording`, plus `FCMHandler` / `FCMCommandData`.
+- **Architecture:** HTTP never touches the room — it hands off over **IPC** to the session handler
+  (`ipcClient.postChatToSession()` / `postAlertToSession()`), route at `api/api.js:347`.
+
+**One P-1 question remains and it is small:** this documents the v2 REST API, not the socket path, so
+the *ordering* of the eight push gates inside the fan-out is still uncaptured. The lever works
+regardless.
+
+### 2026-08-16 10:08 EDT — P-1 ANSWERED: the unsubscribe endpoint exists and was already on disk
+
+**Runtime impact: none** — `todo-next.md` only (3,947 → 4,126 lines).
+
+**`POST /ptr_app/api/v2/session/delUsers` — *"Removes users from a session and unsubscribes them from
+FCM notifications."*** Body `{sessionID, secret, delUsers:[email,…]}`, bulk, authenticated by the
+room's `apiSecret` and rate-limited. Its counterpart is `POST /session/addUsers`. The API's own
+overview lists **"FCM Integration: Automatic push notification subscription management"** as a
+first-class feature.
+
+**This overturns the conclusion I drew four hours earlier.** §8.6 said *"there is no corresponding
+remove endpoint anywhere on the page"* — true of the manage-page markup, and wrong about the system.
+
+**And the source was `apps/controller/evidence-dumps/TIER1-fetched/api-post-routes.md`, fetched
+2026-08-13 — in this repository for three days.** I had made it queue item #1 and described it as
+"one fetch away". That is the **third** time in this session that material I treated as missing was
+already held; the first two are in the 09:58 entry. `gaps-closed.md:52` even records it as *"read in
+full, all 729 lines"*.
+
+**P-1 now has no open mechanism question.** Detect the lapse from `stripeSubscriptionStatus`
+(§6.12) → call `delUsers` per room, or the softer `updateUserFCMTok` with `tokcmd:'unsub'` (§8.1) to
+stop push without removing the member. **Two levers, both fully specified.** The one remaining design
+question is fan-out: `sessionID` is required, so a member in N rooms needs N calls, with the room
+list coming from `otherJWTSessions` / `login.sessions`.
+
+**Also new from that document:** `/session/badges/addTrial` and `/remTrial` make trial status
+externally settable; `/session/deletedlogs` shows the reference retains a moderation audit trail;
+`postToRoom` accepts `badgeID`/`fontColor`/`bkgColor`, the API twin of `presenterSettings`.
+
+**A reconciliation section (§12) now supersedes §4 for anything room-side.** It records that
+`gaps-closed.md` already holds the complete `sessData` contract — **268 write fields with live values
+and byte offsets, 135 read keys with reference counts** — so §8's settings enumeration duplicates it
+for the 36 fields it covered, and stands only for the ones it did not (`diasableFCMAlerts`,
+`sendFcmAlertsNew`, `invalidTokens`, `customClientAlertPostURL`, `disalowMultiLogins`, `isAlertOnly`).
+It also flags three `R-*` items in this file — **R-15, R-14, R-1** — that must be re-checked against
+`missing-commands-triage.md` before any build, because R-15's Mobile App tab is already specified
+there verbatim **and already built at `ModalHost.svelte:5327-5362`**.
+
+**Read but not finished:** `api-post-routes.md` lines 301–729 (responses, errors, rate-limit
+specifics, recordings payload).
+
+### 2026-08-16 09:58 EDT — A 6,600-line prior decode corpus was found, and this session had been duplicating it
+
+**Runtime impact: none** — `todo-next.md` only (3,350 → 3,947 lines).
+
+**The owner's instruction — *"make sure you're not reporting something that we already have based on
+hard evidence"* — caught a systemic failure, twice within ten minutes.**
+
+**First catch.** I wrote the v4 room's entire critical-CSS token contract into a new §10 as though it
+were evidence. It is already in `apps/room/src/lib/styles/tokens.css` (**323 lines**),
+`protradingroom-source.css` and `captured-runtime-components.css` — and most of it is already
+implemented, some with contract tests (`chat-gif-muted-contract.test.ts`,
+`poll-source-contract.test.ts`). Of everything in that section, exactly **one** item is genuinely
+absent from our source: `removeImageFromChat()`.
+
+**Second catch, larger.** Applying the new rule before reading `ptr1.json` / `prt2.json` (33 MB), I
+checked whether we already held them. **We do — `apps/room/docs/website-ptr1-prt2-full-read.md`,
+1,180 lines: *"Every cap and every node was walked. No sampling of caps."*** And with it a corpus of
+**6,600+ lines** never consulted this session: `missing-commands-triage.md` (**the authoritative
+30-item NOT-BUILT list**, with payloads, byte offsets, gates and verbatim UI strings),
+`gaps-closed.md`, `admin-surface.md`, `control-plane-capture.md`, `mobile-app-decoded.md` and six
+more.
+
+**What that corpus already contained, which this session re-derived:** `restoreMobileAppTokens`
+decoded *and built* (`ModalHost.svelte:5327-5362`) — I wrote a console script and ran a live capture
+for it; **R-15's Mobile App tab verbatim** (tab, paragraph, `" Restore Connectivity "` button, alert
+text) — I treated it as needing specification; YouTube's two-button design; the `notyping` payload.
+
+**A new standing rule is now rule 6 of the agent brief:** *nothing is missing without a check.* A gap
+is **present in the reference AND absent from our source** — both halves need hard evidence, and I
+had been supplying only the first.
+
+**A scope line is now at the top of `todo-next.md`:** the prior corpus owns the **v4 room bundle and
+the site captures**; `todo-next.md` owns the **AngularJS manage app** (`app.min.js`) and
+`evidence-page.manageSession.html`. On that line the session's real product stands — §6, §7, §8 and
+§9 are new work, because nothing had read `app.min.js` end to end.
+
+**Also carried forward from the prior corpus, a method warning:** counts must never come from
+`grep -c` on these single-line files — it returns 1/0. §9's counts use `grep -o … | wc -l` and are
+safe, but the `-o` is load-bearing.
+
 ### 2026-08-16 09:44 EDT — Manage page read in full: `tokcmd`/`appcmd` found, and P-1 proved exhaustively
 
 **Runtime impact: none** — `todo-next.md` only (2,959 → 3,350 lines). No source, test or config
@@ -78,6 +528,24 @@ the per-user `updateUserXref` vocabulary differs, and **`10` means "hide persona
 **`/public/html/POST_ROUTE_API_DOCUMENTATION.md`** — the reference's own server-side API
 documentation. It is the only plausible source for the server behaviour no client capture can show.
 Not fetched.
+
+**Audit pass on the owner's instruction to double-check everything (§9).** Seven verifications run
+*after* the full reads, as corroboration rather than substitute; §0 rewritten from a "when it
+arrives" checklist into a closed record; §4 (the gap list) **rewritten entirely** because it still
+told the next reader that the row menu needed a live capture. Three of my own claims were wrong and
+are corrected in place:
+
+- **§6.13's explanation of an earlier error blamed an artefact that does not exist.**
+  `ptr-manage-pull.json` was never produced — the only script run fetched zero files. The probe
+  figures came from a command I ran myself. The conclusion held; the explanation was a second
+  unverified guess layered on the first, and is removed.
+- **`user.isMa` — inference withdrawn.** Anchored counts show it occurs **once** in the whole bundle,
+  inside `hasStripeInfo`, which is referenced **nowhere** in the manage page. It is dead code with a
+  single dead reader; the live field is `user.isMarketPlaceUser`. **The first count returned 5 — four
+  of them were `isMainRoom`.** An unanchored substring count is not evidence, and that near-miss is
+  recorded in §4.
+- **The load-bearing P-1 claim was re-verified against exact bytes.** `alertLater`'s payload has ten
+  keys and **no `dontPush`** — a scheduled alert cannot be told not to push. That hazard stands.
 
 ### 2026-08-16 08:25 EDT — `app.min.js` READ IN FULL: all 17 lines, and P-1 is a wiring problem
 
