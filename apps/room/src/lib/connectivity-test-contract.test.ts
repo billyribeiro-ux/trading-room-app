@@ -16,6 +16,10 @@ import { describe, expect, it } from 'vitest';
 
 const MODAL_HOST = readFileSync(new URL('./components/ModalHost.svelte', import.meta.url), 'utf8');
 const ROOM_PAGE = readFileSync(new URL('../routes/+page.svelte', import.meta.url), 'utf8');
+const ROOM_TRANSPORT = readFileSync(
+  new URL('./room/media-transport.svelte.ts', import.meta.url),
+  'utf8'
+);
 const ROOM_OVERLAYS = readFileSync(
   new URL('./components/RoomOverlays.svelte', import.meta.url),
   'utf8'
@@ -26,7 +30,7 @@ describe('the ICE servers the troubleshooter uses', () => {
     expect(MODAL_HOST).toContain('mediaIceServers?: RTCIceServer[]');
     expect(MODAL_HOST).toContain('mediaIceServers = []');
     // The modal host moved into `RoomOverlays.svelte` in Phase 5 slice 17; the room state it renders
-  // from is handed to that component whole, so the prop is assembled there now.
+    // from is handed to that component whole, so the prop is assembled there now.
     expect(ROOM_OVERLAYS).toContain('mediaIceServers={media.iceServers}');
   });
 
@@ -111,8 +115,10 @@ describe('the room page no longer traps the ICE servers in a closure', () => {
 
   it('assigns them where the grant is minted, and feeds the media session from the same value', () => {
     // One source. Two copies is how the modal and the media session end up testing different things.
-    expect(ROOM_PAGE).toContain('media.iceServers = minted.iceServers ?? []');
-    expect(ROOM_PAGE).toContain('iceServers: () => media.iceServers');
+    // The grant is minted inside `RoomMediaTransport.connect()` since slice 26.
+    expect(ROOM_TRANSPORT).toContain('this.#media.iceServers = minted.iceServers ?? []');
+    // The session is built inside `connect()` since slice 26, from the same value the grant set.
+    expect(ROOM_TRANSPORT).toContain('iceServers: () => this.#media.iceServers');
     // The old function-local must be gone, or the getter could close over a stale empty array.
     expect(ROOM_PAGE).not.toContain('let iceServers: RTCIceServer[] = []');
   });

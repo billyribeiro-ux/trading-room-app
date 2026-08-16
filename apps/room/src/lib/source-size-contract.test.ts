@@ -260,7 +260,7 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       What the slice actually proves is the pattern, which is why it was chosen first: state and the
       functions that write it leaving TOGETHER, where Phase 1 moved fields and left 248 bodies here.
     */
-    max: 3837,
+    max: 3529,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {
@@ -370,8 +370,14 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     file: 'lib/room/media-transport.svelte.ts',
     /*
       The largest module in `lib/room/` by total lines, and the reason the backstop below now counts
-      code: 1,416 lines carrying 615 of code and 699 of citation, which is the same 49% ratio as
+      code: 1,742 lines carrying 768 of code and 862 of citation, which is the same 49% ratio as
       `files.svelte.ts` and `split.svelte.ts`.
+
+      It grew by 326 in slice 26, when `connect()` and `restart()` came back from `onMount` — the
+      wiring slice 4 had to leave behind because it referenced page state that had not moved yet.
+      768 against a backstop of 800 is CLOSE, and that is worth saying rather than noticing later:
+      the next thing to arrive here should be weighed against splitting rather than added on the
+      grounds that it fits.
 
       The citations are why. This class is transcribed from a minified capture, and nearly every
       decision in it is a finding rather than a choice — `TOP_SPATIAL_LAYER` is 9 because mediasoup
@@ -384,8 +390,8 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       so a capture/transport split would have cut through `#mediaSession`, and a local/remote split
       would have cut through `#sharedScreens`, which both paths write.
     */
-    max: 1416,
-    why: 'the SFU transport - 615 code lines under 699 of transcription evidence, and no seam to split on'
+    max: 1742,
+    why: 'the SFU transport - 768 code lines under 862 of transcription, and no seam to split on'
   },
   {
     file: 'lib/components/RoomOverlays.svelte',

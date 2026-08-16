@@ -33,7 +33,10 @@ const PAGE = readFileSync(new URL('../routes/+page.svelte', import.meta.url), 'u
   passing on whatever else happens to match, which is exactly how the broadcast contract survived
   slice 12 by matching the Files pane instead.
 */
-const TRANSPORT = readFileSync(new URL('./room/media-transport.svelte.ts', import.meta.url), 'utf8');
+const TRANSPORT = readFileSync(
+  new URL('./room/media-transport.svelte.ts', import.meta.url),
+  'utf8'
+);
 
 /*
   Comments stripped before every assertion. The block above and the ones in `+page.svelte` both
@@ -48,15 +51,15 @@ const TRANSPORT_CODE = strip(TRANSPORT);
 
 /** The body of a `signalling.on('<event>', …)` registration — `media` until the 2026-08-15 rename. */
 function handler(event: string): string {
-  const at = CODE.indexOf(`signalling.on('${event}'`);
+  const at = TRANSPORT_CODE.indexOf(`signalling.on('${event}'`);
   expect(at, `the ${event} handler must exist`).toBeGreaterThan(-1);
-  return CODE.slice(at, CODE.indexOf("signalling.on('", at + 10));
+  return TRANSPORT_CODE.slice(at, TRANSPORT_CODE.indexOf("signalling.on('", at + 10));
 }
 
 describe('handlers read the live session, not the one captured at build time', () => {
   it('newProducer consumes on the current session', () => {
     const body = handler('newProducer');
-    expect(body).toContain('const active = mediaTransport.session');
+    expect(body).toContain('const active = this.session');
     // THE assertion: the captured const must not be passed to any of the three consumers.
     expect(body).not.toMatch(/addRemote(Screen|Webcam|Audio)\(\s*session\s*,/);
     for (const fn of ['addRemoteScreen', 'addRemoteWebcam', 'addRemoteAudio']) {
@@ -69,25 +72,33 @@ describe('handlers read the live session, not the one captured at build time', (
 
   it('peerClosed walks the current session', () => {
     const body = handler('peerClosed');
-    expect(body).toContain('mediaTransport.session?.remoteStreams.values()');
+    expect(body).toContain('this.session?.remoteStreams.values()');
     expect(body).not.toMatch(/\bsession\.remoteStreams\b/);
   });
 });
 
 describe('teardown closes whichever session is live', () => {
   it('does not close the captured one', () => {
-    const teardown = CODE.slice(CODE.indexOf('stopRoomEvents();'));
-    expect(teardown).toContain('const live = mediaTransport.session');
+    /*
+      The teardown is INSIDE `connect` now, returned by the method that opened the session — which
+      is the whole point of moving it. The two halves used to sit 240 lines apart in `onMount`.
+    */
+    const teardown = TRANSPORT_CODE.slice(TRANSPORT_CODE.indexOf('return () => {'));
+    expect(teardown).toContain('const live = this.session');
     expect(teardown).toContain('live?.close()');
     // The leak: closing the original after a restart left the rebuilt one open.
     expect(teardown).not.toMatch(/(^|[^.\w])session\.close\(\)/m);
+    // And the PAGE calls it, which the class cannot show: a teardown nobody invokes looks correct
+    // from inside the file that returns it.
+    expect(CODE).toContain('const stopMedia = mediaTransport.connect();');
+    expect(CODE).toContain('stopMedia();');
   });
 
   it('reads the live session BEFORE nulling the field', () => {
-    const teardown = CODE.slice(CODE.indexOf('stopRoomEvents();'));
+    const teardown = TRANSPORT_CODE.slice(TRANSPORT_CODE.indexOf('return () => {'));
     // Order is the whole correctness of it - null it first and `live` is null and nothing closes.
-    expect(teardown.indexOf('const live = mediaTransport.session')).toBeLessThan(
-      teardown.indexOf('mediaTransport.attachSession(null)')
+    expect(teardown.indexOf('const live = this.session')).toBeLessThan(
+      teardown.indexOf('this.attachSession(null)')
     );
   });
 });
@@ -108,12 +119,24 @@ describe('the reset clears the dedupe guards, not just the visible streams', () 
   it('exists once and is used by both callers', () => {
     expect(TRANSPORT_CODE.indexOf('dropRemoteMedia(): void {')).toBeGreaterThan(-1);
     // Declared once in the transport...
-    expect(TRANSPORT_CODE.split('dropRemoteMedia').length - 1).toBe(1);
+    // One declaration and two callers, all three inside the transport since slice 26 — the socket
+    // dropping and the role change both live in `connect` and `restart` now.
+    expect(TRANSPORT_CODE.split('dropRemoteMedia').length - 1).toBe(3);
     // ...and called by the two page-level handlers, the socket dropping and the role change.
-    expect(CODE.split('mediaTransport.dropRemoteMedia()').length - 1).toBe(2);
+    // Both callers are inside the transport now: the socket dropping, and the role change.
+    expect(TRANSPORT_CODE.split('this.dropRemoteMedia()').length - 1).toBe(2);
     // The partial reset it replaced must not survive as a lone call at either caller. Checked
     // on the PAGE, where a stray copy would now have to live, since the helper is not there.
-    expect(CODE).not.toMatch(/^\s*(mediaTransport\.)?screenStreams\.clear\(\);\s*$/m);
+    /*
+      The partial reset must not survive as a LONE call anywhere outside the receiver. Checked with
+      the receiver's own body cut out, because the line legitimately lives inside it — the first
+      version of this assertion after slice 26 matched that very line and went red against correct
+      code.
+    */
+    const at = TRANSPORT_CODE.indexOf('dropRemoteMedia(): void {');
+    const outside =
+      TRANSPORT_CODE.slice(0, at) + TRANSPORT_CODE.slice(TRANSPORT_CODE.indexOf('\n  }', at));
+    expect(outside).not.toMatch(/^\s*this\.#screenStreams\.clear\(\);\s*$/m);
   });
 
   it('clears the state each of the three guards actually reads', () => {
@@ -133,9 +156,9 @@ describe('the reset clears the dedupe guards, not just the visible streams', () 
   });
 
   it('runs after the old session is closed on the restart path', () => {
-    const restart = CODE.slice(CODE.indexOf('restartMediaSession = async ()'));
+    const restart = TRANSPORT_CODE.slice(TRANSPORT_CODE.indexOf('async restart()'));
     expect(restart.indexOf('previous?.close()')).toBeLessThan(
-      restart.indexOf('mediaTransport.dropRemoteMedia()')
+      restart.indexOf('this.dropRemoteMedia()')
     );
   });
 });

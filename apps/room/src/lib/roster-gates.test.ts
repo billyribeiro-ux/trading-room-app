@@ -710,7 +710,6 @@ describe('room-wide sound', () => {
  * send transport by their own browser.
  */
 describe('media admission is one formula, not two', () => {
-  const pageSource = readFileSync('src/routes/+page.svelte', 'utf8');
   const grantSource = readFileSync('src/routes/api/media/grant/+server.ts', 'utf8');
 
   it('mints the grant from the permissions, not the account role', () => {
@@ -720,8 +719,13 @@ describe('media admission is one formula, not two', () => {
   });
 
   it('gates canProduce on the same predicate the grant uses', () => {
-    expect(pageSource).toContain('canProduce: joinsMediaAsProducer({');
-    expect(pageSource).not.toContain('canProduce: isPresenter');
+    // Built inside `connect()` since slice 26, from the same predicate `/api/media/grant` uses.
+    const transportSource = readFileSync(
+      new URL('./room/media-transport.svelte.ts', import.meta.url),
+      'utf8'
+    );
+    expect(transportSource).toContain('canProduce: joinsMediaAsProducer({');
+    expect(transportSource).not.toContain('canProduce: isPresenter');
   });
 });
 
@@ -735,8 +739,16 @@ describe('media admission is one formula, not two', () => {
   Read as source text: the handler needs an EventSource, a live SFU and a role change to execute.
 */
 describe('a role change restarts the media session', () => {
-  const page = readFileSync(new URL('../routes/+page.svelte', import.meta.url), 'utf8');
-  const code = page.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+  /*
+    The rebuild moved into `RoomMediaTransport.restart()` in Phase 5 slice 26, with the rest of the
+    SFU wiring. It was a page-level `let` assigned inside `onMount` until then, which is why this
+    block read the page.
+  */
+  const transport = readFileSync(
+    new URL('./room/media-transport.svelte.ts', import.meta.url),
+    'utf8'
+  );
+  const code = transport.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
 
   it('rebuilds rather than reusing, because close() latches permanently', () => {
     /*
@@ -744,9 +756,9 @@ describe('a role change restarts the media session', () => {
       throws `sessionClosed` for ever. Reusing it is the obvious implementation and it would fail on
       the first role change.
     */
-    expect(code).toContain('restartMediaSession = async () => {');
+    expect(code).toContain('async restart(): Promise<void> {');
     const body = code.slice(
-      code.indexOf('restartMediaSession = async () => {'),
+      code.indexOf('async restart(): Promise<void> {'),
       code.indexOf("media.on('newProducer'")
     );
     expect(body).toContain('previous?.close()');
@@ -756,16 +768,28 @@ describe('a role change restarts the media session', () => {
   it('reuses the SAME signalling client', () => {
     // A second socket would leave the SFU holding two peers for one person, and the per-identity
     // connection cap is four.
-    const body = code.slice(
-      code.indexOf('restartMediaSession = async () => {'),
-      code.indexOf("media.on('newProducer'")
-    );
+    /*
+      Bounded by the METHOD's own end, not by a later handler.
+
+      The end marker was `media.on('newProducer'` — the next thing on the page after the restart
+      assignment. `restart` is a method of its own since slice 26 and that handler now sits inside
+      `connect()` ABOVE it, so the old marker sliced backwards and produced an empty string.
+    */
+    const from = code.indexOf('async restart(): Promise<void> {');
+    const body = code.slice(from, code.indexOf('\n  }', from));
     /*
       `signalling`, not `media` — the local `const media = new SignallingClient(...)` was renamed on
       2026-08-15 because `RoomMedia` took that identifier at the top of the page and shadowed it,
       which `svelte-check` caught. The assertion is unchanged in meaning: the SAME client is reused.
     */
-    expect(body).toContain('signalling,');
+    /*
+      `signalling: socket`, where `socket` is `this.#mediaSignalling` — the client `connect` built
+      and stored. It was the bare shorthand `signalling,` until slice 26, when `restart` became a
+      method and had to reach the client through the field rather than a closure. Same client, and
+      the assertion below is the one that says so: no second one is constructed.
+    */
+    expect(body).toContain('const socket = this.#mediaSignalling;');
+    expect(body).toContain('signalling: socket,');
     expect(body).not.toContain('new SignallingClient(');
   });
 
@@ -800,7 +824,7 @@ describe('a role change restarts the media session', () => {
       in `media-restart-contract.test.ts` so this assertion cannot be satisfied by an empty function.
     */
     const body = code.slice(
-      code.indexOf('restartMediaSession = async () => {'),
+      code.indexOf('async restart(): Promise<void> {'),
       code.indexOf("media.on('newProducer'")
     );
     expect(body).toContain('dropRemoteMedia()');

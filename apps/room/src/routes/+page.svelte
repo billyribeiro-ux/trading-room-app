@@ -41,8 +41,6 @@
   } from '$app/env/public';
   import { onMount, tick } from 'svelte';
   import { SvelteSet } from 'svelte/reactivity';
-  import { SignallingClient } from '$lib/media/signalling';
-  import { MediaSession } from '$lib/media/session';
   import { checkPermissionState } from '$lib/media-capture-error';
   import { MtxStreamTabs } from '$lib/room-mtx.svelte';
   import ScreenVolumeControl from '$lib/components/ScreenVolumeControl.svelte';
@@ -52,7 +50,6 @@
     rosterCountVisibleTo,
     rosterRowClass,
     rosterRowVisible,
-    joinsMediaAsProducer,
     locationVisibleTo
   } from '$lib/roster-gates';
   import { RoomRoster } from '$lib/room/roster.svelte';
@@ -928,7 +925,16 @@
     endSpeech: () => recording.endSpeechRecognition(),
     stopRecording: () => recording.stopRecording(),
     showScreensTab: () => (mainTab = 'screens'),
-    checkPermissionState: (kind, userAgent) => checkPermissionState(kind, userAgent)
+    checkPermissionState: (kind, userAgent) => checkPermissionState(kind, userAgent),
+    isPresenter: () => isPresenter,
+    /*
+      The caption LIST stays here: the speech overlay renders it and the transcript page reads it.
+      The transport knows a line arrived and nothing about what is done with it.
+    */
+    onCaption: (caption, isFinal) => {
+      currentCaption = caption;
+      if (isFinal) captionHistory = [...captionHistory, caption].slice(-CAPTION_HISTORY_LIMIT);
+    }
   });
   /*
     Everything that can be DONE to a user, in `$lib/room/user-actions.svelte.ts`.
@@ -1127,7 +1133,7 @@
     session: () => data,
     isPresenter: () => isPresenter,
     appHasFocus: () => appHasFocus,
-    restartMediaSession: () => restartMediaSession,
+    restartMediaSession: () => () => mediaTransport.restart(),
     showTab: (tab) => (mainTab = tab),
     chatMissedWhileHidden: () => (missedChatWhileHidden = true)
   });
@@ -1263,7 +1269,6 @@
    * needs the signalling client and the ICE getter that live in that scope. Duplicating the
    * construction here is how the two copies drift.
    */
-  let restartMediaSession: (() => Promise<void>) | null = null;
   /**
    * The ICE servers THIS deployment minted, hoisted out of `onMount` so the connectivity test can
    * see them (`TODO.md` item N).
@@ -2745,242 +2750,17 @@
       of its own reads (`iceServers`, `connected`, `recordedUrl`) resolved to a `SignallingClient`
       that has none of them. `svelte-check` caught it; the rename is to what the object IS.
     */
-    const signalling = new SignallingClient({
-      url: data.mediaWsUrl,
-      grant: async () => {
-        const response = await fetch('/api/media/grant', { method: 'POST' });
-        if (!response.ok) throw new Error(`grant request failed: ${response.status}`);
-        const minted = (await response.json()) as {
-          grant: string;
-          iceServers?: RTCIceServer[];
-        };
-        // Component-level now, not a local: the connectivity test reads the same value, so it
-        // tests THIS deployment's relay instead of Google's STUN. See `media.iceServers`.
-        media.iceServers = minted.iceServers ?? [];
-        return minted.grant;
-      }
-    });
     /*
-     * A MediaSession on top of the socket: it owns the Device, the recv transport and every
-     * consumer. `canProduce` is the room's own presenter predicate - the server refuses `produce`
-     * from a member with `forbidden`, so asking for a send transport as a reader would buy a
-     * transport and a refusal.
-     */
-    /*
-      `canProduce` must be the SAME predicate the SFU grant is minted from.
+      THE SFU SESSION, opened by the transport that owns it.
 
-      It was `isPresenter` — the room's account role — while `/api/media/grant` mints its role from
-      `joinsMediaAsProducer(...)`, the reference's `isPresenter || hasCam || hasMic || hasScreen`.
-      The two disagreed for exactly the case the permissions modal exists to create: a Participant
-      granted a microphone received a `presenter` grant from the server and was then refused a send
-      transport by their own browser. Half a fix is worse than none, because the server-side half
-      looks correct in isolation.
+      This was 236 lines of signalling wiring sitting in `onMount` — slice 4 moved the transport's
+      state and left it, because it referenced page-level things that had not moved yet. Measured
+      before slice 26: eight page names reached, 37 of the references `mediaTransport` itself.
 
-      One formula, one import, both halves.
+      `connect` returns its own teardown, which is what makes the pairing checkable. The two halves
+      used to sit 240 lines apart here, and the review of 2026-08-11 found the gap between them.
     */
-    const session = new MediaSession({
-      signalling,
-      canProduce: joinsMediaAsProducer({
-        isPresenter,
-        hasMic: data.user.hasMic,
-        hasCam: data.user.hasCam,
-        hasScreen: data.user.hasScreen
-      }),
-      iceServers: () => media.iceServers
-    });
-    mediaTransport.attachSession(session);
-    mediaTransport.signalling = signalling;
-
-    signalling.on('socketopen', ({ reconnected }) => mediaTransport.serverConnected(reconnected));
-    signalling.on('disconnected', () => {
-      mediaTransport.serverDisconnected();
-      // The far side closed every consumer with the socket. Drop them so a stale picture is never
-      // left frozen on screen pretending to be live; the tabs rebuild from `getProducers` on the
-      // next connect.
-      mediaTransport.dropRemoteMedia();
-    });
-
-    /*
-     * `connected` is the server's own notification, sent once before any command is accepted, and
-     * it is the first moment `getProducers` can be issued. Producers that already exist arrive in
-     * that snapshot; ones that appear later arrive as `newProducer`. Both paths funnel into
-     * addRemoteScreen, which dedupes - the two overlap by design, because losing a producer is a
-     * permanently blank tile.
-     */
-    signalling.on('connected', () => {
-      void (async () => {
-        try {
-          /*
-           * `load()` first, and it is not optional. It runs getRouterRtpCapabilities and
-           * `device.load()`, and until it resolves the Device has no capabilities - every
-           * produce/consume call throws `load() must resolve before this is available`. Omitting it
-           * is what made the first working build fail silently: the presenter's share threw, the
-           * viewer's tab never appeared, and the only trace was one console error.
-           */
-          /*
-            `mediaSession`, not the `session` this handler closed over.
-
-            `giveMicScreen` REPLACES the session (see `restartMediaSession`), and `MediaSession.close()`
-            latches `#closed` permanently — `load()` calls `#assertOpen()` and throws `sessionClosed`
-            on a closed instance. A handler holding the original const would therefore throw on the
-            first reconnect after a role change, and the room would silently stop consuming.
-          */
-          const active = mediaTransport.session;
-          if (!active) return;
-          mediaTransport.sessionReady = active.load();
-          await mediaTransport.sessionReady;
-          const { producers } = await signalling.request('getProducers');
-          for (const producer of producers) {
-            await mediaTransport.addRemoteScreen(active, producer);
-            await mediaTransport.addRemoteWebcam(active, producer);
-            await mediaTransport.addRemoteAudio(active, producer);
-          }
-        } catch (error) {
-          // Leaving `sessionReady` pending would hang every future consume on a promise that can
-          // never settle, so it is reset and the next connect retries from scratch.
-          mediaTransport.sessionReady = null;
-          console.error('[media] the session could not be initialised', error);
-        }
-      })();
-    });
-    /*
-      `disconnectAll()` + re-init, from the capture's own handler:
-
-        subscribe("giveMicScreen", e => {
-          globals.user.isPresenter = globals.isLimitedPresenter = globals.isPresenter = e.give,
-          this.mediaHandlerService.disconnectAll(),
-          setTimeout(() => this.mediaHandlerService.initWithGlobalsAndEventHandler(...), 3e3)
-        })
-
-      A new MediaSession rather than a reused one: `close()` latches `#closed` permanently, so the
-      old instance can never `load()` again. Everything else is deliberately reused — the same
-      signalling client, the same ICE getter — because a second socket would leave the SFU holding
-      two peers for one person.
-    */
-    restartMediaSession = async () => {
-      const previous = mediaTransport.session;
-      mediaTransport.attachSession(null);
-      mediaTransport.sessionReady = null;
-      // Closes every transport, producer and consumer this peer held. What was consumed must go
-      // with them, or the tab bar keeps painting a stream whose transport no longer exists — and
-      // the dedupe guards would refuse to re-consume any of it below.
-      previous?.close();
-      mediaTransport.dropRemoteMedia();
-
-      const rebuilt = new MediaSession({
-        signalling,
-        canProduce: joinsMediaAsProducer({
-          isPresenter,
-          hasMic: data.user.hasMic,
-          hasCam: data.user.hasCam,
-          hasScreen: data.user.hasScreen
-        }),
-        iceServers: () => media.iceServers
-      });
-      mediaTransport.attachSession(rebuilt);
-
-      try {
-        mediaTransport.sessionReady = rebuilt.load();
-        await mediaTransport.sessionReady;
-        const { producers } = await signalling.request('getProducers');
-        for (const producer of producers) {
-          await mediaTransport.addRemoteScreen(rebuilt, producer);
-          await mediaTransport.addRemoteWebcam(rebuilt, producer);
-          await mediaTransport.addRemoteAudio(rebuilt, producer);
-        }
-      } catch (error) {
-        mediaTransport.sessionReady = null;
-        console.error('[media] the session could not be rebuilt after a role change', error);
-      }
-    };
-
-    /*
-      `mediaSession`, never the captured `session`.
-
-      `session` is the const built at the top of this block. `restartMediaSession` replaces it —
-      it must, because `close()` latches `#closed` permanently — and every handler registered here
-      closes over the ORIGINAL. Reading it after a role change consumes on a session whose
-      transports are gone, so every producer arriving after a mic hand-over rendered nothing, in
-      silence, with no error. Found by the adversarial review of 2026-08-11.
-
-      The null check is not defensive padding: `restartMediaSession` sets `mediaSession = null` for
-      the window between closing the old session and the new one being assigned, and a producer can
-      arrive inside it.
-    */
-    signalling.on('newProducer', (info) => {
-      const active = mediaTransport.session;
-      if (!active) return;
-      void mediaTransport.addRemoteScreen(active, info);
-      void mediaTransport.addRemoteWebcam(active, info);
-      void mediaTransport.addRemoteAudio(active, info);
-    });
-
-    /*
-     * Captions from whoever is speaking.
-     *
-     * An interim result replaces the line being spoken; a final one commits it to the transcript.
-     * That is what `speechRecoHistoryMode` reads, and it is why interim lines are not appended -
-     * recognition revises the same sentence repeatedly as it hears more of it.
-     */
-    signalling.on('speechReco', (line) => {
-      const caption = {
-        timestamp: line.timestamp,
-        sender: line.sender ?? 'Presenter',
-        text: line.text,
-        live: !line.isFinal
-      };
-      currentCaption = caption;
-      if (line.isFinal) {
-        captionHistory = [...captionHistory, caption].slice(-CAPTION_HISTORY_LIMIT);
-      }
-    });
-    // `producerPaused` / `producerResumed` are declared in `src/lib/media/signalling.ts:162,164`
-    // and were listened for by nothing. They are the capture's `presMuted` / `presUnmuted`.
-    signalling.on('producerPaused', ({ producerId }) => mediaTransport.remoteAudioPaused(producerId));
-    signalling.on('producerResumed', ({ producerId }) => mediaTransport.remoteAudioResumed(producerId));
-    signalling.on('producerClosed', ({ producerId }) => {
-      mediaTransport.removeRemoteScreen(producerId);
-      mediaTransport.removeRemoteWebcam(producerId);
-      mediaTransport.removeRemoteAudio(producerId);
-    });
-    signalling.on('peerClosed', ({ peerId }) => {
-      // The current session, for the same reason as `newProducer` above: after a role change the
-      // captured `session` holds the streams of a connection that no longer exists, so a peer
-      // leaving would tear down nothing and leave their tile painted.
-      for (const remote of mediaTransport.session?.remoteStreams.values() ?? []) {
-        if (remote.peerId === peerId) {
-          mediaTransport.removeRemoteScreen(remote.producerId);
-          mediaTransport.removeRemoteWebcam(remote.producerId);
-          mediaTransport.removeRemoteAudio(remote.producerId);
-        }
-      }
-    });
-    /*
-     * A dial that fails AFTER the socket exists surfaces through `disconnected`, because #onClose
-     * runs even when the open never settled. A dial that fails BEFORE it - an unreachable SFU, or
-     * a grant request the deployment cannot mint (503 when MEDIA_GRANT_PRIVATE_KEY is unset) -
-     * never creates a socket, so nothing emits and the rejection was being swallowed here. That is
-     * precisely the case a reader hits on a deployment with no media server, and it is the case
-     * that must not be silent.
-     *
-     * toasts.show() already dedupes on title+message, so the socket path firing as well cannot
-     * produce two identical toasts.
-     */
-    void signalling.connect().catch(() => {
-      // The first connect never reached `socketopen`, so `media.connected` is still false and the
-      // transition guard would swallow this. A first failure is a real disconnect to report.
-      media.connected = true;
-      mediaTransport.serverDisconnected();
-    });
-
-    /*
-      The poll and its visibility handling live at component scope now — see `onVisibilityChange`.
-      There were TWO `visibilitychange` listeners on this document, in this component: one tracking
-      focus and catching the chat up, one pausing and resuming this timer. Different concerns, both
-      correct, and still a duplication nobody would have found by reading either one.
-
-      All that is left here is starting it, because a tab that is already hidden at mount must not.
-    */
+    const stopMedia = mediaTransport.connect();
     if (!document.hidden) startRefresh();
 
     return () => {
@@ -2992,22 +2772,7 @@
       stopTawk();
       recording.endSpeechRecognition();
       mediaTransport.signalling = null;
-      /*
-        Close whichever session is LIVE, which after a role change is not the captured `session`.
-
-        This read `session.close()`, so leaving a room in which a mic had been handed over closed
-        the already-closed original and left the REBUILT session's transports and
-        RTCPeerConnections open — they survived the component, held the SFU peer slot, and kept the
-        microphone light on. Found by the adversarial review of 2026-08-11.
-
-        Closing `mediaSession` alone covers both cases exactly, with no double close: if no restart
-        happened it IS `session`, and if one did, `restartMediaSession` already closed the original
-        before replacing it.
-      */
-      const live = mediaTransport.session;
-      mediaTransport.attachSession(null);
-      live?.close();
-      signalling.close();
+      stopMedia();
       stopRefresh();
       if (previousOpenImageModal) imageModalWindow.openImageModal = previousOpenImageModal;
       else delete imageModalWindow.openImageModal;
@@ -3017,13 +2782,6 @@
       toasts.destroy();
       unloadSoundEffects();
       media.stopTalking(data.user.id);
-      mediaTransport.stopStream(mediaTransport.microphoneStream);
-      mediaTransport.stopStream(mediaTransport.webcamStream);
-      // Every shared screen, not just the newest: leaving the others running holds the camera or
-      // the screen-capture indicator on after the room is gone.
-      for (const stream of mediaTransport.localScreenStreams.values()) mediaTransport.stopStream(stream);
-      mediaTransport.localScreenStreams.clear();
-      mediaTransport.stopStream(mediaTransport.screenStream);
       if (media.recordedUrl) URL.revokeObjectURL(media.recordedUrl);
     };
   });
