@@ -22,7 +22,7 @@ import {
 */
 
 const SERVER = readFileSync(new URL('../routes/+page.server.ts', import.meta.url), 'utf8');
-const PAGE = readFileSync(new URL('../routes/+page.svelte', import.meta.url), 'utf8');
+const PAGE = readFileSync(new URL('./room/feed-scroll.ts', import.meta.url), 'utf8');
 /*
   Added 2026-08-15: the two paging ACTIONS became remote `query` functions and moved out of
   `+page.server.ts`. Every assertion below that named an action was re-pointed here in the same
@@ -305,7 +305,7 @@ describe('the client stops asking at the end of history', () => {
       start of `main` also stopped `off-topic` from ever paging. The reference keeps this state on
       the roomlog component, and it renders one per channel.
     */
-    expect(pageCode).toContain('if (!chatScrollingUp) chatPages.arm(chat.tab);');
+    expect(pageCode).toContain('if (!this.#chatScrollingUp) this.#chatPages.arm(this.#chat.tab);');
     // PER CHANNEL is now structural: `arm` takes the key, so there is no shared flag to reach for.
     expect(pagesClass).toContain('arm(key: string): void {');
     expect(pagesClass).toContain('this.#hasMore = { ...this.#hasMore, [key]: true };');
@@ -370,12 +370,12 @@ describe('the alerts log is paged by the same machinery', () => {
       while a term is set is load-bearing here: asking for page 2 of a filter the server knows
       nothing about would interleave unfiltered history into a filtered view.
     */
-    expect(pageCode).toContain('searchTerm: alerts.search,');
+    expect(pageCode).toContain('searchTerm: this.#alerts.search,');
   });
 
   it('and stops at the first empty page, re-arming at the bottom', () => {
     expect(pageCode).toContain('alertPages.exhausted(ALERTS_LOG);');
-    expect(pageCode).toContain('if (!alertsScrollingUp) alertPages.arm(ALERTS_LOG);');
+    expect(pageCode).toContain('if (!this.#alertsScrollingUp) this.#alertPages.arm(ALERTS_LOG);');
   });
 });
 

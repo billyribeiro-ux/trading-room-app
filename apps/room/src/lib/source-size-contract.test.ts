@@ -260,7 +260,7 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       What the slice actually proves is the pattern, which is why it was chosen first: state and the
       functions that write it leaving TOGETHER, where Phase 1 moved fields and left 248 bodies here.
     */
-    max: 4083,
+    max: 3936,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {
@@ -314,6 +314,19 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     */
     max: 214,
     why: 'the window listeners - bindings stay on the element, bodies and citations move here'
+  },
+  {
+    file: 'lib/room/feed-scroll.ts',
+    /*
+      Scroll-follow and paging for all three feeds - alerts, chat, extra chat.
+
+      One MECHANISM and three instances of it: a flag per feed saying the reader is in history, a
+      tracker that sets it, and a paging arm disarmed while it is set. The three flags moved here
+      rather than staying shared, which is a change of OWNERSHIP: they were written from two
+      sides, and two writers of one flag is how a feed follows while its reader is up the log.
+    */
+    max: 319,
+    why: 'the scroll and paging mechanism - three feeds, one set of moving parts'
   },
   {
     file: 'lib/room/recording.ts',

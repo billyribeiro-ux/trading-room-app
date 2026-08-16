@@ -24,6 +24,59 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-16
 
+### 2026-08-16 16:52 EDT — Phase 5 slice 23: `RoomFeedScroll`, and a flag with two writers
+
+**`+page.svelte` 4,083 → 3,936 (−147).** Suite 2,305 → 2,308 across 156 files. `svelte-check` 1,183
+files, 0 errors, 0 warnings. All four CI steps green locally.
+**Runtime impact: yes** — scroll-follow and paging moved. No behaviour changed.
+
+**`src/lib/room/feed-scroll.ts` (319).** Eight functions and five fields covering alerts, chat and
+the extra chat column: whether the reader has scrolled up into history, how a feed is pulled back to
+the bottom, and when scrolling far enough fetches an older page.
+
+**Three feeds, one class, because it is one MECHANISM and three instances of it.** Each has a
+`*ScrollingUp` flag, a tracker that sets it, and a paging arm disarmed while it is set — the same
+three moving parts wired to three scrollers. Splitting by feed would put that pattern in three files
+and let one drift, which is the argument `RoomLogPages` already made.
+
+**The three flags MOVED rather than staying shared, and that is a change of OWNERSHIP.** They were
+written in two places: by the trackers, and by the follow effects on the page that clear them on the
+tick they pull a feed to the bottom. Two writers of one flag is how a feed ends up following while
+its reader is halfway up the log. There is one writer of record now, and the page asks —
+`…ReadingHistory` to read, `stopReadingHistory` to clear. The dependency scanner is what found it;
+reading the code, it looked like ordinary local state.
+
+**The log-pages parameters are STRUCTURAL, and the type checker is what decided that.** Naming
+`RoomLogPages` made the call site disagree for a reason that has nothing to do with paging: the page
+holds it over a UNION row — its chat log carries both the main and extra-chat shapes — while the
+rows this file passes to `arrived` come from the two remote loaders. The seven members it actually
+uses are declared instead, generic over the loader's row.
+
+**And the class is NOT generic, which two rejected drafts established.** A single `Row` said the
+alert log and the chat log hold the same shape; two caller-chosen parameters promised it works for
+any shape. It does neither — it calls two specific loaders — so the rows are DERIVED from them,
+which is also how the page had it: it never named these types either.
+
+**A `destroy()`, because the page tears the timers down.** Both debounce timers were cleared in
+`onMount`'s teardown; they travel with the class, so the teardown asks it, beside `toasts.destroy()`
+on the next line.
+
+**A rewriter bug of mine: IMPORT SPECIFIERS ARE NOT REFERENCES.**
+`import { loadOlderAlerts as loadOlderAlertsPage }` became
+`feedScroll.loadOlderAlerts as loadOlderAlertsPage` — fifteen parse errors from one greedy match,
+the same family as the property-key trap already handled. The rewriter now skips import clauses,
+tracking multi-line ones, and this slice's dead import is removed by a counted rule instead.
+
+**Two generator gaps closed, both first hit here.** A `let` with NO initialiser
+(`let alertScrollTimer: T | undefined;`) kept its `let` into the class body, because the constructor
+rewrite anchors on ` = `; it becomes an explicit `undefined` now. And the whole-line count check ran
+before `consts` were processed — fixed in slice 21, exercised again here.
+
+**Negative control seen red:** arming the extra column's paging on the MAIN tab, so one column's
+reader position decides the other's paging.
+
+Not verified: no browser run.
+
 ### 2026-08-16 16:36 EDT — A mention now pierces the hidden-tab gate, and the SERVER is what decides it
 
 **Runtime impact: yes** — a member with `visibilityChangeEnabled` and a hidden tab now receives the
