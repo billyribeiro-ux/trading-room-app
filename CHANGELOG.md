@@ -24,6 +24,49 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-16
 
+### 2026-08-16 05:53 EDT — The decomposition's remaining work is the SCRIPT, and the plan's arithmetic was wrong
+
+**Branch `feat/extra-chat-column`. Runtime impact: none** — `TODO.md` only. Recorded here because it
+changes what the next piece of work is, and because `TODO.md` row AE had gone stale in three places
+while the work it tracks was being done.
+
+**Measured, not estimated:** `+page.svelte` is **9,612 lines — 8,627 of `<script>` and 986 of
+template.**
+
+That single split is the finding. The approved plan expected Phase 1 (state classes) to take the
+file to ~5,500 and Phase 2 (template into components) to take it to ~1,700, arriving near the
+~1,100 target. **Phase 2 delivered in full and then some** — six components rather than five, the
+template down from 4,251 to 986, every pane of the room in its own file, and essentially nothing
+left in the template to extract. **Phase 1 did not.** Eight state classes moved 13,522 → 12,938,
+about 584 lines, because what they moved was DECLARATIONS while the 268 function bodies stayed
+where they were.
+
+So the ~1,100 target is **not reachable by any further component work**, and that matters more than
+it sounds: anyone measuring this row by counting components would conclude the job is nearly done,
+when the remaining 8,627 lines have barely been touched. What is actually left is the orchestration
+in that script block — the SSE handler, the command dispatch, the media transport, the file and
+alert commands — and it needs its own plan, because the Phase 1 pattern (state behind getters in a
+`.svelte.ts` class) is the wrong shape for a 577-line event handler.
+
+**Three stale claims in row AE, corrected:**
+
+- Its headline read *"`+page.svelte` is 13,663 lines"* in the present tense. It is 9,612.
+- *"PHASE 2 IS 3 OF 5 DONE"* with `AlertChatArea` and `PresentationArea` listed as remaining. All
+  six are done: `PrivateChatPanel`, `RoomSidebar`, `RoomNavbar`, `AlertChatArea` (`9d7a990`),
+  `PresentationArea` (`37ab9c2`), `FilesPane` (`eb4685d`).
+- *"PHASE 3 IS UNDER WAY"*, while the same row documented 3a–3d as done further along.
+
+The rewritten passage also carries forward the one genuinely transferable thing the last three
+extractions taught: **write the component with an empty `<script>`, run
+`svelte-check --output machine`, and take every `Cannot find name` as the prop list.** A hand scan
+of these regions produces props for comment text — `data` appears twelve times in the alert/chat
+markup and not once as the variable — and misses what is not an identifier, which is how the
+compiler caught that `screenVolume` is a snippet and `captureVideoImage` is an import.
+
+The historical running totals in that row were left exactly as they are. Each carries its own date
+and is a correct record of the moment it was taken; rewriting them to today's numbers would destroy
+the only trace of how the file actually moved.
+
 ### 2026-08-16 05:43 EDT — `FilesPane`: the last inline pane, and every pane now owns its own file
 
 **Branch `feat/extra-chat-column`. Runtime impact: none intended** — a region moved from one
