@@ -12,7 +12,7 @@ import { hashEmail } from '$lib/server/connection';
 import { db, ensureDatabase } from '$lib/server/db';
 import { chatMutes, messages, users } from '$lib/server/db/schema';
 import { consumeRateLimit } from '$lib/server/rate-limit';
-import { publishToRoom } from '$lib/server/room-events';
+import { publishChatToRoom } from '$lib/server/room-events';
 
 /*
   Posting to the room's chat: a new message, and a reply to one.
@@ -96,12 +96,29 @@ function refuseIfMuted(room: string, userId: number): void {
 function announceChatMessage(
   shortCode: string,
   channel: string,
-  user: { id: number; email: string }
+  user: { id: number; email: string },
+  message: { body: string | null | undefined; fromAdmin: boolean }
 ) {
-  publishToRoom(shortCode, {
-    channel: 'chat',
-    data: { senderId: user.id, senderEmailHash: hashEmail(user.email), room: channel }
-  });
+  /*
+    `publishChatToRoom`, not `publishToRoom`, and the difference is the one bit this frame carries
+    that is DIFFERENT for each recipient.
+
+    `body` and `fromAdmin` go no further than the hub: they are read there to answer "does this
+    mention YOU" against the name each listener joined with, and the payload below is unchanged —
+    still an id, a hash and a channel, still no text. That is the whole reason the decision is made
+    server-side. `room` may be an admin channel, so a frame carrying bodies would put admin chat on
+    every subscriber's wire, which is why the client cannot be handed the message and asked itself.
+
+    It closes the divergence found on 2026-08-16: a member with `visibilityChangeEnabled` and a
+    hidden tab does not refetch on a chat frame, so without this bit the one message addressed to
+    them by name waited until they came back. Upstream keeps mentions alive on that branch —
+    `visibilityChangeEnabled && !appHasFocus ? te.isMention && emit('chatMsg', te) : push(...)`.
+  */
+  publishChatToRoom(
+    shortCode,
+    { senderId: user.id, senderEmailHash: hashEmail(user.email), room: channel },
+    message
+  );
 }
 
 /**
@@ -175,7 +192,10 @@ export const sendMessage = command(
       })
       .run();
 
-    announceChatMessage(shortCode, room, user);
+    announceChatMessage(shortCode, room, user, {
+      body,
+      fromAdmin: isPresenterRole(user.role)
+    });
   }
 );
 
@@ -258,6 +278,9 @@ export const replyMessage = command(
       })
       .run();
 
-    announceChatMessage(shortCode, original.room, user);
+    announceChatMessage(shortCode, original.room, user, {
+      body,
+      fromAdmin: isPresenterRole(user.role)
+    });
   }
 );

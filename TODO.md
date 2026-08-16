@@ -445,33 +445,6 @@ they are removed, and their history lives in `CHANGELOG.md`, dated and timed, wi
 closed each one. Two places recording the same thing is how one of them goes stale, and a list that
 is mostly strikethrough is a list nobody reads to the bottom of.
 
-### A mention does NOT pierce the hidden-tab gate, and the comment said it did
-
-**What the code does.** `RoomEventStream`s chat branch returns before `invalidateAll()` when
-`prefs.visibilityChangeEnabled && !appHasFocus`. The mention popup is a page `$effect` reading
-`data.messages` (`+page.svelte`, `mentionArrivals.fresh(data.messages)`), and `data.messages`
-only changes when the loader runs. So on a hidden tab a mention is DEFERRED to the catch-up that
-`missedChatWhileHidden` triggers, not delivered when it arrives. The chat ding still plays, because
-it runs above the gate.
-
-**Why it was not noticed.** The comment on the gate read "the MENTION path above has already run",
-describing an ordering that does not exist - there is no mention branch on that handler. The
-contract test that was meant to hold it compared the SOURCE POSITION of the gate against the source
-position of the mention `$effect`, which says nothing about execution order and could never have
-failed. Found 2026-08-16 in Phase 5 slice 5, by moving the handler into another file and making the
-cross-file index comparison obviously meaningless.
-
-**What was done.** The comment now describes the real behaviour and says where the popup lives; the
-test now asserts what IS ordered in execution - the ding precedes the return. **The behaviour is
-unchanged.** Whether a mention should pierce the gate is a product decision: upstream does keep
-mentions alive on the hidden branch
-(`visibilityChangeEnabled && !appHasFocus ? te.isMention && emit("chatMsg", te) : push(...)`), so
-matching it would mean the chat frame carrying enough to identify a mention - which it deliberately
-does not, because the payload never carries message text and `room` can be an admin channel.
-Closing it honestly means the SERVER deciding "this is a mention of you" and saying so on the wire.
-
-**Blocks:** nothing. Recorded so the divergence from the reference is deliberate and visible.
-
 ### THE CONTROLLER REGISTER: `docs/reference/evidence-gap-register.md`
 
 Every gap from the full read of `apps/controller/evidence-dumps/` now lives there with a status, in

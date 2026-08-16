@@ -214,7 +214,12 @@ export class RoomEventStream<Entry> {
 
     source.addEventListener('message', (event) => {
       // No initialiser: the `catch` returns, so a value here could never be read.
-      let payload: { channel?: string; data?: Record<string, unknown> };
+      let payload: {
+        channel?: string;
+        data?: Record<string, unknown>;
+        /** Set only on the `chat` channel, and only for the listener it was built for. */
+        isMention?: boolean;
+      };
       try {
         payload = JSON.parse((event as MessageEvent<string>).data);
       } catch {
@@ -725,24 +730,35 @@ export class RoomEventStream<Entry> {
         is skipped is the full refetch. `missedChatWhileHidden` records that there is something to
         catch up on, so returning to a tab where nothing happened costs nothing.
 
-        **The mention POPUP does not survive this return, and the sentence that used to stand here
-        said it did.** It read "the MENTION path above has already run", which describes an ordering
-        that does not exist: there is no mention branch on this handler. The popup is an `$effect` on
-        the page reading `data.messages` (`+page.svelte`, `mentionArrivals.fresh(data.messages)`),
-        and `data.messages` only changes when the loader runs — which is exactly what this return
-        skips. So on a hidden tab a mention is deferred until the tab comes back and the catch-up
-        fires, not delivered immediately.
+        **A MENTION PIERCES THE GATE, and it is the SERVER that says so.** Upstream keeps mentions
+        alive on this branch — `visibilityChangeEnabled && !appHasFocus ? te.isMention &&
+        emit('chatMsg', te) : push(...)` — and this room could not, because the popup is an
+        `$effect` on the page reading `data.messages` (`mentionArrivals.fresh(data.messages)`) and
+        `data.messages` only changes when the loader runs, which is exactly what the return below
+        skips. So a member addressed by name waited until they came back.
 
-        Found in Phase 5 slice 5 by moving the handler: the contract test that was supposed to hold
-        this compared the SOURCE POSITION of the gate against the source position of the mention
-        `$effect`, which tells you nothing about execution order and could never have caught it. The
-        behaviour is UNCHANGED by this slice and is recorded in `TODO.md` rather than altered here —
-        whether a mention should pierce the hidden-tab gate is a product decision, not a refactor's
-        to take.
+        The reference computes `isMention(te)` on the client off `te.txt`, and this room cannot: its
+        `subscribe(path)` is per CHANNEL while this hub's stream is per ROOM, so a frame carrying
+        message text would put admin chat on every subscriber's wire. `publishChatToRoom` therefore
+        answers the question in the hub, per recipient, against the name each listener joined with —
+        the same `isMentionOf` rule this room already uses for the highlight. One bit about your own
+        name, and the body never leaves the process.
+
+        History, because the shape of the miss is worth keeping: the sentence that stood here said
+        "the MENTION path above has already run", describing an ordering that never existed, and the
+        contract meant to hold it compared the SOURCE POSITION of this gate against that of the
+        `$effect` — which says nothing about execution order and could never have failed. Both were
+        found in Phase 5 slice 5 by moving the handler into another file, where a cross-file index
+        comparison is obviously meaningless.
       */
       if (this.#prefs.visibilityChangeEnabled && !this.#appHasFocus()) {
         this.#chatMissedWhileHidden();
-        return;
+        /*
+          `!== true` rather than a falsy test: the field is optional on the wire, and a frame from a
+          publisher that has not learned to send it must behave as it did before rather than
+          announce every message as a mention.
+        */
+        if (payload.isMention !== true) return;
       }
 
       void invalidateAll();

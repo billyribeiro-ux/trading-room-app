@@ -24,6 +24,61 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-16
 
+### 2026-08-16 16:36 EDT — A mention now pierces the hidden-tab gate, and the SERVER is what decides it
+
+**Runtime impact: yes** — a member with `visibilityChangeEnabled` and a hidden tab now receives the
+one message addressed to them by name, instead of waiting until they come back. Suite 2,297 → 2,305
+across 156 files. `svelte-check` 1,182 files, 0 errors, 0 warnings. All four CI steps green locally.
+
+**The divergence.** Upstream keeps mentions alive on the hidden-tab branch:
+`visibilityChangeEnabled && !appHasFocus ? te.isMention && emit('chatMsg', te) : push(...)`. This
+room could not, because its mention popup is an `$effect` reading `data.messages`, and
+`data.messages` only changes when the loader runs — exactly what the early return skips. Found on
+2026-08-16 in Phase 5 slice 5, by moving the handler into another file and discovering that the
+contract meant to hold it compared the SOURCE POSITIONS of a gate and an `$effect`.
+
+**Why the server answers it, and not the client.** The reference computes `isMention(te)` locally
+off `te.txt`, and this room cannot: its `subscribe(path)` is per CHANNEL, while this hub's SSE
+stream is per ROOM. A frame carrying message text would put admin chat on every subscriber's wire —
+which is precisely why the chat payload has always been an id, a hash and a channel name.
+
+**So `publishChatToRoom` decides per RECIPIENT.** The subscriber map already held each listener's
+`RosterUser`, so the hub is the one place that can answer "does this mention YOU" without the body
+going anywhere: it calls `isMentionOf` — the same rule the highlight uses, imported rather than
+copied — against the name each listener joined with. `body` and `fromAdmin` are parameters, not
+payload. A member learns one bit about their own name; the text never leaves the process.
+
+**The client reads `payload.isMention !== true`, not a falsy test.** The field is optional on the
+wire, so a publisher that has not learned to send it leaves the branch behaving exactly as before
+rather than announcing every message as a mention. `chatMissedWhileHidden()` still fires either
+way — a mention arriving does not mean there is nothing else to catch up on.
+
+**A privacy contract re-scoped, and strengthened.** `chat-popup-contract` asserted "the SSE payload
+still carries no message text" by grepping the publish helper for the word `body` — which stopped
+being able to tell reading from publishing the moment the helper took a body in order to answer the
+mention question. It now reads the PAYLOAD ARGUMENT, and the runtime half lives in the new
+`src/lib/server/chat-mention-fanout.test.ts`, which inspects what a subscriber actually RECEIVED:
+the frame's keys are exactly `channel`, `data`, `isMention`; `data`'s are exactly `senderId`,
+`senderEmailHash`, `room`; a deliberately planted admin-channel body appears nowhere in it; and the
+bit is the ONLY thing that differs between two recipients. Source text cannot prove the hub adds no
+field of its own — that file can.
+
+**Two negative controls seen red, one per half.** Making the client ignore the bit reddens the
+runtime mention test; making the hub answer `false` for everyone reddens four fan-out assertions.
+The first control was run BEFORE the client test existed and stayed green — the same missing-test
+finding as slice 22, caught the same way and fixed before the commit rather than after.
+
+**Eight new assertions**, including the three details of `isMentionOf` exercised through the
+fan-out: case-insensitive, a trailing space required (`@bob ` matches, `@bobby` does not), and
+`@all ` honoured only from an admin. Two of them failed on the first run because MY fixtures were
+wrong — `@all` needs no name, and `@ada` at end-of-message has no trailing space — which is the
+documented false negative the reference chose, not a defect.
+
+`TODO.md`'s "Evidence gaps" row is removed rather than struck through.
+
+Not verified: no browser run. The fan-out is proven in process; nothing here proves a real hidden
+tab pops a toast.
+
 ### 2026-08-16 16:24 EDT — Phase 5 slice 18: the window listeners' bodies, and the mention in a docstring that nearly ate the file
 
 **`+page.svelte` 4,151 → 4,083 (−68).** Suite 2,294 → 2,297 across 155 files. `svelte-check` 1,181

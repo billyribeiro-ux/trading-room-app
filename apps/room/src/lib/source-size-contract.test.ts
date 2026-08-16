@@ -266,7 +266,7 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
   {
     file: 'lib/room/events.svelte.ts',
     /*
-      The room's realtime channel: 864 lines carrying 351 of code and 468 of citation.
+      The room's realtime channel: 880 lines carrying 355 of code and 480 of citation.
 
       A ROUTER, and the ratio is the evidence for that reading rather than a coincidence — more than
       half the file is the transcription of what each of six channels means, because the behaviour
@@ -275,7 +275,7 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       instead of reading the mode off the wire, and why the leave beep reads a room setting named
       for joins.
     */
-    max: 864,
+    max: 880,
     why: 'the SSE router - 351 code lines under 468 of channel transcription'
   },
   {

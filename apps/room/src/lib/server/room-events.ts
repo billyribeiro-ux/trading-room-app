@@ -36,13 +36,29 @@
  */
 
 /** One realtime message, mirroring the capture's channel-per-topic shape. */
+import { isMentionOf } from '../mention';
+
 import type { PrivateChatMessage } from './private-chat';
 
 export type RoomEvent =
   /** `/sess/{id}/alerts/` - the capture pushes the alert row and emits `alertMsg`. */
   | { channel: 'alerts'; data: unknown }
-  /** `/sess/{id}/chat/{name}/` - pushes the message and emits `chatMsg`. */
-  | { channel: 'chat'; data: unknown }
+  /**
+   * `/sess/{id}/chat/{name}/` - pushes the message and emits `chatMsg`.
+   *
+   * **The payload carries no message TEXT, deliberately, and `isMention` is why it can still say
+   * whether you were named.** `room` may be an admin channel, so a frame carrying bodies would put
+   * admin chat on every subscriber's wire. The reference does not have this problem — it publishes
+   * per-channel and the client computes `isMention(te)` off `te.txt` locally — but its
+   * `subscribe(path)` is per channel and this hub's SSE stream is per room, so the same trick here
+   * would leak.
+   *
+   * So the SERVER decides, PER RECIPIENT, using the same `isMentionOf` rule the client uses for the
+   * highlight: `publishChatToRoom` builds one event per listener from the name that listener joined
+   * with. A member learns one bit about their own name and nothing about anyone else's, and the
+   * body never leaves the process.
+   */
+  | { channel: 'chat'; data: unknown; isMention?: boolean }
   /**
    * `/sess/{id}/cmds/` - the room's command channel.
    *
@@ -381,6 +397,55 @@ export function publishToRoom(room: string, event: RoomEvent): void {
   for (const listener of listeners.keys()) {
     try {
       listener(event);
+    } catch (error) {
+      console.error('[room-events] subscriber failed', error);
+    }
+  }
+}
+
+/**
+ * Fan a CHAT frame out, deciding per recipient whether it mentions them.
+ *
+ * ## Why this is not `publishToRoom`
+ *
+ * Every other channel sends one object to everybody. Chat cannot: the answer to "does this mention
+ * you" is different for each listener, and the only place that can be computed without putting the
+ * message text on the wire is here, where the subscriber map already holds who each listener is.
+ *
+ * ## Why it matters
+ *
+ * A member with `visibilityChangeEnabled` and a hidden tab does not refetch on a chat frame — that
+ * is the whole point of the preference. Upstream keeps mentions alive on that branch:
+ *
+ * ```js
+ * visibilityChangeEnabled && !appHasFocus ? te.isMention && emit('chatMsg', te) : push(...)
+ * ```
+ *
+ * Without this bit the client cannot tell a mention from any other message, so the one message
+ * addressed to you by name waited until you came back. That divergence was found on 2026-08-16 and
+ * is closed here.
+ *
+ * ## What it does NOT publish
+ *
+ * `body` and `fromAdmin` are parameters, not payload. They are read to answer the question and
+ * discarded; `data` is the same object every listener already received. The bit tells a recipient
+ * about their OWN name and nothing about the message, the sender, or anybody else — and an
+ * anonymous listener, which has no name to match, is told `false` by `isMentionOf`'s own guard.
+ */
+export function publishChatToRoom(
+  room: string,
+  data: unknown,
+  message: { body: string | null | undefined; fromAdmin: boolean }
+): void {
+  const listeners = subscribers.get(room);
+  if (!listeners) return;
+  for (const [listener, user] of listeners) {
+    try {
+      listener({
+        channel: 'chat',
+        data,
+        isMention: isMentionOf(message.body, user?.displayName, message.fromAdmin)
+      });
     } catch (error) {
       console.error('[room-events] subscriber failed', error);
     }

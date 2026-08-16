@@ -1,8 +1,22 @@
 // @vitest-environment jsdom
 import { flushSync } from 'svelte';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { RoomEventStream } from './events.svelte';
+
+/*
+  `invalidateAll` is MOCKED, because it is the observable the hidden-tab branch turns on.
+
+  Every other assertion in this file watches a receiver the class was handed. This one cannot: the
+  question is whether the class REFETCHES, and the refetch is a SvelteKit call with no return value
+  and no collaborator. Counting it is the only way to tell "deferred" from "delivered", which is
+  precisely the distinction the mention bit exists to make.
+*/
+const invalidateAll = vi.fn();
+vi.mock('$app/navigation', () => ({
+  invalidate: vi.fn(async () => {}),
+  invalidateAll: (...args: unknown[]) => invalidateAll(...args)
+}));
 
 /*
   The realtime channel, EXECUTED.
@@ -194,33 +208,85 @@ describe("the stream is this room's own channel, and it closes", () => {
   });
 });
 
+/**
+ * A stream whose viewer has `visibilityChangeEnabled` on and a HIDDEN tab.
+ *
+ * Built once for the three assertions that turn on that condition. Three copies of a fourteen-line
+ * construction is how one of them ends up with `appHasFocus: () => true` and passes for the wrong
+ * reason — which is the failure mode this whole file exists to catch elsewhere.
+ */
+const hiddenTabStream = (missed: true[]) =>
+  new RoomEventStream<{ id: number }>({
+    prefs: { doNotDisturbOn: false, chatSoundOn: false, visibilityChangeEnabled: true } as never,
+    toasts: { show: () => null } as never,
+    media: {} as never,
+    broadcasts: {} as never,
+    mediaTransport: {} as never,
+    mtx: {} as never,
+    roster: { countArrived: () => {}, rosterArrived: () => {} },
+    privateChat: { ingest: () => {} },
+    userActions: { followedUsers: {} },
+    session: () => ({ room: { shortCode: 'abc' }, user: { id: 1 }, sessData: null }),
+    isPresenter: () => false,
+    // The tab is HIDDEN, which is the whole condition these three share.
+    appHasFocus: () => false,
+    restartMediaSession: () => null,
+    showTab: () => {},
+    chatMissedWhileHidden: () => missed.push(true)
+  });
+
 describe('the two receivers reach the page', () => {
   it('a chat frame on a hidden tab calls the receiver instead of refetching', () => {
     const missed: true[] = [];
-    const stream = new RoomEventStream<{ id: number }>({
-      prefs: { doNotDisturbOn: false, chatSoundOn: false, visibilityChangeEnabled: true } as never,
-      toasts: { show: () => null } as never,
-      media: {} as never,
-      broadcasts: {} as never,
-      mediaTransport: {} as never,
-      mtx: {} as never,
-      roster: { countArrived: () => {}, rosterArrived: () => {} },
-      privateChat: { ingest: () => {} },
-      userActions: { followedUsers: {} },
-      session: () => ({ room: { shortCode: 'abc' }, user: { id: 1 }, sessData: null }),
-      isPresenter: () => false,
-      // The tab is HIDDEN, which is the whole condition under test.
-      appHasFocus: () => false,
-      restartMediaSession: () => null,
-      showTab: () => {},
-      chatMissedWhileHidden: () => missed.push(true)
-    });
+    const stream = hiddenTabStream(missed);
     stream.subscribe();
     FakeEventSource.last?.fire('message', {
       data: JSON.stringify({ channel: 'chat', data: { senderId: 99 } })
     });
     // The flag is the page's; the stream can only ask for it to be set.
     expect(missed).toEqual([true]);
+    // And it did NOT refetch, which is the whole point of the preference.
+    expect(invalidateAll).not.toHaveBeenCalled();
+  });
+
+  it('a MENTION pierces the hidden-tab gate, because the server said it was one', () => {
+    /*
+      THE DIVERGENCE CLOSED ON 2026-08-16, asserted at runtime.
+
+      Upstream keeps mentions alive on this branch —
+      `visibilityChangeEnabled && !appHasFocus ? te.isMention && emit('chatMsg', te) : push(...)` —
+      and this room could not, because its mention popup is an `$effect` reading `data.messages`
+      and the early return is exactly what stops that changing. So the refetch IS the delivery, and
+      counting it is how "deferred" is told from "delivered".
+
+      The bit comes from the SERVER: the frame carries no message text, so the client cannot decide
+      this for itself. `chat-mention-fanout.test.ts` proves the other end of that.
+    */
+    invalidateAll.mockClear();
+    const missed: true[] = [];
+    const stream = hiddenTabStream(missed);
+    stream.subscribe();
+    FakeEventSource.last?.fire('message', {
+      data: JSON.stringify({ channel: 'chat', data: { senderId: 99 }, isMention: true })
+    });
+
+    // Still recorded as missed — coming back should still catch up on everything else.
+    expect(missed).toEqual([true]);
+    // But the refetch happened, so the popup's effect sees the message now rather than later.
+    expect(invalidateAll).toHaveBeenCalledTimes(1);
+  });
+
+  it('a frame with no bit behaves as it did before, rather than announcing everything', () => {
+    // The field is optional on the wire. A publisher that has not learned to send it must leave the
+    // branch as it was — `!== true` rather than a falsy test is what makes that so.
+    invalidateAll.mockClear();
+    const missed: true[] = [];
+    const stream = hiddenTabStream(missed);
+    stream.subscribe();
+    FakeEventSource.last?.fire('message', {
+      data: JSON.stringify({ channel: 'chat', data: { senderId: 99 } })
+    });
+    expect(invalidateAll).not.toHaveBeenCalled();
   });
 
   it('a room-wide video moves a non-presenter through the tab receiver', () => {

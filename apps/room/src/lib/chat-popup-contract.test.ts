@@ -79,12 +79,28 @@ describe('ours', () => {
       new URL('../routes/chat-messages.remote.ts', import.meta.url),
       'utf8'
     );
-    const from = chatCommands.indexOf('function announceChatMessage(');
-    expect(from, 'the publish helper must exist for this to guard anything').toBeGreaterThan(-1);
-    const publish = chatCommands.slice(from, chatCommands.indexOf('\n}', from));
-    expect(publish).toContain('senderEmailHash');
-    expect(publish).not.toContain('body');
-    expect(publish).not.toMatch(/\btext\b/);
+    /*
+      Scoped to the PAYLOAD, not to the whole helper, since 2026-08-16.
+
+      The helper now TAKES a body — `publishChatToRoom` reads it to answer "does this mention you"
+      per recipient, and discards it — so grepping the function for the word `body` stopped being
+      able to tell reading from publishing. The property is unchanged and is asserted on the object
+      that actually travels: the argument between the room and the message.
+
+      The runtime half lives in `src/lib/server/chat-mention-fanout.test.ts`, which inspects what a
+      subscriber RECEIVED. Source text cannot prove the hub does not add a field of its own; that
+      file can, and does.
+    */
+    const from = chatCommands.indexOf('publishChatToRoom(');
+    expect(from, 'the publish call must exist for this to guard anything').toBeGreaterThan(-1);
+    const payload = chatCommands.slice(
+      chatCommands.indexOf('{', from),
+      chatCommands.indexOf('}', from) + 1
+    );
+    expect(payload).toContain('senderEmailHash');
+    expect(payload).not.toContain('body');
+    expect(payload).not.toMatch(/\btext\b/);
+    expect(payload).not.toMatch(/\bbodyHtml\b/);
   });
 
   it('reads the text from the server-filtered data instead', () => {
