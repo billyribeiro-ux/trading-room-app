@@ -80,3 +80,75 @@ export class RoomArrivals<Row extends ArrivalRow> {
     return arrived;
   }
 }
+
+/**
+ * `RoomOrderedArrivals` — the same question as `RoomArrivals`, answered by POSITION instead of by
+ * identity, and the two are deliberately not one class.
+ *
+ * ## Why a second algorithm exists at all
+ *
+ * The mention popup marks the LAST message it announced and takes everything after it, by position
+ * in the server's own ordering. A `Set` of seen ids would look equivalent and is not, because of the
+ * case in the middle of `fresh()` below: when the marker is no longer in the list at all — trimmed
+ * out of the newest page while you were away — this **re-seeds silently**. An identity set has no
+ * way to express that. Every row would be unseen, and a member returning to a busy room would get a
+ * toast AND an operating-system notification for every mention in the log at once.
+ *
+ * So they sit in one file, next to each other, precisely so nobody merges them: two algorithms that
+ * look alike, answer the same English sentence, and differ on the case that matters.
+ *
+ * ## The id is an OPAQUE key here, never a number
+ *
+ * `Row` is constrained to `{ id: unknown }` rather than to `ArrivalRow`, and that is deliberate:
+ * this class only ever compares with `===` and slices by POSITION, so it does not need to know what
+ * an id is. `id-opacity-contract.test.ts` exists because the first version of this logic did
+ * `Math.max(highest, item.id)` — and the room-to-API cutover swaps SQLite's numeric ids for uuids,
+ * which is a server-side change ONLY while no client does arithmetic on one. `Math.max` over a uuid
+ * is not a type error; it is `NaN` at runtime. Widening the constraint is what makes that
+ * unwritable here rather than merely discouraged.
+ *
+ * `RoomArrivals` above keeps `number`, and that asymmetry is the point: it uses ids as `Set` keys,
+ * so it needs one that hashes by value.
+ *
+ * ## The empty-room case, which falls out correctly rather than by accident
+ *
+ * Seeded against an empty log, `#lastId` is `undefined`; `findIndex` returns -1; the lost-marker
+ * guard is skipped because it requires a marker to have existed; and `slice(0)` returns the whole
+ * list. So the first message ever posted IS announced. That is the same distinction `RoomArrivals`
+ * needs its `#primed` flag for, arriving here for free — worth stating, because it reads like an
+ * oversight until you follow it through.
+ */
+export class RoomOrderedArrivals<Row extends { readonly id: unknown }> {
+  #lastId: unknown;
+  #seeded = false;
+
+  /**
+   * Everything after the last row this announced, and nothing at all on the first call.
+   *
+   * Arriving in a room with fifty unread mentions is silent: the first pass records where the log
+   * ends and announces none of it.
+   */
+  fresh(messages: readonly Row[]): readonly Row[] {
+    if (!this.#seeded) {
+      this.#seeded = true;
+      this.#lastId = messages.at(-1)?.id;
+      return [];
+    }
+
+    /*
+      THE MARKER IS GONE — trimmed from the newest page, or the log replaced under us. `findIndex`
+      gives -1 and `slice(0)` would announce the entire list, so this re-seeds instead. The
+      `!== undefined` term is what keeps the empty-room case out of this branch; see the note above.
+    */
+    const seenAt = messages.findIndex((item) => item.id === this.#lastId);
+    if (this.#lastId !== undefined && seenAt === -1) {
+      this.#lastId = messages.at(-1)?.id;
+      return [];
+    }
+
+    const arrived = messages.slice(seenAt + 1);
+    if (arrived.length === 0) return [];
+    this.#lastId = messages.at(-1)?.id;
+    return arrived;
+  }
+}

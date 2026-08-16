@@ -70,8 +70,14 @@ describe('the hidden tab stops refetching', () => {
       upstream keeps mentions alive on the hidden branch. A feature that silences the one message
       addressed to you by name is not a saving.
     */
+    /*
+      RE-POINTED 2026-08-15: the popup's marker moved into `RoomOrderedArrivals`, so `lastPopupChatId`
+      is no longer a name in this page. The concern is unchanged and is about ORDER — the hidden-tab
+      early return must come after the mention path, or a member would stop being told about the one
+      message addressed to them by name. `mentionArrivals` is that path's identifier now.
+    */
     const gate = pageCode.indexOf('if (visibilityChangeEnabled && !appHasFocus) {');
-    const mention = pageCode.indexOf('lastPopupChatId');
+    const mention = pageCode.indexOf('mentionArrivals.fresh(');
     expect(mention, 'the mention popup path must exist').toBeGreaterThan(-1);
     expect(gate, 'the refetch gate must come after the mention path').toBeGreaterThan(mention);
   });

@@ -110,7 +110,7 @@
   import { RoomRoster } from '$lib/room/roster.svelte';
   import { RoomAlerts } from '$lib/room/alerts.svelte';
   import { ALERTS_LOG, RoomLogPages } from '$lib/room/log-pages.svelte';
-  import { RoomArrivals } from '$lib/room/arrivals';
+  import { RoomArrivals, RoomOrderedArrivals } from '$lib/room/arrivals';
   import { RoomScrollFollow } from '$lib/room/scroll-follow';
   import type { RoomMessageChrome } from '$lib/room-message-chrome';
   import { EXTRA_COMPOSER, RoomChat } from '$lib/room/chat.svelte';
@@ -926,19 +926,13 @@
   let chatPopup = $state(loadedSettings.chatPopup !== false);
 
   /**
-   * The id of the last chat message already considered for a popup — an OPAQUE key, never a number.
+   * Which chat messages are new since the popup last looked.
    *
-   * `id-opacity-contract.test.ts` caught the first version of this doing `Math.max(highest,
-   * item.id)`, and it was right to: the room-to-API cutover swaps SQLite's numeric ids for uuids,
-   * and that is a server-side change ONLY while no client does arithmetic on one. `Math.max` over a
-   * uuid is not a type error, it is `NaN` at runtime. So the marker is compared with `===` and
-   * everything else is done by POSITION in the server's own ordering.
-   *
-   * `undefined` means "nothing considered yet". Not `$state`: nothing renders from it, and making
-   * it reactive would invalidate the effect that writes it.
+   * `RoomOrderedArrivals`, not `RoomArrivals` — it marks a POSITION and re-seeds silently when the
+   * marker has been trimmed away, and its `Row` is constrained to `{ id: unknown }` so the id stays
+   * the opaque key `id-opacity-contract.test.ts` requires. The reasoning lives with the class.
    */
-  let lastPopupChatId: (typeof data.messages)[number]['id'] | undefined;
-  let popupSeeded = false;
+  const mentionArrivals = new RoomOrderedArrivals<(typeof data.messages)[number]>();
   let chatBadges = $state(loadedSettings.chatBadges !== false);
   let chatGif = $state(loadedSettings.chatGif !== false);
   let makeUsersFollowMyScreens = $state(loadedSettings.makeUsersFollowMyScreens === true);
@@ -2660,32 +2654,16 @@
    * from there cannot show anybody something they were not already entitled to see.
    *
    * An `$effect` because this IS a side effect — a toast and an OS notification — not a derivation.
-   * The marker it writes is bookkeeping, not rendered state.
    *
-   * `lastPopupChatId` starts at -1 and is seeded on the FIRST pass without announcing anything, so
-   * arriving in a room with fifty unread mentions is silent. Only messages that appear afterwards
-   * pop.
+   * `RoomOrderedArrivals` owns which messages are new, and it is deliberately NOT `RoomArrivals`:
+   * this marks a POSITION in the server's ordering and re-seeds silently when that marker has been
+   * trimmed out of the newest page, where an identity set would announce the entire log. Both live
+   * in `$lib/room/arrivals.ts`, next to each other, so nobody merges them. Arriving in a room with
+   * fifty unread mentions is silent; only messages that appear afterwards pop.
    */
   $effect(() => {
-    const messages = data.messages;
-    if (!popupSeeded) {
-      popupSeeded = true;
-      lastPopupChatId = messages.at(-1)?.id;
-      return;
-    }
-    /*
-      Everything AFTER the marker, by position in the server's own ordering. If the marker is gone
-      — trimmed from the log, or the tab changed — `indexOf` gives -1 and `slice(0)` would announce
-      the whole list, so that case seeds again instead.
-    */
-    const seenAt = messages.findIndex((item) => item.id === lastPopupChatId);
-    if (lastPopupChatId !== undefined && seenAt === -1) {
-      lastPopupChatId = messages.at(-1)?.id;
-      return;
-    }
-    const fresh = messages.slice(seenAt + 1);
+    const fresh = mentionArrivals.fresh(data.messages);
     if (fresh.length === 0) return;
-    lastPopupChatId = messages.at(-1)?.id;
 
     // `doNotDisturbOn ||` — the outer gate on the whole block, sound and popup alike.
     if (doNotDisturbOn || !chatPopup) return;

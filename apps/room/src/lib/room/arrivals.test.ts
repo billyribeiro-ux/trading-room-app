@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { RoomArrivals } from './arrivals';
+import { RoomArrivals, RoomOrderedArrivals } from './arrivals';
 
 /**
  * The three effects this class replaced each toasted, beeped or pinged on arrival, so every
@@ -98,5 +98,70 @@ describe('RoomArrivals', () => {
     // Ids are per-table. One shared set would make alert 7 swallow message 7.
     expect(alerts.fresh(rows(1, 7)).map((row) => row.id)).toEqual([7]);
     expect(messages.fresh(rows(1, 7)).map((row) => row.id)).toEqual([7]);
+  });
+});
+
+describe('RoomOrderedArrivals', () => {
+  it('announces nothing on the first pass, whatever is already in the log', () => {
+    const marker = new RoomOrderedArrivals<Row>();
+
+    // Arriving in a room with fifty unread mentions must not produce fifty toasts and fifty
+    // operating-system notifications.
+    expect(marker.fresh(rows(1, 2, 3, 4, 5))).toEqual([]);
+  });
+
+  it('takes everything AFTER the marker, in the server’s order', () => {
+    const marker = new RoomOrderedArrivals<Row>();
+    marker.fresh(rows(1, 2, 3));
+
+    expect(marker.fresh(rows(1, 2, 3, 4, 5)).map((row) => row.id)).toEqual([4, 5]);
+  });
+
+  it('RE-SEEDS SILENTLY when the marker has been trimmed away', () => {
+    const marker = new RoomOrderedArrivals<Row>();
+    marker.fresh(rows(1, 2, 3));
+
+    /*
+      THE CASE AN IDENTITY SET CANNOT EXPRESS, and the reason this is a second class rather than a
+      second use of `RoomArrivals`.
+
+      The reader was away; the newest page has moved on and rows 1-3 are no longer in it. `findIndex`
+      returns -1. Announcing `slice(0)` would toast and ping for every message in the log at once.
+      `RoomArrivals` would do exactly that, because to a set every one of these is unseen.
+    */
+    expect(marker.fresh(rows(50, 51, 52))).toEqual([]);
+
+    // ...and it is now marked at the new end, so the next arrival is announced normally.
+    expect(marker.fresh(rows(50, 51, 52, 53)).map((row) => row.id)).toEqual([53]);
+  });
+
+  it('announces the first message ever posted in an EMPTY room', () => {
+    const marker = new RoomOrderedArrivals<Row>();
+
+    /*
+      Seeded against an empty log there is no marker, so `findIndex` returns -1 — the same -1 the
+      trimmed case produces. What separates them is that the lost-marker branch requires a marker to
+      have EXISTED. Without that term this would be silent, and the first thing anybody said in a new
+      room would never announce.
+    */
+    expect(marker.fresh([])).toEqual([]);
+    expect(marker.fresh(rows(1)).map((row) => row.id)).toEqual([1]);
+  });
+
+  it('is silent when the log has not moved', () => {
+    const marker = new RoomOrderedArrivals<Row>();
+    marker.fresh(rows(1, 2, 3));
+
+    // Every SSE event re-reads the whole log. A re-read is not an arrival.
+    expect(marker.fresh(rows(1, 2, 3))).toEqual([]);
+    expect(marker.fresh(rows(1, 2, 3))).toEqual([]);
+  });
+
+  it('treats the marker as an OPAQUE id — no arithmetic, no assumption that ids ascend', () => {
+    const marker = new RoomOrderedArrivals<Row>();
+    marker.fresh(rows(900, 12));
+
+    // Position is what decides, not the number. `12` is the marker because it is LAST.
+    expect(marker.fresh(rows(900, 12, 7)).map((row) => row.id)).toEqual([7]);
   });
 });

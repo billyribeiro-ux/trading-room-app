@@ -223,6 +223,52 @@ through — both are documented in `.env.example` and until now nothing read the
 **Not done:** retiring `ptr_clone_app` (deferred until the cutover is proven in a real deployment),
 and the owner role / database rename `ptr_clone` → `tradingroom`. Both remain in `TODO.md`.
 
+### 2026-08-15 20:45 EDT — `RoomOrderedArrivals`: the last latch, and two rules that had never been run
+
+**Branch `feat/extra-chat-column`, not merged.** **Runtime impact: none intended** — the mention
+popup's marker logic is unchanged; it is executable now instead of only readable.
+
+`popupSeeded` and `lastPopupChatId` were the last of the latch identifiers the Phase 3 plan named.
+They are gone, and the logic they served is `RoomOrderedArrivals`, which sits in the same file as
+`RoomArrivals` **deliberately, so nobody merges them.**
+
+**They answer the same English sentence and differ on the case that matters.** `RoomArrivals` keeps a
+set of ids. This one marks a POSITION and, when that marker is no longer in the list at all — trimmed
+out of the newest page while the reader was away — **re-seeds silently**. An identity set cannot
+express that: every row would be unseen, and a member returning to a busy room would get a toast AND
+an operating-system notification for every mention in the log at once.
+
+**The rules were guarded, and had never been executed.** `chat-popup-contract.test.ts` had 21
+assertions covering exactly this, all of them reading `+page.svelte` as text — including *"stays
+silent on the backlog when you arrive"* and *"re-seeds rather than re-announcing when the marker is
+gone"*. A text assertion cannot demonstrate a rule whose failure is fifty notifications. Both now run,
+and both were negative-controlled:
+
+```
+delete the re-seed branch      -> RE-SEEDS SILENTLY when the marker has been trimmed away   RED
+delete the priming return      -> announces nothing on the first pass                        RED
+wire RoomArrivals by mistake   -> asks RoomOrderedArrivals which messages are new            RED
+```
+
+That third one is the one worth having. Swapping the classes **compiles and type-checks**, and the
+symptom appears only the first time a marker is ever trimmed.
+
+**An opacity rule made unwritable rather than merely watched.** `id-opacity-contract.test.ts` exists
+because a first draft did `Math.max(highest, item.id)` — and the room-to-API cutover replaces numeric
+ids with uuids, where `Math.max` is not a type error but `NaN` at runtime. `RoomOrderedArrivals`
+constrains its row to `{ id: unknown }`, so equality and position are the only operations available
+to it. `RoomArrivals` keeps `number` because it uses ids as `Set` keys, and that asymmetry is stated
+in both.
+
+**Four contract assertions re-pointed, none deleted**, including one in
+`visibility-change-contract.test.ts` that keyed on `lastPopupChatId` to prove the hidden-tab early
+return comes AFTER the mention path — the order that stops a hidden tab from silencing the one
+message addressed to you by name.
+
+**Verified:** `pnpm run check` 0 errors / 0 warnings across 1,137 files; suite **1,888 across 136
+files**; eslint clean; prettier clean. Three negative controls seen red. `+page.svelte`
+**11,583 → 11,561**, ceiling lowered in the same commit.
+
 ### 2026-08-15 20:26 EDT — `RoomMessageChrome`: the sixteen props every message shares, and a second column missing four of them
 
 **Branch `feat/extra-chat-column`, not merged.** **Runtime impact: none** — the same sixteen values
