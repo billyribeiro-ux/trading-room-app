@@ -260,7 +260,7 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       What the slice actually proves is the pattern, which is why it was chosen first: state and the
       functions that write it leaving TOGETHER, where Phase 1 moved fields and left 248 bodies here.
     */
-    max: 4487,
+    max: 4323,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {
@@ -277,6 +277,18 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     */
     max: 864,
     why: 'the SSE router - 351 code lines under 468 of channel transcription'
+  },
+  {
+    file: 'lib/room/webcams.ts',
+    /*
+      The webcam cards and the three attachments that put a stream into an element.
+
+      It renders; it does not capture — the transport acquires the camera and produces it, and
+      this decides what a card looks like and where the stream lands. Two collaborators, which
+      made it the cleanest seam left on the page after slice 20.
+    */
+    max: 229,
+    why: 'the webcam cards - six functions, two collaborators, and no rune between them'
   },
   {
     file: 'lib/room/recording.ts',

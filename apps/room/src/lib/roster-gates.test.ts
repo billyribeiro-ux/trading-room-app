@@ -598,7 +598,6 @@ describe('locationVisibleTo', () => {
 describe('giveMicScreen wiring', () => {
   // `serverSource` is gone: `+page.server.ts` no longer holds `giveMicScreen`, and a reader
   // that nothing reads is the next person's dead end.
-  const pageSource = readFileSync('src/routes/+page.svelte', 'utf8');
   const modalSource = readFileSync('src/lib/components/ModalHost.svelte', 'utf8');
 
   it('has a sender, which is what made isLimitedPresenter reachable at last', () => {
@@ -645,9 +644,9 @@ describe('giveMicScreen wiring', () => {
     expect(
       readFileSync(new URL('../routes/presenter-commands.remote.ts', import.meta.url), 'utf8')
     ).toContain("cmd: 'giveMicScreen'");
-    expect(
-      readFileSync(new URL('./room/events.svelte.ts', import.meta.url), 'utf8')
-    ).toContain("command?.cmd === 'giveMicScreen'");
+    expect(readFileSync(new URL('./room/events.svelte.ts', import.meta.url), 'utf8')).toContain(
+      "command?.cmd === 'giveMicScreen'"
+    );
   });
 });
 

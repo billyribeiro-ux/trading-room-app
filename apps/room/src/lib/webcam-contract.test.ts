@@ -20,7 +20,6 @@ const bundle = readFileSync(
   new URL('../../docs/source/main.d6d3c112b59b7d0d.js', import.meta.url),
   'utf8'
 );
-const page = readFileSync(new URL('../routes/+page.svelte', import.meta.url), 'utf8');
 
 const stripComments = (source: string) =>
   source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/<!--[\s\S]*?-->/g, '');
@@ -32,7 +31,6 @@ const stripComments = (source: string) =>
 const paneCode = stripComments(
   readFileSync(new URL('./components/PresentationArea.svelte', import.meta.url), 'utf8')
 );
-const code = stripComments(page);
 
 /*
   The camera BEHAVIOUR moved to `RoomMediaTransport` in Phase 5 slice 4, and the assertions that
@@ -43,6 +41,15 @@ const code = stripComments(page);
 */
 const transportCode = stripComments(
   readFileSync(new URL('./room/media-transport.svelte.ts', import.meta.url), 'utf8')
+);
+
+/*
+  The CARDS moved again in Phase 5 slice 21, to `room/webcams.ts`. The X that closes a preview is a
+  rendering concern - it drops the card and leaves the device running - so it followed the cards
+  rather than the capture, which is the whole distinction this file exists to hold.
+*/
+const webcamsCode = stripComments(
+  readFileSync(new URL('./room/webcams.ts', import.meta.url), 'utf8')
 );
 
 /**
@@ -62,11 +69,11 @@ function bodyOf(name: string) {
 }
 
 /** The body of a top-level `function name(` … `\n  }` still on the page. */
-function pageBodyOf(name: string) {
-  const at = code.indexOf(`function ${name}(`);
-  expect(at, `${name} should exist on the page`).toBeGreaterThan(-1);
-  const end = code.indexOf('\n  }', at);
-  return code.slice(at, end);
+function webcamsBodyOf(name: string) {
+  const at = webcamsCode.search(new RegExp(`\\n {2}(?:async )?${name}\\(`));
+  expect(at, `${name} should exist in the cards module`).toBeGreaterThan(-1);
+  const end = webcamsCode.indexOf('\n  }', at);
+  return webcamsCode.slice(at, end);
 }
 
 describe('webcam: the capture separates preview from device', () => {
@@ -109,7 +116,7 @@ describe('webcam: this room reproduces that split', () => {
   });
 
   it('the X removes the card and leaves the camera alone', () => {
-    const close = pageBodyOf('closeWebcamPreview');
+    const close = webcamsBodyOf('closePreview');
     expect(close).toContain('removeWebcamPresenter');
     expect(close, 'the X must not stop the device').not.toContain('stopStream');
     expect(close, 'the X must not disable the track').not.toContain('setStreamEnabled');
