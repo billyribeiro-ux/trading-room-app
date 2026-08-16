@@ -129,14 +129,31 @@ describe('level 3 — the page joins it onto each message', () => {
   });
 
   it('feeds all four gates the component already had', () => {
-    for (const prop of [
-      '{chatBadges}',
-      '{enableBadges}',
-      '{showBadgesToPresentersOnly}',
-      '{disableStarYears}'
+    /*
+      RE-POINTED 2026-08-15. The four used to be counted as shorthand props at each `RoomMessage`.
+      They are now four of the sixteen in `messageChrome`, which every message list spreads — so the
+      question "do all four reach the component" is answered once, at the object, instead of once per
+      call site.
+
+      Positive first: the chrome is FOUND and is built here, before membership is asserted.
+    */
+    const from = pageCode.indexOf('const messageChrome');
+    expect(from, 'messageChrome is not built in +page.svelte').toBeGreaterThan(-1);
+    const chrome = pageCode.slice(from, pageCode.indexOf('\n  });', from));
+
+    for (const gate of [
+      'chatBadges',
+      'enableBadges',
+      'showBadgesToPresentersOnly',
+      'disableStarYears'
     ]) {
-      expect(pageCode, `${prop} must reach RoomMessage`).toContain(prop);
+      expect(chrome, `${gate} must be in the chrome every message list spreads`).toContain(gate);
     }
+
+    // And it reaches all THREE lists — the two here and the second chat column, which was missing
+    // four other gates entirely until the capture settled it. See `extra-chat-column-contract`.
+    expect(pageCode.split('{...messageChrome}').length - 1).toBe(2);
+    expect(pageCode).toContain('chrome={messageChrome}');
   });
 
   it('and the component still gates on all four, in the reference’s order', () => {

@@ -33,13 +33,13 @@
   import EmojiPicker from './EmojiPicker.svelte';
   import GiphyPicker from './GiphyPicker.svelte';
   import RoomMessage from './RoomMessage.svelte';
+  import type { RoomMessageChrome } from '$lib/room-message-chrome';
   import type {
     ChatTab,
     FollowChatStyle,
     MessageAction,
     MessageActionEvent,
-    RoomMessageItem,
-    Theme
+    RoomMessageItem
   } from '$lib/types';
 
   type Props = {
@@ -79,18 +79,34 @@
     */
     canUseRTE: boolean;
     giphyApiKey: string;
-    theme: Theme;
-    chatStyle: FollowChatStyle;
-    chatGif: boolean;
-    chatBadges: boolean;
-    enableBadges: boolean;
-    showBadgesToPresentersOnly: boolean;
-    disableStarYears: boolean;
-    presenterMessagesOnTheRight: boolean;
-    currentUserId: number;
-    currentUserEmailHash: string;
-    currentUserName: string;
-    viewerIsPresenter: boolean;
+    /**
+     * The sixteen props every message in this room shares, spread straight into `RoomMessage`.
+     *
+     * ONE prop where there were twelve, and it closed a real defect rather than only tidying the
+     * declaration. Twelve were declared, destructured and forwarded here purely to pass through
+     * untouched — and the four that were NOT (`usersPublicReply`, `enableReactions`,
+     * `enableEditMessage`, `enableEditAlerts`) therefore fell to their `false` defaults, so the same
+     * chat message carried a reaction bar and an edit entry in the main column and neither here.
+     *
+     * THE CAPTURE SAYS THAT IS WRONG, and says it twice. `app-chat` and `app-extra-chat` are
+     * declared with the SAME const 212 in the room template, and the message component reads those
+     * gates off the shared service rather than off any per-column input:
+     *
+     * ```js
+     * O(19, sessData.enableReactions && "chat" === logType || … ? 19 : -1)
+     * sessData.enableEditMessage && "chat" === logType && (this.canEditMessage = …)
+     * canPublicReply = "chat" === logType && … && (isPresenter || sessData.usersPublicReply)
+     * ```
+     *
+     * Keyed on `logType` alone. A message in this column is `logType === "chat"` exactly as one in
+     * the main column is, so it gets identical reply, edit and reaction capability. There is no
+     * per-column narrowing upstream to reproduce.
+     */
+    chrome: RoomMessageChrome;
+    /**
+     * Kept OUT of the chrome deliberately: this one is not passed through, it is looked up per
+     * message to find the sender's follow style. See `room-message-chrome.ts`.
+     */
     followedUsers: Record<string, { followChatStyle?: FollowChatStyle }>;
     /** The page owns which message menu is open, so only one is open across BOTH columns. */
     openMenuKey: string | null;
@@ -121,18 +137,7 @@
     canPostImages,
     canUseRTE,
     giphyApiKey,
-    theme,
-    chatStyle,
-    chatGif,
-    chatBadges,
-    enableBadges,
-    showBadgesToPresentersOnly,
-    disableStarYears,
-    presenterMessagesOnTheRight,
-    currentUserId,
-    currentUserEmailHash,
-    currentUserName,
-    viewerIsPresenter,
+    chrome,
     followedUsers,
     openMenuKey,
     onmenutoggle,
@@ -267,19 +272,8 @@
           <RoomMessage
             {item}
             kind="chat"
-            {chatGif}
-            {presenterMessagesOnTheRight}
-            {chatBadges}
-            {enableBadges}
-            {showBadgesToPresentersOnly}
-            {disableStarYears}
-            {currentUserId}
-            {currentUserEmailHash}
-            {currentUserName}
+            {...chrome}
             followedStyle={followedUsers[item.senderEmailHash]?.followChatStyle}
-            {chatStyle}
-            {viewerIsPresenter}
-            {theme}
             menuOpen={openMenuKey === `chat:${item.id}`}
             showDateSeparator={'evidenceSeparatorText' in item
               ? item.evidenceSeparatorText !== null

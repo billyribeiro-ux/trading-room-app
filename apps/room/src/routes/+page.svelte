@@ -11106,18 +11106,7 @@
                 {canPostImages}
                 {canUseRTE}
                 {giphyApiKey}
-                {theme}
-                chatStyle={globalChatStyle}
-                {chatGif}
-                {chatBadges}
-                {enableBadges}
-                {showBadgesToPresentersOnly}
-                {disableStarYears}
-                {presenterMessagesOnTheRight}
-                currentUserId={data.user.id}
-                currentUserEmailHash={data.user.emailHash}
-                currentUserName={data.user.displayName}
-                viewerIsPresenter={data.user.role === 'staff' || data.user.role === 'admin'}
+                chrome={messageChrome}
                 {followedUsers}
                 openMenuKey={menus.messageId}
                 onmenutoggle={(key) => menus.openMessageMenu(key)}

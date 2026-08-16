@@ -223,6 +223,63 @@ through — both are documented in `.env.example` and until now nothing read the
 **Not done:** retiring `ptr_clone_app` (deferred until the cutover is proven in a real deployment),
 and the owner role / database rename `ptr_clone` → `tradingroom`. Both remain in `TODO.md`.
 
+### 2026-08-15 20:39 EDT — The capture answered row AI: the second chat column was missing four gates, and that was a defect
+
+**Branch `feat/extra-chat-column`, not merged.** **Runtime impact: YES** — reactions, both edit
+entries and public reply now appear in the second chat column, as they always did in the first.
+
+**I recorded this as "the owner's call" and that was wrong.** The owner's answer was: *every answer
+is in the dump json files.* It is, and it took three reads to get it.
+
+**What the evidence says, in order:**
+
+1. **The rendered staff capture has no second column to inspect.**
+   `proroom-ULTIMATE-staff-2026-07-24T12-42-02-part1.json`, capture 0 `baseline-room`, full DOM,
+   1,052 nodes: `app-chat` ×1, `app-roomscroller` ×2 (the alerts scroller carries
+   `id="chatScrollViewParentAlerts"`; the other is chat), `as-split-area` ×4, and **no
+   `app-extra-chat` at all**. Both scrollers sit at x=250, w=556.5 — stacked, one room, one chat.
+   So the DOM cannot answer it, and saying so is the honest first step rather than the end of it.
+
+2. **The bundle has the component, gated on a preference.** `app-extra-chat` appears four times in
+   `main.d6d3c112b59b7d0d.js`. It renders under
+   `!preferences.extraChatColumn || (roomSplitDir is not ttb/btt) ? -1 : 6` in the vertical layout
+   and its own `as-split-area` under the ltr/rtl one. The captured room simply did not have the
+   preference on. **And it is declared with the SAME const 212 as `app-chat`**, binding the same
+   `openPrivateChat`.
+
+3. **The decisive part: the gates are not per-column inputs at all.** The message component's own
+   code appears twice, ~37,954 bytes apart, and the two copies are byte-identical. Both read:
+
+   ```js
+   canPublicReply = "chat" === logType && hashEmail(user.email) !== msg.avt
+                    && (isPresenter || sessData.usersPublicReply)
+   sessData.enableEditMessage && "chat" === logType && (canEditMessage = …)
+   sessData.enableEditAlerts  && "alerts" === logType && (canEditMessage = isPresenter)
+   O(19, sessData.enableReactions && "chat" === logType
+       || sessData.enableQAReactions && "alerts" === logType && isQAMsg ? 19 : -1)
+   ```
+
+   Read off the shared service, keyed on **`logType` alone**. A message in the second column is
+   `logType === "chat"` exactly as one in the first. There is no per-column narrowing upstream, so
+   passing anything less than the whole chrome was the divergence.
+
+**The fix is one prop.** `ExtraChatPane` declared twelve of the sixteen shared values, destructured
+twelve and forwarded twelve — and the four it never declared fell to their `false` defaults. It takes
+`chrome: RoomMessageChrome` now and spreads it, which both removes the drilling and closes the gap in
+the same line. `RoomMessageChrome` yesterday was the groundwork that made this a one-line fix instead
+of four new props.
+
+**Guarded so it cannot come back:** `extra-chat-column-contract.test.ts` asserts the chrome is passed
+AND that none of the four returns as a narrowed prop, with the bundle evidence quoted in the test.
+Two negative controls seen red — re-adding a narrowed `enableReactions`, and dropping the spread.
+
+**Two more contract assertions re-pointed** (`chat-badge-supply-contract`), and one unused `Theme`
+import removed that eslint caught after the props left.
+
+**Verified:** `pnpm run check` 0 errors / 0 warnings across 1,137 files; suite **1,889 across 136
+files**; eslint clean; prettier clean. `+page.svelte` **11,561 → 11,550**, `ExtraChatPane.svelte`
+**474 → 441**, ceiling lowered in the same commit.
+
 ### 2026-08-15 20:31 EDT — `RoomOrderedArrivals`: the last latch, and two rules that had never been run
 
 **Branch `feat/extra-chat-column`, not merged.** **Runtime impact: none intended** — the mention
