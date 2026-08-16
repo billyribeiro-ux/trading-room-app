@@ -223,6 +223,48 @@ through — both are documented in `.env.example` and until now nothing read the
 **Not done:** retiring `ptr_clone_app` (deferred until the cutover is proven in a real deployment),
 and the owner role / database rename `ptr_clone` → `tradingroom`. Both remain in `TODO.md`.
 
+### 2026-08-15 21:41 EDT — Every file pointed at the right backend, and a governed `services/` re-pin
+
+**Runtime impact: local only** — connection strings and documentation. No schema, no application code.
+
+**Two different backends, and conflating them is what caused this.** The controller (SvelteKit +
+Drizzle) uses database `tradingroom_dev`. The API (`services/`, Rust + sqlx) uses database
+`ptr_clone` as runtime role **`tradingroom_app`**. They are not the same thing and neither is
+`newroom_control_dev`.
+
+**Four files were aiming local work at a database seven migrations behind**, while
+`docs/LOCAL-DEV.md` claimed *"Nothing in this repository points at it."* Repointed to
+`tradingroom_dev`, which makes that sentence true again:
+
+- `apps/controller/.env` — the live local `DATABASE_URL`
+- `apps/controller/.env.example` — the file other developers copy
+- `apps/controller/README.md` — the `createdb` step and its sample URL
+- `apps/controller/scripts/start-e2e-server.mjs` — `newroom_control_e2e` → `tradingroom_e2e`,
+  and the database was created so the default resolves rather than pointing at nothing
+
+**`services/.env.example` needed nothing** — `POSTGRES_RUNTIME_USER=tradingroom_app` already feeds
+`DATABASE_URL`, and `POSTGRES_APP_USER=ptr_clone_app` is correctly still there as the role `0009`
+copies grants FROM.
+
+**`services/README.md` did.** Three prose claims still named `ptr_clone_app` as the runtime role,
+including *"`DATABASE_URL` authenticates the long-running API as `ptr_clone_app`"* — which stopped
+being true when `0009` provisioned `tradingroom_app` and `db::migrate::EXPECTED_RUNTIME_ROLE` began
+comparing against it. A document naming the wrong identity is a defect, not untidiness.
+
+**What was deliberately NOT changed:** the `ptr_clone_app` references in the shipped migrations
+(`0005`, `0006`, `0007`). Migrations are forward-only and editing one changes its checksum, so every
+applied database would refuse to migrate. The README now says that where it previously implied the
+opposite.
+
+**The `services/` edit went through the governed process, which is the point of this entry.**
+`verify-backend-provenance.mjs` refused it immediately on the aggregate manifest hash. Its own rule
+is that the only way the untouched count may move is for a changed file to LEAVE the aggregate and
+gain its own pin, with its reason, in the same commit — so `services/README.md` is now pinned
+individually at `8aece329…`, the aggregate is **75 → 74**, and the manifest re-pin is legitimate only
+because of that. Negative control run: appending one line makes it fail **naming the file**.
+
+`[backend:provenance] PASS 98 imported (74 untouched + 24 diverged, each pinned) + 2 authored here`.
+
 ### 2026-08-15 21:38 EDT — The db cases run green, a claim in `952e152` corrected, and `.env` found pointing at a database seven migrations behind
 
 **Runtime impact: none** — records and a configuration finding. No database was written to.

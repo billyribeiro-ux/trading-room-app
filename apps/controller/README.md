@@ -66,8 +66,8 @@ add missing columns, backfill missing public room IDs, and seat a missing owner
 membership, but it never resets or deletes an existing database.
 
 ```bash
-createdb newroom_control_dev
-# DATABASE_URL=postgres://<user>@localhost:5432/newroom_control_dev
+createdb tradingroom_dev
+# DATABASE_URL=postgres://<user>@localhost:5432/tradingroom_dev
 ```
 
 On a serverless host, point `DATABASE_URL` at the provider's **pooled** endpoint.
