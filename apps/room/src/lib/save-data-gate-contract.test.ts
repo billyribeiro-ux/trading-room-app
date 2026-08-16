@@ -56,6 +56,9 @@ const transportCode = stripComments(
   readFileSync(new URL('./room/media-transport.svelte.ts', import.meta.url), 'utf8')
 );
 const pageCode = stripComments(PAGE);
+const overlaysCode = stripComments(
+  readFileSync(new URL('./components/RoomOverlays.svelte', import.meta.url), 'utf8')
+);
 const modalCode = stripComments(MODAL);
 const paneCode = stripComments(PANE);
 
@@ -102,7 +105,11 @@ describe('ours: the switch reaches the media layer', () => {
   it('the page owns it, unpersisted, matching a writer that calls no setPreference', () => {
     expect(transportCode).toContain('this.#saveData = $state(false);');
     expect(transportCode).not.toMatch(/saveData\s*=\s*\$state\([^)]*loadedSettings/);
-    expect(pageCode).toContain('onSaveDataChange={(enabled) => mediaTransport.setSaveData(enabled)}');
+        // The modal host moved into `RoomOverlays.svelte` in Phase 5 slice 17; the room state it renders
+  // from is handed to that component whole, so the prop is assembled there now.
+    expect(overlaysCode).toContain(
+      'onSaveDataChange={(enabled) => mediaTransport.setSaveData(enabled)}'
+    );
   });
 
   it('THE POINT: the producer is not consumed while it is on', () => {

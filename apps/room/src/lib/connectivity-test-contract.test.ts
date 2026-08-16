@@ -16,12 +16,18 @@ import { describe, expect, it } from 'vitest';
 
 const MODAL_HOST = readFileSync(new URL('./components/ModalHost.svelte', import.meta.url), 'utf8');
 const ROOM_PAGE = readFileSync(new URL('../routes/+page.svelte', import.meta.url), 'utf8');
+const ROOM_OVERLAYS = readFileSync(
+  new URL('./components/RoomOverlays.svelte', import.meta.url),
+  'utf8'
+);
 
 describe('the ICE servers the troubleshooter uses', () => {
   it('takes them from this deployment, passed down as a prop', () => {
     expect(MODAL_HOST).toContain('mediaIceServers?: RTCIceServer[]');
     expect(MODAL_HOST).toContain('mediaIceServers = []');
-    expect(ROOM_PAGE).toContain('mediaIceServers={media.iceServers}');
+    // The modal host moved into `RoomOverlays.svelte` in Phase 5 slice 17; the room state it renders
+  // from is handed to that component whole, so the prop is assembled there now.
+    expect(ROOM_OVERLAYS).toContain('mediaIceServers={media.iceServers}');
   });
 
   /*

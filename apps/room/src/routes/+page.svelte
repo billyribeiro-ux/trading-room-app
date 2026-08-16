@@ -54,7 +54,6 @@
   } from '$app/env/public';
   import { onMount, tick } from 'svelte';
   import { SvelteSet } from 'svelte/reactivity';
-  import BootboxDialog from '$lib/components/BootboxDialog.svelte';
   import { SignallingClient } from '$lib/media/signalling';
   import { MediaSession } from '$lib/media/session';
   import { startSpeechRecognition } from '$lib/media/speech-reco';
@@ -115,10 +114,8 @@
   } from '$lib/room-key-gates';
   import AlertChatArea from '$lib/components/AlertChatArea.svelte';
   import PresentationArea from '$lib/components/PresentationArea.svelte';
+  import RoomOverlays from '$lib/components/RoomOverlays.svelte';
   import ExtraChatPane from '$lib/components/ExtraChatPane.svelte';
-  import GifConfirmDialog from '$lib/components/GifConfirmDialog.svelte';
-  import ImageUploadDialog from '$lib/components/ImageUploadDialog.svelte';
-  import ModalHost from '$lib/components/ModalHost.svelte';
   import { resolveNoteSurfaceGates } from '$lib/components/notes/note-gates';
   import { swingAlertsTabVisible } from '$lib/swing-alerts';
   import type { SwingAlertRow } from '$lib/types';
@@ -136,7 +133,6 @@
   } from '$lib/navbar-labels';
   import RoomNavbar from '$lib/components/RoomNavbar.svelte';
   import RoomSidebar from '$lib/components/RoomSidebar.svelte';
-  import ToastHost from '$lib/components/ToastHost.svelte';
   import { resolveAlertDelivery } from '$lib/alert-delivery';
   import { DUMP_CONTRACT } from '$lib/dump-contract';
   // `shouldAutoScrollForMessage` is no longer imported here: `RoomScrollFollow` calls it, which is
@@ -155,6 +151,7 @@
     MainTab,
     ModalName,
     NoteVersion,
+    SessionControlTab,
     SettingsTab,
     Theme,
     WebcamPresenter
@@ -201,14 +198,6 @@
 
 
 
-  type SessionControlTab =
-    | 'reset-session'
-    | 'close-session'
-    | 'lock-session'
-    | 'av-device-selection'
-    | 'streaming-selection'
-    | 'session-history'
-    | 'webinar-tools';
 
   let { data }: PageProps = $props();
 
@@ -4617,316 +4606,55 @@
       </div>
     </div>
     <!--
-      One hidden sink per remote microphone. A consumed audio track produces no sound until it is
-      attached to an element, and the room has no visible control for a peer's voice - the capture
-      keeps its own audio elements out of sight the same way (`#mp3player` is `display: none`).
+      Everything that floats above the room, in `$lib/components/RoomOverlays.svelte`.
+
+      Phase 5 slice 17, and the largest single template region left after Phase 2: the modal host,
+      the seven dialog blocks, the toast host, the image lightbox, the hidden remote-audio sinks and
+      the "Conected" overlay. 310 lines became this call.
+
+      Nineteen of the props are the room's state classes handed over WHOLE, which is what makes it a
+      saving rather than a move — `ModalHost` still takes its 85, but they are assembled beside it
+      instead of being drilled through here. Only `modal` and `selectedImageUrl` bind back,
+      because only they are written on the other side.
     -->
-    {#each [...mediaTransport.remoteAudioStreams.keys()] as producerId (producerId)}
-      <!--
-        `msRemAudio-{userID}` is the capture's own id and it is load-bearing, not decorative:
-        `adjustVol` does `$("[id^=msRemAudio-]").prop("roomVolume.volume", …)` (bundle byte 2517022),
-        `adjustVolPres` targets one peer's element, and `reconnectAudio` does
-        `$("[id^='msRemAudio-']").remove()` before re-subscribing. This room already queries that
-        exact prefix in `roomVolume.setMasterVolume`, against elements that had no id at all - so the master
-        roomVolume.volume slider moved nothing.
-      -->
-      <audio
-        id="msRemAudio-{mediaTransport.audioProducerOwners.get(producerId)?.userID ?? producerId}"
-        {@attach mediaTransport.attachRemoteAudio(producerId)}
-        autoplay
-        style="display: none;"
-      ></audio>
-    {/each}
-    <div
-      id="connectedMsg"
-      class="notConnectedOverlay animated fadeIn"
-      style={roomEvents.reconnectedFlash ? 'display: block;' : 'display: none;'}
-    >
-      Conected<i class="fas fa-check"></i>
-    </div>
-    <ModalHost
-      name={modal}
-      mediaIceServers={media.iceServers}
-      {mobilePin}
-      modAlertFilterList={data.sessData?.modAlertFilterList}
-      bind:alertFilterFor={alerts.filterFor}
-      bind:showAlertsFrom={alerts.showFrom}
-      onsavealertfilter={saveAlertFilter}
-      onopenalertfilter={() => openModal('alert-filter')}
-      mobileAndroidUrl={data.sessData?.customMobileAppEnabled
-        ? data.sessData?.customMobileAppAndroidUrl
-        : null}
-      mobileIosUrl={data.sessData?.customMobileAppEnabled
-        ? data.sessData?.customMobileAppIOSUrl
-        : null}
-      hideMobileCredentials={Boolean(data.sessData?.hideMobileCredentials)}
-      isLimitedPresenter={media.limitedPresenter}
-      canEditUsername={Boolean(data.sessData?.allowUsersToChangeUsername)}
-      alerts={feeds.searchableAlerts}
-      {chatMode}
-      onChatModeChange={(mode) => void changeChatMode(mode)}
-      canUseRTE={composer.canUseRTE}
-      rteDraft={composer.rteDraft}
-      rteIsEditing={composer.rteIsEditing}
-      onRteDraftChange={(html) => (composer.rteDraft = html)}
-      onRteSend={() => void composer.sendRTE()}
-      {settingsTab}
+    <RoomOverlays
+      {alerts}
+      {broadcasts}
+      {composer}
+      {data}
+      {dayTradeAlerts}
+      {dialogs}
+      {feeds}
+      {media}
+      {mediaTransport}
+      {messageActions}
+      {polls}
+      {prefs}
+      {privateChat}
+      {roomEvents}
+      {roster}
+      {split}
+      {swingAlerts}
+      {toasts}
+      {userActions}
+      bind:modal
+      bind:selectedImageUrl
       {alertTab}
-      {theme}
-      roomSplitDir={split.direction}
+      {chatMode}
+      {globalChatStyle}
+      {mobilePin}
       {sessionControlInitialTab}
-      chatStyle={globalChatStyle}
-      doNotDisturbOn={prefs.doNotDisturbOn}
-      alertSoundOn={prefs.alertSoundOn}
-      nonTradeSound={prefs.nonTradeSound}
-      alertPopup={prefs.alertPopup}
-      longerAlertPopup={prefs.longerAlertPopup}
-      qaSoundOn={prefs.qaSoundOn}
-      chatSoundOn={prefs.chatSoundOn}
-      pollOpenMode={polls.openMode}
-      pollRestoreToken={polls.restoreToken}
-      activePoll={data.activePoll}
-      savedPolls={data.savedPolls}
-      onclose={closeActiveModal}
-      onSettingsTab={(tab) => (settingsTab = tab)}
-      onAlertTab={(tab) => (alertTab = tab)}
-      onTheme={setTheme}
-      onPreferenceChange={(key, value) => prefs.save(key, value)}
-      saveData={mediaTransport.saveData}
-      onSaveDataChange={(enabled) => mediaTransport.setSaveData(enabled)}
-      onDoNotDisturbChange={(enabled) => (prefs.doNotDisturbOn = enabled)}
-      onPlayYoutube={(url) => void broadcasts.playYoutubeForAll(url)}
-      onPostAlert={(submission) => composer.postAlert(submission)}
-      onPastePostAlert={(submission) => composer.postPastedImage(submission)}
-      onPollMinimize={minimizePoll}
-      onPollSave={(question, choices) =>
-        submitPollAction('savePoll', { q: question, choices: JSON.stringify(choices) })}
-      onPollDelete={(pollId) => submitPollAction('deleteSavedPoll', { pollId })}
-      onPollSend={(question, choices) =>
-        submitPollAction('sendPoll', { q: question, choices: JSON.stringify(choices) })}
-      onPollAnswer={(choiceIndex) => submitPollAction('sendPollAnswer', { a: choiceIndex })}
-      onPollPostResults={(body) => composer.postPollResults(body)}
-      onPollEnd={() => submitPollAction('pollDone')}
-      onAlert={(message) => (dialogs.alert = message)}
-      onConfirm={(message, onconfirm) => dialogs.confirm(message, onconfirm)}
-      onReplySend={messageActions.sendReplyMessage}
-      onQuestionSend={messageActions.sendAlertQuestion}
-      alertQuestions={data.alertQuestions}
-      onMentionUser={(name) => messageActions.mention(name)}
-      onPrivateChat={(user) => {
-        userActions.selectedMessageUser = user;
-        privateChat.show();
-      }}
-      onFollowToggle={(user) => userActions.requestFollowToggle(user)}
-      onFollowStyleChange={(user, style) => userActions.applyFollowStyle(user, style)}
-      onMuteToggle={(user) => userActions.requestMuteToggle(user)}
-      onUserAction={(action, user) => userActions.handle(action, user)}
-      streamingType={typeof prefs.loaded.streamingType === 'string' ? prefs.loaded.streamingType : ''}
-      onManagedUserRemoval={(list, user) => userActions.requestManagedRemoval(list, user)}
-      onManagedUserInfo={(user) => userActions.openManagedInfo(user)}
-      currentUser={data.user}
-      targetUser={userActions.target}
-      mutedUsers={userActions.mutedUsers}
-      followedUsers={userActions.followedUsers}
-      targetMessage={messageActions.selected}
+      {settingsTab}
+      {theme}
+      changeChatMode={(mode) => void changeChatMode(mode)}
+      {closeActiveModal}
+      {downloadImage}
+      {minimizePoll}
+      {openModal}
+      {saveAlertFilter}
+      {setTheme}
+      {submitPollAction}
     />
-    {#if modal === 'image-upload'}
-      <ImageUploadDialog
-        onclose={() => (modal = null)}
-        onupload={(files, message) => void composer.uploadImages(files, message)}
-      />
-    {/if}
-    <!--
-      `imgUpload('swing')` — the swing form's own upload dialog.
-
-      A SECOND instance rather than a share of the composer's `modal === 'image-upload'`: the
-      reference's `imgUpload` takes the feature name as an argument and opens a dialog whose
-      completion belongs to that feature, and routing the swing upload through the composer's
-      handler would post the image into chat instead of putting its URL in the form.
-    -->
-    {#if swingAlerts.imageUpload}
-      <ImageUploadDialog
-        onclose={() => swingAlerts.cancelImageUpload()}
-        onupload={(files) => void swingAlerts.completeImageUpload(files)}
-      />
-    {/if}
-    <!--
-      `onImagePaste(event, 'swing')` puts the pasted image in a `bootbox.confirm` before uploading,
-      so a stray paste cannot silently push bytes to the upload server.
-    -->
-    {#if swingAlerts.imagePaste}
-      {@const pastePreviewUrl = swingAlerts.imagePaste.previewUrl}
-      <BootboxDialog
-        mode="confirm"
-        message=""
-        onclose={() => swingAlerts.closeImagePaste()?.resolve(null)}
-        onconfirm={() => void swingAlerts.confirmImagePaste()}
-      >
-        <div class="text-center">
-          <img src={pastePreviewUrl} class="img-fluid" alt="Pasted screenshot" />
-        </div>
-      </BootboxDialog>
-    {/if}
-    <!--
-      `imgUpload('dayTrade')` — the day trade form's own upload dialog.
-
-      A THIRD instance rather than a share of the composer's or the swing form's: `imgUpload` takes
-      the feature name as an argument and `doImggurUpload` dispatches on it deny-by-default —
-      `"swing" === i ? swingAlert.image = F : "dayTrade" === i && (dayTradeAlert.image = F)` at byte
-      1,992,037 — so the completion belongs to exactly one feature. Routing this through either of
-      the others would put the URL in the wrong box or post the image into chat.
-    -->
-    {#if dayTradeAlerts.imageUpload}
-      <ImageUploadDialog
-        onclose={() => dayTradeAlerts.cancelImageUpload()}
-        onupload={(files) => void dayTradeAlerts.completeImageUpload(files)}
-      />
-    {/if}
-    <!--
-      `onImagePaste(event, 'dayTrade')` puts the pasted image in a `bootbox.confirm` before
-      uploading, so a stray paste cannot silently push bytes to the upload server.
-    -->
-    {#if dayTradeAlerts.imagePaste}
-      {@const dayTradePastePreviewUrl = dayTradeAlerts.imagePaste.previewUrl}
-      <BootboxDialog
-        mode="confirm"
-        message=""
-        onclose={() => dayTradeAlerts.closeImagePaste()?.resolve(null)}
-        onconfirm={() => void dayTradeAlerts.confirmImagePaste()}
-      >
-        <div class="text-center">
-          <img src={dayTradePastePreviewUrl} class="img-fluid" alt="Pasted screenshot" />
-        </div>
-      </BootboxDialog>
-    {/if}
-    {#if composer.pendingGifUrl}
-      <GifConfirmDialog
-        url={composer.pendingGifUrl}
-        onclose={() => composer.cancelGif()}
-        onconfirm={() => void composer.confirmGif()}
-      />
-    {/if}
-    {#if dialogs.confirmation}
-      <BootboxDialog
-        mode="confirm"
-        message={dialogs.confirmation.message}
-        className={dialogs.confirmation.className}
-        onclose={() => {
-          const dismissed = dialogs.confirmation?.ondismiss;
-          dialogs.confirmation = null;
-          dismissed?.();
-        }}
-        onconfirm={dialogs.confirmation.onconfirm}
-      />
-    {/if}
-    <!--
-      `randomUser()`'s dialog. Two phases, because the delay IS the feature: the giphy spinner
-      shows for three seconds with "User Info" hidden, then the body is replaced by
-      `<h2 class="text-center flash animated">` carrying the name and the button appears
-      (`$(".btn-random-user").css("display", "inline-block")`).
-
-      `alt=""` and `class="random-user-modal"` are the capture's own. The image is fixed 480x270 so
-      the dialog does not resize around it as it loads.
-    -->
-    {#if roster.pick}
-      <BootboxDialog
-        mode="alert"
-        message=""
-        title="Random User"
-        className="random-user-modal"
-        onclose={() => roster.closeDraw()}
-      >
-        {#if roster.pick.revealed}
-          <h2 class="text-center flash animated">{roster.pick.entry.displayName}</h2>
-        {:else}
-          <p class="text-center">
-            <img
-              src="https://media.giphy.com/media/dyXPQavQUyeSK4nlpt/giphy.gif"
-              alt=""
-              width="480"
-              height="270"
-            />
-          </p>
-        {/if}
-        {#snippet footer()}
-          <!--
-            The User Info handler ends in `!0` inverted - it returns `false`, which is bootbox's
-            "do not dismiss". So the dialog stays open behind the user-info modal.
-          -->
-          {#if roster.pick?.revealed}
-            <button
-              type="button"
-              class="btn btn-warning btn-random-user"
-              onclick={() => roster.pick && userActions.openInfoFor(roster.pick.entry)}
-            >
-              User Info
-            </button>
-          {/if}
-          <button type="button" class="btn btn-danger" onclick={() => roster.closeDraw()}>Close</button>
-        {/snippet}
-      </BootboxDialog>
-    {/if}
-    {#if dialogs.alert}
-      <BootboxDialog mode="alert" message={dialogs.alert} onclose={() => (dialogs.alert = null)} />
-    {/if}
-    {#if dialogs.prompt}
-      <BootboxDialog
-        mode="prompt"
-        message=""
-        title={dialogs.prompt.title}
-        value={dialogs.prompt.value}
-        onclose={() => (dialogs.prompt = null)}
-        onconfirm={(value) => dialogs.prompt?.onconfirm(value ?? '')}
-      />
-    {/if}
-    <ToastHost
-      toasts={toasts.notices}
-      ondismiss={(id) => toasts.dismiss(id)}
-      onstick={(id) => toasts.stick(id)}
-      onresume={(id) => toasts.resume(id)}
-    />
-    {#if selectedImageUrl}
-      <div
-        class="bootbox modal fade imgur-modal show"
-        tabindex="-1"
-        role="dialog"
-        aria-hidden="true"
-        style="display: block;"
-        onclick={(event) => {
-          if (event.target === event.currentTarget) selectedImageUrl = null;
-        }}
-      >
-        <div class="modal-dialog modal-lg">
-          <div class="modal-content">
-            <div class="modal-header border-0">
-              <!-- svelte-ignore a11y_missing_content -->
-              <h5 class="modal-title"></h5>
-              <button
-                type="button"
-                class="bootbox-close-button close btn-close"
-                aria-hidden="true"
-                aria-label="Close"
-                onclick={() => (selectedImageUrl = null)}
-              ></button>
-            </div>
-            <div class="modal-body">
-              <div class="bootbox-body">
-                <img
-                  src={selectedImageUrl}
-                  alt={selectedImageUrl.substring(selectedImageUrl.lastIndexOf('/') + 1)}
-                />
-                <hr />
-                <button
-                  class="btn btn-primary btn-sm"
-                  onclick={() => downloadImage(selectedImageUrl as string)}
-                  ><i class="fa fa-download"></i> Download Image</button
-                >
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    {/if}
     <!--
       `app-privchat` is its own component since 2026-08-15 — the first of the five template
       regions, and the smallest, chosen to prove the pattern on a floating panel rather than on a

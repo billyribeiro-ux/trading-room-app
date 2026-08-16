@@ -24,6 +24,50 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-16
 
+### 2026-08-16 15:44 EDT — Phase 5 slice 17: `RoomOverlays.svelte`, the layer above the room
+
+**`+page.svelte` 4,973 → 4,708 (−265).** Suite 2,277 → 2,280 across 154 files. `svelte-check`
+1,176 files, 0 errors, 0 warnings. `eslint` clean on both files.
+**Runtime impact: yes** — 310 lines of the page's template moved. Nothing changed behaviourally;
+three contract files were re-pointed at the file that now owns each subject.
+
+**`src/lib/components/RoomOverlays.svelte` (471).** The modal host, the seven dialog blocks, the
+toast host, the image lightbox, the hidden remote-audio sinks and the "Conected" overlay — the
+largest single template region left after Phase 2 took the five panes out.
+
+**They are one LAYER, not one feature**, and that is the boundary: every node is positioned over the
+room rather than in it, none participates in the split layout, and each is conditional on state the
+page already owns. A reader looking for why a dialog appears now has one file to open.
+
+**Nineteen of the thirty-six props are state classes handed over whole.** `ModalHost` still takes
+its 85, but they are assembled beside it instead of being drilled through the page. Only `modal`
+and `selectedImageUrl` are `$bindable`, because only they are written on the other side — making
+the rest bindable would invent a second writer for state that has exactly one.
+
+**The unions are the children's own, never widened to `string`.** `ModalHost` takes a
+`ModalName`; a component promising `string` to a child expecting a seven-member union moves the
+type error rather than removing it, and makes its own call site uncheckable. Eight prop types were
+corrected this way after svelte-check refused the first draft, including `submitPollAction`, which
+returns `Promise<boolean>` and not `Promise<void>`.
+
+**`SessionControlTab` moved to `$lib/types.ts`.** It was declared in `+page.svelte`, and
+`RoomNavbar.svelte` records why it had not moved: "moving it would be a change to a file this
+extraction is trying to shrink." A second consumer has now arrived and the page is the file being
+shrunk, so that objection is the opposite of true.
+
+**310 lines arrived and 265 left**, and the 45-line difference is the props list. That is what a
+facade boundary costs, and it is why the phase plan costed template savings at ~218 rather than an
+optimistic ~140 — recorded because the arithmetic held.
+
+**Two tooling faults of mine, both fixed at the source.** The component head was held in a template
+literal inside a generator, so its citation's backticks needed three levels of escaping — it is a
+plain `.txt` file now, the same fix slice 4 made for the same reason. And the region bounds were
+hardcoded line numbers, which the `SessionControlTab` move silently shifted; both the builder and
+the rewirer find their own bounds by marker now.
+
+Not verified: no browser run. The dialogs are asserted as source against the reference bundle by the
+contract files that own them; nothing here proves one opens in a real room.
+
 ### 2026-08-16 15:32 EDT — Phase 5 slice 5: `RoomEventStream`, and a contract that could never have failed
 
 **`+page.svelte` 5,635 → 4,979 (−656), under 5,000 for the first time.** Suite 2,266 → 2,277 across

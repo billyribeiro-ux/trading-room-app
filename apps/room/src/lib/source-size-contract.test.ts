@@ -260,7 +260,7 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       What the slice actually proves is the pattern, which is why it was chosen first: state and the
       functions that write it leaving TOGETHER, where Phase 1 moved fields and left 248 bodies here.
     */
-    max: 4980,
+    max: 4708,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {
@@ -298,6 +298,19 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     */
     max: 1416,
     why: 'the SFU transport - 615 code lines under 699 of transcription evidence, and no seam to split on'
+  },
+  {
+    file: 'lib/components/RoomOverlays.svelte',
+    /*
+      Everything that floats above the room, taken out of the page in Phase 5 slice 17.
+
+      310 lines of markup arrived here and 265 left the page — the difference is the props list,
+      which is what a facade boundary costs and is why the template savings in the phase plan
+      were costed at ~218 rather than an optimistic ~140. Nineteen of the thirty-six props are
+      state classes handed over whole; the rest are page state and callbacks.
+    */
+    max: 471,
+    why: 'the overlay layer - modal host, seven dialogs, toasts, the lightbox and the audio sinks'
   },
   {
     file: 'lib/components/ModalHost.svelte',
