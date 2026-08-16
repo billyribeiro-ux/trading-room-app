@@ -56,6 +56,11 @@ const stripComments = (source: string) =>
     .replace(/^\s*\/\/.*$/gm, '');
 
 const serverCode = stripComments(SERVER);
+/*
+  The screen viewer left the page for `RoomScreens` in Phase 5 slice 11. Read as its own source, so
+  an assertion about which screen is shown cannot pass against a file that no longer decides it.
+*/
+const screensModule = readFileSync(new URL('room/screens.svelte.ts', import.meta.url), 'utf8');
 const pageCode = stripComments(PAGE);
 const remoteCode = stripComments(REMOTE);
 
@@ -152,9 +157,17 @@ describe('the server owns the authority', () => {
 
 describe('the client', () => {
   it('broadcasts from the menu item, after moving locally', () => {
-    const from = pageCode.indexOf('function bringEveryoneToScreen(');
-    const body = pageCode.slice(from, pageCode.indexOf('\n  }', from));
-    expect(body).toContain('void focusOnScreen(screenId).catch(');
+    /*
+      Comment-STRIPPED, because the note above this method quotes the claim it disproves - the
+      broadcast "needs the media signalling channel, which is not wired yet". An assertion that a
+      comment cannot mention is an assertion that forbids recording why the code changed.
+    */
+    const actionsCode = screensModule
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/(^|[^:])\/\/[^\n]*/g, '$1');
+    const from = actionsCode.indexOf('bringEveryoneTo(screenId: string) {');
+    const body = actionsCode.slice(from, actionsCode.indexOf('\n  }', from));
+    expect(body).toContain('void this.#focusOnScreen(screenId).catch(');
     /*
       The catch is not a swallowed one. Upstream shows the presenter nothing when a broadcast fails
       and inventing a toast would change what the room does — but a dropped rejection is the
@@ -183,9 +196,9 @@ describe('the client', () => {
   });
 
   it('only the USER-initiated tab click broadcasts — the loop guard', () => {
-    expect(pageCode).toContain('function selectScreenTabByUser(screenId: string) {');
-    expect(pageCode).toContain(
-      'if (isPresenter && prefs.makeUsersFollowMyScreens) bringEveryoneToScreen(screenId);'
+    expect(screensModule).toContain('selectTab(screenId: string) {');
+    expect(screensModule).toContain(
+      'if (this.#isPresenter() && this.#followMyScreens()) this.bringEveryoneTo(screenId);'
     );
     // The tab strip moved to `PresentationArea.svelte`; the handler behind it did not.
     const paneCode = readFileSync(
@@ -193,7 +206,8 @@ describe('the client', () => {
       'utf8'
     );
     expect(paneCode).toContain('onselect={selectScreenTabByUser}');
-    expect(pageCode).toContain('{selectScreenTabByUser}');
+    // WRAPPED since slice 11: `selectTab` is a method, and a bare reference would lose `this`.
+    expect(pageCode).toContain('selectScreenTabByUser={(id) => screens.selectTab(id)}');
 
     // The programmatic path must NOT broadcast, or receiving a focus command would send one back.
     const from = pageCode.indexOf('function selectScreenTabOfId(');

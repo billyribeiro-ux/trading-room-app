@@ -69,12 +69,6 @@
     type MediaCaptureKind
   } from '$lib/media-capture-error';
   import { MtxStreamTabs } from '$lib/room-mtx.svelte';
-  import {
-    INITIAL_ZOOM_LEVEL,
-    zoomIn,
-    zoomOut,
-    type Pan
-  } from '$lib/screen-zoom';
   import ScreenVolumeControl from '$lib/components/ScreenVolumeControl.svelte';
   import {
     archivesAvailableTo,
@@ -104,6 +98,7 @@
   import { RoomComposer } from '$lib/room/composer.svelte';
   import { RoomFeeds } from '$lib/room/feeds.svelte';
   import { RoomMessageActions } from '$lib/room/message-actions.svelte';
+  import { RoomScreens } from '$lib/room/screens.svelte';
   import { RoomUserActions } from '$lib/room/user-actions.svelte';
   import {
     DAY_TRADE_ALERT_FEED,
@@ -360,10 +355,6 @@
    * the only symptom was `load() must resolve before this is available` in the console.
    */
   let sessionReady: Promise<void> | null = null;
-  let selectedScreenTab = $state<string | null>(null);
-  /** The screen every viewer is taken to; renders the eye badge on that tab. */
-  let forcedScreenId = $state<string | null>(null);
-  let lockedScreenId = $state<string | null>(null);
   /**
    * The MediaMTX stream list and its selected tab, owned by `room-mtx.svelte.ts`.
    *
@@ -509,61 +500,11 @@
     roster.submitSearch();
   }
 
-  /**
-   * Screen zoom, lifted here from `ScreenPane` because that is where the capture keeps it.
-   *
-   * `app-presentationarea` - the component this page reproduces - declares `this.showZoomCtrl = !1`
-   * in its constructor and owns all five handlers
-   * (`docs/source/components/app-presentationarea.compiled.js:12,480-499`). Its buttons live in the
-   * tab bar's `li.nav-item.ms-auto` slot and drive every screen through a broadcast event bus, so
-   * the state cannot sit inside one pane. `src/lib/screen-zoom.ts` carries the transcription and
-   * the reasoning for what is global and what is per screen.
-   */
-  /**
-   * `isFullScreenshare` - `fullScreenshare() { this.isFullScreenshare = !this.isFullScreenshare }`.
-   *
-   * The screens pane takes `is-fullscreenshare` from it via
-   * `UCe = (t, n) => ({'show active': t, 'is-fullscreenshare': n})`, which the captured sheet
-   * makes `position: fixed; 100vw/100vh; z-index: 1030`.
-   */
-  let isFullScreenshare = $state(false);
-  let showZoomCtrl = $state(false);
-  let zoomLevel = $state(INITIAL_ZOOM_LEVEL);
-  /** Per screen, because the drag is: `panZoomIn` is broadcast, a pointer drag is not. */
-  const screenPans = new SvelteMap<string, Pan>();
 
-  function panZoomIn() {
-    zoomLevel = zoomIn(zoomLevel);
-  }
 
-  function panZoomOut() {
-    zoomLevel = zoomOut(zoomLevel);
-  }
 
-  /**
-   * `panZoomAPI.resetView()` on every subscribed view - back to the neutral level AND the
-   * untranslated origin, for all screens rather than the selected one.
-   */
-  function panZoomReset() {
-    zoomLevel = INITIAL_ZOOM_LEVEL;
-    screenPans.clear();
-  }
 
-  /**
-   * The capture resets on EVERY toggle, not only when leaving zoom mode. The subscriber runs
-   * `this.showZoomCtrl = i; this.togglePanZoom()` and the view's own `togglePanZoom()` body is
-   * exactly `this.panZoomReset()`
-   * (`docs/source/components/app-screenshare-view.compiled.js:45-46,73-75`).
-   */
-  function togglePanZoom() {
-    showZoomCtrl = !showZoomCtrl;
-    panZoomReset();
-  }
 
-  /**
-   * Every screen this peer has popped out, producer id -> window. The capture's `screenPopputs`.
-   */
-  const screenPopouts = new Map<string, Window>();
 
   /**
    * Is THIS window a detached screen popout?
@@ -586,136 +527,12 @@
   /** `hideChatAlerts` / `reopenAlertsChatBtn` - set while the pair lives in another window. */
   let chatAlertsDetached = $state(false);
 
-  const detachedScreenId = $derived.by(() => {
-    const params = page.url.searchParams;
-    if (!params.has('dscreen') || !params.has('presID')) return null;
-    return params.get('presID');
-  });
 
-  /**
-   * "Detach Screen to a new window", transcribed from the capture's popout service:
-   *
-   * ```js
-   * openPopoutModal(e, i) {
-   *   "screen" == e && (i.id = globals.sessionID, i.presID = i.pres._id);
-   *   const o = Object.keys(i).map(a => "pres" == a ? "" : enc(a) + "=" + enc(i[a])).join("&");
-   *   const s = window.open(`/?dscreen=1&${o}`, "_blank",
-   *     "toolbar=no,location=no,directories=no,status=no,menubar=no,titlebar=no,fullscreen=no,width=1280,height=1024");
-   *   this.screenPopputs[i.pres._id] = { windowInstance: s, type: e, pres: i.pres };
-   *   s.onbeforeunload = () => appEventBus.emit("reatachScreenShare", i.pres._id)
-   * }
-   * ```
-   *
-   * This used to open `/screen/<id>` at 1280x720 - a route that does not exist in this app, so
-   * detaching a screen opened a window that redirected straight to the login page. The real
-   * contract is the ROOM itself with `?dscreen=1`, which is also how the popout recognises itself:
-   * the captured component reads `isDetachedCtrl = params.has("dscreen") && params.has("presID")`.
-   */
-  function detachScreen(screenId: string) {
-    const screen = sharedScreens.find((entry) => entry.id === screenId);
-    if (!screen) return;
 
-    const existing = screenPopouts.get(screenId);
-    if (existing && !existing.closed) {
-      existing.focus();
-      return;
-    }
 
-    const query = new URLSearchParams({
-      dscreen: '1',
-      id: data.sessionHandle,
-      presID: screenId
-    });
-    const popout = window.open(
-      `/?${query}`,
-      '_blank',
-      'toolbar=no,location=no,directories=no,status=no,menubar=no,titlebar=no,fullscreen=no,width=1280,height=1024'
-    );
-    if (!popout) {
-      // Blocked by the popup blocker. Saying so beats a menu item that silently does nothing.
-      dialogs.alert =
-        'Your browser blocked the detached screen window. Allow popups for this site and try again.';
-      return;
-    }
-    screenPopouts.set(screenId, popout);
 
-    // `s.onbeforeunload = () => appEventBus.emit("reatachScreenShare", i.pres._id)` - closing the
-    // window puts the screen back in the room rather than leaving it detached and invisible.
-    popout.addEventListener('beforeunload', () => {
-      screenPopouts.delete(screenId);
-      selectScreenTabOfId(screenId);
-    });
-  }
 
-  /**
-   * `postMessage({cmd:"screeenStopped", presID})` then drop it - the capture's own spelling.
-   *
-   * A popout showing a screen whose producer has gone would otherwise sit on a frozen last frame
-   * with no way to know the share ended.
-   */
-  function closeScreenPopout(screenId: string) {
-    const popout = screenPopouts.get(screenId);
-    if (!popout) return;
-    screenPopouts.delete(screenId);
-    if (popout.closed) return;
-    try {
-      popout.postMessage({ cmd: 'screeenStopped', presID: screenId }, window.location.origin);
-    } catch {
-      // A window already navigating away cannot be messaged; closing it below is enough.
-    }
-    popout.close();
-  }
 
-  /**
-   * A tab the USER clicked, as opposed to `selectScreenTabOfId`, which is every programmatic path.
-   *
-   * That split is the reference's `i` parameter made structural: `onScreenShareTabChange(e, i = !0)`
-   * broadcasts only when `i`, and callers pass false when the change came from a command. Keeping
-   * two functions instead of a boolean means a new programmatic caller cannot accidentally opt into
-   * broadcasting by forgetting an argument.
-   */
-  function selectScreenTabByUser(screenId: string) {
-    selectedScreenTab = screenId;
-    if (isPresenter && prefs.makeUsersFollowMyScreens) bringEveryoneToScreen(screenId);
-  }
-
-  function toggleLockScreen(screenId: string) {
-    lockedScreenId = lockedScreenId === screenId ? null : screenId;
-  }
-
-  function bringEveryoneToScreen(screenId: string) {
-    /*
-      `bringFocusToScreen(e) { e && this.appService.sendServerAdminCommand("focusOnScreen", {id: e}) }`.
-      This used to move only the presenter, with a comment saying the broadcast "needs the media
-      signalling channel, which is not wired yet". It does not need that channel: the reference
-      sends a SERVER command, and the room already carries server commands on the `cmds` channel —
-      the same one `remotePresCommand` uses.
-
-      The local move stays and happens FIRST, so the presenter's own view responds to their click
-      without waiting for a round trip. The server re-checks that the caller is a presenter and
-      scopes the broadcast to their room, so authority is decided there rather than here.
-    */
-    forcedScreenId = screenId;
-    selectedScreenTab = screenId;
-    if (!isPresenter) return;
-    void focusOnScreen(screenId).catch((cause) => console.error('[focusOnScreen]', cause));
-  }
-
-  function stopSharedScreen(screenId: string) {
-    // One of our own screens: stop it for real - close the producer and release the capture - so
-    // the room loses it too. Dropping only the tab would leave the presenter believing they had
-    // stopped sharing while every viewer kept watching.
-    if (localScreenStreams.has(screenId)) {
-      stopLocalScreen(screenId);
-      return;
-    }
-    // Somebody else's. Stopping their producer is not ours to do, so this only drops the tab and
-    // is deliberately not pretending the remote share ended.
-    sharedScreens = sharedScreens.filter((entry) => entry.id !== screenId);
-    if (selectedScreenTab === screenId) selectedScreenTab = sharedScreens[0]?.id ?? null;
-    if (forcedScreenId === screenId) forcedScreenId = null;
-    if (lockedScreenId === screenId) lockedScreenId = null;
-  }
   /*
     The two chat columns, in `$lib/room/chat.svelte.ts`.
 
@@ -1073,6 +890,35 @@
     stay assignments to state instead of becoming forty rewritten expressions.
   */
   const dialogs = new RoomDialogs();
+  /*
+    The screen VIEWER, in `$lib/room/screens.svelte.ts`.
+
+    Phase 5 slice 11. Which tab is showing, how far it is zoomed, where it is panned, and the popout
+    windows a presenter can detach a screen into.
+
+    It deliberately does NOT own `sharedScreens`: the SFU transport fills that list, and a field
+    written on both sides of a boundary is not extracted, it is shared. The list crosses as a thunk
+    and its removal as a receiver — the rule slice 13 paid for with `followedUsers`.
+
+    The two transport sites that used to write the three ids by hand call `screenAdded` and
+    `screenRemoved` now, because each is one whole state change and a caller with three setters can
+    make a third of it.
+  */
+  const screens = new RoomScreens({
+    dialogs,
+    screens: () => sharedScreens,
+    removeScreen: (screenId) => {
+      sharedScreens = sharedScreens.filter((entry) => entry.id !== screenId);
+    },
+    isLocalScreen: (screenId) => localScreenStreams.has(screenId),
+    stopLocalScreen: (screenId) => stopLocalScreen(screenId),
+    selectTabOfId: (screenId) => selectScreenTabOfId(screenId),
+    searchParams: () => page.url.searchParams,
+    sessionHandle: () => data.sessionHandle,
+    isPresenter: () => isPresenter,
+    followMyScreens: () => prefs.makeUsersFollowMyScreens,
+    focusOnScreen: (screenId) => focusOnScreen(screenId)
+  });
 
   /*
     Everything a presenter plays for the WHOLE ROOM, in `$lib/room/broadcasts.svelte.ts`.
@@ -3334,11 +3180,10 @@
    */
   function selectScreenTabOfId(producerId: string) {
     // A detached window exists to show ONE screen. Anything else arriving must not steal it.
-    if (detachedScreenId !== null && detachedScreenId !== producerId) return;
-    if (lockedScreenId && lockedScreenId !== producerId) return;
+    if (screens.detachedScreenId !== null && screens.detachedScreenId !== producerId) return;
+    if (screens.lockedId && screens.lockedId !== producerId) return;
     mainTab = 'screens';
-    if (selectedScreenTab === producerId) return;
-    selectedScreenTab = producerId;
+    screens.screenAdded(producerId);
   }
 
   function addLocalScreen(producerId: string, screenName: string, stream: MediaStream) {
@@ -3390,7 +3235,7 @@
       try {
         await session.setPreferredLayers(
           screen.id,
-          screen.id === selectedScreenTab ? TOP_SPATIAL_LAYER : 0
+          screen.id === screens.selectedTab ? TOP_SPATIAL_LAYER : 0
         );
       } catch (error) {
         // Not fatal: the stream keeps playing at whatever layer it already had.
@@ -3435,9 +3280,9 @@
   }
 
   function removeRemoteScreen(producerId: string) {
-    closeScreenPopout(producerId);
+    screens.closePopout(producerId);
     screenStreams.delete(producerId);
-    stopSharedScreen(producerId);
+    screens.stop(producerId);
   }
 
   function deliverAlert(alert: {
@@ -3558,7 +3403,7 @@
 
   $effect(() => {
     // Re-runs when the viewer switches tabs or a screen arrives/leaves.
-    void selectedScreenTab;
+    void screens.selectedTab;
     void screenStreams.size;
     void applyScreenLayers();
   });
@@ -4092,7 +3937,7 @@
    * drop the other two.
    */
   function stopLocalScreen(producerId: string) {
-    closeScreenPopout(producerId);
+    screens.closePopout(producerId);
     const stream = localScreenStreams.get(producerId);
     localScreenStreams.delete(producerId);
 
@@ -4105,9 +3950,7 @@
     // nothing else would ever drop it.
     sharedScreens = sharedScreens.filter((entry) => entry.id !== producerId);
     screenStreams.delete(producerId);
-    if (selectedScreenTab === producerId) selectedScreenTab = sharedScreens[0]?.id ?? null;
-    if (forcedScreenId === producerId) forcedScreenId = null;
-    if (lockedScreenId === producerId) lockedScreenId = null;
+    screens.screenRemoved(producerId, sharedScreens[0]?.id ?? null);
 
     if (localScreenProducerId === producerId) localScreenProducerId = null;
     // The recorder and the local preview follow whichever share is still running, if any.
@@ -6091,7 +5934,7 @@
   -->
   <app-room
     id="topRoomDiv"
-    class={{ 'detach-screen': detachedScreenId !== null }}
+    class={{ 'detach-screen': screens.detachedScreenId !== null }}
   >
     <!--
       `KAe = (t, n) => ({'push-wrapper': t, 'mt-0': n})`, bound as
@@ -6369,27 +6212,27 @@
               {closeWebcamPreview}
               videoDisabled={prefs.videoDisabled}
               {sharedScreens}
-              {selectedScreenTab}
-              {forcedScreenId}
-              {lockedScreenId}
-              {detachedScreenId}
+              selectedScreenTab={screens.selectedTab}
+              forcedScreenId={screens.forcedId}
+              lockedScreenId={screens.lockedId}
+              detachedScreenId={screens.detachedScreenId}
               {screenStreams}
-              {screenPans}
-              {zoomLevel}
-              {showZoomCtrl}
-              bind:isFullScreenshare
+              screenPans={screens.pans}
+              zoomLevel={screens.zoomLevel}
+              showZoomCtrl={screens.showZoomCtrl}
+              bind:isFullScreenshare={screens.isFullScreenshare}
               volume={roomVolume.volume}
               {saveData}
               {screenVolume}
-              {selectScreenTabByUser}
-              {detachScreen}
-              {toggleLockScreen}
-              {bringEveryoneToScreen}
-              {stopSharedScreen}
-              {togglePanZoom}
-              {panZoomIn}
-              {panZoomOut}
-              {panZoomReset}
+              selectScreenTabByUser={(id) => screens.selectTab(id)}
+              detachScreen={(id) => screens.detach(id)}
+              toggleLockScreen={(id) => screens.toggleLock(id)}
+              bringEveryoneToScreen={(id) => screens.bringEveryoneTo(id)}
+              stopSharedScreen={(id) => screens.stop(id)}
+              togglePanZoom={() => screens.toggleZoomControls()}
+              panZoomIn={() => screens.zoomIn()}
+              panZoomOut={() => screens.zoomOut()}
+              panZoomReset={() => screens.resetZoom()}
               {hideStreams}
               {streamServerMTX}
               {mtxToken}

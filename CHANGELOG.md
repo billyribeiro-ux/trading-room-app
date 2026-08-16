@@ -24,6 +24,41 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-16
 
+### 2026-08-16 12:35 EDT — Phase 5 slice 11: `RoomScreens`, and nine unbound methods in one run
+
+**`+page.svelte` 6,895 → 6,738.** Suite 2,233 → 2,255 across 152 files.
+`svelte-check` 1,171 files, 0 errors, 0 warnings. `eslint` at the pre-existing 27.
+
+**`src/lib/room/screens.svelte.ts` (359).** The screen VIEWER: which tab is showing, how far it is
+zoomed, where it is panned, and the popout windows a presenter can detach it into. Nineteen
+declarations and functions, 178 lines.
+
+**It does NOT own `sharedScreens`, deliberately.** The SFU transport fills that list —
+`addRemoteScreen` and `removeRemoteScreen` are its writers, and they are slice 4’s. A field
+written on both sides of a boundary is not extracted, it is shared: the list crosses as a thunk
+and its removal as a receiver. That is the rule slice 13 paid for with `followedUsers`, applied
+ahead of time rather than after.
+
+**THE GATE CAUGHT NINE UNBOUND METHODS IN ONE RUN** — eighteen through twenty-six of this phase.
+Every one was a shorthand prop the rewriter correctly expanded to a dotted path, which is right as
+an expression and wrong as a hand-off. Nine at once is the argument for a guard that decides from
+the PROTOTYPE rather than from a list of names.
+
+**A negative control found a duplicate I had just introduced.** Control B’s anchor matched TWICE:
+`stop()` and the new `screenRemoved()` receiver each cleaned up the same three ids. `stop()`
+delegates now, so the cleanup exists in one place. The control was looking for a behaviour and
+found a structural defect on the way.
+
+**`$derived` and `$derived.by` needed different conversions.** Treating them alike produced a
+getter that returned a FUNCTION rather than its value. `svelte-check` caught it only because the
+result was compared to a string — assigned to something loosely typed it would have compiled and
+been permanently truthy. The generator distinguishes them now.
+
+**Six negative controls, all seen red**: the rune off the selected tab; the lock left pointing at a
+removed screen; the zoom reset without clearing the pans; a member allowed to broadcast; every tab
+click broadcasting rather than only when the presenter asked; a second popout opened for a screen
+that already had one.
+
 ### 2026-08-16 14:21 EDT — coverage map added to `todo-next.md`: it is a build spec for 2 surfaces of 42, not for the app
 
 **No runtime impact.** `todo-next.md` only, +65 lines (7,768 -> 7,833).
