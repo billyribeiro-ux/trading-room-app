@@ -208,7 +208,7 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       stronger guarantee: "passed at both call sites" was two spellings that had to agree, and is now
       one object reaching two spreads.
     */
-    max: 11584,
+    max: 11562,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {

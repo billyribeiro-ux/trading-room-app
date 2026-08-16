@@ -88,7 +88,10 @@ describe('ours', () => {
   });
 
   it('reads the text from the server-filtered data instead', () => {
-    expect(pageCode).toContain('const messages = data.messages;');
+    // RE-POINTED 2026-08-15: the log is now handed to `RoomOrderedArrivals` rather than bound to a
+    // local first. The point of the assertion is unchanged — the text comes from `data.messages`,
+    // which the server has already filtered for THIS viewer, and never from the SSE payload.
+    expect(pageCode).toContain('mentionArrivals.fresh(data.messages)');
     expect(pageCode).toContain('showToast({');
     expect(pageCode).toContain('requestAlertBrowserNotification(title, item.body');
   });
@@ -111,28 +114,34 @@ describe('ours', () => {
     expect(pageCode).toContain("`Mention from @${item.senderName ?? 'Unknown'}`");
   });
 
-  it('stays silent on the backlog when you arrive', () => {
+  it('asks RoomOrderedArrivals which messages are new, and nothing else', () => {
     /*
-      The behaviour that would make this worse than not having it: walking into a room and being
-      given fifty OS notifications for messages sent while you were away.
+      RE-POINTED 2026-08-15. Three assertions used to read the marker logic out of this page as text:
+      the priming branch, the `findIndex` equality compare, and the lost-marker re-seed. All three
+      moved into `RoomOrderedArrivals`, where `arrivals.test.ts` now EXECUTES them — which is a
+      strictly better instrument for rules whose failure is "a member is given fifty operating-system
+      notifications at once" and which no amount of reading the source can demonstrate.
+
+      What stays this file's business is that the page asks the right class. Not `RoomArrivals`: an
+      identity set has no way to express the re-seed, so wiring the wrong one here would compile,
+      type-check, and replay the whole log as toasts the first time a marker was ever trimmed.
     */
-    expect(pageCode).toContain('if (!popupSeeded) {');
-    expect(pageCode).toContain('lastPopupChatId = messages.at(-1)?.id;');
+    expect(pageCode).toContain('new RoomOrderedArrivals<');
+    expect(pageCode).toContain('const fresh = mentionArrivals.fresh(data.messages);');
+    expect(pageCode).toContain('if (fresh.length === 0) return;');
   });
 
-  it('treats the marker as an OPAQUE id — no arithmetic, no ordering', () => {
+  it('does no arithmetic on a message id, anywhere in the page', () => {
     /*
       `id-opacity-contract.test.ts` caught the first draft doing `Math.max(highest, item.id)`. The
       room-to-API cutover replaces numeric ids with uuids, and `Math.max` over a uuid is not a type
-      error — it is NaN at runtime. Equality and position only.
+      error — it is NaN at runtime.
+
+      The class now makes this UNWRITABLE rather than merely absent: `RoomOrderedArrivals` constrains
+      its row to `{ id: unknown }`, so equality and position are the only operations available. This
+      keeps watching the page anyway, because the page is where the mistake was made.
     */
-    expect(pageCode).toContain('messages.findIndex((item) => item.id === lastPopupChatId)');
     expect(pageCode).not.toMatch(/Math\.max\([^)]*item\.id/);
     expect(pageCode).not.toMatch(/item\.id\s*>\s*lastPopupChatId/);
-  });
-
-  it('re-seeds rather than re-announcing when the marker is gone', () => {
-    // A trimmed log or a tab change gives `indexOf` -1, and `slice(0)` would replay everything.
-    expect(pageCode).toContain('if (lastPopupChatId !== undefined && seenAt === -1) {');
   });
 });
