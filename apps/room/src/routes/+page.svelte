@@ -98,6 +98,7 @@
   import { RoomComposer } from '$lib/room/composer.svelte';
   import { RoomFeeds } from '$lib/room/feeds.svelte';
   import { RoomMessageActions } from '$lib/room/message-actions.svelte';
+  import { RoomMediaTransport } from '$lib/room/media-transport.svelte';
   import { RoomScreens } from '$lib/room/screens.svelte';
   import { RoomUserActions } from '$lib/room/user-actions.svelte';
   import {
@@ -297,64 +298,7 @@
   // `class="nav-link presAreaTabs-notes"` with `aria-selected="false"`. The room opens on Screens.
   let mainTab: MainTab = $state('screens');
 
-  /**
-   * Screens currently being shared, one tab each.
-   *
-   * A presenter can share several at once - the captured client keeps them in a Map
-   * (`this.screenProducers=new Map`) and the captured tab bar rendered three tabs all belonging to
-   * one presenter - so this is a flat list of screens, NOT a list of presenters. The label is
-   * `{name}-{screenName}`, where `screenName` is free text the sharer typed (`FUTURES`,
-   * `MAIN / SPX`), never generated.
-   *
-   * Empty until the media session is wired in: nothing in this app produces or consumes screen
-   * media yet, so inventing entries here would put fabricated presenters on screen.
-   */
-  let sharedScreens = $state<ScreenTab[]>([]);
-  /**
-   * The live MediaStream behind each screen tab, keyed by producer id.
-   *
-   * Kept beside `sharedScreens` rather than inside it because a tab is a label and a stream is a
-   * resource: the tab can render the moment `newProducer` arrives, while `consume()` is still in
-   * flight, and the pane simply has no picture until the stream lands. Merging them would mean
-   * either a tab that appears late or a `ScreenTab` carrying a nullable MediaStream.
-   */
-  const screenStreams = new SvelteMap<string, MediaStream>();
-  /**
-   * The live MediaStream behind each REMOTE webcam card, keyed by producer id.
-   *
-   * Separate from {@link screenStreams} because the two are different surfaces: a screen becomes a
-   * tab in the presentation area, a camera becomes a floating `app-presenter-cams` card.
-   */
-  const webcamStreams = new SvelteMap<string, MediaStream>();
-  /**
-   * The live media session, hoisted out of onMount so the screen-share button can produce into it.
-   * Null until the socket is up; every call guards on it rather than assuming.
-   */
-  let mediaSession: MediaSession | null = null;
-  /** This peer's own screen producer, so stopping the share can close it. */
-  /**
-   * The most recent local screen producer. Kept for the single-screen callers (`applyScreenLayers`
-   * skipping our own producer) that only need "one of ours".
-   */
-  let localScreenProducerId: string | null = null;
 
-  /**
-   * Every screen THIS presenter is currently sharing, producer id -> its capture stream.
-   *
-   * The mirror of the capture's `this.screenProducers = new Map` (byte 1072217). A plain Map, not
-   * a SvelteMap: nothing renders from it - the tab bar renders from `sharedScreens`, which comes
-   * back from the SFU - so making it reactive would buy a dependency and no redraw.
-   */
-  const localScreenStreams = new Map<string, MediaStream>();
-  /**
-   * Resolves once `MediaSession.load()` has completed.
-   *
-   * `newProducer` can arrive before the `connected` handler has finished loading the Device - the
-   * server pushes it the moment another peer produces, which may be the same tick we joined. Every
-   * consume path awaits this instead of racing it; without it the tab appeared with no picture and
-   * the only symptom was `load() must resolve before this is available` in the console.
-   */
-  let sessionReady: Promise<void> | null = null;
   /**
    * The MediaMTX stream list and its selected tab, owned by `room-mtx.svelte.ts`.
    *
@@ -551,19 +495,6 @@
   // svelte-ignore state_referenced_locally
   let theme: Theme = $state(data.settings?.theme === 'dark' ? 'dark' : 'light');
 
-  /**
-   * `globals.videoDeviceID` - the camera chosen in AV settings, which both camera paths pass as
-   * `deviceId: {ideal: ...}`. The modal already saves it (`onPreferenceChange('videoDeviceID', ...)`);
-   * nothing read it back, so the choice was written and then ignored.
-   *
-   * `ideal`, never `exact`: a camera that has been unplugged since it was chosen must fall back to
-   * another one rather than reject the whole call.
-   */
-  const selectedVideoDeviceId = $derived(
-    typeof prefs.loaded.videoDeviceID === 'string' && prefs.loaded.videoDeviceID
-      ? prefs.loaded.videoDeviceID
-      : undefined
-  );
 
   
   
@@ -906,13 +837,11 @@
   */
   const screens = new RoomScreens({
     dialogs,
-    screens: () => sharedScreens,
-    removeScreen: (screenId) => {
-      sharedScreens = sharedScreens.filter((entry) => entry.id !== screenId);
-    },
-    isLocalScreen: (screenId) => localScreenStreams.has(screenId),
-    stopLocalScreen: (screenId) => stopLocalScreen(screenId),
-    selectTabOfId: (screenId) => selectScreenTabOfId(screenId),
+    screens: () => mediaTransport.screens,
+    removeScreen: (screenId) => mediaTransport.removeScreen(screenId),
+    isLocalScreen: (screenId) => mediaTransport.isLocalScreen(screenId),
+    stopLocalScreen: (screenId) => mediaTransport.stopLocalScreen(screenId),
+    selectTabOfId: (screenId) => mediaTransport.selectScreenTabOfId(screenId),
     searchParams: () => page.url.searchParams,
     sessionHandle: () => data.sessionHandle,
     isPresenter: () => isPresenter,
@@ -1057,6 +986,36 @@
     reactive value breaks the link for everything reading it downstream.
   */
   const toasts = new RoomToasts();
+  /*
+    The SFU TRANSPORT, in `$lib/room/media-transport.svelte.ts`.
+
+    Phase 5 slice 4, the largest of the phase: the session, the producers this browser publishes,
+    the consumers it subscribes to, and every stream on either side.
+
+    `RoomMedia` holds what the UI ASKS FOR; this holds what the wire did about it. That boundary is
+    `media.svelte.ts`'s own recorded decision — "STATE moved, TRANSPORT did not" — and this is the
+    other half of the sentence rather than a revision of it.
+
+    Constructed AFTER `screens`, because the viewer is handed to it. The two hand-offs the other way
+    — `screens`'s list thunk and its removal receiver — read `mediaTransport` through arrows, which
+    is why the order only has to satisfy the compiler.
+  */
+  const mediaTransport: RoomMediaTransport = new RoomMediaTransport({
+    dialogs,
+    toasts,
+    media,
+    screens,
+    session: () => data,
+    closeScreenMenu: () => menus.set('screen', false),
+    videoDeviceId: () =>
+      typeof prefs.loaded.videoDeviceID === 'string' ? prefs.loaded.videoDeviceID : undefined,
+    roomVolume,
+    beginSpeech: () => beginSpeechRecognition(),
+    endSpeech: () => endSpeechRecognition(),
+    stopRecording: () => stopRecording(),
+    showScreensTab: () => (mainTab = 'screens'),
+    checkPermissionState: (kind, userAgent) => checkPermissionState(kind, userAgent)
+  });
   /*
     Everything that can be DONE to a user, in `$lib/room/user-actions.svelte.ts`.
 
@@ -1303,8 +1262,6 @@
   /** Stops recognition; null when this peer is not captioning. */
   let stopSpeechReco: (() => void) | null = null;
   
-  /** The live socket, so the caption sender can issue commands without reaching into MediaSession. */
-  let mediaSignalling: SignallingClient | null = null;
   /**
    * Tears the media session down and builds a new one — the capture's `disconnectAll()` plus
    * re-init, for `giveMicScreen` (`TODO.md` gap 22).
@@ -1331,23 +1288,6 @@
    */
 
   /**
-   * producer id -> the peer that audio producer belongs to.
-   *
-   * "Talking" in the capture means A MICROPHONE IS OPEN, not that anyone is making noise: the room
-   * socket pushes `case "startTalking"` / `case "stopTalking"` carrying a `muser` (bundle byte
-   * 1014120), and the client only ever SENDS those on `presUnmuted` / `presMuted` (byte 1141591).
-   * There is no level detection anywhere in it - the bundle's single `createAnalyser` is the
-   * AV-settings mic-test waveform, and `audioLevel`, `activeSpeaker` and `volumeChange` do not
-   * occur at all.
-   *
-   * That second socket does not exist here, so the same fact is taken from the one that does: an
-   * audio producer appearing means a mic opened, `producerPaused`/`producerResumed` mean it was
-   * muted and unmuted, and `producerClosed` means it went away. `services/media/src/server.rs:1428`
-   * says this is exactly what those announcements are for - "if the SFU that just paused the
-   * producer does not say so, nothing does".
-   */
-  const audioProducerOwners = new Map<string, { userID: number; name: string }>();
-  /**
    * Whether anyone in the room currently has their microphone open.
    *
    * Derived, not stored. It used to be a `$state` flag flipped only inside a listener for a
@@ -1366,36 +1306,6 @@
 
   /** The separate window the preview lives in - the capture's `reopenRecPreviewWindow` target. */
   let recPreviewWindow: Window | null = null;
-  let microphoneStream: MediaStream | null = null;
-  /**
-   * Reactive, unlike the other capture streams, because a `<video>` has to follow it.
-   *
-   * As a plain `let` this held a live camera track that nothing could observe: `toggleWebcam`
-   * acquired it and enabled it, so the browser lit the in-use indicator, and the preview stayed
-   * black because no attachment re-ran and no element ever received it. Both halves had to change
-   * - see {@link attachLocalWebcam}.
-   */
-  let webcamStream = $state<MediaStream | null>(null);
-  /**
-   * The capture's `camProducer`. Its presence is what `toggleCam()` branches on, and `stopCam()`
-   * is a no-op without it - `stopCam() { if (this.camProducer) { … } }`.
-   */
-  let localWebcamProducerId: string | null = null;
-  /**
-   * The capture's `micProducer`. Muting PAUSES it rather than closing it - `muteMic()` calls
-   * `micProducer.pause()` and emits `pauseProducer`, while only `disableMic()` closes it and stops
-   * the track. Keeping the producer across a mute is what lets unmuting resume without a new
-   * transport negotiation.
-   */
-  let localMicProducerId: string | null = null;
-  /**
-   * Every remote peer's microphone, keyed by producer id.
-   *
-   * Audio needs an element to come out of. Nothing in this room consumed audio at all: both
-   * `info.kind` guards were `!== 'video'`, so a remote microphone was discarded on arrival.
-   */
-  const remoteAudioStreams = new SvelteMap<string, MediaStream>();
-  let screenStream: MediaStream | null = null;
   let screenRecorder: MediaRecorder | null = null;
   let recordedScreenChunks: Blob[] = [];
 
@@ -2736,513 +2646,23 @@
     xhr.send();
   }
 
-  /**
-   * The media server's connection toasts, verbatim from the captured room:
-   *
-   *   appEventBus.subscribe("mediaServerConnected", e => {
-   *     this.isMediaConnected = !0, this.alertService.success("Connected to Media Server") })
-   *   appEventBus.subscribe("mediaServerDisconnected", e => {
-   *     this.isMediaConnected = !1,
-   *     this.alertService.error("Disconnected from Media Server... reconnecting...") })
-   *
-   * `success` and `error` are toastr skins, so the geometry and colour come from the captured
-   * stylesheet with nothing declared here: `.ngx-toastr` is 300px wide with
-   * `padding: 15px 15px 15px 50px`, `border-radius: 3px` and a 24px icon inset 15px from the left,
-   * `.toast-success` is `rgb(81, 163, 81)` and `.toast-error` `rgb(189, 54, 47)`. Both messages are
-   * passed with no title, exactly as the capture calls them.
-   */
-  /**
-   * The two sticky reconnect toasts, read out of the reference's own room bundle.
-   *
-   * `docs/source/main.d6d3c112b59b7d0d.js`, in the mediasoup socket's `disconnect` handler:
-   *
-   *     i.reconnectToast || (i.reconnectToast = i.toastr.info(
-   *       'Reconnecting to media... <i class="fas fa-cog fa-spin ms-2"></i>', "Media",
-   *       { disableTimeOut: !0, tapToDismiss: !0, closeButton: !0, enableHtml: !0 }))
-   *
-   *     (i.liveMicTrack || i.liveCamTrack || i.liveScreenTrack) && !i.presenterReconnectToast && (
-   *       i.presenterReconnectToast = i.toastr.info(
-   *         "Reconnecting media (presenter)... re-sharing mic/cam/screen", "Presenter",
-   *         { disableTimeOut: !0, tapToDismiss: !1, closeButton: !1 }))
-   *
-   * These are DISTINCT from the `mediaServerConnected`/`mediaServerDisconnected` bus toasts already
-   * handled below — the reference raises both, and its bundle still carries "Connected to Media
-   * Server" and "Disconnected from Media Server" alongside these.
-   *
-   * `disableTimeOut` is why they are held by id: a banner that says "reconnecting" must not expire
-   * while the thing is still disconnected, so it is cleared by the event that makes it false rather
-   * than by a timer. The `||` guard is the reference's own — one at a time, however many redials
-   * the backoff runs.
-   *
-   * The presenter one is raised only when this peer holds a live track, and the reference makes it
-   * **undismissable** (`tapToDismiss: false, closeButton: false`) where the member one can be
-   * dismissed. That asymmetry is deliberate there and reproduced here: a presenter whose mic is
-   * being re-shared needs to know it, and the toast goes when the re-share finishes.
-   */
-  let reconnectToastId: number | null = null;
-  let presenterReconnectToastId: number | null = null;
 
-  function mediaServerConnected(_reconnected: boolean) {
-    media.connected = true;
-    /*
-      Cleared here, on the socket's `connect`, exactly where the reference clears them — inline in
-      that handler beside `emit("mediaServerConnected")` and `reproduceLocalTracksIfAny()`.
 
-      Its own `clearReconnectToasts()` method duplicates this body and is never called from
-      anywhere in the bundle; that is dead code upstream, not a second path, so there is nothing
-      else to reproduce.
-    */
-    if (reconnectToastId !== null) {
-      toasts.dismiss(reconnectToastId);
-      reconnectToastId = null;
-    }
-    if (presenterReconnectToastId !== null) {
-      toasts.dismiss(presenterReconnectToastId);
-      presenterReconnectToastId = null;
-    }
-    // ALWAYS, not just on a redial. A toast that says "reconnecting..." is false the instant the
-    // socket opens, and gating this on `reconnected` left the error on screen forever whenever the
-    // first connect of a session happened to follow a failed one.
-    toasts.dismissMatching('Disconnected from Media Server');
-    toasts.show({ kind: 'success', message: 'Connected to Media Server', enableHtml: false });
-  }
 
-  /**
-   * Raised on the TRANSITION into a disconnected state, never per redial attempt.
-   *
-   * The capture subscribes to an event bus - `appEventBus.subscribe("mediaServerDisconnected", ...)`
-   * - which is a state change. Our signalling client emits `disconnected` from `#onClose`, and
-   * `#onClose` also runs for every FAILED reconnect attempt, so this was firing on a backoff
-   * schedule that climbs to one every 30s (`maxReconnectDelayMs: 30_000`).
-   *
-   * `toasts.show` dedupes an identical message, but its 5s timer still expires, so each retry raised
-   * a fresh toast the moment the previous one cleared. With the media server down the banner was
-   * permanent - which is exactly what it did when I killed the SFU and left it dead.
-   */
-  function mediaServerDisconnected() {
-    if (!media.connected) return;
-    media.connected = false;
-    toasts.show({
-      kind: 'error',
-      message: 'Disconnected from Media Server... reconnecting...',
-      enableHtml: false
-    });
 
-    // The sticky pair, raised beside the bus toast exactly as the reference raises them.
-    if (reconnectToastId === null) {
-      reconnectToastId = toasts.show(
-        {
-          kind: 'info',
-          title: 'Media',
-          message: 'Reconnecting to media... <i class="fas fa-cog fa-spin ms-2"></i>',
-          enableHtml: true
-        },
-        0
-      );
-    }
-    // Only when this peer is actually producing something to re-share.
-    /*
-      The reference's `liveMicTrack || liveCamTrack || liveScreenTrack`, mapped onto what this room
-      actually holds: `localMicProducerId` is its `micProducer`, `webcamStream` its camera, and
-      `localScreenStreams` its screen shares. A mic that is MUTED still counts — muting pauses the
-      producer rather than closing it, so there is still a track to re-share.
-    */
-    const holdsLiveTrack = Boolean(
-      localMicProducerId || webcamStream || localScreenStreams.size > 0
-    );
-    if (holdsLiveTrack && presenterReconnectToastId === null) {
-      presenterReconnectToastId = toasts.show(
-        {
-          kind: 'info',
-          title: 'Presenter',
-          message: 'Reconnecting media (presenter)... re-sharing mic/cam/screen',
-          enableHtml: false
-        },
-        0
-      );
-    }
-  }
 
-  /**
-   * Turns one remote producer into a screen tab with a live picture.
-   *
-   * Only screen shares are handled here: the producing client tags them `{share: true, screenName}`
-   * in `appData` and the server echoes that back verbatim, which is the only thing distinguishing a
-   * screen from a webcam on the same `video` kind.
-   *
-   * Ordering matters. The tab is added BEFORE `consume()` resolves so the bar reflects the room
-   * immediately, and the stream is filled in when it arrives - a tab with no picture is honest,
-   * a picture with no tab is unreachable.
-   */
-  /**
-   * `mediaService.saveData` — "Disable Video (saves bandwidth)", from the AV settings modal.
-   *
-   * DISTINCT from `prefs.videoDisabled` above, which is `preferences.disableVideo` from the USER settings
-   * modal and swaps the screens and streams panes for a message. Both exist upstream, each with its
-   * own control, and the original row in `TODO.md` conflated them. This one is the media-layer
-   * switch, and it does something the pane preference does not: upstream
-   * `callScreenOfUserWEBRTC` opens with
-   * `this.saveData ? P("callScreenOfUserWEBRTC saveData on.. nop...") : (…)`
-   * (`main.d6d3c112b59b7d0d.js` byte 1132193), so **the consumer is never created and no screen
-   * stream is requested at all**. The `Video Disabled` h3 and the hidden `<video>` are only what the
-   * viewer sees; the bandwidth saving is that nothing is fetched.
-   *
-   * Not persisted, matching the reference: the writer is
-   * `toggleDisableVideo(){this.saveData=!this.saveData}` (byte 1136736) on the media service, which
-   * calls no `setPreference`. It lasts the session.
-   */
-  let saveData = $state(false);
 
-  /**
-   * Screens whose stream was NOT fetched because `saveData` was on when they arrived.
-   *
-   * The reference re-consumes by a different route — selecting a tab calls
-   * `startWatchScreenOf` -> `mediaService.startWatchingScreenOf`, so turning video back on and
-   * clicking a tab re-requests it. This room consumes on producer ARRIVAL instead, so without
-   * keeping the `ProducerInfo` a viewer who re-enabled video would see nothing until the presenter
-   * happened to restart their share.
-   *
-   * A plain `Map`, not `SvelteMap`: nothing renders from it. It is bounded by the number of screens
-   * in the room, and every entry is removed the moment it is consumed.
-   */
-  const deferredScreens = new Map<string, ProducerInfo>();
 
-  /**
-   * The one place `saveData` changes, so the re-consume cannot be forgotten at a second call site.
-   *
-   * Turning it ON does NOT tear down consumers that already exist, and that is the reference's
-   * behaviour rather than an oversight on our part: `saveData` is read in exactly three places
-   * upstream — `callScreenOfUserWEBRTC`, the `hidden` class and the `Video Disabled` h3 — and none
-   * of them closes a consumer. So a screen already being watched keeps arriving and is hidden,
-   * while screens that arrive AFTER the switch are never fetched. Stating it plainly because it
-   * looks like a bug until you have read all three sites.
-   */
-  async function setSaveData(enabled: boolean) {
-    saveData = enabled;
-    if (enabled || deferredScreens.size === 0) return;
-    /* `sessionReady` resolves to void — it is a barrier, not a handle. The session lives in
-       `mediaSession`, which `restartMediaSession` sets to null while it rebuilds, so it is read
-       AFTER the await rather than before. */
-    await sessionReady;
-    const session = mediaSession;
-    if (!session) return;
-    for (const [producerId, info] of [...deferredScreens]) {
-      deferredScreens.delete(producerId);
-      const remote = await session.consume(info);
-      if (remote) screenStreams.set(producerId, remote.stream);
-    }
-  }
 
-  async function addRemoteScreen(session: MediaSession, info: ProducerInfo) {
-    const share = info.appData as { share?: unknown; screenName?: unknown } | null;
-    if (info.kind !== 'video' || share?.share !== true) return;
-    /*
-     * Never consume your own screen.
-     *
-     * `newProducer` already excludes the producing peer (`notify_room(..., except: identity.id)`),
-     * but the `getProducers` snapshot does not - it lists everything in the room, including what
-     * this peer is producing. Consuming yourself asks the server for a consumer on a transport the
-     * producing session does not own, which it refuses with
-     * `unknownTransport: this session has no transport …`, and a presenter would see a duplicate
-     * tab of their own screen.
-     */
-    if (legacyUserId(info.userId) === data.user.id) return;
-    if (sharedScreens.some((screen) => screen.id === info.producerId)) return;
-    // The Device must be loaded before `consume()` will do anything.
-    await sessionReady;
 
-    const screenName = typeof share.screenName === 'string' ? share.screenName : '';
-    sharedScreens = [
-      ...sharedScreens,
-      {
-        id: info.producerId,
-        name: info.displayName ?? 'Presenter',
-        screenName,
-        // The producer carries no avatar. Resolve it from the roster when the peer is known;
-        // gravatar's own `d=mm` placeholder otherwise, rather than inventing a hash.
-        avatarUrl:
-          data.connectedUsers.find((user) => user.id === legacyUserId(info.userId))?.avatarUrl ??
-          'https://secure.gravatar.com/avatar/?d=mm&s=20'
-      }
-    ];
-    // A viewer is brought to the screen too, not just the presenter sharing it. The capture emits
-    // `selectScreenTabOfId` from the viewer's side as well - `callScreenOfUserWEBRTC` when a
-    // viewer starts watching a screen, and `handleScreenSwitchToTalking` when the presenter who
-    // starts talking has one - and without it a member sitting on Notes never learns a screen
-    // exists. `selectScreenTabOfId` honours the lock, so a forced screen still cannot be stolen.
-    selectScreenTabOfId(info.producerId);
 
-    /*
-      The gate, and it sits AFTER the tab is added on purpose. Upstream `saveData` stops
-      `callScreenOfUserWEBRTC` from creating the consumer, but the screenshare view still renders —
-      that is where the `Video Disabled` h3 lives — so the tab must exist for there to be anything
-      to show. Skipping the tab as well would hide the fact that a presenter is sharing at all,
-      which is not what the switch says it does.
 
-      The `ProducerInfo` is kept so re-enabling can fetch it; see `setSaveData`.
-    */
-    if (saveData) {
-      deferredScreens.set(info.producerId, info);
-      return;
-    }
 
-    const remote = await session.consume(info);
-    // `consume` returns null when this producer is already being consumed, which is the dedupe the
-    // server's at-least-once `newProducer` requires.
-    if (remote) screenStreams.set(info.producerId, remote.stream);
-  }
 
-  /**
-   * Turns one remote WEBCAM producer into a floating presenter card.
-   *
-   * The sibling of {@link addRemoteScreen}, and the reason a member saw nothing when a presenter
-   * turned their camera on. `appData.share` is the only thing separating a screen from a camera on
-   * the same `video` kind - `produceScreen` tags `{share: true, screenName}` and `produceWebcam`
-   * tags `{share: false}` - and `addRemoteScreen` returns early on anything that is not a share.
-   * Nothing picked the remainder up, so a webcam producer was consumed by no one.
-   *
-   * The capture routes it the same way, by identity rather than by kind: `app-presenter-cams`'
-   * `ngOnInit` does
-   * `muser.isMe ? (pStream = localWebcamStream) : (subscribe('newWebcamStream', …),
-   * connectToScreenOfProducer(muser))`.
-   *
-   * Card first, stream second - the same ordering `addRemoteScreen` uses and for the same reason:
-   * a card with no picture is honest, a picture with no card is unreachable.
-   */
-  async function addRemoteWebcam(session: MediaSession, info: ProducerInfo) {
-    const share = info.appData as { share?: unknown } | null;
-    /*
-      An EXPLICIT `share === false` is required, not merely "not true".
 
-      The capture tags both kinds positively - `appData:{share:!1,isReconnect:o,prevMuserID:s}` for
-      a camera and `appData:{share:!0,screenName:i,…}` for a screen - and this room's own
-      `produceWebcam`/`produceScreen` do the same (`src/lib/media/session.ts:601,630`). So a video
-      producer carrying NEITHER tag is neither a camera nor a screen, and guessing costs something:
-      with `share !== true` this branch adopted every untagged or unknown video producer as a
-      webcam and built a floating card for it that nothing could ever remove, because no
-      `removeWebcamPresenter` would match a producer the room never really understood.
-    */
-    if (info.kind !== 'video' || share?.share !== false) return;
-    // Never consume your own camera: the `getProducers` snapshot lists it, and the server refuses
-    // a consumer on a transport the producing session owns.
-    if (legacyUserId(info.userId) === data.user.id) return;
-    if (webcamPresenters.some((entry) => entry.id === info.producerId)) return;
-    await sessionReady;
 
-    addWebcamPresenter({
-      id: info.producerId,
-      name: info.displayName ?? 'Presenter',
-      isMe: false
-    });
 
-    const remote = await session.consume(info);
-    // `consume` returns null when this producer is already being consumed - the dedupe the
-    // server's at-least-once `newProducer` requires.
-    if (remote) webcamStreams.set(info.producerId, remote.stream);
-  }
 
-  /**
-   * Consumes one remote MICROPHONE and gives it somewhere to come out.
-   *
-   * This branch did not exist. Both `info.kind` guards in this room were `!== 'video'`
-   * ({@link addRemoteScreen} and {@link addRemoteWebcam}), so an audio producer arriving from the
-   * SFU was matched by nothing and dropped - which is the second half of "no voice in the members
-   * room". The first half was that no microphone was ever produced.
-   *
-   * The stream is put in {@link remoteAudioStreams} and rendered as a hidden `<audio autoplay>`;
-   * audio needs an element to play through, and there is no visible control for it.
-   */
-  async function addRemoteAudio(session: MediaSession, info: ProducerInfo) {
-    if (info.kind !== 'audio') return;
-    // Never consume your own microphone: the server refuses a consumer on the producing session's
-    // own transport, and you would hear yourself.
-    if (legacyUserId(info.userId) === data.user.id) return;
-    if (remoteAudioStreams.has(info.producerId)) return;
-    await sessionReady;
-
-    const remote = await session.consume(info);
-    if (remote) {
-      remoteAudioStreams.set(info.producerId, remote.stream);
-      // An open microphone IS the talking signal. Without this the room reports
-      // "( No one is speaking )" while that peer's voice is plainly coming out of the speakers.
-      const ownerId = legacyUserId(info.userId);
-      if (ownerId !== null) {
-        const owner = { userID: ownerId, name: info.displayName ?? 'Presenter' };
-        audioProducerOwners.set(info.producerId, owner);
-        media.startTalking({ userID: owner.userID, mediaValue: { name: owner.name } });
-      }
-    }
-  }
-
-  /** `producerPaused` - the capture's `presMuted`, i.e. that peer stopped talking. */
-  function onRemoteAudioPaused(producerId: string) {
-    const owner = audioProducerOwners.get(producerId);
-    if (owner) media.stopTalking(owner.userID);
-  }
-
-  /** `producerResumed` - the capture's `presUnmuted`, i.e. that peer is talking again. */
-  function onRemoteAudioResumed(producerId: string) {
-    const owner = audioProducerOwners.get(producerId);
-    if (owner) media.startTalking({ userID: owner.userID, mediaValue: { name: owner.name } });
-  }
-
-  function removeRemoteAudio(producerId: string) {
-    remoteAudioStreams.delete(producerId);
-    const owner = audioProducerOwners.get(producerId);
-    if (owner) media.stopTalking(owner.userID);
-    audioProducerOwners.delete(producerId);
-  }
-
-  /**
-   * Attaches a consumed microphone to its element.
-   *
-   * NOT muted - this is someone else talking, which is the entire point. The room's master volume
-   * applies, matching how every other remote stream is played here. A rejected `play()` is
-   * surfaced: Chrome blocks audible autoplay without a gesture, and silence caused by policy looks
-   * exactly like silence caused by a dead producer.
-   */
-  function attachRemoteAudio(producerId: string) {
-    return (node: HTMLAudioElement) => {
-      const stream = remoteAudioStreams.get(producerId) ?? null;
-      if (node.srcObject !== stream) node.srcObject = stream;
-      /*
-        The master volume is deliberately NOT read here.
-
-        An attachment re-runs when reactive state it reads changes, and its return value is the
-        teardown - so reading `volume` inside it meant every tick of the slider destroyed the
-        attachment (pausing the element and nulling `srcObject`) and rebuilt it, replaying `play()`
-        each time. Dragging the slider produced a pause/replay storm and a stream of AbortErrors.
-        `setMasterVolume` sets the level instead, by the `msRemAudio-` id the capture uses.
-      */
-      node.volume = Math.min(1, Math.max(0, untrack(() => roomVolume.volume) / 100));
-
-      if (stream) {
-        node.play().catch((error: unknown) => {
-          console.warn(`[media] remote audio ${producerId} could not play`, error);
-        });
-      }
-
-      return () => {
-        node.pause();
-        node.srcObject = null;
-      };
-    };
-  }
-
-  /** `removePresenterWebcam` - the card is destroyed and its stream dropped. */
-  function removeRemoteWebcam(producerId: string) {
-    webcamStreams.delete(producerId);
-    removeWebcamPresenter(producerId);
-  }
-
-  /**
-   * Gives the presenter a tab for a screen they are sharing themselves.
-   *
-   * `addRemoteScreen` refuses our own producer on purpose - consuming yourself is refused by the
-   * server with `unknownTransport` - which left a presenter sharing a screen with no tab for it at
-   * all, seeing only other people's. The capture does not consume its own screen either; it adds a
-   * LOCAL one:
-   *
-   * ```js
-   * this.globals.user.id == r.userID && (
-   *   this.isScreenSharing = !0, this.addLocalStream(r), …,
-   *   setTimeout(() => { this.guiEventBus.emit("selectScreenTabOfId", r) }, 500))
-   * ```
-   *
-   * So the stream behind this tab is the capture itself, straight from getDisplayMedia, never a
-   * round trip through the SFU - which is also why it costs nothing and cannot fail.
-   */
-  /**
-   * `selectScreenTabOfId` - bring the presentation area to a screen.
-   *
-   * Transcribed from the capture, and the FIRST line is the one that matters:
-   *
-   * ```js
-   * guiEventBus.subscribe("selectScreenTabOfId", e => {
-   *   if (!globals.lockedScreenID || globals.lockedScreenID === e._id) {
-   *     this.selectedMainTab = "presAreaTabs-screens";
-   *     if (this.selectedScreenShareTab == e._id) return;
-   *     this.selectedScreenShareTab = e._id;
-   *     this.onScreenShareTabChange(e._id, !1)
-   *   }
-   * })
-   * ```
-   *
-   * Selecting the screen's own tab was already done here; switching the MAIN tab was not, and that
-   * is why a shared screen appeared to render nothing. This room opens on Notes
-   * (`mainTab = 'notes'`), so the screen, its tab and its video were all being built inside
-   * `#screensTabsContent` while that entire pane sat hidden behind another tab. Every check that
-   * asked the `<video>` for `videoWidth` or `currentTime` passed, because a hidden pane does not
-   * invalidate the element - which is exactly how it went unnoticed.
-   *
-   * The lock is the capture's own guard: while a presenter has forced everyone to one screen, a
-   * newly arriving screen must not steal the view.
-   */
-  function selectScreenTabOfId(producerId: string) {
-    // A detached window exists to show ONE screen. Anything else arriving must not steal it.
-    if (screens.detachedScreenId !== null && screens.detachedScreenId !== producerId) return;
-    if (screens.lockedId && screens.lockedId !== producerId) return;
-    mainTab = 'screens';
-    screens.screenAdded(producerId);
-  }
-
-  function addLocalScreen(producerId: string, screenName: string, stream: MediaStream) {
-    if (sharedScreens.some((screen) => screen.id === producerId)) return;
-    sharedScreens = [
-      ...sharedScreens,
-      {
-        id: producerId,
-        name: data.user.displayName,
-        screenName,
-        avatarUrl: data.user.avatarUrl
-      }
-    ];
-    screenStreams.set(producerId, stream);
-
-    // `setTimeout(() => guiEventBus.emit("selectScreenTabOfId", r), 500)` in the capture: the view
-    // moves to the new screen a moment after it appears rather than in the same frame.
-    globalThis.setTimeout(() => {
-      if (sharedScreens.some((screen) => screen.id === producerId)) {
-        selectScreenTabOfId(producerId);
-      }
-    }, 500);
-  }
-
-  /**
-   * Keeps every consumer's layer in step with what the viewer is actually looking at.
-   *
-   * The selected screen gets the producer's top layer; every other screen drops to spatial layer 0.
-   * Without this, N shared screens cost N times the bandwidth and N times the decode no matter
-   * which tab is on top - a viewer with four presenters sharing pays for four full-resolution
-   * streams to look at one.
-   *
-   * Layer 9 rather than a real maximum: mediasoup clamps a request above what the producer offers
-   * (proven in `session.rs`'s `a_consumers_preferred_layers_can_be_set_and_clamped`), so asking
-   * high is how a client says "the best you have" without knowing whether the producer sent SVC,
-   * simulcast or a single layer.
-   */
-  const TOP_SPATIAL_LAYER = 9;
-
-  async function applyScreenLayers() {
-    const session = mediaSession;
-    if (!session) return;
-    for (const screen of sharedScreens) {
-      if (!screenStreams.has(screen.id)) continue;
-      // Our own screens play from the local capture and are never consumed, so there is no
-      // consumer whose layers could be preferred - asking would earn one `unknownConsumer` warning
-      // per tab switch for a stream that was never going over the network in the first place.
-      if (localScreenStreams.has(screen.id)) continue;
-      try {
-        await session.setPreferredLayers(
-          screen.id,
-          screen.id === screens.selectedTab ? TOP_SPATIAL_LAYER : 0
-        );
-      } catch (error) {
-        // Not fatal: the stream keeps playing at whatever layer it already had.
-        console.warn(`[media] could not set layers for screen ${screen.id}`, error);
-      }
-    }
-  }
 
   /**
    * Starts captioning this peer's speech.
@@ -3258,12 +2678,12 @@
    * screen should still caption for everybody else.
    */
   function beginSpeechRecognition() {
-    if (stopSpeechReco || !isPresenter || !prefs.doSpeechReco || !mediaSession) return;
+    if (stopSpeechReco || !isPresenter || !prefs.doSpeechReco || !mediaTransport.session) return;
 
     stopSpeechReco = startSpeechRecognition({
-      isMicAlive: () => microphoneStream?.getAudioTracks()[0]?.readyState === 'live',
+      isMicAlive: () => mediaTransport.microphoneStream?.getAudioTracks()[0]?.readyState === 'live',
       onresult: (result) => {
-        void mediaSignalling
+        void mediaTransport.signalling
           ?.request('sendSpeechReco', result)
           .catch((error: unknown) => console.warn('[captions] a line was not relayed', error));
       },
@@ -3279,11 +2699,6 @@
     stopSpeechReco = null;
   }
 
-  function removeRemoteScreen(producerId: string) {
-    screens.closePopout(producerId);
-    screenStreams.delete(producerId);
-    screens.stop(producerId);
-  }
 
   function deliverAlert(alert: {
     senderName: string;
@@ -3404,8 +2819,8 @@
   $effect(() => {
     // Re-runs when the viewer switches tabs or a screen arrives/leaves.
     void screens.selectedTab;
-    void screenStreams.size;
-    void applyScreenLayers();
+    void mediaTransport.screenStreams.size;
+    void mediaTransport.applyScreenLayers();
   });
 
   $effect(() => {
@@ -3477,248 +2892,13 @@
   }
 
 
-  function stopStream(stream: MediaStream | null) {
-    stream?.getTracks().forEach((track) => track.stop());
-  }
-
-  function setStreamEnabled(stream: MediaStream | null, enabled: boolean) {
-    stream?.getTracks().forEach((track) => {
-      track.enabled = enabled;
-    });
-  }
 
 
 
-  /**
-   * Turn a capture failure into the one sentence the user sees.
-   *
-   * The DECISION moved to `media-capture-error.ts`; what stays here is the part that is genuinely
-   * the page's: the async permission round trip and the assignment to `dialogs.alert`.
-   *
-   * The `NotAllowedError` path is why this is still async. `mediaCaptureErrorMessage` returns null
-   * for it because the answer depends on what the Permissions API says, and the room deliberately
-   * stays SILENT unless that comes back denied - somebody who just dismissed the prompt themselves
-   * does not need to be told they dismissed it. The `Permission denied` prefix is the test, because
-   * every other state comes back as a sentinel rather than prose.
-   */
-  async function reportMediaCaptureError(kind: MediaCaptureKind, error: unknown) {
-    const errorName = captureErrorName(error);
 
-    if (errorName === 'NotAllowedError') {
-      const guidance = await checkPermissionState(permissionForCapture(kind), navigator.userAgent);
-      if (guidance.startsWith('Permission denied')) dialogs.alert = guidance;
-      return;
-    }
 
-    const message = mediaCaptureErrorMessage({
-      kind,
-      errorName,
-      errorMessage: captureErrorMessage(error),
-      isSecureContext: window.isSecureContext
-    });
-    if (message) dialogs.alert = message;
-  }
 
-  async function enableMicrophone(retryCount = 0) {
-    try {
-      if (!navigator.mediaDevices?.getUserMedia) {
-        throw new DOMException('Microphone access is not supported', 'NotSupportedError');
-      }
-      microphoneStream ??= await navigator.mediaDevices.getUserMedia({ audio: true });
-      setStreamEnabled(microphoneStream, true);
-      media.micMuted = false;
 
-      /*
-        Publish it, or nobody hears anything.
-
-        `MediaSession.produceMicrophone` (`src/lib/media/session.ts:571`) was written and never
-        called, so this room acquired a microphone, lit the browser's in-use indicator, ran speech
-        recognition on it - and never sent a single packet. The capture produces here:
-        `enableMic` creates `micProducer`, and every later control (`muteMic`, `unmuteMic`,
-        `disableMic`) is a no-op without it.
-
-        Produced once and kept: a mute pauses this producer rather than replacing it.
-      */
-      const micTrack = microphoneStream.getAudioTracks()[0];
-      if (micTrack && mediaSession && !localMicProducerId) {
-        try {
-          const producer = await mediaSession.produceMicrophone(micTrack);
-          localMicProducerId = producer.id;
-        } catch (error) {
-          console.error('[media] the microphone could not be published', error);
-          toasts.show({
-            kind: 'error',
-            message: 'Your microphone could not be shared with the room.',
-            enableHtml: false
-          });
-        }
-      }
-      // An open mic is what "talking" means here - see `audioProducerOwners`.
-      media.startTalking({
-        userID: data.user.id,
-        mediaValue: { name: data.user.displayName }
-      });
-      beginSpeechRecognition();
-    } catch (error) {
-      if (retryCount === 0) {
-        await enableMicrophone(1);
-        return;
-      }
-      media.micMuted = true;
-      media.stopTalking(data.user.id);
-      await reportMediaCaptureError('microphone', error);
-    }
-  }
-
-  async function toggleMicrophone() {
-    if (!media.micMuted) {
-      /*
-        The TOOLBAR is `toggleMute()`, and its mute branch is `disableMic()` - not `muteMic()`.
-
-        ```js
-        toggleMute() { this.micProducer ? (this.micMuted ? this.enableMic(!1) : this.disableMic())
-                                        : this.enableMic(!1) }
-
-        disableMic() {
-          if (this.micProducer) {
-            this.micMuted = !0; this.guiEventBus.emit("media.micMuted", this.micMuted);
-            this.stopSpeechRecognition(); this.micStream = null;
-            this.micProducer.close();
-            this.prevMicStream.getAudioTracks()[0].stop();
-          }
-        }
-        ```
-
-        `muteMic()`/`unmuteMic()` - the pause/resume pair - are the REMOTE-ADMIN controls, reached
-        from a presenter command, not from this button. Using them here left the producer alive: a
-        member kept an `<audio>` element and a live consumer for a microphone that had stopped
-        sending, which is exactly the "presenter is off but still showing" report. Closing it is
-        what makes `producerClosed` reach the room.
-      */
-      if (localMicProducerId && mediaSession) {
-        void mediaSession.closeProducer(localMicProducerId);
-      }
-      localMicProducerId = null;
-      stopStream(microphoneStream);
-      microphoneStream = null;
-      media.micMuted = true;
-      media.stopTalking(data.user.id);
-      endSpeechRecognition();
-      return;
-    }
-
-    media.micLaunching = true;
-    try {
-      await enableMicrophone();
-    } finally {
-      media.micLaunching = false;
-    }
-  }
-
-  /**
-   * The toolbar's webcam control - `toggleCam()`, and the half that actually ends a camera.
-   *
-   * ```js
-   * toggleCam() { this.connected ? (this.camProducer ? this.stopCam() : this.enableCam(!1)) : … }
-   *
-   * stopCam() {
-   *   if (this.camProducer) {
-   *     this.camMuted = !0; this.guiEventBus.emit("camMuted", this.camMuted);
-   *     if (this.localWebcamStream)
-   *       this.localWebcamStream.getTracks().forEach(e => { e.stop() });     // releases the device
-   *     this.prevCamStream = null;
-   *     this.socket.emit("cmd", {cmd:"closeProducer", kind:"video", producerId:…}, …);
-   *   }
-   * }
-   * ```
-   *
-   * The capture never toggles `track.enabled` for the camera: it STOPS every track and re-acquires
-   * with a fresh `getUserMedia` on the way back in (`enableCam` -> "enableWebcam() | calling
-   * getUserMedia()"). This room had been caching the stream with `webcamStream ??= …` and flipping
-   * `enabled`, which left `readyState: "live"` forever - measured after pressing the control:
-   * the track stayed live and the browser kept reporting the camera in use, with no path in the UI
-   * that ever released it. `stopStream` (which calls `track.stop()`) was wired only into page
-   * teardown.
-   *
-   * The SFU half - `closeProducer` - is not reproduced; this room has no camera producer yet.
-   */
-  async function toggleWebcam() {
-    media.camLaunching = true;
-    try {
-      if (!media.camMuted) {
-        // `stopCam()` closes the producer as well as stopping the tracks:
-        //   socket.emit("cmd", {cmd:"closeProducer", kind:"video", producerId: camProducer.id},
-        //              () => { this.camProducer.close(); this.camProducer = null })
-        // Closing it server-side is what tears down every viewer's consumer; without it a member
-        // keeps a frozen last frame instead of losing the camera.
-        if (localWebcamProducerId && mediaSession) {
-          void mediaSession.closeProducer(localWebcamProducerId);
-        }
-        localWebcamProducerId = null;
-        stopStream(webcamStream);
-        webcamStream = null;
-        media.camMuted = true;
-        removeWebcamPresenter(String(data.user.id));
-        return;
-      }
-
-      if (!navigator.mediaDevices?.getUserMedia) {
-        throw new DOMException('Camera access is not supported', 'NotSupportedError');
-      }
-      /*
-        A fresh acquire, not a cached stream: the previous one was stopped and cannot be revived.
-
-        Only the device is constrained, NOT the resolution - and that is deliberate. `enableCam()`
-        reads `const {resolution: _} = this.webcam` and spreads `JN[_]`, but `this.webcam` is
-        initialised `{device: null, resolution: "sd"}` and nothing in the bundle ever writes to it.
-        `JN` has no `sd` key, so `JN["sd"]` is `undefined` and `{...undefined}` contributes nothing:
-        the original's webcam runs unconstrained. Adding 1080p here would be an improvement the
-        capture does not make, so it stays out until it is asked for - see `docs/streaming-choices.md`.
-      */
-      webcamStream = await navigator.mediaDevices.getUserMedia({
-        video: { deviceId: { ideal: selectedVideoDeviceId } }
-      });
-      media.camMuted = false;
-      // `webcamingUsers.push(r)` then `guiEventBus.emit("newWebcamPresenter", r)`.
-      addWebcamPresenter({
-        id: String(data.user.id),
-        name: data.user.displayName,
-        isMe: true
-      });
-
-      /*
-        Publish it. Without this the camera is purely local - the presenter sees their own preview
-        and no member sees anything, which is exactly what this room did: `toggleWebcam` had no
-        produce call of any kind, while `MediaSession.produceWebcam` sat written and uncalled at
-        `src/lib/media/session.ts:592`.
-
-        The capture creates a producer here too - `camProducer = yield producerTransport.produce({
-        stopTracks:!1, …})` - and `toggleCam()` branches on its existence.
-
-        Failure is reported rather than swallowed, matching the screen path: the local preview will
-        still be running, so a silent failure looks to the presenter exactly like success.
-      */
-      const track = webcamStream.getVideoTracks()[0];
-      if (track && mediaSession) {
-        try {
-          const producer = await mediaSession.produceWebcam(track);
-          localWebcamProducerId = producer.id;
-        } catch (error) {
-          console.error('[media] the webcam could not be published', error);
-          toasts.show({
-            kind: 'error',
-            message: 'Your camera could not be shared with the room.',
-            enableHtml: false
-          });
-        }
-      }
-    } catch (error) {
-      media.camMuted = true;
-      await reportMediaCaptureError('camera', error);
-    } finally {
-      media.camLaunching = false;
-    }
-  }
 
 
   function stopRecording() {
@@ -3732,234 +2912,10 @@
     media.recordingReminder = false;
   }
 
-  /** The navbar's stop control: ends every screen this presenter is sharing. */
-  function stopScreenSharing() {
-    menus.set('screen', false);
-    stopRecording();
-    for (const producerId of [...localScreenStreams.keys()]) stopLocalScreen(producerId);
-    // A share that never reached the SFU has no producer id to key on, so it is not in the map.
-    stopStream(screenStream);
-    screenStream = null;
-    localScreenProducerId = null;
-    media.screenSharing = false;
-  }
 
-  /**
-   * "Name for this screen?" - the step that runs BEFORE anything is captured.
-   *
-   * Transcribed from the captured `startScreenSharing(e)` (`docs/source/main.d6d3c112b59b7d0d.js`):
-   *
-   * ```js
-   * this.mediaSoupService.connected
-   *   ? pa.prompt({ value: `Screen ${this.mediaSoupService.screenProducers.size+1}`,
-   *       title: "Name for this screen ? Press OK for default. (You can share multiple screens
-   *               from the same room and name each one here)",
-   *       inputType: "text",
-   *       callback: o => { if (!o) return; let r = o; r || (r = `Screen ${…length+1}`);
-   *                        this.mediaSoupService.startScreenSharing(e, r, …) } })
-   *   : pa.alert("Not connected to media server yet, please wait a second or two...")
-   * ```
-   *
-   * Three things that were not obvious and are worth stating, because I got one of them wrong
-   * before this line was found:
-   *
-   * 1. **There IS a generated default** - `Screen ${screenProducers.size + 1}` - prefilled into the
-   *    input. A live room showing `FUTURES` and `MAIN / SPX` was the presenter typing over it, not
-   *    evidence against a generator. Both are true: the name is free text, and the box starts
-   *    populated.
-   * 2. **Cancel aborts the share entirely.** `if (!o) return` runs before any capture, so no
-   *    getDisplayMedia prompt appears. The `r || (r = …)` line after it is dead in the original -
-   *    `o` is already truthy there - so the fallback it describes can never fire, and it is not
-   *    reproduced.
-   * 3. **Disconnected refuses instead of sharing**, with its own message. Sharing a screen the
-   *    SFU cannot carry is the failure this exists to prevent: the presenter's own preview would
-   *    look perfect while the room saw nothing.
-   */
-  const SCREEN_NAME_PROMPT =
-    'Name for this screen ? Press OK for default. (You can share multiple screens from the same room and name each one here)';
-  const MEDIA_NOT_CONNECTED_ALERT =
-    'Not connected to media server yet, please wait a second or two... Or reload the page if it takes too long... *** If nothing else works, use the Gear icon on the right to open the Session Control and reset the media server...';
 
-  function promptForScreenName(source: 'screen' | 'camera') {
-    // `this.mediaSoupService.connected` in the capture. Deliberately not `sessionReady`: that is a
-    // Promise, so it is truthy the moment load() is CALLED - including after it rejected - and it
-    // says nothing about whether the socket is currently up.
-    if (!mediaSession || !mediaSignalling?.connected) {
-      dialogs.alert = MEDIA_NOT_CONNECTED_ALERT;
-      menus.set('screen', false);
-      return;
-    }
-    dialogs.prompt = {
-      title: SCREEN_NAME_PROMPT,
-      // `screenProducers.size + 1` - what this session is already sharing, so a second screen
-      // opens on "Screen 2" rather than on "Screen 1" again.
-      value: `Screen ${mediaSession.screenNames.length + 1}`,
-      onconfirm: (value) => {
-        dialogs.prompt = null;
-        const screenName = value.trim();
-        // `if (!o) return`: cancelling, or clearing the box, shares nothing at all.
-        if (!screenName) return;
-        void startScreenSharing(source, screenName);
-      }
-    };
-  }
 
-  async function startScreenSharing(source: 'screen' | 'camera', screenName: string) {
-    // Deliberately NOT stopping the screen already being shared.
-    //
-    // This used to open with `stopStream(screenStream)`, which killed the previous screen's track
-    // while leaving its producer open at the SFU. The result was the worst shape a media bug takes:
-    // viewers kept the tab, the <video> stayed unpaused, the track still reported
-    // readyState "live" - and no frame ever arrived again. Measured directly: sharing a second
-    // screen left the first stuck at currentTime 6.50 for as long as it was watched, with nothing
-    // anywhere reporting a fault.
-    //
-    // Multiple concurrent screens are the point - the naming prompt says so in its own text ("You
-    // can share multiple screens from the same room and name each one here") and the capture holds
-    // them in a Map (`this.screenProducers=new Map`, byte 1072217), stopping them individually by
-    // producer id (byte 1099342). So each share keeps its own stream, keyed by its producer id.
 
-    if (!navigator.mediaDevices?.getDisplayMedia) {
-      dialogs.alert =
-        'Screen sharing is not supported in this browser. Please use a modern browser like Chrome, Firefox, or Safari.';
-      return;
-    }
-
-    let stream: MediaStream | null = null;
-    try {
-      stream =
-        source === 'camera'
-          ? await navigator.mediaDevices.getUserMedia({
-              // `getUserMedia({video:{deviceId:{ideal: globals.videoDeviceID}, ...JN.hdd}})` in
-              // `enableShare()`, where the capture's constraint table is
-              //
-              //   JN = { qvga:{320x240}, vga:{640x480}, hd:{1280x720},
-              //          hdd:{width:{ideal:1920}, height:{ideal:1080}} }
-              //
-              // This path took a bare `{video: true}`, which is the browser default - MEASURED at
-              // 640x480. Every member watching an OBS / XSPLIT / virtual-cam share was receiving a
-              // ninth of the pixels the original sends. The selected camera was ignored too.
-              video: {
-                deviceId: { ideal: selectedVideoDeviceId },
-                width: { ideal: 1920 },
-                height: { ideal: 1080 }
-              }
-            })
-          : await navigator.mediaDevices.getDisplayMedia({
-              audio: false,
-              video: {
-                width: { max: 1920 },
-                height: { max: 1080 },
-                frameRate: { max: 30 }
-              }
-            });
-      screenStream = stream;
-      media.screenSharing = true;
-      menus.set('screen', false);
-      const track = stream.getVideoTracks()[0];
-
-      /*
-        `contentHint = 'detail'` — `docs/streaming-choices.md` row 2, and the reasoning is the wire
-        measurement in that document rather than a preference.
-
-        Presenter-to-member, 12 seconds with a member attached: full 1920x1080 leaves the presenter,
-        arrives at the member, paints at 1920x1080, VP9 end to end, ZERO dropped frames. And
-        `qualityLimitationReason: none` with cumulative `bandwidth: 0, cpu: 0` — the encoder spent
-        **zero seconds constrained**.
-
-        So a soft-looking share is not a limit to lift. Nothing is throttling it; nothing is ASKING
-        the encoder to spend more. With `encodings: undefined` there is no floor, no ceiling and no
-        content hint, so libvpx's own heuristic decides — and that heuristic is tuned for camera
-        video, where blurring a moving background is free. For candlesticks, gridlines and 13px
-        quote text it is exactly the wrong trade.
-
-        This is the one line that tells it otherwise. Applied to the SCREEN capture only, never to
-        the camera path above, where the default heuristic is correct.
-
-        Two honest caveats, both from the doc:
-
-        * **Its cost is unmeasured.** It may raise the bitrate, and under genuine congestion it
-          degrades frame rate rather than resolution — a share may end up sharper and choppier. The
-          doc previously called this free; that was an assumption and it was wrong.
-        * **It is a divergence.** The capture sets `contentHint = "detail"` on its alert-overlay
-          canvas stream and never on the raw screen track.
-
-        Chosen anyway because the measurement says the headroom is real and unused, and because it
-        is one property on one track: reverting is deleting this line. The `getStats()` read that
-        would settle it needs a presenter sharing a REAL desktop with a member attached, which is
-        `scripts/collect-share-stats.js`.
-      */
-      if (track) track.contentHint = 'detail';
-
-      /*
-       * Send it to the SFU. Without this the capture is purely local - the presenter sees their own
-       * preview and nobody else sees anything, which is what this room did until now.
-       *
-       * The name came from the prompt in `promptForScreenName`, which the captured app raises
-       * before any capture happens. It is what the tab bar renders as `{name}-{screenName}`.
-       */
-      if (track && mediaSession) {
-        try {
-          const producer = await mediaSession.produceScreen(track, screenName);
-          localScreenProducerId = producer.id;
-          localScreenStreams.set(producer.id, stream);
-          addLocalScreen(producer.id, screenName, stream);
-          // Ending the capture - the browser's own "Stop sharing" bar - closes THIS screen only,
-          // not every screen this presenter is sharing.
-          track.addEventListener('ended', () => stopLocalScreen(producer.id), { once: true });
-        } catch (error) {
-          // The local preview still works; only the sharing half failed, and saying so beats a
-          // presenter believing the room can see them.
-          console.error('[media] the screen could not be published', error);
-          toasts.show({
-            kind: 'error',
-            message: 'Your screen could not be shared with the room.',
-            enableHtml: false
-          });
-        }
-      }
-    } catch (error) {
-      // Only this attempt failed. Screens already being shared are untouched, and `media.screenSharing`
-      // stays true if any of them survive - flipping it off would hide the stop control for shares
-      // that are still running.
-      stopStream(stream);
-      screenStream = localScreenStreams.values().next().value ?? null;
-      media.screenSharing = localScreenStreams.size > 0;
-      await reportMediaCaptureError('screen', error);
-    }
-  }
-
-  /**
-   * Stops one shared screen, leaving the presenter's others running.
-   *
-   * The capture stops them individually by producer id (byte 1099342), which is the only thing
-   * that makes "share multiple screens" usable - a presenter finishing with one chart should not
-   * drop the other two.
-   */
-  function stopLocalScreen(producerId: string) {
-    screens.closePopout(producerId);
-    const stream = localScreenStreams.get(producerId);
-    localScreenStreams.delete(producerId);
-
-    // Close the producer before dropping the track: the server tears the room's consumers down
-    // from `producerClosed`, so viewers lose the tab instead of keeping a frozen last frame.
-    if (mediaSession) void mediaSession.closeProducer(producerId);
-    stopStream(stream ?? null);
-
-    // Our own tab is ours to remove: no `producerClosed` comes back for a producer we closed, so
-    // nothing else would ever drop it.
-    sharedScreens = sharedScreens.filter((entry) => entry.id !== producerId);
-    screenStreams.delete(producerId);
-    screens.screenRemoved(producerId, sharedScreens[0]?.id ?? null);
-
-    if (localScreenProducerId === producerId) localScreenProducerId = null;
-    // The recorder and the local preview follow whichever share is still running, if any.
-    screenStream = localScreenStreams.values().next().value ?? null;
-    if (localScreenStreams.size === 0) {
-      stopRecording();
-      media.screenSharing = false;
-    }
-  }
 
   /**
    * Tells the room what this presenter's recorder is doing. `media.recording-state.remote.ts` carries the
@@ -4013,12 +2969,12 @@
    *   3. NEVER SAVED. A blob URL was created and nothing ever downloaded it.
    */
   function startRecording() {
-    if (!screenStream || !media.screenSharing || typeof MediaRecorder === 'undefined') return;
+    if (!mediaTransport.screenStream || !media.screenSharing || typeof MediaRecorder === 'undefined') return;
 
     // Video from the share, audio from the mic. `getAudioTracks()` on the display stream is empty
     // by construction, so without this the file has no sound at all.
-    const tracks: MediaStreamTrack[] = [...screenStream.getVideoTracks()];
-    const micTrack = microphoneStream?.getAudioTracks()[0];
+    const tracks: MediaStreamTrack[] = [...mediaTransport.screenStream.getVideoTracks()];
+    const micTrack = mediaTransport.microphoneStream?.getAudioTracks()[0];
     if (micTrack && micTrack.readyState === 'live') tracks.push(micTrack);
     media.recordedHasAudio = Boolean(micTrack && micTrack.readyState === 'live');
     const recordedStream = new MediaStream(tracks);
@@ -4685,7 +3641,7 @@
             `onScreenShareTabChange(e, i = !0)`, which callers pass false for programmatic changes;
             here the equivalent is simply that only the user-initiated tab click broadcasts.
           */
-          if (typeof command.screenId === 'string') selectScreenTabOfId(command.screenId);
+          if (typeof command.screenId === 'string') mediaTransport.selectScreenTabOfId(command.screenId);
           return;
         }
 
@@ -4737,9 +3693,9 @@
         // Addressed to one member; everyone else ignores it.
         if (command.targetUserId !== data.user.id) return;
 
-        if (command.subCmd === 'mutemic' && !media.micMuted) void toggleMicrophone();
-        if (command.subCmd === 'mutecam' && !media.camMuted) void toggleWebcam();
-        if (command.subCmd === 'mutescreens') stopScreenSharing();
+        if (command.subCmd === 'mutemic' && !media.micMuted) void mediaTransport.toggleMicrophone();
+        if (command.subCmd === 'mutecam' && !media.camMuted) void mediaTransport.toggleWebcam();
+        if (command.subCmd === 'mutescreens') mediaTransport.stopScreenSharing();
         return;
       }
 
@@ -5082,46 +4038,16 @@
       }),
       iceServers: () => media.iceServers
     });
-    mediaSession = session;
-    mediaSignalling = signalling;
+    mediaTransport.attachSession(session);
+    mediaTransport.signalling = signalling;
 
-    /*
-      Everything this peer consumed from other people, dropped in one place.
-
-      This has to reset the DEDUPE GUARDS, not just the visible streams, and that distinction is the
-      whole reason it exists. `addRemoteScreen` returns early on
-      `sharedScreens.some(entry => entry.id === info.producerId)`, `addRemoteWebcam` on
-      `webcamPresenters.some(...)`, and `addRemoteAudio` on `remoteAudioStreams.has(...)`. Clearing
-      `screenStreams` — which is a DIFFERENT map from `sharedScreens` — cleared no guard at all, so
-      the rebuild from `getProducers` that both callers below rely on found every producer already
-      "known" and consumed none of them. The result was a room that reconnected to silence and a
-      blank tab bar.
-
-      Found by the adversarial review of 2026-08-11. The reconnect half predates that day's work;
-      the role-change half arrived with it.
-
-      Dropping remote state is always safe here: both callers are points where the far side has
-      already closed every consumer, so what is on screen is a still frame pretending to be live.
-      `audioProducerOwners` goes too — it is keyed by producer id and would otherwise attribute a
-      recycled id to whoever held it last.
-    */
-    function dropRemoteMedia() {
-      sharedScreens = [];
-      screenStreams.clear();
-      // `webcamPresenters` is a `const` $state array, so it is emptied in place rather than
-      // reassigned; reassigning it would replace the array every other reader is holding.
-      webcamPresenters.splice(0, webcamPresenters.length);
-      remoteAudioStreams.clear();
-      audioProducerOwners.clear();
-    }
-
-    signalling.on('socketopen', ({ reconnected }) => mediaServerConnected(reconnected));
+    signalling.on('socketopen', ({ reconnected }) => mediaTransport.serverConnected(reconnected));
     signalling.on('disconnected', () => {
-      mediaServerDisconnected();
+      mediaTransport.serverDisconnected();
       // The far side closed every consumer with the socket. Drop them so a stale picture is never
       // left frozen on screen pretending to be live; the tabs rebuild from `getProducers` on the
       // next connect.
-      dropRemoteMedia();
+      mediaTransport.dropRemoteMedia();
     });
 
     /*
@@ -5149,20 +4075,20 @@
             on a closed instance. A handler holding the original const would therefore throw on the
             first reconnect after a role change, and the room would silently stop consuming.
           */
-          const active = mediaSession;
+          const active = mediaTransport.session;
           if (!active) return;
-          sessionReady = active.load();
-          await sessionReady;
+          mediaTransport.sessionReady = active.load();
+          await mediaTransport.sessionReady;
           const { producers } = await signalling.request('getProducers');
           for (const producer of producers) {
-            await addRemoteScreen(active, producer);
-            await addRemoteWebcam(active, producer);
-            await addRemoteAudio(active, producer);
+            await mediaTransport.addRemoteScreen(active, producer);
+            await mediaTransport.addRemoteWebcam(active, producer);
+            await mediaTransport.addRemoteAudio(active, producer);
           }
         } catch (error) {
           // Leaving `sessionReady` pending would hang every future consume on a promise that can
           // never settle, so it is reset and the next connect retries from scratch.
-          sessionReady = null;
+          mediaTransport.sessionReady = null;
           console.error('[media] the session could not be initialised', error);
         }
       })();
@@ -5182,14 +4108,14 @@
       two peers for one person.
     */
     restartMediaSession = async () => {
-      const previous = mediaSession;
-      mediaSession = null;
-      sessionReady = null;
+      const previous = mediaTransport.session;
+      mediaTransport.attachSession(null);
+      mediaTransport.sessionReady = null;
       // Closes every transport, producer and consumer this peer held. What was consumed must go
       // with them, or the tab bar keeps painting a stream whose transport no longer exists — and
       // the dedupe guards would refuse to re-consume any of it below.
       previous?.close();
-      dropRemoteMedia();
+      mediaTransport.dropRemoteMedia();
 
       const rebuilt = new MediaSession({
         signalling,
@@ -5201,19 +4127,19 @@
         }),
         iceServers: () => media.iceServers
       });
-      mediaSession = rebuilt;
+      mediaTransport.attachSession(rebuilt);
 
       try {
-        sessionReady = rebuilt.load();
-        await sessionReady;
+        mediaTransport.sessionReady = rebuilt.load();
+        await mediaTransport.sessionReady;
         const { producers } = await signalling.request('getProducers');
         for (const producer of producers) {
-          await addRemoteScreen(rebuilt, producer);
-          await addRemoteWebcam(rebuilt, producer);
-          await addRemoteAudio(rebuilt, producer);
+          await mediaTransport.addRemoteScreen(rebuilt, producer);
+          await mediaTransport.addRemoteWebcam(rebuilt, producer);
+          await mediaTransport.addRemoteAudio(rebuilt, producer);
         }
       } catch (error) {
-        sessionReady = null;
+        mediaTransport.sessionReady = null;
         console.error('[media] the session could not be rebuilt after a role change', error);
       }
     };
@@ -5232,11 +4158,11 @@
       arrive inside it.
     */
     signalling.on('newProducer', (info) => {
-      const active = mediaSession;
+      const active = mediaTransport.session;
       if (!active) return;
-      void addRemoteScreen(active, info);
-      void addRemoteWebcam(active, info);
-      void addRemoteAudio(active, info);
+      void mediaTransport.addRemoteScreen(active, info);
+      void mediaTransport.addRemoteWebcam(active, info);
+      void mediaTransport.addRemoteAudio(active, info);
     });
 
     /*
@@ -5260,22 +4186,22 @@
     });
     // `producerPaused` / `producerResumed` are declared in `src/lib/media/signalling.ts:162,164`
     // and were listened for by nothing. They are the capture's `presMuted` / `presUnmuted`.
-    signalling.on('producerPaused', ({ producerId }) => onRemoteAudioPaused(producerId));
-    signalling.on('producerResumed', ({ producerId }) => onRemoteAudioResumed(producerId));
+    signalling.on('producerPaused', ({ producerId }) => mediaTransport.remoteAudioPaused(producerId));
+    signalling.on('producerResumed', ({ producerId }) => mediaTransport.remoteAudioResumed(producerId));
     signalling.on('producerClosed', ({ producerId }) => {
-      removeRemoteScreen(producerId);
-      removeRemoteWebcam(producerId);
-      removeRemoteAudio(producerId);
+      mediaTransport.removeRemoteScreen(producerId);
+      mediaTransport.removeRemoteWebcam(producerId);
+      mediaTransport.removeRemoteAudio(producerId);
     });
     signalling.on('peerClosed', ({ peerId }) => {
       // The current session, for the same reason as `newProducer` above: after a role change the
       // captured `session` holds the streams of a connection that no longer exists, so a peer
       // leaving would tear down nothing and leave their tile painted.
-      for (const remote of mediaSession?.remoteStreams.values() ?? []) {
+      for (const remote of mediaTransport.session?.remoteStreams.values() ?? []) {
         if (remote.peerId === peerId) {
-          removeRemoteScreen(remote.producerId);
-          removeRemoteWebcam(remote.producerId);
-          removeRemoteAudio(remote.producerId);
+          mediaTransport.removeRemoteScreen(remote.producerId);
+          mediaTransport.removeRemoteWebcam(remote.producerId);
+          mediaTransport.removeRemoteAudio(remote.producerId);
         }
       }
     });
@@ -5294,7 +4220,7 @@
       // The first connect never reached `socketopen`, so `media.connected` is still false and the
       // transition guard would swallow this. A first failure is a real disconnect to report.
       media.connected = true;
-      mediaServerDisconnected();
+      mediaTransport.serverDisconnected();
     });
 
     /*
@@ -5315,7 +4241,7 @@
       // ours to avoid.
       stopTawk();
       endSpeechRecognition();
-      mediaSignalling = null;
+      mediaTransport.signalling = null;
       /*
         Close whichever session is LIVE, which after a role change is not the captured `session`.
 
@@ -5328,8 +4254,8 @@
         happened it IS `session`, and if one did, `restartMediaSession` already closed the original
         before replacing it.
       */
-      const live = mediaSession;
-      mediaSession = null;
+      const live = mediaTransport.session;
+      mediaTransport.attachSession(null);
       live?.close();
       signalling.close();
       stopRefresh();
@@ -5342,13 +4268,13 @@
       toasts.destroy();
       unloadSoundEffects();
       media.stopTalking(data.user.id);
-      stopStream(microphoneStream);
-      stopStream(webcamStream);
+      mediaTransport.stopStream(mediaTransport.microphoneStream);
+      mediaTransport.stopStream(mediaTransport.webcamStream);
       // Every shared screen, not just the newest: leaving the others running holds the camera or
       // the screen-capture indicator on after the room is gone.
-      for (const stream of localScreenStreams.values()) stopStream(stream);
-      localScreenStreams.clear();
-      stopStream(screenStream);
+      for (const stream of mediaTransport.localScreenStreams.values()) mediaTransport.stopStream(stream);
+      mediaTransport.localScreenStreams.clear();
+      mediaTransport.stopStream(mediaTransport.screenStream);
       if (media.recordedUrl) URL.revokeObjectURL(media.recordedUrl);
     };
   });
@@ -5458,37 +4384,8 @@
     node.setAttribute('autoplay', 'autoplay');
   }
 
-  /**
-   * `webcamingUsers`, as far as this room can populate it.
-   *
-   * The capture pushes an entry when a camera comes on ("<name> webcam on") and emits
-   * `newWebcamPresenter`, which creates the card; `removePresenterWebcam` destroys it. So the
-   * list IS the card set, and an empty list means no cards at all - which is why nothing should
-   * be on screen before anyone opens a camera.
-   *
-   * Only this peer is in it. Remote cameras arrive over the SFU through
-   * `connectToScreenOfProducer` / the `newWebcamStream` event, which is not wired yet, so a
-   * remote presenter's card is honestly absent rather than rendered empty.
-   */
-  const webcamPresenters = $state<WebcamPresenter[]>([]);
 
-  /**
-   * `addPresenterdWebcam(e)` - note the guard, which is the capture's own:
-   *
-   * ```js
-   * if (this.webcamsIdxs.includes(e._id)) return void P("...already have entry for this muser.. NOP");
-   * ```
-   */
-  function addWebcamPresenter(presenter: WebcamPresenter) {
-    if (webcamPresenters.some((entry) => entry.id === presenter.id)) return;
-    webcamPresenters.push(presenter);
-  }
 
-  /** `removePresenterWebcam(e)` - `container.remove(idx)`, i.e. the card is destroyed. */
-  function removeWebcamPresenter(id: string) {
-    const at = webcamPresenters.findIndex((entry) => entry.id === id);
-    if (at > -1) webcamPresenters.splice(at, 1);
-  }
 
   /**
    * `closeMe()` (`docs/source/components/app-presenter-cams.compiled.js`):
@@ -5514,7 +4411,7 @@
     // keeps running and only the preview goes away. Verified against every `stopCam()` call site
     // in the bundle: `toggleCam()`, the soft reset, and the remote `"mutecam"` command. None of
     // them is this.
-    removeWebcamPresenter(presenter.id);
+    mediaTransport.removeWebcamPresenter(presenter.id);
     if (!presenter.isMe) {
       // The remote branch also needs `hupScreenOfProducer(muser)`, which is not wired yet.
       return;
@@ -5535,7 +4432,7 @@
       node.setAttribute('autoplay', 'autoplay');
       node.playsInline = true;
 
-      const stream = webcamStreams.get(producerId) ?? null;
+      const stream = mediaTransport.webcamStreams.get(producerId) ?? null;
       if (node.srcObject !== stream) node.srcObject = stream;
 
       if (stream) {
@@ -5652,7 +4549,7 @@
     node.muted = true;
     node.playsInline = true;
 
-    const stream = media.camMuted ? null : webcamStream;
+    const stream = media.camMuted ? null : mediaTransport.webcamStream;
     if (node.srcObject !== stream) node.srcObject = stream;
 
     if (stream) {
@@ -5849,7 +4746,7 @@
       Escape handling below because that returns early on every other key, which is exactly how a
       host binding added here would go unnoticed.
     */
-    if (pushToTalkShouldUnmute(event, { pushToTalk: prefs.pushToTalk, micMuted: media.micMuted })) void toggleMicrophone();
+    if (pushToTalkShouldUnmute(event, { pushToTalk: prefs.pushToTalk, micMuted: media.micMuted })) void mediaTransport.toggleMicrophone();
     if (shouldBlockCopyKey(event, { disableCopy, isPresenter })) event.preventDefault();
 
     if (event.key !== 'Escape') return;
@@ -5875,7 +4772,7 @@
       that listener upstream: `disableCopy` has no keyup arm, because suppressing a keystroke has
       to happen on the way down.
     */
-    if (pushToTalkShouldMute(event, { pushToTalk: prefs.pushToTalk, micMuted: media.micMuted })) void toggleMicrophone();
+    if (pushToTalkShouldMute(event, { pushToTalk: prefs.pushToTalk, micMuted: media.micMuted })) void mediaTransport.toggleMicrophone();
   }}
   oncontextmenu={(event) => {
     /*
@@ -5999,10 +4896,10 @@
           onpromptforsoundcloud={promptForSoundCloud}
           onstopsoundcloud={stopSoundCloud}
           onstopsoundcloudforme={stopSoundCloudForMe}
-          ontogglemicrophone={() => void toggleMicrophone()}
-          ontogglewebcam={() => void toggleWebcam()}
-          onpromptforscreenname={(source) => void promptForScreenName(source)}
-          onstopscreensharing={() => void stopScreenSharing()}
+          ontogglemicrophone={() => void mediaTransport.toggleMicrophone()}
+          ontogglewebcam={() => void mediaTransport.toggleWebcam()}
+          onpromptforscreenname={(source) => void mediaTransport.promptForScreenName(source)}
+          onstopscreensharing={() => void mediaTransport.stopScreenSharing()}
           onopensessioncontrol={openSessionControl}
           onsetmastervolume={(level) => roomVolume.setMasterVolume(level)}
           onsetbackgroundvolume={(level) => roomVolume.setBackgroundVolume(level)}
@@ -6205,24 +5102,24 @@
               {archivesAvailable}
               {openTranscriptPage}
               {previewWindowsVisible}
-              {webcamPresenters}
+              webcamPresenters={mediaTransport.webcamPresenters}
               {webcamCard}
               {attachLocalWebcam}
               {attachRemoteWebcam}
               {closeWebcamPreview}
               videoDisabled={prefs.videoDisabled}
-              {sharedScreens}
+              sharedScreens={mediaTransport.screens}
               selectedScreenTab={screens.selectedTab}
               forcedScreenId={screens.forcedId}
               lockedScreenId={screens.lockedId}
               detachedScreenId={screens.detachedScreenId}
-              {screenStreams}
+              screenStreams={mediaTransport.screenStreams}
               screenPans={screens.pans}
               zoomLevel={screens.zoomLevel}
               showZoomCtrl={screens.showZoomCtrl}
               bind:isFullScreenshare={screens.isFullScreenshare}
               volume={roomVolume.volume}
-              {saveData}
+              saveData={mediaTransport.saveData}
               {screenVolume}
               selectScreenTabByUser={(id) => screens.selectTab(id)}
               detachScreen={(id) => screens.detach(id)}
@@ -6379,7 +5276,7 @@
       attached to an element, and the room has no visible control for a peer's voice - the capture
       keeps its own audio elements out of sight the same way (`#mp3player` is `display: none`).
     -->
-    {#each [...remoteAudioStreams.keys()] as producerId (producerId)}
+    {#each [...mediaTransport.remoteAudioStreams.keys()] as producerId (producerId)}
       <!--
         `msRemAudio-{userID}` is the capture's own id and it is load-bearing, not decorative:
         `adjustVol` does `$("[id^=msRemAudio-]").prop("roomVolume.volume", …)` (bundle byte 2517022),
@@ -6389,8 +5286,8 @@
         roomVolume.volume slider moved nothing.
       -->
       <audio
-        id="msRemAudio-{audioProducerOwners.get(producerId)?.userID ?? producerId}"
-        {@attach attachRemoteAudio(producerId)}
+        id="msRemAudio-{mediaTransport.audioProducerOwners.get(producerId)?.userID ?? producerId}"
+        {@attach mediaTransport.attachRemoteAudio(producerId)}
         autoplay
         style="display: none;"
       ></audio>
@@ -6450,8 +5347,8 @@
       onAlertTab={(tab) => (alertTab = tab)}
       onTheme={setTheme}
       onPreferenceChange={(key, value) => prefs.save(key, value)}
-      {saveData}
-      onSaveDataChange={setSaveData}
+      saveData={mediaTransport.saveData}
+      onSaveDataChange={(enabled) => mediaTransport.setSaveData(enabled)}
       onDoNotDisturbChange={(enabled) => (prefs.doNotDisturbOn = enabled)}
       onPlayYoutube={(url) => void broadcasts.playYoutubeForAll(url)}
       onPostAlert={(submission) => composer.postAlert(submission)}

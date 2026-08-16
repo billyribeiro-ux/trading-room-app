@@ -191,7 +191,7 @@ describe('the client', () => {
     */
     expect(pageCode).toContain("if (command?.cmd === 'focusOnScreen') {");
     expect(pageCode).toContain(
-      "if (typeof command.screenId === 'string') selectScreenTabOfId(command.screenId);"
+      "if (typeof command.screenId === 'string') mediaTransport.selectScreenTabOfId(command.screenId);"
     );
   });
 

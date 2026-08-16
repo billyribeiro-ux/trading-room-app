@@ -24,6 +24,74 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-16
 
+### 2026-08-16 15:12 EDT — Phase 5 slice 4: `RoomMediaTransport`, the largest slice of the phase
+
+**`+page.svelte` 6,738 → 5,635 (−1,103).** Suite 2,255 → 2,266 across 153 files.
+`svelte-check` 1,173 files, 0 errors, 0 warnings. `eslint` at the pre-existing 27.
+**Runtime impact: yes** — every media path on the page moved. Nothing changed behaviourally; the
+seven contract files that pin this behaviour against the reference bundle all still pass, and each
+was re-pointed at the file that now owns its subject rather than left matching whatever remained.
+
+**`src/lib/room/media-transport.svelte.ts` (1,416 — 615 code, 699 citation).** The SFU transport:
+the session, the producers this browser publishes, the consumers it subscribes to, and every stream
+on either side. Fifty-one regions moved byte-exact.
+
+`RoomMedia` holds what the UI ASKS FOR; this holds what the wire did about it. That boundary is
+`media.svelte.ts`’s own recorded decision — “STATE moved, TRANSPORT did not” — and this is the
+other half of that sentence rather than a revision of it.
+
+**It is ONE module, and that was measured rather than assumed.** The 800-line backstop refused it,
+correctly, so the seam was looked for before the number was touched. There isn’t one:
+
+- **capture / transport** cuts through `#mediaSession`. Every one of `#enableMicrophone`,
+  `toggleMicrophone`, `toggleWebcam`, `startScreenSharing`, `promptForScreenName`,
+  `stopLocalScreen` and `#addLocalScreen` reads it, because acquiring a track and producing it
+  into the session is one act. The members touching no session state are `#stopStream`,
+  `#setStreamEnabled`, `#reportCaptureError` and `selectedVideoDeviceId` — 67 lines.
+- **local / remote** cuts through `#sharedScreens` and `#screenStreams`, which both paths write.
+  `dropRemoteMedia`’s own citation records what happened the last time two collections holding one
+  truth drifted apart: the room reconnected to silence and a blank tab bar.
+
+**So the BACKSTOP was corrected instead, and it got stricter.** It counted total lines, which in a
+repository that is 49% citation by design pays an author to delete the evidence — strip 620 lines
+from this module and it passed, having become strictly worse. It now counts CODE lines against the
+same 800, so deleting a comment changes the number by nothing at all. Measured, and the reason it
+matters: `split` 724 total / 300 code, `files` 382 / 165, this module 1,416 / 615. A control
+test asserts the counter can tell the two apart, because a scanner silently returning zero would
+make every backstop assertion vacuous.
+
+**Four dead collaborators removed, each found by a gate rather than by reading.** `closeMenu`,
+`onSaveDataChanged` and `onCaptureError` came from the dependency scan and had no reader —
+svelte-check found them by refusing the page’s attempt to supply them. `isPresenter` was the
+fourth, found by `no-unused-private-class-members`. Every authority decision in the transport is
+made from `session().user.role` or refused by the server; none of them needed a client-side flag.
+
+**`dropRemoteMedia` became a receiver, not five setters.** The five collections carry one truth
+between them and have to clear together; five public setters would let a caller clear four of them,
+which is precisely the 2026-08-11 defect the method’s citation records.
+
+**`src/lib/room/media-transport.svelte.test.ts` (226).** Seven assertions, one per independently
+reactive group — webcam cards, screen tabs, screen streams, remote audio sinks, the save-data flag —
+plus the receiver invariant. `room-mtx`’s shape: mutate and flush inside `$effect.root`, assert
+outside it. **Four negative controls seen red**, each hitting only its own assertion:
+`#webcamPresenters` demoted to a plain array, `#screenStreams` to a plain `Map`,
+`#sharedScreens` and `#saveData` off their runes. The other five stayed green each time, which
+is the independence the shape exists for.
+
+**One unbound method caught by the contract, not by review.** `onSaveDataChange={setSaveData}` was
+correct as a page function and loses `this` as a method; it is now called rather than passed.
+
+**Two bugs in my own tooling, both mine, both fixed at the source.** The rename guard
+`(?<![\w.#$])` rejected the SPREAD operator — `...screenStream` puts a dot before the name too —
+so three real sites were skipped and only found when svelte-check refused them. And the code-span
+scanner cannot reach a Svelte interpolation inside a QUOTED attribute value, which it reads as a
+string literal; the one site that needed it (`id="msRemAudio-{…}"`) is a whole-line rule with an
+asserted count, the same mechanism `await invalidate(room:data)` needed for the same reason.
+
+Not verified: no browser run. The seven contract files pin this against the reference bundle and the
+new test executes the reactivity, but nothing here proves a real room reconnects — that remains the
+owner’s report.
+
 ### 2026-08-16 12:35 EDT — Phase 5 slice 11: `RoomScreens`, and nine unbound methods in one run
 
 **`+page.svelte` 6,895 → 6,738.** Suite 2,233 → 2,255 across 152 files.

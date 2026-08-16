@@ -34,10 +34,37 @@ const paneCode = stripComments(
 );
 const code = stripComments(page);
 
-/** The body of a top-level `function name(` … `\n  }` in the page's script. */
+/*
+  The camera BEHAVIOUR moved to `RoomMediaTransport` in Phase 5 slice 4, and the assertions that
+  read it follow it here. Acquiring a camera track and producing it into the SFU is one act — every
+  webcam path reads `#mediaSession` — so the transport is where these bodies now live.
+
+  The page keeps what wires them: the navbar handler, the `<video>` attachment, the preview.
+*/
+const transportCode = stripComments(
+  readFileSync(new URL('./room/media-transport.svelte.ts', import.meta.url), 'utf8')
+);
+
+/**
+ * The body of a `name(` … `\n  }` member of `RoomMediaTransport`.
+ *
+ * A method rather than a `function` since slice 4, matched on the class INDENT — two spaces, with
+ * an optional `async` — so a CALL to the same name from inside another member can never be
+ * mistaken for its declaration. That distinction is why this does not simply search for the name:
+ * `toggleWebcam` is called from the presenter-command handler as well as declared, and a helper
+ * that found the call would slice a body that is not the one being asserted about.
+ */
 function bodyOf(name: string) {
+  const at = transportCode.search(new RegExp(`\\n {2}(?:async )?${name}\\(`));
+  expect(at, `${name} should exist in the transport`).toBeGreaterThan(-1);
+  const end = transportCode.indexOf('\n  }', at);
+  return transportCode.slice(at, end);
+}
+
+/** The body of a top-level `function name(` … `\n  }` still on the page. */
+function pageBodyOf(name: string) {
   const at = code.indexOf(`function ${name}(`);
-  expect(at, `${name} should exist`).toBeGreaterThan(-1);
+  expect(at, `${name} should exist on the page`).toBeGreaterThan(-1);
   const end = code.indexOf('\n  }', at);
   return code.slice(at, end);
 }
@@ -69,20 +96,20 @@ describe('webcam: the capture separates preview from device', () => {
 describe('webcam: this room reproduces that split', () => {
   it('the toolbar stops the tracks and drops the stream', () => {
     const toggle = bodyOf('toggleWebcam');
-    expect(toggle).toContain('stopStream(webcamStream)');
-    expect(toggle).toContain('webcamStream = null');
+    expect(toggle).toContain('this.#stopStream(this.#webcamStream)');
+    expect(toggle).toContain('this.#webcamStream = null');
     // A fresh acquire on the way back in - a stopped track cannot be revived, so the old
     // `webcamStream ??= …` cache would have handed back a dead stream.
     expect(toggle).toContain('await navigator.mediaDevices.getUserMedia');
-    expect(toggle, 'the cached-stream bug must not come back').not.toContain('webcamStream ??=');
+    expect(toggle, 'the cached-stream bug must not come back').not.toContain('#webcamStream ??=');
     // `track.enabled` is not how the capture ends a camera.
     expect(toggle, 'enabled-toggling never releases the device').not.toContain(
-      'setStreamEnabled(webcamStream'
+      'setStreamEnabled(this.#webcamStream'
     );
   });
 
   it('the X removes the card and leaves the camera alone', () => {
-    const close = bodyOf('closeWebcamPreview');
+    const close = pageBodyOf('closeWebcamPreview');
     expect(close).toContain('removeWebcamPresenter');
     expect(close, 'the X must not stop the device').not.toContain('stopStream');
     expect(close, 'the X must not disable the track').not.toContain('setStreamEnabled');

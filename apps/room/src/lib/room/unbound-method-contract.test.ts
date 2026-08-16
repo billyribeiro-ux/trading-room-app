@@ -10,6 +10,7 @@ import { RoomTradeAlerts } from './trade-alerts.svelte';
 import { RoomComposer } from './composer.svelte';
 import { RoomFeeds } from './feeds.svelte';
 import { RoomMessageActions } from './message-actions.svelte';
+import { RoomMediaTransport } from './media-transport.svelte';
 import { RoomScreens } from './screens.svelte';
 import { RoomUserActions } from './user-actions.svelte';
 import { RoomChat } from './chat.svelte';
@@ -74,6 +75,7 @@ const INSTANCES: Record<string, new (...args: never[]) => object> = {
   feeds: RoomFeeds,
   messageActions: RoomMessageActions,
   screens: RoomScreens,
+  mediaTransport: RoomMediaTransport,
   userActions: RoomUserActions,
   /*
     The Phase 1 classes, added when the completeness check below refused a map that covered only the
