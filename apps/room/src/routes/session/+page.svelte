@@ -27,7 +27,7 @@
    * in its bundle.
    */
   import { enhance } from '$app/forms';
-  import { goto } from '$app/navigation';
+  import { goto, replaceState } from '$app/navigation';
   import { page } from '$app/state';
   import type { ActionData, PageData } from './$types';
 
@@ -47,25 +47,31 @@
   let agreed = $state(false);
   let submitting = $state(false);
   /*
-    Unchecked here, and the reason is a branch — NOT "nothing else writes it", which is what an
-    earlier version of this comment claimed and the bundle disproves. `ngOnInit` reads:
+    CHECKED by default, and this took three readings to get right — the first two were wrong in
+    opposite directions, so the evidence is written out rather than summarised.
+
+    The constructor, read verbatim at byte 1,188,545:
 
     ```js
-    if("jwt"!=this.authMode&&!this.appService.globals.passedToken||this.pw)
-      this.appService.globals.preferences&&(this.rememberMe=!0, …savedNick… …savedEmail… …phoneNumber…);
-    else if(("jwt"==this.authMode||this.appService.globals.passedToken)&&!this.pw){ … }
+    constructor(e,i){this.appService=e,this.formBuilder=i,this.loginReady=!1,this.browserOK=!0,
+      this.browserOKDismissed=!1,this.disableLoginForm=!1,this.rememberMe=!0,this.forgetMe=!1,
+      this.nick="",this.email="",this.emailHash="",this.pw="",this.token="",this.phoneNumber="",
+      this.showPresenter=!1,this.hasRequiredPhoneInLogin=!1,this.authMode="reg",…}
     ```
 
-    `rememberMe=!0` lives in the FIRST arm — no token, no jwt, restoring from saved preferences.
-    Every arrival on this page carries a token, so we are always in the SECOND arm, which never
-    assigns it. Unchecked is therefore correct for this path, and would be wrong for a
-    preference-restore path if one is ever added here.
+    `this.rememberMe=!0` — before any branch runs. `ngOnInit`'s later `this.rememberMe=!0` in the
+    preference-restore arm is reinforcement, not the origin, and nothing anywhere sets it false. So
+    the box is ticked when the page opens and a member has to opt OUT of a thirty-day session.
+
+    That is a deliberate product decision in the reference and it is worth stating plainly, because
+    the safe-looking default is the opposite one: shipping `false` here would silently give every
+    member a one-day session while showing them an unticked box they never asked for.
 
     It is posted because it has a real consumer: `createSessionFor(cookies, id, remember)` gives the
     session cookie THIRTY_DAYS instead of ONE_DAY. Before this it was passed `false` unconditionally,
     so the server half existed and the switch that drives it did not.
   */
-  let rememberMe = $state(false);
+  let rememberMe = $state(true);
   /*
     `gue`'s only effect is `showPresenter = !0`, and slot 32 renders that link only while
     `showPresenter` is false — so the link reveals the password field and then removes itself.
@@ -86,13 +92,46 @@
   // eslint-disable-next-line no-useless-escape
   const PHONE = /^[+]*[(]{0,1}[0-9]{1,3}[)]{0,1}[-\s\./0-9]*$/;
 
-  /**
-   * `doLoginCheck()`'s conditions, in its order, returning the message it would have alerted.
-   *
-   * The password branch is `e.pw || 'pw' != e.authMode || passedToken`. Every arrival here carries
-   * a token, so that term is satisfied and a password is never demanded — which is why the field is
-   * offered when the room shows one but not required by this pass.
-   */
+  /*
+    Take the credential out of the address bar, exactly as the reference does.
+
+    `ngOnInit`, byte ~1,192,100:
+
+    ```js
+    let i=!0; i=window.top===window.self,
+    i&&(P("removing tok from url"),this.appService.removeUrlParam("tok"))
+    ```
+
+    This is not cosmetic. A JWT left in the URL is written to browser history, offered in the
+    `Referer` header of every outbound request from this page, and copied verbatim whenever somebody
+    pastes "the link they were sent". The token has already been verified server-side and its value
+    is on `data.token`, so the address bar is the one place it has no further use.
+
+    `window.top === window.self` is the reference's own guard and is kept: inside an iframe the
+    embedder owns the history stack, and rewriting it there is both rude and unreliable.
+
+    `replaceState` rather than `goto` — same entry, no navigation, no `load` re-run. A `goto` would
+    re-run the load without the token and blank the very prefill this page was opened to show.
+
+    ON THE FEEDBACK LOOP, because this is the obvious objection and the autofixer raises it: the
+    effect READS `page.url` and `replaceState` WRITES it, so it re-runs itself exactly once. The
+    `has('jwtSite')` guard is what terminates it — the second pass finds no token and returns before
+    touching history. The guard is load-bearing, not defensive; delete it and this spins.
+
+    An effect rather than a `$derived` because there is nothing to derive: the value being produced
+    is a history entry, which is precisely the "synchronise with something outside Svelte" case the
+    docs keep effects for.
+  */
+  $effect(() => {
+    if (window.top !== window.self) return;
+
+    const stripped = new URL(page.url.href);
+    if (!stripped.searchParams.has('jwtSite')) return;
+
+    stripped.searchParams.delete('jwtSite');
+    replaceState(`${stripped.pathname}${stripped.search}`, page.state);
+  });
+
   /**
    * `doLoginFormClear()`, read verbatim at byte 1,199,998:
    *
@@ -130,6 +169,13 @@
     await goto(`${next.pathname}${next.search}`, { invalidateAll: true });
   }
 
+  /**
+   * `doLoginCheck()`'s conditions, in its order, returning the message it would have alerted.
+   *
+   * The password branch is `e.pw || 'pw' != e.authMode || passedToken`. Every arrival here carries
+   * a token, so that term is satisfied and a password is never demanded — which is why the field is
+   * offered when the room shows one but not required by this pass.
+   */
   function clientRefusal(): string {
     if (!data.email || !name.trim()) return 'Please fill in your name and email...';
     if (data.hasRequiredPhoneInLogin && !(phone.trim() && PHONE.test(phone.trim()))) {
@@ -147,16 +193,66 @@
 <div class="login-wrapper">
   <div class="container-fluid">
     <div class="row login-row">
-      <!-- const 33: the room's own side, hidden under 767px by the component's media query. -->
-      <div class="col-md-6 col-sm-6 d-xs-none animated fadeInLeft faster room-message">
-        {#if data.roomTitle}
-          <!-- const 34 `room-title` — an h1 in the component's CSS (`h1.room-title`). -->
-          <h1 class="room-title">{data.roomTitle}</h1>
-        {/if}
-      </div>
+      {#if data.roomDescription}
+        <!-- const 33: the room's own side, hidden under 767px by the component's media query. -->
+        <div class="col-md-6 col-sm-6 d-xs-none animated fadeInLeft faster room-message">
+          {#if data.roomTitle}
+            <!--
+              const 34 `room-title` — an h1 in the component's CSS (`h1.room-title`).
 
-      <!-- const 36. -->
-      <div class="col-md-6 col-sm-12 col-xs-12 login-form-container animated fadeInRight faster">
+              The TEXT is not the room name on its own. `vde`, byte 1,182,4xx:
+              `Ne(" Welcome to the ",e.appService.globals.sessData.name," ")` — the template
+              prepends "Welcome to the ". `eue`, the centred arm's h1, is byte-for-byte the same
+              interpolation, so both layouts read alike and the capture's
+              "Welcome to the Room 3625" is that string with `sessData.name` = "Room 3625".
+
+              We were rendering the bare name.
+            -->
+            <h1 class="room-title">Welcome to the {data.roomTitle}</h1>
+          {/if}
+          <!--
+            const `[1,"room-description",2,"height","100%","overflow-x","hidden",3,"innerHtml"]` —
+            the two inline styles and the `innerHtml` binding are all the reference's.
+
+            `{@html}` is safe here ONLY because `sanitizeRoomDescription` ran on the SERVER in the
+            load. Rendering `data.roomDescription` raw would put owner-authored markup on a route
+            that needs no session.
+          -->
+          <div class="room-description" style="height: 100%; overflow-x: hidden;">
+            {@html data.roomDescription}
+          </div>
+        </div>
+      {/if}
+
+      <!--
+        const 36 when there IS a description, and the offset variant when there is not.
+
+        `yue`'s update block is `O(3, e.appService.globals.sessData.description ? 3 : 4)` — slot 3 is
+        `Wde`, the two-column layout above; slot 4 is `vue`, one column centred by
+        `offset-md-3 offset-sm-3`. A room with nothing to say on the left does not leave half the
+        page empty, it centres the form. The `col-sm-6`/`col-sm-12` difference is the reference's
+        too: the split view gives the form the full width at `sm`, the centred one keeps it halved.
+      -->
+      <div
+        class={[
+          data.roomDescription
+            ? 'col-md-6 col-sm-12 col-xs-12'
+            : 'col-md-6 offset-md-3 col-sm-6 offset-sm-3 col-xs-12',
+          'login-form-container animated fadeInRight faster'
+        ]}
+      >
+        {#if !data.roomDescription && data.roomTitle}
+          <!--
+            `bue` opens with `H(0,eue,2,1,"h1",34)` — const 34 is `room-title`, the SAME h1 as the
+            left column's, rendered here instead. It is not duplicated: the two are the two arms of
+            `sessData.description ? 3 : 4`, so exactly one of them exists at a time.
+
+            `eue` and `vde` carry the identical interpolation, checked rather than assumed:
+            `Ne(" Welcome to the ",e.appService.globals.sessData.name," ")`.
+          -->
+          <h1 class="room-title">Welcome to the {data.roomTitle}</h1>
+        {/if}
+
         <!--
           const 63 `text-center authenticate-info`, and `bue` renders it unconditionally between the
           h1 and the form: `d(1,"p",63),v(2,"Please complete this form:")`. The component's own CSS

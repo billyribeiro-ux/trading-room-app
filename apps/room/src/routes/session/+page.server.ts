@@ -1,3 +1,4 @@
+import sanitizeHtml from 'sanitize-html';
 import { error, fail, redirect } from '@sveltejs/kit';
 import { ROOM_JWT_SECRET } from '$app/env/private';
 import { eq } from 'drizzle-orm';
@@ -45,6 +46,60 @@ import type { Actions, PageServerLoad } from './$types';
  */
 
 /** What the reference prefills before it renders the form. */
+/**
+ * `sessData.description` as HTML that is safe on an UNAUTHENTICATED page.
+ *
+ * The reference hands this string straight to Angular's `innerHtml` binding. We do not, and the
+ * reason is the room this page opens onto: `/session` is reachable without a session, so anything
+ * that lands in this field executes for every visitor before they have identified themselves. The
+ * write path is the owner's settings, which means one compromised or careless owner, not an
+ * attacker, is enough.
+ *
+ * The tag list is derived from what the reference's own stylesheet expects to find in here rather
+ * than from a general-purpose default: `.login-wrapper .room-description img { width:100%; height:auto }`
+ * proves images render, and the const sets `height:100%; overflow-x:hidden` on the container, which
+ * is a block of flowing rich text. Links get `rel="noopener noreferrer nofollow"` and are forced to
+ * `target="_blank"` because this text is not ours and must not be able to navigate the login page.
+ *
+ * Deny-by-default: `sanitize-html` drops every tag and every attribute not named here, so widening
+ * this is a deliberate edit with a reason, never an accident.
+ */
+export function sanitizeRoomDescription(html: string): string {
+  return sanitizeHtml(html, {
+    allowedTags: [
+      'p', 'br', 'hr', 'div', 'span',
+      'b', 'strong', 'i', 'em', 'u', 's', 'sub', 'sup',
+      'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+      'ul', 'ol', 'li', 'blockquote', 'pre', 'code',
+      'a', 'img',
+      'table', 'thead', 'tbody', 'tr', 'th', 'td'
+    ],
+    allowedAttributes: {
+      a: ['href', 'title'],
+      img: ['src', 'alt', 'title', 'width', 'height'],
+      '*': ['style']
+    },
+    // No `data:` — an SVG data URL is a script delivery mechanism dressed as an image.
+    allowedSchemes: ['http', 'https', 'mailto'],
+    allowedSchemesAppliedToAttributes: ['href', 'src'],
+    allowedStyles: {
+      '*': {
+        color: [/^#[0-9a-f]{3,8}$/i, /^rgba?\(/i],
+        'background-color': [/^#[0-9a-f]{3,8}$/i, /^rgba?\(/i],
+        'text-align': [/^left$|^right$|^center$|^justify$/],
+        'font-size': [/^\d+(?:\.\d+)?(?:px|em|rem|%)$/],
+        'font-weight': [/^\d{3}$|^bold$|^normal$/]
+      }
+    },
+    transformTags: {
+      a: sanitizeHtml.simpleTransform('a', {
+        rel: 'noopener noreferrer nofollow',
+        target: '_blank'
+      })
+    }
+  });
+}
+
 type Prefill = {
   token: string;
   shortCode: string;
@@ -65,6 +120,13 @@ type Prefill = {
   /** `?dlf=1` — `globals.disableLoginForm`, bundle byte 2595200ff. */
   disableLoginForm: boolean;
   roomTitle: string;
+  /**
+   * `sessData.description` — the layout selector, NOT decoration.
+   *
+   * Carried as sanitised HTML because the reference binds it with `innerHtml`. Every other
+   * `sessData.*` field on this page reads from `settings`, and so does this one.
+   */
+  roomDescription: string;
   avatarUrl: string;
 };
 
@@ -189,6 +251,13 @@ export const load: PageServerLoad = async ({ url, request }) => {
     customEnterDisclosure: String(settings.customEnterDisclosure ?? ''),
     disableLoginForm: url.searchParams.get('dlf') === '1',
     roomTitle: roomConfig?.room.name ?? '',
+    /*
+      Sanitised HERE, on the server, rather than at the template. This string is owner-authored and
+      renders on a page reachable WITHOUT authentication, so an owner — or anyone who reaches the
+      settings write path — could otherwise put script on an unauthenticated route. The reference
+      hands it straight to `innerHtml`; we do not, and that is deliberate.
+    */
+    roomDescription: sanitizeRoomDescription(String(settings.description ?? '')),
     // The same derivation the roster uses, so the face here is the face in the room.
     avatarUrl: claims ? `https://www.gravatar.com/avatar/${hashEmail(claims.email)}?d=mm` : ''
   };

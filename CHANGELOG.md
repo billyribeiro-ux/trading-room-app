@@ -24,6 +24,134 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-16
 
+### 2026-08-16 14:21 EDT — coverage map added to `todo-next.md`: it is a build spec for 2 surfaces of 42, not for the app
+
+**No runtime impact.** `todo-next.md` only, +65 lines (7,768 -> 7,833).
+
+The owner asked whether `todo-next.md` has everything the app is missing, in detail. **It does not,
+and the file now says so at the top instead of implying otherwise.**
+
+- **42 Svelte surfaces in `apps/room/src`, ~30,000 lines. Two are audited** — `routes/session/+page.svelte`
+  (659) and the `<app-alert-qa-modal>` block of `ModalHost.svelte` (159 of 5,965). **~818 lines,
+  2.7%.**
+- For those two the documentation IS complete to the six-point bar: 18 divergences + 11 gaps + 6
+  defects on login, 10 items + 6 defects + 1 false comment on Q&A.
+- **The other forty have had no reference comparison at all.** They may be complete, may be missing
+  controls, or may carry invented values; nothing in the file says which, and the map states
+  explicitly that no claim about them should be read into it.
+
+The map also sizes the unread evidence that would feed the rest (`account-page` 930 KB, `mising`
+798 KB, `must-match` 535 KB, ~20 more `app-modals/` captures including a 92 KB
+`app-session-control-modal`, the 37 `.less` sources) and names the per-surface method that closing
+them requires.
+
+This is recorded as a number rather than left implied, because "todo-next.md has everything" was not
+true and would have been discovered mid-build.
+
+**Verification.** No source file changed. The timestamp was written as 14:31 and corrected to the
+measured 14:21 before this entry — the second time today, and the reason is writing the stamp before
+measuring it rather than after.
+
+
+### 2026-08-16 12:20 EDT — Phase 5 slice 8: `RoomMessageActions`, and a negative control that found a missing test
+
+**`+page.svelte` 7,162 → 6,895.** Script 6,210 → 5,942, template 952 → 953.
+Suite 2,212 → 2,233 across 151 files. `svelte-check` 1,169 files, 0 errors, 0 warnings.
+`eslint` at the pre-existing 27.
+
+**`src/lib/room/message-actions.svelte.ts` (474).** Ten declarations and functions, 313 lines, of
+which `handleMessageAction` was 180.
+
+**It went LAST of the domain slices deliberately, and the deferral paid.** When this phase began
+the dispatcher reached into rich-text composer state, the private-chat panel, the evidence
+overlay, the modal shell and the mention router — all page-level then, all their own class now.
+Extracting it first would have meant a dozen injected callbacks rewritten three times as slices 7,
+9 and 10 landed. The constructor is a list of collaborators rather than a list of workarounds.
+
+**A NEGATIVE CONTROL FOUND A MISSING TEST, which is the point of running them.** Control E removed
+`composer.canUseRTE` from the edit gate and the suite stayed GREEN. The tests covered "rich
+message opens the rich editor" and "plain message opens the prompt", and never the case the
+narrowing exists for: a viewer who CANNOT use RTE, holding a message that has stored html.
+Upstream omits the presenter term there, so such a member gets the editor, types, presses Save —
+and `retriveRTEContent()` refuses, because THAT check does require presenter. Their edit is lost
+and they are told the message is empty. The test is written now and the control goes red.
+
+**Two more unbound methods, both caught by the gate rather than by review** — the sixteenth and
+seventeenth of this phase. `onmessageaction={messageActions.handle}` and
+`onMentionUser={messageActions.mention}` were bare references, correct for a function and a throw
+for a method.
+
+**A TYPE-level cycle that needed one annotation.** `composer` takes `editMessage` from
+`messageActions`, and `messageActions` takes `composer`. Both hand-offs are arrows, so at runtime
+the order is fine — but TypeScript could infer neither type without the other and reported both as
+implicitly `any`. One explicit `const composer: RoomComposer` breaks it; without it the whole file
+would have lost its checking silently.
+
+**A new guard in the page rewriter: an identifier followed immediately by a colon is a KEY.**
+Renaming one produced `messageActions.editMessage: (kind, item) => …` inside a constructor options
+object — 840 parse errors from one greedy match. A ternary is unaffected, because its colon has a
+space before it. The reference counter learned the same rule, which is why two expected counts
+came down by one rather than the rename being forced through.
+
+**Six negative controls, all red after the gap was closed**: the rune off the selection; a deleted
+row hidden and never put back; markAnswered not unticked on refusal; a private chat with yourself
+allowed; the rich editor opened without the full gate; `targetUserId` carried on every operation.
+
+**Three harness bugs of mine**, and the useful one is the third: a `{ shiftKey: true } as
+MouseEvent` cast is not an INSTANCE, so the branch under test quietly took the confirmation path
+instead. A cast that satisfies the compiler and fails `instanceof` is exactly the shape that makes
+a test pass for the wrong reason.
+
+### 2026-08-16 14:14 EDT — R-1 closed, Q-1 audited against our code, and a false comment found in `ModalHost.svelte`
+
+**No runtime impact.** `todo-next.md` only, +130 lines (7,638 -> 7,768). Documentation phase.
+
+**Scope narrowed on the owner's instruction: a gap counts only if the implementation needs it.** This
+entry is therefore driven from `apps/room/src`, not from the dump pile -- which is what turned an
+open-ended reading queue into a bounded list.
+
+**R-1 closed.** The whole `:root` block plus `.lightTheme` and `.darkTheme`, read end to end.
+`--modal-content-bg-color:#303030`, `--modal-content-color:#fff`, `--modal-input-group-bg:#444`,
+`--modal-upload-files-color:#555`. The other two are defects, not values:
+
+- **`--textarea-color` is not in `:root`** -- only inside the two theme classes -- so the Q&A
+  textarea has no colour of its own when no theme class is on an ancestor.
+- **`--textarea-holder-btns-hover-color` is defined in none of the three blocks**, so
+  `.textAreaBtns:hover{color:var(...)!important}` does nothing. Its non-hover twin IS defined, which
+  is what makes it a slip rather than a convention. Scope stated precisely: absent from the three
+  blocks where this sheet declares custom properties, each read in full -- not asserted absent from
+  all 444 KB.
+
+**Q-1 audited. Our implementation is substantially faithful** -- the role-dependent placeholder was
+already right, and three reference defects (`clas` for `class`, `alt="qaMsg.avt"`, the double space)
+are already reproduced deliberately. The unguarded `hasOwnProperty` crash is deliberately NOT
+reproduced, which is the correct call and is now recorded as a decision rather than left to look
+like an oversight. The back end is stronger than the reference's: one transaction, counts derived
+rather than incremented, a room-scoped lookup, its own rate-limit bucket and a length bound.
+
+**A false comment in our source, and it is load-bearing.** `ModalHost.svelte:1760` says *"The
+captured textarea had no handler at all, so pressing Enter did nothing."* The captured textarea has
+**two** handlers -- const 17 carries `3,"keyup","paste","placeholder"` and the template binds
+`(keyup)="onKey($event)"` and `(paste)="onImagePaste($event)"`. That comment is the stated
+justification for our keyboard behaviour, so the next engineer would believe the divergence is free
+when it is not. The line above it is wrong a second way: it says "Shift+Enter is ignored" while the
+code falls through and inserts a newline. **The behaviour should stay** -- the reference's
+`preventDefault()` on `keyup` cannot stop a character being typed, so ours is genuinely better --
+**but the justification must be replaced with the evidence.**
+
+**Ten implementation items** where ours needs the reference and does not have it, each with its
+locator: the image button misses the `sessData.userUploads` half of `canPostImages` (the comment
+beside it cites the right expression but the code implements only half of it); no paste-to-upload;
+no textarea auto-expand and therefore not the `calc(70vh - {h} + 37px)` body shrink; the alert body
+rendered as text rather than through `parseSymbols`/`parseLinks`; no trade-copy; no compact display
+mode; the alert id not written onto the host element as a class, which is what the upstream
+`hidden.bs.modal` unread-clear binds to; no image-upload flow; no scroll-to-bottom; and mention
+targeting the chat composer rather than the Q&A one.
+
+**Verification.** No source file changed, so no suite was run. The timestamp in `todo-next.md` Sec 19
+was written as 13:52 and corrected to the measured 14:14 before this entry.
+
+
 ### 2026-08-16 12:05 EDT — Phase 5 slice 9: `RoomFeeds`, and a rewriter that can tell code from prose
 
 **`+page.svelte` 7,349 → 7,162.** Script 6,397 → 6,210, template unchanged at 952.

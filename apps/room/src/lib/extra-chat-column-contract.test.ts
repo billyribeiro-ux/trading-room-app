@@ -62,6 +62,15 @@ const composerModule = readFileSync(new URL('room/composer.svelte.ts', import.me
   an assertion about what a pane renders cannot pass against a file that no longer builds it.
 */
 const feedsModule = readFileSync(new URL('room/feeds.svelte.ts', import.meta.url), 'utf8');
+/*
+  The message-action dispatcher left the page for `RoomMessageActions` in Phase 5 slice 8. Read as
+  its own source, so an assertion about what a click does cannot pass against a file that no longer
+  decides it.
+*/
+const messageActionsModule = readFileSync(
+  new URL('room/message-actions.svelte.ts', import.meta.url),
+  'utf8'
+);
 const pageCode = stripComments(PAGE);
 const prefsCode = stripComments(PREFS_SOURCE);
 const paneCode = stripComments(PANE);
@@ -229,7 +238,7 @@ describe('mentions reach the column you are in', () => {
 
   it('the extra column reports that its rows are ITS rows', () => {
     // `extraChatMsg` is true for every row that component renders.
-    expect(pageCode).toContain("handleMessageAction('chat', action, message, event, true)");
+    expect(pageCode).toContain("messageActions.handle('chat', action, message, event, true)");
   });
 
   it('and both composers report focus, or the flag would never move', () => {
@@ -244,7 +253,7 @@ describe('mentions reach the column you are in', () => {
   });
 
   it('the insert goes into the composer that was chosen', () => {
-    expect(pageCode).toContain('function mentionUser(name: string, toExtraColumn = false) {');
+    expect(messageActionsModule).toContain('mention(name: string, toExtraColumn = false) {');
     expect(chatClass).toContain(
       "this.#extraComposer += `${this.#extraComposer ? ' ' : ''}@${name} `;"
     );

@@ -11,7 +11,6 @@
     CHAT_PAGE_REQUEST_NUDGE,
     shouldLoadOlderMessages
   } from '$lib/chat-paging';
-  import { toggleReaction } from '$lib/reaction-toggle';
   import { RoomMenus } from '$lib/room/menus.svelte';
   import { RoomPolls } from '$lib/room/polls.svelte';
   import { chooseRecordingOptions } from '$lib/recording-codec';
@@ -104,6 +103,7 @@
   } from '$lib/room/private-chat.svelte';
   import { RoomComposer } from '$lib/room/composer.svelte';
   import { RoomFeeds } from '$lib/room/feeds.svelte';
+  import { RoomMessageActions } from '$lib/room/message-actions.svelte';
   import { RoomUserActions } from '$lib/room/user-actions.svelte';
   import {
     DAY_TRADE_ALERT_FEED,
@@ -167,11 +167,8 @@
   import type {
     AlertTab,
     ChatTab,
-    MessageAction,
     FollowChatStyle,
     MainTab,
-    MessageActionItem,
-    MessageReactionPayload,
     ModalName,
     NoteVersion,
     SettingsTab,
@@ -1063,7 +1060,6 @@
   */
   const menus = new RoomMenus();
   let newNoteOpen = $state(false);
-  let selectedMessage = $state<MessageActionItem | null>(null);
   let selectedImageUrl = $state<string | null>(null);
   /*
     The room's three bootbox dialogs, in `$lib/room/dialogs.svelte.ts`.
@@ -1246,7 +1242,15 @@
     opinion about where configuration comes from and its fallback can be exercised by passing empty
     strings.
   */
-  const composer = new RoomComposer({
+  /*
+    ANNOTATED, and the annotation is load-bearing rather than decoration.
+
+    `composer` takes `editMessage` from `messageActions`, and `messageActions` takes `composer`.
+    Both hand-offs are arrows, so at RUNTIME the order is fine - but TypeScript cannot infer
+    either type without the other and reports both as implicitly `any`. One explicit type breaks
+    the cycle; without it the whole file loses its checking silently.
+  */
+  const composer: RoomComposer = new RoomComposer({
     dialogs,
     chat,
     commands: {
@@ -1260,11 +1264,51 @@
     openModal: (name) => openModal(name),
     closeModal: () => (modal = null),
     closeMenu: (name, open) => menus.set(name, open),
-    editMessage: (kind, item, body, bodyHtml) => editMessage(kind, item, body, bodyHtml),
+    editMessage: (kind, item, body, bodyHtml) => messageActions.editMessage(kind, item, body, bodyHtml),
     onSent: () => invalidateAll(),
     uploadServer: PUBLIC_PTR_UPLOAD_SERVER ?? '',
     uploadKey: PUBLIC_PTR_CDN_UPLOAD_KEY ?? ''
   });
+  /*
+    What a click on a MESSAGE can do, in `$lib/room/message-actions.svelte.ts`.
+
+    Phase 5 slice 8, and it went LAST of the domain slices deliberately. This dispatcher reached
+    into rich-text composer state, the private-chat panel, the evidence overlay, the modal shell and
+    the mention router — all page-level when the phase began, all their own class now. Extracting it
+    first would have meant a dozen injected callbacks rewritten three times as those slices landed.
+
+    `openPrivateChat` is ONE receiver rather than two calls, because showing the panel and opening
+    the thread must happen together — a caller with both can show an empty panel. `focusComposer`
+    stays here because the element does: `composerElement` is a `bind:this`, and a class cannot
+    hold it without also owning when it mounts.
+  */
+  const messageActions = new RoomMessageActions({
+    dialogs,
+    toasts,
+    chat,
+    composer,
+    session: () => data,
+    sendOperation: (payload) => messageAction(payload),
+    askQuestion: (payload) => askQuestion(payload),
+    replyMessage: (payload) => replyMessage(payload),
+    openModal: (name) => openModal(name),
+    closeMessageMenu: () => menus.openMessageMenu(null),
+    selectUser: (user) => (userActions.selectedMessageUser = user),
+    patchEvidence: (item, patch) => feeds.patchEvidence(item, patch),
+    openPrivateChat: (peerId) => {
+      privateChat.show();
+      void privateChat.switchToUser(peerId);
+    },
+    openImage: (event, url) => openImageModal(event, url),
+    clearUnreadQa: (id) => unreadQaAlertIds.delete(id),
+    focusComposer: () =>
+      requestAnimationFrame(() => {
+        composerElement?.focus();
+        composerElement?.setSelectionRange(chat.composer.length, chat.composer.length);
+      }),
+    onChanged: () => invalidateAll()
+  });
+
   const userActions = new RoomUserActions<(typeof data.connectedUsers)[number]>({
     dialogs,
     toasts,
@@ -1281,8 +1325,8 @@
     openModal: (name) => openModal(name),
     closeModal: () => (modal = null),
     closeUserMenu: () => menus.openUserMenu(null),
-    mentionUser: (name) => mentionUser(name),
-    clearSelectedMessage: () => (selectedMessage = null),
+    mentionUser: (name) => messageActions.mention(name),
+    clearSelectedMessage: () => messageActions.clearSelected(),
     hidePreviewWindows: () => (previewWindowsVisible = false),
     defaultFollowStyle: () => defaultFollowChatStyle(),
     reload: () => invalidateAll()
@@ -2757,7 +2801,7 @@
     // when an answer lands while the modal is already open - that update sets unreadQA and emits
     // `openAlertQAModal` with `openModal: !1`, so only the close can clear it:
     //   yi(`.${e._id}`).on('hidden.bs.modal', () => { ... delete e.unreadQA })
-    if (modal === 'qa' && selectedMessage) unreadQaAlertIds.delete(selectedMessage.id);
+    if (modal === 'qa' && messageActions.selected) unreadQaAlertIds.delete(messageActions.selected.id);
     modal = null;
   }
 
@@ -3528,326 +3572,14 @@
     if (incoming && !prefs.doNotDisturbOn && prefs.chatSoundOn) playSoundEffect('pling');
   });
 
-  async function runMessageOperation(
-    kind: 'alert' | 'chat',
-    item: MessageActionItem,
-    operation: 'delete' | 'markAnswered' | 'mute24' | 'showMsgToAll'
-  ) {
-    /*
-      `targetUserId` rides ONLY on `mute24` now. The action took it on every operation and read it on
-      one, so a delete carried a field nothing looked at; `z.discriminatedUnion` refuses it on the
-      other three, which is what makes the shape honest.
 
-      A rejection is the refusal. The old `response.ok` reported "the request arrived" and not "the
-      operation happened" — SvelteKit put a `fail` in the BODY with a 200 status — so anything
-      undoing an optimistic update had to read the result itself.
-    */
-    try {
-      await messageAction(
-        operation === 'mute24'
-          ? { kind, id: item.id, operation, targetUserId: item.senderId }
-          : { kind, id: item.id, operation }
-      );
-    } catch (cause) {
-      dialogs.alert = isHttpError(cause) ? cause.body.message : 'That did not work.';
-      return false;
-    }
-    if (operation === 'delete' || operation === 'markAnswered') await invalidateAll();
-    return true;
-  }
 
-  /**
-   * @param newBodyHtml Rich text from the editor, when the edit was made with it.
-   *
-   * `editChatMessage` with `newMsg` set to the editor's content, which is what the reference sends
-   * from `sendMessage()` while `isEditing`. As on the post path, the server sanitises it and
-   * derives the plain body itself.
-   */
-  async function editMessage(
-    kind: 'alert' | 'chat',
-    item: MessageActionItem,
-    newBody: string,
-    newBodyHtml?: string
-  ) {
-    try {
-      await messageAction({ kind, id: item.id, operation: 'edit', newBody, newBodyHtml });
-    } catch (cause) {
-      dialogs.alert = isHttpError(cause) ? cause.body.message : 'That edit did not save.';
-      return false;
-    }
-    await invalidateAll();
-    return true;
-  }
 
-  async function toggleMessageReaction(
-    kind: 'alert' | 'chat',
-    item: MessageActionItem,
-    reaction: MessageReactionPayload
-  ) {
-    try {
-      await messageAction({
-        kind,
-        id: item.id,
-        operation: 'reaction',
-        reactionKey: reaction.key,
-        reactionEmoji: reaction.emoji
-      });
-    } catch (cause) {
-      dialogs.alert = isHttpError(cause) ? cause.body.message : 'That reaction did not save.';
-      return false;
-    }
-    await invalidateAll();
-    return true;
-  }
 
-  function toggleEvidenceReaction(
-    item: MessageActionItem,
-    reactionPayload: MessageReactionPayload
-  ) {
-    // The same four rules the server applies, from the same function — see `$lib/reaction-toggle`.
-    const reactions = toggleReaction(
-      item.reactions ?? {},
-      reactionPayload.key,
-      reactionPayload.emoji,
-      data.user.emailHash
-    );
-    feeds.patchEvidence(item, { reactions });
-  }
 
-  /**
-   * The two sends that act on the modal's selected message. One helper because they differed only in
-   * the command called — two copies of a refusal path is how one of them ends up refetching anyway.
-   */
-  async function sendAgainstSelectedMessage(
-    send: (id: number) => Promise<void>,
-    failure: string
-  ): Promise<boolean> {
-    if (!selectedMessage) return false;
-    try {
-      await send(selectedMessage.id);
-    } catch (cause) {
-      dialogs.alert = isHttpError(cause) ? cause.body.message : failure;
-      return false;
-    }
-    await invalidateAll();
-    return true;
-  }
 
-  const sendAlertQuestion = (body: string) =>
-    sendAgainstSelectedMessage((alertId) => askQuestion({ body, alertId }), 'Question not sent.');
 
-  const sendReplyMessage = (body: string) =>
-    sendAgainstSelectedMessage((messageId) => replyMessage({ body, messageId }), 'Reply not sent.');
 
-  /**
-   * `doMention` / `doMentionExtra` — the SAME insert, into whichever composer is the target.
-   *
-   * ```js
-   * doMention(e) {
-   *   guiEventBus.emit(
-   *     this.isQAMsg ? "doQAMention"
-   *     : preferences.extraChatColumn && (this.extraChatMsg || "textAreaTxtExtra" === globals.chatInputFocus)
-   *       ? "doMentionExtra" : "doMention", e)
-   * }
-   * ```
-   *
-   * Two ways to reach the extra column, and both matter: the message you clicked was IN that column
-   * (`extraChatMsg`, true for every row it renders), or you were last typing there
-   * (`chat.focus`). Without the second, clicking a name in the main log while composing in the
-   * extra column would insert into the pane you are not looking at.
-   *
-   * The extra column's insert is upstream's own, and it differs by a space:
-   * `i.length ? val(i + ' @' + e + ' ') : val('@' + e + ' ')`.
-   */
-  function mentionUser(name: string, toExtraColumn = false) {
-    // The insert is the class's; the caret is this file's, because the element is.
-    if (!chat.mention(name, toExtraColumn)) return;
-    requestAnimationFrame(() => {
-      composerElement?.focus();
-      composerElement?.setSelectionRange(chat.composer.length, chat.composer.length);
-    });
-  }
-
-  function handleMessageAction(
-    kind: 'alert' | 'chat',
-    action: MessageAction,
-    item: MessageActionItem,
-    payload?: MouseEvent | MessageReactionPayload,
-    /** True when the click came from the extra chat column — upstream's `extraChatMsg`. */
-    fromExtraColumn = false
-  ) {
-    if (action !== 'reaction') menus.openMessageMenu(null);
-    selectedMessage = item;
-    userActions.selectedMessageUser = {
-      id: item.senderId,
-      nick: item.senderName,
-      emailHash: item.senderEmailHash,
-      pic: item.senderAvatarUrl,
-      status: item.senderStatus ?? 'offline',
-      ...(item.senderStatus && item.senderStatus !== 'offline'
-        ? { userXrefID: String(item.senderId), _id: String(item.senderId) }
-        : {})
-    };
-
-    if (action === 'user') openModal('user');
-    if (action === 'mention'){
-      mentionUser(item.senderName, chat.mentionTargetIsExtra(fromExtraColumn));
-    }
-    if (action === 'reply') openModal('reply');
-    if (action === 'report') openModal('report');
-    if (action === 'question') {
-      // `openAlertQAModal` clears the marker as it opens:
-      //   e.hasOwnProperty('unreadQA') && delete e.unreadQA
-      unreadQaAlertIds.delete(item.id);
-      openModal('qa');
-    }
-    /*
-      `startPrivChat`, verbatim:
-
-        guiEventBus.subscribe('startPrivChat', i =>
-          i.user._id != globals.user.id
-            ? (privChatInited || (privChatInited = !0, initPMDrag()),
-               privChatVisible = !0,
-               guiEventBus.emit('PCfocusOnUser', {uid: i.uid, isInit: i.isInit, user: i.user}))
-            : bootbox.alert('Chatting with yourself again?'))
-
-      Picking "Private Chat" on your OWN message does not open a panel in the capture - it shows
-      that alert and stops. The server refuses it too, but by then the panel has already opened on
-      an empty conversation with yourself, which is not what the original does.
-    */
-    if (action === 'private') {
-      if (item.senderId === data.user.id) {
-        dialogs.alert = 'Chatting with yourself again?';
-        return;
-      }
-      privateChat.show();
-      // `PCfocusOnUser` - open straight onto that person's thread rather than the tab list.
-      void privateChat.switchToUser(item.senderId);
-    }
-    if (action === 'image' && item.targetUrl) {
-      openImageModal(payload instanceof MouseEvent ? payload : undefined, item.targetUrl);
-    }
-    if (action === 'delete') {
-      const event = payload instanceof MouseEvent ? payload : undefined;
-      const deleteMessage = () => {
-        // Captured items used to stop here, hidden in this browser's memory and nowhere else - so
-        // a presenter deleting an alert watched it vanish while every member kept being served it
-        // from the fixture on every poll, forever. The local hide stays as the optimistic update,
-        // because the server round-trip and its invalidate take a moment and the row should not
-        // linger under the cursor; the server call is what makes it stick for the room.
-        if (item.evidenceKey) feeds.patchEvidence(item, { hidden: true });
-        void runMessageOperation(kind, item, 'delete').then((succeeded) => {
-          // A member may only delete what the capture attributes to them, and the server is what
-          // decides that. Put a refused item back rather than leaving it hidden for this viewer
-          // alone - that is the same one-sided disappearance this change exists to remove.
-          if (!succeeded && item.evidenceKey) feeds.patchEvidence(item, { hidden: false });
-        });
-      };
-      if (event?.shiftKey) {
-        deleteMessage();
-      } else {
-        const noun = kind === 'alert' ? 'alert' : 'message';
-        dialogs.confirmation = {
-          message:
-            data.user.role === 'staff' || data.user.role === 'admin'
-              ? `Are you sure you want to delete this ${noun} by ${item.senderName}. text: ${item.body}`
-              : `Are you sure you want to delete your message: ${item.body}`,
-          onconfirm: () => {
-            dialogs.confirmation = null;
-            deleteMessage();
-          }
-        };
-      }
-    }
-    if (action === 'mute') {
-      if (item.senderId <= 0) {
-        dialogs.alert = 'Could not retrieve user info.';
-        return;
-      }
-      dialogs.confirmation = {
-        message: 'Are you sure you want to mute this user for 24 hours?',
-        onconfirm: () => {
-          dialogs.confirmation = null;
-          void runMessageOperation(kind, item, 'mute24').then((success) => {
-            if (success) dialogs.alert = 'User chat muted.';
-          });
-        }
-      };
-    }
-    if (action === 'show-all') {
-      void runMessageOperation(kind, item, 'showMsgToAll');
-    }
-    if (action === 'answered') {
-      // Optimistic for the captured case, then persisted - the same shape the delete uses. Marking
-      // answered in this browser alone left the ✅ invisible to everyone else, which is the whole
-      // point of the marker.
-      if (item.evidenceKey) feeds.patchEvidence(item, { answered: true });
-      void runMessageOperation(kind, item, 'markAnswered').then((succeeded) => {
-        if (!succeeded && item.evidenceKey) feeds.patchEvidence(item, { answered: false });
-      });
-    }
-    if (action === 'copy' && typeof navigator !== 'undefined') {
-      const container = document.createElement('div');
-      container.innerHTML = item.body;
-      const plainText = container.textContent ?? '';
-      void navigator.clipboard.writeText(plainText).then(() => {
-        toasts.info('Copied to clipboard.');
-      });
-    }
-    if (action === 'edit') {
-      /*
-        ```js
-        editMessage() {
-          if ("chat" === this.logType) {
-            if (sessData.enableRTE && preferences.enableRTE && containsHtml(this.msg.txt))
-              return void guiEventBus.emit("doRTEModalEdit", {msg: this.msg});
-            bootbox.prompt({title: "Edit chat message:", inputType: "textarea", …})
-        ```
-
-        A rich message is edited richly; everything else keeps the plain prompt below, which is the
-        reference's own fallback and was already built here.
-
-        THE ONE DIFFERENCE, and it is the column. Upstream asks `containsHtml(msg.txt)` — it sniffs
-        the stored text for markup, because a message there is one string and nothing records how
-        it was written. This room records it: `bodyHtml` is a nullable column, set only by the
-        sanitiser on the way in. So somebody who TYPED a less-than in the plain composer gets the
-        plain prompt and sees the characters they typed, rather than an editor that treats their
-        sentence as tags. Same rule the renderer follows, for the same reason.
-      */
-      if (kind === 'chat' && composer.canUseRTE && item.bodyHtml) {
-        composer.editInRTE(item, item.bodyHtml);
-        return;
-      }
-      dialogs.prompt = {
-        title: kind === 'chat' ? 'Edit chat message:' : `Edit alert by ${item.senderName}:`,
-        value: item.body,
-        onconfirm: (value) => {
-          const newBody = value.trim();
-          if (!newBody) return;
-          dialogs.prompt = null;
-          const previousBody = item.body;
-          if (item.evidenceKey) feeds.patchEvidence(item, { body: newBody });
-          void editMessage(kind, item, newBody).then((succeeded) => {
-            if (!succeeded && item.evidenceKey) feeds.patchEvidence(item, { body: previousBody });
-          });
-        }
-      };
-    }
-    if (action === 'reaction' && payload && !(payload instanceof MouseEvent) && 'key' in payload) {
-      // Optimistic locally so the pill responds under the cursor, then persisted. The server does
-      // the same toggle against the stored override, so it - not this browser - decides the result.
-      const previousReactions = item.evidenceKey ? structuredClone(item.reactions ?? {}) : null;
-      if (item.evidenceKey) toggleEvidenceReaction(item, payload);
-      void toggleMessageReaction(kind, item, payload).then((succeeded) => {
-        if (!succeeded && previousReactions) {
-          feeds.patchEvidence(item, { reactions: previousReactions });
-        }
-        window.setTimeout(() => {
-          menus.openMessageMenu(null);
-        }, 500);
-      });
-    }
-  }
 
 
   function setInputChecked(checked: boolean) {
@@ -6589,7 +6321,8 @@
               onarchivealerts={archiveAlerts}
               onalertsscroll={trackAlertsScroll}
               onchatscroll={trackChatScroll}
-              onmessageaction={handleMessageAction}
+              onmessageaction={(kind, action, item, payload) =>
+                messageActions.handle(kind, action, item, payload)}
               onprivatechat={() => privateChat.show()}
               onexpandcomposer={autoExpandComposer}
               onsend={() => composer.send()}
@@ -6723,7 +6456,7 @@
                 openMenuKey={menus.messageId}
                 onmenutoggle={(key) => menus.openMessageMenu(key)}
                 onaction={(action, message, event) =>
-                  handleMessageAction('chat', action, message, event, true)}
+                  messageActions.handle('chat', action, message, event, true)}
                 onfocus={() => chat.focused(EXTRA_COMPOSER)}
                 onsend={() => void composer.sendExtra()}
                 onscroll={(scroller) => trackExtraChatScroll(scroller)}
@@ -6891,10 +6624,10 @@
       onPollEnd={() => submitPollAction('pollDone')}
       onAlert={(message) => (dialogs.alert = message)}
       onConfirm={(message, onconfirm) => dialogs.confirm(message, onconfirm)}
-      onReplySend={sendReplyMessage}
-      onQuestionSend={sendAlertQuestion}
+      onReplySend={messageActions.sendReplyMessage}
+      onQuestionSend={messageActions.sendAlertQuestion}
       alertQuestions={data.alertQuestions}
-      onMentionUser={mentionUser}
+      onMentionUser={(name) => messageActions.mention(name)}
       onPrivateChat={(user) => {
         userActions.selectedMessageUser = user;
         privateChat.show();
@@ -6910,7 +6643,7 @@
       targetUser={userActions.target}
       mutedUsers={userActions.mutedUsers}
       followedUsers={userActions.followedUsers}
-      targetMessage={selectedMessage}
+      targetMessage={messageActions.selected}
     />
     {#if modal === 'image-upload'}
       <ImageUploadDialog
@@ -7138,7 +6871,7 @@
       formatTime={(at) => privateChat.formatTime(at)}
       onclosepeer={() => {
         userActions.clearSelectedMessageUser();
-        selectedMessage = null;
+        messageActions.clearSelected();
       }}
       ondeletethis={() => privateChat.deleteThread()}
       onclose={() => privateChat.close()}

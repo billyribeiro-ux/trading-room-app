@@ -46,6 +46,21 @@ export type { StreamIngestKey } from '$lib/stream-ingest';
  */
 export interface RoomSessionSettings {
   /**
+   * The room's rich-text blurb, and the ONE value that picks the login page's layout.
+   *
+   * `yue`'s update block, read at bundle byte 1,188,490:
+   * `O(3, e.appService.globals.sessData.description ? 3 : 4)` — slot 3 is `Wde`, the two-column
+   * layout whose left column carries `h1.room-title` and `div.room-description`; slot 4 is `vue`,
+   * a single column centred with `offset-md-3 offset-sm-3`. So a room WITH a description gets the
+   * split view and a room WITHOUT one gets the centred form.
+   *
+   * HTML, not text: the const is
+   * `[1,"room-description",2,"height","100%","overflow-x","hidden",3,"innerHtml"]` — bound through
+   * `innerHtml`, and the component's CSS styles `.room-description img`, so images are expected.
+   * It is owner-authored and reaches an unauthenticated page, so it is sanitised before render.
+   */
+  description?: string;
+  /**
    * Presenter messages align right, and their reactions with them. Two consumers in
    * `RoomMessage.svelte` — `presenter-msg-right` on the body and `presenter-reactions-right` on the
    * reaction row — both of which existed unfed until 2026-08-14.

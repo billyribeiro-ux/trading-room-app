@@ -58,6 +58,15 @@ const stripComments = (source: string) =>
   NEGATIVES below still point at something that could hold the wrong version.
 */
 const composerModule = readFileSync(new URL('room/composer.svelte.ts', import.meta.url), 'utf8');
+/*
+  The message-action dispatcher left the page for `RoomMessageActions` in Phase 5 slice 8. Read as
+  its own source, so an assertion about what a click does cannot pass against a file that no longer
+  decides it.
+*/
+const messageActionsModule = readFileSync(
+  new URL('room/message-actions.svelte.ts', import.meta.url),
+  'utf8'
+);
 const pageCode = stripComments(PAGE);
 const prefsCode = stripComments(PREFS_SOURCE);
 const modalCode = stripComments(MODAL);
@@ -203,12 +212,24 @@ describe('the two entry points', () => {
       follows in `chat-rich-text-contract.test.ts`.
     */
     /*
-      Still on the page, because deciding WHICH editor to open is the message-action path's job.
-      Slice 10 moved the editor's own state, so the branch now hands off to `editInRTE` rather than
-      writing three fields inline — which is what stops a draft and its target disagreeing.
+      Deciding WHICH editor to open is the message-action path's job, and since slice 8 that path is
+      its own class. Slice 10 had already moved the editor's STATE, so the branch hands off to
+      `editInRTE` rather than writing three fields inline — which is what stops a draft and its
+      target disagreeing.
     */
-    expect(pageCode).toContain("if (kind === 'chat' && composer.canUseRTE && item.bodyHtml) {");
-    expect(pageCode).toContain('composer.editInRTE(item, item.bodyHtml);');
+    expect(messageActionsModule).toContain(
+      "if (kind === 'chat' && this.#composer.canUseRTE && item.bodyHtml) {"
+    );
+    expect(messageActionsModule).toContain('this.#composer.editInRTE(item, item.bodyHtml);');
+    /*
+      Against the comment-STRIPPED module: the note above this branch quotes upstream's
+      `containsHtml(this.msg.txt)` to explain what we do instead, and an assertion that a comment
+      cannot mention is an assertion that forbids documenting.
+    */
+    const actionsCode = messageActionsModule
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/(^|[^:])\/\/[^\n]*/g, '$1');
+    expect(actionsCode).not.toContain('containsHtml');
     expect(pageCode).not.toContain('containsHtml');
     expect(composerModule).not.toContain('containsHtml');
   });
@@ -223,15 +244,18 @@ describe('the two entry points', () => {
       narrowing survives: the edit branch reads `canUseRTE`, the same three terms as everything
       else.
     */
-    const from = pageCode.indexOf("if (action === 'edit') {");
+    const from = messageActionsModule.indexOf("if (action === 'edit') {");
     expect(from).toBeGreaterThan(-1);
-    const branch = pageCode.slice(from, pageCode.indexOf('bootboxPrompt = {', from));
+    const branch = messageActionsModule.slice(
+      from,
+      messageActionsModule.indexOf('this.#dialogs.prompt = {', from)
+    );
     expect(branch).toContain('canUseRTE');
   });
 
   it('and the plain prompt is still there for everything else', () => {
     // The reference's own fallback, and the path every non-rich message keeps taking.
-    expect(pageCode).toContain("title: kind === 'chat' ? 'Edit chat message:'");
+    expect(messageActionsModule).toContain("title: kind === 'chat' ? 'Edit chat message:'");
   });
 });
 
