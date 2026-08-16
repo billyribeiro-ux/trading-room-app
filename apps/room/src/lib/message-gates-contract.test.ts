@@ -26,10 +26,7 @@ const GATES = [
 ] as const;
 
 const page = readFileSync(new URL('../routes/+page.svelte', import.meta.url), 'utf8');
-const component = readFileSync(
-  new URL('./components/RoomMessage.svelte', import.meta.url),
-  'utf8'
-);
+const component = readFileSync(new URL('./components/RoomMessage.svelte', import.meta.url), 'utf8');
 const strip = (source: string) =>
   source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/<!--[\s\S]*?-->/g, '');
 const pageCode = strip(page);
@@ -67,10 +64,27 @@ describe('both message lists receive all four', () => {
     expect(chatAt).toBeGreaterThan(-1);
   });
 
-  it.each(GATES)('%s is passed at BOTH call sites', (gate) => {
-    // Two occurrences of the shorthand, one per call site, and nothing else in the file uses it.
-    const passes = pageCode.split(`{${gate}}`).length - 1;
-    expect(passes, `${gate} is passed ${passes} time(s), expected 2`).toBe(2);
+  it('spreads ONE chrome object at both call sites', () => {
+    /*
+      RE-POINTED 2026-08-15, and what it guards got stronger.
+
+      Each gate used to be counted as `{gate}` appearing exactly twice in the page — once per call
+      site. The sixteen props both lists share are now built once as `messageChrome` and spread, so
+      "passed at both call sites" is no longer two spellings to keep in step. It is one object
+      reaching two spreads, which is a thing that cannot drift rather than a thing that happens not
+      to have.
+
+      Positive first: both spreads are found, before any membership is asserted below.
+    */
+    expect(pageCode.slice(alertAt, alertAt + 200)).toContain('{...messageChrome}');
+    expect(pageCode.slice(chatAt, chatAt + 200)).toContain('{...messageChrome}');
+  });
+
+  it.each(GATES)('%s is in the chrome that both call sites spread', (gate) => {
+    const from = pageCode.indexOf('const messageChrome');
+    expect(from, 'messageChrome is not built in +page.svelte').toBeGreaterThan(-1);
+    const chrome = pageCode.slice(from, pageCode.indexOf('\n  });', from));
+    expect(chrome, `${gate} is not in messageChrome`).toContain(gate);
   });
 });
 

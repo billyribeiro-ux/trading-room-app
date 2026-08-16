@@ -112,6 +112,7 @@
   import { ALERTS_LOG, RoomLogPages } from '$lib/room/log-pages.svelte';
   import { RoomArrivals } from '$lib/room/arrivals';
   import { RoomScrollFollow } from '$lib/room/scroll-follow';
+  import type { RoomMessageChrome } from '$lib/room-message-chrome';
   import { EXTRA_COMPOSER, RoomChat } from '$lib/room/chat.svelte';
   import { RoomMedia } from '$lib/room/media.svelte';
   import { alertSoundButtonFor, filesSectionHidden } from '$lib/files-gates';
@@ -2410,6 +2411,27 @@
   const enableReactions = $derived(data.sessData?.enableReactions === true);
   const enableEditMessage = $derived(data.sessData?.enableEditMessage === true);
   const enableEditAlerts = $derived(data.sessData?.enableEditAlerts === true);
+
+  /** The sixteen props every message in this room shares. `room-message-chrome.ts` says why. */
+  const messageChrome: RoomMessageChrome = $derived({
+    currentUserId: data.user.id,
+    currentUserEmailHash: data.user.emailHash,
+    currentUserName: data.user.displayName,
+    // The ROLE, not `isPresenter`. See `media-elevation.ts` and the module's own note.
+    viewerIsPresenter: data.user.role === 'staff' || data.user.role === 'admin',
+    theme,
+    chatStyle: globalChatStyle,
+    chatGif,
+    chatBadges,
+    enableBadges,
+    showBadgesToPresentersOnly,
+    disableStarYears,
+    presenterMessagesOnTheRight,
+    usersPublicReply,
+    enableReactions,
+    enableEditMessage,
+    enableEditAlerts
+  });
 
   const alertFilterConfigured = $derived(alertFilterAvailable(data.sessData?.modAlertFilterList));
 
@@ -9350,25 +9372,9 @@
                           <RoomMessage
                             {item}
                             kind="alert"
+                            {...messageChrome}
                             {alertLabels}
-                            {chatGif}
-                            {presenterMessagesOnTheRight}
-                            {chatBadges}
-                            {enableBadges}
-                            {showBadgesToPresentersOnly}
-                            {disableStarYears}
-                            {usersPublicReply}
-                            {enableReactions}
-                            {enableEditMessage}
-                            {enableEditAlerts}
-                            currentUserId={data.user.id}
-                            currentUserEmailHash={data.user.emailHash}
-                            currentUserName={data.user.displayName}
                             followedStyle={followedUsers[item.senderEmailHash]?.followChatStyle}
-                            chatStyle={globalChatStyle}
-                            viewerIsPresenter={data.user.role === 'staff' ||
-                              data.user.role === 'admin'}
-                            {theme}
                             menuOpen={menus.messageId === `alert:${item.id}`}
                             showDateSeparator={'evidenceSeparatorText' in item
                               ? item.evidenceSeparatorText !== null
@@ -9487,24 +9493,8 @@
                           <RoomMessage
                             {item}
                             kind="chat"
-                            {chatGif}
-                            {presenterMessagesOnTheRight}
-                            {chatBadges}
-                            {enableBadges}
-                            {showBadgesToPresentersOnly}
-                            {disableStarYears}
-                            {usersPublicReply}
-                            {enableReactions}
-                            {enableEditMessage}
-                            {enableEditAlerts}
-                            currentUserId={data.user.id}
-                            currentUserEmailHash={data.user.emailHash}
-                            currentUserName={data.user.displayName}
+                            {...messageChrome}
                             followedStyle={followedUsers[item.senderEmailHash]?.followChatStyle}
-                            chatStyle={globalChatStyle}
-                            viewerIsPresenter={data.user.role === 'staff' ||
-                              data.user.role === 'admin'}
-                            {theme}
                             menuOpen={menus.messageId === `chat:${item.id}`}
                             showDateSeparator={'evidenceSeparatorText' in item
                               ? item.evidenceSeparatorText !== null
