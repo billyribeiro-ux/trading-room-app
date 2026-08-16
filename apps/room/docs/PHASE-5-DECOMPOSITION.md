@@ -9,7 +9,7 @@ five ways a mechanical extraction silently breaks this file, each of which has a
 
 ## 1. Where it stands
 
-`+page.svelte` **9,605 → 8,699**. Script 8,627 → 7,729. Template 978 → 970.
+`+page.svelte` **9,605 → 8,415**. Script 8,627 → 7,463. Template 978 → 952.
 
 | slice | module                          | commit    | page after |
 | ----- | ------------------------------- | --------- | ---------: |
@@ -20,8 +20,9 @@ five ways a mechanical extraction silently breaks this file, each of which has a
 | 4b    | `RoomVolume`                    | `2330597` |      9,057 |
 | 12    | `RoomBroadcasts`                | `a4480c4` |      8,899 |
 | 6     | `RoomFiles`                     | `9d5a5fb` |      8,699 |
+| 15    | `RoomTradeAlerts`               | `pending` |      8,415 |
 
-Suite 1,954/138 → **2,093/145**. `svelte-check` 0 errors, 0 warnings throughout.
+Suite 1,954/138 → **2,114/146**. `svelte-check` 0 errors, 0 warnings throughout.
 
 **The template moved for the first time in slice 6**, and only because that slice collapsed a prop
 list: 984 → 970. Everything before it came off the script alone. Slices 17–19 still carry almost all
@@ -41,18 +42,17 @@ touch `PresentationArea`'s surface, so the same arithmetic applies to them.
 reordering of `RoomVolume` and `RoomBroadcasts` ahead of media transport is why six slices landed
 rather than three.
 
-| #   | module                    | ~script lines | note                                                                                                |
-| --- | ------------------------- | ------------: | --------------------------------------------------------------------------------------------------- |
-| 15  | `RoomTradeAlerts`         |           330 | swing + day-trade are near-identical; one keyed module, two instances, the `RoomLogPages` precedent |
-| 16  | `RoomNotes` + attachments |           340 | the seam I am least sure of — split if it does not read as one thing                                |
-| 8   | `RoomMessageActions`      |           380 | `handleMessageAction` + evidence state                                                              |
-| 7   | `RoomPrivateChat`         |           430 |                                                                                                     |
-| 11  | `RoomScreens`             |           450 | tabs, zoom, popouts, detach                                                                         |
-| 10  | `RoomComposer`            |           520 | sending, RTE, uploads, post-alert                                                                   |
-| 5   | `RoomEventStream`         |           650 | `subscribeToRoomEvents`; `createSubscriber` applies to `roomEventsConnected` ONLY                   |
-| 9   | `RoomFeeds`               |           700 | the three scroll effects go to the panes that own the scrollers                                     |
-| 13  | `RoomUserActions`         |           700 | `handleUserAction` (249 lines)                                                                      |
-| 4   | media transport           |         1,700 | largest; `RoomMedia` keeps the state, transport goes to a sibling                                   |
+| #   | module                    | ~script lines | note                                                                              |
+| --- | ------------------------- | ------------: | --------------------------------------------------------------------------------- |
+| 16  | `RoomNotes` + attachments |           340 | the seam I am least sure of — split if it does not read as one thing              |
+| 8   | `RoomMessageActions`      |           380 | `handleMessageAction` + evidence state                                            |
+| 7   | `RoomPrivateChat`         |           430 |                                                                                   |
+| 11  | `RoomScreens`             |           450 | tabs, zoom, popouts, detach                                                       |
+| 10  | `RoomComposer`            |           520 | sending, RTE, uploads, post-alert                                                 |
+| 5   | `RoomEventStream`         |           650 | `subscribeToRoomEvents`; `createSubscriber` applies to `roomEventsConnected` ONLY |
+| 9   | `RoomFeeds`               |           700 | the three scroll effects go to the panes that own the scrollers                   |
+| 13  | `RoomUserActions`         |           700 | `handleUserAction` (249 lines)                                                    |
+| 4   | media transport           |         1,700 | largest; `RoomMedia` keeps the state, transport goes to a sibling                 |
 
 **Group C — the template.** 17 `RoomOverlays.svelte`, 18 document/window handlers, 19 `RoomShell.svelte`.
 
@@ -195,6 +195,19 @@ All four caught something real, usually within one slice of being written.
 | comment + citation floors (6,329 / 220)                    | the `screen-volume.ts` docstring corruption, before it was written                                                            |
 | `unbound-method-contract.test.ts`                          | see below                                                                                                                     |
 
+**A KNOWN BLIND SPOT in the citation gate, found in slice 15 and deliberately not fixed there.**
+
+The floor counts citations with `bytes? [\d,]{5,}`, which cannot see one wrapped across a line
+break. `changeDayTradeAlertMonths` carried `(byte\n      1,993,666)` and the gate never counted
+it, so `MINIMUM_CITATIONS` has been low by at least one and possibly by more. It matters most
+exactly where slice 15 was working: merging two halves into one class is the case where a citation
+carried by only one half can vanish silently.
+
+It was handled by carrying both wrapped citations across by hand and verifying them BY NUMBER rather
+than by the gate. Widening the regex re-baselines the floor, which makes it its own change rather
+than a passenger on an extraction — and the next slice that touches the gate should do it, then
+re-measure the floor and say what the real count was.
+
 **The unbound-method trap deserves its own note.** A class method passed as a prop loses `this` and
 throws on first click. It happened **fifteen times in four slices** — ten in one commit — and
 `svelte-check`, `eslint`, `svelte-autofixer`, every text-reading contract test AND the suite all pass
@@ -221,6 +234,15 @@ whole rather than being handed methods.
 - **Lint the whole repo, not just changed files.** A rename orphans constants in files the slice does
   not otherwise touch. 27 pre-existing errors live in `scripts/* 2.mjs` duplicates — that is the
   baseline, not a regression.
+- **Prove a duplication claim before collapsing it.** Slice 15's "one class, two instances" rested
+  on folding one half's vocabulary onto the other and diffing: nine of fourteen pairs came back
+  byte-identical, and the only CODE difference in 297 lines was two strings. That took ten minutes
+  and turned a design opinion into a measurement. When the two halves are NOT that close, the same
+  ten minutes tells you to write two classes.
+- **A collapse can lose evidence one half carried alone.** Only the day trade half cited
+  `byte 1,955,967` and `byte 1,993,666`; a merge that took the swing half as the source would
+  have dropped both, and the citation gate could only see one of them (§6). Diff the citations of
+  the two halves BEFORE merging, and carry the union.
 - **Report the number honestly when it misses.** Slice 1 was −73 against a planned ~250 because
   delivery policy stayed with the preferences it reads. A number that quietly misses its estimate is
   how the next estimate gets believed.

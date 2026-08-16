@@ -24,6 +24,108 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-16
 
+### 2026-08-16 11:08 EDT — Phase 5 slice 15: `RoomTradeAlerts`, one class where there were two of everything
+
+**`+page.svelte` 8,699 → 8,415.** Script 7,729 → 7,463, template 970 → 952.
+Suite 2,096 → 2,114 across 146 files. `svelte-check` 1,159 files, 0 errors, 0 warnings.
+`eslint` at the pre-existing 27.
+
+**`src/lib/room/trade-alerts.svelte.ts` (337), instantiated TWICE.** 297 lines left the page — 28
+declarations and functions, fourteen for swing and fourteen for day trade — and roughly half that
+arrived, because the second copy simply stops existing. This is the `RoomLogPages` shape: the slice
+that removes a duplicate rather than moving one.
+
+**The sameness was MEASURED before the class was written, not assumed.** Folding the day trade
+vocabulary onto the swing one and diffing the two halves left **nine of fourteen pairs
+byte-identical**. Of the five that differed, four differed only in PROSE — a window number in a
+sentence, a cross-reference, a citation one half carried and the other did not. **The only code
+difference in 297 lines was the endpoint and the failure sentence.** That is why `TradeAlertFeed`
+has four members and why `payload()` is one method where the page had two byte-identical functions.
+
+That measurement cannot be re-executed, because the duplicate it measured is gone. What
+`trade-alerts.svelte.test.ts` asserts instead is the shape it justified: those four values are the
+whole of the difference, and the two feeds disagree on all four.
+
+**Fourteen props became two, at the page and again in `PresentationArea`** (1,142 → 1,123). The
+wire action names stay at the call sites, because `submit()` is generic over them — and that is
+now stronger than it was: passing a name outside the union is a type error at the call site, which
+two separate hand-written unions could not check.
+
+**The seed is a constructor value, not a thunk, and that is the OPPOSITE of `RoomFiles` two
+constructions above.** Deliberate: `RoomFiles` takes thunks precisely so they keep following
+`data`; this class takes a one-time value precisely so it stops. The page load always answers one
+fixed window — 42 days for swing, 21 for day trade — so a value that kept tracking `data` would
+throw away the presenter's chosen months window on the next `invalidateAll()`.
+
+**The `state_referenced_locally` suppression MOVED rather than disappearing.** It sat on the
+page's `$state.raw(data.swingAlerts)`; the deliberate one-time read is now at the construction
+site, so the suppression and its reason are there. `svelte-check` reported it, which is how it was
+noticed rather than dropped.
+
+**`cancelImageUpload()` is new, and is a receiver rather than a setter.** The page did two writes
+inline in the dialog's `onclose` — resolve the waiting promise with `null`, clear the pending
+record. A caller holding a setter can do one of them and leave a composer waiting forever on a
+promise nothing will settle.
+
+**Two more unbound methods wrapped.** `onPasteImage={requestSwingImagePaste}` and its upload twin
+were plain functions passed by reference, which is correct for a function and a throw for a method.
+Four sites, two per feed.
+
+**The dispatcher guard was restructured rather than re-pointed.** `remote-call-sites-contract.test.ts`
+checked that every action name a `fetch(\`?/${action}\`)` can produce still exists on the server,
+and it found those names in the dispatcher's SIGNATURE. One generic `submit(action: Action, …)` has
+no such signature, so each entry now names the `declaration` its union is written in — two exported
+type aliases. Two table rows against one dispatcher, and the count assertion counts dispatchers
+rather than rows. The list went from four to three, which is the direction that ratchet allows.
+Its inverse check also stopped being scoped to `+page.svelte`, because one of the three now lives
+in `lib/room/`.
+
+**A blind spot found in the citation gate, and NOT fixed here.** `source-size-contract.test.ts`
+counts citations with `bytes? [\d,]{5,}`, which cannot see a citation wrapped across a line break —
+`(byte\n      1,993,666)` in `changeDayTradeAlertMonths` is one, and the floor has been
+under-counting it. Both wrapped citations were carried into the merged class by hand and verified by
+number rather than by the gate. Widening the regex re-baselines the floor, so it is its own change
+rather than a passenger on an extraction; written up in `apps/room/docs/PHASE-5-DECOMPOSITION.md` §6,
+with the method rather than with the capture gaps — it is a defect in our tooling, not a hole in the
+evidence.
+
+**Five negative controls, all seen red**: the rune off `#log`; the list not emptied before the
+refetch; the entitlement cached instead of re-read; cancel not settling the promise; the preview
+object URL not revoked.
+
+### 2026-08-16 11:05 EDT — Six real gaps found: five in the v4 login form, one Q&A control
+
+**No runtime impact.** `todo-next.md` only (5,826 → 5,942). No `src/` change — the gaps are recorded,
+not yet closed.
+
+**Two more at-risk artefacts read end to end and transcribed** (`start-up/start-up-login` 3,532 B and
+`q&a/answer`), and unlike `more-fucking-evidence` these are **not** fully consumed.
+
+**Five confirmed gaps in `routes/session/+page.svelte`**, each with both halves of rule 6 proven —
+read in the capture, counted at zero in our own source: the `authenticate-info` sub-heading
+("Please complete this form:"); the **"Keep me logged in" checkbox UI** (`#remember-me`,
+`.form-check-input`/`.form-check-label`) — notable because the *behaviour* already exists server-side
+and is named in comments in both `lib/server/auth.ts:94` and `lib/server/connection.ts:134`, so this
+is **a control with no UI, the exact inverse of the "no UI without a consumer" rule**; the
+`session-login-link` anchors "Not you? clear form" and "Have a password? Click here" (that class is
+zero in our source); and the centering offsets `offset-md-3 offset-sm-3`, which appear in our tree
+only inside bundled CSS and in no template.
+
+**Two divergences deliberately NOT filed as defects.** The capture puts `<h1 class="room-title">`
+inside the form container with no left column and centering offsets, while ours renders a separate
+`room-message` column citing bundle consts 33/34/36 — the `<!---->` after the `h1` is an Angular
+conditional marker, so the honest reading is that the reference branches and we built the other
+branch. Same for `.user-nick`, which the capture renders as `@<nickname>` without `text-center` and
+ours renders as the email with it. **Both need bundle consts 33–36 and 70 read before anything is
+changed**; guessing here would replace working code with a different render state.
+
+**One Q&A gap:** the ask button `class="btn btn-sm btn-secondary me-1 alert-qa"` with its
+parenthesised count `" (2) "` and answered-tick `" ✅"` as two independent spans — `alert-qa` is zero
+in our source; only the modal's component tag was known. Also recorded: the button carries **`me-1`
+and `mr-2` on sibling elements** — Bootstrap 5 and 4 utilities in one subtree, in the room's own
+markup — and its `date:'short'` stamp is a **different format from the Files pane's `date:'medium'`**.
+Unifying either would be a silent change.
+
 ### 2026-08-16 11:01 EDT — The deletion-risk register, measured — and `more-fucking-evidence` read in full: zero gaps
 
 **No runtime impact.** `todo-next.md` only (5,696 → 5,826). No `src/` change, no test touched.

@@ -57,9 +57,12 @@
   import type { RoomMedia } from '$lib/room/media.svelte';
   import type { RoomMenus } from '$lib/room/menus.svelte';
   import type { RoomFiles } from '$lib/room/files.svelte';
+  import type {
+    DayTradeAlertAction,
+    RoomTradeAlerts,
+    SwingAlertAction
+  } from '$lib/room/trade-alerts.svelte';
   import type { RoomSplit } from '$lib/room/split.svelte';
-  import type { SwingAlertDraft } from '$lib/components/swing-alerts/draft';
-  import type { DayTradeAlertDraft } from '$lib/components/day-trade-alerts/draft';
   import type {
     DayTradeAlertRow,
     MainTab,
@@ -163,26 +166,16 @@
     uploadAlertFiles: (files: readonly File[]) => Promise<readonly string[]>;
 
     // ── #swingAlerts and #dayTradeAlerts ───────────────────────────────────────
-    swingAlertsEnabled: boolean;
-    swingAlertsLog: readonly SwingAlertRow[];
-    submitSwingCommand: (
-      action: 'swingAlertMsg' | 'editSwingAlertMsg' | 'deleteSwingAlertMsg',
-      values: Record<string, string | number>
-    ) => Promise<void>;
-    swingAlertPayload: (draft: SwingAlertDraft) => Record<string, string>;
-    changeSwingAlertMonths: (months: number) => Promise<void>;
-    requestSwingImageUpload: () => Promise<string | null>;
-    requestSwingImagePaste: (file: File) => Promise<string | null>;
-    dayTradeAlertsEnabled: boolean;
-    dayTradeAlertsLog: readonly DayTradeAlertRow[];
-    submitDayTradeCommand: (
-      action: 'dayTradeAlertMsg' | 'editDayTradeAlertMsg' | 'deleteDayTradeAlertMsg',
-      values: Record<string, string | number>
-    ) => Promise<void>;
-    dayTradeAlertPayload: (draft: DayTradeAlertDraft) => Record<string, string>;
-    changeDayTradeAlertMonths: (months: number) => Promise<void>;
-    requestDayTradeImageUpload: () => Promise<string | null>;
-    requestDayTradeImagePaste: (file: File) => Promise<string | null>;
+    /**
+     * The two trade alert feeds, whole — `$lib/room/trade-alerts.svelte.ts`.
+     *
+     * Fourteen props, seven per feed, and the two sevens were the same seven twice. They are one
+     * class with two instances now, so the pane calls below read `swingAlerts.log` where they read
+     * `swingAlertsLog`, and the wire action names stay at the call sites where they belong —
+     * `submit()` is generic over them precisely so this component keeps naming them.
+     */
+    swingAlerts: RoomTradeAlerts<SwingAlertRow, SwingAlertAction>;
+    dayTradeAlerts: RoomTradeAlerts<DayTradeAlertRow, DayTradeAlertAction>;
 
     // ── #videoplayer ───────────────────────────────────────────────────────────
     /** Set by `playVideoForAll` and cleared by `stopVideoForAll`, both on the `cmds` channel. */
@@ -276,20 +269,8 @@
     submitNoteMutation,
     loadNoteVersions,
     uploadAlertFiles,
-    swingAlertsEnabled,
-    swingAlertsLog,
-    submitSwingCommand,
-    swingAlertPayload,
-    changeSwingAlertMonths,
-    requestSwingImageUpload,
-    requestSwingImagePaste,
-    dayTradeAlertsEnabled,
-    dayTradeAlertsLog,
-    submitDayTradeCommand,
-    dayTradeAlertPayload,
-    changeDayTradeAlertMonths,
-    requestDayTradeImageUpload,
-    requestDayTradeImagePaste,
+    swingAlerts,
+    dayTradeAlerts,
     hideVideoPlayer,
     videoPlayerUrl,
     scheduledVideoForAll,
@@ -566,7 +547,7 @@
 
                     The icon is `fas fa-bell` (const 64), shared with the Day Trades tab.
                   -->
-        {#if swingAlertsEnabled}
+        {#if swingAlerts.enabled}
           <li role="presentation" class="nav-item">
             <a
               id="swingAlerts-tab"
@@ -604,7 +585,7 @@
                     own heading says "Latest Day Trade Alerts" and the tab says the short form. The
                     icon is `fas fa-bell` (const 64), the same tuple the Swing tab uses.
                   -->
-        {#if dayTradeAlertsEnabled}
+        {#if dayTradeAlerts.enabled}
           <li role="presentation" class="nav-item">
             <a
               id="dayTradeAlerts-tab"
@@ -975,7 +956,7 @@
                     it is what lets the contract test prove the component renders nothing on a false
                     entitlement without standing up this whole page.
                   -->
-        {#if swingAlertsEnabled}
+        {#if swingAlerts.enabled}
           <div
             id="swingAlerts"
             class={mainTab === 'swingAlerts'
@@ -985,24 +966,24 @@
             aria-labelledby="swingAlerts-tab"
           >
             <SwingAlertsPane
-              alerts={swingAlertsLog}
-              hasSwingTradeAlerts={swingAlertsEnabled}
+              alerts={swingAlerts.log}
+              hasSwingTradeAlerts={swingAlerts.enabled}
               {isPresenter}
               onCreate={async (draft) => {
-                await submitSwingCommand('swingAlertMsg', swingAlertPayload(draft));
+                await swingAlerts.submit('swingAlertMsg', swingAlerts.payload(draft));
               }}
               onDelete={async (swingAlertID) => {
-                await submitSwingCommand('deleteSwingAlertMsg', { swingAlertID });
+                await swingAlerts.submit('deleteSwingAlertMsg', { swingAlertID });
               }}
               onEdit={async (draft) => {
-                await submitSwingCommand('editSwingAlertMsg', {
-                  ...swingAlertPayload(draft),
+                await swingAlerts.submit('editSwingAlertMsg', {
+                  ...swingAlerts.payload(draft),
                   swingAlertID: draft.swingAlertID ?? 0
                 });
               }}
-              onMonthsChange={(months) => void changeSwingAlertMonths(months)}
-              onPasteImage={requestSwingImagePaste}
-              onUploadImage={requestSwingImageUpload}
+              onMonthsChange={(months) => void swingAlerts.changeMonths(months)}
+              onPasteImage={(file) => swingAlerts.requestImagePaste(file)}
+              onUploadImage={() => swingAlerts.requestImageUpload()}
               sessionHandle={data.sessionHandle}
             />
           </div>
@@ -1017,7 +998,7 @@
                     it is what lets the contract test prove the component renders nothing on a false
                     entitlement without standing up this whole page.
                   -->
-        {#if dayTradeAlertsEnabled}
+        {#if dayTradeAlerts.enabled}
           <div
             id="dayTradeAlerts"
             class={mainTab === 'dayTradeAlerts'
@@ -1027,26 +1008,26 @@
             aria-labelledby="dayTradeAlerts-tab"
           >
             <DayTradeAlertsPane
-              alerts={dayTradeAlertsLog}
-              hasDayTradeAlerts={dayTradeAlertsEnabled}
+              alerts={dayTradeAlerts.log}
+              hasDayTradeAlerts={dayTradeAlerts.enabled}
               {isPresenter}
               onCreate={async (draft) => {
-                await submitDayTradeCommand('dayTradeAlertMsg', dayTradeAlertPayload(draft));
+                await dayTradeAlerts.submit('dayTradeAlertMsg', dayTradeAlerts.payload(draft));
               }}
               onDelete={async (dayTradeAlertID) => {
-                await submitDayTradeCommand('deleteDayTradeAlertMsg', {
+                await dayTradeAlerts.submit('deleteDayTradeAlertMsg', {
                   dayTradeAlertID
                 });
               }}
               onEdit={async (draft) => {
-                await submitDayTradeCommand('editDayTradeAlertMsg', {
-                  ...dayTradeAlertPayload(draft),
+                await dayTradeAlerts.submit('editDayTradeAlertMsg', {
+                  ...dayTradeAlerts.payload(draft),
                   dayTradeAlertID: draft.dayTradeAlertID ?? 0
                 });
               }}
-              onMonthsChange={(months) => void changeDayTradeAlertMonths(months)}
-              onPasteImage={requestDayTradeImagePaste}
-              onUploadImage={requestDayTradeImageUpload}
+              onMonthsChange={(months) => void dayTradeAlerts.changeMonths(months)}
+              onPasteImage={(file) => dayTradeAlerts.requestImagePaste(file)}
+              onUploadImage={() => dayTradeAlerts.requestImageUpload()}
               sessionHandle={data.sessionHandle}
             />
           </div>

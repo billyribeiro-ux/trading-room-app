@@ -28,8 +28,7 @@ import { describe, expect, it } from 'vitest';
 
   (1) and (3) are the two halves of what would have caught `presenterCommand`: a call site naming
   something the server does not have. (3) is mostly the compiler's job once a thing is an import;
-  (1) is the half the compiler can never do, because those four call sites build the name at
-  runtime.
+  (1) is the half the compiler can never do, because those call sites build the name at runtime.
 */
 
 const SRC = new URL('../', import.meta.url);
@@ -92,10 +91,11 @@ describe('the call-site sweep can see the application', () => {
 });
 
 /*
-  THE FOUR THAT REMAIN, and why the first version of this file claimed there were none.
+  THE THREE THAT REMAIN — four until 2026-08-16 — and why the first version of this file claimed
+  there were none.
 
   I asserted "zero `fetch('?/…')` call sites" and it was FALSE. My sweep — and the grep I checked it
-  with — matched `fetch('?/`, a single-quoted literal. These four build the endpoint from a template
+  with — matched `fetch('?/`, a single-quoted literal. They build the endpoint from a template
   literal, `fetch(\`?/${action}\`)`, so neither saw them. That is the same mistake as the
   `presenterCommand` miss one commit earlier: searching for the shape I expected and concluding from
   what came back.
@@ -110,7 +110,15 @@ describe('the call-site sweep can see the application', () => {
   done is closing the failure mode: every name each union can produce is checked against the actions
   that actually exist. The list of dispatchers is a ratchet — it may shrink, never grow.
 */
-const DISPATCHERS = [
+/** A dispatcher, plus WHERE its reachable set is written when that is not the signature. */
+type Dispatcher = {
+  readonly file: string;
+  readonly fn: string;
+  readonly declaration?: string;
+  readonly actions: readonly string[];
+};
+
+const DISPATCHERS: readonly Dispatcher[] = [
   {
     file: 'routes/+page.svelte',
     fn: 'async function submitPollAction(',
@@ -128,59 +136,91 @@ const DISPATCHERS = [
       'setWelcomeMatNoteTab'
     ]
   },
+  /*
+    THE TWO TRADE ALERT DISPATCHERS BECAME ONE, and the union moved with it.
+
+    Phase 5 slice 15 replaced `submitSwingCommand` and `submitDayTradeCommand` — two functions
+    with byte-identical bodies — with one generic `RoomTradeAlerts.submit(action: Action, …)`
+    instantiated twice. So the reachable set is no longer written in the signature; it is written in
+    two exported type aliases, and `declaration` is where each entry now looks for it.
+
+    Two entries against ONE dispatcher is the honest shape: there is one `fetch`, and there are two
+    unions that can reach it, because there are two instances. The count assertion below counts
+    dispatchers rather than table rows for exactly that reason.
+
+    The list shrank from four to three, which is the direction the ratchet allows.
+  */
   {
-    file: 'routes/+page.svelte',
-    fn: 'async function submitSwingCommand(',
+    file: 'lib/room/trade-alerts.svelte.ts',
+    fn: 'async submit(',
+    declaration: 'export type SwingAlertAction =',
     actions: ['swingAlertMsg', 'editSwingAlertMsg', 'deleteSwingAlertMsg']
   },
   {
-    file: 'routes/+page.svelte',
-    fn: 'async function submitDayTradeCommand(',
+    file: 'lib/room/trade-alerts.svelte.ts',
+    fn: 'async submit(',
+    declaration: 'export type DayTradeAlertAction =',
     actions: ['dayTradeAlertMsg', 'editDayTradeAlertMsg', 'deleteDayTradeAlertMsg']
   }
-] as const;
+];
+
+/** One row per DISPATCHER, not per union — two of the rows above share a `fetch`. */
+const DISPATCHER_COUNT = new Set(DISPATCHERS.map((entry) => entry.file + entry.fn)).size;
 
 describe('the form actions still reached from JavaScript', () => {
   const SERVER = FILES.find((file) => file.path === 'routes/+page.server.ts')!;
 
-  it('is exactly the four dispatchers listed, and the list only ever shrinks', () => {
+  it('is exactly the three dispatchers listed, and the list only ever shrinks', () => {
     /*
       Counted from the CODE rather than trusted from the table above, so converting one and
       forgetting to delete its row here fails instead of passing quietly.
+
+      Four until 2026-08-16, three since: merging the two trade alert dispatchers into one generic
+      method removed one. A shrink is allowed and a growth is not, which is why this reads the code
+      and compares against a count DERIVED from the table rather than against a literal.
     */
     const found = FILES.flatMap((file) =>
       [...file.code.matchAll(/fetch\(\s*[`'"]\?\//g)].map(() => file.path)
     );
-    expect(found).toHaveLength(DISPATCHERS.length);
+    expect(found).toHaveLength(DISPATCHER_COUNT);
     expect(new Set(found)).toEqual(new Set(DISPATCHERS.map((entry) => entry.file)));
   });
 
-  it.each(DISPATCHERS)('$fn still reaches actions that exist', ({ file, fn, actions }) => {
-    /*
+  it.each(DISPATCHERS)(
+    '$fn still reaches actions that exist ($declaration)',
+    ({ file, fn, actions, declaration }) => {
+      /*
       THE GUARD THAT WOULD HAVE CAUGHT `presenterCommand`, for the case where the compiler cannot.
 
       Each name in the union is checked against `+page.server.ts`. Convert one of these to a remote
       function without rewriting the dispatcher and this goes red, where today it would compile,
       type-check, lint, build, and silently do nothing.
-    */
-    const source = FILES.find((entry) => entry.path === file);
-    expect(source, `${file} must be in the sweep`).toBeDefined();
-    const at = source!.code.indexOf(fn);
-    expect(at, `${fn} must exist in ${file}`).toBeGreaterThan(-1);
 
-    // The union is declared in the signature; assert the table matches the code, not just the code.
-    const signature = source!.code.slice(
-      at,
-      source!.code.indexOf('{', source!.code.indexOf(')', at))
-    );
-    for (const action of actions) {
-      expect(signature, `${fn} must still name ${action}`).toContain(`'${action}'`);
-      expect(
-        SERVER.code,
-        `${file} posts to '?/${action}', which no longer exists as an action — convert the dispatcher or restore it`
-      ).toContain(`${action}: async`);
+      `declaration` names WHERE the union is written, because that stopped always being the
+      signature: a generic `submit(action: Action, …)` declares its reachable set in an exported
+      type alias instead. The dispatcher itself is still asserted to exist — a union with no
+      `fetch` behind it proves nothing.
+    */
+      const source = FILES.find((entry) => entry.path === file);
+      expect(source, `${file} must be in the sweep`).toBeDefined();
+      const at = source!.code.indexOf(fn);
+      expect(at, `${fn} must exist in ${file}`).toBeGreaterThan(-1);
+
+      const from = declaration ? source!.code.indexOf(declaration) : at;
+      expect(from, `${declaration ?? fn} must exist in ${file}`).toBeGreaterThan(-1);
+      // Where the names live: the signature, or the type alias up to its terminating semicolon.
+      const signature = declaration
+        ? source!.code.slice(from, source!.code.indexOf(';', from))
+        : source!.code.slice(from, source!.code.indexOf('{', source!.code.indexOf(')', from)));
+      for (const action of actions) {
+        expect(signature, `${fn} must still name ${action}`).toContain(`'${action}'`);
+        expect(
+          SERVER.code,
+          `${file} posts to '?/${action}', which no longer exists as an action — convert the dispatcher or restore it`
+        ).toContain(`${action}: async`);
+      }
     }
-  });
+  );
 
   it('and no dispatcher can reach an action it does not declare', () => {
     /*
@@ -188,12 +228,15 @@ describe('the form actions still reached from JavaScript', () => {
       union IS the reachable set — but only while the interpolation is the whole path. A concatenation
       or a computed segment would break that, and this is what says so.
     */
-    const page = FILES.find((file) => file.path === 'routes/+page.svelte')!;
-    for (const match of page.code.matchAll(/fetch\(\s*`\?\/([^`]*)`/g)) {
-      expect(
-        match[1],
-        'a dispatcher must interpolate exactly its `action` parameter and nothing else'
-      ).toBe('${action}');
+    // Every file, not just the page: one of the three dispatchers lives in `lib/room/` since
+    // slice 15, and a check scoped to `+page.svelte` would have stopped seeing it.
+    for (const file of FILES) {
+      for (const match of file.code.matchAll(/fetch\(\s*`\?\/([^`]*)`/g)) {
+        expect(
+          match[1],
+          `a dispatcher must interpolate exactly its \`action\` parameter and nothing else (${file.path})`
+        ).toBe('${action}');
+      }
     }
   });
 });
