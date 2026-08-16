@@ -24,6 +24,48 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-16
 
+### 2026-08-16 16:01 EDT — Phase 5 slice 21: `RoomWebcams`, and a generator that judged a rule before running it
+
+**`+page.svelte` 4,485 → 4,323 (−162).** Suite 2,283 → 2,286 across 154 files. `svelte-check`
+1,178 files, 0 errors, 0 warnings. `eslint` clean.
+**Runtime impact: yes** — the webcam cards moved. No behaviour changed.
+
+**`src/lib/room/webcams.ts` (229).** The cards, the drag-and-resize panel they live in, and the
+three attachments that put a `MediaStream` into an element. Six functions and TWO collaborators —
+the cleanest seam left on the page, which is why it was taken whole rather than folded into the
+transport.
+
+**It renders; it does not capture.** `RoomMediaTransport` acquires the camera and produces it into
+the SFU; this decides what a card looks like and which element the stream lands in. That is the same
+split `RoomNavbar` already draws — it decides what a button LOOKS like, `RoomMedia` says what is
+true.
+
+**A plain `.ts` again, on the same test as `recording.ts`:** nothing here holds a rune. The list
+of presenters is the transport's `#webcamPresenters`, which is `$state` and stays there.
+
+**Two helpers became MODULE functions rather than methods.** `setWebcamAudioAttributes` and
+`setAutoplayAttribute` each take a node and set an attribute; neither reads `this`, and both are
+reached from the template. As private methods eslint refused them; as public ones they would have
+been two more unbound references for the prototype contract to catch. A pure helper that never
+touches instance state is not a method, and saying so in the shape is cheaper than exempting it
+twice.
+
+**A generator bug of mine, which reported a rule that had not run as a rule that had failed.** The
+whole-line count check ran BEFORE `consts` was processed, so a line rule scoped to a const region
+was counted at zero and refused. Slice 21 is the first extraction to put a line rule on a const,
+which is why the ordering had never been exercised; the check now runs after every producer.
+
+**And a second one, on escaping.** A code-span rewrite passed through JSON turns a `\w` into a
+literal backslash unless it is escaped twice. `data.sessionHandle` sits inside a template
+interpolation and silently did not rewrite. It is a whole-line rule with an asserted count now — the
+third time this session that hand-counted escaping has cost a round, and the third fix that removes
+the level rather than adding a backslash.
+
+**Negative control seen red:** making the card's X stop the camera — the exact confusion
+`webcam-contract` exists to refuse — then restored.
+
+Not verified: no browser run. Nothing here proves a card renders.
+
 ### 2026-08-16 15:53 EDT — Phase 5 slice 20: `RoomRecording`, and a file extension that was lying
 
 **`+page.svelte` 4,708 → 4,485 (−223).** Suite 2,280 → 2,283 across 154 files. `svelte-check`
