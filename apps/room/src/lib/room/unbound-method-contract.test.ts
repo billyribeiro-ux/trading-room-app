@@ -7,6 +7,7 @@ import { RoomBroadcasts } from './broadcasts.svelte';
 import { RoomFiles } from './files.svelte';
 import { RoomPrivateChat } from './private-chat.svelte';
 import { RoomTradeAlerts } from './trade-alerts.svelte';
+import { RoomUserActions } from './user-actions.svelte';
 import { RoomChat } from './chat.svelte';
 import { RoomDialogs } from './dialogs.svelte';
 import { RoomLogPages } from './log-pages.svelte';
@@ -65,6 +66,7 @@ const INSTANCES: Record<string, new (...args: never[]) => object> = {
   files: RoomFiles,
   swingAlerts: RoomTradeAlerts,
   privateChat: RoomPrivateChat,
+  userActions: RoomUserActions,
   /*
     The Phase 1 classes, added when the completeness check below refused a map that covered only the
     new ones. Every one of these is handed to a component as a prop — `roster` and `menus` go whole

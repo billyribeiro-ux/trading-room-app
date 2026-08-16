@@ -64,7 +64,6 @@
   import { MediaSession } from '$lib/media/session';
   import { startSpeechRecognition } from '$lib/media/speech-reco';
   import { isMtxStream } from '$lib/mtx-streams';
-  import { MISSING_SCHEME_ALERT, addVideoToList, isAcceptableSendUrl, userActionAlert } from '$lib/user-action-intent';
   import {
     captureErrorMessage,
     captureErrorName,
@@ -106,6 +105,7 @@
     type PrivateChatMessage,
     RoomPrivateChat
   } from '$lib/room/private-chat.svelte';
+  import { RoomUserActions } from '$lib/room/user-actions.svelte';
   import {
     DAY_TRADE_ALERT_FEED,
     type DayTradeAlertAction,
@@ -116,11 +116,6 @@
   import type { RoomMessageChrome } from '$lib/room-message-chrome';
   import { EXTRA_COMPOSER, RoomChat } from '$lib/room/chat.svelte';
   import { RoomMedia } from '$lib/room/media.svelte';
-  import {
-    MUTE_ALL_CONFIRM,
-    MUTE_STAGGER_MS,
-    nonAdminTalkingUsers
-  } from '$lib/mute-all-non-admins';
   import { tawkAttributes, tawkScript, tawkSupportAvailable } from '$lib/tawk-support';
   import {
     RoomSplit,
@@ -185,12 +180,10 @@
     MessageAction,
     FollowChatStyle,
     MainTab,
-    ManagedChatUser,
     MessageActionItem,
     MessageReactionPayload,
     MessageReactions,
     ModalName,
-    ModalTargetUser,
     NoteVersion,
     SettingsTab,
     Theme,
@@ -1140,8 +1133,6 @@
       }
     >
   >({});
-  let selectedUserId = $state<number | null>(null);
-  let selectedMessageUser = $state<ModalTargetUser | null>(null);
   let selectedMessage = $state<MessageActionItem | null>(null);
   let selectedImageUrl = $state<string | null>(null);
   /*
@@ -1274,8 +1265,8 @@
     viewerOnlyMode: () => viewerOnlyMode,
     playSound: (name) => playSoundEffect(name),
     closeUserMenu: () => menus.openUserMenu(null),
-    selectRosterUser: (user) => selectRosterUser(user),
-    onCleared: () => (selectedMessageUser = null),
+    selectRosterUser: (user) => userActions.select(user),
+    onCleared: () => userActions.clearSelectedMessageUser(),
     onThreadDeleted: () => invalidateAll()
   });
   /*
@@ -1294,6 +1285,44 @@
     reactive value breaks the link for everything reading it downstream.
   */
   const toasts = new RoomToasts();
+  /*
+    Everything that can be DONE to a user, in `$lib/room/user-actions.svelte.ts`.
+
+    Phase 5 slice 13, and the largest single function in this file went with it: `handleUserAction`
+    was 249 lines. What holds the twenty-three declarations together is that every one of them reads
+    the same two things — WHO is selected, and what this viewer may do — and `ModalHost` reads the
+    resolved `target` a hundred times.
+
+    Constructed after `toasts` because it needs one, and after `privateChat` even though
+    `privateChat` is handed `select`. That is not a cycle: the hand-off is an arrow, evaluated
+    when a roster row is clicked rather than when the class is built.
+
+    `defaultFollowStyle` is injected rather than moved — it reads the theme preference, and
+    `alerts-background-contract.test.ts` pins it against THIS file by name because it is about a
+    captured colour rather than about this class.
+  */
+  const userActions = new RoomUserActions<(typeof data.connectedUsers)[number]>({
+    dialogs,
+    toasts,
+    commands: {
+      presenter: (payload) => presenterCommand(payload),
+      editUsername: (payload) => editUsername(payload),
+      unmuteChat: (payload) => unmuteChatCommand(payload)
+    },
+    session: () => data,
+    isPresenter: () => isPresenter,
+    talking: () => media.talking,
+    rosterUsers: () => roster.users,
+    savePreference: (key, value) => prefs.save(key, value),
+    openModal: (name) => openModal(name),
+    closeModal: () => (modal = null),
+    closeUserMenu: () => menus.openUserMenu(null),
+    mentionUser: (name) => mentionUser(name),
+    clearSelectedMessage: () => (selectedMessage = null),
+    hidePreviewWindows: () => (previewWindowsVisible = false),
+    defaultFollowStyle: () => defaultFollowChatStyle(),
+    reload: () => invalidateAll()
+  });
   let tweetWindow: Window | null = null;
   /**
    * `app-privchat`'s state, in the capture's own shapes.
@@ -1554,8 +1583,6 @@
   const alertArrivals = new RoomArrivals<(typeof data.alerts)[number]>();
   let alertScrollTimer: ReturnType<typeof globalThis.setTimeout> | undefined;
   let chatScrollTimer: ReturnType<typeof globalThis.setTimeout> | undefined;
-  let mutedUsers = $state<Record<string, ManagedChatUser>>({});
-  let followedUsers = $state<Record<string, ManagedChatUser>>({});
   /**
    * The other half of `onResize`, and the half that is easy to miss: crossing the threshold REFETCHES
    * (`app-room.full.js:2987-2999`).
@@ -1907,60 +1934,10 @@
    */
   const extraChatColumnVisible = $derived(prefs.extraChatColumn && !split.chatCollapsed);
 
-  const targetUser = $derived.by<ModalTargetUser>(() => {
-    if (selectedMessageUser) return selectedMessageUser;
-    const user = data.connectedUsers.find((connectedUser) => connectedUser.id === selectedUserId);
-    if (!user) {
-      return {
-        id: 0,
-        nick: '',
-        emailHash: 'undefined',
-        pic: 'https://secure.gravatar.com/avatar/undefined?d=mm&s=80',
-        status: 'offline',
-        ip: 'n/a'
-      };
-    }
-    return {
-      id: user.id,
-      nick: user.displayName,
-      email: user.email,
-      emailHash: user.emailHash,
-      pic: user.avatarUrl,
-      status: user.status,
-      permissions: user.role === 'user' ? 'r' : 'a',
-      ...(user.status !== 'offline' ? { userXrefID: String(user.id), _id: String(user.id) } : {})
-    };
-  });
 
-  function rosterUserTarget(user: (typeof data.connectedUsers)[number]): ModalTargetUser {
-    return {
-      id: user.id,
-      nick: user.displayName,
-      email: user.email,
-      emailHash: user.emailHash,
-      pic: user.avatarUrl,
-      status: user.status,
-      permissions: user.role === 'user' ? 'r' : 'a',
-      ...(user.status !== 'offline' ? { userXrefID: String(user.id), _id: String(user.id) } : {})
-    };
-  }
 
-  function selectRosterUser(user: (typeof data.connectedUsers)[number]) {
-    selectedUserId = user.id;
-    selectedMessageUser = rosterUserTarget(user);
-    selectedMessage = null;
-    menus.openUserMenu(null);
-  }
 
-  function openRosterUserInfo(user: (typeof data.connectedUsers)[number]) {
-    selectRosterUser(user);
-    openModal('user');
-  }
 
-  function mentionRosterUser(user: (typeof data.connectedUsers)[number]) {
-    selectRosterUser(user);
-    mentionUser(user.displayName);
-  }
 
 
   function withEvidenceState<T extends MessageActionItem>(item: T): T {
@@ -2761,149 +2738,14 @@
         };
   }
 
-  function readManagedUsers(key: 'mutedUsers' | 'followedUsers') {
-    if (typeof localStorage === 'undefined') return {};
-    try {
-      const stored = localStorage.getItem(key);
-      if (!stored) return {};
-      const parsed = JSON.parse(stored);
-      return parsed && typeof parsed === 'object'
-        ? (parsed as Record<string, ManagedChatUser>)
-        : {};
-    } catch {
-      return {};
-    }
-  }
 
-  function loadManagedUsers() {
-    mutedUsers = readManagedUsers('mutedUsers');
-    followedUsers = readManagedUsers('followedUsers');
-  }
 
-  function storeManagedUsers(
-    key: 'mutedUsers' | 'followedUsers',
-    users: Record<string, ManagedChatUser>
-  ) {
-    if (typeof localStorage !== 'undefined') {
-      localStorage.setItem(key, JSON.stringify(users));
-    }
-  }
 
-  function applyFollowToggle(user: ModalTargetUser) {
-    const next = { ...followedUsers };
-    if (next[user.emailHash]) {
-      delete next[user.emailHash];
-    } else {
-      next[user.emailHash] = {
-        nick: user.nick,
-        emailHash: user.emailHash,
-        pic: user.pic,
-        userXrefID: user.userXrefID,
-        _id: user._id,
-        followChatStyle: defaultFollowChatStyle()
-      };
-    }
-    followedUsers = next;
-    storeManagedUsers('followedUsers', next);
-  }
 
-  function applyFollowStyle(user: ModalTargetUser, style: FollowChatStyle) {
-    const existing = followedUsers[user.emailHash];
-    if (!existing) return;
-    const next = {
-      ...followedUsers,
-      [user.emailHash]: {
-        ...existing,
-        followChatStyle: { ...style }
-      }
-    };
-    followedUsers = next;
-    storeManagedUsers('followedUsers', next);
-  }
 
-  function applyMuteToggle(user: ModalTargetUser) {
-    const next = { ...mutedUsers };
-    if (next[user.emailHash]) {
-      delete next[user.emailHash];
-    } else {
-      next[user.emailHash] = {
-        nick: user.nick,
-        emailHash: user.emailHash,
-        pic: user.pic
-      };
-    }
-    mutedUsers = next;
-    storeManagedUsers('mutedUsers', next);
-  }
 
-  function requestFollowToggle(user: ModalTargetUser) {
-    dialogs.confirmation = {
-      message: `Do you want to ${followedUsers[user.emailHash] ? 'un' : ''}follow ${user.nick}?`,
-      className: 'manage-user-list',
-      onconfirm: () => {
-        dialogs.confirmation = null;
-        applyFollowToggle(user);
-      }
-    };
-  }
 
-  function requestMuteToggle(user: ModalTargetUser) {
-    dialogs.confirmation = {
-      message: `Do you want to ${mutedUsers[user.emailHash] ? 'un' : ''}mute ${user.nick}?`,
-      className: 'manage-user-list',
-      onconfirm: () => {
-        dialogs.confirmation = null;
-        applyMuteToggle(user);
-      }
-    };
-  }
 
-  /**
-   * `muteAllNonAdmins()` — `app-room.full.js:2963-2986`, reached through
-   * `appEventBus.subscribe('muteAllNonAdmins', …)` (`:2219-2221`), which in this room is the
-   * session-control action of the same name.
-   *
-   * **This replaced a control that did the wrong thing quietly.** It read
-   * `muted = true; volume = 0` — so a presenter who asked the room to silence its non-admin
-   * speakers silenced their OWN speakers instead, and every one of those microphones stayed open
-   * for everybody else. The label and the effect were unrelated.
-   *
-   * The selection is `nonAdminTalkingUsers` in `$lib/mute-all-non-admins`, with the four properties
-   * that matter transcribed and tested there — chiefly that a talking user with no roster row is
-   * SKIPPED rather than assumed ordinary.
-   *
-   * **One mapping, stated because it is not a transcription.** Upstream sends its own
-   * `sendServerCommand('muteTalkingUser', muser)`. This room has no such command; it has
-   * `remotePresCommand` / `mutemic`, which is the same act addressed to one peer and is already
-   * carried out by that peer's own browser (`:5917`). The server re-checks that the caller is a
-   * presenter and that the subCmd is one of three (`+page.server.ts:1654-1670`), so authority is
-   * decided there rather than asserted here.
-   *
-   * The 100ms stagger is the reference's and is not cosmetic: this is one request per muted member.
-   */
-  function muteAllNonAdmins() {
-    // `if (!globals.user.isPresenter) return` — the first line of the method, before the dialog.
-    if (!isPresenter) return;
-    // `!e || 0 === e.length ||` — with nobody speaking the confirm never opens at all.
-    if (media.talking.length === 0) return;
-
-    dialogs.confirmation = {
-      message: MUTE_ALL_CONFIRM,
-      onconfirm: () => {
-        dialogs.confirmation = null;
-        const targets = nonAdminTalkingUsers(media.talking, roster.users);
-        // `0 !== r.length &&` — an empty selection sends nothing, which is the case where every
-        // open microphone belongs to a presenter.
-        targets.forEach((entry, index) => {
-          globalThis.setTimeout(() => {
-            void presenterCommand({ subCmd: 'mutemic', targetUserId: entry.userID }).catch(
-              (cause) => console.error('[presenterCommand]', cause)
-            );
-          }, MUTE_STAGGER_MS * index);
-        });
-      }
-    };
-  }
 
   /**
    * Tawk.to presenter support — `app-room.full.js:2224-2298`.
@@ -2998,322 +2840,10 @@
     tawkWidgetOpen = true;
   }
 
-  function requestManagedUserRemoval(list: 'mutedUsers' | 'followedUsers', user: ManagedChatUser) {
-    dialogs.confirmation = {
-      message: `Do you want to un${list === 'mutedUsers' ? 'mute' : 'follow'} ${user.nick}?`,
-      className: 'manage-user-list',
-      onconfirm: () => {
-        dialogs.confirmation = null;
-        const next = { ...(list === 'mutedUsers' ? mutedUsers : followedUsers) };
-        delete next[user.emailHash];
-        if (list === 'mutedUsers') mutedUsers = next;
-        else followedUsers = next;
-        storeManagedUsers(list, next);
-      }
-    };
-  }
 
-  function openManagedUserInfo(user: ManagedChatUser) {
-    if (!user.userXrefID || !user._id) {
-      dialogs.alert = 'User is not logged in.';
-      return;
-    }
-    selectedMessageUser = {
-      id: Number(user._id),
-      nick: user.nick,
-      emailHash: user.emailHash,
-      pic: user.pic,
-      status: 'online',
-      userXrefID: user.userXrefID,
-      _id: user._id
-    };
-    openModal('user');
-  }
 
-  /** `invalidateAll()` only on the resolved path — the roster is this route's `load`, not a query. */
-  async function updateUsername(user: ModalTargetUser, username: string) {
-    const trimmed = username.trim();
-    if (!trimmed) return;
-    try {
-      await editUsername({ userId: user.id, username: trimmed });
-    } catch (cause) {
-      dialogs.alert = isHttpError(cause) ? cause.body.message : 'Could not change that username.';
-      return;
-    }
-    await invalidateAll();
-  }
 
-  /**
-   * Lifts a member's chat mute — the other half of `mute24`.
-   *
-   * The mute was enforced on the server and the unmute was not sent anywhere: the modal's button
-   * raised the reference's alert and stopped. `invalidateAll()` refreshes the presenter's own view
-   * of the roster; the MEMBER learns about it on the `privCmds` channel, because their gate is
-   * server-read and nothing local to them changed.
-   *
-   * That `invalidateAll()` runs by hand and has to: single-flight mutations refresh remote QUERIES,
-   * and the presenter's roster is not one — it comes from this route's `load`. Converting it is its
-   * own change, and doing it here would be claiming a refresh that never happens.
-   *
-   * The caller does not await this — `handleUserAction` is synchronous — but it DOES catch it. A
-   * remote command rejects where the old `fetch('?/unmuteChat')` returned `response.ok === false`
-   * for anyone who bothered to look, and nobody did; that is the same silent success this whole
-   * path was built to fix. `chat-mute.remote.ts` carries the rest of the reasoning.
-   */
-  async function unmuteChat(user: ModalTargetUser) {
-    await unmuteChatCommand({ targetUserId: user.id });
-    await invalidateAll();
-  }
 
-  function handleUserAction(action: string, user: ModalTargetUser) {
-    if (action === 'session-reload-config') {
-      dialogs.confirm('Are you sure you want to reload tge session config?', () => {
-        modal = null;
-        void invalidateAll();
-        dialogs.alert = 'Session config reloaded...';
-      });
-      return;
-    }
-
-    /*
-      The reference raises `alertService.success("Copied to clipboard.")` from all three of its
-      copy buttons (`main.d6d3c112b59b7d0d.js` bytes 2168500-2169300). `alertService` is
-      ngx-toastr, which is what `ToastHost` reproduces — so this is the same transient success
-      toast, not a modal.
-    */
-    if (action === 'copied-to-clipboard') {
-      toasts.show({ kind: 'success', message: 'Copied to clipboard.', enableHtml: false });
-      return;
-    }
-
-    if (action === 'session-refresh-roster') {
-      void invalidateAll();
-      dialogs.alert =
-        'Command send OK. Please allow 1/2 minute for old entries to get deleted from the list';
-      return;
-    }
-
-    if (action === 'session-soft-reset') {
-      dialogs.confirm('Are you sure you want to soft reset the room?', () => {
-        modal = null;
-        void invalidateAll();
-        dialogs.alert = 'Soft reset request sent...';
-      });
-      return;
-    }
-
-    if (action === 'session-hard-reset' || action === 'session-hard-reset-revoke') {
-      dialogs.confirm('Are you sure you want to reset the room?', () => {
-        modal = null;
-        prefs.save('sessionTokensRevoked', action === 'session-hard-reset-revoke');
-        void invalidateAll();
-      });
-      return;
-    }
-
-    if (action === 'session-save-close') {
-      prefs.save('sessionOpen', false);
-      modal = null;
-      return;
-    }
-
-    if (action === 'session-save-close-message') {
-      dialogs.alert = 'Message Saved';
-      return;
-    }
-
-    if (action === 'session-open') {
-      prefs.save('sessionOpen', true);
-      modal = null;
-      return;
-    }
-
-    if (action === 'session-lock' || action === 'session-lock-kick') {
-      prefs.save('sessionLocked', true);
-      prefs.save('sessionLockKick', action === 'session-lock-kick');
-      dialogs.alert = 'Session Locked';
-      return;
-    }
-
-    if (action === 'session-unlock') {
-      prefs.save('sessionLocked', false);
-      dialogs.alert = 'Session Unlocked';
-      return;
-    }
-
-    if (action === 'invalid-restream-link') {
-      dialogs.alert =
-        'Invalid RTMP link!, please make sure it starts with "rtmp://" and does not contain spaces or special characters. For example: rtmp://example.com/live/stream';
-      return;
-    }
-
-    if (
-      action === 'session-send-video' ||
-      action === 'session-send-sales-image' ||
-      action === 'session-send-users-url'
-    ) {
-      dialogs.prompt = {
-        title: 'Please enter the URL:',
-        value: '',
-        onconfirm: (value) => {
-          const url = value.trim();
-          dialogs.prompt = null;
-          if (!isAcceptableSendUrl(url)) {
-            dialogs.alert = MISSING_SCHEME_ALERT;
-            return;
-          }
-          if (action === 'session-send-video') {
-            const key = `videos-${data.sessionHandle}`;
-            const stored = JSON.parse(localStorage.getItem(key) ?? '[]') as string[];
-            const result = addVideoToList(stored, url);
-            if (!result.added) {
-              dialogs.alert = 'Video already exists.';
-              return;
-            }
-            localStorage.setItem(key, JSON.stringify(result.videos));
-            modal = null;
-            dialogs.alert = 'Video added.';
-            return;
-          }
-          modal = null;
-          dialogs.alert = 'Command send OK.';
-        }
-      };
-      return;
-    }
-
-    if (action === 'edit-my-info') {
-      selectedMessageUser = null;
-      selectedUserId = data.user.id;
-      modal = 'user';
-      return;
-    }
-
-    if (action === 'remove-preview-windows') {
-      previewWindowsVisible = false;
-      return;
-    }
-
-    if (action === 'mute-all-non-admins') {
-      muteAllNonAdmins();
-      return;
-    }
-
-    if (action === 'edit-username') {
-      // `editUsername(e)` - a presenter renaming somebody else. No pre-filled value, no length or
-      // character rules: the capture accepts whatever a presenter types.
-      dialogs.prompt = {
-        title: `Enter a new username for "${user.nick}":`,
-        value: '',
-        onconfirm: (value) => {
-          dialogs.prompt = null;
-          void updateUsername(user, value);
-        }
-      };
-      return;
-    }
-
-    if (action === 'edit-username-by-user') {
-      /*
-        `editUsernameByUser(e)` - a member renaming THEMSELVES, and a different function from the
-        one above in four ways the capture is explicit about:
-
-          bootbox.prompt({ title: "Enter a new username for yourself:", value: this.user.nick, … })
-          if (!/^[a-zA-Z0-9]+$/.test(o))  "Username can only contain letters and numbers"
-          if (o.length < 3)               "Username must be at least 3 characters long"
-          if (o.length >= 30)             "Username must be less than 30 characters long"
-          … && this.user.nick?.trim() != o && (… setPreference("savedNick", o) …)
-
-        The rules exist because this one is reachable by the person being renamed. Every string is
-        the capture's, including "less than 30" on a `>= 30` test.
-      */
-      dialogs.prompt = {
-        title: 'Enter a new username for yourself:',
-        value: user.nick,
-        onconfirm: (value) => {
-          dialogs.prompt = null;
-          const next = value?.trim() ?? '';
-          if (next.length === 0) return;
-          if (!/^[a-zA-Z0-9]+$/.test(next)) {
-            dialogs.alert = 'Username can only contain letters and numbers';
-            return;
-          }
-          if (next.length < 3) {
-            dialogs.alert = 'Username must be at least 3 characters long';
-            return;
-          }
-          if (next.length >= 30) {
-            dialogs.alert = 'Username must be less than 30 characters long';
-            return;
-          }
-          // Unchanged is a no-op, not a round trip.
-          if (user.nick?.trim() === next) return;
-          void updateUsername(user, next);
-        }
-      };
-      return;
-    }
-
-    if (action === 'kick' || action === 'kick-ban') {
-      dialogs.prompt = {
-        title: 'Enter the kick message for this user',
-        value: 'You have been kicked from the room by an administrator',
-        onconfirm: () => {
-          dialogs.prompt = null;
-          modal = null;
-          dialogs.alert = 'User kicked OK';
-        }
-      };
-      return;
-    }
-
-    if (action === 'kick-duplicates') {
-      dialogs.prompt = {
-        title: `Kick all other duplicates of ${user.nick} with the following message:`,
-        value: 'You have been kicked from the room by an administrator',
-        onconfirm: () => {
-          dialogs.prompt = null;
-          modal = null;
-          dialogs.alert = `No duplicates found for ${user.nick}`;
-        }
-      };
-      return;
-    }
-
-    if (action === 'admin-notes-password') {
-      dialogs.prompt = {
-        title: "Please enter the password to manage user's notes:",
-        value: '',
-        onconfirm: () => {
-          dialogs.prompt = null;
-          dialogs.alert = 'Wrong password!';
-        }
-      };
-      return;
-    }
-
-    /*
-      Ahead of `userActionAlert` below because this one sends something — see `EXACT_ALERTS` in
-      `user-action-intent.ts` for why leaving it in that table was the bug. The alert is raised
-      first because the reference raises it immediately; `Command failed.` is inherited from the
-      sibling handlers in this file, not captured, because the reference never showed us a failure
-      for this control.
-    */
-    if (action === 'unmute-chat') {
-      dialogs.alert = 'user chat unmuted';
-      void unmuteChat(user).catch(() => {
-        dialogs.alert = 'Command failed.';
-      });
-      return;
-    }
-
-    // The table moved to `user-action-intent.ts`; the state writes stay here. See it for why.
-    const fixedAlert = userActionAlert(action);
-    if (fixedAlert) {
-      if (action === 'save-permissions') modal = null;
-      dialogs.alert = fixedAlert;
-    }
-  }
 
   /**
    * `toggleAlertsToolbar()` - the gear (`app-alerts.compiled.js:134-140`):
@@ -3363,7 +2893,7 @@
   }
 
   function openModal(name: Exclude<ModalName, null>) {
-    if (name === 'muted' || name === 'followed' || name === 'user') loadManagedUsers();
+    if (name === 'muted' || name === 'followed' || name === 'user') userActions.loadManaged();
     modal = name;
     menus.closeForModal();
   }
@@ -4312,7 +3842,7 @@
   ) {
     if (action !== 'reaction') menus.openMessageMenu(null);
     selectedMessage = item;
-    selectedMessageUser = {
+    userActions.selectedMessageUser = {
       id: item.senderId,
       nick: item.senderName,
       emailHash: item.senderEmailHash,
@@ -6300,7 +5830,7 @@
         The chat ding, transcribed from `app-chat.compiled.js:112-137`:
 
           !preferences.doNotDisturbOn && preferences.chatSoundOn
-            ? followedUsers[e.avt].followChatStyle.playSound
+            ? userActions.followedUsers[e.avt].followChatStyle.playSound
                 ? pling.play()
                 : ((playChatMessageSoundFor.length && hashEmail(user.email) !== e.avt
                      && playChatMessageSoundFor.includes(e.avt))
@@ -6325,7 +5855,9 @@
       */
       if (payload.channel === 'chat' && !prefs.doNotDisturbOn && prefs.chatSoundOn) {
         const senderHash = (payload.data as { senderEmailHash?: string } | undefined)?.senderEmailHash;
-        const followStyle = senderHash ? followedUsers[senderHash]?.followChatStyle : undefined;
+        const followStyle = senderHash
+      ? userActions.followedUsers[senderHash]?.followChatStyle
+      : undefined;
         if (followStyle?.playSound) playSoundEffect('pling');
         else if (data.sessData?.dingOnNewMessage) playSoundEffect('followed');
       }
@@ -6408,7 +5940,7 @@
     const stopTawk = tawkAvailable ? loadTawkSupport() : () => {};
     initializeSoundEffects();
     setSoundEffectsVolume(roomVolume.volume / 100);
-    loadManagedUsers();
+    userActions.loadManaged();
     promoteLegacySplitSizes();
 
     /*
@@ -7465,10 +6997,10 @@
           benzingaLogoUrl={data.sessData?.altBenzingaLogoURL}
           dumpVersion={DUMP_CONTRACT.version}
           onopenmodal={openModal}
-          onopenrosteruserinfo={openRosterUserInfo}
+          onopenrosteruserinfo={(user) => userActions.openInfoFor(user)}
           onopenrosterprivatechat={(user) => privateChat.openFromRoster(user)}
-          onmentionrosteruser={mentionRosterUser}
-          onselectuser={(id) => (selectedUserId = id)}
+          onmentionrosteruser={(user) => userActions.mentionFromRoster(user)}
+          onselectuser={(id) => userActions.selectUserId(id)}
           onusersearchkey={doUserSearch}
           ongetmobilepin={() => void getMyPinAndDoInfo()}
           ongetrandomuser={getRandomUser}
@@ -7544,7 +7076,7 @@
               {visibleChatMessages}
               {alertLabels}
               {messageChrome}
-              {followedUsers}
+              followedUsers={userActions.followedUsers}
               {captureAlertChatElement}
               {captureAlertsScroller}
               {captureChatScroller}
@@ -7689,7 +7221,7 @@
                 {canUseRTE}
                 {giphyApiKey}
                 chrome={messageChrome}
-                {followedUsers}
+                followedUsers={userActions.followedUsers}
                 openMenuKey={menus.messageId}
                 onmenutoggle={(key) => menus.openMessageMenu(key)}
                 onaction={(action, message, event) =>
@@ -7866,20 +7398,20 @@
       alertQuestions={data.alertQuestions}
       onMentionUser={mentionUser}
       onPrivateChat={(user) => {
-        selectedMessageUser = user;
+        userActions.selectedMessageUser = user;
         privateChat.show();
       }}
-      onFollowToggle={requestFollowToggle}
-      onFollowStyleChange={applyFollowStyle}
-      onMuteToggle={requestMuteToggle}
-      onUserAction={handleUserAction}
+      onFollowToggle={(user) => userActions.requestFollowToggle(user)}
+      onFollowStyleChange={(user, style) => userActions.applyFollowStyle(user, style)}
+      onMuteToggle={(user) => userActions.requestMuteToggle(user)}
+      onUserAction={(action, user) => userActions.handle(action, user)}
       streamingType={typeof prefs.loaded.streamingType === 'string' ? prefs.loaded.streamingType : ''}
-      onManagedUserRemoval={requestManagedUserRemoval}
-      onManagedUserInfo={openManagedUserInfo}
+      onManagedUserRemoval={(list, user) => userActions.requestManagedRemoval(list, user)}
+      onManagedUserInfo={(user) => userActions.openManagedInfo(user)}
       currentUser={data.user}
-      {targetUser}
-      {mutedUsers}
-      {followedUsers}
+      targetUser={userActions.target}
+      mutedUsers={userActions.mutedUsers}
+      followedUsers={userActions.followedUsers}
       targetMessage={selectedMessage}
     />
     {#if modal === 'image-upload'}
@@ -8009,7 +7541,7 @@
             <button
               type="button"
               class="btn btn-warning btn-random-user"
-              onclick={() => roster.pick && openRosterUserInfo(roster.pick.entry)}
+              onclick={() => roster.pick && userActions.openInfoFor(roster.pick.entry)}
             >
               User Info
             </button>
@@ -8097,7 +7629,7 @@
       open={privateChat.open}
       doNotDisturb={prefs.doNotDisturbOn}
       {isPresenter}
-      peer={selectedMessageUser}
+      peer={userActions.selectedMessageUser}
       tabs={privateChat.tabs}
       currentUserId={privateChat.peerId}
       log={privateChat.log}
@@ -8107,7 +7639,7 @@
       body={bodySegmentsPrivate}
       formatTime={(at) => privateChat.formatTime(at)}
       onclosepeer={() => {
-        selectedMessageUser = null;
+        userActions.clearSelectedMessageUser();
         selectedMessage = null;
       }}
       ondeletethis={() => privateChat.deleteThread()}

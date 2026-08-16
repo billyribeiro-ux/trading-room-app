@@ -24,6 +24,62 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-16
 
+### 2026-08-16 11:35 EDT — Phase 5 slice 13: `RoomUserActions`, and the largest function in the file
+
+**`+page.svelte` 8,132 → 7,664.** Script 7,180 → 6,712, template unchanged at 952.
+Suite 2,148 → 2,173 across 148 files. `svelte-check` 1,163 files, 0 errors, 0 warnings.
+`eslint` at the pre-existing 27, plus one from in-flight work on `session/+page.svelte`.
+
+**`src/lib/room/user-actions.svelte.ts` (730).** Twenty-three declarations and functions, 501
+lines, of which `handleUserAction` alone was **249** — the largest single function in the page.
+
+**What holds them together is `target`.** `ModalHost` reads it a hundred times. It resolves from
+two fields — the message you clicked, or the roster row you picked — and every action either writes
+those fields or acts on what they resolve to. Splitting the selection from the actions would have
+put a hundred reads on one side of a prop boundary and every write on the other.
+
+**`selectUserId` is a receiver, not a setter, and a negative control proves why.** A bare setter
+lets a caller change WHO is selected while leaving the message selection pointing at somebody else,
+and `target` prefers the message one — so the modal would show the person you did not click.
+
+**The follow half was missed on the first pass, and that is recorded rather than hidden.** The
+extraction took the mute toggle and left `applyFollowToggle`, `applyFollowStyle` and
+`requestFollowToggle` behind, so `followedUsers` had a getter in the class and three writers on the
+page. A field with writers on both sides of a boundary is not extracted, it is shared. Caught by
+reading the page's remaining references, not by any gate.
+
+**`defaultFollowChatStyle` is injected rather than moved**, twice over: it reads the theme
+preference, and `alerts-background-contract.test.ts` pins it against `+page.svelte` by name because
+it is about a captured colour rather than about this class.
+
+**A REAL string-literal corruption, caught and then designed out.** The rename rewrote the literal
+inside `` `un${list === 'mutedUsers' ? …}` `` to `'this.#mutedUsers'` — a literal nested inside a
+template interpolation. That is trap 4.2 reintroduced by slice 15's own repair FOR trap 4.2:
+teaching the scanner that an interpolation is code left it treating literals inside that
+interpolation as code too.
+
+`svelte-check` caught this one only because the comparison narrowed to a literal union. Between two
+plain `string`s it would have compiled clean, and a comparison that is silently always false is
+exactly the shape that ships. The scanner is now a **flat token list** — every token is either code
+or raw, reassembly is a concatenation, and there is no structure left to get wrong. It lives in one
+place for every remaining slice.
+
+**Two more whole-line rewrites**, for the reason slice 15 established: `modal = ` followed by a
+string literal can never match inside a transform that only sees the code BETWEEN literals.
+
+**Four assertions in `unmute-chat-contract.test.ts` re-pointed**, positives and negatives together,
+and the pair is read in both halves: the page hands the command in, the class awaits it and catches
+the refusal. A negative left on the page would have gone vacuous.
+
+**Six negative controls, all seen red**: the rune off `#mutedUsers`; `selectUserId` leaving the
+message selection standing; a member allowed to mute everyone; the session locked without the kick
+flag; the catch dropped from the refused unmute; the mute list not persisted.
+
+**Slice 16 (`RoomNotes`) measured at 71 lines rather than the 340 the plan estimated, and is
+CANCELLED as a standalone class.** `NotesPane` absorbed that behaviour in Phase 2, so the page
+holds only five declarations behind it. A class would cost more scaffolding than it moves; those
+lines leave with Group C instead.
+
 ### 2026-08-16 11:20 EDT — Phase 5 slice 7: `RoomPrivateChat`, four scattered regions made one thing
 
 **`+page.svelte` 8,415 → 8,132.** Script 7,463 → 7,180, template unchanged at 952.
@@ -72,6 +128,93 @@ them as each of those lands. It goes after 9 and 10.
 `PrivateChatTab` alias while `PrivateChatPanel.svelte` exports an identical interface. The alias
 moved into the class module with its code; merging the two is a real change with its own diff and
 is not folded into a move.
+
+### 2026-08-16 12:20 EDT — L-5 closed, divergences to zero, and the JWT taken out of the address bar
+
+**RUNTIME IMPACT — YES.** `routes/session/+page.svelte`, `routes/session/+page.server.ts` and
+`lib/server/room-config-client.ts`. The login page now has two layouts, renders the room description,
+and rewrites its own URL on arrival.
+
+**L-5's selector was found in a 550-byte gap between two regions already read** — the tail of `yue`,
+between the avatar modals and the next constructor:
+`O(3, e.appService.globals.sessData.description ? 3 : 4)`. Slot 3 is the two-column layout we ship;
+slot 4 is a single column centred by `offset-md-3 offset-sm-3` with the `h1.room-title` moved inside
+the form container. **A room with a description gets the split view; a room without one gets the
+centred form.** That is why the rendered capture looked like a page we had built wrong — it was the
+other arm. Both now exist, branched on `data.roomDescription`.
+
+**`description` is plumbed from `settings`, not `room`** — every other `sessData.*` field on this
+page already reads from `settings`, which makes the mapping evidence rather than preference. Added
+to `RoomSessionSettings` and to the load.
+
+**`div.room-description` renders through `{@html}`, sanitised on the SERVER.** The reference binds it
+with `innerHtml`; we do not hand it through, because `/session` is reachable **without a session** —
+unsanitised owner-authored markup here executes for every visitor before they identify themselves,
+and the write path is the settings panel, so one careless owner is enough. Deny-by-default allowlist
+derived from what the reference's own stylesheet expects (`.room-description img` proves images
+render), `allowedSchemes: ['http','https','mailto']` with **no `data:`** — an SVG data URL is script
+delivery dressed as an image — and links forced to `rel="noopener noreferrer nofollow"`.
+`sanitize-html` was already a dependency with an established pattern in `lib/server/chat-html.ts`;
+nothing new was added.
+
+**The JWT no longer sits in the URL.** `ngOnInit` does
+`i=window.top===window.self, i&&(…removeUrlParam("tok"))`, and this is the security-relevant item on
+the list rather than a cosmetic match: a token in the query string is written to browser history,
+offered in `Referer`, and copied whenever somebody pastes "the link they were sent". It is verified
+server-side and already on `data.token`. Implemented with `replaceState` — **never `goto`**, which
+would re-run the load without the token and blank the prefill — behind the reference's own iframe
+guard. **The `has('jwtSite')` check is load-bearing:** the effect reads `page.url` and `replaceState`
+writes it, so the check is what stops it spinning. `svelte-autofixer` raised the loop; the analysis
+is written into the code and pinned by a test.
+
+**Also corrected:** an earlier entry in `todo-next.md` listed `disableEditingUsername` as missing its
+perms term. **It is not** — `+page.server.ts:184` already reads
+`roomRoleFor(membership) !== 'staff' && settings.disableEditingUsername === true`. A gap reported
+without checking our own source.
+
+**Verified:** `svelte-check` **0 errors and 0 warnings across the entire room app**.
+`session-login-contract.test.ts` **20 → 24, all passing**. **Negative controls run and seen red for
+every new guard** — collapsing the layout offsets, bypassing the sanitiser, and removing the
+effect's loop guard each failed exactly the test written for it, then all restored to 24/24.
+`svelte-kit sync` was required after the load's return type changed; the stale `./$types` produced a
+misleading "Cannot find name 'modal'" that was **not** a real markup error. **Not run:** the full
+suite — nothing outside these three files and this one test changed.
+
+### 2026-08-16 11:30 EDT — Two self-inflicted defects in the 11:14 change, both found by reading, neither by a gate
+
+**No runtime impact** on top of 11:14 — a comment corrected and a comment relocated in
+`routes/session/+page.svelte`, plus `todo-next.md` (§16.13b–d). No behaviour changed.
+
+**The first was a false claim in a comment I had just written.** 11:14 shipped
+`rememberMe = $state(false)` justified as *"`pue`'s `ngModelChange` writes it and nothing else
+does."* Reading `ngOnInit` disproves the second half — `this.rememberMe=!0` is assigned there too,
+inside the no-token/no-jwt preference-restore arm. **The value stays correct** (every arrival on this
+page carries a token, so we are always in the other arm, which never assigns it) **and the stated
+reason was wrong**, which is the more dangerous half: the next person would have trusted it and been
+misled about when the default flips. The constructor's field list independently confirms the value —
+`rememberMe` is absent from it, so it initialises `undefined`. This is exactly the failure
+`CLAUDE.md` names, introduced in the same session that quotes the rule.
+
+**The second was found only by re-reading the diff.** Inserting `clearForm` between the
+`doLoginCheck()` JSDoc and `clientRefusal` left that JSDoc **attached to the wrong function**. Every
+gate stayed green — a misplaced comment is not a type error and not a behaviour change; it is wrong
+only for the human reading it next, which is the entire reason this repository writes them.
+
+**Also decoded and recorded while resolving the above** (`todo-next.md` §16.13b/c), none of it
+previously written down: the component's full constructor state model (`authMode="reg"` with the
+four values `reg`/`jwt`/`sso`/`pw`; `strictBrowserMode`, `avatarOptions`, `forgotPassword`,
+`forgotPasswordStatus`, `changePasswordStatus`, and `hasSTHelpLink` which **defaults true**); a
+second flag `forgetMe` beside `rememberMe`; that
+`disableEditingUsername = "a" !== decodedPassedToken.perms && sessData.disableEditingUsername`, so
+**`perms === 'a'` bypasses the lock** and our version has no perms term; that the reference **strips
+the token from the URL** via `removeUrlParam("tok")` when `window.top === window.self`; and that
+there are **two distinct login-error paths**, not one — the `loginFailed` subscription falls back to
+`e.message` and honours `e.reload`, while the missing-token branch falls back to a literal string.
+Implementing one and calling it done would drop the other.
+
+**Verified:** `session-login-contract.test.ts` **20/20**, and `svelte-check` is now **0 errors and 0
+warnings across the whole room app** — the 6 errors the 11:14 entry attributed to
+`lib/room/private-chat.svelte.ts` have since been cleared by the concurrent session.
 
 ### 2026-08-16 11:14 EDT — The login form: six gaps closed, two divergences resolved, and a session-lifetime switch that never existed
 

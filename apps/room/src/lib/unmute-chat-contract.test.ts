@@ -29,6 +29,12 @@ import { describe, expect, it } from 'vitest';
 const server = readFileSync(new URL('../routes/+page.server.ts', import.meta.url), 'utf8');
 const page = readFileSync(new URL('../routes/+page.svelte', import.meta.url), 'utf8');
 const remote = readFileSync(new URL('../routes/chat-mute.remote.ts', import.meta.url), 'utf8');
+/*
+  The unmute CALL SITE left the page for `RoomUserActions` in Phase 5 slice 13. The page still
+  imports the command and hands it in, so both halves are read: the page supplies it, and the class
+  is what awaits it and catches the refusal.
+*/
+const userActions = readFileSync(new URL('room/user-actions.svelte.ts', import.meta.url), 'utf8');
 const events = readFileSync(new URL('./server/room-events.ts', import.meta.url), 'utf8');
 const viteConfig = readFileSync(new URL('../../vite.config.ts', import.meta.url), 'utf8');
 const intent = readFileSync(new URL('./user-action-intent.ts', import.meta.url), 'utf8');
@@ -65,7 +71,9 @@ describe('the unmute reaches the server', () => {
     expect(pageCode).toContain(
       "import { unmuteChat as unmuteChatCommand } from './chat-mute.remote';"
     );
-    expect(pageCode).toContain('await unmuteChatCommand({ targetUserId: user.id });');
+    // The page hands the command in; the CLASS is what calls it.
+    expect(pageCode).toContain('unmuteChat: (payload) => unmuteChatCommand(payload)');
+    expect(userActions).toContain('await this.#commands.unmuteChat({ targetUserId: user.id });');
     // The endpoint-as-a-magic-string this replaced. Its return is what nobody had to check.
     expect(pageCode).not.toContain("fetch('?/unmuteChat'");
   });
@@ -163,19 +171,19 @@ describe('a refusal is visible', () => {
     layer. A remote command rejects, so the refusal has to be caught to be dropped.
   */
   it('catches the rejection and says so, rather than dropping it', () => {
-    const branch = pageCode.slice(pageCode.indexOf("if (action === 'unmute-chat') {"));
+    const branch = userActions.slice(userActions.indexOf("if (action === 'unmute-chat') {"));
     const body = branch.slice(0, branch.indexOf('return;'));
-    expect(body).toContain('void unmuteChat(user).catch(() => {');
-    expect(body).toContain("dialogs.alert = 'Command failed.';");
+    expect(body).toContain('void this.#unmuteChat(user).catch(() => {');
+    expect(body).toContain("this.#dialogs.alert = 'Command failed.';");
   });
 
   it('still awaits the command inside the wrapper, so a 403 cannot reach invalidateAll', () => {
     // Refreshing the roster after a refused mutation would show the presenter an unchanged list
     // and no reason for it.
-    const fn = pageCode.slice(pageCode.indexOf('async function unmuteChat(user: ModalTargetUser)'));
+    const fn = userActions.slice(userActions.indexOf('async #unmuteChat(user: ModalTargetUser)'));
     const body = fn.slice(0, fn.indexOf('\n  }'));
-    expect(body.indexOf('await unmuteChatCommand(')).toBeLessThan(
-      body.indexOf('await invalidateAll()')
+    expect(body.indexOf('await this.#commands.unmuteChat(')).toBeLessThan(
+      body.indexOf('await this.#reload()')
     );
   });
 });
@@ -210,7 +218,10 @@ describe('the two strings stay two strings', () => {
     of the member, which is the sort of drift that only shows up in a screenshot diff.
   */
   it('keeps the presenter alert verbatim, lower-case included', () => {
-    expect(pageCode).toContain("dialogs.alert = 'user chat unmuted';");
+    expect(userActions).toContain("this.#dialogs.alert = 'user chat unmuted';");
+    // ...and the member's toast is still the page's, on the SSE path, which is the whole point of
+    // the pair being two strings on two screens.
+    expect(pageCode).not.toContain("'user chat unmuted'");
   });
 
   it('keeps the member toast verbatim and separate', () => {
