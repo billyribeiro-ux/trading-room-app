@@ -211,7 +211,13 @@ describe('mentions reach the column you are in', () => {
   });
 
   it('and both composers report focus, or the flag would never move', () => {
-    expect(pageCode).toContain("onfocus={() => chat.focused('textAreaTxt')}");
+    // The MAIN composer moved to `AlertChatArea.svelte` on 2026-08-15; the extra column's `onfocus`
+    // is still supplied by the page, so the pair is now read from the two files that own them.
+    const mainPane = readFileSync(
+      new URL('./components/AlertChatArea.svelte', import.meta.url),
+      'utf8'
+    );
+    expect(mainPane).toContain("onfocus={() => chat.focused('textAreaTxt')}");
     expect(pageCode).toContain('onfocus={() => chat.focused(EXTRA_COMPOSER)}');
   });
 

@@ -59,17 +59,23 @@ describe('the room consumes the setting it asked the controller for', () => {
       The assertion that was missing. Removing the prop from both call sites left every room test
       green, so the setting could have been silently disconnected again at any point.
     */
-    const chat = pageCode.indexOf('kind="chat"');
-    const alert = pageCode.indexOf('kind="alert"');
+    /*
+      RE-POINTED TWICE ON 2026-08-15. First the prop became one of the sixteen in `messageChrome`,
+      spread at both sites; then both sites moved into `AlertChatArea.svelte`. The concern is
+      unchanged — it must reach both lists — and it is now proven across the two files: the spreads
+      in the pane, the chrome and the hand-off on the page.
+    */
+    const paneCode = readFileSync(
+      new URL('./components/AlertChatArea.svelte', import.meta.url),
+      'utf8'
+    );
+    const chat = paneCode.indexOf('kind="chat"');
+    const alert = paneCode.indexOf('kind="alert"');
     expect(chat, 'the chat list must exist').toBeGreaterThan(-1);
     expect(alert, 'the alert list must exist').toBeGreaterThan(-1);
-    /*
-      RE-POINTED 2026-08-15: the prop is one of the sixteen in `messageChrome` now, spread at both
-      sites. The concern above is unchanged — it must reach both lists — and both halves are still
-      asserted, one at the spread and one at the chrome that supplies it.
-    */
-    expect(pageCode.slice(chat, chat + 200)).toContain('{...messageChrome}');
-    expect(pageCode.slice(alert, alert + 200)).toContain('{...messageChrome}');
+    expect(paneCode.slice(chat, chat + 200)).toContain('{...messageChrome}');
+    expect(paneCode.slice(alert, alert + 200)).toContain('{...messageChrome}');
+    expect(pageCode).toContain('{messageChrome}');
 
     const from = pageCode.indexOf('const messageChrome');
     expect(from, 'messageChrome is not built in +page.svelte').toBeGreaterThan(-1);

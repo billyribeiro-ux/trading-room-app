@@ -13,7 +13,13 @@ import { describe, expect, it } from 'vitest';
   one. There are two.
 */
 
-const page = readFileSync(new URL('../routes/+page.svelte', import.meta.url), 'utf8');
+/*
+  BOTH call sites moved to `AlertChatArea.svelte` on 2026-08-15 — the alerts list and the chat list
+  are the two panes that component owns, so the count that proves "two lists, both including the
+  first item" is now a count taken there. The page is no longer read by this file at all: pointing
+  the count at a file that holds neither list would have made it assert `0 === 0` and pass forever.
+*/
+const pane = readFileSync(new URL('./components/AlertChatArea.svelte', import.meta.url), 'utf8');
 const roomCapture = readFileSync(
   new URL('../../app-room/complete.clean.html', import.meta.url),
   'utf8'
@@ -41,13 +47,13 @@ describe('day separator', () => {
 
   it('renders for the first item of each list, not only for day changes', () => {
     // Two call sites - alerts and chat - and both must include the first item.
-    expect((page.match(/showDateSeparator=/g) ?? []).length).toBe(2);
-    expect((page.match(/index === 0 \|\|/g) ?? []).length).toBe(2);
+    expect((pane.match(/showDateSeparator=/g) ?? []).length).toBe(2);
+    expect((pane.match(/index === 0 \|\|/g) ?? []).length).toBe(2);
 
     // `index > 0` is what suppressed the first day entirely. It must not come back.
-    expect(page).not.toMatch(/showDateSeparator[\s\S]{0,200}index > 0/);
+    expect(pane).not.toMatch(/showDateSeparator[\s\S]{0,200}index > 0/);
 
     // The day comparison itself is still what drives every LATER separator.
-    expect((page.match(/sameCalendarDay\(/g) ?? []).length).toBeGreaterThanOrEqual(2);
+    expect((pane.match(/sameCalendarDay\(/g) ?? []).length).toBeGreaterThanOrEqual(2);
   });
 });

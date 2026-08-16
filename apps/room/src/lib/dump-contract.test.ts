@@ -292,8 +292,16 @@ describe('part 1 capture contract', () => {
     expect(compiledChat).toContain(
       '(this.isPresenter || this.appService.globals.sessData.userUploads) &&\n          (this.canPostImages = !0)'
     );
+    /*
+      The flag STAYS on the page and the "+" that sets it moved to `AlertChatArea.svelte` on
+      2026-08-15, so this reads both — and the `bind:` between them is asserted as well, because a
+      plain prop would let the pane set its own copy while the page's value never moved.
+    */
+    const paneSource = text(new URL('components/AlertChatArea.svelte', import.meta.url));
     expect(pageSource).toContain('let showMessageOptions = $state(false);');
-    expect(pageSource).toContain('onclick={() => (showMessageOptions = true)}');
+    expect(pageSource).toContain('bind:showMessageOptions');
+    expect(paneSource).toContain('showMessageOptions = $bindable(false)');
+    expect(paneSource).toContain('onclick={() => (showMessageOptions = true)}');
 
     // The captured `offsetWidth >= 400` threshold is still honoured, but it is now applied by a
     // container query so the server paints the correct button set instead of a ResizeObserver
@@ -305,9 +313,11 @@ describe('part 1 capture contract', () => {
     expect(appCss).toContain('#textAreaHolder {\n  container-type: inline-size;\n}');
     expect(appCss).toContain('@container (width < 410px)');
     expect(appCss).toContain('@container (width >= 410px)');
+    // The OBSERVER stays on the page — it pokes at DOM the page also writes — while the buttons it
+    // governs moved to the pane with the rest of the composer.
     expect(pageSource).toContain('if (node.offsetWidth >= 400) return;');
-    expect(pageSource).toContain("ngbtooltip: 'Show message options'");
-    expect(pageSource).toContain('data-bs-target="#play-youtube-modal"');
+    expect(paneSource).toContain("ngbtooltip: 'Show message options'");
+    expect(paneSource).toContain('data-bs-target="#play-youtube-modal"');
   });
 
   it('keeps every Svelte form field addressable with unique literal ids', () => {
@@ -429,16 +439,18 @@ describe('part 1 capture contract', () => {
 
     const pageSource = text(new URL('../routes/+page.svelte', import.meta.url));
     const modalHostSource = text(new URL('components/ModalHost.svelte', import.meta.url));
-    expect(pageSource).toContain('<span class="badge badge-danger ms-2"');
     /*
-      ONE here since the private-chat panel became its own component on 2026-08-15; the second is
-      the panel's own. Counted in both files rather than dropped to 1, because a bare 1 would go
-      green if the panel's badge vanished entirely.
+      THREE DND badges, and after 2026-08-15 they sit in three different files: the alerts header's
+      `ms-2` and the chat header's `ml-2` went to `AlertChatArea.svelte`, the third is the private
+      panel's. Counted per file rather than summed, because a total would go green if one file grew
+      a second badge while another lost its only one.
     */
-    expect(pageSource.match(/<span class="badge badge-danger ml-2"/g)).toHaveLength(1);
+    const alertChatArea = text(new URL('components/AlertChatArea.svelte', import.meta.url));
+    expect(alertChatArea).toContain('<span class="badge badge-danger ms-2"');
+    expect(alertChatArea.match(/<span class="badge badge-danger ml-2"/g)).toHaveLength(1);
     const privateChatPanel = text(new URL('components/PrivateChatPanel.svelte', import.meta.url));
     expect(privateChatPanel.match(/<span class="badge badge-danger ml-2"/g)).toHaveLength(1);
-    expect(pageSource).toContain('<i class="fas fa-bell-slash"></i> DND');
+    expect(alertChatArea).toContain('<i class="fas fa-bell-slash"></i> DND');
     expect(pageSource).toContain("typeof loadedSettings.doNotDisturbOn === 'boolean'");
     expect(pageSource).toContain('DEFAULT_ALERT_DELIVERY_PREFERENCES.doNotDisturbOn');
     expect(pageSource).toContain('{#if media.anyoneTalking && media.talking.length > 0}');

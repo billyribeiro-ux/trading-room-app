@@ -24,6 +24,85 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-15
 
+### 2026-08-15 22:05 EDT — `AlertChatArea`: the alerts and chat panes out of `+page.svelte`, 11,550 → 10,860
+
+**Branch `feat/extra-chat-column`. Runtime impact: none intended** — a region moved from a page into
+a component with no behavioural change, plus one type moved to `$lib/types` and a duplicate deleted.
+
+Closes **`TODO.md` row AK**, the fourth of Phase 2's five components and the largest single drop of
+the whole decomposition: **696 lines of markup out, `+page.svelte` 11,550 → 10,860 (−690)**,
+`AlertChatArea.svelte` at 869 lines.
+
+**One component for two panes, on purpose.** The split between alerts and chat is one `<as-split>`
+whose gutter drags one number — `split.alertsPercent` sizes the alert area and the chat area is what
+is left. Two components would have to share that percentage *and* the gutter that writes it, which
+is a binding across a boundary invented purely to make files shorter. It renders from INSIDE the
+`chatAlertsPane` snippet rather than replacing it, because that snippet is rendered at two sites —
+the horizontal room layout and the vertical one — so a component at each would spell the prop list
+twice and the next person would update one of them.
+
+**Forty-five props, and the COMPILER produced the list.** The file was written with an empty
+`<script>` and `svelte-check --output machine` was asked what it could not resolve; every
+`Cannot find name` became a prop. That was not ceremony: `data` appears twelve times in that markup
+and not once as the variable — every hit is a `data-bs-toggle` or `data-bs-target` attribute, which
+is the exact false positive that put four invented props in a first draft of `RoomNavbar`. Five of
+the forty-five are state CLASSES rather than scalars (`split`, `alerts`, `chat`, `polls`, `menus`),
+replacing roughly thirty separate inputs — the payoff `RoomSidebar` and `RoomNavbar` recorded, on
+the largest surface. `showMessageOptions` is the only `$bindable()`: the composer's "+" assigns it,
+and as a plain prop the four composer buttons would have appeared in the pane while the page's value
+never moved. `svelte-check` is silent on that, exactly as it was on `RoomNavbar`'s two.
+
+**The markup was moved byte-exact, not retyped.** Six hundred and ninety-six lines of
+evidence-derived markup and captured citations; retyping them is how a captured class or a quoted
+`H(6, M2e, …)` reference drifts. The whole region was read first — that is what let the byte-exact
+move be checked rather than trusted. One consequence is recorded honestly below.
+
+**What actually blocked this for a day was not the component: it was 24 assertions across 13
+contract files**, several asserting on BOTH the page's script and the pane's markup inside one test.
+Each of those files got two source constants and every assertion was pointed at the file that owns
+its subject. **Most came out stronger**, because a control split across two files now has its
+HAND-OFF asserted too — `ontogglealertssearch={toggleAlertsToolbarSearchOnly}`,
+`onrte={openRTEModal}`, `bind:showMessageOptions`. A pane whose callback nothing supplies is
+precisely the defect a single blanket re-point would have hidden.
+
+**A gap in the vacuity police, opened by this change and closed in the same commit.**
+`source-size-contract.test.ts` generates one test per contract file that reads `+page.svelte` or
+`+page.server.ts` as text, checking each still asserts something POSITIVE — the guard against a
+negative assertion going green because its region was extracted. Re-pointing
+`day-separator-contract.test.ts` at the pane meant it stopped naming `+page.svelte` at all, and it
+silently dropped out of that list: policed while its subject sat in the page, unpoliced the moment
+its subject moved. That is the failure mode the block exists to catch, arriving by a route the block
+did not cover. `components/AlertChatArea.svelte` is now a third extraction source, and the list is
+named `EXTRACTION_SOURCES` so the next component is one line rather than a rediscovery. The test
+count went 1,891 → 1,890 and back to 1,891, which is how the gap was noticed at all.
+
+Also: `MessageActionItem` moved from `+page.svelte` to `$lib/types` (the pane raises these actions,
+so a shape declared in the page is a shape the pane has to guess at), and the page's local
+`MessageReactionPayload` — character-identical to the one `$lib/types` already exported — was
+deleted rather than moved.
+
+**Verified, and how:**
+
+- `svelte-check --threshold error` — **0 errors, 0 warnings across 1,138 files**.
+- `npx eslint src` — clean. It named exactly the six now-unused imports (`RoomMessage`,
+  `EmojiPicker`, `GiphyPicker`, `ngbTooltip`, `formatChatMutedTill`, `sameCalendarDay`), which is
+  independent confirmation the pane took every one of their usages.
+- `npx vitest run` — **136 files, 1,891 tests, all passing.**
+- `svelte-autofixer` on the script block authored here — **zero suggestions**; its only output is
+  a11y warnings on elements whose `svelte-ignore` comments the reduced artifact did not carry.
+- **Three negative controls, each with the mutation verified to have landed** before believing the
+  red: removing one `{...messageChrome}` spread from the pane turned four files red; replacing
+  `bind:showMessageOptions` with a plain prop turned `dump-contract` red; mis-wiring
+  `ontogglealertssearch` to the wrong toggler turned `alerts-toolbar-contract` red — which proves
+  the new hand-off assertions catch a defect the old single-file tests could not have seen.
+- Ceiling lowered 11,551 → 10,861 in the same commit; ceilings only go down.
+
+**One honest wart.** The comment bodies inside the moved markup are over-indented — prettier does
+not reindent inside `<!-- -->`, so citations that sat at a 10-space base in the page now sit deeper
+than their surroundings. The content is intact and correct. It was left rather than machine-dedented
+because a script walking 696 lines to strip leading whitespace inside comments is a script that can
+corrupt captured evidence text, and this file exists to hold that evidence.
+
 ### 2026-08-15 19:16 EDT — `TODO.md` pruned to what is actually left, 809 → 627 lines
 
 **Merged to `main` in `526074a` (PR #61). Runtime impact: none** — `TODO.md` and

@@ -22,6 +22,12 @@ import { chatModeConfirmPrompt } from './chat-mode';
 
 const SERVER = readFileSync(new URL('../routes/+page.server.ts', import.meta.url), 'utf8');
 const PAGE = readFileSync(new URL('../routes/+page.svelte', import.meta.url), 'utf8');
+/*
+  What each MODE draws — the Chat Disabled block, the mute suffix and the webinar banner — moved to
+  `AlertChatArea.svelte` on 2026-08-15. What DECIDES the mode did not: the refetch, the derived and
+  the `=== true` comparisons are still read from the page below.
+*/
+const PANE = readFileSync(new URL('./components/AlertChatArea.svelte', import.meta.url), 'utf8');
 const MODAL = readFileSync(new URL('./components/ModalHost.svelte', import.meta.url), 'utf8');
 const SCHEMA = readFileSync(new URL('./server/db/schema.ts', import.meta.url), 'utf8');
 const DB = readFileSync(new URL('./server/db/index.ts', import.meta.url), 'utf8');
@@ -32,6 +38,7 @@ const stripComments = (source: string) =>
 
 const serverCode = stripComments(SERVER);
 const pageCode = stripComments(PAGE);
+const paneCode = stripComments(PANE);
 const modalCode = stripComments(MODAL);
 
 describe('the mode is ROOM state, not a preference', () => {
@@ -217,11 +224,13 @@ describe('the client reads the ROW, never the broadcast', () => {
 describe('what each mode does', () => {
   it('`d` replaces the composer with the captured Chat Disabled block', () => {
     // `<div class="chatDisabled d-flex align-items-center"><h5 class="pl-3"><i class="fas fa-lock">`
-    expect(pageCode).toContain('{#if !chatEnabled}');
-    expect(pageCode).toContain('<div class="chatDisabled d-flex align-items-center">');
-    expect(pageCode).toContain('<h5 class="pl-3">');
-    expect(pageCode).toContain('<i class="fas fa-lock"></i> Chat Disabled');
+    expect(paneCode).toContain('{#if !chatEnabled}');
+    expect(paneCode).toContain('<div class="chatDisabled d-flex align-items-center">');
+    expect(paneCode).toContain('<h5 class="pl-3">');
+    expect(paneCode).toContain('<i class="fas fa-lock"></i> Chat Disabled');
     expect(CSS).toContain('.chatDisabled {');
+    // The pane draws it; the page decides it. Both halves, or the gate could arrive from nothing.
+    expect(pageCode).toContain('{chatEnabled}');
   });
 
   it('and a MUTED viewer reaches the same block, which was enforced but never shown', () => {
@@ -237,13 +246,13 @@ describe('what each mode does', () => {
 
   it('the mute suffix is the captured string, not an approximation of it', () => {
     // `Ne(' till ', Ct(2, 1, e.chatMutedTill, 'EEE @ h:mm a'), '')`
-    expect(pageCode).toContain('till {formatChatMutedTill(selfMutedUntil)}');
+    expect(paneCode).toContain('till {formatChatMutedTill(selfMutedUntil)}');
   });
 
   it('`p` draws the captured banner, tooltip and all', () => {
-    expect(pageCode).toContain('{#if webinarMode}');
-    expect(pageCode).toContain('<div class="px-1 webinarMode">');
-    expect(pageCode).toContain(
+    expect(paneCode).toContain('{#if webinarMode}');
+    expect(paneCode).toContain('<div class="px-1 webinarMode">');
+    expect(paneCode).toContain(
       'In webinar mode users only see their own chat messages, while Presenters see everyones messages...'
     );
     expect(CSS).toContain('.webinarMode {');

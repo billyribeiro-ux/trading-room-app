@@ -31,6 +31,16 @@ const stripComments = (source: string) =>
   source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/<!--[\s\S]*?-->/g, '');
 const markup = stripComments(page);
 /*
+  The toolbar's MARKUP moved to `AlertChatArea.svelte` on 2026-08-15 while the two togglers stayed
+  on the page, so this file now reads three of ours instead of two — and each assertion below points
+  at whichever one owns its subject. A single re-pointed constant would have been the wrong fix:
+  half of these assert on a template gate and half on the function behind it, and pointing both at
+  the pane would have quietly dropped the page's half of every pair.
+*/
+const paneMarkup = stripComments(
+  readFileSync(new URL('./components/AlertChatArea.svelte', import.meta.url), 'utf8')
+);
+/*
   The two toolbar flags and the two togglers moved to `room/alerts.svelte.ts` on 2026-08-15. The
   assertions against the CAPTURE — everything read out of `docs/source/**` — are untouched, because
   the evidence did not move; only our half of each pair did.
@@ -56,13 +66,21 @@ describe('alerts toolbar: two states, two controls', () => {
     expect(markup).toContain('function toggleAlertsToolbar()');
 
     // The magnifier (title="Search") must call the search-only toggle…
-    const magnifier = markup.slice(markup.indexOf('title="Search"'));
-    expect(magnifier.slice(0, 300)).toContain('toggleAlertsToolbarSearchOnly');
+    const magnifier = paneMarkup.slice(paneMarkup.indexOf('title="Search"'));
+    expect(magnifier.slice(0, 300)).toContain('ontogglealertssearch');
 
     // …and the gear must expand the toolbar, NOT open the alert-filter modal.
-    const gear = markup.slice(markup.indexOf('nav-link dropdown-toggle p-0'));
-    expect(gear.slice(0, 300)).toContain('toggleAlertsToolbar');
-    expect(gear.slice(0, 300)).not.toContain("openModal('alert-filter')");
+    const gear = paneMarkup.slice(paneMarkup.indexOf('nav-link dropdown-toggle p-0'));
+    expect(gear.slice(0, 300)).toContain('ontogglealertstoolbar');
+    expect(gear.slice(0, 300)).not.toContain("onopenmodal('alert-filter')");
+
+    /*
+      The two are now in two files, so the WIRING is its own assertion. Without it both halves above
+      could pass while the pane's callbacks arrived from nothing — the magnifier calling a prop the
+      page never supplies is exactly the failure a source-text contract is blind to otherwise.
+    */
+    expect(markup).toContain('ontogglealertssearch={toggleAlertsToolbarSearchOnly}');
+    expect(markup).toContain('ontogglealertstoolbar={toggleAlertsToolbar}');
   });
 
   it('keeps the gear expanding rather than closing a search-only strip', () => {
@@ -86,12 +104,12 @@ describe('alerts toolbar: what each state renders', () => {
   it('gates the top row on the extended flag', () => {
     // `O(1, e.showAlertsToolbarExtended ? 1 : -1)` in N2e.
     expect(helpers).toContain('showAlertsToolbarExtended');
-    expect(markup).toContain('{#if alerts.toolbarExtended}');
+    expect(paneMarkup).toContain('{#if alerts.toolbarExtended}');
   });
 
   it('keeps the search input and its clear button in BOTH states', () => {
     // The form and const 33 are unconditional in N2e - only the tail is gated.
-    const toolbar = markup.slice(markup.indexOf('alertsToolbar'));
+    const toolbar = paneMarkup.slice(paneMarkup.indexOf('alertsToolbar'));
     const form = toolbar.indexOf('id="alert-settings"');
     const clear = toolbar.indexOf('id="addon-chat-clear"');
     const gatedTail = toolbar.indexOf('id="addon-chat-save"');
@@ -104,7 +122,7 @@ describe('alerts toolbar: what each state renders', () => {
   it('gates save and archive on extended, and archive again on presenter', () => {
     // O2e renders const 47 (save); inside it I2e is gated on isPresenter && !isLimitedPresenter.
     expect(helpers).toContain('isPresenter');
-    const tail = markup.slice(markup.indexOf('id="addon-chat-clear"'));
+    const tail = paneMarkup.slice(paneMarkup.indexOf('id="addon-chat-clear"'));
     const gate = tail.indexOf('{#if alerts.toolbarExtended}');
     const save = tail.indexOf('id="addon-chat-save"');
     const presenterGate = tail.indexOf('{#if isPresenter}');
@@ -122,13 +140,13 @@ describe('alerts toolbar: what each state renders', () => {
     expect(component).toContain('alert-filter-modal');
     expect(component).toContain('alerts-advanced-search-modal');
 
-    expect(markup).toContain('data-bs-target="#alerts-advanced-search-modal"');
-    expect(markup).toContain('fas fa-search me-1');
-    expect(markup).toContain('btn btn-outline-light btn-sm m-1');
+    expect(paneMarkup).toContain('data-bs-target="#alerts-advanced-search-modal"');
+    expect(paneMarkup).toContain('fas fa-search me-1');
+    expect(paneMarkup).toContain('btn btn-outline-light btn-sm m-1');
     // Const 45, the Filter alerts icon.
-    expect(markup).toContain('fas fa-filter me-1');
+    expect(paneMarkup).toContain('fas fa-filter me-1');
 
-    const row = markup.slice(markup.indexOf('{#if alerts.toolbarExtended}'));
+    const row = paneMarkup.slice(paneMarkup.indexOf('{#if alerts.toolbarExtended}'));
     const slot = row.slice(0, row.indexOf('id="alert-settings"'));
 
     /*
@@ -165,7 +183,7 @@ describe('alerts toolbar: what each state renders', () => {
       a permanent "filtered" badge on every such room, and collapsing it to the selection alone
       would show it where the feature is switched off.
     */
-    const header = markup.slice(markup.indexOf('alertHeader'));
+    const header = paneMarkup.slice(paneMarkup.indexOf('alertHeader'));
     const brandEnd = header.indexOf('</ul>');
     const brand = header.slice(0, brandEnd);
 
@@ -188,7 +206,7 @@ describe('alerts toolbar: what each state renders', () => {
 
   it('gates the inline-alert-entry checkbox on presenter and Detach on chat-only mode', () => {
     // `O(2, e.isPresenter ? 2 : -1)` and `O(3, chatOnlyMode ? -1 : 3)` in R2e.
-    const row = markup.slice(markup.indexOf('{#if alerts.toolbarExtended}'));
+    const row = paneMarkup.slice(paneMarkup.indexOf('{#if alerts.toolbarExtended}'));
     const presenter = row.indexOf('{#if isPresenter}');
     const checkbox = row.indexOf('id="inline-alert-entry"');
     const notChatOnly = row.indexOf('{#if !chatOnlyMode}');

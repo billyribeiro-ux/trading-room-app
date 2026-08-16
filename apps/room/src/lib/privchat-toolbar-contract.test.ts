@@ -104,12 +104,21 @@ describe('the private-chat toolbar', () => {
 
 describe('all three DND badges', () => {
   it('keep the classes their own components declare', () => {
+    /*
+      Two of the three moved to `AlertChatArea.svelte` on 2026-08-15 — the alerts header's `ms-2`
+      and the chat header's `ml-2` — while the private panel keeps its own. Three badges in two
+      files now, and each is read from the component that declares it.
+    */
+    const pane = readFileSync(
+      new URL('./components/AlertChatArea.svelte', import.meta.url),
+      'utf8'
+    );
     // app-chat const 11 and app-privchat const 9 are both `badge badge-danger ml-2`; alerts is ms-2.
-    expect(page).toContain('class="badge badge-danger ms-2"');
-    // One of the two `ml-2` badges is the private panel's, and it went with the panel.
-    expect(page).toContain('class="badge badge-danger ml-2"');
+    expect(pane).toContain('class="badge badge-danger ms-2"');
+    expect(pane).toContain('class="badge badge-danger ml-2"');
+    // The third `ml-2` badge is the private panel's, and it went with the panel.
     expect(panel).toContain('class="badge badge-danger ml-2"');
-    expect(page).toContain('<i class="fas fa-bell-slash"></i> DND');
+    expect(pane).toContain('<i class="fas fa-bell-slash"></i> DND');
     expect(panel).toContain('<i class="fas fa-bell-slash"></i> DND');
   });
 });
