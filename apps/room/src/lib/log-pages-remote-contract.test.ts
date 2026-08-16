@@ -16,7 +16,12 @@ import { describe, expect, it } from 'vitest';
 
 const remote = readFileSync(new URL('../routes/log-pages.remote.ts', import.meta.url), 'utf8');
 const server = readFileSync(new URL('../routes/+page.server.ts', import.meta.url), 'utf8');
-const page = readFileSync(new URL('../routes/+page.svelte', import.meta.url), 'utf8');
+/*
+  The CLIENT half of paging moved to `room/feed-scroll.ts` in Phase 5 slice 23 — the two loaders,
+  the exhausted/settled calls and the failure path. Every assertion here that reads "the client"
+  reads that module now; nothing this file asserts stayed on the page.
+*/
+const page = readFileSync(new URL('./room/feed-scroll.ts', import.meta.url), 'utf8');
 const strip = (source: string) =>
   source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/<!--[\s\S]*?-->/g, '');
 const remoteCode = strip(remote);
@@ -139,7 +144,7 @@ describe('a failed page is non-fatal and retried, not swallowed', () => {
   });
 
   it('leaves hasMoreData alone on the failure path', () => {
-    const fn = pageCode.slice(pageCode.indexOf('async function loadOlderAlerts(scroller'));
+    const fn = pageCode.slice(pageCode.indexOf('\n  async loadOlderAlerts(scroller'));
     const failure = fn.slice(fn.indexOf('} catch {'), fn.indexOf('} finally {'));
     expect(failure, 'the failure path must be findable').not.toBe('');
     expect(failure).not.toContain('exhausted');

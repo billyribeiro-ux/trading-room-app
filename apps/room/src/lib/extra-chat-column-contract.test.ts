@@ -72,6 +72,15 @@ const messageActionsModule = readFileSync(
   'utf8'
 );
 const pageCode = stripComments(PAGE);
+/*
+  The extra column's SCROLLING moved to `room/feed-scroll.ts` in Phase 5 slice 23 — its tracker, its
+  own `extraChatScrollingUp` flag, and the paging arm keyed by its channel. What stayed on the page
+  is the follow effect, which now reads that flag through a getter, so both files are named and each
+  assertion points at the one that owns its subject.
+*/
+const scrollCode = stripComments(
+  readFileSync(new URL('./room/feed-scroll.ts', import.meta.url), 'utf8')
+);
 const prefsCode = stripComments(PREFS_SOURCE);
 const paneCode = stripComments(PANE);
 const modalCode = stripComments(MODAL);
@@ -192,16 +201,21 @@ describe('both columns share one pipeline, and that is the point', () => {
       twice; two columns on different channels get different keys and page independently. That falls
       out of the paging state being a record keyed by channel rather than by column.
     */
-    expect(pageCode).toContain('void loadOlderChatMessages(chat.extraTab, scroller);');
-    expect(pageCode).toContain('hasMoreData: chatPages.hasMore(chat.extraTab),');
+    expect(scrollCode).toContain('void this.loadOlderChatMessages(this.#chat.extraTab, scroller);');
+    expect(scrollCode).toContain('hasMoreData: this.#chatPages.hasMore(this.#chat.extraTab),');
     // ONE instance for both columns, so "keyed by channel rather than by column" is structural.
-    expect(pageCode).toContain('if (!extraChatScrollingUp) chatPages.arm(chat.extraTab);');
+    expect(scrollCode).toContain(
+      'if (!this.#extraChatScrollingUp) this.#chatPages.arm(this.#chat.extraTab);'
+    );
   });
 
   it('but each column scrolls independently', () => {
     // `app-extra-roomscroller` exists upstream for exactly this reason.
-    expect(pageCode).toContain('function trackExtraChatScroll(scroller: HTMLElement) {');
-    expect(pageCode).toContain('let extraChatScrollingUp = false;');
+    expect(scrollCode).toContain('trackExtraChatScroll(scroller: HTMLElement) {');
+    // It is a field of the scroll class now, and the page reads it through a getter — which is the
+    // point: two writers of one flag is how a column follows while its reader is up the log.
+    expect(scrollCode).toContain('#extraChatScrollingUp: boolean;');
+    expect(pageCode).toContain('feedScroll.extraChatReadingHistory');
   });
 
   it('and sends into the channel IT is showing, not the main column’s', () => {
@@ -346,7 +360,9 @@ describe('the second column follows its own messages', () => {
   */
   it('reads the scroller it is handed', () => {
     expect(pageCode).toContain('const scroller = extraChatScroller;');
-    expect(pageCode).toContain('if (extraChatScroller === scroller) forceChatToBottom(scroller);');
+    expect(pageCode).toContain(
+      'if (extraChatScroller === scroller) feedScroll.forceChatToBottom(scroller);'
+    );
   });
 
   it('scrolls on first view, on a channel switch, and on a new message', () => {
@@ -382,7 +398,7 @@ describe('the second column follows its own messages', () => {
     const from = pageCode.indexOf('const scroller = extraChatScroller;');
     expect(from, 'the extra column scroll effect is not in +page.svelte').toBeGreaterThan(-1);
     const effect = pageCode.slice(from, pageCode.indexOf('\n  });', from));
-    expect(effect).toContain('readingHistory: extraChatScrollingUp');
+    expect(effect).toContain('readingHistory: feedScroll.extraChatReadingHistory');
     expect(effect).not.toContain('readingHistory: chatScrollingUp');
   });
 

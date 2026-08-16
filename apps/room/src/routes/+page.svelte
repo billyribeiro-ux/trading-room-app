@@ -6,11 +6,6 @@
     isWebinarMode,
     type ChatMode
   } from '$lib/chat-mode';
-  import {
-    CHAT_PAGE_ARRIVAL_NUDGE,
-    CHAT_PAGE_REQUEST_NUDGE,
-    shouldLoadOlderMessages
-  } from '$lib/chat-paging';
   import { RoomMenus } from '$lib/room/menus.svelte';
   import { RoomPolls } from '$lib/room/polls.svelte';
   import { page } from '$app/state';
@@ -18,10 +13,6 @@
   // The first remote function in this app. Aliased because the local wrapper below keeps the name.
   import { unmuteChat as unmuteChatCommand } from './chat-mute.remote';
   import { getMyMobilePin } from './mobile-pin.remote';
-  import {
-    loadOlderAlerts as loadOlderAlertsPage,
-    loadOlderChatMessages as loadOlderChatPage
-  } from './log-pages.remote';
   import {
     deletePrivateChatLog as deletePrivateChatLogCommand,
     loadPrivateChatLog as loadPrivateChatLogCommand,
@@ -79,6 +70,7 @@
   import { RoomPrivateChat } from '$lib/room/private-chat.svelte';
   import { RoomComposer } from '$lib/room/composer.svelte';
   import { RoomAlertsPane } from '$lib/room/alerts-pane';
+  import { RoomFeedScroll } from '$lib/room/feed-scroll';
   import { RoomFeeds } from '$lib/room/feeds.svelte';
   import { RoomMessageActions } from '$lib/room/message-actions.svelte';
   import { RoomEventStream } from '$lib/room/events.svelte';
@@ -133,9 +125,6 @@
   import RoomSidebar from '$lib/components/RoomSidebar.svelte';
   import { resolveAlertDelivery } from '$lib/alert-delivery';
   import { DUMP_CONTRACT } from '$lib/dump-contract';
-  // `shouldAutoScrollForMessage` is no longer imported here: `RoomScrollFollow` calls it, which is
-  // where the rule about the alerts column not taking the override now lives with it.
-  import { isRoomScrollerReadingHistory, scrollRoomScrollerToBottom } from '$lib/room-scroller';
   import {
     initializeSoundEffects,
     playSoundEffect,
@@ -540,7 +529,6 @@
    * afterwards so a scroller swapped out mid-await is not written to.
    */
   let extraChatScroller = $state<HTMLElement | undefined>();
-  let extraChatScrollingUp = false;
 
   
   let appHasFocus = $state(true);
@@ -1326,8 +1314,6 @@
   let composerElement: HTMLTextAreaElement | undefined;
   let alertsScroller = $state<HTMLElement | undefined>();
   let chatScroller = $state<HTMLElement | undefined>();
-  let alertsScrollingUp = false;
-  let chatScrollingUp = false;
   /*
     ONE INSTANCE PER COLUMN, and that is the whole point rather than an implementation detail: the
     three columns have independent tabs, independent lists and independent reader scroll positions,
@@ -1353,8 +1339,6 @@
    * this question share one implementation, and why it is a plain class rather than a rune module.
    */
   const alertArrivals = new RoomArrivals<(typeof data.alerts)[number]>();
-  let alertScrollTimer: ReturnType<typeof globalThis.setTimeout> | undefined;
-  let chatScrollTimer: ReturnType<typeof globalThis.setTimeout> | undefined;
   /**
    * The other half of `onResize`, and the half that is easy to miss: crossing the threshold REFETCHES
    * (`app-room.full.js:2987-2999`).
@@ -1934,13 +1918,34 @@
     the class writes it and this file reads it to lay out. A reader thunk was supplied at first and
     eslint refused it as a collaborator nothing consumes.
   */
+  /*
+    SCROLL-FOLLOW and PAGING for all three feeds, in `$lib/room/feed-scroll.ts`.
+
+    Phase 5 slice 23. One mechanism and three instances of it: a flag per feed saying the reader has
+    scrolled up into history, a tracker that sets it, and a paging arm that is disarmed while it is
+    set.
+
+    The three flags MOVED rather than staying here, and that is a change of ownership. They were
+    written from two sides — the trackers, and the follow effects below that clear them on the tick
+    they pull a feed to the bottom — and two writers of one flag is how a feed ends up following
+    while its reader is halfway up the log. The effects now ask: `…ReadingHistory` to read,
+    `stopReadingHistory` to clear.
+  */
+  const feedScroll = new RoomFeedScroll({
+    alerts,
+    chat,
+    alertPages,
+    chatPages,
+    feeds
+  });
+
   const alertsPane = new RoomAlertsPane<(typeof data.alerts)[number]>({
     alerts,
     dialogs,
     prefs,
     feeds,
     alertsScroller: () => alertsScroller ?? null,
-    forceAlertsToBottom,
+    forceAlertsToBottom: feedScroll.forceAlertsToBottom,
     sessionHandle: () => data.sessionHandle,
     setChatAlertsDetached: (next) => (chatAlertsDetached = next)
   });
@@ -1948,74 +1953,10 @@
 
 
 
-  function forceAlertsToBottom(scroller: HTMLElement) {
-    if (alertScrollTimer !== undefined) globalThis.clearTimeout(alertScrollTimer);
-    alertScrollTimer = scrollRoomScrollerToBottom(scroller);
-  }
 
-  function forceChatToBottom(scroller: HTMLElement) {
-    if (chatScrollTimer !== undefined) globalThis.clearTimeout(chatScrollTimer);
-    chatScrollTimer = scrollRoomScrollerToBottom(scroller);
-  }
 
-  function trackAlertsScroll(event: Event) {
-    const scroller = event.currentTarget as HTMLElement;
-    alertsScrollingUp = isRoomScrollerReadingHistory(scroller);
-    // Back at the bottom, so paging is armed again — `hasMoreData = !0` on the way down.
-    if (!alertsScrollingUp) alertPages.arm(ALERTS_LOG);
-    if (
-      !shouldLoadOlderMessages({
-        scrollTop: scroller.scrollTop,
-        messageCount: feeds.visibleAlerts.length,
-        /* REAL here, unlike the chat log: the alerts pane has a live search field, and
-           `matchesAlertSearch` filters the rendered list by it. Upstream refuses to page while a
-           term is set because a filtered log is not a paged one — asking for page 2 of a filter the
-           server knows nothing about would interleave unfiltered history into a filtered view. */
-        searchTerm: alerts.search,
-        hasMoreData: alertPages.hasMore(ALERTS_LOG),
-        loadingMore: alertPages.loading
-      })
-    ) {
-      return;
-    }
-    scroller.scrollTop += CHAT_PAGE_REQUEST_NUDGE;
-    void loadOlderAlerts(scroller);
-  }
 
-  /** `loadMoreLogs({type: 'alerts', page})` -> `getAlertsLog {page}`. */
-  async function loadOlderAlerts(scroller: HTMLElement) {
-    const page = alertPages.requesting(ALERTS_LOG);
 
-    let incoming: Awaited<ReturnType<typeof loadOlderAlertsPage>>;
-    try {
-      incoming = await loadOlderAlertsPage(page);
-    } catch {
-      // Non-fatal by design, not swallowed: `hasMoreData` stays true and the next scroll retries.
-      return; // `log-pages.remote.ts` carries why, and why the `finally` below must not move.
-    } finally {
-      alertPages.settled();
-    }
-
-    if (incoming.length === 0) {
-      alertPages.exhausted(ALERTS_LOG);
-      return;
-    }
-
-    alertPages.arrived(ALERTS_LOG, incoming, page);
-    scroller.scrollTop += CHAT_PAGE_ARRIVAL_NUDGE;
-  }
-
-  function trackChatScroll(event: Event) {
-    const scroller = event.currentTarget as HTMLElement;
-    chatScrollingUp = isRoomScrollerReadingHistory(scroller);
-    /*
-      Back at the bottom, so paging is armed again: `hasMoreData = !0` on the way down is the
-      reference's own reset, and without it a reader who once hit the end of the history could never
-      page again in that session even after the log had grown.
-    */
-    if (!chatScrollingUp) chatPages.arm(chat.tab);
-    maybeLoadOlderMessages(scroller);
-  }
 
   /*
     ── Older chat history ───────────────────────────────────────────────────────────────────────
@@ -2024,69 +1965,7 @@
     triggers — refreshes the live tail without throwing away what the reader scrolled back to.
   */
 
-  function maybeLoadOlderMessages(scroller: HTMLElement) {
-    if (
-      !shouldLoadOlderMessages({
-        scrollTop: scroller.scrollTop,
-        messageCount: feeds.visibleChat.length,
-        /*
-          Always empty HERE, and deliberately not invented. The reference's roomlog component has
-          its own `searchTerm` that filters the live log in place, and refuses to page while one is
-          set — a filtered log is not a paged one. This room has no such filter: its chat search is
-          the `chat-logs` archive modal, a separate view over its own query. The rule is kept whole
-          in `shouldLoadOlderMessages` because it is the reference's, and this call site passes the
-          only honest value it has.
-        */
-        searchTerm: '',
-        hasMoreData: chatPages.hasMore(chat.tab),
-        loadingMore: chatPages.loading
-      })
-    ) {
-      return;
-    }
-    /*
-      `+30` the instant the request goes out, before any answer — upstream applies it synchronously
-      after the emit, in the scroll handler itself. It moves the reader off the trigger zone so a
-      continuing gesture is not fighting the threshold while the fetch is in flight.
-    */
-    scroller.scrollTop += CHAT_PAGE_REQUEST_NUDGE;
-    void loadOlderChatMessages(chat.tab, scroller);
-  }
 
-  /**
-   * `loadMoreLogs({type: 'chat', channel, page})` — one page older, appended in front.
-   *
-   * The empty answer is the terminator, exactly as upstream reads it
-   * (`0 == o.length && (this.hasMoreData = !1)`): the server does not say how much history is left
-   * and does not need to, because running out is something you discover by asking once too often.
-   */
-  async function loadOlderChatMessages(channel: ChatTab, scroller: HTMLElement) {
-    const page = chatPages.requesting(channel);
-
-    let incoming: Awaited<ReturnType<typeof loadOlderChatPage>>;
-    try {
-      incoming = await loadOlderChatPage({ channel, page });
-    } catch {
-      return; // Non-fatal and retried, exactly as the alerts sibling above.
-    } finally {
-      chatPages.settled();
-    }
-
-    if (incoming.length === 0) {
-      chatPages.exhausted(channel);
-      return;
-    }
-
-    chatPages.arrived(channel, incoming, page);
-    /*
-      The SECOND nudge. The reference does two and they are not duplicates: `+30` the instant the
-      request goes out, which is above, and `+1` when a page greater than zero arrives, which is
-      here. Prepending fifty rows leaves the browser free to keep `scrollTop` pointing at what is
-      now different content, and one pixel is the smallest scroll that makes it recompute the
-      anchor without visibly moving the reader.
-    */
-    scroller.scrollTop += CHAT_PAGE_ARRIVAL_NUDGE;
-  }
 
   $effect(() => {
     const scroller = alertsScroller;
@@ -2100,12 +1979,12 @@
         count,
         newestSenderId: newestMessage?.senderId,
         viewerId: data.user.id,
-        readingHistory: alertsScrollingUp
+        readingHistory: feedScroll.alertsReadingHistory
       })
     ) {
-      alertsScrollingUp = false;
+      feedScroll.stopReadingHistory('alerts');
       void tick().then(() => {
-        if (alertsScroller === scroller) forceAlertsToBottom(scroller);
+        if (alertsScroller === scroller) feedScroll.forceAlertsToBottom(scroller);
       });
     }
   });
@@ -2124,12 +2003,12 @@
         tab: activeTab,
         newestSenderId: newestMessage?.senderId,
         viewerId: data.user.id,
-        readingHistory: chatScrollingUp
+        readingHistory: feedScroll.chatReadingHistory
       })
     ) {
-      chatScrollingUp = false;
+      feedScroll.stopReadingHistory('chat');
       void tick().then(() => {
-        if (chatScroller === scroller) forceChatToBottom(scroller);
+        if (chatScroller === scroller) feedScroll.forceChatToBottom(scroller);
       });
     }
   });
@@ -2159,12 +2038,12 @@
         viewerId: data.user.id,
         // THIS column's flag. Passing `chatScrollingUp` would let the main column's reader position
         // decide whether this one jumps, which is the defect its own contract test guards.
-        readingHistory: extraChatScrollingUp
+        readingHistory: feedScroll.extraChatReadingHistory
       })
     ) {
-      extraChatScrollingUp = false;
+      feedScroll.stopReadingHistory('extraChat');
       void tick().then(() => {
-        if (extraChatScroller === scroller) forceChatToBottom(scroller);
+        if (extraChatScroller === scroller) feedScroll.forceChatToBottom(scroller);
       });
     }
   });
@@ -2820,31 +2699,6 @@
   }
 
 
-  /**
-   * The extra column's scroll handler.
-   *
-   * Its own `isScrollingUp` and its own paging trigger: two scrollers with two positions is the
-   * whole point of `app-extra-roomscroller` being a separate component upstream. The paging STATE
-   * is shared because it is keyed by channel — two columns showing the same channel are looking at
-   * the same history, and should not fetch it twice.
-   */
-  function trackExtraChatScroll(scroller: HTMLElement) {
-    extraChatScrollingUp = isRoomScrollerReadingHistory(scroller);
-    if (!extraChatScrollingUp) chatPages.arm(chat.extraTab);
-    if (
-      !shouldLoadOlderMessages({
-        scrollTop: scroller.scrollTop,
-        messageCount: feeds.visibleExtraChat.length,
-        searchTerm: '',
-        hasMoreData: chatPages.hasMore(chat.extraTab),
-        loadingMore: chatPages.loading
-      })
-    ) {
-      return;
-    }
-    scroller.scrollTop += CHAT_PAGE_REQUEST_NUDGE;
-    void loadOlderChatMessages(chat.extraTab, scroller);
-  }
 
 
 
@@ -3239,8 +3093,7 @@
       stopRefresh();
       if (previousOpenImageModal) imageModalWindow.openImageModal = previousOpenImageModal;
       else delete imageModalWindow.openImageModal;
-      if (alertScrollTimer !== undefined) globalThis.clearTimeout(alertScrollTimer);
-      if (chatScrollTimer !== undefined) globalThis.clearTimeout(chatScrollTimer);
+      feedScroll.destroy();
       // An armed "play at" that outlives the room would post a broadcast from a page nobody is on.
       broadcasts.clearScheduledVideoTimer();
       toasts.destroy();
@@ -3768,8 +3621,8 @@
               ondetachalerts={alertsPane.detach}
               onsavealerts={alertsPane.save}
               onarchivealerts={alertsPane.archive}
-              onalertsscroll={trackAlertsScroll}
-              onchatscroll={trackChatScroll}
+              onalertsscroll={feedScroll.trackAlertsScroll}
+              onchatscroll={feedScroll.trackChatScroll}
               onmessageaction={(kind, action, item, payload) =>
                 messageActions.handle(kind, action, item, payload)}
               onprivatechat={() => privateChat.show()}
@@ -3908,7 +3761,7 @@
                   messageActions.handle('chat', action, message, event, true)}
                 onfocus={() => chat.focused(EXTRA_COMPOSER)}
                 onsend={() => void composer.sendExtra()}
-                onscroll={(scroller) => trackExtraChatScroll(scroller)}
+                onscroll={(scroller) => feedScroll.trackExtraChatScroll(scroller)}
                 onscrollerready={(scroller) => (extraChatScroller = scroller)}
                 onprivatechat={() => privateChat.show()}
                 onsearch={() => openModal('chat-logs')}
