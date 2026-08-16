@@ -219,6 +219,7 @@
             that needs no session.
           -->
           <div class="room-description" style="height: 100%; overflow-x: hidden;">
+            <!-- eslint-disable-next-line svelte/no-at-html-tags -->
             {@html data.roomDescription}
           </div>
         </div>
