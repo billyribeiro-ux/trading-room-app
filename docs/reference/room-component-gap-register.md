@@ -10,11 +10,47 @@ room gaps have been tracked ad hoc in `TODO.md` rows instead. This file is the r
 next to it. `OPEN` means nobody has done it. `WON'T FIX` means a decision was taken and the reason is
 recorded. **Never mark a row closed on reasoning alone.**
 
+**This file has two parts, and they must not be read as one list.**
+
+- **Part A — reference gaps (`R-*`).** Claims about the v4 bundle, every one backed by a byte offset
+  in `apps/room/docs/source/`. Nothing here is opinion.
+- **Part B — owner-stated product requirements (`P-*`).** Added 2026-08-16 at the owner's
+  instruction. These are **not** capture-derived and no amount of reading the bundle will confirm
+  them; three of the five are new product the reference never had. What each row *does* cite is the
+  second half — what exists in this repository today — and anything not established is written as a
+  question rather than filled in.
+
+**Part B is where the money is.** P-1 alone is a cancelled member still receiving the product.
+
 ## The corpus
 
-`apps/room/docs/source/` — the deployed Angular 17 room build: `main.d6d3c112b59b7d0d.js`,
+`apps/room/docs/source/` — an Angular 17 room build: `main.d6d3c112b59b7d0d.js` (2,887,876 bytes),
 `styles.d622cb9ed2bbc221.css`, and **194 decoded files covering 51 components** in
 `docs/source/components/` (`.full.js`, `.compiled.js`, `.render-helpers.js`, `.component.css` each).
+
+### ⛔ CORPUS CAVEAT — Part A audited the OLDER build. Found 2026-08-16, mine.
+
+**`apps/room/docs/source/` is not the current bundle.** There are two more captures I had not opened:
+
+| capture | bundle | size |
+|---|---|---|
+| `apps/room/docs/source/` | `main.d6d3c112b59b7d0d.js` | 2,887,876 B — **the older build** |
+| `apps/room/docs/source-v4-2026-08-15/` | `main.d1d09071be31f1ba.js` | 2,891,205 B — **the current v4** |
+| `apps/room/docs/source-v3-2026-08-15/` | `main.99a5781d1d7a7775.js` | v3, not read at all |
+
+`docs/decoded/mobile-app-decoded.md` establishes the difference by counting across both, and it is
+not cosmetic — see **R-15**, a whole surface that exists only in the current build.
+
+**What this does and does not invalidate.** Every Part A citation is still a real offset in a real
+deployed bundle, and the presence table in `mobile-app-decoded.md:80-99` shows most mobile strings
+identical across both builds. But **every `MATCH` verdict in Part A means "matches the older
+build"**, and only a re-run against `main.d1d09071be31f1ba.js` can promote that to "matches what is
+deployed". **Only 51 components were decoded, and they were decoded from the older bundle** — so the
+component count itself is a claim about that build too.
+
+**Action: re-decode from `source-v4-2026-08-15` and diff the component set before trusting any
+`MATCH` above.** Recorded rather than quietly corrected, because I audited nine components against
+the wrong baseline and reported them as done.
 
 The decode is proven complete by `pull-everything-contract.test.ts`, which asserts the extractor
 finds every `selectors:[` definition in the bundle rather than a hardcoded list, and names
@@ -683,3 +719,300 @@ reproduces every gate and control of its reference except where a row below says
 this as "six things are missing" has read it wrong — six components are missing *entirely*, and
 `app-root` alone turned up thirteen absent subscriptions, six unread query parameters and an unbuilt
 password gate **inside components we already call built**.
+
+---
+
+# Part B — owner-stated product requirements
+
+**These are NOT capture-derived and must never be confused with the rows above.** Everything in
+Part A is a claim about the v4 bundle, backed by a byte offset. Everything here is a requirement the
+owner stated on **2026-08-16**, recorded in their own terms. The evidence discipline still applies to
+the *second* half of each row — what exists in this repo today is cited, and what has not been
+established is marked as a question rather than filled in.
+
+Two of these (P-4, P-5) the owner explicitly flagged for further discussion. Their rows carry the
+questions that must be answered before any design, not a design.
+
+| id | requirement | state |
+|---|---|---|
+| P-1 | Mobile push notifications must stop on cancellation / non-renewal / revocation | **OPEN — the sender is not in this repo; see below** |
+| P-2 | One computer + one mobile device per account | **OPEN — no device identity exists** |
+| P-3 | Finish the super-admin dashboard (enterprise controls business accounts) | **PARTIAL — more built than expected; scope needs defining** |
+| P-4 | Drawing / annotation tool | **OPEN — nothing exists; needs discussion** |
+| P-5 | Spotify integration | **OPEN — needs discussion; one hard question first** |
+
+## P-1 — Alert push notifications keep reaching cancelled members
+
+**The owner's words:** *"The app when the subscription doesn't renew, the members continue to receive
+alerts on their app which they're not supposed to. Either upon membership cancelation or failure to
+renew it has to stop immediately."* Clarified: this is the **mobile app receiving alert push
+notifications**, after cancellation, non-renewal, **or revocation**.
+
+**Severity: this is revenue integrity, and it is the highest-value row in this file.** A cancelled
+member still receiving trade alerts is still receiving the product. Unlike everything in Part A, it
+costs money every day it is open.
+
+### What exists here, read and cited
+
+| piece | where |
+|---|---|
+| per-member push tokens | `roomUsers.pushTokensJson` (+ `notificationsState`) |
+| device pairing door | `api/mobile/pair/+server.ts` — PIN-credentialed, single use, 5 failures destroy it |
+| FCM v1 sender | `lib/server/fcm.ts:304` `sendPush()`, HTTP v1 + OAuth, `messages:send` |
+| registration validate/prune | `lib/server/rooms.ts:772` `listFcmRegistrations()` — `validate_only`, prunes only `unregistered` |
+| operator test push | `lib/server/rooms.ts:845` `sendTestPushToMember()` |
+| entitlement rule | `lib/server/sso-entitlement.ts:91` `evaluateEntitlement(filters, asserted)` |
+| account lifecycle seam | `accounts.status` — `'active'` / `'suspended'`, with `suspendedAt/By/Reason` |
+
+### FOUND — the reference's own mechanism, and it explains the behaviour exactly
+
+**This is captured, not inferred.** `room-settings-schema.ts:289-290` holds both settings with the
+reference's own labels and help text, verbatim:
+
+| setting | label | help text, **verbatim** | captured default | wired here |
+|---|---|---|---|---|
+| `mobileAppExpireNotificationsDays` | **Push expire days** | *"If user does not log in this many days, we'll stop sending push notifications"* | **14** | **`wired: false`** |
+| `ptrMobileAppExpirePairCodeDays` | **PTR app exp days** | *"If user does not log in from regular site, mobile app token will expire after this many days"* | **7** | **`wired: false`** |
+
+**Read that help text again, because it is the whole answer.** The reference's automatic stop is
+keyed on **`lastLogin`** — *"if user does not log in this many days"* — and **not on subscription
+state at all.** The reference's own `/sessions/users` response
+(`lib/content/api-docs.ts:197-215`) carries `lastLogin`, `active`, `alerterAppFCMUserOff` and
+`alerterAppTokens` side by side, so the data to do better was right there and the setting does not
+use it.
+
+**So the original's design is: cancel → the member can no longer log in to the web room → 14 days
+later push stops.** That is a **fourteen-day paid-content leak by construction**, and it is exactly
+what the owner is seeing. **This is not a defect we introduced in the rebuild — it is how the
+reference behaves**, and "it has to stop immediately" is a requirement the original never met.
+
+### The four controls the reference has, and what we built of each
+
+| reference control | what it does | ours |
+|---|---|---|
+| `pauseUserNotifs(id, …, 'pause'\|'resume'\|'unsub')` | per-member, three verbs | **BUILT** — `rooms.ts:958` writes `notificationsState`; UI at `account/rooms/[id]/[[tab]]/+page.svelte:1989` |
+| `notifications_state` | `active` / paused / unsubscribed | **BUILT** — `schema.ts:442`, default `'active'` |
+| `resetFCMForuser` | drop every registration and start clean | **BUILT** — `rooms.ts:965-970`, sets `pushTokensJson: '[]'` + state back to `active` |
+| `sendTestFCM` | a real push to that member's devices | **BUILT** — `sendTestPushToMember` |
+| `alerterAppFCMUserOff` | per-user push-off boolean in the API | our equivalent is `notificationsState` |
+| **`mobileAppExpireNotificationsDays`** | the automatic stop | **NOT WIRED** |
+| **`ptrMobileAppExpirePairCodeDays`** | token expiry | **partly** — used for *pair-code* expiry (`mobile-pin/[code]/+server.ts:80`), not for token expiry |
+
+**So every MANUAL control is built and only the AUTOMATIC one is missing** — and the automatic one
+is the one that would have to fire without an operator noticing a cancellation.
+
+### The second finding: nothing in this repo sends alert pushes at all
+
+**`sendPush` has exactly two callers here, and neither is the alert broadcast.**
+`listFcmRegistrations` (`rooms.ts:772`) is a `validate_only` dry run; `sendTestPushToMember`
+(`:845`) is an operator's manual test. There is **no alert → push fan-out** in this codebase, and
+`FCM_SERVICE_ACCOUNT_JSON` is unset (`MOBILE-APP.md:188`), so nothing here can send at all.
+
+**Therefore the notifications the owner's members are receiving today are being sent by the
+reference/production system, not by this rebuild.** That splits the work cleanly, and the two halves
+have different urgencies:
+
+- **The live leak is operational and fixable today, on the production system**, by whichever of
+  `pauseUserNotifs('unsub')` / `resetFCMForuser` that system exposes — and by setting **Push expire
+  days** to something far below 14 as an interim floor. It does not need this repo.
+- **The rebuild's job is not to reproduce the 14-day decay.** It is to gate the fan-out that does
+  not exist yet.
+
+### What this repo must do when the fan-out is built
+
+Recorded now, before the code exists, because that is the cheap moment:
+
+1. **Check `notificationsState` at SEND time**, not only at pause time. The column is written by four
+   places and **read by none on any send path** — because there is no send path. When one is added
+   this is the first gate, or the whole pause/unsub feature is decorative.
+2. **Gate on entitlement at send time, not entry time.** `evaluateEntitlement`
+   (`sso-entitlement.ts:91`) takes **asserted** SSO claims and is a **door check evaluated once**; a
+   phone paired while the subscription was live never passes that door again.
+3. **Drive it off the billing event, not off `lastLogin`.** `accounts.status` is the designed seam —
+   its own comment anticipates *"past-due, closed"* once billing exists — and there is **no billing
+   machinery anywhere in `apps/` or `services/`** today.
+4. **Keep the login-decay as a BACKSTOP, wired at last.** `mobileAppExpireNotificationsDays` is worth
+   having as defence in depth for a device that goes dark; it is the wrong primary mechanism, and
+   the reference proves it by failing exactly this way.
+5. **Do not delete tokens to achieve it.** `MOBILE-APP.md:463` records the rule and its reason: only
+   a registration FCM itself disowns is deleted, because dropping on transient failure silently
+   unsubscribes working devices. **Suspension belongs in `notificationsState`, not in the token
+   store** — which also answers the open question below in favour of suspend-not-unpair.
+
+`TODO.md` row **Q** is adjacent and is NOT this. Q proves the WordPress/WooCommerce **entry door**
+closes after cancellation. **Push bypasses the door entirely**, because the phone is already
+registered. Closing Q does not close P-1.
+
+### Answered by the evidence: suspend, don't unpair
+
+The open question in the first draft of this row — unpair the device or suspend delivery — is
+settled by rule 5 above plus the shape of `resetFCMForuser`, which exists precisely so an operator
+can *deliberately* drop registrations. Suspension is `notificationsState`; unpairing is a separate,
+heavier operator action the reference keeps distinct. **Keep them distinct here too.**
+
+### "Immediately" is a design constraint, and it is the hard part
+
+A next-login check is not immediate — a cancelled member who never opens the app keeps receiving
+pushes forever. Immediate means the *lapse event* must actively revoke, so the design needs:
+
+- a **billing webhook** (Stripe, or WooCommerce → our side) as the trigger;
+- a **revocation write** that clears the tokens and marks the member;
+- an **idempotent, replayable** path, because webhooks arrive twice and out of order;
+- **fail-closed on ambiguity** — if entitlement cannot be determined, do not send. This is a
+  multi-tenant fintech app and this file's parent standard says every allow-list is deny-by-default;
+- a **reconciliation sweep**, because a webhook that is never delivered must not mean a member is
+  entitled forever.
+
+**Open question for the owner:** should revocation *unpair the device* (it must pair again, needing a
+new PIN) or *suspend delivery* (tokens retained, resumed on renewal)? The second is far better for a
+member who lapses and renews a day later, and it is the one I would build — but it is a product call,
+not a technical one.
+
+## P-2 — One computer and one mobile device per account
+
+**The owner's words:** *"We also need to create a way where only one computer and one mobile device
+can be connected. What happens quite often is people share the subscription and there are 5, 6 or
+sometimes more users connected to the same account."*
+
+**What exists:** `loginSessions` — `id`, `userId`, `createdAt`, `lastSeenAt`, plus
+`login_sessions_last_seen_idx`. **That is all.** There is no device identifier, no device class, no
+per-user session cap, and no eviction anywhere in `apps/` or `services/`.
+
+**So the shape is: one row per login, unlimited rows per user.** Six people sharing one password
+produce six perfectly valid sessions and nothing notices. The table is the right seam — it already
+exists, is already keyed by user, and already tracks `lastSeenAt`, which is what an eviction policy
+needs.
+
+**What has to be added, none of which is speculative:**
+
+- a **stable device identity** that survives a browser restart and is not trivially cleared;
+- a **device class** — `desktop` | `mobile` — because the cap is *one of each*, not two of any. The
+  mobile side already has a natural identity in the FCM registration from P-1;
+- a **cap with an eviction policy**, which is a product decision: does a new login **evict the
+  oldest** (seamless, and how Netflix-style limits usually behave) or **get refused** until the other
+  signs out (stricter, and generates support load)?
+- the **room** counted too, not just the controller. A room session is reached by handoff token; if
+  the cap lives only at the controller's login, a shared handoff URL walks straight past it.
+
+**Warn before enforcing.** Turning this on cold will sign out real single-users on their second
+browser and read as an outage. Recommended order: **count and log first**, look at the real
+distribution, then enforce with a clear message that says which other device is signed in.
+
+**Open questions:** does a presenter get the same cap as a member (a presenter plausibly runs a
+second screen)? Does "one computer" mean one browser, one machine, or one concurrent session?
+
+## P-3 — The super-admin dashboard is further along than "to finish" suggests
+
+**The owner's words:** *"We also have to finish the super admin dashboard, which is the enterprise
+account which controls the business's accounts. (we might need to investigate that a little
+further)."* The parenthesis is right, and this row is that investigation's starting point.
+
+**What is already built — 795 lines, and it is not a stub:**
+
+| piece | where |
+|---|---|
+| route | `(app)/admin/` — `+layout.server.ts`, `+page.server.ts` (266), `+page.svelte` (273) |
+| authorization | `lib/server/superadmin.ts` (256) — `requireSuperadmin`, `recordAdminAccess` |
+| guard | layout-level so it is **opt-out, not opt-in**, *plus* a page-level guard, both proven by `admin-guard-contract.test.ts` |
+| audit | `admin_audit`; **refusals are recorded before the rethrow**, which is the half a naive version drops |
+| tables | `admin_users`, `admin_audit`, `impersonations` |
+| operator console | a table of Account · Owner · Registered · Users · Rooms · Members · Badges · API keys · Status |
+| actions | `setAccountStatus` (suspend/reactivate), `impersonate`, `stopImpersonating` |
+
+**The tenant boundary already exists too:** `accounts` is the business, `users.accountId` is the
+membership, and `accounts.status` is honoured at one chokepoint (`readUser`) plus the two paths that
+do not use a cookie — the login action and `internal/room-config`. Its comment states the reason
+plainly: *"Miss one and a suspended owner keeps working, which is worse than no suspend at all
+because it reads as enforced."*
+
+**So "the enterprise account which controls the business's accounts" is largely the model that is
+there.** What is NOT established — and must be, before any work — is what *finished* means:
+
+1. **Is the enterprise tier a new level above `accounts`,** or is it the existing superadmin console
+   with more features? These are very different: the first is a schema change (an
+   `organisations` parent, re-scoping every query and every guard), the second is UI work on a
+   boundary that already holds. **Nothing in the repo answers this** and I will not guess.
+2. **What does an enterprise operator need to DO** that `setAccountStatus` / `impersonate` do not
+   already cover — billing, usage, per-account limits, seat management, reporting?
+3. **P-1 and P-2 both terminate here.** Billing state (P-1) and device caps (P-2) are exactly what an
+   enterprise console displays and overrides. **Settle P-3's model before building either**, or they
+   get built against a boundary that then moves.
+
+## P-4 — Drawing / annotation tool
+
+**The owner's words:** *"And one more thing is the drawing tool I would like to integrate into the
+app. (will discuss further)."* Recorded as raised; **no design is proposed here**, per that note.
+
+**What exists: nothing.** No canvas, annotation, whiteboard or drawing surface anywhere in
+`apps/room/src` or `apps/controller/src`, and no such component in the 51-component reference bundle
+— so **this is new product, not a reference match.** It is the first item in this file with no
+capture to check against, which also means nothing constrains its design.
+
+**The surfaces it would touch,** named so the discussion has a starting point: `ScreenPane.svelte`
+(the screenshare view), `PresentationArea.svelte`, and `screen-zoom.ts` / `ScreenZoomControls.svelte`
+— pan/zoom already transforms that surface, and an annotation layer has to share that transform or
+the drawing slides off the content.
+
+**Questions to settle before any design:**
+
+- **Who draws** — presenters only, or members too?
+- **Does it broadcast?** A presenter annotating a chart for the room is a completely different build
+  from a member marking up their own view. Broadcast means a wire format, ordering, late-join replay
+  (the same problem as R-14's `ytStartTime`) and per-stroke authorization.
+- **What does it draw ON** — the shared screen, a stream tab, a blank whiteboard, an uploaded chart?
+- **Does it persist**, and if so is it part of the recording?
+
+## P-5 — Spotify
+
+**The owner's words:** *"and also need to discuss implementing spotify."* Recorded; discussion
+pending.
+
+**What exists: nothing.** The only `spotify` matches in the repo are inside the Font Awesome brand
+icon font — a glyph, not an integration.
+
+**The precedent is `app-scplayer`** (audited above, R-13): SoundCloud as a hidden `iframe`, parked
+below the fold, audio-only, one input `scUrl`. Room-wide audio is already a solved shape here —
+`media.soundCloudPlaying`, `mp3Playing` and `youtubeForAllUrl` are the three sources the navbar
+already knows about (`RoomNavbar.svelte:728`), so a fourth has somewhere to plug in.
+
+**One question has to be answered before anything is designed, because it may end the discussion:**
+Spotify's embed and Web Playback SDK are built for a listener playing to *themselves* — playback
+requires each listener's own Premium account, and there is no supported way to take one presenter's
+Spotify stream and rebroadcast it to a room. That is not the same shape as SoundCloud's public embed
+or an MP3 the room hosts.
+
+**So the real question is which product you want**, and they differ enormously in cost:
+
+- **(a) Each member plays their own Spotify**, room-synced — needs per-member Spotify auth and
+  Premium; the room only broadcasts *what to play*, never audio. Feasible, but every member needs a
+  Premium account.
+- **(b) The presenter's Spotify audio reaches everyone** — this is the one people usually mean, and
+  it is the one the platform is designed to prevent. It would mean capturing system audio into the
+  existing screenshare/SFU path rather than integrating Spotify at all, with the licensing question
+  that raises.
+
+**I have not verified Spotify's current developer terms against this use case**, and I am not going
+to assert them from memory in a file whose whole point is cited evidence. **Action: confirm the terms
+first**, then pick (a) or (b). If the answer is (b), the honest framing is that it is a
+system-audio-capture feature that happens to be used for Spotify.
+
+---
+
+## Cross-check — what else is recorded elsewhere and is NOT duplicated here
+
+Checked against `TODO.md`'s "Not an evidence gap — missing work" table so nothing is tracked in two
+places (which is how one copy goes stale). The room-relevant rows there stay there:
+
+- **Q** — WordPress/WooCommerce entry door after cancellation. **Adjacent to P-1 and not the same
+  thing**; cross-referenced from P-1 rather than copied.
+- **S** — guest path shows two forms where the reference has one.
+- **W** — **HIGH: user-info / session-control modal actions that report success and send nothing**
+  (`kick`, `kick-ban`, `kick-duplicates`, `admin-notes-password`, `session-send-users-url`,
+  `session-send-sales-image`). This is the largest known room defect and it is a *behaviour* gap
+  inside built components, so it belongs in that table — but **step 2 of this audit will meet it
+  again** when `app-user-info-modal` and `app-session-control-modal` are read.
+- **X** — `recPreviewWindow`, blocked on a MediaMTX cluster.
+- **AE / AF / AG** — the `+page.svelte` decomposition, the html-to-text derivation, and the seventeen
+  dynamically-dispatched form actions.
+
+**Nothing in that table is missing from this file's scope, and nothing in this file duplicates it.**

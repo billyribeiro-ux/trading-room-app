@@ -182,6 +182,63 @@ which accounts for all 45. `eslint` clean; `prettier --check` clean, and the fil
 too, so the formatting pass was fixing what this change introduced rather than pre-existing drift.
 **Not verified:** nothing runtime, because nothing runtime changed.
 
+### 2026-08-16 07:24 EDT — Five owner requirements added to the room register as Part B, and the push-notification one has a decisive finding
+
+**Branch `feat/extra-chat-column`. Runtime impact: none** —
+`docs/reference/room-component-gap-register.md`, `TODO.md`. No source file changed.
+
+Requirements stated by the owner 2026-08-16 and recorded in their own words. They are **not**
+capture-derived, so they are kept in a structurally separate **Part B** (`P-1`…`P-5`) — mixing them
+into the `R-*` rows would put opinion beside byte offsets in a file whose whole value is that it
+does not.
+
+**P-1 — cancelled/lapsed/revoked members still receive alert push notifications on the mobile app.
+This is the highest-value open item in the repository: a cancelled member still receiving trade
+alerts is still receiving the product.** The investigation produced one finding that decides the
+whole row:
+
+> **`sendPush` has exactly two callers in this repository, and neither is the alert broadcast.**
+> `listFcmRegistrations` (`rooms.ts:772`) is a `validate_only` dry run; `sendTestPushToMember`
+> (`:845`) is an operator's manual test. **The fan-out actually reaching members' phones is not in
+> this codebase.**
+
+So step one is to find the production sender, not to write code — a fix written here may not be on
+the path at all. The half that *is* here is revocation at the token store (`roomUsers.pushTokensJson`),
+which stops delivery regardless of sender **provided the sender reads this store**, and that proviso
+is the open question. Also established: `evaluateEntitlement` (`sso-entitlement.ts:91`) is a **door
+check evaluated once** from SSO-asserted claims, and a phone paired while the subscription was live
+never passes that door again; there is **no billing machinery anywhere in `apps/` or `services/`**,
+though `accounts.status` was explicitly designed as its seam. **`TODO.md` row Q is adjacent and is
+not this** — Q proves the *web entry door* closes after cancellation; push bypasses the door.
+
+**P-2 — one computer + one mobile device.** `loginSessions` carries `id`/`userId`/`createdAt`/
+`lastSeenAt` and nothing else: no device identity, no device class, no cap, no eviction. Six shared
+logins are six valid sessions. Recorded with the eviction-policy decision called out as the owner's
+(evict oldest vs refuse), and a warning to count before enforcing.
+
+**P-3 — the super-admin dashboard is further along than "finish" implies:** 795 lines across
+`(app)/admin/` and `superadmin.ts`, a **layout-level guard so protection is opt-out not opt-in**,
+audit that records refusals *before* rethrowing, and `setAccountStatus` / `impersonate` /
+`stopImpersonating`. The undefined part is whether the enterprise tier is a **new level above
+`accounts`** (a schema change re-scoping every query and guard) or the existing console with more
+features. **P-1 and P-2 both terminate in this console, so this is the one to settle first.**
+
+**P-4 (drawing tool) and P-5 (Spotify)** the owner flagged for further discussion, so both rows carry
+**questions rather than designs**. Neither exists in any form — the only `spotify` matches in the
+repo are Font Awesome glyphs. P-5 names the question that may end it: there is no supported path to
+rebroadcast one presenter's Spotify audio to a room, so that product is system-audio capture rather
+than a Spotify integration. **Spotify's current terms were deliberately NOT asserted from memory** in
+a file whose standard is cited evidence.
+
+**Also cross-checked:** every room-relevant row in `TODO.md`'s "Not an evidence gap" table (Q, S, W,
+X, AE, AF, AG) against this register, confirming nothing is tracked twice and nothing in scope is
+missing. Row **W** — modal actions that report success and send nothing — is flagged as something
+step 2 of the audit will meet again at `app-user-info-modal` and `app-session-control-modal`.
+
+**Verified:** every "what exists today" claim by opening the cited file. **Not verified and marked as
+such:** the identity of the production push sender, Spotify's developer terms, and the intended
+scope of the enterprise tier. **Not run:** any test or gate — no source file was touched.
+
 ### 2026-08-16 06:50 EDT — The room gets its first gap register, and its own re-run corrects two of its rows
 
 **Branch `feat/extra-chat-column`. Runtime impact: none** — `docs/reference/room-component-gap-register.md`

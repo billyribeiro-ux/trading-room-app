@@ -474,6 +474,30 @@ divergences are — `app-typing-indicator-dots` is missing from inside `AlertCha
 Two rows in that file were **corrected by its own re-run** rather than by review, and the pass log at
 the end of it records both. Do not act on a row there without re-reading its citation first.
 
+**That file now has a PART B: five owner-stated product requirements (`P-1`…`P-5`), added
+2026-08-16 at the owner's instruction.** They are not capture-derived and are kept structurally
+separate from the `R-*` rows for that reason. In priority order as they stand:
+
+- **P-1 — cancelled/lapsed members still receive alert PUSH NOTIFICATIONS on the mobile app.**
+  Revenue integrity, and the highest-value open item anywhere in this repository. **The decisive
+  finding: `sendPush` has exactly two callers here and neither is the alert broadcast** — one is a
+  `validate_only` registration check, the other an operator test push. **The fan-out reaching real
+  phones is not in this codebase**, so step one is to find it, not to write code. Entitlement
+  (`sso-entitlement.ts`) is a door check evaluated once at entry; a paired phone never passes that
+  door again. **Row Q is adjacent and is NOT this** — Q is the web entry door, and push bypasses the
+  door entirely.
+- **P-2 — one computer + one mobile device per account.** `loginSessions` has no device identity, no
+  device class and no cap; six shared logins produce six valid sessions and nothing notices.
+- **P-3 — finish the super-admin dashboard.** More is built than the phrasing suggests (795 lines,
+  layout-level guard, audit incl. refusals, suspend + impersonate). What is undefined is whether the
+  enterprise tier is a **new level above `accounts`** or the existing console with more features —
+  a schema change versus UI work. **P-1 and P-2 both terminate here, so settle this first.**
+- **P-4 — drawing/annotation tool.** Nothing exists; not in the reference either. Owner flagged for
+  discussion; the row carries the questions, not a design.
+- **P-5 — Spotify.** Nothing exists. The row names the one question that may end it: Spotify has no
+  supported room-rebroadcast path, so "presenter's audio to everyone" is a system-audio-capture
+  feature, not a Spotify integration. Terms unverified and deliberately not asserted from memory.
+
 As of 2026-08-15 20:52 EDT: **68 CLOSED, 5 OPEN, 14 parked/won't-fix, 87 total.**
 
 **Everything closable by READING is closed.** The six that remain need something no source file
