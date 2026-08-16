@@ -24,6 +24,14 @@ const page = readFileSync(new URL('../routes/+page.svelte', import.meta.url), 'u
 
 const stripComments = (source: string) =>
   source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/<!--[\s\S]*?-->/g, '');
+/*
+  The presentation area moved to `PresentationArea.svelte` on 2026-08-15. The assertions below
+  point at whichever file owns each subject: markup here, the handlers and gates behind it on the
+  page.
+*/
+const paneCode = stripComments(
+  readFileSync(new URL('./components/PresentationArea.svelte', import.meta.url), 'utf8')
+);
 const code = stripComments(page);
 
 /** The body of a top-level `function name(` … `\n  }` in the page's script. */
@@ -91,7 +99,7 @@ describe('webcam: this room reproduces that split', () => {
     // `removePresenterWebcam` calls `container.remove(idx)`; here the {#each} drops the node.
     const remove = bodyOf('removeWebcamPresenter');
     expect(remove).toContain('splice');
-    expect(code).toContain('{#each webcamPresenters as presenter, index (presenter.id)}');
+    expect(paneCode).toContain('{#each webcamPresenters as presenter, index (presenter.id)}');
   });
 });
 

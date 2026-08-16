@@ -226,8 +226,27 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       assertion pointed at the file that owns its subject — and most of them came out stronger,
       because a control split across two files now has its hand-off asserted as well. A pane whose
       callback nothing supplies is exactly the defect a single re-pointed constant would have hidden.
+
+      `PresentationArea` is the fifth and CLOSES PHASE 2: 10,860 -> 9,612, a fall of 1,248 for a
+      1,335-line region. The webcam strip, the main tab bar and all seven of its panes.
+
+      It takes ~100 props, which is the largest surface of the five and is not defended as elegant —
+      it is what the region reads, produced by the compiler rather than by a scan. Two things came
+      out of that list which a hand scan would have got wrong: `screenVolume` is a SNIPPET, not a
+      value, and `captureVideoImage` is an import from `$lib/screen-zoom` rather than page state.
+
+      DEVIATION, recorded: the page's function names are kept rather than renamed to `on*` as
+      `RoomNavbar` and `AlertChatArea` did. A third of the ~45 functions here are QUERIES the markup
+      calls to compute a value (`countFiles`, `searchedFiles`, `matchesFileTab`, `fileSortTitle`,
+      `swingAlertPayload`), and an `on` prefix would misname them; renaming only the true handlers
+      would leave two conventions inside one file. The one exception is `onfilesearch`, which became
+      a callback because ESLint proved the value was write-only in the pane — see that prop's note.
+
+      The Files pane inside it is a `FilesPane` waiting to happen: ~480 lines and ~25 identifiers
+      with no component of its own. Recorded in `TODO.md` rather than done here, because two
+      extractions in one pass is how a mangle ships.
     */
-    max: 10861,
+    max: 9613,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {
@@ -322,7 +341,15 @@ describe('the contract tests that read source as text cannot pass vacuously', ()
   const EXTRACTION_SOURCES = [
     'routes/+page.svelte',
     'routes/+page.server.ts',
-    'components/AlertChatArea.svelte'
+    'components/AlertChatArea.svelte',
+    /*
+      Added the same day it was created, and for the reason the entry above was: re-pointing
+      `notes-style-contract` and `screen-tab-bar-contract` at this component took both of them out
+      of the generated list, exactly as `day-separator` fell out when `AlertChatArea` landed. The
+      count dropping is the only signal that happens, so it is worth saying plainly — a file leaves
+      this list silently and stays green while it does.
+    */
+    'components/PresentationArea.svelte'
   ];
 
   const readers = readdirSync(testDir)

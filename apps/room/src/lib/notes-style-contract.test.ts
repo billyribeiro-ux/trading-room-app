@@ -11,7 +11,7 @@ describe('Notes captured stylesheet authority', () => {
   const bridgedCss = text(new URL('styles/captured-runtime-components.css', import.meta.url));
   const localCss = text(new URL('../app.css', import.meta.url));
   const notesPane = text(new URL('components/notes/NotesPane.svelte', import.meta.url));
-  const page = text(new URL('../routes/+page.svelte', import.meta.url));
+  const presentationArea = text(new URL('components/PresentationArea.svelte', import.meta.url));
 
   it('retains the decoded Notes tab, menu, content, and action-bar rules', () => {
     expect(sourceCss).toContain(
@@ -34,7 +34,8 @@ describe('Notes captured stylesheet authority', () => {
   });
 
   it('uses the decoded presentation-area bridge for full-height Notes layout', () => {
-    expect(page).toContain('<app-presentationarea>');
+    // The element moved to `PresentationArea.svelte` on 2026-08-15.
+    expect(presentationArea).toContain('<app-presentationarea>');
     expect(bridgedCss).toContain('app-presentationarea #notes:not(:root)');
     expect(bridgedCss).toContain(
       'app-presentationarea #notesTabsContent:not(:root) .tab-pane.active:not(:root)'

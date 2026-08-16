@@ -24,6 +24,82 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-15
 
+### 2026-08-15 22:48 EDT — `PresentationArea`: the last of the five, 10,860 → 9,612, and Phase 2 closes
+
+**Branch `feat/extra-chat-column`. Runtime impact: none intended** — a region moved from a page into
+a component, plus one type moved to `$lib/types`.
+
+**The largest region of the whole decomposition and the last of Phase 2's five components: 1,335
+lines out, `+page.svelte` 10,860 → 9,612 (−1,248)**, `PresentationArea.svelte` at 1,652. The webcam
+strip, the main tab bar and all seven of its panes — screens, streams, notes, swing alerts, day
+trades, video player and files.
+
+**~100 props, which is not defended as elegant.** It is what the region reads, and the COMPILER
+produced the list, not a scan: empty `<script>`, `svelte-check --output machine`, every
+`Cannot find name`. Two entries would have been got wrong by hand — `screenVolume` is a **snippet**,
+not a value, and `captureVideoImage` is an import from `$lib/screen-zoom` rather than page state.
+Four of the props are state classes (`split`, `media`, `menus`, `mtx`).
+
+**DEVIATION, recorded rather than taken quietly: the page's function names are kept.** `RoomNavbar`
+and `AlertChatArea` renamed every callback to `on*`. That rule does not fit here — a third of the
+~45 functions are QUERIES the markup calls to compute a value (`countFiles`, `searchedFiles`,
+`matchesFileTab`, `fileSortTitle`, `swingAlertPayload`, `dayTradeAlertPayload`), and an `on` prefix
+would misname them; renaming only the true handlers would leave two conventions inside one file. The
+mapping is therefore the identity, which also means a reader diffing this against `+page.svelte`
+sees a move rather than a rewrite.
+
+**The one exception was found by ESLint, not by me.** `fileSearch` was declared `$bindable()` and
+`no-useless-assignment` reported the assigned value as never used. It was right: the search box only
+ever WRITES that value and the page's `searchedFiles()` is what reads it, so the incoming half of
+the binding was dead. It is `onfilesearch` now — the pane reports, the page owns.
+
+**40 assertions across 11 contract files**, re-pointed one at a time. `files-pane-contract` alone
+held 23. Its markup reads went to the pane and its handler reads stayed on the page — `setAlertSound`
+and `searchedFiles` are still declared there — so that file now reads two sources with each
+assertion aimed at the one that owns its subject.
+
+**Four defects I caused doing it, all mine, all caught before they shipped**, and recorded because
+the rule in `CLAUDE.md` is to rule out my own tooling rather than report it as a finding: a
+mechanical `page` → `pane` replace missed `lastIndexOf`, so two assertions sliced the pane using an
+index computed from the page and compared against an empty string; the same replace turned a local
+`const pane = page.slice(...)` into a self-referencing declaration; and an unindented search pattern
+matched both the module-level and the indented copy of the same line. Every one was caught by
+asserting the substitution count before writing, or by the suite. None reached a commit.
+
+**The same vacuity gap as last time, closed the same way.** Re-pointing `notes-style-contract` and
+`screen-tab-bar-contract` at the new component took both out of `source-size-contract`'s generated
+list — the count went 1,891 → 1,889 — exactly as `day-separator` fell out when `AlertChatArea`
+landed. `components/PresentationArea.svelte` is now a fourth `EXTRACTION_SOURCES` entry and the
+count is back at 1,891.
+
+**Verified, and how:**
+
+- `svelte-check --threshold error` — **0 errors, 0 warnings across 1,139 files**.
+- `npx eslint src` — clean. It named the 18 now-unused imports on the page, which is independent
+  confirmation the component took every one of their usages.
+- `npx vitest run` — **136 files, 1,891 tests, all passing.**
+- `svelte-autofixer` — **zero issues.** Of its three suggestions, two are artifacts of the reduced
+  sample and the third is REFUSED with cause: the `{' '}` mustaches are the capture's padded text
+  nodes (`v(2, 'Delete Selected ')`), and Svelte trims whitespace at element edges, so the pad has
+  to be an expression to survive into the DOM. `files-pane-contract` asserts exactly that. Taking
+  the suggestion would break a captured DOM match to satisfy a style hint.
+- **Four negative controls, each with the mutation verified to have landed** before believing the
+  red: un-gating the disable-video pane, dropping the `hideVideoPlayer` term from the video-player
+  gate, removing the `screenVolume` snippet hand-off, and making the files sort bar unconditional.
+- Ceiling lowered 10,861 → 9,613; ceilings only go down.
+
+Also: `WebcamPresenter` moved from `+page.svelte` to `$lib/types`, for the same reason
+`MessageActionItem` did — the page owns the list and the component renders the cards.
+
+**Recorded as the next piece of work rather than done here: `FilesPane`.** It is the one pane inside
+this component with no component of its own — roughly 480 lines and 25 identifiers of toolbar, sort
+bar and table, sitting inline. Two extractions in one pass is how a mangle ships. `TODO.md` carries
+the measurements.
+
+**Phase 2 of the decomposition plan is complete.** Five components: `PrivateChatPanel`,
+`RoomSidebar`, `RoomNavbar`, `AlertChatArea`, `PresentationArea`. `+page.svelte` has gone from
+13,663 at the start of this work to **9,612**.
+
 ### 2026-08-15 22:05 EDT — `AlertChatArea`: the alerts and chat panes out of `+page.svelte`, 11,550 → 10,860
 
 **Branch `feat/extra-chat-column`. Runtime impact: none intended** — a region moved from a page into

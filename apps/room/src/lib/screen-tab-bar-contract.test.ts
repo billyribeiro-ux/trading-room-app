@@ -211,7 +211,11 @@ describe('screens tab bar height', () => {
   pointing at.
 */
 describe('the screens tab bar is not conditional on anyone sharing', () => {
-  const page = readFileSync(new URL('../routes/+page.svelte', import.meta.url), 'utf8');
+  // The screens pane moved to `PresentationArea.svelte` on 2026-08-15, heading and bar together.
+  const page = readFileSync(
+    new URL('./components/PresentationArea.svelte', import.meta.url),
+    'utf8'
+  );
 
   it('renders the bar as a sibling of the idle heading, not as its alternative', () => {
     // Comments stripped first: the block above and the one in `+page.svelte` both DESCRIBE the

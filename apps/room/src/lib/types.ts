@@ -355,6 +355,15 @@ export type MessageAction =
   | 'edit'
   | 'reaction';
 
+/**
+ * One entry per user with a live camera — the room's `webcamingUsers`.
+ *
+ * Lifted out of `+page.svelte` on 2026-08-15 when `PresentationArea` took the webcam strip: the
+ * page owns the list and the component renders the cards, so a shape declared inside either one is
+ * a shape the other has to guess at.
+ */
+export type WebcamPresenter = { id: string; name: string; isMe: boolean };
+
 /** A reaction pill's payload, as `RoomMessage` emits it with the `reaction` action. */
 export interface MessageReactionPayload {
   key: string;

@@ -187,7 +187,13 @@ describe('the client', () => {
     expect(pageCode).toContain(
       'if (isPresenter && makeUsersFollowMyScreens) bringEveryoneToScreen(screenId);'
     );
-    expect(pageCode).toContain('onselect={selectScreenTabByUser}');
+    // The tab strip moved to `PresentationArea.svelte`; the handler behind it did not.
+    const paneCode = readFileSync(
+      new URL('./components/PresentationArea.svelte', import.meta.url),
+      'utf8'
+    );
+    expect(paneCode).toContain('onselect={selectScreenTabByUser}');
+    expect(pageCode).toContain('{selectScreenTabByUser}');
 
     // The programmatic path must NOT broadcast, or receiving a focus command would send one back.
     const from = pageCode.indexOf('function selectScreenTabOfId(');

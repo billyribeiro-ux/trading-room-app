@@ -109,8 +109,13 @@ describe('screen controls', () => {
 
     // The slot was already modelled and never filled - `+page.svelte` passed no snippet, so the
     // `{#if}` around it was permanently false. That is what this asserts against.
-    expect(page, 'the page must pass the controls snippet').toContain('{#snippet controls()}');
-    expect(page).toContain('variant="attached"');
+    // The snippet moved with the tab strip into `PresentationArea.svelte` on 2026-08-15.
+    const pane = readFileSync(
+      new URL('./components/PresentationArea.svelte', import.meta.url),
+      'utf8'
+    );
+    expect(pane, 'the pane must pass the controls snippet').toContain('{#snippet controls()}');
+    expect(pane).toContain('variant="attached"');
   });
 
   it('renders the pane cluster only when the screen is detached', () => {
