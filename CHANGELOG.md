@@ -223,7 +223,7 @@ through — both are documented in `.env.example` and until now nothing read the
 **Not done:** retiring `ptr_clone_app` (deferred until the cutover is proven in a real deployment),
 and the owner role / database rename `ptr_clone` → `tradingroom`. Both remain in `TODO.md`.
 
-### 2026-08-15 20:45 EDT — `RoomOrderedArrivals`: the last latch, and two rules that had never been run
+### 2026-08-15 20:31 EDT — `RoomOrderedArrivals`: the last latch, and two rules that had never been run
 
 **Branch `feat/extra-chat-column`, not merged.** **Runtime impact: none intended** — the mention
 popup's marker logic is unchanged; it is executable now instead of only readable.
