@@ -185,7 +185,7 @@ describe('the client', () => {
   it('only the USER-initiated tab click broadcasts — the loop guard', () => {
     expect(pageCode).toContain('function selectScreenTabByUser(screenId: string) {');
     expect(pageCode).toContain(
-      'if (isPresenter && makeUsersFollowMyScreens) bringEveryoneToScreen(screenId);'
+      'if (isPresenter && prefs.makeUsersFollowMyScreens) bringEveryoneToScreen(screenId);'
     );
     // The tab strip moved to `PresentationArea.svelte`; the handler behind it did not.
     const paneCode = readFileSync(

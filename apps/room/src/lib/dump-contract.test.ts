@@ -451,8 +451,13 @@ describe('part 1 capture contract', () => {
     const privateChatPanel = text(new URL('components/PrivateChatPanel.svelte', import.meta.url));
     expect(privateChatPanel.match(/<span class="badge badge-danger ml-2"/g)).toHaveLength(1);
     expect(alertChatArea).toContain('<i class="fas fa-bell-slash"></i> DND');
-    expect(pageSource).toContain("typeof loadedSettings.doNotDisturbOn === 'boolean'");
-    expect(pageSource).toContain('DEFAULT_ALERT_DELIVERY_PREFERENCES.doNotDisturbOn');
+    /*
+      The DND seed moved to `RoomPrefs` in Phase 5 slice 3 — the badge that renders it is still the
+      pane's, so the two halves are read from the files that own them.
+    */
+    const prefsSource = text(new URL('room/prefs.svelte.ts', import.meta.url));
+    expect(prefsSource).toContain("typeof loadedSettings.doNotDisturbOn === 'boolean'");
+    expect(prefsSource).toContain('DEFAULT_ALERT_DELIVERY_PREFERENCES.doNotDisturbOn');
     expect(pageSource).toContain('{#if media.anyoneTalking && media.talking.length > 0}');
     expect(modalHostSource).toContain('onDoNotDisturbChange(input.checked);');
   });

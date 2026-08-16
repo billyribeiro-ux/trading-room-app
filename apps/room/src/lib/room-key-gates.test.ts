@@ -173,9 +173,11 @@ describe('it is the reference’s handlers, bound to the reference’s events', 
     */
     expect(PAGE).toContain("from '$lib/room-key-gates'");
     expect(PAGE).toContain(
-      'pushToTalkShouldUnmute(event, { pushToTalk, micMuted: media.micMuted })'
+      'pushToTalkShouldUnmute(event, { pushToTalk: prefs.pushToTalk, micMuted: media.micMuted })'
     );
-    expect(PAGE).toContain('pushToTalkShouldMute(event, { pushToTalk, micMuted: media.micMuted })');
+    expect(PAGE).toContain(
+      'pushToTalkShouldMute(event, { pushToTalk: prefs.pushToTalk, micMuted: media.micMuted })'
+    );
     expect(PAGE).toContain('shouldBlockCopyKey(event, { disableCopy, isPresenter })');
     expect(PAGE).toContain('shouldBlockContextMenu({ disableCopy, isPresenter })');
     expect(PAGE).toContain("document.body.classList.add('noselect')");

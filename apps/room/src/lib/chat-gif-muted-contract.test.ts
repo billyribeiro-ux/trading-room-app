@@ -48,12 +48,19 @@ const SHIPPED_CSS = readFileSync(
 const MESSAGE = readFileSync(new URL('./components/RoomMessage.svelte', import.meta.url), 'utf8');
 const APP_CSS = readFileSync(new URL('../app.css', import.meta.url), 'utf8');
 const PAGE = readFileSync(new URL('../routes/+page.svelte', import.meta.url), 'utf8');
+/*
+  The preference declarations and the write path moved to `RoomPrefs` in Phase 5 slice 3, so the
+  assertions about them read the class that now owns them. The page half is still read above -
+  each assertion points at the file that owns its subject.
+*/
+const PREFS_SOURCE = readFileSync(new URL('./room/prefs.svelte.ts', import.meta.url), 'utf8');
 
 const stripComments = (source: string) =>
   source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/<!--[\s\S]*?-->/g, '');
 
 const messageCode = stripComments(MESSAGE);
 const pageCode = stripComments(PAGE);
+const prefsCode = stripComments(PREFS_SOURCE);
 
 describe('the reference', () => {
   it('mutes gifs only, and hides the image rather than omitting it', () => {
@@ -102,9 +109,9 @@ describe('ours', () => {
 
   it('defaults ON, matching the reference blob', () => {
     expect(messageCode).toContain('chatGif = true,');
-    expect(pageCode).toContain('let chatGif = $state(loadedSettings.chatGif !== false);');
+    expect(prefsCode).toContain('this.#chatGif = $state(loadedSettings.chatGif !== false);');
     // `=== true` here would mute gifs for every viewer who has never touched the checkbox.
-    expect(pageCode).not.toContain('let chatGif = $state(loadedSettings.chatGif === true);');
+    expect(prefsCode).not.toContain('this.#chatGif = $state(loadedSettings.chatGif === true);');
   });
 
   it('reaches BOTH message lists — the pipe is shared upstream', () => {

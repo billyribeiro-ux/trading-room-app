@@ -28,6 +28,12 @@ import { describe, expect, it } from 'vitest';
 */
 
 const PAGE = readFileSync(new URL('../routes/+page.svelte', import.meta.url), 'utf8');
+/*
+  The preference declarations and the write path moved to `RoomPrefs` in Phase 5 slice 3, so the
+  assertions about them read the class that now owns them. The page half is still read above -
+  each assertion points at the file that owns its subject.
+*/
+const PREFS_SOURCE = readFileSync(new URL('./room/prefs.svelte.ts', import.meta.url), 'utf8');
 const MODAL = readFileSync(new URL('./components/ModalHost.svelte', import.meta.url), 'utf8');
 const EDITOR = readFileSync(new URL('./components/RichTextEditor.svelte', import.meta.url), 'utf8');
 /*
@@ -47,6 +53,7 @@ const stripComments = (source: string) =>
   source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/<!--[\s\S]*?-->/g, '');
 
 const pageCode = stripComments(PAGE);
+const prefsCode = stripComments(PREFS_SOURCE);
 const modalCode = stripComments(MODAL);
 const editorCode = stripComments(EDITOR);
 const serverCode = stripComments(SERVER);
@@ -54,7 +61,7 @@ const serverCode = stripComments(SERVER);
 describe('the gate is the reference expression, resolved once', () => {
   it('all three terms, in one derived value', () => {
     expect(pageCode).toContain(
-      'const canUseRTE = $derived(data.sessData?.enableRTE === true && enableRTE && isPresenter);'
+      'const canUseRTE = $derived(data.sessData?.enableRTE === true && prefs.enableRTE && isPresenter);'
     );
   });
 
@@ -73,8 +80,8 @@ describe('the gate is the reference expression, resolved once', () => {
       Polarity matters and is easy to get backwards: `!== false` would default it ON and hand every
       presenter a toolbar the reference does not give them.
     */
-    expect(pageCode).toContain('let enableRTE = $state(loadedSettings.enableRTE === true);');
-    expect(pageCode).not.toContain('loadedSettings.enableRTE !== false');
+    expect(prefsCode).toContain('this.#enableRTE = $state(loadedSettings.enableRTE === true);');
+    expect(pageCode).not.toContain('prefs.loaded.enableRTE !== false');
   });
 });
 

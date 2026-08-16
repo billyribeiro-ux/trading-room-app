@@ -24,6 +24,89 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-16
 
+### 2026-08-16 07:57 EDT — `RoomPrefs`: 27 preferences, one write path, and 25 of them can no longer be written any other way
+
+**Branch `feat/extra-chat-column`. Runtime impact: yes** — every viewer preference in the room moved,
+along with the function that persists them. Behaviour is intended to be identical.
+
+**`+page.svelte` 9,519 → 9,247** (script 8,265). Phase 5 slice 3, and the first with a real drop:
+**−272**, against −73 and −13 for the two before it.
+
+**THE INVARIANT IS THE POINT, not the line count.** Twenty-seven preferences were declared across
+eleven hundred lines of the page — `doNotDisturbOn` at 742, `pushToTalk` at 1853 — while
+`savePreference` sat two thousand lines below the values it assigned. **Twenty-five of the twenty-seven
+now have no public setter at all.** Before this, any code in the page could write `chatGif = true`:
+the preference changed on screen and never reached the server, because persistence lived in a
+function nobody was obliged to call. The only way in is now `prefs.save`, and
+`prefs.svelte.test.ts` asserts the absence of those setters off the prototype — plus that the write
+throws at runtime, not merely at the type level.
+
+The two that keep a setter are the two the room genuinely writes *without* persisting, and both are
+transient by the reference's own design: `doNotDisturbOn` (`app-privchat`'s `setDND()` flips the flag
+and calls no `setPreference`, unlike every neighbouring handler) and `subtitles` (`setMasterVolume`
+forces it on at zero volume).
+
+**THE INITIALISERS MOVED BYTE-EXACT.** `svelte/$state` permits `this.#x = $state(...)` as the first
+assignment in a constructor, so the whole transformation was `let x = ` → `this.#x = `, applied
+programmatically with the marker count asserted per declaration. That matters more than convenience:
+these comments carry the polarity reasoning — `!== false` against `=== true`, decided by the
+reference's own defaults and not by house style — and this room has already shipped two defects from
+guessing it. `alwaysScrollToBottom` (`=== true`) and `showSpeechRecoOverlay` (`!== false`) sit four
+lines apart and are opposite for good reason; both now have an executed test saying so.
+
+**WHAT THE CLASS DELIBERATELY DOES NOT OWN.** Two branches of the old write path are not preferences:
+`chatStyle` writes the room's chat rendering and `roomSplitDir` re-seeds the split geometry. They are
+handed back through an `onSideEffect` hook with their reasoning, because a preferences module that
+re-seeded the layout would have stopped having a boundary. The server write is injected for the same
+reason plus one more — it keeps a route-level remote function out of `$lib` and makes `save`
+testable without mocking the wire.
+
+**FOUR MECHANICAL-REPLACE TRAPS, ALL CAUGHT BY `svelte-check` AS PARSE ERRORS.** 143 renames landed
+cleanly; the failures were all shape, not count:
+
+1. **Object-literal shorthand keys got renamed** — `{ alwaysScrollToBottom: () => alwaysScrollToBottom }`
+   became `{ prefs.alwaysScrollToBottom: ... }`.
+2. **Svelte attribute shorthand** — `{doNotDisturbOn}` became `{prefs.doNotDisturbOn}`, which is not
+   valid as an attribute.
+3. **A positional function argument treated as an object key** by my own repair pass —
+   `trimChatLog(messages, trimChatLogs)` became `trimChatLogs: prefs.trimChatLogs`. Eight sites were
+   rewritten by that pass and **seven were correct**; this was the one that was not, and it was found
+   by reading all eight rather than trusting the count.
+4. **A `bind:` directive** — `bind:subtitles` became `bind:prefs.subtitles`.
+
+The parser reports one error at a time, so each fix revealed the next. That is slow and it is also
+the point: every one of these is a *syntax* failure rather than a silent behavioural one.
+
+**THE `this`-BINDING TRAP AGAIN, TWICE.** `onupdatesoundcheck={updateSoundCheck}` and
+`onPreferenceChange={savePreference}` both became unbound class methods. Same case as slice 2's
+`onConfirm`, same remedy, and the third and fourth instances of it in this phase — which is why it
+is written into the class rather than left to be rediscovered per call site.
+
+**ESLINT CAUGHT TWO ORPHANED IMPORTS** the compiler was happy with:
+`mirrorPreferenceToLocalStorage` and `DEFAULT_ALERT_DELIVERY_PREFERENCES` both moved into the class
+and left dead imports behind. "Nothing exists without a consumer", enforced by a tool rather than by
+memory.
+
+**FORTY-FOUR ASSERTIONS RE-POINTED ACROSS 13 CONTRACT FILES** — by far the largest migration of the
+phase so far, and the reason this slice took as long as the three before it combined. Files that
+assert on both halves now carry two named source constants, with each assertion pointed at the file
+that owns its subject: `settings-preference-wiring-contract.test.ts` reads the modal from
+`ModalHost.svelte`, the consumers from `+page.svelte`, and the 26 assignment wires from
+`prefs.svelte.ts`. One over-eager re-point (a `mentionUser` assertion swept up because `this.#`
+appeared two lines below it) was caught by the suite and put back.
+
+**A CHURN CORRECTION, recorded because it was mine:** a blanket `prettier --write src/lib/*.test.ts`
+reformatted six files that had nothing to do with this slice and were already prettier-dirty. All six
+were reverted; the commit touches only the files the slice actually needed.
+
+**Verified:** `svelte-check` **1,150 files, 0 errors, 0 warnings**. `vitest` **2,009 across 141**, up
+from 1,986/140 — +20 `RoomPrefs` tests and +3 for the module's ceiling, staleness and backstop.
+`svelte-autofixer` on the new module: zero issues, zero suggestions. `eslint` clean; `prettier` clean
+on every changed file except `+page.svelte`. Ceilings lowered 9,519 → 9,248 and `prefs.svelte.ts`
+declared at 590 in the same commit. **Not verified:** no browser — no preference has been toggled in
+a real room since the move, and the two `this`-binding fixes are exactly the kind only a real click
+proves.
+
 ### 2026-08-16 07:21 EDT — `RoomDialogs`, and a runtime trap the compiler cannot see
 
 **Branch `feat/extra-chat-column`. Runtime impact: yes** — 130 references to the room's three bootbox

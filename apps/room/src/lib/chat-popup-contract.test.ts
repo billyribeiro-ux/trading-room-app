@@ -99,7 +99,7 @@ describe('ours', () => {
   });
 
   it('honours BOTH gates, do-not-disturb first', () => {
-    expect(pageCode).toContain('if (doNotDisturbOn || !chatPopup) return;');
+    expect(pageCode).toContain('if (prefs.doNotDisturbOn || !prefs.chatPopup) return;');
   });
 
   it('never announces your own message', () => {

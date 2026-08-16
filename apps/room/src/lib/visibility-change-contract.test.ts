@@ -23,6 +23,11 @@ import { describe, expect, it } from 'vitest';
 */
 
 const PAGE = readFileSync(new URL('../routes/+page.svelte', import.meta.url), 'utf8');
+/*
+  The preference declaration and its write-path case moved to `RoomPrefs` in Phase 5 slice 3. The
+  SSE gate that READS it is still the page's, so the two are asserted against their own files.
+*/
+const PREFS_SOURCE = readFileSync(new URL('./room/prefs.svelte.ts', import.meta.url), 'utf8');
 const MODAL = readFileSync(new URL('./components/ModalHost.svelte', import.meta.url), 'utf8');
 const DEAD = readFileSync(new URL('./dead-preference-keys.ts', import.meta.url), 'utf8');
 
@@ -30,13 +35,14 @@ const stripComments = (source: string) =>
   source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/<!--[\s\S]*?-->/g, '');
 
 const pageCode = stripComments(PAGE);
+const prefsCode = stripComments(PREFS_SOURCE);
 const modalCode = stripComments(MODAL);
 
 describe('the preference', () => {
   it('is wired, where it was one of the dead element ids', () => {
     expect(modalCode).toContain("'visibility-change-enabled': 'visibilityChangeEnabled'");
-    expect(pageCode).toContain(
-      "if (key === 'visibilityChangeEnabled') visibilityChangeEnabled = value;"
+    expect(prefsCode).toContain(
+      "if (key === 'visibilityChangeEnabled') this.#visibilityChangeEnabled = value;"
     );
   });
 
@@ -47,8 +53,8 @@ describe('the preference', () => {
       a viewer who has not opted in should not silently stop receiving until they look at the tab.
       Off by default, and the divergence is stated rather than inherited by accident.
     */
-    expect(pageCode).toContain(
-      'let visibilityChangeEnabled = $state(loadedSettings.visibilityChangeEnabled === true);'
+    expect(prefsCode).toContain(
+      'this.#visibilityChangeEnabled = $state(loadedSettings.visibilityChangeEnabled === true);'
     );
   });
 
@@ -60,7 +66,7 @@ describe('the preference', () => {
 
 describe('the hidden tab stops refetching', () => {
   it('the SSE handler returns instead of invalidating', () => {
-    expect(pageCode).toContain('if (visibilityChangeEnabled && !appHasFocus) {');
+    expect(pageCode).toContain('if (prefs.visibilityChangeEnabled && !appHasFocus) {');
     expect(pageCode).toContain('missedChatWhileHidden = true;');
   });
 
@@ -76,7 +82,7 @@ describe('the hidden tab stops refetching', () => {
       early return must come after the mention path, or a member would stop being told about the one
       message addressed to them by name. `mentionArrivals` is that path's identifier now.
     */
-    const gate = pageCode.indexOf('if (visibilityChangeEnabled && !appHasFocus) {');
+    const gate = pageCode.indexOf('if (prefs.visibilityChangeEnabled && !appHasFocus) {');
     const mention = pageCode.indexOf('mentionArrivals.fresh(');
     expect(mention, 'the mention popup path must exist').toBeGreaterThan(-1);
     expect(gate, 'the refetch gate must come after the mention path').toBeGreaterThan(mention);

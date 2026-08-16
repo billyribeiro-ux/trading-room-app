@@ -81,7 +81,6 @@
     type Pan
   } from '$lib/screen-zoom';
   import ScreenVolumeControl from '$lib/components/ScreenVolumeControl.svelte';
-  import { mirrorPreferenceToLocalStorage } from '$lib/dead-preference-keys';
   import {
     adjustVolumeForPresenter,
     toggleTalkingPresenter,
@@ -104,6 +103,7 @@
   import { RoomArrivals, RoomOrderedArrivals } from '$lib/room/arrivals';
   import { RoomScrollFollow } from '$lib/room/scroll-follow';
   import { RoomDialogs } from '$lib/room/dialogs.svelte';
+  import { RoomPrefs } from '$lib/room/prefs.svelte';
   import { RoomToasts } from '$lib/room/toasts.svelte';
   import type { RoomMessageChrome } from '$lib/room-message-chrome';
   import { EXTRA_COMPOSER, RoomChat } from '$lib/room/chat.svelte';
@@ -170,7 +170,7 @@
   import RoomNavbar from '$lib/components/RoomNavbar.svelte';
   import RoomSidebar from '$lib/components/RoomSidebar.svelte';
   import ToastHost from '$lib/components/ToastHost.svelte';
-  import { DEFAULT_ALERT_DELIVERY_PREFERENCES, resolveAlertDelivery } from '$lib/alert-delivery';
+  import { resolveAlertDelivery } from '$lib/alert-delivery';
   import { DUMP_CONTRACT } from '$lib/dump-contract';
   import {
     composePastedImageAlert,
@@ -251,16 +251,6 @@
   }
 
 
-  function decodeSettingsJson(value: string | null | undefined) {
-    try {
-      const parsed: unknown = JSON.parse(value ?? '{}');
-      return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
-        ? (parsed as Record<string, unknown>)
-        : {};
-    } catch {
-      return {};
-    }
-  }
 
   type SessionControlTab =
     | 'reset-session'
@@ -272,6 +262,57 @@
     | 'webinar-tools';
 
   let { data }: PageProps = $props();
+
+  /*
+    Every preference this viewer owns, in `$lib/room/prefs.svelte.ts`.
+
+    Twenty-seven of them were declared across eleven hundred lines of this file, and the function
+    that writes them sat two thousand lines below the values it assigned. TWENTY-FIVE now have no
+    public setter at all: before this, any code here could write `chatGif = true` and the
+    preference would change on screen and never reach the server, because persistence lived in a
+    function nobody was obliged to call. The only way in is `prefs.save`.
+
+    The two that keep a setter are the two the room writes WITHOUT persisting, both transient by the
+    reference's own design — `doNotDisturbOn` (the private-chat toolbar's `setDND` calls no
+    `setPreference`, unlike every neighbouring handler) and `subtitles` (`setMasterVolume`
+    forces it on at zero volume).
+
+    `persist` is injected rather than imported, which keeps a route-level remote function out of
+    `$lib` and lets the write path be tested without mocking the wire.
+  */
+  // The server settings are the intentional one-time seed for editable client preference state.
+  // svelte-ignore state_referenced_locally
+  const prefs = new RoomPrefs(data.settings?.settingsJson, {
+    persist: (key, value) => {
+      // The value goes as a VALUE — devalue carries it, and `z.json()` is the schema for what the
+      // settings blob can hold. It used to be stringified for the wire and parsed back in a `try`.
+      void savePreferenceCommand({
+        key,
+        value: value as Parameters<typeof savePreferenceCommand>[0]['value']
+      }).catch((cause) => console.error('savePreference', key, cause));
+    },
+    /*
+      The two branches of the write path that are NOT preferences, kept here with their reasoning.
+      A preferences class that re-seeded the room's layout would have stopped having a boundary.
+    */
+    onSideEffect: (key, value) => {
+          if (key === 'chatStyle' && value && typeof value === 'object' && !Array.isArray(value)) {
+            globalChatStyle = {
+              ...globalChatStyle,
+              ...(value as Partial<FollowChatStyle>)
+            };
+          }
+          /*
+            Applies the sizes the server rendered with, alongside the new direction. Each arrangement has
+            its own pair of preference keys, so this brings back the geometry last chosen for THAT
+            arrangement rather than reinterpreting a width as a height. Only reached on a deliberate user
+            action, never on a page load.
+          */
+          if (key === 'roomSplitDir' && isRoomSplitDir(value)) {
+            split.setDirection(value, settingsSplitPair);
+          }
+    }
+  });
 
   let sidebarOpen = $state(false);
   let mobileNavOpen = $state(false);
@@ -382,7 +423,7 @@
    * `onStreamTabChange(e)` is two assignments and nothing else (`:2722-2725`). It does not emit the
    * `stopWatchScreenOf` / `startWatchScreenOf` pair that `onScreenShareTabChange` does, because
    * every stream pane stays mounted and only its classes change. It also does not broadcast: the
-   * `makeUsersFollowMyScreens` clause lives on the SCREENSHARE path alone.
+   * `prefs.makeUsersFollowMyScreens` clause lives on the SCREENSHARE path alone.
    */
   function selectStreamTabByUser(streamId: string) {
     mtx.selectByUser(streamId);
@@ -654,7 +695,7 @@
    */
   function selectScreenTabByUser(screenId: string) {
     selectedScreenTab = screenId;
-    if (isPresenter && makeUsersFollowMyScreens) bringEveryoneToScreen(screenId);
+    if (isPresenter && prefs.makeUsersFollowMyScreens) bringEveryoneToScreen(screenId);
   }
 
   function toggleLockScreen(screenId: string) {
@@ -709,21 +750,19 @@
 
     Which channel each shows, what is typed in each, which one the viewer last touched, and the
     mention routing that reads three of those at once. They were declared 650 lines apart and the
-    thing binding them — `extraChatColumn && (fromExtraColumn || chat.focus === 'textAreaTxtExtra')`
+    thing binding them — `prefs.extraChatColumn && (fromExtraColumn || chat.focus === 'textAreaTxtExtra')`
     — was not visible from any one of them.
 
-    `extraChatColumn` stays a page preference and is passed as a THUNK: it is one of fifteen booleans
+    `prefs.extraChatColumn` stays a page preference and is passed as a THUNK: it is one of fifteen booleans
     seeded from the settings snapshot and written through one `savePreference`, and a copy would be
     the value as of construction, so turning the second column on mid-session would leave every
     mention routing to the main composer.
   */
-  const chat = new RoomChat({ extraColumnEnabled: () => extraChatColumn });
+  const chat = new RoomChat({ extraColumnEnabled: () => prefs.extraChatColumn });
   // The page data is the intentional one-time seed for client-managed theme state.
   // svelte-ignore state_referenced_locally
   let theme: Theme = $state(data.settings?.theme === 'dark' ? 'dark' : 'light');
-  // The server settings are the intentional one-time seed for editable client preference state.
-  // svelte-ignore state_referenced_locally
-  const loadedSettings = decodeSettingsJson(data.settings?.settingsJson);
+
   /**
    * `globals.videoDeviceID` - the camera chosen in AV settings, which both camera paths pass as
    * `deviceId: {ideal: ...}`. The modal already saves it (`onPreferenceChange('videoDeviceID', ...)`);
@@ -733,56 +772,29 @@
    * another one rather than reject the whole call.
    */
   const selectedVideoDeviceId = $derived(
-    typeof loadedSettings.videoDeviceID === 'string' && loadedSettings.videoDeviceID
-      ? loadedSettings.videoDeviceID
+    typeof prefs.loaded.videoDeviceID === 'string' && prefs.loaded.videoDeviceID
+      ? prefs.loaded.videoDeviceID
       : undefined
   );
-  // The deployed client seeds this global flag from the per-session preferences object.
-  // Its direct DND controls toggle the flag without calling setPreference.
-  let doNotDisturbOn = $state(
-    typeof loadedSettings.doNotDisturbOn === 'boolean'
-      ? loadedSettings.doNotDisturbOn
-      : DEFAULT_ALERT_DELIVERY_PREFERENCES.doNotDisturbOn
-  );
-  let alertSoundOn = $state(
-    typeof loadedSettings.alertSoundOn === 'boolean'
-      ? loadedSettings.alertSoundOn
-      : DEFAULT_ALERT_DELIVERY_PREFERENCES.alertSoundOn
-  );
-  let nonTradeSound = $state(
-    typeof loadedSettings.nonTradeSound === 'boolean'
-      ? loadedSettings.nonTradeSound
-      : DEFAULT_ALERT_DELIVERY_PREFERENCES.nonTradeSound
-  );
-  /**
-   * `preferences.recordingStartSound` / `recordingStopSound` - whether this listener hears the room
-   * start and stop media.recording. Both default ON: the capture's checks are
-   * `!doNotDisturbOn && preferences.recordingStartSound && ...`, so an unset preference would
-   * silence a cue the room is meant to give everyone.
-   */
-  /**
-   * The four per-viewer halves of the join/leave gates (`app-room.full.js:2137-2153`).
-   *
-   * Default ON, for the same reason `recordingStartSound` does: the reference's checks are
-   * `sessData.X && preferences.Y && …`, so an unset preference would silence a cue the ROOM has
-   * been configured to give. The room setting is the off switch; the preference is the override.
-   */
-  let popupOnUserJoin = $state(loadedSettings.popupOnUserJoin !== false);
-  let popupOnUserLeave = $state(loadedSettings.popupOnUserLeave !== false);
-  let beepOnUserJoin = $state(loadedSettings.beepOnUserJoin !== false);
-  let beepOnUserLeave = $state(loadedSettings.beepOnUserLeave !== false);
+
+  
+  
+  
+  
+  
+  
   /**
    * `preferences.alwaysScrollToBottom` — the chat's "always scroll to bottom" override.
    *
    * `=== true`, not `!== false`, and the difference is the reference's own default: the preferences
-   * blob ships `alwaysScrollToBottom:!1` (`main.d6d3c112b59b7d0d.js` byte 979602). Seeding it ON for
+   * blob ships `prefs.alwaysScrollToBottom:!1` (`main.d6d3c112b59b7d0d.js` byte 979602). Seeding it ON for
    * anyone who has never touched the checkbox would drag a reader out of the history they are
    * scrolled up into — the opposite of the mistake made with `showSpeechRecoOverlay`, where
    * `=== true` wrongly disabled a feature that defaults ON. The default decides which comparison is
    * correct; neither is a house style.
    *
    * PERSISTED, unlike `saveData`: `chatAlwaysScrollToBottomChange` calls
-   * `setPreference('alwaysScrollToBottom', …)` (byte 2246247).
+   * `setPreference('prefs.alwaysScrollToBottom', …)` (byte 2246247).
    */
   /**
    * `preferences.makeUsersFollowMyScreens` — when this presenter changes screen tab, take the room
@@ -793,13 +805,13 @@
    * true and is passed false for programmatic changes, which is the loop guard: receiving a focus
    * command must not send one back.
    *
-   * `=== true` — the blob ships `makeUsersFollowMyScreens:!1` (byte 980006). A presenter who has
+   * `=== true` — the blob ships `prefs.makeUsersFollowMyScreens:!1` (byte 980006). A presenter who has
    * never touched it should not be dragging the room around by clicking their own tabs.
    */
   /**
    * `preferences.chatGif` — whether inline gifs play or show a click-to-reveal placeholder.
    *
-   * `!== false`, because the blob ships `chatGif:!0`. A viewer who has never touched the checkbox
+   * `!== false`, because the blob ships `prefs.chatGif:!0`. A viewer who has never touched the checkbox
    * gets gifs, which is what the reference does; `=== true` would mute them for everybody.
    */
   /**
@@ -886,30 +898,8 @@
     }
     return resolved;
   }
-  /**
-   * `preferences.chatBadges` — the VIEWER's half of the badge gate, distinct from the owner's
-   * `enableBadges`. Ships `!0`, so `!== false`.
-   */
-  /**
-   * `preferences.chatPopup` — a toast and a browser notification when somebody mentions you.
-   *
-   * `!doNotDisturbOn && chatPopup` upstream, sitting beside the sound in the same block:
-   * `doNotDisturbOn || (chatSoundOn && pling.play(), chatPopup && (alertService.info(…), new
-   * Notification(…)))` (`main.d6d3c112b59b7d0d.js` byte 1431308). The sound half has been here since
-   * the SSE handler was written; this is the other half.
-   *
-   * `!== false`, because the blob ships it on with its siblings and a viewer who has never opened
-   * the settings modal should be told when they are addressed by name.
-   */
-  /**
-   * `preferences.trimChatLogs` — "Reduce chat log memory", the settings modal's own label.
-   *
-   * `!== false`: the blob ships it ON, and it is the safer default in a room this one cannot bound
-   * — see the note on `visibleChatMessages`. Upstream trims one message per arrival; ours caps the
-   * derived view, which reaches the same steady state and also bounds the DOM.
-   */
-  let trimChatLogs = $state(loadedSettings.trimChatLogs !== false);
-  let chatPopup = $state(loadedSettings.chatPopup !== false);
+  
+  
 
   /**
    * Which chat messages are new since the popup last looked.
@@ -919,29 +909,15 @@
    * the opaque key `id-opacity-contract.test.ts` requires. The reasoning lives with the class.
    */
   const mentionArrivals = new RoomOrderedArrivals<(typeof data.messages)[number]>();
-  let chatBadges = $state(loadedSettings.chatBadges !== false);
-  let chatGif = $state(loadedSettings.chatGif !== false);
-  let makeUsersFollowMyScreens = $state(loadedSettings.makeUsersFollowMyScreens === true);
-  let alwaysScrollToBottom = $state(loadedSettings.alwaysScrollToBottom === true);
-  let recordingStartSound = $state(loadedSettings.recordingStartSound !== false);
-  let recordingStopSound = $state(loadedSettings.recordingStopSound !== false);
-  /**
-   * `preferences.enableRTE` — the presenter's own half of the rich text editor gate.
-   *
-   * Defaults OFF, and that polarity is read rather than chosen: the reference's default preferences
-   * object lists twenty-five keys and `enableRTE` is not one of them, so a fresh account evaluates
-   * the gate on `undefined`. Its neighbours here that DO appear in that object are written to match
-   * it — `pushToTalk:!1` and `makeUsersFollowMyScreens:!1` are both `=== true` for the same reason.
-   */
-  let enableRTE = $state(loadedSettings.enableRTE === true);
+  
+  
+  
+  
+  
+  
+  
 
-  /**
-   * `preferences.extraChatColumn` — the second chat column.
-   *
-   * Defaults OFF, read rather than chosen: it is absent from the reference's twenty-five default
-   * preferences, exactly like `enableRTE`, so a fresh account evaluates the gate on `undefined`.
-   */
-  let extraChatColumn = $state(loadedSettings.extraChatColumn === true);
+  
   /**
    * The extra chat column's scroll container, and the three trackers its autoscroll needs.
    *
@@ -958,36 +934,7 @@
   let extraChatScroller = $state<HTMLElement | undefined>();
   let extraChatScrollingUp = false;
 
-  /**
-   * `preferences.visibilityChangeEnabled`, and `globals.appHasFocus` — pause chat work while the
-   * tab is hidden, catch up when it comes back.
-   *
-   * ```js
-   * document.hidden
-   *   ? (globals.appHasFocus = !1, unloadRoster())
-   *   : (globals.appHasFocus = !0, …, guiEventBus.emit('appHasFocusGetChatLog'),
-   *      preferences.extraChatColumn && guiEventBus.emit('appHasFocusGetChatLogExtraChatColumn'))
-   * ```
-   *
-   * ## Why this matters MORE here than upstream
-   *
-   * Upstream a hidden tab merely stops appending to an in-memory array. This room re-reads its chat
-   * log from the server on every SSE event, so a hidden tab was doing a full page load per message
-   * posted in the room. That is the cost this removes.
-   *
-   * ## The ROSTER half is deliberately not reproduced
-   *
-   * `unloadRoster()` / `loadRoster()` gate a five-second POLL. This roster is SSE-pushed, so gating
-   * it the same way would make a hidden tab hold a stale roster for anyone who has not opted in —
-   * strictly worse than doing nothing. Recorded in item AA before this was built and still true.
-   *
-   * ## Mentions are never paused
-   *
-   * `visibilityChangeEnabled && !appHasFocus ? te.isMention && emit('chatMsg', te) : push(...)` —
-   * the hidden branch still surfaces a mention. A feature that silences the one message addressed
-   * to you by name is not a saving.
-   */
-  let visibilityChangeEnabled = $state(loadedSettings.visibilityChangeEnabled === true);
+  
   let appHasFocus = $state(true);
   /** Set while hidden, so the catch-up only runs when something was actually missed. */
   let missedChatWhileHidden = false;
@@ -1072,36 +1019,7 @@
     void invalidateAll();
   }
 
-  /**
-   * `preferences.disableVideo` - the viewer's own "turn the video off to preserve data" switch.
-   *
-   * The CHECKBOX has been in the settings modal since it was built (`ModalHost.svelte:2652`,
-   * `id="app-disable-video"`). Nothing read it. `settingChecks['app-disable-video']` is written at
-   * `ModalHost.svelte:1172` and was read only by its own label two lines below itself, which made
-   * it a control whose only effect was changing its own words - the thing this repository
-   * forbids. This state is the missing consumer.
-   *
-   * Upstream the flag swaps the ENTIRE screens pane for one line of text.
-   * `app-presentationarea.render-helpers.js:496-499` - `TSe` renders `eSe` when the flag is set
-   * and `wSe` otherwise, and `wSe` is the "No one is presenting right now..." h3, `ul#screenTabs`
-   * and `div#screensTabsContent` together. The message is `eSe` at `:126-128`:
-   * `<h3 class="text-center mt-4">Video off to preserve data...</h3>`, its class being const 23 at
-   * `app-presentationarea.full.js:3907`.
-   *
-   * INVERTED relative to the checkbox, which is checked when video is ENABLED: the reference binds
-   * `checked: !preferences.disableVideo` (`app-user-settings-modal.full.js:3070`) and labels it
-   * "Enabled" / "Disabled" (`XEe` / `JEe`, `:293-298`). The modal's own default is
-   * `'app-disable-video': true`, so both halves start at "video on" without being wired together.
-   *
-   * NOT restored from a saved preference, and that is deliberate rather than an omission.
-   * `disableVideoChange()` (`app-user-settings-modal.full.js:1223-1226`) is the ONE handler in that
-   * neighbourhood that does not call `appService.setPreference` - `beepOnUserLeaveChange`,
-   * `popupOnUserLeaveChange` and `smallImagePreviewOnChange` (`:1197-1221`) all do. Upstream the
-   * switch lasts for the session and a reload comes back with video on. Matching that is also the
-   * kinder default: a member who turned the screens off on a phone last month should not open the
-   * room today to an empty pane and no idea why.
-   */
-  let videoDisabled = $state(false);
+  
 
   /**
    * The ROOM's media.recording state - `globals.roomState.isRecording` / `isRecordingPaused` / `recName`.
@@ -1131,35 +1049,23 @@
    * treated as off when absent - the capture's default is to SHOW the name.
    */
   const recordingTooltip = $derived.by(() => {
-    const hideFromUsers = loadedSettings.dontShowRecInfoToUsers === true;
+    const hideFromUsers = prefs.loaded.dontShowRecInfoToUsers === true;
     if ((hideFromUsers && !isPresenter) || !media.roomRecordingName) return '';
     return `Recording to: ${decodeURIComponent(media.roomRecordingName)}`;
   });
 
-  let alertPopup = $state(
-    typeof loadedSettings.alertPopup === 'boolean'
-      ? loadedSettings.alertPopup
-      : DEFAULT_ALERT_DELIVERY_PREFERENCES.alertPopup
-  );
-  let longerAlertPopup = $state(
-    typeof loadedSettings.longerAlertPopup === 'boolean'
-      ? loadedSettings.longerAlertPopup
-      : DEFAULT_ALERT_DELIVERY_PREFERENCES.longerAlertPopup
-  );
-  let qaSoundOn = $state(
-    typeof loadedSettings.qaSoundOn === 'boolean' ? loadedSettings.qaSoundOn : true
-  );
-  let chatSoundOn = $state(
-    typeof loadedSettings.chatSoundOn === 'boolean' ? loadedSettings.chatSoundOn : true
-  );
+  
+  
+  
+  
   const loadedChatStyle =
-    loadedSettings.chatStyle &&
-    typeof loadedSettings.chatStyle === 'object' &&
-    !Array.isArray(loadedSettings.chatStyle)
-      ? (loadedSettings.chatStyle as Partial<FollowChatStyle>)
+    prefs.loaded.chatStyle &&
+    typeof prefs.loaded.chatStyle === 'object' &&
+    !Array.isArray(prefs.loaded.chatStyle)
+      ? (prefs.loaded.chatStyle as Partial<FollowChatStyle>)
       : {};
-  const loadedRoomSplitDir = isRoomSplitDir(loadedSettings.roomSplitDir)
-    ? loadedSettings.roomSplitDir
+  const loadedRoomSplitDir = isRoomSplitDir(prefs.loaded.roomSplitDir)
+    ? prefs.loaded.roomSplitDir
     : 'ltr';
   // svelte-ignore state_referenced_locally
   let globalChatStyle = $state<FollowChatStyle>({
@@ -1215,10 +1121,10 @@
   */
   const alerts = new RoomAlerts({
     // The stored settings are the intentional one-time seed for editable client preference state.
-    alertFilterFor: RoomAlerts.readFilterFor(loadedSettings.alertFilterFor),
-    showAlertsFrom: loadedSettings.showAlertsFrom === true,
+    alertFilterFor: RoomAlerts.readFilterFor(prefs.loaded.alertFilterFor),
+    showAlertsFrom: prefs.loaded.showAlertsFrom === true,
     archivedAt:
-      typeof loadedSettings.alertsArchivedAt === 'number' ? loadedSettings.alertsArchivedAt : null
+      typeof prefs.loaded.alertsArchivedAt === 'number' ? prefs.loaded.alertsArchivedAt : null
   });
   let alertsDetachedWindow: Window | null = null;
   /*
@@ -1521,8 +1427,8 @@
    */
   // The stored settings are the intentional one-time seed for editable client preference state.
   let presenterAudio = $state.raw<PresenterAudioPreferences>({
-    audioMutedFor: readPresenterMuteMap(loadedSettings.audioMutedFor),
-    audioVolumeFor: readPresenterVolumeMap(loadedSettings.audioVolumeFor)
+    audioMutedFor: readPresenterMuteMap(prefs.loaded.audioMutedFor),
+    audioVolumeFor: readPresenterVolumeMap(prefs.loaded.audioVolumeFor)
   });
 
   /**
@@ -1556,33 +1462,11 @@
     }
     return map;
   }
-  /**
-   * This viewer's caption-overlay preference — `preferences.showSpeechRecoOverlay`.
-   *
-   * `$state(false)` before, seeded from nothing, and that was the whole bug: the navbar's
-   * `presentation-subtitles` checkbox seeds and renders from
-   * `soundChecks['presentation-subtitles']`, persists through `savePreference`, and **never touched
-   * this**. Two comments in this file asserted it was "already wired". It was not — the only
-   * writers were `toggleMute`, `setMasterVolume` and the overlay's own close button. So the
-   * checkbox read "on" by default while the overlay was off, and ticking it did nothing at all.
-   *
-   * `!== false` reproduces the reference's gate exactly:
-   * `isSpeechRecoOverlayEnabled() { const e = …preferences.showSpeechRecoOverlay; return null == e
-   * || !!e }` (`app-presentationarea.full.js:2409-2412`) — absent, null and true all enable it, and
-   * only an explicit `false` turns it off. The same expression already seeds the checkbox at the
-   * `soundChecks` declaration below, which is where that reasoning was first written down; it
-   * simply never reached the state the overlay reads.
-   *
-   * Defaulting ON is safe rather than noisy, because the overlay carries its OWN second gate:
-   * `SpeechRecoOverlay.svelte:86` renders nothing at all unless there is a current caption or a
-   * non-empty history. Two gates, both of which must be open — which is what the comment at the
-   * render site already claimed.
-   */
-  let subtitles = $state(loadedSettings.showSpeechRecoOverlay !== false);
+  
   /**
    * Closed captions.
    *
-   * `subtitles` above is the navbar's `presentation-subtitles` checkbox, already wired to the
+   * `prefs.subtitles` above is the navbar's `presentation-prefs.subtitles` checkbox, already wired to the
    * `showSpeechRecoOverlay` preference. These are the overlay's own state: the line being spoken,
    * the transcript, and `speechRecoHistoryMode`.
    *
@@ -1606,14 +1490,7 @@
   const CAPTION_HISTORY_LIMIT = 500;
   /** Stops recognition; null when this peer is not captioning. */
   let stopSpeechReco: (() => void) | null = null;
-  /**
-   * The session-level "Speech Recognition for Closed Captions:" switch, distinct from the
-   * per-viewer `subtitles` overlay toggle. Defaults on, matching the captured preference
-   * (`doSpeechReco:!0`, byte 979439).
-   */
-  let doSpeechReco = $state(
-    typeof loadedSettings.doSpeechReco === 'boolean' ? loadedSettings.doSpeechReco : true
-  );
+  
   /** The live socket, so the caption sender can issue commands without reaching into MediaSession. */
   let mediaSignalling: SignallingClient | null = null;
   /**
@@ -1710,30 +1587,7 @@
   let screenRecorder: MediaRecorder | null = null;
   let recordedScreenChunks: Blob[] = [];
 
-  let soundChecks = $state<Record<string, boolean>>({
-    'alert-donot-disturb':
-      typeof loadedSettings.alertSoundOn === 'boolean'
-        ? loadedSettings.alertSoundOn
-        : DEFAULT_ALERT_DELIVERY_PREFERENCES.alertSoundOn,
-    'qa-donot-disturb':
-      typeof loadedSettings.qaSoundOn === 'boolean' ? loadedSettings.qaSoundOn : true,
-    'non-trade-donot-disturb':
-      typeof loadedSettings.nonTradeSound === 'boolean'
-        ? loadedSettings.nonTradeSound
-        : DEFAULT_ALERT_DELIVERY_PREFERENCES.nonTradeSound,
-    'chat-donot-disturb':
-      typeof loadedSettings.chatSoundOn === 'boolean' ? loadedSettings.chatSoundOn : true,
-    /*
-     * Absent means ENABLED, which is the opposite of what `=== true` did here.
-     *
-     * The capture gates the overlay on `isSpeechRecoOverlayEnabled()` and reads the stored
-     * preference as `null == e || !!e` - null, undefined and true all enable it, and only an
-     * explicit `false` turns it off. Written as `=== true`, a reader who had never touched the
-     * subtitles checkbox had no stored value, so the overlay stayed disabled and captions never
-     * appeared however well the rest of the pipeline worked.
-     */
-    'presentation-subtitles': loadedSettings.showSpeechRecoOverlay !== false
-  });
+  
   let mainElement: HTMLElement | undefined;
   let alertChatElement: HTMLElement | undefined;
   let composerElement: HTMLTextAreaElement | undefined;
@@ -1746,7 +1600,7 @@
     three columns have independent tabs, independent lists and independent reader scroll positions,
     so a shared set of markers would let traffic in one column yank a reader out of another.
 
-    The two chat columns take the viewer's `alwaysScrollToBottom` override; the alerts column is
+    The two chat columns take the viewer's `prefs.alwaysScrollToBottom` override; the alerts column is
     constructed WITHOUT one, because `shouldAutoScrollForMessage` records that the alerts scroller
     shares the function and must not take it. Here that rule is structural — there is no argument to
     forget.
@@ -1756,10 +1610,10 @@
   */
   const alertsFollow = new RoomScrollFollow();
   const chatFollow = new RoomScrollFollow<ChatTab>({
-    alwaysScrollToBottom: () => alwaysScrollToBottom
+    alwaysScrollToBottom: () => prefs.alwaysScrollToBottom
   });
   const extraChatFollow = new RoomScrollFollow<ChatTab>({
-    alwaysScrollToBottom: () => alwaysScrollToBottom
+    alwaysScrollToBottom: () => prefs.alwaysScrollToBottom
   });
   /**
    * Which alerts are NEW since the last load — see `RoomArrivals` for why the three lists that ask
@@ -1796,7 +1650,7 @@
    * `invalidate('room:data')` is all three commands at once here: the load registers
    * `depends('room:data')` (`+page.server.ts:124`) and returns the alerts and the messages together,
    * so there is no separate alerts request to make. The extra-chat emit has no counterpart because
-   * `extraChatColumn` has zero occurrences in this room — a pre-existing gap, not one opened here.
+   * `prefs.extraChatColumn` has zero occurrences in this room — a pre-existing gap, not one opened here.
    *
    * `lastThresholdActedOn` is a PLAIN variable, not `$state`: nothing renders from it, and making it
    * reactive would put a write to a tracked value inside the effect that reads it. It starts `null`
@@ -1832,25 +1686,7 @@
    * the same two terms and folding `!isPresenter` in here would hide that they are one rule.
    */
   const disableCopy = $derived(data.sessData?.disableCopy === true);
-  /**
-   * `preferences.pushToTalk` — a per-USER preference, not a room setting, so it is seeded from the
-   * persisted settings blob like every other preference rather than crossing the config boundary.
-   *
-   * This USED to read "HONEST GAP: nothing in this room WRITES it yet", and that claim expired
-   * without anything here changing — the failure mode working-rule 2 exists for. The control was
-   * already built: `ModalHost.svelte` renders it as `id="presenter-push-to-talk"`. What was missing
-   * was one row in that component's id-to-preference table, so the checkbox persisted itself under
-   * its own element id and this gate never saw it. The old comment's own words were right about
-   * what to do — it "will do the right thing the moment a control sets it" — and now one does.
-   *
-   * `$state` rather than `$derived`, and the difference is not cosmetic. `loadedSettings` is a
-   * plain object, deliberately (`svelte-ignore state_referenced_locally` where it is built), so
-   * `savePreference` mutating it notifies nothing: a `$derived` over it would hold its
-   * page-load value until some unrelated dependency happened to change, and push-to-talk would
-   * start working only after a reload. Seeded from the same blob, then assigned by
-   * `savePreference`, which is what every other live preference on this page does.
-   */
-  let pushToTalk = $state(loadedSettings.pushToTalk === true);
+  
   /*
     `document.body.classList.add('noselect')` — `ngAfterViewInit`, `app-room.full.js:2227-2229`,
     behind the same `!isPresenter && sessData.disableCopy` the keystroke and right-click gates use.
@@ -2051,7 +1887,7 @@
    *
    * `sessData.enableRTE && preferences.enableRTE && isPresenter`, which is the reference's own
    * expression and appears THREE times in it: on the composer button
-   * (`O(5, …enableRTE && …enableRTE && …isPresenter ? 5 : -1)`), inside `loadRTE()`, which will not
+   * (`O(5, …prefs.enableRTE && …prefs.enableRTE && …isPresenter ? 5 : -1)`), inside `loadRTE()`, which will not
    * construct the editor without it, and inside `retriveRTEContent()`, which returns an empty
    * string so a click that reached the send anyway cannot post through a disabled editor. All
    * three consumers here read THIS, so the three cannot disagree.
@@ -2084,7 +1920,7 @@
       data.sessData?.userToPresenterPM === true) &&
       !(data.user.isFT === true && data.sessData?.disablePMForTrials === true)
   );
-  const canUseRTE = $derived(data.sessData?.enableRTE === true && enableRTE && isPresenter);
+  const canUseRTE = $derived(data.sessData?.enableRTE === true && prefs.enableRTE && isPresenter);
   /**
    * The room's chat mode — `g` group, `p` webinar, `d` disabled.
    *
@@ -2133,11 +1969,11 @@
   /**
    * Whether the second column is on screen.
    *
-   * `extraChatColumn` is the viewer's preference; this is that preference AND the collapse, so the
+   * `prefs.extraChatColumn` is the viewer's preference; this is that preference AND the collapse, so the
    * setting survives being hidden — `extraChatColumnWasEnabled` in the capture, which has no
    * counterpart here precisely because this is a derivation rather than a second stored flag.
    */
-  const extraChatColumnVisible = $derived(extraChatColumn && !split.chatCollapsed);
+  const extraChatColumnVisible = $derived(prefs.extraChatColumn && !split.chatCollapsed);
 
   const targetUser = $derived.by<ModalTargetUser>(() => {
     if (selectedMessageUser) return selectedMessageUser;
@@ -2369,8 +2205,8 @@
     viewerIsPresenter: data.user.role === 'staff' || data.user.role === 'admin',
     theme,
     chatStyle: globalChatStyle,
-    chatGif,
-    chatBadges,
+    chatGif: prefs.chatGif,
+    chatBadges: prefs.chatBadges,
     enableBadges,
     showBadgesToPresentersOnly,
     disableStarYears,
@@ -2402,8 +2238,8 @@
    */
   function saveAlertFilter(next: { alertFilterFor: AlertFilterFor; showAlertsFrom: boolean }) {
     const write = alerts.filterChanged(next);
-    savePreference('alertFilterFor', write.alertFilterFor);
-    savePreference('showAlertsFrom', write.showAlertsFrom);
+    prefs.save('alertFilterFor', write.alertFilterFor);
+    prefs.save('showAlertsFrom', write.showAlertsFrom);
   }
 
   const visibleAlerts = $derived(
@@ -2467,7 +2303,7 @@
         dialogs.confirmation = null;
         // One clock reading for the state and the preference: two calls could straddle an alert
         // arriving and archive it out of the list while storing a cut-off that does not cover it.
-        savePreference('alertsArchivedAt', alerts.archive(Date.now()));
+        prefs.save('alertsArchivedAt', alerts.archive(Date.now()));
       }
     };
   }
@@ -2598,7 +2434,7 @@
     alertsDetachedWindow = null;
   }
   /**
-   * The mention popup — `chatPopup`'s half of the reference's notification block.
+   * The mention popup — `prefs.chatPopup`'s half of the reference's notification block.
    *
    * Driven off `data.messages` rather than off the SSE payload, and that is a deliberate security
    * choice rather than convenience. The chat event carries only `senderId`, `senderEmailHash` and
@@ -2619,8 +2455,8 @@
     const fresh = mentionArrivals.fresh(data.messages);
     if (fresh.length === 0) return;
 
-    // `doNotDisturbOn ||` — the outer gate on the whole block, sound and popup alike.
-    if (doNotDisturbOn || !chatPopup) return;
+    // `prefs.doNotDisturbOn ||` — the outer gate on the whole block, sound and popup alike.
+    if (prefs.doNotDisturbOn || !prefs.chatPopup) return;
 
     for (const item of fresh) {
       // Your own message is never a mention of you, whatever it says.
@@ -2652,7 +2488,7 @@
     rather than concatenating because offset paging over a live tail can hand the boundary row back
     twice — see `mergeOlderChatMessages`, which matches on identity and never on order.
 
-    The trim runs AFTER the merge, so `trimChatLogs` still caps what is held at the reference's 300
+    The trim runs AFTER the merge, so `prefs.trimChatLogs` still caps what is held at the reference's 300
     however far back somebody paged. Trimming first would let the cap be exceeded by exactly the
     pages this feature adds.
   */
@@ -2666,7 +2502,7 @@
   function chatMessagesFor(tab: ChatTab) {
     return trimChatLog(
       mergeOlderChatMessages(chatPages.older(tab), data.messages),
-      trimChatLogs
+      prefs.trimChatLogs
     )
       .filter((item) => item.room === tab && !isEvidenceMessageHidden(item))
       /*
@@ -3248,10 +3084,10 @@
     if (tawkWidgetOpen) return;
     api.setAttributes?.(
       tawkAttributes({
-        savedNick: typeof loadedSettings.savedNick === 'string' ? loadedSettings.savedNick : null,
+        savedNick: typeof prefs.loaded.savedNick === 'string' ? prefs.loaded.savedNick : null,
         nick: data.user.displayName,
         name: data.user.displayName,
-        savedEmail: typeof loadedSettings.savedEmail === 'string' ? loadedSettings.savedEmail : null,
+        savedEmail: typeof prefs.loaded.savedEmail === 'string' ? prefs.loaded.savedEmail : null,
         email: data.user.email
       }),
       (error) => {
@@ -3368,14 +3204,14 @@
     if (action === 'session-hard-reset' || action === 'session-hard-reset-revoke') {
       dialogs.confirm('Are you sure you want to reset the room?', () => {
         modal = null;
-        savePreference('sessionTokensRevoked', action === 'session-hard-reset-revoke');
+        prefs.save('sessionTokensRevoked', action === 'session-hard-reset-revoke');
         void invalidateAll();
       });
       return;
     }
 
     if (action === 'session-save-close') {
-      savePreference('sessionOpen', false);
+      prefs.save('sessionOpen', false);
       modal = null;
       return;
     }
@@ -3386,20 +3222,20 @@
     }
 
     if (action === 'session-open') {
-      savePreference('sessionOpen', true);
+      prefs.save('sessionOpen', true);
       modal = null;
       return;
     }
 
     if (action === 'session-lock' || action === 'session-lock-kick') {
-      savePreference('sessionLocked', true);
-      savePreference('sessionLockKick', action === 'session-lock-kick');
+      prefs.save('sessionLocked', true);
+      prefs.save('sessionLockKick', action === 'session-lock-kick');
       dialogs.alert = 'Session Locked';
       return;
     }
 
     if (action === 'session-unlock') {
-      savePreference('sessionLocked', false);
+      prefs.save('sessionLocked', false);
       dialogs.alert = 'Session Unlocked';
       return;
     }
@@ -3682,96 +3518,6 @@
     void saveTheme(nextTheme).catch((cause) => console.error('saveTheme', nextTheme, cause));
   }
 
-  function savePreference(key: string, value: unknown) {
-    // Mirror into the decoded snapshot so anything that resolves a preference later in the same
-    // session (the split sizes, for instance) sees the write instead of the value the page was
-    // server-rendered with.
-    loadedSettings[key] = value;
-
-    if (key === 'chatStyle' && value && typeof value === 'object' && !Array.isArray(value)) {
-      globalChatStyle = {
-        ...globalChatStyle,
-        ...(value as Partial<FollowChatStyle>)
-      };
-    }
-    /*
-      Applies the sizes the server rendered with, alongside the new direction. Each arrangement has
-      its own pair of preference keys, so this brings back the geometry last chosen for THAT
-      arrangement rather than reinterpreting a width as a height. Only reached on a deliberate user
-      action, never on a page load.
-    */
-    if (key === 'roomSplitDir' && isRoomSplitDir(value)) {
-      split.setDirection(value, settingsSplitPair);
-    }
-    if (typeof value === 'boolean') {
-      if (key === 'alertSoundOn') {
-        alertSoundOn = value;
-        soundChecks['alert-donot-disturb'] = value;
-      }
-      if (key === 'nonTradeSound') {
-        nonTradeSound = value;
-        soundChecks['non-trade-donot-disturb'] = value;
-      }
-      if (key === 'alertPopup') alertPopup = value;
-      if (key === 'longerAlertPopup') longerAlertPopup = value;
-      if (key === 'qaSoundOn') {
-        qaSoundOn = value;
-        soundChecks['qa-donot-disturb'] = value;
-      }
-      if (key === 'chatSoundOn') {
-        chatSoundOn = value;
-        soundChecks['chat-donot-disturb'] = value;
-      }
-      /*
-        INVERTED, and the inversion is the whole point: the modal reports whether the box is
-        TICKED, and a ticked box means video is enabled. `updateSettingCheck` sends `input.checked`
-        under the reference's own preference name, and the label reads "Enabled" when checked -
-        matching the reference's `checked: !preferences.disableVideo`
-        (`app-user-settings-modal.full.js:3070`). Storing `value` here rather than `!value` would
-        blank the screens pane for every viewer who has video ON, which is all of them by default.
-      */
-      if (key === 'disableVideo') videoDisabled = !value;
-      /*
-        Four preferences whose CONSUMER already existed and whose control never reached it. The
-        modal writes them under their reference names (see the mapping table in
-        `ModalHost.svelte`); these lines are the other half, because persisting a preference does
-        not move the state this page already read it into. Without them the setting would take
-        effect only after a reload — which is how `recordingStartSound` behaved: the checkbox
-        flipped, the POST succeeded, and the sound still played.
-      */
-      if (key === 'recordingStartSound') recordingStartSound = value;
-      if (key === 'recordingStopSound') recordingStopSound = value;
-      if (key === 'pushToTalk') pushToTalk = value;
-      if (key === 'doSpeechReco') doSpeechReco = value;
-      if (key === 'alwaysScrollToBottom') alwaysScrollToBottom = value;
-      if (key === 'makeUsersFollowMyScreens') makeUsersFollowMyScreens = value;
-      if (key === 'chatGif') chatGif = value;
-      if (key === 'chatBadges') chatBadges = value;
-      if (key === 'chatPopup') chatPopup = value;
-      if (key === 'trimChatLogs') trimChatLogs = value;
-      if (key === 'enableRTE') enableRTE = value;
-      if (key === 'extraChatColumn') extraChatColumn = value;
-      if (key === 'visibilityChangeEnabled') visibilityChangeEnabled = value;
-      /*
-        Both halves, because this preference has TWO controls: the navbar's
-        `presentation-subtitles` checkbox and the settings modal's `app-speech-reco-overlay`. The
-        navbar one sets `soundChecks` itself before calling here, so that line is redundant for it
-        and load-bearing for the modal — without it, changing the setting from the modal would open
-        the overlay while the navbar checkbox went on reading "off".
-      */
-      if (key === 'showSpeechRecoOverlay') {
-        subtitles = value;
-        soundChecks['presentation-subtitles'] = value;
-      }
-    }
-    mirrorPreferenceToLocalStorage(key, value);
-    // The value goes as a VALUE — devalue carries it, and `z.json()` is the schema for what the
-    // settings blob can hold. It used to be stringified for the wire and parsed back in a `try`.
-    void savePreferenceCommand({
-      key,
-      value: value as Parameters<typeof savePreferenceCommand>[0]['value']
-    }).catch((cause) => console.error('savePreference', key, cause));
-  }
 
   const closeFloatingMenus = () => menus.closeFloating();
 
@@ -3974,7 +3720,7 @@
   /**
    * `mediaService.saveData` — "Disable Video (saves bandwidth)", from the AV settings modal.
    *
-   * DISTINCT from `videoDisabled` above, which is `preferences.disableVideo` from the USER settings
+   * DISTINCT from `prefs.videoDisabled` above, which is `preferences.disableVideo` from the USER settings
    * modal and swaps the screens and streams panes for a message. Both exist upstream, each with its
    * own control, and the original row in `TODO.md` conflated them. This one is the media-layer
    * switch, and it does something the pane preference does not: upstream
@@ -4350,13 +4096,13 @@
    *   "Speech recognition not started: disabled by preferences or session settings"
    *   "Speech recognition not started: mic is muted or not enabled"
    *
-   * so it needs the session-level `doSpeechReco` on and a live microphone - and here, a presenter,
-   * because the server refuses `sendSpeechReco` from a member. `subtitles` is deliberately NOT a
+   * so it needs the session-level `prefs.doSpeechReco` on and a live microphone - and here, a presenter,
+   * because the server refuses `sendSpeechReco` from a member. `prefs.subtitles` is deliberately NOT a
    * gate: that is the per-viewer overlay preference, and a presenter who hides captions on their own
    * screen should still caption for everybody else.
    */
   function beginSpeechRecognition() {
-    if (stopSpeechReco || !isPresenter || !doSpeechReco || !mediaSession) return;
+    if (stopSpeechReco || !isPresenter || !prefs.doSpeechReco || !mediaSession) return;
 
     stopSpeechReco = startSpeechRecognition({
       isMicAlive: () => microphoneStream?.getAudioTracks()[0]?.readyState === 'live',
@@ -4397,11 +4143,11 @@
         nonTradeAlert: alert.nonTrade === true
       },
       {
-        doNotDisturbOn,
-        alertSoundOn,
-        nonTradeSound,
-        alertPopup,
-        longerAlertPopup
+        doNotDisturbOn: prefs.doNotDisturbOn,
+        alertSoundOn: prefs.alertSoundOn,
+        nonTradeSound: prefs.nonTradeSound,
+        alertPopup: prefs.alertPopup,
+        longerAlertPopup: prefs.longerAlertPopup
       }
     );
     if (!delivery) return;
@@ -4445,8 +4191,8 @@
     );
     if (!isPresenter && !askedOnThisAlert) return;
 
-    if (!doNotDisturbOn && qaSoundOn) playSoundEffect('qaAlert');
-    if (!alertPopup) return;
+    if (!prefs.doNotDisturbOn && prefs.qaSoundOn) playSoundEffect('qaAlert');
+    if (!prefs.alertPopup) return;
 
     const senderIsPresenter =
       question.senderRole === 'staff' || question.senderRole === 'admin';
@@ -4512,7 +4258,7 @@
     const arrived = chatArrivals.fresh(data.messages);
     const incoming = arrived.some((message) => message.senderId !== data.user.id);
 
-    if (incoming && !doNotDisturbOn && chatSoundOn) playSoundEffect('pling');
+    if (incoming && !prefs.doNotDisturbOn && prefs.chatSoundOn) playSoundEffect('pling');
   });
 
   async function runMessageOperation(
@@ -4856,23 +4602,6 @@
     };
   }
 
-  function updateSoundCheck(event: Event) {
-    const input = event.currentTarget as HTMLInputElement;
-    if (input.id === 'app-donot-disturb') {
-      doNotDisturbOn = input.checked;
-      return;
-    }
-    soundChecks[input.id] = input.checked;
-    const preferenceKeyByInputId: Record<string, string> = {
-      'alert-donot-disturb': 'alertSoundOn',
-      'non-trade-donot-disturb': 'nonTradeSound',
-      'qa-donot-disturb': 'qaSoundOn',
-      'chat-donot-disturb': 'chatSoundOn',
-      'presentation-subtitles': 'showSpeechRecoOverlay'
-    };
-    const preferenceKey = preferenceKeyByInputId[input.id];
-    if (preferenceKey) savePreference(preferenceKey, input.checked);
-  }
 
   function setMasterVolume(nextVolume: number) {
     volume = nextVolume;
@@ -4884,7 +4613,7 @@
           media.volume = nextVolume / 100;
         });
     }
-    if (nextVolume === 0) subtitles = true;
+    if (nextVolume === 0) prefs.subtitles = true;
   }
 
   function setBackgroundVolume(nextVolume: number) {
@@ -4926,7 +4655,7 @@
    * NAVBAR's behaviour and it is what {@link toggleMute} already does; the overlay's is deliberately
    * the shorter one, because the two components genuinely differ.
    *
-   * One divergence, stated rather than hidden: `setMasterVolume` here also sets `subtitles = true`
+   * One divergence, stated rather than hidden: `setMasterVolume` here also sets `prefs.subtitles = true`
    * at zero, because it was written from `app-room`'s `adjustVol` — the only `adjustVol` this room
    * had a caller for. `app-presentationarea`'s `adjustVol` has no such line. Splitting it would mean
    * two master-volume paths over one `volume` state, which is worse than the one line of drift.
@@ -4934,12 +4663,12 @@
   function muteScreenAudio() {
     previousVolume = volume;
     setMasterVolume(0);
-    doNotDisturbOn = true;
+    prefs.doNotDisturbOn = true;
   }
 
   function unmuteScreenAudio() {
     setMasterVolume(previousVolume);
-    doNotDisturbOn = false;
+    prefs.doNotDisturbOn = false;
   }
 
   /**
@@ -5007,8 +4736,8 @@
     // Unmuting restores 100, muting drops to 0 — the reference writes both into `audioVolumeFor`,
     // so the element follows the stored value rather than a second opinion about it.
     applyPresenterVolume(user.userID, next.listen ? 1 : 0);
-    savePreference('audioMutedFor', next.preferences.audioMutedFor);
-    savePreference('audioVolumeFor', next.preferences.audioVolumeFor);
+    prefs.save('audioMutedFor', next.preferences.audioMutedFor);
+    prefs.save('audioVolumeFor', next.preferences.audioVolumeFor);
   }
 
   /** `adjustVolPres(event, user)` — the per-presenter slider. Same two effects as above. */
@@ -5016,23 +4745,23 @@
     const next = adjustVolumeForPresenter(presenterAudio, user, rawValue);
     presenterAudio = next.preferences;
     applyPresenterVolume(user.userID, next.elementVolume);
-    savePreference('audioMutedFor', next.preferences.audioMutedFor);
-    savePreference('audioVolumeFor', next.preferences.audioVolumeFor);
+    prefs.save('audioMutedFor', next.preferences.audioMutedFor);
+    prefs.save('audioVolumeFor', next.preferences.audioVolumeFor);
   }
 
   function toggleMute() {
     if (volume > 0) {
       previousVolume = volume;
       setMasterVolume(0);
-      doNotDisturbOn = true;
-      subtitles = true;
+      prefs.doNotDisturbOn = true;
+      prefs.subtitles = true;
       backgroundVolume = volume;
       setBackgroundVolume(backgroundVolume);
       return;
     }
     setMasterVolume(previousVolume);
-    doNotDisturbOn = false;
-    subtitles = false;
+    prefs.doNotDisturbOn = false;
+    prefs.subtitles = false;
     backgroundVolume = volume;
     setBackgroundVolume(backgroundVolume);
   }
@@ -5077,7 +4806,7 @@
       unreadByPeer = { ...unreadByPeer, [peerId]: (unreadByPeer[peerId] ?? 0) + 1 };
     }
 
-    if (!doNotDisturbOn && !isMine && chatSoundOn) playSoundEffect('pling');
+    if (!prefs.doNotDisturbOn && !isMine && prefs.chatSoundOn) playSoundEffect('pling');
     if (currUser === peerId) scrollPrivateChatToBottom();
   }
 
@@ -5233,11 +4962,11 @@
   /**
    * The private-chat toolbar's "Don't Disturb" button. `app-privchat`'s `setDND()` flips the one
    * global flag and nothing else - no persistence call, unlike its neighbours which end in
-   * `savePreference(...)`. `app-chat` defines the same method but never binds it to a template, so
+   * `prefs.save(...)`. `app-chat` defines the same method but never binds it to a template, so
    * the private chat is the only place in the capture this button exists.
    */
   function setDND() {
-    doNotDisturbOn = !doNotDisturbOn;
+    prefs.doNotDisturbOn = !prefs.doNotDisturbOn;
   }
 
   /**
@@ -6755,7 +6484,7 @@
 
   // Server-persisted sizes. These are the ones SSR can see, so they are the source of truth.
   function settingsSplitPair(key: string) {
-    return splitPairFromValue(loadedSettings[key]);
+    return splitPairFromValue(prefs.loaded[key]);
   }
 
   // Browser-only sizes written by earlier builds, kept as a one-time migration source.
@@ -6778,7 +6507,7 @@
       for (const key of [roomKey, chatKey]) {
         if (settingsSplitPair(key)) continue;
         const legacy = storedSplitPair(key);
-        if (legacy) savePreference(key, legacy);
+        if (legacy) prefs.save(key, legacy);
       }
     }
   }
@@ -6805,7 +6534,7 @@
    */
   function finishSplit() {
     const write = split.endDrag(performance.now());
-    if (write) savePreference(write.key, write.pair);
+    if (write) prefs.save(write.key, write.pair);
   }
 
   /**
@@ -6932,36 +6661,36 @@
           The room's media.recording state, for EVERYONE in it. Verbatim:
 
             subscribe("startRec",  i => { roomState.isRecording = !0;
-              !doNotDisturbOn && recordingStartSound && !videoOnlyMode && recordingStart.play() })
+              !prefs.doNotDisturbOn && prefs.recordingStartSound && !videoOnlyMode && recordingStart.play() })
             subscribe("stopRec",   i => { roomState.isRecording = !1;
-              !doNotDisturbOn && recordingStopSound  && !videoOnlyMode && recordingStop.play() })
+              !prefs.doNotDisturbOn && prefs.recordingStopSound  && !videoOnlyMode && recordingStop.play() })
             subscribe("pauseRec",  () => { roomState.isRecordingPaused = !0;
-              !doNotDisturbOn && recordingStopSound && recordingStop.play() })
+              !prefs.doNotDisturbOn && prefs.recordingStopSound && recordingStop.play() })
             subscribe("resumeRec", () => { roomState.isRecordingPaused = !1;
-              !doNotDisturbOn && recordingStopSound && recordingStart.play() })
+              !prefs.doNotDisturbOn && prefs.recordingStopSound && recordingStart.play() })
 
           Two quirks kept because they are the capture's: pause and resume BOTH check
-          `recordingStopSound` (resume plays the start sound behind the stop preference), and
+          `prefs.recordingStopSound` (resume plays the start sound behind the stop preference), and
           neither checks `videoOnlyMode` where start and stop do.
         */
         if (command?.cmd === 'startRec') {
           media.roomRecordingStarted(command.recName ?? '');
-          if (!doNotDisturbOn && recordingStartSound) playSoundEffect('recordingStart');
+          if (!prefs.doNotDisturbOn && prefs.recordingStartSound) playSoundEffect('recordingStart');
           return;
         }
         if (command?.cmd === 'stopRec') {
           media.roomRecordingStopped();
-          if (!doNotDisturbOn && recordingStopSound) playSoundEffect('recordingStop');
+          if (!prefs.doNotDisturbOn && prefs.recordingStopSound) playSoundEffect('recordingStop');
           return;
         }
         if (command?.cmd === 'pauseRec') {
           media.roomRecordingPauseChanged(true);
-          if (!doNotDisturbOn && recordingStopSound) playSoundEffect('recordingStop');
+          if (!prefs.doNotDisturbOn && prefs.recordingStopSound) playSoundEffect('recordingStop');
           return;
         }
         if (command?.cmd === 'resumeRec') {
           media.roomRecordingPauseChanged(false);
-          if (!doNotDisturbOn && recordingStopSound) playSoundEffect('recordingStart');
+          if (!prefs.doNotDisturbOn && prefs.recordingStopSound) playSoundEffect('recordingStart');
           return;
         }
 
@@ -7239,14 +6968,14 @@
           * NEVER YOURSELF — `user.userXrefID !== i.userXrefID`. Opening the room would otherwise
             announce your own arrival to you.
           * TWO GATES PER EFFECT, and they are different gates. The popup needs the ROOM setting
-            `userJoinAndLeavePopup` and the VIEWER preference `popupOnUserJoin`; the beep needs the
-            room's `beepOnUserJoin` and the viewer's `beepOnUserJoin`. An owner can turn the feature
+            `userJoinAndLeavePopup` and the VIEWER preference `prefs.popupOnUserJoin`; the beep needs the
+            room's `prefs.beepOnUserJoin` and the viewer's `prefs.beepOnUserJoin`. An owner can turn the feature
             off for the room, and a presenter can turn it off for themselves.
           * `info` for a join, `warning` for a leave — the reference uses two different toast skins,
             and the strings are "logged in." / "logged out." with the full stop.
 
           THE QUIRK, reproduced: the LEAVE beep reads `sessData.beepOnUserJoin`, not a
-          `beepOnUserLeave` room setting. There is no such room setting upstream — only the viewer
+          `prefs.beepOnUserLeave` room setting. There is no such room setting upstream — only the viewer
           preference is per-direction. Transcribed rather than tidied.
         */
         if (
@@ -7259,7 +6988,7 @@
 
           if (
             data.sessData?.userJoinAndLeavePopup &&
-            (joined ? popupOnUserJoin : popupOnUserLeave)
+            (joined ? prefs.popupOnUserJoin : prefs.popupOnUserLeave)
           ) {
             toasts.show({
               kind: joined ? 'info' : 'warning',
@@ -7269,8 +6998,8 @@
           }
           if (
             data.sessData?.beepOnUserJoin &&
-            (joined ? beepOnUserJoin : beepOnUserLeave) &&
-            !doNotDisturbOn
+            (joined ? prefs.beepOnUserJoin : prefs.beepOnUserLeave) &&
+            !prefs.doNotDisturbOn
           ) {
             playSoundEffect(joined ? 'userJoin' : 'userLeave');
           }
@@ -7381,7 +7110,7 @@
         Sending raw member emails to every browser to decide a sound would be the wrong trade;
         recorded rather than quietly skipped.
       */
-      if (payload.channel === 'chat' && !doNotDisturbOn && chatSoundOn) {
+      if (payload.channel === 'chat' && !prefs.doNotDisturbOn && prefs.chatSoundOn) {
         const senderHash = (payload.data as { senderEmailHash?: string } | undefined)?.senderEmailHash;
         const followStyle = senderHash ? followedUsers[senderHash]?.followChatStyle : undefined;
         if (followStyle?.playSound) playSoundEffect('pling');
@@ -7389,13 +7118,13 @@
       }
 
       /*
-        `visibilityChangeEnabled && !appHasFocus` — do not re-read the room for a hidden tab.
+        `prefs.visibilityChangeEnabled && !appHasFocus` — do not re-read the room for a hidden tab.
 
         The MENTION path above has already run, so the one message addressed to you by name still
         reaches you; what is skipped is the full refetch. `missedChatWhileHidden` records that there
         is something to catch up on, so returning to a tab where nothing happened costs nothing.
       */
-      if (visibilityChangeEnabled && !appHasFocus) {
+      if (prefs.visibilityChangeEnabled && !appHasFocus) {
         missedChatWhileHidden = true;
         return;
       }
@@ -8599,7 +8328,7 @@
       Escape handling below because that returns early on every other key, which is exactly how a
       host binding added here would go unnoticed.
     */
-    if (pushToTalkShouldUnmute(event, { pushToTalk, micMuted: media.micMuted })) void toggleMicrophone();
+    if (pushToTalkShouldUnmute(event, { pushToTalk: prefs.pushToTalk, micMuted: media.micMuted })) void toggleMicrophone();
     if (shouldBlockCopyKey(event, { disableCopy, isPresenter })) event.preventDefault();
 
     if (event.key !== 'Escape') return;
@@ -8625,7 +8354,7 @@
       that listener upstream: `disableCopy` has no keyup arm, because suppressing a keystroke has
       to happen on the way down.
     */
-    if (pushToTalkShouldMute(event, { pushToTalk, micMuted: media.micMuted })) void toggleMicrophone();
+    if (pushToTalkShouldMute(event, { pushToTalk: prefs.pushToTalk, micMuted: media.micMuted })) void toggleMicrophone();
   }}
   oncontextmenu={(event) => {
     /*
@@ -8729,11 +8458,11 @@
           {recordingTooltip}
           {mobileAppAvailable}
           {tawkAvailable}
-          {doNotDisturbOn}
+          doNotDisturbOn={prefs.doNotDisturbOn}
           {mp3Playing}
           {youtubeForAllUrl}
           {backgroundVolume}
-          {soundChecks}
+          soundChecks={prefs.soundChecks}
           noSpeakerText={NO_SPEAKER_TEXT}
           shareScreenText={SHARE_SCREEN_TEXT}
           virtualCamText={VIRTUAL_CAM_TEXT}
@@ -8759,7 +8488,7 @@
           ontogglemute={toggleMute}
           onadjustpresentervolume={adjustPresenterVolume}
           ontoggletalkingpresenteraudio={toggleTalkingPresenterAudio}
-          onupdatesoundcheck={updateSoundCheck}
+          onupdatesoundcheck={(event) => prefs.updateSoundCheck(event)}
           ontoggletawksupport={toggleTAWKSupport}
           ongetmypinanddoinfo={() => void getMyPinAndDoInfo()}
           onrequestreload={requestReload}
@@ -8883,7 +8612,7 @@
               {polls}
               {menus}
               {isPresenter}
-              {doNotDisturbOn}
+              doNotDisturbOn={prefs.doNotDisturbOn}
               {pollIsActive}
               {alertFilterConfigured}
               {alertFilterActive}
@@ -8945,9 +8674,9 @@
               {mtx}
               {isPresenter}
               {viewerOnlyMode}
-              {doNotDisturbOn}
+              doNotDisturbOn={prefs.doNotDisturbOn}
               bind:mainTab
-              bind:subtitles
+              bind:subtitles={prefs.subtitles}
               {currentCaption}
               {captionHistory}
               bind:speechRecoHistoryMode
@@ -8959,7 +8688,7 @@
               {attachLocalWebcam}
               {attachRemoteWebcam}
               {closeWebcamPreview}
-              {videoDisabled}
+              videoDisabled={prefs.videoDisabled}
               {sharedScreens}
               {selectedScreenTab}
               {forcedScreenId}
@@ -9061,7 +8790,7 @@
                 bind:tab={chat.extraTab}
                 bind:composer={chat.extraComposer}
                 messages={visibleExtraChatMessages}
-                {doNotDisturbOn}
+                doNotDisturbOn={prefs.doNotDisturbOn}
                 {chatEnabled}
                 {webinarMode}
                 {selfMutedUntil}
@@ -9209,13 +8938,13 @@
       roomSplitDir={split.direction}
       {sessionControlInitialTab}
       chatStyle={globalChatStyle}
-      {doNotDisturbOn}
-      {alertSoundOn}
-      {nonTradeSound}
-      {alertPopup}
-      {longerAlertPopup}
-      {qaSoundOn}
-      {chatSoundOn}
+      doNotDisturbOn={prefs.doNotDisturbOn}
+      alertSoundOn={prefs.alertSoundOn}
+      nonTradeSound={prefs.nonTradeSound}
+      alertPopup={prefs.alertPopup}
+      longerAlertPopup={prefs.longerAlertPopup}
+      qaSoundOn={prefs.qaSoundOn}
+      chatSoundOn={prefs.chatSoundOn}
       pollOpenMode={polls.openMode}
       pollRestoreToken={polls.restoreToken}
       activePoll={data.activePoll}
@@ -9224,10 +8953,10 @@
       onSettingsTab={(tab) => (settingsTab = tab)}
       onAlertTab={(tab) => (alertTab = tab)}
       onTheme={setTheme}
-      onPreferenceChange={savePreference}
+      onPreferenceChange={(key, value) => prefs.save(key, value)}
       {saveData}
       onSaveDataChange={setSaveData}
-      onDoNotDisturbChange={(enabled) => (doNotDisturbOn = enabled)}
+      onDoNotDisturbChange={(enabled) => (prefs.doNotDisturbOn = enabled)}
       onPlayYoutube={(url) => void playYoutubeForAll(url)}
       onPostAlert={postAlert}
       onPastePostAlert={postPastedAlertImage}
@@ -9254,7 +8983,7 @@
       onFollowStyleChange={applyFollowStyle}
       onMuteToggle={requestMuteToggle}
       onUserAction={handleUserAction}
-      streamingType={typeof loadedSettings.streamingType === 'string' ? loadedSettings.streamingType : ''}
+      streamingType={typeof prefs.loaded.streamingType === 'string' ? prefs.loaded.streamingType : ''}
       onManagedUserRemoval={requestManagedUserRemoval}
       onManagedUserInfo={openManagedUserInfo}
       currentUser={data.user}
@@ -9482,7 +9211,7 @@
     -->
     <PrivateChatPanel
       open={privateChatOpen}
-      doNotDisturb={doNotDisturbOn}
+      doNotDisturb={prefs.doNotDisturbOn}
       {isPresenter}
       peer={selectedMessageUser}
       tabs={chatTabs}
