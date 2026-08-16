@@ -19,6 +19,14 @@ import { describe, expect, it } from 'vitest';
 const remote = readFileSync(new URL('../routes/private-chat.remote.ts', import.meta.url), 'utf8');
 const server = readFileSync(new URL('../routes/+page.server.ts', import.meta.url), 'utf8');
 const page = readFileSync(new URL('../routes/+page.svelte', import.meta.url), 'utf8');
+/*
+  The client half of private chat left the page for `RoomPrivateChat` in Phase 5 slice 7. Read as
+  its own source, so an assertion about the client cannot pass against a file that no longer holds it.
+*/
+const privateChatModule = readFileSync(
+  new URL('room/private-chat.svelte.ts', import.meta.url),
+  'utf8'
+);
 const strip = (source: string) =>
   source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/<!--[\s\S]*?-->/g, '');
 const remoteCode = strip(remote);
@@ -212,7 +220,8 @@ describe('both parties are told', () => {
     expect((send().match(/publishToRoom\(room, \{/g) ?? []).length).toBe(2);
     expect(send()).toContain('toUserId: peer, fromUserId: user.id, message');
     expect(send()).toContain('toUserId: user.id, fromUserId: user.id, message');
-    expect(pageCode).toContain("privateChatDraft = '';");
+    // The client's half moved to `RoomPrivateChat` in Phase 5 slice 7; the assertion moved with it.
+    expect(privateChatModule).toContain("this.#draft = '';");
   });
 
   it('publishes once on delete, to the peer whose tab is now lying to them', () => {
@@ -224,8 +233,8 @@ describe('both parties are told', () => {
 describe('the client’s own half', () => {
   it('replaces on page 0 or a search, and prepends older history otherwise', () => {
     // Page 0 is the current state of the thread; a later page is older and belongs in front.
-    expect(pageCode).toContain(
-      'page === 0 || searchTerm ? incoming : [...incoming, ...(privChatLog[peerId] ?? [])]'
+    expect(privateChatModule).toContain(
+      'page === 0 || searchTerm ? incoming : [...incoming, ...(this.#threads[peerId] ?? [])]'
     );
   });
 

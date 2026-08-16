@@ -24,6 +24,100 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-16
 
+### 2026-08-16 11:20 EDT — Phase 5 slice 7: `RoomPrivateChat`, four scattered regions made one thing
+
+**`+page.svelte` 8,415 → 8,132.** Script 7,463 → 7,180, template unchanged at 952.
+Suite 2,125 → 2,148 across 147 files. `svelte-check` 1,161 files, 0 errors, 0 warnings.
+`eslint` at the pre-existing 27.
+
+**`src/lib/room/private-chat.svelte.ts` (521).** Twenty-four declarations and functions, 298 lines,
+plus the two type aliases that travelled with them. They were spread across FOUR regions of the
+page — the state at 1,263, the roster entry points at 2,000, the behaviour at 4,585 — and they read
+each other constantly: `ingest` alone touches six of the nine fields.
+
+**Generic over the roster row, and that was a decision rather than a formality.** `canOpenFor` and
+`openFromRoster` took `(typeof data.connectedUsers)[number]`, which cannot survive the move —
+`typeof` does not accept a call expression once the session is a thunk. Narrowing to the three
+fields the gates read was the easy answer and the wrong one: `openFromRoster` hands the row
+straight on to `selectRosterUser`, which wants all of it. The row type is a class parameter, so the
+full row travels intact.
+
+**`selectedMessageUser` did NOT come along.** `close()` clears it and it belongs to the
+message-action path, so it crosses as an `onCleared` callback rather than as a field this class
+would co-own with a feature it knows nothing about. That is also why slice 8 is deferred (below).
+
+**Nine call sites wrapped.** Every one of `canOpenRosterPrivateChat`, `openRosterPrivateChat`,
+`privateChatTime`, `switchChatToUser`, `deleteThisPM`, `closePrivateChatPanel`,
+`downloadPrivateChatLog` and both `onprivatechat={showPrivateChat}` was a bare reference — correct
+for a function, a throw for a method.
+
+**Four assertions re-pointed, each at the file that owns its subject now.** Two in
+`private-chat-remote-contract.test.ts` (the draft clear and the paging rule), one in
+`roster-private-chat.test.ts` (the hand-off, now asserted as WRAPPED rather than as a bare
+reference), one in `screen-volume-contract.test.ts` — and that last one is read in BOTH halves
+deliberately: the class refuses on `#viewerOnlyMode()`, and the page is asserted to supply it,
+because a class refusing against a flag nobody passes would satisfy a source assertion and never
+fire.
+
+**Six negative controls, all seen red**: the rune off `#open`; bucketing by direction instead of by
+peer; the re-entrancy guard removed; unread bumped for our own echo; viewer-only mode allowed to
+open the panel; close not deselecting the thread.
+
+**Slice 8 (`RoomMessageActions`) is DEFERRED, with a reason.** `handleMessageAction` reaches into
+RTE composer state, the private-chat panel, evidence messages, modals and mentions — collaborators
+that slices 7, 9 and 10 move. Extracting it now means injecting a dozen callbacks and rewriting
+them as each of those lands. It goes after 9 and 10.
+
+**A pre-existing duplicate recorded rather than merged.** The page declared its own
+`PrivateChatTab` alias while `PrivateChatPanel.svelte` exports an identical interface. The alias
+moved into the class module with its code; merging the two is a real change with its own diff and
+is not folded into a move.
+
+### 2026-08-16 11:14 EDT — The login form: six gaps closed, two divergences resolved, and a session-lifetime switch that never existed
+
+**RUNTIME IMPACT — YES.** `routes/session/+page.svelte` and `routes/session/+page.server.ts` both
+changed. This alters what a member sees on the room login page and how long their session lasts.
+
+**The one that matters: "Keep me logged in" had a complete server half and no switch.**
+`setSessionCookie` has always branched `THIRTY_DAYS : ONE_DAY` on its `remember` argument, and
+`+page.server.ts:322` passed a **hardcoded `false`** — so **every session was capped at one day
+regardless of intent**, and the checkbox the reference shows was absent from our form entirely. The
+checkbox now exists (`pue`: const 81/107/108), posts as `name="remember"`, and the action reads it.
+
+**A shipped guess, corrected.** We rendered `<div class="user-nick text-center">{data.email}</div>`.
+const 70 is `[1,"user-nick"]` — one class — and the component's own scoped CSS is
+`.user-nick{font-style:italic;font-size:15px;margin-left:0}`, **with no `text-align` at all**. The
+reference renders `@` + `e.nick` guarded by `O(9,e.nick?9:-1)`. Both the stray class and the wrong
+field are fixed. This is the "colour picked because it looked right" failure in a different costume.
+
+**A defect nobody had filed:** `mue` is `d(0,"span"),v(1," Connecting "),T(2,"i",110)` — the busy
+label is **" Connecting "**, not "Login". Slots 27/28 swap the whole word on `globals.logginIn`; we
+swapped only the spinner.
+
+**Also added,** each from a named view function rather than the rendered capture alone: the
+`authenticate-info` sub-heading (const 63); "Not you? clear form" wired to the read-verbatim
+`doLoginFormClear` at byte 1,199,998 — which clears the **identity** and keeps the **room**, since
+it passes `globals.sessionID` to `clearSavedToken`; and "Have a password? Click here", whose only
+effect in the reference is `showPresenter = !0`, revealing the password field and removing itself.
+
+**Both divergences resolved by reading, and our layout was never wrong.** `Wde` is the two-column
+branch (`row login-row` → `room-message` → `h1.room-title`) and it is exactly what we ship; the
+capture shows the other branch, where the `h1` sits inside a form container centred by
+`offset-md-3 offset-sm-3`. **The condition selecting between them is still unread and was not
+guessed** — it stays open in `todo-next.md` §16.13.
+
+**Two deliberate departures, stated in the code:** the reference's bare `<a>`-with-click became a
+`<button type="button">` carrying the same class list, because an anchor with no href is not
+keyboard-operable; and `clearForm` drops `jwtSite`/`name`/`email` from the query while keeping `id`,
+because our token rides the URL where the reference's rides a service.
+
+**Verified:** `svelte-autofixer` → `issues: []`. `svelte-check` → **0 errors in the changed file**;
+the 6 that remain are in `lib/room/private-chat.svelte.ts`, the concurrent session's file, untouched
+here. `session-login-contract.test.ts` **12 → 20 tests, 20 passing**. **Negative controls run and
+seen red:** restoring the hardcoded `false` and re-adding `text-center` failed exactly the two
+guards written for them (2 failed / 18 passed), then both restored to 20/20. **Not run:** the full
+suite — nothing outside these two files and this one test changed.
+
 ### 2026-08-16 11:08 EDT — Phase 5 slice 15: `RoomTradeAlerts`, one class where there were two of everything
 
 **`+page.svelte` 8,699 → 8,415.** Script 7,729 → 7,463, template 970 → 952.

@@ -103,6 +103,10 @@
   import { RoomToasts } from '$lib/room/toasts.svelte';
   import { RoomFiles } from '$lib/room/files.svelte';
   import {
+    type PrivateChatMessage,
+    RoomPrivateChat
+  } from '$lib/room/private-chat.svelte';
+  import {
     DAY_TRADE_ALERT_FEED,
     type DayTradeAlertAction,
     SWING_ALERT_FEED,
@@ -169,10 +173,6 @@
   // `shouldAutoScrollForMessage` is no longer imported here: `RoomScrollFollow` calls it, which is
   // where the rule about the alerts column not taking the override now lives with it.
   import { isRoomScrollerReadingHistory, scrollRoomScrollerToBottom } from '$lib/room-scroller';
-  import {
-    canShowRosterPrivateChat,
-    resolveRosterPrivateChatStart
-  } from '$lib/roster-private-chat';
   import {
     initializeSoundEffects,
     playSoundEffect,
@@ -1244,6 +1244,41 @@
     uploadImages: (files) => uploadAlertFiles(files)
   });
   /*
+    The private-chat panel, in `$lib/room/private-chat.svelte.ts`.
+
+    Phase 5 slice 7. Twenty-four declarations and functions that were spread across four regions of
+    this file — the state at 1,263, the roster entry points at 2,000 and the behaviour at 4,585 —
+    and that read each other constantly: `ingest` alone touches six of the nine fields.
+
+    The session goes in as a THUNK, so a navigation reaches the tab strip. The roster row type is a
+    class parameter rather than a narrowed copy, because `openFromRoster` hands the row straight on
+    to `selectRosterUser` and that wants all of it.
+
+    `onCleared` is `selectedMessageUser`, which the panel's close clears and which belongs to the
+    message-action path rather than to the panel. It crosses as a callback rather than as a field
+    the class would then co-own with a feature it knows nothing about.
+  */
+  // The roster row type, given explicitly: nothing in the options infers it, so without this the
+  // class would be instantiated at its constraint and `selectRosterUser` would receive a narrowed
+  // row where the roster wants the whole one.
+  const privateChat = new RoomPrivateChat<(typeof data.connectedUsers)[number]>({
+    dialogs,
+    prefs,
+    commands: {
+      loadLog: (payload) => loadPrivateChatLogCommand(payload),
+      send: (payload) => sendPrivateMessageCommand(payload),
+      deleteLog: (payload) => deletePrivateChatLogCommand(payload)
+    },
+    session: () => data,
+    isPresenter: () => isPresenter,
+    viewerOnlyMode: () => viewerOnlyMode,
+    playSound: (name) => playSoundEffect(name),
+    closeUserMenu: () => menus.openUserMenu(null),
+    selectRosterUser: (user) => selectRosterUser(user),
+    onCleared: () => (selectedMessageUser = null),
+    onThreadDeleted: () => invalidateAll()
+  });
+  /*
     The room's toast queue, in `$lib/room/toasts.svelte.ts`.
 
     The first slice of the phase that moves BEHAVIOUR out of this file rather than declarations —
@@ -1260,10 +1295,6 @@
   */
   const toasts = new RoomToasts();
   let tweetWindow: Window | null = null;
-  let privateChatOpen = $state(false);
-  // The private-chat gear is a toolbar toggle, not a dropdown: `<li class="nav-item dropdown"
-  // (click)="togglePMToolbar()">`, with the toolbar rendered as a sibling of the nav inside
-  let pmSearchTerm = $state('');
   /**
    * `app-privchat`'s state, in the capture's own shapes.
    *
@@ -1274,74 +1305,8 @@
    * `msgs` is whichever array the open tab points at. `chatTabs` is the strip, most-recently-active
    * last, because `newMessage()` splices a tab out and pushes it to the end.
    */
-  type PrivateChatMessage = {
-    _id: string;
-    t: number;
-    n: string;
-    txt: string;
-    uid: number;
-    recvdID: number;
-    avt: string;
-    pic: string;
-    isA: boolean;
-  };
-  type PrivateChatTab = {
-    name: string;
-    uid: number;
-    avt: string;
-    pic: string;
-    unread: number;
-    isA: boolean;
-    online: boolean;
-  };
 
-  let privChatLog = $state<Record<number, PrivateChatMessage[]>>({});
-  /**
-   * The tab strip: the server's conversation list MERGED with what has happened since.
-   *
-   * Deliberately not a writable `$derived` overridden by hand. Overriding a derived is documented
-   * as temporary - it survives only until a dependency changes - and `data` changes on every
-   * `invalidateAll()`, which silently reset every unread count back to zero. Measured: an SSE
-   * frame arrived correctly and the badge still read 0.
-   *
-   * So the local deltas live in their own state and the strip is a pure function of both. Nothing
-   * to reset, and a conversation started this session appears without waiting for a refetch.
-   */
-  let unreadByPeer = $state<Record<number, number>>({});
-  let lastActivityByPeer = $state<Record<number, number>>({});
-  // An array, not a Record. `Object.entries` stringifies its keys, so reading a peer id back out
-  // means `Number(uid)` - and this project forbids arithmetic on an id, because the room-to-API
-  // cutover turns them into uuids (`docs/CUTOVER-ROOM-TO-API.md` §1, pinned by
-  // `id-opacity-contract.test.ts`). Keeping the id inside the object never coerces it.
-  let peerProfiles = $state<PrivateChatTab[]>([]);
 
-  const chatTabs: PrivateChatTab[] = $derived.by(() => {
-    const byId = new Map<number, PrivateChatTab>();
-    for (const tab of data.privateChats ?? []) {
-      byId.set(tab.uid, {
-        name: tab.name,
-        uid: tab.uid,
-        avt: tab.avt,
-        pic: tab.pic,
-        unread: 0,
-        isA: tab.isA,
-        online: false
-      });
-    }
-    // Conversations that started after this page loaded.
-    for (const profile of peerProfiles) {
-      if (!byId.has(profile.uid)) byId.set(profile.uid, profile);
-    }
-    return [...byId.values()]
-      .map((tab) => ({ ...tab, unread: unreadByPeer[tab.uid] ?? 0 }))
-      // `newMessage()` splices a tab out and pushes it, so the most recent sits last.
-      .sort((a, b) => (lastActivityByPeer[a.uid] ?? 0) - (lastActivityByPeer[b.uid] ?? 0));
-  });
-  /** `this.currUser` - the peer id whose thread is on screen, `''` when none. */
-  let currUser = $state<number | null>(null);
-  let pmSearching = $state(false);
-  let privateChatDraft = $state('');
-  const privateChatLog = $derived(currUser === null ? [] : (privChatLog[currUser] ?? []));
   let previewWindowsVisible = $state(true);
   let showMessageOptions = $state(false);
   let sendingGif = $state(false);
@@ -1997,38 +1962,7 @@
     mentionUser(user.displayName);
   }
 
-  function canOpenRosterPrivateChat(user: (typeof data.connectedUsers)[number]) {
-    return canShowRosterPrivateChat(
-      {
-        isPresenter,
-        userPmEnabled: data.sessData?.userPM,
-        userToPresenterPmEnabled: data.sessData?.userToPresenterPM,
-        // Both of these were absent, which made the helper's trial branch unreachable.
-        currentUserIsTrial: data.user.isFT,
-        disablePmForTrials: data.sessData?.disablePMForTrials
-      },
-      {
-        id: user.id,
-        permissions: user.isP ? 'a' : 'r',
-        // The row's OWN flag, not `role !== 'user'` - an admin-chat member is neither a presenter
-        // nor an ordinary row, and that distinction is the whole point of the flag.
-        hasAdminChat: user.hasAdminChat
-      }
-    );
-  }
 
-  function openRosterPrivateChat(user: (typeof data.connectedUsers)[number]) {
-    const start = resolveRosterPrivateChatStart(data.user.id, user.id);
-    menus.openUserMenu(null);
-
-    if (start.kind === 'self') {
-      dialogs.alert = start.message;
-      return;
-    }
-
-    selectRosterUser(user);
-    showPrivateChat();
-  }
   function withEvidenceState<T extends MessageActionItem>(item: T): T {
     if (!item.evidenceKey) return item;
     const state = evidenceMessageState[item.evidenceKey];
@@ -4420,9 +4354,9 @@
         dialogs.alert = 'Chatting with yourself again?';
         return;
       }
-      showPrivateChat();
+      privateChat.show();
       // `PCfocusOnUser` - open straight onto that person's thread rather than the tab list.
-      void switchChatToUser(item.senderId);
+      void privateChat.switchToUser(item.senderId);
     }
     if (action === 'image' && item.targetUrl) {
       openImageModal(payload instanceof MouseEvent ? payload : undefined, item.targetUrl);
@@ -4582,198 +4516,15 @@
 
   
 
-  /**
-   * `newMessage(e)` - one frame off the private channel.
-   *
-   * The capture's rules, kept: bucket by peer; if the tab exists but is not the open one, move it
-   * to the end of the strip and increment `unread`; if it does not exist, create it. The unread
-   * count is only bumped for messages that are NOT mine, which is why `isMine` is computed first -
-   * our own echo must not make our own conversation look unread.
-   */
-  function ingestPrivateMessage(message: PrivateChatMessage) {
-    const isMine = message.uid === data.user.id;
-    const peerId = isMine ? message.recvdID : message.uid;
 
-    const thread = privChatLog[peerId] ?? [];
-    // Re-entrancy guard: the sender gets an echo AND may already have the row from the action's
-    // response. Two copies of one message is worse than none.
-    if (thread.some((existing) => existing._id === message._id)) return;
-    privChatLog = { ...privChatLog, [peerId]: [...thread, message] };
 
-    // A peer we have never had a tab for: remember enough to draw one.
-    if (!chatTabs.some((tab) => tab.uid === peerId)) {
-      peerProfiles = [
-        ...peerProfiles.filter((profile) => profile.uid !== peerId),
-        {
-          name: isMine ? `User ${peerId}` : message.n,
-          uid: peerId,
-          avt: message.avt,
-          pic: message.pic,
-          unread: 0,
-          isA: message.isA,
-          online: true
-        }
-      ];
-    }
-    lastActivityByPeer = { ...lastActivityByPeer, [peerId]: message.t };
 
-    // Only somebody else's message, and only when their tab is not the one on screen.
-    if (!isMine && currUser !== peerId) {
-      unreadByPeer = { ...unreadByPeer, [peerId]: (unreadByPeer[peerId] ?? 0) + 1 };
-    }
 
-    if (!prefs.doNotDisturbOn && !isMine && prefs.chatSoundOn) playSoundEffect('pling');
-    if (currUser === peerId) scrollPrivateChatToBottom();
-  }
 
-  /** `app-st-compactmessage` shows a short local time against each row. */
-  function privateChatTime(at: number) {
-    return new Date(at).toLocaleTimeString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: true
-    });
-  }
 
-  /** `scrollPCLogToBottom` - the scroller's own handler, which also re-runs after a tick. */
-  function scrollPrivateChatToBottom() {
-    const run = () => {
-      const scroller = document.querySelector('.pc-messages');
-      if (scroller) scroller.scrollTop = scroller.scrollHeight;
-    };
-    run();
-    setTimeout(run, 60);
-  }
 
-  /**
-   * `switchChatToUser(uid, user)` - open a thread.
-   *
-   * Clears `unread` on the tab it opens, seeds an empty array so the scroller has something to
-   * bind to, and loads the first page.
-   */
-  async function switchChatToUser(peerId: number) {
-    currUser = peerId;
-    pmSearchTerm = '';
-    if (!privChatLog[peerId]) privChatLog = { ...privChatLog, [peerId]: [] };
-    unreadByPeer = { ...unreadByPeer, [peerId]: 0 };
-    await loadPrivateChatLog(peerId, 0);
-    scrollPrivateChatToBottom();
-  }
 
-  /** `loadPClogForUID(uid, page)` -> `getPCLog {page, peerID}`; with a term it is `doPCLogSearch`. */
-  async function loadPrivateChatLog(peerId: number, page = 0, searchTerm = '') {
-    let incoming: PrivateChatMessage[];
-    try {
-      incoming = await loadPrivateChatLogCommand({ peerId, page, searchTerm });
-    } catch {
-      return; // Non-fatal: the held log stays as it was. See `private-chat.remote.ts`.
-    }
 
-    // Page 0 replaces; a later page is older history and goes in front of what is already there.
-    privChatLog = {
-      ...privChatLog,
-      [peerId]:
-        page === 0 || searchTerm ? incoming : [...incoming, ...(privChatLog[peerId] ?? [])]
-    };
-  }
-
-  /** `sendMessage()` - `sendPrivChat(currUser, text, recvdUser)`. Empty text sends nothing. */
-  async function sendPrivateMessage() {
-    const text = privateChatDraft.trim();
-    if (!text || currUser === null) return;
-
-    try {
-      await sendPrivateMessageCommand({ peerId: currUser, body: text });
-    } catch (cause) {
-      // The server's own wording, which includes the capture's `Chatting with yourself again?`.
-      dialogs.alert = isHttpError(cause) ? cause.body.message : 'Message not sent.';
-      return;
-    }
-    privateChatDraft = '';
-    // The echo on `/privChat` is what actually appends it, so nothing is inserted here.
-    scrollPrivateChatToBottom();
-  }
-
-  /** `deleteThisPM()` - confirm, then `deletePeerPCLog {peerID}`, then drop the tab. */
-  function deleteThisPM() {
-    if (currUser === null) return;
-    const peerId = currUser;
-    dialogs.confirmation = {
-      message: 'Are you sure you want to delete all messages in this chat?',
-      onconfirm: async () => {
-        dialogs.confirmation = null;
-        await deletePrivateChatLogCommand({ peerId });
-        const { [peerId]: _dropped, ...remainingLog } = privChatLog;
-        privChatLog = remainingLog;
-        const { [peerId]: _unread, ...remainingUnread } = unreadByPeer;
-        unreadByPeer = remainingUnread;
-        peerProfiles = peerProfiles.filter((profile) => profile.uid !== peerId);
-        await invalidateAll();
-        currUser = null;
-        selectedMessageUser = null;
-      }
-    };
-  }
-
-  /**
-   * `closePanel()` - the X in the private-chat header:
-   *
-   * ```js
-   * closePanel(){
-   *   guiEventBus.emit('PCClosePanel');
-   *   this.notificationInterval && (clearInterval(this.notificationInterval),
-   *                                 document.title = globals.sessionName);
-   *   this.user = null; this.recvdUser = null; this.currUser = '';
-   * }
-   * ```
-   *
-   * Closing DESELECTS the thread. Hiding the panel alone - which is all the X used to do - means
-   * reopening lands straight back in the last conversation, where the capture returns to
-   * "No active chat".
-   */
-  /**
-   * `showPrivateChat()` — the ONE door into the private-chat panel, and its refusal.
-   *
-   * `app-room.compiled.js:855-861`, verbatim in shape:
-   *
-   * ```js
-   * showPrivateChat(e = null, i = null) {
-   *   this.appService.globals.videoOnlyMode ||
-   *     this.appService.globals.viewerOnlyMode ||
-   *     (this.privChatInited || (…initPMDrag()), this.privChatVisible = !0, …)
-   * }
-   * ```
-   *
-   * A leading `a || b || (…)`: in video-only or viewer-only mode the panel does not open at all,
-   * silently. Four call sites in this file each set `privateChatOpen = true` on their own, so the
-   * guard has to live in one place or it is four places to forget it.
-   *
-   * `videoOnlyMode` is the `r` query parameter — the media.recording-bot mode — which this room does not
-   * model, the same honest gap `files-gates.ts` already records for `hideFiles`. The half that is
-   * modelled is enforced.
-   */
-  function showPrivateChat() {
-    if (viewerOnlyMode) return;
-    privateChatOpen = true;
-  }
-
-  function closePrivateChatPanel() {
-    privateChatOpen = false;
-    currUser = null;
-    selectedMessageUser = null;
-    pmSearchTerm = '';
-    pmSearching = false;
-    privateChatDraft = '';
-  }
-
-  /** `onEnterSearchChat(value)` - a term searches this thread; an empty one restores it. */
-  async function onEnterSearchPrivateChat(term: string) {
-    if (currUser === null) return;
-    pmSearchTerm = term;
-    pmSearching = Boolean(term.trim());
-    await loadPrivateChatLog(currUser, 0, term.trim());
-    scrollPrivateChatToBottom();
-  }
 
   /**
    * The private-chat toolbar's "Don't Disturb" button. `app-privchat`'s `setDND()` flips the one
@@ -4785,40 +4536,6 @@
     prefs.doNotDisturbOn = !prefs.doNotDisturbOn;
   }
 
-  /**
-   * The toolbar's "Download Log" button, transcribed from `app-privchat`'s `downloadLog()`: one
-   * `toLocaleTimeString('en-us', ...)` line per message, CRLF-terminated, offered as a text blob
-   * named `${name}_${date}_${time}.txt` with the space in the name replaced (the capture calls
-   * `replace(' ', '_')`, which replaces only the first - kept as-is).
-   *
-   * The private-chat message log itself is still a stub here, so this currently writes an empty
-   * file. That is the honest state, not a placeholder transcript.
-   */
-  function downloadPrivateChatLog() {
-    const openTab = chatTabs.find((tab) => tab.uid === currUser);
-    if (!openTab) return;
-    const format: Intl.DateTimeFormatOptions = {
-      year: 'numeric',
-      month: 'numeric',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    };
-    const lines = privateChatLog.map(
-      (message) =>
-        `${new Date(message.t).toLocaleTimeString('en-us', format)} [${message.n}]: ${message.txt}\r\n`
-    );
-    const url = URL.createObjectURL(new Blob(lines, { type: 'text/plain;charset=utf-8' }));
-    const link = document.createElement('a');
-    link.href = url;
-    const now = new Date();
-    link.download = `${openTab.name.replace(' ', '_')}_${now.toLocaleDateString()}_${now.toLocaleTimeString()}.txt`;
-    link.style.display = 'none';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-  }
 
   function stopStream(stream: MediaStream | null) {
     stream?.getTracks().forEach((track) => track.stop());
@@ -6572,7 +6289,7 @@
           void invalidateAll();
           return;
         }
-        ingestPrivateMessage(priv.message);
+        privateChat.ingest(priv.message);
         return;
       }
 
@@ -7741,7 +7458,7 @@
           {rowVisible}
           {rosterRowClass}
           locationVisible={(entry) => locationVisibleTo({ isPresenter }, entry)}
-          {canOpenRosterPrivateChat}
+          canOpenRosterPrivateChat={(user) => privateChat.canOpenFor(user)}
           {mobileAppAvailable}
           {benzingaVisible}
           {benzingaUrl}
@@ -7749,7 +7466,7 @@
           dumpVersion={DUMP_CONTRACT.version}
           onopenmodal={openModal}
           onopenrosteruserinfo={openRosterUserInfo}
-          onopenrosterprivatechat={openRosterPrivateChat}
+          onopenrosterprivatechat={(user) => privateChat.openFromRoster(user)}
           onmentionrosteruser={mentionRosterUser}
           onselectuser={(id) => (selectedUserId = id)}
           onusersearchkey={doUserSearch}
@@ -7843,7 +7560,7 @@
               onalertsscroll={trackAlertsScroll}
               onchatscroll={trackChatScroll}
               onmessageaction={handleMessageAction}
-              onprivatechat={showPrivateChat}
+              onprivatechat={() => privateChat.show()}
               onexpandcomposer={autoExpandComposer}
               onsend={sendComposerMessage}
               onimageupload={openImageUpload}
@@ -7981,7 +7698,7 @@
                 onsend={() => void sendExtraComposerMessage()}
                 onscroll={(scroller) => trackExtraChatScroll(scroller)}
                 onscrollerready={(scroller) => (extraChatScroller = scroller)}
-                onprivatechat={showPrivateChat}
+                onprivatechat={() => privateChat.show()}
                 onsearch={() => openModal('chat-logs')}
                 onsettings={() => openModal('settings')}
                 onimageupload={openImageUpload}
@@ -8150,7 +7867,7 @@
       onMentionUser={mentionUser}
       onPrivateChat={(user) => {
         selectedMessageUser = user;
-        showPrivateChat();
+        privateChat.show();
       }}
       onFollowToggle={requestFollowToggle}
       onFollowStyleChange={applyFollowStyle}
@@ -8377,30 +8094,30 @@
       a line rather than relocating one.
     -->
     <PrivateChatPanel
-      open={privateChatOpen}
+      open={privateChat.open}
       doNotDisturb={prefs.doNotDisturbOn}
       {isPresenter}
       peer={selectedMessageUser}
-      tabs={chatTabs}
-      currentUserId={currUser}
-      log={privateChatLog}
-      searching={pmSearching}
-      bind:searchTerm={pmSearchTerm}
-      bind:draft={privateChatDraft}
+      tabs={privateChat.tabs}
+      currentUserId={privateChat.peerId}
+      log={privateChat.log}
+      searching={privateChat.searching}
+      searchTerm={privateChat.searchTerm}
+      bind:draft={privateChat.draft}
       body={bodySegmentsPrivate}
-      formatTime={privateChatTime}
+      formatTime={(at) => privateChat.formatTime(at)}
       onclosepeer={() => {
         selectedMessageUser = null;
         selectedMessage = null;
       }}
-      ondeletethis={deleteThisPM}
-      onclose={closePrivateChatPanel}
-      onsearch={(term) => void onEnterSearchPrivateChat(term)}
+      ondeletethis={() => privateChat.deleteThread()}
+      onclose={() => privateChat.close()}
+      onsearch={(term) => void privateChat.search(term)}
       ondonotdisturb={setDND}
-      ondownload={downloadPrivateChatLog}
-      onswitchuser={switchChatToUser}
-      onloadmore={(uid, page) => loadPrivateChatLog(uid, page)}
-      onsend={() => void sendPrivateMessage()}
+      ondownload={() => privateChat.downloadLog()}
+      onswitchuser={(uid) => void privateChat.switchToUser(uid)}
+      onloadmore={(uid, page) => void privateChat.loadLog(uid, page)}
+      onsend={() => void privateChat.send()}
     />
   </app-room>
   <audio

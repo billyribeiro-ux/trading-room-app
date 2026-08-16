@@ -260,7 +260,7 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       What the slice actually proves is the pattern, which is why it was chosen first: state and the
       functions that write it leaving TOGETHER, where Phase 1 moved fields and left 248 bodies here.
     */
-    max: 8415,
+    max: 8132,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {
@@ -420,6 +420,11 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     file: 'lib/room/files.svelte.ts',
     max: 382,
     why: 'the file drive; the first slice to collapse a prop list at TWO call sites rather than one'
+  },
+  {
+    file: 'lib/room/private-chat.svelte.ts',
+    max: 521,
+    why: 'the private-chat panel; generic over the roster row so the full row reaches selectRosterUser'
   },
   {
     file: 'lib/room/trade-alerts.svelte.ts',
