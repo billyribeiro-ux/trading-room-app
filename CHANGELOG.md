@@ -223,6 +223,41 @@ through — both are documented in `.env.example` and until now nothing read the
 **Not done:** retiring `ptr_clone_app` (deferred until the cutover is proven in a real deployment),
 and the owner role / database rename `ptr_clone` → `tradingroom`. Both remain in `TODO.md`.
 
+### 2026-08-15 21:45 EDT — Migration `0013` applied to `tradingroom_dev`, with the schema read back
+
+**Runtime impact: local schema only.** `tradingroom_dev` is this repository's controller database.
+
+Everything about `0013` had been proven against throwaway clusters the db tests build and delete.
+This is the missing half: the migration applied to a **persistent** database and the result read out
+of PostgreSQL's own catalogue, which is the evidence this repository asks for on any schema change.
+
+```
+ dark_theme          | boolean                  | not null | false
+ dark_theme_badge_id | integer                  |          |
+Foreign-key constraints:
+    "badges_dark_theme_badge_id_fkey" FOREIGN KEY (dark_theme_badge_id)
+        REFERENCES badges(id) ON DELETE SET NULL
+Referenced by:
+    TABLE "badges" CONSTRAINT "badges_dark_theme_badge_id_fkey" …
+```
+
+Three design decisions confirmed by the catalogue rather than by the file that requested them:
+
+- **the self-reference resolved** — `badges` referencing `badges(id)`, which is the thing that
+  needed the `(): AnyPgColumn =>` annotation in the schema and typed the whole table `any` without it;
+- **`ON DELETE SET NULL` is on the constraint**, so deleting a badge another badge nominated clears
+  the reference instead of refusing the delete;
+- **`dark_theme` survives beside it**, superseded and not dropped, because migrations are
+  forward-only and `0002` is shipped.
+
+`applied_migrations` records `13 badge_dark_theme_badge_id`. Re-running the `ALTER` by hand returns
+`ALTER TABLE` and leaves exactly one such column, so `IF NOT EXISTS` is idempotent in practice and
+not only by inspection.
+
+**This was only reachable because `.env` was repointed minutes earlier.** Run against
+`newroom_control_dev` — where it pointed until 21:41 — the migrator would have applied eight
+migrations to a database nothing uses, and reported success.
+
 ### 2026-08-15 21:41 EDT — Every file pointed at the right backend, and a governed `services/` re-pin
 
 **Runtime impact: local only** — connection strings and documentation. No schema, no application code.
