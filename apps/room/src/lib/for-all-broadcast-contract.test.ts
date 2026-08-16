@@ -356,8 +356,16 @@ describe('the client sends, instead of moving its own screen', () => {
 
   it('"Stop For All" and "×" invoke DIFFERENT things', () => {
     // Same function behind both props is the defect; the props must not name one handler.
-    expect(pageCode).toContain('onstop={() => void stopYoutubeForAll()}');
-    expect(pageCode).toContain('onclose={closeYoutubeFrame}');
+    // The overlay moved to `PresentationArea.svelte`; the two handlers behind it did not, so
+    // the wiring is asserted at both ends rather than at one.
+    const paneCode = readFileSync(
+      new URL('./components/PresentationArea.svelte', import.meta.url),
+      'utf8'
+    );
+    expect(paneCode).toContain('onstop={() => void stopYoutubeForAll()}');
+    expect(paneCode).toContain('onclose={closeYoutubeFrame}');
+    expect(pageCode).toContain('{stopYoutubeForAll}');
+    expect(pageCode).toContain('{closeYoutubeFrame}');
 
     // "Stop For All" reaches the server.
     expect(functionBody(pageCode, 'async function stopYoutubeForAll()')).toContain(
@@ -394,8 +402,12 @@ describe('the client receives, so it reaches another browser', () => {
 
   it('the member’s tab and pane carry the captured gate, not `isPresenter` alone', () => {
     // Without the `hideVideoPlayer` term a member is moved to a tab that renders nothing.
+    const paneCode = readFileSync(
+      new URL('./components/PresentationArea.svelte', import.meta.url),
+      'utf8'
+    );
     expect(
-      pageCode.split('{#if (hideVideoPlayer && !isPresenter) || isPresenter}').length - 1
+      paneCode.split('{#if (hideVideoPlayer && !isPresenter) || isPresenter}').length - 1
     ).toBe(2);
   });
 
@@ -439,7 +451,9 @@ describe('the seek offset is computed, never transmitted', () => {
   it('the embed mute stays the LOCAL preference it is upstream', () => {
     // Per-viewer, passed in as a prop — never read off a broadcast payload.
     expect(overlayCode).toContain("const mute = muted ? '&mute=1' : '';");
-    expect(pageCode).toContain('muted={doNotDisturbOn}');
+    expect(
+      readFileSync(new URL('./components/PresentationArea.svelte', import.meta.url), 'utf8')
+    ).toContain('muted={doNotDisturbOn}');
   });
 });
 

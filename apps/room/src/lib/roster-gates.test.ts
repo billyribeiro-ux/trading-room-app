@@ -663,16 +663,21 @@ describe('room-wide sound', () => {
 
   it('binds the audio element to the url, so something actually plays', () => {
     // It was `src=""`, which is the whole reason the feature made no sound.
-    expect(pageSource).toContain("src={mp3Url ?? ''}");
+    // The element moved to `PresentationArea.svelte` on 2026-08-15; `mp3Url` is still the
+    // page's state, handed over as a prop.
+    const paneSource = readFileSync('src/lib/components/PresentationArea.svelte', 'utf8');
+    expect(paneSource).toContain("src={mp3Url ?? ''}");
     // `#mp3player` is the capture's id and setBkgMusicVol reaches it by that selector.
-    expect(pageSource).toContain('id="mp3player"');
+    expect(paneSource).toContain('id="mp3player"');
+    expect(pageSource).toContain('{mp3Url}');
   });
 
   it('gates Stop For All on BOTH presenter and playing', () => {
     // `O(83, o.isP && o.mp3Playing ? 83 : -1)` — a control that is inert most of the time should
     // not be on screen most of the time.
-    expect(pageSource).toContain('{#if isPresenter && mp3Playing}');
-    expect(pageSource).toContain('Stop For All');
+    const paneSource = readFileSync('src/lib/components/PresentationArea.svelte', 'utf8');
+    expect(paneSource).toContain('{#if isPresenter && mp3Playing}');
+    expect(paneSource).toContain('Stop For All');
   });
 
   it('keeps mp3Playing as its own flag rather than deriving it from the url', () => {

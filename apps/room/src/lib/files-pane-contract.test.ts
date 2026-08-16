@@ -80,6 +80,13 @@ vi.mock('$lib/server/room-config-client', () => ({
      capture's silence is still the reason the first build of this bar was built from a paste.
 */
 
+/*
+  The whole Files pane moved to `PresentationArea.svelte` on 2026-08-15, so `pane` is what the
+  markup assertions read. `page` stays for the HANDLERS behind that markup — `setAlertSound`,
+  `deleteFile`, `searchedFiles` and the rest are still declared on the page, which is why this file
+  reads two sources and each assertion points at the one that owns its subject.
+*/
+const pane = readFileSync(new URL('./components/PresentationArea.svelte', import.meta.url), 'utf8');
 const page = readFileSync(new URL('../routes/+page.svelte', import.meta.url), 'utf8');
 const bundle = readFileSync(
   new URL('../../docs/source/components/app-presentationarea.full.js', import.meta.url),
@@ -94,12 +101,12 @@ const bundle = readFileSync(
  * buttons, look presenter-gated when it is not inside either.
  */
 function guardsFor(marker: string) {
-  const at = page.indexOf(marker);
+  const at = pane.indexOf(marker);
   if (at === -1) return null;
   // Comments first. A comment that QUOTES template syntax - "while this sat inside `{#if recording}`"
   // - is prose, but to a regex it is an `{#if}` that never closes, and every guard after it comes
   // back wrong. That is exactly how this test started failing while svelte-check stayed clean.
-  const template = page.slice(0, at).replace(/<!--[\s\S]*?-->/g, '');
+  const template = pane.slice(0, at).replace(/<!--[\s\S]*?-->/g, '');
   const stack: string[] = [];
   for (const token of template.matchAll(/\{#if ([^}]*)\}|\{:else[^}]*\}|\{\/if\}/g)) {
     if (token[0] === '{/if}') stack.pop();
@@ -134,18 +141,18 @@ describe('files pane permissions', () => {
 
 describe('files table', () => {
   it('renders the captured table, not a stub', () => {
-    expect(page).toContain('table table-striped m-auto w-100 mt-3 st-fileTable');
-    expect(page).toContain('id="filesDriveList"');
-    expect(page).toContain('class="st-fileName"');
-    expect(page).toContain('class="st-fileSize ml-2"');
-    expect(page).toContain('btn st-fileDownload');
+    expect(pane).toContain('table table-striped m-auto w-100 mt-3 st-fileTable');
+    expect(pane).toContain('id="filesDriveList"');
+    expect(pane).toContain('class="st-fileName"');
+    expect(pane).toContain('class="st-fileSize ml-2"');
+    expect(pane).toContain('btn st-fileDownload');
     // The stub this replaced.
-    expect(page).not.toContain('<article>{item.name}</article>');
+    expect(pane).not.toContain('<article>{item.name}</article>');
   });
 
   it('does NOT render the captured empty heading, because its gate can never fire here', () => {
     /*
-      This asserted `expect(page).toContain('No room files found.')` and went on passing after the
+      This asserted `expect(pane).toContain('No room files found.')` and went on passing after the
       heading was deleted — because the phrase survives in the comment that explains why it is
       gone. A string assertion against a whole source file cannot tell markup from prose, so it
       pins the ELEMENT instead.
@@ -154,7 +161,7 @@ describe('files table', () => {
       gate (`sessionFiles` FALSY) cannot arise behind a loader that ends in `.all()`.
     */
     expect(bundle).toContain("v(1, 'No room files found.')");
-    expect(page).not.toContain('<h4 class="mt-4 text-center">');
+    expect(pane).not.toContain('<h4 class="mt-4 text-center">');
   });
 
   it('reports size the way the capture does', () => {
@@ -173,7 +180,7 @@ describe('files table', () => {
       `'Kb '` and failed for being wrong about the formatter, not about the markup. The space is
       still rendered; it is whitespace between the text and the closing tag.
     */
-    expect(page).toContain('>{fileSizeInKb(item.size)}Kb');
+    expect(pane).toContain('>{fileSizeInKb(item.size)}Kb');
   });
 });
 
@@ -198,7 +205,7 @@ const v4 = readFileSync(
   attribute from a sentence about that attribute, which is the trap already documented four times in
   this file, and it would let every markup assertion below pass against its own documentation.
 */
-const template = page.replace(/<!--[\s\S]*?-->/g, '');
+const template = pane.replace(/<!--[\s\S]*?-->/g, '');
 
 /*
   The same file with the SCRIPT's block comments stripped as well.
@@ -584,14 +591,14 @@ describe('file rows', () => {
   it('emits a <tr> for every searched file, empty when it belongs to another tab', () => {
     // more-fucking-evidence/sounds: 30 `<tr class="ng-star-inserted"><!----></tr>` around 2 mp3s.
     // Filtering these out would shift `nth-of-type` striping by one on every visible row.
-    expect(page).toContain('{#each searchedFiles() as item (item.id)}');
-    expect(page).toContain('{#if !matchesFileTab(item)}');
+    expect(pane).toContain('{#each searchedFiles() as item (item.id)}');
+    expect(pane).toContain('{#if !matchesFileTab(item)}');
   });
 
   it('sets the anchor type to the CONTENT type, not the bucket', () => {
     // The evidence rows carry type="image/png" and type="audio/mpeg".
-    expect(page).toContain('type={item.contentType}');
-    expect(page).not.toContain('type={item.kind}');
+    expect(pane).toContain('type={item.contentType}');
+    expect(pane).not.toContain('type={item.kind}');
   });
 
   it('renders NEITHER the heading nor the table for an empty room', () => {
@@ -608,17 +615,17 @@ describe('file rows', () => {
       Our loader ends in `.all()`, which always returns an array, so the falsy state cannot arise
       and the heading is not rendered at all rather than kept as an unreachable branch.
     */
-    expect(page).toContain('{#if data.files.length > 0}');
+    expect(pane).toContain('{#if data.files.length > 0}');
     // The ELEMENT, not the phrase — the phrase still appears in the note explaining why it is gone,
     // and an assertion that a comment cannot mention is an assertion that forbids documenting.
-    expect(page).not.toContain('<h4 class="mt-4 text-center">');
+    expect(pane).not.toContain('<h4 class="mt-4 text-center">');
   });
 
   it('wires every row control', () => {
-    expect(page).toContain('onclick={deleteSelectedFiles}');
-    expect(page).toContain('onclick={() => deleteFile(item)}');
-    expect(page).toContain('onclick={() => playMp3ForMe(item)}');
-    expect(page).toContain('onclick={() => playMp3ForAll(item.url)}');
+    expect(pane).toContain('onclick={deleteSelectedFiles}');
+    expect(pane).toContain('onclick={() => deleteFile(item)}');
+    expect(pane).toContain('onclick={() => playMp3ForMe(item)}');
+    expect(pane).toContain('onclick={() => playMp3ForAll(item.url)}');
   });
 
   it("keeps the capture's misspelled empty-selection alert", () => {
@@ -634,12 +641,12 @@ describe('file rows', () => {
     // The rendered text node, not the bare phrase — the phrase also appears in the note above the
     // button explaining where it came from, and counting that would make this test unwritable.
     const rendered = '</i>Stop Playing For All';
-    expect(page.split(rendered).length - 1).toBe(1);
+    expect(pane.split(rendered).length - 1).toBe(1);
 
     // ...and it sits ABOVE the per-row loop, so it cannot be emitted once per file
-    const loopStart = page.indexOf('{#each searchedFiles()');
+    const loopStart = pane.indexOf('{#each searchedFiles()');
     expect(loopStart).toBeGreaterThan(-1);
-    expect(page.indexOf(rendered)).toBeLessThan(loopStart);
+    expect(pane.indexOf(rendered)).toBeLessThan(loopStart);
   });
 
   it('searches every string field, not just the name', () => {
@@ -660,7 +667,7 @@ describe('file rows', () => {
       `.fileDriveImg { max-width: 200px }`. A fixed 120x90 box distorted every upload that was
       not 4:3.
     */
-    const img = page.slice(page.indexOf('class="fileDriveImg"'));
+    const img = pane.slice(pane.indexOf('class="fileDriveImg"'));
     const tagEnd = img.indexOf('/>');
     expect(img.slice(0, tagEnd)).not.toMatch(/\bwidth=|\bheight=/);
   });
@@ -699,9 +706,9 @@ describe('the files search input', () => {
     );
 
     // The tag itself, not the file: the note above it names both attributes it no longer has.
-    const at = page.indexOf('placeholder="Search files..."');
+    const at = pane.indexOf('placeholder="Search files..."');
     expect(at).toBeGreaterThan(-1);
-    const tag = page.slice(page.lastIndexOf('<input', at), page.indexOf('/>', at));
+    const tag = pane.slice(pane.lastIndexOf('<input', at), pane.indexOf('/>', at));
     expect(tag).not.toMatch(/\bid=/);
     expect(tag).not.toMatch(/\bname=/);
     // ...and what does name it is still there.
@@ -722,9 +729,9 @@ describe('the files Refresh button', () => {
     const server = readFileSync(new URL('../routes/+page.server.ts', import.meta.url), 'utf8');
     expect(server).toContain("depends('room:data')");
 
-    const at = page.indexOf('st-fileSeeMore');
+    const at = pane.indexOf('st-fileSeeMore');
     expect(at).toBeGreaterThan(-1);
-    const button = page.slice(at, page.indexOf('</button>', at));
+    const button = pane.slice(at, pane.indexOf('</button>', at));
     expect(button).toContain("onclick={() => invalidate('room:data')}");
     expect(button).not.toContain('invalidateAll');
   });
@@ -758,7 +765,7 @@ describe('the padded text nodes', () => {
       "Stop{' '}",
       "Play For All{' '}"
     ]) {
-      expect(page).toContain(label);
+      expect(pane).toContain(label);
     }
   });
 });
@@ -788,11 +795,11 @@ describe('the alert-sound row buttons', () => {
       'utf8'
     );
     expect(bridged).toContain('app-presentationarea .set-alert-sound-btn:not(:root)');
-    expect(page.split('class="btn ml-2 btn-info set-alert-sound-btn"').length - 1).toBe(2);
+    expect(pane.split('class="btn ml-2 btn-info set-alert-sound-btn"').length - 1).toBe(2);
 
     // The TITLE strings verbatim, misspelling and all.
-    expect(page).toContain('title="Overwrite Cash Register Sound"');
-    expect(page).toContain('title="Remove Overwrited Cash Register Sound"');
+    expect(pane).toContain('title="Overwrite Cash Register Sound"');
+    expect(pane).toContain('title="Remove Overwrited Cash Register Sound"');
 
     /*
       Const 263 spells the attribute `pe="button"` where every sibling spells `type`. That is a typo
@@ -806,13 +813,13 @@ describe('the alert-sound row buttons', () => {
       assertions in this file. A `toContain`/`toMatch` over a whole source file cannot tell markup
       from prose, and the fix is always to strip the prose, never to stop writing it.
     */
-    const template = page.replace(/<!--[\s\S]*?-->/g, '');
+    const template = pane.replace(/<!--[\s\S]*?-->/g, '');
     expect(template).not.toMatch(/\bpe="button"/);
-    const set = page.slice(page.indexOf('title="Overwrite Cash Register Sound"'));
+    const set = pane.slice(pane.indexOf('title="Overwrite Cash Register Sound"'));
     expect(set.slice(0, set.indexOf('>'))).not.toContain('pe=');
-    const remove = page.slice(page.indexOf('title="Remove Overwrited Cash Register Sound"'));
+    const remove = pane.slice(pane.indexOf('title="Remove Overwrited Cash Register Sound"'));
     expect(remove.slice(0, remove.indexOf('>'))).not.toContain('pe=');
-    const setTag = page.slice(page.lastIndexOf('<button', page.indexOf('title="Overwrite Cash')));
+    const setTag = pane.slice(pane.lastIndexOf('<button', pane.indexOf('title="Overwrite Cash')));
     expect(setTag.slice(0, setTag.indexOf('>'))).toContain('type="button"');
   });
 
@@ -823,10 +830,10 @@ describe('the alert-sound row buttons', () => {
       independent blocks. Written separately, a room that never receives the setting shows both
       buttons on every sound file — which is how a missing read half announces itself.
     */
-    expect(page).toContain("{#if alertSoundButton === 'set'}");
-    expect(page).toContain("{:else if alertSoundButton === 'remove'}");
+    expect(pane).toContain("{#if alertSoundButton === 'set'}");
+    expect(pane).toContain("{:else if alertSoundButton === 'remove'}");
     // ...and the one answer both branches read is computed once per row.
-    expect(page).toContain('{@const alertSoundButton = alertSoundButtonFor(');
+    expect(pane).toContain('{@const alertSoundButton = alertSoundButtonFor(');
   });
 
   it('wires both buttons to the action that PERSISTS the choice', () => {
@@ -866,8 +873,8 @@ describe('the alert-sound row buttons', () => {
     expect(server).toContain('export const actions: Actions = {');
     expect(server).not.toContain('overwriteCashRegisterSound: async ({ request, locals }) => {');
 
-    expect(page).toContain('onclick={() => setAlertSound(item.url, true)}');
-    expect(page).toContain('onclick={() => setAlertSound(item.url, false)}');
+    expect(pane).toContain('onclick={() => setAlertSound(item.url, true)}');
+    expect(pane).toContain('onclick={() => setAlertSound(item.url, false)}');
     expect(page).toContain('await overwriteCashRegisterSound({ url, on });');
   });
 
@@ -887,9 +894,9 @@ describe('the alert-sound row buttons', () => {
     expect(roomConfig).toContain('hideFiles?: boolean;');
 
     // The two elements, by their own markup rather than by a count of the word `hidden`.
-    expect(page).toContain('<li role="presentation" class="nav-item" hidden={filesHidden}>');
-    const pane = page.slice(page.indexOf('id="files"'));
-    expect(pane.slice(0, pane.indexOf('>'))).toContain('hidden={filesHidden}');
+    expect(pane).toContain('<li role="presentation" class="nav-item" hidden={filesHidden}>');
+    const filesPaneEl = pane.slice(pane.indexOf('id="files"'));
+    expect(filesPaneEl.slice(0, filesPaneEl.indexOf('>'))).toContain('hidden={filesHidden}');
 
     // ...and the pane's `display: none` is declared, because `#files.active` would otherwise win.
     const appCss = readFileSync(new URL('../app.css', import.meta.url), 'utf8');
@@ -915,7 +922,7 @@ describe('the Files pane stylesheet', () => {
     // They dressed the `<article>` stub the captured table replaced. The class appears in no
     // template in this repo, so all three rules were unreachable.
     expect(declarations).not.toContain('.file-list');
-    expect(page).not.toContain('file-list');
+    expect(pane).not.toContain('file-list');
   });
 
   it('does not re-declare the files badge background Bootstrap pins with !important', () => {

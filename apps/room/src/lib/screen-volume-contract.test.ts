@@ -52,6 +52,15 @@ const CLUSTER = readFileSync(
   'utf8'
 );
 const PAGE = readFileSync(new URL('../routes/+page.svelte', import.meta.url), 'utf8');
+/*
+  `PANE` in this file is `ScreenPane.svelte`. This one is the presentation AREA, which took the
+  main tab strip and `#screensTabsContent` on 2026-08-15 — named in full so the two cannot be
+  confused by the next reader.
+*/
+const PRESENTATION = readFileSync(
+  new URL('./components/PresentationArea.svelte', import.meta.url),
+  'utf8'
+);
 const ROWS = readFileSync(
   new URL('./components/PresenterMuteRows.svelte', import.meta.url),
   'utf8'
@@ -475,7 +484,7 @@ describe('viewer-only mode drives every binding the reference gives it', () => {
 
   it('hides the main tab strip', () => {
     expect(COMPILED).toContain("z('hidden', o.appService.globals.viewerOnlyMode)");
-    expect(PAGE).toContain('hidden={viewerOnlyMode}');
+    expect(PRESENTATION).toContain('hidden={viewerOnlyMode}');
   });
 
   it('hides the chat and alerts column', () => {
@@ -568,7 +577,7 @@ describe('viewer-only mode drives every binding the reference gives it', () => {
       "H0e = (t, n) => ({ hidden: t, 'viewer-only-screen-video': n })"
     );
 
-    expect(pageMarkup).toContain('class:viewer-only-screen-tab={viewerOnlyMode}');
+    expect(stripComments(PRESENTATION)).toContain('class:viewer-only-screen-tab={viewerOnlyMode}');
     expect(clusterMarkup).toContain('class:viewer-only-screen-zoom-controls={viewerOnlyMode}');
     expect(stripComments(PANE)).toContain('class:viewer-only-screen-video={viewerOnlyMode}');
 
@@ -595,7 +604,10 @@ describe('viewer-only mode drives every binding the reference gives it', () => {
     expect(CONSTS[70]).not.toContain('ngClass');
     expect(HELPERS).toContain("Hr = (t) => ({ 'show active': t })");
 
-    const tabsContent = pageMarkup.slice(pageMarkup.indexOf('id="screensTabsContent"'));
+    const presentationMarkup = stripComments(PRESENTATION);
+    const tabsContent = presentationMarkup.slice(
+      presentationMarkup.indexOf('id="screensTabsContent"')
+    );
     expect(tabsContent.slice(0, 200)).toContain('class:viewer-only-screen-tab={viewerOnlyMode}');
     expect(stripComments(TABS), 'the tab strip cannot carry it').not.toContain(
       'viewer-only-screen-tab'
@@ -681,7 +693,10 @@ describe('the cluster keeps the captured child order', () => {
   });
 
   it('the page supplies the slot, and gates it on the vo query parameter', () => {
-    expect(PAGE).toContain('volume={screenVolume}');
+    // The slot is filled in the pane now; the SNIPPET it is filled with is still the page's.
+    expect(PRESENTATION).toContain('volume={screenVolume}');
+    expect(PAGE).toContain('{#snippet screenVolume()}');
+    expect(PAGE).toContain('{screenVolume}');
     expect(PAGE).toContain("page.url.searchParams.get('vo') === '1'");
     expect(PAGE).toContain("page.url.searchParams.get('vo') === '2'");
     expect(controlMarkup).toContain('{#if viewerOnlyMode}');

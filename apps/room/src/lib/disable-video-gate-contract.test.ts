@@ -46,6 +46,14 @@ const MODAL = readFileSync(new URL('./components/ModalHost.svelte', import.meta.
 const stripComments = (source: string) =>
   source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/<!--[\s\S]*?-->/g, '');
 
+/*
+  The presentation area moved to `PresentationArea.svelte` on 2026-08-15. The assertions below
+  point at whichever file owns each subject: markup here, the handlers and gates behind it on the
+  page.
+*/
+const paneMarkup = stripComments(
+  readFileSync(new URL('./components/PresentationArea.svelte', import.meta.url), 'utf8')
+);
 const pageMarkup = stripComments(PAGE);
 
 /** One top-level `function NAME(t, n) { … }` out of a decoded render-helper file. */
@@ -163,7 +171,7 @@ describe('ours: the flag reaches the markup', () => {
   });
 
   it('renders the reference string, with the reference class', () => {
-    expect(pageMarkup).toContain('<h3 class="text-center mt-4">Video off to preserve data...</h3>');
+    expect(paneMarkup).toContain('<h3 class="text-center mt-4">Video off to preserve data...</h3>');
   });
 
   it('gates the WHOLE pane — the tabs and the content are in the else branch', () => {
@@ -173,14 +181,14 @@ describe('ours: the flag reaches the markup', () => {
       never notice, since the message would be visible and the screens would keep streaming
       underneath it.
     */
-    const gate = pageMarkup.indexOf('{#if videoDisabled}');
+    const gate = paneMarkup.indexOf('{#if videoDisabled}');
     expect(gate, 'the screens pane must be gated on videoDisabled').toBeGreaterThan(-1);
-    const message = pageMarkup.indexOf('Video off to preserve data...', gate);
-    const otherwise = pageMarkup.indexOf('{:else}', gate);
-    const tabs = pageMarkup.indexOf('<ScreenTabs', gate);
-    const content = pageMarkup.indexOf('id="screensTabsContent"', gate);
-    const close = pageMarkup.indexOf('{/if}', content);
-    const streams = pageMarkup.indexOf('id="streams"', gate);
+    const message = paneMarkup.indexOf('Video off to preserve data...', gate);
+    const otherwise = paneMarkup.indexOf('{:else}', gate);
+    const tabs = paneMarkup.indexOf('<ScreenTabs', gate);
+    const content = paneMarkup.indexOf('id="screensTabsContent"', gate);
+    const close = paneMarkup.indexOf('{/if}', content);
+    const streams = paneMarkup.indexOf('id="streams"', gate);
 
     expect(message).toBeGreaterThan(gate);
     expect(otherwise).toBeGreaterThan(message);
