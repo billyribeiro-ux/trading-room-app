@@ -2621,8 +2621,8 @@
           onusersearchkey={doUserSearch}
           ongetmobilepin={() => void getMyPinAndDoInfo()}
           ongetrandomuser={getRandomUser}
-          onopentranscript={alertsPane.openTranscript}
-          onreopenalertschat={alertsPane.reopen}
+          onopentranscript={() => alertsPane.openTranscript()}
+          onreopenalertschat={() => alertsPane.reopen()}
           onreload={() => void invalidateAll()}
         />
         {@render mainNavigation()}
@@ -2703,11 +2703,11 @@
               onopenpoll={() => modals.openPollUI()}
               ontogglealertstoolbar={() => alertsPane.toggleToolbar()}
               ontogglealertssearch={() => alertsPane.toggleToolbarSearchOnly()}
-              ondetachalerts={alertsPane.detach}
-              onsavealerts={alertsPane.save}
-              onarchivealerts={alertsPane.archive}
-              onalertsscroll={feedScroll.trackAlertsScroll}
-              onchatscroll={feedScroll.trackChatScroll}
+              ondetachalerts={() => alertsPane.detach()}
+              onsavealerts={() => alertsPane.save()}
+              onarchivealerts={() => alertsPane.archive()}
+              onalertsscroll={(event) => feedScroll.trackAlertsScroll(event)}
+              onchatscroll={(event) => feedScroll.trackChatScroll(event)}
               onmessageaction={(kind, action, item, payload) =>
                 messageActions.handle(kind, action, item, payload)}
               onprivatechat={() => privateChat.show()}
@@ -2747,13 +2747,13 @@
               {captionHistory}
               bind:speechRecoHistoryMode
               archivesAvailable={gates.archivesAvailable}
-              openTranscriptPage={alertsPane.openTranscript}
+              openTranscriptPage={() => alertsPane.openTranscript()}
               {previewWindowsVisible}
               webcamPresenters={mediaTransport.webcamPresenters}
-              webcamCard={webcams.card}
-              attachLocalWebcam={webcams.attachLocal}
-              attachRemoteWebcam={webcams.attachRemote}
-              closeWebcamPreview={webcams.closePreview}
+              webcamCard={(presenter, index) => webcams.card(presenter, index)}
+              attachLocalWebcam={(node) => webcams.attachLocal(node)}
+              attachRemoteWebcam={(producerId) => webcams.attachRemote(producerId)}
+              closeWebcamPreview={(presenter) => webcams.closePreview(presenter)}
               videoDisabled={prefs.videoDisabled}
               sharedScreens={mediaTransport.screens}
               selectedScreenTab={screens.selectedTab}
@@ -2964,7 +2964,7 @@
       downloadImage={(url) => modals.downloadImage(url)}
       minimizePoll={() => modals.minimizePoll()}
       openModal={(name) => modals.open(name)}
-      saveAlertFilter={alertsPane.saveFilter}
+      saveAlertFilter={(next) => alertsPane.saveFilter(next)}
       setTheme={(next) => modals.setTheme(next)}
       submitPollAction={(action, values) => modals.submitPollAction(action, values)}
     />

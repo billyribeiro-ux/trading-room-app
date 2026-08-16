@@ -13,7 +13,13 @@ import { RoomMessageActions } from './message-actions.svelte';
 import { RoomEventStream } from './events.svelte';
 import { RoomGates } from './gates.svelte';
 import { RoomMediaTransport } from './media-transport.svelte';
+import { RoomAlertsPane } from './alerts-pane';
+import { RoomArrivals, RoomOrderedArrivals } from './arrivals';
+import { RoomFeedScroll } from './feed-scroll';
 import { RoomRecording } from './recording';
+import { RoomScrollFollow } from './scroll-follow';
+import { RoomWebcams } from './webcams';
+import { RoomWindowHandlers } from './window-handlers';
 import { RoomScreens } from './screens.svelte';
 import { RoomUserActions } from './user-actions.svelte';
 import { RoomChat } from './chat.svelte';
@@ -100,7 +106,28 @@ const INSTANCES: Record<string, new (...args: never[]) => object> = {
   notes: RoomNotes,
   polls: RoomPolls,
   roster: RoomRoster,
-  split: RoomSplit
+  split: RoomSplit,
+  /*
+    THE PLAIN `.ts` MODULES, added 2026-08-16 — and the reason is a defect this file could not see
+    while it scanned only `*.svelte.ts`.
+
+    `ondetachalerts={alertsPane.detach}` was on the page and `RoomAlertsPane` lives in a plain
+    `alerts-pane.ts`, because it holds no rune. The discovery below skipped it, the map did not name
+    it, and the guard reported nothing. Executed rather than argued: calling `pane.detach` by
+    reference throws `TypeError: Cannot read properties of undefined (reading '#detachedWindow')`,
+    so "Detach Alerts" was broken in every room from the slice that introduced it.
+
+    Being the wrong extension is not a reason to be unguarded. It is the SAME sentence
+    `source-size-contract.test.ts` already carries about its own catalog, and it turns out to have
+    been the more expensive of the two omissions.
+  */
+  alertsPane: RoomAlertsPane,
+  alertArrivals: RoomArrivals,
+  qaArrivals: RoomOrderedArrivals,
+  feedScroll: RoomFeedScroll,
+  alertsFollow: RoomScrollFollow,
+  webcams: RoomWebcams,
+  windowHandlers: RoomWindowHandlers
 };
 
 /*
@@ -119,7 +146,7 @@ const exportedRoomClasses = () => {
   const dir = new URL('./', import.meta.url);
   const names = new Set<string>();
   for (const file of readdirSync(dir)) {
-    if (!file.endsWith('.svelte.ts') || file.endsWith('.test.ts')) continue;
+    if (!file.endsWith('.ts') || file.endsWith('.test.ts')) continue;
     const source = readFileSync(new URL(file, dir), 'utf8');
     for (const match of source.matchAll(/^export class (\w+)/gm)) names.add(match[1]);
   }
@@ -231,5 +258,41 @@ describe('no room-class method is ever passed as a prop by reference', () => {
       offenders,
       `${offenders.join('\n')}\n\nA class method handed over as a value loses \`this\` and throws the first time it is called. svelte-check, eslint and the autofixer all pass on it. Wrap it instead: onthing={(a, b) => instance.method(a, b)}.`
     ).toEqual([]);
+  });
+
+  /*
+    THE CONSEQUENCE, EXECUTED — because everything above this line is a source-text assertion, and a
+    source-text assertion cannot prove that the thing it forbids is actually harmful.
+
+    That mattered on 2026-08-16. `alerts-pane.ts` holds no rune, so it is a plain `.ts`, so the
+    discovery above skipped it and the map did not name it, and `ondetachalerts={alertsPane.detach}`
+    sat on the page reported by nothing. Thirteen props were in that state across two plain modules
+    — Detach Alerts, Save, Archive, Open Transcript, Reopen, both scroll trackers, the four webcam
+    attachments and the alert-filter save. Every one of them threw on the first click, in every room.
+
+    So this runs the failure rather than describing it. If a future change makes an unbound pass
+    harmless — a decorator, a bind in the constructor, a build step — this test goes GREEN in the
+    wrong direction and says so, instead of the whole file quietly guarding nothing.
+  */
+  it('an unbound pass really does throw, which is what the rest of this file is for', () => {
+    const pane = new RoomAlertsPane<{ createdAt: string; senderName: string; body: string }>({
+      alerts: {} as never,
+      dialogs: {} as never,
+      prefs: {} as never,
+      feeds: {} as never,
+      alertsScroller: () => null,
+      forceAlertsToBottom: () => {},
+      sessionHandle: () => 'handle',
+      setChatAlertsDetached: () => {}
+    });
+    /*
+      Called through the instance it belongs to, the private-field read SUCCEEDS and execution
+      carries on into `window.open`, which this environment does not have. That `ReferenceError` is
+      the proof: it can only be reached by getting past `this.#detachedWindow`.
+    */
+    expect(() => pane.detach()).toThrow(ReferenceError);
+    // Handed over as a value — which is exactly what `ondetachalerts={alertsPane.detach}` did.
+    const handedOver = pane.detach;
+    expect(() => handedOver()).toThrow(TypeError);
   });
 });

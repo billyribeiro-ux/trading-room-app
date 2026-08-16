@@ -24,6 +24,45 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-16
 
+### 2026-08-16 18:52 EDT — THIRTEEN BROKEN CONTROLS: the unbound-method guard could not see a plain `.ts`
+
+**A runtime bug fix, not a refactor.** Suite 2,374 across 160. `svelte-check` 1,190/0/0. All four
+CI steps green locally.
+**Runtime impact: yes** — thirteen controls that threw on the first click now work.
+
+**What was broken.** Every one of these was handed to a component as a bare method reference, so it
+was called with `this` undefined and threw before doing anything:
+
+Detach Alerts, Save Alerts, Archive Alerts, Open Transcript (twice — sidebar and presentation area),
+Reopen Alerts/Chat, the alerts scroll tracker, the chat scroll tracker, Save Alert Filter, and the
+four webcam attachments (`webcamCard`, `attachLocalWebcam`, `attachRemoteWebcam`,
+`closeWebcamPreview`).
+
+**Why nothing caught it, which is the part worth recording.** `unbound-method-contract.test.ts`
+exists for exactly this failure and has been catching it since Phase 5 slice 2. It scanned
+`*.svelte.ts` only. `RoomAlertsPane`, `RoomFeedScroll` and `RoomWebcams` hold no rune, so they are
+plain `.ts` files — the discovery skipped them, the INSTANCES map did not name them, and the guard
+reported clean while thirteen props sat in the state it was written to forbid.
+
+Being the wrong extension is not a reason to be unguarded. That is the same sentence
+`source-size-contract.test.ts` already carries about its own catalog, and this was the more
+expensive of the two omissions.
+
+**Proved before it was reported**, per the rule that every failure has to be shown not to be my own
+tooling: `pane.detach` called through its instance throws `ReferenceError: window is not defined` —
+which is only reachable by getting PAST `this.#detachedWindow` — and handed over as a value throws
+`TypeError: Cannot read properties of undefined (reading '#detachedWindow')`.
+
+**That probe is now a permanent test.** Everything else in that file is a source-text assertion, and
+a source-text assertion cannot prove the thing it forbids is harmful. The new case executes both
+calls, so if an unbound pass ever becomes harmless the file goes green in the wrong direction and
+says so rather than quietly guarding nothing.
+
+**Also fixed:** discovery now reads every `.ts` in `lib/room/`, and the seven previously invisible
+classes are in the map — `RoomAlertsPane`, `RoomArrivals`, `RoomOrderedArrivals`, `RoomFeedScroll`,
+`RoomScrollFollow`, `RoomWebcams`, `RoomWindowHandlers`. Negative control seen RED: putting
+`ondetachalerts={alertsPane.detach}` back names the file and line.
+
 ### 2026-08-16 18:44 EDT — Phase 5 slice 27: the sixteen view gates, and ten comments that had lost their code
 
 **`+page.svelte` 3,529 → 3,021 (−508).** Suite 2,373 across 160 files. `svelte-check` 1,190 files,
