@@ -173,7 +173,9 @@ describe('there is ONE form in the product', () => {
 describe('the login form controls decoded from the v4 bundle', () => {
   it('renders the authenticate-info sub-heading between the title and the form', () => {
     // `bue`: `d(1,"p",63),v(2,"Please complete this form:")`, const 63 = text-center authenticate-info.
-    expect(pageCode).toContain('<p class="text-center authenticate-info">Please complete this form:</p>');
+    expect(pageCode).toContain(
+      '<p class="text-center authenticate-info">Please complete this form:</p>'
+    );
   });
 
   it('has the "Keep me logged in" checkbox, and POSTS it', () => {
@@ -186,7 +188,9 @@ describe('the login form controls decoded from the v4 bundle', () => {
     expect(pageCode).toContain('id="remember-me"');
     expect(pageCode).toContain('name="remember"');
     expect(pageCode).toContain('class="form-check-input"');
-    expect(pageCode).toContain('<label for="remember-me" class="form-check-label">Keep me logged in</label>');
+    expect(pageCode).toContain(
+      '<label for="remember-me" class="form-check-label">Keep me logged in</label>'
+    );
   });
 
   it('WIRES that checkbox to the cookie lifetime — the half that was missing', () => {
@@ -253,15 +257,28 @@ describe('the login form controls decoded from the v4 bundle', () => {
 
       Three assertions, and the LAST TWO are the ones that matter:
         - the iframe guard is the reference's and must survive;
-        - `replaceState`, never `goto` — a goto re-runs the load without the token and blanks the
-          prefill this page exists to show;
+        - the navigation must NOT re-run the load — one that does blanks the prefill this page
+          exists to show;
         - the `has()` check is what stops the effect re-triggering itself, since it reads `page.url`
-          and replaceState writes it. Removing it spins.
+          and the navigation writes it. Removing it spins.
+
+      RE-POINTED for the SvelteKit 3 RC (2026-08-13), which deprecates `pushState`/`replaceState` in
+      favour of `goto` with a `shallow` option. Note what changed and what did not: the assertion
+      used to forbid `goto` OUTRIGHT, which was the right guard for the old API and would be exactly
+      wrong for the new one — under Kit 3 the correct call IS a `goto`, and what carries the "no load
+      re-run" guarantee is `shallow: true`.
+
+      So the guard now names the property rather than the function. `replace: true` is asserted
+      beside it because it is the half `replaceState` used to carry in its name and is the easiest
+      thing to drop silently: without it a Back press returns the reader to a URL holding their JWT.
     */
     expect(pageCode).toContain('window.top !== window.self');
-    expect(pageCode).toContain('replaceState(');
     expect(pageCode).toContain("stripped.searchParams.has('jwtSite')");
-    expect(pageCode).not.toContain("goto(`${stripped.pathname}");
+    expect(pageCode).toContain('shallow: true');
+    expect(pageCode).toContain('replace: true');
+    // The deprecated pair is gone from this page, not merely unused.
+    expect(pageCode).not.toContain('replaceState(');
+    expect(pageCode).not.toContain('pushState(');
   });
 
   it('picks the layout on sessData.description, which is the whole of L-5', () => {
@@ -290,7 +307,7 @@ describe('the login form controls decoded from the v4 bundle', () => {
     */
     expect(pageCode).toContain('{@html data.roomDescription}');
     expect(serverCode).toContain('roomDescription: sanitizeRoomDescription(');
-    expect(serverCode).not.toContain("roomDescription: String(settings.description");
+    expect(serverCode).not.toContain('roomDescription: String(settings.description');
     // Deny-by-default, and no `data:` — an SVG data URL is script delivery dressed as an image.
     expect(serverCode).toContain("allowedSchemes: ['http', 'https', 'mailto']");
     expect(serverCode).not.toContain("'data'");

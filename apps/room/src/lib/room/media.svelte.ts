@@ -139,6 +139,21 @@ export class RoomMedia {
     this.#connected = on;
   }
 
+  /**
+   * The ICE servers THIS deployment minted, hoisted out of `onMount` so the connectivity test can
+   * see them (`TODO.md` item N).
+   *
+   * They were a `let` inside `onMount`, reachable only by the media session. The consequence was a
+   * diagnostic that tested somebody else's infrastructure: the modal fell back to Google's public
+   * STUN, so a green tick said nothing about whether `media.tradingroom.app` is reachable, and a red
+   * one blamed the user's firewall for a server we do not run.
+   *
+   * `$state.raw` rather than `$state`: the array is REPLACED on every grant, never mutated, so deep
+   * proxying would cost something and buy nothing.
+   *
+   * Empty until the first grant is minted, which happens when the socket opens. The modal treats
+   * empty as "not connected yet" and says so rather than pretending.
+   */
   get iceServers(): RTCIceServer[] {
     return this.#iceServers;
   }

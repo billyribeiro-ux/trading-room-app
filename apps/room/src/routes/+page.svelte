@@ -45,9 +45,6 @@
   import { MtxStreamTabs } from '$lib/room-mtx.svelte';
   import ScreenVolumeControl from '$lib/components/ScreenVolumeControl.svelte';
   import {
-    archivesAvailableTo,
-    rosterBlockVisible,
-    rosterCountVisibleTo,
     rosterRowClass,
     rosterRowVisible,
     locationVisibleTo
@@ -67,6 +64,7 @@
   import { RoomComposer } from '$lib/room/composer.svelte';
   import { RoomAlertsPane } from '$lib/room/alerts-pane';
   import { RoomFeedScroll } from '$lib/room/feed-scroll';
+  import { RoomGates } from '$lib/room/gates.svelte';
   import { RoomModals } from '$lib/room/modals.svelte';
   import { RoomNotes } from '$lib/room/notes.svelte';
   import { RoomFeeds } from '$lib/room/feeds.svelte';
@@ -92,7 +90,7 @@
   import type { RoomMessageChrome } from '$lib/room-message-chrome';
   import { EXTRA_COMPOSER, RoomChat } from '$lib/room/chat.svelte';
   import { RoomMedia } from '$lib/room/media.svelte';
-  import { tawkAttributes, tawkScript, tawkSupportAvailable } from '$lib/tawk-support';
+  import { tawkAttributes, tawkScript } from '$lib/tawk-support';
   import {
     RoomSplit,
     isRoomSplitDir,
@@ -107,7 +105,6 @@
   import { resolveNoteSurfaceGates } from '$lib/components/notes/note-gates';
   import { swingAlertsTabVisible } from '$lib/swing-alerts';
   import type { SwingAlertRow } from '$lib/types';
-  import { parseAlertLabels } from '$lib/alert-labels';
   import { alertFilterAvailable, alertPassesFilter } from '$lib/alert-filter';
   import { dayTradeAlertsTabVisible } from '$lib/day-trade-alerts';
   import type { DayTradeAlertRow } from '$lib/types';
@@ -174,9 +171,6 @@
           playSound: true
         };
   }
-
-
-
 
   let { data }: PageProps = $props();
 
@@ -246,14 +240,12 @@
     soundCloudPlaying: () => media.soundCloudPlaying
   });
 
-
   let sidebarOpen = $state(false);
   let mobileNavOpen = $state(false);
   // `new-evidence/presenter-tab` captures the bar as rendered: `screens-tab` carries
   // `class="nav-link active"` with `aria-selected="true"`, and `notes-tab` carries
   // `class="nav-link presAreaTabs-notes"` with `aria-selected="false"`. The room opens on Screens.
   let mainTab: MainTab = $state('screens');
-
 
   /**
    * The MediaMTX stream list and its selected tab, owned by `room-mtx.svelte.ts`.
@@ -363,23 +355,6 @@
     roster.submitSearch();
   }
 
-
-
-
-
-
-
-  /**
-   * Is THIS window a detached screen popout?
-   *
-   * The capture's own test, from app-screenshare-view's ngOnInit:
-   *
-   *   const o = new URLSearchParams(window.location.search);
-   *   this.isDetachedCtrl = o.has("dscreen") && o.has("presID");
-   *
-   * Both keys, not either: `dscreen` alone says "a popout" and `presID` says which screen, and a
-   * window with only one of them has nothing to render.
-   */
   /**
    * `co=1` - chat-only mode. The capture reads it as `const F = s.get("co")` into
    * `globals.chatOnlyMode`, and a detached chat window runs in it so the popout shows the alerts
@@ -389,12 +364,6 @@
 
   /** `hideChatAlerts` / `reopenAlertsChatBtn` - set while the pair lives in another window. */
   let chatAlertsDetached = $state(false);
-
-
-
-
-
-
 
   /*
     The two chat columns, in `$lib/room/chat.svelte.ts`.
@@ -414,77 +383,13 @@
   // svelte-ignore state_referenced_locally
   let theme: Theme = $state(data.settings?.theme === 'dark' ? 'dark' : 'light');
 
+  
+  
+  
+  
+  
+  
 
-  
-  
-  
-  
-  
-  
-  /**
-   * `preferences.alwaysScrollToBottom` — the chat's "always scroll to bottom" override.
-   *
-   * `=== true`, not `!== false`, and the difference is the reference's own default: the preferences
-   * blob ships `prefs.alwaysScrollToBottom:!1` (`main.d6d3c112b59b7d0d.js` byte 979602). Seeding it ON for
-   * anyone who has never touched the checkbox would drag a reader out of the history they are
-   * scrolled up into — the opposite of the mistake made with `showSpeechRecoOverlay`, where
-   * `=== true` wrongly disabled a feature that defaults ON. The default decides which comparison is
-   * correct; neither is a house style.
-   *
-   * PERSISTED, unlike `saveData`: `chatAlwaysScrollToBottomChange` calls
-   * `setPreference('prefs.alwaysScrollToBottom', …)` (byte 2246247).
-   */
-  /**
-   * `preferences.makeUsersFollowMyScreens` — when this presenter changes screen tab, take the room
-   * with them.
-   *
-   * `i && globals.isPresenter && preferences.makeUsersFollowMyScreens && this.bringFocusToScreen(…)`
-   * at the end of `onScreenShareTabChange` (`main.d6d3c112b59b7d0d.js` byte 1967413). `i` defaults
-   * true and is passed false for programmatic changes, which is the loop guard: receiving a focus
-   * command must not send one back.
-   *
-   * `=== true` — the blob ships `prefs.makeUsersFollowMyScreens:!1` (byte 980006). A presenter who has
-   * never touched it should not be dragging the room around by clicking their own tabs.
-   */
-  /**
-   * `preferences.chatGif` — whether inline gifs play or show a click-to-reveal placeholder.
-   *
-   * `!== false`, because the blob ships `prefs.chatGif:!0`. A viewer who has never touched the checkbox
-   * gets gifs, which is what the reference does; `=== true` would mute them for everybody.
-   */
-  /**
-   * `sessData.presenterMsgsOnTheRight` — a ROOM setting, not a viewer preference.
-   *
-   * `RoomMessage.svelte` has carried both consumers since it was written and neither was ever fed:
-   * `messageBodyClass` adds `presenter-msg-right`, and the reaction row takes
-   * `presenter-reactions-right`. Owner-configurable at
-   * `page.manageSession.html:1108`.
-   *
-   * It is also the FIRST term of the reference's chat-badge gate —
-   * `preferences.chatBadges && !sessData.presenterMsgsOnTheRight && sessData.enableBadges && …` —
-   * so with it on, badges are suppressed regardless of the other three. That coupling is upstream's
-   * and is reproduced by `visibleBadges`.
-   */
-  const presenterMessagesOnTheRight = $derived(data.sessData?.presenterMsgsOnTheRight === true);
-
-  /**
-   * The other three terms of the reference's chat-badge gate:
-   *
-   * ```js
-   * preferences.chatBadges && !sessData.presenterMsgsOnTheRight && sessData.enableBadges &&
-   *   msg.b && msg.b.length && (!sessData.showBadgesToPresentersOnly || globals.isPresenter)
-   * ```
-   *
-   * `enableBadges` is the owner's master switch and is `=== true`: a room that has never been
-   * configured shows no badges, which is what an absent setting means everywhere else in this
-   * payload — the controller omits unset values rather than sending null.
-   *
-   * `showBadgesToPresentersOnly` narrows them to presenters. `disableStarYears` gates the
-   * membership-star, whose `item.membershipYears` still has no supply, so it is passed for the
-   * component's own gate and is expected to change nothing until that lands — recorded rather than
-   * left to look like an oversight.
-   */
-  const enableBadges = $derived(data.sessData?.enableBadges === true);
   const showBadgesToPresentersOnly = $derived(data.sessData?.showBadgesToPresentersOnly === true);
   const disableStarYears = $derived(data.sessData?.disableStarYears === true);
 
@@ -630,18 +535,6 @@
     both refused there. They arrive here because this is where their writers are.
   */
   const media = new RoomMedia();
-
-  /**
-   * `'Recording to: ' + decodedRecName()`, suppressed for non-presenters when the session says so.
-   *
-   * `dontShowRecInfoToUsers` is not captured in our session data, so it is read defensively and
-   * treated as off when absent - the capture's default is to SHOW the name.
-   */
-  const recordingTooltip = $derived.by(() => {
-    const hideFromUsers = prefs.loaded.dontShowRecInfoToUsers === true;
-    if ((hideFromUsers && !isPresenter) || !media.roomRecordingName) return '';
-    return `Recording to: ${decodeURIComponent(media.roomRecordingName)}`;
-  });
 
   
   
@@ -874,7 +767,7 @@
     },
     session: () => data,
     isPresenter: () => isPresenter,
-    viewerOnlyMode: () => viewerOnlyMode,
+    viewerOnlyMode: () => gates.viewerOnlyMode,
     playSound: (name) => playSoundEffect(name),
     closeUserMenu: () => menus.openUserMenu(null),
     selectRosterUser: (user) => userActions.select(user),
@@ -1148,7 +1041,6 @@
    * last, because `newMessage()` splices a tab out and pushes it to the end.
    */
 
-
   let previewWindowsVisible = $state(true);
   let showMessageOptions = $state(false);
   
@@ -1159,65 +1051,6 @@
   
   
   
-  /**
-   * `appService.globals.viewerOnlyMode` — the `vo` query parameter, and the ONLY gate on the screen
-   * overlay's volume trigger (`ScreenVolumeControl.svelte`).
-   *
-   * Read the same way `chatOnlyMode` above reads `co` and `detachedScreenId` reads `dscreen`: this
-   * app's query parameters are its own, and the reference's parser assigns all three out of one
-   * block. `?vo=2` additionally sets `viewerOnlyModeLimited` upstream; nothing in this room reads
-   * that yet, so it is deliberately not modelled here rather than added as state with no consumer.
-   *
-   * PROVENANCE, stated because it is the one fact in this change that was not re-read this session:
-   * the `vo` -> `viewerOnlyMode` mapping comes from `HANDOFF.md`, which quotes it from the minified
-   * bundle at ~2595500. It is NOT in `docs/source/components/**` — that tree decodes the 51
-   * COMPONENTS, and the query-parameter block belongs to the app service. What IS re-read and cited
-   * is every consumer: `app-presentationarea.compiled.js:92`, `app-room.compiled.js:76,856`, and
-   * the two `ngClass` helpers `jCe`/`VCe` in `app-presentationarea.render-helpers.js:9-10`.
-   */
-  const viewerOnlyMode = $derived(
-    page.url.searchParams.get('vo') === '1' || page.url.searchParams.get('vo') === '2'
-  );
-  /**
-   * `sessData.individualVolumeControls` — "Individual Volume Controls?", the room setting that
-   * reveals the per-presenter slider inside the overlay's `room-sound-options`
-   * (`bSe`'s `O(6, …sessData.individualVolumeControls ? 6 : -1)`).
-   *
-   * It exists in the controller's schema (`room-settings-schema.ts`, "Individual volume controls
-   * for each Presenter") and had to be added to `ROOM_VISIBLE_SETTINGS` to reach this room; that
-   * change and its consumer land together.
-   */
-  const individualVolumeControls = $derived(data.sessData?.individualVolumeControls === true);
-  /**
-   * `hideChatAlerts` — ONE flag with five writers upstream, and the single gate on the whole
-   * chat/alerts column: `O(1, e.hideChatAlerts ? -1 : 1)` (`app-room.render-helpers.js:1650`),
-   * plus the extra chat column beside it at `:1652-1660`.
-   *
-   * The five writers, all in `ngOnInit` except the last (`app-room.full.js`):
-   *
-   *   :1893      `this.hideChatAlerts = sessData.hideChatAlerts`        — the room setting
-   *   :1894-1896 `isPlayer && isPresenter` forces it true
-   *   :1898-1900 `videoOnlyMode && (hideChatAlerts = !recordChat && videoOnlyMode)`
-   *   :1901-1902 `viewerOnlyMode && (hideChatAlerts = viewerOnlyMode)`
-   *   :2179-2181 the `detachChat` event sets it true, with `reopenAlertsChatBtn`
-   *
-   * THREE of the five are modelled here. The two that are not are honest gaps, not oversights:
-   *
-   * - `isPlayer` has ZERO occurrences in this room. Upstream it is a client global for a stream
-   *   PLAYBACK mode — the only other thing that reads it raises "The stream has ended. You can
-   *   close this page now." on `streamPlayerEnded` (`full.js:2162-2165`). This room has no such
-   *   mode, so there is nothing to read.
-   * - `videoOnlyMode` is the `r` query parameter, the media.recording-bot mode — the same gap
-   *   `files-gates.ts` already records for `hideFiles`. `recordChat` is deliberately not on the
-   *   wire either, because it appears ONLY inside that writer and would arrive with no reader.
-   *
-   * This replaces two unrelated mechanisms that each carried one writer: a hardcoded branch on
-   * `viewerOnlyMode` and a separate `chatAlertsDetached` branch. They were the same decision
-   * rendered twice, which is why the room setting an owner ticks did nothing at all.
-   */
-  const hideChatAlerts = $derived(
-    data.sessData?.hideChatAlerts === true || viewerOnlyMode || chatAlertsDetached
-  );
   /**
    * `hidePresentation` — `(chatOnlyMode || sessData.isChatOnlyRoom)` sets it, gating the
    * presentation column at `O(3, e.hidePresentation ? -1 : 3)`
@@ -1261,29 +1094,6 @@
    */
   const CAPTION_HISTORY_LIMIT = 500;
   
-  /**
-   * Tears the media session down and builds a new one — the capture's `disconnectAll()` plus
-   * re-init, for `giveMicScreen` (`TODO.md` gap 22).
-   *
-   * A closure assigned in `onMount` rather than a top-level function, because building a session
-   * needs the signalling client and the ICE getter that live in that scope. Duplicating the
-   * construction here is how the two copies drift.
-   */
-  /**
-   * The ICE servers THIS deployment minted, hoisted out of `onMount` so the connectivity test can
-   * see them (`TODO.md` item N).
-   *
-   * They were a `let` inside `onMount`, reachable only by the media session. The consequence was a
-   * diagnostic that tested somebody else's infrastructure: the modal fell back to Google's public
-   * STUN, so a green tick said nothing about whether `media.tradingroom.app` is reachable, and a red
-   * one blamed the user's firewall for a server we do not run.
-   *
-   * `$state.raw` rather than `$state`: the array is REPLACED on every grant, never mutated, so deep
-   * proxying would cost something and buy nothing.
-   *
-   * Empty until the first grant is minted, which happens when the socket opens. The modal treats
-   * empty as "not connected yet" and says so rather than pretending.
-   */
 
   /**
    * Whether anyone in the room currently has their microphone open.
@@ -1301,7 +1111,6 @@
    * so the roster changes on mute and unmute, and the indicator holds for as long as a microphone
    * is open. Pausing between sentences must not flip it back to " ( No one is speaking )".
    */
-
 
   
   let mainElement: HTMLElement | undefined;
@@ -1424,6 +1233,21 @@
   });
 
   /**
+   * `getRandomUser()`, transcribed:
+   *
+   * ```js
+   * bootbox.confirm({ message: "Only select from Trials?",
+   *   buttons: { confirm: {label:"Yes", className:"btn-success"},
+   *              cancel:  {label:"No",  className:"btn-danger"} },
+   *   callback(i){ let o = globals.roster.filter(r => !r.isP);
+   *                let {uniqueUsers: s} = uniqueRoster(o);
+   *                i && (s = s.filter(r => r.isFT));
+   *                randomUser(s) } })
+   * ```
+   *
+   * Presenters only, and it draws from NON-presenters. Both answers run the SAME code path - "Yes"
+   * only adds the `isFT` filter - so the No branch is not a dismissal to be ignored.
+   *
    * `randomUser(e)`:
    *
    * ```js
@@ -1446,22 +1270,6 @@
    *
    * The three-second suspense is the point of the dialog: the giphy spinner shows, then the name
    * replaces it and only then does "User Info" become clickable.
-   */
-  /**
-   * `getRandomUser()`, transcribed:
-   *
-   * ```js
-   * bootbox.confirm({ message: "Only select from Trials?",
-   *   buttons: { confirm: {label:"Yes", className:"btn-success"},
-   *              cancel:  {label:"No",  className:"btn-danger"} },
-   *   callback(i){ let o = globals.roster.filter(r => !r.isP);
-   *                let {uniqueUsers: s} = uniqueRoster(o);
-   *                i && (s = s.filter(r => r.isFT));
-   *                randomUser(s) } })
-   * ```
-   *
-   * Presenters only, and it draws from NON-presenters. Both answers run the SAME code path - "Yes"
-   * only adds the `isFT` filter - so the No branch is not a dismissal to be ignored.
    */
   function getRandomUser() {
     dialogs.confirmation = {
@@ -1494,26 +1302,28 @@
   });
   const rosterSession = $derived(data.sessData ?? {});
 
-  /**
-   * Mobile App Info.
-   *
-   * `getMyPinAndDoInfo()`, transcribed:
-   *
-   * ```js
-   * (sessData.ptrMobileAppEnabled || sessData.customMobileAppEnabled)
-   *   && (!globals.user.isFT || sessData.freeTrialsGetApp)
-   *   && appService.sendServerCommand("getMyMobilePin", null)
-   * ```
-   *
-   * The same predicate gates the two buttons that call it, so it is named once. Re-checking it
-   * inside the handler is the capture's own belt-and-braces and is kept: a `data-bs-toggle` opens
-   * the modal whether or not the click handler agrees, so the command must not go out on a room
-   * with no app.
-   */
-  const mobileAppAvailable = $derived(
-    (Boolean(data.sessData?.ptrMobileAppEnabled) || Boolean(data.sessData?.customMobileAppEnabled)) &&
-      (!data.user.isFT || Boolean(data.sessData?.freeTrialsGetApp))
-  );
+  /*
+    WHAT THIS VIEWER MAY SEE, in `$lib/room/gates.svelte.ts`.
+
+    Phase 5 slice 27. Sixteen `$derived` predicates answering one question sixteen ways: given this
+    room's configuration and this viewer's role, what is on screen.
+
+    They are GETTERS in the class rather than `$derived` fields, because a derived field initialises
+    in declaration order - before the constructor has assigned the thunks it reads - and would cache
+    an `undefined` evaluation. `RoomFiles.filesHidden` is where that was first paid for. A getter is
+    exactly as reactive: a `$derived` read through one is the same signal read.
+
+    The RULES stay in `$lib/*-gates.ts` with their own tests. This asks them.
+  */
+  const gates = new RoomGates({
+    prefs,
+    media,
+    session: () => data,
+    isPresenter: () => isPresenter,
+    rosterViewer: () => rosterViewer,
+    rosterSession: () => rosterSession,
+    chatAlertsDetached: () => chatAlertsDetached
+  });
 
   /**
    * `mobilePin`, and the modal it belongs to.
@@ -1525,7 +1335,7 @@
   let mobilePin = $state('N/A');
 
   async function getMyPinAndDoInfo() {
-    if (!mobileAppAvailable) return;
+    if (!gates.mobileAppAvailable) return;
     // Open first. The capture's button opens the modal through `data-bs-toggle` regardless of what
     // the handler does, so the pin arriving late shows as `N/A` becoming a number, not as a delay
     // before anything appears.
@@ -1539,34 +1349,6 @@
       dialogs.alert = isHttpError(cause) ? cause.body.message : 'Could not get an app pin right now.';
     }
   }
-
-  /**
-   * Benzinga.
-   *
-   * ```js
-   * benzingaUrl = `https://ptrv3.protradingroom.com/public/bz/index.html
-   *                ?sessID=${globals.sessionID}&id=${sessData.uuid}&tok=${globals.sesionToken}`;
-   * "" != sessData.altBenzingaLinkURL && (benzingaUrl = sessData.altBenzingaLinkURL)
-   * ```
-   *
-   * The default is built from three values this room does not have: the reference's own
-   * `sessionID`, a `sessData.uuid` that is not in the 268-key schema at all, and `sesionToken`
-   * (the capture's spelling), which is the controller's session credential and has no business
-   * crossing into a page. So the default is NOT reproduced - a link built from three blanks is a
-   * broken link wearing a logo.
-   *
-   * `altBenzingaLinkURL` is reproduced exactly, and a room that sets it gets a working item.
-   * Without it the item does not render, and `TODO.md` records why.
-   */
-  const benzingaUrl = $derived(data.sessData?.altBenzingaLinkURL?.trim() || null);
-  const benzingaVisible = $derived(Boolean(data.sessData?.hasBenzingaNews) && benzingaUrl !== null);
-
-  /** `O(32, e.archivesAvailableTo() ? 32 : -1)` */
-  const archivesAvailable = $derived(archivesAvailableTo(rosterViewer, rosterSession));
-  /** `O(44, …)` - the Users block. */
-  const rosterVisible = $derived(rosterBlockVisible(rosterViewer, rosterSession));
-  /** `O(6, …)` - the badge, which is gated separately from the list. */
-  const rosterCountVisible = $derived(rosterCountVisibleTo(rosterViewer, rosterSession));
 
   function rowVisible(entry: RosterEntry) {
     return rosterRowVisible(rosterViewer, rosterSession, entry);
@@ -1592,44 +1374,6 @@
    * implementation disagreed.
    */
   const canPostImages = $derived(isPresenter || data.sessData?.userUploads === true);
-  /**
-   * The chat rich text editor's gate — the two extra flags the comment above refers to.
-   *
-   * `sessData.enableRTE && preferences.enableRTE && isPresenter`, which is the reference's own
-   * expression and appears THREE times in it: on the composer button
-   * (`O(5, …prefs.enableRTE && …prefs.enableRTE && …isPresenter ? 5 : -1)`), inside `loadRTE()`, which will not
-   * construct the editor without it, and inside `retriveRTEContent()`, which returns an empty
-   * string so a click that reached the send anyway cannot post through a disabled editor. All
-   * three consumers here read THIS, so the three cannot disagree.
-   *
-   * ## One deliberate narrowing, and it is a narrowing
-   *
-   * The reference's EDIT entry point asks a different question —
-   * `sessData.enableRTE && preferences.enableRTE && containsHtml(msg.txt)`, with no presenter term.
-   * A member who owns a rich message therefore gets the editor opened for them, types into it,
-   * presses Save, and `retriveRTEContent()` refuses because THAT check does require presenter: the
-   * editor reports "Empty message. Please type a message..." and their edit is lost. Reproducing a
-   * control that cannot ever complete is not reproducing a feature, so the edit branch below asks
-   * this same full question. Strictly fewer people reach the editor than upstream, and everyone
-   * who reaches it can finish.
-   */
-  /**
-   * `showPMBtn` — the chat header's private-chat button.
-   *
-   * ```js
-   * this.showPMBtn = (isPresenter || sessData.userPM || sessData.userToPresenterPM)
-   *   && !(user.isFT && sessData.disablePMForTrials)
-   * ```
-   *
-   * The same three settings the roster's per-target `canShowRosterPrivateChat` reads, asked without
-   * a target because this button opens the chooser rather than one conversation.
-   */
-  const showPmButton = $derived(
-    (isPresenter ||
-      data.sessData?.userPM === true ||
-      data.sessData?.userToPresenterPM === true) &&
-      !(data.user.isFT === true && data.sessData?.disablePMForTrials === true)
-  );
   /**
    * The room's chat mode — `g` group, `p` webinar, `d` disabled.
    *
@@ -1684,15 +1428,6 @@
    */
   const extraChatColumnVisible = $derived(prefs.extraChatColumn && !split.chatCollapsed);
 
-
-
-
-
-
-
-
-
-
   // `unreadQA` is a transient per-viewer marker in the source, not a property of the alert: it is
   // set when a Q&A update arrives (`o.unreadQA = !0` in updateAlertMsg) and deleted when this
   // viewer opens or closes that alert's modal. It is deliberately not derived from whether the
@@ -1720,42 +1455,6 @@
     the key already decides.
   */
   const alertPages = new RoomLogPages<(typeof data.alerts)[number]>();
-  /*
-    The live tail from the load, with whatever older pages the reader has scrolled back to in front
-    of it — the same two-lifetime split the chat log uses, and for the same reason: `data.alerts` is
-    replaced by every `invalidateAll()`, so older pages held there would be discarded by one new
-    alert.
-  */
-  /**
-   * `globals.user.alertFilterFor` and `preferences.showAlertsFrom` — the Alert Filter.
-   *
-   * `$state.raw` on the map for the same reason `presenterAudio` uses it: every transition in
-   * `$lib/alert-filter` REPLACES the object rather than mutating it, so a deep proxy would cost a
-   * proxy per key and buy nothing.
-   *
-   * Seeded from the stored preferences, which is where `updateAlertFilter` persists them — the
-   * reference sends the map to the server AND calls `setPreference('showAlertsFrom', …)` in the same
-   * expression, byte 1,221,491.
-   */
-  /**
-   * Is the Alert Filter configured for this room at all?
-   *
-   * The reference gates all THREE of its entry points on `sessData.modAlertFilterList` being
-   * truthy — a room that never configured a trader list has no feature, no button and no badge.
-   * Same value the filter predicate reads, so the controls cannot appear while the filtering they
-   * describe is inert.
-   */
-  /**
-   * The room's Alert Labels, parsed ONCE for the page rather than once per rendered alert.
-   *
-   * `RoomMessage` is instantiated per message, so parsing inside it would run `JSON.parse` for
-   * every row in the log. The reference parses once too, at byte 1,147,290, when the session
-   * arrives.
-   *
-   * This THROWS on a malformed setting, deliberately and like the reference — see
-   * `parseAlertLabels`. A room that typed bad JSON into Alert Labels should find out.
-   */
-  const alertLabels = $derived(parseAlertLabels(data.sessData?.alertLabels));
 
   /*
     Four gates `RoomMessage.svelte` has implemented since it was written and never received.
@@ -1769,18 +1468,6 @@
     `sourceMessageBehavior` already picks between them on `kind`. Collapsing them would let a
     room that allows editing alerts also allow editing chat.
   */
-  /*
-    The OWNER term of the media.recording-reminder banner, byte 2,477,770.
-
-    Upstream shares this name between a room setting and a local runtime flag, and the gate needs
-    BOTH. The room already had the flag and the banner, so this is the missing half rather than a
-    new feature: without it an owner cannot switch the reminder off at all.
-
-    HONEST GAP: the captured gate also requires mic state -
-    !micDisabled && !media.micMuted - which this room does not model on that banner. Named here rather
-    than silently approximated.
-  */
-  const recordingReminderAllowed = $derived(data.sessData?.recordingReminder === true);
   const usersPublicReply = $derived(data.sessData?.usersPublicReply === true);
   const enableReactions = $derived(data.sessData?.enableReactions === true);
   const enableEditMessage = $derived(data.sessData?.enableEditMessage === true);
@@ -1797,16 +1484,24 @@
     chatStyle: globalChatStyle,
     chatGif: prefs.chatGif,
     chatBadges: prefs.chatBadges,
-    enableBadges,
+    enableBadges: gates.enableBadges,
     showBadgesToPresentersOnly,
     disableStarYears,
-    presenterMessagesOnTheRight,
+    presenterMessagesOnTheRight: gates.presenterMessagesOnTheRight,
     usersPublicReply,
     enableReactions,
     enableEditMessage,
     enableEditAlerts
   });
 
+  /**
+   * Is the Alert Filter configured for this room at all?
+   *
+   * The reference gates all THREE of its entry points on `sessData.modAlertFilterList` being
+   * truthy — a room that never configured a trader list has no feature, no button and no badge.
+   * Same value the filter predicate reads, so the controls cannot appear while the filtering they
+   * describe is inert.
+   */
   const alertFilterConfigured = $derived(alertFilterAvailable(data.sessData?.modAlertFilterList));
 
   /**
@@ -1818,16 +1513,6 @@
    * are separate values rather than one.
    */
   const alertFilterActive = $derived(alertFilterConfigured && alerts.filterSelected);
-
-
-
-
-
-
-
-
-
-
 
   /**
    * The mention popup — `prefs.chatPopup`'s half of the reference's notification block.
@@ -1982,22 +1667,12 @@
     setChatAlertsDetached: (next) => (chatAlertsDetached = next)
   });
 
-
-
-
-
-
-
-
-
   /*
     ── Older chat history ───────────────────────────────────────────────────────────────────────
     The page load sends the NEWEST page per channel. Everything before that is fetched here, one
     page at a time, and held in client state so an `invalidateAll()` — which every SSE event
     triggers — refreshes the live tail without throwing away what the reader scrolled back to.
   */
-
-
 
   $effect(() => {
     const scroller = alertsScroller;
@@ -2170,35 +1845,6 @@
         };
   }
 
-
-
-
-
-
-
-
-
-
-  /**
-   * Tawk.to presenter support — `app-room.full.js:2224-2298`.
-   *
-   * The gates, the URL shape and the attribute fallbacks are in `$lib/tawk-support`, with the one
-   * DIVERGENCE stated there and tested: the property id is configuration, never the capture's
-   * literal, because copying `5aecb59f227d3d7edc24f7c2` would open every presenter's support chat
-   * into another company's inbox and post their name and email into it.
-   *
-   * `loadTawkSupport()` runs from `ngAfterViewInit` upstream — after the view exists, once — which
-   * is `onMount` here. `setTAWKAttributes()` then awaits the API and calls `hideWidget()`, so the
-   * widget is present and invisible until the navbar control is used; that is why the control is a
-   * toggle rather than a launcher.
-   */
-  const tawkAvailable = $derived(
-    tawkSupportAvailable(
-      { isPresenter },
-      data.sessData ?? {},
-      PUBLIC_PTR_TAWK_PROPERTY_ID
-    )
-  );
   /** `this.tawkWidgetOpen` — attributes are set once, on the first open. */
   let tawkWidgetOpen = false;
 
@@ -2271,45 +1917,6 @@
     );
     tawkWidgetOpen = true;
   }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
   function deliverAlert(alert: {
     senderName: string;
@@ -2443,16 +2050,6 @@
     if (incoming && !prefs.doNotDisturbOn && prefs.chatSoundOn) playSoundEffect('pling');
   });
 
-
-
-
-
-
-
-
-
-
-
   function setInputChecked(checked: boolean) {
     return (node: HTMLInputElement) => {
       node.checked = checked;
@@ -2465,7 +2062,6 @@
     };
   }
 
-
   
 
   
@@ -2481,16 +2077,6 @@
   
 
   
-
-
-
-
-
-
-
-
-
-
 
   /**
    * The private-chat toolbar's "Don't Disturb" button. `app-privchat`'s `setDND()` flips the one
@@ -2502,35 +2088,12 @@
     prefs.doNotDisturbOn = !prefs.doNotDisturbOn;
   }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
   /**
    * Tells the room what this presenter's recorder is doing. `media.recording-state.remote.ts` carries the
    * reasoning for all of it: why the room is told rather than each browser reading its own flag, why
    * `cmd` is the command's schema instead of four restated strings, and why the catch is here once
    * rather than at each of the four `void`-ed call sites.
    */
-
-
-
-
-
-
-
 
   function promptForSoundCloud() {
     dialogs.prompt = {
@@ -2567,7 +2130,6 @@
     menus.set('soundcloud', false);
   }
 
-
   function requestReload() {
     dialogs.confirmation = {
       message: 'Are you sure you want to reload the page?',
@@ -2575,14 +2137,6 @@
     };
   }
 
-
-
-
-
-
-
-
-
   
   
 
@@ -2591,18 +2145,10 @@
   
 
   
-
-
-
-
 
   /* ── The chat rich text editor ────────────────────────────────────────────────────────────────
      The editor lives in `ModalHost`; its session lives here, because the composer hands work to it
      and the send hands work back to the same code path an ordinary message uses. */
-
-
-
-
 
   /**
    * `sendServerAdminCommand('changeChatMode', {mode})` — presenter-only, and re-checked there.
@@ -2620,20 +2166,6 @@
     }
     await invalidateAll();
   }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
   
 
@@ -2708,8 +2240,6 @@
     if (write) prefs.save(write.key, write.pair);
   }
 
-
-
   onMount(() => {
     const stopRoomEvents = roomEvents.subscribe();
     // After subscribe, never before: the stream must not wait on a third-party host.
@@ -2721,7 +2251,7 @@
     imageModalWindow.openImageModal = modals.openImage;
     // `ngAfterViewInit`: `sessData.tawkPresenterSupport && (loadTawkSupport(), setTAWKAttributes())`.
     // Gated on `tawkAvailable`, which adds the configured-property term — with none, no script.
-    const stopTawk = tawkAvailable ? loadTawkSupport() : () => {};
+    const stopTawk = gates.tawkAvailable ? loadTawkSupport() : () => {};
     initializeSoundEffects();
     setSoundEffectsVolume(roomVolume.volume / 100);
     userActions.loadManaged();
@@ -2882,46 +2412,9 @@
     return () => observer.disconnect();
   }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
   /* ── Swing Trade Alerts ──────────────────────────────────────────────────────────────────── */
 
-
-
-
-
-
-
-
-
-
-
-
-
   /* ── Day Trade Alerts ────────────────────────────────────────────────────────────────────── */
-
-
-
-
-
-
-
-
-
-
-
-
 
 </script>
 
@@ -2935,11 +2428,11 @@
 -->
 {#snippet screenVolume()}
   <ScreenVolumeControl
-    {viewerOnlyMode}
+    viewerOnlyMode={gates.viewerOnlyMode}
     audioVolume={roomVolume.volume}
     talkingUsers={media.talking}
     preferences={roomVolume.presenterAudio}
-    {individualVolumeControls}
+    individualVolumeControls={gates.individualVolumeControls}
     onvolume={(level) => roomVolume.setMasterVolume(level)}
     onmute={() => roomVolume.muteScreenAudio()}
     onunmute={() => roomVolume.unmuteScreenAudio()}
@@ -2959,7 +2452,6 @@
       >{:else}{part}{/if}
   {/each}
 {/snippet}
-
 
 <!-- Not an effect: see `onVisibilityChange`. Svelte owns the add and the remove. -->
 <svelte:document onvisibilitychange={onVisibilityChange} />
@@ -3004,7 +2496,7 @@
       gap recorded for `hideFiles` in `files-gates.ts`. The two modes it does model are bound.
     -->
     <div
-      class={['wrapper', { 'push-wrapper': sidebarOpen, 'mt-0': chatOnlyMode || viewerOnlyMode }]}
+      class={['wrapper', { 'push-wrapper': sidebarOpen, 'mt-0': chatOnlyMode || gates.viewerOnlyMode }]}
     >
       <div class="d-flex flex-column-reverse flex-sm-row room-container">
         {#snippet mainNavigation()}
@@ -3026,11 +2518,11 @@
           {roster}
           volume={roomVolume.volume}
           presenterAudio={roomVolume.presenterAudio}
-          {individualVolumeControls}
-          {recordingReminderAllowed}
-          {recordingTooltip}
-          {mobileAppAvailable}
-          {tawkAvailable}
+          individualVolumeControls={gates.individualVolumeControls}
+          recordingReminderAllowed={gates.recordingReminderAllowed}
+          recordingTooltip={gates.recordingTooltip}
+          mobileAppAvailable={gates.mobileAppAvailable}
+          tawkAvailable={gates.tawkAvailable}
           doNotDisturbOn={prefs.doNotDisturbOn}
           mp3Playing={broadcasts.mp3Playing}
           youtubeForAllUrl={broadcasts.youtubeForAllUrl}
@@ -3086,7 +2578,7 @@
           has five sources of its own (`full.js:1893-1902`). This is the chrome, and it goes on the
           mode alone.
         -->
-        {#if !(chatOnlyMode || viewerOnlyMode)}
+        {#if !(chatOnlyMode || gates.viewerOnlyMode)}
         <!--
           `.room-sidebar` is `RoomSidebar.svelte` since 2026-08-15 — the second of the five
           template regions, and the first to take state CLASSES as props rather than a wall of
@@ -3109,16 +2601,16 @@
           roomEventsConnected={roomEvents.connected}
           mediaConnected={media.connected}
           {chatAlertsDetached}
-          {rosterVisible}
-          {rosterCountVisible}
-          {archivesAvailable}
+          rosterVisible={gates.rosterVisible}
+          rosterCountVisible={gates.rosterCountVisible}
+          archivesAvailable={gates.archivesAvailable}
           {rowVisible}
           {rosterRowClass}
           locationVisible={(entry) => locationVisibleTo({ isPresenter }, entry)}
           canOpenRosterPrivateChat={(user) => privateChat.canOpenFor(user)}
-          {mobileAppAvailable}
-          {benzingaVisible}
-          {benzingaUrl}
+          mobileAppAvailable={gates.mobileAppAvailable}
+          benzingaVisible={gates.benzingaVisible}
+          benzingaUrl={gates.benzingaUrl}
           benzingaLogoUrl={data.sessData?.altBenzingaLogoURL}
           dumpVersion={DUMP_CONTRACT.version}
           onopenmodal={(name) => modals.open(name)}
@@ -3129,8 +2621,8 @@
           onusersearchkey={doUserSearch}
           ongetmobilepin={() => void getMyPinAndDoInfo()}
           ongetrandomuser={getRandomUser}
-          onopentranscript={alertsPane.openTranscript}
-          onreopenalertschat={alertsPane.reopen}
+          onopentranscript={() => alertsPane.openTranscript()}
+          onreopenalertschat={() => alertsPane.reopen()}
           onreload={() => void invalidateAll()}
         />
         {@render mainNavigation()}
@@ -3154,7 +2646,7 @@
           minsize="0"
           id="mainAreaSplit"
           gutterdblclickduration="400"
-          class={{ 'is-resizing': split.target !== null, 'vh-100': chatOnlyMode || viewerOnlyMode }}
+          class={{ 'is-resizing': split.target !== null, 'vh-100': chatOnlyMode || gates.viewerOnlyMode }}
           style={split.isHorizontal ? undefined : 'flex-direction: column;'}
           dir="ltr"
         >
@@ -3199,7 +2691,7 @@
               bind:showMessageOptions
               visibleAlerts={feeds.visibleAlerts}
               visibleChatMessages={feeds.visibleChat}
-              {alertLabels}
+              alertLabels={gates.alertLabels}
               {messageChrome}
               followedUsers={userActions.followedUsers}
               {captureAlertChatElement}
@@ -3211,11 +2703,11 @@
               onopenpoll={() => modals.openPollUI()}
               ontogglealertstoolbar={() => alertsPane.toggleToolbar()}
               ontogglealertssearch={() => alertsPane.toggleToolbarSearchOnly()}
-              ondetachalerts={alertsPane.detach}
-              onsavealerts={alertsPane.save}
-              onarchivealerts={alertsPane.archive}
-              onalertsscroll={feedScroll.trackAlertsScroll}
-              onchatscroll={feedScroll.trackChatScroll}
+              ondetachalerts={() => alertsPane.detach()}
+              onsavealerts={() => alertsPane.save()}
+              onarchivealerts={() => alertsPane.archive()}
+              onalertsscroll={(event) => feedScroll.trackAlertsScroll(event)}
+              onchatscroll={(event) => feedScroll.trackChatScroll(event)}
               onmessageaction={(kind, action, item, payload) =>
                 messageActions.handle(kind, action, item, payload)}
               onprivatechat={() => privateChat.show()}
@@ -3247,21 +2739,21 @@
               {menus}
               {mtx}
               {isPresenter}
-              {viewerOnlyMode}
+              viewerOnlyMode={gates.viewerOnlyMode}
               doNotDisturbOn={prefs.doNotDisturbOn}
               bind:mainTab
               bind:subtitles={prefs.subtitles}
               {currentCaption}
               {captionHistory}
               bind:speechRecoHistoryMode
-              {archivesAvailable}
-              openTranscriptPage={alertsPane.openTranscript}
+              archivesAvailable={gates.archivesAvailable}
+              openTranscriptPage={() => alertsPane.openTranscript()}
               {previewWindowsVisible}
               webcamPresenters={mediaTransport.webcamPresenters}
-              webcamCard={webcams.card}
-              attachLocalWebcam={webcams.attachLocal}
-              attachRemoteWebcam={webcams.attachRemote}
-              closeWebcamPreview={webcams.closePreview}
+              webcamCard={(presenter, index) => webcams.card(presenter, index)}
+              attachLocalWebcam={(node) => webcams.attachLocal(node)}
+              attachRemoteWebcam={(producerId) => webcams.attachRemote(producerId)}
+              closeWebcamPreview={(presenter) => webcams.closePreview(presenter)}
               videoDisabled={prefs.videoDisabled}
               sharedScreens={mediaTransport.screens}
               selectedScreenTab={screens.selectedTab}
@@ -3346,7 +2838,7 @@
                 {chatEnabled}
                 {webinarMode}
                 {selfMutedUntil}
-                {showPmButton}
+                showPmButton={gates.showPmButton}
                 {canPostImages}
                 canUseRTE={composer.canUseRTE}
                 {giphyApiKey}
@@ -3419,11 +2911,11 @@
           {#if split.isMobileScreen}
             {#if !hidePresentation}{@render presentationPane()}{/if}
             {@render mainGutter()}
-            {#if !hideChatAlerts}{@render chatAlertsPane()}{/if}
-            {#if !hideChatAlerts && extraChatColumnVisible}{@render extraChatPane()}{/if}
+            {#if !gates.hideChatAlerts}{@render chatAlertsPane()}{/if}
+            {#if !gates.hideChatAlerts && extraChatColumnVisible}{@render extraChatPane()}{/if}
           {:else}
-            {#if !hideChatAlerts}{@render chatAlertsPane()}{/if}
-            {#if !hideChatAlerts && extraChatColumnVisible}{@render extraChatPane()}{/if}
+            {#if !gates.hideChatAlerts}{@render chatAlertsPane()}{/if}
+            {#if !gates.hideChatAlerts && extraChatColumnVisible}{@render extraChatPane()}{/if}
             {#if !hidePresentation}{@render presentationPane()}{/if}
             {@render mainGutter()}
           {/if}
@@ -3472,7 +2964,7 @@
       downloadImage={(url) => modals.downloadImage(url)}
       minimizePoll={() => modals.minimizePoll()}
       openModal={(name) => modals.open(name)}
-      saveAlertFilter={alertsPane.saveFilter}
+      saveAlertFilter={(next) => alertsPane.saveFilter(next)}
       setTheme={(next) => modals.setTheme(next)}
       submitPollAction={(action, values) => modals.submitPollAction(action, values)}
     />

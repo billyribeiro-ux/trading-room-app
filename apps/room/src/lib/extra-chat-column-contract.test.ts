@@ -115,7 +115,7 @@ describe('the column is its own split area', () => {
       `extraChatColumnWasEnabled`.
     */
     expect(pageCode).toContain(
-      '{#if !hideChatAlerts && extraChatColumnVisible}{@render extraChatPane()}'
+      '{#if !gates.hideChatAlerts && extraChatColumnVisible}{@render extraChatPane()}'
     );
   });
 
@@ -312,7 +312,7 @@ describe('hideChat — the pane collapses for non-presenters while chat is disab
       'const extraChatColumnVisible = $derived(prefs.extraChatColumn && !split.chatCollapsed);'
     );
     expect(pageCode).toContain(
-      '{#if !hideChatAlerts && extraChatColumnVisible}{@render extraChatPane()}'
+      '{#if !gates.hideChatAlerts && extraChatColumnVisible}{@render extraChatPane()}'
     );
     /*
       The collapse must never write the preference — now a STRUCTURAL guarantee rather than a slice.

@@ -812,6 +812,14 @@ export class RoomMediaTransport {
     signalling client, the same ICE getter — because a second socket would leave the SFU holding
     two peers for one person.
   */
+  /**
+   * Tears the media session down and builds a new one — the capture's `disconnectAll()` plus
+   * re-init, for `giveMicScreen` (`TODO.md` gap 22).
+   *
+   * A closure assigned in `onMount` rather than a top-level function, because building a session
+   * needs the signalling client and the ICE getter that live in that scope. Duplicating the
+   * construction here is how the two copies drift.
+   */
   async restart(): Promise<void> {
     const previous = this.session;
     this.attachSession(null);
@@ -1202,23 +1210,6 @@ export class RoomMediaTransport {
   }
 
   /**
-   * Gives the presenter a tab for a screen they are sharing themselves.
-   *
-   * `addRemoteScreen` refuses our own producer on purpose - consuming yourself is refused by the
-   * server with `unknownTransport` - which left a presenter sharing a screen with no tab for it at
-   * all, seeing only other people's. The capture does not consume its own screen either; it adds a
-   * LOCAL one:
-   *
-   * ```js
-   * this.globals.user.id == r.userID && (
-   *   this.isScreenSharing = !0, this.addLocalStream(r), …,
-   *   setTimeout(() => { this.guiEventBus.emit("selectScreenTabOfId", r) }, 500))
-   * ```
-   *
-   * So the stream behind this tab is the capture itself, straight from getDisplayMedia, never a
-   * round trip through the SFU - which is also why it costs nothing and cannot fail.
-   */
-  /**
    * `selectScreenTabOfId` - bring the presentation area to a screen.
    *
    * Transcribed from the capture, and the FIRST line is the one that matters:
@@ -1253,6 +1244,23 @@ export class RoomMediaTransport {
     this.#screens.screenAdded(producerId);
   }
 
+  /**
+   * Gives the presenter a tab for a screen they are sharing themselves.
+   *
+   * `addRemoteScreen` refuses our own producer on purpose - consuming yourself is refused by the
+   * server with `unknownTransport` - which left a presenter sharing a screen with no tab for it at
+   * all, seeing only other people's. The capture does not consume its own screen either; it adds a
+   * LOCAL one:
+   *
+   * ```js
+   * this.globals.user.id == r.userID && (
+   *   this.isScreenSharing = !0, this.addLocalStream(r), …,
+   *   setTimeout(() => { this.guiEventBus.emit("selectScreenTabOfId", r) }, 500))
+   * ```
+   *
+   * So the stream behind this tab is the capture itself, straight from getDisplayMedia, never a
+   * round trip through the SFU - which is also why it costs nothing and cannot fail.
+   */
   #addLocalScreen(producerId: string, screenName: string, stream: MediaStream) {
     if (this.#sharedScreens.some((screen) => screen.id === producerId)) return;
     this.#sharedScreens = [

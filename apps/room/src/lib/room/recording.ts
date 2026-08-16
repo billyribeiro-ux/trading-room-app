@@ -202,6 +202,14 @@ export class RoomRecording {
     this.#menus.set('recording', false);
   }
 
+  /**
+   * Writes the finished media.recording to the user's Downloads folder.
+   *
+   * Called automatically when the recorder stops, and again from the menu if they want another
+   * copy. The extension follows the container the browser actually chose - Chrome gives
+   * `video/webm;codecs=...`, Safari `video/mp4` - because naming an mp4 `.webm` produces a file
+   * the OS refuses to open.
+   */
   downloadRecording() {
     if (!this.#media.recordedUrl) return;
     const type = this.#screenRecorder?.mimeType || 'video/webm';
@@ -241,14 +249,6 @@ export class RoomRecording {
     }
   }
 
-  /**
-   * Writes the finished media.recording to the user's Downloads folder.
-   *
-   * Called automatically when the recorder stops, and again from the menu if they want another
-   * copy. The extension follows the container the browser actually chose - Chrome gives
-   * `video/webm;codecs=...`, Safari `video/mp4` - because naming an mp4 `.webm` produces a file
-   * the OS refuses to open.
-   */
   /**
    * `showRecPreview()` / `hideRecPreview()`, which in the capture are:
    *

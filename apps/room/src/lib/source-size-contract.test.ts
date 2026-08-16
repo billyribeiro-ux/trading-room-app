@@ -260,7 +260,7 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       What the slice actually proves is the pattern, which is why it was chosen first: state and the
       functions that write it leaving TOGETHER, where Phase 1 moved fields and left 248 bodies here.
     */
-    max: 3529,
+    max: 3021,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {
@@ -389,8 +389,13 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       backstop's own note. Acquiring a track and producing it into the session is a single act here,
       so a capture/transport split would have cut through `#mediaSession`, and a local/remote split
       would have cut through `#sharedScreens`, which both paths write.
+
+      +8 in slice 27, and it is my own debt being paid: slice 26 moved `restartMediaSession` here and
+      left its docblock on the page, where the orphaned-comment gate then found it sitting above an
+      unrelated declaration. The prose is now on `restart()`, which is the only place it means
+      anything. No code arrived with it.
     */
-    max: 1742,
+    max: 1750,
     why: 'the SFU transport - 768 code lines under 862 of transcription, and no seam to split on'
   },
   {
@@ -500,7 +505,14 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
   },
   {
     file: 'lib/room/media.svelte.ts',
-    max: 371,
+    /*
+      +15, slice 27: the ICE-servers note. It was one of four docblocks found ORPHANED on
+      `+page.svelte` — left behind by an earlier slice that took the declaration and not the
+      explanation, so it had come to rest above an unrelated statement where it read as a note about
+      something else. This is the "arrival" case the block above names: what grew is prose that
+      belongs to `iceServers`, and the page shed the same lines.
+    */
+    max: 386,
     why: 'every media flag the interface renders from; STATE, never transport'
   },
   {
@@ -556,7 +568,14 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
   },
   {
     file: 'lib/room/prefs.svelte.ts',
-    max: 590,
+    /*
+      +31, slice 27: the three preference docblocks slice 3 left on the page when it took the forty
+      declarations. The longest is the twelve-line note on `alwaysScrollToBottom` explaining why the
+      comparison is `=== true` and not `!== false` — the preferences blob ships the flag OFF, so
+      seeding it on would drag a reader out of the history they are scrolled up into. This class held
+      the field and the comparison and did not hold the reason until now.
+    */
+    max: 621,
     why: 'every viewer preference and the one write path; 25 of 27 have no public setter'
   },
   {
@@ -566,7 +585,8 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
   },
   {
     file: 'lib/room/screens.svelte.ts',
-    max: 359,
+    /* +11, slice 27: the popout test note, orphaned on the page, now above `detachedScreenId`. */
+    max: 370,
     why: 'the screen viewer; the transport keeps the list, this keeps the three ids that point into it'
   },
   {
@@ -576,12 +596,24 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
   },
   {
     file: 'lib/room/feeds.svelte.ts',
-    max: 359,
+    /*
+      +6, slice 27: the ALERTS tail note, which slice 9 wrote for the chat tail and never wrote for
+      the alerts one — `visibleAlerts` had no explanation at all of why it merges rather than
+      concatenates, which is the same two-lifetime split with an unbounded list behind it.
+    */
+    max: 365,
     why: 'what each pane renders, and the evidence overlay every pipeline consults'
   },
   {
     file: 'lib/room/composer.svelte.ts',
-    max: 553,
+    /*
+      +20, slice 27: the RTE gate's own docblock, found ORPHANED on `+page.svelte` and swept into
+      `gates.svelte.ts` by the extraction before landing where it belongs. It is the longest of the
+      four because it records a deliberate NARROWING — upstream opens the editor for a member who
+      owns a rich message and then refuses their save, so fewer people reach the editor here and
+      everyone who reaches it can finish. `chat-rte-gate-contract.test.ts` executes that claim.
+    */
+    max: 573,
     why: 'everything that leaves the browser as content; five entry points, one refusal path'
   },
   {
@@ -593,6 +625,17 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     file: 'lib/room/private-chat.svelte.ts',
     max: 521,
     why: 'the private-chat panel; generic over the roster row so the full row reaches selectRosterUser'
+  },
+  /*
+    Phase 5 slice 27. Sixteen view gates — every `$derived` boolean that decides whether a control is
+    drawn at all — as GETTERS rather than `$derived` class fields, because a derived field
+    initialises in declaration order, before the constructor has assigned the thunks it reads.
+    `RoomFiles.filesHidden` is the recorded precedent for that and it cost a slice to find.
+  */
+  {
+    file: 'lib/room/gates.svelte.ts',
+    max: 390,
+    why: 'the sixteen view gates; getters not derived fields, so a thunk assigned in the constructor is read at call time'
   },
   {
     file: 'lib/room/trade-alerts.svelte.ts',
@@ -1018,7 +1061,22 @@ describe('the contract tests that read source as text cannot pass vacuously', ()
       this counts the counting form only, with no double-count to correct for.
     */
     const counted = source.split('.match(').length - 1;
-    return contains + matches + counted;
+    /*
+      THE STRUCTURAL FORM, added 2026-08-16 for `orphaned-comment-contract.test.ts`, and it is the
+      same defect-in-the-check as the counting form above rather than a new exemption.
+
+      That file parses the page's top-level block comments and asserts `.length` is above a floor
+      before it looks for orphans among them. That IS the positive assertion this rule asks for — at
+      zero comments found its real check is vacuous, and the floor is what says so — but it reaches
+      the count through a helper rather than through `.match(`, so a check enumerating only string
+      methods called it absent.
+
+      `toBeGreaterThan(` is accepted on its own terms: it cannot be satisfied by a region that has
+      been extracted, which is the property that made the counting form acceptable. `.not.` has no
+      meaning on it, so there is nothing to subtract.
+    */
+    const floors = source.split('.toBeGreaterThan(').length - 1;
+    return contains + matches + counted + floors;
   };
 
   it.each(readers.map(({ name }) => name))('%s asserts something positive', (name) => {

@@ -24,6 +24,191 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-16
 
+### 2026-08-16 19:28 EDT — SvelteKit 3 RC conformance: audited against the guide published three days ago
+
+**A conformance pass, not a refactor.** Suite 2,374 across 160. `svelte-check` 1,190/0/0. All four
+CI steps green locally.
+**Runtime impact: yes** — one navigation call changed shape and one `goto` option was silently
+inert.
+
+The SvelteKit 3 Release Candidate landed **2026-08-13**, three days ago, and this repository runs
+`@sveltejs/kit@3.0.0-next.16`. Every item of its migration guide was checked against both apps
+rather than assumed, and the result is written out in full because "we are already conformant" is
+exactly the claim that rots.
+
+**Already conformant — verified, not assumed:** configuration in `vite.config.ts` (no
+`svelte.config.js`); `tsconfig` extends `$app/tsconfig` in BOTH apps; `$app/environment` → `$app/env`
+(0 old, 32 files new); `$app/stores` → `$app/state` (0 old, 5 new); `$env/*` → `$app/env/*` (0 real
+imports — the ten surviving mentions are all prose documenting the 2026-08-15 move); `$service-worker`
+(0); `$app/paths` using `asset()`/`resolve()` and never `base`/`assets`/`resolveRoute` (21 imports,
+all the new API); no `page.url` mutation; no `error(status, {object})`; no `node/polyfills`; no
+`csrf.checkOrigin`; no `data-sveltekit-*="off"`. Node v24.19 against a floor of v22.17, Vite 8.2.1
+against a floor of 8.0.12, Svelte 5.56.8 against a floor of 5.56.4.
+
+**Three divergences, all fixed:**
+
+**1. `replaceState` → `goto(..., { shallow: true, replace: true })`** — `session/+page.svelte`, the
+effect that strips a JWT out of the address bar. Kit 3 deprecates `pushState`/`replaceState` for one
+navigation function with a `shallow` option. What matters is that the guarantee moved with it: the
+old comment said "`replaceState` rather than `goto` — no `load` re-run", and under Kit 3 the correct
+call IS a `goto`, with `shallow: true` carrying that guarantee and `replace: true` carrying the half
+the old name held. Without the latter a Back press returns the reader to a URL holding their token.
+
+**2. `goto(..., { invalidateAll: true })` → `refreshAll: true`** — `clearForm()` on the same page.
+The rename has no alias, so the option was being **silently ignored**: clearing the identity
+parameters left the stale `load` data behind them and the form refilled. Nothing errored.
+
+**3. A stale comment holding dead config in place** — `apps/room/tsconfig.json` listed
+`.svelte-kit/ambient.d.ts` in `include` "for the `$env/dynamic/*` and `$env/static/*` module
+declarations, which this app still imports". It imports neither; the move to `$app/env/*` landed
+2026-08-15 and the sentence did not move with it. Removed and proved dead by measurement —
+`svelte-check` 1,190 files, 0 errors, unchanged.
+
+**`session-login-contract.test.ts` was RE-POINTED rather than relaxed**, and the distinction is the
+point: the old assertion forbade `goto` outright, which was right for the old API and would be
+exactly wrong for the new one. It now names the PROPERTY that carries the guarantee — `shallow: true`
+and `replace: true` — and forbids the deprecated pair by name.
+
+**KNOWN AND NOT DONE: `$lib` → `#lib`.** Kit 3 replaces the alias with Node subpath imports, and
+`vite.config.ts:105` currently keeps the old specifier working through `alias: { $lib: 'src/lib' }`,
+which the plugin deprecates on every run. Measured: **688 specifiers across 186 files** in the two
+apps, plus the `paths` block in each `tsconfig.json`. It needs explicit extensions (`#lib/foo.ts`,
+`#lib/foo/index.ts`) because Node and TypeScript require subpath imports to be unambiguous, so it is
+a resolve-then-rewrite, not a find-and-replace. Its own change, as `vite.config.ts:100-104` already
+said.
+
+
+### 2026-08-16 18:52 EDT — THIRTEEN BROKEN CONTROLS: the unbound-method guard could not see a plain `.ts`
+
+**A runtime bug fix, not a refactor.** Suite 2,374 across 160. `svelte-check` 1,190/0/0. All four
+CI steps green locally.
+**Runtime impact: yes** — thirteen controls that threw on the first click now work.
+
+**What was broken.** Every one of these was handed to a component as a bare method reference, so it
+was called with `this` undefined and threw before doing anything:
+
+Detach Alerts, Save Alerts, Archive Alerts, Open Transcript (twice — sidebar and presentation area),
+Reopen Alerts/Chat, the alerts scroll tracker, the chat scroll tracker, Save Alert Filter, and the
+four webcam attachments (`webcamCard`, `attachLocalWebcam`, `attachRemoteWebcam`,
+`closeWebcamPreview`).
+
+**Why nothing caught it, which is the part worth recording.** `unbound-method-contract.test.ts`
+exists for exactly this failure and has been catching it since Phase 5 slice 2. It scanned
+`*.svelte.ts` only. `RoomAlertsPane`, `RoomFeedScroll` and `RoomWebcams` hold no rune, so they are
+plain `.ts` files — the discovery skipped them, the INSTANCES map did not name them, and the guard
+reported clean while thirteen props sat in the state it was written to forbid.
+
+Being the wrong extension is not a reason to be unguarded. That is the same sentence
+`source-size-contract.test.ts` already carries about its own catalog, and this was the more
+expensive of the two omissions.
+
+**Proved before it was reported**, per the rule that every failure has to be shown not to be my own
+tooling: `pane.detach` called through its instance throws `ReferenceError: window is not defined` —
+which is only reachable by getting PAST `this.#detachedWindow` — and handed over as a value throws
+`TypeError: Cannot read properties of undefined (reading '#detachedWindow')`.
+
+**That probe is now a permanent test.** Everything else in that file is a source-text assertion, and
+a source-text assertion cannot prove the thing it forbids is harmful. The new case executes both
+calls, so if an unbound pass ever becomes harmless the file goes green in the wrong direction and
+says so rather than quietly guarding nothing.
+
+**Also fixed:** discovery now reads every `.ts` in `lib/room/`, and the seven previously invisible
+classes are in the map — `RoomAlertsPane`, `RoomArrivals`, `RoomOrderedArrivals`, `RoomFeedScroll`,
+`RoomScrollFollow`, `RoomWebcams`, `RoomWindowHandlers`. Negative control seen RED: putting
+`ondetachalerts={alertsPane.detach}` back names the file and line.
+
+### 2026-08-16 18:44 EDT — Phase 5 slice 27: the sixteen view gates, and ten comments that had lost their code
+
+**`+page.svelte` 3,529 → 3,021 (−508).** Suite 2,373 across 160 files. `svelte-check` 1,190 files,
+0 errors, 0 warnings. All four CI steps green locally.
+**Runtime impact: yes** — every gate that decides whether a control is drawn moved. No behaviour
+changed; the four negative controls below prove the gates still answer the same questions.
+
+**`RoomGates`, `src/lib/room/gates.svelte.ts` (390 lines, 16 getters).** Every `$derived` boolean
+that decides what this viewer may see: whether the roster and its badge are visible, whether
+archives are reachable, which alert labels the room uses, whether the Benzinga panel appears and at
+what URL, whether the mobile-app link is offered, whether the chat column is hidden at all. They are
+one module because they answer ONE question sixteen ways, and the seam was measured rather than
+chosen — seven collaborators across 286 lines and not one field shared with the page.
+
+**GETTERS, not `$derived` class fields, and the precedent is recorded rather than restated.** A
+derived class field initialises in DECLARATION ORDER, before the constructor has assigned the thunks
+it reads, so it evaluates against `undefined` once and caches that. `RoomFiles.filesHidden` is where
+that was first paid for. A getter is exactly as reactive: a `$derived` read through one is the same
+signal read. `gates.svelte.test.ts` executes it — five assertions, one per independently reactive
+source, mutations and `flushSync` inside `$effect.root` and the expectations outside it.
+
+**The RULES did not move.** `archivesAvailableTo`, `rosterBlockVisible`, `rosterCountVisibleTo`,
+`parseAlertLabels` and `tawkSupportAvailable` stay in `$lib/*-gates.ts` with their citations and
+their own tests. This class asks them. A predicate folded into a class that also holds state stops
+being testable on its own, and every one of these is a gate on what a member may see.
+
+#### TEN ORPHANED COMMENTS, which is the finding of this slice rather than a footnote
+
+The extraction's generator copies the block comments that PRECEDE a moved declaration. Six of them
+belonged to declarations that stayed behind, so the prose landed in `gates.svelte.ts` stacked on top
+of one another — the mirror image of slice 3 leaving four docblocks on the page, and equally
+invisible to a diff, because every line of it is an addition to a new file.
+
+Reading the destinations found four more that predate this slice and had simply never been looked
+for. All ten are now on the code they explain:
+
+| prose | now on |
+| --- | --- |
+| the chat RTE gate, incl. the deliberate edit-branch narrowing | `RoomComposer.canUseRTE` |
+| the alerts tail's two lifetimes | `RoomFeeds.visibleAlerts` |
+| the chat tail's two lifetimes | `RoomFeeds.visibleChat` |
+| the four `RoomMessage` gates | `usersPublicReply` + 3, on the page |
+| "is the Alert Filter configured at all?" | `alertFilterConfigured`, on the page |
+| the SSE channel | `RoomEventStream.subscribe` |
+| the presenter's own screen tab | `RoomMediaTransport.#addLocalScreen` |
+| `closePanel()` | `RoomPrivateChat.close` |
+| writing the recording to Downloads | `RoomRecording.downloadRecording` |
+| the class docblock, which sat above a type alias | `RoomGates` itself |
+
+One was a straight duplicate of `RoomAlerts`'s alert-filter note and was dropped rather than kept in
+two places. Two stale pointers to `canUseRTE` "in `+page.svelte`" now name the module that holds it.
+
+**`orphaned-comment-contract.test.ts` was widened to catch all of it**, which is the half of the
+mechanism it was missing: it read the page alone, on the reasoning that the page is where an
+extraction REMOVES things. The modules are now discovered from disk and policed the same way, and
+the negative control — stranding the download note above `showRecPreview`'s docblock, which is
+exactly where it was found — goes red naming the file and line.
+
+Two narrowings are stated in the file rather than implied: JSDoc pairs only, because a plain `/*` is
+how this codebase writes a slice citation and a group header and both legitimately precede another
+comment; and a file's FIRST block comment is exempt, because a module header introduces the file.
+What that costs is stated too — a comment orphaned above a plain statement is not caught.
+
+#### The ceilings
+
+`routes/+page.svelte` 3,529 → 3,021. Five module caps rose, each recorded with WHAT ARRIVED, which
+is the distinction `source-size-contract.test.ts` already draws between a ratchet and a cap:
+`composer` +20, `prefs` +31, `media` +15, `screens` +11, `feeds` +6, `media-transport` +8. Every one
+of those is relocated prose and not one line of code; the page shed the same lines.
+
+`gates.svelte.ts` is capped at 390 the moment it appeared on disk — the catalog demanding an entry
+rather than recording one, for the sixth time.
+
+**One correction inside the vacuity police.** `positiveAssertions` enumerated three string forms and
+called `orphaned-comment-contract` absent, because that file reaches its count through a helper. The
+structural form (`toBeGreaterThan`) is now accepted on the same terms the counting form already was:
+it cannot be satisfied by a region that has been extracted. Same defect-in-the-check as the counting
+form, made once and not generalised.
+
+**`chat-rte-gate-contract`'s three `containsHtml` negatives now all read comment-stripped source**,
+for the reason its own note gives — an assertion a comment cannot mention is an assertion that
+forbids documenting. That correction had been applied to one of the three and left off the other
+two, so it held only until the next comment landed. It did.
+
+**Verification.** All four CI steps run locally before the commit: `lint` (clean over everything
+tracked — the 27 errors reported are all in `apps/room/scripts/`, which `.gitignore:176` excludes
+from the repository, so CI never checks them out), `check` 1,190/0/0, `test` 2,373/160, `build` ✓.
+Two negative controls seen RED and reverted: the widened orphan gate, and `RoomGates`'s detach thunk
+captured once in the constructor. `svelte-autofixer` could NOT be run on the new module — it parses
+its input as a component and rejects a plain TypeScript class at `readonly #session: () => …`, which
+was confirmed against a reduced snippet before being reported as a tool limit rather than a defect.
+
 ### 2026-08-16 18:05 EDT — Phase 5 slice 26: the SFU wiring goes home, and a teardown that finally pairs
 
 **`+page.svelte` 3,771 → 3,529 (−242).** Suite 2,324 across 158 files. `svelte-check` 1,187 files,

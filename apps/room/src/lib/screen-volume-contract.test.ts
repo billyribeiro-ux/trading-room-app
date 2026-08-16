@@ -505,8 +505,9 @@ describe('viewer-only mode drives every binding the reference gives it', () => {
       here. The gate itself, the other four writers and the two this room cannot model are covered
       by `chat-alerts-gates-contract.test.ts`.
     */
-    expect(PAGE).toContain('|| viewerOnlyMode || chatAlertsDetached');
-    expect(PAGE).toContain('{#if !hideChatAlerts}');
+    const GATES = readFileSync(new URL('./room/gates.svelte.ts', import.meta.url), 'utf8');
+    expect(GATES).toContain('this.viewerOnlyMode ||\n      this.#chatAlertsDetached()');
+    expect(PAGE).toContain('{#if !gates.hideChatAlerts}');
   });
 
   it('refuses to open the private chat', () => {
@@ -524,7 +525,7 @@ describe('viewer-only mode drives every binding the reference gives it', () => {
     );
     expect(privateChatModule).toContain('show() {');
     expect(privateChatModule).toContain('if (this.#viewerOnlyMode()) return;');
-    expect(PAGE).toContain('viewerOnlyMode: () => viewerOnlyMode,');
+    expect(PAGE).toContain('viewerOnlyMode: () => gates.viewerOnlyMode,');
   });
 
   it('removes the navbar and the sidebar, and reclaims the 49px they reserved', () => {
@@ -562,8 +563,8 @@ describe('viewer-only mode drives every binding the reference gives it', () => {
     expect(wrapperAt, 'the de-scoped app-room .wrapper rule must exist').toBeGreaterThan(-1);
     expect(APPLIED.slice(wrapperAt, wrapperAt + 2500)).toContain('margin-top: 49px');
 
-    expect(pageMarkup).toContain("'mt-0': chatOnlyMode || viewerOnlyMode");
-    expect(pageMarkup).toContain('{#if !(chatOnlyMode || viewerOnlyMode)}');
+    expect(pageMarkup).toContain("'mt-0': chatOnlyMode || gates.viewerOnlyMode");
+    expect(pageMarkup).toContain('{#if !(chatOnlyMode || gates.viewerOnlyMode)}');
     // And the harness that measures the consequence must actually render those elements — it did
     // not, which is why `4/4` could not catch the defect this pins.
     const LAYOUT_HARNESS = readFileSync(
@@ -579,7 +580,7 @@ describe('viewer-only mode drives every binding the reference gives it', () => {
     // `QB = (t) => ({'vh-100': t})`, bound to videoOnly || chatOnly || viewerOnly.
     expect(ROOM_HELPERS).toContain("QB = (t) => ({ 'vh-100': t })");
     expect(ROOM_HELPERS).toContain('e.appService.globals.viewerOnlyMode\n      )');
-    expect(pageMarkup).toContain("'vh-100': chatOnlyMode || viewerOnlyMode");
+    expect(pageMarkup).toContain("'vh-100': chatOnlyMode || gates.viewerOnlyMode");
   });
 
   it('applies all three viewer-only classes as BINDINGS, never as static classes', () => {
@@ -709,8 +710,9 @@ describe('the cluster keeps the captured child order', () => {
     expect(PRESENTATION).toContain('volume={screenVolume}');
     expect(PAGE).toContain('{#snippet screenVolume()}');
     expect(PAGE).toContain('{screenVolume}');
-    expect(PAGE).toContain("page.url.searchParams.get('vo') === '1'");
-    expect(PAGE).toContain("page.url.searchParams.get('vo') === '2'");
+    const GATES_SOURCE = readFileSync(new URL('./room/gates.svelte.ts', import.meta.url), 'utf8');
+    expect(GATES_SOURCE).toContain("page.url.searchParams.get('vo') === '1'");
+    expect(GATES_SOURCE).toContain("page.url.searchParams.get('vo') === '2'");
     expect(controlMarkup).toContain('{#if viewerOnlyMode}');
   });
 });

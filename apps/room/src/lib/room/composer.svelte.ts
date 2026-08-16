@@ -153,10 +153,30 @@ export class RoomComposer {
   }
 
   /**
-   * `sessData.enableRTE && preferences.enableRTE && isP` — all three, and the room's flag first.
+   * The chat rich text editor's gate.
    *
-   * A getter rather than a `$derived` field: it reads `#session()` and `#isPresenter()`, both
-   * assigned by the constructor, and a derived class field initialises before that happens.
+   * `sessData.enableRTE && preferences.enableRTE && isPresenter`, which is the reference's own
+   * expression and appears THREE times in it: on the composer button
+   * (`O(5, …prefs.enableRTE && …prefs.enableRTE && …isPresenter ? 5 : -1)`), inside `loadRTE()`, which will not
+   * construct the editor without it, and inside `retriveRTEContent()`, which returns an empty
+   * string so a click that reached the send anyway cannot post through a disabled editor. All
+   * three consumers here read THIS, so the three cannot disagree.
+   *
+   * ## One deliberate narrowing, and it is a narrowing
+   *
+   * The reference's EDIT entry point asks a different question —
+   * `sessData.enableRTE && preferences.enableRTE && containsHtml(msg.txt)`, with no presenter term.
+   * A member who owns a rich message therefore gets the editor opened for them, types into it,
+   * presses Save, and `retriveRTEContent()` refuses because THAT check does require presenter: the
+   * editor reports "Empty message. Please type a message..." and their edit is lost. Reproducing a
+   * control that cannot ever complete is not reproducing a feature, so the edit branch below asks
+   * this same full question. Strictly fewer people reach the editor than upstream, and everyone
+   * who reaches it can finish.
+   *
+   * ## A getter, not a `$derived` field
+   *
+   * It reads `#session()` and `#isPresenter()`, both assigned by the constructor, and a derived
+   * class field initialises before that happens.
    */
   get canUseRTE(): boolean {
     return (

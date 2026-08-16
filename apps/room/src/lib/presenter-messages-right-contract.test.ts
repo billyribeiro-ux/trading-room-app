@@ -49,8 +49,13 @@ describe('the room consumes the setting it asked the controller for', () => {
       `=== true` rather than truthiness: an unset setting is absent from the payload entirely — the
       controller omits unset values rather than sending null — and `undefined` must read as off.
     */
-    expect(pageCode).toContain(
-      'const presenterMessagesOnTheRight = $derived(data.sessData?.presenterMsgsOnTheRight === true);'
+    /*
+  The sixteen view gates moved to `room/gates.svelte.ts` in Phase 5 slice 27. A DECLARATION is
+  asserted there; a USE stays where it is and carries the `gates.` prefix.
+*/
+    const gatesCode = readFileSync(new URL('./room/gates.svelte.ts', import.meta.url), 'utf8');
+    expect(gatesCode).toContain(
+      'return this.#session().sessData?.presenterMsgsOnTheRight === true;'
     );
   });
 
