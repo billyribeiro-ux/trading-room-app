@@ -81,10 +81,17 @@ vi.mock('$lib/server/room-config-client', () => ({
 */
 
 /*
+  THREE sources since 2026-08-16, and every assertion points at the one that owns its subject.
+
   The whole Files pane moved to `PresentationArea.svelte` on 2026-08-15, so `pane` is what the
-  markup assertions read. `page` stays for the HANDLERS behind that markup — `setAlertSound`,
-  `deleteFile`, `searchedFiles` and the rest are still declared on the page, which is why this file
-  reads two sources and each assertion points at the one that owns its subject.
+  markup assertions read. `page` used to hold the HANDLERS behind that markup; Phase 5 slice 6
+  moved every one of them — `setAlertSound`, `deleteFile`, `searchedFiles`, the sort pair, the
+  selection and the search term — into `RoomFiles`, so `filesModule` is the third.
+
+  An extraction is exactly when a `toContain` starts passing against the wrong file and a
+  `not.toContain` goes vacuous by pointing at a file that no longer holds the subject at all. Two
+  of the negatives below moved with their positives for that reason, and each is now anchored on
+  something the file it reads actually contains.
 */
 const pane = readFileSync(new URL('./components/FilesPane.svelte', import.meta.url), 'utf8');
 /*
@@ -97,6 +104,11 @@ const presentationArea = readFileSync(
   'utf8'
 );
 const page = readFileSync(new URL('../routes/+page.svelte', import.meta.url), 'utf8');
+/*
+  The file drive's state and every handler behind it, extracted from the page in Phase 5 slice 6.
+  `$lib/room/files.svelte.ts` — see `RoomFiles`.
+*/
+const filesModule = readFileSync(new URL('room/files.svelte.ts', import.meta.url), 'utf8');
 const bundle = readFileSync(
   new URL('../../docs/source/components/app-presentationarea.full.js', import.meta.url),
   'utf8'
@@ -406,8 +418,8 @@ describe('files sort bar: the markup', () => {
   it('applies `.active` from the FIELD alone, which is captured rather than derived', () => {
     // `mo=t=>({active:t})` applied as `ct(13,mo,"name"===e.fileSortField)` — the direction is not
     // part of it.
-    expect(template).toContain("{ active: fileSort.field === 'name' }");
-    expect(template).toContain("{ active: fileSort.field === 'date' }");
+    expect(template).toContain("{ active: files.fileSort.field === 'name' }");
+    expect(template).toContain("{ active: files.fileSort.field === 'date' }");
   });
 
   it('renders the bar INSIDE the file-count gate, beside the table it sorts', () => {
@@ -600,8 +612,8 @@ describe('file rows', () => {
   it('emits a <tr> for every searched file, empty when it belongs to another tab', () => {
     // more-fucking-evidence/sounds: 30 `<tr class="ng-star-inserted"><!----></tr>` around 2 mp3s.
     // Filtering these out would shift `nth-of-type` striping by one on every visible row.
-    expect(pane).toContain('{#each searchedFiles() as item (item.id)}');
-    expect(pane).toContain('{#if !matchesFileTab(item)}');
+    expect(pane).toContain('{#each files.searchedFiles() as item (item.id)}');
+    expect(pane).toContain('{#if !files.matchesFileTab(item)}');
   });
 
   it('sets the anchor type to the CONTENT type, not the bucket', () => {
@@ -631,14 +643,29 @@ describe('file rows', () => {
   });
 
   it('wires every row control', () => {
-    expect(pane).toContain('onclick={deleteSelectedFiles}');
-    expect(pane).toContain('onclick={() => deleteFile(item)}');
-    expect(pane).toContain('onclick={() => playMp3ForMe(item)}');
+    /*
+      Every one of these is a METHOD on `RoomFiles` since slice 6, and `deleteSelectedFiles` is
+      the one that had to change shape rather than just gain a prefix. It was
+      `onclick={deleteSelectedFiles}` — a bare reference, which is fine for a function and throws
+      for a method, because `this` inside it would be the `<button>`. `$state`'s own class section
+      says so directly: "when calling methods in JavaScript, the value of `this` matters".
+
+      Asserted here as well as in `unbound-method-contract.test.ts` because the two catch it at
+      different moments — that file refuses the pattern anywhere in `lib/room/`, this line pins the
+      wrapper on the one control that needed it.
+    */
+    expect(pane).toContain('onclick={() => files.deleteSelectedFiles()}');
+    expect(pane).not.toContain('onclick={deleteSelectedFiles}');
+    expect(pane).toContain('onclick={() => files.deleteFile(item)}');
+    expect(pane).toContain('onclick={() => files.playMp3ForMe(item)}');
+    // Still a page callback rather than a method: the room-wide mp3 belongs to `RoomBroadcasts`.
     expect(pane).toContain('onclick={() => playMp3ForAll(item.url)}');
   });
 
   it("keeps the capture's misspelled empty-selection alert", () => {
-    expect(page).toContain('No files where checked...');
+    expect(filesModule).toContain('No files where checked...');
+    // It left the page in slice 6; asserting that keeps this from passing on a stale copy.
+    expect(page).not.toContain('No files where checked...');
   });
 
   it('renders "Stop Playing For All" ONCE, in the toolbar, not per row', () => {
@@ -653,7 +680,7 @@ describe('file rows', () => {
     expect(pane.split(rendered).length - 1).toBe(1);
 
     // ...and it sits ABOVE the per-row loop, so it cannot be emitted once per file
-    const loopStart = pane.indexOf('{#each searchedFiles()');
+    const loopStart = pane.indexOf('{#each files.searchedFiles()');
     expect(loopStart).toBeGreaterThan(-1);
     expect(pane.indexOf(rendered)).toBeLessThan(loopStart);
   });
@@ -664,9 +691,17 @@ describe('file rows', () => {
       property, so "png" or "mp3" narrows the list by content type. Ours tested `item.name` alone
       and silently returned nothing for those.
     */
-    expect(page).toContain("typeof field === 'string'");
-    expect(page).not.toContain(
-      'data.files.filter((item) => item.name.toLowerCase().includes(query))'
+    /*
+      Re-pointed at `RoomFiles` in slice 6, POSITIVE AND NEGATIVE TOGETHER. Leaving the negative on
+      `page` would have left it green forever: the page no longer contains `searchedFiles` in any
+      form, so a name-only filter could be reintroduced in the module without this line noticing.
+      A negative is only worth writing against a file that holds the thing it forbids the wrong
+      version of.
+    */
+    expect(filesModule).toContain("typeof field === 'string'");
+    expect(filesModule).toContain('Object.values(item).some(');
+    expect(filesModule).not.toContain(
+      'this.#files().filter((item) => item.name.toLowerCase().includes(query))'
     );
   });
 
@@ -882,9 +917,15 @@ describe('the alert-sound row buttons', () => {
     expect(server).toContain('export const actions: Actions = {');
     expect(server).not.toContain('overwriteCashRegisterSound: async ({ request, locals }) => {');
 
-    expect(pane).toContain('onclick={() => setAlertSound(item.url, true)}');
-    expect(pane).toContain('onclick={() => setAlertSound(item.url, false)}');
-    expect(page).toContain('await overwriteCashRegisterSound({ url, on });');
+    expect(pane).toContain('onclick={() => files.setAlertSound(item.url, true)}');
+    expect(pane).toContain('onclick={() => files.setAlertSound(item.url, false)}');
+    /*
+      The command is INJECTED since slice 6 rather than imported by the handler, so the wiring is
+      two halves and both are read: the page hands the remote command in, and the module is what
+      awaits it. Asserting only the page would pass on a class that never called what it was given.
+    */
+    expect(page).toContain('setAlertSound: (payload) => overwriteCashRegisterSound(payload)');
+    expect(filesModule).toContain('await this.#commands.setAlertSound({ url, on });');
   });
 
   it('gates the Files tab AND the pane on hideFiles, as the reference gates both', () => {
@@ -910,10 +951,10 @@ describe('the alert-sound row buttons', () => {
       that is gone, which is the whole point of the assertion.
     */
     expect(presentationArea).toContain(
-      '<li role="presentation" class="nav-item" hidden={filesHidden}>'
+      '<li role="presentation" class="nav-item" hidden={files.filesHidden}>'
     );
     const filesPaneEl = pane.slice(pane.indexOf('id="files"'));
-    expect(filesPaneEl.slice(0, filesPaneEl.indexOf('>'))).toContain('hidden={filesHidden}');
+    expect(filesPaneEl.slice(0, filesPaneEl.indexOf('>'))).toContain('hidden={files.filesHidden}');
     /*
       ...and the flag reaches the pane from the component that also gates the tab on it.
 
@@ -921,11 +962,15 @@ describe('the alert-sound row buttons', () => {
       version of this line was `expect(presentationArea).toContain('{filesHidden}')`, which the
       TAB's own `hidden={filesHidden}` satisfies as a substring. It could never fail, and a negative
       control proved it — deleting the hand-off entirely left this file green.
+
+      Slice 6 replaced fifteen props with one object, so what crosses is `{files}`. The slice stays
+      for the same reason: it is what makes this an assertion about the HAND-OFF rather than about
+      the word appearing somewhere in a 1,145-line component.
     */
     const invocation = presentationArea.slice(presentationArea.indexOf('<FilesPane'));
     const handoff = invocation.slice(0, invocation.indexOf('/>'));
     expect(handoff, 'the FilesPane invocation must be findable').not.toBe('');
-    expect(handoff).toContain('{filesHidden}');
+    expect(handoff).toContain('{files}');
 
     // ...and the pane's `display: none` is declared, because `#files.active` would otherwise win.
     const appCss = readFileSync(new URL('../app.css', import.meta.url), 'utf8');

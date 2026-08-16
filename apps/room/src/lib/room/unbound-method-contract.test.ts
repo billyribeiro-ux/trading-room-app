@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 
 import { RoomAlerts } from './alerts.svelte';
 import { RoomBroadcasts } from './broadcasts.svelte';
+import { RoomFiles } from './files.svelte';
 import { RoomChat } from './chat.svelte';
 import { RoomDialogs } from './dialogs.svelte';
 import { RoomLogPages } from './log-pages.svelte';
@@ -59,6 +60,7 @@ const INSTANCES: Record<string, new (...args: never[]) => object> = {
   prefs: RoomPrefs,
   roomVolume: RoomVolume,
   broadcasts: RoomBroadcasts,
+  files: RoomFiles,
   /*
     The Phase 1 classes, added when the completeness check below refused a map that covered only the
     new ones. Every one of these is handed to a component as a prop — `roster` and `menus` go whole

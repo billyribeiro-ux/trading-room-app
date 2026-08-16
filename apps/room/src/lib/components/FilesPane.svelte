@@ -25,74 +25,56 @@
 
     ## `mainTab` is READ here and never written
 
-    A plain prop, unlike `fileTab`. The main tab strip lives in `PresentationArea` and this pane only
-    needs to know whether it is the visible one, so a bindable would hand it an authority it does not
-    use — and `svelte-check` is silent on a bindable nobody writes.
+    The main tab strip lives in `PresentationArea` and this pane only needs to know whether it is
+    the visible one, so a bindable would hand it an authority it does not use — and `svelte-check`
+    is silent on a bindable nobody writes.
+
+    This note used to contrast `mainTab` with `fileTab`, which WAS bindable. It is not any more:
+    Phase 5 slice 6 replaced fifteen props with the `RoomFiles` object, and the three tab buttons
+    now write `files.fileTab` through its setter. The bind: hop existed only to carry that write
+    back up through `PresentationArea`, which never read it, so removing the props removed the
+    reason for the binding as well. The prop count in the section above is therefore historical —
+    twenty-two was the number the compiler produced when this pane was cut out, and it is eight now.
   */
   import { invalidate } from '$app/navigation';
   import { alertSoundButtonFor } from '$lib/files-gates';
-  import { fileSizeInKb, fileSortTitle, type FileSortField } from '$lib/file-sort';
+  import { fileSizeInKb, fileSortTitle } from '$lib/file-sort';
   import { mediumDate } from '$lib/message-formatters';
-  import type { FileTab, MainTab, ModalName } from '$lib/types';
+  import type { MainTab, ModalName } from '$lib/types';
+  import type { RoomFiles } from '$lib/room/files.svelte';
   import type { PageProps } from '../../routes/$types';
-
-  type RoomFile = PageProps['data']['files'][number];
 
   interface Props {
     /** Read for `data.files` and for the `sessData` the alert-sound gate resolves against. */
     data: PageProps['data'];
     /** The ROLE, decided on the page. Gates Delete Selected, Upload, and the per-row controls. */
     isPresenter: boolean;
-    /** `z('hidden', o.hideFiles)` — the pane half of the gate; the TAB carries the other half. */
-    filesHidden: boolean;
+    /**
+     * The file drive, whole — `$lib/room/files.svelte.ts`.
+     *
+     * Fifteen props collapsed into this one object, and the same fifteen disappeared from
+     * `PresentationArea`, which passed every one of them straight through. `filesHidden` still
+     * carries the PANE half of the hide gate; the TAB half is read off the same object one level up.
+     */
+    files: RoomFiles;
     /** Read only: whether `#files` is the visible main tab. See the note above. */
     mainTab: MainTab;
-    /** BINDABLE: the three file tabs write it. */
-    fileTab: FileTab;
-    fileSort: { field: FileSortField; direction: 'asc' | 'desc' };
-    selectedFileIds: Set<number>;
-    playingForMe: Set<number>;
     /** `O(83, o.isP && o.mp3Playing ? 83 : -1)` — the room-wide playback, not this viewer's. */
     mp3Playing: boolean;
 
-    countFiles: (kind: FileTab) => number;
-    searchedFiles: () => readonly RoomFile[];
-    matchesFileTab: (item: { kind: string }) => boolean;
-    applyFileSort: (field: FileSortField) => void;
-    /** Reports the search box's value up; the page owns the term and filters with it. */
-    onfilesearch: (value: string) => void;
-    toggleFileSelection: (id: number, selected: boolean) => void;
-    deleteSelectedFiles: () => void;
-    deleteFile: (file: { id: number; name: string }) => void;
-    playMp3ForMe: (file: { id: number; url: string; contentType: string }) => void;
     playMp3ForAll: (url: string) => Promise<void>;
     stopMp3ForAll: () => Promise<void>;
-    setAlertSound: (url: string, on: boolean) => Promise<void>;
     openModal: (name: Exclude<ModalName, null>) => void;
   }
 
   let {
     data,
     isPresenter,
-    filesHidden,
+    files,
     mainTab,
-    fileTab = $bindable('files'),
-    fileSort,
-    selectedFileIds,
-    playingForMe,
     mp3Playing,
-    countFiles,
-    searchedFiles,
-    matchesFileTab,
-    applyFileSort,
-    onfilesearch,
-    toggleFileSelection,
-    deleteSelectedFiles,
-    deleteFile,
-    playMp3ForMe,
     playMp3ForAll,
     stopMp3ForAll,
-    setAlertSound,
     openModal
   }: Props = $props();
 </script>
@@ -100,7 +82,7 @@
 <div
   id="files"
   class={mainTab === 'files' ? 'tab-pane fade active show' : 'tab-pane fade'}
-  hidden={filesHidden}
+  hidden={files.filesHidden}
   role="tabpanel"
   aria-labelledby="files-tab"
 >
@@ -111,25 +93,25 @@
                            target. Ours listened on the <a> alone and that band was dead. The anchor
                            keeps the keydown, so the tab stays operable from the keyboard, which the
                            reference's is not. -->
-    <li class="nav-item" role="presentation" onclick={() => (fileTab = 'files')}>
+    <li class="nav-item" role="presentation" onclick={() => (files.fileTab = 'files')}>
       <!-- svelte-ignore a11y_interactive_supports_focus -->
       <a
         id="files-tab"
         class={[
           'nav-link d-flex align-items-center justify-content-between',
-          { active: fileTab === 'files' }
+          { active: files.fileTab === 'files' }
         ]}
         data-bs-toggle="tab"
         role="tab"
         aria-controls="files"
-        aria-selected={fileTab === 'files'}
-        onclick={() => (fileTab = 'files')}
+        aria-selected={files.fileTab === 'files'}
+        onclick={() => (files.fileTab = 'files')}
         onkeydown={(event) => {
-          if (event.key === 'Enter' || event.key === ' ') fileTab = 'files';
+          if (event.key === 'Enter' || event.key === ' ') files.fileTab = 'files';
         }}
       >
         <span>Files</span>
-        <span class="badge rounded-pill bg-danger files-badge">{countFiles('files')}</span>
+        <span class="badge rounded-pill bg-danger files-badge">{files.countFiles('files')}</span>
       </a>
     </li>
     <!-- The click handler sits on the <li>, as the reference has it: its const puts the
@@ -138,25 +120,25 @@
                            target. Ours listened on the <a> alone and that band was dead. The anchor
                            keeps the keydown, so the tab stays operable from the keyboard, which the
                            reference's is not. -->
-    <li class="nav-item" role="presentation" onclick={() => (fileTab = 'images')}>
+    <li class="nav-item" role="presentation" onclick={() => (files.fileTab = 'images')}>
       <!-- svelte-ignore a11y_interactive_supports_focus -->
       <a
         id="image-tab"
         class={[
           'nav-link d-flex align-items-center justify-content-between',
-          { active: fileTab === 'images' }
+          { active: files.fileTab === 'images' }
         ]}
         data-bs-toggle="tab"
         role="tab"
         aria-controls="image"
-        aria-selected={fileTab === 'images'}
-        onclick={() => (fileTab = 'images')}
+        aria-selected={files.fileTab === 'images'}
+        onclick={() => (files.fileTab = 'images')}
         onkeydown={(event) => {
-          if (event.key === 'Enter' || event.key === ' ') fileTab = 'images';
+          if (event.key === 'Enter' || event.key === ' ') files.fileTab = 'images';
         }}
       >
         <span>Images</span>
-        <span class="badge rounded-pill bg-danger files-badge">{countFiles('images')}</span>
+        <span class="badge rounded-pill bg-danger files-badge">{files.countFiles('images')}</span>
       </a>
     </li>
     <!-- The click handler sits on the <li>, as the reference has it: its const puts the
@@ -165,25 +147,25 @@
                            target. Ours listened on the <a> alone and that band was dead. The anchor
                            keeps the keydown, so the tab stays operable from the keyboard, which the
                            reference's is not. -->
-    <li class="nav-item" role="presentation" onclick={() => (fileTab = 'sounds')}>
+    <li class="nav-item" role="presentation" onclick={() => (files.fileTab = 'sounds')}>
       <!-- svelte-ignore a11y_interactive_supports_focus -->
       <a
         id="sounds-tab"
         class={[
           'nav-link d-flex align-items-center justify-content-between',
-          { active: fileTab === 'sounds' }
+          { active: files.fileTab === 'sounds' }
         ]}
         data-bs-toggle="tab"
         role="tab"
         aria-controls="sounds"
-        aria-selected={fileTab === 'sounds'}
-        onclick={() => (fileTab = 'sounds')}
+        aria-selected={files.fileTab === 'sounds'}
+        onclick={() => (files.fileTab = 'sounds')}
         onkeydown={(event) => {
-          if (event.key === 'Enter' || event.key === ' ') fileTab = 'sounds';
+          if (event.key === 'Enter' || event.key === ' ') files.fileTab = 'sounds';
         }}
       >
         <span>Sounds</span>
-        <span class="badge rounded-pill bg-danger files-badge">{countFiles('sounds')}</span>
+        <span class="badge rounded-pill bg-danger files-badge">{files.countFiles('sounds')}</span>
       </a>
     </li>
   </ul>
@@ -209,7 +191,7 @@
           placeholder="Search files..."
           aria-label="search"
           aria-describedby="addon-wrapping"
-          oninput={(event) => onfilesearch(event.currentTarget.value)}
+          oninput={(event) => files.search(event.currentTarget.value)}
         />
         <span
           id="basic-addon1"
@@ -241,7 +223,7 @@
         <button
           class="btn m-2 st-fileDeleteSelected"
           title="Delete Selected"
-          onclick={deleteSelectedFiles}
+          onclick={() => files.deleteSelectedFiles()}
         >
           <i class="fa fa-trash fa-check mr-2"></i>Delete Selected{' '}
         </button>
@@ -374,14 +356,14 @@
                           while `svelte-check` stayed green.
                         -->
       <button
-        class={['btn btn-sm m-1 st-fileSortName', { active: fileSort.field === 'name' }]}
-        title={fileSortTitle('name', fileSort)}
-        onclick={() => applyFileSort('name')}
+        class={['btn btn-sm m-1 st-fileSortName', { active: files.fileSort.field === 'name' }]}
+        title={fileSortTitle('name', files.fileSort)}
+        onclick={() => files.applyFileSort('name')}
       >
         {' '}Name{' '}
-        {#if fileSort.field === 'name'}
+        {#if files.fileSort.field === 'name'}
           <i
-            class="fas ml-2 {fileSort.direction === 'asc'
+            class="fas ml-2 {files.fileSort.direction === 'asc'
               ? 'fa-sort-alpha-down'
               : 'fa-sort-alpha-up'}"
           ></i>
@@ -390,14 +372,14 @@
         {/if}
       </button>
       <button
-        class={['btn btn-sm m-1 st-fileSortDate', { active: fileSort.field === 'date' }]}
-        title={fileSortTitle('date', fileSort)}
-        onclick={() => applyFileSort('date')}
+        class={['btn btn-sm m-1 st-fileSortDate', { active: files.fileSort.field === 'date' }]}
+        title={fileSortTitle('date', files.fileSort)}
+        onclick={() => files.applyFileSort('date')}
       >
         {' '}Date{' '}
-        {#if fileSort.field === 'date'}
+        {#if files.fileSort.field === 'date'}
           <i
-            class="fas ml-2 {fileSort.direction === 'asc'
+            class="fas ml-2 {files.fileSort.direction === 'asc'
               ? 'fa-sort-amount-down'
               : 'fa-sort-amount-up'}"
           ></i>
@@ -408,9 +390,9 @@
     </div>
     <table class="table table-striped m-auto w-100 mt-3 st-fileTable">
       <tbody id="filesDriveList">
-        {#each searchedFiles() as item (item.id)}
+        {#each files.searchedFiles() as item (item.id)}
           <tr>
-            {#if !matchesFileTab(item)}
+            {#if !files.matchesFileTab(item)}
               <!--
                                   Deliberately empty. The capture emits this row for every file in
                                   the room and collapses its cells when the file belongs to another
@@ -431,8 +413,9 @@
                   <input
                     type="checkbox"
                     value={item.id}
-                    checked={selectedFileIds.has(item.id)}
-                    onchange={(event) => toggleFileSelection(item.id, event.currentTarget.checked)}
+                    checked={files.selectedFileIds.has(item.id)}
+                    onchange={(event) =>
+                      files.toggleFileSelection(item.id, event.currentTarget.checked)}
                   />
                 </td>
               {/if}
@@ -490,7 +473,7 @@
                       type="button"
                       title="Delete File"
                       class="btn ml-2 st-fileDelete"
-                      onclick={() => deleteFile(item)}
+                      onclick={() => files.deleteFile(item)}
                     >
                       <i class="fa fa-trash mr-2"></i>Delete{' '}
                     </button>
@@ -500,9 +483,9 @@
                       type="button"
                       title="Play"
                       class="btn ml-2 st-fileDownload btn-success"
-                      onclick={() => playMp3ForMe(item)}
+                      onclick={() => files.playMp3ForMe(item)}
                     >
-                      {#if playingForMe.has(item.id)}
+                      {#if files.playingForMe.has(item.id)}
                         <span><i class="fa fa-stop-circle mr-2"></i>Stop{' '}</span>
                       {:else}
                         <span><i class="fa fa-play-circle mr-2"></i>Play{' '}</span>
@@ -548,7 +531,7 @@
                       type="button"
                       title="Overwrite Cash Register Sound"
                       class="btn ml-2 btn-info set-alert-sound-btn"
-                      onclick={() => setAlertSound(item.url, true)}
+                      onclick={() => files.setAlertSound(item.url, true)}
                     >
                       <i class="fa fa-bell mr-2"></i>Set as alert sound{' '}
                     </button>
@@ -557,7 +540,7 @@
                       type="button"
                       title="Remove Overwrited Cash Register Sound"
                       class="btn ml-2 btn-info set-alert-sound-btn"
-                      onclick={() => setAlertSound(item.url, false)}
+                      onclick={() => files.setAlertSound(item.url, false)}
                     >
                       <i class="fa fa-trash mr-2"></i>Remove as alert sound{' '}
                     </button>

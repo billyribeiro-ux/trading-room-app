@@ -101,16 +101,10 @@
   import { RoomVolume } from '$lib/room/volume.svelte';
   import { RoomBroadcasts } from '$lib/room/broadcasts.svelte';
   import { RoomToasts } from '$lib/room/toasts.svelte';
+  import { RoomFiles } from '$lib/room/files.svelte';
   import type { RoomMessageChrome } from '$lib/room-message-chrome';
   import { EXTRA_COMPOSER, RoomChat } from '$lib/room/chat.svelte';
   import { RoomMedia } from '$lib/room/media.svelte';
-  import { filesSectionHidden } from '$lib/files-gates';
-  import {
-    INITIAL_FILE_SORT,
-    type FileSortField,
-    sortFiles,
-    toggleFileSort
-  } from '$lib/file-sort';
   import {
     MUTE_ALL_CONFIRM,
     MUTE_STAGGER_MS,
@@ -192,7 +186,6 @@
     AlertTab,
     ChatTab,
     MessageAction,
-    FileTab,
     FollowChatStyle,
     MainTab,
     ManagedChatUser,
@@ -747,16 +740,6 @@
     if (forcedScreenId === screenId) forcedScreenId = null;
     if (lockedScreenId === screenId) lockedScreenId = null;
   }
-  let fileTab: FileTab = $state('files');
-  /**
-   * "Hide Files Section?" — `filesSectionHidden` in `$lib/files-gates`, tested there.
-   *
-   * `hidden` on BOTH the main-tab `li` and the `#files` pane, which is what the reference binds
-   * (`z('hidden', o.hideFiles)` at full.js:5375 and 5410-5413). Derived rather than copied into
-   * `$state` so a controller change picked up by the five-second `invalidate('room:data')` takes
-   * effect without a reload.
-   */
-  const filesHidden = $derived(filesSectionHidden(data.sessData ?? {}));
   /*
     The two chat columns, in `$lib/room/chat.svelte.ts`.
 
@@ -1197,6 +1180,39 @@
     }
   });
   /*
+    The file drive, in `$lib/room/files.svelte.ts`.
+
+    The slice with the clearest payoff beyond its own line count. Fifteen of these props were handed
+    to `PresentationArea`, which passed the same fifteen straight through to `FilesPane` while
+    reading only `filesHidden` itself — so one object removes thirty prop declarations, not fifteen.
+
+    `files` and `sessData` go in as THUNKS rather than as values. `data` is a `$props()` value, so
+    handing over `data.files` would hand over THAT array and the pane would still be showing it
+    after a navigation replaced it; a thunk read inside the class tracks whatever it touches. This
+    is the shape `$state`'s "passing state into functions" section documents, and `RoomRoster`
+    already uses it.
+
+    The two commands are injected for the reason `RoomBroadcasts` records: the class needs no route
+    import and its refusal paths can be tested without the wire. Neither is an authority — both
+    `deleteFile` and `overwriteCashRegisterSound` re-check `presenterRoom()` on the server, so what
+    moved here is which button is drawn, never who may press it.
+
+    The two invalidations are injected for the same reason and are deliberately NOT the same call:
+    a delete re-reads the whole page, while setting the alert sound only needs the room's settings
+    back. Collapsing them would make every "Set as alert sound" click re-run every load function.
+  */
+  const files = new RoomFiles({
+    dialogs,
+    files: () => data.files,
+    sessData: () => data.sessData ?? {},
+    commands: {
+      deleteFile: (payload) => deleteFileCommand(payload),
+      setAlertSound: (payload) => overwriteCashRegisterSound(payload)
+    },
+    onFilesChanged: () => invalidateAll(),
+    onRoomDataChanged: () => invalidate('room:data')
+  });
+  /*
     The room's toast queue, in `$lib/room/toasts.svelte.ts`.
 
     The first slice of the phase that moves BEHAVIOUR out of this file rather than declarations —
@@ -1304,24 +1320,6 @@
   
   
   
-  let fileSearch = $state('');
-  /*
-    The Files sort bar's state - ONE field and ONE direction, opening on date/desc.
-
-    This used to be three variables (`fileSortKey`, `nameAscending`, `dateNewestFirst`) built from
-    the owner's pasted markup, because the capture we held at the time contained no sort bar at all.
-    The v4 bundle does contain it, and it disagrees on two points that a per-button direction cannot
-    express: both icons read the same `fileSortDir` (bytes 1,946,450 and 1,946,605), and switching
-    field RESETS that direction to the new field's default rather than restoring a remembered one
-    (byte 1,975,308). `$lib/file-sort` holds the decode and the reasoning.
-
-    `$state.raw`, not `$state`: this object is only ever REPLACED, by `toggleFileSort` returning a
-    new pair, so a deep proxy over it would be per-read overhead buying nothing. The pair is one
-    value rather than two so the field and the direction cannot drift apart.
-  */
-  let fileSort = $state.raw(INITIAL_FILE_SORT);
-  // The row checkboxes that feed "Delete Selected"; `#filesDriveList input:checked` in the capture.
-  let selectedFileIds = $state<Set<number>>(new Set());
   
   
   
@@ -4523,10 +4521,6 @@
     }
   }
 
-  function countFiles(kind: FileTab) {
-    const singularKind = kind === 'files' ? 'file' : kind.slice(0, -1);
-    return data.files.filter((item) => item.kind === singularKind).length;
-  }
 
   function setInputChecked(checked: boolean) {
     return (node: HTMLInputElement) => {
@@ -5521,166 +5515,13 @@
     };
   }
 
-  /** True when a file belongs to the tab on screen - `Ywe`'s `O(1, ...)`, keyed on content type. */
-  function matchesFileTab(item: { kind: string }) {
-    return item.kind === (fileTab === 'files' ? 'file' : fileTab.slice(0, -1));
-  }
 
-  /**
-   * Every file matching the SEARCH box, sorted - not filtered by tab.
-   *
-   * The capture's `{#each}` equivalent runs over `filter(sessionFiles, filesSearch)` and emits a
-   * `<tr>` for each, leaving the row EMPTY when it belongs to another tab. `more-fucking-evidence/
-   * sounds` shows exactly that: 30 `<tr class="ng-star-inserted"><!----></tr>` around the two mp3s.
-   *
-   * Those empty rows are not inert. `.st-fileTable tbody tr:nth-of-type(2n+1)` stripes on position
-   * among ALL rows, so filtering them out here would shift every visible row's stripe by one and
-   * invert the banding against the capture.
-   */
-  /*
-    The search matches EVERY string field, not just the name.
 
-    The reference's `filter` pipe lower-cases the query and walks `Object.keys(row)`, testing every
-    string-valued property — so a member can find a file by its content type, its id, its date or
-    its path, and typing "png" or "mp3" narrows the list. Ours tested `item.name` alone, which
-    silently returned nothing for all of those.
-  */
-  function searchedFiles() {
-    const query = fileSearch.trim().toLowerCase();
-    const matching = data.files.filter((item) =>
-      Object.values(item).some(
-        (field) => typeof field === 'string' && field.toLowerCase().includes(query)
-      )
-    );
-    /*
-      SEARCH FIRST, THEN SORT, which is the order the reference composes its two pipes in - read at
-      byte 1,951,076:
 
-          pt(rg(16,9,Ct(15,6,e.sessionFiles,e.filesSearch),e.fileSortField,e.fileSortDir))
 
-      `Ct` binds the two-argument `filter`, and its result is the FIRST argument to the
-      three-argument `sortFiles`. Sorting first and filtering after would give the same rows here,
-      but it is not what the reference does and it costs a comparison pass over rows that are about
-      to be discarded.
 
-      `sortFiles` copies before it sorts, so the array `filter` just allocated is not sorted in
-      place either; see property 1 in `$lib/file-sort`.
-    */
-    return sortFiles(matching, fileSort.field, fileSort.direction);
-  }
 
-  /**
-   * One click on one of the two sort buttons.
-   *
-   * The whole transition lives in `$lib/file-sort` so it can be exercised without rendering this
-   * component; all this does is hand the current pair in and store the pair that comes back. The
-   * single assignment is deliberate - `$state.raw` reacts to reassignment, and assigning field and
-   * direction separately is what would let a stale direction survive a field change.
-   */
-  function applyFileSort(field: FileSortField) {
-    fileSort = toggleFileSort(fileSort, field);
-  }
 
-  /**
-   * `deleteFile(name, id)`:
-   *
-   * ```js
-   * bootbox.confirm(`Delete file: "${e}" ?`, s => { s && (r.fileID = i, post(cmd), getSessionFiles()) })
-   * ```
-   */
-  function deleteFile(file: { id: number; name: string }) {
-    dialogs.confirmation = {
-      message: `Delete file: "${file.name}" ?`,
-      onconfirm: async () => {
-        dialogs.confirmation = null;
-        await postDeleteFile(file.id);
-        await invalidateAll();
-      }
-    };
-  }
-
-  /**
-   * `deleteSelected()` - the checked boxes, a count in the prompt, then the same command per file:
-   *
-   * ```js
-   * $('#filesDriveList input:checked').each(function(){ i.push(this.value) });
-   * 0 != i.length
-   *   ? bootbox.confirm('Are you sure you want to delete ' + i.length + ' files ?', ...)
-   *   : bootbox.alert('No files where checked...');
-   * ```
-   *
-   * The misspelling in the empty-selection alert is the capture's, kept verbatim.
-   */
-  function deleteSelectedFiles() {
-    const ids = [...selectedFileIds];
-    if (!ids.length) {
-      dialogs.alert = 'No files where checked...';
-      return;
-    }
-    dialogs.confirmation = {
-      message: `Are you sure you want to delete ${ids.length} files ?`,
-      onconfirm: async () => {
-        dialogs.confirmation = null;
-        for (const id of ids) await postDeleteFile(id);
-        selectedFileIds = new Set();
-        await invalidateAll();
-      }
-    };
-  }
-
-  /** One delete; the loop above drives it, as the capture's `deleteSelected()` does. */
-  async function postDeleteFile(fileId: number) {
-    try {
-      await deleteFileCommand({ fileId });
-    } catch (cause) {
-      dialogs.alert = isHttpError(cause) ? cause.body.message : 'Delete failed.';
-    }
-  }
-
-  /**
-   * `playMp3ForMe(e)` - a toggle that builds a hidden `<audio>` keyed by the file id and removes
-   * that same element to stop:
-   *
-   * ```js
-   * this.isPlayingForMe[e._id] = !this.isPlayingForMe?.[e._id];
-   * if (playing) { const i = document.createElement('audio');
-   *   i.controls = !0; i.type = e.contentType; i.src = e.vidPath; i.id = e._id;
-   *   i.style.display = 'none'; document.body.appendChild(i); i.play(); }
-   * else { document.body.removeChild(document.getElementById(e._id)); }
-   * ```
-   */
-  let playingForMe = $state<Set<number>>(new Set());
-
-  function playMp3ForMe(file: { id: number; url: string; contentType: string }) {
-    const elementId = `file-audio-${file.id}`;
-    const existing = document.getElementById(elementId);
-    if (existing) {
-      existing.remove();
-      const next = new Set(playingForMe);
-      next.delete(file.id);
-      playingForMe = next;
-      return;
-    }
-    const audio = document.createElement('audio');
-    audio.controls = true;
-    // `i.type = e.contentType` in the capture. `type` is not a property of HTMLAudioElement, so
-    // that line only ever set a JS expando; written as the attribute it actually reaches the DOM.
-    audio.setAttribute('type', file.contentType);
-    audio.src = file.url;
-    audio.id = elementId;
-    audio.style.display = 'none';
-    // The capture leaves the element behind on natural end, so the button stays showing "Stop"
-    // until pressed. Clearing the flag keeps the label honest about what is actually playing.
-    audio.addEventListener('ended', () => {
-      audio.remove();
-      const next = new Set(playingForMe);
-      next.delete(file.id);
-      playingForMe = next;
-    });
-    document.body.appendChild(audio);
-    void audio.play();
-    playingForMe = new Set(playingForMe).add(file.id);
-  }
 
   
   
@@ -5691,34 +5532,7 @@
 
   
 
-  /**
-   * `overwriteCashRegisterSound(e, i)` — "Set as alert sound" and "Remove as alert sound".
-   *
-   * The reference posts an admin command and then writes the new value into its own
-   * `globals.sessData` (full.js:3084-3086). Here the action writes it through to the controller,
-   * which is where a room's settings live, and `invalidate('room:data')` re-reads it — so the label
-   * changes because the stored value changed, not instead of it. A button whose only effect is
-   * changing its own label is the failure mode this avoids.
-   */
-  async function setAlertSound(url: string, on: boolean) {
-    try {
-      // `on` crosses as a real boolean now; the action carried the strings 'true' / 'false'.
-      await overwriteCashRegisterSound({ url, on });
-    } catch (cause) {
-      dialogs.alert = isHttpError(cause) ? cause.body.message : 'Command failed.';
-      // Returned, not fallen through: re-reading after a refusal redraws the button at a setting
-      // the controller never stored, which is the label-only lie this whole path exists to avoid.
-      return;
-    }
-    await invalidate('room:data');
-  }
 
-  function toggleFileSelection(id: number, selected: boolean) {
-    const next = new Set(selectedFileIds);
-    if (selected) next.add(id);
-    else next.delete(id);
-    selectedFileIds = next;
-  }
 
   async function sendComposerMessage() {
     const body = chat.composer.trim();
@@ -8395,24 +8209,10 @@
               playVideoForAll={(url) => broadcasts.playVideoForAll(url)}
               scheduleVideoForAll={(url, whenLocal) => broadcasts.scheduleVideoForAll(url, whenLocal)}
               stopVideoForAll={() => broadcasts.stopVideoForAll()}
-              {filesHidden}
-              bind:fileTab
-              onfilesearch={(value) => (fileSearch = value)}
-              {fileSort}
-              {selectedFileIds}
-              {playingForMe}
+              {files}
               {mountUploadFileLink}
-              {countFiles}
-              {searchedFiles}
-              {matchesFileTab}
-              {applyFileSort}
-              {toggleFileSelection}
-              {deleteSelectedFiles}
-              {deleteFile}
-              {playMp3ForMe}
               playMp3ForAll={(url) => broadcasts.playMp3ForAll(url)}
               stopMp3ForAll={() => broadcasts.stopMp3ForAll()}
-              {setAlertSound}
               {openModal}
               youtubeForAllUrl={broadcasts.youtubeForAllUrl}
               stopYoutubeForAll={() => broadcasts.stopYoutubeForAll()}

@@ -353,10 +353,23 @@ describe('the client sends, instead of moving its own screen', () => {
       Both refusals reach the presenter with the SERVER's own wording — `That is not a playable
       video url.` is what a mistyped url earns, and collapsing it into the generic fallback would
       leave the presenter guessing which of the two things went wrong.
+
+      THIS LINE READ `pageCode` UNTIL 2026-08-16 AND WAS WRONG FROM THE MOMENT SLICE 12 LANDED.
+
+      The senders moved to `RoomBroadcasts` and this assertion did not move with them. It kept
+      passing because `+page.svelte` still held a line spelled identically — the Files pane's
+      `setAlertSound`, a different feature with the same generic fallback — so a positive
+      `toContain` was satisfied by a file that no longer owned its subject. Slice 6 moved that line
+      out too, and only then did the assertion go red.
+
+      That is the mirror image of the vacuous negative this phase keeps guarding against, and it
+      argues the same thing: an assertion has to name the file that owns its subject. Three
+      senders, so the count is asserted rather than the presence — one sender losing its refusal
+      path would otherwise still leave two matches and a green test.
     */
-    expect(pageCode).toContain(
-      "dialogs.alert = isHttpError(cause) ? cause.body.message : 'Command failed.';"
-    );
+    const refusal =
+      "this.#dialogs.alert = isHttpError(cause) ? cause.body.message : 'Command failed.';";
+    expect(BROADCASTS.split(refusal).length - 1).toBe(3);
     // And the actions are gone from the server, so there is one way in and not two.
     expect(serverCode).not.toContain('videoForAll: async (');
     expect(serverCode).not.toContain('youtubeForAll: async (');

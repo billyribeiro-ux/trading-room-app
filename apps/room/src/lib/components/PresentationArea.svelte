@@ -39,7 +39,6 @@
     computed once on the page from data the server owns. Nothing here opens a device, starts a
     stream, or writes a file.
   */
-  import type { FileSortField } from '$lib/file-sort';
   import { NEUTRAL_PAN, captureVideoImage, type Pan } from '$lib/screen-zoom';
   import DayTradeAlertsPane from '$lib/components/day-trade-alerts/DayTradeAlertsPane.svelte';
   import FilesPane from '$lib/components/FilesPane.svelte';
@@ -57,12 +56,12 @@
   import type { MtxStreamTabs } from '$lib/room-mtx.svelte';
   import type { RoomMedia } from '$lib/room/media.svelte';
   import type { RoomMenus } from '$lib/room/menus.svelte';
+  import type { RoomFiles } from '$lib/room/files.svelte';
   import type { RoomSplit } from '$lib/room/split.svelte';
   import type { SwingAlertDraft } from '$lib/components/swing-alerts/draft';
   import type { DayTradeAlertDraft } from '$lib/components/day-trade-alerts/draft';
   import type {
     DayTradeAlertRow,
-    FileTab,
     MainTab,
     ModalName,
     NoteVersion,
@@ -195,34 +194,19 @@
     stopVideoForAll: () => Promise<void>;
 
     // ── #files ─────────────────────────────────────────────────────────────────
-    filesHidden: boolean;
-    /** BINDABLE: the three file tabs write it. */
-    fileTab: FileTab;
-    /** BINDABLE: the search box writes it. */
     /**
-     * A CALLBACK, not a bindable, and that distinction was made by ESLint rather than by me.
+     * The file drive, whole — `$lib/room/files.svelte.ts`.
      *
-     * The search box only ever WRITES this value — the page's `searchedFiles()` is what reads it,
-     * and nothing in this component consults it. A `$bindable()` would therefore be a prop whose
-     * incoming half is dead, which `no-useless-assignment` reported precisely. Reporting the value
-     * up is what is actually happening, so that is what the prop says.
+     * This was fifteen props, and every one of them arrived from the page and left again for
+     * `FilesPane` unread: the only member this component itself touches is `filesHidden`, on the
+     * main tab `li` below. Passing the object rather than its parts is what `RoomSidebar` does
+     * with `roster` and `menus`, and it is why `bind:fileTab` is gone — the pane writes
+     * `files.fileTab` directly, so there is no value to bind back up through here.
      */
-    onfilesearch: (value: string) => void;
-    fileSort: { field: FileSortField; direction: 'asc' | 'desc' };
-    selectedFileIds: Set<number>;
-    playingForMe: Set<number>;
+    files: RoomFiles;
     mountUploadFileLink: (menu: HTMLUListElement) => void;
-    countFiles: (kind: FileTab) => number;
-    searchedFiles: () => readonly PageProps['data']['files'][number][];
-    matchesFileTab: (item: { kind: string }) => boolean;
-    applyFileSort: (field: FileSortField) => void;
-    toggleFileSelection: (id: number, selected: boolean) => void;
-    deleteSelectedFiles: () => void;
-    deleteFile: (file: { id: number; name: string }) => void;
-    playMp3ForMe: (file: { id: number; url: string; contentType: string }) => void;
     playMp3ForAll: (url: string) => Promise<void>;
     stopMp3ForAll: () => Promise<void>;
-    setAlertSound: (url: string, on: boolean) => Promise<void>;
     openModal: (name: Exclude<ModalName, null>) => void;
 
     // ── the overlays that sit under the tab content ────────────────────────────
@@ -312,24 +296,10 @@
     playVideoForAll,
     scheduleVideoForAll,
     stopVideoForAll,
-    filesHidden,
-    fileTab = $bindable('files'),
-    onfilesearch,
-    fileSort,
-    selectedFileIds,
-    playingForMe,
+    files,
     mountUploadFileLink,
-    countFiles,
-    searchedFiles,
-    matchesFileTab,
-    applyFileSort,
-    toggleFileSelection,
-    deleteSelectedFiles,
-    deleteFile,
-    playMp3ForMe,
     playMp3ForAll,
     stopMp3ForAll,
-    setAlertSound,
     openModal,
     youtubeForAllUrl,
     stopYoutubeForAll,
@@ -670,7 +640,7 @@
                     client global, set from the `r` query parameter, and this room has no media.recording
                     bot to model.
                   -->
-        <li role="presentation" class="nav-item" hidden={filesHidden}>
+        <li role="presentation" class="nav-item" hidden={files.filesHidden}>
           <!-- svelte-ignore a11y_missing_attribute -->
           <a
             class={['nav-link', { active: mainTab === 'files' }]}
@@ -1112,25 +1082,11 @@
         <FilesPane
           {data}
           {isPresenter}
-          {filesHidden}
+          {files}
           {mainTab}
-          bind:fileTab
-          {fileSort}
-          {selectedFileIds}
-          {playingForMe}
           {mp3Playing}
-          {countFiles}
-          {searchedFiles}
-          {matchesFileTab}
-          {applyFileSort}
-          {onfilesearch}
-          {toggleFileSelection}
-          {deleteSelectedFiles}
-          {deleteFile}
-          {playMp3ForMe}
           {playMp3ForAll}
           {stopMp3ForAll}
-          {setAlertSound}
           {openModal}
         />
       </div>

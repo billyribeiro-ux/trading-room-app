@@ -24,6 +24,135 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-16
 
+### 2026-08-16 10:52 EDT — Phase 5 slice 6: `RoomFiles`, and the first prop list collapsed at TWO call sites
+
+**`+page.svelte` 8,899 → 8,699.** Script 7,915 → 7,729, and the template moved for the FIRST
+time in this phase: 984 → 970, because collapsing a prop list is a template change as well as a
+script one. Suite 2,071 → 2,093 across 145 files. `svelte-check` 1,157 files, 0 errors, 0 warnings.
+`eslint` at the pre-existing 27, all in `scripts/* 2.*` duplicates.
+
+**`src/lib/room/files.svelte.ts` (382).** The file drive: which tab, what is typed in the search
+box, how the rows are sorted, which are ticked, and every command a row can send — 16 declarations
+and functions, 212 lines, moved byte-exact with their comments.
+
+**Fifteen props became one object at BOTH ends of a two-level drill.** `+page.svelte` handed
+fifteen to `PresentationArea`, which passed the same fifteen straight through to `FilesPane` while
+reading only `filesHidden` itself. `PresentationArea` 1,186 → 1,142 and `FilesPane` 573 → 556,
+so the extraction removed thirty prop declarations rather than fifteen. `bind:fileTab` went with
+them: the binding existed only to carry a write back up through a component that never read it.
+
+**`filesHidden` is a getter, not a `$derived` field, and the test now proves the difference.** A
+derived class field initialises in declaration order — before the constructor assigns the thunk it
+reads — so it would evaluate against `undefined` once and cache that. `files.svelte.test.ts`
+flips the session behind the thunk and asserts the gate moves; the negative control replaced the
+getter with a cached field and went red.
+
+**`files` and `sessData` cross as THUNKS.** `data` is a `$props()` value, so handing over
+`data.files` would hand over that array and the pane would still be showing it after a navigation
+replaced it. The shape `$state`'s "passing state into functions" section documents; `RoomRoster`
+already used it.
+
+**`fileSearch` has no accessor at all.** The box writes, `searchedFiles()` reads, nothing reads it
+back — so a getter would be a member with no consumer. `search()` is its receiver, which keeps true
+the finding `PresentationArea`'s `onfilesearch` prop recorded when ESLint's
+`no-useless-assignment` refused a bindable whose incoming half was dead.
+
+**One control had to change shape rather than gain a prefix.** `onclick={deleteSelectedFiles}` was
+a bare reference — correct for a function, and a throw for a method, because `this` inside it would
+be the `<button>`. Wrapped, and pinned in two places: `unbound-method-contract.test.ts` refuses
+the pattern anywhere in `lib/room/`, and `files-pane-contract.test.ts` pins the wrapper on the one
+control that needed it. That guard now covers 14 classes.
+
+**A stale assertion of my own, found by this slice and fixed here.**
+`for-all-broadcast-contract.test.ts` asserted the broadcast refusal wording against
+`+page.svelte`. The senders moved to `RoomBroadcasts` in slice 12 and the assertion did not move
+with them — it kept passing because the page still held a line spelled identically, the Files pane's
+`setAlertSound`, a different feature with the same generic fallback. Slice 6 moved that line out
+too and the assertion went red. Re-pointed at the module **with a count of 3**, so one sender losing
+its refusal path can no longer leave two matches and a green test. This is the mirror image of the
+vacuous negative this phase keeps guarding against and it argues the same thing: an assertion has to
+name the file that owns its subject.
+
+**Two negatives in `files-pane-contract.test.ts` moved with their positives** for the same reason.
+The search-pipeline negative left on `page` would have been green forever, because the page no
+longer contains `searchedFiles` in any form.
+
+**Nothing gained authority.** `deleteFile` and `overwriteCashRegisterSound` both re-check
+`presenterRoom()` on the server. What moved is which button is drawn, never who may press it.
+
+**The two invalidations are injected separately and deliberately are not one call.** A delete
+re-reads the page; setting the alert sound needs only the room's settings back. Collapsing them
+would make every "Set as alert sound" click re-run every load function.
+
+**`SvelteSet` declined for the third time in this phase**, and recorded in the class rather than
+left to be re-litigated from the autofixer's output. Both sets are copy-on-write — the mutation
+happens on a copy before the value is ever stored, and the `$state` reassignment is what publishes
+it — so `SvelteSet` would trade eight allocations for a proxy on every read and change behaviour on
+a path no test covers, inside a slice whose whole job is to move code.
+
+**Three things the generator caught before they were written**, each recorded in the tooling:
+
+- A **string literal** would have been corrupted by a rename: the reassembly re-derived the quote
+  character with `indexOf`, and on `fileTab === 'files' ? 'file' : …` searching for `file` finds
+  it inside `fileTab` and returns `(`. The literal check refused it. Trap 4.2, third occurrence.
+- The rewrite whose pattern **spans** a literal — `await invalidate('room:data')` — cannot run
+  inside a code-span transform at all, because the argument is lifted out before the regex sees it.
+  Moved to a whole-line rewrite with an asserted count.
+- `new Set()` reassigned in `deleteSelectedFiles` read as `Set<unknown>` once the declared type
+  lived in the constructor rather than on the variable. Fixed by annotating the FIELD, which leaves
+  the moved line byte-exact.
+
+**And one it did not catch, found by reading the diff.** `svelte.parse` reports a statement's start
+at the statement, not at the start of its line, so removing a region left its two spaces of indent
+behind — and where two regions were adjacent the orphans accumulated into a six-space indent on the
+comment that followed. It compiled, it type-checked, and it was wrong. The page was reverted and the
+removal redone indent-aware rather than patched.
+
+### 2026-08-16 10:38 EDT — `control-plane-capture.md` READ IN FULL (1,243/1,243); its §H vindicates our `account.css` comment
+
+**Runtime impact: none** — `todo-next.md` only (5,126 → 5,202 lines).
+
+**§G is a completeness sweep — a seventh agent audited the other six and found 21 misses.** It is the
+model for the twice-run audit: re-check the headline claims independently, then look for what nobody
+opened. All three claims held, two more strongly than stated. The misses concentrated in cross-field
+arithmetic no single slice could do, collector artefacts reported as site properties, and **a live
+JWT in 8 copies that no agent mentioned**.
+
+**One finding reopens New Room properly and is sharper than what I had:** `newRoomCreate` and
+`adminUserAddForm` are hidden with computed `display:block`, `visibility:visible`, `opacity:1` and
+**no `ng-hide` class** — they are collapsed by an **ancestor**, and **no node object anywhere in the
+capture records an ancestor**. So the gate is *genuinely not-captured*, not merely "the clicks were
+refused". Two of the four hidden nodes are self-hidden and two are not — a distinction nobody had
+drawn. **And the five-click threshold is the collector's own assumption, not an observation** — §15.5
+must not be read as "five clicks".
+
+**§H item 6 vindicates the §G-1 closure made at 10:36.** That document leaves our `account.css:1995`
+bootbox comment as *"either backed by evidence outside this slice or an unevidenced claim in our own
+source."* **Backed** — `manageApiKeyRestrictions` occurs once in `app.min.js` and is
+`bootbox.dialog({title:"Manage API Key Restrictions", …})`. No change needed to our source.
+
+**Eight collector defects are now logged, two already fixed and both verified in git:**
+`dbc7001` *"the exemption disarmed one guard of two"* (the denylist matched `New` inside
+`showNewRoom=showNewRoom+1;`, zero occurrences in the label "Sessions") and `4928f47`
+*"it wrote 8 live JWTs to disk"* (now masks by parameter NAME so unpredicted credential shapes are
+caught by their label). **Still open: silent truncation at exactly 4,000/300 chars with no marker** —
+described as *"the same defect `collect-manage-gaps.js` was written to fix in its predecessor, whose
+header calls silent truncation 'the worst kind' — reintroduced here."*
+
+**One item is a reference defect, not a collector defect:** `app.dashboard` and `app-dock.dashboard`
+both register the URL `/dashboard` with the same template — the only duplicated URL among the 31.
+
+**Residue transcribed so it survives dump deletion:** a **12th stylesheet** exists (the
+AngularJS-injected `ng-hide` sheet, `href: null`) that `provenance.stylesheets` omits — and it is the
+sheet that actually hides both hidden controls; `panes.apiKeyRestrictionControls` is a **bare array**,
+so its selector and true match count are unrecorded and the number of restrictions links cannot be
+stated; the two identity sweeps **disagree** (2 srefs, 1 nav entry); the module graph is closed and
+valid (0 dangling, 0 orphans); and the `census` **dom and css columns are unverifiable** from the
+artifact while the four route-registry surfaces are exactly reproducible.
+
+**P-3 is still not closed.** The verdict is scoped to one build, one account, one moment, and **a
+separate operator origin/subdomain was never probed.**
+
 ### 2026-08-16 10:36 EDT — `admin-surface.md` §G-1 CLOSED: the API-key restrictions editor, transcribed in full
 
 **Runtime impact: none** — `todo-next.md` only (4,960 → 5,126 lines).
