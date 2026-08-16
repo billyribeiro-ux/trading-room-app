@@ -1,6 +1,11 @@
 <script lang="ts">
   import { ngbTooltip, ngbTooltipWith } from '$lib/ngb-tooltip';
   import { alertDateFormatter } from '$lib/message-formatters';
+  import {
+    CONNECTIVITY_ROWS,
+    connectivityGlyph,
+    connectivityRowClasses
+  } from '$lib/connectivity-status-rows';
   import { rtmpIngestUrl, whipIngestUrl, type StreamIngestKey } from '$lib/stream-ingest';
   import { invalidateAll } from '$app/navigation';
   import { resolve } from '$app/paths';
@@ -1948,8 +1953,7 @@
                 role="tab"
                 aria-controls="nav-{tabId}"
                 aria-selected={userInfoTab === tabId}
-                class:active={userInfoTab === tabId}
-                class="nav-item nav-link"
+                class={['nav-item nav-link', { active: userInfoTab === tabId }]}
                 onclick={(event) => {
                   event.preventDefault();
                   userInfoTab = tabId as typeof userInfoTab;
@@ -1965,9 +1969,10 @@
             id="nav-info"
             role="tabpanel"
             aria-labelledby="nav-tab-info"
-            class:show={userInfoTab === 'info'}
-            class:active={userInfoTab === 'info'}
-            class="tab-pane fade"
+            class={[
+              'tab-pane fade',
+              { show: userInfoTab === 'info', active: userInfoTab === 'info' }
+            ]}
           >
             <div class="d-flex flex-wrap align-items-center justify-content-center">
               <div class="table-responsive">
@@ -2173,9 +2178,10 @@
             id="nav-system"
             role="tabpanel"
             aria-labelledby="nav-tab-system"
-            class:show={userInfoTab === 'system'}
-            class:active={userInfoTab === 'system'}
-            class="tab-pane fade"
+            class={[
+              'tab-pane fade',
+              { show: userInfoTab === 'system', active: userInfoTab === 'system' }
+            ]}
           >
             <div class="d-flex flex-wrap align-items-center justify-content-center">
               <div class="table-responsive">
@@ -2233,9 +2239,10 @@
             id="nav-options"
             role="tabpanel"
             aria-labelledby="nav-tab-options"
-            class:show={userInfoTab === 'options'}
-            class:active={userInfoTab === 'options'}
-            class="tab-pane fade"
+            class={[
+              'tab-pane fade',
+              { show: userInfoTab === 'options', active: userInfoTab === 'options' }
+            ]}
           >
             <div class="row">
               {#if targetUser.permissions === 'a'}
@@ -2332,8 +2339,7 @@
                   <div
                     {...{ ngbdropdownmenu: '' } as Record<string, string>}
                     aria-labelledby="dropdownBasic1"
-                    class:show={userMuteMenuOpen}
-                    class="dropdown-menu"
+                    class={['dropdown-menu', { show: userMuteMenuOpen }]}
                   >
                     <button
                       {...{ ngbdropdownitem: '' } as Record<string, string>}
@@ -2380,9 +2386,10 @@
             id="nav-notes"
             role="tabpanel"
             aria-labelledby="nav-tab-perms"
-            class:show={userInfoTab === 'notes'}
-            class:active={userInfoTab === 'notes'}
-            class="tab-pane fade"
+            class={[
+              'tab-pane fade',
+              { show: userInfoTab === 'notes', active: userInfoTab === 'notes' }
+            ]}
           >
             <div>
               <p>To be able to manage user's notes, please enter the password.</p>
@@ -2498,9 +2505,13 @@
             onclick={() => onUserAction('test-follow-sound', targetUser)}
           >
             <span
-              class="fa"
-              class:fa-volume-up={followChatStyle.playSound}
-              class:fa-volume-mute={!followChatStyle.playSound}
+              class={[
+                'fa',
+                {
+                  'fa-volume-up': followChatStyle.playSound,
+                  'fa-volume-mute': !followChatStyle.playSound
+                }
+              ]}
             ></span>
           </button>
         </div>
@@ -3957,8 +3968,7 @@
             role="tab"
             aria-controls={tabId}
             aria-selected={sessionControlTab === tabId}
-            class:active={sessionControlTab === tabId}
-            class="nav-link"
+            class={['nav-link', { active: sessionControlTab === tabId }]}
             onclick={(event) => {
               event.preventDefault();
               sessionControlTab = tabId as typeof sessionControlTab;
@@ -3972,9 +3982,13 @@
         id="reset-session"
         role="tabpanel"
         aria-labelledby="reset-session-tab"
-        class:show={sessionControlTab === 'reset-session'}
-        class:active={sessionControlTab === 'reset-session'}
-        class="tab-pane fade"
+        class={[
+          'tab-pane fade',
+          {
+            show: sessionControlTab === 'reset-session',
+            active: sessionControlTab === 'reset-session'
+          }
+        ]}
       >
         <div class="row mt-4">
           <div class="col border-right pr-4">
@@ -4092,9 +4106,13 @@
         id="close-session"
         role="tabpanel"
         aria-labelledby="close-session-tab"
-        class:show={sessionControlTab === 'close-session'}
-        class:active={sessionControlTab === 'close-session'}
-        class="tab-pane fade"
+        class={[
+          'tab-pane fade',
+          {
+            show: sessionControlTab === 'close-session',
+            active: sessionControlTab === 'close-session'
+          }
+        ]}
       >
         <div class="d-flex justify-content-center">
           <button
@@ -4125,9 +4143,13 @@
         id="lock-session"
         role="tabpanel"
         aria-labelledby="lock-session-tab"
-        class:show={sessionControlTab === 'lock-session'}
-        class:active={sessionControlTab === 'lock-session'}
-        class="tab-pane fade"
+        class={[
+          'tab-pane fade',
+          {
+            show: sessionControlTab === 'lock-session',
+            active: sessionControlTab === 'lock-session'
+          }
+        ]}
       >
         <button
           type="button"
@@ -4159,9 +4181,13 @@
         id="av-device-selection"
         role="tabpanel"
         aria-labelledby="av-device-selection-tab"
-        class:show={sessionControlTab === 'av-device-selection'}
-        class:active={sessionControlTab === 'av-device-selection'}
-        class="tab-pane fade"
+        class={[
+          'tab-pane fade',
+          {
+            show: sessionControlTab === 'av-device-selection',
+            active: sessionControlTab === 'av-device-selection'
+          }
+        ]}
       >
         <div class="d-flex justify-content-end align-items-center mt-2 mb-3">
           <button
@@ -4264,9 +4290,13 @@
         id="streaming-selection"
         role="tabpanel"
         aria-labelledby="streaming-selection-tab"
-        class:show={sessionControlTab === 'streaming-selection'}
-        class:active={sessionControlTab === 'streaming-selection'}
-        class="tab-pane fade"
+        class={[
+          'tab-pane fade',
+          {
+            show: sessionControlTab === 'streaming-selection',
+            active: sessionControlTab === 'streaming-selection'
+          }
+        ]}
       >
         <ul id="streaming-settings-tab" role="tablist" class="nav nav-tabs">
           {#each [['obs-streaming', 'Stream RTMP/WHIP/OBS'], ['restream', 'Restream'], ['stream-player', 'Stream Player']] as [tabId, label] (tabId)}
@@ -4278,8 +4308,7 @@
                 role="tab"
                 aria-controls={tabId}
                 aria-selected={streamingControlTab === tabId}
-                class:active={streamingControlTab === tabId}
-                class="nav-link"
+                class={['nav-link', { active: streamingControlTab === tabId }]}
                 onclick={(event) => {
                   event.preventDefault();
                   streamingControlTab = tabId as typeof streamingControlTab;
@@ -4293,9 +4322,13 @@
             id="stream-player"
             role="tabpanel"
             aria-labelledby="stream-player-tab"
-            class:show={streamingControlTab === 'stream-player'}
-            class:active={streamingControlTab === 'stream-player'}
-            class="tab-pane fade"
+            class={[
+              'tab-pane fade',
+              {
+                show: streamingControlTab === 'stream-player',
+                active: streamingControlTab === 'stream-player'
+              }
+            ]}
           >
             <p>
               The stream player tool allows you to create a link you can share with others to watch
@@ -4332,9 +4365,13 @@
             id="obs-streaming"
             role="tabpanel"
             aria-labelledby="obs-streaming-tab"
-            class:show={streamingControlTab === 'obs-streaming'}
-            class:active={streamingControlTab === 'obs-streaming'}
-            class="tab-pane fade"
+            class={[
+              'tab-pane fade',
+              {
+                show: streamingControlTab === 'obs-streaming',
+                active: streamingControlTab === 'obs-streaming'
+              }
+            ]}
           >
             <div class="form-group m-4 w-100 text-center">
               <div class="form-check form-check-inline">
@@ -4531,9 +4568,13 @@
             id="restream"
             role="tabpanel"
             aria-labelledby="restream-tab"
-            class:show={streamingControlTab === 'restream'}
-            class:active={streamingControlTab === 'restream'}
-            class="tab-pane fade"
+            class={[
+              'tab-pane fade',
+              {
+                show: streamingControlTab === 'restream',
+                active: streamingControlTab === 'restream'
+              }
+            ]}
           >
             <textarea
               id="restream-link"
@@ -4553,9 +4594,13 @@
         id="session-history"
         role="tabpanel"
         aria-labelledby="session-history-tab"
-        class:show={sessionControlTab === 'session-history'}
-        class:active={sessionControlTab === 'session-history'}
-        class="tab-pane fade"
+        class={[
+          'tab-pane fade',
+          {
+            show: sessionControlTab === 'session-history',
+            active: sessionControlTab === 'session-history'
+          }
+        ]}
       >
         <div class="p-4 text-center">No session history.</div>
         <div class="p-4 text-center">
@@ -4566,9 +4611,13 @@
         id="webinar-tools"
         role="tabpanel"
         aria-labelledby="webinar-tools-tab"
-        class:show={sessionControlTab === 'webinar-tools'}
-        class:active={sessionControlTab === 'webinar-tools'}
-        class="tab-pane fade"
+        class={[
+          'tab-pane fade',
+          {
+            show: sessionControlTab === 'webinar-tools',
+            active: sessionControlTab === 'webinar-tools'
+          }
+        ]}
       >
         <div class="p-4">
           <button
@@ -5548,8 +5597,7 @@
           <button
             type="button"
             role="tab"
-            class:active={activeConnectivityTab === 'network'}
-            class="nav-link"
+            class={['nav-link', { active: activeConnectivityTab === 'network' }]}
             onclick={() => onConnectivityTabChange('network')}
           >
             <i class="fas fa-network-wired me-1"></i> Network Test
@@ -5560,8 +5608,7 @@
             <button
               type="button"
               role="tab"
-              class:active={activeConnectivityTab === 'mic'}
-              class="nav-link"
+              class={['nav-link', { active: activeConnectivityTab === 'mic' }]}
               onclick={() => onConnectivityTabChange('mic')}
             >
               <i class="fas fa-microphone me-1"></i> Mic Test
@@ -5592,94 +5639,33 @@
             {/if}
           </p>
         {/if}
-        <div
-          class:passed={testStates.udp === 'passed'}
-          class:failed={testStates.udp === 'failed'}
-          class="status-item mb-3"
-        >
-          <span class="fw-medium">UDP Enabled</span>
-          <span
-            class:spin={testStates.udp === 'pending' && isTestRunning}
-            class="status-icon {testStates.udp}"
-          >
-            {testStates.udp === 'pending'
-              ? isTestRunning
-                ? '...'
-                : '●'
-              : testStates.udp === 'passed'
-                ? '✔'
-                : '✖'}
-          </span>
-        </div>
-        <div
-          class:passed={testStates.tcp === 'passed'}
-          class:failed={testStates.tcp === 'failed'}
-          class="status-item mb-3"
-        >
-          <span class="fw-medium">TCP Enabled</span>
-          <span
-            class:spin={testStates.tcp === 'pending' && isTestRunning}
-            class="status-icon {testStates.tcp}"
-          >
-            {testStates.tcp === 'pending'
-              ? isTestRunning
-                ? '...'
-                : '●'
-              : testStates.tcp === 'passed'
-                ? '✔'
-                : '✖'}
-          </span>
-        </div>
-        <div
-          class:passed={testStates.stun === 'passed'}
-          class:failed={testStates.stun === 'failed'}
-          class="status-item mb-3"
-        >
-          <span class="fw-medium">STUN Server Connectivity</span>
-          <span
-            class:spin={testStates.stun === 'pending' && isTestRunning}
-            class="status-icon {testStates.stun}"
-          >
-            {testStates.stun === 'pending'
-              ? isTestRunning
-                ? '...'
-                : '●'
-              : testStates.stun === 'passed'
-                ? '✔'
-                : '✖'}
-          </span>
-        </div>
-        <div
-          class:passed={testStates.turn === 'passed'}
-          class:failed={testStates.turn === 'failed'}
-          class="status-item mb-4"
-        >
-          <span class="fw-medium">TURN Server Connectivity</span>
-          <!-- `–` for unconfigured, never `✖`. A cross next to "check your network or firewall"
-               reads as the user's fault; this deployment simply has no relay set. -->
-          <span
-            class:spin={testStates.turn === 'pending' && isTestRunning}
-            class="status-icon {testStates.turn}"
-            title={testStates.turn === 'unconfigured'
-              ? 'No TURN relay is configured for this deployment'
-              : undefined}
-          >
-            {testStates.turn === 'pending'
-              ? isTestRunning
-                ? '...'
-                : '●'
-              : testStates.turn === 'passed'
-                ? '✔'
-                : testStates.turn === 'unconfigured'
-                  ? '–'
-                  : '✖'}
-          </span>
-        </div>
+        <!--
+          The four checks, one loop. They were four near-identical blocks stating the same two rules
+          four times; the table and the two pure functions live in `$lib/connectivity-status-rows`,
+          where they are tested. The TURN row's `–`-for-unconfigured is preserved and is the reason
+          the glyph is a function rather than a nested ternary in the markup.
+        -->
+        {#each CONNECTIVITY_ROWS as row (row.key)}
+          {@const state = testStates[row.key]}
+          <div class={[`status-item ${row.spacing}`, connectivityRowClasses(state)]}>
+            <span class="fw-medium">{row.label}</span>
+            <span
+              class={[`status-icon ${state}`, { spin: state === 'pending' && isTestRunning }]}
+              title={state === 'unconfigured' ? row.unconfiguredTitle : undefined}
+            >
+              {connectivityGlyph(state, isTestRunning)}
+            </span>
+          </div>
+        {/each}
         {#if showConnectivityMessage}
           <div
-            class:alert-success={connectivityMessageText.includes('passed')}
-            class:alert-danger={connectivityMessageText.includes('failed')}
-            class="alert alert-info"
+            class={[
+              'alert alert-info',
+              {
+                'alert-success': connectivityMessageText.includes('passed'),
+                'alert-danger': connectivityMessageText.includes('failed')
+              }
+            ]}
           >
             {connectivityMessageText}
           </div>
@@ -5725,7 +5711,7 @@
               {/each}
             </select>
           </div>
-          <div class:active={isMicTesting} class="waveform-wrapper mb-3">
+          <div class={['waveform-wrapper mb-3', { active: isMicTesting }]}>
             <canvas bind:this={waveformCanvas} width="480" height="120" class="waveform-canvas"
             ></canvas>
             {#if !isMicTesting}
@@ -5738,14 +5724,14 @@
           <div class="volume-meter mb-3">
             <div class="volume-label">
               <span class="mic-label">Volume Level</span>
-              <span class:active={isMicTesting} class="volume-value">{micLevel}%</span>
+              <span class={['volume-value', { active: isMicTesting }]}>{micLevel}%</span>
             </div>
             <div class="volume-bar-track">
               <div
-                class:low={micLevel <= 30}
-                class:mid={micLevel > 30 && micLevel <= 70}
-                class:high={micLevel > 70}
-                class="volume-bar-fill"
+                class={[
+                  'volume-bar-fill',
+                  { low: micLevel <= 30, mid: micLevel > 30 && micLevel <= 70, high: micLevel > 70 }
+                ]}
                 style:width={`${micLevel}%`}
               ></div>
             </div>
@@ -5777,8 +5763,7 @@
               {/if}
               {#if isMicTesting && !isRecording}
                 <button
-                  class:recording={isRecording}
-                  class="btn btn-mic-record"
+                  class={['btn btn-mic-record', { recording: isRecording }]}
                   onclick={startRecording}
                 >
                   <i class="fas fa-circle"></i> Record
@@ -5792,7 +5777,7 @@
             {#if recordedAudioUrl}
               <div class="mic-actions-row">
                 <button class="btn btn-mic-play" onclick={playRecording} disabled={isPlayingBack}>
-                  <i class:fa-play={!isPlayingBack} class:fa-volume-up={isPlayingBack} class="fas"
+                  <i class={['fas', { 'fa-play': !isPlayingBack, 'fa-volume-up': isPlayingBack }]}
                   ></i>
                   {isPlayingBack ? 'Playing...' : 'Play Recording'}
                 </button>
@@ -5936,8 +5921,7 @@
               <!-- svelte-ignore a11y_no_static_element_interactions -->
               <div
                 id="filedrag"
-                class="filedrag"
-                class:hover={dragHover}
+                class={['filedrag', { hover: dragHover }]}
                 style={uploadListVisible ? 'display: none;' : 'display: block;'}
                 ondragover={onDragState}
                 ondragleave={onDragState}

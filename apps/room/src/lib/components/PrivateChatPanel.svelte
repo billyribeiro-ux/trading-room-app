@@ -293,12 +293,14 @@
             <button
               type="button"
               aria-current={currentUserId === tab.uid}
-              class="list-group-item list-group-item-light d-flex align-items-center justify-content-between px-1"
-              class:pc-active={currentUserId === tab.uid}
+              class={[
+                'list-group-item list-group-item-light d-flex align-items-center justify-content-between px-1',
+                { 'pc-active': currentUserId === tab.uid }
+              ]}
               onclick={() => onswitchuser(tab.uid)}
             >
               <span class="user-status-container">
-                <span class:bg-success={tab.online} class="badge user-status-type">&nbsp;</span>
+                <span class={['badge user-status-type', { 'bg-success': tab.online }]}>&nbsp;</span>
                 <img alt="t.avt" class="avatarImg" src={tab.pic} />
                 <span class="pc-username ms-1">{tab.name}</span>
               </span>
@@ -337,7 +339,7 @@
                   <app-st-compactmessage id="pcm-{message._id}">
                     <div class="msg-box pb-1">
                       <div class="d-flex justify-content-between align-items-center w-100">
-                        <strong class="username mx-1" class:presUser={message.isA}
+                        <strong class={['username mx-1', { presUser: message.isA }]}
                           >{message.n}</strong
                         >
                         <span class="msg-time mr-1">{formatTime(message.t)}</span>

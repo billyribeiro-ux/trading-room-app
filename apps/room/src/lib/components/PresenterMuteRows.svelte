@@ -113,7 +113,7 @@
         onchange={() => ontogglepresenter(user)}
       />
       <!-- Const 113 / 202, with `ngClass` `{muted: audioMutedFor[userID]}`. -->
-      <label class="form-check-label" class:muted for={rowId}>
+      <label class={['form-check-label', { muted }]} for={rowId}>
         {#if !muted}<span>Mute</span>{/if}
         {user.mediaValue.name}
         {#if muted}<span>Muted</span>{/if}

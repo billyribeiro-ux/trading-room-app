@@ -70,7 +70,7 @@
 >
   <div class="modal-dialog">
     <div class="modal-content">
-      <div class:modal-header={true} class:border-0={mode !== 'prompt'}>
+      <div class={{ 'modal-header': true, 'border-0': mode !== 'prompt' }}>
         <h5 class="modal-title">{title}</h5>
         <button
           type="button"

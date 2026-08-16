@@ -136,9 +136,7 @@
     boxed into the 3.5em scroll area for no reason the capture shares.
   -->
   <div
-    class="speech-reco-overlay"
-    class:history-mode={historyMode}
-    class:single-line={!historyMode}
+    class={['speech-reco-overlay', { 'history-mode': historyMode, 'single-line': !historyMode }]}
   >
     <div class="speech-reco-body">
       {#if historyMode}

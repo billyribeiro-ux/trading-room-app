@@ -406,8 +406,8 @@ describe('files sort bar: the markup', () => {
   it('applies `.active` from the FIELD alone, which is captured rather than derived', () => {
     // `mo=t=>({active:t})` applied as `ct(13,mo,"name"===e.fileSortField)` — the direction is not
     // part of it.
-    expect(template).toContain("class:active={fileSort.field === 'name'}");
-    expect(template).toContain("class:active={fileSort.field === 'date'}");
+    expect(template).toContain("{ active: fileSort.field === 'name' }");
+    expect(template).toContain("{ active: fileSort.field === 'date' }");
   });
 
   it('renders the bar INSIDE the file-count gate, beside the table it sorts', () => {

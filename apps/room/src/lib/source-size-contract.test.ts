@@ -246,7 +246,7 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       with no component of its own. Recorded in `TODO.md` rather than done here, because two
       extractions in one pass is how a mangle ships.
     */
-    max: 9613,
+    max: 9606,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {
@@ -267,7 +267,25 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       the bug's explanation were paid for by `$lib/refusal-message.ts`, which eleven call sites had
       been writing out by hand.
     */
-    max: 5982,
+    /*
+      PHASE 4, 2026-08-16, and the first time this ceiling has been the thing that FORCED a piece of
+      work rather than merely recording one.
+
+      Converting 160 `class:` directives to the clsx attribute form that `svelte/best-practices`
+      asks for is a net saving across the repository — every component shrank except this one. This
+      file grew 55 lines, because its tags carry the densest multi-condition classes and a
+      two-condition object wraps onto more lines than the two directives it replaces.
+
+      The rule above says a raise is a conversation, so the growth was paid for the way the previous
+      four rounds were: with a real extraction. The conversion had exposed the candidate itself —
+      the connectivity test's four rows were four near-identical 22-line blocks stating ONE
+      pass/fail rule and ONE glyph rule four times over. They are a single `{#each}` over
+      `$lib/connectivity-status-rows` now, and those rules are EXECUTED by a test for the first
+      time: a ternary inside an attribute is not reachable without mounting this 6,000-line host.
+
+      5,982 -> 5,965, so the file is smaller than it was before Phase 4 rather than merely level.
+    */
+    max: 5966,
     why: 'every modal in the room, in one component'
   },
   {

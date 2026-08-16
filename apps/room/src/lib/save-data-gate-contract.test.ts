@@ -145,7 +145,7 @@ describe('ours: the switch reaches the media layer', () => {
   });
 
   it('the pane hides the video and shows the reference message', () => {
-    expect(paneCode).toContain('class:hidden={stream === null || saveData}');
+    expect(paneCode).toContain('{ hidden: stream === null || saveData');
     expect(paneCode).toContain('<h3 class="mt-4 text-center">Video Disabled</h3>');
   });
 });

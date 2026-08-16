@@ -603,8 +603,7 @@
     -->
     {#if versions.length > 0}
       <button
-        class="btn btn-warning text-center m-1"
-        class:active={showVersionHistory}
+        class={['btn btn-warning text-center m-1', { active: showVersionHistory }]}
         type="button"
         onclick={() => onVersionHistoryOpenChange(!showVersionHistory)}
         ><i class="fas fa-history"></i> Version History ({versions.length})
@@ -669,9 +668,7 @@
 
   <div id={`summernoteEdit-${noteId}`} class="note-view" hidden></div>
   <div
-    class="note-editor note-frame"
-    class:fullscreen
-    class:codeview={codeView}
+    class={['note-editor note-frame', { fullscreen, codeview: codeView }]}
     style:height={fullscreen ? '100vh' : `${editorHeight}px`}
   >
     <div class="note-dropzone"><div class="note-dropzone-message"></div></div>
@@ -714,16 +711,14 @@
       <div class="note-btn-group note-view">
         <button
           type="button"
-          class="note-btn btn-fullscreen note-codeview-keep"
-          class:active={fullscreen}
+          class={['note-btn btn-fullscreen note-codeview-keep', { active: fullscreen }]}
           aria-label="Full Screen"
           aria-pressed={fullscreen}
           onclick={() => (fullscreen = !fullscreen)}><i class="note-icon-arrows-alt"></i></button
         >
         <button
           type="button"
-          class="note-btn btn-codeview note-codeview-keep"
-          class:active={codeView}
+          class={['note-btn btn-codeview note-codeview-keep', { active: codeView }]}
           aria-label="Code View"
           aria-pressed={codeView}
           onclick={toggleCodeView}><i class="note-icon-code"></i></button
@@ -750,8 +745,7 @@
       <div class="note-btn-group note-font">
         <button
           type="button"
-          class="note-btn note-btn-bold"
-          class:active={active('bold')}
+          class={['note-btn note-btn-bold', { active: active('bold') }]}
           aria-label="Bold"
           aria-pressed={active('bold')}
           onclick={() => command((instance) => instance.chain().focus().toggleBold().run())}
@@ -759,8 +753,7 @@
         >
         <button
           type="button"
-          class="note-btn note-btn-italic"
-          class:active={active('italic')}
+          class={['note-btn note-btn-italic', { active: active('italic') }]}
           aria-label="Italic"
           aria-pressed={active('italic')}
           onclick={() => command((instance) => instance.chain().focus().toggleItalic().run())}
@@ -768,8 +761,7 @@
         >
         <button
           type="button"
-          class="note-btn note-btn-underline"
-          class:active={active('underline')}
+          class={['note-btn note-btn-underline', { active: active('underline') }]}
           aria-label="Underline"
           aria-pressed={active('underline')}
           onclick={() => command((instance) => instance.chain().focus().toggleUnderline().run())}
@@ -803,8 +795,10 @@
               {#each fontFamilies as font (font)}
                 <button
                   type="button"
-                  class="note-dropdown-item"
-                  class:checked={active('textStyle', { fontFamily: font })}
+                  class={[
+                    'note-dropdown-item',
+                    { checked: active('textStyle', { fontFamily: font }) }
+                  ]}
                   onclick={() =>
                     command((instance) => instance.chain().focus().setFontFamily(font).run())}
                   ><i class="note-icon-menu-check"></i>
@@ -834,8 +828,10 @@
               {#each fontSizes as size (size)}
                 <button
                   type="button"
-                  class="note-dropdown-item"
-                  class:checked={active('textStyle', { fontSize: `${size}px` })}
+                  class={[
+                    'note-dropdown-item',
+                    { checked: active('textStyle', { fontSize: `${size}px` }) }
+                  ]}
                   onclick={() =>
                     command((instance) => instance.chain().focus().setFontSize(`${size}px`).run())}
                   ><i class="note-icon-menu-check"></i> {size}</button
@@ -961,16 +957,14 @@
       <div class="note-btn-group note-para">
         <button
           type="button"
-          class="note-btn"
-          class:active={active('bulletList')}
+          class={['note-btn', { active: active('bulletList') }]}
           aria-label="Unordered list"
           onclick={() => command((instance) => instance.chain().focus().toggleBulletList().run())}
           ><i class="note-icon-unorderedlist"></i></button
         >
         <button
           type="button"
-          class="note-btn"
-          class:active={active('orderedList')}
+          class={['note-btn', { active: active('orderedList') }]}
           aria-label="Ordered list"
           onclick={() => command((instance) => instance.chain().focus().toggleOrderedList().run())}
           ><i class="note-icon-orderedlist"></i></button
@@ -1037,8 +1031,10 @@
               {#each lineHeights as height (height)}
                 <button
                   type="button"
-                  class="note-dropdown-item"
-                  class:checked={active('textStyle', { lineHeight: height })}
+                  class={[
+                    'note-dropdown-item',
+                    { checked: active('textStyle', { lineHeight: height }) }
+                  ]}
                   onclick={() =>
                     command((instance) => instance.chain().focus().setLineHeight(height).run())}
                   ><i class="note-icon-menu-check"></i> {height}</button

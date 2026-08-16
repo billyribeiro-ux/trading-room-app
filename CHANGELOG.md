@@ -24,6 +24,150 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-16
 
+### 2026-08-16 06:12 EDT — Row AE re-measured after Phase 4, and the seven lines say the thing outright
+
+**Branch `feat/extra-chat-column`. Runtime impact: none** — `TODO.md` only.
+
+Phase 4 changed `+page.svelte`, so the two counts row AE quotes were a commit out of date. Re-taken
+rather than adjusted by arithmetic:
+
+| | before Phase 4 | after |
+| --- | --- | --- |
+| total | 9,612 | **9,605** |
+| `<script>` | 8,627 | **8,627** |
+| template | 986 | **978** |
+
+**All seven lines came off the template. The script did not move by one.** That is a sharper
+statement of the finding recorded at 05:53 than any of the prose around it: converting 162 `class:`
+directives — a change touching 25 files and every conditional class in the room — could not shift
+the script block, because the script block is not what template work reaches. 8,627 of the 9,605
+lines are orchestration, and they will still be there after any further component or attribute pass.
+
+The template is now 978 lines, down from 4,251 across Phases 2 and 4. There is essentially nothing
+left in it to extract, which is why the next piece of work is a plan for the script rather than more
+of the same.
+
+### 2026-08-16 06:07 EDT — Phase 4: 162 `class:` directives converted to clsx, and the growth paid for
+
+**Branch `feat/extra-chat-column`. Runtime impact: none** — the rendered class attribute is
+byte-identical in every case, which is proven below rather than asserted.
+
+`svelte/best-practices` says outright: *"use clsx-style arrays and objects in `class` attributes,
+instead of the `class:` directive"*. **162 directives across 25 files** now do. Zero remain.
+
+**The measurement first: the plan said 44, and 44 was wrong.** That figure counted `+page.svelte`
+alone, before Phase 2 moved its template into components. The real number across the repository was
+162, in 25 files — `ModalHost.svelte` alone had 59.
+
+**The order question, settled by rendering rather than by reading.** These conversions are only
+mechanical if both forms produce the same class string in the same ORDER, and this repository's
+contract tests assert exact class strings taken from the capture. `svelte/class` calls the two forms
+"equivalent" but does not state the order, and an order change would not fail type-checking, would
+not fail the autofixer, and would surface as a confusing capture-fidelity failure somewhere far from
+the cause. So `class-clsx-equivalence.test.ts` renders both forms of every shape that occurs in this
+codebase — static + one condition, static + two, a false condition, an expression class, an explicit
+condition, a hyphenated name, and no static class at all — across three condition combinations, and
+compares. Static classes come first, conditionals follow in written order, and the bare case omits
+the attribute in both forms. **It stays as a permanent contract**, because it is now also what
+catches a future Svelte release changing clsx's join order.
+
+**My first instrument was wrong and reported success.** The conversion began as a hand-rolled tag
+scanner. It silently stopped after three tags in `+page.svelte` — an apostrophe inside a JS
+arrow-function handler put its quote tracking in a state it never left — and reported **"0
+directives"** for a file that has five. A clean run with a wrong answer. Rewritten to use
+`svelte.parse`, which is the repo's own rule: do not hand-roll what the platform already does. The
+AST gives exact offsets, so each edit is a slice rather than a guess, and the count then matched the
+independent grep exactly, file by file.
+
+**THE CEILING FORCED REAL WORK, which is the first time it has.** Across the repository the
+conversion is a net saving — every component shrank except one. `ModalHost.svelte` grew 55 lines,
+because its tags carry the densest multi-condition classes and a two-condition object wraps onto
+more lines than the two directives it replaces. `source-size-contract.test.ts` caps that file and
+its rule is that ceilings only go DOWN: *"If you find yourself raising one, that is the conversation
+this file exists to force — not a number to edit."*
+
+So it was paid for with an extraction, and **the conversion had exposed the candidate itself**: the
+connectivity test's four rows were four near-identical 22-line blocks, restating one pass/fail rule
+and one glyph rule four times over. They are a single `{#each}` over `$lib/connectivity-status-rows`
+now. **Those rules had never been executed by a test** — a ternary inside an attribute is not
+reachable without mounting a 6,000-line modal host — so this is new coverage, not moved coverage.
+The TURN row's `–`-for-`unconfigured` is preserved and is now the thing a test pins: a cross beside
+"check your network or firewall" reads as the viewer's fault, where an unconfigured relay is a
+property of the deployment. **ModalHost 5,982 → 5,965**, so it ends smaller than it was before
+Phase 4 rather than merely level.
+
+**Two Phase 4 items are deliberate NON-changes, and both are verified intact:**
+
+- **The 8 copy-on-write `new Set()` sites are untouched.** The autofixer suggests `SvelteSet` on
+  them; the pattern (`playingForMe = new Set(playingForMe).add(id)`) works correctly today, so that
+  suggestion is a per-toggle allocation removed and **not** a correctness fix. Taking it as one is
+  the misreading the plan warned about.
+- **`<svelte:document>` stays as it is.** The note at that listener already records why it is not an
+  attachment. It is a decision, not an oversight.
+
+**Verified, and how:**
+
+- `svelte-check --threshold error` — **0 errors, 0 warnings across 1,144 files**.
+- `npx vitest run` — **138 files, 1,909 tests**, up from 1,896: the equivalence contract and the new
+  module's own tests.
+- `npx eslint src` — clean. Prettier clean on every touched file.
+- `svelte-autofixer` on a converted component — **`issues: []` AND `suggestions: []`**, the first
+  fully clean result of this whole exercise.
+- **Three negative controls, each with the mutation verified to have landed**: making `unconfigured`
+  render a cross again, making a converted conditional class static, and — the one that matters —
+  reversing the clsx array so the object precedes the static string. That last came back with
+  `expected 'show active tab-pane fade' to be 'tab-pane fade show active'`, which is precisely the
+  silent corruption the equivalence test was written to catch.
+- Ceilings lowered in the same commit: `+page.svelte` 9,613 → 9,606, `ModalHost` 5,982 → 5,966.
+
+The one-off migration script was deleted rather than committed. The method is recorded here; a
+tool with no remaining consumer is the dead scaffolding this repository's rules forbid.
+
+**This completes all four phases of the decomposition plan.**
+
+### 2026-08-16 05:53 EDT — The decomposition's remaining work is the SCRIPT, and the plan's arithmetic was wrong
+
+**Branch `feat/extra-chat-column`. Runtime impact: none** — `TODO.md` only. Recorded here because it
+changes what the next piece of work is, and because `TODO.md` row AE had gone stale in three places
+while the work it tracks was being done.
+
+**Measured, not estimated:** `+page.svelte` is **9,612 lines — 8,627 of `<script>` and 986 of
+template.**
+
+That single split is the finding. The approved plan expected Phase 1 (state classes) to take the
+file to ~5,500 and Phase 2 (template into components) to take it to ~1,700, arriving near the
+~1,100 target. **Phase 2 delivered in full and then some** — six components rather than five, the
+template down from 4,251 to 986, every pane of the room in its own file, and essentially nothing
+left in the template to extract. **Phase 1 did not.** Eight state classes moved 13,522 → 12,938,
+about 584 lines, because what they moved was DECLARATIONS while the 268 function bodies stayed
+where they were.
+
+So the ~1,100 target is **not reachable by any further component work**, and that matters more than
+it sounds: anyone measuring this row by counting components would conclude the job is nearly done,
+when the remaining 8,627 lines have barely been touched. What is actually left is the orchestration
+in that script block — the SSE handler, the command dispatch, the media transport, the file and
+alert commands — and it needs its own plan, because the Phase 1 pattern (state behind getters in a
+`.svelte.ts` class) is the wrong shape for a 577-line event handler.
+
+**Three stale claims in row AE, corrected:**
+
+- Its headline read *"`+page.svelte` is 13,663 lines"* in the present tense. It is 9,612.
+- *"PHASE 2 IS 3 OF 5 DONE"* with `AlertChatArea` and `PresentationArea` listed as remaining. All
+  six are done: `PrivateChatPanel`, `RoomSidebar`, `RoomNavbar`, `AlertChatArea` (`9d7a990`),
+  `PresentationArea` (`37ab9c2`), `FilesPane` (`eb4685d`).
+- *"PHASE 3 IS UNDER WAY"*, while the same row documented 3a–3d as done further along.
+
+The rewritten passage also carries forward the one genuinely transferable thing the last three
+extractions taught: **write the component with an empty `<script>`, run
+`svelte-check --output machine`, and take every `Cannot find name` as the prop list.** A hand scan
+of these regions produces props for comment text — `data` appears twelve times in the alert/chat
+markup and not once as the variable — and misses what is not an identifier, which is how the
+compiler caught that `screenVolume` is a snippet and `captureVideoImage` is an import.
+
+The historical running totals in that row were left exactly as they are. Each carries its own date
+and is a correct record of the moment it was taken; rewriting them to today's numbers would destroy
+the only trace of how the file actually moved.
+
 ### 2026-08-16 05:43 EDT — `FilesPane`: the last inline pane, and every pane now owns its own file
 
 **Branch `feat/extra-chat-column`. Runtime impact: none intended** — a region moved from one

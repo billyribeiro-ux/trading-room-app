@@ -91,8 +91,10 @@ describe('ours', () => {
   });
 
   it('hides the image rather than dropping it, so revealing needs no refetch', () => {
+    // Phase 4 converted the `class:` directive to the clsx attribute form. The guarantee is
+    // unchanged - `d-none` is applied CONDITIONALLY and the <img> stays in the markup either way.
     expect(messageCode).toContain(
-      'class:d-none={isMutedGif(segment.url) && !revealedGifs[segment.url]}'
+      "{ 'd-none': isMutedGif(segment.url) && !revealedGifs[segment.url] }"
     );
     // The <img> stays in the markup unconditionally.
     expect(messageCode).toContain('<img class="uploaded-img" src={segment.url} />');

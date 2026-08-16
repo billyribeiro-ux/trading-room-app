@@ -87,7 +87,7 @@ describe('the room consumes the setting it asked the controller for', () => {
   it('and both consumers are still in the component', () => {
     // If either is deleted the prop becomes dead, and its allow-list entry should go with it.
     expect(messageCode).toContain('presenter-msg-right');
-    expect(messageCode).toContain('class:presenter-reactions-right={presenterMessagesOnTheRight}');
+    expect(messageCode).toContain("{ 'presenter-reactions-right': presenterMessagesOnTheRight }");
   });
 
   it('suppresses badges when on — upstream’s coupling, not ours', () => {

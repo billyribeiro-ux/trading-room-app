@@ -452,8 +452,7 @@
         <li role="presentation" class="nav-item">
           <a
             id="screens-tab"
-            class="nav-link"
-            class:active={mainTab === 'screens'}
+            class={['nav-link', { active: mainTab === 'screens' }]}
             role="tab"
             tabindex={mainTab === 'screens' ? undefined : -1}
             aria-controls="screens"
@@ -479,8 +478,7 @@
         <li role="presentation" class="nav-item" hidden={hideStreams}>
           <a
             id="streams-tab"
-            class="nav-link"
-            class:active={mainTab === 'streams'}
+            class={['nav-link', { active: mainTab === 'streams' }]}
             role="tab"
             tabindex={mainTab === 'streams' ? undefined : -1}
             aria-controls="streams"
@@ -500,8 +498,7 @@
         <li role="presentation" class="nav-item">
           <a
             id="notes-tab"
-            class="nav-link presAreaTabs-notes"
-            class:active={mainTab === 'notes'}
+            class={['nav-link presAreaTabs-notes', { active: mainTab === 'notes' }]}
             role="tab"
             tabindex={mainTab === 'notes' ? undefined : -1}
             aria-controls="notes"
@@ -537,8 +534,7 @@
                 </span>
                 <ul
                   aria-labelledby="dropdownMenuButton"
-                  class="dropdown-menu"
-                  class:show={menus.notes}
+                  class={['dropdown-menu', { show: menus.notes }]}
                   {@attach mountNewNoteLink}
                 ></ul>
               </div>
@@ -571,8 +567,7 @@
           <li role="presentation" class="nav-item">
             <a
               id="videoplayer-tab"
-              class="nav-link"
-              class:active={mainTab === 'videoplayer'}
+              class={['nav-link', { active: mainTab === 'videoplayer' }]}
               data-bs-toggle="tab"
               data-bs-target="#videoplayer"
               role="tab"
@@ -605,8 +600,7 @@
           <li role="presentation" class="nav-item">
             <a
               id="swingAlerts-tab"
-              class="nav-link"
-              class:active={mainTab === 'swingAlerts'}
+              class={['nav-link', { active: mainTab === 'swingAlerts' }]}
               data-bs-toggle="tab"
               data-bs-target="#swingAlerts"
               role="tab"
@@ -644,8 +638,7 @@
           <li role="presentation" class="nav-item">
             <a
               id="dayTradeAlerts-tab"
-              class="nav-link"
-              class:active={mainTab === 'dayTradeAlerts'}
+              class={['nav-link', { active: mainTab === 'dayTradeAlerts' }]}
               data-bs-toggle="tab"
               data-bs-target="#dayTradeAlerts"
               role="tab"
@@ -680,8 +673,7 @@
         <li role="presentation" class="nav-item" hidden={filesHidden}>
           <!-- svelte-ignore a11y_missing_attribute -->
           <a
-            class="nav-link"
-            class:active={mainTab === 'files'}
+            class={['nav-link', { active: mainTab === 'files' }]}
             role="tab"
             tabindex={mainTab === 'files' ? undefined : -1}
             aria-controls="files"
@@ -721,8 +713,7 @@
                 </span>
                 <ul
                   aria-labelledby="dropdownMenuFiles"
-                  class="dropdown-menu"
-                  class:show={menus.files}
+                  class={['dropdown-menu', { show: menus.files }]}
                   {@attach mountUploadFileLink}
                 ></ul>
               </div>
@@ -734,10 +725,14 @@
       <div id="mainTabsContent" class="tab-content">
         <div
           id="screens"
-          class="tab-pane fade"
-          class:show={mainTab === 'screens'}
-          class:active={mainTab === 'screens'}
-          class:is-fullscreenshare={isFullScreenshare}
+          class={[
+            'tab-pane fade',
+            {
+              show: mainTab === 'screens',
+              active: mainTab === 'screens',
+              'is-fullscreenshare': isFullScreenshare
+            }
+          ]}
           role="tabpanel"
           aria-labelledby="screens-tab"
         >
@@ -842,8 +837,7 @@
                     -->
             <div
               id="screensTabsContent"
-              class="tab-content"
-              class:viewer-only-screen-tab={viewerOnlyMode}
+              class={['tab-content', { 'viewer-only-screen-tab': viewerOnlyMode }]}
             >
               {#each sharedScreens as screen (screen.id)}
                 <ScreenPane

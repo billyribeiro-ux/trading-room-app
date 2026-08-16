@@ -486,8 +486,10 @@
               {#each EMOJI_DUMP_DATA.anchors as anchor, index (anchor.title)}
                 <!-- svelte-ignore a11y_no_static_element_interactions -->
                 <span
-                  class="emoji-mart-anchor"
-                  class:emoji-mart-anchor-selected={!searchResults && selectedCategory === index}
+                  class={[
+                    'emoji-mart-anchor',
+                    { 'emoji-mart-anchor-selected': !searchResults && selectedCategory === index }
+                  ]}
                   title={anchor.title}
                   style:color={!searchResults && selectedCategory === index
                     ? 'rgb(174, 101, 197)'
@@ -554,8 +556,10 @@
         >
           <svelte:element this={"emoji-category"}>
             <section
-              class="emoji-mart-category"
-              class:emoji-mart-no-results={!searchResults || searchResults.length === 0}
+              class={[
+                'emoji-mart-category',
+                { 'emoji-mart-no-results': !searchResults || searchResults.length === 0 }
+              ]}
               aria-label="Search Results"
               style:display={searchResults ? 'block' : 'none'}
             >
@@ -667,9 +671,9 @@
               </div>
               <div class="emoji-mart-preview-skins">
                 <svelte:element this={"emoji-skins"}>
-                  <section class="emoji-mart-skin-swatches" class:opened={skinsOpened}>
+                  <section class={['emoji-mart-skin-swatches', { opened: skinsOpened }]}>
                     {#each EMOJI_DUMP_DATA.skinTones as tone, index (tone.title)}
-                      <span class="emoji-mart-skin-swatch" class:selected={index + 1 === skin}>
+                      <span class={['emoji-mart-skin-swatch', { selected: index + 1 === skin }]}>
                         <svelte:element
                           this={"span"}
                           role="button"

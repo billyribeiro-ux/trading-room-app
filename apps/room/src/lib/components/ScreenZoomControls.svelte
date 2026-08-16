@@ -197,8 +197,10 @@
 {#if variant === 'attached'}
   {#if showZoomCtrl}
     <div
-      class="zoom-controls position-absolute"
-      class:viewer-only-screen-zoom-controls={viewerOnlyMode}
+      class={[
+        'zoom-controls position-absolute',
+        { 'viewer-only-screen-zoom-controls': viewerOnlyMode }
+      ]}
     >
       {@render zoomTrio()}
     </div>
