@@ -260,8 +260,23 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       What the slice actually proves is the pattern, which is why it was chosen first: state and the
       functions that write it leaving TOGETHER, where Phase 1 moved fields and left 248 bodies here.
     */
-    max: 5635,
+    max: 4980,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
+  },
+  {
+    file: 'lib/room/events.svelte.ts',
+    /*
+      The room's realtime channel: 864 lines carrying 351 of code and 468 of citation.
+
+      A ROUTER, and the ratio is the evidence for that reading rather than a coincidence — more than
+      half the file is the transcription of what each of six channels means, because the behaviour
+      is almost entirely "which class owns the state this frame changes". The routing itself is a
+      chain of equality checks; what is expensive to recover is WHY `changeChatMode` refetches
+      instead of reading the mode off the wire, and why the leave beep reads a room setting named
+      for joins.
+    */
+    max: 864,
+    why: 'the SSE router - 351 code lines under 468 of channel transcription'
   },
   {
     file: 'lib/room/media-transport.svelte.ts',

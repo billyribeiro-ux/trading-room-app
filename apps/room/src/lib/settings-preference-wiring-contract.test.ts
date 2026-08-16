@@ -35,6 +35,8 @@ const SETTINGS = readFileSync(
   'utf8'
 );
 const PAGE = readFileSync(new URL('../routes/+page.svelte', import.meta.url), 'utf8');
+// The recording sounds are played by the SSE dispatch, which moved in Phase 5 slice 5.
+const EVENTS = readFileSync(new URL('./room/events.svelte.ts', import.meta.url), 'utf8');
 /*
   The write path moved to `RoomPrefs` in Phase 5 slice 3, so the assignment each wire ends in is
   read from the class that now performs it. The modal half and the page half are unchanged and are
@@ -437,7 +439,15 @@ describe('the wire has no silent break points', () => {
       'pushToTalkShouldUnmute(event, { pushToTalk: prefs.pushToTalk, micMuted: media.micMuted })'
     );
     expect(pageCode).toContain('!prefs.doSpeechReco');
-    expect(pageCode).toContain("&& prefs.recordingStartSound) playSoundEffect('recordingStart')");
-    expect(pageCode).toContain("&& prefs.recordingStopSound) playSoundEffect('recordingStop')");
+    // Both recording sounds are played by the SSE dispatch, which is the stream's now.
+    const eventsCode = stripComments(EVENTS);
+    // Matched across the line break prettier puts in, because the wrap is formatting and the
+    // wiring is what this asserts.
+    expect(eventsCode).toMatch(
+      /&& this\.#prefs\.recordingStartSound\)\s+playSoundEffect\('recordingStart'\)/
+    );
+    expect(eventsCode).toMatch(
+      /&& this\.#prefs\.recordingStopSound\)\s+playSoundEffect\('recordingStop'\)/
+    );
   });
 });

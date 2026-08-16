@@ -65,27 +65,53 @@ describe('the preference', () => {
 });
 
 describe('the hidden tab stops refetching', () => {
+  /*
+    The handler moved to `RoomEventStream` in Phase 5 slice 5; `missedChatWhileHidden` did not.
+
+    The flag is written on BOTH sides of that boundary — set by the stream, cleared by the
+    visibility handler still on the page — so it stays the page's and crosses as a receiver. Both
+    ends are asserted below, because a stream calling a receiver nobody wired would satisfy either
+    one alone.
+  */
+  const streamCode = readFileSync(new URL('./room/events.svelte.ts', import.meta.url), 'utf8');
+
   it('the SSE handler returns instead of invalidating', () => {
-    expect(pageCode).toContain('if (prefs.visibilityChangeEnabled && !appHasFocus) {');
-    expect(pageCode).toContain('missedChatWhileHidden = true;');
+    expect(streamCode).toContain(
+      'if (this.#prefs.visibilityChangeEnabled && !this.#appHasFocus()) {'
+    );
+    expect(streamCode).toContain('this.#chatMissedWhileHidden();');
+    // The page end of the receiver, so the pair cannot drift apart silently.
+    expect(pageCode).toContain('chatMissedWhileHidden: () => (missedChatWhileHidden = true)');
   });
 
-  it('but the gate is AFTER the mention path, so a mention still reaches you', () => {
+  it('the ding plays BEFORE the gate, so a hidden tab is still audible', () => {
     /*
-      `visibilityChangeEnabled && !appHasFocus ? te.isMention && emit('chatMsg', te) : push(...)` —
-      upstream keeps mentions alive on the hidden branch. A feature that silences the one message
-      addressed to you by name is not a saving.
+      THIS ASSERTION REPLACES ONE THAT COULD NEVER HAVE FAILED, and the replacement is the finding
+      rather than a tidy-up.
+
+      What stood here compared the SOURCE POSITION of the gate against the source position of
+      `mentionArrivals.fresh(`, on the claim that "the gate is AFTER the mention path, so a mention
+      still reaches you". Two things are wrong with it. The mention path is an `$effect`, and where
+      an effect is DECLARED says nothing about when it RUNS. And the effect reads `data.messages`,
+      which only changes when the loader runs — which is precisely what the gate's early return
+      skips. So on a hidden tab the mention popup is deferred to the catch-up, not delivered; the
+      old assertion passed because the two indices happened to be in that order, never because the
+      behaviour it described was real.
+
+      Moving the handler into another file is what exposed it: a cross-file index comparison is
+      obviously meaningless, where the same comparison inside one file had looked like a check.
+
+      What IS ordered, in one file and in execution: the chat ding runs before the early return, so
+      a followed user is still heard while the tab is hidden. That is the real saving-versus-silence
+      trade this feature makes, and it is what is asserted now. The mention behaviour is recorded in
+      `TODO.md` as a gap; changing it is a product decision, not a refactor's.
     */
-    /*
-      RE-POINTED 2026-08-15: the popup's marker moved into `RoomOrderedArrivals`, so `lastPopupChatId`
-      is no longer a name in this page. The concern is unchanged and is about ORDER — the hidden-tab
-      early return must come after the mention path, or a member would stop being told about the one
-      message addressed to them by name. `mentionArrivals` is that path's identifier now.
-    */
-    const gate = pageCode.indexOf('if (prefs.visibilityChangeEnabled && !appHasFocus) {');
-    const mention = pageCode.indexOf('mentionArrivals.fresh(');
-    expect(mention, 'the mention popup path must exist').toBeGreaterThan(-1);
-    expect(gate, 'the refetch gate must come after the mention path').toBeGreaterThan(mention);
+    const code = streamCode.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+    const ding = code.indexOf("playSoundEffect('pling')");
+    const gate = code.indexOf('if (this.#prefs.visibilityChangeEnabled && !this.#appHasFocus()) {');
+    expect(ding, 'the chat ding must exist').toBeGreaterThan(-1);
+    expect(gate, 'the hidden-tab gate must exist').toBeGreaterThan(-1);
+    expect(ding, 'the ding must come before the hidden-tab return').toBeLessThan(gate);
   });
 });
 

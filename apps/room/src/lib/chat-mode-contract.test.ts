@@ -23,6 +23,12 @@ import { chatModeConfirmPrompt } from './chat-mode';
 const SERVER = readFileSync(new URL('../routes/+page.server.ts', import.meta.url), 'utf8');
 const PAGE = readFileSync(new URL('../routes/+page.svelte', import.meta.url), 'utf8');
 /*
+  The RECEIVING half moved to `RoomEventStream` in Phase 5 slice 5. The sending half — the
+  presenter's `changeChatMode` wrapper — stayed on the page, so both files are named and each
+  assertion reads the one that owns its subject.
+*/
+const EVENTS = readFileSync(new URL('./room/events.svelte.ts', import.meta.url), 'utf8');
+/*
   What each MODE draws — the Chat Disabled block, the mute suffix and the webinar banner — moved to
   `AlertChatArea.svelte` on 2026-08-15. What DECIDES the mode did not: the refetch, the derived and
   the `=== true` comparisons are still read from the page below.
@@ -43,6 +49,7 @@ const serverCode = stripComments(SERVER);
 */
 const feedsModule = readFileSync(new URL('room/feeds.svelte.ts', import.meta.url), 'utf8');
 const pageCode = stripComments(PAGE);
+const eventsCode = stripComments(EVENTS);
 const paneCode = stripComments(PANE);
 const modalCode = stripComments(MODAL);
 
@@ -217,9 +224,9 @@ describe('the client reads the ROW, never the broadcast', () => {
       for a command like `mutemic`, which is an instruction with nothing to re-read. A chat mode is
       state.
     */
-    const from = pageCode.indexOf("if (command?.cmd === 'changeChatMode')");
+    const from = eventsCode.indexOf("if (command?.cmd === 'changeChatMode')");
     expect(from).toBeGreaterThan(-1);
-    const branch = pageCode.slice(from, from + 260);
+    const branch = eventsCode.slice(from, from + 260);
     expect(branch).toContain('void invalidateAll();');
     // Trusting the payload would put room policy in the gift of whatever arrives on a socket.
     expect(branch).not.toContain('command.mode');

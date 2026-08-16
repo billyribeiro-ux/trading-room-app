@@ -43,6 +43,7 @@ const BUNDLE = readFileSync(
 );
 const SERVER = readFileSync(new URL('../routes/+page.server.ts', import.meta.url), 'utf8');
 const PAGE = readFileSync(new URL('../routes/+page.svelte', import.meta.url), 'utf8');
+const EVENTS = readFileSync(new URL('./room/events.svelte.ts', import.meta.url), 'utf8');
 /*
   The three "for all" broadcasts moved to `RoomBroadcasts` in Phase 5 slice 12. The senders and the
   receivers went with them; what stays in `+page.svelte` is the DISPATCH — which command maps to
@@ -70,6 +71,7 @@ const stripComments = (source: string) =>
 
 const serverCode = stripComments(SERVER);
 const pageCode = stripComments(PAGE);
+const eventsCode = stripComments(EVENTS);
 const playerCode = stripComments(PLAYER);
 const overlayCode = stripComments(OVERLAY);
 
@@ -412,21 +414,22 @@ describe('the client sends, instead of moving its own screen', () => {
 
 describe('the client receives, so it reaches another browser', () => {
   it('sets the url for everyone and moves only a NON-presenter', () => {
-    expect(pageCode).toContain("if (command?.cmd === 'playVideoForAll') {");
+    expect(eventsCode).toContain("if (command?.cmd === 'playVideoForAll') {");
     /*
       The two writes are one receiver now. The assertion moved with them rather than being
       dropped: what it guards is that a play sets BOTH the url and the flag that lets a member see
       the tab at all, and `videoStarted` is where that pair now lives.
     */
-    expect(pageCode).toContain('broadcasts.videoStarted(command.url);');
+    expect(eventsCode).toContain('this.#broadcasts.videoStarted(command.url);');
     const started = functionBody(BROADCASTS, 'videoStarted(url: string)');
     expect(started).toContain('this.#videoPlayerUrl = url;');
     expect(started, 'hideVideoPlayer is what lets a MEMBER see the tab').toContain(
       'this.#hideVideoPlayer = true;'
     );
-    expect(pageCode).toContain("if (!isPresenter) mainTab = 'videoplayer';");
+    // `mainTab` is the PAGE's, so the stream reaches it through a receiver rather than owning it.
+    expect(eventsCode).toContain("if (!this.#isPresenter()) this.#showTab('videoplayer');");
 
-    expect(pageCode).toContain("if (command?.cmd === 'stopVideoForAll') {");
+    expect(eventsCode).toContain("if (command?.cmd === 'stopVideoForAll') {");
     /*
       Four writes are one receiver now, and that is the point rather than a tidy-up: stopping a
       video must ALSO clear the armed timer and blank the schedule, and a caller holding setters
@@ -436,7 +439,7 @@ describe('the client receives, so it reaches another browser', () => {
     expect(stopped).toContain('this.clearScheduledVideoTimer();');
     expect(stopped).toContain("this.#videoPlayerUrl = '';");
     expect(stopped).toContain('this.#hideVideoPlayer = false;');
-    expect(pageCode).toContain("if (!isPresenter) mainTab = 'screens';");
+    expect(eventsCode).toContain("if (!this.#isPresenter()) this.#showTab('screens');");
   });
 
   it('the member’s tab and pane carry the captured gate, not `isPresenter` alone', () => {
@@ -451,11 +454,11 @@ describe('the client receives, so it reaches another browser', () => {
   });
 
   it('the stop cancels an armed play sent by ANOTHER presenter', () => {
-    const from = pageCode.indexOf("if (command?.cmd === 'stopVideoForAll') {");
-    const body = pageCode.slice(from, pageCode.indexOf('return;', from));
+    const from = eventsCode.indexOf("if (command?.cmd === 'stopVideoForAll') {");
+    const body = eventsCode.slice(from, eventsCode.indexOf('return;', from));
     // The stop's four writes are one receiver now, so the invariant cannot be half-applied by a
     // caller holding setters. The dispatch calls it; the receiver is asserted to do all of it.
-    expect(body).toContain('broadcasts.videoStopped();');
+    expect(body).toContain('this.#broadcasts.videoStopped();');
     const stopped = functionBody(BROADCASTS, 'videoStopped()');
     expect(
       stopped,
@@ -467,11 +470,11 @@ describe('the client receives, so it reaches another browser', () => {
   });
 
   it('tears the overlay down on stop, everywhere', () => {
-    expect(pageCode).toContain("if (command?.cmd === 'playYTForAll') {");
-    expect(pageCode).toContain(
-      "if (typeof command.url === 'string') broadcasts.youtubeStarted(command.url);"
+    expect(eventsCode).toContain("if (command?.cmd === 'playYTForAll') {");
+    expect(eventsCode).toContain(
+      "if (typeof command.url === 'string') this.#broadcasts.youtubeStarted(command.url);"
     );
-    expect(pageCode).toContain("if (command?.cmd === 'stopYTForAll') {");
+    expect(eventsCode).toContain("if (command?.cmd === 'stopYTForAll') {");
   });
 });
 

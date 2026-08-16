@@ -24,6 +24,77 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-16
 
+### 2026-08-16 15:32 EDT — Phase 5 slice 5: `RoomEventStream`, and a contract that could never have failed
+
+**`+page.svelte` 5,635 → 4,979 (−656), under 5,000 for the first time.** Suite 2,266 → 2,277 across
+154 files. `svelte-check` 1,175 files, 0 errors, 0 warnings. **`eslint` on the page: 13 → 0.**
+**Runtime impact: yes** — the room's realtime channel moved. No behaviour changed; ten contract
+files were re-pointed at the file that owns each subject.
+
+**`src/lib/room/events.svelte.ts` (864 — 351 code, 468 citation).** `subscribeToRoomEvents` was
+575 lines, the largest single function left after slice 4, and the browser-side geolocation travels
+with it because the page starts and stops both at the same two moments.
+
+**It is a ROUTER and owns almost nothing**, which is the shape rather than an accident: fourteen
+collaborators injected, four fields travelling, and all four describe the CONNECTION rather than the
+room. A frame about a poll answer does not teach this class what a poll is — it calls
+`invalidateAll()` and the loader decides. Hence 351 code lines under 468 of transcription.
+
+**Three collaborators arrive as the NARROW SURFACE the stream calls, not as their whole class.**
+`RoomRoster`, `RoomPrivateChat` and `RoomUserActions` are each generic over a user shape and this
+router reads none of it — it hands the roster a list it never inspects, the private chat one message,
+and reads a single boolean off a follow style. Threading three unrelated type parameters through a
+class that reads no field of any of them would have made the signature describe work the file does
+not do, and would have made the router untestable without the whole object graph.
+
+**`createSubscriber` was evaluated here and REJECTED — the opposite of what the phase plan
+proposed, so the reason is recorded rather than the conclusion.** `roomEventsConnected` is a getter
+over an external source and was the one honest candidate in the file. The docs decide it: *"the
+returned teardown function will only be called when all effects are destroyed."* Correct for
+`MediaQuery`, whose `matchMedia` is free to re-create; wrong here, because it would tie the life
+of the room's realtime connection to whether anything happens to be reading the sidebar's indicator.
+The stream must run whether or not anyone is watching the light.
+
+**A CONTRACT THAT COULD NEVER HAVE FAILED, and the divergence it was hiding.**
+`visibility-change-contract` asserted "the gate is AFTER the mention path, so a mention still
+reaches you" by comparing the SOURCE POSITION of the hidden-tab gate against the position of
+`mentionArrivals.fresh(`. Two things are wrong with that. Where an `$effect` is DECLARED says
+nothing about when it RUNS. And the effect reads `data.messages`, which only changes when the
+loader runs — exactly what the gate's early return skips. **So on a hidden tab a mention is deferred
+to the catch-up, not delivered**, and the comment on the gate ("the MENTION path above has already
+run") described an ordering that does not exist: there is no mention branch on that handler.
+
+Moving the handler into another file is what exposed it — a cross-file index comparison is obviously
+meaningless where the same comparison inside one file had looked like a check. **The behaviour is
+unchanged by this slice.** The comment now says what the code does, the test now asserts what IS
+ordered in execution (the chat ding runs before the return, so a followed user is still heard on a
+hidden tab), and the divergence is written up in `TODO.md` — closing it honestly needs the SERVER
+to decide "this is a mention of you", because the chat frame deliberately carries no message text.
+
+**Thirteen dead imports removed from the page, and a correction to yesterday's entry.** Ten of them
+(`untrack`, `SvelteMap`, `ScreenTab`, `legacyUserId`, `ProducerInfo`, `captureErrorMessage`,
+`captureErrorName`, `mediaCaptureErrorMessage`, `permissionForCapture`, `MediaCaptureKind`)
+were left behind by **slice 4**, whose entry above says "eslint at the pre-existing 27". That was
+checked on the new module and not on the page, and it was wrong: the page went from 0 to 10. All
+thirteen are gone and the page now lints clean.
+
+**A dependency scanner, because slice 4 paid for guessing twice.** `/tmp/deps.mjs` reports, per
+name a slice reads, whether it is a collaborator (declared outside), travelling (declared inside),
+or SHARED (written on both sides — a thunk plus a receiver, never extracted). Validated against
+slice 4's known answer before being trusted on this one. It is what found that `mainTab` and
+`missedChatWhileHidden` are shared and had to cross as receivers.
+
+**`src/lib/room/events.svelte.test.ts` (8 tests).** The class EXECUTED against a stand-in
+`EventSource` — jsdom has none — supplying exactly the three events the class registers, so a
+rename of `open` would not pass. Two reactivity assertions, one per independently reactive group
+(the sidebar indicator and the "Conected" overlay are different elements), plus the RE-connect rule:
+the flash stays down on the first open and rises on the open after a drop. **Three negative controls
+seen red:** both runes demoted, and `chatMissedWhileHidden` removed.
+
+Not verified: no browser run. The eight contract files pin this against the reference bundle and the
+new test executes the connection lifecycle, but nothing here proves a real room receives a frame —
+that remains the owner's report.
+
 ### 2026-08-16 15:12 EDT — Phase 5 slice 4: `RoomMediaTransport`, the largest slice of the phase
 
 **`+page.svelte` 6,738 → 5,635 (−1,103).** Suite 2,255 → 2,266 across 153 files.

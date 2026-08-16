@@ -36,6 +36,9 @@ const remote = readFileSync(new URL('../routes/chat-mute.remote.ts', import.meta
 */
 const userActions = readFileSync(new URL('room/user-actions.svelte.ts', import.meta.url), 'utf8');
 const events = readFileSync(new URL('./server/room-events.ts', import.meta.url), 'utf8');
+// The CLIENT half. Named `stream` because `events` above is the SERVER publisher - two ends of
+// one channel, and confusing them is how an assertion ends up proving the sender to itself.
+const streamCode = readFileSync(new URL('./room/events.svelte.ts', import.meta.url), 'utf8');
 const viteConfig = readFileSync(new URL('../../vite.config.ts', import.meta.url), 'utf8');
 const intent = readFileSync(new URL('./user-action-intent.ts', import.meta.url), 'utf8');
 const strip = (source: string) =>
@@ -147,8 +150,9 @@ describe('the member is told, on the channel meant for one member', () => {
   });
 
   it('only reacts on the addressed member', () => {
-    expect(pageCode).toContain(
-      "if (command?.cmd === 'unmuteChat' && command.targetUserId === data.user.id) {"
+    // The receiving dispatch moved to `RoomEventStream` in Phase 5 slice 5.
+    expect(streamCode).toContain(
+      "if (command?.cmd === 'unmuteChat' && command.targetUserId === this.#session().user.id) {"
     );
   });
 
@@ -157,7 +161,7 @@ describe('the member is told, on the channel meant for one member', () => {
       `chatMutedTill` comes from the server. A toast without this would tell the member their chat
       is back while the composer stayed disabled — the same class of lie as the original bug.
     */
-    const branch = pageCode.slice(pageCode.indexOf("command?.cmd === 'unmuteChat'"));
+    const branch = streamCode.slice(streamCode.indexOf("command?.cmd === 'unmuteChat'"));
     expect(branch.slice(0, branch.indexOf('}'))).toBeTruthy();
     expect(branch.slice(0, 400)).toContain('void invalidateAll();');
   });
@@ -225,8 +229,8 @@ describe('the two strings stay two strings', () => {
   });
 
   it('keeps the member toast verbatim and separate', () => {
-    expect(pageCode).toContain(
-      "toasts.show({ kind: 'info', message: 'Chat enabled', enableHtml: false });"
+    expect(streamCode).toContain(
+      "this.#toasts.show({ kind: 'info', message: 'Chat enabled', enableHtml: false });"
     );
   });
 });
