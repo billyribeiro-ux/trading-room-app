@@ -19,14 +19,12 @@ const COMMAND = readFileSync(
   new URL('../routes/recording-state.remote.ts', import.meta.url),
   'utf8'
 );
-const PAGE = readFileSync(new URL('../routes/+page.svelte', import.meta.url), 'utf8');
 const SERVER = readFileSync(new URL('../routes/+page.server.ts', import.meta.url), 'utf8');
 
 const stripComments = (source: string) =>
   source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/<!--[\s\S]*?-->/g, '');
 
 const commandCode = stripComments(COMMAND);
-const pageCode = stripComments(PAGE);
 const recorderCode = stripComments(
   readFileSync(new URL('./room/recording.ts', import.meta.url), 'utf8')
 );
@@ -118,9 +116,7 @@ describe('the page announces rather than inferring', () => {
 
   it('every transition the recorder makes is announced', () => {
     // The badge and its pause state are driven entirely by these; a missed one desyncs the room.
-    expect(recorderCode).toMatch(
-      /void this\.#broadcastRecordingState\(\s*'startRec'/
-    );
+    expect(recorderCode).toMatch(/void this\.#broadcastRecordingState\(\s*'startRec'/);
     expect(recorderCode).toContain("void this.#broadcastRecordingState('stopRec')");
     expect(recorderCode).toContain("void this.#broadcastRecordingState('pauseRec')");
     expect(recorderCode).toContain("void this.#broadcastRecordingState('resumeRec')");

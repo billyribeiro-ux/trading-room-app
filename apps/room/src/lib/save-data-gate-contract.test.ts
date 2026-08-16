@@ -45,7 +45,6 @@ const SHARE = readFileSync(
   new URL('../../docs/source/components/app-screenshare-view.render-helpers.js', import.meta.url),
   'utf8'
 );
-const PAGE = readFileSync(new URL('../routes/+page.svelte', import.meta.url), 'utf8');
 const MODAL = readFileSync(new URL('./components/ModalHost.svelte', import.meta.url), 'utf8');
 const PANE = readFileSync(new URL('./components/ScreenPane.svelte', import.meta.url), 'utf8');
 
@@ -55,7 +54,6 @@ const stripComments = (source: string) =>
 const transportCode = stripComments(
   readFileSync(new URL('./room/media-transport.svelte.ts', import.meta.url), 'utf8')
 );
-const pageCode = stripComments(PAGE);
 const overlaysCode = stripComments(
   readFileSync(new URL('./components/RoomOverlays.svelte', import.meta.url), 'utf8')
 );
@@ -105,8 +103,8 @@ describe('ours: the switch reaches the media layer', () => {
   it('the page owns it, unpersisted, matching a writer that calls no setPreference', () => {
     expect(transportCode).toContain('this.#saveData = $state(false);');
     expect(transportCode).not.toMatch(/saveData\s*=\s*\$state\([^)]*loadedSettings/);
-        // The modal host moved into `RoomOverlays.svelte` in Phase 5 slice 17; the room state it renders
-  // from is handed to that component whole, so the prop is assembled there now.
+    // The modal host moved into `RoomOverlays.svelte` in Phase 5 slice 17; the room state it renders
+    // from is handed to that component whole, so the prop is assembled there now.
     expect(overlaysCode).toContain(
       'onSaveDataChange={(enabled) => mediaTransport.setSaveData(enabled)}'
     );

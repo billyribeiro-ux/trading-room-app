@@ -20,7 +20,6 @@ const bundle = readFileSync(
   new URL('../../docs/source/main.d6d3c112b59b7d0d.js', import.meta.url),
   'utf8'
 );
-const page = readFileSync(new URL('../routes/+page.svelte', import.meta.url), 'utf8');
 
 const stripComments = (source: string) =>
   source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/<!--[\s\S]*?-->/g, '');
@@ -32,7 +31,6 @@ const stripComments = (source: string) =>
 const paneCode = stripComments(
   readFileSync(new URL('./components/PresentationArea.svelte', import.meta.url), 'utf8')
 );
-const code = stripComments(page);
 
 /*
   The camera BEHAVIOUR moved to `RoomMediaTransport` in Phase 5 slice 4, and the assertions that
