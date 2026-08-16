@@ -1,5 +1,70 @@
 # todo-next — the room audit, the v4 corpus decision, and the owner's 2026-08-16 requirements
 
+# ⛔ COVERAGE MAP — READ THIS BEFORE TREATING THIS FILE AS A BUILD SPEC
+
+Added 2026-08-16 14:21 EDT, in answer to the owner's question *"todo-next.md should have everything
+our app is missing and needs to be implemented in detail. did you get that right?"*
+
+**No. Not yet, and the honest number is 2 of 42.**
+
+This file documents **every gap on the two surfaces that have been audited against our source**. It
+does NOT yet document what the other forty are missing, because those have not been compared to the
+reference at all. Treating it as a complete build spec would silently under-scope the work.
+
+| | |
+|---|---|
+| Svelte surfaces in `apps/room/src` | **42**, ~30,000 lines |
+| audited against reference evidence | **2** — `routes/session/+page.svelte` (659) and the `<app-alert-qa-modal>` block of `ModalHost.svelte` (159 of 5,965) |
+| lines audited | **~818 of ~30,000 — 2.7%** |
+
+## Audited — gaps documented in full
+
+| surface | lines | where the gaps are | count |
+|---|---|---|---|
+| `routes/session/+page.svelte` + `+page.server.ts` | 659 + 402 | §17.8 | 18 divergences (A-1…A-18), 11 gaps (G-1…G-11), 6 defects (D-1…D-6) |
+| `ModalHost.svelte` `<app-alert-qa-modal>` (4781–4939, handlers 1751–1769) | 159 | §19.4, §19.3 | 10 items (QA-1…QA-10), 6 defects (Q-D1…Q-D6), **1 false comment** |
+| `alert-questions.remote.ts` | 138 | §19.2 | 0 — stronger than the reference |
+
+## NOT audited — no reference comparison has been run
+
+Each of these may be complete, may be missing controls, or may carry invented values. **Nothing in
+this file says which, and no claim about them should be read into it.**
+
+| surface | lines | reference counterpart, where known |
+|---|---|---|
+| `routes/+page.svelte` | 6,894 | `app-room` — the room shell |
+| `ModalHost.svelte` (the other 5,806 lines) | 5,806 | ~18 further `app-*-modal` components; captures exist in `new-room/app-modals/` |
+| `notes/NoteEditor.svelte` | 1,517 | `app-notes` |
+| `PresentationArea.svelte` | 1,123 | `as-split-area.presentation-box` |
+| `RoomMessage.svelte` | 936 | `app-st-message` / `app-st-compactmessage` |
+| `RoomNavbar.svelte` | 904 | `nav.mainAppNav` |
+| `AlertChatArea.svelte` | 873 | `as-split-area.alert-chat-box` |
+| `PollPanel.svelte` | 804 | `app-poll-modal` |
+| `EmojiPicker.svelte` | 709 | `emoji-mart` |
+| `RoomSidebar.svelte` | 694 | `div.room-sidebar` |
+| `day-trade-alerts/*`, `swing-alerts/*` | 1,801 | — |
+| `FilesPane.svelte` | 556 | Files pane — partly evidenced in `more-fucking-evidence` |
+| `StreamingView`, `ScreenPane`, `ScreenTabs`, `StreamTabs`, `VideoPlayer`, `ScreenZoomControls`, `ScreenVolumeControl` | 2,237 | — |
+| `ExtraChatPane`, `PrivateChatPanel`, `NotesPane`, `PostAlertModal`, `RichTextEditor`, `GiphyPicker`, and 13 smaller | 2,600 | `app-post-alert-modal`, `app-user-pmmodal`, … |
+
+**Unread reference evidence that would feed the above**, sized: `account-page/` 930 KB ·
+`mising/` 798 KB · `must-match/` 535 KB · `gap-dump/` 171 KB · `app-modals/` ~250 KB across ~20
+files (`app-session-control-modal` alone is 92 KB, `app-user-settings-modal` 24 KB,
+`app-post-alert-modal` 21 KB) · 37 `.less` sources · `styes.css` 2,657–11,347 · the v4 rule-split
+(5,410 rules).
+
+## The honest scoping statement
+
+To make this file a complete build spec, **each of the forty unaudited surfaces needs the same
+treatment the two audited ones got**: read its reference component end to end at verified
+boundaries, transcribe every const by value, record every condition and handler, then measure our
+implementation against it and list what is missing.
+
+That is the remaining work, and it is large. It is written here as a number rather than implied,
+because "todo-next.md has everything" was not true and would have been discovered mid-build.
+
+---
+
 # ⛔⛔ PHASE RULE — DOCUMENT ONLY. DO NOT BUILD. ⛔⛔
 
 **Owner directive, 2026-08-16 13:15, and it governs every section of this file:**

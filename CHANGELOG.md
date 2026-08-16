@@ -24,6 +24,35 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-16
 
+### 2026-08-16 14:21 EDT — coverage map added to `todo-next.md`: it is a build spec for 2 surfaces of 42, not for the app
+
+**No runtime impact.** `todo-next.md` only, +65 lines (7,768 -> 7,833).
+
+The owner asked whether `todo-next.md` has everything the app is missing, in detail. **It does not,
+and the file now says so at the top instead of implying otherwise.**
+
+- **42 Svelte surfaces in `apps/room/src`, ~30,000 lines. Two are audited** — `routes/session/+page.svelte`
+  (659) and the `<app-alert-qa-modal>` block of `ModalHost.svelte` (159 of 5,965). **~818 lines,
+  2.7%.**
+- For those two the documentation IS complete to the six-point bar: 18 divergences + 11 gaps + 6
+  defects on login, 10 items + 6 defects + 1 false comment on Q&A.
+- **The other forty have had no reference comparison at all.** They may be complete, may be missing
+  controls, or may carry invented values; nothing in the file says which, and the map states
+  explicitly that no claim about them should be read into it.
+
+The map also sizes the unread evidence that would feed the rest (`account-page` 930 KB, `mising`
+798 KB, `must-match` 535 KB, ~20 more `app-modals/` captures including a 92 KB
+`app-session-control-modal`, the 37 `.less` sources) and names the per-surface method that closing
+them requires.
+
+This is recorded as a number rather than left implied, because "todo-next.md has everything" was not
+true and would have been discovered mid-build.
+
+**Verification.** No source file changed. The timestamp was written as 14:31 and corrected to the
+measured 14:21 before this entry — the second time today, and the reason is writing the stamp before
+measuring it rather than after.
+
+
 ### 2026-08-16 12:20 EDT — Phase 5 slice 8: `RoomMessageActions`, and a negative control that found a missing test
 
 **`+page.svelte` 7,162 → 6,895.** Script 6,210 → 5,942, template 952 → 953.
