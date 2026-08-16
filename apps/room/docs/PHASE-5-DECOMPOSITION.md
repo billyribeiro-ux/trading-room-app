@@ -9,7 +9,7 @@ five ways a mechanical extraction silently breaks this file, each of which has a
 
 ## 1. Where it stands
 
-`+page.svelte` **9,605 → 8,415**. Script 8,627 → 7,463. Template 978 → 952.
+`+page.svelte` **9,605 → 7,349**. Script 8,627 → 6,397. Template 978 → 952.
 
 | slice | module                          | commit    | page after |
 | ----- | ------------------------------- | --------- | ---------: |
@@ -20,9 +20,12 @@ five ways a mechanical extraction silently breaks this file, each of which has a
 | 4b    | `RoomVolume`                    | `2330597` |      9,057 |
 | 12    | `RoomBroadcasts`                | `a4480c4` |      8,899 |
 | 6     | `RoomFiles`                     | `9d5a5fb` |      8,699 |
-| 15    | `RoomTradeAlerts`               | `pending` |      8,415 |
+| 15    | `RoomTradeAlerts`               | `1bd38a2` |      8,415 |
+| 7     | `RoomPrivateChat`               | `00ec080` |      8,132 |
+| 13    | `RoomUserActions`               | `dc92cae` |      7,664 |
+| 10    | `RoomComposer`                  | `6535c98` |      7,349 |
 
-Suite 1,954/138 → **2,114/146**. `svelte-check` 0 errors, 0 warnings throughout.
+Suite 1,954/138 → **2,197/149**. `svelte-check` 0 errors, 0 warnings throughout.
 
 **The template moved for the first time in slice 6**, and only because that slice collapsed a prop
 list: 984 → 970. Everything before it came off the script alone. Slices 17–19 still carry almost all
@@ -119,7 +122,32 @@ rewriting `foo.bar` also stops you rewriting a spread. Handle `\.\.\.name` expli
 `this.#fileTab = $state('files')`. Rewriting it in place produces
 `this.#fileTab: FileTab = $state(...)`, which is a parse error.
 
-### 4.5 A REMOVED region leaves its own indent behind
+### 4.5a A GENERIC declaration is `name<T>(`, not `name(`
+
+`withEvidenceState<T extends MessageActionItem>(item: T)` was renamed nowhere in slice 9, because
+both the reference rewrite and the declaration rewrite anchored on the opening parenthesis. The
+result parsed as a stray `function` inside a class body — 46 errors from one missed rename, which
+is at least loud. The same declaration without a type parameter renames correctly, so this is
+invisible until a slice happens to contain one.
+
+### 4.5b A BARE method reference is the unbound trap arriving from the SOURCE
+
+`.map(withEvidenceState)` has no parenthesis, so the rename cannot see it — and left alone it is an
+unbound method handed to `map`. This is the same defect `unbound-method-contract.test.ts` refuses
+at prop boundaries, reaching the class from its own moved code instead. Any surviving bare reference
+to a renamed method should be refused by the generator rather than passed through.
+
+### 4.5c A literal NESTED inside a template interpolation is still a literal
+
+Slice 15 taught the scanner that `${…}` is code. Slice 13 found the hole that opened: a literal
+inside the interpolation was then treated as code too, and
+`` `un${list === 'mutedUsers' ? …}` `` had its inner literal rewritten to `'this.#mutedUsers'`.
+`svelte-check` caught it only because the comparison narrowed to a literal union; between two plain
+`string`s it would have compiled, and a comparison that is silently always false is exactly the
+shape that ships. The scanner is a flat TOKEN LIST now — every token is code or raw, reassembly is a
+concatenation, and there is no structure left to get wrong.
+
+### 4.6 A REMOVED region leaves its own indent behind
 
 `svelte.parse` reports a statement's start at the statement, not at the start of its line, so a part
 that opens with a block comment arrives flush left while the page has it at two spaces. Removing
@@ -141,6 +169,43 @@ method's leading JSDoc lands at column 0 above a body at column 4.
 The repair pass is itself dangerous: it rewrote a positional argument
 (`trimChatLog(messages, trimChatLogs)`) as an object key. **Read every site it changes** — 8 were
 rewritten in slice 3 and 7 were correct.
+
+---
+
+## 5a. Slice 9 (`RoomFeeds`) — SCOPED AND GENERATED, NOT LANDED
+
+The class was written, type-checked clean at 372 lines with citations 2/2, and then REMOVED rather
+than left unimported. What stopped it is worth writing down, because it is not difficulty:
+
+**The page rewiring needs a COMMENT-AWARE pass, and the counted-string-swap approach cannot do it.**
+Every other slice's identifiers appeared only in code. `visibleAlerts`, `searchableAlerts` and
+`enableBadges` appear in PROSE as well — `RoomAlerts`'s own docstring says it "deliberately does
+NOT own `visibleAlerts` / `searchableAlerts`", and there are eight more such mentions. A blind
+replace rewrites those sentences into nonsense, and the citation gate cannot see it because the
+count does not change.
+
+**What remains, precisely:**
+
+- 30 page sites, of which ~9 are inside comments and must NOT be rewritten;
+- two of them are object-literal SHORTHAND in `messageChrome` (`enableBadges,` and
+  `showBadgesToPresentersOnly,`), which need the key written back;
+- `AlertChatArea` takes 8 of these as props already, so its side is a prop rename only.
+
+The transform to use is the generator's own `xform`, which skips comment lines — not the flat
+`swap` the rewiring scripts use. That is a twenty-minute change and it was not worth starting with
+too little left to verify it.
+
+**Design decisions already taken and worth keeping:**
+
+- Generic over BOTH row types. `RoomAlerts`'s predicates take `AlertRow` — body, sender, hash,
+  timestamp — which is NARROWER than `MessageActionItem`. Widening `AlertRow` to make one type fit
+  would loosen a contract four other call sites depend on.
+- The pipelines become GETTERS, not `$derived` fields, for the reason `RoomFiles.filesHidden`
+  records.
+- `chatMessagesFor` stays ONE function called twice, not two deriveds. Six steps duplicated is six
+  chances to drift, and the extra column arrived after the main one.
+- The unbounded `visibleAlerts` pass is NOT fixed inside the move. It is recorded in the class
+  docstring and in `TODO.md`; fixing it changes behaviour and belongs in its own change.
 
 ---
 
