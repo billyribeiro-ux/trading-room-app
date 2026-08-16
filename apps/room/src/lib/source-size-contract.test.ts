@@ -260,7 +260,7 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       What the slice actually proves is the pattern, which is why it was chosen first: state and the
       functions that write it leaving TOGETHER, where Phase 1 moved fields and left 248 bodies here.
     */
-    max: 4323,
+    max: 4152,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {
@@ -289,6 +289,18 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     */
     max: 229,
     why: 'the webcam cards - six functions, two collaborators, and no rune between them'
+  },
+  {
+    file: 'lib/room/alerts-pane.ts',
+    /*
+      What a viewer DOES to the alerts pane: archive, export, detach, and the two toolbar toggles.
+
+      The boundary against `RoomAlerts` and `RoomFeeds` is that neither of those knows the pane
+      exists - they hold what the alerts ARE and which of them are visible. This holds the
+      actions, and reads both.
+    */
+    max: 291,
+    why: 'the alerts pane actions - eight functions, and only the detach receiver crosses back'
   },
   {
     file: 'lib/room/recording.ts',
