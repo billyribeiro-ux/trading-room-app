@@ -60,13 +60,13 @@ describe('the sound on an incoming chat message', () => {
     elsewhere in the dispatch — so the slice came out empty and three assertions failed against
     code that was correct. A test that slices source has to anchor both ends.
   */
-  const start = code.indexOf("payload.channel === 'chat' && !doNotDisturbOn");
+  const start = code.indexOf("payload.channel === 'chat' && !prefs.doNotDisturbOn");
   const block = code.slice(start, code.indexOf('void invalidateAll()', start));
 
   it('is gated on do-not-disturb AND the chat-sound preference', () => {
     // The reference's outer condition, both halves. Dropping either makes the room noisy for
     // somebody who explicitly asked it not to be.
-    expect(block).toContain('!doNotDisturbOn && chatSoundOn');
+    expect(block).toContain('!prefs.doNotDisturbOn && prefs.chatSoundOn');
   });
 
   it('plays `pling` for a FOLLOWED user and `followed` for everyone else', () => {

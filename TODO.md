@@ -445,11 +445,23 @@ they are removed, and their history lives in `CHANGELOG.md`, dated and timed, wi
 closed each one. Two places recording the same thing is how one of them goes stale, and a list that
 is mostly strikethrough is a list nobody reads to the bottom of.
 
-### THE REGISTER: `docs/reference/evidence-gap-register.md`
+### THE CONTROLLER REGISTER: `docs/reference/evidence-gap-register.md`
 
 Every gap from the full read of `apps/controller/evidence-dumps/` now lives there with a status, in
 five tiers. **That file is the tracker — this section is only the index to it.** Do not record a
 gap's status in both places; one of them will go stale.
+
+**It covers the CONTROLLER ONLY.** That was not obvious and cost a pass to establish: it tracks
+`page.manageSession.html`, `page.welcome.html` and their siblings, and says nothing whatever about
+`apps/room`. Room gaps used to be scattered through the rows of this file instead.
+
+### THE ROOM REGISTER + THE NEXT-WORK LIST — see `todo-next.md`
+
+The room's own gap register is `docs/reference/room-component-gap-register.md`, and the work queue
+that goes with it is **`todo-next.md`**, deliberately a SEPARATE file from this one: this file is
+being edited concurrently by the `+page.svelte` decomposition work, and two sessions writing one
+TODO is how a merge conflict eats a finding. **Nothing about the room audit or the owner's 2026-08-16
+requirements is recorded here — it is all in `todo-next.md`.**
 
 As of 2026-08-15 20:52 EDT: **68 CLOSED, 5 OPEN, 14 parked/won't-fix, 87 total.**
 

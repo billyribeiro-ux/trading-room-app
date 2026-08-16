@@ -24,6 +24,778 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-16
 
+### 2026-08-16 09:44 EDT — Manage page read in full: `tokcmd`/`appcmd` found, and P-1 proved exhaustively
+
+**Runtime impact: none** — `todo-next.md` only (2,959 → 3,350 lines). No source, test or config
+touched.
+
+Three more artefacts read end to end: **`apps/controller/evidence-page.manageSession.html`
+(2,718 lines, already in this repo)**, `docs/decoded/enterprise-and-control-plane.md`, and
+`apps/controller/evidence-dumps/stripe-details-2026-08-14.json`. Written up as §7 and §8.
+
+**The gap that needed a live capture did not.** `tokcmd` ∈ `pause|resume|unsub` and
+`appcmd` ∈ `enable|disable` are literal arguments in the row menu's `ng-click` attributes, in a file
+that has been in this repository since 2026-08-11. §4 said this required the owner to open the manage
+site and re-run a script; it did not. §6.1's inference that `manageMobileApp` was the
+`ptrMobileAppCaseByCaseEnabled` toggle is confirmed exactly.
+
+**P-1 is now exhaustive rather than sampled.** Having read the complete settings surface and the
+complete row menu, the push decision chain is **eight gates**: `ptrMobileAppEnabled` /
+`customMobileAppEnabled` · `freeTrialsGetApp` · `ptrMobileAppCaseByCaseEnabled` + `user.hasMobileApp` ·
+**`diasableFCMAlerts`** (a room-wide push kill switch) · **`user.alerterAppFCMUserOff`** (per member,
+red phone icon) · `mobileAppExpireNotificationsDays` (the 14-day decay) · `dontPush` (per alert) ·
+`isAlertOnly`. **Not one reads `stripeSubscriptionStatus`, `stripeCurrentPeriodEnd`,
+`allowedMemberships`, `allowedProducts` or `allowedPerms`.** The data exists (§6.12) and nothing
+consumes it. Gate #5 — written by `updateUserFCMTok` — is the lever to drive from billing.
+
+**A fifth alert channel and a sixth:** `customClientAlertPostURL` + `customClientAlertPostSecret` POST
+alerts to an arbitrary external endpoint, and **linked rooms are six settings, not one** — alerts,
+swing alerts and day-trade alerts each flow both to and from other rooms, authenticated only by an
+exchanged `linkedStreamsAPIKey`.
+
+**P-2 is not green field either:** `disalowMultiLogins` — *"users could can only log in once per
+room"* — already exists, plus `disalowSporadicMultiLogins` and `banIPList`. It is per-room and
+device-blind, so the work is extending it to be account-scoped and device-class-aware, not building
+it.
+
+**The billing seam, named:** `https://chat.protradingroom.com/ptr_app/sessions/v2/addUser/<sessionId>/?sec=<pairSecretKey>&email=&name=`
+provisions a member into a room, authenticated by a room secret in a query string. **There is no
+corresponding remove endpoint anywhere on the page** — which is P-1 in one line.
+
+**Also settled:** `sendFcmAlertsNew` is *"Use pub/sub for notifications"* — flagged as a real design
+risk, because if it means FCM topics then per-member revocation is structurally impossible under it.
+`invalidTokens` is a **manual** comma-separated text box, so §6.10's guess that `closeRoomAndRevoke`
+populates it is **withdrawn as unproven**. `altCodeAppJS` / `altCodeVendorJS` / `useV3` / `useV5`
+explain the version question: **a room is served whichever bundle PTR assigns it.**
+
+**Two corrections to earlier sections.** §6.1's role-integer table is the **bulk** vocabulary only —
+the per-user `updateUserXref` vocabulary differs, and **`10` means "hide personal data" per-user but
+"remove all" in bulk**, so a shared enum would turn a privacy toggle into a mass delete (§7.2). And
+§7.5's inference that `user.isMa` means "is marketplace" is **withdrawn**: the template gates on
+`user.isMarketPlaceUser`, and `hasStripeInfo` — which tests `isMa` — is referenced nowhere (§8.9).
+
+**Named next, and better than anything read so far:** the manage page links to
+**`/public/html/POST_ROUTE_API_DOCUMENTATION.md`** — the reference's own server-side API
+documentation. It is the only plausible source for the server behaviour no client capture can show.
+Not fetched.
+
+### 2026-08-16 08:25 EDT — `app.min.js` READ IN FULL: all 17 lines, and P-1 is a wiring problem
+
+**Runtime impact: none** — `todo-next.md` only (1,481 → 2,959 lines). No source, test or config was
+touched. The bundle is a live-site capture and stays in `~/Downloads` per `.gitignore`.
+
+The remaining eleven slices were read in order — lines 1–8 and 15–17, joining the six from 08:06.
+**§6 now runs §6.1 through §6.15 with a byte range per slice**, and §6.15 states plainly what the file
+answered and what it structurally cannot.
+
+**The finding that changes P-1's design:**
+
+**The subscription state is already on the member record and nothing acts on it.** `openStripeDetails`
+renders `stripeSubscriptionStatus`, `stripeCurrentPeriodEnd`, `stripeCancelAt`, `stripeCanceledAt`,
+`stripeLastPaymentFailureAt` and nine more fields — into a read-only admin popup, and nowhere else.
+So P-1 is **not** "the reference has no entitlement data"; it is that the signal, the decision point
+(`dontPush`, a per-alert push switch) and the revocation call (`updateUserFCMTok` + `tokcmd`) all
+exist and are not connected. Three hazards found alongside: `sendLinked` defaults ON and fans alerts
+into **other rooms**; `alertLater` has **no `dontPush` field**, so scheduled alerts always push; and
+browser Web Notifications are a fourth delivery channel independent of FCM.
+
+**Also settled:** there are **two mobile apps** — `protradingroom` and **`ptrAlerter`** — which is
+what the whole `alerterApp*` family refers to, and P-1 is about the second. `customMobileAppLaunchWord`
+is the custom **URL scheme** for a white-labelled app, deep-linking `?t=<jwt>&s=<roomID>&pc=<pairCode>`.
+P-5 has a complete blueprint in the SoundCloud path. P-3 has three existing control-plane pieces: a
+marketplace API with `memberships[]`, API keys with per-session/per-endpoint restriction, and an
+admin-users table.
+
+**A correction, recorded because the reasoning failed twice before it was caught.** Five sections of
+the read-log told the next agent *"by elimination the FCM settings must be in lines 2–8."* Having now
+read those lines, they are not there and never were: the pull script's census records only non-zero
+probes, so those names had been **absent** from it from the first minute, and I read a zero count as
+an unread region. `saveSessField` explains where they really are — a single generic command writes
+every session setting, so setting names appear only in the manage page's HTML, not in any JS bundle.
+`apps/controller/evidence-page.manageSession.html` is already in this repo and is now queue item #2.
+
+**Two further security findings, values deliberately not transcribed:** member image uploads go to
+**imgur via RapidAPI** with hardcoded keys — so a screenshot of a brokerage account leaves the tenant
+to a public image host — and the client fetches each member's location from **ipapi.co**, meaning the
+"city, region" shown to presenters is client-asserted and every member's IP reaches a third party.
+A hardcoded route secret and a published `sourceMappingURL` are also logged.
+
+**Eighteen reference bugs** are recorded where they were found, each with what it breaks — among them
+a `loadNonMobileUsers` that returns mobile users on rooms over 10,000, a `loadSettingsFromJSON` that
+exports instead of importing, and a webinar-mode delete that hides a message locally and sends
+nothing.
+
+**Not done, and named:** `/public/dist/maps/app.min.js.map` is referenced by the bundle and has not
+been fetched — if served it supersedes this entire decode, and it is queue item #1. The `tokcmd` and
+`appcmd` argument values still need the live row menu. The reference server remains uncaptured.
+
+### 2026-08-16 08:06 EDT — `app.min.js` read: six of sixteen slices, and the P-1 contract in full
+
+**Runtime impact: none** — `todo-next.md` only; no source, test or config was touched. `app.min.js`
+itself is a live-site capture and stays in `~/Downloads`, per `.gitignore`.
+
+The manage-page bundle (455,329 B, pulled 07:51 with `apps/room/scripts/ptr-pull-manage-bundle.js`)
+was **read, not searched** — lines 9–14 of its 17, in order, end to end. `todo-next.md` gains **§6**
+as the read log, with a byte-offset table so the next session can resume exactly where this stopped.
+
+**What it settled:**
+
+- **P-1's server contract, complete.** All six push actions post to a single relative endpoint,
+  `/users/v1/sessions`. **`updateUserFCMTok` with `tokcmd` is the revocation primitive** the
+  subscription-lapse work needs. Two previously unknown siblings — `sendTestAlert` and
+  `manageMobileApp` (plus `manageFileAccess`) — were found in the same statement neighbourhood.
+- **P-2 is not a green field.** The reference already carries a per-user mobile flag (`isM`), a
+  stable cross-room identity (the roster's `email` is an **md5 hash**), and a manual remedy
+  (`kickDuplicates`). What it lacks is enforcement — and **`isM` is client-asserted**, as is the
+  `bannedcookie` localStorage ban, so neither can be built on.
+- **P-5 has a precedent.** `doSoundCloudEmbed` / `stopSoundCloudEmbed` already broadcast an embedded
+  player room-wide, next to `playYTForAll` and `playSoundFile`. Spotify is a fourth member of an
+  existing family.
+- **R-1's data model** — typing state is per-channel, keyed `data.c`, entries carrying `uid` + `ts`.
+- **R-14 is buildable.** `recStartTime` is not invented: `roomState` carries `isRecording`, `recUser`
+  and `recStartTime` on every `getRoomState`. The warning at `+page.svelte:7183-7201` was right to
+  refuse to guess it; the value exists and is server-sourced.
+
+**Two things written earlier were corrected against this evidence:** `APIURL` is the **empty string**
+(every API call is same-origin relative), and every localStorage key is **namespaced by room id**, so
+nothing stored there is account-wide.
+
+**A security finding about the reference is recorded, with the values deliberately not transcribed:**
+`appVars.globals` ships the Verto password, TURN username and password, and a Giphy API key to every
+browser. Naming the exposed keys is enough to act on; copying them into a git-tracked file would move
+the leak rather than close it.
+
+**Also logged: eleven reference bugs** — among them a `changePerm` handler that iterates objects as
+arrays and so never promotes anyone, a postMessage origin check placed in a comma expression where it
+logs but cannot block, and two typo'd identifiers (`useHSL`, `lastSlowLinkAdjus`) that disable the
+guards they belong to. Each is recorded so a port does not silently inherit it.
+
+**Not done, and named as such:** lines 2–8 — 224 KB, the manage page proper — remain unread, and by
+elimination that is where `sendFcmAlertsNew`, `invalidTokens`, `diasableFCMAlerts`,
+`customMobileAppLaunchWord` and the Twilio/Protexting channels must be. Nothing in the six slices read
+ties push delivery to entitlement, which leaves §3's finding standing: the reference stops push on
+`lastLogin` decay, not on subscription state.
+
+### 2026-08-16 09:47 EDT — `RoomBroadcasts`, and a rename that silently broke three wire commands
+
+**Branch `feat/extra-chat-column`. Runtime impact: yes** — the video, YouTube and mp3 "for all"
+broadcasts moved, and **three wire command names and seven handler props were broken and fixed inside
+this slice.**
+
+**`+page.svelte` 9,057 → 8,899.** Phase 5 slice 12.
+
+**THE DEFECT THAT MATTERS, and it would have shipped silently.** The mechanical rename rewrote three
+strings that are not identifiers but **wire command names**: `'stopMp3ForAll'`, `'playVideoForAll'`
+and `'stopVideoForAll'` each became `'broadcasts.<name>'` inside the SSE dispatch's comparison. The
+server sends those literals on the `cmds` channel; prefixed, they match nothing. **Video and mp3
+"for all" would have stopped working for every member in the room**, with `svelte-check`, `eslint`
+and `svelte-autofixer` all green. A contract test caught it, because
+`for-all-broadcast-contract.test.ts` asserts on the literal.
+
+This is the same root cause as slice 4b's mangled import paths, one slice later: my transform skips
+comments and does **not** skip string literals. Comments and strings are both "not code", and only
+one of them was being protected. The rewire script now refuses to touch `import` lines, and the
+detector regex was widened after the first version missed `Mp3` — `[A-Za-z]+` has no digits.
+
+**RECEIVERS RATHER THAN SETTERS, a deliberate deviation from a pure move.** Six of these fields were
+assigned inline by the dispatch; the `stopVideoForAll` case set four in a row. Six public setters
+would have relocated the code and lost the invariant — **stopping a video must also cancel the armed
+timer and blank the schedule**, and a caller with setters can do one of the three, leaving a play
+that arrives minutes after the room was told it was removed. The wire events are named as methods
+(`videoStarted`, `videoStopped`, `mp3Started`, …) and the dispatch calls those. Same shape as
+`RoomMedia.roomRecordingStarted`. `broadcasts.svelte.test.ts` arms a play, stops it, advances the
+clock two minutes and asserts **nothing was sent** — with the negative half beside it, so the test
+cannot pass against a scheduler that never works.
+
+**THE UNBOUND-METHOD GUARD WAS BLIND TO THE NEW CLASS, one slice after being written.** Seven methods
+were passed as props by the shorthand repair and the guard said nothing, because its instance map had
+four entries and `RoomBroadcasts` was not one of them. **A guard blind to the newest module is worse
+than no guard, because it reads as coverage.** The map is now checked against disk: every class
+`lib/room/` exports must be listed, in the same shape and for the same reason as
+`source-size-contract.test.ts` refusing a module with no declared ceiling.
+
+**That check immediately found the map covered none of the eight Phase 1 classes either.** All
+thirteen are now listed — and the good news is that extending it found **zero** pre-existing
+offenders: `RoomSidebar` and `RoomNavbar` take `roster`, `menus` and `media` *whole* rather than
+being handed their methods, which is exactly what Phase 2 recorded doing.
+
+**Zero net contract regressions after re-pointing**, but eleven assertions moved: the senders and
+receivers are read from the class, the dispatch and the prop wiring from the page, and the invariant
+assertions read `videoStopped` directly rather than the four writes they replaced.
+
+**Verified:** `svelte-check` **1,155 files, 0 errors, 0 warnings**. `vitest` **2,071 across 144**, up
+from 2,059/143 — +11 `RoomBroadcasts` tests, +1 guard completeness check, +3 ceilings.
+`svelte-autofixer`: zero issues; one `SvelteDate` suggestion declined and recorded, because the date
+is parsed once, converted to a number on the same line and never read. `eslint` at the pre-existing
+27. Ceiling lowered 9,058 → 8,899, `broadcasts.svelte.ts` declared at 350. **Not verified:** no
+browser — and the three restored wire commands are precisely what one real "Play For All" would prove.
+
+### 2026-08-16 08:16 EDT — The full gate finds two orphans I left, and the reader catalog proves itself
+
+**Branch `feat/extra-chat-column`. Runtime impact: none** — one contract test.
+
+**Found by running `eslint .` across the repository rather than over changed files.** Through five
+slices I had linted only what I touched, which is the targeted-testing rule applied one notch too
+narrowly: a rename can orphan a constant in a file it does not otherwise change.
+`privchat-toolbar-contract.test.ts` carried a `PREFS_SOURCE` my slice-3 script added and a
+`page` read the same slice made redundant, and neither was in a file the slice reported touching.
+Fixed by USING the file-level constant rather than re-reading inside the test, and dropping the dead
+read. 29 problems -> 27, and **all 27 remaining are pre-existing duplicates under `scripts/*  2.mjs`**,
+untouched by this phase.
+
+**AND IT DEMONSTRATED SLICE 0a.** Removing that `page` read means the file no longer names
+`routes/+page.svelte` anywhere — which under the OLD hand-kept `EXTRACTION_SOURCES` would have
+silently dropped it out of the vacuity police, exactly as `day-separator-contract.test.ts` did
+twice. It stays policed, because the catalog discovers `lib/room/*.svelte.ts` and the file names
+`room/prefs.svelte.ts`. The reader floor held at its number. That is the gate written four hours
+ago catching, in passing, the failure it was written for.
+
+**Full gate, run once before the push:** `pnpm test` (privacy boundary + PostgreSQL schema
+artifacts + vitest) **2,056 across 143**; `pnpm check` **1,153 files, 0 errors, 0 warnings**;
+`eslint .` at the pre-existing 27.
+
+### 2026-08-16 08:11 EDT — `RoomVolume`, and the fifteenth unbound method finally gets a gate
+
+**Branch `feat/extra-chat-column`. Runtime impact: yes** — every volume in the room moved, and **ten
+handler props were fixed that would have thrown on first click.**
+
+**`+page.svelte` 9,247 → 9,057.** Phase 5 slice 4b.
+
+**REORDERED, and stated rather than done quietly.** The plan put media transport (~1,700 lines) next.
+The Group B slices do not depend on each other, so the order is free, and banking a small
+self-contained slice is worth more than starting the largest one. `RoomVolume` also exercises the
+`RoomPrefs` seam built an hour earlier — it is the first class in this repository to take another as
+a dependency.
+
+**Why it takes `RoomPrefs` rather than a callback:** `mute()`/`unmute()` set
+`preferences.doNotDisturbOn` in the reference itself, so the coupling is captured behaviour rather
+than one invented here, and `app-room`'s pair additionally drags `subtitles` and the background music
+along. Those two are the only preferences that kept a public setter after slice 3, and this class is
+one of the two reasons they did. The per-presenter pair goes the other way, through `prefs.save` —
+after slice 3 there is no other way to write a preference at all.
+
+**THE FIFTEENTH UNBOUND METHOD, AND NOW A GATE FOR IT.** A mechanical rename turned **ten** handler
+props into `onthing={roomVolume.method}` in one commit. A class method passed as a value loses
+`this`; the body reaches for a private field on `undefined` and throws the first time a user clicks.
+Counting slices 2 and 3, that is **fifteen instances in four slices**, every one found by reading a
+diff.
+
+**Every gate in this toolchain passes on it.** `svelte-check` — the types line up, a method *is* a
+function of that signature. `eslint` — nothing unused, nothing shadowed. `svelte-autofixer` — no
+opinion about `this`. Every text-reading contract test — the text is exactly what they expect. The
+suite — nothing mounts the component and clicks.
+
+So `room/unbound-method-contract.test.ts` now decides it **from the prototype, not from source
+text**: for each known room-class instance, an accessor is a value and safe to pass, a data property
+holding a function is a method and is not. It needs no list of method names, cannot go stale when a
+class gains one, and reports the file, line and prop. It parses with `svelte.parse` and never a
+regex — a hand-rolled scanner on this file once stopped after three tags on an apostrophe and
+reported a clean run with a wrong answer. **Negative control: reinstating one unbound method turns it
+red with `routes/+page.svelte:8298 — ontogglemute={roomVolume.toggleMute} passes a METHOD by
+reference`,** on code all four other gates accept. `AGENTS.md` DPE rule 2 — the gate comes before the
+bug, and this one is four slices late.
+
+**MY GENERATOR CORRUPTED A CITATION, AND THAT IS WHY THE COMMENT GATE EXISTS.** The first transform
+pass rewrote `screen-volume.ts` to `screen-this.#volume.ts` **inside a docstring**, because it did
+not distinguish code from comments. Caught before it was written by counting citations in and out
+(5 → 5 only after the fix). It then did the same thing to two import *paths* —
+`'$lib/screen-volume'` became `'$lib/screen-roomVolume.volume'` — which `svelte-check` caught, because
+string literals are not comments. Both are the same lesson: a mechanical rename must know what it is
+allowed to touch, and "skip comments" is only half of it.
+
+**MY TEST WAS WRONG AND THE SOURCE HAD ALREADY ANSWERED IT.** I asserted that the screen overlay's
+mute does not touch captions — `app-presentationarea`'s `mute()` genuinely is the shorter of the two.
+It fails, because the overlay reaches captions *transitively*: `muteScreenAudio` calls
+`setMasterVolume`, which carries `subtitles = true` at zero, a divergence the class records in as
+many words. The test now asserts what the room does and names why, and keeps the part that IS still
+shorter — the overlay leaves the background music alone. Recorded because the answer was in the file
+before I wrote the test.
+
+**Zero contract-test regressions**, which is worth noting after slice 3's forty-four:
+`screen-volume-contract.test.ts` asserts on the pure module and the overlay component, never on the
+page's wiring, so the extraction passed straight through it.
+
+**Verified:** `svelte-check` **1,153 files, 0 errors, 0 warnings**. `vitest` **2,056 across 143**, up
+from 2,009/141 — +10 `RoomVolume` tests, +34 for the unbound-method guard, +3 ceilings.
+`svelte-autofixer` on the new module: zero issues, zero suggestions. `eslint` clean (it caught four
+orphaned imports whose consumers moved). Ceiling lowered 9,248 → 9,058, `volume.svelte.ts` declared
+at 297. **Not verified:** no browser — and the ten wrapped handlers are exactly what a real click
+would have proven.
+
+### 2026-08-16 07:57 EDT — `RoomPrefs`: 27 preferences, one write path, and 25 of them can no longer be written any other way
+
+**Branch `feat/extra-chat-column`. Runtime impact: yes** — every viewer preference in the room moved,
+along with the function that persists them. Behaviour is intended to be identical.
+
+**`+page.svelte` 9,519 → 9,247** (script 8,265). Phase 5 slice 3, and the first with a real drop:
+**−272**, against −73 and −13 for the two before it.
+
+**THE INVARIANT IS THE POINT, not the line count.** Twenty-seven preferences were declared across
+eleven hundred lines of the page — `doNotDisturbOn` at 742, `pushToTalk` at 1853 — while
+`savePreference` sat two thousand lines below the values it assigned. **Twenty-five of the twenty-seven
+now have no public setter at all.** Before this, any code in the page could write `chatGif = true`:
+the preference changed on screen and never reached the server, because persistence lived in a
+function nobody was obliged to call. The only way in is now `prefs.save`, and
+`prefs.svelte.test.ts` asserts the absence of those setters off the prototype — plus that the write
+throws at runtime, not merely at the type level.
+
+The two that keep a setter are the two the room genuinely writes *without* persisting, and both are
+transient by the reference's own design: `doNotDisturbOn` (`app-privchat`'s `setDND()` flips the flag
+and calls no `setPreference`, unlike every neighbouring handler) and `subtitles` (`setMasterVolume`
+forces it on at zero volume).
+
+**THE INITIALISERS MOVED BYTE-EXACT.** `svelte/$state` permits `this.#x = $state(...)` as the first
+assignment in a constructor, so the whole transformation was `let x = ` → `this.#x = `, applied
+programmatically with the marker count asserted per declaration. That matters more than convenience:
+these comments carry the polarity reasoning — `!== false` against `=== true`, decided by the
+reference's own defaults and not by house style — and this room has already shipped two defects from
+guessing it. `alwaysScrollToBottom` (`=== true`) and `showSpeechRecoOverlay` (`!== false`) sit four
+lines apart and are opposite for good reason; both now have an executed test saying so.
+
+**WHAT THE CLASS DELIBERATELY DOES NOT OWN.** Two branches of the old write path are not preferences:
+`chatStyle` writes the room's chat rendering and `roomSplitDir` re-seeds the split geometry. They are
+handed back through an `onSideEffect` hook with their reasoning, because a preferences module that
+re-seeded the layout would have stopped having a boundary. The server write is injected for the same
+reason plus one more — it keeps a route-level remote function out of `$lib` and makes `save`
+testable without mocking the wire.
+
+**FOUR MECHANICAL-REPLACE TRAPS, ALL CAUGHT BY `svelte-check` AS PARSE ERRORS.** 143 renames landed
+cleanly; the failures were all shape, not count:
+
+1. **Object-literal shorthand keys got renamed** — `{ alwaysScrollToBottom: () => alwaysScrollToBottom }`
+   became `{ prefs.alwaysScrollToBottom: ... }`.
+2. **Svelte attribute shorthand** — `{doNotDisturbOn}` became `{prefs.doNotDisturbOn}`, which is not
+   valid as an attribute.
+3. **A positional function argument treated as an object key** by my own repair pass —
+   `trimChatLog(messages, trimChatLogs)` became `trimChatLogs: prefs.trimChatLogs`. Eight sites were
+   rewritten by that pass and **seven were correct**; this was the one that was not, and it was found
+   by reading all eight rather than trusting the count.
+4. **A `bind:` directive** — `bind:subtitles` became `bind:prefs.subtitles`.
+
+The parser reports one error at a time, so each fix revealed the next. That is slow and it is also
+the point: every one of these is a *syntax* failure rather than a silent behavioural one.
+
+**THE `this`-BINDING TRAP AGAIN, TWICE.** `onupdatesoundcheck={updateSoundCheck}` and
+`onPreferenceChange={savePreference}` both became unbound class methods. Same case as slice 2's
+`onConfirm`, same remedy, and the third and fourth instances of it in this phase — which is why it
+is written into the class rather than left to be rediscovered per call site.
+
+**ESLINT CAUGHT TWO ORPHANED IMPORTS** the compiler was happy with:
+`mirrorPreferenceToLocalStorage` and `DEFAULT_ALERT_DELIVERY_PREFERENCES` both moved into the class
+and left dead imports behind. "Nothing exists without a consumer", enforced by a tool rather than by
+memory.
+
+**FORTY-FOUR ASSERTIONS RE-POINTED ACROSS 13 CONTRACT FILES** — by far the largest migration of the
+phase so far, and the reason this slice took as long as the three before it combined. Files that
+assert on both halves now carry two named source constants, with each assertion pointed at the file
+that owns its subject: `settings-preference-wiring-contract.test.ts` reads the modal from
+`ModalHost.svelte`, the consumers from `+page.svelte`, and the 26 assignment wires from
+`prefs.svelte.ts`. One over-eager re-point (a `mentionUser` assertion swept up because `this.#`
+appeared two lines below it) was caught by the suite and put back.
+
+**A CHURN CORRECTION, recorded because it was mine:** a blanket `prettier --write src/lib/*.test.ts`
+reformatted six files that had nothing to do with this slice and were already prettier-dirty. All six
+were reverted; the commit touches only the files the slice actually needed.
+
+**Verified:** `svelte-check` **1,150 files, 0 errors, 0 warnings**. `vitest` **2,009 across 141**, up
+from 1,986/140 — +20 `RoomPrefs` tests and +3 for the module's ceiling, staleness and backstop.
+`svelte-autofixer` on the new module: zero issues, zero suggestions. `eslint` clean; `prettier` clean
+on every changed file except `+page.svelte`. Ceilings lowered 9,519 → 9,248 and `prefs.svelte.ts`
+declared at 590 in the same commit. **Not verified:** no browser — no preference has been toggled in
+a real room since the move, and the two `this`-binding fixes are exactly the kind only a real click
+proves.
+
+### 2026-08-16 07:21 EDT — `RoomDialogs`, and a runtime trap the compiler cannot see
+
+**Branch `feat/extra-chat-column`. Runtime impact: yes** — 130 references to the room's three bootbox
+dialogs were renamed and their state moved. Behaviour is intended to be identical.
+
+**`+page.svelte` 9,532 → 9,519.** Phase 5 slice 2.
+
+**THIRTEEN LINES, and that is a poor return stated plainly rather than dressed up.** The class costs
+115 lines and the page gave back 13. The slice is worth doing anyway, for two things that are not
+line count: it takes 130 scattered references to raw page state down to one object, and it is what
+lets `ModalHost`, the three `BootboxDialog` blocks and the image lightbox leave as **one** prop when
+`RoomOverlays` is extracted in slice 17. A slice whose whole value is measured in its own diff is
+the wrong way to read this phase — slice 1 was −73 and slice 2 is −13, and the template savings both
+of them set up land later.
+
+**THREE FIELDS, NOT ONE DISCRIMINATED UNION, and the room's own behaviour is why.** The obvious
+simplification is `open: Dialog | null`. It is refused because these three **stack**:
+`handleUserAction` raises a prompt whose `onconfirm` raises an alert, and `deleteThisPM` raises a
+confirm whose handler alerts on failure. One field would let the second silently replace the first,
+and a reader would answer a prompt and watch it vanish with no result. The Escape handler at the
+bottom of the page reads all three in a fixed precedence for exactly that reason.
+
+**THE TRAP: `onConfirm={dialogs.confirm}` TYPE-CHECKS CLEANLY AND THROWS AT RUNTIME.** A class method
+handed over as a value loses `this`, and the body reaches for a private field on `undefined`.
+`svelte-check` passed with 0 errors on it, and no text-reading contract test can see it either.
+`svelte/$state` names the case outright — *"when calling methods in JavaScript, the value of `this`
+matters"* — and the documented remedy is the wrapper now at that call site. **It was caught by
+reading the diff for reference-passed methods, not by any gate**, which is the third time this
+session that reading found what the toolchain could not. Written into `RoomDialogs.confirm`'s
+docstring so the next call site does not repeat it.
+
+**A MISTAKE I MADE AND FIXED IN THE SAME SLICE:** the first version of that fix put an HTML comment
+*inside* the component's attribute list, which is invalid — `svelte-check` answered
+`attribute_duplicate` at 9246:59. The reasoning moved into the class, where it belongs anyway,
+beside the method it is about.
+
+**MY OWN INSTRUMENT WAS WRONG AGAIN, and the count guard caught it before anything was written.**
+The scoping pass used `grep -c`, which counts matching **lines**, not occurrences — so the expected
+substitution counts were short by two on `bootboxAlert` and one on `bootboxPrompt`. The mechanical
+replace aborted rather than writing a partial rename. This is the same family as the `id-opacity`
+control an hour ago: an instrument that answers a slightly different question than the one asked.
+Re-counted with `split().length - 1` and applied at 31 / 70 / 25 / 4.
+
+**`bootboxPrompt` in `BootboxDialog.svelte` was deliberately NOT renamed.** It is
+`name="bootboxPrompt"`, an HTML input attribute, not a reference to the page's variable — the exact
+"do not rename a local sharing the constant's name" trap that once produced `const pane =
+pane.slice(...)`. The rename was scoped to `+page.svelte`, so it could not reach it.
+
+**Three reactivity assertions, one per field, and the control proves they are independent.**
+`room-mtx.svelte.test.ts` records that a wiring making one getter reactive while leaving another
+stale passes a single test and still renders the wrong thing. Removing `$state` from `#confirmation`
+alone turned **exactly one** of the three red and left the other two green — which is the assertion
+that a single reactivity test would have missed.
+
+**Verified:** `svelte-check` **1,148 files, 0 errors, 0 warnings**. `vitest` **1,986 across 140**, up
+from 1,973/139 — +10 dialog tests, +3 for the new module's ceiling, staleness and backstop.
+`svelte-autofixer` on the new module: zero issues, zero suggestions. `eslint` clean, `prettier` clean
+on every changed file except `+page.svelte`, a recorded pre-existing failure. Page ceiling lowered
+9,533 → 9,519 in the same commit. **Not verified:** no browser — no dialog has been raised in a real
+room since the move, and the `this`-binding fix above is precisely the kind that only a real click
+proves.
+
+### 2026-08-16 07:12 EDT — `RoomToasts`: the first slice that moves behaviour, and the gate written an hour earlier caught it
+
+**Branch `feat/extra-chat-column`. Runtime impact: yes** — `+page.svelte` and the new
+`apps/room/src/lib/room/toasts.svelte.ts` change how every toast in the room is raised and dismissed.
+Behaviour is intended to be identical; it is a relocation, not a rewrite.
+
+**`+page.svelte` 9,605 → 9,532** (script 8,627 → 8,549, template 978 → 983). Phase 5 slice 1.
+
+**What makes this different from Phase 1's eight classes:** those moved *declarations* and left the
+248 function bodies behind, which is why they moved only 584 lines between them. This moves the state
+**and every function that writes it, together** — the queue, its timers, the duplicate guard, the
+browser notification. That is the pattern the remaining eighteen slices repeat, and it was proved on
+the smallest region with a real boundary and **no dependencies at all**: no preferences, no `data`,
+no server call, nothing but the browser.
+
+**SEVENTY-THREE LINES, AGAINST A PLANNED ~250, and that is a re-scoping rather than a shortfall** —
+stated because a number that quietly misses its estimate is how the next estimate gets believed. The
+plan filed alert and Q&A **delivery** under this slice. Delivery decides *who* is told and with
+*which sound*, reading six preferences (`doNotDisturbOn`, `alertSoundOn`, `nonTradeSound`,
+`alertPopup`, `longerAlertPopup`, `qaSoundOn`) that are still declared in the page until slice 3.
+Moving it now would have meant six constructor thunks rewritten two commits later. So the class took
+the MECHANISM and left the POLICY where its inputs are — it knows how to show a thing and when to
+take it away, and has no opinion about whether it should be shown. The rest of the 250 arrives with
+the preferences.
+
+**THE GATE FROM 06:52 FIRED ON THE FIRST MODULE IT COULD POSSIBLY HAVE CAUGHT.** `toasts.svelte.ts`
+appeared on disk and the ceiling test went red — *"exists in lib/room/ with no ceiling. A module
+cannot be added without saying what too big means for it."* Twenty minutes old and already doing the
+job the hand-kept list had failed at twice. It fired a second time after `prettier` reflowed the
+module from 183 to 184 lines.
+
+**A NEGATIVE GUARD HAD ALREADY GONE VACUOUS, and was caught by looking rather than by the suite.**
+`post-alert-contract.test.ts` asserted `not.toContain("showInfoToast('Alert")`. `showInfoToast`
+stopped existing in `+page.svelte` the moment the queue moved, so it passed for the wrong reason —
+the text was absent because the FUNCTION had been renamed, not because the room had stopped raising
+a success toast on a posted alert. **The full suite was green with that guard guarding nothing.**
+This is the `exactAlerts` failure exactly, on the first slice, which is the measure of how easily it
+happens. Re-pointed to the new spelling AND anchored: it now asserts first that
+`persistPostedAlert` is still in this file, because a guard on a region that has moved is not a guard.
+
+**Four contract files re-pointed, and the split ones came out stronger.**
+`media-reconnect-toast-contract.test.ts` now carries two source constants, because the control is
+genuinely split: the QUEUE moved, but what *raises* those two toasts is `mediaServerDisconnected`,
+which is media transport and stays until slice 4. Each assertion points at the file owning its
+subject, and **a new test asserts the hand-off itself** — that the page constructs `RoomToasts` and
+that the class defines the methods the page calls. Every prior expectation there was satisfiable by a
+page calling a method nobody defines; that is the `presenterCommand` shape, which posted to a removed
+action for three commits.
+
+**The class ships with its reactivity test, not a commit later.** `room-mtx.svelte.test.ts` records
+having been written after its extraction, and records two drafts that were wrong: registering the
+effect inside `$effect.root` but mutating outside it records nothing, and asserting inside the root
+hides failures because the root swallows a thrown assertion. Both shapes are avoided here. **The
+negative control — deleting `$state` from the field — turned both reactivity tests red while the 13
+value tests stayed green**, which is precisely the point that file makes: a plain object passes
+everything except the assertion that matters.
+
+**Two deliberate non-changes, recorded so nobody re-proposes them:**
+
+1. **`$state`, not `$state.raw`.** The array qualifies on this repository's own rule — only ever
+   replaced, never mutated, and `ToastHost.svelte` was READ to confirm it mutates no field of a
+   notice. It stays `$state` because this slice is a MOVE, and a move plus an optimisation is two
+   changes in one commit with no way to tell which one broke something. The analysis is in the file
+   so converting it later is one word backed by evidence.
+2. **`svelte-autofixer` suggests `SvelteMap` for the timer map, and the suggestion is declined.**
+   `SvelteMap` makes READS reactive; nothing reads that map from a template or a derived. Same trade
+   the owner already ruled on for the room's eight copy-on-write `new Set()` sites. Written into the
+   file so the next run does not re-litigate it.
+
+**Verified:** `svelte-check` **1,146 files, 0 errors, 0 warnings**. `vitest` **1,973 across 139**, up
+from 1,954/138 — +15 toast tests, +1 hand-off test, +3 for the new module's ceiling, staleness and
+backstop. `svelte-autofixer` on `+page.svelte` returns **zero issues** and no suggestion mentioning
+toasts; its mutable-Map count went DOWN by one, because `toastTimers` left. `eslint` clean;
+`prettier` clean on every changed file except `+page.svelte`, which is one of the four pre-existing
+failures recorded in `AGENTS.md`. **Not verified:** no browser — the toasts have not been seen raised
+in a real room since the move.
+
+### 2026-08-16 06:52 EDT — The decomposition's gates land BEFORE the decomposition, and one of them was structurally blind
+
+**Branch `feat/extra-chat-column`. Runtime impact: none** — `apps/room/src/lib/source-size-contract.test.ts`
+only. No source file changed; `+page.svelte` is byte-identical to its parent commit.
+
+**Slice 0 of the `+page.svelte` decomposition (9,605 → under 1,000), and it deliberately extracts
+nothing.** `apps/room/AGENTS.md` DPE rule 2 says the gate comes before the hand-written artifact, not
+after the bug. Nineteen slices are about to move ~5,500 lines of function bodies out of one file, and
+the three failure modes that work has — a guard going vacuous, the mass relocating into an uncapped
+module, and an explanation being shed — are all invisible to `svelte-check`, to the suite and to
+`svelte-autofixer`. So they are executable first, and each was seen red before being trusted.
+
+**THE FINDING, and it is why this could not have been per-slice discipline.** `EXTRACTION_SOURCES`
+listed five `.svelte` paths. It could see a region moving into a COMPONENT and was **structurally
+blind to a region moving into a `.svelte.ts` MODULE** — which is the entire shape of the phase that
+follows. A test re-pointed from `+page.svelte` to `room/toasts.svelte.ts` would have stopped naming
+any entry, silently left the filter, and gone unpoliced while staying green: the
+`day-separator-contract.test.ts` failure for a third time, by the one route two previous retrofits
+had still not closed. Both retrofits were added *after* a dropped test count gave the game away.
+
+**Now catalog-driven** (DPE rule 4 — "prefer a catalog-driven test that discovers its own subjects
+over a hardcoded list"), over `routes/+page.*`, `lib/components/*.svelte` and `lib/room/*.svelte.ts`.
+**Measured before the change, because widening a filter can only add subjects and subjects can only
+add failures: the hand-kept list policed 54 files, the catalog polices 63, and all 9 newly-policed
+files already assert something positive.** The widening cost nothing and closed a hole. A floor was
+added with it — the policed count only ever rises, because twice it fell by exactly one and both
+times the only thing that noticed was a person thinking a number looked small.
+
+**A NEGATIVE CONTROL CAME BACK GREEN AND THE FAULT WAS MINE**, recorded because it cost a turn and
+because this repository's own count is now six such controls with four faulty instruments. The
+control re-pointed `id-opacity-contract.test.ts`'s `readFileSync` away from the page; the count did
+not move. The gate was right: that file names `routes/+page.svelte` **three** times — once as the
+read, once as an `ALLOWED` map key, once inside its own assertion — and my replace covered one, which
+is the `lastIndexOf` trap in miniature. Re-run against a file whose only mention *is* its read
+(`recording-codec.test.ts`), the gate went red at 62 against the floor of 63, and the suite total fell
+71 → 70 as a second independent signal. **The limitation it exposed is now recorded in the file:
+`source.includes(target)` matches a MENTION, not a READ.** It is inherited rather than introduced —
+the hand-kept list matched identically — and is deliberately not tightened, because requiring the
+path to sit inside a `readFileSync` call means parsing the test rather than reading it, and a guard
+cleverer than it is trustworthy is how the last three vacuous assertions got written.
+
+**Ceilings now cover the destination, not just the source** (owner decision, 2026-08-16). A ceiling on
+`+page.svelte` and none on `lib/room/` is not a ratchet, it is a funnel. The ten existing room
+modules are capped at their measured sizes, discovered from disk so the twentieth is covered by
+nobody remembering, with a test that **fails if a module exists with no ceiling**. The entries mean
+something different from the three above them and the file says so: those three are RATCHETS on files
+that outgrew the standard, where growth is the disease; these are CAPS on files that exist to receive
+an extraction, where growth is the treatment. `alerts`, `chat`, `log-pages`, `roster` and `media` are
+named destinations and will each rise once, in the commit that moves code in, with that commit saying
+what arrived — the conversation the rule asks for, held where it belongs.
+
+**A backstop of 800 under all of them**, because a per-file number can be raised one commit at a time
+until it means nothing and nineteen commits is enough for that. 800 is the honest maximum plus room
+for one slice: **`split.svelte.ts` is 724 today** — the largest module by 350 lines, and legitimately
+so, since twenty derived geometry values and two nested splits are one subject. Recorded rather than
+rounded down, because a limit nothing meets is a wish. This also corrects the phase plan, which had
+said "≤700 per module" without checking that the largest existing module already exceeds it.
+
+**The comment gate is the one a diff review cannot replace**, because a slice that sheds an
+explanation looks exactly like a slice that tidied up. Two whole-tree floors across 43 files: **6,329
+comment lines and 220 capture citations** (`full.js:`, `byte 1,221,430`, `main.d6d3c112b59b7d0d.js`).
+Whole-tree rather than per-file precisely because comments are *meant* to move — a relocation is
+level, a deletion is a fall. The line count is named in the file as a PROXY and not a census: it
+over-counts a string containing `//`, which is harmless for a ratchet and is deliberately not a
+structural claim, since a hand-rolled scanner making structural claims about this file is what once
+reported "0 directives" for a file with five. It also enforces that extractions land inside the
+catalog — move a region to some new corner of `$lib` and the total falls and the gate asks why the
+room's reasoning just left the room.
+
+**Every control seen RED, each with the mutation verified to have landed first:** an uncapped
+903-line module failed both the missing-ceiling and the backstop assertions; deleting one 8-line
+docstring carrying two byte offsets took the counts to 6,321/218 and failed both floors with the exact
+arithmetic. All three controls were reverted and `git diff` confirms `+page.svelte`,
+`id-opacity-contract.test.ts` and `recording-codec.test.ts` are byte-identical to HEAD.
+
+**Verified:** `svelte-check` **1,144 files, 0 errors, 0 warnings, 0 files with problems**; `vitest`
+**1,954 across 138**, up from 1,909 — +10 readers and the floor, +32 module caps, +3 comment gates,
+which accounts for all 45. `eslint` clean; `prettier --check` clean, and the file was clean at HEAD
+too, so the formatting pass was fixing what this change introduced rather than pre-existing drift.
+**Not verified:** nothing runtime, because nothing runtime changed.
+
+### 2026-08-16 08:05 EDT — The corpus moves to v4, the push-notification root cause is FOUND, and the work queue moves to `todo-next.md`
+
+**Branch `feat/extra-chat-column`. Runtime impact: none** — `todo-next.md` (new),
+`docs/reference/room-component-gap-register.md`, `TODO.md`, `CHANGELOG.md`. No source file changed.
+
+**`todo-next.md` is new and deliberately separate from `TODO.md`** (owner, 2026-08-16): a concurrent
+session is running the `+page.svelte` decomposition against `TODO.md`, and two sessions writing one
+file is how a merge conflict eats a finding. `TODO.md` keeps a pointer and nothing else.
+
+**P-1 ROOT CAUSE FOUND, and it is in the reference's own settings.** `room-settings-schema.ts:289-290`
+carries `mobileAppExpireNotificationsDays` — label **"Push expire days"**, help text verbatim *"If
+user does not log in this many days, we'll stop sending push notifications"*, captured default
+**14** — and `ptrMobileAppExpirePairCodeDays` (**7**). **The reference's automatic stop is keyed on
+`lastLogin`, not on subscription state.** Cancel → the member can no longer log in → fourteen days
+later push stops. **That is a fourteen-day paid-content leak by construction, and it is what the
+owner is seeing. It is not a defect this rebuild introduced**, and "stop immediately" is a
+requirement the original never met. Both settings are `wired: false` here; every *manual* control
+(`pauseUserNotifs`→`notificationsState`, `resetFCMForuser`, `sendTestFCM`) **is** built. Reached by
+reading two files nobody had opened: `docs/MOBILE-APP.md` (495 lines) and
+`docs/decoded/mobile-app-decoded.md`.
+
+**THE CORPUS IS NOW v4** (owner: *"we have to be all v4"*), and the cost was **measured before
+acting** rather than assumed. Three captures exist; the audit had been reading the OLDEST.
+
+- **Component sets are identical.** Both bundles hold **68** single-selector definitions, same set —
+  **51 first-party `app-*`** (exactly the decoded set, so the decode is complete) and 17 third-party
+  (`as-split`, `pan-zoom`, `re-captcha`, `router-outlet`, `ng-component`, `option`, five `ngb-*`, six
+  `emoji-mart`/`ngx-emoji`). **The 51 / 42 / 9 inventory holds unchanged for v4.**
+- **Body-level diff: 10 byte-identical, 39 differing by exactly ZERO length, 2 with real change.**
+  The 39 are proven renames, not assumed — `app-root` is 454 bytes in both and differs only by
+  `H(1,DRe,…)` → `H(1,IRe,…)`, one minified symbol whose name each build assigns in its own order.
+- **Only `app-webrtc-troubleshooter` (+551) and `app-presentationarea` (+299) actually changed.** So
+  "all v4" costs a re-decode plus two genuine re-reads, and Part A's findings survive.
+
+**New row R-15** — the +551 is v4's **Mobile App tab**: a third troubleshooter tab, ungated where
+every other mobile control carries the `ptrMobileAppEnabled || customMobileAppEnabled` gate, whose
+`Restore Connectivity` button fires `restoreMobileAppTokens` and whose default now lands a
+non-presenter on it as their **only** tab. Ours is the older build (`ModalHost.svelte:5588` renders
+the single-literal title). **It is the member's only self-service fix for stopped notifications**, so
+it belongs to P-1 as much as to the reference match.
+
+**MY OWN INSTRUMENT FAILED FIRST AND IS RECORDED AS SUCH.** The body comparison initially returned
+"51 unresolved". It searched for `dt({` — the helper name in the *decoded* files — while the raw v4
+bundle uses `ut({`; the minified helper name itself differs per build. Rewritten to match
+`cmp=<ident>({` and bracket-match, then validated against a known answer before being believed.
+**The first result was the tool failing, not a finding**, and reporting it would have been a claim
+about the evidence that was really a claim about my regex.
+
+**Also recorded: the evidence I do NOT have**, named in `todo-next.md` §4 so nobody assumes it was
+checked — the reference's **server** (uncaptured entirely, so what `restoreMobileAppTokens` does is
+unknown), the manage-page bundle `/public/dist/app.min.js` (**not in this repo**, and it holds
+`pauseUserNotifs`, `getFCMTokens`, `resetFCMForuser`, the `ptrMobileAppCaseByCaseEnabled` branches
+and `customMobileAppLaunchWord`), the v3 bundle, and two unread files that likely answer P-3 and
+P-1's billing seam.
+
+**Verified:** the bundle comparison twice, the second time with a corrected and validated
+instrument; every "what exists today" claim by opening the cited file. **Not verified:** what the
+reference server does with `restoreMobileAppTokens`; the contents of `app-presentationarea`'s +299
+bytes. **Not run:** any test — no source file was touched.
+
+### 2026-08-16 07:24 EDT — Five owner requirements added to the room register as Part B, and the push-notification one has a decisive finding
+
+**Branch `feat/extra-chat-column`. Runtime impact: none** —
+`docs/reference/room-component-gap-register.md`, `TODO.md`. No source file changed.
+
+Requirements stated by the owner 2026-08-16 and recorded in their own words. They are **not**
+capture-derived, so they are kept in a structurally separate **Part B** (`P-1`…`P-5`) — mixing them
+into the `R-*` rows would put opinion beside byte offsets in a file whose whole value is that it
+does not.
+
+**P-1 — cancelled/lapsed/revoked members still receive alert push notifications on the mobile app.
+This is the highest-value open item in the repository: a cancelled member still receiving trade
+alerts is still receiving the product.** The investigation produced one finding that decides the
+whole row:
+
+> **`sendPush` has exactly two callers in this repository, and neither is the alert broadcast.**
+> `listFcmRegistrations` (`rooms.ts:772`) is a `validate_only` dry run; `sendTestPushToMember`
+> (`:845`) is an operator's manual test. **The fan-out actually reaching members' phones is not in
+> this codebase.**
+
+So step one is to find the production sender, not to write code — a fix written here may not be on
+the path at all. The half that *is* here is revocation at the token store (`roomUsers.pushTokensJson`),
+which stops delivery regardless of sender **provided the sender reads this store**, and that proviso
+is the open question. Also established: `evaluateEntitlement` (`sso-entitlement.ts:91`) is a **door
+check evaluated once** from SSO-asserted claims, and a phone paired while the subscription was live
+never passes that door again; there is **no billing machinery anywhere in `apps/` or `services/`**,
+though `accounts.status` was explicitly designed as its seam. **`TODO.md` row Q is adjacent and is
+not this** — Q proves the *web entry door* closes after cancellation; push bypasses the door.
+
+**P-2 — one computer + one mobile device.** `loginSessions` carries `id`/`userId`/`createdAt`/
+`lastSeenAt` and nothing else: no device identity, no device class, no cap, no eviction. Six shared
+logins are six valid sessions. Recorded with the eviction-policy decision called out as the owner's
+(evict oldest vs refuse), and a warning to count before enforcing.
+
+**P-3 — the super-admin dashboard is further along than "finish" implies:** 795 lines across
+`(app)/admin/` and `superadmin.ts`, a **layout-level guard so protection is opt-out not opt-in**,
+audit that records refusals *before* rethrowing, and `setAccountStatus` / `impersonate` /
+`stopImpersonating`. The undefined part is whether the enterprise tier is a **new level above
+`accounts`** (a schema change re-scoping every query and guard) or the existing console with more
+features. **P-1 and P-2 both terminate in this console, so this is the one to settle first.**
+
+**P-4 (drawing tool) and P-5 (Spotify)** the owner flagged for further discussion, so both rows carry
+**questions rather than designs**. Neither exists in any form — the only `spotify` matches in the
+repo are Font Awesome glyphs. P-5 names the question that may end it: there is no supported path to
+rebroadcast one presenter's Spotify audio to a room, so that product is system-audio capture rather
+than a Spotify integration. **Spotify's current terms were deliberately NOT asserted from memory** in
+a file whose standard is cited evidence.
+
+**Also cross-checked:** every room-relevant row in `TODO.md`'s "Not an evidence gap" table (Q, S, W,
+X, AE, AF, AG) against this register, confirming nothing is tracked twice and nothing in scope is
+missing. Row **W** — modal actions that report success and send nothing — is flagged as something
+step 2 of the audit will meet again at `app-user-info-modal` and `app-session-control-modal`.
+
+**Verified:** every "what exists today" claim by opening the cited file. **Not verified and marked as
+such:** the identity of the production push sender, Spotify's developer terms, and the intended
+scope of the enterprise tier. **Not run:** any test or gate — no source file was touched.
+
+### 2026-08-16 06:50 EDT — The room gets its first gap register, and its own re-run corrects two of its rows
+
+**Branch `feat/extra-chat-column`. Runtime impact: none** — `docs/reference/room-component-gap-register.md`
+(new), `TODO.md`. No source file changed.
+
+**The finding that made this necessary:** `docs/reference/evidence-gap-register.md` — 70 rows, the
+thing everyone reaches for — **covers the controller only.** It tracks
+`apps/controller/evidence-dumps/` and says nothing about `apps/room`. Nothing systematic had ever
+tracked the room against the v4 bundle; room gaps sat ad hoc in `TODO.md` rows.
+`pull-everything-contract.test.ts` is a *decoder* contract, proving all 51 components were extracted
+from the bundle — not a gap tracker, though it reads like one.
+
+**Inventory, derived twice independently:** 51 reference components, **42 render the reference custom
+element, 9 do not.** Three of the nine are built without the wrapper — `app-session-login` is a whole
+route, `app-streaming-view` is `StreamingView.svelte`, `app-screenshare-view` is `ScreenPane.svelte` —
+so a marker search alone would have called them missing. All six genuinely absent components were
+read whole and now carry rows with citations:
+
+- **`app-typing-indicator-dots`** — rendered upstream by `app-chat` AND `app-extra-chat`, which are
+  our `AlertChatArea` and `ExtraChatPane`. **A gap inside two components we call finished.** Our CSS
+  carries `.typing-indicator-container` rules; nothing renders a typing indicator.
+- **`app-closed-session-page`** — not a message but a **complete second application shell**: its own
+  navbar, its own sidebar, nine modals of its own, around one `[innerHTML]` of `sessData.closedTxt`.
+- **`app-session-transcript`** — a full paginated page (300/page, five buttons rendered twice,
+  13:00 UTC query vs 08:00 local picker). Our `openTranscriptPage()` stub is honest and correct.
+- **`app-detached-screen`** — upstream `?dscreen=1` switches the whole app to a bare screen viewer;
+  ours opens the entire room with a `.detach-screen` class. A defensible divergence that was never
+  written down.
+- **`app-positions-container`**, **`app-kicked-page`** — as previously captured.
+
+**Two cross-cutting rows nobody had recorded, both from reading `app-root` whole:** the
+**fourteen-parameter query contract** (six absent here; `sl` and `forcedStream` are links this app
+*generates and cannot honour*), and `app-root`'s **five-page switch and thirteen event
+subscriptions** — including `deleteAlertPW`, so a password-protected alert deletion is not
+password-protected here.
+
+**The re-run is the point of this entry.** The audit was run, then re-run twice as instructed. Pass 2
+re-derived 51/42/9 from scratch and diffed the file against its own snapshot — 454 → 632 lines, zero
+deletions. **Pass 3 attacked the absence claims and found two of mine wrong:**
+
+1. R-14 called the YouTube late-join seek "documented and then not built", implying an oversight.
+   `+page.svelte:7196-7198` already declares the gap, explains it needs persisted room video state,
+   and **warns against inventing a `startTime` to make the branch look implemented** — the exact fix
+   my wording invited.
+2. R-6 claimed nothing in `apps/room/src` listens for a `message` event. `+page.svelte:6979` does —
+   an `EventSource`, not `window`, so the point stood but the sentence did not.
+
+Both errors were mine, both in new material, and neither would have survived being acted on.
+
+**Verified:** the inventory by two independent derivations; every reference claim by reading the
+`.full.js` whole; every citation by opening the cited line. **Not run:** any test or gate — no source
+file was touched. **Not done:** 33 of the 42 rendered components are still unaudited for
+completeness, and they are listed by name rather than summarised as a count.
+
 ### 2026-08-16 06:12 EDT — Row AE re-measured after Phase 4, and the seven lines say the thing outright
 
 **Branch `feat/extra-chat-column`. Runtime impact: none** — `TODO.md` only.

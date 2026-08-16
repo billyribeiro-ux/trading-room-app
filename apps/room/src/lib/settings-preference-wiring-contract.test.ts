@@ -35,6 +35,12 @@ const SETTINGS = readFileSync(
   'utf8'
 );
 const PAGE = readFileSync(new URL('../routes/+page.svelte', import.meta.url), 'utf8');
+/*
+  The write path moved to `RoomPrefs` in Phase 5 slice 3, so the assignment each wire ends in is
+  read from the class that now performs it. The modal half and the page half are unchanged and are
+  still read from their own files — which is the point of naming three sources rather than one.
+*/
+const PREFS = readFileSync(new URL('./room/prefs.svelte.ts', import.meta.url), 'utf8');
 const MODAL = readFileSync(new URL('./components/ModalHost.svelte', import.meta.url), 'utf8');
 const SERVER = readFileSync(new URL('../routes/+page.server.ts', import.meta.url), 'utf8');
 
@@ -43,6 +49,7 @@ const stripComments = (source: string) =>
 
 const pageCode = stripComments(PAGE);
 const modalCode = stripComments(MODAL);
+const prefsCode = stripComments(PREFS);
 
 /**
  * The four wires repaired on 2026-08-14. Each already had BOTH ends built — a rendered checkbox and
@@ -53,25 +60,25 @@ const WIRES = [
     id: 'app-recording-start-sound',
     preference: 'recordingStartSound',
     handler: 'recordingStartSoundOnChange',
-    assignment: "if (key === 'recordingStartSound') recordingStartSound = value;"
+    assignment: "if (key === 'recordingStartSound') this.#recordingStartSound = value;"
   },
   {
     id: 'app-recording-stop-sound',
     preference: 'recordingStopSound',
     handler: 'recordingStopSoundOnChange',
-    assignment: "if (key === 'recordingStopSound') recordingStopSound = value;"
+    assignment: "if (key === 'recordingStopSound') this.#recordingStopSound = value;"
   },
   {
     id: 'presenter-push-to-talk',
     preference: 'pushToTalk',
     handler: 'pushToTalkOnChange',
-    assignment: "if (key === 'pushToTalk') pushToTalk = value;"
+    assignment: "if (key === 'pushToTalk') this.#pushToTalk = value;"
   },
   {
     id: 'presenter-speech-recognition',
     preference: 'doSpeechReco',
     handler: 'speechRecoCCOnChange',
-    assignment: "if (key === 'doSpeechReco') doSpeechReco = value;"
+    assignment: "if (key === 'doSpeechReco') this.#doSpeechReco = value;"
   },
   {
     id: 'app-speech-reco-overlay',
@@ -83,19 +90,19 @@ const WIRES = [
     id: 'chat-always-scroll',
     preference: 'alwaysScrollToBottom',
     handler: 'chatAlwaysScrollToBottomChange',
-    assignment: "if (key === 'alwaysScrollToBottom') alwaysScrollToBottom = value;"
+    assignment: "if (key === 'alwaysScrollToBottom') this.#alwaysScrollToBottom = value;"
   },
   {
     id: 'presenter-follow-my-screens',
     preference: 'makeUsersFollowMyScreens',
     handler: 'makeUsersFollowMyScreensOnChange',
-    assignment: "if (key === 'makeUsersFollowMyScreens') makeUsersFollowMyScreens = value;"
+    assignment: "if (key === 'makeUsersFollowMyScreens') this.#makeUsersFollowMyScreens = value;"
   },
   {
     id: 'chat-gif-donot-disturb',
     preference: 'chatGif',
     handler: 'chatGifOnChange',
-    assignment: "if (key === 'chatGif') chatGif = value;"
+    assignment: "if (key === 'chatGif') this.#chatGif = value;"
   },
   {
     id: 'presenter-alert-donot-disturb',
@@ -113,37 +120,37 @@ const WIRES = [
     id: 'chat-badges-donot-disturb',
     preference: 'chatBadges',
     handler: 'chatBadgesOnChange',
-    assignment: "if (key === 'chatBadges') chatBadges = value;"
+    assignment: "if (key === 'chatBadges') this.#chatBadges = value;"
   },
   {
     id: 'chat-popup-donot-disturb',
     preference: 'chatPopup',
     handler: 'chatPopupChange',
-    assignment: "if (key === 'chatPopup') chatPopup = value;"
+    assignment: "if (key === 'chatPopup') this.#chatPopup = value;"
   },
   {
     id: 'chat-mem-clear',
     preference: 'trimChatLogs',
     handler: 'reduceChatLogMemoryChange',
-    assignment: "if (key === 'trimChatLogs') trimChatLogs = value;"
+    assignment: "if (key === 'trimChatLogs') this.#trimChatLogs = value;"
   },
   {
     id: 'visibility-change-enabled',
     preference: 'visibilityChangeEnabled',
     handler: 'visibilityChangeEnabledChange',
-    assignment: "if (key === 'visibilityChangeEnabled') visibilityChangeEnabled = value;"
+    assignment: "if (key === 'visibilityChangeEnabled') this.#visibilityChangeEnabled = value;"
   },
   {
     id: 'extra-chat-column',
     preference: 'extraChatColumn',
     handler: 'extraChatColumnOnChange',
-    assignment: "if (key === 'extraChatColumn') extraChatColumn = value;"
+    assignment: "if (key === 'extraChatColumn') this.#extraChatColumn = value;"
   },
   {
     id: 'presenter-enable-rte',
     preference: 'enableRTE',
     handler: 'enableRTEOnChange',
-    assignment: "if (key === 'enableRTE') enableRTE = value;"
+    assignment: "if (key === 'enableRTE') this.#enableRTE = value;"
   }
 ] as const;
 
@@ -171,8 +178,8 @@ describe.each(WIRES)(
       expect(modalCode).toContain(`'${id}': '${preference}'`);
     });
 
-    it('the page moves the preference into the state its consumer reads', () => {
-      expect(pageCode).toContain(assignment);
+    it('the write path moves the preference into the state its consumer reads', () => {
+      expect(prefsCode).toContain(assignment);
     });
   }
 );
@@ -269,7 +276,7 @@ describe('the wire has no silent break points', () => {
     expect(deadKeys).toContain(
       'for (const dead of DEAD_PREFERENCE_KEYS) localStorage.removeItem(dead);'
     );
-    expect(pageCode).toContain('mirrorPreferenceToLocalStorage(key, value);');
+    expect(prefsCode).toContain('mirrorPreferenceToLocalStorage(key, value);');
 
     /*
       Every id that REACHES the handler is either mapped, dead, or the early-returning one.
@@ -312,21 +319,21 @@ describe('the wire has no silent break points', () => {
     expect(pruneDeadPreferenceKeys(settings)).toBe(0);
   });
 
-  it('pushToTalk is $state, because $derived over loadedSettings would not react', () => {
+  it('pushToTalk is $state, because $derived over prefs.loaded would not react', () => {
     /*
-      `loadedSettings` is a plain object, seeded once and mutated by `savePreference`. A `$derived`
+      `prefs.loaded` is a plain object, seeded once and mutated by `savePreference`. A `$derived`
       reading it holds its page-load value until an unrelated dependency changes, so push-to-talk
       would have started working only after a reload — the bug half-fixed, which is worse than the
       bug, because it looks tested.
     */
-    expect(pageCode).toContain('let pushToTalk = $state(loadedSettings.pushToTalk === true);');
-    expect(pageCode).not.toContain('$derived(loadedSettings.pushToTalk');
+    expect(prefsCode).toContain('this.#pushToTalk = $state(loadedSettings.pushToTalk === true);');
+    expect(pageCode).not.toContain('$derived(prefs.loaded.pushToTalk');
   });
 
   it('the caption overlay is seeded from the preference, not from false', () => {
     /*
       The bug this replaced: `subtitles` was `$state(false)` seeded from nothing, while the navbar
-      checkbox seeded and rendered from `soundChecks['presentation-subtitles']`. The checkbox read
+      checkbox seeded and rendered from `this.#soundChecks['presentation-subtitles']`. The checkbox read
       "on" by default and the overlay was off, and ticking it changed neither.
 
       `!== false` is the reference's own gate — `isSpeechRecoOverlayEnabled()` is
@@ -334,14 +341,14 @@ describe('the wire has no silent break points', () => {
       `=== true` here would silently disable captions for every viewer who has never touched the
       checkbox, which is the exact defect the `soundChecks` seed was fixed for once already.
     */
-    expect(pageCode).toContain(
-      'let subtitles = $state(loadedSettings.showSpeechRecoOverlay !== false);'
+    expect(prefsCode).toContain(
+      'this.#subtitles = $state(loadedSettings.showSpeechRecoOverlay !== false);'
     );
   });
 
   it('both controls for the overlay stay in agreement', () => {
     // The modal is the second control; without this the navbar checkbox would contradict it.
-    expect(pageCode).toContain("soundChecks['presentation-subtitles'] = value;");
+    expect(prefsCode).toContain("this.#soundChecks['presentation-subtitles'] = value;");
   });
 
   it('alwaysScrollToBottom defaults OFF, and only the CHAT scroller takes it', () => {
@@ -361,11 +368,11 @@ describe('the wire has no silent break points', () => {
          `shouldAutoScrollForMessage`, and passing the override there would yank a reader out of the
          alert history they were scrolled into, from a checkbox whose label says "chat".
     */
-    expect(pageCode).toContain(
-      'let alwaysScrollToBottom = $state(loadedSettings.alwaysScrollToBottom === true);'
+    expect(prefsCode).toContain(
+      'this.#alwaysScrollToBottom = $state(loadedSettings.alwaysScrollToBottom === true);'
     );
-    expect(pageCode).not.toContain(
-      'let alwaysScrollToBottom = $state(loadedSettings.alwaysScrollToBottom !== false);'
+    expect(prefsCode).not.toContain(
+      'this.#alwaysScrollToBottom = $state(loadedSettings.alwaysScrollToBottom !== false);'
     );
 
     /*
@@ -385,7 +392,9 @@ describe('the wire has no silent break points', () => {
     expect(pageCode).toContain('const chatFollow = new RoomScrollFollow<ChatTab>({');
     expect(pageCode).toContain('const extraChatFollow = new RoomScrollFollow<ChatTab>({');
 
-    const overrideTakers = pageCode.match(/alwaysScrollToBottom: \(\) => alwaysScrollToBottom/g);
+    const overrideTakers = pageCode.match(
+      /alwaysScrollToBottom: \(\) => prefs.alwaysScrollToBottom/g
+    );
     expect(overrideTakers, 'the two chat columns must take the override').toHaveLength(2);
   });
 
@@ -425,10 +434,10 @@ describe('the wire has no silent break points', () => {
   it('the consumers the wires feed are still there', () => {
     // If a consumer is deleted, the assignment above becomes dead and this file should say so.
     expect(pageCode).toContain(
-      'pushToTalkShouldUnmute(event, { pushToTalk, micMuted: media.micMuted })'
+      'pushToTalkShouldUnmute(event, { pushToTalk: prefs.pushToTalk, micMuted: media.micMuted })'
     );
-    expect(pageCode).toContain('!doSpeechReco');
-    expect(pageCode).toContain("&& recordingStartSound) playSoundEffect('recordingStart')");
-    expect(pageCode).toContain("&& recordingStopSound) playSoundEffect('recordingStop')");
+    expect(pageCode).toContain('!prefs.doSpeechReco');
+    expect(pageCode).toContain("&& prefs.recordingStartSound) playSoundEffect('recordingStart')");
+    expect(pageCode).toContain("&& prefs.recordingStopSound) playSoundEffect('recordingStop')");
   });
 });

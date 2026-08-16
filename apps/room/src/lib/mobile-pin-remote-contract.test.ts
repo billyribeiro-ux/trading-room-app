@@ -89,7 +89,7 @@ describe('the two server messages stay two messages on the client', () => {
     (`remote_request` throws `new HttpError({ status, ...result.error })`), not assumed.
   */
   it('narrows the rejection and shows the server’s own message', () => {
-    expect(pageCode).toContain('bootboxAlert = isHttpError(cause)');
+    expect(pageCode).toContain('dialogs.alert = isHttpError(cause)');
     expect(pageCode).toContain('? cause.body.message');
   });
 

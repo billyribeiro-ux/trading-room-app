@@ -40,6 +40,12 @@ const SETTINGS = readFileSync(
   'utf8'
 );
 const PAGE = readFileSync(new URL('../routes/+page.svelte', import.meta.url), 'utf8');
+/*
+  The preference declarations and the write path moved to `RoomPrefs` in Phase 5 slice 3, so the
+  assertions about them read the class that now owns them. The page half is still read above -
+  each assertion points at the file that owns its subject.
+*/
+const PREFS_SOURCE = readFileSync(new URL('./room/prefs.svelte.ts', import.meta.url), 'utf8');
 const MODAL = readFileSync(new URL('./components/ModalHost.svelte', import.meta.url), 'utf8');
 
 /** Comments quote the reference at length, so a positional assertion must not read them. */
@@ -55,6 +61,7 @@ const paneMarkup = stripComments(
   readFileSync(new URL('./components/PresentationArea.svelte', import.meta.url), 'utf8')
 );
 const pageMarkup = stripComments(PAGE);
+const prefsCode = stripComments(PREFS_SOURCE);
 
 /** One top-level `function NAME(t, n) { … }` out of a decoded render-helper file. */
 function helper(source: string, name: string): string {
@@ -140,9 +147,9 @@ describe('the reference: what disableVideo does upstream', () => {
 
 describe('ours: the flag reaches the markup', () => {
   it('starts false rather than being restored, matching the non-persisting handler', () => {
-    expect(pageMarkup).toContain('let videoDisabled = $state(false);');
-    // Not `loadedSettings[...]` — see the reference assertion above for why that is deliberate.
-    expect(pageMarkup).not.toMatch(/videoDisabled\s*=\s*\$state\([^)]*loadedSettings/);
+    expect(prefsCode).toContain('this.#videoDisabled = $state(false);');
+    // Not `prefs.loaded[...]` — see the reference assertion above for why that is deliberate.
+    expect(pageMarkup).not.toMatch(/videoDisabled\s*=\s*\$state\([^)]*prefs.loaded/);
   });
 
   it('the settings checkbox is wired to it, INVERTED', () => {
@@ -152,7 +159,7 @@ describe('ours: the flag reaches the markup', () => {
       of them by default — a defect that would look like "the room is broken", not like a
       preference bug.
     */
-    expect(pageMarkup).toContain("if (key === 'disableVideo') videoDisabled = !value;");
+    expect(PREFS_SOURCE).toContain("if (key === 'disableVideo') this.#videoDisabled = !value;");
   });
 
   it('persists under the reference name, not the element id', () => {

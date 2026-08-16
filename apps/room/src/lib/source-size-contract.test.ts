@@ -245,8 +245,22 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       The Files pane inside it is a `FilesPane` waiting to happen: ~480 lines and ~25 identifiers
       with no component of its own. Recorded in `TODO.md` rather than done here, because two
       extractions in one pass is how a mangle ships.
+
+      PHASE 5 STARTS HERE — the script block, which is what Phases 1 to 4 left behind. Slice 0 was
+      the gates and moved nothing. `RoomToasts` is slice 1: 9,606 -> 9,533, a drop of 73.
+
+      SEVENTY-THREE, against a planned ~250, and the gap is a deliberate re-scoping rather than a
+      shortfall — recorded here because a number that misses its estimate silently is how the next
+      estimate gets believed. The plan filed alert and Q&A DELIVERY under this slice. Delivery reads
+      six preferences that are still declared in the page, so moving it now would have meant six
+      constructor thunks rewritten two commits later. The class took the MECHANISM — the queue, the
+      timers, the duplicate guard, the browser notification — and left the policy where its inputs
+      are. The rest of the 250 arrives with the preferences in slice 3.
+
+      What the slice actually proves is the pattern, which is why it was chosen first: state and the
+      functions that write it leaving TOGETHER, where Phase 1 moved fields and left 248 bodies here.
     */
-    max: 9606,
+    max: 8899,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {
@@ -292,12 +306,180 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     file: 'routes/+page.server.ts',
     max: 1584,
     why: 'the loader and every form action left; 3,233 before the remote-function conversions began'
+  },
+  /*
+    THE ROOM MODULES, capped from 2026-08-16 — and the reason they are here is that the three
+    entries above are only half a guarantee.
+
+    Those three stop the outgrown files growing. Nothing stopped the 9,605 lines being "solved" by
+    moving the mass one directory over into `lib/room/`, which is precisely what the decomposition
+    that follows this commit spends nineteen slices doing. A ceiling on the source and none on the
+    destination is not a ratchet, it is a funnel.
+
+    THESE ENTRIES MEAN SOMETHING DIFFERENT FROM THE THREE ABOVE, and conflating the two is how this
+    rule would end up being broken every second commit:
+
+    * The three above are RATCHETS on files that outgrew the standard. Growth there is the disease,
+      so their numbers only ever fall.
+    * These are CAPS on files that exist to receive an extraction. Growth here is the treatment.
+      `alerts`, `chat`, `log-pages`, `roster` and `media` are all named destinations in the phase
+      plan, so each will legitimately rise once, in the commit that moves code into it, with that
+      commit saying what arrived. That is the conversation the rule asks for, held where it belongs
+      rather than as a standing exemption.
+
+    The distinction is the one this file already draws in the `+page.svelte` note: compacting a
+    comment to hit a number is the tail wagging the dog, but moving an explanation to the code it
+    explains IS the extraction. A raise here is the second thing. A raise that is not paired with an
+    arrival is the first, and the commit will not have anything to say.
+
+    The staleness half still applies to every one of them, which is what keeps a cap from being a
+    licence: extract a slice back out of a module and its number must come down with it.
+  */
+  {
+    file: 'lib/room/alerts.svelte.ts',
+    max: 314,
+    why: "the alerts pane's toolbar, viewer filter, archive cut-off and search term"
+  },
+  {
+    file: 'lib/room/arrivals.ts',
+    max: 155,
+    why: 'which rows in a wholesale-replaced list are new; a plain .ts on purpose'
+  },
+  {
+    file: 'lib/room/chat.svelte.ts',
+    max: 179,
+    why: 'the two chat columns and the mention routing that reads three of their fields at once'
+  },
+  {
+    file: 'lib/room/log-pages.svelte.ts',
+    max: 173,
+    why: 'older-page paging for both logs, one keyed class at two arities'
+  },
+  {
+    file: 'lib/room/media.svelte.ts',
+    max: 371,
+    why: 'every media flag the interface renders from; STATE, never transport'
+  },
+  {
+    file: 'lib/room/menus.svelte.ts',
+    max: 187,
+    why: 'the eleven floating menus and the two closers that deliberately differ'
+  },
+  {
+    file: 'lib/room/polls.svelte.ts',
+    max: 119,
+    why: "the poll modal's four fields; the first of the room state classes"
+  },
+  {
+    file: 'lib/room/roster.svelte.ts',
+    max: 321,
+    why: 'the live roster, its four header controls, the badge count and the random draw'
+  },
+  {
+    file: 'lib/room/scroll-follow.ts',
+    max: 117,
+    why: 'one instance per column; a plain .ts on purpose'
+  },
+  {
+    file: 'lib/room/split.svelte.ts',
+    max: 724,
+    why: "the room's two nested splits and twenty derived geometry values"
+  },
+  /*
+    Phase 5 slice 1, and the first module this file has ever demanded rather than recorded. The
+    ceiling test went red the moment `toasts.svelte.ts` appeared on disk with no entry - which is
+    the catalog working one commit after it was written, on the first module it could possibly have
+    caught.
+  */
+  {
+    file: 'lib/room/toasts.svelte.ts',
+    max: 184,
+    why: 'the toast queue, its timers, the duplicate guard and the browser notification'
+  },
+  {
+    file: 'lib/room/dialogs.svelte.ts',
+    max: 115,
+    why: 'the three bootbox dialogs, which STACK and therefore stay three fields'
+  },
+  {
+    file: 'lib/room/volume.svelte.ts',
+    max: 297,
+    why: 'the master, background and per-presenter volumes; the first class to depend on another'
+  },
+  {
+    file: 'lib/room/broadcasts.svelte.ts',
+    max: 350,
+    why: 'the video, YouTube and mp3 broadcasts; receivers rather than setters, so a stop cannot be half-applied'
+  },
+  {
+    file: 'lib/room/prefs.svelte.ts',
+    max: 590,
+    why: 'every viewer preference and the one write path; 25 of 27 have no public setter'
   }
 ];
 
+/*
+  A BACKSTOP UNDER THE CAPS, because a per-file number can be raised one commit at a time until it
+  means nothing, and nineteen slices is enough commits for that to happen without anyone noticing.
+
+  800 is not a round number chosen for comfort — it is the largest module plus room to receive one
+  slice. `split.svelte.ts` is 724 today and is the biggest thing in `lib/room/` by 350 lines; it is
+  that big because twenty derived geometry values and two nested splits genuinely are one subject,
+  and splitting it would put a shared percentage across a file boundary invented to make files
+  shorter. So the backstop is set above the honest maximum rather than at a target nothing meets,
+  which is the difference between a limit and a wish.
+
+  A module that reaches this has stopped being a module. The answer is a real domain seam, not a
+  bigger number here.
+*/
+const MODULE_LINE_BACKSTOP = 800;
+
 const lineCount = (file: string) => readFileSync(new URL(file, SOURCE), 'utf8').split('\n').length;
 
-describe('the three files that outgrew the standard do not grow further', () => {
+/*
+  The modules are DISCOVERED, never listed, which is `AGENTS.md` DPE rule 4 applied to the one place
+  it matters most here: "prefer a catalog-driven test that discovers its own subjects over a
+  hardcoded list, so the next table is covered without anyone remembering."
+
+  A hand-kept list of modules would have exactly the failure mode the block at the bottom of this
+  file records twice for `EXTRACTION_SOURCES` — the nineteenth slice creates a module, nobody adds
+  the row, and the cap that was the whole point of capping quietly does not exist. Discovery makes
+  that impossible: the module appears on disk, the test finds it, and the test fails until somebody
+  says what too big means for it.
+
+  `.test.ts` is excluded because a module's own unit test is not the module. The plain `.ts` files
+  are INCLUDED — `arrivals.ts` and `scroll-follow.ts` are deliberately not rune modules, and being
+  the wrong extension is not a reason to be uncapped.
+*/
+const roomModules = readdirSync(new URL('lib/room/', SOURCE))
+  .filter((name) => name.endsWith('.ts') && !name.endsWith('.test.ts'))
+  .map((name) => `lib/room/${name}`);
+
+describe('every room module is discovered and capped', () => {
+  it('found the modules it is meant to cap', () => {
+    // At zero, every assertion below is vacuous - the same guard the reader catalog carries.
+    expect(roomModules.length).toBeGreaterThan(0);
+  });
+
+  it('every room module on disk has a declared ceiling', () => {
+    const capped = new Set(CEILINGS.map((entry) => entry.file));
+    const uncapped = roomModules.filter((file) => !capped.has(file));
+    expect(
+      uncapped,
+      `${uncapped.join(', ')} exists in lib/room/ with no ceiling. A module cannot be added without saying what too big means for it - that is the whole point of capping the destination as well as the source. Add an entry to CEILINGS at the size it actually lands.`
+    ).toEqual([]);
+  });
+
+  it.each(roomModules)('%s is under the backstop', (file) => {
+    const actual = lineCount(file);
+    expect(
+      actual,
+      `${file} is ${actual} lines against a backstop of ${MODULE_LINE_BACKSTOP}. A module this size has stopped being a module; find the domain seam rather than raising the backstop.`
+    ).toBeLessThanOrEqual(MODULE_LINE_BACKSTOP);
+  });
+});
+
+describe('the files that outgrew the standard do not grow further', () => {
   it.each(CEILINGS)('$file stays at or below its ceiling', ({ file, max }) => {
     const actual = lineCount(file);
     expect(
@@ -316,6 +498,116 @@ describe('the three files that outgrew the standard do not grow further', () => 
       max - actual,
       `${file} measures ${actual} but its ceiling is ${max}. Lower the ceiling to ${actual}.`
     ).toBeLessThanOrEqual(SLACK);
+  });
+});
+
+/*
+  THE COMMENTS ARE THE ASSET, and this is the only rule of the decomposition that a diff review
+  cannot catch — because a slice that sheds an explanation looks exactly like a slice that tidied up.
+
+  Roughly 3,825 of `+page.svelte`'s script lines are comments, and they are not commentary: they are
+  capture citations carrying byte offsets, const numbers and file/line references into the decoded
+  reference bundle. They are the reason a rule with no recorded WHY does not get "simplified" back
+  into the bug it was fixing. The standing instruction is that they MOVE WITH THE CODE THEY EXPLAIN,
+  and that reaching a line target by shortening prose is rejected outright.
+
+  Every other gate in this repository would stay green through exactly that failure. `svelte-check`
+  does not read comments. The suite does not read comments. `svelte-autofixer` does not read
+  comments. The ceiling above would go green FASTER if the prose were shaved. So the gate has to be
+  here, and it has to be counted rather than promised in a commit message.
+
+  ## Two counts, and why both
+
+  * **Comment lines** is the blunt one. It is a PROXY and is deliberately not called a census: it
+    tallies lines whose first non-space character opens or continues a comment, which will
+    over-count a string literal containing `//` somewhere. That is fine and is the point — as a
+    ratchet the number only has to be STABLE, not exact, and a consistent over-count is stable.
+    What it is not allowed to be is a structural claim, because a hand-rolled scanner making a
+    structural claim about this file is what once reported "0 directives" for a file with five.
+
+  * **Capture citations** is the sharp one, and it is the one that matters. `full.js:1234`,
+    `byte 1,221,430`, `main.d6d3c112b59b7d0d.js` — these are literal, unambiguous, and they are the
+    part that cannot be reconstructed by anybody who does not have the decoded bundle open. A
+    comment can be reworded; a byte offset that is deleted is gone.
+
+  ## Why a whole-tree total rather than a per-file one
+
+  Because the whole point of the phase is that comments MOVE. A per-file assertion would fail on
+  every slice by design and be disabled within a week. Summed across the source and every
+  destination, a move is level and a deletion is a fall — which is exactly the distinction being
+  policed.
+
+  It also enforces something worth having on its own: an extraction has to land INSIDE this catalog,
+  in `lib/room/` or `lib/components/`. Move a region to some new corner of `$lib` and the total
+  falls and this goes red. That is not a false positive; that is the gate asking why the room's
+  reasoning just left the room.
+*/
+describe('the reasoning survives every extraction', () => {
+  const COMMENTED_SOURCES = [
+    'routes/+page.svelte',
+    'routes/+page.server.ts',
+    ...readdirSync(new URL('lib/components/', SOURCE))
+      .filter((name) => name.endsWith('.svelte'))
+      .map((name) => `lib/components/${name}`),
+    ...roomModules
+  ];
+
+  /*
+    The three shapes a citation into the decoded capture takes, read off the ones already in the
+    tree rather than invented: a decoded component file with a line number, a byte offset into the
+    bundle, and the bundle's own hashed name. `[\d,]{5,}` because every real offset is six figures
+    or more with separators - a bare `byte 12` is prose, not a citation.
+  */
+  const CITATION =
+    /(full\.js|compiled\.js|render-helpers\.js|\.component\.css)[:.]|bytes? [\d,]{5,}|main\.d6d3c112b59b7d0d\.js/g;
+
+  const opensAComment = (line: string) => {
+    const text = line.trimStart();
+    return (
+      text.startsWith('*') ||
+      text.startsWith('/*') ||
+      text.startsWith('//') ||
+      text.startsWith('<!--')
+    );
+  };
+
+  const tally = () => {
+    let commentLines = 0;
+    let citations = 0;
+    for (const file of COMMENTED_SOURCES) {
+      const source = readFileSync(new URL(file, SOURCE), 'utf8');
+      citations += (source.match(CITATION) ?? []).length;
+      for (const line of source.split('\n')) if (opensAComment(line)) commentLines += 1;
+    }
+    return { commentLines, citations };
+  };
+
+  /*
+    Measured 2026-08-16 across 43 files, immediately before the first slice moves anything. These
+    rise as reasoning is written and stay LEVEL as it is relocated. They do not fall.
+  */
+  const MINIMUM_COMMENT_LINES = 6329;
+  const MINIMUM_CITATIONS = 220;
+
+  it('found something to count', () => {
+    // A catalog that resolved to nothing would make both assertions below pass on zero.
+    expect(COMMENTED_SOURCES.length).toBeGreaterThan(0);
+  });
+
+  it('does not shed explanation across the room', () => {
+    const { commentLines } = tally();
+    expect(
+      commentLines,
+      `${commentLines} comment lines across the room, against a floor of ${MINIMUM_COMMENT_LINES}. Comments MOVE WITH THE CODE THEY EXPLAIN - a fall means an extraction left an explanation behind instead of taking it, or shortened one to hit a line target. Neither is permitted; put the reasoning in the file that now owns the code.`
+    ).toBeGreaterThanOrEqual(MINIMUM_COMMENT_LINES);
+  });
+
+  it('does not shed a single capture citation', () => {
+    const { citations } = tally();
+    expect(
+      citations,
+      `${citations} capture citations across the room, against a floor of ${MINIMUM_CITATIONS}. A byte offset or a decoded-file reference is the one kind of comment nobody can reconstruct without the reference bundle open. If a citation is genuinely obsolete, say so in the commit and lower this number deliberately - do not let it fall by accident.`
+    ).toBeGreaterThanOrEqual(MINIMUM_CITATIONS);
   });
 });
 
@@ -354,27 +646,66 @@ describe('the contract tests that read source as text cannot pass vacuously', ()
     its subject moved, which is the failure mode this whole block exists to catch, arriving by a
     route the block did not cover.
 
-    The list is the files that regions get extracted OUT OF. It grows when the next one does.
+    `PresentationArea.svelte` was added for the same reason a day later: re-pointing
+    `notes-style-contract` and `screen-tab-bar-contract` at it took both of them out of the
+    generated list, exactly as `day-separator` fell out when `AlertChatArea` landed. `FilesPane`
+    was the first added in the SAME commit that created the component, which is the habit those two
+    retrofits exist to teach.
+
+    THAT HAND-KEPT LIST IS NOW A CATALOG, 2026-08-16, and the reason is that the habit was not
+    enough and could not have been. The list named `.svelte` files only, so it could see a region
+    moving into a COMPONENT and was structurally blind to a region moving into a `.svelte.ts`
+    MODULE — which is the entire shape of the decomposition that follows this commit. A test
+    re-pointed from `+page.svelte` to `room/toasts.svelte.ts` would stop naming any entry here,
+    leave this filter, and go unpoliced while staying green: the `day-separator` failure again, by
+    the one route two retrofits had still not closed.
+
+    So the subjects are DISCOVERED rather than remembered. `AGENTS.md` DPE rule 4 asks for exactly
+    this — "prefer a catalog-driven test that discovers its own subjects over a hardcoded list, so
+    the next table is covered without anyone remembering" — and here it means the next module is
+    covered on the day it is created, by nobody.
+
+    MEASURED BEFORE THE CHANGE, because widening a filter can only add subjects and adding subjects
+    can only add failures: the hand-kept list policed 54 files, the catalog polices 63, and all 9
+    newly-policed files already assert something positive. The widening cost nothing and closed a
+    hole; that is why it went in as one commit ahead of the extraction rather than alongside it.
+
+    WHAT THIS FILTER STILL CANNOT SEE, found by a negative control that came back GREEN and is
+    recorded because it cost a turn and would cost the next person one. `source.includes(target)`
+    matches a MENTION, not a READ. The first control changed `id-opacity-contract.test.ts`'s
+    `readFileSync` target away from the page and the count did not move, because that file names
+    `routes/+page.svelte` twice more — once as an `ALLOWED` map key and once inside its own
+    assertion — and either mention is enough to keep it here. The control was wrong, not the gate;
+    the gate went red the moment it was re-run against a file whose only mention IS its read
+    (`recording-codec.test.ts`), reporting 62 against the floor.
+
+    So a test could stop reading a file, keep the string somewhere, and stay counted. That is a
+    weaker guarantee than it looks and it is inherited rather than introduced — the hand-kept list
+    matched exactly the same way. It is not tightened here because requiring the path to sit inside
+    a `readFileSync`/`new URL` call means parsing the test rather than reading it, and a guard that
+    is cleverer than it is trustworthy is how the last three vacuous assertions got written. The
+    positive-assertion rule below still applies to every file this catches, which is the guarantee
+    that actually matters.
+  */
+  const catalogOf = (dir: string, suffix: string, prefix: string) =>
+    readdirSync(new URL(dir, SOURCE))
+      .filter((name) => name.endsWith(suffix))
+      .map((name) => `${prefix}${name}`);
+
+  /*
+    The strings are what a test's SOURCE contains, not filesystem paths, because that is what the
+    filter below matches on: a reader writes `new URL('./components/FilesPane.svelte', …)` or
+    `new URL('./room/media.svelte.ts', …)`, so the catalog entry has to be the tail those share.
+
+    `.svelte.ts` rather than `.svelte` for the modules is load-bearing on its own: `room/chat.svelte`
+    would also match `room/chat.svelte.test.ts` and quietly police a module's own unit test as
+    though it were a text reader.
   */
   const EXTRACTION_SOURCES = [
     'routes/+page.svelte',
     'routes/+page.server.ts',
-    'components/AlertChatArea.svelte',
-    /*
-      Added the same day it was created, and for the reason the entry above was: re-pointing
-      `notes-style-contract` and `screen-tab-bar-contract` at this component took both of them out
-      of the generated list, exactly as `day-separator` fell out when `AlertChatArea` landed. The
-      count dropping is the only signal that happens, so it is worth saying plainly — a file leaves
-      this list silently and stays green while it does.
-    */
-    'components/PresentationArea.svelte',
-    /*
-      Added in the SAME commit that created the component, which is the point. The two entries
-      above were both added after the fact, once a dropped test count gave the game away. This one
-      went in before `files-pane-contract` was re-pointed, so the list never lost it — that is the
-      habit the two retrofits above exist to teach.
-    */
-    'components/FilesPane.svelte'
+    ...catalogOf('lib/components/', '.svelte', 'components/'),
+    ...catalogOf('lib/room/', '.svelte.ts', 'room/')
   ];
 
   const readers = readdirSync(testDir)
@@ -389,6 +720,29 @@ describe('the contract tests that read source as text cannot pass vacuously', ()
   it('found the text-reading contract tests it is meant to police', () => {
     // If this drops to zero the filter above has drifted and every assertion below is vacuous too.
     expect(readers.length).toBeGreaterThan(0);
+  });
+
+  /*
+    A RATCHET ON THE COUNT, which is the half `toBeGreaterThan(0)` cannot give.
+
+    Zero is not the failure that has actually happened here. Twice the count fell by ONE — a single
+    file leaving the policed set while 50-odd others stayed — and both times the only thing that
+    noticed was a person reading a test summary and thinking the number looked small. That is not a
+    gate, it is a coincidence, and the second occurrence proves the first taught nothing.
+
+    So the floor moves the way the ceilings above move, in the opposite direction: it only ever goes
+    UP. Re-pointing a test from the page to the module it now belongs to keeps it in the catalog and
+    keeps this number level, which is the whole point — a re-point is not a loss and must not read
+    as one. A number that FALLS means a file stopped reading source text altogether, and that is
+    either a deleted guard or a vacuous one.
+  */
+  const MINIMUM_POLICED_READERS = 63;
+
+  it('polices at least as many readers as it did before the last extraction', () => {
+    expect(
+      readers.length,
+      `${readers.length} text-reading contract tests are policed, against a floor of ${MINIMUM_POLICED_READERS}. A FALLING count means a test stopped naming any extraction source — it has left this guard and is passing unpoliced, which is exactly how \`day-separator-contract.test.ts\` went quiet twice. Re-point it at the file that now owns its subject; do not lower this number.`
+    ).toBeGreaterThanOrEqual(MINIMUM_POLICED_READERS);
   });
 
   /*

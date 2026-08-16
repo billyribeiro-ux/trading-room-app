@@ -20,6 +20,12 @@ import { describe, expect, it } from 'vitest';
 */
 
 const PAGE = readFileSync(new URL('../routes/+page.svelte', import.meta.url), 'utf8');
+/*
+  The preference declarations and the write path moved to `RoomPrefs` in Phase 5 slice 3, so the
+  assertions about them read the class that now owns them. The page half is still read above -
+  each assertion points at the file that owns its subject.
+*/
+const PREFS_SOURCE = readFileSync(new URL('./room/prefs.svelte.ts', import.meta.url), 'utf8');
 const PANE = readFileSync(new URL('./components/ExtraChatPane.svelte', import.meta.url), 'utf8');
 const MODAL = readFileSync(new URL('./components/ModalHost.svelte', import.meta.url), 'utf8');
 /*
@@ -46,6 +52,7 @@ const stripComments = (source: string) =>
 const chatClass = readFileSync(new URL('./room/chat.svelte.ts', import.meta.url), 'utf8');
 const splitCode = stripComments(SPLIT);
 const pageCode = stripComments(PAGE);
+const prefsCode = stripComments(PREFS_SOURCE);
 const paneCode = stripComments(PANE);
 const modalCode = stripComments(MODAL);
 
@@ -56,15 +63,15 @@ describe('the preference', () => {
       own HTML id into the settings blob and no code read it back.
     */
     expect(modalCode).toContain("'extra-chat-column': 'extraChatColumn'");
-    expect(pageCode).toContain("if (key === 'extraChatColumn') extraChatColumn = value;");
+    expect(prefsCode).toContain("if (key === 'extraChatColumn') this.#extraChatColumn = value;");
   });
 
   it('defaults OFF, as the reference default preferences do', () => {
     // Absent from the reference's twenty-five defaults, exactly like `enableRTE`.
-    expect(pageCode).toContain(
-      'let extraChatColumn = $state(loadedSettings.extraChatColumn === true);'
+    expect(prefsCode).toContain(
+      'this.#extraChatColumn = $state(loadedSettings.extraChatColumn === true);'
     );
-    expect(pageCode).not.toContain('loadedSettings.extraChatColumn !== false');
+    expect(pageCode).not.toContain('prefs.loaded.extraChatColumn !== false');
   });
 });
 
@@ -264,7 +271,7 @@ describe('hideChat — the pane collapses for non-presenters while chat is disab
       removed 2026-08-14 once ESLint surfaced it. The two assertions below are the actual mechanism.
     */
     expect(pageCode).toContain(
-      'const extraChatColumnVisible = $derived(extraChatColumn && !split.chatCollapsed);'
+      'const extraChatColumnVisible = $derived(prefs.extraChatColumn && !split.chatCollapsed);'
     );
     expect(pageCode).toContain(
       '{#if !hideChatAlerts && extraChatColumnVisible}{@render extraChatPane()}'

@@ -21,7 +21,12 @@ import { describe, expect, it } from 'vitest';
   a bug and is the captured behaviour.
 */
 
-const page = readFileSync(new URL('../routes/+page.svelte', import.meta.url), 'utf8');
+/*
+  The preference declarations and the write path moved to `RoomPrefs` in Phase 5 slice 3, so the
+  assertions about them read the class that now owns them. The page half is still read above -
+  each assertion points at the file that owns its subject.
+*/
+const PREFS_SOURCE = readFileSync(new URL('./room/prefs.svelte.ts', import.meta.url), 'utf8');
 const main = readFileSync(
   new URL('../../docs/source/main.d6d3c112b59b7d0d.js', import.meta.url),
   'utf8'
@@ -58,13 +63,14 @@ describe('DND is session-only, by capture', () => {
   });
 
   it('keeps the early return that skips savePreference', () => {
-    const at = page.indexOf("if (input.id === 'app-donot-disturb')");
+    // `updateSoundCheck` moved to `RoomPrefs` in Phase 5 slice 3; the early return went with it.
+    const at = PREFS_SOURCE.indexOf("if (input.id === 'app-donot-disturb')");
     expect(at).toBeGreaterThan(-1);
     // The branch assigns and returns; it must not reach the savePreference below it.
-    const branch = page.slice(at, page.indexOf('}', at));
-    expect(branch).toContain('doNotDisturbOn = input.checked');
+    const branch = PREFS_SOURCE.slice(at, PREFS_SOURCE.indexOf('}', at));
+    expect(branch).toContain('this.#doNotDisturbOn = input.checked');
     expect(branch).toContain('return');
-    expect(branch).not.toContain('savePreference');
+    expect(branch).not.toContain('this.save(');
   });
 });
 
