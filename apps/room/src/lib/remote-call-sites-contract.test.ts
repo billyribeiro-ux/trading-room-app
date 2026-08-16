@@ -125,8 +125,8 @@ const DISPATCHERS: readonly Dispatcher[] = [
     actions: ['savePoll', 'deleteSavedPoll', 'sendPoll', 'sendPollAnswer', 'pollDone']
   },
   {
-    file: 'routes/+page.svelte',
-    fn: 'async function submitNoteMutation<',
+    file: 'lib/room/notes.svelte.ts',
+    fn: '  async submitMutation<',
     actions: [
       'deleteSessionNoteTab',
       'newSessionNoteTab',

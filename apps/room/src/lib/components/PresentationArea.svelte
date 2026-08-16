@@ -151,6 +151,8 @@
     giphyApiKey: string;
     /** BINDABLE: `NotesPane` reports the new-note form opening and closing. */
     newNoteOpen: boolean;
+    /** Forwarded from `NotesPane`. The flag is `RoomNotes`s; this pane only relays it. */
+    onNewNoteOpenChange: (open: boolean) => void;
     mountNewNoteLink: (menu: HTMLUListElement) => void;
     submitNoteMutation: <Success extends Record<string, unknown> = Record<string, unknown>>(
       action:
@@ -264,7 +266,8 @@
     toggleLockStreamMtx,
     noteGates,
     giphyApiKey,
-    newNoteOpen = $bindable(false),
+    newNoteOpen,
+    onNewNoteOpenChange,
     mountNewNoteLink,
     submitNoteMutation,
     loadNoteVersions,
@@ -926,7 +929,7 @@
                 await submitNoteMutation('deleteSessionNoteTab', { noteId });
               }}
               onLoadVersions={loadNoteVersions}
-              onNewNoteOpenChange={(open) => (newNoteOpen = open)}
+              {onNewNoteOpenChange}
               onRename={async (noteId, newName) => {
                 await submitNoteMutation('renameSessionNoteTab', { noteId, newName });
               }}

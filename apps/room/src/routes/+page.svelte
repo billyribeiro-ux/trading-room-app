@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { deserialize } from '$app/forms';
   import {
     chatComposerEnabled,
     isChatMode,
@@ -72,6 +71,7 @@
   import { RoomAlertsPane } from '$lib/room/alerts-pane';
   import { RoomFeedScroll } from '$lib/room/feed-scroll';
   import { RoomModals } from '$lib/room/modals.svelte';
+  import { RoomNotes } from '$lib/room/notes.svelte';
   import { RoomFeeds } from '$lib/room/feeds.svelte';
   import { RoomMessageActions } from '$lib/room/message-actions.svelte';
   import { RoomEventStream } from '$lib/room/events.svelte';
@@ -136,7 +136,6 @@
     ChatTab,
     FollowChatStyle,
     MainTab,
-    NoteVersion,
     Theme
   } from '$lib/types';
   import type { PageProps } from './$types';
@@ -724,7 +723,6 @@
     difference is a decision somebody can read rather than a divergence nobody can see.
   */
   const menus = new RoomMenus();
-  let newNoteOpen = $state(false);
   /*
     The room's three bootbox dialogs, in `$lib/room/dialogs.svelte.ts`.
 
@@ -1945,6 +1943,21 @@
     setTheme: (next) => (theme = next)
   });
 
+  /*
+    THE NOTES TAB s own actions, in `$lib/room/notes.svelte.ts`.
+
+    Phase 5 slice 25. The two link mounts came with them because each wires a link that only exists
+    inside note or file markup - content this class is responsible for - while the page s other
+    capture helpers hold DOM handles the whole page reads. The plan named that seam as the one it
+    was least sure of; measured, they do not read as one thing, so only the note pair moved.
+  */
+  const notes = new RoomNotes({
+    menus,
+    modals,
+    noteGates: () => noteGates,
+    showNotesTab: () => (mainTab = 'notes')
+  });
+
   const feedScroll = new RoomFeedScroll({
     alerts,
     chat,
@@ -3121,72 +3134,8 @@
 
 
 
-  function mountNewNoteLink(menu: HTMLUListElement) {
-    const item = document.createElement('li');
-    const link = document.createElement('a');
-    const icon = document.createElement('i');
 
-    link.setAttribute('href', '#');
-    link.className = 'dropdown-item';
-    icon.className = 'fas fa-plus';
-    link.append(icon, document.createTextNode(' New Note'));
-    link.addEventListener('click', (event) => {
-      event.preventDefault();
-      menus.set('notes', false);
-      mainTab = 'notes';
-      newNoteOpen = noteGates.editorMounted;
-    });
-    item.append(link);
-    menu.append(item);
 
-    return () => item.remove();
-  }
-
-  async function submitNoteMutation<
-    Success extends Record<string, unknown> = Record<string, unknown>
-  >(
-    action:
-      | 'deleteSessionNoteTab'
-      | 'newSessionNoteTab'
-      | 'renameSessionNoteTab'
-      | 'restoreNoteVersion'
-      | 'saveSessionNote'
-      | 'setWelcomeMatNoteTab',
-    values: Record<string, boolean | string | number>
-  ): Promise<Success | undefined> {
-    const body = new FormData();
-    for (const [key, value] of Object.entries(values)) body.set(key, String(value));
-    const response = await fetch(`?/${action}`, { method: 'POST', body });
-    const result = deserialize<Success, { message?: string }>(await response.text());
-
-    if (result.type === 'failure') {
-      throw new Error(result.data?.message ?? `Unable to ${action}.`);
-    }
-    if (result.type === 'error') {
-      throw new Error(result.error.message ?? `Unable to ${action}.`);
-    }
-    if (result.type !== 'success') {
-      throw new Error(`Unable to ${action}.`);
-    }
-
-    await invalidateAll();
-    return result.data;
-  }
-
-  /*
-    Read by `NotesPane` while a presenter has the editor open, to fill the Version History panel.
-
-    A plain GET rather than `submitNoteMutation`: this changes nothing, so it must not go through
-    `invalidateAll()` — doing so would re-run every load function on the page each time a panel
-    was opened, and the route already answers with exactly the rows the panel needs.
-  */
-  async function loadNoteVersions(noteId: number): Promise<readonly NoteVersion[]> {
-    const response = await fetch(`/api/notes/${noteId}/versions`);
-    if (!response.ok) {
-      throw new Error('Unable to load note versions.');
-    }
-    return (await response.json()) as readonly NoteVersion[];
-  }
 
   /* ── Swing Trade Alerts ──────────────────────────────────────────────────────────────────── */
 
@@ -3216,25 +3165,6 @@
 
 
 
-  function mountUploadFileLink(menu: HTMLUListElement) {
-    const item = document.createElement('li');
-    const link = document.createElement('a');
-    const icon = document.createElement('i');
-
-    link.setAttribute('href', '#');
-    link.className = 'dropdown-item';
-    icon.className = 'fas fa-plus';
-    link.append(icon, document.createTextNode(' Upload File'));
-    link.addEventListener('click', (event) => {
-      event.preventDefault();
-      menus.set('files', false);
-      modals.open('file-upload');
-    });
-    item.append(link);
-    menu.append(item);
-
-    return () => item.remove();
-  }
 </script>
 
 <!--
@@ -3605,10 +3535,14 @@
               {toggleLockStreamMtx}
               {noteGates}
               {giphyApiKey}
-              bind:newNoteOpen
-              {mountNewNoteLink}
-              {submitNoteMutation}
-              {loadNoteVersions}
+              newNoteOpen={notes.newNoteOpen}
+              onNewNoteOpenChange={(open) => (notes.newNoteOpen = open)}
+              mountNewNoteLink={(menu) => notes.mountNewNoteLink(menu)}
+              submitNoteMutation={<Success extends Record<string, unknown>>(
+                action: Parameters<typeof notes.submitMutation>[0],
+                values: Parameters<typeof notes.submitMutation>[1]
+              ) => notes.submitMutation<Success>(action, values)}
+              loadNoteVersions={(noteId) => notes.loadVersions(noteId)}
               uploadAlertFiles={(files) => composer.uploadAlertFiles(files)}
               {swingAlerts}
               {dayTradeAlerts}
@@ -3619,7 +3553,7 @@
               scheduleVideoForAll={(url, whenLocal) => broadcasts.scheduleVideoForAll(url, whenLocal)}
               stopVideoForAll={() => broadcasts.stopVideoForAll()}
               {files}
-              {mountUploadFileLink}
+              mountUploadFileLink={(menu) => notes.mountUploadFileLink(menu)}
               playMp3ForAll={(url) => broadcasts.playMp3ForAll(url)}
               stopMp3ForAll={() => broadcasts.stopMp3ForAll()}
               openModal={(name) => modals.open(name)}

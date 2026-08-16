@@ -21,6 +21,7 @@ import { RoomLogPages } from './log-pages.svelte';
 import { RoomMedia } from './media.svelte';
 import { RoomMenus } from './menus.svelte';
 import { RoomModals } from './modals.svelte';
+import { RoomNotes } from './notes.svelte';
 import { RoomPolls } from './polls.svelte';
 import { RoomPrefs } from './prefs.svelte';
 import { RoomRoster } from './roster.svelte';
@@ -94,6 +95,7 @@ const INSTANCES: Record<string, new (...args: never[]) => object> = {
   media: RoomMedia,
   menus: RoomMenus,
   modals: RoomModals,
+  notes: RoomNotes,
   polls: RoomPolls,
   roster: RoomRoster,
   split: RoomSplit
