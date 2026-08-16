@@ -260,7 +260,7 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       What the slice actually proves is the pattern, which is why it was chosen first: state and the
       functions that write it leaving TOGETHER, where Phase 1 moved fields and left 248 bodies here.
     */
-    max: 4708,
+    max: 4487,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {
@@ -277,6 +277,18 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     */
     max: 864,
     why: 'the SSE router - 351 code lines under 468 of channel transcription'
+  },
+  {
+    file: 'lib/room/recording.ts',
+    /*
+      The recorder, and the speech recognition that shares its microphone.
+
+      Speech recognition is here rather than in the transport because it is a second consumer of
+      the DEVICE, not of the wire: it starts and stops on the same events the recorder does and
+      writes into the caption list rather than onto a producer.
+    */
+    max: 341,
+    why: 'MediaRecorder, the preview window, the room-wide broadcast and the two speech calls'
   },
   {
     file: 'lib/room/media-transport.svelte.ts',

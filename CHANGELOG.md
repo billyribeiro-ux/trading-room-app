@@ -24,6 +24,57 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-16
 
+### 2026-08-16 15:53 EDT — Phase 5 slice 20: `RoomRecording`, and a file extension that was lying
+
+**`+page.svelte` 4,708 → 4,485 (−223).** Suite 2,280 → 2,283 across 154 files. `svelte-check`
+1,177 files, 0 errors, 0 warnings. `eslint` clean.
+**Runtime impact: yes** — the recorder moved. No behaviour changed; two contract files were
+re-pointed at the file that now owns their subject.
+
+**`src/lib/room/recording.ts` (341).** `MediaRecorder`, the preview window, the room-wide
+broadcast that tells everyone else a recording started, and the two speech-recognition calls that
+share the recorder's microphone. Ten functions and four fields.
+
+**Speech recognition travels with the RECORDER, not with the transport**, and the reason is the
+microphone. `RoomMediaTransport` owns the track — acquiring one and producing it into the SFU is a
+single act, which is why that class is one module — but recognition is a second consumer of the
+DEVICE, not of the wire. It starts and stops on the same events the recorder does and writes into
+the caption list rather than onto a producer. Putting it in the transport would have meant a class
+that both publishes media and transcribes it.
+
+**A plain `.ts`, not `.svelte.ts`, and the rename was the point rather than a detail.** The class
+holds no rune: its four fields are a `MediaRecorder`, a chunk list, a `Window` and a teardown
+function, and nothing renders from any of them — what the UI shows comes from `RoomMedia.recording`,
+which this class writes and that class owns. `.svelte.ts` tells the compiler to look for runes and
+tells a reader the module is reactive, so on a module with neither it is a lie. `arrivals.ts` and
+`scroll-follow.ts` sit in `lib/room/` on the same footing, and the size contract already caps
+plain `.ts` modules for exactly this reason.
+
+**Five methods passed by reference, caught by the unbound-method contract rather than by review.**
+`onpauserecording={recording.pauseRecording}` and four siblings were correct as page functions and
+lose `this` as methods. That contract decides from the PROTOTYPE, which is why it found all five at
+once instead of the one somebody happens to click.
+
+**A forward `let` replaced with a `const`, on svelte-check's warning.** The recorder and the
+transport point at each other, and the first draft forward-declared `let recording` — which drew
+"`recording` is updated, but is not declared with `$state(...)`". The warning is right and the fix
+is not a rune: the instance is assigned once. The transport reaches it through ARROWS, which are not
+called during construction, so a `const` declared afterwards is legal and the ordering only has to
+satisfy the compiler — the same shape `screens` and `mediaTransport` already use.
+
+**A generator bug of mine, fixed at the source.** The constructor rewrite matched a field's type
+annotation with `[^=]+`, which stops dead at the `=` inside `=>`. `stopSpeechReco` is
+`(() => void) | null`, so its `let` survived into the class body and TypeScript read it as a
+variable declaration onto a private field. It is a lazy match up to a space-equals-space now, which
+an arrow cannot produce.
+
+**No reactivity test, stated rather than skipped quietly.** The class carries no `$state`, so
+there is no reactive group to assert; the runtime property it does have is the announcement
+sequence, and the negative control run was removing the `wasRecording` guard on the stop broadcast
+— seen red, then restored.
+
+Not verified: no browser run. Nothing here proves a real recorder starts.
+
 ### 2026-08-16 15:44 EDT — Phase 5 slice 17: `RoomOverlays.svelte`, the layer above the room
 
 **`+page.svelte` 4,973 → 4,708 (−265).** Suite 2,277 → 2,280 across 154 files. `svelte-check`

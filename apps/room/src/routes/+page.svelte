@@ -13,7 +13,6 @@
   } from '$lib/chat-paging';
   import { RoomMenus } from '$lib/room/menus.svelte';
   import { RoomPolls } from '$lib/room/polls.svelte';
-  import { chooseRecordingOptions } from '$lib/recording-codec';
   import { page } from '$app/state';
   import { panelDragResize, readPanelBounds } from '$lib/panel-drag';
   import { invalidate, invalidateAll } from '$app/navigation';
@@ -31,7 +30,6 @@
   } from './private-chat.remote';
   import { focusOnScreen, presenterCommand } from './presenter-commands.remote';
   import { videoForAll, youtubeForAll } from './for-all-broadcast.remote';
-  import { recordingState } from './recording-state.remote';
   import { changeChatMode as changeChatModeCommand } from './chat-mode.remote';
   import {
     deleteFile as deleteFileCommand,
@@ -56,7 +54,6 @@
   import { SvelteSet } from 'svelte/reactivity';
   import { SignallingClient } from '$lib/media/signalling';
   import { MediaSession } from '$lib/media/session';
-  import { startSpeechRecognition } from '$lib/media/speech-reco';
   import { checkPermissionState } from '$lib/media-capture-error';
   import { MtxStreamTabs } from '$lib/room-mtx.svelte';
   import ScreenVolumeControl from '$lib/components/ScreenVolumeControl.svelte';
@@ -86,6 +83,7 @@
   import { RoomMessageActions } from '$lib/room/message-actions.svelte';
   import { RoomEventStream } from '$lib/room/events.svelte';
   import { RoomMediaTransport } from '$lib/room/media-transport.svelte';
+  import { RoomRecording } from '$lib/room/recording';
   import { RoomScreens } from '$lib/room/screens.svelte';
   import { RoomUserActions } from '$lib/room/user-actions.svelte';
   import {
@@ -950,9 +948,9 @@
     videoDeviceId: () =>
       typeof prefs.loaded.videoDeviceID === 'string' ? prefs.loaded.videoDeviceID : undefined,
     roomVolume,
-    beginSpeech: () => beginSpeechRecognition(),
-    endSpeech: () => endSpeechRecognition(),
-    stopRecording: () => stopRecording(),
+    beginSpeech: () => recording.beginSpeechRecognition(),
+    endSpeech: () => recording.endSpeechRecognition(),
+    stopRecording: () => recording.stopRecording(),
     showScreensTab: () => (mainTab = 'screens'),
     checkPermissionState: (kind, userAgent) => checkPermissionState(kind, userAgent)
   });
@@ -1052,6 +1050,15 @@
         composerElement?.setSelectionRange(chat.composer.length, chat.composer.length);
       }),
     onChanged: () => invalidateAll()
+  });
+
+  const recording = new RoomRecording({
+    dialogs,
+    media,
+    menus,
+    prefs,
+    mediaTransport,
+    isPresenter: () => isPresenter
   });
 
   const userActions = new RoomUserActions<(typeof data.connectedUsers)[number]>({
@@ -1231,8 +1238,6 @@
    * to two lines a second per speaker. The overlay only shows what fits its 60vh scroll area.
    */
   const CAPTION_HISTORY_LIMIT = 500;
-  /** Stops recognition; null when this peer is not captioning. */
-  let stopSpeechReco: (() => void) | null = null;
   
   /**
    * Tears the media session down and builds a new one — the capture's `disconnectAll()` plus
@@ -1276,10 +1281,6 @@
    * is open. Pausing between sentences must not flip it back to " ( No one is speaking )".
    */
 
-  /** The separate window the preview lives in - the capture's `reopenRecPreviewWindow` target. */
-  let recPreviewWindow: Window | null = null;
-  let screenRecorder: MediaRecorder | null = null;
-  let recordedScreenChunks: Blob[] = [];
 
   
   let mainElement: HTMLElement | undefined;
@@ -2636,40 +2637,7 @@
 
 
 
-  /**
-   * Starts captioning this peer's speech.
-   *
-   * Gated as the capture gates it:
-   *
-   *   "Speech recognition not started: disabled by preferences or session settings"
-   *   "Speech recognition not started: mic is muted or not enabled"
-   *
-   * so it needs the session-level `prefs.doSpeechReco` on and a live microphone - and here, a presenter,
-   * because the server refuses `sendSpeechReco` from a member. `prefs.subtitles` is deliberately NOT a
-   * gate: that is the per-viewer overlay preference, and a presenter who hides captions on their own
-   * screen should still caption for everybody else.
-   */
-  function beginSpeechRecognition() {
-    if (stopSpeechReco || !isPresenter || !prefs.doSpeechReco || !mediaTransport.session) return;
 
-    stopSpeechReco = startSpeechRecognition({
-      isMicAlive: () => mediaTransport.microphoneStream?.getAudioTracks()[0]?.readyState === 'live',
-      onresult: (result) => {
-        void mediaTransport.signalling
-          ?.request('sendSpeechReco', result)
-          .catch((error: unknown) => console.warn('[captions] a line was not relayed', error));
-      },
-      onfatal: (reason) => {
-        console.warn('[captions] recognition stopped:', reason);
-        endSpeechRecognition();
-      }
-    });
-  }
-
-  function endSpeechRecognition() {
-    stopSpeechReco?.();
-    stopSpeechReco = null;
-  }
 
 
   function deliverAlert(alert: {
@@ -2873,16 +2841,6 @@
 
 
 
-  function stopRecording() {
-    const wasRecording = media.recording;
-    if (screenRecorder && screenRecorder.state !== 'inactive') screenRecorder.stop();
-    // Only announce a stop we actually made: `stopScreenSharing()` calls this unconditionally, and
-    // a stop broadcast with no start would clear the badge for a room that is still media.recording.
-    if (wasRecording) void broadcastRecordingState('stopRec');
-    media.recording = false;
-    media.recordingPaused = false;
-    media.recordingReminder = false;
-  }
 
 
 
@@ -2895,193 +2853,13 @@
    * `cmd` is the command's schema instead of four restated strings, and why the catch is here once
    * rather than at each of the four `void`-ed call sites.
    */
-  type RecordingTransition = Parameters<typeof recordingState>[0]['cmd'];
 
-  async function broadcastRecordingState(cmd: RecordingTransition, recName = '') {
-    /*
-      THE SPINNER'S MISSING WRITER, added 2026-08-15.
 
-      `recIndicatorStart` — the spinner-plus-REC navbar indicator, consts 92/93/94 — was rendered
-      and `media.roomRecordingStarting` was never set by anything, so the branch was unreachable and the
-      presenter got no feedback at all between pressing record and the room confirming. Found by
-      reading every use of the field while extracting `RoomMedia`: one declaration, one template
-      branch, no writer.
 
-      The failure path clears it too, and that half matters as much: a spinner left running on a
-      refused command reads as "still starting" for the rest of the session, which is worse than no
-      feedback because it is wrong feedback.
-    */
-    if (cmd === 'startRec') media.roomRecordingRequested();
-    try {
-      await recordingState({ cmd, recName });
-    } catch (error) {
-      if (cmd === 'startRec') media.roomRecordingRequestFailed();
-      console.error('recordingState', cmd, error);
-    }
-  }
 
-  /**
-   * Records the shared screen to a file on this machine.
-   *
-   * NOT what the capture does, and the divergence is deliberate. The original records
-   * SERVER-side - `mediaSoupService.startRec(muser)` and
-   * `sendServerAdminCommand('startRecMtx', {streams})`, with the server pushing back a `recName`
-   * - and the whole bundle contains exactly ONE `new MediaRecorder`, which is the microphone test
-   * in the AV settings modal. The original never writes a session media.recording to your computer.
-   * Server-side media.recording needs the media.recording/transcoding workers that the deployment plan defers,
-   * so this records in the browser instead.
-   *
-   * Three things were wrong with it:
-   *
-   *   1. SILENT. `getDisplayMedia({ audio: false })` means `screenStream` carries video only, so
-   *      every media.recording was a silent movie. The presenter's microphone is mixed in below.
-   *   2. UNREACHABLE. `media.recordedUrl` is only set by the recorder's `stop` event, which also
-   *      sets `media.recording = false` - and the menu item that exposed it sat inside `{#if media.recording}`.
-   *      It existed only at the moment it became invisible.
-   *   3. NEVER SAVED. A blob URL was created and nothing ever downloaded it.
-   */
-  function startRecording() {
-    if (!mediaTransport.screenStream || !media.screenSharing || typeof MediaRecorder === 'undefined') return;
 
-    // Video from the share, audio from the mic. `getAudioTracks()` on the display stream is empty
-    // by construction, so without this the file has no sound at all.
-    const tracks: MediaStreamTrack[] = [...mediaTransport.screenStream.getVideoTracks()];
-    const micTrack = mediaTransport.microphoneStream?.getAudioTracks()[0];
-    if (micTrack && micTrack.readyState === 'live') tracks.push(micTrack);
-    media.recordedHasAudio = Boolean(micTrack && micTrack.readyState === 'live');
-    const recordedStream = new MediaStream(tracks);
 
-    recordedScreenChunks = [];
-    /*
-      Explicit codec and bitrate, where this was `new MediaRecorder(recordedStream)` with NO options.
 
-      With none, the browser chose both the container and roughly 2.5 Mbps. `docs/streaming-choices.md`
-      row 4 measured, on realistic chart content, that VP9 produces 3841 kbps at an 8 Mbps cap and
-      keeps scaling, while H.264 saturates near 2033 and ignores anything higher — so the detail was
-      available and simply never asked for. See `media.recording-codec.ts` for the full ordering and for
-      why 8 Mbps rather than 12: a second 1080p encode competes with the live encoder, and the share
-      members are watching matters more than the presenter's own file.
-    */
-    const recordingOptions = chooseRecordingOptions();
-    screenRecorder = new MediaRecorder(recordedStream, {
-      // Omitted entirely when nothing is supported: passing an unsupported `mimeType` THROWS, and a
-      // media.recording that fails to start is worse than one at the browser's default.
-      ...(recordingOptions.mimeType ? { mimeType: recordingOptions.mimeType } : {}),
-      videoBitsPerSecond: recordingOptions.videoBitsPerSecond,
-      audioBitsPerSecond: recordingOptions.audioBitsPerSecond
-    });
-    screenRecorder.addEventListener('dataavailable', (event) => {
-      if (event.data.size > 0) recordedScreenChunks.push(event.data);
-    });
-    screenRecorder.addEventListener(
-      'stop',
-      () => {
-        if (media.recordedUrl) URL.revokeObjectURL(media.recordedUrl);
-        if (recordedScreenChunks.length === 0) {
-          dialogs.alert = 'Nothing was recorded.';
-          return;
-        }
-        const type = screenRecorder?.mimeType || 'video/webm';
-        media.recordedUrl = URL.createObjectURL(new Blob(recordedScreenChunks, { type }));
-        downloadRecording();
-      },
-      { once: true }
-    );
-    // A timeslice, so `dataavailable` fires periodically instead of only at stop. Without it a
-    // media.recording lost to a crash or a closed tab is a media.recording with zero chunks.
-    screenRecorder.start(1000);
-    media.recording = true;
-    // The room learns from the server, never from this flag - see `broadcastRecordingState`.
-    void broadcastRecordingState('startRec', `room-media.recording-${new Date().toISOString()}`);
-    media.recordingPaused = false;
-    media.recordingReminder = true;
-    menus.set('recording', false);
-  }
-
-  /**
-   * Writes the finished media.recording to the user's Downloads folder.
-   *
-   * Called automatically when the recorder stops, and again from the menu if they want another
-   * copy. The extension follows the container the browser actually chose - Chrome gives
-   * `video/webm;codecs=...`, Safari `video/mp4` - because naming an mp4 `.webm` produces a file
-   * the OS refuses to open.
-   */
-  /**
-   * `showRecPreview()` / `hideRecPreview()`, which in the capture are:
-   *
-   * ```js
-   * showRecPreview(){ if(!roomState.isRecording) return !1;
-   *   globals.recPreviewOpen = !0; guiEventBus.emit("reopenRecPreviewWindow") }
-   * hideRecPreview(){ if(!roomState.isRecording) return !1;
-   *   globals.recPreviewOpen = !1; guiEventBus.emit("closeRecPreviewWindow") }
-   * ```
-   *
-   * There the preview is a separate WINDOW pointed at a server-supplied URL - the server sends
-   * `setRecPreview` and the client stores `sessData.recPreviewLocation = i.url`. We have no
-   * server-side media.recording and therefore no such URL, so the window shows the local media.recording
-   * instead. The window model itself is the capture's.
-   *
-   * The toggle previously flipped `media.recPreviewOpen` and nothing read it anywhere else in the app:
-   * a control that changed its own label and did nothing.
-   */
-  function showRecPreview() {
-    if (!media.recordedUrl) return;
-    recPreviewWindow?.close();
-    recPreviewWindow = window.open(media.recordedUrl, 'RecPreview', 'width=960,height=600');
-    menus.set('recording', false);
-
-    // `window.open` returns null when the popup is blocked. Flipping the label to "Hide" anyway
-    // would claim a window that is not there, and staying silent looks like a dead button - which
-    // is what the control already was. Say what happened; the file is still on disk either way.
-    if (!recPreviewWindow) {
-      media.recPreviewOpen = false;
-      dialogs.alert =
-        'Your browser blocked the preview window. Allow pop-ups for this site, or open the downloaded media.recording from your Downloads folder.';
-      return;
-    }
-    media.recPreviewOpen = true;
-  }
-
-  function hideRecPreview() {
-    recPreviewWindow?.close();
-    recPreviewWindow = null;
-    media.recPreviewOpen = false;
-    menus.set('recording', false);
-  }
-
-  function downloadRecording() {
-    if (!media.recordedUrl) return;
-    const type = screenRecorder?.mimeType || 'video/webm';
-    const extension = type.includes('mp4') ? 'mp4' : 'webm';
-    // `sv-SE` gives `2026-08-05 20:33:41` - ISO-shaped and already local time, so the name sorts
-    // chronologically in Finder without any timezone arithmetic.
-    const stamp = new Date().toLocaleString('sv-SE').replace(/[: ]/g, '-');
-    const link = document.createElement('a');
-    link.href = media.recordedUrl;
-    link.download = `room-media.recording-${stamp}.${extension}`;
-    link.style.display = 'none';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  }
-
-  function pauseRecording() {
-    if (!screenRecorder || screenRecorder.state !== 'recording') return;
-    screenRecorder.pause();
-    void broadcastRecordingState('pauseRec');
-    media.recordingPaused = true;
-    media.recordingReminder = true;
-    menus.set('recording', false);
-  }
-
-  function resumeRecording() {
-    if (!screenRecorder || screenRecorder.state !== 'paused') return;
-    screenRecorder.resume();
-    void broadcastRecordingState('resumeRec');
-    media.recordingPaused = false;
-    media.recordingReminder = false;
-    menus.set('recording', false);
-  }
 
   function promptForSoundCloud() {
     dialogs.prompt = {
@@ -3574,7 +3352,7 @@
       // no teardown to transcribe; leaving a third-party script attached to a dead component is
       // ours to avoid.
       stopTawk();
-      endSpeechRecognition();
+      recording.endSpeechRecognition();
       mediaTransport.signalling = null;
       /*
         Close whichever session is LIVE, which after a role change is not the captured `session`.
@@ -4222,11 +4000,11 @@
           {setInputChecked}
           {setRangeValue}
           ontoggletopmenu={toggleTopMenu}
-          onstartrecording={() => void startRecording()}
-          onstoprecording={() => void stopRecording()}
-          onpauserecording={pauseRecording}
-          onresumerecording={resumeRecording}
-          ondownloadrecording={downloadRecording}
+          onstartrecording={() => void recording.startRecording()}
+          onstoprecording={() => void recording.stopRecording()}
+          onpauserecording={() => recording.pauseRecording()}
+          onresumerecording={() => recording.resumeRecording()}
+          ondownloadrecording={() => recording.downloadRecording()}
           onpromptforsoundcloud={promptForSoundCloud}
           onstopsoundcloud={stopSoundCloud}
           onstopsoundcloudforme={stopSoundCloudForMe}
@@ -4244,8 +4022,8 @@
           ontoggletawksupport={toggleTAWKSupport}
           ongetmypinanddoinfo={() => void getMyPinAndDoInfo()}
           onrequestreload={requestReload}
-          onshowrecpreview={showRecPreview}
-          onhiderecpreview={hideRecPreview}
+          onshowrecpreview={() => recording.showRecPreview()}
+          onhiderecpreview={() => recording.hideRecPreview()}
         />
         {/snippet}
 
