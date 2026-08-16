@@ -71,6 +71,30 @@ elimination that is where `sendFcmAlertsNew`, `invalidTokens`, `diasableFCMAlert
 ties push delivery to entitlement, which leaves §3's finding standing: the reference stops push on
 `lastLogin` decay, not on subscription state.
 
+### 2026-08-16 08:16 EDT — The full gate finds two orphans I left, and the reader catalog proves itself
+
+**Branch `feat/extra-chat-column`. Runtime impact: none** — one contract test.
+
+**Found by running `eslint .` across the repository rather than over changed files.** Through five
+slices I had linted only what I touched, which is the targeted-testing rule applied one notch too
+narrowly: a rename can orphan a constant in a file it does not otherwise change.
+`privchat-toolbar-contract.test.ts` carried a `PREFS_SOURCE` my slice-3 script added and a
+`page` read the same slice made redundant, and neither was in a file the slice reported touching.
+Fixed by USING the file-level constant rather than re-reading inside the test, and dropping the dead
+read. 29 problems -> 27, and **all 27 remaining are pre-existing duplicates under `scripts/*  2.mjs`**,
+untouched by this phase.
+
+**AND IT DEMONSTRATED SLICE 0a.** Removing that `page` read means the file no longer names
+`routes/+page.svelte` anywhere — which under the OLD hand-kept `EXTRACTION_SOURCES` would have
+silently dropped it out of the vacuity police, exactly as `day-separator-contract.test.ts` did
+twice. It stays policed, because the catalog discovers `lib/room/*.svelte.ts` and the file names
+`room/prefs.svelte.ts`. The reader floor held at its number. That is the gate written four hours
+ago catching, in passing, the failure it was written for.
+
+**Full gate, run once before the push:** `pnpm test` (privacy boundary + PostgreSQL schema
+artifacts + vitest) **2,056 across 143**; `pnpm check` **1,153 files, 0 errors, 0 warnings**;
+`eslint .` at the pre-existing 27.
+
 ### 2026-08-16 08:11 EDT — `RoomVolume`, and the fifteenth unbound method finally gets a gate
 
 **Branch `feat/extra-chat-column`. Runtime impact: yes** — every volume in the room moved, and **ten
