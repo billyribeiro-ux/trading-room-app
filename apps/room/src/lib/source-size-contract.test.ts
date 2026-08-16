@@ -184,8 +184,14 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       catching the chat up, one pausing the five-second refresh poll - into the single
       `<svelte:document>` handler. The poll hoisted out of `onMount` to sit beside it, which costs
       lines here and removes a listener, a teardown and a whole duplicated concern.
+
+      3c: `RoomArrivals`. Three effects each answered "which rows in this wholesale-replaced list are
+      new?" with their own set and their own priming boolean - `seenAlertIds`/`alertDeliveryInitialized`,
+      `seenQuestionIds`/`qaNoticesPrimed`, `seenMessageIds`/`chatSoundPrimed` - two thousand lines
+      apart, restating the rule that the first pass announces NOTHING three times. One class now, so
+      the rule is tested once instead of being re-implemented where two of the three could drift.
     */
-    max: 11621,
+    max: 11602,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {

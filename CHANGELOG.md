@@ -223,6 +223,85 @@ through — both are documented in `.env.example` and until now nothing read the
 **Not done:** retiring `ptr_clone_app` (deferred until the cutover is proven in a real deployment),
 and the owner role / database rename `ptr_clone` → `tradingroom`. Both remain in `TODO.md`.
 
+### 2026-08-15 20:12 EDT — Phase 3c: one arrival rule instead of three, and a plan corrected by reading the code it was written about
+
+**Branch `feat/extra-chat-column`, not merged.** **Runtime impact: none intended** — three effects
+now call one class where each held its own copy of the same algorithm. Behaviour is unchanged at all
+three sites and the equivalence is argued below rather than asserted.
+
+**THE APPROVED PLAN FOR THIS STEP WAS WRONG, and reading `subscribeToRoomEvents` end to end is what
+said so.** It claimed the latch effects react to a server push arriving through that function, so the
+code should move to the arrival point and the latches would delete themselves — with `createSubscriber`
+as the documented way to make the source reactive. Two things disprove it:
+
+1. **`data` has four producers, not one.** The SSE handler's `invalidateAll()`, the five-second
+   poll's `invalidate('room:data')`, the reconnect catch-up on `source.addEventListener('open')`, and
+   the visibility return. Moving delivery into the SSE handler would deliver **silently** every alert
+   that arrives by the other three — precisely the ones that arrive while the stream was down. The
+   hidden-tab branch makes it worse: it returns *before* the refetch, so the catch-up on return is
+   the only thing that would ever deliver those, and it is not an SSE event.
+2. **`createSubscriber` does not apply.** Its documented job is integrating an *external* event-based
+   system with Svelte's reactivity by making a getter reactive. `data.messages` is already reactive
+   load data. There is nothing external to wrap, and it would not remove one latch, because the
+   latches answer *which rows are new*, not *did something change*.
+
+**What was done instead is 3c's stated prize by a different route.** Three effects each carried the
+same algorithm — *given a list replaced wholesale and a marker of what I have seen, which are new,
+and say nothing at all on the first pass*:
+
+```
+  alert delivery   seenAlertIds     + alertDeliveryInitialized   -> toast + sound
+  Q&A notices      seenQuestionIds  + qaNoticesPrimed            -> toast + sound
+  chat sound       seenMessageIds   + chatSoundPrimed            -> pling
+```
+
+Two thousand lines apart, restating one rule three times where two of them could drift. Now one
+`RoomArrivals` in `$lib/room/arrivals.ts` — **six latch identifiers deleted from the page**, and the
+rule tested once with its own negative controls.
+
+**Deliberately a plain `.ts` class and NOT a rune module.** Nothing renders from these markers; they
+are bookkeeping read inside an effect that also writes them. A `$state` set in that position re-runs
+its own effect. The absence of runes here is a decision, and the class says so.
+
+**One control-flow change, stated rather than glossed:** the Q&A effect's priming pass used to
+`return` before the answered-clearing sweep, so that sweep ran from the second pass onwards and now
+runs from the first. It is a no-op — `unreadQaAlertIds` is declared empty and is only ever filled by
+the loop directly above it, so there is nothing to clear on the first pass. Verified by reading its
+declaration, not assumed.
+
+**THE CONTROL THAT MATTERED CAME BACK GREEN, TWICE.** With the suite at 1,862 assertions:
+
+```
+  arrived.some((m) => m.senderId !== data.user.id)  ->  .some(() => true)     1862 passed
+  const unseenAlerts = alertArrivals.fresh(data.alerts)  ->  = data.alerts    1862 passed
+```
+
+The first makes the chat ding fire for your **own** messages. The second makes every load **re-toast
+and re-sound every alert in the room**. Both are things a member hears, and the suite had nothing to
+say about either: `RoomArrivals` had unit tests, and the page's *use* of it had none. Closed by
+`arrival-delivery-contract.test.ts` — 7 assertions, every slice proving it was FOUND before asserting
+on its contents — and all three controls re-run against it and seen **red**.
+
+**A defect in my own instrument, found and fixed before it was reported as anything else.** The first
+version of that guard matched `chatArrivals\n      .fresh(data.messages)` — prettier's line break
+encoded into the marker string. The source was rewritten to a named local so the guard reads a stable
+expression rather than a formatting accident.
+
+**A finding recorded, not fixed — `TODO.md` row AH.** Deciding whether `RoomArrivals` could bound its
+marker set meant reading the three server queries that feed it. `messages` and `alerts` page through
+`CHAT_LOG_PAGE_SIZE = 50`. **The `alertQuestions` read has no `LIMIT` at all** — read in full at
+`+page.server.ts:481-520`, `.select(...).innerJoin(...).where(...).orderBy(...).all()`, no `.limit()`
+and no `.offset()`. It is the same defect fixed for the other two logs on 2026-08-14, and the third
+list was missed: every `invalidateAll()` re-reads and re-serialises every question the room has ever
+had, with bodies, sender names, avatars and roles, into the SSR HTML and the payload. It also blocks
+bounding `#seen`, because evicting an id still present in the list re-announces it. Server read
+first, then the marker set — a bound picked because it looked big enough is what this repository
+forbids.
+
+**Verified:** `pnpm run check` 0 errors / 0 warnings across 1,133 files; suite **1,870 across 135
+files**; eslint clean; prettier clean; five negative controls run and seen red (two on the class, three
+on the wiring). `+page.svelte` **11,620 → 11,601**, ceiling lowered in the same commit.
+
 ### 2026-08-15 20:00 EDT — Phase 3b: two listeners for one event, and the double load they were hiding
 
 **Branch `feat/extra-chat-column`, not merged.** **Runtime impact: yes** — returning to the tab now

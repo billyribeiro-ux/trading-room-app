@@ -110,6 +110,7 @@
   import { RoomRoster } from '$lib/room/roster.svelte';
   import { RoomAlerts } from '$lib/room/alerts.svelte';
   import { ALERTS_LOG, RoomLogPages } from '$lib/room/log-pages.svelte';
+  import { RoomArrivals } from '$lib/room/arrivals';
   import { EXTRA_COMPOSER, RoomChat } from '$lib/room/chat.svelte';
   import { RoomMedia } from '$lib/room/media.svelte';
   import { alertSoundButtonFor, filesSectionHidden } from '$lib/files-gates';
@@ -1760,8 +1761,11 @@
   let previousAlertCount = 0;
   let previousChatCount = 0;
   let previousChatTab: ChatTab | undefined;
-  let alertDeliveryInitialized = false;
-  let seenAlertIds = new Set<number>();
+  /**
+   * Which alerts are NEW since the last load — see `RoomArrivals` for why the three lists that ask
+   * this question share one implementation, and why it is a plain class rather than a rune module.
+   */
+  const alertArrivals = new RoomArrivals<(typeof data.alerts)[number]>();
   let alertScrollTimer: ReturnType<typeof globalThis.setTimeout> | undefined;
   let chatScrollTimer: ReturnType<typeof globalThis.setTimeout> | undefined;
   let mutedUsers = $state<Record<string, ManagedChatUser>>({});
@@ -2985,18 +2989,9 @@
   });
 
   $effect(() => {
-    const currentAlerts = data.alerts;
-
-    if (!alertDeliveryInitialized) {
-      seenAlertIds = new Set(currentAlerts.map((alert) => alert.id));
-      alertDeliveryInitialized = true;
-      return;
-    }
-
-    const unseenAlerts = currentAlerts.filter((alert) => !seenAlertIds.has(alert.id));
+    const unseenAlerts = alertArrivals.fresh(data.alerts);
     if (unseenAlerts.length === 0) return;
 
-    for (const alert of unseenAlerts) seenAlertIds.add(alert.id);
     queueMicrotask(() => {
       /*
         THE ALERT FILTER, site one of three — the LIVE arrival, byte 1,004,533.
@@ -4591,8 +4586,7 @@
   // so: never for your own post, otherwise every presenter plus anyone who has asked on that same
   // alert. `alertService.info` is the cyan `.toast-info` skin (background rgb(47, 150, 180)) and
   // `qaAlert` is clearly.mp3, which is why it sounds different from an alert's `cash`.
-  const seenQuestionIds = new Set<number>();
-  let qaNoticesPrimed = false;
+  const qaArrivals = new RoomArrivals<(typeof data.alertQuestions)[number]>();
 
   function deliverQaNotice(question: (typeof data.alertQuestions)[number]) {
     if (question.senderId === data.user.id) return;
@@ -4621,17 +4615,10 @@
   $effect(() => {
     const questions = data.alertQuestions;
 
-    // The first run is whatever was already stored when the page loaded, not news: seed the set so
-    // a reader opening the room does not get a toast per historical question.
-    if (!qaNoticesPrimed) {
-      for (const question of questions) seenQuestionIds.add(question.id);
-      qaNoticesPrimed = true;
-      return;
-    }
-
-    for (const question of questions) {
-      if (seenQuestionIds.has(question.id)) continue;
-      seenQuestionIds.add(question.id);
+    // The first pass is whatever was already stored when the page loaded, not news, and
+    // `RoomArrivals` returns nothing for it — a reader opening the room gets no toast per
+    // historical question.
+    for (const question of qaArrivals.fresh(questions)) {
       // updateAlertMsg sets the marker for whoever receives the update, with no role check.
       unreadQaAlertIds.add(question.alertId);
       deliverQaNotice(question);
@@ -4649,6 +4636,11 @@
     // Here an alert stops flashing as soon as it has no unanswered question left, so the flash
     // reads as "someone is waiting on you" rather than "there is something you have not opened".
     // The two upstream clears still apply in the meantime.
+    //
+    // The priming pass used to `return` above this, so this ran from the SECOND pass onwards; it now
+    // runs from the first. That is a no-op and not a behaviour change: `unreadQaAlertIds` is
+    // declared empty and only ever filled by the loop directly above, so on the first pass there is
+    // nothing to clear.
     const answered = [...unreadQaAlertIds].filter(
       (alertId) => !questions.some((question) => question.alertId === alertId && !question.answeredAt)
     );
@@ -4659,8 +4651,7 @@
   //   preferences.doNotDisturbOn || (preferences.chatSoundOn && soundEffectsService.pling.play())
   // Your own message does not ring, and one ring covers a batch that arrives together rather than
   // one per message.
-  const seenMessageIds = new Set<number>();
-  let chatSoundPrimed = false;
+  const chatArrivals = new RoomArrivals<(typeof data.messages)[number]>();
 
   $effect(() => {
     // Re-runs when the viewer switches tabs or a screen arrives/leaves.
@@ -4670,20 +4661,10 @@
   });
 
   $effect(() => {
-    const roomMessages = data.messages;
-
-    if (!chatSoundPrimed) {
-      for (const message of roomMessages) seenMessageIds.add(message.id);
-      chatSoundPrimed = true;
-      return;
-    }
-
-    let incoming = false;
-    for (const message of roomMessages) {
-      if (seenMessageIds.has(message.id)) continue;
-      seenMessageIds.add(message.id);
-      if (message.senderId !== data.user.id) incoming = true;
-    }
+    // ONE ring for a batch that arrives together, not one per message — `.some` is that rule, and
+    // it is why the sound is decided after the whole arrival is known rather than inside the loop.
+    const arrived = chatArrivals.fresh(data.messages);
+    const incoming = arrived.some((message) => message.senderId !== data.user.id);
 
     if (incoming && !doNotDisturbOn && chatSoundOn) playSoundEffect('pling');
   });
