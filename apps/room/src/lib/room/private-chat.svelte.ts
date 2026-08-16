@@ -424,22 +424,6 @@ export class RoomPrivateChat<User extends { id: number; isP: boolean; hasAdminCh
   }
 
   /**
-   * `closePanel()` - the X in the private-chat header:
-   *
-   * ```js
-   * closePanel(){
-   *   guiEventBus.emit('PCClosePanel');
-   *   this.notificationInterval && (clearInterval(this.notificationInterval),
-   *                                 document.title = globals.sessionName);
-   *   this.user = null; this.recvdUser = null; this.currUser = '';
-   * }
-   * ```
-   *
-   * Closing DESELECTS the thread. Hiding the panel alone - which is all the X used to do - means
-   * reopening lands straight back in the last conversation, where the capture returns to
-   * "No active chat".
-   */
-  /**
    * `showPrivateChat()` — the ONE door into the private-chat panel, and its refusal.
    *
    * `app-room.compiled.js:855-861`, verbatim in shape:
@@ -465,6 +449,22 @@ export class RoomPrivateChat<User extends { id: number; isP: boolean; hasAdminCh
     this.#open = true;
   }
 
+  /**
+   * `closePanel()` - the X in the private-chat header:
+   *
+   * ```js
+   * closePanel(){
+   *   guiEventBus.emit('PCClosePanel');
+   *   this.notificationInterval && (clearInterval(this.notificationInterval),
+   *                                 document.title = globals.sessionName);
+   *   this.user = null; this.recvdUser = null; this.currUser = '';
+   * }
+   * ```
+   *
+   * Closing DESELECTS the thread. Hiding the panel alone - which is all the X used to do - means
+   * reopening lands straight back in the last conversation, where the capture returns to
+   * "No active chat".
+   */
   close() {
     this.#open = false;
     this.#peerId = null;

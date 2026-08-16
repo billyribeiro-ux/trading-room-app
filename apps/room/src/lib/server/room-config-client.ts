@@ -78,7 +78,7 @@ export interface RoomSessionSettings {
   /**
    * "Enable Rich Text Editor?" — the OWNER's term in the three-way gate on the chat rich text
    * editor. The room resolves it as `sessData.enableRTE && preferences.enableRTE && isPresenter`;
-   * see `canUseRTE` in `+page.svelte`. Absent means off, which matches the reference: `enableRTE`
+   * see `canUseRTE` in `room/composer.svelte.ts`. Absent means off, which matches the reference: `enableRTE`
    * is not among the 25 keys in its default preferences object either.
    */
   enableRTE?: boolean;

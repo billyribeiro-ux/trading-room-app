@@ -133,6 +133,12 @@ export class RoomFeeds<
     return this.#alerts.filterFor;
   }
 
+  /*
+    The live tail from the load, with whatever older pages the reader has scrolled back to in front
+    of it — the same two-lifetime split the chat log uses, and for the same reason: `data.alerts` is
+    replaced by every `invalidateAll()`, so older pages held there would be discarded by one new
+    alert.
+  */
   get visibleAlerts() {
     return (
       mergeOlderChatMessages(this.#alertPages.older(this.#alertsLogKey), this.#session().alerts)
@@ -186,10 +192,6 @@ export class RoomFeeds<
     );
   }
 
-  get visibleChat() {
-    return this.chatMessagesFor(this.#chat.tab);
-  }
-
   /*
     The live tail from the load, with whatever older pages the reader has scrolled back to in front
     of it.
@@ -203,6 +205,10 @@ export class RoomFeeds<
     however far back somebody paged. Trimming first would let the cap be exceeded by exactly the
     pages this feature adds.
   */
+  get visibleChat() {
+    return this.chatMessagesFor(this.#chat.tab);
+  }
+
   /*
     The extra column's rows, through the SAME pipeline as the main column's — merge, trim, hide,
     badge, and the webinar filter — differing only in which channel it reads. Written as a function

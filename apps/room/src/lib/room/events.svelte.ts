@@ -197,6 +197,21 @@ export class RoomEventStream<Entry> {
     return this.#reconnectedFlash;
   }
 
+  /**
+   * The room's realtime channel - the half that makes this a room rather than a page.
+   *
+   * The capture subscribes to `/sess/{sessionID}/alerts/` (and nine sibling channels) over
+   * SocketCluster and drains each with `for await`, pushing every message into `alertsLog` /
+   * `chatLog` and re-emitting it on its event bus. This room subscribed to nothing: an alert a
+   * presenter posted was invisible to every other member until that member reloaded, because
+   * `invalidateAll()` only ever ran after the acting user's own submission.
+   *
+   * `invalidate` rather than a local push: the alert list is server-derived (it carries the
+   * sender's avatar, role and evidence state, joined in `+page.server.ts`), so refetching keeps
+   * one source of truth instead of two shapes of the same row. The event is the trigger, not the
+   * payload - which is also why a message this peer caused is skipped, since its own action has
+   * already invalidated.
+   */
   subscribe() {
     if (typeof EventSource === 'undefined') return () => {};
 
@@ -813,21 +828,6 @@ export class RoomEventStream<Entry> {
     return () => source.close();
   }
 
-  /**
-   * The room's realtime channel - the half that makes this a room rather than a page.
-   *
-   * The capture subscribes to `/sess/{sessionID}/alerts/` (and nine sibling channels) over
-   * SocketCluster and drains each with `for await`, pushing every message into `alertsLog` /
-   * `chatLog` and re-emitting it on its event bus. This room subscribed to nothing: an alert a
-   * presenter posted was invisible to every other member until that member reloaded, because
-   * `invalidateAll()` only ever ran after the acting user's own submission.
-   *
-   * `invalidate` rather than a local push: the alert list is server-derived (it carries the
-   * sender's avatar, role and evidence state, joined in `+page.server.ts`), so refetching keeps
-   * one source of truth instead of two shapes of the same row. The event is the trigger, not the
-   * payload - which is also why a message this peer caused is skipped, since its own action has
-   * already invalidated.
-   */
   /**
    * The member's own city, resolved in the BROWSER and posted back for the roster.
    *

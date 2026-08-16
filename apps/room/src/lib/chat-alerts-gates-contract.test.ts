@@ -40,6 +40,13 @@ const ROOM_FULL_COMPACT = compact(ROOM_FULL);
 const ROOM_HELPERS_COMPACT = compact(ROOM_HELPERS);
 const PAGE_COMPACT = compact(PAGE);
 /*
+  The sixteen view gates moved to `room/gates.svelte.ts` in Phase 5 slice 27. A DECLARATION is
+  asserted there; a USE stays on the page or in a pane and carries the `gates.` prefix.
+*/
+const GATES_COMPACT = compact(
+  readFileSync(new URL('./room/gates.svelte.ts', import.meta.url), 'utf8')
+);
+/*
   The `beforeunload` BODY moved to `RoomWindowHandlers` in Phase 5 slice 18; the binding stayed on
   `<svelte:window>`. So the post is asserted in the module and the listener in the page - both
   halves, because a body nobody binds and a binding with no body each look correct alone.
@@ -89,19 +96,23 @@ describe('hideChatAlerts is ONE flag, not one mechanism per writer', () => {
   });
 
   it('is one derived flag here, fed by the three sources this room can resolve', () => {
-    expect(PAGE_COMPACT).toContain(
-      'consthideChatAlerts=$derived(data.sessData?.hideChatAlerts===true||viewerOnlyMode||chatAlertsDetached)'
+    expect(GATES_COMPACT).toContain(
+      'getviewerOnlyMode()'
+    );
+    /* The three sources, still one expression: the room setting, the mode, and the detach. */
+    expect(GATES_COMPACT).toContain(
+      'gethideChatAlerts(){return(this.#session().sessData?.hideChatAlerts===true||this.viewerOnlyMode||this.#chatAlertsDetached());}'
     );
   });
 
   it('gates the column exactly once, and no branch tests a single writer directly', () => {
-    expect(PAGE).toContain('{#if !hideChatAlerts}');
+    expect(PAGE).toContain('{#if !gates.hideChatAlerts}');
     /*
       The defect this replaced: `viewerOnlyMode` and `chatAlertsDetached` each had their own branch
       on this column, so the room SETTING had nowhere to be read and did nothing. Either name
       reappearing as a branch condition here means the flag has been split apart again.
     */
-    expect(PAGE).not.toContain('{#if viewerOnlyMode}');
+    expect(PAGE).not.toContain('{#if gates.viewerOnlyMode}');
     expect(PAGE).not.toContain('{:else if chatAlertsDetached}');
   });
 

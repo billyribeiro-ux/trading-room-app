@@ -212,7 +212,7 @@
      * `sessData.enableRTE && preferences.enableRTE && isPresenter`. Resolved there and not here
      * because the same answer gates the composer button that opens this modal, and one expression
      * with one consumer cannot drift from itself. The reference asks it twice for the same reason
-     * and gets it wrong once — see `canUseRTE` in `+page.svelte`.
+     * and gets it wrong once — see `canUseRTE` in `room/composer.svelte.ts`.
      */
     canUseRTE?: boolean;
     /** The message being composed in the editor, as HTML. The page owns it; this modal shows it. */

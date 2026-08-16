@@ -178,10 +178,41 @@ export class RoomPrefs {
 
     this.#chatBadges = $state(loadedSettings.chatBadges !== false);
 
+    /**
+     * `preferences.chatGif` — whether inline gifs play or show a click-to-reveal placeholder.
+     *
+     * `!== false`, because the blob ships `prefs.chatGif:!0`. A viewer who has never touched the checkbox
+     * gets gifs, which is what the reference does; `=== true` would mute them for everybody.
+     */
     this.#chatGif = $state(loadedSettings.chatGif !== false);
 
+    /**
+     * `preferences.makeUsersFollowMyScreens` — when this presenter changes screen tab, take the room
+     * with them.
+     *
+     * `i && globals.isPresenter && preferences.makeUsersFollowMyScreens && this.bringFocusToScreen(…)`
+     * at the end of `onScreenShareTabChange` (`main.d6d3c112b59b7d0d.js` byte 1967413). `i` defaults
+     * true and is passed false for programmatic changes, which is the loop guard: receiving a focus
+     * command must not send one back.
+     *
+     * `=== true` — the blob ships `prefs.makeUsersFollowMyScreens:!1` (byte 980006). A presenter who has
+     * never touched it should not be dragging the room around by clicking their own tabs.
+     */
     this.#makeUsersFollowMyScreens = $state(loadedSettings.makeUsersFollowMyScreens === true);
 
+    /**
+     * `preferences.alwaysScrollToBottom` — the chat's "always scroll to bottom" override.
+     *
+     * `=== true`, not `!== false`, and the difference is the reference's own default: the preferences
+     * blob ships `prefs.alwaysScrollToBottom:!1` (`main.d6d3c112b59b7d0d.js` byte 979602). Seeding it ON for
+     * anyone who has never touched the checkbox would drag a reader out of the history they are
+     * scrolled up into — the opposite of the mistake made with `showSpeechRecoOverlay`, where
+     * `=== true` wrongly disabled a feature that defaults ON. The default decides which comparison is
+     * correct; neither is a house style.
+     *
+     * PERSISTED, unlike `saveData`: `chatAlwaysScrollToBottomChange` calls
+     * `setPreference('prefs.alwaysScrollToBottom', …)` (byte 2246247).
+     */
     this.#alwaysScrollToBottom = $state(loadedSettings.alwaysScrollToBottom === true);
 
     this.#recordingStartSound = $state(loadedSettings.recordingStartSound !== false);

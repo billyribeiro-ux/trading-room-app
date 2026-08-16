@@ -11,6 +11,7 @@ import { RoomComposer } from './composer.svelte';
 import { RoomFeeds } from './feeds.svelte';
 import { RoomMessageActions } from './message-actions.svelte';
 import { RoomEventStream } from './events.svelte';
+import { RoomGates } from './gates.svelte';
 import { RoomMediaTransport } from './media-transport.svelte';
 import { RoomRecording } from './recording';
 import { RoomScreens } from './screens.svelte';
@@ -83,6 +84,7 @@ const INSTANCES: Record<string, new (...args: never[]) => object> = {
   recording: RoomRecording,
   roomEvents: RoomEventStream,
   userActions: RoomUserActions,
+  gates: RoomGates,
   /*
     The Phase 1 classes, added when the completeness check below refused a map that covered only the
     new ones. Every one of these is handed to a component as a prop — `roster` and `menus` go whole

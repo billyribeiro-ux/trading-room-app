@@ -434,8 +434,8 @@ describe('the sidebar renders what the gates decide', () => {
     */
     const page = readFileSync(new URL('../routes/+page.svelte', import.meta.url), 'utf8');
     expect(page).toContain('<RoomSidebar');
-    expect(page).toContain('{rosterVisible}');
-    expect(page).toContain('{rosterCountVisible}');
+    expect(page).toContain('rosterVisible={gates.rosterVisible}');
+    expect(page).toContain('rosterCountVisible={gates.rosterCountVisible}');
     expect(page).toContain('{rowVisible}');
   });
 

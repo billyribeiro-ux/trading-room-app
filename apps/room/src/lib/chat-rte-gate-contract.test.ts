@@ -222,16 +222,22 @@ describe('the two entry points', () => {
     );
     expect(messageActionsModule).toContain('this.#composer.editInRTE(item, item.bodyHtml);');
     /*
-      Against the comment-STRIPPED module: the note above this branch quotes upstream's
-      `containsHtml(this.msg.txt)` to explain what we do instead, and an assertion that a comment
-      cannot mention is an assertion that forbids documenting.
+      Against the comment-STRIPPED sources: two notes quote upstream's `containsHtml(this.msg.txt)`
+      to explain what we do instead, and an assertion that a comment cannot mention is an assertion
+      that forbids documenting.
+
+      All THREE are stripped as of slice 27, which is the same correction made once and then not
+      generalised. It was applied to the actions module when the note beside that branch tripped it,
+      and the other two were left reading raw source — so the rule held only until the next comment
+      landed in one of them. It did: `canUseRTE`'s gate docblock, which explains the deliberate
+      narrowing of the edit entry point, moved into the composer with the getter it describes and
+      quotes upstream's expression to say what is NOT reproduced.
     */
-    const actionsCode = messageActionsModule
-      .replace(/\/\*[\s\S]*?\*\//g, '')
-      .replace(/(^|[^:])\/\/[^\n]*/g, '$1');
-    expect(actionsCode).not.toContain('containsHtml');
-    expect(pageCode).not.toContain('containsHtml');
-    expect(composerModule).not.toContain('containsHtml');
+    const stripComments = (source: string) =>
+      source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/[^\n]*/g, '$1');
+    expect(stripComments(messageActionsModule)).not.toContain('containsHtml');
+    expect(stripComments(pageCode)).not.toContain('containsHtml');
+    expect(stripComments(composerModule)).not.toContain('containsHtml');
   });
 
   it('the edit is NARROWED to the full gate, deliberately', () => {

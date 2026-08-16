@@ -24,6 +24,98 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-16
 
+### 2026-08-16 18:44 EDT — Phase 5 slice 27: the sixteen view gates, and ten comments that had lost their code
+
+**`+page.svelte` 3,529 → 3,021 (−508).** Suite 2,373 across 160 files. `svelte-check` 1,190 files,
+0 errors, 0 warnings. All four CI steps green locally.
+**Runtime impact: yes** — every gate that decides whether a control is drawn moved. No behaviour
+changed; the four negative controls below prove the gates still answer the same questions.
+
+**`RoomGates`, `src/lib/room/gates.svelte.ts` (390 lines, 16 getters).** Every `$derived` boolean
+that decides what this viewer may see: whether the roster and its badge are visible, whether
+archives are reachable, which alert labels the room uses, whether the Benzinga panel appears and at
+what URL, whether the mobile-app link is offered, whether the chat column is hidden at all. They are
+one module because they answer ONE question sixteen ways, and the seam was measured rather than
+chosen — seven collaborators across 286 lines and not one field shared with the page.
+
+**GETTERS, not `$derived` class fields, and the precedent is recorded rather than restated.** A
+derived class field initialises in DECLARATION ORDER, before the constructor has assigned the thunks
+it reads, so it evaluates against `undefined` once and caches that. `RoomFiles.filesHidden` is where
+that was first paid for. A getter is exactly as reactive: a `$derived` read through one is the same
+signal read. `gates.svelte.test.ts` executes it — five assertions, one per independently reactive
+source, mutations and `flushSync` inside `$effect.root` and the expectations outside it.
+
+**The RULES did not move.** `archivesAvailableTo`, `rosterBlockVisible`, `rosterCountVisibleTo`,
+`parseAlertLabels` and `tawkSupportAvailable` stay in `$lib/*-gates.ts` with their citations and
+their own tests. This class asks them. A predicate folded into a class that also holds state stops
+being testable on its own, and every one of these is a gate on what a member may see.
+
+#### TEN ORPHANED COMMENTS, which is the finding of this slice rather than a footnote
+
+The extraction's generator copies the block comments that PRECEDE a moved declaration. Six of them
+belonged to declarations that stayed behind, so the prose landed in `gates.svelte.ts` stacked on top
+of one another — the mirror image of slice 3 leaving four docblocks on the page, and equally
+invisible to a diff, because every line of it is an addition to a new file.
+
+Reading the destinations found four more that predate this slice and had simply never been looked
+for. All ten are now on the code they explain:
+
+| prose | now on |
+| --- | --- |
+| the chat RTE gate, incl. the deliberate edit-branch narrowing | `RoomComposer.canUseRTE` |
+| the alerts tail's two lifetimes | `RoomFeeds.visibleAlerts` |
+| the chat tail's two lifetimes | `RoomFeeds.visibleChat` |
+| the four `RoomMessage` gates | `usersPublicReply` + 3, on the page |
+| "is the Alert Filter configured at all?" | `alertFilterConfigured`, on the page |
+| the SSE channel | `RoomEventStream.subscribe` |
+| the presenter's own screen tab | `RoomMediaTransport.#addLocalScreen` |
+| `closePanel()` | `RoomPrivateChat.close` |
+| writing the recording to Downloads | `RoomRecording.downloadRecording` |
+| the class docblock, which sat above a type alias | `RoomGates` itself |
+
+One was a straight duplicate of `RoomAlerts`'s alert-filter note and was dropped rather than kept in
+two places. Two stale pointers to `canUseRTE` "in `+page.svelte`" now name the module that holds it.
+
+**`orphaned-comment-contract.test.ts` was widened to catch all of it**, which is the half of the
+mechanism it was missing: it read the page alone, on the reasoning that the page is where an
+extraction REMOVES things. The modules are now discovered from disk and policed the same way, and
+the negative control — stranding the download note above `showRecPreview`'s docblock, which is
+exactly where it was found — goes red naming the file and line.
+
+Two narrowings are stated in the file rather than implied: JSDoc pairs only, because a plain `/*` is
+how this codebase writes a slice citation and a group header and both legitimately precede another
+comment; and a file's FIRST block comment is exempt, because a module header introduces the file.
+What that costs is stated too — a comment orphaned above a plain statement is not caught.
+
+#### The ceilings
+
+`routes/+page.svelte` 3,529 → 3,021. Five module caps rose, each recorded with WHAT ARRIVED, which
+is the distinction `source-size-contract.test.ts` already draws between a ratchet and a cap:
+`composer` +20, `prefs` +31, `media` +15, `screens` +11, `feeds` +6, `media-transport` +8. Every one
+of those is relocated prose and not one line of code; the page shed the same lines.
+
+`gates.svelte.ts` is capped at 390 the moment it appeared on disk — the catalog demanding an entry
+rather than recording one, for the sixth time.
+
+**One correction inside the vacuity police.** `positiveAssertions` enumerated three string forms and
+called `orphaned-comment-contract` absent, because that file reaches its count through a helper. The
+structural form (`toBeGreaterThan`) is now accepted on the same terms the counting form already was:
+it cannot be satisfied by a region that has been extracted. Same defect-in-the-check as the counting
+form, made once and not generalised.
+
+**`chat-rte-gate-contract`'s three `containsHtml` negatives now all read comment-stripped source**,
+for the reason its own note gives — an assertion a comment cannot mention is an assertion that
+forbids documenting. That correction had been applied to one of the three and left off the other
+two, so it held only until the next comment landed. It did.
+
+**Verification.** All four CI steps run locally before the commit: `lint` (clean over everything
+tracked — the 27 errors reported are all in `apps/room/scripts/`, which `.gitignore:176` excludes
+from the repository, so CI never checks them out), `check` 1,190/0/0, `test` 2,373/160, `build` ✓.
+Two negative controls seen RED and reverted: the widened orphan gate, and `RoomGates`'s detach thunk
+captured once in the constructor. `svelte-autofixer` could NOT be run on the new module — it parses
+its input as a component and rejects a plain TypeScript class at `readonly #session: () => …`, which
+was confirmed against a reduced snippet before being reported as a tool limit rather than a defect.
+
 ### 2026-08-16 18:05 EDT — Phase 5 slice 26: the SFU wiring goes home, and a teardown that finally pairs
 
 **`+page.svelte` 3,771 → 3,529 (−242).** Suite 2,324 across 158 files. `svelte-check` 1,187 files,

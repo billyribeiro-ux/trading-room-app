@@ -199,6 +199,17 @@ export class RoomScreens {
     if (this.#lockedScreenId === screenId) this.#lockedScreenId = null;
   }
 
+  /**
+   * Is THIS window a detached screen popout?
+   *
+   * The capture's own test, from app-screenshare-view's ngOnInit:
+   *
+   *   const o = new URLSearchParams(window.location.search);
+   *   this.isDetachedCtrl = o.has("dscreen") && o.has("presID");
+   *
+   * Both keys, not either: `dscreen` alone says "a popout" and `presID` says which screen, and a
+   * window with only one of them has nothing to render.
+   */
   get detachedScreenId() {
     const params = this.#searchParams();
     if (!params.has('dscreen') || !params.has('presID')) return null;
