@@ -24,6 +24,55 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-16
 
+### 2026-08-16 12:20 EDT — Phase 5 slice 8: `RoomMessageActions`, and a negative control that found a missing test
+
+**`+page.svelte` 7,162 → 6,895.** Script 6,210 → 5,942, template 952 → 953.
+Suite 2,212 → 2,233 across 151 files. `svelte-check` 1,169 files, 0 errors, 0 warnings.
+`eslint` at the pre-existing 27.
+
+**`src/lib/room/message-actions.svelte.ts` (474).** Ten declarations and functions, 313 lines, of
+which `handleMessageAction` was 180.
+
+**It went LAST of the domain slices deliberately, and the deferral paid.** When this phase began
+the dispatcher reached into rich-text composer state, the private-chat panel, the evidence
+overlay, the modal shell and the mention router — all page-level then, all their own class now.
+Extracting it first would have meant a dozen injected callbacks rewritten three times as slices 7,
+9 and 10 landed. The constructor is a list of collaborators rather than a list of workarounds.
+
+**A NEGATIVE CONTROL FOUND A MISSING TEST, which is the point of running them.** Control E removed
+`composer.canUseRTE` from the edit gate and the suite stayed GREEN. The tests covered "rich
+message opens the rich editor" and "plain message opens the prompt", and never the case the
+narrowing exists for: a viewer who CANNOT use RTE, holding a message that has stored html.
+Upstream omits the presenter term there, so such a member gets the editor, types, presses Save —
+and `retriveRTEContent()` refuses, because THAT check does require presenter. Their edit is lost
+and they are told the message is empty. The test is written now and the control goes red.
+
+**Two more unbound methods, both caught by the gate rather than by review** — the sixteenth and
+seventeenth of this phase. `onmessageaction={messageActions.handle}` and
+`onMentionUser={messageActions.mention}` were bare references, correct for a function and a throw
+for a method.
+
+**A TYPE-level cycle that needed one annotation.** `composer` takes `editMessage` from
+`messageActions`, and `messageActions` takes `composer`. Both hand-offs are arrows, so at runtime
+the order is fine — but TypeScript could infer neither type without the other and reported both as
+implicitly `any`. One explicit `const composer: RoomComposer` breaks it; without it the whole file
+would have lost its checking silently.
+
+**A new guard in the page rewriter: an identifier followed immediately by a colon is a KEY.**
+Renaming one produced `messageActions.editMessage: (kind, item) => …` inside a constructor options
+object — 840 parse errors from one greedy match. A ternary is unaffected, because its colon has a
+space before it. The reference counter learned the same rule, which is why two expected counts
+came down by one rather than the rename being forced through.
+
+**Six negative controls, all red after the gap was closed**: the rune off the selection; a deleted
+row hidden and never put back; markAnswered not unticked on refusal; a private chat with yourself
+allowed; the rich editor opened without the full gate; `targetUserId` carried on every operation.
+
+**Three harness bugs of mine**, and the useful one is the third: a `{ shiftKey: true } as
+MouseEvent` cast is not an INSTANCE, so the branch under test quietly took the confirmation path
+instead. A cast that satisfies the compiler and fails `instanceof` is exactly the shape that makes
+a test pass for the wrong reason.
+
 ### 2026-08-16 14:14 EDT — R-1 closed, Q-1 audited against our code, and a false comment found in `ModalHost.svelte`
 
 **No runtime impact.** `todo-next.md` only, +130 lines (7,638 -> 7,768). Documentation phase.
