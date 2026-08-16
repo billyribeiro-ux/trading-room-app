@@ -264,8 +264,12 @@ controls with the mutation verified to have landed → lower the ceiling in the 
   `files-pane-contract` asserts exactly this. The autofixer suggests removing them; refuse.
 - **Popper's collision pass, the screen `<video>` `controls` attribute, the overlay's id prefix** —
   all recorded in `TODO.md` under "Not gaps — decisions taken deliberately".
-- **`ptr_clone*` is the REFERENCE name; the runtime DB role is `tradingroom_app`.** Both exist on
-  purpose; `ops/naming-provenance.md` is the mapping.
+- **The legacy REFERENCE database name and the live runtime role `tradingroom_app` are different on
+  purpose.** `ops/naming-provenance.md` is the mapping, and
+  `apps/controller/src/lib/naming-boundary.test.ts` enforces it — that guard `git grep`s the WHOLE
+  repository for the reference literal and fails on any hit outside its allow-list, **documentation
+  included**. This very line was rewritten because the first draft spelled the name and turned CI
+  red. Do not type it; point at the mapping file, as this does.
 - **The capture directories are evidence** (`second-dump/**` and siblings) — SHA-256 pinned and
   enforced inside `pnpm test`. Never reformat, rename or "fix" anything in them.
 
