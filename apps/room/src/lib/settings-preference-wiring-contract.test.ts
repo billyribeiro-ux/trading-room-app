@@ -50,6 +50,10 @@ const stripComments = (source: string) =>
   source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/<!--[\s\S]*?-->/g, '');
 
 const pageCode = stripComments(PAGE);
+// Push-to-talk moved with the window listeners in Phase 5 slice 18.
+const handlersCode = stripComments(
+  readFileSync(new URL('./room/window-handlers.ts', import.meta.url), 'utf8')
+);
 const modalCode = stripComments(MODAL);
 const prefsCode = stripComments(PREFS);
 
@@ -435,8 +439,8 @@ describe('the wire has no silent break points', () => {
 
   it('the consumers the wires feed are still there', () => {
     // If a consumer is deleted, the assignment above becomes dead and this file should say so.
-    expect(pageCode).toContain(
-      'pushToTalkShouldUnmute(event, { pushToTalk: prefs.pushToTalk, micMuted: media.micMuted })'
+    expect(handlersCode).toMatch(
+      /pushToTalkShouldUnmute\(event, \{\s*pushToTalk: this\.#prefs\.pushToTalk,\s*micMuted: this\.#media\.micMuted\s*\}\)/
     );
     // Speech recognition moved with the recorder in Phase 5 slice 20 - it is a second consumer
     // of the microphone, not of the wire.

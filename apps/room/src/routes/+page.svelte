@@ -84,6 +84,7 @@
   import { RoomEventStream } from '$lib/room/events.svelte';
   import { RoomMediaTransport } from '$lib/room/media-transport.svelte';
   import { RoomRecording } from '$lib/room/recording';
+  import { RoomWindowHandlers } from '$lib/room/window-handlers';
   import {
     RoomWebcams,
     setAutoplayAttribute,
@@ -108,13 +109,7 @@
     splitPairFromValue,
     splitStorageKeys
   } from '$lib/room/split.svelte';
-  import {
-    pushToTalkShouldMute,
-    pushToTalkShouldUnmute,
-    shouldBlockContextMenu,
-    shouldBlockCopyKey,
-    shouldDisableSelection
-  } from '$lib/room-key-gates';
+  import { shouldDisableSelection } from '$lib/room-key-gates';
   import AlertChatArea from '$lib/components/AlertChatArea.svelte';
   import PresentationArea from '$lib/components/PresentationArea.svelte';
   import RoomOverlays from '$lib/components/RoomOverlays.svelte';
@@ -1072,6 +1067,32 @@
     two attribute setters beside it are module functions rather than methods, because neither reads
     any instance state.
   */
+  /*
+    THE WINDOW LISTENERS' bodies, in `$lib/room/window-handlers.ts`.
+
+    Phase 5 slice 18. The bindings stay on `<svelte:window>` at the bottom of this file, because
+    that is how Svelte says to attach a window listener and it owns the add and the remove. What
+    moved is the hundred lines of body and citation that were sitting inside the attribute values.
+
+    `selectedImageUrl` crosses BOTH ways — Escape reads it to decide what to close and clears it —
+    so it is a reader plus a receiver, unlike slice 22's detach flag where only the write crossed.
+  */
+  const windowHandlers = new RoomWindowHandlers({
+    menus,
+    split,
+    prefs,
+    media,
+    mediaTransport,
+    dialogs,
+    mainElement: () => mainElement,
+    alertChatElement: () => alertChatElement,
+    disableCopy: () => disableCopy,
+    isPresenter: () => isPresenter,
+    chatOnlyMode: () => chatOnlyMode,
+    selectedImageUrl: () => selectedImageUrl,
+    clearSelectedImage: () => (selectedImageUrl = null)
+  });
+
   const webcams = new RoomWebcams({
     media,
     mediaTransport,
@@ -2405,7 +2426,6 @@
   }
 
 
-  const closeFloatingMenus = () => menus.closeFloating();
 
   function openImageModal(event: MouseEvent | undefined, url: string) {
     const ctrlClick = (event as (MouseEvent & { ctrlClick?: boolean }) | undefined)?.ctrlClick;
@@ -3500,103 +3520,14 @@
 
 <svelte:window
   bind:innerWidth={split.viewportWidth}
-  onclick={(event) => {
-    const target = event.target instanceof Element ? event.target : null;
-    if (!target?.closest('.textAreaBtns, .popOverDiv')) {
-      menus.set('emoji', false);
-      menus.set('giphy', false);
-    }
-    if (target?.closest('.dropdown')) return;
-    closeFloatingMenus();
-  }}
-  onpointermove={(event) => {
-    if (split.target) split.dragTo(event, mainElement, alertChatElement);
-  }}
+  onclick={(event) => windowHandlers.click(event)}
+  onpointermove={(event) => windowHandlers.pointerMove(event)}
   onpointerup={finishSplit}
   onpointercancel={finishSplit}
-  onkeydown={(event) => {
-    /*
-      `onKeyDown` — `app-room.full.js:3011-3021`, bound as a host listener on `keydown`
-      (`app-room.compiled.js:1260-1266`). Two unrelated features that share the keyboard, in the
-      reference's own order: push-to-talk first, then the copy restriction.
-
-      Both predicates live in `$lib/room-key-gates` with their citations. They run before the
-      Escape handling below because that returns early on every other key, which is exactly how a
-      host binding added here would go unnoticed.
-    */
-    if (pushToTalkShouldUnmute(event, { pushToTalk: prefs.pushToTalk, micMuted: media.micMuted })) void mediaTransport.toggleMicrophone();
-    if (shouldBlockCopyKey(event, { disableCopy, isPresenter })) event.preventDefault();
-
-    if (event.key !== 'Escape') return;
-    /*
-      The emoji and GIF triggers carry ngbPopover's `autoclose: 'outside'`, and that mode
-      closes on Escape as well as on an outside click - the click half was already handled
-      above, this is the other half.
-    */
-    if (menus.emoji || menus.giphy) {
-      menus.set('emoji', false);
-      menus.set('giphy', false);
-      return;
-    }
-    if (selectedImageUrl) selectedImageUrl = null;
-    else if (dialogs.confirmation) dialogs.confirmation = null;
-    else if (dialogs.prompt) dialogs.prompt = null;
-    else if (dialogs.alert) dialogs.alert = null;
-  }}
-  onkeyup={(event) => {
-    /*
-      `onKeyUp` — `app-room.full.js:3027-3032`, host-bound on `keyup`
-      (`app-room.compiled.js:1274-1280`). The release half of push-to-talk, and the ONLY thing on
-      that listener upstream: `disableCopy` has no keyup arm, because suppressing a keystroke has
-      to happen on the way down.
-    */
-    if (pushToTalkShouldMute(event, { pushToTalk: prefs.pushToTalk, micMuted: media.micMuted })) void mediaTransport.toggleMicrophone();
-  }}
-  oncontextmenu={(event) => {
-    /*
-      `onRightClick` — `app-room.full.js:3022-3026`, host-bound on `contextmenu`
-      (`app-room.compiled.js:1267-1273`). Every right-click, not merely those over the presentation
-      area, and never the presenter's.
-
-      Bound on `window` rather than `document`: the reference uses a different target resolver here
-      than for the key events, and neither resolver is defined anywhere in the decoded tree, so
-      which is which is not established. `contextmenu` bubbles to both, and this handler's only
-      effect is `preventDefault`, so the distinction cannot change behaviour — see the note at the
-      top of `$lib/room-key-gates`.
-    */
-    if (shouldBlockContextMenu({ disableCopy, isPresenter })) event.preventDefault();
-  }}
-  onbeforeunload={() => {
-    /*
-      The other half of the `hidePresentation` block, registered in the same statement upstream:
-
-        (chatOnlyMode || sessData.isChatOnlyRoom) &&
-          ((this.hidePresentation = !0),
-           window.addEventListener('beforeunload', () => {
-             window.opener.postMessage('windowClosing', window.location.origin);
-           }))
-
-      (`app-room.full.js:1903-1907`.) It is how the opener learns the popout closed: the room that
-      detached the chat listens for exactly this message and calls `reatachChat` —
-      `window.addEventListener("message", o => "windowClosing" === o.data && emit("reatachChat"))`
-      (`:1692-1693`, transcribed in `detachAlerts` above). Without it, closing the detached window
-      leaves the opener believing the pair still lives elsewhere, and the column never comes back.
-
-      Gated on the MODE, not on `hidePresentation`: a room whose owner set `isChatOnlyRoom` is not a
-      popout and has no opener to notify. `chatOnlyMode` is the `co=1` that `detachAlerts` sets, so
-      it is the precise condition under which an opener exists.
-
-      The `window.opener` guard is OURS and is a declared divergence. The reference dereferences it
-      unconditionally, which is safe upstream only because `co=1` is reached exclusively through
-      `detachChat`. This room can also be opened at `?co=1` by hand — a member who bookmarks the
-      popout URL — and there `window.opener` is null, so the reference's line would throw a
-      TypeError on every unload. The origin argument is `window.location.origin`, matching the
-      reference exactly: the opener and the popout are the same origin, so this never posts
-      cross-origin.
-    */
-    if (!chatOnlyMode) return;
-    window.opener?.postMessage('windowClosing', window.location.origin);
-  }}
+  onkeydown={(event) => windowHandlers.keyDown(event)}
+  onkeyup={(event) => windowHandlers.keyUp(event)}
+  oncontextmenu={(event) => windowHandlers.contextMenu(event)}
+  onbeforeunload={() => windowHandlers.beforeUnload()}
 />
 
 <app-root ng-version="17.3.12">
