@@ -410,7 +410,7 @@ describe('the sidebar renders what the gates decide', () => {
     expect(SIDEBAR).toContain('onclick={() => roster.toggleTrialsOnly()}');
     expect(SIDEBAR).toContain('onclick={() => roster.toggleSortByNick()}');
     expect(SIDEBAR).toContain('onclick={() => roster.toggleSearch()}');
-    expect(SIDEBAR).toContain('class:btn-dark={roster.sortByNick}');
+    expect(SIDEBAR).toContain("{ 'btn-dark': roster.sortByNick }");
     expect(SIDEBAR).toContain('<i class="fas fa-check-circle"></i>');
     // The search input is the fourth, and it is a two-way binding onto the class's own term.
     expect(SIDEBAR).toContain('bind:value={roster.searchTerm}');

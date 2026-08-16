@@ -479,8 +479,8 @@ describe('part 1 capture contract', () => {
       reported `svelte-check` and prettier only. What it GUARDS is unchanged and is still asserted:
       the wrapper always carries `wrapper`, and `push-wrapper` appears only with `sidebarOpen`.
     */
-    expect(pageSource).toContain('class="wrapper"');
-    expect(pageSource).toContain('class:push-wrapper={sidebarOpen}');
+    // Phase 4: one clsx attribute now carries both, which is what `KAe` quoted above returns.
+    expect(pageSource).toContain("'wrapper', { 'push-wrapper': sidebarOpen");
     expect(NAVBAR).toContain('onclick={() => (sidebarOpen = !sidebarOpen)}');
     expect(NAVBAR).toContain("class={sidebarOpen ? 'fas fa-arrow-left' : 'fas fa-bars'}");
     /*

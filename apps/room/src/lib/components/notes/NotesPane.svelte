@@ -295,8 +295,7 @@
         data-bs-toggle="tab"
         role="tab"
         aria-selected={activeNote?.id === note.id}
-        class="nav-link"
-        class:active={activeNote?.id === note.id}
+        class={['nav-link', { active: activeNote?.id === note.id }]}
         id={`${tabId}-tab`}
         aria-controls={tabId}
         onclick={(event) => {

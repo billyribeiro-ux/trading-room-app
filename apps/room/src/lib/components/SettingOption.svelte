@@ -29,7 +29,7 @@
     {checked}
     onchange={(event) => onchange(event.currentTarget.checked)}
   />
-  <label class:checked for={id}>
+  <label class={{ checked }} for={id}>
     {label}{#if showState}
       <span>{checked ? 'on' : 'off'}</span>{/if}
   </label>

@@ -134,7 +134,7 @@ describe('screen controls', () => {
 
     // Attached (app-presentationarea `CSe`): the trio is child [2] and the dark buttons are [16]
     // and [18], so the trio comes FIRST and is absolutely positioned clear of the row.
-    expect(attached).toContain('class="zoom-controls position-absolute"');
+    expect(attached).toContain("'zoom-controls position-absolute'");
     expect(attached.indexOf('{@render zoomTrio()}')).toBeLessThan(
       attached.indexOf('{@render darkButtons()}')
     );

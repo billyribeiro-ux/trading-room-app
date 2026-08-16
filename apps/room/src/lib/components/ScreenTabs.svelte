@@ -156,8 +156,7 @@
       -->
       <a
         id="{screen.id}-tab"
-        class="nav-link"
-        class:active={screen.id === selectedScreenId}
+        class={['nav-link', { active: screen.id === selectedScreenId }]}
         role="tab"
         tabindex={screen.id === selectedScreenId ? 0 : -1}
         aria-controls={screen.id}
@@ -197,16 +196,14 @@
             id="dropdownMenuScreen"
             data-bs-toggle="dropdown"
             aria-expanded={openMenuId === screen.id}
-            class="dropdown-toggle"
-            class:show={openMenuId === screen.id}
+            class={['dropdown-toggle', { show: openMenuId === screen.id }]}
             onclick={(event) => toggleMenu(screen.id, event)}
           >
             <i class="fas fa-cog"></i>
           </span>
           <ul
             aria-labelledby="dropdownMenuButton"
-            class="dropdown-menu"
-            class:show={openMenuId === screen.id}
+            class={['dropdown-menu', { show: openMenuId === screen.id }]}
           >
             {#if isPresenter}
               <li>

@@ -85,7 +85,7 @@
       >
         <i class="fas fa-cog"></i>
       </span>
-      <ul aria-labelledby={menuId} class="dropdown-menu" class:show={menuOpen}>
+      <ul aria-labelledby={menuId} class={['dropdown-menu', { show: menuOpen }]}>
         <li>
           <!-- svelte-ignore a11y_invalid_attribute -->
           <a href="#" class="dropdown-item" onclick={(event) => activate(event, onStartEditing)}

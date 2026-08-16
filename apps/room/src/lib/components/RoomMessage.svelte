@@ -533,8 +533,7 @@
       >
         {revealedGifs[segment.url] ? 'click to hide' : 'gif muted, click to show'}
       </div>{/if}<!-- svelte-ignore a11y_no_static_element_interactions --><!-- svelte-ignore a11y_click_events_have_key_events --><div
-        class="img-container"
-        class:d-none={isMutedGif(segment.url) && !revealedGifs[segment.url]}
+        class={['img-container', { 'd-none': isMutedGif(segment.url) && !revealedGifs[segment.url] }]}
         onclick={(event) => runAction('image', event)}
       >
         <!-- svelte-ignore a11y_missing_attribute -->
@@ -726,8 +725,7 @@
               <!-- svelte-ignore a11y_click_events_have_key_events -->
               <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
               <strong
-                class="username mx-1"
-                class:text-primary={kind === 'alert' && isAdminMessage && !item.evidenceKey}
+                class={['username mx-1', { 'text-primary': kind === 'alert' && isAdminMessage && !item.evidenceKey }]}
                 style={usernameStyle}
                 onclick={() => runAction('mention')}
                 ondblclick={() => runAction('user')}
@@ -766,10 +764,7 @@
                 {#if !isQaMessage && hasQaOnAlerts}
                   <button
                     title="Ask a question"
-                    class="btn btn-sm btn-secondary me-1 alert-qa"
-                    class:btn-danger={Boolean(item.unreadQa)}
-                    class:animated={Boolean(item.unreadQa)}
-                    class:flash={Boolean(item.unreadQa)}
+                    class={['btn btn-sm btn-secondary me-1 alert-qa', { 'btn-danger': Boolean(item.unreadQa), animated: Boolean(item.unreadQa), flash: Boolean(item.unreadQa) }]}
                     style={bodyStyle}
                     onclick={() => runAction('question')}
                   >
@@ -807,9 +802,7 @@
             {#if item.replyToName && item.replyToBody}
               <div class="ms-1 private-reply">
                 <div
-                  class="private-reply-message w-100"
-                  class:private-reply-bg-light={theme === 'light'}
-                  class:private-reply-bg-dark={theme === 'dark'}
+                  class={['private-reply-message w-100', { 'private-reply-bg-light': theme === 'light', 'private-reply-bg-dark': theme === 'dark' }]}
                 >
                   <strong class="d-block username" style={usernameStyle}>
                     {item.replyToName}
@@ -895,14 +888,13 @@
             {/if}
           </div>
           {#if canReact && reactions.length > 0}
-            <span class:presenter-reactions-right={presenterMessagesOnTheRight} style={bodyStyle}>
+            <span class={{ 'presenter-reactions-right': presenterMessagesOnTheRight }} style={bodyStyle}>
               {#each reactions as [reactionKey, reaction] (reactionKey)}
                 {#if reaction.clickedBy.length > 0}
                   <!-- svelte-ignore a11y_click_events_have_key_events -->
                   <!-- svelte-ignore a11y_no_static_element_interactions -->
                   <span
-                    class="badge chat-reaction"
-                    class:chat-reaction-added={reaction.clickedBy.includes(currentUserEmailHash)}
+                    class={['badge chat-reaction', { 'chat-reaction-added': reaction.clickedBy.includes(currentUserEmailHash) }]}
                     onclick={() =>
                       runAction('reaction', {
                         key: reactionKey,

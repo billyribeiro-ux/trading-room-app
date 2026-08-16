@@ -81,7 +81,7 @@
             <!-- svelte-ignore a11y_no_static_element_interactions -->
             <div
               id="filedrag"
-              class:hover={dragging}
+              class={{ hover: dragging }}
               ondragover={handleDrag}
               ondragleave={handleDrag}
               ondrop={handleDrop}

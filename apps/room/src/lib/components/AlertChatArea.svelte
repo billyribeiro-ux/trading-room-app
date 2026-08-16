@@ -252,9 +252,13 @@
               <ul class="nav ml-auto">
                 {#if isPresenter}
                   <li
-                    class:poll-active-blink={pollIsActive && !polls.minimized}
-                    class:poll-active-indicator={polls.minimized}
-                    class="nav-item mx-2"
+                    class={[
+                      'nav-item mx-2',
+                      {
+                        'poll-active-blink': pollIsActive && !polls.minimized,
+                        'poll-active-indicator': polls.minimized
+                      }
+                    ]}
                   >
                     <!-- svelte-ignore a11y_click_events_have_key_events -->
                     <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -549,8 +553,7 @@
                   <a
                     data-bs-toggle="tab"
                     role="tab"
-                    class:active={chat.tab === 'main'}
-                    class="nav-link"
+                    class={['nav-link', { active: chat.tab === 'main' }]}
                     onclick={() => (chat.tab = 'main')}>Main Chat</a
                   >
                 </li>
@@ -561,8 +564,7 @@
                   <a
                     data-bs-toggle="tab"
                     role="tab"
-                    class:active={chat.tab === 'off-topic'}
-                    class="nav-link"
+                    class={['nav-link', { active: chat.tab === 'off-topic' }]}
                     onclick={() => (chat.tab = 'off-topic')}>Off Topic</a
                   >
                 </li>
@@ -706,8 +708,10 @@
                           button sets, exactly as the captured app's toggleMessageOptions() does.
                         -->
                 <div
-                  class="justify-content-center d-flex flex-row align-items-center justify-content-center p-0 m-0 text-center textAreaBtnsCol"
-                  class:composer-options-forced={showMessageOptions}
+                  class={[
+                    'justify-content-center d-flex flex-row align-items-center justify-content-center p-0 m-0 text-center textAreaBtnsCol',
+                    { 'composer-options-forced': showMessageOptions }
+                  ]}
                 >
                   <div class="composer-options">
                     <span

@@ -502,8 +502,7 @@
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
   id="pollPanelTitlebar"
-  class:ui-draggable-handle={dragInitialized}
-  class="poll-panel-titlebar"
+  class={['poll-panel-titlebar', { 'ui-draggable-handle': dragInitialized }]}
   onpointerdown={beginDrag}
 >
   <span class="poll-panel-title">Polls</span>
@@ -539,8 +538,7 @@
               data-bs-toggle="tab"
               aria-selected={pollTab === 'new'}
               tabindex={pollTab === 'new' ? undefined : -1}
-              class:active={pollTab === 'new'}
-              class="nav-link"
+              class={['nav-link', { active: pollTab === 'new' }]}
               onclick={() => (pollTab = 'new')}
             >
               Create New Poll
@@ -554,8 +552,7 @@
               data-bs-toggle="tab"
               aria-selected={pollTab === 'saved'}
               tabindex={pollTab === 'saved' ? undefined : -1}
-              class:active={pollTab === 'saved'}
-              class="nav-link"
+              class={['nav-link', { active: pollTab === 'saved' }]}
               onclick={() => (pollTab = 'saved')}
             >
               Pre-Canned Polls
@@ -567,9 +564,7 @@
             role="tabpanel"
             id="sendpoll"
             aria-labelledby="sendpolltab"
-            class:active={pollTab === 'new'}
-            class:show={pollTab === 'new'}
-            class="tab-pane"
+            class={['tab-pane', { active: pollTab === 'new', show: pollTab === 'new' }]}
           >
             <div class="p-2">
               <h3><span class="label label-warning">1</span> Enter your poll question:</h3>
@@ -652,9 +647,7 @@
           <div
             role="tabpanel"
             id="savedPolls"
-            class:active={pollTab === 'saved'}
-            class:show={pollTab === 'saved'}
-            class="tab-pane"
+            class={['tab-pane', { active: pollTab === 'saved', show: pollTab === 'saved' }]}
           >
             <p>
               You can store polls you use often here. Just type the poll on the create poll tab

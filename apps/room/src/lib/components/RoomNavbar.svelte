@@ -343,8 +343,10 @@
             data-bs-toggle="dropdown"
             aria-haspopup="true"
             aria-expanded={menus.recording}
-            class="nav-link dropdown-toggle d-flex align-items-center"
-            class:muted={!media.screenSharing}
+            class={[
+              'nav-link dropdown-toggle d-flex align-items-center',
+              { muted: !media.screenSharing }
+            ]}
             onclick={() => ontoggletopmenu('recording')}
           >
             <i class="far fa-2x fa-dot-circle"></i>
@@ -365,8 +367,10 @@
           <ul
             aria-labelledby="dropdownRecording"
             data-bs-popper={menus.recording ? 'static' : undefined}
-            class="screen-options-start-screen dropdown-menu dropdown-menu-end"
-            class:show={menus.recording}
+            class={[
+              'screen-options-start-screen dropdown-menu dropdown-menu-end',
+              { show: menus.recording }
+            ]}
             style={menus.recording ? 'display: block;' : undefined}
           >
             {#if !media.screenSharing}
@@ -449,8 +453,10 @@
             data-bs-toggle="dropdown"
             aria-haspopup="true"
             aria-expanded={menus.soundcloud}
-            class="nav-link dropdown-toggle d-flex align-items-center"
-            class:text-white={media.soundCloudPlaying}
+            class={[
+              'nav-link dropdown-toggle d-flex align-items-center',
+              { 'text-white': media.soundCloudPlaying }
+            ]}
             onclick={() => ontoggletopmenu('soundcloud')}
           >
             <i class="fab fa-2x fa-soundcloud"></i>
@@ -464,8 +470,10 @@
           <ul
             aria-labelledby="soundcloudDropdown"
             data-bs-popper={menus.soundcloud ? 'static' : undefined}
-            class="dropdown-menu dropdown-menu-end soundcloud-options"
-            class:show={menus.soundcloud}
+            class={[
+              'dropdown-menu dropdown-menu-end soundcloud-options',
+              { show: menus.soundcloud }
+            ]}
             style={menus.soundcloud ? 'display: block;' : undefined}
           >
             <!-- svelte-ignore a11y_click_events_have_key_events -->
@@ -492,9 +500,10 @@
             <!-- svelte-ignore a11y_no_static_element_interactions -->
             <a
               id="unmuteMuteMicrophone"
-              class="nav-link d-flex align-items-center"
-              class:muted={media.micMuted}
-              class:text-white={!media.micMuted}
+              class={[
+                'nav-link d-flex align-items-center',
+                { muted: media.micMuted, 'text-white': !media.micMuted }
+              ]}
               onclick={ontogglemicrophone}
             >
               <i class="fas fa-2x fa-microphone"></i>
@@ -532,9 +541,10 @@
             data-bs-toggle="dropdown"
             aria-haspopup="true"
             aria-expanded={menus.screen}
-            class="nav-link dropdown-toggle d-flex align-items-center"
-            class:muted={!media.screenSharing}
-            class:text-white={media.screenSharing}
+            class={[
+              'nav-link dropdown-toggle d-flex align-items-center',
+              { muted: !media.screenSharing, 'text-white': media.screenSharing }
+            ]}
             onclick={() => ontoggletopmenu('screen')}
           >
             <i class="fas fa-2x fa-desktop"></i>
@@ -543,8 +553,10 @@
           <ul
             aria-labelledby="dropdownScreenSharing"
             data-bs-popper={menus.screen ? 'static' : undefined}
-            class="screen-options-start-screen dropdown-menu dropdown-menu-end"
-            class:show={menus.screen}
+            class={[
+              'screen-options-start-screen dropdown-menu dropdown-menu-end',
+              { show: menus.screen }
+            ]}
             style={menus.screen ? 'display: block;' : undefined}
           >
             <!-- svelte-ignore a11y_click_events_have_key_events -->
@@ -593,9 +605,10 @@
           <li title="Start / Stop WebCam" class="nav-item" onclick={ontogglewebcam}>
             <a
               id="startStopWebCam"
-              class="nav-link d-flex align-items-center"
-              class:muted={media.camMuted}
-              class:text-white={!media.camMuted}
+              class={[
+                'nav-link d-flex align-items-center',
+                { muted: media.camMuted, 'text-white': !media.camMuted }
+              ]}
             >
               <i class="fas fa-2x fa-video"></i>
               <span class="ml-2 mainNavItem">Start / Stop WebCam</span>

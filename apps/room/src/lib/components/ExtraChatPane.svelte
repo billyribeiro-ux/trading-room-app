@@ -201,8 +201,7 @@
             <a
               data-bs-toggle="tab"
               role="tab"
-              class:active={tab === 'main'}
-              class="nav-link"
+              class={['nav-link', { active: tab === 'main' }]}
               onclick={() => (tab = 'main')}>Main Chat</a
             >
           </li>
@@ -213,8 +212,7 @@
             <a
               data-bs-toggle="tab"
               role="tab"
-              class:active={tab === 'off-topic'}
-              class="nav-link"
+              class={['nav-link', { active: tab === 'off-topic' }]}
               onclick={() => (tab = 'off-topic')}>Off Topic</a
             >
           </li>
@@ -337,8 +335,10 @@
               onkeydown={submitOnEnter}></textarea>
           </div>
           <div
-            class="justify-content-center d-flex flex-row align-items-center justify-content-center p-0 m-0 text-center textAreaBtnsCol"
-            class:composer-options-forced={showMessageOptions}
+            class={[
+              'justify-content-center d-flex flex-row align-items-center justify-content-center p-0 m-0 text-center textAreaBtnsCol',
+              { 'composer-options-forced': showMessageOptions }
+            ]}
           >
             <div class="composer-options">
               <!-- svelte-ignore a11y_click_events_have_key_events -->

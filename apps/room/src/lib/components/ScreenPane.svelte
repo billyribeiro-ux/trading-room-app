@@ -262,18 +262,14 @@
 -->
 <div
   {id}
-  class="tab-pane fade"
-  class:show={active}
-  class:active
+  class={['tab-pane fade', { show: active, active }]}
   role="tabpanel"
   aria-labelledby="{id}-tab"
 >
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div
     id="video-screen-container-{id}"
-    class="video-screen-container"
-    class:screencast-pan={!showZoomCtrl}
-    class:screencast-pan-grabbing={showZoomCtrl}
+    class={['video-screen-container', { 'screencast-pan': !showZoomCtrl, 'screencast-pan-grabbing': showZoomCtrl }]}
     ondblclick={(event) => toggleFullscreen(event.currentTarget)}
     onpointerdown={onPointerDown}
     onpointermove={onPointerMove}
@@ -339,9 +335,7 @@
         {/if}
         <video
           id="webcamScreen-{id}"
-          class="webcamScreen"
-          class:hidden={stream === null || saveData}
-          class:viewer-only-screen-video={viewerOnlyMode}
+          class={['webcamScreen', { hidden: stream === null || saveData, 'viewer-only-screen-video': viewerOnlyMode }]}
           autoplay
           playsinline
           {@attach attachStream}

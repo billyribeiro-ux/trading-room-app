@@ -115,8 +115,10 @@
       <!-- svelte-ignore a11y_interactive_supports_focus -->
       <a
         id="files-tab"
-        class="nav-link d-flex align-items-center justify-content-between"
-        class:active={fileTab === 'files'}
+        class={[
+          'nav-link d-flex align-items-center justify-content-between',
+          { active: fileTab === 'files' }
+        ]}
         data-bs-toggle="tab"
         role="tab"
         aria-controls="files"
@@ -140,8 +142,10 @@
       <!-- svelte-ignore a11y_interactive_supports_focus -->
       <a
         id="image-tab"
-        class="nav-link d-flex align-items-center justify-content-between"
-        class:active={fileTab === 'images'}
+        class={[
+          'nav-link d-flex align-items-center justify-content-between',
+          { active: fileTab === 'images' }
+        ]}
         data-bs-toggle="tab"
         role="tab"
         aria-controls="image"
@@ -165,8 +169,10 @@
       <!-- svelte-ignore a11y_interactive_supports_focus -->
       <a
         id="sounds-tab"
-        class="nav-link d-flex align-items-center justify-content-between"
-        class:active={fileTab === 'sounds'}
+        class={[
+          'nav-link d-flex align-items-center justify-content-between',
+          { active: fileTab === 'sounds' }
+        ]}
         data-bs-toggle="tab"
         role="tab"
         aria-controls="sounds"
@@ -368,8 +374,7 @@
                           while `svelte-check` stayed green.
                         -->
       <button
-        class="btn btn-sm m-1 st-fileSortName"
-        class:active={fileSort.field === 'name'}
+        class={['btn btn-sm m-1 st-fileSortName', { active: fileSort.field === 'name' }]}
         title={fileSortTitle('name', fileSort)}
         onclick={() => applyFileSort('name')}
       >
@@ -385,8 +390,7 @@
         {/if}
       </button>
       <button
-        class="btn btn-sm m-1 st-fileSortDate"
-        class:active={fileSort.field === 'date'}
+        class={['btn btn-sm m-1 st-fileSortDate', { active: fileSort.field === 'date' }]}
         title={fileSortTitle('date', fileSort)}
         onclick={() => applyFileSort('date')}
       >

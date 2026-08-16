@@ -445,7 +445,9 @@ describe('the NAVBAR dropdown, which is the same control in a different componen
     */
     expect(ROOM_HELPERS).toContain('KB = (t) => ({ muted: t })');
     expect(HELPERS).toContain('HCe = (t) => ({ muted: t })');
-    expect(rows).toContain('class:muted');
+    // Phase 4: the directive became the clsx attribute form. `{ muted }` is the shorthand, which
+    // is the same shape `HCe` returns.
+    expect(rows).toContain('{ muted }');
   });
 
   it('the ids collide UPSTREAM, and this app diverges on purpose for the overlay copy', () => {
@@ -550,7 +552,7 @@ describe('viewer-only mode drives every binding the reference gives it', () => {
     expect(wrapperAt, 'the de-scoped app-room .wrapper rule must exist').toBeGreaterThan(-1);
     expect(APPLIED.slice(wrapperAt, wrapperAt + 2500)).toContain('margin-top: 49px');
 
-    expect(pageMarkup).toContain('class:mt-0={chatOnlyMode || viewerOnlyMode}');
+    expect(pageMarkup).toContain("'mt-0': chatOnlyMode || viewerOnlyMode");
     expect(pageMarkup).toContain('{#if !(chatOnlyMode || viewerOnlyMode)}');
     // And the harness that measures the consequence must actually render those elements — it did
     // not, which is why `4/4` could not catch the defect this pins.
@@ -567,7 +569,7 @@ describe('viewer-only mode drives every binding the reference gives it', () => {
     // `QB = (t) => ({'vh-100': t})`, bound to videoOnly || chatOnly || viewerOnly.
     expect(ROOM_HELPERS).toContain("QB = (t) => ({ 'vh-100': t })");
     expect(ROOM_HELPERS).toContain('e.appService.globals.viewerOnlyMode\n      )');
-    expect(pageMarkup).toContain('class:vh-100={chatOnlyMode || viewerOnlyMode}');
+    expect(pageMarkup).toContain("'vh-100': chatOnlyMode || viewerOnlyMode");
   });
 
   it('applies all three viewer-only classes as BINDINGS, never as static classes', () => {
@@ -577,9 +579,9 @@ describe('viewer-only mode drives every binding the reference gives it', () => {
       "H0e = (t, n) => ({ hidden: t, 'viewer-only-screen-video': n })"
     );
 
-    expect(stripComments(PRESENTATION)).toContain('class:viewer-only-screen-tab={viewerOnlyMode}');
-    expect(clusterMarkup).toContain('class:viewer-only-screen-zoom-controls={viewerOnlyMode}');
-    expect(stripComments(PANE)).toContain('class:viewer-only-screen-video={viewerOnlyMode}');
+    expect(stripComments(PRESENTATION)).toContain("'viewer-only-screen-tab': viewerOnlyMode");
+    expect(clusterMarkup).toContain("'viewer-only-screen-zoom-controls': viewerOnlyMode");
+    expect(stripComments(PANE)).toContain("'viewer-only-screen-video': viewerOnlyMode");
 
     // The defect this replaced: both were STATIC, so viewer-only geometry applied to every room.
     expect(stripComments(PANE)).not.toContain('webcamScreen viewer-only-screen-video');
@@ -608,7 +610,7 @@ describe('viewer-only mode drives every binding the reference gives it', () => {
     const tabsContent = presentationMarkup.slice(
       presentationMarkup.indexOf('id="screensTabsContent"')
     );
-    expect(tabsContent.slice(0, 200)).toContain('class:viewer-only-screen-tab={viewerOnlyMode}');
+    expect(tabsContent.slice(0, 250)).toContain("'viewer-only-screen-tab': viewerOnlyMode");
     expect(stripComments(TABS), 'the tab strip cannot carry it').not.toContain(
       'viewer-only-screen-tab'
     );
@@ -637,7 +639,7 @@ describe('viewer-only mode drives every binding the reference gives it', () => {
     expect(SHARE_COMPILED.replace(/\s+/g, '')).toContain(
       '!o.isConnected||(o.isPresentingThisScreen&&!o.localpreview)||o.mediaService.saveData'
     );
-    expect(stripComments(PANE)).toContain('class:hidden={stream === null || saveData}');
+    expect(stripComments(PANE)).toContain('{ hidden: stream === null || saveData');
     // The class needs a rule, and this component's copy is scoped — hence its own style block.
     expect(PANE).toMatch(/\.hidden\s*\{\s*display:\s*none;/);
   });

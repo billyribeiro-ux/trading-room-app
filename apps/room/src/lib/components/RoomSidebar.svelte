@@ -212,8 +212,7 @@
                   type="button"
                   data-bs-toggle="modal"
                   data-bs-target="#mobileAppInfoModal"
-                  class="btn btn-sm btn-secondary"
-                  class:btn-dark={theme === 'dark'}
+                  class={['btn btn-sm btn-secondary', { 'btn-dark': theme === 'dark' }]}
                   onclick={ongetmobilepin}>Mobile App Info</button
                 >
               {/if}
@@ -548,8 +547,10 @@
                 -->
                 <button
                   title="Sort Users"
-                  class="btn btn-sm btn-secondary float-right border-0 ms-1"
-                  class:btn-dark={roster.sortByNick}
+                  class={[
+                    'btn btn-sm btn-secondary float-right border-0 ms-1',
+                    { 'btn-dark': roster.sortByNick }
+                  ]}
                   onclick={() => roster.toggleSortByNick()}
                 >
                   <i class="fas fa-sort-alpha-down"></i>

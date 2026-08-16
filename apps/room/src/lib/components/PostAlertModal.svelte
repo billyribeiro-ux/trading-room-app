@@ -337,8 +337,7 @@
         <!-- svelte-ignore a11y_no_static_element_interactions -->
         <div
           id="filedragAlert"
-          class="filedragMD"
-          class:hover={dragging}
+          class={['filedragMD', { hover: dragging }]}
           style:display={files.length > 0 ? 'none' : 'block'}
           ondragover={handleDrag}
           ondragleave={handleDrag}

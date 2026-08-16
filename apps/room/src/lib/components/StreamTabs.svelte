@@ -164,8 +164,7 @@
       -->
       <a
         id="{stream._id}-tab"
-        class="nav-link"
-        class:active={stream._id === selectedStreamId}
+        class={['nav-link', { active: stream._id === selectedStreamId }]}
         role="tab"
         tabindex={stream._id === selectedStreamId ? 0 : -1}
         aria-controls={stream._id}
@@ -237,8 +236,7 @@
           id="dropdownMenuScreen"
           data-bs-toggle="dropdown"
           aria-expanded={openMenuId === stream._id}
-          class="dropdown-toggle"
-          class:show={openMenuId === stream._id}
+          class={['dropdown-toggle', { show: openMenuId === stream._id }]}
           onclick={(event) => toggleMenu(stream._id, event)}
         >
           <i class="fas fa-cog"></i>
@@ -250,8 +248,7 @@
         -->
         <ul
           aria-labelledby="dropdownMenuButton"
-          class="dropdown-menu"
-          class:show={openMenuId === stream._id}
+          class={['dropdown-menu', { show: openMenuId === stream._id }]}
         >
           {#if isPresenter}
             <li>

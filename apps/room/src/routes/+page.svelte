@@ -8776,8 +8776,7 @@
   -->
   <app-room
     id="topRoomDiv"
-    class={theme === 'dark' ? 'darkTheme' : 'lightTheme'}
-    class:detach-screen={detachedScreenId !== null}
+    class={{ 'detach-screen': detachedScreenId !== null }}
   >
     <!--
       `KAe = (t, n) => ({'push-wrapper': t, 'mt-0': n})`, bound as
@@ -8795,9 +8794,7 @@
       gap recorded for `hideFiles` in `files-gates.ts`. The two modes it does model are bound.
     -->
     <div
-      class="wrapper"
-      class:push-wrapper={sidebarOpen}
-      class:mt-0={chatOnlyMode || viewerOnlyMode}
+      class={['wrapper', { 'push-wrapper': sidebarOpen, 'mt-0': chatOnlyMode || viewerOnlyMode }]}
     >
       <div class="d-flex flex-column-reverse flex-sm-row room-container">
         {#snippet mainNavigation()}
@@ -8947,11 +8944,7 @@
           minsize="0"
           id="mainAreaSplit"
           gutterdblclickduration="400"
-          class={split.isHorizontal
-            ? 'as-horizontal as-percent as-init'
-            : 'as-vertical as-percent as-init'}
-          class:is-resizing={split.target !== null}
-          class:vh-100={chatOnlyMode || viewerOnlyMode}
+          class={{ 'is-resizing': split.target !== null, 'vh-100': chatOnlyMode || viewerOnlyMode }}
           style={split.isHorizontal ? undefined : 'flex-direction: column;'}
           dir="ltr"
         >
