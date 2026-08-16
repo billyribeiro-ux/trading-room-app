@@ -1,6 +1,6 @@
 <script lang="ts">
-  import BootboxDialog from '$lib/components/BootboxDialog.svelte';
-  import type { SwingAlertRow } from '$lib/types';
+  import BootboxDialog from '#lib/components/BootboxDialog.svelte';
+  import type { SwingAlertRow } from '#lib/types.js';
   import {
     SWING_ALERT_DEFAULT_LIMIT,
     SWING_ALERT_DEFAULT_MONTHS,
@@ -16,7 +16,7 @@
     swingAlertsTabVisible,
     swingTradesCsv,
     swingTradesCsvFilename
-  } from '$lib/swing-alerts';
+  } from '#lib/swing-alerts.js';
   import SwingAlertForm from './SwingAlertForm.svelte';
   import { emptySwingAlertDraft, swingAlertDraftFrom, type SwingAlertDraft } from './draft';
 
@@ -131,7 +131,7 @@
    * `onSwingAlertSubmit` — validate, then confirm, then send.
    *
    * The validation messages and their order are `swingAlertSubmitError`'s; the confirmation is
-   * `swingAlertSubmitConfirm`'s. Both live in `$lib/swing-alerts` so they can be asserted without
+   * `swingAlertSubmitConfirm`'s. Both live in `#lib/swing-alerts.js` so they can be asserted without
    * rendering a pane.
    */
   function requestSubmit(): void {

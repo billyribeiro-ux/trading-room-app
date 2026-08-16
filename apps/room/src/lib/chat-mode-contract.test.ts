@@ -153,11 +153,11 @@ describe('the command', () => {
   it('refuses any mode that is not one of the three letters, from the ONE constant', () => {
     /*
       `z.enum(CHAT_MODES)` and not a hand-called `isChatMode`. Same three letters, deny-by-default
-      either way — but derived from what `$lib/chat-mode.ts` exports, so a fourth mode cannot be
+      either way — but derived from what `#lib/chat-mode.ts` exports, so a fourth mode cannot be
       added there and silently refused here.
     */
     expect(commandCode).toContain('command(z.enum(CHAT_MODES), async (mode)');
-    expect(commandCode).toContain("import { CHAT_MODES } from '$lib/chat-mode';");
+    expect(commandCode).toContain("import { CHAT_MODES } from '#lib/chat-mode.js';");
   });
 
   it('upserts rather than appending a second opinion about the mode', () => {

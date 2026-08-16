@@ -1,4 +1,4 @@
-import { mergeOlderChatMessages } from '$lib/chat-paging';
+import { mergeOlderChatMessages } from '#lib/chat-paging.js';
 
 /*
   Older-page state for a room log — held ONCE, because upstream holds it once.
@@ -27,7 +27,7 @@ import { mergeOlderChatMessages } from '$lib/chat-paging';
   ## What is NOT here
 
   The SCROLL side of paging — the trigger threshold, the two nudges and the refusal to page while a
-  search term is set — stays in `$lib/chat-paging`, which is pure and already tested against the
+  search term is set — stays in `#lib/chat-paging.js`, which is pure and already tested against the
   reference's own rules. This class holds the state those rules are asked about; it does not decide
   anything about scrolling and never touches an element.
 

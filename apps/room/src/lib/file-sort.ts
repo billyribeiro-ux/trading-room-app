@@ -76,7 +76,7 @@ export const INITIAL_FILE_SORT: FileSortState = { field: 'date', direction: 'des
  * One row, as far as the comparator is concerned.
  *
  * The reference reads `e.created`; the column here is `createdAt` (`sharedFiles` in
- * `$lib/server/db/schema`, drizzle timestamp mode, so a `Date` at runtime). `new Date(x)` accepts
+ * `#lib/server/db/schema`, drizzle timestamp mode, so a `Date` at runtime). `new Date(x)` accepts
  * all three shapes and is what the reference does to its own value, so the union is transcribed
  * rather than narrowed.
  *

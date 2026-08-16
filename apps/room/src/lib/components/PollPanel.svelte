@@ -10,8 +10,8 @@
     formatPollResults,
     formatVisiblePollResponses,
     pollDeleteConfirmation
-  } from '$lib/poll-behavior';
-  import type { ActivePoll, SavedPoll } from '$lib/types';
+  } from '#lib/poll-behavior.js';
+  import type { ActivePoll, SavedPoll } from '#lib/types.js';
 
   type PollMode = 'setup' | 'answer' | 'results' | 'done';
   type PollTab = 'new' | 'saved';

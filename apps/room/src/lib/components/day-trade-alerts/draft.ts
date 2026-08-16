@@ -1,4 +1,4 @@
-import type { DayTradeAlertDirection, DayTradeAlertRow } from '$lib/types';
+import type { DayTradeAlertDirection, DayTradeAlertRow } from '#lib/types.js';
 
 /**
  * `this.dayTradeAlert` — the composer's model.

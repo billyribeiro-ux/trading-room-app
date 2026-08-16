@@ -167,7 +167,7 @@ export const variables = defineEnvVars({
     (`app-room.full.js:2279`) — and reproducing that literal would open every presenter's support
     chat into protradingroom's inbox, with `setAttributes` posting their name and email address
     into it. So this is the one value in that feature that is configuration rather than
-    transcription. See `$lib/tawk-support`.
+    transcription. See `#lib/tawk-support.js`.
 
     Public by construction: it reaches the browser inside the script URL, exactly as the reference's
     does. It is an embed id, not a credential.

@@ -44,7 +44,7 @@ import {
   MEDIA_TURN_URLS,
   MEDIA_WS_URL
 } from '$app/env/private';
-import { joinsMediaAsProducer, type MediaPermissions } from '$lib/roster-gates';
+import { joinsMediaAsProducer, type MediaPermissions } from '#lib/roster-gates.js';
 import type { User } from './db/schema';
 
 /**
@@ -222,7 +222,7 @@ export function mediaRoomIdFor(roomShortCode: string): string {
  *
  * Throws rather than returning null when it is missing or malformed. A media session that silently
  * does not work is worse than a 500 naming the variable, and this key is the half that must never
- * reach a browser - so it is only ever read here, in a `$lib/server` module SvelteKit refuses to
+ * reach a browser - so it is only ever read here, in a `#lib/server` module SvelteKit refuses to
  * bundle into client code.
  */
 export function loadSigningKey(env: NodeJS.ProcessEnv = serverEnv()): KeyObject {
@@ -416,7 +416,7 @@ export const TURN_CREDENTIAL_TTL_SECONDS = 3600;
  * credential = base64( HMAC-SHA1( static-auth-secret, username ) )
  * ```
  *
- * The long-term secret stays here, in a `$lib/server` module SvelteKit will not bundle into client
+ * The long-term secret stays here, in a `#lib/server` module SvelteKit will not bundle into client
  * code - the browser only ever receives a username/credential pair that expires. HMAC-SHA1 is not a
  * choice this app gets to make: it is what the TURN REST specification defines and what coturn
  * verifies against, so using anything stronger would simply be refused.

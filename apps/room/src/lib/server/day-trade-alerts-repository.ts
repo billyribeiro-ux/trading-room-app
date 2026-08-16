@@ -1,15 +1,15 @@
 import { and, desc, eq, gte, isNull } from 'drizzle-orm';
-import type { DayTradeAlertDirection, DayTradeAlertRow } from '$lib/types';
-import { db, ensureDatabase } from '$lib/server/db';
+import type { DayTradeAlertDirection, DayTradeAlertRow } from '#lib/types.js';
+import { db, ensureDatabase } from '#lib/server/db/index.js';
 import {
   alertQuestions,
   alerts,
   dayTradeAlerts,
   users,
   type DayTradeAlert
-} from '$lib/server/db/schema';
-import { hashEmail } from '$lib/server/connection';
-import { formatDayTradeAlertTxt } from '$lib/day-trade-alerts';
+} from '#lib/server/db/schema.js';
+import { hashEmail } from '#lib/server/connection.js';
+import { formatDayTradeAlertTxt } from '#lib/day-trade-alerts.js';
 
 /**
  * Day Trade Alerts, persisted.

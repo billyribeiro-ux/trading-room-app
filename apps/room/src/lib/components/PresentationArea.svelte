@@ -19,7 +19,7 @@
 
     Empty `<script>`, `svelte-check --output machine`, and every `Cannot find name` became a prop.
     It found things a hand scan would not have: `screenVolume` is a SNIPPET, not a value, and
-    `captureVideoImage` is an import from `$lib/screen-zoom` rather than page state.
+    `captureVideoImage` is an import from `#lib/screen-zoom.js` rather than page state.
 
     ## DEVIATION, recorded rather than taken quietly: the page's names are kept
 
@@ -39,30 +39,30 @@
     computed once on the page from data the server owns. Nothing here opens a device, starts a
     stream, or writes a file.
   */
-  import { NEUTRAL_PAN, captureVideoImage, type Pan } from '$lib/screen-zoom';
-  import DayTradeAlertsPane from '$lib/components/day-trade-alerts/DayTradeAlertsPane.svelte';
-  import FilesPane from '$lib/components/FilesPane.svelte';
-  import NotesPane from '$lib/components/notes/NotesPane.svelte';
-  import ScreenPane from '$lib/components/ScreenPane.svelte';
-  import ScreenTabs, { type ScreenTab } from '$lib/components/ScreenTabs.svelte';
-  import ScreenZoomControls from '$lib/components/ScreenZoomControls.svelte';
-  import SpeechRecoOverlay from '$lib/components/SpeechRecoOverlay.svelte';
-  import StreamingView from '$lib/components/StreamingView.svelte';
-  import StreamTabs from '$lib/components/StreamTabs.svelte';
-  import SwingAlertsPane from '$lib/components/swing-alerts/SwingAlertsPane.svelte';
-  import VideoPlayer from '$lib/components/VideoPlayer.svelte';
-  import YoutubePlayerOverlay from '$lib/components/YoutubePlayerOverlay.svelte';
+  import { NEUTRAL_PAN, captureVideoImage, type Pan } from '#lib/screen-zoom.js';
+  import DayTradeAlertsPane from '#lib/components/day-trade-alerts/DayTradeAlertsPane.svelte';
+  import FilesPane from '#lib/components/FilesPane.svelte';
+  import NotesPane from '#lib/components/notes/NotesPane.svelte';
+  import ScreenPane from '#lib/components/ScreenPane.svelte';
+  import ScreenTabs, { type ScreenTab } from '#lib/components/ScreenTabs.svelte';
+  import ScreenZoomControls from '#lib/components/ScreenZoomControls.svelte';
+  import SpeechRecoOverlay from '#lib/components/SpeechRecoOverlay.svelte';
+  import StreamingView from '#lib/components/StreamingView.svelte';
+  import StreamTabs from '#lib/components/StreamTabs.svelte';
+  import SwingAlertsPane from '#lib/components/swing-alerts/SwingAlertsPane.svelte';
+  import VideoPlayer from '#lib/components/VideoPlayer.svelte';
+  import YoutubePlayerOverlay from '#lib/components/YoutubePlayerOverlay.svelte';
   import type { Snippet } from 'svelte';
-  import type { MtxStreamTabs } from '$lib/room-mtx.svelte';
-  import type { RoomMedia } from '$lib/room/media.svelte';
-  import type { RoomMenus } from '$lib/room/menus.svelte';
-  import type { RoomFiles } from '$lib/room/files.svelte';
+  import type { MtxStreamTabs } from '#lib/room-mtx.svelte.js';
+  import type { RoomMedia } from '#lib/room/media.svelte.js';
+  import type { RoomMenus } from '#lib/room/menus.svelte.js';
+  import type { RoomFiles } from '#lib/room/files.svelte.js';
   import type {
     DayTradeAlertAction,
     RoomTradeAlerts,
     SwingAlertAction
-  } from '$lib/room/trade-alerts.svelte';
-  import type { RoomSplit } from '$lib/room/split.svelte';
+  } from '#lib/room/trade-alerts.svelte.js';
+  import type { RoomSplit } from '#lib/room/split.svelte.js';
   import type {
     DayTradeAlertRow,
     MainTab,
@@ -71,7 +71,7 @@
     RoomNote,
     SwingAlertRow,
     WebcamPresenter
-  } from '$lib/types';
+  } from '#lib/types.js';
   import type { PageProps } from '../../routes/$types';
 
   type Caption = { timestamp: number; sender: string; text: string; live?: boolean };
@@ -169,7 +169,7 @@
 
     // ── #swingAlerts and #dayTradeAlerts ───────────────────────────────────────
     /**
-     * The two trade alert feeds, whole — `$lib/room/trade-alerts.svelte.ts`.
+     * The two trade alert feeds, whole — `#lib/room/trade-alerts.svelte.ts`.
      *
      * Fourteen props, seven per feed, and the two sevens were the same seven twice. They are one
      * class with two instances now, so the pane calls below read `swingAlerts.log` where they read
@@ -190,7 +190,7 @@
 
     // ── #files ─────────────────────────────────────────────────────────────────
     /**
-     * The file drive, whole — `$lib/room/files.svelte.ts`.
+     * The file drive, whole — `#lib/room/files.svelte.ts`.
      *
      * This was fifteen props, and every one of them arrived from the page and left again for
      * `FilesPane` unread: the only member this component itself touches is `filesHidden`, on the
@@ -620,7 +620,7 @@
 
                     The reference feeds the binding `sessData.hideFiles || globals.videoOnlyMode`
                     (2289-2290). Only the first term is implemented, and `filesSectionHidden` in
-                    `$lib/files-gates` says why: the second is not a setting but the media.recording-bot
+                    `#lib/files-gates.js` says why: the second is not a setting but the media.recording-bot
                     client global, set from the `r` query parameter, and this room has no media.recording
                     bot to model.
                   -->

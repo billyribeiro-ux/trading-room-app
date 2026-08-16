@@ -61,7 +61,11 @@ export function getBrowserPermissionGuidance(
   const isSafari = userAgent.includes('safari') && !userAgent.includes('chrome');
   const isEdge = userAgent.includes('edg');
   const permissionLabel =
-    permission === 'microphone' ? 'Microphone' : permission === 'camera' ? 'Camera' : 'Screen capture';
+    permission === 'microphone'
+      ? 'Microphone'
+      : permission === 'camera'
+        ? 'Camera'
+        : 'Screen capture';
   let browserName = 'your browser';
   let settingsPath = '';
 
@@ -80,7 +84,11 @@ export function getBrowserPermissionGuidance(
   }
 
   const mediaLabel =
-    permission === 'microphone' ? 'microphone' : permission === 'camera' ? 'camera' : 'screen sharing';
+    permission === 'microphone'
+      ? 'microphone'
+      : permission === 'camera'
+        ? 'camera'
+        : 'screen sharing';
   return `Permission denied. To enable ${mediaLabel}, go to ${browserName} ${settingsPath} and allow access for this site.`;
 }
 

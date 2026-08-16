@@ -1,4 +1,4 @@
-import type { MessageReactions } from '$lib/types';
+import type { MessageReactions } from '#lib/types.js';
 
 /**
  * Reads the stored `reactions_json` blob back into a shape the room can render.

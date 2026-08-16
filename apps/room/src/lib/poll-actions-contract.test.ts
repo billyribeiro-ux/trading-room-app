@@ -1,7 +1,7 @@
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { eq } from 'drizzle-orm';
-import { db, ensureDatabase } from '$lib/server/db';
-import { pollAnswers, polls, savedPolls, users, type User } from '$lib/server/db/schema';
+import { db, ensureDatabase } from '#lib/server/db/index.js';
+import { pollAnswers, polls, savedPolls, users, type User } from '#lib/server/db/schema.js';
 import { actions } from '../routes/+page.server';
 
 /*

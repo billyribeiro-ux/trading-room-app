@@ -1,9 +1,9 @@
 import { invalidate, invalidateAll } from '$app/navigation';
 
-import { isMtxStream } from '$lib/mtx-streams';
-import type { MtxStreamTabs } from '$lib/room-mtx.svelte';
-import { formatUserLocation } from '$lib/roster-gates';
-import { playSoundEffect } from '$lib/sound-effects';
+import { isMtxStream } from '#lib/mtx-streams.js';
+import type { MtxStreamTabs } from '#lib/room-mtx.svelte.js';
+import { formatUserLocation } from '#lib/roster-gates.js';
+import { playSoundEffect } from '#lib/sound-effects.js';
 
 import type { RoomBroadcasts } from './broadcasts.svelte';
 import type { RoomMedia } from './media.svelte';

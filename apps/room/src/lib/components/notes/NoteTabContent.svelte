@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { RoomNote } from '$lib/types';
+  import type { RoomNote } from '#lib/types.js';
   import type { Attachment } from 'svelte/attachments';
 
   interface Props {

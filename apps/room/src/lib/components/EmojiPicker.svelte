@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { EMOJI_DUMP_DATA, type EmojiDumpEntry } from '$lib/emoji-data';
+  import { EMOJI_DUMP_DATA, type EmojiDumpEntry } from '#lib/emoji-data.js';
 
   interface Props {
     onselect: (glyph: string) => void;

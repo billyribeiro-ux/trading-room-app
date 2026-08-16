@@ -28,9 +28,12 @@ describe('the two cases the caller must handle itself', () => {
     is noise. A future edit that gave either one a sentence here would make the room talk over the
     user.
   */
-  it.each(['microphone', 'camera', 'screen'] as const)('NotAllowedError yields null for %s', (kind) => {
-    expect(mediaCaptureErrorMessage({ ...base, kind, errorName: 'NotAllowedError' })).toBeNull();
-  });
+  it.each(['microphone', 'camera', 'screen'] as const)(
+    'NotAllowedError yields null for %s',
+    (kind) => {
+      expect(mediaCaptureErrorMessage({ ...base, kind, errorName: 'NotAllowedError' })).toBeNull();
+    }
+  );
 
   it.each(['microphone', 'camera', 'screen'] as const)('AbortError yields null for %s', (kind) => {
     expect(mediaCaptureErrorMessage({ ...base, kind, errorName: 'AbortError' })).toBeNull();
@@ -151,7 +154,8 @@ describe('browser-specific settings guidance', () => {
   const CHROME =
     'Mozilla/5.0 (Macintosh) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36';
   const EDGE = `${CHROME} Edg/126.0`;
-  const SAFARI = 'Mozilla/5.0 (Macintosh) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15';
+  const SAFARI =
+    'Mozilla/5.0 (Macintosh) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15';
   const FIREFOX = 'Mozilla/5.0 (Macintosh; rv:127.0) Gecko/20100101 Firefox/127.0';
 
   it('tells Chrome users the Chrome path', () => {

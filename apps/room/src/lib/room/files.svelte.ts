@@ -1,8 +1,13 @@
 import { isHttpError } from '@sveltejs/kit';
 
-import { INITIAL_FILE_SORT, type FileSortField, sortFiles, toggleFileSort } from '$lib/file-sort';
-import { type FilesSessionFlags, filesSectionHidden } from '$lib/files-gates';
-import type { FileTab } from '$lib/types';
+import {
+  INITIAL_FILE_SORT,
+  type FileSortField,
+  sortFiles,
+  toggleFileSort
+} from '#lib/file-sort.js';
+import { type FilesSessionFlags, filesSectionHidden } from '#lib/files-gates.js';
+import type { FileTab } from '#lib/types.js';
 
 import type { RoomDialogs } from './dialogs.svelte';
 
@@ -57,7 +62,7 @@ export interface RoomFileCommands {
 
   `fileSort` is one `$state.raw` value holding field AND direction, replaced wholesale by
   `toggleFileSort`. Two separate fields is what let a stale direction survive a field change, which
-  is the defect `$lib/file-sort` was written to close; keeping them one value here keeps it closed.
+  is the defect `#lib/file-sort.js` was written to close; keeping them one value here keeps it closed.
 
   ## Which fields are public, and why three of them are not
 
@@ -123,7 +128,7 @@ export class RoomFiles {
       The v4 bundle does contain it, and it disagrees on two points that a per-button direction cannot
       express: both icons read the same `fileSortDir` (bytes 1,946,450 and 1,946,605), and switching
       field RESETS that direction to the new field's default rather than restoring a remembered one
-      (byte 1,975,308). `$lib/file-sort` holds the decode and the reasoning.
+      (byte 1,975,308). `#lib/file-sort.js` holds the decode and the reasoning.
 
       `$state.raw`, not `$state`: this object is only ever REPLACED, by `toggleFileSort` returning a
       new pair, so a deep proxy over it would be per-read overhead buying nothing. The pair is one
@@ -170,7 +175,7 @@ export class RoomFiles {
   }
 
   /**
-   * "Hide Files Section?" — `filesSectionHidden` in `$lib/files-gates`, tested there.
+   * "Hide Files Section?" — `filesSectionHidden` in `#lib/files-gates.js`, tested there.
    *
    * `hidden` on BOTH the main-tab `li` and the `#files` pane, which is what the reference binds
    * (`z('hidden', o.hideFiles)` at full.js:5375 and 5410-5413). Derived rather than copied into
@@ -255,7 +260,7 @@ export class RoomFiles {
       to be discarded.
 
       `sortFiles` copies before it sorts, so the array `filter` just allocated is not sorted in
-      place either; see property 1 in `$lib/file-sort`.
+      place either; see property 1 in `#lib/file-sort.js`.
     */
     return sortFiles(matching, this.#fileSort.field, this.#fileSort.direction);
   }
@@ -263,7 +268,7 @@ export class RoomFiles {
   /**
    * One click on one of the two sort buttons.
    *
-   * The whole transition lives in `$lib/file-sort` so it can be exercised without rendering this
+   * The whole transition lives in `#lib/file-sort.js` so it can be exercised without rendering this
    * component; all this does is hand the current pair in and store the pair that comes back. The
    * single assignment is deliberate - `$state.raw` reacts to reassignment, and assigning field and
    * direction separately is what would let a stale direction survive a field change.

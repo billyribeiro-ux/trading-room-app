@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
-import { db, ensureDatabase } from '$lib/server/db';
-import { users } from '$lib/server/db/schema';
+import { db, ensureDatabase } from '#lib/server/db/index.js';
+import { users } from '#lib/server/db/schema.js';
 
 /*
   The controller, stubbed.
@@ -16,7 +16,7 @@ import { users } from '$lib/server/db/schema';
   drives both applications for real.
 */
 const CONTROLLER_SETTINGS = { rosterVisibleToViewers: true, userUploads: false } as const;
-vi.mock('$lib/server/room-config-client', () => ({
+vi.mock('#lib/server/room-config-client.js', () => ({
   readRoomConfig: async () => ({
     room: {
       shortCode: '3625',

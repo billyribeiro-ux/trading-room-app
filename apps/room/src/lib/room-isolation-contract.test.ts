@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { and, eq } from 'drizzle-orm';
-import { db, ensureDatabase } from '$lib/server/db';
+import { db, ensureDatabase } from '#lib/server/db/index.js';
 import {
   alertQuestions,
   alerts,
@@ -10,7 +10,7 @@ import {
   savedPolls,
   sharedFiles,
   users
-} from '$lib/server/db/schema';
+} from '#lib/server/db/schema.js';
 
 /**
  * A room created a moment ago must come up EMPTY.
@@ -42,7 +42,7 @@ const FRESH_ROOM = '9001';
   in it. If emptiness came from being refused rather than from scoping, that would be a different
   test passing for the wrong reason.
 */
-vi.mock('$lib/server/room-config-client', () => ({
+vi.mock('#lib/server/room-config-client.js', () => ({
   readRoomConfig: async (_request: Request, shortCode: string) => ({
     room: {
       shortCode,

@@ -6,9 +6,9 @@ import {
   composePastedImageAlert,
   composeUploadedAlert,
   postOnXIntent
-} from '$lib/post-alert-behavior';
-import { stripHtmlToText } from '$lib/chat-plain-text';
-import type { AlertTab, ChatTab, MessageActionItem, ModalName } from '$lib/types';
+} from '#lib/post-alert-behavior.js';
+import { stripHtmlToText } from '#lib/chat-plain-text.js';
+import type { AlertTab, ChatTab, MessageActionItem, ModalName } from '#lib/types.js';
 
 import type { MenuName } from './menus.svelte';
 
@@ -57,7 +57,7 @@ export interface ComposerCommands {
   ## What it does NOT own
 
   **The composition rules.** `composeUploadedAlert`, `composePastedImageAlert` and
-  `postOnXIntent` are transcriptions in `$lib/post-alert-behavior`, tested there against the capture's
+  `postOnXIntent` are transcriptions in `#lib/post-alert-behavior`, tested there against the capture's
   wording. This class calls them.
 
   **Who may post.** Every command re-checks on the server. What moved is which control is drawn and

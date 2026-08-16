@@ -10,10 +10,10 @@
   import StarterKit from '@tiptap/starter-kit';
   import { onMount } from 'svelte';
   import type { Attachment } from 'svelte/attachments';
-  import BootboxDialog from '$lib/components/BootboxDialog.svelte';
-  import EmojiPicker from '$lib/components/EmojiPicker.svelte';
-  import GiphyPicker from '$lib/components/GiphyPicker.svelte';
-  import type { NoteVersion } from '$lib/types';
+  import BootboxDialog from '#lib/components/BootboxDialog.svelte';
+  import EmojiPicker from '#lib/components/EmojiPicker.svelte';
+  import GiphyPicker from '#lib/components/GiphyPicker.svelte';
+  import type { NoteVersion } from '#lib/types.js';
   import {
     PtrCarousel,
     findCarousel,

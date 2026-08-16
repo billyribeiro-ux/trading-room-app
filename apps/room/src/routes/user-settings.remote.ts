@@ -1,10 +1,10 @@
 import { command, getRequestEvent } from '$app/server';
 import { eq } from 'drizzle-orm';
 import { z } from 'zod';
-import { pruneDeadPreferenceKeys } from '$lib/dead-preference-keys';
-import { requireUser } from '$lib/server/auth';
-import { db, ensureDatabase } from '$lib/server/db';
-import { userSettings } from '$lib/server/db/schema';
+import { pruneDeadPreferenceKeys } from '#lib/dead-preference-keys.js';
+import { requireUser } from '#lib/server/auth.js';
+import { db, ensureDatabase } from '#lib/server/db/index.js';
+import { userSettings } from '#lib/server/db/schema.js';
 
 /*
   The two writes a member makes to their OWN settings row.
@@ -28,7 +28,7 @@ import { userSettings } from '$lib/server/db/schema';
  * a silent coercion means a typo at a call site sets the wrong theme and reports success, which is
  * the same shape of quiet-wrong-answer this repository has been removing all afternoon.
  *
- * `Theme` in `$lib/types` is `'light' | 'dark'` — the same two, and the caller already had that
+ * `Theme` in `#lib/types` is `'light' | 'dark'` — the same two, and the caller already had that
  * type, so nothing legitimate can now be refused.
  */
 export const saveTheme = command(z.enum(['light', 'dark']), async (theme) => {

@@ -1,4 +1,4 @@
-import type { AlertTab } from '$lib/types';
+import type { AlertTab } from '#lib/types.js';
 
 export const POST_ALERT_LEGAL_DISCLOSURE = 'FOR EDUCATIONAL PURPOSES ONLY, NOT FINANCIAL ADVICE';
 export const POST_ALERT_URL_SCHEME_ERROR = 'The link seems to be missing "https://" or "http://"';

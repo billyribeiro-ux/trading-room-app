@@ -1,12 +1,12 @@
 <script lang="ts">
   import { onDestroy } from 'svelte';
-  import type { AlertTab } from '$lib/types';
+  import type { AlertTab } from '#lib/types.js';
   import {
     composePostAlert,
     POST_ALERT_LEGAL_DISCLOSURE,
     type PastedImageSubmission,
     type PostAlertSubmission
-  } from '$lib/post-alert-behavior';
+  } from '#lib/post-alert-behavior.js';
   import BootboxDialog from './BootboxDialog.svelte';
   import Modal from './Modal.svelte';
 

@@ -29,7 +29,9 @@ describe('tawkSupportAvailable', () => {
   });
 
   it('is unavailable when the room has not enabled it', () => {
-    expect(tawkSupportAvailable(PRESENTER, { tawkPresenterSupport: false }, 'prop-123')).toBe(false);
+    expect(tawkSupportAvailable(PRESENTER, { tawkPresenterSupport: false }, 'prop-123')).toBe(
+      false
+    );
     expect(tawkSupportAvailable(PRESENTER, {}, 'prop-123')).toBe(false);
   });
 

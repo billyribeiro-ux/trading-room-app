@@ -2,9 +2,9 @@ import { error } from '@sveltejs/kit';
 import { command, getRequestEvent } from '$app/server';
 import { eq } from 'drizzle-orm';
 import { z } from 'zod';
-import { isPresenterRole, requireUser } from '$lib/server/auth';
-import { db, ensureDatabase } from '$lib/server/db';
-import { users } from '$lib/server/db/schema';
+import { isPresenterRole, requireUser } from '#lib/server/auth.js';
+import { db, ensureDatabase } from '#lib/server/db/index.js';
+import { users } from '#lib/server/db/schema.js';
 
 /*
   Renaming an account — its own, or somebody else's.

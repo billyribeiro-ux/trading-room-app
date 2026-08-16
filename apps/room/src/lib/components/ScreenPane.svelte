@@ -44,7 +44,7 @@
    * `li.nav-item.ms-auto` slot carries it. See `ScreenZoomControls.svelte` for both arrangements
    * and `src/lib/screen-zoom.ts` for the state model.
    */
-  import { scaleForZoomLevel, captureVideoImage, type Pan } from '$lib/screen-zoom';
+  import { scaleForZoomLevel, captureVideoImage, type Pan } from '#lib/screen-zoom.js';
   import ScreenZoomControls from './ScreenZoomControls.svelte';
 
   type Props = {

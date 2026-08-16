@@ -207,7 +207,7 @@ describe('the server owns the authority', () => {
   it('refuses a non-presenter on both commands', () => {
     /*
       The gate was `if (!isPresenterRole(user.role)) return fail(403, …)` inlined in both. It is now
-      `presenterRoom()` in `$lib/server/auth.ts`, which returns the room ONLY after the role check —
+      `presenterRoom()` in `#lib/server/auth.ts`, which returns the room ONLY after the role check —
       so a command cannot obtain the tenant it is about to broadcast into without having passed the
       gate. Each command is asserted to reach it, and the gate itself is asserted where it lives.
     */

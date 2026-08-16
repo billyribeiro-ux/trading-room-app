@@ -1,4 +1,4 @@
-import type { MessageReactions } from '$lib/types';
+import type { MessageReactions } from '#lib/types.js';
 
 /**
  * One person clicking one reaction, on or off.

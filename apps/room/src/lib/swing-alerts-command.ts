@@ -9,7 +9,7 @@ import { z } from 'zod';
  *
  * The command names come from `docs/decoded/swing-alerts.md` §5. **Create is `swingAlertMsg`** —
  * `newSwingAlertMsg` is the server→client push and a field name inside the edit payload, and the
- * first revision of the decode had the two the wrong way round. `$lib/swing-alerts` carries the
+ * first revision of the decode had the two the wrong way round. `#lib/swing-alerts.js` carries the
  * same names as `SWING_ALERT_COMMANDS`, and `swing-alerts-contract.test.ts` pins them together.
  */
 

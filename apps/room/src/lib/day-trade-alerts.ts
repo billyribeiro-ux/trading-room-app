@@ -27,7 +27,7 @@
  * `editAlertMessageSwing`, spelled with `Swing`, on the Day Trade path too.
  */
 
-import { formatSwingAlertDate } from '$lib/swing-alerts';
+import { formatSwingAlertDate } from '#lib/swing-alerts.js';
 
 /** The room settings this feature reads. Absent means unset, and unset means off. */
 export interface DayTradeAlertsSessionFlags {

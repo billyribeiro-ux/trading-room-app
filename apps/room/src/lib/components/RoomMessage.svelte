@@ -1,28 +1,28 @@
 <script lang="ts">
-  import type { MessageAction, RoomMessageItem } from '$lib/types';
-  import EmojiPicker from '$lib/components/EmojiPicker.svelte';
-  import type { EmojiDumpEntry } from '$lib/emoji-data';
-  import { isMentionOf } from '$lib/mention';
+  import type { MessageAction, RoomMessageItem } from '#lib/types.js';
+  import EmojiPicker from '#lib/components/EmojiPicker.svelte';
+  import type { EmojiDumpEntry } from '#lib/emoji-data.js';
+  import { isMentionOf } from '#lib/mention.js';
   import {
     ALERT_LABEL_BADGE_CLASS,
     alertLabelBadgeStyle,
     splitAlertLabels,
     type AlertLabel
-  } from '$lib/alert-labels';
+  } from '#lib/alert-labels.js';
   import { safeChatHtml } from './chat-safe-html';
-  import { calculateMessageMenuPosition } from '$lib/message-menu-position';
-  import { ngbTooltipWith } from '$lib/ngb-tooltip';
+  import { calculateMessageMenuPosition } from '#lib/message-menu-position.js';
+  import { ngbTooltipWith } from '#lib/ngb-tooltip.js';
   import {
     alertDateFormatter,
     chatTimeFormatter,
     longDateFormatter
-  } from '$lib/message-formatters';
+  } from '#lib/message-formatters.js';
   import {
     capturedMenuAllows,
     MESSAGE_MENU_LABEL,
     sourceMessageBehavior
-  } from '$lib/message-behavior';
-  import type { FollowChatStyle } from '$lib/types';
+  } from '#lib/message-behavior.js';
+  import type { FollowChatStyle } from '#lib/types.js';
 
   type MessageKind = 'alert' | 'chat';
   interface MessageReactionPayload {
@@ -259,7 +259,7 @@
     The shared rule, not a second copy. This was `item.body.includes('@' + currentUserName)` —
     case-sensitive, no trailing space and blind to `@all`, so `@Bob` never highlighted for bob,
     `@bobby` always did, and a presenter addressing the room with `@all ` highlighted for nobody.
-    See `$lib/mention` for the reference's own three terms.
+    See `#lib/mention` for the reference's own three terms.
   */
   const isMention = $derived(isMentionOf(item.body, currentUserName, isAdminMessage));
   const isQuestion = $derived(
@@ -401,7 +401,7 @@
   const replyStockSegments = $derived(item.replyToBody ? parseBodySegments(item.replyToBody) : []);
 
   /*
-    The three formatters live in `$lib/message-formatters` and are built ONCE for the page.
+    The three formatters live in `#lib/message-formatters.js` and are built ONCE for the page.
 
     This script runs per rendered item — one per alert, one per chat message — so declaring them
     here constructed three `Intl.DateTimeFormat` objects per message, of which at most one is ever

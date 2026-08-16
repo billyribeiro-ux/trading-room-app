@@ -2,7 +2,7 @@
 import { flushSync } from 'svelte';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { FilesSessionFlags } from '$lib/files-gates';
+import type { FilesSessionFlags } from '#lib/files-gates.js';
 
 import { RoomDialogs } from './dialogs.svelte';
 import { type RoomFileRow, RoomFiles } from './files.svelte';
@@ -242,7 +242,7 @@ describe('searching and sorting, as the reference composes them', () => {
 
   it('resets the direction to the new field default rather than carrying the old one', () => {
     /*
-      The defect `$lib/file-sort` was written to close, kept closed by holding ONE value: with two
+      The defect `#lib/file-sort.js` was written to close, kept closed by holding ONE value: with two
       fields, toggling date to descending and then switching to name left name sorted descending,
       which the v4 bundle disagrees with at byte 1,975,308.
     */

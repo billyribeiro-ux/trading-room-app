@@ -250,10 +250,7 @@ describe('the row icon', () => {
 */
 describe('the filter is applied at all THREE sites, not just the visible one', () => {
   const page = readFileSync(new URL('../routes/+page.svelte', import.meta.url), 'utf8');
-  const overlays = readFileSync(
-    new URL('components/RoomOverlays.svelte', import.meta.url),
-    'utf8'
-  );
+  const overlays = readFileSync(new URL('components/RoomOverlays.svelte', import.meta.url), 'utf8');
   /*
   The read pipelines left the page for `RoomFeeds` in Phase 5 slice 9. Read as their own source, so
   an assertion about what a pane renders cannot pass against a file that no longer builds it.
@@ -307,7 +304,7 @@ describe('the filter is applied at all THREE sites, not just the visible one', (
 
   it('feeds the advanced-search modal the filtered rows, not the raw log', () => {
     // The modal host moved into `RoomOverlays.svelte` in Phase 5 slice 17; the room state it renders
-  // from is handed to that component whole, so the prop is assembled there now.
+    // from is handed to that component whole, so the prop is assembled there now.
     expect(overlays).toContain('alerts={feeds.searchableAlerts}');
     expect(source).not.toContain('alerts={data.alerts}');
     // `searchableAlerts` must come off `data.alerts` rather than off `visibleAlerts`, or the search

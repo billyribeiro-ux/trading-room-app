@@ -1,7 +1,7 @@
 import { deserialize } from '$app/forms';
 import { invalidateAll } from '$app/navigation';
 
-import type { NoteVersion } from '$lib/types';
+import type { NoteVersion } from '#lib/types.js';
 
 import type { RoomMenus } from './menus.svelte';
 import type { RoomModals } from './modals.svelte';

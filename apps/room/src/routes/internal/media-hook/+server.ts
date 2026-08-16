@@ -24,7 +24,7 @@
  * feature here has it, including `focusOnScreen`. The durable fix is the same one `TODO.md` already
  * names — PostgreSQL `room_events`, which `services/api` already listens on.
  *
- * What makes the stream list correct in the meantime is `$lib/mtx-reconcile`, which every instance
+ * What makes the stream list correct in the meantime is `#lib/mtx-reconcile.js`, which every instance
  * runs against MediaMTX's own `/v3/paths/list` for its own subscribers. This route exists so a
  * stream appears in under a second instead of at the next reconcile; if it never arrives, nothing is
  * permanently wrong.
@@ -51,8 +51,8 @@ import { timingSafeEqual } from 'node:crypto';
   until the build was rolled back. `src/env.ts` records that at length.
 */
 import { MEDIA_HOOK_SECRET } from '$app/env/private';
-import { mtxStreamFromPath } from '$lib/mtx-reconcile';
-import { publishToRoom } from '$lib/server/room-events';
+import { mtxStreamFromPath } from '#lib/mtx-reconcile.js';
+import { publishToRoom } from '#lib/server/room-events.js';
 import type { RequestHandler } from './$types';
 
 /**

@@ -1,9 +1,9 @@
 import { error } from '@sveltejs/kit';
 import { and, eq } from 'drizzle-orm';
-import { db, ensureDatabase } from '$lib/server/db';
-import { sharedFiles } from '$lib/server/db/schema';
-import { readStoredFile } from '$lib/server/file-storage';
-import { requireRoomShortCode, requireUser } from '$lib/server/auth';
+import { db, ensureDatabase } from '#lib/server/db/index.js';
+import { sharedFiles } from '#lib/server/db/schema.js';
+import { readStoredFile } from '#lib/server/file-storage.js';
+import { requireRoomShortCode, requireUser } from '#lib/server/auth.js';
 import type { RequestHandler } from './$types';
 
 /**

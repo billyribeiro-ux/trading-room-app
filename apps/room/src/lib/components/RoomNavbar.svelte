@@ -1,9 +1,9 @@
 <script lang="ts">
-  import type { RoomMedia, TalkingUser } from '$lib/room/media.svelte';
-  import type { RoomMenus } from '$lib/room/menus.svelte';
-  import type { RoomRoster, RosterMember } from '$lib/room/roster.svelte';
-  import type { PresenterAudioPreferences } from '$lib/screen-volume';
-  import PresenterMuteRows from '$lib/components/PresenterMuteRows.svelte';
+  import type { RoomMedia, TalkingUser } from '#lib/room/media.svelte.js';
+  import type { RoomMenus } from '#lib/room/menus.svelte.js';
+  import type { RoomRoster, RosterMember } from '#lib/room/roster.svelte.js';
+  import type { PresenterAudioPreferences } from '#lib/screen-volume.js';
+  import PresenterMuteRows from '#lib/components/PresenterMuteRows.svelte';
 
   /*
     `.mainAppNav` — the room's top bar: the brand, the connected count, the REC and speaking
@@ -875,7 +875,7 @@
           (`app-room.compiled.js:2050-2051, 2048, 1697`).
 
           `tawkAvailable` carries a THIRD term the reference does not have: a configured
-          property id. See `$lib/tawk-support` — the reference's id is its own company's,
+          property id. See `#lib/tawk-support` — the reference's id is its own company's,
           and a room with none configured shows no control rather than a control that opens
           somebody else's support inbox.
         -->

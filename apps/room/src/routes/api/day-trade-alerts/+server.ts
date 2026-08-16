@@ -1,10 +1,10 @@
 import { error, json } from '@sveltejs/kit';
-import { requireRoomShortCode, requireUser } from '$lib/server/auth';
-import { ensureDatabase } from '$lib/server/db';
-import { readRoomConfig } from '$lib/server/room-config-client';
-import { getDayTradeAlerts } from '$lib/server/day-trade-alerts-repository';
-import { dayTradeAlertsLogDaysSchema } from '$lib/day-trade-alerts-command';
-import { dayTradeAlertsTabVisible } from '$lib/day-trade-alerts';
+import { requireRoomShortCode, requireUser } from '#lib/server/auth.js';
+import { ensureDatabase } from '#lib/server/db/index.js';
+import { readRoomConfig } from '#lib/server/room-config-client.js';
+import { getDayTradeAlerts } from '#lib/server/day-trade-alerts-repository.js';
+import { dayTradeAlertsLogDaysSchema } from '#lib/day-trade-alerts-command.js';
+import { dayTradeAlertsTabVisible } from '#lib/day-trade-alerts.js';
 import type { RequestHandler } from './$types';
 
 /**

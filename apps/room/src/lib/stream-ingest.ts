@@ -43,8 +43,8 @@ export const MEDIAMTX_RTMPS_PORT = 1936;
 /**
  * What the controller answers for `getRTMPToken`.
  *
- * Declared HERE rather than in `$lib/server/room-config-client`, even though that is the module
- * that fetches it, because the panel needs the type too. A `$lib/server` import in a component is
+ * Declared HERE rather than in `#lib/server/room-config-client.js`, even though that is the module
+ * that fetches it, because the panel needs the type too. A `#lib/server` import in a component is
  * refused by SvelteKit's server-only module boundary, and a type-only import surviving that check
  * is a property of the preprocessor rather than a guarantee. This module is pure, so both sides can
  * name the same shape without either reaching across the boundary.

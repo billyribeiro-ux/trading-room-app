@@ -1,4 +1,4 @@
-import type { SwingAlertDirection, SwingAlertRow } from '$lib/types';
+import type { SwingAlertDirection, SwingAlertRow } from '#lib/types.js';
 
 /**
  * `this.swingAlert` — the composer's model.

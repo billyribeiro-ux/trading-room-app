@@ -2,13 +2,13 @@ import { error } from '@sveltejs/kit';
 import { command, getRequestEvent } from '$app/server';
 import { and, eq, isNull } from 'drizzle-orm';
 import { z } from 'zod';
-import { MAX_QUESTION_BODY } from '$lib/message-bounds';
-import { requireRoomShortCode, requireUser } from '$lib/server/auth';
-import { capturedRoomItem } from '$lib/server/captured-room';
-import { hashEmail } from '$lib/server/connection';
-import { db, ensureDatabase } from '$lib/server/db';
-import { alertQuestions, alerts } from '$lib/server/db/schema';
-import { consumeRateLimit } from '$lib/server/rate-limit';
+import { MAX_QUESTION_BODY } from '#lib/message-bounds.js';
+import { requireRoomShortCode, requireUser } from '#lib/server/auth.js';
+import { capturedRoomItem } from '#lib/server/captured-room.js';
+import { hashEmail } from '#lib/server/connection.js';
+import { db, ensureDatabase } from '#lib/server/db/index.js';
+import { alertQuestions, alerts } from '#lib/server/db/schema.js';
+import { consumeRateLimit } from '#lib/server/rate-limit.js';
 
 /*
   Asking a question against an alert.
@@ -51,7 +51,7 @@ import { consumeRateLimit } from '$lib/server/rate-limit';
  * ## The length bound is NEW
  *
  * This accepted a body of any size. A question lands in a thread every reader of that alert loads,
- * so an unbounded body is an unbounded payload for the room — see `$lib/message-bounds.ts`.
+ * so an unbounded body is an unbounded payload for the room — see `#lib/message-bounds.ts`.
  */
 export const askQuestion = command(
   z.strictObject({

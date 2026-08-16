@@ -3,7 +3,7 @@ import {
   pushToTalkShouldUnmute,
   shouldBlockContextMenu,
   shouldBlockCopyKey
-} from '$lib/room-key-gates';
+} from '#lib/room-key-gates.js';
 
 import type { RoomDialogs } from './dialogs.svelte';
 import type { RoomMedia } from './media.svelte';
@@ -30,7 +30,7 @@ import type { RoomSplit } from './split.svelte';
  * on one listener and lose the ordering the citations record.
  *
  * **The predicates are not re-derived here.** `pushToTalkShouldUnmute`, `shouldBlockCopyKey` and
- * `shouldBlockContextMenu` live in `$lib/room-key-gates` with their own citations and their own
+ * `shouldBlockContextMenu` live in `#lib/room-key-gates.js` with their own citations and their own
  * tests; this calls them. Every authority decision — `isPresenter`, `disableCopy` — arrives as a
  * thunk from the page, which reads it from data the server owns.
  *
@@ -109,7 +109,7 @@ export class RoomWindowHandlers {
     (`app-room.compiled.js:1260-1266`). Two unrelated features that share the keyboard, in the
     reference's own order: push-to-talk first, then the copy restriction.
 
-    Both predicates live in `$lib/room-key-gates` with their citations. They run before the
+    Both predicates live in `#lib/room-key-gates.js` with their citations. They run before the
     Escape handling below because that returns early on every other key, which is exactly how a
     host binding added here would go unnoticed.
   */
@@ -171,7 +171,7 @@ export class RoomWindowHandlers {
     than for the key events, and neither resolver is defined anywhere in the decoded tree, so
     which is which is not established. `contextmenu` bubbles to both, and this handler's only
     effect is `preventDefault`, so the distinction cannot change behaviour — see the note at the
-    top of `$lib/room-key-gates`.
+    top of `#lib/room-key-gates.js`.
   */
     if (
       shouldBlockContextMenu({ disableCopy: this.#disableCopy(), isPresenter: this.#isPresenter() })

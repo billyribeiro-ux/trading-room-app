@@ -1,8 +1,8 @@
 import { command } from '$app/server';
 import { z } from 'zod';
-import { presenterRoom } from '$lib/server/auth';
-import { ensureDatabase } from '$lib/server/db';
-import { publishToRoom } from '$lib/server/room-events';
+import { presenterRoom } from '#lib/server/auth.js';
+import { ensureDatabase } from '#lib/server/db/index.js';
+import { publishToRoom } from '#lib/server/room-events.js';
 
 /*
   The room's recording state — announced, never inferred.

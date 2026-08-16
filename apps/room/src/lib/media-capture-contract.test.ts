@@ -60,7 +60,9 @@ describe('media capture activation contract', () => {
       'ontogglemicrophone={() => void mediaTransport.toggleMicrophone()}'
     );
     expect(roomSource).toContain('ontogglewebcam={() => void mediaTransport.toggleWebcam()}');
-    expect(TRANSPORT).toMatch(/async toggleMicrophone\(\)[\s\S]*?await this\.#enableMicrophone\(\)/);
+    expect(TRANSPORT).toMatch(
+      /async toggleMicrophone\(\)[\s\S]*?await this\.#enableMicrophone\(\)/
+    );
     // The point of this assertion is WHERE the capture happens - behind the click handler, never on
     // mount - not which constraints it carries. It used to pin the literal `{ video: true }`, which
     // turned a deliberate fix into a red test: both camera paths now pass

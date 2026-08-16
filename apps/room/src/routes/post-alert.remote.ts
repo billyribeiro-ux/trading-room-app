@@ -1,12 +1,12 @@
 import { error } from '@sveltejs/kit';
 import { command, getRequestEvent } from '$app/server';
 import { z } from 'zod';
-import { MAX_ALERT_BODY } from '$lib/message-bounds';
-import { presenterRoom, requireUser } from '$lib/server/auth';
-import { db, ensureDatabase } from '$lib/server/db';
-import { alerts } from '$lib/server/db/schema';
-import { consumeRateLimit } from '$lib/server/rate-limit';
-import { publishToRoom } from '$lib/server/room-events';
+import { MAX_ALERT_BODY } from '#lib/message-bounds.js';
+import { presenterRoom, requireUser } from '#lib/server/auth.js';
+import { db, ensureDatabase } from '#lib/server/db/index.js';
+import { alerts } from '#lib/server/db/schema.js';
+import { consumeRateLimit } from '#lib/server/rate-limit.js';
+import { publishToRoom } from '#lib/server/room-events.js';
 
 /*
   Posting an alert — the presenter act the whole room is watching for.

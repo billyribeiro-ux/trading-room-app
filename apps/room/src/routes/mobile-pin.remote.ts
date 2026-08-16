@@ -1,8 +1,8 @@
 import { error } from '@sveltejs/kit';
 import { command, getRequestEvent } from '$app/server';
-import { requireRoomShortCode, requireUser } from '$lib/server/auth';
-import { ensureDatabase } from '$lib/server/db';
-import { readRoomConfig, requestMobilePin } from '$lib/server/room-config-client';
+import { requireRoomShortCode, requireUser } from '#lib/server/auth.js';
+import { ensureDatabase } from '#lib/server/db/index.js';
+import { readRoomConfig, requestMobilePin } from '#lib/server/room-config-client.js';
 
 /*
   The pairing pin for the mobile app, and the second remote function here.

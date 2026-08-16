@@ -1,6 +1,6 @@
 <script lang="ts">
-  import BootboxDialog from '$lib/components/BootboxDialog.svelte';
-  import type { NoteVersion, RoomNote } from '$lib/types';
+  import BootboxDialog from '#lib/components/BootboxDialog.svelte';
+  import type { NoteVersion, RoomNote } from '#lib/types.js';
   import { onMount } from 'svelte';
   import { SvelteSet } from 'svelte/reactivity';
   import NoteEditor from './NoteEditor.svelte';

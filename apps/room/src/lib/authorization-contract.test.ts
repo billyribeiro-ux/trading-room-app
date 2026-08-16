@@ -157,7 +157,7 @@ describe('write-action input validation', () => {
       Stored forever and re-sent to every reader on every poll, so an unbounded body is a storage
       and bandwidth problem as much as an input-validation one.
 
-      All three moved out of `+page.server.ts` when the commands did. `$lib/message-bounds.ts` holds
+      All three moved out of `+page.server.ts` when the commands did. `#lib/message-bounds.ts` holds
       the numbers — a `.remote.ts` file cannot export a constant, so the alternative was the same
       value written three times. Two of the three bounds are NEW: only `sendMessage` ever checked a
       length, and `replyMessage` and `askQuestion` accepted a body of any size.

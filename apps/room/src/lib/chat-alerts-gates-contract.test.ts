@@ -96,9 +96,7 @@ describe('hideChatAlerts is ONE flag, not one mechanism per writer', () => {
   });
 
   it('is one derived flag here, fed by the three sources this room can resolve', () => {
-    expect(GATES_COMPACT).toContain(
-      'getviewerOnlyMode()'
-    );
+    expect(GATES_COMPACT).toContain('getviewerOnlyMode()');
     /* The three sources, still one expression: the room setting, the mode, and the detach. */
     expect(GATES_COMPACT).toContain(
       'gethideChatAlerts(){return(this.#session().sessData?.hideChatAlerts===true||this.viewerOnlyMode||this.#chatAlertsDetached());}'

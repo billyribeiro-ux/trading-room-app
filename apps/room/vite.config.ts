@@ -97,12 +97,22 @@ export default defineConfig({
   plugins: [
     sveltekit({
       /*
-        Kit 3 removed `$lib` in favour of `#lib`, and offers this alias to keep the old specifier
-        working — the error names it directly. Taken deliberately rather than renaming several
-        hundred import sites inside the same diff as a framework major, which would make the upgrade
-        unreviewable. Migrating to `#lib` is its own change.
+        NO `alias`, and its absence is the deliverable rather than a tidy-up.
+
+        This carried `alias: { $lib: 'src/lib' }` from the Kit 3 upgrade until 2026-08-16 — a
+        compatibility shim taken deliberately, so that several hundred import sites would not be
+        renamed inside the same diff as a framework major. The note here said "Migrating to `#lib`
+        is its own change," and this is that change.
+
+        `#lib` resolves through the `imports` field in `package.json`, which is Node's own subpath
+        imports and needs no bundler cooperation — which is precisely why Kit dropped the alias: the
+        code that used to coordinate the Vite alias and the TypeScript path could be deleted, because
+        Vite and TypeScript both read `imports` natively.
+
+        The specifiers carry an explicit extension because subpath imports are resolved LITERALLY —
+        `#lib/*` maps to `./src/lib/*` with no extension search and no index lookup.
+        `lib-subpath-imports.test.ts` checks that every one of them lands on a real file.
       */
-      alias: { $lib: 'src/lib' },
       /*
         Remote functions — `.remote.ts` files exporting `query` / `command` / `form`, called with a
         real signature on the client and executed on the server.

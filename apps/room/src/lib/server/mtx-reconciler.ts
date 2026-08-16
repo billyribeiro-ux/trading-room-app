@@ -37,8 +37,8 @@
  */
 
 import { MEDIA_API_URL } from '$app/env/private';
-import { MTX_PAGE_SIZE, mtxStreamDeltas, mtxStreamsFromPathList } from '$lib/mtx-reconcile';
-import type { MtxStream } from '$lib/mtx-streams';
+import { MTX_PAGE_SIZE, mtxStreamDeltas, mtxStreamsFromPathList } from '#lib/mtx-reconcile.js';
+import type { MtxStream } from '#lib/mtx-streams.js';
 import { publishToRoom, roomSubscriberCount } from './room-events';
 import { streamNamesForRoom } from './stream-names';
 

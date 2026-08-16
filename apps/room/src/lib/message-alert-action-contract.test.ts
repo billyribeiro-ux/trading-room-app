@@ -1,6 +1,6 @@
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { eq } from 'drizzle-orm';
-import { db, ensureDatabase } from '$lib/server/db';
+import { db, ensureDatabase } from '#lib/server/db/index.js';
 import {
   alertQuestions,
   alerts,
@@ -8,9 +8,9 @@ import {
   messages,
   users,
   type User
-} from '$lib/server/db/schema';
-import { resetRateLimits } from '$lib/server/rate-limit';
-import { callRemote } from '$lib/server/remote-command-harness';
+} from '#lib/server/db/schema.js';
+import { resetRateLimits } from '#lib/server/rate-limit.js';
+import { callRemote } from '#lib/server/remote-command-harness.js';
 
 /*
   Characterization tests for the four actions that create content: sendMessage, replyMessage,

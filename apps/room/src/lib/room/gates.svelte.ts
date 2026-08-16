@@ -1,9 +1,13 @@
 import { PUBLIC_PTR_TAWK_PROPERTY_ID } from '$app/env/public';
 import { page } from '$app/state';
 
-import { parseAlertLabels } from '$lib/alert-labels';
-import { archivesAvailableTo, rosterBlockVisible, rosterCountVisibleTo } from '$lib/roster-gates';
-import { tawkSupportAvailable } from '$lib/tawk-support';
+import { parseAlertLabels } from '#lib/alert-labels.js';
+import {
+  archivesAvailableTo,
+  rosterBlockVisible,
+  rosterCountVisibleTo
+} from '#lib/roster-gates.js';
+import { tawkSupportAvailable } from '#lib/tawk-support.js';
 
 import type { PageData } from '../../routes/$types';
 
@@ -19,7 +23,7 @@ import type { RoomPrefs } from './prefs.svelte';
  */
 type GatesSession = Pick<PageData, 'sessData' | 'user' | 'streamRead'>;
 
-/** The viewer and session shapes `$lib/roster-gates` takes, assembled by the page. */
+/** The viewer and session shapes `#lib/roster-gates.js` takes, assembled by the page. */
 type RosterViewer = Parameters<typeof rosterBlockVisible>[0];
 type RosterSession = Parameters<typeof rosterBlockVisible>[1];
 
@@ -42,7 +46,7 @@ type RosterSession = Parameters<typeof rosterBlockVisible>[1];
  * a `$derived` read through a getter is the same signal read.
  *
  * **The RULES are not here.** `archivesAvailableTo`, `rosterBlockVisible`, `benzingaVisibleTo` and
- * the rest live in `$lib/*-gates.ts` with their citations and their own tests; this class asks them.
+ * the rest live in `#lib/*-gates.ts` with their citations and their own tests; this class asks them.
  * Moving a predicate into a class that also holds state is how a rule stops being testable on its
  * own, and every one of these is a gate on what a member may see.
  */
@@ -311,7 +315,7 @@ export class RoomGates {
   /**
    * Tawk.to presenter support — `app-room.full.js:2224-2298`.
    *
-   * The gates, the URL shape and the attribute fallbacks are in `$lib/tawk-support`, with the one
+   * The gates, the URL shape and the attribute fallbacks are in `#lib/tawk-support.js`, with the one
    * DIVERGENCE stated there and tested: the property id is configuration, never the capture's
    * literal, because copying `5aecb59f227d3d7edc24f7c2` would open every presenter's support chat
    * into another company's inbox and post their name and email into it.

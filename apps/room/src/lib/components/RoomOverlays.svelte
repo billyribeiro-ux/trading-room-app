@@ -1,40 +1,40 @@
 <script lang="ts">
-  import type { AlertFilterFor } from '$lib/alert-filter';
-  import type { ChatMode } from '$lib/chat-mode';
-  import BootboxDialog from '$lib/components/BootboxDialog.svelte';
-  import GifConfirmDialog from '$lib/components/GifConfirmDialog.svelte';
-  import ImageUploadDialog from '$lib/components/ImageUploadDialog.svelte';
-  import ModalHost from '$lib/components/ModalHost.svelte';
-  import ToastHost from '$lib/components/ToastHost.svelte';
-  import type { RoomAlerts } from '$lib/room/alerts.svelte';
-  import type { RoomBroadcasts } from '$lib/room/broadcasts.svelte';
-  import type { RoomComposer } from '$lib/room/composer.svelte';
-  import type { RoomDialogs } from '$lib/room/dialogs.svelte';
-  import type { RoomEventStream } from '$lib/room/events.svelte';
-  import type { RoomFeeds } from '$lib/room/feeds.svelte';
-  import type { RoomMedia } from '$lib/room/media.svelte';
-  import type { RoomMediaTransport } from '$lib/room/media-transport.svelte';
-  import type { RoomMessageActions } from '$lib/room/message-actions.svelte';
-  import type { RoomModals } from '$lib/room/modals.svelte';
-  import type { RoomPolls } from '$lib/room/polls.svelte';
-  import type { RoomPrefs } from '$lib/room/prefs.svelte';
-  import type { RoomPrivateChat } from '$lib/room/private-chat.svelte';
-  import type { RoomRoster } from '$lib/room/roster.svelte';
-  import type { RoomSplit } from '$lib/room/split.svelte';
-  import type { RoomToasts } from '$lib/room/toasts.svelte';
+  import type { AlertFilterFor } from '#lib/alert-filter.js';
+  import type { ChatMode } from '#lib/chat-mode.js';
+  import BootboxDialog from '#lib/components/BootboxDialog.svelte';
+  import GifConfirmDialog from '#lib/components/GifConfirmDialog.svelte';
+  import ImageUploadDialog from '#lib/components/ImageUploadDialog.svelte';
+  import ModalHost from '#lib/components/ModalHost.svelte';
+  import ToastHost from '#lib/components/ToastHost.svelte';
+  import type { RoomAlerts } from '#lib/room/alerts.svelte.js';
+  import type { RoomBroadcasts } from '#lib/room/broadcasts.svelte.js';
+  import type { RoomComposer } from '#lib/room/composer.svelte.js';
+  import type { RoomDialogs } from '#lib/room/dialogs.svelte.js';
+  import type { RoomEventStream } from '#lib/room/events.svelte.js';
+  import type { RoomFeeds } from '#lib/room/feeds.svelte.js';
+  import type { RoomMedia } from '#lib/room/media.svelte.js';
+  import type { RoomMediaTransport } from '#lib/room/media-transport.svelte.js';
+  import type { RoomMessageActions } from '#lib/room/message-actions.svelte.js';
+  import type { RoomModals } from '#lib/room/modals.svelte.js';
+  import type { RoomPolls } from '#lib/room/polls.svelte.js';
+  import type { RoomPrefs } from '#lib/room/prefs.svelte.js';
+  import type { RoomPrivateChat } from '#lib/room/private-chat.svelte.js';
+  import type { RoomRoster } from '#lib/room/roster.svelte.js';
+  import type { RoomSplit } from '#lib/room/split.svelte.js';
+  import type { RoomToasts } from '#lib/room/toasts.svelte.js';
   import type {
     DayTradeAlertAction,
     RoomTradeAlerts,
     SwingAlertAction
-  } from '$lib/room/trade-alerts.svelte';
-  import type { RoomUserActions } from '$lib/room/user-actions.svelte';
+  } from '#lib/room/trade-alerts.svelte.js';
+  import type { RoomUserActions } from '#lib/room/user-actions.svelte.js';
   import type {
     DayTradeAlertRow,
     FollowChatStyle,
     ModalName,
     SwingAlertRow,
     Theme
-  } from '$lib/types';
+  } from '#lib/types.js';
 
   import type { PageData } from '../../routes/$types';
 
@@ -67,7 +67,7 @@
     **The unions are the children's own, never widened to `string`.** `ModalHost` takes a
     `ModalName`; a component that promised `string` to a child expecting a seven-member union would
     have moved the type error rather than removed it, and would have made this call site
-    uncheckable. `SessionControlTab` moved to `$lib/types.ts` for the same reason — a second
+    uncheckable. `SessionControlTab` moved to `#lib/types.ts` for the same reason — a second
     consumer arrived, and `RoomNavbar.svelte`'s note that "moving it would be a change to a file
     this extraction is trying to shrink" is now the opposite of true.
   */

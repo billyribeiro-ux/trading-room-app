@@ -1,7 +1,10 @@
 import { isHttpError } from '@sveltejs/kit';
 
-import { canShowRosterPrivateChat, resolveRosterPrivateChatStart } from '$lib/roster-private-chat';
-import type { SoundEffectName } from '$lib/sound-effects';
+import {
+  canShowRosterPrivateChat,
+  resolveRosterPrivateChatStart
+} from '#lib/roster-private-chat.js';
+import type { SoundEffectName } from '#lib/sound-effects.js';
 
 import type { RoomDialogs } from './dialogs.svelte';
 
@@ -99,7 +102,7 @@ export interface PrivateChatPrefs {
   ## What it does NOT own
 
   **The refusal rules.** `canShowRosterPrivateChat` and `resolveRosterPrivateChatStart` are
-  transcriptions in `$lib/roster-private-chat`, tested there against their truth tables. This class
+  transcriptions in `#lib/roster-private-chat.js`, tested there against their truth tables. This class
   calls them; it does not decide them, and the server re-checks every one.
 
   **Who is on the roster.** `selectRosterUser` is `RoomRoster`'s, injected, because the roster

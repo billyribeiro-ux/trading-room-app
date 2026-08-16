@@ -11,9 +11,9 @@ import {
   resolveSplitSizes,
   splitStorageKeys
 } from './split.svelte';
-import { DIRECT_EVIDENCE_CONTRACT } from '$lib/direct-evidence-contract';
-import { DUMP_CONTRACT } from '$lib/dump-contract';
-import { GUTTER_DOUBLE_CLICK_MS } from '$lib/split-gutter';
+import { DIRECT_EVIDENCE_CONTRACT } from '#lib/direct-evidence-contract.js';
+import { DUMP_CONTRACT } from '#lib/dump-contract.js';
+import { GUTTER_DOUBLE_CLICK_MS } from '#lib/split-gutter.js';
 
 /*
   `RoomSplit` is the third of the room state classes and the first whose output is checkable against

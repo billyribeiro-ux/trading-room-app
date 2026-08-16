@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, test } from 'vitest';
-import { db, ensureDatabase } from '$lib/server/db';
-import { sessions, users } from '$lib/server/db/schema';
+import { db, ensureDatabase } from '#lib/server/db/index.js';
+import { sessions, users } from '#lib/server/db/schema.js';
 import { resolveConnectedIdentity } from './connection';
 
 /**

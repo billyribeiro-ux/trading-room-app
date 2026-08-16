@@ -2,17 +2,17 @@ import { error } from '@sveltejs/kit';
 import { command, getRequestEvent } from '$app/server';
 import { and, eq, gt } from 'drizzle-orm';
 import { z } from 'zod';
-import { MAX_MESSAGE_BODY } from '$lib/message-bounds';
-import { isChatTab, type ChatTab } from '$lib/types';
-import { stripHtmlToText } from '$lib/chat-plain-text';
-import { isPresenterRole, requireRoomShortCode, requireUser } from '$lib/server/auth';
-import { capturedRoomItem } from '$lib/server/captured-room';
-import { isEmptyChatHtml, sanitizeChatHtml } from '$lib/server/chat-html';
-import { hashEmail } from '$lib/server/connection';
-import { db, ensureDatabase } from '$lib/server/db';
-import { chatMutes, messages, users } from '$lib/server/db/schema';
-import { consumeRateLimit } from '$lib/server/rate-limit';
-import { publishChatToRoom } from '$lib/server/room-events';
+import { MAX_MESSAGE_BODY } from '#lib/message-bounds.js';
+import { isChatTab, type ChatTab } from '#lib/types.js';
+import { stripHtmlToText } from '#lib/chat-plain-text.js';
+import { isPresenterRole, requireRoomShortCode, requireUser } from '#lib/server/auth.js';
+import { capturedRoomItem } from '#lib/server/captured-room.js';
+import { isEmptyChatHtml, sanitizeChatHtml } from '#lib/server/chat-html.js';
+import { hashEmail } from '#lib/server/connection.js';
+import { db, ensureDatabase } from '#lib/server/db/index.js';
+import { chatMutes, messages, users } from '#lib/server/db/schema.js';
+import { consumeRateLimit } from '#lib/server/rate-limit.js';
+import { publishChatToRoom } from '#lib/server/room-events.js';
 
 /*
   Posting to the room's chat: a new message, and a reply to one.
@@ -135,7 +135,7 @@ function announceChatMessage(
  * client that never learns this column exists. Two representations of one message, and the HTML one
  * is never the only copy.
  *
- * The derivation is `stripHtmlToText` from `$lib/chat-plain-text` — the same function the composer's
+ * The derivation is `stripHtmlToText` from `#lib/chat-plain-text` — the same function the composer's
  * optimistic copy uses. It was three lines written out here and three identical lines written out
  * there, with a docstring on the client one saying "the two must agree". Now they are one function,
  * so they cannot disagree. **That closes `TODO.md` row AF's first half**: two of the three copies of

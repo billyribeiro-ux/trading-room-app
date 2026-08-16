@@ -11,7 +11,7 @@ import { z } from 'zod';
  * The command names come from `docs/decoded/day-trade-alerts.md` §1.7, each re-read in the bundle
  * while writing this file. **Create is `dayTradeAlertMsg`** — `newDayTradeAlertMsg` is the
  * server→client push AND a field name inside the edit payload, and it is the create command
- * nowhere. `$lib/day-trade-alerts` carries the same names as `DAY_TRADE_ALERT_COMMANDS`, and
+ * nowhere. `#lib/day-trade-alerts` carries the same names as `DAY_TRADE_ALERT_COMMANDS`, and
  * `day-trade-alerts-contract.test.ts` pins them together.
  */
 

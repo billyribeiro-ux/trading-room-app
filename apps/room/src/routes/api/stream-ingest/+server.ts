@@ -20,13 +20,13 @@
  */
 
 import { json } from '@sveltejs/kit';
-import { requireRoomShortCode, requireUser } from '$lib/server/auth';
+import { requireRoomShortCode, requireUser } from '#lib/server/auth.js';
 import {
   RoomConfigUnavailable,
   StreamIngestForbidden,
   requestStreamIngestKey
-} from '$lib/server/room-config-client';
-import { recordStreamIngestName } from '$lib/server/stream-names';
+} from '#lib/server/room-config-client.js';
+import { recordStreamIngestName } from '#lib/server/stream-names.js';
 import type { RequestHandler } from './$types';
 
 export const POST: RequestHandler = async ({ locals }) => {

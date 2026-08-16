@@ -12,20 +12,20 @@
  * built to cache. `cache-control: no-store` says so explicitly as well.
  *
  * The signing key never appears in the response and never leaves the server: it is read only inside
- * `$lib/server/media-grant`, and SvelteKit refuses to bundle a `$lib/server` module into client
+ * `#lib/server/media-grant`, and SvelteKit refuses to bundle a `$lib/server` module into client
  * code. What the browser gets is the token, the room, its role and the expiry.
  */
 
 import { json } from '@sveltejs/kit';
-import { requireRoomShortCode, requireUser } from '$lib/server/auth';
+import { requireRoomShortCode, requireUser } from '#lib/server/auth.js';
 import {
   GrantConfigError,
   mediaIceServers,
   mediaSignallingUrl,
   mintGrant
-} from '$lib/server/media-grant';
-import { RoomConfigUnavailable, readRoomConfig } from '$lib/server/room-config-client';
-import { hasMediaElevation } from '$lib/server/media-elevation';
+} from '#lib/server/media-grant.js';
+import { RoomConfigUnavailable, readRoomConfig } from '#lib/server/room-config-client.js';
+import { hasMediaElevation } from '#lib/server/media-elevation.js';
 import type { RequestHandler } from './$types';
 
 export const POST: RequestHandler = async ({ locals, request }) => {

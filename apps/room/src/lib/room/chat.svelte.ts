@@ -1,4 +1,4 @@
-import type { ChatTab } from '$lib/types';
+import type { ChatTab } from '#lib/types.js';
 
 /*
   The room's two chat columns — which channel each shows, what is typed in each, which one the

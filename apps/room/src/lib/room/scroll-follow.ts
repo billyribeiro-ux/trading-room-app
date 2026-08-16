@@ -1,4 +1,4 @@
-import { shouldAutoScrollForMessage } from '$lib/room-scroller';
+import { shouldAutoScrollForMessage } from '#lib/room-scroller.js';
 
 /**
  * `RoomScrollFollow` — does this render pull the reader to the bottom, or leave them where they are?

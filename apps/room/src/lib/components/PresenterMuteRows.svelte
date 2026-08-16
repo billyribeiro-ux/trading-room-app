@@ -29,7 +29,7 @@
     presenterVolumeValue,
     type PresenterAudioPreferences,
     type TalkingPresenter
-  } from '$lib/screen-volume';
+  } from '#lib/screen-volume.js';
 
   type Props = {
     /** `mediaService.talkingUsers` — everyone with a microphone open right now. */

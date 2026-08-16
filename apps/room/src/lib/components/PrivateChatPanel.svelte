@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
-  import { panelDragResize } from '$lib/panel-drag';
+  import { panelDragResize } from '#lib/panel-drag.js';
 
   /*
     `app-privchat` — the room's private-message panel, as its own component.
@@ -44,7 +44,7 @@
   /**
    * One rendered row.
    *
-   * Declared structurally rather than imported from `$lib/server/private-chat`, so a client
+   * Declared structurally rather than imported from `#lib/server/private-chat.js`, so a client
    * component does not reach into a server-only module for a shape. The five fields are what the
    * markup reads: `_id` is the each block's key, `isA` styles the presenter's name, `n` is the
    * name, `t` the timestamp and `txt` the body.

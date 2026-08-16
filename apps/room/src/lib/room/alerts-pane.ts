@@ -1,6 +1,6 @@
 import { tick } from 'svelte';
 
-import type { AlertFilterFor } from '$lib/alert-filter';
+import type { AlertFilterFor } from '#lib/alert-filter.js';
 
 import type { RoomAlerts } from './alerts.svelte';
 import type { RoomDialogs } from './dialogs.svelte';

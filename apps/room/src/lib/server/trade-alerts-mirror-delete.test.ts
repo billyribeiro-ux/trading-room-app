@@ -1,9 +1,12 @@
 import { eq } from 'drizzle-orm';
 import { beforeAll, describe, expect, it } from 'vitest';
-import { db, ensureDatabase } from '$lib/server/db';
-import { alerts, users } from '$lib/server/db/schema';
-import { createSwingAlert, deleteSwingAlert } from '$lib/server/swing-alerts-repository';
-import { createDayTradeAlert, deleteDayTradeAlert } from '$lib/server/day-trade-alerts-repository';
+import { db, ensureDatabase } from '#lib/server/db/index.js';
+import { alerts, users } from '#lib/server/db/schema.js';
+import { createSwingAlert, deleteSwingAlert } from '#lib/server/swing-alerts-repository.js';
+import {
+  createDayTradeAlert,
+  deleteDayTradeAlert
+} from '#lib/server/day-trade-alerts-repository.js';
 
 /**
  * Deleting a trade alert must actually delete it.

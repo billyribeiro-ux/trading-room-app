@@ -1,5 +1,5 @@
 import { error, type Handle } from '@sveltejs/kit';
-import { resolveConnectedIdentity } from '$lib/server/connection';
+import { resolveConnectedIdentity } from '#lib/server/connection.js';
 
 /**
  * Routes reachable without a session. Everything else requires one.

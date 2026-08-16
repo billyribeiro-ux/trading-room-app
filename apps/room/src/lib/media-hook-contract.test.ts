@@ -22,7 +22,7 @@ vi.mock('$app/env/private', () => ({
 }));
 
 const published: Array<{ room: string; event: unknown }> = [];
-vi.mock('$lib/server/room-events', () => ({
+vi.mock('#lib/server/room-events.js', () => ({
   publishToRoom: (room: string, event: unknown) => {
     published.push({ room, event });
   }
@@ -92,7 +92,10 @@ describe('it refuses before it does anything', () => {
 
   it('refuses a bearer that is a PREFIX of the real one', async () => {
     // The length-equality branch of the constant-time compare, which must not accept a short guess.
-    const response = await call({ event: 'available', path: 'room__3625__dana' }, SECRET.slice(0, 5));
+    const response = await call(
+      { event: 'available', path: 'room__3625__dana' },
+      SECRET.slice(0, 5)
+    );
     expect(response.status).toBe(401);
     expect(published).toEqual([]);
   });

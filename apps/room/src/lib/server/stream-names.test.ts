@@ -1,8 +1,8 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { eq, inArray } from 'drizzle-orm';
-import { db, ensureDatabase } from '$lib/server/db';
-import { streamIngestNames, users } from '$lib/server/db/schema';
-import { mtxStreamFromPath, mtxStreamsFromPathList } from '$lib/mtx-reconcile';
+import { db, ensureDatabase } from '#lib/server/db/index.js';
+import { streamIngestNames, users } from '#lib/server/db/schema.js';
+import { mtxStreamFromPath, mtxStreamsFromPathList } from '#lib/mtx-reconcile.js';
 import { recordStreamIngestName, streamNamesForRoom } from './stream-names';
 
 /**
