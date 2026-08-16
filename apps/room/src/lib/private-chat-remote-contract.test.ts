@@ -188,8 +188,20 @@ describe('the capture’s own strings survive verbatim', () => {
   });
 
   it('shows the server’s wording on the client, with a fallback that is not invented', () => {
-    expect(pageCode).toContain(
-      "dialogs.alert = isHttpError(cause) ? cause.body.message : 'Message not sent.';"
+    /*
+      TWO senders raise this, and both are read: the private-chat panel's own, and the room
+      composer's. They are separate classes since slices 7 and 10 and neither may invent a fallback
+      where the server supplied wording.
+    */
+    expect(privateChatModule).toContain(
+      "this.#dialogs.alert = isHttpError(cause) ? cause.body.message : 'Message not sent.';"
+    );
+    const composerModule = readFileSync(
+      new URL('room/composer.svelte.ts', import.meta.url),
+      'utf8'
+    );
+    expect(composerModule).toContain(
+      "this.#dialogs.alert = isHttpError(cause) ? cause.body.message : 'Message not sent.';"
     );
   });
 });

@@ -74,10 +74,21 @@ describe('Post Alert forensic evidence', () => {
       post path is still in this file at all, because a guard on a region that has moved is not a
       guard.
     */
+    /*
+      RE-POINTED on 2026-08-16, exactly as the note above anticipated: the alert post path left the
+      page for `RoomComposer` in Phase 5 slice 10. The message that fired here is the reason this
+      re-point took one minute instead of an afternoon — a guard that says WHERE to look when its
+      region moves is worth the sentence it costs.
+    */
+    const composerModule = readFileSync(
+      new URL('room/composer.svelte.ts', import.meta.url),
+      'utf8'
+    );
     expect(
-      page,
-      'the alert post path has left the page - re-point this guard at its new owner'
-    ).toContain('async function persistPostedAlert(');
+      composerModule,
+      'the alert post path has moved again - re-point this guard at its new owner'
+    ).toContain('async #persistAlert(');
+    expect(composerModule).not.toContain("toasts.info('Alert");
     expect(page).not.toContain("toasts.info('Alert");
   });
 });

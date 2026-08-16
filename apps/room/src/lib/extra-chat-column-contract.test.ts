@@ -51,6 +51,12 @@ const stripComments = (source: string) =>
 */
 const chatClass = readFileSync(new URL('./room/chat.svelte.ts', import.meta.url), 'utf8');
 const splitCode = stripComments(SPLIT);
+/*
+  The composer left the page for `RoomComposer` in Phase 5 slice 10. Read as its own source, so an
+  assertion about the RTE gate cannot pass against a file that no longer holds it — and so the
+  NEGATIVES below still point at something that could hold the wrong version.
+*/
+const composerModule = readFileSync(new URL('room/composer.svelte.ts', import.meta.url), 'utf8');
 const pageCode = stripComments(PAGE);
 const prefsCode = stripComments(PREFS_SOURCE);
 const paneCode = stripComments(PANE);
@@ -145,9 +151,11 @@ describe('the component', () => {
     */
     expect(paneCode).toContain('{#if canUseRTE}');
     expect(paneCode).toContain('class="fas fa-font"');
-    expect(pageCode).toContain('function openExtraRTEModal() {');
+    expect(composerModule).toContain('openExtraRTE() {');
     // Take-and-clear in ONE call, so the draft cannot exist in the modal and behind it at once.
-    expect(pageCode).toContain('rteDraft = textToEditorHtml(chat.take(EXTRA_COMPOSER));');
+    expect(composerModule).toContain(
+      'this.#rteDraft = this.#textToEditorHtml(this.#chat.take(EXTRA_COMPOSER));'
+    );
     expect(chatClass).toContain('take(composer: ChatComposerId): string {');
     expect(chatClass).toContain('this.clear(composer);');
   });
@@ -189,12 +197,16 @@ describe('both columns share one pipeline, and that is the point', () => {
       `sendMessageBody` took the main tab from module scope until the extra column arrived. Left
       that way, a message typed in the off-topic column would have landed in main.
     */
-    expect(pageCode).toContain(
-      'async function sendMessageBody(body: string, bodyHtml?: string, room: ChatTab = chat.tab) {'
+    expect(composerModule).toContain(
+      'async sendBody(body: string, bodyHtml?: string, room: ChatTab = this.#chat.tab) {'
     );
     // `room` rides on the command's argument now, not on a hand-built `FormData`.
-    expect(pageCode).toContain('await sendMessageCommand({ body: trimmedBody, bodyHtml, room });');
-    expect(pageCode).toContain('if (await sendMessageBody(body, undefined, chat.extraTab))');
+    expect(composerModule).toContain(
+      'await this.#commands.send({ body: trimmedBody, bodyHtml, room });'
+    );
+    expect(composerModule).toContain(
+      'if (await this.sendBody(body, undefined, this.#chat.extraTab))'
+    );
   });
 });
 

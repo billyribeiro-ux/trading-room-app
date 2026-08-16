@@ -24,6 +24,162 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-16
 
+### 2026-08-16 11:52 EDT — Phase 5 slice 10: `RoomComposer`, five entry points and one refusal
+
+**`+page.svelte` 7,664 → 7,349.** Script 6,712 → 6,397, template unchanged at 952.
+Suite 2,173 → 2,197 across 149 files. `svelte-check` 1,165 files, 0 errors, 0 warnings.
+`eslint` at the pre-existing 27.
+
+**`src/lib/room/composer.svelte.ts` (553).** Twenty-five declarations and functions, 339 lines,
+spread from line 1,326 to line 5,215.
+
+**They funnel, and that is why they are one class.** Five entry points — plain composer, extra
+column, rich text, image upload, GIF — all end at `sendBody`, and the two alert paths share its
+uploader. Each used to carry its own `try`/`catch` and its own wording.
+
+**`editInRTE` is a receiver rather than three setters.** The draft, the editing flag and the edit
+target are one state: a draft with no target is a new message, a target with no draft is an editor
+showing nothing, and `sendRTE` branches on the target. A caller holding setters can produce
+either. The page wrote all three inline; now it hands over the item and the html.
+
+**`editMessage` is injected rather than moved.** Opening the editor on an EXISTING message is the
+message-action path's job, and injecting it is what leaves slice 8 free to move that later.
+
+**The upload server and key cross as VALUES**, so the class has no opinion about where
+configuration comes from and its two-backend fallback can be exercised by passing empty strings —
+which is what the test does, in both directions.
+
+**A guard that told us where to look.** `post-alert-contract.test.ts` carried the message *"the
+alert post path has left the page — re-point this guard at its new owner"*, written when the
+assertion was added. It fired on exactly the move it anticipated, and the re-point took a minute.
+A guard that says WHERE to look when its region moves is worth the sentence it costs.
+
+**Fourteen assertions re-pointed across five contract files** — the RTE gate, the extra column,
+post-alert, private chat. The private-chat one now reads BOTH senders: two classes raise the same
+refusal wording since slices 7 and 10, and neither may invent a fallback where the server supplied
+one.
+
+**The generator is now reusable.** Four slices had each rebuilt the same transform by hand and
+each had reintroduced at least one trap the previous one already paid for. It takes a config now,
+and every trap in §4 of `PHASE-5-DECOMPOSITION.md` is handled in one place.
+
+**Six negative controls, all seen red**: the rune off `#sendingGif`; the composer cleared whatever
+the send answered; the room’s `enableRTE` dropped from the gate; rich text sent without the
+emptiness rule; a message posted after a failed upload; a second GIF pick replacing the first.
+
+### 2026-08-16 13:29 EDT — the six login evidence gaps closed: MD5, the site key, the upload endpoint, the gear padding, both password wire calls
+
+**No runtime impact.** `todo-next.md` only, +195 lines (7,158 -> 7,353). Documentation phase.
+
+**Sec 17.10 named six gaps; five are now closed by reading and one is proven unreachable.**
+
+- **`--avatar-gear-icon-padding` = `5px 5.5px`**, from `styles.ee2a710065b60389.css` byte 422,481 --
+  the stylesheet PAIRED with the bundle being decoded, not the differently-hashed `new-room` sibling.
+  The same `:root` block gives the four colour variables the login CSS consumes (`--dark-black:#222`,
+  `--light-gray:#ccc`, `--lighter-gray:#eee`, `--white:#fff`). The padding is asymmetric; guessing
+  `5px` would have rendered the gear as an oval.
+- **`hashEmail` is MD5**, identified from the K-table constants (`-680876936`, `606105819`,
+  `-1044525330`, ...) and the `7,12,17,22` shift schedule, not from the function name and not from
+  what Gravatar happens to want. `avt = MD5(email.trim().toLocaleLowerCase())`, lowercase hex.
+  **`toLocaleLowerCase`, not `toLowerCase`** -- under a Turkish locale `I` lowercases to dotless
+  `i`, changing the hash, and `avt` is the identity compared by `canDeleteOwnMessage`, so the same
+  account in a different locale loses the ability to delete its own messages. Ours uses
+  `toLowerCase()`; recorded as an intentional divergence with the reason.
+- **The reCAPTCHA site key** comes from DI, not the template: the root module provides
+  `{provide: ZN, useValue: {siteKey: ...}}` and the component reads it through an `@Optional()`
+  injection. Recorded in full -- it is the PUBLIC half of the pair, served to every visitor in the
+  page HTML; the secret key is server-side and is not in this bundle.
+- **The upload endpoint**: `POST https://cdn1.protradingroom.com/image/{sessionID}` with
+  `Authorization: Client-ID {cdn_upload_key}`. **The key itself is a live bearer credential and was
+  NOT transcribed** -- `todo-next.md` records its byte offset instead, to be read at build time and
+  put in `apps/controller/.env`.
+- **Both password wire calls**, with a new reference defect: `doRoomForgotPassword`'s catch emits a
+  `message` key while its own fallback and both `doRoomChangePassword` paths emit `msg`, which is
+  what the template reads. On a network failure the bus fires twice and the user sees `undefined`
+  before the real text. The asymmetry with `doRoomChangePassword` is what proves it a typo.
+- **`supported_browsers.jpeg`** searched by filename across all three trees and found in none --
+  but `new-room-control/static/public/images/` exists and holds four other assets, so const 25's
+  path is live on the reference host and only the binary was never captured. **This is the one gap
+  reading cannot close**; the owner supplies the file or accepts a broken image.
+
+**Also read, unprompted:** `doSessionLogin` -- `POST {apiROOT}/sessions/v2/authUser/{sessionID}`,
+and the session token stored in `localStorage` under `ag-{sessionID}`, readable by any script on the
+origin. Ours is an httpOnly cookie; divergence kept, reason recorded. And `globals.appVersion` is
+`"v4.0.1"`, which closes the footer version line.
+
+**Login-component evidence gaps: 0.** Six reference defects flagged as owner decisions, 18
+divergences and 11 unbuilt-but-documented items carried into the build phase. The wider unread queue
+(`account-page`, the 37 `.less` sources, `styes.css` 2,657-11,347, Q-1 and the rest) is explicitly
+NOT closed and is listed as such in Sec 17.12.
+
+**One mistake of mine, disclosed because the directory is governed.** A `cat >>` ran with the shell
+still `cd`'d into `apps/room/docs/source-v4-2026-08-15/`, creating a stray untracked `todo-next.md`
+inside the SHA-256-pinned evidence directory. Caught immediately by the line count, content moved to
+the real file, stray removed. `shasum -a 256 -c sha256sums.txt` re-run: `deployed-index.html`,
+`main.d1d09071be31f1ba.js`, `styles.ee2a710065b60389.css` all **OK**, directory back to its five
+files. No pinned byte changed.
+
+**Verification.** `shasum -a 256 -c sha256sums.txt` in the evidence directory (3/3 OK). No source
+file changed, so no suite was run. The uncommitted `session/` edits from 11:14-12:42 remain
+untouched and still await the owner's keep-or-revert decision.
+
+
+### 2026-08-16 13:20 EDT — `app-session-login` read end to end: 120 consts, 59 view functions, the complete stylesheet, and an audit of ours against it
+
+**No runtime impact.** `todo-next.md` only, +528 lines (6,630 -> 7,158). Documentation phase: the
+owner's directive of 2026-08-16 is that nothing is built until the documentation leaves no room for
+interpretation, so no source file was touched.
+
+**What was read.** `apps/room/docs/source-v4-2026-08-15/main.d1d09071be31f1ba.js`, bytes
+1,168,000-1,218,000, in five contiguous windows, line by line. The window opens BEFORE the first
+view function and closes AFTER the component's `return t})()`, so the component is bracketed by
+verified boundaries on both sides. This is the direct answer to the failure recorded in Sec 16.19 --
+two claims of "absent from the reference" that were really "absent from my slice".
+
+**Sec 17 in `todo-next.md`** now records, all verbatim: the const table 0-119; both render trees with
+every show/hide condition; the complete component stylesheet de-minified; twelve measured
+differences between the two layout arms; five reference handlers; the three login-failure paths.
+
+**The findings that change what gets built:**
+
+- **Five controls are DEAD in the reference**, proven from the complete const table rather than
+  inferred: both avatar modals (nothing carries `data-bs-toggle`, their inputs have no binding and
+  their Save buttons no click handler), the "Non Presenter Admin" checkbox, "Not you? log out"
+  (`href="#"`, no handler), and the always-empty error `div`. An implementer working from a
+  screenshot would build all of them.
+- **Sec 16.18 and Sec 16.19 are both retired.** The two modals are symmetrical, correctly attributed
+  AND unreachable, so the accessibility question was moot from the start.
+- **Const 6 resolved.** Used at exactly one site -- the browser-upgrade notice, not the login form.
+  Sec 16.19 recorded it verbatim and refused to interpret it; that restraint was correct.
+- **Const 100 is a typo in the reference**: `[1,"input-group","mb-","3"]` renders
+  `class="input-group mb- 3"`, so the password field has no bottom margin. Const 46 beside it is the
+  correct `mb-3`. An owner decision, flagged as such.
+- **The submit's inner `<span>` carries its own click handler** while the form carries a submit
+  handler, both calling `doLoginCheck()` -- clicking the word "Login" fires it twice.
+- **A banned IP gets no message at all**: `doLoginCheck` opens with a `banIPList` test that returns
+  `false` silently.
+
+**Audit of ours.** `session/+page.svelte` and `+page.server.ts` read in full and measured against the
+above: **18 divergences and 11 gaps**, each with its locator. The headline ones are the remember-me
+label (the reference says "Remember me" in the two-column arm, "Keep me logged in" only in the
+centred one), the password field's two missing `authMode` terms, and `hideWelcomeTo` -- a sessData
+flag we do not carry, which is what actually gates the h1.
+
+**A false comment in our own source is recorded rather than quietly fixed.**
+`session/+page.svelte:545-548` claims the `<style>` block carries every rule our markup uses and
+drops only rules for markup we do not render. Six rules falsify it, including
+`p.authenticate-info{padding:15px 0}` and both `.session-login-link` rules, all of which target
+selectors this page renders.
+
+**Six new evidence gaps opened**, each naming where it was looked for and what it blocks:
+`--avatar-gear-icon-padding`, the `re-captcha` site key, `globals.upload_server` /
+`cdn_upload_key`, `appService.hashEmail`, and the two forgot/change-password wire calls.
+
+**Verification.** None run, and none applicable: no source file changed. The uncommitted edits in
+`session/+page.svelte`, `+page.server.ts`, `room-config-client.ts` and `session-login-contract.test.ts`
+from 2026-08-16 11:14-12:42 are untouched and still awaiting the owner's keep-or-revert decision.
+
+
 ### 2026-08-16 11:35 EDT — Phase 5 slice 13: `RoomUserActions`, and the largest function in the file
 
 **`+page.svelte` 8,132 → 7,664.** Script 7,180 → 6,712, template unchanged at 952.

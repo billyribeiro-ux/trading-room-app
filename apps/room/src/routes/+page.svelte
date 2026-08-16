@@ -13,7 +13,6 @@
     mergeOlderChatMessages,
     shouldLoadOlderMessages
   } from '$lib/chat-paging';
-  import { stripHtmlToText } from '$lib/chat-plain-text';
   import { toggleReaction } from '$lib/reaction-toggle';
   import { RoomMenus } from '$lib/room/menus.svelte';
   import { RoomPolls } from '$lib/room/polls.svelte';
@@ -105,6 +104,7 @@
     type PrivateChatMessage,
     RoomPrivateChat
   } from '$lib/room/private-chat.svelte';
+  import { RoomComposer } from '$lib/room/composer.svelte';
   import { RoomUserActions } from '$lib/room/user-actions.svelte';
   import {
     DAY_TRADE_ALERT_FEED,
@@ -158,13 +158,6 @@
   import ToastHost from '$lib/components/ToastHost.svelte';
   import { resolveAlertDelivery } from '$lib/alert-delivery';
   import { DUMP_CONTRACT } from '$lib/dump-contract';
-  import {
-    composePastedImageAlert,
-    composeUploadedAlert,
-    postOnXIntent,
-    type PastedImageSubmission,
-    type PostAlertSubmission
-  } from '$lib/post-alert-behavior';
   // `shouldAutoScrollForMessage` is no longer imported here: `RoomScrollFollow` calls it, which is
   // where the rule about the alerts column not taking the override now lives with it.
   import { isRoomScrollerReadingHistory, scrollRoomScrollerToBottom } from '$lib/room-scroller';
@@ -1223,7 +1216,7 @@
     feed: SWING_ALERT_FEED,
     seed: data.swingAlerts,
     enabled: () => swingAlertsTabVisible(data.sessData ?? {}),
-    uploadImages: (files) => uploadAlertFiles(files)
+    uploadImages: (files) => composer.uploadAlertFiles(files)
   });
   // The same one-time seed, for the same reason.
   // svelte-ignore state_referenced_locally
@@ -1232,7 +1225,7 @@
     feed: DAY_TRADE_ALERT_FEED,
     seed: data.dayTradeAlerts,
     enabled: () => dayTradeAlertsTabVisible(data.sessData ?? {}),
-    uploadImages: (files) => uploadAlertFiles(files)
+    uploadImages: (files) => composer.uploadAlertFiles(files)
   });
   /*
     The private-chat panel, in `$lib/room/private-chat.svelte.ts`.
@@ -1301,6 +1294,40 @@
     `alerts-background-contract.test.ts` pins it against THIS file by name because it is about a
     captured colour rather than about this class.
   */
+  /*
+    Everything that LEAVES this browser as content, in `$lib/room/composer.svelte.ts`.
+
+    Phase 5 slice 10. Five entry points — plain composer, extra column, rich text, image upload,
+    GIF — that all funnel into one `sendBody`, plus the two alert paths that share its uploader.
+    They were spread from line 1,326 to line 5,215 and every one of them had its own refusal
+    handling.
+
+    `editMessage` is injected rather than moved: opening the editor on an EXISTING message is the
+    message-action path's job, and injecting it is what leaves slice 8 free to move that later.
+
+    The upload server and key cross as values rather than being imported inside, so the class has no
+    opinion about where configuration comes from and its fallback can be exercised by passing empty
+    strings.
+  */
+  const composer = new RoomComposer({
+    dialogs,
+    chat,
+    commands: {
+      send: (payload) => sendMessageCommand(payload),
+      uploadImage: (payload) => uploadComposerImage(payload),
+      postAlert: (payload) => postAlertCommand(payload)
+    },
+    session: () => data,
+    prefs,
+    isPresenter: () => isPresenter,
+    openModal: (name) => openModal(name),
+    closeModal: () => (modal = null),
+    closeMenu: (name, open) => menus.set(name, open),
+    editMessage: (kind, item, body, bodyHtml) => editMessage(kind, item, body, bodyHtml),
+    onSent: () => invalidateAll(),
+    uploadServer: PUBLIC_PTR_UPLOAD_SERVER ?? '',
+    uploadKey: PUBLIC_PTR_CDN_UPLOAD_KEY ?? ''
+  });
   const userActions = new RoomUserActions<(typeof data.connectedUsers)[number]>({
     dialogs,
     toasts,
@@ -1323,7 +1350,6 @@
     defaultFollowStyle: () => defaultFollowChatStyle(),
     reload: () => invalidateAll()
   });
-  let tweetWindow: Window | null = null;
   /**
    * `app-privchat`'s state, in the capture's own shapes.
    *
@@ -1338,8 +1364,6 @@
 
   let previewWindowsVisible = $state(true);
   let showMessageOptions = $state(false);
-  let sendingGif = $state(false);
-  let pendingGifUrl = $state<string | null>(null);
   
   
   
@@ -1879,7 +1903,6 @@
       data.sessData?.userToPresenterPM === true) &&
       !(data.user.isFT === true && data.sessData?.disablePMForTrials === true)
   );
-  const canUseRTE = $derived(data.sessData?.enableRTE === true && prefs.enableRTE && isPresenter);
   /**
    * The room's chat mode — `g` group, `p` webinar, `d` disabled.
    *
@@ -3978,11 +4001,8 @@
         plain prompt and sees the characters they typed, rather than an editor that treats their
         sentence as tags. Same rule the renderer follows, for the same reason.
       */
-      if (kind === 'chat' && canUseRTE && item.bodyHtml) {
-        rteIsEditing = true;
-        rteEditTarget = item;
-        rteDraft = item.bodyHtml;
-        openModal('rich-text');
+      if (kind === 'chat' && composer.canUseRTE && item.bodyHtml) {
+        composer.editInRTE(item, item.bodyHtml);
         return;
       }
       dialogs.prompt = {
@@ -4812,144 +4832,15 @@
 
 
 
-  async function sendComposerMessage() {
-    const body = chat.composer.trim();
-    if (!body) return;
 
-    if (await sendMessageBody(body)) chat.clear('textAreaTxt');
-  }
-
-  /**
-   * @param bodyHtml Rich text from the editor, when the message was written with it.
-   *
-   * Sent as a SEPARATE field rather than folded into `body`, because which kind of message this is
-   * has to be a fact the row carries — see `chat-rich-text-contract.test.ts`. The server sanitises
-   * it and derives its own `body` from the result, so what arrives here as plain text is the
-   * optimistic copy and never the stored one.
-   */
-  async function sendMessageBody(body: string, bodyHtml?: string, room: ChatTab = chat.tab) {
-    const trimmedBody = body.trim();
-    if (!trimmedBody) return false;
-
-    try {
-      await sendMessageCommand({ body: trimmedBody, bodyHtml, room });
-    } catch (cause) {
-      dialogs.alert = isHttpError(cause) ? cause.body.message : 'Message not sent.';
-      return false;
-    }
-    await invalidateAll();
-    return true;
-  }
 
   /* ── The chat rich text editor ────────────────────────────────────────────────────────────────
      The editor lives in `ModalHost`; its session lives here, because the composer hands work to it
      and the send hands work back to the same code path an ordinary message uses. */
 
-  /** The message being composed in the editor, as HTML. */
-  let rteDraft = $state('');
-  /** `Save` rather than `Send`, and an edit rather than a post. */
-  let rteIsEditing = $state(false);
-  /**
-   * The message being edited, when editing. Null for a new message.
-   *
-   * `$state.raw`, not `$state`: this is a message row that is only ever REPLACED, never mutated
-   * field by field, so a deep proxy over it would cost a proxy read on every property access and
-   * buy nothing. Reassignment still triggers, which is the only reactivity this needs.
-   */
-  let rteEditTarget = $state.raw<MessageActionItem | null>(null);
 
-  /**
-   * Text typed in the plain composer, as HTML for the editor.
-   *
-   * The reference hands its composer's value straight to `summernote('code', …)`, which parses it
-   * as markup. Ours escapes it, and that is not a deviation from the feature: `#textAreaTxt` is a
-   * `<textarea>`, so its value is TEXT, and rendering text as markup is a category error whoever
-   * typed it. Somebody who types a less-than and switches to the editor should see the character
-   * they typed, exactly as `chat-rich-text-contract` requires of the renderer.
-   *
-   * The escaping is the platform's — assign to `textContent`, read back `innerHTML` — rather than a
-   * hand-rolled replace over three characters that always turns out to be four.
-   */
-  function textToEditorHtml(text: string) {
-    const holder = document.createElement('div');
-    holder.textContent = text;
-    return holder.innerHTML;
-  }
 
-  /**
-   * `openRTEModal()` — the composer's `fa-font` button.
-   *
-   * ```js
-   * openRTEModal() {
-   *   this.appService.guiEventBus.emit("doRTEModal", {
-   *     channel: this.channel, txt: $("#textAreaTxt")?.val()?.toString()?.trim() || "" });
-   *   $("#textAreaTxt")?.val("");
-   * }
-   * ```
-   *
-   * Both halves are load-bearing: the composer's text comes WITH you into the editor, and the
-   * composer is left empty so the same words cannot be sent twice from two places.
-   */
-  function openRTEModal() {
-    menus.set('emoji', false);
-    menus.set('giphy', false);
-    rteIsEditing = false;
-    rteEditTarget = null;
-    // One step, so a half-written message cannot exist in the modal AND behind it — which is a
-    // message sent twice.
-    rteDraft = textToEditorHtml(chat.take('textAreaTxt'));
-    openModal('rich-text');
-  }
 
-  /**
-   * The editor's Send / Save.
-   *
-   * ```js
-   * sendMessage() {
-   *   let e = this.retriveRTEContent();
-   *   if (!e || "" === e.trim()) return P("Empty message. Please type a message..."), !1;
-   *   this.isEditing ? (sendServerCommand("editChatMessage", {msgID: this.msg._id, newMsg: e}), …)
-   *                  : (sendGrpChat(this.channel, e),
-   *                     guiEventBus.emit("scrollChatLogToBottom", {force:!0, repeat:!1}));
-   *   this.destroyRTE(); $("#rteModal").modal("hide");
-   * }
-   * ```
-   *
-   * `retriveRTEContent()` is the gate asked a second time, and it is reproduced rather than
-   * skipped: with the gate shut it returns an empty string, so this refuses in the same words.
-   *
-   * THE EMPTINESS TEST IS THE SERVER'S, not the reference's. Upstream compares against four
-   * literal strings, so `<b></b>` — formatting with nothing in it, which is what you get by
-   * pressing Bold and then Send — passes, and is then refused by the server with a 400 the modal
-   * has nowhere to show. Asking the same question `isEmptyChatHtml` asks (tags stripped, `&nbsp;`
-   * treated as the space it looks like) means the person is TOLD, in the reference's own words,
-   * rather than left in front of a button that appears to do nothing.
-   */
-  async function sendRTEMessage() {
-    const html = canUseRTE ? rteDraft.trim() : '';
-    const text = stripHtmlToText(html);
-    if (!text) {
-      dialogs.alert = 'Empty message. Please type a message...';
-      return;
-    }
-    const target = rteEditTarget;
-    const succeeded = target
-      ? await editMessage('chat', target, text, html)
-      : await sendMessageBody(text, html);
-    if (!succeeded) return;
-    rteDraft = '';
-    rteIsEditing = false;
-    rteEditTarget = null;
-    modal = null;
-    /*
-      NOT scrolled here, and the omission is the point. The reference follows its send with
-      `scrollChatLogToBottom {force:!0}`; this room reaches the same place through the autoscroll
-      effect above, whose `shouldAutoScrollForMessage` returns true when
-      `senderId === connectedUserId` — your own message always wins, whatever you were reading.
-      Adding a second scroll would be a duplicate writer of somebody else's scroll position, which
-      is how the alerts scroller went wrong once already.
-    */
-  }
 
   /**
    * `sendServerAdminCommand('changeChatMode', {mode})` — presenter-only, and re-checked there.
@@ -4968,12 +4859,6 @@
     await invalidateAll();
   }
 
-  /** The extra column's composer, sending into the channel that column is showing. */
-  async function sendExtraComposerMessage() {
-    const body = chat.extraComposer.trim();
-    if (!body) return;
-    if (await sendMessageBody(body, undefined, chat.extraTab)) chat.clear(EXTRA_COMPOSER);
-  }
 
   /**
    * The extra column's scroll handler.
@@ -5001,217 +4886,17 @@
     void loadOlderChatMessages(chat.extraTab, scroller);
   }
 
-  /**
-   * The extra column's rich-text button — `openRTEModal()` on `app-extra-chat`, which reads
-   * `#textAreaTxtExtra` rather than `#textAreaTxt` and clears that one.
-   */
-  function openExtraRTEModal() {
-    rteIsEditing = false;
-    rteEditTarget = null;
-    rteDraft = textToEditorHtml(chat.take(EXTRA_COMPOSER));
-    openModal('rich-text');
-  }
 
-  function openImageUpload() {
-    menus.set('emoji', false);
-    menus.set('giphy', false);
-    openModal('image-upload');
-  }
 
-  /**
-   * Upload one image and return the URL to put in the message body.
-   *
-   * The capture posts to an external CDN, `Client-ID`-authenticated, and reads `data.link` back:
-   *
-   * ```js
-   * fetch(`${uploadServer}/image/${sessionHandle}`, { method:'POST',
-   *   headers:{ Authorization:`Client-ID ${uploadKey}` }, body: form })  // -> { data: { link } }
-   * ```
-   *
-   * `PUBLIC_PTR_UPLOAD_SERVER` and `PUBLIC_PTR_CDN_UPLOAD_KEY` are both empty here - we do not have
-   * that service - and the code threw "Missing captured upload configuration.", which is where
-   * posting an alert with an image died. Rather than fail, it falls back to the room's OWN upload,
-   * which stores the bytes and hands back a real `/uploads/<uuid>` URL. Same contract: a URL that
-   * resolves to the image the user picked.
-   *
-   * The captured path is kept and still wins when the environment provides it.
-   */
-  async function uploadOneImage(file: File): Promise<string> {
-    const uploadServer = PUBLIC_PTR_UPLOAD_SERVER ?? '';
-    const uploadKey = PUBLIC_PTR_CDN_UPLOAD_KEY ?? '';
 
-    if (uploadServer && uploadKey) {
-      const upload = new FormData();
-      upload.append('image', file);
-      upload.append('name', file.name);
-      const response = await fetch(`${uploadServer}/image/${data.sessionHandle}`, {
-        method: 'POST',
-        headers: { Authorization: `Client-ID ${uploadKey}` },
-        body: upload
-      });
-      if (!response.ok) throw new Error(`Image upload failed with ${response.status}.`);
-      const payload = (await response.json()) as { data?: { link?: string } };
-      const link = payload.data?.link;
-      if (!link) throw new Error('Image upload response did not include data.link.');
-      return link;
-    }
 
-    /*
-      `composer-image.remote.ts`, NOT the Files pane's `uploadFile` — that one is presenter-only and
-      refused every member while their own upload button sat there enabled. The `File` goes as
-      itself; that module cites the two functions in Kit that reduce and revive it.
 
-      Re-thrown, not caught: `uploadComposerImages` already turns a failure into the dialog, so
-      swallowing here would post a message with an image that never uploaded.
-    */
-    try {
-      return await uploadComposerImage({ file, originalName: file.name });
-    } catch (cause) {
-      // `{ cause }` because the rejection is the only record of WHY — an `HttpError` re-thrown as a
-      // bare `Error` keeps the sentence and loses the status the server actually answered with.
-      throw new Error(isHttpError(cause) ? cause.body.message : 'Upload failed.', { cause });
-    }
-  }
 
-  async function uploadComposerImages(files: File[], message: string) {
-    modal = null;
-    if (files.length === 0) return;
 
-    const uploadedUrls: string[] = [];
-    try {
-      for (const [index, file] of files.entries()) {
-        dialogs.alert = `Uploading ${index}/${files.length}: ${file.name}. Please wait...`;
-        uploadedUrls.push(await uploadOneImage(file));
-      }
 
-      const body = `${uploadedUrls.join(' ')}${message ? ` ${message}` : ''}`;
-      dialogs.alert = null;
-      await sendMessageBody(body);
-    } catch (error) {
-      console.error(error);
-      dialogs.alert = 'Upload Failed...';
-    }
-  }
 
-  async function uploadAlertFiles(files: readonly File[]) {
-    const uploadedUrls: string[] = [];
-    for (const file of files) uploadedUrls.push(await uploadOneImage(file));
-    return uploadedUrls;
-  }
 
-  function postAlertOnX(body: string) {
-    if (!body) return;
-    const intent = postOnXIntent(body);
-    if (tweetWindow && !tweetWindow.closed) {
-      tweetWindow.focus();
-      tweetWindow.location.href = intent;
-      return;
-    }
-    tweetWindow = window.open(
-      intent,
-      'TweetWindow',
-      'width=800,height=800,scrollbars=yes,resizable=yes'
-    );
-  }
 
-  async function persistPostedAlert(
-    kind: AlertTab,
-    body: string,
-    targetUrl: string | null,
-    nonTradeAlert: boolean,
-    dontPush: boolean
-  ) {
-    // `dontPush` is NOT sent: the action received it and never read it, and `post-alert.remote.ts`
-    // refuses it rather than accept a field nothing consumes. The parameter stays; the caller
-    // computes it, and the push suppression it names has no consumer in this room yet.
-    void dontPush;
-    try {
-      await postAlertCommand({ kind, body, targetUrl, nonTradeAlert });
-    } catch (cause) {
-      dialogs.alert = isHttpError(cause) ? cause.body.message : 'Alert not posted.';
-      return false;
-    }
-    await invalidateAll();
-    return true;
-  }
-
-  async function postAlert(submission: PostAlertSubmission) {
-    let body: string;
-    let targetUrl: string | null;
-
-    if (submission.composition.status === 'upload') {
-      try {
-        const uploadedUrls = await uploadAlertFiles(submission.files);
-        body = composeUploadedAlert(
-          submission.composition.bodyBeforeUploads,
-          uploadedUrls,
-          submission.legalDisclosure,
-          submission.legalDisclosureText
-        );
-        targetUrl = uploadedUrls[0] ?? null;
-      } catch (error) {
-        console.error(error);
-        dialogs.alert = 'Upload Failed...';
-        return false;
-      }
-    } else {
-      body = submission.composition.body;
-      targetUrl = null;
-    }
-
-    if (submission.postOnX) postAlertOnX(body);
-    return persistPostedAlert(
-      submission.composition.kind,
-      body,
-      targetUrl,
-      submission.nonTradeAlert,
-      submission.dontPush
-    );
-  }
-
-  async function postPastedAlertImage(submission: PastedImageSubmission) {
-    try {
-      const [uploadedUrl] = await uploadAlertFiles([submission.file]);
-      if (!uploadedUrl) throw new Error('Image upload response did not include data.link.');
-      const body = composePastedImageAlert(
-        submission.alertText,
-        uploadedUrl,
-        submission.legalDisclosure,
-        submission.legalDisclosureText
-      );
-      if (submission.postOnX) postAlertOnX(body);
-      return persistPostedAlert(
-        'media',
-        body,
-        uploadedUrl,
-        submission.nonTradeAlert,
-        submission.dontPush
-      );
-    } catch (error) {
-      console.error(error);
-      dialogs.alert = 'Upload Failed...';
-      return false;
-    }
-  }
-
-  function selectGif(_title: string, url: string) {
-    if (sendingGif) return;
-    menus.set('giphy', false);
-    sendingGif = true;
-    pendingGifUrl = url;
-  }
-
-  function cancelGif() {
-    pendingGifUrl = null;
-    sendingGif = false;
-  }
-
-  async function confirmGif() {
-    const url = pendingGifUrl;
-    pendingGifUrl = null;
-    if (url) await sendMessageBody(url);
-    sendingGif = false;
-  }
 
   
 
@@ -7069,7 +6754,7 @@
               {chatEnabled}
               {selfMutedUntil}
               {canPostImages}
-              {canUseRTE}
+              canUseRTE={composer.canUseRTE}
               {giphyApiKey}
               bind:showMessageOptions
               {visibleAlerts}
@@ -7094,10 +6779,10 @@
               onmessageaction={handleMessageAction}
               onprivatechat={() => privateChat.show()}
               onexpandcomposer={autoExpandComposer}
-              onsend={sendComposerMessage}
-              onimageupload={openImageUpload}
-              onrte={openRTEModal}
-              onselectgif={selectGif}
+              onsend={() => composer.send()}
+              onimageupload={() => composer.openImageUpload()}
+              onrte={() => composer.openRTE()}
+              onselectgif={(title, url) => composer.selectGif(title, url)}
               onbeginsplit={beginSplit}
             />
           {/snippet}
@@ -7171,7 +6856,7 @@
               {mountNewNoteLink}
               {submitNoteMutation}
               {loadNoteVersions}
-              {uploadAlertFiles}
+              uploadAlertFiles={(files) => composer.uploadAlertFiles(files)}
               {swingAlerts}
               {dayTradeAlerts}
               hideVideoPlayer={broadcasts.hideVideoPlayer}
@@ -7218,7 +6903,7 @@
                 {selfMutedUntil}
                 {showPmButton}
                 {canPostImages}
-                {canUseRTE}
+                canUseRTE={composer.canUseRTE}
                 {giphyApiKey}
                 chrome={messageChrome}
                 followedUsers={userActions.followedUsers}
@@ -7227,15 +6912,15 @@
                 onaction={(action, message, event) =>
                   handleMessageAction('chat', action, message, event, true)}
                 onfocus={() => chat.focused(EXTRA_COMPOSER)}
-                onsend={() => void sendExtraComposerMessage()}
+                onsend={() => void composer.sendExtra()}
                 onscroll={(scroller) => trackExtraChatScroll(scroller)}
                 onscrollerready={(scroller) => (extraChatScroller = scroller)}
                 onprivatechat={() => privateChat.show()}
                 onsearch={() => openModal('chat-logs')}
                 onsettings={() => openModal('settings')}
-                onimageupload={openImageUpload}
-                onrte={openExtraRTEModal}
-                onselectgif={(url) => selectGif('', url)}
+                onimageupload={() => composer.openImageUpload()}
+                onrte={() => composer.openExtraRTE()}
+                onselectgif={(url) => composer.selectGif('', url)}
               />
             </as-split-area>
           {/snippet}
@@ -7349,11 +7034,11 @@
       alerts={searchableAlerts}
       {chatMode}
       onChatModeChange={(mode) => void changeChatMode(mode)}
-      {canUseRTE}
-      {rteDraft}
-      {rteIsEditing}
-      onRteDraftChange={(html) => (rteDraft = html)}
-      onRteSend={() => void sendRTEMessage()}
+      canUseRTE={composer.canUseRTE}
+      rteDraft={composer.rteDraft}
+      rteIsEditing={composer.rteIsEditing}
+      onRteDraftChange={(html) => (composer.rteDraft = html)}
+      onRteSend={() => void composer.sendRTE()}
       {settingsTab}
       {alertTab}
       {theme}
@@ -7380,8 +7065,8 @@
       onSaveDataChange={setSaveData}
       onDoNotDisturbChange={(enabled) => (prefs.doNotDisturbOn = enabled)}
       onPlayYoutube={(url) => void broadcasts.playYoutubeForAll(url)}
-      onPostAlert={postAlert}
-      onPastePostAlert={postPastedAlertImage}
+      onPostAlert={(submission) => composer.postAlert(submission)}
+      onPastePostAlert={(submission) => composer.postPastedImage(submission)}
       onPollMinimize={minimizePoll}
       onPollSave={(question, choices) =>
         submitPollAction('savePoll', { q: question, choices: JSON.stringify(choices) })}
@@ -7389,7 +7074,7 @@
       onPollSend={(question, choices) =>
         submitPollAction('sendPoll', { q: question, choices: JSON.stringify(choices) })}
       onPollAnswer={(choiceIndex) => submitPollAction('sendPollAnswer', { a: choiceIndex })}
-      onPollPostResults={(body) => persistPostedAlert('text', body, null, false, false)}
+      onPollPostResults={(body) => composer.postPollResults(body)}
       onPollEnd={() => submitPollAction('pollDone')}
       onAlert={(message) => (dialogs.alert = message)}
       onConfirm={(message, onconfirm) => dialogs.confirm(message, onconfirm)}
@@ -7417,7 +7102,7 @@
     {#if modal === 'image-upload'}
       <ImageUploadDialog
         onclose={() => (modal = null)}
-        onupload={(files, message) => void uploadComposerImages(files, message)}
+        onupload={(files, message) => void composer.uploadImages(files, message)}
       />
     {/if}
     <!--
@@ -7483,11 +7168,11 @@
         </div>
       </BootboxDialog>
     {/if}
-    {#if pendingGifUrl}
+    {#if composer.pendingGifUrl}
       <GifConfirmDialog
-        url={pendingGifUrl}
-        onclose={cancelGif}
-        onconfirm={() => void confirmGif()}
+        url={composer.pendingGifUrl}
+        onclose={() => composer.cancelGif()}
+        onconfirm={() => void composer.confirmGif()}
       />
     {/if}
     {#if dialogs.confirmation}
