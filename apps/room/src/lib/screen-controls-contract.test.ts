@@ -35,6 +35,11 @@ const controls = readFileSync(
 const pane = readFileSync(new URL('./components/ScreenPane.svelte', import.meta.url), 'utf8');
 const tabs = readFileSync(new URL('./components/ScreenTabs.svelte', import.meta.url), 'utf8');
 const zoom = readFileSync(new URL('./screen-zoom.ts', import.meta.url), 'utf8');
+/*
+  The screen viewer left the page for `RoomScreens` in Phase 5 slice 11. Read as its own source, so
+  an assertion about which screen is shown cannot pass against a file that no longer decides it.
+*/
+const screensModule = readFileSync(new URL('room/screens.svelte.ts', import.meta.url), 'utf8');
 const page = readFileSync(new URL('../routes/+page.svelte', import.meta.url), 'utf8');
 
 /*
@@ -176,8 +181,14 @@ describe('screen controls', () => {
     // `app-presentationarea`'s constructor carries `this.showZoomCtrl = !1`, and its five handlers
     // drive every screen over the event bus. A per-pane copy cannot reach the shared bar slot.
     expect(bundle).toContain('this.showZoomCtrl=!1');
-    expect(page).toContain('let showZoomCtrl = $state(false)');
-    expect(page).toContain('function togglePanZoom()');
+    /*
+      Lifted OUT of the pane and now out of the page too: `RoomScreens` owns it since slice 11. The
+      property this test is about is unchanged — one copy, shared by every screen, because a
+      per-pane copy cannot reach the shared bar slot.
+    */
+    expect(screensModule).toContain('this.#showZoomCtrl = $state(false)');
+    expect(screensModule).toContain('toggleZoomControls() {');
+    expect(page).not.toContain('let showZoomCtrl = $state(false)');
 
     // The pane receives them; it no longer owns them.
     expect(pane).not.toMatch(/let showZoomCtrl = \$state/);
