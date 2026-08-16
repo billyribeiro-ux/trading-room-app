@@ -24,6 +24,29 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-16
 
+### 2026-08-16 06:12 EDT — Row AE re-measured after Phase 4, and the seven lines say the thing outright
+
+**Branch `feat/extra-chat-column`. Runtime impact: none** — `TODO.md` only.
+
+Phase 4 changed `+page.svelte`, so the two counts row AE quotes were a commit out of date. Re-taken
+rather than adjusted by arithmetic:
+
+| | before Phase 4 | after |
+| --- | --- | --- |
+| total | 9,612 | **9,605** |
+| `<script>` | 8,627 | **8,627** |
+| template | 986 | **978** |
+
+**All seven lines came off the template. The script did not move by one.** That is a sharper
+statement of the finding recorded at 05:53 than any of the prose around it: converting 162 `class:`
+directives — a change touching 25 files and every conditional class in the room — could not shift
+the script block, because the script block is not what template work reaches. 8,627 of the 9,605
+lines are orchestration, and they will still be there after any further component or attribute pass.
+
+The template is now 978 lines, down from 4,251 across Phases 2 and 4. There is essentially nothing
+left in it to extract, which is why the next piece of work is a plan for the script rather than more
+of the same.
+
 ### 2026-08-16 06:07 EDT — Phase 4: 162 `class:` directives converted to clsx, and the growth paid for
 
 **Branch `feat/extra-chat-column`. Runtime impact: none** — the rendered class attribute is
