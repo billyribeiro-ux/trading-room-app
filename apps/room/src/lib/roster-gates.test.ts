@@ -669,7 +669,7 @@ describe('room-wide sound', () => {
     expect(paneSource).toContain("src={mp3Url ?? ''}");
     // `#mp3player` is the capture's id and setBkgMusicVol reaches it by that selector.
     expect(paneSource).toContain('id="mp3player"');
-    expect(pageSource).toContain('{mp3Url}');
+    expect(pageSource).toContain('mp3Url={broadcasts.mp3Url}');
   });
 
   it('gates Stop For All on BOTH presenter and playing', () => {
@@ -680,13 +680,18 @@ describe('room-wide sound', () => {
     const filesPane = readFileSync('src/lib/components/FilesPane.svelte', 'utf8');
     expect(filesPane).toContain('{#if isPresenter && mp3Playing}');
     expect(filesPane).toContain('Stop For All');
-    expect(pageSource).toContain('{mp3Playing}');
+    expect(pageSource).toContain('mp3Playing={broadcasts.mp3Playing}');
   });
 
   it('keeps mp3Playing as its own flag rather than deriving it from the url', () => {
     // The capture keeps both and gates different things on each.
-    expect(pageSource).toMatch(/let mp3Playing = \$state\(false\)/);
-    expect(pageSource).toMatch(/let mp3Url = \$state<string \| null>\(null\)/);
+    // The flag moved to `RoomBroadcasts`; it stays a separate flag rather than being derived
+    // from the url, because the reference gates different things on each.
+    const broadcasts = readFileSync(new URL('room/broadcasts.svelte.ts', import.meta.url), 'utf8');
+    expect(broadcasts).toMatch(/this\.#mp3Playing = \$state\(false\)/);
+    expect(readFileSync(new URL('room/broadcasts.svelte.ts', import.meta.url), 'utf8')).toMatch(
+      /this\.#mp3Url = \$state<string \| null>\(null\)/
+    );
   });
 });
 

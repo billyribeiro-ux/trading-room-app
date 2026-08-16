@@ -24,6 +24,111 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-16
 
+### 2026-08-16 09:44 EDT — Manage page read in full: `tokcmd`/`appcmd` found, and P-1 proved exhaustively
+
+**Runtime impact: none** — `todo-next.md` only (2,959 → 3,350 lines). No source, test or config
+touched.
+
+Three more artefacts read end to end: **`apps/controller/evidence-page.manageSession.html`
+(2,718 lines, already in this repo)**, `docs/decoded/enterprise-and-control-plane.md`, and
+`apps/controller/evidence-dumps/stripe-details-2026-08-14.json`. Written up as §7 and §8.
+
+**The gap that needed a live capture did not.** `tokcmd` ∈ `pause|resume|unsub` and
+`appcmd` ∈ `enable|disable` are literal arguments in the row menu's `ng-click` attributes, in a file
+that has been in this repository since 2026-08-11. §4 said this required the owner to open the manage
+site and re-run a script; it did not. §6.1's inference that `manageMobileApp` was the
+`ptrMobileAppCaseByCaseEnabled` toggle is confirmed exactly.
+
+**P-1 is now exhaustive rather than sampled.** Having read the complete settings surface and the
+complete row menu, the push decision chain is **eight gates**: `ptrMobileAppEnabled` /
+`customMobileAppEnabled` · `freeTrialsGetApp` · `ptrMobileAppCaseByCaseEnabled` + `user.hasMobileApp` ·
+**`diasableFCMAlerts`** (a room-wide push kill switch) · **`user.alerterAppFCMUserOff`** (per member,
+red phone icon) · `mobileAppExpireNotificationsDays` (the 14-day decay) · `dontPush` (per alert) ·
+`isAlertOnly`. **Not one reads `stripeSubscriptionStatus`, `stripeCurrentPeriodEnd`,
+`allowedMemberships`, `allowedProducts` or `allowedPerms`.** The data exists (§6.12) and nothing
+consumes it. Gate #5 — written by `updateUserFCMTok` — is the lever to drive from billing.
+
+**A fifth alert channel and a sixth:** `customClientAlertPostURL` + `customClientAlertPostSecret` POST
+alerts to an arbitrary external endpoint, and **linked rooms are six settings, not one** — alerts,
+swing alerts and day-trade alerts each flow both to and from other rooms, authenticated only by an
+exchanged `linkedStreamsAPIKey`.
+
+**P-2 is not green field either:** `disalowMultiLogins` — *"users could can only log in once per
+room"* — already exists, plus `disalowSporadicMultiLogins` and `banIPList`. It is per-room and
+device-blind, so the work is extending it to be account-scoped and device-class-aware, not building
+it.
+
+**The billing seam, named:** `https://chat.protradingroom.com/ptr_app/sessions/v2/addUser/<sessionId>/?sec=<pairSecretKey>&email=&name=`
+provisions a member into a room, authenticated by a room secret in a query string. **There is no
+corresponding remove endpoint anywhere on the page** — which is P-1 in one line.
+
+**Also settled:** `sendFcmAlertsNew` is *"Use pub/sub for notifications"* — flagged as a real design
+risk, because if it means FCM topics then per-member revocation is structurally impossible under it.
+`invalidTokens` is a **manual** comma-separated text box, so §6.10's guess that `closeRoomAndRevoke`
+populates it is **withdrawn as unproven**. `altCodeAppJS` / `altCodeVendorJS` / `useV3` / `useV5`
+explain the version question: **a room is served whichever bundle PTR assigns it.**
+
+**Two corrections to earlier sections.** §6.1's role-integer table is the **bulk** vocabulary only —
+the per-user `updateUserXref` vocabulary differs, and **`10` means "hide personal data" per-user but
+"remove all" in bulk**, so a shared enum would turn a privacy toggle into a mass delete (§7.2). And
+§7.5's inference that `user.isMa` means "is marketplace" is **withdrawn**: the template gates on
+`user.isMarketPlaceUser`, and `hasStripeInfo` — which tests `isMa` — is referenced nowhere (§8.9).
+
+**Named next, and better than anything read so far:** the manage page links to
+**`/public/html/POST_ROUTE_API_DOCUMENTATION.md`** — the reference's own server-side API
+documentation. It is the only plausible source for the server behaviour no client capture can show.
+Not fetched.
+
+### 2026-08-16 08:25 EDT — `app.min.js` READ IN FULL: all 17 lines, and P-1 is a wiring problem
+
+**Runtime impact: none** — `todo-next.md` only (1,481 → 2,959 lines). No source, test or config was
+touched. The bundle is a live-site capture and stays in `~/Downloads` per `.gitignore`.
+
+The remaining eleven slices were read in order — lines 1–8 and 15–17, joining the six from 08:06.
+**§6 now runs §6.1 through §6.15 with a byte range per slice**, and §6.15 states plainly what the file
+answered and what it structurally cannot.
+
+**The finding that changes P-1's design:**
+
+**The subscription state is already on the member record and nothing acts on it.** `openStripeDetails`
+renders `stripeSubscriptionStatus`, `stripeCurrentPeriodEnd`, `stripeCancelAt`, `stripeCanceledAt`,
+`stripeLastPaymentFailureAt` and nine more fields — into a read-only admin popup, and nowhere else.
+So P-1 is **not** "the reference has no entitlement data"; it is that the signal, the decision point
+(`dontPush`, a per-alert push switch) and the revocation call (`updateUserFCMTok` + `tokcmd`) all
+exist and are not connected. Three hazards found alongside: `sendLinked` defaults ON and fans alerts
+into **other rooms**; `alertLater` has **no `dontPush` field**, so scheduled alerts always push; and
+browser Web Notifications are a fourth delivery channel independent of FCM.
+
+**Also settled:** there are **two mobile apps** — `protradingroom` and **`ptrAlerter`** — which is
+what the whole `alerterApp*` family refers to, and P-1 is about the second. `customMobileAppLaunchWord`
+is the custom **URL scheme** for a white-labelled app, deep-linking `?t=<jwt>&s=<roomID>&pc=<pairCode>`.
+P-5 has a complete blueprint in the SoundCloud path. P-3 has three existing control-plane pieces: a
+marketplace API with `memberships[]`, API keys with per-session/per-endpoint restriction, and an
+admin-users table.
+
+**A correction, recorded because the reasoning failed twice before it was caught.** Five sections of
+the read-log told the next agent *"by elimination the FCM settings must be in lines 2–8."* Having now
+read those lines, they are not there and never were: the pull script's census records only non-zero
+probes, so those names had been **absent** from it from the first minute, and I read a zero count as
+an unread region. `saveSessField` explains where they really are — a single generic command writes
+every session setting, so setting names appear only in the manage page's HTML, not in any JS bundle.
+`apps/controller/evidence-page.manageSession.html` is already in this repo and is now queue item #2.
+
+**Two further security findings, values deliberately not transcribed:** member image uploads go to
+**imgur via RapidAPI** with hardcoded keys — so a screenshot of a brokerage account leaves the tenant
+to a public image host — and the client fetches each member's location from **ipapi.co**, meaning the
+"city, region" shown to presenters is client-asserted and every member's IP reaches a third party.
+A hardcoded route secret and a published `sourceMappingURL` are also logged.
+
+**Eighteen reference bugs** are recorded where they were found, each with what it breaks — among them
+a `loadNonMobileUsers` that returns mobile users on rooms over 10,000, a `loadSettingsFromJSON` that
+exports instead of importing, and a webinar-mode delete that hides a message locally and sends
+nothing.
+
+**Not done, and named:** `/public/dist/maps/app.min.js.map` is referenced by the bundle and has not
+been fetched — if served it supersedes this entire decode, and it is queue item #1. The `tokcmd` and
+`appcmd` argument values still need the live row menu. The reference server remains uncaptured.
+
 ### 2026-08-16 08:06 EDT — `app.min.js` read: six of sixteen slices, and the P-1 contract in full
 
 **Runtime impact: none** — `todo-next.md` only; no source, test or config was touched. `app.min.js`
@@ -70,6 +175,60 @@ elimination that is where `sendFcmAlertsNew`, `invalidTokens`, `diasableFCMAlert
 `customMobileAppLaunchWord` and the Twilio/Protexting channels must be. Nothing in the six slices read
 ties push delivery to entitlement, which leaves §3's finding standing: the reference stops push on
 `lastLogin` decay, not on subscription state.
+
+### 2026-08-16 09:47 EDT — `RoomBroadcasts`, and a rename that silently broke three wire commands
+
+**Branch `feat/extra-chat-column`. Runtime impact: yes** — the video, YouTube and mp3 "for all"
+broadcasts moved, and **three wire command names and seven handler props were broken and fixed inside
+this slice.**
+
+**`+page.svelte` 9,057 → 8,899.** Phase 5 slice 12.
+
+**THE DEFECT THAT MATTERS, and it would have shipped silently.** The mechanical rename rewrote three
+strings that are not identifiers but **wire command names**: `'stopMp3ForAll'`, `'playVideoForAll'`
+and `'stopVideoForAll'` each became `'broadcasts.<name>'` inside the SSE dispatch's comparison. The
+server sends those literals on the `cmds` channel; prefixed, they match nothing. **Video and mp3
+"for all" would have stopped working for every member in the room**, with `svelte-check`, `eslint`
+and `svelte-autofixer` all green. A contract test caught it, because
+`for-all-broadcast-contract.test.ts` asserts on the literal.
+
+This is the same root cause as slice 4b's mangled import paths, one slice later: my transform skips
+comments and does **not** skip string literals. Comments and strings are both "not code", and only
+one of them was being protected. The rewire script now refuses to touch `import` lines, and the
+detector regex was widened after the first version missed `Mp3` — `[A-Za-z]+` has no digits.
+
+**RECEIVERS RATHER THAN SETTERS, a deliberate deviation from a pure move.** Six of these fields were
+assigned inline by the dispatch; the `stopVideoForAll` case set four in a row. Six public setters
+would have relocated the code and lost the invariant — **stopping a video must also cancel the armed
+timer and blank the schedule**, and a caller with setters can do one of the three, leaving a play
+that arrives minutes after the room was told it was removed. The wire events are named as methods
+(`videoStarted`, `videoStopped`, `mp3Started`, …) and the dispatch calls those. Same shape as
+`RoomMedia.roomRecordingStarted`. `broadcasts.svelte.test.ts` arms a play, stops it, advances the
+clock two minutes and asserts **nothing was sent** — with the negative half beside it, so the test
+cannot pass against a scheduler that never works.
+
+**THE UNBOUND-METHOD GUARD WAS BLIND TO THE NEW CLASS, one slice after being written.** Seven methods
+were passed as props by the shorthand repair and the guard said nothing, because its instance map had
+four entries and `RoomBroadcasts` was not one of them. **A guard blind to the newest module is worse
+than no guard, because it reads as coverage.** The map is now checked against disk: every class
+`lib/room/` exports must be listed, in the same shape and for the same reason as
+`source-size-contract.test.ts` refusing a module with no declared ceiling.
+
+**That check immediately found the map covered none of the eight Phase 1 classes either.** All
+thirteen are now listed — and the good news is that extending it found **zero** pre-existing
+offenders: `RoomSidebar` and `RoomNavbar` take `roster`, `menus` and `media` *whole* rather than
+being handed their methods, which is exactly what Phase 2 recorded doing.
+
+**Zero net contract regressions after re-pointing**, but eleven assertions moved: the senders and
+receivers are read from the class, the dispatch and the prop wiring from the page, and the invariant
+assertions read `videoStopped` directly rather than the four writes they replaced.
+
+**Verified:** `svelte-check` **1,155 files, 0 errors, 0 warnings**. `vitest` **2,071 across 144**, up
+from 2,059/143 — +11 `RoomBroadcasts` tests, +1 guard completeness check, +3 ceilings.
+`svelte-autofixer`: zero issues; one `SvelteDate` suggestion declined and recorded, because the date
+is parsed once, converted to a number on the same line and never read. `eslint` at the pre-existing
+27. Ceiling lowered 9,058 → 8,899, `broadcasts.svelte.ts` declared at 350. **Not verified:** no
+browser — and the three restored wire commands are precisely what one real "Play For All" would prove.
 
 ### 2026-08-16 08:16 EDT — The full gate finds two orphans I left, and the reader catalog proves itself
 

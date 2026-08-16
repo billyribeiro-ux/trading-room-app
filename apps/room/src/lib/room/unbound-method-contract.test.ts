@@ -2,8 +2,17 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { parse } from 'svelte/compiler';
 import { describe, expect, it } from 'vitest';
 
+import { RoomAlerts } from './alerts.svelte';
+import { RoomBroadcasts } from './broadcasts.svelte';
+import { RoomChat } from './chat.svelte';
 import { RoomDialogs } from './dialogs.svelte';
+import { RoomLogPages } from './log-pages.svelte';
+import { RoomMedia } from './media.svelte';
+import { RoomMenus } from './menus.svelte';
+import { RoomPolls } from './polls.svelte';
 import { RoomPrefs } from './prefs.svelte';
+import { RoomRoster } from './roster.svelte';
+import { RoomSplit } from './split.svelte';
 import { RoomToasts } from './toasts.svelte';
 import { RoomVolume } from './volume.svelte';
 
@@ -44,10 +53,49 @@ import { RoomVolume } from './volume.svelte';
   passed as props need to be here; a class the page never hands to a component cannot exhibit this.
 */
 const INSTANCES: Record<string, new (...args: never[]) => object> = {
+  // Phase 5 services
   toasts: RoomToasts,
   dialogs: RoomDialogs,
   prefs: RoomPrefs,
-  roomVolume: RoomVolume
+  roomVolume: RoomVolume,
+  broadcasts: RoomBroadcasts,
+  /*
+    The Phase 1 classes, added when the completeness check below refused a map that covered only the
+    new ones. Every one of these is handed to a component as a prop — `roster` and `menus` go whole
+    to `RoomSidebar`, `media` and `menus` to `RoomNavbar`, five of them to `AlertChatArea` — so
+    they can exhibit this exactly as the new ones can, and were simply never checked.
+  */
+  alerts: RoomAlerts,
+  chat: RoomChat,
+  logPages: RoomLogPages,
+  media: RoomMedia,
+  menus: RoomMenus,
+  polls: RoomPolls,
+  roster: RoomRoster,
+  split: RoomSplit
+};
+
+/*
+  A HAND-KEPT MAP IS THE FAILURE THIS FILE EXISTS TO PREVENT, so it is checked against disk.
+
+  `RoomBroadcasts` proved it within one slice of the guard being written: the class landed, seven of
+  its methods were passed as props by a mechanical shorthand repair, and this file said nothing —
+  because the map had four entries and the new class was not one of them. A guard that is blind to
+  the newest module is worse than no guard, since it reads as coverage.
+
+  So every class this directory exports has to be listed. Adding a module without adding it here
+  fails, in the same shape and for the same reason as `source-size-contract.test.ts` refusing a
+  module with no declared ceiling.
+*/
+const exportedRoomClasses = () => {
+  const dir = new URL('./', import.meta.url);
+  const names = new Set<string>();
+  for (const file of readdirSync(dir)) {
+    if (!file.endsWith('.svelte.ts') || file.endsWith('.test.ts')) continue;
+    const source = readFileSync(new URL(file, dir), 'utf8');
+    for (const match of source.matchAll(/^export class (\w+)/gm)) names.add(match[1]);
+  }
+  return names;
 };
 
 const methodNames = (constructor: new (...args: never[]) => object) => {
@@ -133,6 +181,16 @@ describe('no room-class method is ever passed as a prop by reference', () => {
     expect(methodNames(RoomVolume), 'volume is a getter and must not be flagged').not.toContain(
       'volume'
     );
+  });
+
+  it('lists every room class, so the map cannot go stale', () => {
+    const listed = new Set(Object.values(INSTANCES).map((c) => c.name));
+    const missing = [...exportedRoomClasses()].filter((name) => !listed.has(name));
+    expect(
+      missing,
+      missing.join(', ') +
+        ' is exported from lib/room/ but absent from INSTANCES, so this guard is blind to it. Add it — that is exactly how RoomBroadcasts slipped seven unbound methods past this file.'
+    ).toEqual([]);
   });
 
   it('found Svelte files to inspect', () => {

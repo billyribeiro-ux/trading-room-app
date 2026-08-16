@@ -99,6 +99,7 @@
   import { RoomDialogs } from '$lib/room/dialogs.svelte';
   import { RoomPrefs } from '$lib/room/prefs.svelte';
   import { RoomVolume } from '$lib/room/volume.svelte';
+  import { RoomBroadcasts } from '$lib/room/broadcasts.svelte';
   import { RoomToasts } from '$lib/room/toasts.svelte';
   import type { RoomMessageChrome } from '$lib/room-message-chrome';
   import { EXTRA_COMPOSER, RoomChat } from '$lib/room/chat.svelte';
@@ -323,6 +324,7 @@
     prefs,
     soundCloudPlaying: () => media.soundCloudPlaying
   });
+
 
   let sidebarOpen = $state(false);
   let mobileNavOpen = $state(false);
@@ -1174,6 +1176,26 @@
     stay assignments to state instead of becoming forty rewritten expressions.
   */
   const dialogs = new RoomDialogs();
+
+  /*
+    Everything a presenter plays for the WHOLE ROOM, in `$lib/room/broadcasts.svelte.ts`.
+
+    The three commands are one shape: a button, a server command, and every browser reacting to what
+    comes back on the `cmds` channel. The dispatch below calls RECEIVERS rather than assigning the
+    fields, because stopping a video must also clear its armed timer and blank its schedule — three
+    writes that a caller holding setters could do one of.
+
+    The commands are injected rather than imported so the class needs no route import and its
+    refusal paths can be tested without the wire.
+  */
+  const broadcasts = new RoomBroadcasts({
+    dialogs,
+    commands: {
+      video: (payload) => videoForAll(payload),
+      youtube: (payload) => youtubeForAll(payload),
+      fileMedia: (payload) => fileMediaCommand(payload)
+    }
+  });
   /*
     The room's toast queue, in `$lib/room/toasts.svelte.ts`.
 
@@ -1277,52 +1299,11 @@
   let showMessageOptions = $state(false);
   let sendingGif = $state(false);
   let pendingGifUrl = $state<string | null>(null);
-  let youtubeForAllUrl = $state('');
-  /**
-   * `videoPlayerUrl` / `hideVideoPlayer` / `scheduledVideo` — the VideoPlayer tab, for the ROOM.
-   *
-   * All three were `VideoPlayer.svelte`'s own `$state`, and that is why "Play For All" and
-   * "Stop For All" only ever moved one browser. They live here because this is where the `cmds`
-   * subscription is; the component receives them as props, exactly as `mp3Url` already worked.
-   *
-   * The two subscribers this reproduces, verbatim from `main.d1d09071be31f1ba.js` byte 1,966,711
-   * and 1,966,882:
-   *
-   * ```js
-   * subscribe("playVideoForAll", e => { this.videoPlayerUrl = e.url; this.hideVideoPlayer = !0;
-   *                                     this.isP || this.onMainTabChange("presAreaTabs-videoplayer") })
-   * subscribe("stopVideoForAll", () => { this.videoPlayerUrl = ""; this.scheduledVideo.videoURL = "";
-   *                                      this.scheduledVideo.videoPlayTime = null;
-   *                                      this.hideVideoPlayer = !1;
-   *                                      this.isP || this.onMainTabChange("presAreaTabs-screens") })
-   * ```
-   *
-   * `hideVideoPlayer` is named for what upstream called it and means the OPPOSITE of what it
-   * sounds like: it is true while a video is playing, and it is the term that lets a MEMBER see
-   * the tab at all (`O(25, o.hideVideoPlayer && !o.isP || o.isP ? 25 : -1)`, byte 2,016,864). It
-   * was previously unmodelled here, which is recorded in the comment on the tab itself.
-   */
-  let videoPlayerUrl = $state('');
-  let hideVideoPlayer = $state(false);
-  /*
-    Replaced wholesale rather than mutated, so `$state.raw`: the two writers both assign a fresh
-    pair, and a deep proxy over an object that is never edited in place is cost with no reader.
-  */
-  let scheduledVideoForAll = $state.raw<{ videoURL: string; videoPlayTime: string | null }>({
-    videoURL: '',
-    videoPlayTime: null
-  });
-  /*
-    The armed play, held in the presenter's OWN browser.
-
-    Upstream this timer is the server's: `playVideoForAll` is posted at the moment the presenter
-    presses Send, carrying `videoPlayTime`, and the session record holds the pair until it fires
-    (the late-join replay reads it back at byte 1,967,430). This room has no store for that and no
-    server-side scheduler, so the browser that armed it is the one that posts when it fires. The
-    consequences are real and recorded in `TODO.md`: closing the tab cancels the play, and a member
-    who joins after a video started does not see it.
-  */
-  let scheduledVideoTimer: number | undefined;
+  
+  
+  
+  
+  
   let fileSearch = $state('');
   /*
     The Files sort bar's state - ONE field and ONE direction, opening on date/desc.
@@ -5701,48 +5682,14 @@
     playingForMe = new Set(playingForMe).add(file.id);
   }
 
-  /**
-   * `mp3Playing` / `mp3Url` — the room-wide sound a presenter started.
-   *
-   * Transcribed from the bundle. The subscribers are at offset 1963827:
-   *
-   * ```js
-   * guiEventBus.subscribe('playMP3ForAll', e => { this.mp3Url = e.url; this.mp3Playing = true })
-   * guiEventBus.subscribe('stopMp3ForAll', () => { this.mp3Url = null; this.mp3Playing = false })
-   * ```
-   *
-   * The sender for both already existed here; nothing RECEIVED them, so a presenter could hit
-   * "Play For All" and no other browser made a sound — the same shape as every other missing
-   * receiver in this file.
-   *
-   * `mp3Playing` is a separate flag rather than `mp3Url !== null` because the capture keeps both
-   * and gates different things on each: the audio element binds `src` to the URL
-   * (`z('src', o.mp3Url, Mt)`), while "Stop For All" is gated on `isP && mp3Playing`
-   * (`O(83, o.isP && o.mp3Playing ? 83 : -1)`).
-   */
-  let mp3Playing = $state(false);
-  let mp3Url = $state<string | null>(null);
+  
+  
 
-  /** `playMp3ForAll(e) { sendServerAdminCommand('playMP3ForAll', { url: e }) }`. */
-  async function playMp3ForAll(url: string) {
-    await sendPresenterFileCommand('playMP3ForAll', url);
-  }
+  
 
-  /** `stopMp3ForAll() { sendServerAdminCommand('stopMp3ForAll') }`. */
-  async function stopMp3ForAll() {
-    await sendPresenterFileCommand('stopMp3ForAll');
-  }
+  
 
-  /** The command's own union, so the capture's asymmetric MP3 casing is checked at compile time. */
-  type FileMediaCmd = Parameters<typeof fileMediaCommand>[0]['cmd'];
-
-  async function sendPresenterFileCommand(cmd: FileMediaCmd, url?: string) {
-    try {
-      await fileMediaCommand({ cmd, url });
-    } catch (cause) {
-      dialogs.alert = isHttpError(cause) ? cause.body.message : 'Command failed.';
-    }
-  }
+  
 
   /**
    * `overwriteCashRegisterSound(e, i)` — "Set as alert sound" and "Remove as alert sound".
@@ -6174,123 +6121,23 @@
     sendingGif = false;
   }
 
-  /**
-   * The YouTube modal's Play button — `playYtVideo()`, byte 2,296,932.
-   *
-   * ```js
-   * playYtVideo() {
-   *   this.appService.sendServerAdminCommand('stopYTForAll', {url: this.youtubeURL});
-   *   this.appService.sendServerAdminCommand('playYTForAll', {url: this.youtubeURL});
-   * }
-   * ```
-   *
-   * A stop and then a play, in that order, so a second video replaces the first cleanly. Both are
-   * posted in ONE request — see the action — because two in-flight posts can be answered in either
-   * order, and the inverted pair leaves every browser holding a torn-down overlay.
-   *
-   * This used to be `youtubeForAllUrl = url`, which played the video for the presenter alone.
-   */
-  async function playYoutubeForAll(url: string) {
-    await sendYoutubeForAllCommand('playYTForAll', url);
-  }
+  
 
-  /**
-   * The overlay's "Stop For All" — `stopYTForAll() { sendServerAdminCommand('stopYTForAll') }`,
-   * byte 1,503,220. Presenter-only in the markup, and re-checked on the server.
-   */
-  async function stopYoutubeForAll() {
-    await sendYoutubeForAllCommand('stopYTForAll');
-  }
+  
 
-  /**
-   * The overlay's "×" — `closeYTFrame() { this.appService.guiEventBus.emit('stopYTForAll') }`,
-   * byte 1,503,275.
-   *
-   * THE DISTINCTION IS THE POINT, and it is drawn by which bus the reference emits on: "Stop For
-   * All" goes to the SERVER and takes the video off everyone's screen; "×" emits on the LOCAL gui
-   * bus, so it dismisses this viewer's own iframe and nobody else's. That is also why "×" is not
-   * presenter-gated in the markup and "Stop For All" is — a member must be able to close an
-   * overlay sitting over their room, without taking it away from the room.
-   *
-   * Both were wired to the same function here, which collapsed the two into one and made the "×"
-   * on a member's screen a no-op they had no authority to perform.
-   */
-  function closeYoutubeFrame() {
-    youtubeForAllUrl = '';
-  }
+  
 
-  async function sendYoutubeForAllCommand(cmd: 'playYTForAll' | 'stopYTForAll', url?: string) {
-    try {
-      await youtubeForAll({ cmd, url });
-    } catch (cause) {
-      dialogs.alert = isHttpError(cause) ? cause.body.message : 'Command failed.';
-    }
-  }
+  
 
-  /**
-   * "Play For All" → "Play now", and the moment an armed schedule fires.
-   *
-   * `sendServerAdminCommand('playVideoForAll', {url: e, videoPlayTime: null})`, byte 1,981,761.
-   * Nothing is assigned locally: the broadcast comes back down the `cmds` channel to this browser
-   * along with every other, which is the same rule the private chat note states — the sender learns
-   * its own message from the channel and nobody inserts optimistically.
-   */
-  async function playVideoForAll(url: string) {
-    clearScheduledVideoTimer();
-    scheduledVideoForAll = { videoURL: '', videoPlayTime: null };
-    await sendVideoForAllCommand('playVideoForAll', url);
-  }
+  
 
-  /**
-   * "Choose time?" → "Send". Arms the play locally and shows the presenter what is pending.
-   *
-   * `whenLocal` is the raw `datetime-local` value, kept as the string the reference keeps
-   * (`this.scheduledVideo.videoPlayTime = i` before it is converted) because that is what the
-   * "Video scheduled for:" line formats.
-   *
-   * A time already past plays immediately rather than never — `delay > 0` arms the timer, and a
-   * finite non-positive delay falls through to the immediate path. An unparseable value arms
-   * nothing and plays nothing, loudly: the pending line simply does not appear.
-   */
-  function scheduleVideoForAll(url: string, whenLocal: string) {
-    clearScheduledVideoTimer();
+  
 
-    const delay = new Date(whenLocal).getTime() - Date.now();
-    if (!Number.isFinite(delay)) return;
-    if (delay <= 0) {
-      void playVideoForAll(url);
-      return;
-    }
+  
 
-    scheduledVideoForAll = { videoURL: url, videoPlayTime: whenLocal };
-    scheduledVideoTimer = window.setTimeout(() => {
-      scheduledVideoTimer = undefined;
-      void playVideoForAll(url);
-    }, delay);
-  }
+  
 
-  /**
-   * "Stop For All" and "Remove Scheduled Video" — one command for both, byte 1,981,811.
-   *
-   * The armed timer is dropped when the command ARRIVES, not here, so that a stop sent by another
-   * presenter cancels this browser's pending play too. See the `stopVideoForAll` case below.
-   */
-  async function stopVideoForAll() {
-    await sendVideoForAllCommand('stopVideoForAll');
-  }
-
-  function clearScheduledVideoTimer() {
-    if (scheduledVideoTimer !== undefined) window.clearTimeout(scheduledVideoTimer);
-    scheduledVideoTimer = undefined;
-  }
-
-  async function sendVideoForAllCommand(cmd: 'playVideoForAll' | 'stopVideoForAll', url?: string) {
-    try {
-      await videoForAll({ cmd, url });
-    } catch (cause) {
-      dialogs.alert = isHttpError(cause) ? cause.body.message : 'Command failed.';
-    }
-  }
+  
 
   // Server-persisted sizes. These are the ones SSR can see, so they are the source of truth.
   function settingsSplitPair(key: string) {
@@ -6579,13 +6426,11 @@
           who receives it plays it, which is the whole point of "For All".
         */
         if (command?.cmd === 'playMP3ForAll') {
-          mp3Url = typeof command.url === 'string' ? command.url : null;
-          mp3Playing = mp3Url !== null;
+          broadcasts.mp3Started(typeof command.url === 'string' ? command.url : null);
           return;
         }
         if (command?.cmd === 'stopMp3ForAll') {
-          mp3Url = null;
-          mp3Playing = false;
+          broadcasts.mp3Stopped();
           return;
         }
 
@@ -6608,8 +6453,7 @@
         */
         if (command?.cmd === 'playVideoForAll') {
           if (typeof command.url !== 'string') return;
-          videoPlayerUrl = command.url;
-          hideVideoPlayer = true;
+          broadcasts.videoStarted(command.url);
           if (!isPresenter) mainTab = 'videoplayer';
           return;
         }
@@ -6620,10 +6464,7 @@
             is pressed would leave the first presenter's video arriving minutes after the room was
             told it had been removed.
           */
-          clearScheduledVideoTimer();
-          videoPlayerUrl = '';
-          scheduledVideoForAll = { videoURL: '', videoPlayTime: null };
-          hideVideoPlayer = false;
+          broadcasts.videoStopped();
           if (!isPresenter) mainTab = 'screens';
           return;
         }
@@ -6649,13 +6490,13 @@
           started playing, and nothing here knows that.
         */
         if (command?.cmd === 'playYTForAll') {
-          if (typeof command.url === 'string') youtubeForAllUrl = command.url;
+          if (typeof command.url === 'string') broadcasts.youtubeStarted(command.url);
           return;
         }
         if (command?.cmd === 'stopYTForAll') {
           // No payload is read. A url rides with the stop that precedes a play (byte 2,296,932)
           // and the reference's dispatch forwards none of it.
-          youtubeForAllUrl = '';
+          broadcasts.youtubeStopped();
           return;
         }
 
@@ -7330,7 +7171,7 @@
       if (alertScrollTimer !== undefined) globalThis.clearTimeout(alertScrollTimer);
       if (chatScrollTimer !== undefined) globalThis.clearTimeout(chatScrollTimer);
       // An armed "play at" that outlives the room would post a broadcast from a page nobody is on.
-      clearScheduledVideoTimer();
+      broadcasts.clearScheduledVideoTimer();
       toasts.destroy();
       unloadSoundEffects();
       media.stopTalking(data.user.id);
@@ -8269,8 +8110,8 @@
           {mobileAppAvailable}
           {tawkAvailable}
           doNotDisturbOn={prefs.doNotDisturbOn}
-          {mp3Playing}
-          {youtubeForAllUrl}
+          mp3Playing={broadcasts.mp3Playing}
+          youtubeForAllUrl={broadcasts.youtubeForAllUrl}
           backgroundVolume={roomVolume.backgroundVolume}
           soundChecks={prefs.soundChecks}
           noSpeakerText={NO_SPEAKER_TEXT}
@@ -8548,12 +8389,12 @@
               {changeDayTradeAlertMonths}
               {requestDayTradeImageUpload}
               {requestDayTradeImagePaste}
-              {hideVideoPlayer}
-              {videoPlayerUrl}
-              {scheduledVideoForAll}
-              {playVideoForAll}
-              {scheduleVideoForAll}
-              {stopVideoForAll}
+              hideVideoPlayer={broadcasts.hideVideoPlayer}
+              videoPlayerUrl={broadcasts.videoPlayerUrl}
+              scheduledVideoForAll={broadcasts.scheduledVideoForAll}
+              playVideoForAll={(url) => broadcasts.playVideoForAll(url)}
+              scheduleVideoForAll={(url, whenLocal) => broadcasts.scheduleVideoForAll(url, whenLocal)}
+              stopVideoForAll={() => broadcasts.stopVideoForAll()}
               {filesHidden}
               bind:fileTab
               onfilesearch={(value) => (fileSearch = value)}
@@ -8569,15 +8410,15 @@
               {deleteSelectedFiles}
               {deleteFile}
               {playMp3ForMe}
-              {playMp3ForAll}
-              {stopMp3ForAll}
+              playMp3ForAll={(url) => broadcasts.playMp3ForAll(url)}
+              stopMp3ForAll={() => broadcasts.stopMp3ForAll()}
               {setAlertSound}
               {openModal}
-              {youtubeForAllUrl}
-              {stopYoutubeForAll}
-              {closeYoutubeFrame}
-              {mp3Playing}
-              {mp3Url}
+              youtubeForAllUrl={broadcasts.youtubeForAllUrl}
+              stopYoutubeForAll={() => broadcasts.stopYoutubeForAll()}
+              closeYoutubeFrame={() => broadcasts.closeYoutubeFrame()}
+              mp3Playing={broadcasts.mp3Playing}
+              mp3Url={broadcasts.mp3Url}
               {setAutoplayAttribute}
             />
           {/snippet}
@@ -8767,7 +8608,7 @@
       {saveData}
       onSaveDataChange={setSaveData}
       onDoNotDisturbChange={(enabled) => (prefs.doNotDisturbOn = enabled)}
-      onPlayYoutube={(url) => void playYoutubeForAll(url)}
+      onPlayYoutube={(url) => void broadcasts.playYoutubeForAll(url)}
       onPostAlert={postAlert}
       onPastePostAlert={postPastedAlertImage}
       onPollMinimize={minimizePoll}
