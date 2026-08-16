@@ -40,7 +40,14 @@ or the owner. **Apply rule 6 to every item — check our source before recording
 
 | # | artefact | lines / size | what it should close |
 |---|---|---|---|
-| ~~1~~ | ~~`docs/decoded/control-plane-capture.md`~~ | **lines 1–280 read — §15** | ✅ **P-3 ANSWERED: no operator console exists in the tenant build; it is a DESIGN task.** Lines 281–1,243 (the panes/DOM/CSS slices) still to read |
+| **0a** | ⭐ **`apps/controller/evidence-dumps/TIER1-fetched/styles.css`** | **218,719 B / 11,347 lines** | **PTR's entire MANAGE stylesheet** (the Naut theme). §15.8's tokens all come from it. **Read: 1–2,657.** ⚠️ **IN THE REPO AND GIT-TRACKED** — byte-identical to `~/Desktop/new-room-control/css-modals/styes.css` (SHA `23bc4e02…`), so **line citations into it are permanent and the deletion banner does not apply** (§16.7). See §16 |
+| **0b** | ⭐ **`apps/room/docs/source-v4-2026-08-15/styles.ee2a710065b60389.css`** | 444,793 B / 20 lines → **5,410 rules** | ⭐ **THE v4 ROOM CSS REFERENCE** — the build's own sheet, author values. Rule-split on `}` (`perl -pe 's/\}/}\n/g'`) and read the 5,410 lines. Never read. **§16.8 corrected this row** — it used to point at `css/complete-app-styles.css` |
+| ~~0b-old~~ | ~~`apps/room/css/complete-app-styles.css`~~ | 688,687 B | ⛔ **NOT the v4 CSS — do not read it as such (§16.8).** It is a **2026-07-30 multi-sheet RUNTIME capture** (FontAwesome + animate + app), browser-serialized, **16 days before v4**, and our own `files-pane-contract.test.ts:268` proves it lacks `.st-fileSortBar`. Useful ONLY as the record of the third-party sheets |
+| ~~0b′~~ | ~~shipped vs captured v4 sheet, 265-byte delta~~ | ✅ **CLOSED — §16.8** | The delta is **`@charset "UTF-8";` (17 B) + the three Files-sort-bar rules (248 B) = 265**, exhaustively. Not a defect: the reference **grew the feature between captures**, and it is already built and contract-tested here |
+| ~~0b″~~ | ~~`apps/room/src/lib/styles/captured-runtime-components.css`~~ | ✅ **CLOSED — §16.9** | **GENERATED** from `complete-app-styles.css` (source SHA `d1829b30…` in its own header) by `pnpm css:sync-captured` ⇒ it inherits the **2026-07-30, pre-v4, browser-serialized** provenance. Not a completeness check. **By-product: a 26-component census of the v4 room** from its `:is(…)` cascade guard |
+| **0c** | ⚠️ **`~/Desktop/new-room-control/css-modals/`** — **37 `.less` + `bootstrap.css` + `bottstrap-min.css`** | ~517 KB | **Bootstrap 3 SOURCE.** Carries the LESS **variables** compiled CSS cannot — the definitive "custom vs stock" oracle. ⛔ **`find` returns ZERO `.less` files in the repo: these are AT DELETION RISK and exist nowhere else (§16.10).** Highest-priority copy-in candidate |
+| **0d** | ⚠️ **11 evidence dirs in `~/Desktop/new-room` with no repo counterpart** | 22 files / ~121 MB | **§16.10 is the register.** Small + PII-free: `more-fucking-evidence` (16 K, cited by name in the global `~/CLAUDE.md`), `q&a`, `stylesheet`, `modal`, `start-up`. Unread: `account-page` (1.0 M — *"the one surface never read"*), `must-match`, `mising`, `gap-dump`. ⛔ **Never copy** `enterprise` (31 M) / `NEXT-STEP` (88 M) — live JWTs + PII |
+| ~~1~~ | ~~`docs/decoded/control-plane-capture.md`~~ | ✅ **READ IN FULL — 1,243/1,243 — §15.1–§15.12** | Closed `admin-surface.md` **§G-1**; specified the whole Account page; 8 collector defects logged. **P-3 not closed** — the verdict is scoped to one build/account/moment and a separate operator subdomain was never probed |
 | 2 | `docs/decoded/admin-surface.md` | 1,035 | **P-3** — the admin surface; §15 supersedes its §D |
 | 3 | `docs/decoded/gaps-closed.md` | **lines 330–991** (1–330 read, §12.1) | rest of the cross-spec pass |
 | 4 | `apps/room/docs/website-ptr1-prt2-full-read.md` | 1,180 | ptr1+prt2 (already decoded — read the write-up, **not** the 33 MB) |
@@ -3428,6 +3435,254 @@ have one plausible source: **`POST_ROUTE_API_DOCUMENTATION.md` (§8.7).**
 
 ---
 
+# 16. 🛑 THE COMPLETE STYLESHEETS ARE ON DISK — and I recorded "not captured" instead
+
+**Owner correction, 2026-08-16 10:40: *"if you read all the css files and folders i created you will
+have a lot of answers that once again you're assuming. either on new-room-control or new-room folder
+i created an entire css folder with every css stylesheet."*** **Correct. Located, and it invalidates
+a class of claim I made repeatedly.**
+
+## 16.0 🔴 CORRECTION TO §16 ITSELF — the manage stylesheet is ALSO IN OUR REPO, with a contract test
+
+**Verified 2026-08-16 10:44, `cmp -s`: BYTE-IDENTICAL.**
+
+```
+~/Desktop/new-room-control/css-modals/styes.css          218,719 B
+apps/controller/evidence-dumps/TIER1-fetched/styles.css  218,719 B   ← same file, in this repo since 2026-08-13
+```
+
+**And we already have `apps/controller/src/lib/manage-panel-bootstrap3-contract.test.ts` over it**,
+which SHA-pins the Bootstrap 3 source and records a finding neither §15 nor §16 had:
+
+> *"The product runs **TWO Bootstrap generations** on two different surfaces… **The room** is
+> Bootstrap **5** — proven by a live capture, `class="tooltip fade show bs-tooltip-start"` with
+> `data-popper-placement`, which only Bootstrap 5 emits… **The account, manage and login pages** are
+> Bootstrap **3** — `div class="panel panel-default"` appears six times across the login-page
+> captures. `.panel` is a Bootstrap 3 component; Bootstrap 4 replaced it with `.card` and Bootstrap 5
+> has no `.panel` at all, so that markup cannot be 4 or 5."*
+
+**That independently corroborates two things this session derived separately:** §10.2's finding that
+the v4 room stacks Bootstrap 5, and §6.13's observation of BS5 class names (`me-1`, `rounded-pill`)
+leaking into the AngularJS manage page.
+
+**So §16's framing was too narrow.** The CSS was not only in the owner's folder — **it was in our own
+repository, byte-identical, already analysed, and already pinned by a test.** That makes this the
+**sixth** instance of the same failure, not the fifth, and the one with the least excuse.
+
+**What §16 still gets right, and what is genuinely new:**
+
+- ✅ The **Bootstrap 3 LESS sources** (35 files) are **only** in `new-room-control/css-modals/` —
+  not in our repo. They are the definitive custom-vs-stock oracle.
+- ✅ `complete-app-styles.css` (688,687 B, the v4 room) is **only** in `new-room/css/`.
+- ✅ **The theme name `Naut` by `@geedmo`** (§16.5) closes a gap `control-plane-capture.md` refused to
+  guess at — and it was discoverable in our own repo the whole time.
+
+## 16.1 The corpus — 41 files the owner assembled, none of it consulted
+
+| path | bytes | what it is |
+|---|---|---|
+| **`~/Desktop/new-room-control/css-modals/styes.css`** *(sic)* | **218,719** | **PTR's own `styles.css`** — the single first-party manage stylesheet. Same byte count as `gaps-closed.md:56`'s `TIER1-fetched/styles.css` |
+| `~/Desktop/new-room-control/css-modals/bootstrap.css` | 144,638 | **full Bootstrap 3 source** |
+| `~/Desktop/new-room-control/css-modals/bottstrap-min.css` *(sic)* | 147,852 | minified twin |
+| **35 × `.less`** in the same folder | — | **Bootstrap 3's LESS SOURCES** — `buttons` `labels` `panels` `tables` `type` `forms` `navs` `modals` `dropdowns` `list-group` `scaffolding` `normalize` `utilities` `grid` `navbar` `tooltip` `popovers` `input-groups` `button-groups` `progress-bars` `pagination` `pager` `carousel` `jumbotron` `media` `thumbnails` `wells` `close` `code` `breadcrumb` `alert` `badge` `print` `responsive-*` `component-animations` |
+| `~/Desktop/new-room/css/complete-app-styles.css` | **688,687** | **the complete v4 ROOM CSS**, captured 2026-07-30 |
+| `~/Desktop/new-room/docs/source/styles.d622cb9ed2bbc221.css` | 444,545 | the v4 room's built stylesheet |
+| `~/Desktop/new-room/docs/source/app-st-message.component.css` | 4,901 | one component's CSS |
+
+**The LESS sources are better evidence than any capture** — they carry the variables and the
+authored structure, not just a resolved cascade.
+
+## 16.2 What this closes that I had recorded as "not captured"
+
+**Verified from source, all four sheets:**
+
+| claim I made | source verdict |
+|---|---|
+| §15.8: *"`.btn-secondary` — the class is in the markup but nothing readable defines it"*, with a hedge that a cross-origin sheet *"could in principle"* carry it | **PROVEN DEAD. `btn-secondary` = 0 in `buttons.less`, 0 in `bootstrap.css`, 0 in `bottstrap-min.css`, 0 in `styes.css`.** It is a Bootstrap **4** class name in a Bootstrap **3** build. The hedge is gone — *"Close Add Admin User" renders as a bare user-agent button and copying it faithfully copies a bug* |
+| §15.8: `.btn-inverse` *"exists only in styles.css; Bootstrap 3 has no such class"* | **CONFIRMED, and quantified: 58 occurrences in `styes.css`, 0 in Bootstrap.** Not a one-off — a load-bearing custom class |
+| §15.9: `label-orange` *"is not stock Bootstrap 3"* | **CONFIRMED: 6 in `styes.css`, 0 in `labels.less`, 0 in `bootstrap.css`** |
+| §15.9/§15.12: *"heading CSS is uncaptured — 'this heading has no rule' is unprovable"* | **FALSE.** `type.less` carries the heading block at lines 9–26 and `h3, .h3 { font-size: @font-size-h3; }` at line 49. **The h3's 24px / 500 / 26.4px is derivable from source, not merely observed** |
+| §15.8: *"No :hover, :focus, :active, :visited or :disabled rules appear anywhere in this slice"* | **Those states are all in `buttons.less` and `bootstrap.css`.** They were never missing — the *capture* only collected rules matching each element's current state |
+| §15.12: *"2 cross-origin stylesheets are unreadable, so a zero in the css column is weaker"* | **Only true of the capture.** The sheets themselves are on disk |
+
+## 16.3 The rule this earns
+
+**"Not captured" is a statement about ONE artefact. It is not a statement about the evidence
+available.** Before writing it, check whether the underlying asset exists somewhere on disk —
+especially in `~/Desktop/new-room/` and `~/Desktop/new-room-control/`, which the owner has been
+assembling deliberately.
+
+This is the **fifth** instance of the same family of error in this session, and the sharpest, because
+the answer was in a folder created for exactly this purpose:
+
+1. §10 — v4 CSS tokens re-derived when `tokens.css` already held them
+2. §11 — a 6,600-line decode corpus never consulted
+3. §12.3 — R-15 called "built" from a truncated citation
+4. §13 — `api-post-routes.md` called "one fetch away" while sitting in the repo
+5. **§16 — "not captured" written five times over stylesheets that were on disk**
+
+## 16.5 🟢 `styes.css` lines 1–260 — THE THEME IS IDENTIFIED
+
+**The file's own banner, verbatim from lines 9–17:**
+
+```css
+/*!
+ * Naut - Bootstrap Admin Theme + AngularJS
+ * Author: @geedmo
+ * Website: http://geedmo.com
+ * License: https://wrapbootstrap.com/help/licenses
+ */
+```
+
+**`control-plane-capture.md` §A listed this as an explicit gap and refused to guess:**
+
+> *"The AngularJS admin theme's NAME and vendor are not in the capture… I grouped 16 states as theme
+> leftovers on internal evidence (generic filenames, shell reuse, 'demo' in a filename, absence of
+> product URL parameters) — **I am NOT naming the theme product, because that name is not in the
+> evidence.**"*
+
+**✅ CLOSED. The theme is `Naut`, by `@geedmo`, licensed through WrapBootstrap.** That vindicates the
+16-state "theme leftover" grouping in §15.3 — the mailbox, `dashboard`, `dashboard-alt`, `columns` and
+`setting-demo` routes are Naut's own demo screens, and their absence from our build is correct.
+
+**Also: `@import url(//fonts.googleapis.com/css?family=Roboto:500,400italic,100,700italic,300,700,400)`
+is LIVE at line 2** — the manage app loads **Roboto** from Google Fonts. (The v4 room's equivalent
+imports were commented out and it uses **Lato** — §10.1/§10.2. **Two different font stacks between the
+two apps.**)
+
+### 🔴 The accessibility defect is worse than §15.8 recorded
+
+```css
+*:focus { outline: 0 !important; }      /* lines 66-68 */
+a       { outline: none !important; }   /* lines 69-71 */
+```
+
+§15.8 recorded this as *"`styles.css .btn { outline: none !important }` and `a { outline: none }`"*.
+**It is a UNIVERSAL selector — `*:focus`.** Every focusable element on the manage app loses its focus
+ring, not just buttons and links. **Do not reproduce.**
+
+### Sourced at last — three values §15 could only observe
+
+| §15 observation | the rule that produces it |
+|---|---|
+| sessions header row **60.5px** tall, padding `20px 8px` | `.table > thead > tr > th { border-bottom-width: 1px; padding-top: 20px !important; padding-bottom: 20px !important; }` (lines 189–193) |
+| `.btn-default` border **`#e6e9ee`** — *"not Bootstrap's #ccc"* | `#e6e9ee` is a theme-wide token: also `.page-header{border-bottom-color:#e6e9ee}`, `.nav-tabs-alerts>li>a{border:1px solid #e6e9ee}`, `.tab-content{border-color:#e6e9ee}`, `.popover{border-bottom:2px solid #e6e9ee}` |
+| the `.ng-hide` rule with `href: null` | **A distinct rule.** `styes.css` lines 58–65 define the **cloak** set (`[ng\:cloak]`, `[ng-cloak]`, `[data-ng-cloak]`, `[x-ng-cloak]`, `.ng-cloak`, `.x-ng-cloak`) — **without** `.ng-hide:not(.ng-hide-animate)`. The injected sheet §15.12 found **adds** that selector. **Both exist; they are not the same rule.** Do not merge them |
+
+### Other facts from the first 260 lines
+
+- **`.glyphicon` is remapped onto FontAwesome** — `font: normal normal normal 14px/1 FontAwesome`,
+  with `glyphicon-chevron-left/right/up/down` overridden to `\f053` / `\f054` / `\f077` / `\f078`.
+  **Bootstrap 3's icon font is not shipped; Glyphicon class names resolve to FA glyphs.**
+- `[ui-sref], [data-ui-sref] { cursor: pointer }` — and the same for `.nav-pills, .pagination,
+  .carousel, .panel-title a`.
+- `.form-control { padding-left: 18px; padding-right: 18px; box-shadow: 0 0 0 #000 !important }` —
+  **18px horizontal padding, not Bootstrap's 12px.**
+- `.form-control, .input-group-addon { border-color: #dbd9d9 }`; `.input-group-addon` background
+  `#f8f9fb`; `.input-sm, select.input-sm { height: 31px }`.
+- `fieldset { padding-bottom:20px; border-bottom: 1px dashed #eee; margin-bottom:20px }` with
+  `:last-child` clearing the border — **the manage settings tab's section rule.**
+- Every text input gets `-webkit-appearance: none`.
+- `.dropdown-menu { border-radius: 2px; font-size: 13px }` — **13px, not 14px.**
+- `.popover`, `.progress`, `.jumbotron`, `.well`, `.thumbnail` all get custom shadows;
+  `.progress` and `.popover` get `border-radius: 2px`.
+- `.list-group { line-height: 1.3 }` and `.list-group-item { padding: 10px }` — **relevant to the
+  API-key restrictions editor's two `list-group` lists (§15.11).**
+- `.mediaLI { margin-top: 0; font-size: 14px }` — the roster row class from §6.2.
+
+## 16.6 `styes.css` lines 260–559 — the layout system. **Two §15 "uncaptured ancestor" gaps close.**
+
+### 🟢 CLOSED — where the 1140px comes from
+
+§15.9 recorded: *"The parent element that constrains `.app` to 1140px is not captured. The `.app`
+rule declares `width:100%`, so the 1140px measured width comes from an **uncaptured ancestor** (its
+selector, class and rules are unknown)."*
+
+```css
+.layout-boxed .app-container > section { max-width: 1140px; margin: 0 auto; }   /* lines 556-559 */
+```
+
+**✅ That is the ancestor. `.layout-boxed` on the body/container is what produces the centred 1140px
+column** — and it explains §15.9's derived arithmetic (424.5px of slack each side of 1989px) without
+any inference.
+
+### 🟢 CLOSED — the footer that `.footer-hidden` suppresses
+
+§15.9 noted the computed `padding-bottom: 0` *"proves an ancestor carried `.footer-hidden`"* but had
+no footer to point at:
+
+```css
+.app-container > footer { position: absolute; left:0; right:0; bottom:0;
+  height: 60px; padding: 15px; border-top: 1px solid #f4f5f5;
+  background-color: #f0f0f0; z-index: 210; }
+.app { padding: 15px; padding-bottom: 80px; width: 100%; }   /* lines 471-475 — exactly as captured */
+```
+
+**✅ The footer is 60px tall; `.app` reserves 80px for it.** With the footer shown, restore the 80px.
+
+### The manage app's layout contract — complete
+
+| | value |
+|---|---|
+| **sidebar (`aside`)** | **`width: 240px`**, `top: 50px`, `bottom: 0`, `position: absolute` |
+| `.aside-offscreen` | `aside { margin-left: -240px }`, and `section`/`footer` drop to `margin-left: 0` |
+| desktop (`≥768px`) | `section` and `footer` get `margin-left: 240px` |
+| **z-index stack** | header **410** · aside **310** · footer **210** · section **110** |
+| `.layout-fixed` | header + aside `position: fixed`; header `width:100%`; section `padding-top: 50px` |
+| **`.layout-boxed`** | **`section { max-width: 1140px; margin: 0 auto }`** |
+| header shadow | `0 0 4px rgba(0,0,0,.14), 0 4px 8px rgba(0,0,0,.28)` |
+| aside shadow | `0 0 4px rgba(0,0,0,.14), 2px 4px 8px rgba(0,0,0,.28)` |
+| navbar height | **50px** — `line-height: 50px` on the brand, `height: 50px` on `.mobile-toggles` |
+| brand colour | `#fafafa`; margin `0 50px` → **`0 15px` at ≥768px** |
+| `.app-view-header` | `font-size: 23px`, `margin: 20px 0 30px`; `> small` `12px` / **`#8394a9`** |
+
+> ⚠ **The manage sidebar is 240px; the v4 ROOM's is 250px (§10.2).** Different apps, different
+> layout constants — **do not share the value between them.**
+
+**Shared palette confirmed across both apps:** `rgba(54,63,69,.05)` is the topnavbar hover — the same
+`#363f45` as `.btn-inverse` (§15.8), and **`#8394a9`** here is the room's `--lightTheme-date-color`
+(§10.2). **One design system, two Bootstrap generations.**
+
+**All layout media queries key on `min-width: 768px`** — one breakpoint, not a scale.
+
+### ✅ IMPLEMENTATION AUDIT — we reproduce the geometry, but attribute it to the wrong mechanism
+
+`layout-boxed` is **0 occurrences** in `apps/controller/src`. **That is not a gap** — we reproduce the
+result from measured rects, documented throughout:
+
+```
+account.css:318   /* .center-block.mt-xl — 424.5,80,1140x953.992. */
+account.css:331      "…so padding would leave it 1140 wide at x=424.5. The reference measures…"
+AppFooter.svelte:2   424.5,1033.992,1140x91 — a sibling of the page content INSIDE the…
+```
+
+**Our numbers are right.** Rule 6c again — an identifier search would have called this missing.
+
+> ⚠ **One attribution to correct.** `account.css:743` says *"It sits INSIDE the **1170** container in
+> the reference"*. **Bootstrap 3's `.container` is 1170px at the `lg` breakpoint, but
+> `.layout-boxed .app-container > section { max-width: 1140px }` overrides it** — which is why every
+> measurement in our own comments is **1140**, not 1170. The measured values are correct; the
+> explanatory comment names the wrong constraint. **Cheap fix, and worth making before the dumps are
+> deleted**, because after that the comment is the only record of the reasoning.
+
+**Read: `styes.css` lines 1–559 of 11,347.** Formatted, no line over 300 chars — **read in ~300-line
+slices with `Read(offset, limit)`.** Component banners (`/** Component: <name>.less */`) mark the
+section boundaries; seen so far: `bootstrap-reset`, `top-navbar`, `layout`.
+
+## 16.4 ⭐ What these files are FOR — the rebuild, not just the audit
+
+`styes.css` (218,719 B) is **PTR's entire first-party manage stylesheet.** §15.8's account-page tokens
+— `#e6e9ee`, `#363f45`, `.mb`, the `.text-center !important` escalation — all come from it, and the
+capture only ever showed the handful of rules that happened to match twelve elements.
+
+**This is the source of truth for the controller's visual match**, and it has not been read. Likewise
+`complete-app-styles.css` (688,687 B) for the room.
+
+**Added to the resume queue as items 0a and 0b — ahead of the remaining decoded docs**, because they
+answer questions those docs explicitly leave open.
+
+---
+
 # 15. 🟡 P-3 — `control-plane-capture.md`, lines 1–280 of 1,243. **PARTIAL. NOT ANSWERED.**
 
 > ⛔ **Owner correction, 2026-08-16 10:22: *"stop assuming, and only work based off of hard evidence
@@ -4074,7 +4329,83 @@ false negative from a too-narrow probe cannot be ruled out."*
 **One cheap pixel check owed:** our restrictions button's computed `display` and rect against the
 reference's **`inline`, 75.6875 × 16.5** at 1989×1265 @2×.
 
-**Read: lines 1–1,119 of 1,243. Only §F's tail (~124 lines) remains in this file.** — `panes.extraAdminUsers`,
+## 15.12 §G + §H — ✅ `control-plane-capture.md` READ IN FULL, all 1,243 lines
+
+### §G — a seventh agent audited the other six, and found 21 misses
+
+*"The failure mode for an exhaustive decode is silent omission — six agents each cover their slice and
+nobody notices a whole key was never opened."* **This is the model for the twice-run audit the owner
+asked for.** It re-checked three claims independently (all held, two more strongly than stated) and
+then found what nobody reported.
+
+**The misses concentrate in three places, and the third matters most:**
+
+1. **Cross-field arithmetic nobody could do from one slice** — the four `panes.*.panel` objects are
+   deep-equal, and `newRoomReveal.control` is deep-equal to `newRoomCreate.nodes[0]`. **17.7% of the
+   118,757-byte file is duplicated content.**
+2. **Collector artefacts reported as site properties, or not at all.**
+3. **The live JWT — 8 copies — that no agent mentioned**, carrying the owner's name, email, user id
+   and `exp 2027-08-09`, *"while the redactor masked the same 24-hex id about 900 characters earlier
+   in the same string."*
+
+### 🔴 The finding that reopens New Room properly
+
+> **`newRoomCreate` and `adminUserAddForm` are hidden with computed `display:block`,
+> `visibility:visible`, `opacity:1` and NO `ng-hide` class — they are collapsed by an ANCESTOR. And
+> no node object anywhere in this capture records an ancestor.**
+
+**So the New Room gate is genuinely NOT-CAPTURED, not absent** — a stronger and more precise
+statement than "the clicks were refused". Two of the four hidden nodes (`marketplacePerSession`,
+`adminUserAddToggle[1]`) *are* self-hidden by `ng-hide`; two are not. **The mechanism differs and
+nobody had distinguished them.**
+
+**And the five-click threshold is the COLLECTOR's assumption, not an observation** — *"refusedClicks
+says 'click N of 5', which is the collector's assumed threshold… the actual number of clicks the
+build requires is not in the capture."* **§15.5 should not be read as "five clicks".**
+
+### ✅ §H item 6 vindicates §15.11 — our `account.css` comment is backed
+
+§H line 1146 leaves our bootbox comment as *"either backed by evidence outside this slice or an
+unevidenced claim in our own source."* **§15.11 resolved it: backed.** `manageApiKeyRestrictions`
+occurs once in `app.min.js` and it is `bootbox.dialog({title:"Manage API Key Restrictions", …})`.
+**No change needed to `account.css:1995`.**
+
+### §H — eight collector defects, two already fixed
+
+| # | defect | status |
+|---|---|---|
+| 1 | `paneOf()` resolves to one shared ancestor for all four panes | **open** — 17.7% duplication, per-pane structure absent |
+| 2 | **Silent truncation** — `html` at exactly 4,000, `text` at exactly 300, **no ellipsis, no marker** | **open.** *"the same defect `collect-manage-gaps.js` was written to fix in its predecessor, whose header calls silent truncation 'the worst kind' — reintroduced here"* |
+| 3 | Every `styles.css` rule stored **twice**; **no** `bootstrap.min.css` rule ever duplicated | open — 87 bootstrap / 70 styles.css entries, **exactly 35 of the 70 are duplicates** |
+| 4 | Headings carry **no `rules` key at all** (10 keys vs 11) | open — **heading CSS is uncaptured; "this heading has no rule" is unprovable** |
+| 5 | `refusedClicks` — the denylist matched `New` inside `showNewRoom=showNewRoom+1;`, **0 occurrences in the label "Sessions"** | ✅ **fixed in `dbc7001`** |
+| 6 | Redactor inconsistent **within a single field** | ✅ **fixed in `4928f47`** — now masks by parameter NAME so unpredicted credential shapes are caught by their label |
+| 7 | UA is Android Pixel 9 mobile; viewport is 1989px desktop | open — emulation or spoof, unresolved |
+| 8 | **`app.dashboard` and `app-dock.dashboard` both register `/dashboard`** | **NOT a collector defect — a genuine duplicate registration in the reference.** The only duplicated URL among the 31 |
+
+### Residue worth keeping from §G
+
+- **A 12th stylesheet exists** — the AngularJS-injected `ng-hide` sheet, `href: null`, carrying
+  `.ng-hide:not(.ng-hide-animate){display:none!important}`. **`provenance.stylesheets` lists 11 and
+  is therefore incomplete by one** — and it is the sheet that actually hides both hidden controls.
+- **`panes.apiKeyRestrictionControls` is a bare 1-element ARRAY**, not the `{selector, count, nodes}`
+  shape every `namedControls` entry uses. **Its selector and true match count are unrecorded — it
+  cannot be said whether exactly one "restrictions" link exists or only one was kept.**
+- **The two identity sweeps disagree:** `allSrefs` has 2 entries but only 1 appears in `navEntries`.
+  `page.forgot-password` has an sref the nav sweep never picked up.
+- **The module graph is closed and valid:** 0 dangling dependencies, 0 orphans, `app` the only root,
+  69 of 97 with empty dependency arrays, 26 are `template/*.html` `$templateCache` pseudo-modules.
+- **8 states carry path parameters:** `/:folder`, `/:id`, `/stats/:sessionID`,
+  `/manageSession/:sessionID`, `/mstats/:sessionID`, `/change-password/:uid`,
+  `/user-change-password/:uid`, `/login/:sessionID`.
+- **Geometry closes exactly:** `440.5 + 247.796875 = 688.296875` (the two sort columns are
+  pixel-contiguous); `424.5 + 15 = 439.5` (all four heading x); `1140 − 30 = 1110` (all four heading
+  w); `80 + 15 + 10 = 105` (the h4's y).
+- **`census` dom and css columns are unverifiable** — no `bodyText`, no stylesheet text is captured.
+  They supply **100%** of `room`'s total and **80%** of `console`'s. The four route-registry surfaces
+  are fully reproducible; those two are not.
+
+**✅ FILE COMPLETE — 1,243 / 1,243.** — `panes.extraAdminUsers`,
 `panes.apiKeys`, `panes.sessions`, `panes.serverInjectedGlobals` (which holds `__disableMobile`), and
 the 4 unattributed DOM hits for `console`.
 
@@ -5124,3 +5455,372 @@ addition, not a reconstruction, and should be designed rather than searched for.
 
 **P-3 gates P-1 and P-2.** Both terminate in the enterprise console; settle its model before building
 either, or they get built against a boundary that then moves.
+
+---
+
+## §16.7 — ⭐ THE DELETION RISK IS SMALLER THAN THIS FILE ASSUMED. Both "never read" stylesheets are already IN the repository, tracked by git.
+
+**2026-08-16.** Written after computing SHA-256 over the two queue items 0a and 0b and over every
+large CSS file in the repository. **This is rule 6 firing for the seventh time** — I queued two
+artefacts as *"on the Desktop, never read, must be transcribed before the dumps are deleted"* when
+both already live inside `trading-room-app` **and are committed**.
+
+### The digests, measured
+
+| file | SHA-256 | bytes |
+|---|---|---|
+| `~/Desktop/new-room-control/css-modals/styes.css` | `23bc4e02…c2f49c` | 218,719 |
+| **`apps/controller/evidence-dumps/TIER1-fetched/styles.css`** | **`23bc4e02…c2f49c`** | **218,719** |
+| `~/Desktop/new-room/css/complete-app-styles.css` | `d1829b30…6d19bd609` | 688,687 |
+| **`apps/room/css/complete-app-styles.css`** | **`d1829b30…6d19bd609`** | **688,687** |
+
+Both pairs are **byte-identical**, and `git ls-files --error-unmatch` returns both repo paths, so
+both are **tracked, not ignored**.
+
+### What that changes — three things, and none of them are cosmetic
+
+1. **Neither file dies with the dump deletion.** The rule at the top of this file — *"write values,
+   not locations"* — was written because a byte offset into a deleted capture is worthless. **It does
+   not apply to these two.** A citation of the form `evidence-dumps/TIER1-fetched/styles.css:556` is
+   permanent, reproducible by the next reader, and survives every deletion the owner plans. The
+   transcription burden on the CSS corpus is therefore **much lower than §16 assumed**, and the
+   remaining ~19,000 lines of CSS do not need to be copied into prose to be safe.
+2. **The Desktop copies are duplicates, not sources.** Read the repo path. Same bytes, no dependency
+   on a folder that is scheduled for deletion, and the read is reproducible after it is gone.
+3. **The queue's items 0a and 0b were mis-scoped.** They are still worth reading — reading them
+   closed §15.9's two "uncaptured ancestor" gaps (§16.6) — but they were **never at risk**, so they
+   are not the emergency the queue made them. The genuinely at-risk artefacts are the ones with **no
+   byte-identical copy inside the repository**, and that set is being computed by digest rather than
+   guessed at.
+
+### The room CSS corpus, now inventoried by digest rather than by assumption
+
+Four distinct stylesheets exist for the room, and they are **not** copies of one another:
+
+| repo path | SHA-256 | lines | bytes |
+|---|---|---|---|
+| `apps/room/css/complete-app-styles.css` | `d1829b30…` | 8,086 | 688,687 |
+| `apps/room/docs/source-v4-2026-08-15/styles.ee2a710065b60389.css` | `8b54386a…` | **20** | 444,793 |
+| `apps/room/src/lib/styles/protradingroom-source.css` | `d0cf9aba…` | **20** | 444,528 |
+| `apps/room/src/lib/styles/captured-runtime-components.css` | `88d308b0…` | 8,156 | 216,055 |
+| `apps/controller/evidence-dumps/TIER1-fetched/theme.css` | `497733a0…` | 6,809 | 232,979 |
+| `apps/controller/evidence-bootstrap-3.3.7.css` | `74a581f4…` | — | — |
+
+Two observations worth recording, both from the numbers above and neither previously written down:
+
+- **`styles.ee2a710065b60389.css` is the v4 build's own minified stylesheet — 444,793 bytes on 20
+  lines.** `protradingroom-source.css`, which is in `src/lib/styles` and therefore **shipped**, is
+  444,528 bytes on 20 lines — **265 bytes smaller**. Those two are the same artefact at two moments
+  or with one edit between them. **The delta is unexplained and is a real open question**: a shipped
+  stylesheet that differs from the captured reference by 265 bytes is either a deliberate patch that
+  should be documented or a stale copy. It is NOT recorded anywhere as either.
+- **`complete-app-styles.css` (688,687 B, 8,086 lines) is formatted, not minified** — it is the
+  useful one to read, and it is 244 KB larger than the minified build sheet, which is what expansion
+  costs. It is the correct target for queue item 0b.
+
+### Correction to this file's own queue
+
+The RESUME HERE rows for 0a and 0b said **"Never read"** and pointed at `~/Desktop`. Both halves were
+misleading: they point at duplicates, and the urgency implied by the deletion banner does not apply.
+Rows corrected in place. **The pattern is the same one rule 6 exists for** — a gap is only a gap when
+*both* halves are checked, and "this evidence is at risk" is a claim about our repository that has to
+be checked against our repository before it is written down.
+
+---
+
+## §16.8 — ⭐ THE 265-BYTE DELTA IS THE FILES SORT BAR, AND IT REDATES THE WHOLE CSS QUEUE
+
+**2026-08-16.** §16.7 opened item **0b′** — *"the shipped stylesheet is 265 bytes smaller than the
+captured v4 build sheet; deliberate patch or stale copy, not recorded as either."* **It is closed,
+exhaustively, and the answer reorders the CSS queue.**
+
+### The measurement
+
+`apps/room/src/lib/styles/protradingroom-source.css` and
+`apps/room/docs/source-v4-2026-08-15/styles.ee2a710065b60389.css` are both 20 lines. **Lines 1–19 are
+byte-for-byte identical** (per-line lengths match exactly; `cmp` puts the first differing byte at
+char 421,881, inside line 20). Splitting both on `}` into 5,407 / 5,410 readable rules and diffing
+gives **two hunks and nothing else**:
+
+```
+5215c5215
+<                   :root{--dark-gray: #aaa; …
+> @charset "UTF-8";:root{--dark-gray: #aaa; …
+
+5298a5299,5301
+> .st-fileSortBar{font-size:12px}
+> .st-fileSortName,.st-fileSortDate{color:var(--tabs-color);background-color:transparent;border:1px solid var(--file-see-more-bg)}
+> .st-fileSortName.active,.st-fileSortDate.active{background-color:var(--file-see-more-bg)}
+```
+
+**The arithmetic closes to the byte:** `@charset "UTF-8";` is **17** bytes, the three rules are
+**248** bytes, `17 + 248 = 265`. **The delta is fully explained; there is no third difference.**
+
+### It is not a defect. It is a DATE.
+
+The identifier is `st-fileSortBar` — **the exact control the global `~/CLAUDE.md` names as the
+canonical search-vs-read failure** (*"I searched for `st-fileSortBar`, got nothing, and reported 'not
+in the capture'"*). So the first instinct is that something is missing again. **Check our source
+before writing that down — rule 6 — and it is the opposite:**
+
+- `apps/room/src/app.css:3089-3091` carries all three rules **verbatim as captured evidence**, and
+  `3110-3122` carries them expanded.
+- `apps/room/src/lib/components/FilesPane.svelte:321-325` carries the markup with the decoded class
+  lists (`d-flex flex-wrap justify-content-center align-items-center mt-2 st-fileSortBar`,
+  `btn btn-sm m-1 st-fileSortName`, `btn btn-sm m-1 st-fileSortDate`).
+- `apps/room/src/lib/files-pane-contract.test.ts` **pins all three rules** and carries two negative
+  controls that a plausible rewrite would trip: `not.toContain('.st-fileSortName:hover')` and
+  `not.toMatch(/#[0-9a-f]{3,6}/)` on both button rules — the second proving the colours are
+  **var-only**, never literal hex.
+- `apps/room/src/lib/file-sort.ts:13-16` already records the reason in prose: *"our older capture
+  contains `st-fileSortBar` zero times and the v4 bundle contains it once. The feature is not missing
+  from the older capture because anybody searched wrong — **the evidence simply predates it.
+  Evidence has a date, and the live application moves.**"*
+
+**So the 265 bytes are the reference growing a feature between two captures, and we have both sides
+and the feature.** `protradingroom-source.css` is not "stale by an unknown amount" — it is stale by
+**exactly one feature, already built and already contract-tested.** That is a much stronger statement
+than "265 bytes differ", and it is the kind of statement only a full diff can produce.
+
+### ⛔ THE CORRECTION THAT MATTERS: queue item 0b was pointed at the WRONG STYLESHEET
+
+`files-pane-contract.test.ts:268` asserts, and passes:
+
+```js
+expect(captured).not.toContain('.st-fileSortBar');   // captured = ../../css/complete-app-styles.css
+```
+
+**`apps/room/css/complete-app-styles.css` does not contain the sort bar — so it is NOT the v4
+stylesheet.** The queue called it *"the complete v4 ROOM CSS"* and put it at the top of the reading
+order. **Reading 8,086 lines of it as the v4 reference would have imported pre-v4 values wholesale —
+a direct rule 6d violation** (*"THE CORPUS IS v4"*), and the sort bar proves the two builds genuinely
+disagree.
+
+Its own header, read rather than assumed, says what it actually is:
+
+```
+  COMPLETE APPLICATION CSS CAPTURE
+  Page: https://chat.protradingroom.com/?id=6a628a99731b9f77ae9bf505
+  Captured: 2026-07-30T14:35:01.059Z
+
+/* =========================================================
+   SOURCE: https://use.fontawesome.com/releases/v5.8.1/css/all.css
+   ========================================================= */
+```
+
+**Three properties, all measured, none of them "the v4 room CSS":**
+
+1. **It is dated 2026-07-30 — sixteen days before the v4 build capture (2026-08-15).** That is why
+   the sort bar is absent, and it is the whole explanation.
+2. **It is every stylesheet on the page, not the app's own sheet.** Whitespace-stripped it is
+   **616,199 bytes** against the build sheet's **439,090** — **177 KB more CSS**, which is
+   FontAwesome 5.8.1, animate.css and the rest, each under its own `SOURCE:` banner. It is therefore
+   **not** a pretty-print of `protradingroom-source.css` (normalized digests differ:
+   `311f2eb4…` vs `b430e343…`).
+3. **It is browser-serialized, not author source.** `border: 0.08em solid rgb(238, 238, 238)`,
+   `transform: rotate(1turn)`, `animation: 2s linear 0s infinite normal none running fa-spin` — those
+   are CSSOM `cssText` serializations, with hex normalized to `rgb()` and shorthands reordered.
+   **A value copied out of it is the browser's rendering of the author's value, not the author's
+   value**, which matters the moment a rule is compared against a `.less` source.
+
+### What each room stylesheet is actually FOR, now that they are told apart
+
+| artefact | what it really is | use it for |
+|---|---|---|
+| `docs/source-v4-2026-08-15/styles.ee2a710065b60389.css` | ⭐ **the v4 build's own sheet, 2026-08-15, author values, minified** | **THE v4 CSS REFERENCE.** Rule-split it on `}` into 5,410 lines and read that |
+| `src/lib/styles/protradingroom-source.css` | the same sheet **one feature earlier** (no sort bar, no `@charset`) | nothing — superseded, and the delta is now fully known |
+| `css/complete-app-styles.css` | **2026-07-30 multi-sheet RUNTIME capture**, browser-serialized, incl. FontAwesome/animate | ⭐ **the only record of the THIRD-PARTY sheets as the browser saw them**, and the only source of computed serializations |
+| `src/lib/styles/captured-runtime-components.css` | 8,156 lines / 216,055 B | (not yet characterized — do the same digest/date check before trusting it) |
+
+**Queue rows 0b and 0b′ corrected in place.** The lesson is the one this file keeps re-learning in a
+new costume: **an artefact's NAME is not evidence of what it contains.** `complete-app-styles.css`
+reads like the definitive room stylesheet and is a three-week-old capture of a different build with
+FontAwesome bolted on. One `expect(...).not.toContain` already in our own suite said so.
+
+---
+
+## §16.9 — 0b″ closed: `captured-runtime-components.css` is GENERATED from the superseded 2026-07-30 capture — and its selectors are a component census
+
+**2026-08-16.** Opened in §16.8, closed by reading its header rather than assuming from its name.
+
+```css
+/*
+ * GENERATED FROM css/complete-app-styles.css
+ * Source SHA-256: d1829b306dcc6c71a6142c61e46af69ba4eb30cead1a083120b962c6d19bd609
+ *
+ * Angular's runtime scope attributes are translated to captured custom-element
+ * hosts while retaining their original cascade specificity. …
+ * Do not edit this file by hand; run: pnpm css:sync-captured
+ */
+```
+
+**That source digest is `complete-app-styles.css` exactly** (§16.7's table). So a **shipped**
+stylesheet under `src/lib/styles/` is derived from the artefact §16.8 just proved is a
+**2026-07-30, browser-serialized, pre-v4 multi-sheet runtime capture**. Two consequences follow
+mechanically, and neither is recorded anywhere else:
+
+1. **It cannot contain anything the reference gained after 2026-07-30.** The Files sort bar is the
+   worked example — absent from its source, therefore absent from it, and `app.css:3110-3122` is
+   where those rules actually live instead. **Do not treat this file as a completeness check.**
+2. **Its values are browser serializations, not author values** (§16.8 property 3), because its
+   source is. A colour read out of it is `rgb(…)` where the author wrote hex.
+
+**Neither is a defect** — it is a generated file with a named regeneration command and an honest
+provenance header, which is exactly right. It is a **dating** fact, and it is the second time in this
+session that dating an artefact mattered more than reading it.
+
+### ⭐ The by-product: a 26-component census of the v4 room, from the cascade guard
+
+The generator writes an ownership boundary into every `app-room` rule — `:not(app-room :is(…) *)` —
+and that `:is()` list enumerates every child host it found. Read in full at lines 26–52:
+
+```
+app-alert-filter-modal      app-alert-logs-modal        app-alert-qa-modal
+app-alert-send-report-modal app-alerts-advanced-search  app-all-user-pmmodal
+app-av-settings-modal       app-chat-logs-modal         app-debug-log-modal
+app-followed-users-modal    app-mobile-app-info-modal   app-muted-users-modal
+app-play-youtube-modal      app-poll-modal              app-post-alert-modal
+app-privchat                app-rec-preview             app-reply-modal
+app-rich-text-editor        app-room-roster             app-scheduled-alerts-modal
+app-screenshare-preview     app-session-control-modal   app-user-info-modal
+app-user-settings-modal     app-webrtc-troubleshooter   as-split
+```
+
+**26 components plus `as-split`**, under `app-root` → `app-room`. Several bear directly on open
+items: `app-mobile-app-info-modal` (R-15, the Mobile App tab), `app-webrtc-troubleshooter`,
+`app-debug-log-modal`, `app-alerts-advanced-search`, `app-scheduled-alerts-modal` (the alert
+scheduler), `app-rec-preview` + `app-screenshare-preview`.
+
+⚠️ **Apply rule 6b to this list — it is a LOWER BOUND, not a census.** The list contains exactly
+those components that **had scoped CSS rules in the 2026-07-30 capture**. A component with no
+component-scoped styles, or one added after 2026-07-30, cannot appear in it. **Its absence from this
+list is not evidence of anything.** The presence of each of the 26 *is* hard evidence.
+
+---
+
+## §16.10 — ⭐ THE DELETION-RISK REGISTER, MEASURED. The at-risk evidence was never the CSS.
+
+**2026-08-16.** The banner at the top of this file has driven every write since it was added:
+*"the dumps are being deleted — write values, not locations."* **It has been enforced against the
+wrong targets.** §16.7 found the two flagged stylesheets already tracked in git. This section
+answers the question properly — **which reference artefacts have NO counterpart inside
+`trading-room-app`** — by measuring rather than assuming.
+
+### Method, and its one honest limit
+
+Both `~/Desktop/new-room` and `~/Desktop/new-room-control` are **full sibling checkouts of the
+application**, not dump folders — each has `src/`, `services/`, `package.json`,
+`pnpm-workspace.yaml`. `new-room` holds **246,775** non-`node_modules` files; `new-room-control`'s
+`services/` alone is **24 GB** of Rust target output. **A file-by-file digest comparison of those two
+trees is not a tractable operation and was abandoned after it produced a 50 MB digest list** — that
+was my tooling being wrong for the job, not a finding, and it is recorded here so nobody retries it.
+
+The tractable question is the right one anyway: the **evidence directories** — the captures, dumps
+and pastes that exist nowhere else — are a short list, and each was checked for a repo counterpart
+by name.
+
+### `~/Desktop/new-room` — 11 evidence directories with NO repo counterpart
+
+| directory | files | size | notes |
+|---|---|---|---|
+| ⭐ **`more-fucking-evidence`** | 3 | **16 K** | **Cited by name in the global `~/CLAUDE.md`** as the source that revealed the **30 empty `<tr>` elements** around 2 populated ones driving `nth-of-type` striping — *"no search for a class name would ever have surfaced an empty element."* **Tiny, authoritative, at risk.** |
+| **`account-page`** | 2 | 1.0 M | **The account page — which §7/§13 call "the one surface never read."** |
+| `must-match` | 3 | 532 K | name implies a reference-match target |
+| `mising` *(sic)* | 3 | 788 K | |
+| `q&a` | 2 | 12 K | bears on `app-alert-qa-modal` (§16.9's census) |
+| `stylesheet` | 1 | 24 K | |
+| `gap-dump` | 1 | 168 K | |
+| `modal` | 1 | 12 K | |
+| `start-up` | 1 | 4 K | |
+| ⛔ **`enterprise`** | 2 | **31 M** | `ptr1.json` + `prt2.json`. **CONTAINS LIVE JWTs AND PII — MUST NOT BE COMMITTED.** Already fully decoded into `apps/room/docs/website-ptr1-prt2-full-read.md` (6,600+ lines, in the repo). |
+| ⛔ **`NEXT-STEP`** | 5 | **88 M** | Same PII constraint applies until each file is checked. |
+
+**Present in the repo, not at risk:** `new-evidence` → `apps/room/new-evidence`, `second-dump` →
+`apps/room/second-dump`, `preview` → `apps/room/preview`.
+
+### `~/Desktop/new-room-control` — one directory that matters
+
+`css-modals/` holds **40 files**. Exactly **one** — `styes.css` — is in the repo (§16.7). The other
+**39 are not**, and they are queue item 0c:
+
+```
+bootstrap.css   bottstrap-min.css (sic)
+alert.less  badge.less  breadcrumb.less  button-groups.less  buttons.less  carousel.less
+close.less  code.less  component-animations.less  dropdowns.less  forms.less  glyphicons.less
+grid.less  input-groups.less  jumbotron.less  labels.less  list-group.less  media.less
+modals.less  navbar.less  navs.less  normalize.less  pager.less  pagination.less  panels.less
+popovers.less  print.less  progress-bars.less  responsive-embeds.less  responsive-utilities.less
+scaffolding.less  tables.less  thumbnails.less  tooltip.less  type.less  utilities.less  wells.less
+```
+
+**37 `.less` files. `find` over the repository returns ZERO `.less` files anywhere.** These are the
+**Bootstrap 3 LESS sources** — the *custom-vs-stock oracle*. `apps/controller/evidence-bootstrap-3.3.7.css`
+covers part of that job, but **compiled CSS cannot answer what a LESS variable was**, and
+"is this rule stock Bootstrap or a PTR customization?" is a question the manage-page reconstruction
+asks constantly. **~517 KB, uniquely valuable, entirely at risk.**
+
+### The recommendation, stated once and left to the owner
+
+**Three tiers, and only the owner decides:**
+
+1. **Copy in before deletion — no PII, small, uniquely valuable:** `css-modals/*.less` +
+   `bootstrap.css` (~517 K), `more-fucking-evidence` (16 K), `q&a` (12 K), `stylesheet` (24 K),
+   `modal` (12 K), `start-up` (4 K). **~585 KB total.** Precedent exists and is already tracked:
+   `evidence-dumps/TIER1-fetched/styles.css` and `apps/room/css/complete-app-styles.css`.
+2. **Read and transcribe before deletion — larger, or unexamined:** `account-page` (1.0 M),
+   `must-match` (532 K), `mising` (788 K), `gap-dump` (168 K).
+3. ⛔ **NEVER COPY — transcribe findings only:** `enterprise` (31 M) and `NEXT-STEP` (88 M), which
+   carry live JWTs and PII. `enterprise` is already decoded in the repo; `NEXT-STEP` is not checked.
+
+**I have not copied anything.** Moving 585 KB into a git-tracked repository is the owner's call, not
+mine, and `.gitignore` deliberately blocks live-room captures.
+
+---
+
+## §16.11 — `more-fucking-evidence` READ IN FULL (3 files, all 16 KB). **Zero gaps. It is 100% consumed, verbatim, typo included.**
+
+**2026-08-16.** The artefact the global `~/CLAUDE.md` cites by name as the canonical read-don't-search
+evidence. Read end to end — all three files, both of them one line, `sounds` at 4,976 bytes. **It is
+now transcribed here, so it survives the deletion regardless of what the owner decides in §16.10.**
+
+### `files` — a NON-image row, in full
+
+```html
+<div><span class="st-fileName">Melissa's Premarket Checklist.pdf </span><span class="st-fileSize ml-2">68Kb </span><div class="st-fileName"><i>Nov 24, 2025, 7:27:14 AM</i></div></div>
+```
+
+### `images` — an IMAGE row, in full
+
+```html
+<div class="d-flex flex-column"><div><span class="st-fileName">TR3NDY ROOM SCHEDULE.png </span><span class="st-fileSize ml-2">44Kb </span><div class="st-fileName"><i>Oct 13, 2023, 11:27:49 PM</i></div></div><a target="_blank" href="/var/www/uploads/4a500d1f358c6eefbf70295bdb7796d0" type="image/png" download="TR3NDY ROOM SCHEDULE.png" class="ng-star-inserted"><img alt="Image" class="fileDriveImg" style="background-color: #000;" src="/var/www/uploads/4a500d1f358c6eefbf70295bdb7796d0"></a><!----></div>
+```
+
+### `sounds` — the two populated rows' action cell, in full
+
+```html
+<table class="table table-striped m-auto w-100 mt-3 st-fileTable ng-star-inserted"><tbody id="filesDriveList">
+<td class="ng-star-inserted"><div class="d-flex justify-content-center align-items-center flex-wrap"><a class="fileDowload ng-star-inserted" href="/var/www/uploads/66b8e8bdc0470b24bf74e4fe0fa2bf86" type="audio/mpeg" download="PMZ mp3.mp3"></a><!----><a title="Download File" target="_blank" class="btn st-fileDownload" href="/var/www/uploads/66b8e8bdc0470b24bf74e4fe0fa2bf86" type="audio/mpeg" download="PMZ mp3.mp3"><i class="fas fa-download mr-2"></i>Download </a><!----><button type="button" title="Play" class="btn ml-2 st-fileDownload btn-success ng-star-inserted"><span class="ng-star-inserted"><i class="fa fa-play-circle mr-2"></i>Play </span></button></div></td>
+```
+
+### The nine details that only a full read produces — every one already in our source
+
+| detail, from the markup | where ours carries it |
+|---|---|
+| `<tr>` **emitted for EVERY file**, cells collapsed when it belongs to another tab — **7 empty, 2 populated, 23 empty = 32 rows, 30 empty**, which is what drives `table-striped`'s `nth-of-type` | `FilesPane.svelte:393-400` — the `{#each}` is unfiltered, the `{#if !files.matchesFileTab(item)}` arm is deliberately empty, and the comment says *"the row still counts for `nth-of-type` striping"* |
+| ⭐ **`class="fileDowload"` — the reference's own typo**, missing the `n` | `FilesPane.svelte:455` — **preserved exactly**, not "corrected" |
+| ⭐ **two DIFFERENT FontAwesome prefixes**: `fas fa-download` but `fa fa-play-circle` | `:469` and `:491` — both kept distinct |
+| `type="audio/mpeg"` / `type="image/png"` — the real MIME, **three attributes from the row a search would have stopped at** | `files-pane-contract.test.ts:620` |
+| size is **always `Kb`, never scaled** — `4304Kb`, not `4.3Mb`, rounded | `fileSizeInKb` + literal `Kb`; `file-sort.ts:241` records `i.round(e.size/1024)` |
+| trailing spaces inside every label — `"…pdf "`, `"68Kb "`, `"Download "`, `"Play "` | `{' '}` at `:469`, `:491`; the test comment at `:199-204` records a prior wrong assertion about exactly this |
+| a **second, empty, contentless** `<a class="fileDowload">` beside the visible Download button | `:455` |
+| `<img alt="Image" class="fileDriveImg" style="background-color: #000;">` | `:442`, with `.fileDriveImg { max-width: 200px }` and the test at `:711-714` explaining a fixed 120×90 box distorted uploads |
+| dates as `Nov 24, 2025, 7:27:14 AM` — Angular `date:'medium'`, **the format that became `20-3341` when a regex was written over it** | rendered from the formatted string, per the global rule |
+
+**Verdict: zero gaps.** Every class, attribute, glyph, MIME type, trailing space and the striping
+semantics are already implemented and pinned by `files-pane-contract.test.ts`. **This is rule 6
+firing for the tenth time in this file**, and it is the strongest instance yet — the one artefact
+most likely to contain something missing contains nothing missing at all.
+
+⚠️ **It is still a §16.10 tier-1 copy-in candidate.** 16 KB, no PII, cited by name in the standing
+instructions, and the *only* record of the 30-empty-row striping behaviour in its original form.
+This section transcribes it; the file itself is still worth keeping.

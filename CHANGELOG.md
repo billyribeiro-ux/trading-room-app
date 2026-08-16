@@ -24,6 +24,76 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-16
 
+### 2026-08-16 11:01 EDT — The deletion-risk register, measured — and `more-fucking-evidence` read in full: zero gaps
+
+**No runtime impact.** `todo-next.md` only (5,696 → 5,826). No `src/` change, no test touched.
+
+**The evidence at risk from the planned dump deletion was never the CSS.** Measured rather than
+assumed: **11 evidence directories in `~/Desktop/new-room` have no repo counterpart** (22 files,
+~121 MB), and **`~/Desktop/new-room-control/css-modals` holds 37 `.less` files + `bootstrap.css`
+that exist nowhere in this repository** — `find` returns zero `.less` files here. Those LESS sources
+are the custom-vs-stock oracle for the Bootstrap 3 manage page, and compiled CSS cannot answer what a
+LESS variable was. `todo-next.md` §16.10 is the register, in three tiers: ~585 KB that is small and
+PII-free, ~2.5 MB that needs reading and transcribing first, and **119 MB of `enterprise`/`NEXT-STEP`
+that must never be copied** because it carries live JWTs and PII. **Nothing was copied — that is the
+owner's call.**
+
+A digest-by-digest comparison of the two reference trees was attempted and **abandoned as the wrong
+tool**: both are full sibling checkouts (`new-room` alone holds 246,775 non-`node_modules` files;
+`new-room-control/services` is 24 GB of Rust target output), and the job produced a 50 MB digest list
+before being killed. Recorded in §16.10 so nobody retries it.
+
+**`more-fucking-evidence` — the artefact the global instructions cite by name — read end to end, all
+three files, and it is 100% consumed.** Every detail is already implemented and pinned: the
+reference's own typo `class="fileDowload"` preserved uncorrected, the two *different* FontAwesome
+prefixes (`fas fa-download` but `fa fa-play-circle`), `type="audio/mpeg"`, sizes always in `Kb` and
+never scaled (`4304Kb`), the trailing space inside every label, and — the one only a full read
+produces — **a `<tr>` emitted for every file with its cells collapsed when it belongs to another tab**
+(7 empty, 2 populated, 23 empty = 30 empty rows), which is what drives `table-striped`'s
+`nth-of-type`. `FilesPane.svelte:393-400` already does exactly that and says why. **Zero gaps.** All
+three files are transcribed verbatim into §16.11 so the finding survives deletion either way.
+
+### 2026-08-16 10:57 EDT — The CSS evidence corpus, dated: four "room stylesheets" told apart, and one queue item that pointed at the wrong build
+
+**No runtime impact.** `todo-next.md` only (5,453 → 5,696) — evidence documentation. No `src/`
+change, nothing shipped, no test touched.
+
+**The 265-byte delta between our shipped `protradingroom-source.css` and the captured v4 build sheet
+is `@charset "UTF-8";` (17 B) plus the three Files-sort-bar rules (248 B), and nothing else.**
+Lines 1–19 of both are byte-identical; splitting line 20 on `}` into 5,407/5,410 rules and diffing
+gives exactly two hunks. **It is a date, not a defect** — the reference grew the feature between two
+captures, and `app.css:3089-3122`, `FilesPane.svelte:321-325` and `files-pane-contract.test.ts`
+already carry all three rules with negative controls. `file-sort.ts:13-16` had already written down
+the principle: *evidence has a date, and the live application moves.*
+
+**The correction that mattered: `apps/room/css/complete-app-styles.css` is not the v4 room CSS.**
+`todo-next.md` had it queued at the top of the reading order as *"the complete v4 ROOM CSS"*.
+Reading its own header instead of its filename: it is a **2026-07-30 runtime capture of every
+stylesheet on the page** — 16 days before the v4 build, browser-serialized (`rgb(238, 238, 238)`,
+`rotate(1turn)`), and 177 KB larger than the app sheet because it includes FontAwesome 5.8.1 and
+animate.css. Our own `files-pane-contract.test.ts:268` already asserted it lacks `.st-fileSortBar`.
+**Reading 8,086 lines of it as the v4 reference would have imported pre-v4 values wholesale.** The
+v4 reference is `docs/source-v4-2026-08-15/styles.ee2a710065b60389.css`.
+
+**`src/lib/styles/captured-runtime-components.css` is generated from that same 2026-07-30 capture** —
+its header names the source SHA `d1829b30…` and the command `pnpm css:sync-captured` — so it inherits
+the pre-v4 date and the browser serialization. Not a defect; a dating fact worth recording once. Its
+`:not(app-room :is(…) *)` cascade guard yields a **26-component census** of the v4 room, recorded
+with the rule-6b caveat that it is a lower bound: only components that had scoped rules on
+2026-07-30 can appear in it.
+
+**Also corrected: the deletion banner over-scoped the risk.** Both stylesheets the queue flagged as
+*"on the Desktop, never read, transcribe before deletion"* are byte-identical to files already
+**tracked in this repository** (`23bc4e02…`, `d1829b30…`), so line citations into them are permanent
+and the transcription burden on the CSS corpus is far smaller than assumed.
+
+**Verified:** SHA-256 over both Desktop copies and every repo CSS file >100 KB; `cmp` for the first
+differing byte; per-line length comparison; whitespace-stripped digests to test the pretty-print
+hypothesis (it failed — 616,199 B vs 439,090 B normalized); headers of all four stylesheets read
+directly. **Not verified:** no test was run, because no code changed. One tooling error was caught
+and corrected before it reached a finding — `tr '}' '}\n'` maps one character to one character and
+silently did not split anything; redone with `perl -pe`.
+
 ### 2026-08-16 10:52 EDT — Phase 5 slice 6: `RoomFiles`, and the first prop list collapsed at TWO call sites
 
 **`+page.svelte` 8,899 → 8,699.** Script 7,915 → 7,729, and the template moved for the FIRST
@@ -107,6 +177,136 @@ at the statement, not at the start of its line, so removing a region left its tw
 behind — and where two regions were adjacent the orphans accumulated into a six-space indent on the
 comment that followed. It compiled, it type-checked, and it was wrong. The page was reverted and the
 removal redone indent-aware rather than patched.
+
+### 2026-08-16 10:47 EDT — Two "uncaptured ancestor" gaps closed from the stylesheet; one wrong attribution found in our own CSS
+
+**Runtime impact: none** — `todo-next.md` only (5,342 → 5,433 lines). `styes.css` read to line 559 of
+11,347.
+
+**Two gaps `control-plane-capture.md` left open as "uncaptured ancestor" are closed from source:**
+
+- §15.9 recorded *"The parent element that constrains `.app` to 1140px is not captured… the 1140px
+  measured width comes from an uncaptured ancestor (its selector, class and rules are unknown)."*
+  **It is `.layout-boxed .app-container > section { max-width: 1140px; margin: 0 auto }`.**
+- §15.9's `.footer-hidden` inference had no footer to point at. **It is
+  `.app-container > footer { height: 60px; padding: 15px; border-top: 1px solid #f4f5f5;
+  background-color: #f0f0f0 }`** — and `.app { padding: 15px; padding-bottom: 80px }` reserves the
+  space for it, exactly as captured.
+
+**The manage app's layout contract is now complete:** sidebar `240px` (`.aside-offscreen` pulls it to
+`-240px`), navbar `50px`, z-index stack header **410** / aside **310** / footer **210** / section
+**110**, `.layout-fixed` pinning header and aside, and a single `min-width: 768px` breakpoint
+throughout.
+
+**A cross-app caution recorded:** the **manage sidebar is 240px while the v4 room's is 250px** (§10.2).
+Different apps, different constants — the value must not be shared. Meanwhile the *palette* is
+shared: the topnavbar hover `rgba(54,63,69,.05)` is the same `#363f45` as `.btn-inverse`, and
+`#8394a9` here is the room's `--lightTheme-date-color`. **One design system, two Bootstrap
+generations.**
+
+**Implementation audit — we reproduce the geometry but name the wrong cause.** `layout-boxed` has
+**0 occurrences** in `apps/controller/src`, and that is *not* a gap: `account.css:318/331` and
+`AppFooter.svelte:2` carry the measured rects (`424.5,80,1140x953.992`) and our numbers are correct.
+**But `account.css:743` says *"It sits INSIDE the 1170 container in the reference"*** — Bootstrap 3's
+`.container` is 1170px at `lg`, and `.layout-boxed` overrides it to **1140**, which is why every
+measurement in our own comments is 1140. **The values are right; the explanatory comment names the
+wrong constraint.** Worth fixing before the dumps are deleted, since after that the comment is the
+only record of the reasoning.
+
+### 2026-08-16 10:44 EDT — The theme is `Naut` by @geedmo; and the manage stylesheet was in our own repo, contract-tested
+
+**Runtime impact: none** — `todo-next.md` only (5,270 → 5,342 lines).
+
+**A gap `control-plane-capture.md` explicitly refused to guess at is closed from source.** Its §A
+recorded: *"The AngularJS admin theme's NAME and vendor are not in the capture… I am NOT naming the
+theme product, because that name is not in the evidence."* **`styes.css` lines 9–17 name it:
+`Naut — Bootstrap Admin Theme + AngularJS`, author `@geedmo`, licensed through WrapBootstrap.** That
+vindicates the 16-state "theme leftover" grouping — the mailbox, dashboard, dashboard-alt, columns and
+setting-demo routes are Naut's own demo screens, and their absence from our build is correct.
+
+**And a correction to the entry above it.** `cmp -s` proves
+`~/Desktop/new-room-control/css-modals/styes.css` is **byte-identical** to
+`apps/controller/evidence-dumps/TIER1-fetched/styles.css` — **218,719 bytes, in this repository since
+2026-08-13** — and `apps/controller/src/lib/manage-panel-bootstrap3-contract.test.ts` already
+SHA-pins the Bootstrap 3 source against it. **So this is the sixth instance of the same failure, not
+the fifth, and the one with the least excuse.**
+
+That test also records a finding neither §15 nor §16 had reached: **the product runs two Bootstrap
+generations** — the **room is Bootstrap 5** (proven by a live tooltip capture emitting
+`bs-tooltip-start` with `data-popper-placement`) while **account, manage and login are Bootstrap 3**
+(`div class="panel panel-default"` six times across the login-page captures; `.panel` does not exist
+in 4 or 5). **That independently corroborates §10.2's Bootstrap-5 room stack and §6.13's sighting of
+BS5 class names leaking into the AngularJS manage page.**
+
+**Three accessibility and styling facts now sourced rather than observed:**
+
+- **`*:focus { outline: 0 !important }`** at lines 66–68 — §15.8 recorded this as `.btn` and `a`
+  only. **It is a universal selector**; every focusable element on the manage app loses its focus
+  ring. Worse than recorded, and not to be reproduced.
+- The sessions header's **60.5px** height comes from
+  `.table > thead > tr > th { padding-top: 20px !important; padding-bottom: 20px !important }`.
+- **`#e6e9ee` is a theme-wide token**, not just `.btn-default`'s border — it is also
+  `.page-header`, `.nav-tabs-alerts`, `.tab-content` and `.popover`.
+
+**One distinction preserved rather than collapsed:** `styes.css` lines 58–65 define the **cloak** set
+without `.ng-hide:not(.ng-hide-animate)`, while the injected sheet §15.12 found **adds** that
+selector. **Both exist and they are different rules.**
+
+**Also: the two apps load different fonts** — the manage app `@import`s **Roboto** from Google Fonts
+(live, line 2), while the v4 room's font imports are commented out and it uses **Lato** (§10.1–10.2).
+
+**Still genuinely only in the owner's folders:** the **35 Bootstrap 3 `.less` sources** (the
+definitive custom-vs-stock oracle, used to prove `.btn-secondary` dead in all four sheets) and
+`complete-app-styles.css` (688,687 B, the v4 room).
+
+### 2026-08-16 10:42 EDT — The complete stylesheets were on disk the whole time; "not captured" was wrong five times
+
+**Runtime impact: none** — `todo-next.md` only (5,202 → 5,270 lines).
+
+**Owner: *"if you read all the css files and folders i created you will have a lot of answers that
+once again you're assuming."*** Correct, and located: **41 files** the owner assembled, none of them
+consulted.
+
+- **`~/Desktop/new-room-control/css-modals/styes.css`** *(sic)* — **218,719 bytes, PTR's entire
+  first-party manage stylesheet.** Same byte count as the `TIER1-fetched/styles.css` that
+  `gaps-closed.md:56` already listed.
+- **`bootstrap.css` (144,638) + `bottstrap-min.css` (147,852) + 35 Bootstrap 3 `.less` SOURCES** —
+  `buttons`, `labels`, `panels`, `tables`, `type`, `forms`, `navs`, `modals` and the rest. **The LESS
+  sources are better evidence than any capture** — they carry variables and authored structure, not a
+  resolved cascade.
+- **`~/Desktop/new-room/css/complete-app-styles.css` — 688,687 bytes, the complete v4 room CSS**,
+  plus `styles.d622cb9ed2bbc221.css` (444,545).
+
+**What that invalidates, verified against all four sheets:**
+
+- **`.btn-secondary` = 0 in `buttons.less`, `bootstrap.css`, `bottstrap-min.css` AND `styes.css`.**
+  §15.8 said *"nothing readable defines it"* with a hedge that a cross-origin sheet *"could in
+  principle"* carry it. **The hedge is gone — it is proven dead from source.** A Bootstrap 4 class
+  name in a Bootstrap 3 build.
+- **`.btn-inverse` — 58 occurrences in `styes.css`, 0 in Bootstrap.** Confirmed custom, and
+  load-bearing rather than incidental.
+- **`.label-orange` — 6 in `styes.css`, 0 in `labels.less`.** Confirmed custom.
+- **§15.9/§15.12's *"heading CSS is uncaptured, so 'this heading has no rule' is unprovable"* is
+  FALSE** — `type.less` carries the heading block at lines 9–26 and `h3, .h3 { font-size:
+  @font-size-h3; }` at line 49.
+- **§15.8's *"no :hover, :focus, :active or :disabled rules appear anywhere"*** was a fact about the
+  *capture*, which only collected rules matching each element's current state. Those states are all
+  in `buttons.less`.
+
+**The rule this earns: "not captured" is a statement about ONE artefact, never about the evidence
+available.** Check whether the underlying asset exists on disk — especially under
+`~/Desktop/new-room/` and `~/Desktop/new-room-control/`, which the owner has been assembling
+deliberately.
+
+**This is the fifth instance of the same family of error this session**, and the sharpest, because
+the answer sat in a folder created for exactly this purpose: (1) v4 CSS tokens re-derived when
+`tokens.css` held them; (2) a 6,600-line decode corpus never consulted; (3) R-15 called "built" from
+a truncated citation; (4) `api-post-routes.md` called "one fetch away" while in the repo;
+(5) **"not captured" written five times over stylesheets on disk.**
+
+**These are now queue items 0a–0c, ahead of the remaining decoded docs**, because `styes.css` is the
+source of truth for the controller's visual match and answers questions those docs explicitly leave
+open.
 
 ### 2026-08-16 10:38 EDT — `control-plane-capture.md` READ IN FULL (1,243/1,243); its §H vindicates our `account.css` comment
 
