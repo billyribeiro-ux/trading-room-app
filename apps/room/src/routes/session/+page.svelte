@@ -27,7 +27,7 @@
    * in its bundle.
    */
   import { enhance } from '$app/forms';
-  import { goto, replaceState } from '$app/navigation';
+  import { goto } from '$app/navigation';
   import { page } from '$app/state';
   import type { ActionData, PageData } from './$types';
 
@@ -110,11 +110,17 @@
     `window.top === window.self` is the reference's own guard and is kept: inside an iframe the
     embedder owns the history stack, and rewriting it there is both rude and unreliable.
 
-    `replaceState` rather than `goto` — same entry, no navigation, no `load` re-run. A `goto` would
-    re-run the load without the token and blank the very prefill this page was opened to show.
+    `goto(..., { shallow: true, replace: true })` — same entry, no navigation, no `load` re-run.
+    A plain `goto` would re-run the load without the token and blank the very prefill this page was
+    opened to show, which is why `shallow` is the load-bearing option rather than a style choice.
+
+    It was `replaceState` until the SvelteKit 3 RC (2026-08-13), which deprecates `pushState` and
+    `replaceState` in favour of one navigation function with a `shallow` option — migration guide,
+    "Shallow Routing". `replace: true` carries the other half of the old name: a Back press must not
+    return the reader to a URL that still holds their token.
 
     ON THE FEEDBACK LOOP, because this is the obvious objection and the autofixer raises it: the
-    effect READS `page.url` and `replaceState` WRITES it, so it re-runs itself exactly once. The
+    effect READS `page.url` and the shallow navigation WRITES it, so it re-runs itself exactly once. The
     `has('jwtSite')` guard is what terminates it — the second pass finds no token and returns before
     touching history. The guard is load-bearing, not defensive; delete it and this spins.
 
@@ -129,7 +135,11 @@
     if (!stripped.searchParams.has('jwtSite')) return;
 
     stripped.searchParams.delete('jwtSite');
-    replaceState(`${stripped.pathname}${stripped.search}`, page.state);
+    void goto(`${stripped.pathname}${stripped.search}`, {
+      shallow: true,
+      replace: true,
+      state: page.state
+    });
   });
 
   /**
@@ -165,8 +175,15 @@
 
     /* `page.url` is a ReadonlyURL — its `searchParams` has no `delete`. Copy via href to mutate. */
     const next = new URL(page.url.href);
-    for (const identityParam of ['jwtSite', 'name', 'email']) next.searchParams.delete(identityParam);
-    await goto(`${next.pathname}${next.search}`, { invalidateAll: true });
+    for (const identityParam of ['jwtSite', 'name', 'email'])
+      next.searchParams.delete(identityParam);
+    /*
+      `refreshAll`, which is what `invalidateAll` was RENAMED to for `goto` in SvelteKit 3 —
+      migration guide, "goto Options". The old name is not kept as an alias, so passing it means the
+      option is silently ignored and the cleared identity parameters leave stale `load` data behind
+      them. That is the failure mode worth naming: nothing errors, the form just refills.
+    */
+    await goto(`${next.pathname}${next.search}`, { refreshAll: true });
   }
 
   /**

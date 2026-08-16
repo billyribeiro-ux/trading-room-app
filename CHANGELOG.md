@@ -24,6 +24,60 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-16
 
+### 2026-08-16 19:28 EDT — SvelteKit 3 RC conformance: audited against the guide published three days ago
+
+**A conformance pass, not a refactor.** Suite 2,374 across 160. `svelte-check` 1,190/0/0. All four
+CI steps green locally.
+**Runtime impact: yes** — one navigation call changed shape and one `goto` option was silently
+inert.
+
+The SvelteKit 3 Release Candidate landed **2026-08-13**, three days ago, and this repository runs
+`@sveltejs/kit@3.0.0-next.16`. Every item of its migration guide was checked against both apps
+rather than assumed, and the result is written out in full because "we are already conformant" is
+exactly the claim that rots.
+
+**Already conformant — verified, not assumed:** configuration in `vite.config.ts` (no
+`svelte.config.js`); `tsconfig` extends `$app/tsconfig` in BOTH apps; `$app/environment` → `$app/env`
+(0 old, 32 files new); `$app/stores` → `$app/state` (0 old, 5 new); `$env/*` → `$app/env/*` (0 real
+imports — the ten surviving mentions are all prose documenting the 2026-08-15 move); `$service-worker`
+(0); `$app/paths` using `asset()`/`resolve()` and never `base`/`assets`/`resolveRoute` (21 imports,
+all the new API); no `page.url` mutation; no `error(status, {object})`; no `node/polyfills`; no
+`csrf.checkOrigin`; no `data-sveltekit-*="off"`. Node v24.19 against a floor of v22.17, Vite 8.2.1
+against a floor of 8.0.12, Svelte 5.56.8 against a floor of 5.56.4.
+
+**Three divergences, all fixed:**
+
+**1. `replaceState` → `goto(..., { shallow: true, replace: true })`** — `session/+page.svelte`, the
+effect that strips a JWT out of the address bar. Kit 3 deprecates `pushState`/`replaceState` for one
+navigation function with a `shallow` option. What matters is that the guarantee moved with it: the
+old comment said "`replaceState` rather than `goto` — no `load` re-run", and under Kit 3 the correct
+call IS a `goto`, with `shallow: true` carrying that guarantee and `replace: true` carrying the half
+the old name held. Without the latter a Back press returns the reader to a URL holding their token.
+
+**2. `goto(..., { invalidateAll: true })` → `refreshAll: true`** — `clearForm()` on the same page.
+The rename has no alias, so the option was being **silently ignored**: clearing the identity
+parameters left the stale `load` data behind them and the form refilled. Nothing errored.
+
+**3. A stale comment holding dead config in place** — `apps/room/tsconfig.json` listed
+`.svelte-kit/ambient.d.ts` in `include` "for the `$env/dynamic/*` and `$env/static/*` module
+declarations, which this app still imports". It imports neither; the move to `$app/env/*` landed
+2026-08-15 and the sentence did not move with it. Removed and proved dead by measurement —
+`svelte-check` 1,190 files, 0 errors, unchanged.
+
+**`session-login-contract.test.ts` was RE-POINTED rather than relaxed**, and the distinction is the
+point: the old assertion forbade `goto` outright, which was right for the old API and would be
+exactly wrong for the new one. It now names the PROPERTY that carries the guarantee — `shallow: true`
+and `replace: true` — and forbids the deprecated pair by name.
+
+**KNOWN AND NOT DONE: `$lib` → `#lib`.** Kit 3 replaces the alias with Node subpath imports, and
+`vite.config.ts:105` currently keeps the old specifier working through `alias: { $lib: 'src/lib' }`,
+which the plugin deprecates on every run. Measured: **688 specifiers across 186 files** in the two
+apps, plus the `paths` block in each `tsconfig.json`. It needs explicit extensions (`#lib/foo.ts`,
+`#lib/foo/index.ts`) because Node and TypeScript require subpath imports to be unambiguous, so it is
+a resolve-then-rewrite, not a find-and-replace. Its own change, as `vite.config.ts:100-104` already
+said.
+
+
 ### 2026-08-16 18:52 EDT — THIRTEEN BROKEN CONTROLS: the unbound-method guard could not see a plain `.ts`
 
 **A runtime bug fix, not a refactor.** Suite 2,374 across 160. `svelte-check` 1,190/0/0. All four

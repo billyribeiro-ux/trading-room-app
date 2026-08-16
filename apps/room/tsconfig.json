@@ -16,15 +16,13 @@
   },
   // Kit 3's base carries no `include`, so it is stated here. Without it TypeScript checks everything
   // under the project directory, including tooling that was never in the gate.
-  // `.svelte-kit/ambient.d.ts` is listed explicitly: it carries the `$env/dynamic/*` and
-  // `$env/static/*` module declarations, which this app still imports. Kit 2's generated base
-  // included it; Kit 3's does not, so without this line every `$env/*` import reads as a missing
-  // module. The controller does not need it — it uses the newer `$app/env/*` API.
-  "include": [
-    "src/**/*.js",
-    "src/**/*.ts",
-    "src/**/*.svelte",
-    "vite.config.ts",
-    ".svelte-kit/ambient.d.ts"
-  ]
+  //
+  // `.svelte-kit/ambient.d.ts` USED to be listed here, for the `$env/dynamic/*` and `$env/static/*`
+  // module declarations it carries. That line was removed on 2026-08-16 because the reason given for
+  // it had stopped being true: the sentence said "which this app still imports", and the app imports
+  // neither — the move to `$app/env/*` landed on 2026-08-15 and the comment was not updated with it.
+  // Ten references to `$env/dynamic/private` survive in this app and every one is prose explaining
+  // that migration. Verified by removing the line and re-running `svelte-check`: 1,190 files, 0
+  // errors, unchanged. It was config nothing read, held in place by a stale explanation.
+  "include": ["src/**/*.js", "src/**/*.ts", "src/**/*.svelte", "vite.config.ts"]
 }
