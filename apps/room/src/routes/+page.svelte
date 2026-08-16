@@ -103,6 +103,7 @@
   import { ALERTS_LOG, RoomLogPages } from '$lib/room/log-pages.svelte';
   import { RoomArrivals, RoomOrderedArrivals } from '$lib/room/arrivals';
   import { RoomScrollFollow } from '$lib/room/scroll-follow';
+  import { RoomToasts } from '$lib/room/toasts.svelte';
   import type { RoomMessageChrome } from '$lib/room-message-chrome';
   import { EXTRA_COMPOSER, RoomChat } from '$lib/room/chat.svelte';
   import { RoomMedia } from '$lib/room/media.svelte';
@@ -190,7 +191,6 @@
     setSoundEffectsVolume,
     unloadSoundEffects
   } from '$lib/sound-effects';
-  import type { ToastNotice } from '$lib/toast';
   import type {
     AlertTab,
     ChatTab,
@@ -1262,9 +1262,22 @@
     value: string;
     onconfirm: (value: string) => void;
   } | null>(null);
-  let toasts = $state<ToastNotice[]>([]);
-  let toastSequence = 0;
-  const toastTimers = new Map<number, ReturnType<typeof globalThis.setTimeout>>();
+  /*
+    The room's toast queue, in `$lib/room/toasts.svelte.ts`.
+
+    The first slice of the phase that moves BEHAVIOUR out of this file rather than declarations —
+    the queue, its timers, the duplicate guard and the browser notification left together, because
+    a class holding `toasts` while this file held every function that writes it is what Phase 1
+    produced eight times and is why it only moved 584 lines.
+
+    It owns the MECHANISM and deliberately not the policy: `deliverAlert` and `deliverQaNotice`
+    below decide who is told and with which sound, reading six preferences that still live in this
+    file, so they stay here until those do.
+
+    A `const` that is never reassigned, for the reason `RoomPolls` records: reassigning a shared
+    reactive value breaks the link for everything reading it downstream.
+  */
+  const toasts = new RoomToasts();
   let tweetWindow: Window | null = null;
   let privateChatOpen = $state(false);
   // The private-chat gear is a toolbar toggle, not a dropdown: `<li class="nav-item dropdown"
@@ -2621,8 +2634,8 @@
       const title = `Mention from @${item.senderName ?? 'Unknown'}`;
       /*  — the reference passes the body as the
          toast TEXT and the title second, and enables HTML because chat bodies carry markup. */
-      showToast({ kind: 'info', title, message: item.body, enableHtml: true });
-      requestAlertBrowserNotification(title, item.body, null, item.senderEmailHash ?? '');
+      toasts.show({ kind: 'info', title, message: item.body, enableHtml: true });
+      toasts.notify(title, item.body, null, item.senderEmailHash ?? '');
     }
   });
 
@@ -3346,7 +3359,7 @@
       toast, not a modal.
     */
     if (action === 'copied-to-clipboard') {
-      showToast({ kind: 'success', message: 'Copied to clipboard.', enableHtml: false });
+      toasts.show({ kind: 'success', message: 'Copied to clipboard.', enableHtml: false });
       return;
     }
 
@@ -3834,46 +3847,6 @@
     xhr.send();
   }
 
-  function clearToastTimer(id: number) {
-    const timer = toastTimers.get(id);
-    if (timer !== undefined) globalThis.clearTimeout(timer);
-    toastTimers.delete(id);
-  }
-
-  function dismissToast(id: number) {
-    clearToastTimer(id);
-    toasts = toasts.filter((toast) => toast.id !== id);
-  }
-
-  function scheduleToastRemoval(id: number, timeOut: number) {
-    clearToastTimer(id);
-    toastTimers.set(
-      id,
-      globalThis.setTimeout(() => {
-        dismissToast(id);
-      }, timeOut)
-    );
-  }
-
-  /**
-   * @param timeOut milliseconds, or **0 for a toast that never expires** — toastr's
-   *   `disableTimeOut: true`. The reconnect toasts below use it: a banner that says "reconnecting"
-   *   must not clear itself while the thing is still disconnected.
-   * @returns the id, so a sticky toast can be cleared by whatever raised it. `null` when the notice
-   *   was a duplicate and nothing was added.
-   */
-  function showToast(notice: Omit<ToastNotice, 'id'>, timeOut = 5_000): number | null {
-    const duplicate = toasts.some(
-      (toast) => toast.title === notice.title && toast.message === notice.message
-    );
-    if (duplicate) return null;
-
-    const id = ++toastSequence;
-    toasts = [{ id, ...notice }, ...toasts];
-    if (timeOut > 0) scheduleToastRemoval(id, timeOut);
-    return id;
-  }
-
   /**
    * The media server's connection toasts, verbatim from the captured room:
    *
@@ -3931,18 +3904,18 @@
       else to reproduce.
     */
     if (reconnectToastId !== null) {
-      dismissToast(reconnectToastId);
+      toasts.dismiss(reconnectToastId);
       reconnectToastId = null;
     }
     if (presenterReconnectToastId !== null) {
-      dismissToast(presenterReconnectToastId);
+      toasts.dismiss(presenterReconnectToastId);
       presenterReconnectToastId = null;
     }
     // ALWAYS, not just on a redial. A toast that says "reconnecting..." is false the instant the
     // socket opens, and gating this on `reconnected` left the error on screen forever whenever the
     // first connect of a session happened to follow a failed one.
-    dismissToastsMatching('Disconnected from Media Server');
-    showToast({ kind: 'success', message: 'Connected to Media Server', enableHtml: false });
+    toasts.dismissMatching('Disconnected from Media Server');
+    toasts.show({ kind: 'success', message: 'Connected to Media Server', enableHtml: false });
   }
 
   /**
@@ -3953,14 +3926,14 @@
    * `#onClose` also runs for every FAILED reconnect attempt, so this was firing on a backoff
    * schedule that climbs to one every 30s (`maxReconnectDelayMs: 30_000`).
    *
-   * `showToast` dedupes an identical message, but its 5s timer still expires, so each retry raised
+   * `toasts.show` dedupes an identical message, but its 5s timer still expires, so each retry raised
    * a fresh toast the moment the previous one cleared. With the media server down the banner was
    * permanent - which is exactly what it did when I killed the SFU and left it dead.
    */
   function mediaServerDisconnected() {
     if (!media.connected) return;
     media.connected = false;
-    showToast({
+    toasts.show({
       kind: 'error',
       message: 'Disconnected from Media Server... reconnecting...',
       enableHtml: false
@@ -3968,7 +3941,7 @@
 
     // The sticky pair, raised beside the bus toast exactly as the reference raises them.
     if (reconnectToastId === null) {
-      reconnectToastId = showToast(
+      reconnectToastId = toasts.show(
         {
           kind: 'info',
           title: 'Media',
@@ -3989,7 +3962,7 @@
       localMicProducerId || webcamStream || localScreenStreams.size > 0
     );
     if (holdsLiveTrack && presenterReconnectToastId === null) {
-      presenterReconnectToastId = showToast(
+      presenterReconnectToastId = toasts.show(
         {
           kind: 'info',
           title: 'Presenter',
@@ -4424,56 +4397,6 @@
     stopSharedScreen(producerId);
   }
 
-  function dismissToastsMatching(fragment: string) {
-    for (const toast of toasts) {
-      if (toast.message.includes(fragment)) dismissToast(toast.id);
-    }
-  }
-
-  function showInfoToast(message: string) {
-    showToast({ kind: 'info', message, enableHtml: false });
-  }
-
-  function stickToast(id: number) {
-    clearToastTimer(id);
-  }
-
-  function resumeToast(id: number) {
-    if (toasts.some((toast) => toast.id === id)) scheduleToastRemoval(id, 1_000);
-  }
-
-  function decodeHtmlEntities(value: string) {
-    const textarea = document.createElement('textarea');
-    textarea.innerHTML = value;
-    return textarea.value;
-  }
-
-  function requestAlertBrowserNotification(
-    title: string,
-    message: string,
-    icon: string | null | undefined,
-    emailHash: string
-  ) {
-    if (!('Notification' in window)) return;
-
-    void Notification.requestPermission()
-      .then((permission) => {
-        if (permission !== 'granted' && permission !== 'default') {
-          console.log('User blocked notifications.');
-          return;
-        }
-        const notificationIcon =
-          icon || `https://secure.gravatar.com/avatar/${emailHash}?d=mm&s=50`;
-        new Notification(title, {
-          body: decodeHtmlEntities(message),
-          icon: notificationIcon
-        });
-      })
-      .catch((error: unknown) => {
-        console.error(error);
-      });
-  }
-
   function deliverAlert(alert: {
     senderName: string;
     senderEmailHash: string;
@@ -4501,8 +4424,8 @@
     if (!delivery.toast) return;
 
     const { timeOut, ...toast } = delivery.toast;
-    showToast(toast, timeOut);
-    requestAlertBrowserNotification(
+    toasts.show(toast, timeOut);
+    toasts.notify(
       delivery.toast.title,
       delivery.toast.message,
       alert.senderAvatarUrl,
@@ -4541,7 +4464,7 @@
 
     const senderIsPresenter =
       question.senderRole === 'staff' || question.senderRole === 'admin';
-    showToast({
+    toasts.show({
       kind: 'info',
       title: `Alert ${senderIsPresenter ? 'answer' : 'question'} from @${question.senderName}`,
       message: `"${question.body}" for alert: "${alert.body}" by ${alert.senderName}`,
@@ -4869,7 +4792,7 @@
       container.innerHTML = item.body;
       const plainText = container.textContent ?? '';
       void navigator.clipboard.writeText(plainText).then(() => {
-        showInfoToast('Copied to clipboard.');
+        toasts.info('Copied to clipboard.');
       });
     }
     if (action === 'edit') {
@@ -5435,7 +5358,7 @@
           localMicProducerId = producer.id;
         } catch (error) {
           console.error('[media] the microphone could not be published', error);
-          showToast({
+          toasts.show({
             kind: 'error',
             message: 'Your microphone could not be shared with the room.',
             enableHtml: false
@@ -5594,7 +5517,7 @@
           localWebcamProducerId = producer.id;
         } catch (error) {
           console.error('[media] the webcam could not be published', error);
-          showToast({
+          toasts.show({
             kind: 'error',
             message: 'Your camera could not be shared with the room.',
             enableHtml: false
@@ -5800,7 +5723,7 @@
           // The local preview still works; only the sharing half failed, and saying so beats a
           // presenter believing the room can see them.
           console.error('[media] the screen could not be published', error);
-          showToast({
+          toasts.show({
             kind: 'error',
             message: 'Your screen could not be shared with the room.',
             enableHtml: false
@@ -7083,7 +7006,7 @@
             `success` and `error`, not one skin for both — losing a capability is not good news, and
             the capture colours it accordingly.
           */
-          showToast({
+          toasts.show({
             kind: command.give === true ? 'success' : 'error',
             message:
               command.give === true
@@ -7352,7 +7275,7 @@
             data.sessData?.userJoinAndLeavePopup &&
             (joined ? popupOnUserJoin : popupOnUserLeave)
           ) {
-            showToast({
+            toasts.show({
               kind: joined ? 'info' : 'warning',
               message: `${nick} logged ${joined ? 'in' : 'out'}.`,
               enableHtml: false
@@ -7410,7 +7333,7 @@
           tell the member they can type while the box stayed disabled.
         */
         if (command?.cmd === 'unmuteChat' && command.targetUserId === data.user.id) {
-          showToast({ kind: 'info', message: 'Chat enabled', enableHtml: false });
+          toasts.show({ kind: 'info', message: 'Chat enabled', enableHtml: false });
           void invalidateAll();
         }
         return;
@@ -7831,7 +7754,7 @@
      * precisely the case a reader hits on a deployment with no media server, and it is the case
      * that must not be silent.
      *
-     * showToast() already dedupes on title+message, so the socket path firing as well cannot
+     * toasts.show() already dedupes on title+message, so the socket path firing as well cannot
      * produce two identical toasts.
      */
     void signalling.connect().catch(() => {
@@ -7883,8 +7806,7 @@
       if (chatScrollTimer !== undefined) globalThis.clearTimeout(chatScrollTimer);
       // An armed "play at" that outlives the room would post a broadcast from a page nobody is on.
       clearScheduledVideoTimer();
-      for (const timer of toastTimers.values()) globalThis.clearTimeout(timer);
-      toastTimers.clear();
+      toasts.destroy();
       unloadSoundEffects();
       media.stopTalking(data.user.id);
       stopStream(microphoneStream);
@@ -9510,7 +9432,12 @@
         onconfirm={(value) => bootboxPrompt?.onconfirm(value ?? '')}
       />
     {/if}
-    <ToastHost {toasts} ondismiss={dismissToast} onstick={stickToast} onresume={resumeToast} />
+    <ToastHost
+      toasts={toasts.notices}
+      ondismiss={(id) => toasts.dismiss(id)}
+      onstick={(id) => toasts.stick(id)}
+      onresume={(id) => toasts.resume(id)}
+    />
     {#if selectedImageUrl}
       <div
         class="bootbox modal fade imgur-modal show"

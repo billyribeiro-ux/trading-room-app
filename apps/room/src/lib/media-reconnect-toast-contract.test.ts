@@ -25,12 +25,31 @@ import { describe, expect, it } from 'vitest';
 const cwd = process.cwd();
 const BUNDLE = readFileSync(resolve(cwd, 'docs/source/main.d6d3c112b59b7d0d.js'), 'utf8');
 const PAGE = readFileSync(resolve(cwd, 'src/routes/+page.svelte'), 'utf8');
+/*
+  TWO SOURCE CONSTANTS since 2026-08-16, because this control is now split across two files and
+  saying so is the point.
+
+  The QUEUE — how a toast is raised, whether it expires, what `show` hands back — moved to
+  `RoomToasts` in Phase 5 slice 1. What RAISES these two particular toasts did not: they are raised
+  by `mediaServerDisconnected` and cleared by `mediaServerConnected`, both of which are media
+  transport and stay in the page until slice 4.
+
+  So each assertion below points at the file that owns its subject, and the hand-off between them is
+  asserted as well rather than assumed. A page that called a method the class does not define, or a
+  class whose method the page never calls, would otherwise pass every individual expectation here.
+*/
+const TOASTS = readFileSync(resolve(cwd, 'src/lib/room/toasts.svelte.ts'), 'utf8');
 
 /* Comments stripped: the page quotes the bundle in its own docblock, and a test reading the raw
    source would match that quotation with the implementation deleted. */
-const code = PAGE.replace(/<!--[\s\S]*?-->/g, '')
-  .replace(/\/\*[\s\S]*?\*\//g, '')
-  .replace(/^\s*\/\/.*$/gm, '');
+const stripComments = (source: string) =>
+  source
+    .replace(/<!--[\s\S]*?-->/g, '')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/^\s*\/\/.*$/gm, '');
+
+const code = stripComments(PAGE);
+const queue = stripComments(TOASTS);
 
 describe('the bundle still says what this was built from', () => {
   it('raises both toasts in the disconnect handler', () => {
@@ -78,7 +97,7 @@ describe('the member toast matches the captured call', () => {
     const at = BUNDLE.indexOf('Reconnecting to media...');
     expect(BUNDLE.slice(at, at + 220)).toContain('disableTimeOut');
     expect(code).toContain('if (reconnectToastId === null)');
-    // `0` is this room's spelling of `disableTimeOut` — see `showToast`.
+    // `0` is this room's spelling of `disableTimeOut` — see `RoomToasts.show`.
     const raise = code.slice(code.indexOf("title: 'Media'"));
     expect(raise.slice(0, 400)).toMatch(/\n\s*0\n\s*\)/);
   });
@@ -130,20 +149,48 @@ describe('both are cleared by the event that makes them false', () => {
     // Defined once, and that once is the definition itself.
     expect((BUNDLE.match(/clearReconnectToasts/g) ?? []).length).toBe(1);
 
-    const connected = code.slice(code.indexOf('function mediaServerConnected'));
-    expect(connected.slice(0, 700)).toContain('dismissToast(reconnectToastId)');
-    expect(connected.slice(0, 700)).toContain('dismissToast(presenterReconnectToastId)');
+    const at = code.indexOf('function mediaServerConnected');
+    // Positive first: a slice that moves this handler must fail here rather than slicing from -1
+    // and asserting against the whole rest of the file, which is how `chat-mode-contract` went
+    // green against an end marker that had ceased to exist.
+    expect(
+      at,
+      'mediaServerConnected has left the page - re-point this at the file that owns it'
+    ).toBeGreaterThan(-1);
+
+    const connected = code.slice(at);
+    expect(connected.slice(0, 700)).toContain('toasts.dismiss(reconnectToastId)');
+    expect(connected.slice(0, 700)).toContain('toasts.dismiss(presenterReconnectToastId)');
     expect(connected.slice(0, 700)).toContain('reconnectToastId = null');
     expect(connected.slice(0, 700)).toContain('presenterReconnectToastId = null');
   });
 
   it('a sticky toast is never handed to the removal timer', () => {
-    // `showToast` schedules removal only for a positive timeout; 0 means it stays until cleared.
-    expect(code).toContain('if (timeOut > 0) scheduleToastRemoval(id, timeOut)');
+    // `show` schedules removal only for a positive timeout; 0 means it stays until cleared.
+    // The rule lives with the queue now, so it is read from the queue.
+    expect(queue).toContain('if (timeOut > 0) this.#scheduleRemoval(id, timeOut)');
   });
 
-  it('showToast returns the id, or the sticky ones could never be cleared', () => {
-    expect(code).toMatch(/function showToast\([^)]*\): number \| null/);
-    expect(code).toContain('return id;');
+  it('show returns the id, or the sticky ones could never be cleared', () => {
+    expect(queue).toMatch(/show\([^)]*\): number \| null/);
+    expect(queue).toContain('return id;');
+  });
+
+  it('the two halves are actually joined', () => {
+    /*
+      THE HAND-OFF, asserted rather than assumed, and it is the assertion the split made possible.
+
+      Every expectation above is satisfied by a page that calls a method nobody defines, or by a
+      class whose method nobody calls. Neither would raise a toast in a real room. Checking that the
+      name the page uses is the name the class exports is cheap and is exactly the defect a
+      re-pointed constant would otherwise hide - `presenterCommand` was posted to a removed action
+      for three commits on precisely this shape.
+    */
+    expect(code, 'the page no longer constructs the queue it dismisses toasts on').toContain(
+      'new RoomToasts()'
+    );
+    for (const method of ['dismiss(', 'show(', 'dismissMatching(']) {
+      expect(queue, `RoomToasts does not define ${method}`).toContain(`  ${method}`);
+    }
   });
 });

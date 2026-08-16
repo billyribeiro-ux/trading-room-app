@@ -92,8 +92,10 @@ describe('ours', () => {
     // local first. The point of the assertion is unchanged — the text comes from `data.messages`,
     // which the server has already filtered for THIS viewer, and never from the SSE payload.
     expect(pageCode).toContain('mentionArrivals.fresh(data.messages)');
-    expect(pageCode).toContain('showToast({');
-    expect(pageCode).toContain('requestAlertBrowserNotification(title, item.body');
+    expect(pageCode).toContain('toasts.show({');
+    // `requestAlertBrowserNotification` became `RoomToasts.notify` in Phase 5 slice 1. The call site
+    // stays here, because deciding to notify is the mention effect's job and not the queue's.
+    expect(pageCode).toContain('toasts.notify(title, item.body');
   });
 
   it('honours BOTH gates, do-not-disturb first', () => {

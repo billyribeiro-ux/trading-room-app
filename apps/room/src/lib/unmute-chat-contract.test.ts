@@ -215,7 +215,7 @@ describe('the two strings stay two strings', () => {
 
   it('keeps the member toast verbatim and separate', () => {
     expect(pageCode).toContain(
-      "showToast({ kind: 'info', message: 'Chat enabled', enableHtml: false });"
+      "toasts.show({ kind: 'info', message: 'Chat enabled', enableHtml: false });"
     );
   });
 });

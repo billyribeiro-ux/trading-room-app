@@ -24,6 +24,83 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-16
 
+### 2026-08-16 07:12 EDT — `RoomToasts`: the first slice that moves behaviour, and the gate written an hour earlier caught it
+
+**Branch `feat/extra-chat-column`. Runtime impact: yes** — `+page.svelte` and the new
+`apps/room/src/lib/room/toasts.svelte.ts` change how every toast in the room is raised and dismissed.
+Behaviour is intended to be identical; it is a relocation, not a rewrite.
+
+**`+page.svelte` 9,605 → 9,532** (script 8,627 → 8,549, template 978 → 983). Phase 5 slice 1.
+
+**What makes this different from Phase 1's eight classes:** those moved *declarations* and left the
+248 function bodies behind, which is why they moved only 584 lines between them. This moves the state
+**and every function that writes it, together** — the queue, its timers, the duplicate guard, the
+browser notification. That is the pattern the remaining eighteen slices repeat, and it was proved on
+the smallest region with a real boundary and **no dependencies at all**: no preferences, no `data`,
+no server call, nothing but the browser.
+
+**SEVENTY-THREE LINES, AGAINST A PLANNED ~250, and that is a re-scoping rather than a shortfall** —
+stated because a number that quietly misses its estimate is how the next estimate gets believed. The
+plan filed alert and Q&A **delivery** under this slice. Delivery decides *who* is told and with
+*which sound*, reading six preferences (`doNotDisturbOn`, `alertSoundOn`, `nonTradeSound`,
+`alertPopup`, `longerAlertPopup`, `qaSoundOn`) that are still declared in the page until slice 3.
+Moving it now would have meant six constructor thunks rewritten two commits later. So the class took
+the MECHANISM and left the POLICY where its inputs are — it knows how to show a thing and when to
+take it away, and has no opinion about whether it should be shown. The rest of the 250 arrives with
+the preferences.
+
+**THE GATE FROM 06:52 FIRED ON THE FIRST MODULE IT COULD POSSIBLY HAVE CAUGHT.** `toasts.svelte.ts`
+appeared on disk and the ceiling test went red — *"exists in lib/room/ with no ceiling. A module
+cannot be added without saying what too big means for it."* Twenty minutes old and already doing the
+job the hand-kept list had failed at twice. It fired a second time after `prettier` reflowed the
+module from 183 to 184 lines.
+
+**A NEGATIVE GUARD HAD ALREADY GONE VACUOUS, and was caught by looking rather than by the suite.**
+`post-alert-contract.test.ts` asserted `not.toContain("showInfoToast('Alert")`. `showInfoToast`
+stopped existing in `+page.svelte` the moment the queue moved, so it passed for the wrong reason —
+the text was absent because the FUNCTION had been renamed, not because the room had stopped raising
+a success toast on a posted alert. **The full suite was green with that guard guarding nothing.**
+This is the `exactAlerts` failure exactly, on the first slice, which is the measure of how easily it
+happens. Re-pointed to the new spelling AND anchored: it now asserts first that
+`persistPostedAlert` is still in this file, because a guard on a region that has moved is not a guard.
+
+**Four contract files re-pointed, and the split ones came out stronger.**
+`media-reconnect-toast-contract.test.ts` now carries two source constants, because the control is
+genuinely split: the QUEUE moved, but what *raises* those two toasts is `mediaServerDisconnected`,
+which is media transport and stays until slice 4. Each assertion points at the file owning its
+subject, and **a new test asserts the hand-off itself** — that the page constructs `RoomToasts` and
+that the class defines the methods the page calls. Every prior expectation there was satisfiable by a
+page calling a method nobody defines; that is the `presenterCommand` shape, which posted to a removed
+action for three commits.
+
+**The class ships with its reactivity test, not a commit later.** `room-mtx.svelte.test.ts` records
+having been written after its extraction, and records two drafts that were wrong: registering the
+effect inside `$effect.root` but mutating outside it records nothing, and asserting inside the root
+hides failures because the root swallows a thrown assertion. Both shapes are avoided here. **The
+negative control — deleting `$state` from the field — turned both reactivity tests red while the 13
+value tests stayed green**, which is precisely the point that file makes: a plain object passes
+everything except the assertion that matters.
+
+**Two deliberate non-changes, recorded so nobody re-proposes them:**
+
+1. **`$state`, not `$state.raw`.** The array qualifies on this repository's own rule — only ever
+   replaced, never mutated, and `ToastHost.svelte` was READ to confirm it mutates no field of a
+   notice. It stays `$state` because this slice is a MOVE, and a move plus an optimisation is two
+   changes in one commit with no way to tell which one broke something. The analysis is in the file
+   so converting it later is one word backed by evidence.
+2. **`svelte-autofixer` suggests `SvelteMap` for the timer map, and the suggestion is declined.**
+   `SvelteMap` makes READS reactive; nothing reads that map from a template or a derived. Same trade
+   the owner already ruled on for the room's eight copy-on-write `new Set()` sites. Written into the
+   file so the next run does not re-litigate it.
+
+**Verified:** `svelte-check` **1,146 files, 0 errors, 0 warnings**. `vitest` **1,973 across 139**, up
+from 1,954/138 — +15 toast tests, +1 hand-off test, +3 for the new module's ceiling, staleness and
+backstop. `svelte-autofixer` on `+page.svelte` returns **zero issues** and no suggestion mentioning
+toasts; its mutable-Map count went DOWN by one, because `toastTimers` left. `eslint` clean;
+`prettier` clean on every changed file except `+page.svelte`, which is one of the four pre-existing
+failures recorded in `AGENTS.md`. **Not verified:** no browser — the toasts have not been seen raised
+in a real room since the move.
+
 ### 2026-08-16 06:52 EDT — The decomposition's gates land BEFORE the decomposition, and one of them was structurally blind
 
 **Branch `feat/extra-chat-column`. Runtime impact: none** — `apps/room/src/lib/source-size-contract.test.ts`

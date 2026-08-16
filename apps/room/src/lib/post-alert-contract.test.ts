@@ -57,6 +57,27 @@ describe('Post Alert forensic evidence', () => {
     );
     expect(component.match(/bind:value=\{alertUrl\}/g)).toHaveLength(2);
     expect(component).toContain('{#if legalDisclosure}');
-    expect(page).not.toContain("showInfoToast('Alert");
+    /*
+      A NEGATIVE GUARD THAT WENT VACUOUS AND WAS CAUGHT, 2026-08-16. It read
+      `not.toContain("showInfoToast('Alert")`, and `showInfoToast` stopped existing in this file the
+      moment the toast queue moved to `RoomToasts` in Phase 5 slice 1 — so it passed for the wrong
+      reason: the text was absent because the FUNCTION had been renamed, not because the room had
+      stopped raising a success toast on a posted alert.
+
+      This is the exact failure `source-size-contract.test.ts` documents against `exactAlerts`, and
+      it is why the rule is that every extraction re-points its negatives rather than merely running
+      the suite and seeing green.
+
+      Re-pointed AND anchored. The rule being guarded is that posting an alert raises no success
+      toast — the reference does not, and one would sit on top of the alert the presenter just
+      posted. So the guard now asserts the new spelling is absent, and asserts FIRST that the alert
+      post path is still in this file at all, because a guard on a region that has moved is not a
+      guard.
+    */
+    expect(
+      page,
+      'the alert post path has left the page - re-point this guard at its new owner'
+    ).toContain('async function persistPostedAlert(');
+    expect(page).not.toContain("toasts.info('Alert");
   });
 });

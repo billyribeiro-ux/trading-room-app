@@ -245,8 +245,22 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       The Files pane inside it is a `FilesPane` waiting to happen: ~480 lines and ~25 identifiers
       with no component of its own. Recorded in `TODO.md` rather than done here, because two
       extractions in one pass is how a mangle ships.
+
+      PHASE 5 STARTS HERE — the script block, which is what Phases 1 to 4 left behind. Slice 0 was
+      the gates and moved nothing. `RoomToasts` is slice 1: 9,606 -> 9,533, a drop of 73.
+
+      SEVENTY-THREE, against a planned ~250, and the gap is a deliberate re-scoping rather than a
+      shortfall — recorded here because a number that misses its estimate silently is how the next
+      estimate gets believed. The plan filed alert and Q&A DELIVERY under this slice. Delivery reads
+      six preferences that are still declared in the page, so moving it now would have meant six
+      constructor thunks rewritten two commits later. The class took the MECHANISM — the queue, the
+      timers, the duplicate guard, the browser notification — and left the policy where its inputs
+      are. The rest of the 250 arrives with the preferences in slice 3.
+
+      What the slice actually proves is the pattern, which is why it was chosen first: state and the
+      functions that write it leaving TOGETHER, where Phase 1 moved fields and left 248 bodies here.
     */
-    max: 9606,
+    max: 9533,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {
@@ -370,6 +384,17 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     file: 'lib/room/split.svelte.ts',
     max: 724,
     why: "the room's two nested splits and twenty derived geometry values"
+  },
+  /*
+    Phase 5 slice 1, and the first module this file has ever demanded rather than recorded. The
+    ceiling test went red the moment `toasts.svelte.ts` appeared on disk with no entry - which is
+    the catalog working one commit after it was written, on the first module it could possibly have
+    caught.
+  */
+  {
+    file: 'lib/room/toasts.svelte.ts',
+    max: 184,
+    why: 'the toast queue, its timers, the duplicate guard and the browser notification'
   }
 ];
 
