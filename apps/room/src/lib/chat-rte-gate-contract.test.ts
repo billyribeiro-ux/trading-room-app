@@ -134,7 +134,7 @@ describe('every consumer reads that one value', () => {
       it is what stops a click that reached the button after the gate closed from posting.
     */
     expect(pageCode).toContain("const html = canUseRTE ? rteDraft.trim() : '';");
-    expect(pageCode).toContain("bootboxAlert = 'Empty message. Please type a message...';");
+    expect(pageCode).toContain("dialogs.alert = 'Empty message. Please type a message...';");
   });
 
   it('and refuses on the SERVER emptiness rule, so formatting-only cannot fail silently', () => {

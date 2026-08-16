@@ -103,6 +103,7 @@
   import { ALERTS_LOG, RoomLogPages } from '$lib/room/log-pages.svelte';
   import { RoomArrivals, RoomOrderedArrivals } from '$lib/room/arrivals';
   import { RoomScrollFollow } from '$lib/room/scroll-follow';
+  import { RoomDialogs } from '$lib/room/dialogs.svelte';
   import { RoomToasts } from '$lib/room/toasts.svelte';
   import type { RoomMessageChrome } from '$lib/room-message-chrome';
   import { EXTRA_COMPOSER, RoomChat } from '$lib/room/chat.svelte';
@@ -610,7 +611,7 @@
     );
     if (!popout) {
       // Blocked by the popup blocker. Saying so beats a menu item that silently does nothing.
-      bootboxAlert =
+      dialogs.alert =
         'Your browser blocked the detached screen window. Allow popups for this site and try again.';
       return;
     }
@@ -1245,23 +1246,18 @@
   let selectedMessageUser = $state<ModalTargetUser | null>(null);
   let selectedMessage = $state<MessageActionItem | null>(null);
   let selectedImageUrl = $state<string | null>(null);
-  let bootboxConfirmation = $state<{
-    message: string;
-    onconfirm: () => void;
-    /**
-     * The FALSE branch. `bootbox.confirm(msg, cb)` calls back with `false` for No and for a
-     * dismissal, and not every call site treats that as "do nothing" - `getRandomUser()` picks
-     * from everyone when the answer is No.
-     */
-    ondismiss?: () => void;
-    className?: string;
-  } | null>(null);
-  let bootboxAlert = $state<string | null>(null);
-  let bootboxPrompt = $state<{
-    title: string;
-    value: string;
-    onconfirm: (value: string) => void;
-  } | null>(null);
+  /*
+    The room's three bootbox dialogs, in `$lib/room/dialogs.svelte.ts`.
+
+    Three fields and not one discriminated union, because they STACK: a prompt's `onconfirm` raises
+    an alert, a confirm's handler raises an alert on failure, and the Escape handler at the bottom
+    of this file reads all three in a fixed precedence for that reason. One field would let the
+    second silently replace the first.
+
+    Settable properties rather than `raise*` methods, so the forty-odd `dialogs.alert = '…'` sites
+    stay assignments to state instead of becoming forty rewritten expressions.
+  */
+  const dialogs = new RoomDialogs();
   /*
     The room's toast queue, in `$lib/room/toasts.svelte.ts`.
 
@@ -1922,10 +1918,10 @@
    * only adds the `isFT` filter - so the No branch is not a dismissal to be ignored.
    */
   function getRandomUser() {
-    bootboxConfirmation = {
+    dialogs.confirmation = {
       message: 'Only select from Trials?',
       onconfirm: () => {
-        bootboxConfirmation = null;
+        dialogs.confirmation = null;
         roster.draw(true);
       },
       // `bootbox.confirm`'s callback receives false for No AND for a dismissal, and this call site
@@ -1994,7 +1990,7 @@
     } catch (cause) {
       // `N/A` stays as set above — no invented placeholder. `isHttpError` narrows Kit's rejection so
       // the 409 and 502 wordings stay distinct; `mobile-pin.remote.ts` says why that shape is known.
-      bootboxAlert = isHttpError(cause) ? cause.body.message : 'Could not get an app pin right now.';
+      dialogs.alert = isHttpError(cause) ? cause.body.message : 'Could not get an app pin right now.';
     }
   }
 
@@ -2223,7 +2219,7 @@
     menus.openUserMenu(null);
 
     if (start.kind === 'self') {
-      bootboxAlert = start.message;
+      dialogs.alert = start.message;
       return;
     }
 
@@ -2462,13 +2458,13 @@
   function archiveAlerts() {
     const archivable = visibleAlerts.length;
     if (archivable === 0) {
-      bootboxAlert = 'There are no alerts to archive.';
+      dialogs.alert = 'There are no alerts to archive.';
       return;
     }
-    bootboxConfirmation = {
+    dialogs.confirmation = {
       message: `Archive ${archivable} alert${archivable === 1 ? '' : 's'} from this list? They stay stored and are not deleted.`,
       onconfirm: () => {
-        bootboxConfirmation = null;
+        dialogs.confirmation = null;
         // One clock reading for the state and the preference: two calls could straddle an alert
         // arriving and archive it out of the list while storing a cut-off that does not cover it.
         savePreference('alertsArchivedAt', alerts.archive(Date.now()));
@@ -2479,7 +2475,7 @@
   // "Save alerts messages" exports what is currently listed, mirroring how a note is downloaded.
   function saveAlerts() {
     if (visibleAlerts.length === 0) {
-      bootboxAlert = 'There are no alerts to save.';
+      dialogs.alert = 'There are no alerts to save.';
       return;
     }
     const lines = visibleAlerts.map((item) => {
@@ -2557,7 +2553,7 @@
       `toolbar=no,location=no,directories=no,status=no,menubar=no,titlebar=no,fullscreen=no,width=${Math.round(window.innerWidth / 2)},height=${window.innerHeight}`
     );
     if (!alertsDetachedWindow) {
-      bootboxAlert =
+      dialogs.alert =
         'Your browser blocked the detached window. Please allow pop-ups for this site.';
       return;
     }
@@ -2567,7 +2563,7 @@
       chatAlertsDetached = false;
       alertsDetachedWindow = null;
     });
-    bootboxAlert = DETACHED_ALERTS_MESSAGE;
+    dialogs.alert = DETACHED_ALERTS_MESSAGE;
   }
 
   /**
@@ -2592,7 +2588,7 @@
     'The transcript page is not available in this room: speech recognition results are not being captured, so there is nothing to open.';
 
   function openTranscriptPage() {
-    bootboxAlert = TRANSCRIPT_UNAVAILABLE;
+    dialogs.alert = TRANSCRIPT_UNAVAILABLE;
   }
 
   /** `reopenAlertsChat()` - the side-menu control the bootbox message points at. */
@@ -3104,22 +3100,22 @@
   }
 
   function requestFollowToggle(user: ModalTargetUser) {
-    bootboxConfirmation = {
+    dialogs.confirmation = {
       message: `Do you want to ${followedUsers[user.emailHash] ? 'un' : ''}follow ${user.nick}?`,
       className: 'manage-user-list',
       onconfirm: () => {
-        bootboxConfirmation = null;
+        dialogs.confirmation = null;
         applyFollowToggle(user);
       }
     };
   }
 
   function requestMuteToggle(user: ModalTargetUser) {
-    bootboxConfirmation = {
+    dialogs.confirmation = {
       message: `Do you want to ${mutedUsers[user.emailHash] ? 'un' : ''}mute ${user.nick}?`,
       className: 'manage-user-list',
       onconfirm: () => {
-        bootboxConfirmation = null;
+        dialogs.confirmation = null;
         applyMuteToggle(user);
       }
     };
@@ -3154,10 +3150,10 @@
     // `!e || 0 === e.length ||` — with nobody speaking the confirm never opens at all.
     if (media.talking.length === 0) return;
 
-    bootboxConfirmation = {
+    dialogs.confirmation = {
       message: MUTE_ALL_CONFIRM,
       onconfirm: () => {
-        bootboxConfirmation = null;
+        dialogs.confirmation = null;
         const targets = nonAdminTalkingUsers(media.talking, roster.users);
         // `0 !== r.length &&` — an empty selection sends nothing, which is the case where every
         // open microphone belongs to a presenter.
@@ -3265,22 +3261,12 @@
     tawkWidgetOpen = true;
   }
 
-  function requestModalConfirmation(message: string, onconfirm: () => void) {
-    bootboxConfirmation = {
-      message,
-      onconfirm: () => {
-        bootboxConfirmation = null;
-        onconfirm();
-      }
-    };
-  }
-
   function requestManagedUserRemoval(list: 'mutedUsers' | 'followedUsers', user: ManagedChatUser) {
-    bootboxConfirmation = {
+    dialogs.confirmation = {
       message: `Do you want to un${list === 'mutedUsers' ? 'mute' : 'follow'} ${user.nick}?`,
       className: 'manage-user-list',
       onconfirm: () => {
-        bootboxConfirmation = null;
+        dialogs.confirmation = null;
         const next = { ...(list === 'mutedUsers' ? mutedUsers : followedUsers) };
         delete next[user.emailHash];
         if (list === 'mutedUsers') mutedUsers = next;
@@ -3292,7 +3278,7 @@
 
   function openManagedUserInfo(user: ManagedChatUser) {
     if (!user.userXrefID || !user._id) {
-      bootboxAlert = 'User is not logged in.';
+      dialogs.alert = 'User is not logged in.';
       return;
     }
     selectedMessageUser = {
@@ -3314,7 +3300,7 @@
     try {
       await editUsername({ userId: user.id, username: trimmed });
     } catch (cause) {
-      bootboxAlert = isHttpError(cause) ? cause.body.message : 'Could not change that username.';
+      dialogs.alert = isHttpError(cause) ? cause.body.message : 'Could not change that username.';
       return;
     }
     await invalidateAll();
@@ -3344,10 +3330,10 @@
 
   function handleUserAction(action: string, user: ModalTargetUser) {
     if (action === 'session-reload-config') {
-      requestModalConfirmation('Are you sure you want to reload tge session config?', () => {
+      dialogs.confirm('Are you sure you want to reload tge session config?', () => {
         modal = null;
         void invalidateAll();
-        bootboxAlert = 'Session config reloaded...';
+        dialogs.alert = 'Session config reloaded...';
       });
       return;
     }
@@ -3365,22 +3351,22 @@
 
     if (action === 'session-refresh-roster') {
       void invalidateAll();
-      bootboxAlert =
+      dialogs.alert =
         'Command send OK. Please allow 1/2 minute for old entries to get deleted from the list';
       return;
     }
 
     if (action === 'session-soft-reset') {
-      requestModalConfirmation('Are you sure you want to soft reset the room?', () => {
+      dialogs.confirm('Are you sure you want to soft reset the room?', () => {
         modal = null;
         void invalidateAll();
-        bootboxAlert = 'Soft reset request sent...';
+        dialogs.alert = 'Soft reset request sent...';
       });
       return;
     }
 
     if (action === 'session-hard-reset' || action === 'session-hard-reset-revoke') {
-      requestModalConfirmation('Are you sure you want to reset the room?', () => {
+      dialogs.confirm('Are you sure you want to reset the room?', () => {
         modal = null;
         savePreference('sessionTokensRevoked', action === 'session-hard-reset-revoke');
         void invalidateAll();
@@ -3395,7 +3381,7 @@
     }
 
     if (action === 'session-save-close-message') {
-      bootboxAlert = 'Message Saved';
+      dialogs.alert = 'Message Saved';
       return;
     }
 
@@ -3408,18 +3394,18 @@
     if (action === 'session-lock' || action === 'session-lock-kick') {
       savePreference('sessionLocked', true);
       savePreference('sessionLockKick', action === 'session-lock-kick');
-      bootboxAlert = 'Session Locked';
+      dialogs.alert = 'Session Locked';
       return;
     }
 
     if (action === 'session-unlock') {
       savePreference('sessionLocked', false);
-      bootboxAlert = 'Session Unlocked';
+      dialogs.alert = 'Session Unlocked';
       return;
     }
 
     if (action === 'invalid-restream-link') {
-      bootboxAlert =
+      dialogs.alert =
         'Invalid RTMP link!, please make sure it starts with "rtmp://" and does not contain spaces or special characters. For example: rtmp://example.com/live/stream';
       return;
     }
@@ -3429,14 +3415,14 @@
       action === 'session-send-sales-image' ||
       action === 'session-send-users-url'
     ) {
-      bootboxPrompt = {
+      dialogs.prompt = {
         title: 'Please enter the URL:',
         value: '',
         onconfirm: (value) => {
           const url = value.trim();
-          bootboxPrompt = null;
+          dialogs.prompt = null;
           if (!isAcceptableSendUrl(url)) {
-            bootboxAlert = MISSING_SCHEME_ALERT;
+            dialogs.alert = MISSING_SCHEME_ALERT;
             return;
           }
           if (action === 'session-send-video') {
@@ -3444,16 +3430,16 @@
             const stored = JSON.parse(localStorage.getItem(key) ?? '[]') as string[];
             const result = addVideoToList(stored, url);
             if (!result.added) {
-              bootboxAlert = 'Video already exists.';
+              dialogs.alert = 'Video already exists.';
               return;
             }
             localStorage.setItem(key, JSON.stringify(result.videos));
             modal = null;
-            bootboxAlert = 'Video added.';
+            dialogs.alert = 'Video added.';
             return;
           }
           modal = null;
-          bootboxAlert = 'Command send OK.';
+          dialogs.alert = 'Command send OK.';
         }
       };
       return;
@@ -3479,11 +3465,11 @@
     if (action === 'edit-username') {
       // `editUsername(e)` - a presenter renaming somebody else. No pre-filled value, no length or
       // character rules: the capture accepts whatever a presenter types.
-      bootboxPrompt = {
+      dialogs.prompt = {
         title: `Enter a new username for "${user.nick}":`,
         value: '',
         onconfirm: (value) => {
-          bootboxPrompt = null;
+          dialogs.prompt = null;
           void updateUsername(user, value);
         }
       };
@@ -3504,23 +3490,23 @@
         The rules exist because this one is reachable by the person being renamed. Every string is
         the capture's, including "less than 30" on a `>= 30` test.
       */
-      bootboxPrompt = {
+      dialogs.prompt = {
         title: 'Enter a new username for yourself:',
         value: user.nick,
         onconfirm: (value) => {
-          bootboxPrompt = null;
+          dialogs.prompt = null;
           const next = value?.trim() ?? '';
           if (next.length === 0) return;
           if (!/^[a-zA-Z0-9]+$/.test(next)) {
-            bootboxAlert = 'Username can only contain letters and numbers';
+            dialogs.alert = 'Username can only contain letters and numbers';
             return;
           }
           if (next.length < 3) {
-            bootboxAlert = 'Username must be at least 3 characters long';
+            dialogs.alert = 'Username must be at least 3 characters long';
             return;
           }
           if (next.length >= 30) {
-            bootboxAlert = 'Username must be less than 30 characters long';
+            dialogs.alert = 'Username must be less than 30 characters long';
             return;
           }
           // Unchanged is a no-op, not a round trip.
@@ -3532,38 +3518,38 @@
     }
 
     if (action === 'kick' || action === 'kick-ban') {
-      bootboxPrompt = {
+      dialogs.prompt = {
         title: 'Enter the kick message for this user',
         value: 'You have been kicked from the room by an administrator',
         onconfirm: () => {
-          bootboxPrompt = null;
+          dialogs.prompt = null;
           modal = null;
-          bootboxAlert = 'User kicked OK';
+          dialogs.alert = 'User kicked OK';
         }
       };
       return;
     }
 
     if (action === 'kick-duplicates') {
-      bootboxPrompt = {
+      dialogs.prompt = {
         title: `Kick all other duplicates of ${user.nick} with the following message:`,
         value: 'You have been kicked from the room by an administrator',
         onconfirm: () => {
-          bootboxPrompt = null;
+          dialogs.prompt = null;
           modal = null;
-          bootboxAlert = `No duplicates found for ${user.nick}`;
+          dialogs.alert = `No duplicates found for ${user.nick}`;
         }
       };
       return;
     }
 
     if (action === 'admin-notes-password') {
-      bootboxPrompt = {
+      dialogs.prompt = {
         title: "Please enter the password to manage user's notes:",
         value: '',
         onconfirm: () => {
-          bootboxPrompt = null;
-          bootboxAlert = 'Wrong password!';
+          dialogs.prompt = null;
+          dialogs.alert = 'Wrong password!';
         }
       };
       return;
@@ -3577,9 +3563,9 @@
       for this control.
     */
     if (action === 'unmute-chat') {
-      bootboxAlert = 'user chat unmuted';
+      dialogs.alert = 'user chat unmuted';
       void unmuteChat(user).catch(() => {
-        bootboxAlert = 'Command failed.';
+        dialogs.alert = 'Command failed.';
       });
       return;
     }
@@ -3588,7 +3574,7 @@
     const fixedAlert = userActionAlert(action);
     if (fixedAlert) {
       if (action === 'save-permissions') modal = null;
-      bootboxAlert = fixedAlert;
+      dialogs.alert = fixedAlert;
     }
   }
 
@@ -4550,7 +4536,7 @@
           : { kind, id: item.id, operation }
       );
     } catch (cause) {
-      bootboxAlert = isHttpError(cause) ? cause.body.message : 'That did not work.';
+      dialogs.alert = isHttpError(cause) ? cause.body.message : 'That did not work.';
       return false;
     }
     if (operation === 'delete' || operation === 'markAnswered') await invalidateAll();
@@ -4573,7 +4559,7 @@
     try {
       await messageAction({ kind, id: item.id, operation: 'edit', newBody, newBodyHtml });
     } catch (cause) {
-      bootboxAlert = isHttpError(cause) ? cause.body.message : 'That edit did not save.';
+      dialogs.alert = isHttpError(cause) ? cause.body.message : 'That edit did not save.';
       return false;
     }
     await invalidateAll();
@@ -4594,7 +4580,7 @@
         reactionEmoji: reaction.emoji
       });
     } catch (cause) {
-      bootboxAlert = isHttpError(cause) ? cause.body.message : 'That reaction did not save.';
+      dialogs.alert = isHttpError(cause) ? cause.body.message : 'That reaction did not save.';
       return false;
     }
     await invalidateAll();
@@ -4627,7 +4613,7 @@
     try {
       await send(selectedMessage.id);
     } catch (cause) {
-      bootboxAlert = isHttpError(cause) ? cause.body.message : failure;
+      dialogs.alert = isHttpError(cause) ? cause.body.message : failure;
       return false;
     }
     await invalidateAll();
@@ -4718,7 +4704,7 @@
     */
     if (action === 'private') {
       if (item.senderId === data.user.id) {
-        bootboxAlert = 'Chatting with yourself again?';
+        dialogs.alert = 'Chatting with yourself again?';
         return;
       }
       showPrivateChat();
@@ -4748,13 +4734,13 @@
         deleteMessage();
       } else {
         const noun = kind === 'alert' ? 'alert' : 'message';
-        bootboxConfirmation = {
+        dialogs.confirmation = {
           message:
             data.user.role === 'staff' || data.user.role === 'admin'
               ? `Are you sure you want to delete this ${noun} by ${item.senderName}. text: ${item.body}`
               : `Are you sure you want to delete your message: ${item.body}`,
           onconfirm: () => {
-            bootboxConfirmation = null;
+            dialogs.confirmation = null;
             deleteMessage();
           }
         };
@@ -4762,15 +4748,15 @@
     }
     if (action === 'mute') {
       if (item.senderId <= 0) {
-        bootboxAlert = 'Could not retrieve user info.';
+        dialogs.alert = 'Could not retrieve user info.';
         return;
       }
-      bootboxConfirmation = {
+      dialogs.confirmation = {
         message: 'Are you sure you want to mute this user for 24 hours?',
         onconfirm: () => {
-          bootboxConfirmation = null;
+          dialogs.confirmation = null;
           void runMessageOperation(kind, item, 'mute24').then((success) => {
-            if (success) bootboxAlert = 'User chat muted.';
+            if (success) dialogs.alert = 'User chat muted.';
           });
         }
       };
@@ -4822,13 +4808,13 @@
         openModal('rich-text');
         return;
       }
-      bootboxPrompt = {
+      dialogs.prompt = {
         title: kind === 'chat' ? 'Edit chat message:' : `Edit alert by ${item.senderName}:`,
         value: item.body,
         onconfirm: (value) => {
           const newBody = value.trim();
           if (!newBody) return;
-          bootboxPrompt = null;
+          dialogs.prompt = null;
           const previousBody = item.body;
           if (item.evidenceKey) updateEvidenceMessage(item, { body: newBody });
           void editMessage(kind, item, newBody).then((succeeded) => {
@@ -5155,7 +5141,7 @@
       await sendPrivateMessageCommand({ peerId: currUser, body: text });
     } catch (cause) {
       // The server's own wording, which includes the capture's `Chatting with yourself again?`.
-      bootboxAlert = isHttpError(cause) ? cause.body.message : 'Message not sent.';
+      dialogs.alert = isHttpError(cause) ? cause.body.message : 'Message not sent.';
       return;
     }
     privateChatDraft = '';
@@ -5167,10 +5153,10 @@
   function deleteThisPM() {
     if (currUser === null) return;
     const peerId = currUser;
-    bootboxConfirmation = {
+    dialogs.confirmation = {
       message: 'Are you sure you want to delete all messages in this chat?',
       onconfirm: async () => {
-        bootboxConfirmation = null;
+        dialogs.confirmation = null;
         await deletePrivateChatLogCommand({ peerId });
         const { [peerId]: _dropped, ...remainingLog } = privChatLog;
         privChatLog = remainingLog;
@@ -5305,7 +5291,7 @@
    * Turn a capture failure into the one sentence the user sees.
    *
    * The DECISION moved to `media-capture-error.ts`; what stays here is the part that is genuinely
-   * the page's: the async permission round trip and the assignment to `bootboxAlert`.
+   * the page's: the async permission round trip and the assignment to `dialogs.alert`.
    *
    * The `NotAllowedError` path is why this is still async. `mediaCaptureErrorMessage` returns null
    * for it because the answer depends on what the Permissions API says, and the room deliberately
@@ -5318,7 +5304,7 @@
 
     if (errorName === 'NotAllowedError') {
       const guidance = await checkPermissionState(permissionForCapture(kind), navigator.userAgent);
-      if (guidance.startsWith('Permission denied')) bootboxAlert = guidance;
+      if (guidance.startsWith('Permission denied')) dialogs.alert = guidance;
       return;
     }
 
@@ -5328,7 +5314,7 @@
       errorMessage: captureErrorMessage(error),
       isSecureContext: window.isSecureContext
     });
-    if (message) bootboxAlert = message;
+    if (message) dialogs.alert = message;
   }
 
   async function enableMicrophone(retryCount = 0) {
@@ -5597,17 +5583,17 @@
     // Promise, so it is truthy the moment load() is CALLED - including after it rejected - and it
     // says nothing about whether the socket is currently up.
     if (!mediaSession || !mediaSignalling?.connected) {
-      bootboxAlert = MEDIA_NOT_CONNECTED_ALERT;
+      dialogs.alert = MEDIA_NOT_CONNECTED_ALERT;
       menus.set('screen', false);
       return;
     }
-    bootboxPrompt = {
+    dialogs.prompt = {
       title: SCREEN_NAME_PROMPT,
       // `screenProducers.size + 1` - what this session is already sharing, so a second screen
       // opens on "Screen 2" rather than on "Screen 1" again.
       value: `Screen ${mediaSession.screenNames.length + 1}`,
       onconfirm: (value) => {
-        bootboxPrompt = null;
+        dialogs.prompt = null;
         const screenName = value.trim();
         // `if (!o) return`: cancelling, or clearing the box, shares nothing at all.
         if (!screenName) return;
@@ -5632,7 +5618,7 @@
     // producer id (byte 1099342). So each share keeps its own stream, keyed by its producer id.
 
     if (!navigator.mediaDevices?.getDisplayMedia) {
-      bootboxAlert =
+      dialogs.alert =
         'Screen sharing is not supported in this browser. Please use a modern browser like Chrome, Firefox, or Safari.';
       return;
     }
@@ -5864,7 +5850,7 @@
       () => {
         if (media.recordedUrl) URL.revokeObjectURL(media.recordedUrl);
         if (recordedScreenChunks.length === 0) {
-          bootboxAlert = 'Nothing was recorded.';
+          dialogs.alert = 'Nothing was recorded.';
           return;
         }
         const type = screenRecorder?.mimeType || 'video/webm';
@@ -5921,7 +5907,7 @@
     // is what the control already was. Say what happened; the file is still on disk either way.
     if (!recPreviewWindow) {
       media.recPreviewOpen = false;
-      bootboxAlert =
+      dialogs.alert =
         'Your browser blocked the preview window. Allow pop-ups for this site, or open the downloaded media.recording from your Downloads folder.';
       return;
     }
@@ -5970,15 +5956,15 @@
   }
 
   function promptForSoundCloud() {
-    bootboxPrompt = {
+    dialogs.prompt = {
       title:
         'You can play SoundCloud music for all. Click on "Share" from your track or playlist, copy and paste the share url here',
       value: '',
       onconfirm: (value) => {
-        bootboxPrompt = null;
+        dialogs.prompt = null;
         if (!value) return;
         if (value.indexOf('https://soundcloud.com') !== 0) {
-          bootboxAlert = 'Invalid SoundCloud URL...';
+          dialogs.alert = 'Invalid SoundCloud URL...';
           return;
         }
         media.soundCloudUrl = value;
@@ -6009,7 +5995,7 @@
   }
 
   function requestReload() {
-    bootboxConfirmation = {
+    dialogs.confirmation = {
       message: 'Are you sure you want to reload the page?',
       onconfirm: () => window.location.reload()
     };
@@ -6083,10 +6069,10 @@
    * ```
    */
   function deleteFile(file: { id: number; name: string }) {
-    bootboxConfirmation = {
+    dialogs.confirmation = {
       message: `Delete file: "${file.name}" ?`,
       onconfirm: async () => {
-        bootboxConfirmation = null;
+        dialogs.confirmation = null;
         await postDeleteFile(file.id);
         await invalidateAll();
       }
@@ -6108,13 +6094,13 @@
   function deleteSelectedFiles() {
     const ids = [...selectedFileIds];
     if (!ids.length) {
-      bootboxAlert = 'No files where checked...';
+      dialogs.alert = 'No files where checked...';
       return;
     }
-    bootboxConfirmation = {
+    dialogs.confirmation = {
       message: `Are you sure you want to delete ${ids.length} files ?`,
       onconfirm: async () => {
-        bootboxConfirmation = null;
+        dialogs.confirmation = null;
         for (const id of ids) await postDeleteFile(id);
         selectedFileIds = new Set();
         await invalidateAll();
@@ -6127,7 +6113,7 @@
     try {
       await deleteFileCommand({ fileId });
     } catch (cause) {
-      bootboxAlert = isHttpError(cause) ? cause.body.message : 'Delete failed.';
+      dialogs.alert = isHttpError(cause) ? cause.body.message : 'Delete failed.';
     }
   }
 
@@ -6215,7 +6201,7 @@
     try {
       await fileMediaCommand({ cmd, url });
     } catch (cause) {
-      bootboxAlert = isHttpError(cause) ? cause.body.message : 'Command failed.';
+      dialogs.alert = isHttpError(cause) ? cause.body.message : 'Command failed.';
     }
   }
 
@@ -6233,7 +6219,7 @@
       // `on` crosses as a real boolean now; the action carried the strings 'true' / 'false'.
       await overwriteCashRegisterSound({ url, on });
     } catch (cause) {
-      bootboxAlert = isHttpError(cause) ? cause.body.message : 'Command failed.';
+      dialogs.alert = isHttpError(cause) ? cause.body.message : 'Command failed.';
       // Returned, not fallen through: re-reading after a refusal redraws the button at a setting
       // the controller never stored, which is the label-only lie this whole path exists to avoid.
       return;
@@ -6270,7 +6256,7 @@
     try {
       await sendMessageCommand({ body: trimmedBody, bodyHtml, room });
     } catch (cause) {
-      bootboxAlert = isHttpError(cause) ? cause.body.message : 'Message not sent.';
+      dialogs.alert = isHttpError(cause) ? cause.body.message : 'Message not sent.';
       return false;
     }
     await invalidateAll();
@@ -6365,7 +6351,7 @@
     const html = canUseRTE ? rteDraft.trim() : '';
     const text = stripHtmlToText(html);
     if (!text) {
-      bootboxAlert = 'Empty message. Please type a message...';
+      dialogs.alert = 'Empty message. Please type a message...';
       return;
     }
     const target = rteEditTarget;
@@ -6516,16 +6502,16 @@
     const uploadedUrls: string[] = [];
     try {
       for (const [index, file] of files.entries()) {
-        bootboxAlert = `Uploading ${index}/${files.length}: ${file.name}. Please wait...`;
+        dialogs.alert = `Uploading ${index}/${files.length}: ${file.name}. Please wait...`;
         uploadedUrls.push(await uploadOneImage(file));
       }
 
       const body = `${uploadedUrls.join(' ')}${message ? ` ${message}` : ''}`;
-      bootboxAlert = null;
+      dialogs.alert = null;
       await sendMessageBody(body);
     } catch (error) {
       console.error(error);
-      bootboxAlert = 'Upload Failed...';
+      dialogs.alert = 'Upload Failed...';
     }
   }
 
@@ -6564,7 +6550,7 @@
     try {
       await postAlertCommand({ kind, body, targetUrl, nonTradeAlert });
     } catch (cause) {
-      bootboxAlert = isHttpError(cause) ? cause.body.message : 'Alert not posted.';
+      dialogs.alert = isHttpError(cause) ? cause.body.message : 'Alert not posted.';
       return false;
     }
     await invalidateAll();
@@ -6587,7 +6573,7 @@
         targetUrl = uploadedUrls[0] ?? null;
       } catch (error) {
         console.error(error);
-        bootboxAlert = 'Upload Failed...';
+        dialogs.alert = 'Upload Failed...';
         return false;
       }
     } else {
@@ -6625,7 +6611,7 @@
       );
     } catch (error) {
       console.error(error);
-      bootboxAlert = 'Upload Failed...';
+      dialogs.alert = 'Upload Failed...';
       return false;
     }
   }
@@ -6698,7 +6684,7 @@
     try {
       await youtubeForAll({ cmd, url });
     } catch (cause) {
-      bootboxAlert = isHttpError(cause) ? cause.body.message : 'Command failed.';
+      dialogs.alert = isHttpError(cause) ? cause.body.message : 'Command failed.';
     }
   }
 
@@ -6763,7 +6749,7 @@
     try {
       await videoForAll({ cmd, url });
     } catch (cause) {
-      bootboxAlert = isHttpError(cause) ? cause.body.message : 'Command failed.';
+      dialogs.alert = isHttpError(cause) ? cause.body.message : 'Command failed.';
     }
   }
 
@@ -8325,7 +8311,7 @@
       pending.resolve(url ?? null);
     } catch (error) {
       console.error(error);
-      bootboxAlert = 'Upload Failed...';
+      dialogs.alert = 'Upload Failed...';
       pending.resolve(null);
     }
   }
@@ -8359,7 +8345,7 @@
       pending.resolve(url ?? null);
     } catch (error) {
       console.error(error);
-      bootboxAlert = 'Upload Failed...';
+      dialogs.alert = 'Upload Failed...';
       pending.resolve(null);
     }
   }
@@ -8488,7 +8474,7 @@
       pending.resolve(url ?? null);
     } catch (error) {
       console.error(error);
-      bootboxAlert = 'Upload Failed...';
+      dialogs.alert = 'Upload Failed...';
       pending.resolve(null);
     }
   }
@@ -8522,7 +8508,7 @@
       pending.resolve(url ?? null);
     } catch (error) {
       console.error(error);
-      bootboxAlert = 'Upload Failed...';
+      dialogs.alert = 'Upload Failed...';
       pending.resolve(null);
     }
   }
@@ -8628,9 +8614,9 @@
       return;
     }
     if (selectedImageUrl) selectedImageUrl = null;
-    else if (bootboxConfirmation) bootboxConfirmation = null;
-    else if (bootboxPrompt) bootboxPrompt = null;
-    else if (bootboxAlert) bootboxAlert = null;
+    else if (dialogs.confirmation) dialogs.confirmation = null;
+    else if (dialogs.prompt) dialogs.prompt = null;
+    else if (dialogs.alert) dialogs.alert = null;
   }}
   onkeyup={(event) => {
     /*
@@ -9254,8 +9240,8 @@
       onPollAnswer={(choiceIndex) => submitPollAction('sendPollAnswer', { a: choiceIndex })}
       onPollPostResults={(body) => persistPostedAlert('text', body, null, false, false)}
       onPollEnd={() => submitPollAction('pollDone')}
-      onAlert={(message) => (bootboxAlert = message)}
-      onConfirm={requestModalConfirmation}
+      onAlert={(message) => (dialogs.alert = message)}
+      onConfirm={(message, onconfirm) => dialogs.confirm(message, onconfirm)}
       onReplySend={sendReplyMessage}
       onQuestionSend={sendAlertQuestion}
       alertQuestions={data.alertQuestions}
@@ -9359,17 +9345,17 @@
         onconfirm={() => void confirmGif()}
       />
     {/if}
-    {#if bootboxConfirmation}
+    {#if dialogs.confirmation}
       <BootboxDialog
         mode="confirm"
-        message={bootboxConfirmation.message}
-        className={bootboxConfirmation.className}
+        message={dialogs.confirmation.message}
+        className={dialogs.confirmation.className}
         onclose={() => {
-          const dismissed = bootboxConfirmation?.ondismiss;
-          bootboxConfirmation = null;
+          const dismissed = dialogs.confirmation?.ondismiss;
+          dialogs.confirmation = null;
           dismissed?.();
         }}
-        onconfirm={bootboxConfirmation.onconfirm}
+        onconfirm={dialogs.confirmation.onconfirm}
       />
     {/if}
     <!--
@@ -9419,17 +9405,17 @@
         {/snippet}
       </BootboxDialog>
     {/if}
-    {#if bootboxAlert}
-      <BootboxDialog mode="alert" message={bootboxAlert} onclose={() => (bootboxAlert = null)} />
+    {#if dialogs.alert}
+      <BootboxDialog mode="alert" message={dialogs.alert} onclose={() => (dialogs.alert = null)} />
     {/if}
-    {#if bootboxPrompt}
+    {#if dialogs.prompt}
       <BootboxDialog
         mode="prompt"
         message=""
-        title={bootboxPrompt.title}
-        value={bootboxPrompt.value}
-        onclose={() => (bootboxPrompt = null)}
-        onconfirm={(value) => bootboxPrompt?.onconfirm(value ?? '')}
+        title={dialogs.prompt.title}
+        value={dialogs.prompt.value}
+        onclose={() => (dialogs.prompt = null)}
+        onconfirm={(value) => dialogs.prompt?.onconfirm(value ?? '')}
       />
     {/if}
     <ToastHost

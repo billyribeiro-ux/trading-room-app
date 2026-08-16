@@ -166,7 +166,7 @@ describe('a refusal is visible', () => {
     const branch = pageCode.slice(pageCode.indexOf("if (action === 'unmute-chat') {"));
     const body = branch.slice(0, branch.indexOf('return;'));
     expect(body).toContain('void unmuteChat(user).catch(() => {');
-    expect(body).toContain("bootboxAlert = 'Command failed.';");
+    expect(body).toContain("dialogs.alert = 'Command failed.';");
   });
 
   it('still awaits the command inside the wrapper, so a 403 cannot reach invalidateAll', () => {
@@ -210,7 +210,7 @@ describe('the two strings stay two strings', () => {
     of the member, which is the sort of drift that only shows up in a screenshot diff.
   */
   it('keeps the presenter alert verbatim, lower-case included', () => {
-    expect(pageCode).toContain("bootboxAlert = 'user chat unmuted';");
+    expect(pageCode).toContain("dialogs.alert = 'user chat unmuted';");
   });
 
   it('keeps the member toast verbatim and separate', () => {

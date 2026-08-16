@@ -181,7 +181,7 @@ describe('the capture’s own strings survive verbatim', () => {
 
   it('shows the server’s wording on the client, with a fallback that is not invented', () => {
     expect(pageCode).toContain(
-      "bootboxAlert = isHttpError(cause) ? cause.body.message : 'Message not sent.';"
+      "dialogs.alert = isHttpError(cause) ? cause.body.message : 'Message not sent.';"
     );
   });
 });

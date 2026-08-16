@@ -24,6 +24,68 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-16
 
+### 2026-08-16 07:21 EDT — `RoomDialogs`, and a runtime trap the compiler cannot see
+
+**Branch `feat/extra-chat-column`. Runtime impact: yes** — 130 references to the room's three bootbox
+dialogs were renamed and their state moved. Behaviour is intended to be identical.
+
+**`+page.svelte` 9,532 → 9,519.** Phase 5 slice 2.
+
+**THIRTEEN LINES, and that is a poor return stated plainly rather than dressed up.** The class costs
+115 lines and the page gave back 13. The slice is worth doing anyway, for two things that are not
+line count: it takes 130 scattered references to raw page state down to one object, and it is what
+lets `ModalHost`, the three `BootboxDialog` blocks and the image lightbox leave as **one** prop when
+`RoomOverlays` is extracted in slice 17. A slice whose whole value is measured in its own diff is
+the wrong way to read this phase — slice 1 was −73 and slice 2 is −13, and the template savings both
+of them set up land later.
+
+**THREE FIELDS, NOT ONE DISCRIMINATED UNION, and the room's own behaviour is why.** The obvious
+simplification is `open: Dialog | null`. It is refused because these three **stack**:
+`handleUserAction` raises a prompt whose `onconfirm` raises an alert, and `deleteThisPM` raises a
+confirm whose handler alerts on failure. One field would let the second silently replace the first,
+and a reader would answer a prompt and watch it vanish with no result. The Escape handler at the
+bottom of the page reads all three in a fixed precedence for exactly that reason.
+
+**THE TRAP: `onConfirm={dialogs.confirm}` TYPE-CHECKS CLEANLY AND THROWS AT RUNTIME.** A class method
+handed over as a value loses `this`, and the body reaches for a private field on `undefined`.
+`svelte-check` passed with 0 errors on it, and no text-reading contract test can see it either.
+`svelte/$state` names the case outright — *"when calling methods in JavaScript, the value of `this`
+matters"* — and the documented remedy is the wrapper now at that call site. **It was caught by
+reading the diff for reference-passed methods, not by any gate**, which is the third time this
+session that reading found what the toolchain could not. Written into `RoomDialogs.confirm`'s
+docstring so the next call site does not repeat it.
+
+**A MISTAKE I MADE AND FIXED IN THE SAME SLICE:** the first version of that fix put an HTML comment
+*inside* the component's attribute list, which is invalid — `svelte-check` answered
+`attribute_duplicate` at 9246:59. The reasoning moved into the class, where it belongs anyway,
+beside the method it is about.
+
+**MY OWN INSTRUMENT WAS WRONG AGAIN, and the count guard caught it before anything was written.**
+The scoping pass used `grep -c`, which counts matching **lines**, not occurrences — so the expected
+substitution counts were short by two on `bootboxAlert` and one on `bootboxPrompt`. The mechanical
+replace aborted rather than writing a partial rename. This is the same family as the `id-opacity`
+control an hour ago: an instrument that answers a slightly different question than the one asked.
+Re-counted with `split().length - 1` and applied at 31 / 70 / 25 / 4.
+
+**`bootboxPrompt` in `BootboxDialog.svelte` was deliberately NOT renamed.** It is
+`name="bootboxPrompt"`, an HTML input attribute, not a reference to the page's variable — the exact
+"do not rename a local sharing the constant's name" trap that once produced `const pane =
+pane.slice(...)`. The rename was scoped to `+page.svelte`, so it could not reach it.
+
+**Three reactivity assertions, one per field, and the control proves they are independent.**
+`room-mtx.svelte.test.ts` records that a wiring making one getter reactive while leaving another
+stale passes a single test and still renders the wrong thing. Removing `$state` from `#confirmation`
+alone turned **exactly one** of the three red and left the other two green — which is the assertion
+that a single reactivity test would have missed.
+
+**Verified:** `svelte-check` **1,148 files, 0 errors, 0 warnings**. `vitest` **1,986 across 140**, up
+from 1,973/139 — +10 dialog tests, +3 for the new module's ceiling, staleness and backstop.
+`svelte-autofixer` on the new module: zero issues, zero suggestions. `eslint` clean, `prettier` clean
+on every changed file except `+page.svelte`, a recorded pre-existing failure. Page ceiling lowered
+9,533 → 9,519 in the same commit. **Not verified:** no browser — no dialog has been raised in a real
+room since the move, and the `this`-binding fix above is precisely the kind that only a real click
+proves.
+
 ### 2026-08-16 07:12 EDT — `RoomToasts`: the first slice that moves behaviour, and the gate written an hour earlier caught it
 
 **Branch `feat/extra-chat-column`. Runtime impact: yes** — `+page.svelte` and the new

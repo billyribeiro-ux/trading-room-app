@@ -347,7 +347,7 @@ describe('the client sends, instead of moving its own screen', () => {
       leave the presenter guessing which of the two things went wrong.
     */
     expect(pageCode).toContain(
-      "bootboxAlert = isHttpError(cause) ? cause.body.message : 'Command failed.';"
+      "dialogs.alert = isHttpError(cause) ? cause.body.message : 'Command failed.';"
     );
     // And the actions are gone from the server, so there is one way in and not two.
     expect(serverCode).not.toContain('videoForAll: async (');
