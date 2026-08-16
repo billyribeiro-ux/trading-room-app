@@ -31,7 +31,7 @@ import { hashEmail, publicSessionHandle } from '$lib/server/connection';
 // `MAX_CHAT_LOG_PAGE`, `isChatChannel` and `loadChatPage` left with the paging queries for
 // `log-pages.remote.ts`. What stays is the FIRST page, which the loader still sends with the room.
 import { loadNewestChatPages } from '$lib/server/chat-log';
-import { loadAlertPage } from '$lib/server/alert-log';
+import { loadAlertPage, loadQuestionsForAlerts } from '$lib/server/alert-log';
 // `isChatMode` left with `changeChatMode` for `chat-mode.remote.ts`, where it is `z.enum(CHAT_MODES)`.
 import { parseReactions } from '$lib/server/reactions';
 // `requestMobilePin` left with `getMyMobilePin` for `mobile-pin.remote.ts`; this file no longer calls it.
@@ -99,8 +99,6 @@ import {
 } from '$lib/day-trade-alerts-command';
 import { DAY_TRADE_ALERT_INITIAL_DAYS, dayTradeAlertsTabVisible } from '$lib/day-trade-alerts';
 import {
-  alertQuestions,
-  alerts,
   capturedItemOverrides,
   chatMutes,
   roomState,
@@ -478,46 +476,15 @@ export const load: PageServerLoad = async ({ depends, locals, request, cookies }
   */
   const alertRows = loadAlertPage(requireRoomShortCode(locals));
 
-  const questionRows = db
-    .select({
-      id: alertQuestions.id,
-      alertId: alertQuestions.alertId,
-      senderId: alertQuestions.senderId,
-      body: alertQuestions.body,
-      answeredAt: alertQuestions.answeredAt,
-      createdAt: alertQuestions.createdAt,
-      senderName: users.displayName,
-      senderEmail: users.email,
-      senderAvatarUrl: users.avatarUrl,
-      // Drives `msg-box-adm` / the reversed layout on each Q&A entry. The captured reader-side
-      // modal renders another reader's question as plain `msg-box pb-1` and the presenter's answer
-      // as `msg-box pb-1 msg-box-adm`, so this follows the sender, not the viewer.
-      senderRole: users.role
-    })
-    .from(alertQuestions)
-    /*
-      SCOPED TO THIS ROOM — added 2026-08-14, and it was a cross-tenant leak until then.
-
-      `alert_questions` is the one room-owned table with NO `room_short_code` column: it reaches its
-      room through `alert_id`, which the delete path already documents ("`alertQuestions` reaches
-      its room through `alertId`"). This read had no filter of any kind, so every browser in every
-      room received every alert question in the deployment — question bodies, and the name, avatar
-      and role of whoever asked — serialised into the SSR HTML and into the `__sveltekit` payload.
-      What the client chose to RENDER was never the point; the data had already crossed.
-
-      Joining through `alerts` applies the room the same way every other read here does. The
-      alternative — adding `room_short_code` to the table — would denormalise a fact this schema
-      already derives, and would need a backfill that this join makes unnecessary.
-    */
-    .innerJoin(alerts, eq(alerts.id, alertQuestions.alertId))
-    .innerJoin(users, eq(alertQuestions.senderId, users.id))
-    .where(eq(alerts.roomShortCode, requireRoomShortCode(locals)))
-    .orderBy(asc(alertQuestions.createdAt), asc(alertQuestions.id))
-    .all()
-    .map(({ senderEmail, ...question }) => ({
-      ...question,
-      senderEmailHash: hashEmail(senderEmail)
-    }));
+  /*
+    THE THIRD UNBOUNDED READ, and the last one — moved to `alert-log.ts` 2026-08-15 along with the
+    reasoning, because the module that owns how alerts are PAGED is the one that owns what bounds
+    their questions.
+  */
+  const questionRows = loadQuestionsForAlerts(
+    requireRoomShortCode(locals),
+    alertRows.map((alert) => alert.id)
+  );
 
   // The Q&A button has three states and `alert_questions.answered_at` is the only source of truth
   // for which one an alert is in. Deriving them here means the button cannot disagree with the

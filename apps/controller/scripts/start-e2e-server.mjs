@@ -18,7 +18,7 @@ const environment = {
   // makes the runtime refuse to start, which would fail Playwright for an unrelated reason.
   PUBLIC_RECAPTCHA_SITE_KEY: '',
   RECAPTCHA_SECRET_KEY: '',
-  DATABASE_URL: process.env.DATABASE_URL ?? 'postgres://localhost:5432/newroom_control_e2e',
+  DATABASE_URL: process.env.DATABASE_URL ?? 'postgres://localhost:5432/tradingroom_e2e',
   ROOM_JWT_SECRET: randomBytes(32).toString('hex')
 };
 

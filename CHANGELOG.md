@@ -223,6 +223,131 @@ through — both are documented in `.env.example` and until now nothing read the
 **Not done:** retiring `ptr_clone_app` (deferred until the cutover is proven in a real deployment),
 and the owner role / database rename `ptr_clone` → `tradingroom`. Both remain in `TODO.md`.
 
+### 2026-08-15 21:41 EDT — Every file pointed at the right backend, and a governed `services/` re-pin
+
+**Runtime impact: local only** — connection strings and documentation. No schema, no application code.
+
+**Two different backends, and conflating them is what caused this.** The controller (SvelteKit +
+Drizzle) uses database `tradingroom_dev`. The API (`services/`, Rust + sqlx) uses database
+`ptr_clone` as runtime role **`tradingroom_app`**. They are not the same thing and neither is
+`newroom_control_dev`.
+
+**Four files were aiming local work at a database seven migrations behind**, while
+`docs/LOCAL-DEV.md` claimed *"Nothing in this repository points at it."* Repointed to
+`tradingroom_dev`, which makes that sentence true again:
+
+- `apps/controller/.env` — the live local `DATABASE_URL`
+- `apps/controller/.env.example` — the file other developers copy
+- `apps/controller/README.md` — the `createdb` step and its sample URL
+- `apps/controller/scripts/start-e2e-server.mjs` — `newroom_control_e2e` → `tradingroom_e2e`,
+  and the database was created so the default resolves rather than pointing at nothing
+
+**`services/.env.example` needed nothing** — `POSTGRES_RUNTIME_USER=tradingroom_app` already feeds
+`DATABASE_URL`, and `POSTGRES_APP_USER=ptr_clone_app` is correctly still there as the role `0009`
+copies grants FROM.
+
+**`services/README.md` did.** Three prose claims still named `ptr_clone_app` as the runtime role,
+including *"`DATABASE_URL` authenticates the long-running API as `ptr_clone_app`"* — which stopped
+being true when `0009` provisioned `tradingroom_app` and `db::migrate::EXPECTED_RUNTIME_ROLE` began
+comparing against it. A document naming the wrong identity is a defect, not untidiness.
+
+**What was deliberately NOT changed:** the `ptr_clone_app` references in the shipped migrations
+(`0005`, `0006`, `0007`). Migrations are forward-only and editing one changes its checksum, so every
+applied database would refuse to migrate. The README now says that where it previously implied the
+opposite.
+
+**The `services/` edit went through the governed process, which is the point of this entry.**
+`verify-backend-provenance.mjs` refused it immediately on the aggregate manifest hash. Its own rule
+is that the only way the untouched count may move is for a changed file to LEAVE the aggregate and
+gain its own pin, with its reason, in the same commit — so `services/README.md` is now pinned
+individually at `8aece329…`, the aggregate is **75 → 74**, and the manifest re-pin is legitimate only
+because of that. Negative control run: appending one line makes it fail **naming the file**.
+
+`[backend:provenance] PASS 98 imported (74 untouched + 24 diverged, each pinned) + 2 authored here`.
+
+### 2026-08-15 21:38 EDT — The db cases run green, a claim in `952e152` corrected, and `.env` found pointing at a database seven migrations behind
+
+**Runtime impact: none** — records and a configuration finding. No database was written to.
+
+**Row AJ's db cases are executed: 55 tests across 9 files, green.** They stand up their own
+PostgreSQL — `initdb` into a temp directory, a random high port bound to 127.0.0.1 only, then
+`pg_ctl stop` and delete — so no real database is touched, and migration `0013` is applied to a fresh
+cluster on every run. Those four `darkThemeBadgeId` cases could not pass against a schema without the
+column, which is what makes the migration proven rather than assumed.
+
+**CORRECTING `952e152`, whose message is now permanent and wrong on one point.** It says a `\d badges`
+against "the local dev database" showed no `dark_theme_badge_id` because that database "simply has
+not been migrated". I had connected to **`newroom_control_dev`**, taken from `apps/controller/.env`.
+That is not this repository's current database. Reading the actual cluster:
+
+```
+tradingroom_dev        applied_migrations up to 12  (stream_ingest_keys)
+newroom_control_dev    applied_migrations up to  5  (open_existing_rooms)
+```
+
+`tradingroom_dev` is the live one and is seven migrations ahead. Neither has `dark_theme_badge_id`,
+and for `tradingroom_dev` that is simply because `0013` is new and nothing has run the migrator since
+it was written — expected, not a defect. The defect was my conclusion, drawn from the wrong database
+because I read a connection string instead of asking which database this repository actually uses.
+**The runtime role is `tradingroom_app` and the database is `tradingroom_dev`; `newroom_control_dev`
+is a legacy name in the same family as `ptr_clone`** — `ops/naming-provenance.md` is the mapping.
+
+**AND THAT IS A REAL FINDING, not only my error.** `apps/controller/.env` sets
+`DATABASE_URL=postgres://…/newroom_control_dev`, so anything run locally against `.env` — the app, a
+manual check, a seed — talks to a schema stuck at migration 5, missing `room_sessions`,
+`recorded_max_capacity`, `stream_ingest_keys` and four others. It reads as a working database and
+answers with a seven-migration-old shape. Recorded as row AL rather than repointed here: which
+database a developer's `.env` should name is the owner's call, and `.env` is not mine to edit.
+
+**Also in this commit: three struck-through rows removed from `TODO.md`.** That file's own rule is
+that closed items are REMOVED and their history lives here — I struck AH, AI and AJ through instead,
+three times in one session, which is the exact drift the rule exists to stop.
+
+### 2026-08-15 21:26 EDT — Row AH closed: the third unbounded read, bounded by the alert page it belongs to
+
+**Branch `feat/extra-chat-column`. Runtime impact: YES** — the page load stops serialising every
+alert question the room has ever had, on every SSE event.
+
+`messages` and `alerts` were both `.all()` with no LIMIT until 2026-08-14. **`alert_questions` was
+the same defect in the same load and was missed** — found 2026-08-15 by reading the query while
+deciding whether `RoomArrivals` could bound its marker set. Every `invalidateAll()`, which is every
+message and every alert posted, re-read and re-serialised the whole question history — each body, and
+the name, avatar and role of whoever asked — into the SSR HTML and the `__sveltekit` payload.
+
+**Bounded differently from the other two, on purpose.** A `LIMIT` here would be wrong in exactly the
+way `chat-log.ts` describes for a bare `.limit(300)`: it would silently drop the questions belonging
+to an alert that IS on screen. Questions exist only for alerts, and the load already ships **one page
+of alerts** — so the read takes the questions for exactly those alerts. Bounded by that page, nothing
+the client can display is lost, and there is no second pagination cursor to keep in step with the
+first. Captured alerts carry negative ids and have no rows in that table at all, so they are
+correctly absent from the id list.
+
+**It moved to `alert-log.ts`, and that paid for the ratchet rather than raising it.** The explanation
+belongs with the module that owns how alerts are paged, because that page is what bounds the
+questions. `+page.server.ts` **1,659 → 1,583**, comfortably below its 1,617 ceiling, which is now
+1,584.
+
+**THREE OF MY OWN CONTROLS WERE NO-OPS BEFORE THEY WERE CONTROLS.** Twice a mutation targeted a
+single-line `.where(...)` that prettier had wrapped across three lines, so nothing changed and the
+test passed for the only reason it could — it was still looking at the original code. Both were
+caught by asserting on the mutation itself (`occurrences left: 0`) instead of trusting `perl`. The
+lesson is the same one this file recorded at 20:52: a check whose subject was never modified is not a
+control, and reporting it as one is reporting about my tooling.
+
+**And a fourth guard matched the wrong site.** `alert-log.ts` holds TWO room-scoped reads, so
+"the module contains `eq(alerts.roomShortCode, roomShortCode)`" passed with that filter **deleted**
+from the new one — `loadAlertPage` still had its own. Anchored to the function now. That is the third
+time today a guard has matched one of two sites; the other two were `.from(rooms)` in the controller's
+account page and `{...messageChrome}` at two call sites.
+
+**A worse one: `git checkout -- src/routes/+page.server.ts`, meant to undo a control's mutation,
+reverted the whole change.** Caught by counting call sites (`loadQuestionsForAlerts: 0`) rather than
+by assuming the restore had done what it said.
+
+**Verified:** `pnpm run check` 0 errors / 0 warnings across 1,137 files; suite **1,891 across 136
+files**; eslint clean (two schema imports the move orphaned, removed); prettier clean on all four
+touched files. Three negative controls seen red, each after proving the mutation applied.
+
 ### 2026-08-15 21:16 EDT — `AlertChatArea` extracted, proven, and reverted on purpose
 
 **Branch `feat/extra-chat-column`. Runtime impact: none — nothing was kept.** The tree is exactly

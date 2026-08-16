@@ -59,10 +59,11 @@ const EXPECTED_PATH_LIST_SHA256 = '66ab4696e3d3685daaa5ba27e28137a1cc038a71a32fc
   aggregate is legitimate ONLY because of that. A manifest re-pinned to whatever the tree happens to
   contain would be the rubber stamp this file's own header rejects, and it would be green forever.
 
-  Last moved 2026-08-15, 83 -> 75, by the second half of the runtime-role cutover.
+  Last moved 2026-08-15, 75 -> 74: `services/README.md` left the aggregate for its own pin below,
+  because three of its prose claims still named `ptr_clone_app` as the runtime role.
 */
-const EXPECTED_UNTOUCHED_COUNT = 75;
-const EXPECTED_MANIFEST_SHA256 = 'f1d59daf09b3ab94eed2a91de0790304bbdb5c0418f97fd47bd70346c2966c1e';
+const EXPECTED_UNTOUCHED_COUNT = 74;
+const EXPECTED_MANIFEST_SHA256 = 'cfb319e72317631a15280a6fff725fa7617de15a7ae39ec98d4de04d83fe898a';
 
 /*
   Files under `services/**` that were AUTHORED HERE and never imported.
@@ -137,6 +138,19 @@ const LOCALLY_AUTHORED = new Map([
   with it — the same rule `LOCALLY_AUTHORED` carries, for the same reason.
 */
 const DIVERGED_FROM_IMPORT = new Map([
+  /*
+    Diverged 2026-08-15 21:40. Three prose claims in `services/README.md` still named
+    `ptr_clone_app` as the RUNTIME role, which stopped being true when `0009` provisioned
+    `tradingroom_app` and `db::migrate::EXPECTED_RUNTIME_ROLE` began comparing against it. A
+    document that tells the next engineer which identity the API binds as, and names the wrong one,
+    is the kind of stale claim this repository treats as a defect rather than as tidying.
+
+    What was NOT changed, and the distinction is the whole point: the `ptr_clone_app` references in
+    the shipped migrations (`0005`, `0006`, `0007`) stay exactly as they are. Migrations are
+    forward-only and editing one changes its checksum, so every applied database would refuse to
+    migrate. The README now says so where it used to imply the opposite.
+  */
+  ['services/README.md', '8aece32950b831df72d68efc2411f9b80352877001fc8a0f4a51b7f617f027fc'],
   ['services/Cargo.lock', '9ba77dc5f3fe6dac83a40799f6c5d60ad9e5f358f635ab094ceae608ca6d1668'],
   /*
     Diverged 2026-08-14, and it is the file this very comment block warned about.

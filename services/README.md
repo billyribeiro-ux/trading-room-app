@@ -64,7 +64,8 @@ verification.
 
    The database binds only to `127.0.0.1`. On first initialization, the official
    image creates owner role `ptr_clone`; the mounted provisioner creates
-   `ptr_clone_app` with the exact restricted runtime posture. PostgreSQL runs
+   `ptr_clone_app` with the exact restricted runtime posture, and `0009` provisions
+   **`tradingroom_app`** with parity to it — that second role is the one the API binds as. PostgreSQL runs
    `/docker-entrypoint-initdb.d` only when the named volume is empty. Changing
    credentials later does not re-run the provisioner against existing data.
 
@@ -98,7 +99,11 @@ Two database URLs represent different privilege levels:
   only by the one-shot migrator. The migration boundary requires that exact
   authenticated owner identity; the long-running runtime role cannot alter the
   schema.
-- `DATABASE_URL` authenticates the long-running API as `ptr_clone_app`. Before
+- `DATABASE_URL` authenticates the long-running API as **`tradingroom_app`** — the runtime role
+  since 2026-08-15, and what `db::migrate::EXPECTED_RUNTIME_ROLE` compares the authenticated
+  identity against before binding a listener. `ptr_clone_app` still EXISTS: `0009` provisions the
+  new role with exact parity to it rather than renaming it, because a rename would have broken
+  every existing deployment's connection string at the moment the migration ran. Before
   binding a listener, the API requires that exact session identity and current
   role, `LOGIN`, `NOSUPERUSER`, `NOCREATEDB`, `NOCREATEROLE`, `NOINHERIT`,
   `NOREPLICATION`, `NOBYPASSRLS`, and zero direct role memberships.
@@ -275,7 +280,11 @@ raw tenant-bearing connection or an unscoped pool transaction.
 
 Migration `0005_harden_runtime_role_and_room_events_policy.sql` narrows the
 `room_events` policy to `ptr_clone_app` and enforces the complete role posture
-described above. The bootstrap provisioner, migration, and pre-bind runtime check
+described above. **That name is correct and permanent in the shipped migration** —
+migrations are forward-only and editing one changes its checksum, so every applied
+database would refuse to migrate. `0009` extends the same posture to
+`tradingroom_app`; `ops/naming-provenance.md` is the mapping, and the two names
+being true at once is the point of that table. The bootstrap provisioner, migration, and pre-bind runtime check
 are intentionally redundant controls at different lifecycle boundaries.
 
 Migration `0006_restrict_runtime_object_privileges.sql` then revokes the
