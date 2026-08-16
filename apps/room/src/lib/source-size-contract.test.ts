@@ -207,8 +207,27 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       which is what has kept it last. THREE contract tests were re-pointed and all three got a
       stronger guarantee: "passed at both call sites" was two spellings that had to agree, and is now
       one object reaching two spreads.
+
+      `AlertChatArea` is the fourth component and the largest single drop of the whole exercise:
+      11,550 -> 10,860, a fall of 690 for a 696-line region. It is the alerts pane, the chat pane and
+      the gutter between them in one component, because the split IS one gutter dragging one
+      percentage — two components would have to share that number across a boundary invented purely
+      to make files shorter.
+
+      FORTY-FIVE props, and the COMPILER produced the list rather than a scan: the file was written
+      with an empty `<script>` and `svelte-check --output machine` was asked what it could not
+      resolve. That mattered concretely here — `data` appears twelve times in that markup and not
+      once as the variable, every hit being a `data-bs-toggle` or `data-bs-target` attribute, which
+      is the same false positive that put four invented props in a first draft of `RoomNavbar`.
+
+      What made this the LAST of the five, and what actually blocked it for a day, was not the
+      component: it was 24 assertions across 13 contract files, several of which assert on BOTH the
+      page's script and the pane's markup in one test. Those got two source constants each and every
+      assertion pointed at the file that owns its subject — and most of them came out stronger,
+      because a control split across two files now has its hand-off asserted as well. A pane whose
+      callback nothing supplies is exactly the defect a single re-pointed constant would have hidden.
     */
-    max: 11551,
+    max: 10861,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {
@@ -290,13 +309,29 @@ describe('the contract tests that read source as text cannot pass vacuously', ()
   const testDir = new URL('./', import.meta.url);
   const selfName = 'source-size-contract.test.ts';
 
+  /*
+    `AlertChatArea.svelte` joined the two page files on 2026-08-15, and the reason is the trap above
+    rather than tidiness. Thirteen contract files were re-pointed at it that day, and one of them —
+    `day-separator-contract.test.ts` — stopped naming `+page.svelte` at all, which silently dropped
+    it out of this list. It was policed while its subject sat in the page and unpoliced the moment
+    its subject moved, which is the failure mode this whole block exists to catch, arriving by a
+    route the block did not cover.
+
+    The list is the files that regions get extracted OUT OF. It grows when the next one does.
+  */
+  const EXTRACTION_SOURCES = [
+    'routes/+page.svelte',
+    'routes/+page.server.ts',
+    'components/AlertChatArea.svelte'
+  ];
+
   const readers = readdirSync(testDir)
     .filter((name) => name.endsWith('.test.ts') && name !== selfName)
     .map((name) => ({ name, source: readFileSync(new URL(name, testDir), 'utf8') }))
     .filter(
       ({ source }) =>
         source.includes('readFileSync') &&
-        (source.includes('routes/+page.svelte') || source.includes('routes/+page.server.ts'))
+        EXTRACTION_SOURCES.some((target) => source.includes(target))
     );
 
   it('found the text-reading contract tests it is meant to police', () => {

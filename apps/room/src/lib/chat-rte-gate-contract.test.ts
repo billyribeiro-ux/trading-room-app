@@ -80,10 +80,22 @@ describe('the gate is the reference expression, resolved once', () => {
 
 describe('every consumer reads that one value', () => {
   it('the composer button — the fifth conditional in the captured const block', () => {
-    const from = pageCode.indexOf('{#if canUseRTE}');
+    /*
+      The composer moved to `AlertChatArea.svelte` on 2026-08-15. The BUTTON is read there; the gate
+      it reads and the modal opener it calls are still the page's, so both hand-offs are asserted
+      too — a button wired to a prop nothing supplies would otherwise satisfy every line here.
+    */
+    const paneCode = readFileSync(
+      new URL('./components/AlertChatArea.svelte', import.meta.url),
+      'utf8'
+    );
+    expect(pageCode).toContain('{canUseRTE}');
+    expect(pageCode).toContain('onrte={openRTEModal}');
+
+    const from = paneCode.indexOf('{#if canUseRTE}');
     expect(from, 'the composer must gate its button on canUseRTE').toBeGreaterThan(-1);
-    const button = pageCode.slice(from, from + 600);
-    expect(button).toContain('onclick={openRTEModal}');
+    const button = paneCode.slice(from, from + 600);
+    expect(button).toContain('onclick={onrte}');
     // consts 67 and 89: `[1,"textAreaBtns",3,"click"]` and
     // `["ngbTooltip","Rich Text Editor","placement","left",1,"fas","fa-font"]`.
     expect(button).toContain('class="textAreaBtns"');

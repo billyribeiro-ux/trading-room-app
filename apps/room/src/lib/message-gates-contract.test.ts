@@ -26,10 +26,17 @@ const GATES = [
 ] as const;
 
 const page = readFileSync(new URL('../routes/+page.svelte', import.meta.url), 'utf8');
+/*
+  The two message lists moved to `AlertChatArea.svelte` on 2026-08-15. The four gates are still
+  DERIVED on the page and still collected into `messageChrome` there — only the two spreads moved,
+  so the call-site assertions read the pane and everything else stays where it was.
+*/
+const pane = readFileSync(new URL('./components/AlertChatArea.svelte', import.meta.url), 'utf8');
 const component = readFileSync(new URL('./components/RoomMessage.svelte', import.meta.url), 'utf8');
 const strip = (source: string) =>
   source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/<!--[\s\S]*?-->/g, '');
 const pageCode = strip(page);
+const paneCode = strip(pane);
 const componentCode = strip(component);
 
 describe('the four message gates are read from the room, not decided locally', () => {
@@ -56,8 +63,8 @@ describe('both message lists receive all four', () => {
     divergence that shows as "reactions work in chat but not on alerts" — the shape of bug that gets
     reported as flakiness rather than as a missing prop.
   */
-  const alertAt = pageCode.indexOf('kind="alert"');
-  const chatAt = pageCode.indexOf('kind="chat"');
+  const alertAt = paneCode.indexOf('kind="alert"');
+  const chatAt = paneCode.indexOf('kind="chat"');
 
   it('has both call sites', () => {
     expect(alertAt).toBeGreaterThan(-1);
@@ -76,8 +83,10 @@ describe('both message lists receive all four', () => {
 
       Positive first: both spreads are found, before any membership is asserted below.
     */
-    expect(pageCode.slice(alertAt, alertAt + 200)).toContain('{...messageChrome}');
-    expect(pageCode.slice(chatAt, chatAt + 200)).toContain('{...messageChrome}');
+    expect(paneCode.slice(alertAt, alertAt + 200)).toContain('{...messageChrome}');
+    expect(paneCode.slice(chatAt, chatAt + 200)).toContain('{...messageChrome}');
+    // …and the object they spread is the one the page built and handed over.
+    expect(pageCode).toContain('{messageChrome}');
   });
 
   it.each(GATES)('%s is in the chrome that both call sites spread', (gate) => {

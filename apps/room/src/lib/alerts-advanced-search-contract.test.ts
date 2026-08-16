@@ -39,6 +39,12 @@ const component = readFileSync(
 );
 const modalHost = readFileSync(new URL('./components/ModalHost.svelte', import.meta.url), 'utf8');
 const page = readFileSync(new URL('../routes/+page.svelte', import.meta.url), 'utf8');
+/*
+  The alerts toolbar moved to `AlertChatArea.svelte` on 2026-08-15, so the BUTTON is read there and
+  the WIRING is read from the page. Two constants rather than one re-pointed constant, because the
+  two halves are now two files and a single source would let either half rot unnoticed.
+*/
+const pane = readFileSync(new URL('./components/AlertChatArea.svelte', import.meta.url), 'utf8');
 const alertsComponent = readFileSync(
   new URL('../../docs/source/components/app-alerts.compiled.js', import.meta.url),
   'utf8'
@@ -49,6 +55,7 @@ const stripComments = (source: string) =>
 
 const hostMarkup = stripComments(modalHost);
 const pageMarkup = stripComments(page);
+const paneMarkup = stripComments(pane);
 
 describe('alerts advanced search: reachability', () => {
   it('is opened from the alerts toolbar, as the capture opens it', () => {
@@ -57,14 +64,18 @@ describe('alerts advanced search: reachability', () => {
 
     // Before this change `name === 'advanced-search'` was the ONLY occurrence of that modal name
     // in the repository, so the modal could never be shown. The opener is what fixes that.
-    expect(pageMarkup).toContain('data-bs-target="#alerts-advanced-search-modal"');
-    expect(pageMarkup).toContain("openModal('advanced-search')");
-    expect(pageMarkup).toContain('Advanced Search');
+    expect(paneMarkup).toContain('data-bs-target="#alerts-advanced-search-modal"');
+    expect(paneMarkup).toContain("onopenmodal('advanced-search')");
+    expect(paneMarkup).toContain('Advanced Search');
+
+    // …and the page is what hands the pane the real opener. Without this line the assertion above
+    // would pass against a component whose callback nothing supplies.
+    expect(pageMarkup).toContain('onopenmodal={openModal}');
   });
 
   it('keeps the captured button classes and icon', () => {
-    expect(pageMarkup).toContain('btn btn-outline-light btn-sm m-1');
-    expect(pageMarkup).toContain('fas fa-search me-1');
+    expect(paneMarkup).toContain('btn btn-outline-light btn-sm m-1');
+    expect(paneMarkup).toContain('fas fa-search me-1');
   });
 });
 

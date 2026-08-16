@@ -111,12 +111,20 @@ describe('ours', () => {
       sixteen in `messageChrome`, which both lists spread. Same guarantee by a shorter route — one
       value reaching two spreads instead of two spellings that have to agree.
     */
-    const chat = pageCode.indexOf('kind="chat"');
-    const alert = pageCode.indexOf('kind="alert"');
-    expect(alert, 'the alert call site is not in +page.svelte').toBeGreaterThan(-1);
-    expect(chat, 'the chat call site is not in +page.svelte').toBeGreaterThan(-1);
-    expect(pageCode.slice(alert, alert + 200)).toContain('{...messageChrome}');
-    expect(pageCode.slice(chat, chat + 200)).toContain('{...messageChrome}');
+    /*
+      RE-POINTED AGAIN 2026-08-15: both lists moved to `AlertChatArea.svelte`, so the two call sites
+      are read there while the chrome that feeds them is still built on the page.
+    */
+    const paneCode = readFileSync(
+      new URL('./components/AlertChatArea.svelte', import.meta.url),
+      'utf8'
+    );
+    const chat = paneCode.indexOf('kind="chat"');
+    const alert = paneCode.indexOf('kind="alert"');
+    expect(alert, 'the alert call site is not in AlertChatArea.svelte').toBeGreaterThan(-1);
+    expect(chat, 'the chat call site is not in AlertChatArea.svelte').toBeGreaterThan(-1);
+    expect(paneCode.slice(alert, alert + 200)).toContain('{...messageChrome}');
+    expect(paneCode.slice(chat, chat + 200)).toContain('{...messageChrome}');
 
     const from = pageCode.indexOf('const messageChrome');
     expect(pageCode.slice(from, pageCode.indexOf('\n  });', from))).toContain('chatGif');

@@ -361,5 +361,50 @@ export interface MessageReactionPayload {
   emoji: string;
 }
 
+/**
+ * A message as the ACTION handlers need it — narrower than {@link RoomMessageItem} and not a subset
+ * of it, which is why it is its own type rather than a `Pick<>`. `createdAt` is optional here
+ * because a handler is given whatever the caller has; `replyToMessageId` and `nonTrade` are carried
+ * because delete/reply/report read them, and the renderer never does.
+ *
+ * Lifted out of `+page.svelte` on 2026-08-15 for the same reason `RoomMessageItem` was lifted out of
+ * `RoomMessage.svelte`: `AlertChatArea` renders the rows that raise these actions, so a shape
+ * declared inside the page is a shape the pane has to guess at.
+ */
+export interface MessageActionItem {
+  id: number;
+  senderId: number;
+  senderName: string;
+  senderEmailHash: string;
+  senderAvatarUrl: string;
+  senderRole?: string;
+  senderStatus?: string;
+  body: string;
+  /** Set when the message was written with the rich text editor. Its presence IS the fact. */
+  bodyHtml?: string | null;
+  targetUrl?: string | null;
+  nonTrade?: boolean;
+  isAdmin?: boolean;
+  backgroundColor?: string | null;
+  fontColor?: string | null;
+  answered?: boolean;
+  replyToMessageId?: number | null;
+  replyToName?: string | null;
+  replyToBody?: string | null;
+  reactions?: MessageReactions;
+  evidenceKey?: string;
+  // Present on every item RoomMessage hands back; the Q&A modal reproduces the alert card and
+  // needs the timestamp, using the captured text where the item carries one.
+  createdAt?: Date;
+  evidenceTimestampText?: string;
+  evidenceBodySegments?: Array<{
+    kind: string;
+    text?: string;
+    url?: string;
+    width?: number;
+    height?: number;
+  }>;
+}
+
 /** What rides with a message action: a click, or a reaction pill. */
 export type MessageActionEvent = MouseEvent | MessageReactionPayload | undefined;

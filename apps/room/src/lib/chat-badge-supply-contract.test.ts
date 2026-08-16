@@ -150,9 +150,21 @@ describe('level 3 — the page joins it onto each message', () => {
       expect(chrome, `${gate} must be in the chrome every message list spreads`).toContain(gate);
     }
 
-    // And it reaches all THREE lists — the two here and the second chat column, which was missing
-    // four other gates entirely until the capture settled it. See `extra-chat-column-contract`.
-    expect(pageCode.split('{...messageChrome}').length - 1).toBe(2);
+    /*
+      And it reaches all THREE lists — the alerts and chat lists, which moved to `AlertChatArea` on
+      2026-08-15, and the second chat column, which was missing four other gates entirely until the
+      capture settled it. See `extra-chat-column-contract`.
+
+      The two spreads are counted in the PANE and the two hand-offs in the page, because that is
+      where each now lives. Counting spreads in the page would find zero and `0 === 0` is not a
+      contract.
+    */
+    const paneCode = readFileSync(
+      new URL('./components/AlertChatArea.svelte', import.meta.url),
+      'utf8'
+    );
+    expect(paneCode.split('{...messageChrome}').length - 1).toBe(2);
+    expect(pageCode).toContain('{messageChrome}');
     expect(pageCode).toContain('chrome={messageChrome}');
   });
 
