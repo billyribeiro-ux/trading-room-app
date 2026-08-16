@@ -11,6 +11,7 @@ import { sql as roomSessionsFkActions } from './0009-room-sessions-fk-actions.js
 import { sql as userRowReferenceFields } from './0010-user-row-reference-fields.js';
 import { sql as recordedMaxCapacity } from './0011-recorded-max-capacity.js';
 import { sql as streamIngestKeys } from './0012-stream-ingest-keys.js';
+import { sql as badgeDarkThemeBadgeId } from './0013-badge-dark-theme-badge-id.js';
 
 /**
  * Versioned, forward-only, apply-exactly-once migrations.
@@ -125,6 +126,11 @@ export const MIGRATIONS = [
     version: 12,
     name: 'stream_ingest_keys',
     sql: streamIngestKeys
+  },
+  {
+    version: 13,
+    name: 'badge_dark_theme_badge_id',
+    sql: badgeDarkThemeBadgeId
   }
 ];
 

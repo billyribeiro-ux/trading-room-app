@@ -218,33 +218,89 @@ describe('account scoping of the account page row actions, against a real Postgr
     expect(after).toEqual(before);
   }, 60_000);
 
-  it('toggles the dark-theme flag both ways for the owning account', async () => {
+  /*
+    REWRITTEN 2026-08-15. These read `darkTheme` as a boolean and asserted "it is a toggle, not a
+    setter" — which is what this repository believed until `$scope.addBadgeDarkTheme` was captured
+    out of the live `app.min.js` and turned out to be a free-text field holding ANOTHER badge's id.
+  */
+  it('sets and clears the dark-theme badge for the owning account', async () => {
     const { db, mine } = await world();
     const { badges } = await import('./db/schema');
     const { eq } = await import('drizzle-orm');
 
+    // A second badge in the same account to nominate. A badge cannot be its own dark variant.
+    const [other] = await db
+      .insert(badges)
+      .values({ accountId: mine.accountId, label: 'Dark VIP', createdAt: new Date() })
+      .returning({ id: badges.id });
+
     const [initial] = await db.select().from(badges).where(eq(badges.id, mine.badgeId));
-    expect(initial.darkTheme, 'a new badge starts unmarked').toBe(false);
+    expect(initial.darkThemeBadgeId, 'a new badge nominates nothing').toBeNull();
 
-    await post('addBadgeDarkTheme', mine.locals, { id: String(mine.badgeId) });
-    const [on] = await db.select().from(badges).where(eq(badges.id, mine.badgeId));
-    expect(on.darkTheme).toBe(true);
+    await post('addBadgeDarkTheme', mine.locals, {
+      id: String(mine.badgeId),
+      darkThemeBadgeId: String(other.id)
+    });
+    const [set] = await db.select().from(badges).where(eq(badges.id, mine.badgeId));
+    expect(set.darkThemeBadgeId).toBe(other.id);
 
-    await post('addBadgeDarkTheme', mine.locals, { id: String(mine.badgeId) });
-    const [off] = await db.select().from(badges).where(eq(badges.id, mine.badgeId));
-    expect(off.darkTheme, 'it is a toggle, not a setter').toBe(false);
+    // An EMPTY field is how the captured dialog clears it — not a failure, and not a toggle back.
+    await post('addBadgeDarkTheme', mine.locals, {
+      id: String(mine.badgeId),
+      darkThemeBadgeId: ''
+    });
+    const [cleared] = await db.select().from(badges).where(eq(badges.id, mine.badgeId));
+    expect(cleared.darkThemeBadgeId).toBeNull();
   }, 60_000);
 
-  it('refuses to toggle another account badge, and leaves the flag alone', async () => {
+  it('refuses to write another account badge, and leaves it alone', async () => {
     const { db, mine, theirs } = await world();
     const { badges } = await import('./db/schema');
     const { eq } = await import('drizzle-orm');
 
-    const outcome = await post('addBadgeDarkTheme', mine.locals, { id: String(theirs.badgeId) });
+    const outcome = await post('addBadgeDarkTheme', mine.locals, {
+      id: String(theirs.badgeId),
+      darkThemeBadgeId: ''
+    });
     expect(outcome.status).toBe(404);
 
     const [after] = await db.select().from(badges).where(eq(badges.id, theirs.badgeId));
-    expect(after.darkTheme).toBe(false);
+    expect(after.darkThemeBadgeId).toBeNull();
+  }, 60_000);
+
+  it('refuses to POINT AT another account badge — the id is typed, so it is raw input', async () => {
+    const { db, mine, theirs } = await world();
+    const { badges } = await import('./db/schema');
+    const { eq } = await import('drizzle-orm');
+
+    /*
+      The cross-tenant case the write's own WHERE clause cannot catch: the row being written is
+      mine, and only the TARGET belongs to someone else. Nothing stops an admin typing any integer
+      into that box, so the subquery that resolves it carries the account as well.
+    */
+    const outcome = await post('addBadgeDarkTheme', mine.locals, {
+      id: String(mine.badgeId),
+      darkThemeBadgeId: String(theirs.badgeId)
+    });
+    expect(outcome.status).toBe(404);
+
+    const [after] = await db.select().from(badges).where(eq(badges.id, mine.badgeId));
+    expect(after.darkThemeBadgeId, 'it must not have stored the other tenant row').toBeNull();
+  }, 60_000);
+
+  it('refuses a badge that nominates itself', async () => {
+    const { db, mine } = await world();
+    const { badges } = await import('./db/schema');
+    const { eq } = await import('drizzle-orm');
+
+    const outcome = await post('addBadgeDarkTheme', mine.locals, {
+      id: String(mine.badgeId),
+      darkThemeBadgeId: String(mine.badgeId)
+    });
+    expect(outcome.status).toBe(400);
+
+    const [after] = await db.select().from(badges).where(eq(badges.id, mine.badgeId));
+    expect(after.darkThemeBadgeId).toBeNull();
   }, 60_000);
 
   it('archives and unarchives the owning account own room', async () => {
@@ -304,7 +360,7 @@ describe('account scoping of the account page row actions, against a real Postgr
     const { mine } = await world();
     for (const bad of ['', 'abc', '0', '-3', '1.5']) {
       expect((await post('updateBadge', mine.locals, { id: bad, label: 'x' })).status).toBe(400);
-      expect((await post('addBadgeDarkTheme', mine.locals, { id: bad })).status).toBe(400);
+      expect((await post('addBadgeDarkTheme', mine.locals, { id: bad, darkThemeBadgeId: '' })).status).toBe(400);
       expect((await post('setRoomArchived', mine.locals, { id: bad, archived: 'true' })).status).toBe(400);
     }
   }, 60_000);

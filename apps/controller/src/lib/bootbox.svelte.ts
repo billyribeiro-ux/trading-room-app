@@ -35,6 +35,13 @@ interface PendingBase {
   message: string;
   /** the reference's confirm button always reads "OK"; kept configurable for other call sites */
   okLabel: string;
+  /**
+   * What the prompt's control starts with. Empty for every caller until the badge dark-theme
+   * setter, whose captured dialog seeds its input with the current value:
+   * `'<input type="text" value="' + darkThemeID + '" id="darkThemeID" class="form-control"/>'`
+   * (`app.min.js` byte 202828). Confirms ignore it — they have no control to seed.
+   */
+  value: string;
 }
 
 interface ConfirmPending extends PendingBase {
@@ -83,6 +90,7 @@ export const bootbox = {
         inputType: 'text',
         message,
         okLabel,
+        value: '',
         resolve
       };
     });
@@ -93,7 +101,12 @@ export const bootbox = {
    * uses it. Resolves the entered text, or null if it was dismissed, so a caller
    * can tell "cancelled" from "submitted empty".
    */
-  prompt(title: string, okLabel = 'OK', inputType: 'text' | 'textarea' = 'textarea'): Promise<string | null> {
+  prompt(
+    title: string,
+    okLabel = 'OK',
+    inputType: 'text' | 'textarea' = 'textarea',
+    value = ''
+  ): Promise<string | null> {
     requireBrowser();
     dismissPending();
     return new Promise<string | null>((resolve) => {
@@ -102,6 +115,7 @@ export const bootbox = {
         inputType,
         message: title,
         okLabel,
+        value,
         resolve
       };
     });

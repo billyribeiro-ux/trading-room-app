@@ -19,10 +19,7 @@ import { readRestrictions } from './server/rooms';
  * pattern for `ips` and `scopes`, which is stated in the code rather than implied.
  */
 
-const TEMPLATE = readFileSync(
-  `${process.cwd()}/evidence-dumps/TIER1-fetched/views/page.welcome.html`,
-  'utf8'
-);
+const TEMPLATE = readFileSync(`${process.cwd()}/evidence-dumps/TIER1-fetched/views/page.welcome.html`, 'utf8');
 const PAGE = readFileSync(`${process.cwd()}/src/routes/(app)/account/+page.svelte`, 'utf8');
 const SERVER = readFileSync(`${process.cwd()}/src/routes/(app)/account/+page.server.ts`, 'utf8');
 
@@ -36,9 +33,7 @@ describe('the evidence for the field', () => {
 
 describe('readRestrictions', () => {
   it('parses all three lists', () => {
-    const r = readRestrictions(
-      JSON.stringify({ ips: ['203.0.113.7'], scopes: ['sessions/list'], sessions: ['3625'] })
-    );
+    const r = readRestrictions(JSON.stringify({ ips: ['203.0.113.7'], scopes: ['sessions/list'], sessions: ['3625'] }));
     expect(r).toEqual({ ips: ['203.0.113.7'], scopes: ['sessions/list'], sessions: ['3625'] });
   });
 
@@ -66,7 +61,35 @@ describe('the save action', () => {
       that reads as one. Same deny-by-default reasoning the IP list already gets.
     */
     expect(SERVER).toContain('ownRooms.has(code)');
-    expect(SERVER).toMatch(/\.from\(rooms\)\s*\n\s*\.where\(eq\(rooms\.accountId, accountId\)\)/);
+    /*
+      `\s*` and not `\s*\n\s*`. The original REQUIRED a newline between the two calls, so it was an
+      assertion about where prettier happened to wrap the chain rather than about the scope. It went
+      red on 2026-08-15 when an unrelated edit made the file prettier-clean for the first time and
+      the chain collapsed onto one line — the guarantee never changed for a moment.
+
+      Same family as the marker string that encoded a line break in `arrival-delivery-contract`
+      earlier the same day: a guard coupled to formatting fails for reasons that are about the
+      formatter, and the next person's fix is to delete it.
+    */
+    /*
+      ANCHORED TO `ownRooms`, and that is the second correction this assertion needed.
+
+      It first required a NEWLINE between `.from(rooms)` and `.where(...)`, so it was an assertion
+      about where prettier wrapped the chain; it went red on 2026-08-15 when an unrelated edit made
+      the file prettier-clean for the first time and the chain collapsed onto one line. The
+      guarantee had not changed for a moment.
+
+      Relaxing the whitespace exposed a worse problem, found by running the control: this file has
+      TWO `.from(rooms)` reads, so "somewhere there is a scoped rooms read" passed just as happily
+      with the scope DELETED from one of them. Deleting the scope on the room list left it green.
+
+      So it reads the `ownRooms` statement itself. That is the read this test is about — the one
+      whose result decides which posted session codes survive.
+    */
+    const from = SERVER.indexOf('const ownRooms = new Set(');
+    expect(from, 'the ownRooms read is not in the account server file').toBeGreaterThan(-1);
+    const ownRoomsRead = SERVER.slice(from, SERVER.indexOf(';', from));
+    expect(ownRoomsRead).toMatch(/\.from\(rooms\)\s*\.where\(eq\(rooms\.accountId, accountId\)\)/);
   });
 
   it('persists sessions alongside the other two', () => {

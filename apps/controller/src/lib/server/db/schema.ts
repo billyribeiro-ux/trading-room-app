@@ -1,4 +1,14 @@
-import { bigint, boolean, index, integer, pgTable, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core';
+import {
+  bigint,
+  boolean,
+  index,
+  integer,
+  pgTable,
+  text,
+  timestamp,
+  uniqueIndex,
+  type AnyPgColumn
+} from 'drizzle-orm/pg-core';
 
 /**
  * The controller's data model, mirroring the two tiers the reference exposes:
@@ -613,7 +623,47 @@ export const badges = pgTable('badges', {
    * one. Matching that key list matters more than carrying an extra flag into a file whose purpose
    * is to interchange with the original's.
    */
+  /**
+   * SUPERSEDED 2026-08-15 by `darkThemeBadgeId`, and kept because migrations are forward-only.
+   *
+   * Nothing reads it any more. It records only that somebody once pressed a control this repository
+   * had modelled as a toggle, and it cannot say WHICH badge they meant — see the column below.
+   */
   darkTheme: boolean('dark_theme').notNull().default(false),
+  /**
+   * The badge shown INSTEAD of this one in the dark theme, and the setter is now captured verbatim.
+   *
+   * `$scope.addBadgeDarkTheme`, byte 202828 of the live `app.min.js`, opens a `bootbox.dialog` whose
+   * body is a free-text input SEEDED with the current value and posts what was typed:
+   *
+   * ```js
+   * message: "<p>Add a badge id to show in the dark theme instead of this badge: " + b +
+   *   '</p><p><input type="text" value="' + darkThemeID + '" id="darkThemeID" class="form-control"/></p>'
+   * confirm: { label: "Set", className: "btn btn-inverse",
+   *            callback: … args.darkTheme = $("#darkThemeID").val() … }
+   * ```
+   *
+   * So it is neither a picker nor a toggle, and the note above this column read the current value
+   * being passed back as proof of a toggle — which is exactly the inference the evidence refutes.
+   * It is passed back to SEED THE FIELD.
+   *
+   * That also explains the badge table's `ng-dblclick="showBadgeID=!showBadgeID"` header and the
+   * hidden `.room-badge-id` span on each row: double-clicking reveals the ids so an admin has one to
+   * paste in here. Two captured details that only make sense together.
+   *
+   * NULL means no variant is set, which is every row until somebody nominates one — the boolean it
+   * supersedes never recorded which badge, so `true` backfills to NULL and nothing is invented.
+   */
+  darkThemeBadgeId: integer('dark_theme_badge_id').references(
+    /*
+      `AnyPgColumn` and not an inferred return, because this is the schema's only SELF-reference and
+      without the annotation `badges` is defined in terms of itself: TypeScript gives up and types
+      the whole table `any`, which then silently unt-types every badge read in the application. This
+      is Drizzle's documented shape for a self-referencing key, and it cost four errors to find.
+    */
+    (): AnyPgColumn => badges.id,
+    { onDelete: 'set null' }
+  ),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull()
 });
 

@@ -359,26 +359,82 @@ export const actions: Actions = {
   },
 
   /**
-   * "Dark Theme" — the reference's `addBadgeDarkTheme(b._id, b.text, b.imgURL, b.darkTheme)`
-   * (#759/#760/#761). It is handed the badge's CURRENT value, which is what makes it a toggle.
+   * "Dark Theme" — `$scope.addBadgeDarkTheme`, captured verbatim at byte 202828 of the live
+   * `app.min.js`. It opens a dialog with a free-text field seeded with the current value and posts
+   * `args.darkTheme = $("#darkThemeID").val()`: whatever the admin typed.
    *
-   * Flipped IN the UPDATE (`NOT dark_theme`) rather than read-then-written. A SELECT followed by an
-   * UPDATE is a lost-update race between two tabs, and the flip is exactly the kind of statement
-   * PostgreSQL can do atomically. `.returning()` hands back the value that was actually committed,
-   * so the caller never reports a state it merely predicted.
+   * **It was a toggle here until 2026-08-15 and that was wrong.** The docstring this replaces read
+   * the current value being handed back as proof of a toggle; it is handed back to SEED THE FIELD.
+   * The value is the id of ANOTHER badge — the dark-theme variant of this one — which
+   * `page.welcome.html:1191-1211` had already proven by comparing it with `roomBadge._id`.
+   *
+   * ## Three refusals, and each is a real reachable input rather than defensive noise
+   *
+   * * **Empty clears it.** The captured field can be emptied and Set pressed, and the only coherent
+   *   meaning is "no dark variant". NULL, not zero.
+   * * **A badge cannot be its own dark variant.** Nothing upstream forbids it, but the display is a
+   *   lookup of another row; pointing a badge at itself renders it as its own replacement forever.
+   * * **The target must be a badge in THIS account.** The reference has no such check because it
+   *   scopes by session; this is a multi-tenant fintech application and an id typed into a text box
+   *   is raw user input. Deny-by-default: the id is resolved against `accountId` and refused if it
+   *   does not resolve, so a typed id from another tenant fails exactly as a nonsense one does.
+   *
+   * The write stays a single conditional UPDATE for the same reason it always did — a SELECT then an
+   * UPDATE is a lost-update race between two tabs — and `.returning()` reports what was committed
+   * rather than what was predicted.
    */
   addBadgeDarkTheme: async ({ request, locals }) => {
     const { accountId } = requireUser(locals);
-    const id = readRowId(await request.formData(), 'id');
+    const form = await request.formData();
+    const id = readRowId(form, 'id');
     if (id === null) return fail(400, { message: 'That badge id is not a row id.' });
 
+    const typed = String(form.get('darkThemeBadgeId') ?? '').trim();
+
+    /* Empty is not a failure: it is how the captured field says "no dark variant". */
+    let parsed: number | null = null;
+    if (typed !== '') {
+      const asNumber = Number(typed);
+      if (!Number.isInteger(asNumber) || asNumber <= 0) {
+        return fail(400, { message: 'That is not a badge id.' });
+      }
+      if (asNumber === id) {
+        return fail(400, { message: 'A badge cannot be its own dark theme.' });
+      }
+      parsed = asNumber;
+    }
+
+    /*
+      ONE STATEMENT, and the account scope appears TWICE inside it — once on the row being written
+      and once inside the subquery that resolves the target.
+
+      The obvious shape is a SELECT to check the target belongs to this account, then an UPDATE. That
+      is the SELECT-then-UPDATE this repository forbids, and `account-actions-contract.test.ts`
+      refuses it by reading this function's source. Correctly: the check and the write must not be
+      two decisions a concurrent request can slip between.
+
+      So the target is resolved BY the write. The subquery yields the id only if that badge is in
+      this account, and NULL otherwise — which is why the outcome has to be compared against intent
+      on the next line rather than trusted: a NULL result means either "cleared, as asked" or "that
+      id is not yours", and only the caller's `parsed` distinguishes them. A cross-tenant id and a
+      nonsense one therefore fail identically, which is the point.
+    */
     const changed = await getDb()
       .update(badges)
-      .set({ darkTheme: sql`NOT ${badges.darkTheme}` })
+      .set({
+        darkThemeBadgeId:
+          parsed === null
+            ? null
+            : sql`(SELECT b.id FROM badges b WHERE b.id = ${parsed} AND b.account_id = ${accountId})`
+      })
       .where(and(eq(badges.id, id), eq(badges.accountId, accountId)))
-      .returning({ id: badges.id, darkTheme: badges.darkTheme });
+      .returning({ id: badges.id, darkThemeBadgeId: badges.darkThemeBadgeId });
+
     if (changed.length === 0) return fail(404, { message: 'No such badge.' });
-    return { darkTheme: changed[0].darkTheme };
+    if (parsed !== null && changed[0].darkThemeBadgeId === null) {
+      return fail(404, { message: 'No badge with that id.' });
+    }
+    return { darkThemeBadgeId: changed[0].darkThemeBadgeId };
   },
 
   deleteBadge: async ({ request, locals }) => {
@@ -493,12 +549,9 @@ export const actions: Actions = {
       the rest of it.
     */
     const ownRooms = new Set(
-      (
-        await getDb()
-          .select({ shortCode: rooms.shortCode })
-          .from(rooms)
-          .where(eq(rooms.accountId, accountId))
-      ).map((r) => r.shortCode)
+      (await getDb().select({ shortCode: rooms.shortCode }).from(rooms).where(eq(rooms.accountId, accountId))).map(
+        (r) => r.shortCode
+      )
     );
     const sessions = form
       .getAll('sessions')
