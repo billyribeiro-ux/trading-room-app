@@ -1,13 +1,13 @@
 import { error } from '@sveltejs/kit';
 import { command, getRequestEvent } from '$app/server';
 import { z } from 'zod';
-import { requireRoomShortCode, requireUser, isPresenterRole } from '$lib/server/auth';
-import { db, ensureDatabase } from '$lib/server/db';
-import { sharedFiles } from '$lib/server/db/schema';
-import { storeUpload } from '$lib/server/file-storage';
-import { consumeRateLimit } from '$lib/server/rate-limit';
-import { readRoomConfig } from '$lib/server/room-config-client';
-import { publishToRoom } from '$lib/server/room-events';
+import { requireRoomShortCode, requireUser, isPresenterRole } from '#lib/server/auth.js';
+import { db, ensureDatabase } from '#lib/server/db/index.js';
+import { sharedFiles } from '#lib/server/db/schema.js';
+import { storeUpload } from '#lib/server/file-storage.js';
+import { consumeRateLimit } from '#lib/server/rate-limit.js';
+import { readRoomConfig } from '#lib/server/room-config-client.js';
+import { publishToRoom } from '#lib/server/room-events.js';
 
 /*
   An image posted into chat, an alert, or a private message.

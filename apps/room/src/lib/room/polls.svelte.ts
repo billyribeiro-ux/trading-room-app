@@ -1,4 +1,4 @@
-import type { ActivePoll } from '$lib/types';
+import type { ActivePoll } from '#lib/types.js';
 
 /*
   The poll modal's own state — the first of the six room state classes, and the shape the rest
@@ -11,7 +11,7 @@ import type { ActivePoll } from '$lib/types';
   same rule from the other end — reassign a context value *"and you will 'break the link'"*.
 
   A class field keeps the box behind `this`, so every consumer reads through a getter and stays
-  reactive however the field is written. `MtxStreamTabs` in `$lib/room-mtx.svelte.ts` is the working
+  reactive however the field is written. `MtxStreamTabs` in `#lib/room-mtx.svelte.ts` is the working
   precedent this copies.
 
   It matters more than it sounds. Getting it wrong produces a room that renders once and then

@@ -177,7 +177,7 @@ describe('it is the reference’s handlers, bound to the reference’s events', 
       here, so a content-protection checkbox an owner could tick protected nothing. An export
       nothing calls would be the same defect wearing a test.
     */
-    expect(HANDLERS).toContain("from '$lib/room-key-gates'");
+    expect(HANDLERS).toContain("from '#lib/room-key-gates.js'");
     expect(HANDLERS).toMatch(
       /pushToTalkShouldUnmute\(event, \{\s*pushToTalk: this\.#prefs\.pushToTalk,\s*micMuted: this\.#media\.micMuted\s*\}\)/
     );

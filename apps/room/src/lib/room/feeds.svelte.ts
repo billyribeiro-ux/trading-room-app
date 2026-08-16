@@ -1,10 +1,10 @@
-import type { AlertFilterFor } from '$lib/alert-filter';
+import type { AlertFilterFor } from '#lib/alert-filter.js';
 import type { AlertRow } from './alerts.svelte';
-import { mergeOlderChatMessages } from '$lib/chat-paging';
-import { webinarMessageVisible } from '$lib/chat-mode';
-import { isMentionOf } from '$lib/mention';
-import { trimChatLog } from '$lib/room-scroller';
-import type { ChatTab, MessageActionItem, MessageBadge, MessageReactions } from '$lib/types';
+import { mergeOlderChatMessages } from '#lib/chat-paging.js';
+import { webinarMessageVisible } from '#lib/chat-mode.js';
+import { isMentionOf } from '#lib/mention.js';
+import { trimChatLog } from '#lib/room-scroller.js';
+import type { ChatTab, MessageActionItem, MessageBadge, MessageReactions } from '#lib/types.js';
 
 /** The load values every pipeline reads, taken as a thunk so a navigation reaches them. */
 export interface FeedSession<Alert, Message> {
@@ -58,7 +58,7 @@ export interface EvidencePatch {
   **The rules.** `mergeOlderChatMessages` matches on identity and never on order,
   `webinarMessageVisible` carries the reference's asymmetry about `@`, `isMentionOf` is the one
   mention rule the highlight and the popup also use, and the alert filter fails OPEN in three
-  distinct ways inside `$lib/alert-filter`. All are transcriptions tested where they live.
+  distinct ways inside `#lib/alert-filter.js`. All are transcriptions tested where they live.
 
   **Ordering and paging.** `RoomLogPages` holds the older pages; this class merges them.
 
@@ -153,7 +153,7 @@ export class RoomFeeds<
         of the sender's email, which is what the selection is keyed by. `alerts-advanced-search.ts`
         matches on the same field for the same reason.
 
-        The predicate lives in `$lib/alert-filter` rather than here because it fails OPEN in three
+        The predicate lives in `#lib/alert-filter.js` rather than here because it fails OPEN in three
         distinct ways and inlining it would put that logic in three places.
       */
         .filter(this.#alerts.passesFilter(this.#session().sessData?.modAlertFilterList))
@@ -324,7 +324,7 @@ export class RoomFeeds<
         asymmetry that a message containing an `@` is dropped even when it is an admin message.
 
         `isMention` is computed with the SAME rule the highlight and the popup use, rather than the
-        loose `indexOf('@')` upstream tests separately: one mention rule, in `$lib/mention`.
+        loose `indexOf('@')` upstream tests separately: one mention rule, in `#lib/mention.js`.
       */
         .filter((item) =>
           !this.#webinarMode()

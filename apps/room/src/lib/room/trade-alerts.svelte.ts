@@ -1,7 +1,7 @@
 import { deserialize } from '$app/forms';
 
-import { DAY_TRADE_ALERT_INITIAL_DAYS, dayTradeAlertLogDays } from '$lib/day-trade-alerts';
-import { SWING_ALERT_INITIAL_DAYS, swingAlertLogDays } from '$lib/swing-alerts';
+import { DAY_TRADE_ALERT_INITIAL_DAYS, dayTradeAlertLogDays } from '#lib/day-trade-alerts.js';
+import { SWING_ALERT_INITIAL_DAYS, swingAlertLogDays } from '#lib/swing-alerts.js';
 
 import type { RoomDialogs } from './dialogs.svelte';
 
@@ -45,7 +45,7 @@ export interface TradeAlertFeed {
   /** The window the page load always answers, before the presenter changes it. */
   initialDays: number;
   /**
-   * Months to days. Transcribed per feed in `$lib/swing-alerts` and `$lib/day-trade-alerts`,
+   * Months to days. Transcribed per feed in `#lib/swing-alerts` and `$lib/day-trade-alerts`,
    * where they are tested — the two do NOT agree, and neither is `months * 30`.
    */
   logDays: (months: number) => number;

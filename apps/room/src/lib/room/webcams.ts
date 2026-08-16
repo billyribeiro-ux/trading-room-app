@@ -1,5 +1,5 @@
-import { panelDragResize, readPanelBounds } from '$lib/panel-drag';
-import type { WebcamPresenter } from '$lib/types';
+import { panelDragResize, readPanelBounds } from '#lib/panel-drag.js';
+import type { WebcamPresenter } from '#lib/types.js';
 
 import type { RoomMedia } from './media.svelte';
 import type { RoomMediaTransport } from './media-transport.svelte';

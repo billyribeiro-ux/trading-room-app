@@ -1,10 +1,10 @@
 import { error } from '@sveltejs/kit';
 import { command, getRequestEvent } from '$app/server';
 import { z } from 'zod';
-import { presenterRoom, requireUser } from '$lib/server/auth';
-import { ensureDatabase } from '$lib/server/db';
-import { grantMediaElevation, revokeMediaElevation } from '$lib/server/media-elevation';
-import { publishToRoom } from '$lib/server/room-events';
+import { presenterRoom, requireUser } from '#lib/server/auth.js';
+import { ensureDatabase } from '#lib/server/db/index.js';
+import { grantMediaElevation, revokeMediaElevation } from '#lib/server/media-elevation.js';
+import { publishToRoom } from '#lib/server/room-events.js';
 
 /*
   A presenter commands the room: mute somebody's mic, or pull everybody to one screen.
@@ -27,7 +27,7 @@ import { publishToRoom } from '$lib/server/room-events';
   whole conversion exists to remove: an invariant repeated per call site is an invariant that can be
   fixed in one place and left wrong in the other.
 
-  It became `presenterRoom()` in this file, and then MOVED AGAIN to `$lib/server/auth.ts` the moment
+  It became `presenterRoom()` in this file, and then MOVED AGAIN to `#lib/server/auth.ts` the moment
   `for-all-broadcast.remote.ts` needed the same gate — because leaving it here would have recreated
   the duplication one level up, between modules instead of between actions. It returns the room only
   after the role check, so "gated" and "scoped to the caller's tenant" are the same event and cannot

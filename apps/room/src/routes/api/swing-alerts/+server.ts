@@ -1,10 +1,10 @@
 import { error, json } from '@sveltejs/kit';
-import { requireRoomShortCode, requireUser } from '$lib/server/auth';
-import { ensureDatabase } from '$lib/server/db';
-import { readRoomConfig } from '$lib/server/room-config-client';
-import { getSwingAlerts } from '$lib/server/swing-alerts-repository';
-import { swingAlertsLogDaysSchema } from '$lib/swing-alerts-command';
-import { swingAlertsTabVisible } from '$lib/swing-alerts';
+import { requireRoomShortCode, requireUser } from '#lib/server/auth.js';
+import { ensureDatabase } from '#lib/server/db/index.js';
+import { readRoomConfig } from '#lib/server/room-config-client.js';
+import { getSwingAlerts } from '#lib/server/swing-alerts-repository.js';
+import { swingAlertsLogDaysSchema } from '#lib/swing-alerts-command.js';
+import { swingAlertsTabVisible } from '#lib/swing-alerts.js';
 import type { RequestHandler } from './$types';
 
 /**

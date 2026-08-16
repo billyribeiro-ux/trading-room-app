@@ -2,7 +2,7 @@
 import { flushSync } from 'svelte';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { MessageActionItem } from '$lib/types';
+import type { MessageActionItem } from '#lib/types.js';
 
 import { RoomChat } from './chat.svelte';
 import { RoomComposer } from './composer.svelte';

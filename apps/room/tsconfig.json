@@ -5,14 +5,22 @@
   // is exactly the kind of thing that bites later rather than now.
   "extends": "$app/tsconfig",
   "compilerOptions": {
-    "esModuleInterop": true,
     "sourceMap": true,
-    "strict": true,
-    // Kit 3's base ships `paths: {}`; Kit 2's supplied these.
-    "paths": {
-      "$lib": ["./src/lib"],
-      "$lib/*": ["./src/lib/*"]
-    }
+    "strict": true
+    // NO `paths` BLOCK, and its absence is the point.
+    //
+    // It used to carry `$lib` and `$lib/*`, under a comment claiming "Kit 3's base ships `paths: {}`;
+    // Kit 2's supplied these." That was false for this version — `node_modules/$app/tsconfig.json`
+    // ships `$lib` paths of its own — so the block was a redundant copy, and because `paths` is
+    // REPLACED rather than merged by `extends`, it overwrote the generated one.
+    //
+    // `vite build` said so outright once `#lib` specifiers existed:
+    //   "paths" was overwritten. Imports from "#lib" may not typecheck
+    // Removed with the alias it existed for. `#lib` resolves through the `imports` field in
+    // `package.json`, which TypeScript reads natively under `moduleResolution: "bundler"`.
+    //
+    // `esModuleInterop` also went: Kit 3's generated base already sets it, so restating it here was
+    // the same redundancy in a second key.
   },
   // Kit 3's base carries no `include`, so it is stated here. Without it TypeScript checks everything
   // under the project directory, including tooling that was never in the gate.
@@ -21,8 +29,6 @@
   // module declarations it carries. That line was removed on 2026-08-16 because the reason given for
   // it had stopped being true: the sentence said "which this app still imports", and the app imports
   // neither — the move to `$app/env/*` landed on 2026-08-15 and the comment was not updated with it.
-  // Ten references to `$env/dynamic/private` survive in this app and every one is prose explaining
-  // that migration. Verified by removing the line and re-running `svelte-check`: 1,190 files, 0
-  // errors, unchanged. It was config nothing read, held in place by a stale explanation.
+  // Verified by removing the line and re-running `svelte-check`: 1,190 files, 0 errors, unchanged.
   "include": ["src/**/*.js", "src/**/*.ts", "src/**/*.svelte", "vite.config.ts"]
 }

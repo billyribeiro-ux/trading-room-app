@@ -1,7 +1,7 @@
 <script lang="ts">
   import { cubicIn } from 'svelte/easing';
   import { fade, fly } from 'svelte/transition';
-  import type { ToastNotice } from '$lib/toast';
+  import type { ToastNotice } from '#lib/toast.js';
 
   interface Props {
     toasts: ToastNotice[];

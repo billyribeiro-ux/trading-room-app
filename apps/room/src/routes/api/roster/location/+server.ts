@@ -20,8 +20,8 @@
  * improvement, not smuggled in here.
  */
 import { json } from '@sveltejs/kit';
-import { requireRoomShortCode, requireUser } from '$lib/server/auth';
-import { publishToRoom, roomRoster, setRosterLocation } from '$lib/server/room-events';
+import { requireRoomShortCode, requireUser } from '#lib/server/auth.js';
+import { publishToRoom, roomRoster, setRosterLocation } from '#lib/server/room-events.js';
 import type { RequestHandler } from './$types';
 
 /**

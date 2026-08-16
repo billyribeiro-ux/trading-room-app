@@ -1,4 +1,4 @@
-import type { FollowChatStyle, Theme } from '$lib/types';
+import type { FollowChatStyle, Theme } from '#lib/types.js';
 
 /**
  * `RoomMessageChrome` — everything `RoomMessage` needs that is the SAME for every message.

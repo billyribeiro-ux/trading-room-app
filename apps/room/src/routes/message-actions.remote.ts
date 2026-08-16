@@ -2,13 +2,13 @@ import { error } from '@sveltejs/kit';
 import { command, getRequestEvent } from '$app/server';
 import { and, eq } from 'drizzle-orm';
 import { z } from 'zod';
-import { stripHtmlToText } from '$lib/chat-plain-text';
-import { MAX_MESSAGE_BODY } from '$lib/message-bounds';
-import { isPresenterRole, requireRoomShortCode, requireUser } from '$lib/server/auth';
-import { capturedRoomItem } from '$lib/server/captured-room';
-import { isEmptyChatHtml, sanitizeChatHtml } from '$lib/server/chat-html';
-import { hashEmail } from '$lib/server/connection';
-import { db, ensureDatabase } from '$lib/server/db';
+import { stripHtmlToText } from '#lib/chat-plain-text.js';
+import { MAX_MESSAGE_BODY } from '#lib/message-bounds.js';
+import { isPresenterRole, requireRoomShortCode, requireUser } from '#lib/server/auth.js';
+import { capturedRoomItem } from '#lib/server/captured-room.js';
+import { isEmptyChatHtml, sanitizeChatHtml } from '#lib/server/chat-html.js';
+import { hashEmail } from '#lib/server/connection.js';
+import { db, ensureDatabase } from '#lib/server/db/index.js';
 import {
   alertQuestions,
   alerts,
@@ -16,9 +16,9 @@ import {
   chatMutes,
   hiddenRoomItems,
   messages
-} from '$lib/server/db/schema';
-import { toggleReaction } from '$lib/reaction-toggle';
-import { parseReactions } from '$lib/server/reactions';
+} from '#lib/server/db/schema.js';
+import { toggleReaction } from '#lib/reaction-toggle.js';
+import { parseReactions } from '#lib/server/reactions.js';
 
 /*
   Everything the message context menu does — delete, edit, react, mark answered, mute for 24 hours,
@@ -170,7 +170,7 @@ export const messageAction = command(messageActionArgs, async (args) => {
     The toggle all three branches apply — the two real ones and the captured override — and the same
     one the page's optimistic copy uses. It was these nine lines written out three times; two of the
     copies were in this file and the third was in `+page.svelte` with no way to notice if they
-    diverged. `$lib/reaction-toggle.ts` states the four rules once.
+    diverged. `#lib/reaction-toggle.ts` states the four rules once.
   */
   const toggledReactions = (source: string, key: string, emoji: string) =>
     toggleReaction(parseReactions(source), key, emoji, hashEmail(user.email));

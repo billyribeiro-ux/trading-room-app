@@ -1,13 +1,13 @@
 import { and, asc, desc, eq, isNull, max } from 'drizzle-orm';
-import type { NoteVersion, RoomNote } from '$lib/types';
-import { db, ensureDatabase } from '$lib/server/db';
+import type { NoteVersion, RoomNote } from '#lib/types.js';
+import { db, ensureDatabase } from '#lib/server/db/index.js';
 import {
   notes,
   noteVersions,
   type Note,
   type NoteVersion as StoredNoteVersion
-} from '$lib/server/db/schema';
-import { sanitizeNoteHtml } from '$lib/server/notes';
+} from '#lib/server/db/schema.js';
+import { sanitizeNoteHtml } from '#lib/server/notes.js';
 
 const COALESCE_WINDOW_MS = 30_000;
 

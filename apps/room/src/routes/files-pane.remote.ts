@@ -2,13 +2,13 @@ import { error } from '@sveltejs/kit';
 import { command, getRequestEvent } from '$app/server';
 import { and, eq } from 'drizzle-orm';
 import { z } from 'zod';
-import { alertSoundCommandValue } from '$lib/files-gates';
-import { presenterRoom, requireUser } from '$lib/server/auth';
-import { db, ensureDatabase } from '$lib/server/db';
-import { sharedFiles } from '$lib/server/db/schema';
-import { deleteStoredFile, storeUpload } from '$lib/server/file-storage';
-import { publishToRoom } from '$lib/server/room-events';
-import { writeRoomSetting } from '$lib/server/room-config-client';
+import { alertSoundCommandValue } from '#lib/files-gates.js';
+import { presenterRoom, requireUser } from '#lib/server/auth.js';
+import { db, ensureDatabase } from '#lib/server/db/index.js';
+import { sharedFiles } from '#lib/server/db/schema.js';
+import { deleteStoredFile, storeUpload } from '#lib/server/file-storage.js';
+import { publishToRoom } from '#lib/server/room-events.js';
+import { writeRoomSetting } from '#lib/server/room-config-client.js';
 
 /*
   The Files pane's three presenter acts: delete a file, play one to the room, make one the alert

@@ -103,8 +103,7 @@ export const ALERT_LABEL_BADGE_CLASS = 'my-1 me-1 badge';
 
 /** A body split into literal text and the label badges found in it. */
 export type AlertLabelPiece =
-  | { kind: 'text'; text: string }
-  | { kind: 'label'; text: string; label: AlertLabel };
+  { kind: 'text'; text: string } | { kind: 'label'; text: string; label: AlertLabel };
 
 /**
  * Split a body on its configured labels, reproducing the reference's replace loop.

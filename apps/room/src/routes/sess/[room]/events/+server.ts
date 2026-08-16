@@ -23,12 +23,12 @@ import {
   roomRoster,
   subscribeToRoom,
   type RoomEvent
-} from '$lib/server/room-events';
-import { startMtxReconcile, stopMtxReconcileIfEmpty } from '$lib/server/mtx-reconciler';
+} from '#lib/server/room-events.js';
+import { startMtxReconcile, stopMtxReconcileIfEmpty } from '#lib/server/mtx-reconciler.js';
 import { error } from '@sveltejs/kit';
-import { requireRoomShortCode, requireUser } from '$lib/server/auth';
-import { hashEmail } from '$lib/server/connection';
-import { readRoomConfig, type RoomMembership } from '$lib/server/room-config-client';
+import { requireRoomShortCode, requireUser } from '#lib/server/auth.js';
+import { hashEmail } from '#lib/server/connection.js';
+import { readRoomConfig, type RoomMembership } from '#lib/server/room-config-client.js';
 
 /**
  * `GET /sess/{room}/events` - the room's realtime channel.

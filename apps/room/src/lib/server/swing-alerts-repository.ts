@@ -1,9 +1,15 @@
 import { and, desc, eq, gte, isNull } from 'drizzle-orm';
-import type { SwingAlertDirection, SwingAlertRow } from '$lib/types';
-import { db, ensureDatabase } from '$lib/server/db';
-import { alertQuestions, alerts, swingAlerts, users, type SwingAlert } from '$lib/server/db/schema';
-import { hashEmail } from '$lib/server/connection';
-import { formatSwingAlertTxt } from '$lib/swing-alerts';
+import type { SwingAlertDirection, SwingAlertRow } from '#lib/types.js';
+import { db, ensureDatabase } from '#lib/server/db/index.js';
+import {
+  alertQuestions,
+  alerts,
+  swingAlerts,
+  users,
+  type SwingAlert
+} from '#lib/server/db/schema.js';
+import { hashEmail } from '#lib/server/connection.js';
+import { formatSwingAlertTxt } from '#lib/swing-alerts.js';
 
 /**
  * Swing Trade Alerts, persisted.

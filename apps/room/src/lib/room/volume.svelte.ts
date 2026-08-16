@@ -3,8 +3,8 @@ import {
   toggleTalkingPresenter,
   type PresenterAudioPreferences,
   type TalkingPresenter as PresenterAudioUser
-} from '$lib/screen-volume';
-import { setSoundEffectsVolume } from '$lib/sound-effects';
+} from '#lib/screen-volume.js';
+import { setSoundEffectsVolume } from '#lib/sound-effects.js';
 import type { RoomPrefs } from './prefs.svelte';
 
 /*
@@ -69,7 +69,7 @@ export class RoomVolume {
     /**
      * `preferences.audioMutedFor` and `preferences.audioVolumeFor` — per-presenter audio, persisted.
      *
-     * `$state.raw`, not `$state`: every transition in `$lib/screen-volume` REPLACES both maps, so a
+     * `$state.raw`, not `$state`: every transition in `#lib/screen-volume.js` REPLACES both maps, so a
      * deep proxy would cost a proxy per key and buy nothing.
      *
      * Seeded from the same stored settings every other preference here is seeded from. The reference
@@ -229,7 +229,7 @@ export class RoomVolume {
   /**
    * `toggleTalkingPresenter(user)` — the per-presenter mute checkbox.
    *
-   * The state transition is in `$lib/screen-volume` and tested there. What is left here is the two
+   * The state transition is in `#lib/screen-volume.js` and tested there. What is left here is the two
    * effects the reference pairs with it:
    *
    * 1. **The persistence**, `setPreference('audioMutedFor'|'audioVolumeFor', …)`, which is this

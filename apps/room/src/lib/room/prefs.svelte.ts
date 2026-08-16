@@ -1,5 +1,5 @@
-import { DEFAULT_ALERT_DELIVERY_PREFERENCES } from '$lib/alert-delivery';
-import { mirrorPreferenceToLocalStorage } from '$lib/dead-preference-keys';
+import { DEFAULT_ALERT_DELIVERY_PREFERENCES } from '#lib/alert-delivery.js';
+import { mirrorPreferenceToLocalStorage } from '#lib/dead-preference-keys.js';
 
 /*
   Every preference this VIEWER owns, and the one write path that persists them.
@@ -37,7 +37,7 @@ import { mirrorPreferenceToLocalStorage } from '$lib/dead-preference-keys';
   owner of the room's layout, which is how a module stops having a boundary.
 
   The server write is injected for the same reason and one more: it keeps a route-level remote
-  function out of `$lib`, and it makes {@link save} testable without mocking the wire.
+  function out of `#lib`, and it makes {@link save} testable without mocking the wire.
 */
 
 /** What decodes out of `settings_json` — arbitrary keys, so every read narrows before use. */

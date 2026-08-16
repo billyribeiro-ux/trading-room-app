@@ -1,9 +1,9 @@
 import { error } from '@sveltejs/kit';
 import { command } from '$app/server';
 import { z } from 'zod';
-import { presenterRoom } from '$lib/server/auth';
-import { ensureDatabase } from '$lib/server/db';
-import { publishToRoom } from '$lib/server/room-events';
+import { presenterRoom } from '#lib/server/auth.js';
+import { ensureDatabase } from '#lib/server/db/index.js';
+import { publishToRoom } from '#lib/server/room-events.js';
 
 /*
   "For All" — a presenter plays a video, or a YouTube video, in every browser in the room.

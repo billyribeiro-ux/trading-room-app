@@ -1,13 +1,13 @@
 import { isHttpError } from '@sveltejs/kit';
 
-import { toggleReaction } from '$lib/reaction-toggle';
+import { toggleReaction } from '#lib/reaction-toggle.js';
 import type {
   MessageAction,
   MessageActionItem,
   MessageReactionPayload,
   ModalName,
   ModalTargetUser
-} from '$lib/types';
+} from '#lib/types.js';
 
 import type { RoomChat } from './chat.svelte';
 import type { RoomComposer } from './composer.svelte';
@@ -60,7 +60,7 @@ export type MessageOperation =
 
   ## What it does NOT decide
 
-  **The four reaction rules.** `toggleReaction` in `$lib/reaction-toggle` is the same function the
+  **The four reaction rules.** `toggleReaction` in `#lib/reaction-toggle.js` is the same function the
   SERVER applies, called here for the optimistic half so the two cannot disagree.
 
   **Who may act.** Every operation re-checks on the server. What moved is which control is drawn and
@@ -235,7 +235,7 @@ export class RoomMessageActions {
   }
 
   #toggleEvidenceReaction(item: MessageActionItem, reactionPayload: MessageReactionPayload) {
-    // The same four rules the server applies, from the same function — see `$lib/reaction-toggle`.
+    // The same four rules the server applies, from the same function — see `#lib/reaction-toggle.js`.
     const reactions = toggleReaction(
       item.reactions ?? {},
       reactionPayload.key,

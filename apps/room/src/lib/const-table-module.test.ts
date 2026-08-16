@@ -30,10 +30,7 @@ const consoleScript = readFileSync(
   new URL('../../scripts/pull-component-source.js', import.meta.url),
   'utf8'
 );
-const moduleSource = readFileSync(
-  new URL('./const-table.mjs', import.meta.url),
-  'utf8'
-);
+const moduleSource = readFileSync(new URL('./const-table.mjs', import.meta.url), 'utf8');
 const offlineScript = readFileSync(
   new URL('../../scripts/extract-component-source.mjs', import.meta.url),
   'utf8'

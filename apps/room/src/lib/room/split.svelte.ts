@@ -1,6 +1,6 @@
-import { DIRECT_EVIDENCE_CONTRACT } from '$lib/direct-evidence-contract';
-import { DUMP_CONTRACT } from '$lib/dump-contract';
-import { NO_PENDING_CLICK, gutterRelease, togglePresentationSplit } from '$lib/split-gutter';
+import { DIRECT_EVIDENCE_CONTRACT } from '#lib/direct-evidence-contract.js';
+import { DUMP_CONTRACT } from '#lib/dump-contract.js';
+import { NO_PENDING_CLICK, gutterRelease, togglePresentationSplit } from '#lib/split-gutter.js';
 
 /*
   The room's two nested splits — the outer presentation/chat-alerts pair and the inner alerts/chat
@@ -554,7 +554,7 @@ export class RoomSplit {
    * outer split in both of the reference's layouts (`app-room.render-helpers.js:1622-1623` and
    * `:1787-1788`).
    *
-   * The decision itself is in `$lib/split-gutter`, with the citations and the reasoning, because a
+   * The decision itself is in `#lib/split-gutter.js`, with the citations and the reasoning, because a
    * two-click state machine whose entire content is timing has to be drivable by a test.
    *
    * `K4e` binds `gutterDblClick` to this same handler (`:1787-1788`), so the toggle exists on a

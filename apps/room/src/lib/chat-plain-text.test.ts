@@ -36,7 +36,7 @@ describe('the plain-text twin of a rich message', () => {
   });
 
   it('returns empty for an empty editor, in each of the shapes one produces', () => {
-    // The four `EMPTY_EDITOR_OUTPUT` shapes `$lib/server/chat-html.ts` enumerates.
+    // The four `EMPTY_EDITOR_OUTPUT` shapes `#lib/server/chat-html.ts` enumerates.
     expect(stripHtmlToText('')).toBe('');
     expect(stripHtmlToText('<p><br></p>')).toBe('');
     expect(stripHtmlToText('<br>')).toBe('');

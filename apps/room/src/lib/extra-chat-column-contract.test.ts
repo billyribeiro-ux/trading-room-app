@@ -137,7 +137,7 @@ describe('the component', () => {
       deal of churn to reproduce a structure the reference does not have.
     */
     expect(paneCode).toContain('<app-extra-chat>');
-    expect(pageCode).toContain("import ExtraChatPane from '$lib/components/ExtraChatPane.svelte';");
+    expect(pageCode).toContain("import ExtraChatPane from '#lib/components/ExtraChatPane.svelte';");
   });
 
   it('defaults to the off-topic channel', () => {

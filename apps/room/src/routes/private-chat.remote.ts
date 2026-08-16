@@ -2,18 +2,18 @@ import { error } from '@sveltejs/kit';
 import { command, getRequestEvent } from '$app/server';
 import { eq } from 'drizzle-orm';
 import { z } from 'zod';
-import { isPresenterRole, requireRoomShortCode, requireUser } from '$lib/server/auth';
-import { MAX_CHAT_LOG_PAGE } from '$lib/server/chat-log';
-import { db, ensureDatabase } from '$lib/server/db';
-import { users } from '$lib/server/db/schema';
+import { isPresenterRole, requireRoomShortCode, requireUser } from '#lib/server/auth.js';
+import { MAX_CHAT_LOG_PAGE } from '#lib/server/chat-log.js';
+import { db, ensureDatabase } from '#lib/server/db/index.js';
+import { users } from '#lib/server/db/schema.js';
 import {
   deleteThread,
   insertPrivateMessage,
   loadThread,
   searchThread
-} from '$lib/server/private-chat';
-import { consumeRateLimit } from '$lib/server/rate-limit';
-import { publishToRoom } from '$lib/server/room-events';
+} from '#lib/server/private-chat.js';
+import { consumeRateLimit } from '#lib/server/rate-limit.js';
+import { publishToRoom } from '#lib/server/room-events.js';
 
 /*
   The private-chat wire: read a thread, send to it, delete it.
@@ -22,7 +22,7 @@ import { publishToRoom } from '$lib/server/room-events';
   Doing them one action at a time would have produced three files, three copies of the peer-id
   schema, and three chances for the room scope to be written slightly differently. They are one
   feature — they share a peer id, a room, a `privChat` channel and a repository module
-  (`$lib/server/private-chat.ts`) — so they are one module, and the things they share are declared
+  (`#lib/server/private-chat.ts`) — so they are one module, and the things they share are declared
   once. The unit of conversion is the FEATURE, not the call site.
 
   ALL THREE ARE COMMANDS, INCLUDING THE READ, AND THAT IS THE INTERESTING PART.

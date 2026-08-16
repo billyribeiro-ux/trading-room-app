@@ -1,4 +1,4 @@
-import type { MessageBadge } from '$lib/types';
+import type { MessageBadge } from '#lib/types.js';
 /**
  * Reading this room's own configuration from the controller.
  *
@@ -30,12 +30,12 @@ import {
   streamReadUrl
 } from './control-plane';
 /*
-  The ingest-key shape lives in the PURE `$lib/stream-ingest` so the panel can name it too — a
-  component importing `$lib/server` is refused by SvelteKit's server-only boundary. Re-exported here
+  The ingest-key shape lives in the PURE `#lib/stream-ingest.js` so the panel can name it too — a
+  component importing `#lib/server` is refused by SvelteKit's server-only boundary. Re-exported here
   because this is the module that fetches it, and a caller should not have to know both places.
 */
-import type { StreamIngestKey } from '$lib/stream-ingest';
-export type { StreamIngestKey } from '$lib/stream-ingest';
+import type { StreamIngestKey } from '#lib/stream-ingest.js';
+export type { StreamIngestKey } from '#lib/stream-ingest.js';
 
 /**
  * What the controller will send. Named here so a reader can see the surface at a glance.
@@ -177,7 +177,7 @@ export interface RoomSessionSettings {
    *
    * The property id is NOT carried with it: the reference hardcodes its own, and reproducing that
    * would post presenters' names and email addresses into another company's inbox. See
-   * `$lib/tawk-support`.
+   * `#lib/tawk-support.js`.
    */
   tawkPresenterSupport?: boolean;
   userJoinAndLeavePopup?: boolean;
@@ -236,7 +236,7 @@ export interface RoomSessionSettings {
    * (bundle byte 1,955,884), and one flag gates three things: the nav `<li>`
    * (`O(26, o.hasSwingTradeAlerts ? 26 : -1)`), the `#swingAlerts` pane (`O(48, …)`) and the initial
    * fetch in `loadSessionLogs()`. `-1` is "instantiate nothing", so a room without the setting
-   * emits no markup rather than hidden markup — see `swingAlertsTabVisible` in `$lib/swing-alerts`.
+   * emits no markup rather than hidden markup — see `swingAlertsTabVisible` in `#lib/swing-alerts.js`.
    *
    * NOT presenter status. Presenter status gates only the form and the row buttons, inside the pane.
    *
@@ -260,7 +260,7 @@ export interface RoomSessionSettings {
    * (`O(27, o.hasDayTradeAlerts ? 27 : -1)`, byte 2,016,951), the `#dayTradeAlerts` pane
    * (`O(49, …)`, byte 2,017,748) and the initial fetch in `loadSessionLogs()` (byte 1,009,503).
    * `-1` is "instantiate nothing", so a room without the setting emits no markup rather than hidden
-   * markup — see `dayTradeAlertsTabVisible` in `$lib/day-trade-alerts`.
+   * markup — see `dayTradeAlertsTabVisible` in `#lib/day-trade-alerts.js`.
    *
    * **Note the spelling against its sibling.** The Swing flag doubles the word — `hasSwingTradeAlerts`
    * — and this one does not. Both were read side by side in `loadSessionLogs()` at bytes 1,009,430
@@ -311,7 +311,7 @@ export interface RoomSessionSettings {
    * carries `senderAvt` so the feed can draw the avatar — so nothing crosses here that the alerts
    * feed does not already carry.
    *
-   * Read by `$lib/alert-filter`.
+   * Read by `#lib/alert-filter.js`.
    */
   modAlertFilterList?: string;
   /**
@@ -328,7 +328,7 @@ export interface RoomSessionSettings {
    * **`JSON.parse` with no try/catch**, exactly as `modAlertFilterList` above — a malformed setting
    * throws rather than silently rendering no labels.
    *
-   * Read by `$lib/alert-labels` and `RoomMessage.svelte`.
+   * Read by `#lib/alert-labels` and `RoomMessage.svelte`.
    */
   alertLabels?: string;
   /**

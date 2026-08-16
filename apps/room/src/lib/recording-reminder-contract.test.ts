@@ -42,9 +42,7 @@ describe('the recording reminder needs the owner AND the runtime flag', () => {
       it reads, which `RoomFiles.filesHidden` paid for.
     */
     const gatesCode = readFileSync(new URL('./room/gates.svelte.ts', import.meta.url), 'utf8');
-    expect(gatesCode).toContain(
-      'return this.#session().sessData?.recordingReminder === true;'
-    );
+    expect(gatesCode).toContain('return this.#session().sessData?.recordingReminder === true;');
   });
 
   it('keeps the local runtime flag separate from the setting', () => {

@@ -119,7 +119,11 @@ describe('the replace loop, reproduced including the parts that look wrong', () 
       '#DayTrade#SwingTrade',
       '$AAPL up, #DayTrade'
     ]) {
-      expect(splitAlertLabels(body, labels).map((p) => p.text).join('')).toBe(body);
+      expect(
+        splitAlertLabels(body, labels)
+          .map((p) => p.text)
+          .join('')
+      ).toBe(body);
     }
   });
 

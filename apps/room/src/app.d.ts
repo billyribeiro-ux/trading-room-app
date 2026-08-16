@@ -1,4 +1,4 @@
-import type { User } from '$lib/server/db/schema';
+import type { User } from '#lib/server/db/schema.js';
 
 declare module 'svelte/elements' {
   // The type parameter is unread here but its ARITY is what makes this a declaration merge rather

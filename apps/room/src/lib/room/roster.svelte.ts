@@ -5,7 +5,7 @@ import {
   randomUserCandidates,
   searchRoster,
   sortRosterByNick
-} from '$lib/roster-gates';
+} from '#lib/roster-gates.js';
 
 /*
   Who is in the room — the live roster, the four header controls that filter it, the badge count and
@@ -14,7 +14,7 @@ import {
   ## What it does NOT own, deliberately
 
   **The gates.** `archivesAvailableTo`, `rosterBlockVisible`, `rosterCountVisibleTo` and
-  `rosterRowVisible` are transcriptions in `$lib/roster-gates`, tested there against their truth
+  `rosterRowVisible` are transcriptions in `#lib/roster-gates.js`, tested there against their truth
   tables, and they take a VIEWER and a SESSION. Both come from the page load. Pulling them in here
   would make this class the owner of the room's authority model, which is the opposite of the
   standard's "every authority decision is made on the server from data the server owns".

@@ -1,6 +1,6 @@
 import { json } from '@sveltejs/kit';
-import { isPresenterRole, requireRoomShortCode, requireUser } from '$lib/server/auth';
-import { getNoteVersions } from '$lib/server/notes-repository';
+import { isPresenterRole, requireRoomShortCode, requireUser } from '#lib/server/auth.js';
+import { getNoteVersions } from '#lib/server/notes-repository.js';
 import type { RequestHandler } from './$types';
 
 export const GET: RequestHandler = ({ locals, params }) => {

@@ -161,7 +161,7 @@ describe('the page bound that did not exist before', () => {
     expect(remoteCode).toContain(
       'const threadPage = z.number().int().min(0).max(MAX_CHAT_LOG_PAGE);'
     );
-    expect(remoteCode).toContain("import { MAX_CHAT_LOG_PAGE } from '$lib/server/chat-log';");
+    expect(remoteCode).toContain("import { MAX_CHAT_LOG_PAGE } from '#lib/server/chat-log.js';");
   });
 
   it('allows page 0, unlike the room log', () => {

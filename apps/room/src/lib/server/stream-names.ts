@@ -13,8 +13,8 @@
  */
 
 import { eq } from 'drizzle-orm';
-import { db, ensureDatabase } from '$lib/server/db';
-import { streamIngestNames, users } from '$lib/server/db/schema';
+import { db, ensureDatabase } from '#lib/server/db/index.js';
+import { streamIngestNames, users } from '#lib/server/db/schema.js';
 
 /**
  * Record who a freshly minted ingest path belongs to.

@@ -47,7 +47,9 @@ describe('the reference markup is decoded, not inferred', () => {
 
   it('pins the const entries for the bar and its pane', () => {
     // The bar is `id="streamsTabs"` but wears the SCREENSHARE bar's `screens-tabs` class.
-    expect(bundle).toContain('"id","streamsTabs","role","tablist",1,"nav","nav-tabs","screens-tabs"');
+    expect(bundle).toContain(
+      '"id","streamsTabs","role","tablist",1,"nav","nav-tabs","screens-tabs"'
+    );
     expect(bundle).toContain('"id","streamsTabsContent",1,"tab-content"');
     // There is no `streams-tabs` class anywhere. Inventing one would look right and style nothing.
     expect(bundle).not.toContain('"streams-tabs"');
@@ -101,7 +103,9 @@ describe('the four controls that are INERT upstream', () => {
 
   it('"Bring everyone here" broadcasts an id no recipient can resolve', () => {
     // It sends the same command the screenshare menu sends...
-    expect(bundle).toContain('bringFocusToScreen(e){e&&this.appService.sendServerAdminCommand("focusOnScreen",{id:e})}');
+    expect(bundle).toContain(
+      'bringFocusToScreen(e){e&&this.appService.sendServerAdminCommand("focusOnScreen",{id:e})}'
+    );
     // ...but every receiver scans the SCREENSHARE list only, never mtxHandlerService.mtxStreams.
     expect(bundle).toContain(
       'guiEventBus.subscribe("focusOnScreen",e=>{const i=this.mediaService.screenSharingUsers'

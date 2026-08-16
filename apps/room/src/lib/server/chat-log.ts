@@ -69,7 +69,7 @@ export const MAX_CHAT_LOG_PAGE = 2_000;
  * The channels this room renders, and therefore the channels worth reading.
  *
  * `messages.room` is a channel label rather than a foreign key, so an arbitrary string can be
- * written into it. Only these two are ever displayed — `ChatTab` in `$lib/types` is a closed union
+ * written into it. Only these two are ever displayed — `ChatTab` in `#lib/types.js` is a closed union
  * of exactly these — so a row in any other channel is invisible today whatever this returns.
  * Reading only what is rendered is the same fail-closed rule the settings allow-list follows.
  */

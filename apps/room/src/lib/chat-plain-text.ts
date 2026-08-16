@@ -22,7 +22,7 @@
  * `&amp;` reads correctly as typed and decoding it would be the start of an escaping round-trip
  * nobody asked for.
  *
- * `isEmptyChatHtml` in `$lib/server/chat-html.ts` runs the identical three steps to answer a
+ * `isEmptyChatHtml` in `#lib/server/chat-html.ts` runs the identical three steps to answer a
  * different question — whether a sanitised message is empty. That is a second copy, and the server's
  * own `body` derivation on the message-send path is very likely a third; it has NOT been read, so
  * the count is not asserted here. Recorded as **`TODO.md` row AF** rather than merged on a guess:

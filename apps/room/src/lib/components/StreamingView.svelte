@@ -24,7 +24,7 @@
    */
   import { onDestroy } from 'svelte';
   import type Hls from 'hls.js';
-  import { mtxPlaylistUrl, type MtxStream } from '$lib/mtx-streams';
+  import { mtxPlaylistUrl, type MtxStream } from '#lib/mtx-streams.js';
 
   interface Props {
     /** The stream to play. `muser` upstream — the same payload key every media command uses. */

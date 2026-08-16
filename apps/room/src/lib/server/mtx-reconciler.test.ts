@@ -17,8 +17,10 @@ vi.mock('$app/env/private', () => ({
   }
 }));
 
-const published: Array<{ room: string; event: { data: { cmd: string; muser?: { _id: string } } } }> =
-  [];
+const published: Array<{
+  room: string;
+  event: { data: { cmd: string; muser?: { _id: string } } };
+}> = [];
 let subscribers = 1;
 
 vi.mock('./room-events', () => ({
@@ -70,7 +72,10 @@ describe('the lifecycle', () => {
   });
 
   it('starts once per room, however many clients subscribe', () => {
-    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify(page([])))));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(JSON.stringify(page([]))))
+    );
     startMtxReconcile(ROOM);
     expect(isReconciling(ROOM)).toBe(true);
     // The SSE route calls this on EVERY subscribe and must not stack timers.
@@ -80,7 +85,10 @@ describe('the lifecycle', () => {
   });
 
   it('stops only when the last subscriber has gone', () => {
-    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify(page([])))));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(JSON.stringify(page([]))))
+    );
     startMtxReconcile(ROOM);
 
     subscribers = 1;
@@ -116,7 +124,10 @@ describe('one pass', () => {
 
   it('publishes start, then stop, as the world changes', async () => {
     let current = page(['room__3625__dana']);
-    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify(current))));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(JSON.stringify(current)))
+    );
 
     startMtxReconcile(ROOM);
     await vi.waitFor(() => expect(cmds()).toEqual(['mtxStartStream']));
@@ -227,7 +238,9 @@ describe('pagination', () => {
     const fetchMock = vi.fn(async (url: string) => {
       const requested = Number(new URL(url).searchParams.get('page'));
       return new Response(
-        JSON.stringify(requested === 0 ? page(['room__3625__a'], 3) : page([`room__3625__p${requested}`], 3))
+        JSON.stringify(
+          requested === 0 ? page(['room__3625__a'], 3) : page([`room__3625__p${requested}`], 3)
+        )
       );
     });
     vi.stubGlobal('fetch', fetchMock as unknown as typeof fetch);

@@ -35,18 +35,18 @@
     `chatEnabled`, `alertFilterConfigured`. Authority is computed once, on the page, from data the
     server owns. A pane that re-derived any of them would be a second opinion about permission.
   */
-  import { ngbTooltip } from '$lib/ngb-tooltip';
-  import { formatChatMutedTill, sameCalendarDay } from '$lib/message-formatters';
-  import EmojiPicker from '$lib/components/EmojiPicker.svelte';
-  import GiphyPicker from '$lib/components/GiphyPicker.svelte';
-  import RoomMessage from '$lib/components/RoomMessage.svelte';
-  import type { AlertLabel } from '$lib/alert-labels';
-  import type { RoomMessageChrome } from '$lib/room-message-chrome';
-  import type { RoomAlerts } from '$lib/room/alerts.svelte';
-  import type { RoomChat } from '$lib/room/chat.svelte';
-  import type { RoomMenus } from '$lib/room/menus.svelte';
-  import type { RoomPolls } from '$lib/room/polls.svelte';
-  import type { RoomSplit } from '$lib/room/split.svelte';
+  import { ngbTooltip } from '#lib/ngb-tooltip.js';
+  import { formatChatMutedTill, sameCalendarDay } from '#lib/message-formatters.js';
+  import EmojiPicker from '#lib/components/EmojiPicker.svelte';
+  import GiphyPicker from '#lib/components/GiphyPicker.svelte';
+  import RoomMessage from '#lib/components/RoomMessage.svelte';
+  import type { AlertLabel } from '#lib/alert-labels.js';
+  import type { RoomMessageChrome } from '#lib/room-message-chrome.js';
+  import type { RoomAlerts } from '#lib/room/alerts.svelte.js';
+  import type { RoomChat } from '#lib/room/chat.svelte.js';
+  import type { RoomMenus } from '#lib/room/menus.svelte.js';
+  import type { RoomPolls } from '#lib/room/polls.svelte.js';
+  import type { RoomSplit } from '#lib/room/split.svelte.js';
   import type {
     FollowChatStyle,
     MessageAction,
@@ -54,7 +54,7 @@
     MessageReactionPayload,
     ModalName,
     RoomMessageItem
-  } from '$lib/types';
+  } from '#lib/types.js';
 
   interface Props {
     /** The outer area's style and the inner pair's — one instance, because it is one gutter. */

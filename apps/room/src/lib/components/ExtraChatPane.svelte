@@ -28,19 +28,19 @@
    * `changeChatMode` handler only re-runs its own resize. That asymmetry is upstream's and is kept:
    * the extra column is not the thing that collapses the layout.
    */
-  import { ngbTooltip } from '$lib/ngb-tooltip';
-  import { formatChatMutedTill, sameCalendarDay } from '$lib/message-formatters';
+  import { ngbTooltip } from '#lib/ngb-tooltip.js';
+  import { formatChatMutedTill, sameCalendarDay } from '#lib/message-formatters.js';
   import EmojiPicker from './EmojiPicker.svelte';
   import GiphyPicker from './GiphyPicker.svelte';
   import RoomMessage from './RoomMessage.svelte';
-  import type { RoomMessageChrome } from '$lib/room-message-chrome';
+  import type { RoomMessageChrome } from '#lib/room-message-chrome.js';
   import type {
     ChatTab,
     FollowChatStyle,
     MessageAction,
     MessageActionEvent,
     RoomMessageItem
-  } from '$lib/types';
+  } from '#lib/types.js';
 
   type Props = {
     /**

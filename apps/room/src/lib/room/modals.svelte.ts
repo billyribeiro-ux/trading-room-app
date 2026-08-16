@@ -1,7 +1,7 @@
 import { invalidateAll } from '$app/navigation';
 
 import { saveTheme } from '../../routes/user-settings.remote';
-import type { AlertTab, ModalName, SessionControlTab, SettingsTab, Theme } from '$lib/types';
+import type { AlertTab, ModalName, SessionControlTab, SettingsTab, Theme } from '#lib/types.js';
 
 import type { RoomMenus } from './menus.svelte';
 import type { RoomPolls } from './polls.svelte';

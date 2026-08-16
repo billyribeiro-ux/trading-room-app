@@ -1,6 +1,6 @@
 import { SvelteMap } from 'svelte/reactivity';
 
-import { INITIAL_ZOOM_LEVEL, type Pan, zoomIn, zoomOut } from '$lib/screen-zoom';
+import { INITIAL_ZOOM_LEVEL, type Pan, zoomIn, zoomOut } from '#lib/screen-zoom.js';
 
 import type { RoomDialogs } from './dialogs.svelte';
 

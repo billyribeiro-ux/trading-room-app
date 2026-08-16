@@ -2,14 +2,14 @@ import {
   CHAT_PAGE_ARRIVAL_NUDGE,
   CHAT_PAGE_REQUEST_NUDGE,
   shouldLoadOlderMessages
-} from '$lib/chat-paging';
-import type { ChatTab } from '$lib/types';
+} from '#lib/chat-paging.js';
+import type { ChatTab } from '#lib/types.js';
 
 import {
   loadOlderAlerts as loadOlderAlertsPage,
   loadOlderChatMessages as loadOlderChatPage
 } from '../../routes/log-pages.remote';
-import { isRoomScrollerReadingHistory, scrollRoomScrollerToBottom } from '$lib/room-scroller';
+import { isRoomScrollerReadingHistory, scrollRoomScrollerToBottom } from '#lib/room-scroller.js';
 
 import type { RoomAlerts } from './alerts.svelte';
 import type { RoomChat } from './chat.svelte';

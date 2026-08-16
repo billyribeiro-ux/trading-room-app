@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from 'vitest';
 import { eq, inArray } from 'drizzle-orm';
-import { db, ensureDatabase } from '$lib/server/db';
-import { notes, noteVersions, users } from '$lib/server/db/schema';
+import { db, ensureDatabase } from '#lib/server/db/index.js';
+import { notes, noteVersions, users } from '#lib/server/db/schema.js';
 import {
   createNote,
   deleteNote,

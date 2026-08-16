@@ -2,9 +2,9 @@
 import { flushSync } from 'svelte';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { TalkingEntry } from '$lib/mute-all-non-admins';
-import type { ModalTargetUser } from '$lib/types';
-import { MISSING_SCHEME_ALERT } from '$lib/user-action-intent';
+import type { TalkingEntry } from '#lib/mute-all-non-admins.js';
+import type { ModalTargetUser } from '#lib/types.js';
+import { MISSING_SCHEME_ALERT } from '#lib/user-action-intent.js';
 
 import { RoomDialogs } from './dialogs.svelte';
 import { RoomToasts } from './toasts.svelte';

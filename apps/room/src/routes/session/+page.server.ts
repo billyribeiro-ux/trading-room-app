@@ -2,18 +2,18 @@ import sanitizeHtml from 'sanitize-html';
 import { error, fail, redirect } from '@sveltejs/kit';
 import { ROOM_JWT_SECRET } from '$app/env/private';
 import { eq } from 'drizzle-orm';
-import { db, ensureDatabase } from '$lib/server/db';
-import { users } from '$lib/server/db/schema';
-import { createSessionFor } from '$lib/server/auth';
-import { isBannedFromRoom, isShutOutByRoomState, roomRoleFor } from '$lib/server/room-role';
-import { verifyHandoffToken } from '$lib/server/handoff-token';
-import { hashEmail } from '$lib/server/connection';
+import { db, ensureDatabase } from '#lib/server/db/index.js';
+import { users } from '#lib/server/db/schema.js';
+import { createSessionFor } from '#lib/server/auth.js';
+import { isBannedFromRoom, isShutOutByRoomState, roomRoleFor } from '#lib/server/room-role.js';
+import { verifyHandoffToken } from '#lib/server/handoff-token.js';
+import { hashEmail } from '#lib/server/connection.js';
 import {
   decideRoomEntryRemotely,
   readRoomConfig,
   type RoomConfig,
   type RoomMembership
-} from '$lib/server/room-config-client';
+} from '#lib/server/room-config-client.js';
 import type { Actions, PageServerLoad } from './$types';
 
 /**
@@ -74,12 +74,39 @@ import type { Actions, PageServerLoad } from './$types';
 function sanitizeRoomDescription(html: string): string {
   return sanitizeHtml(html, {
     allowedTags: [
-      'p', 'br', 'hr', 'div', 'span',
-      'b', 'strong', 'i', 'em', 'u', 's', 'sub', 'sup',
-      'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
-      'ul', 'ol', 'li', 'blockquote', 'pre', 'code',
-      'a', 'img',
-      'table', 'thead', 'tbody', 'tr', 'th', 'td'
+      'p',
+      'br',
+      'hr',
+      'div',
+      'span',
+      'b',
+      'strong',
+      'i',
+      'em',
+      'u',
+      's',
+      'sub',
+      'sup',
+      'h1',
+      'h2',
+      'h3',
+      'h4',
+      'h5',
+      'h6',
+      'ul',
+      'ol',
+      'li',
+      'blockquote',
+      'pre',
+      'code',
+      'a',
+      'img',
+      'table',
+      'thead',
+      'tbody',
+      'tr',
+      'th',
+      'td'
     ],
     allowedAttributes: {
       a: ['href', 'title'],

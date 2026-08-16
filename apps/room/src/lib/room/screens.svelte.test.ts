@@ -2,7 +2,7 @@
 import { flushSync } from 'svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { INITIAL_ZOOM_LEVEL } from '$lib/screen-zoom';
+import { INITIAL_ZOOM_LEVEL } from '#lib/screen-zoom.js';
 
 import { RoomDialogs } from './dialogs.svelte';
 import { RoomScreens, type SharedScreen } from './screens.svelte';

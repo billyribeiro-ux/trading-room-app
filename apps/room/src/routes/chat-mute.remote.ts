@@ -2,10 +2,10 @@ import { error } from '@sveltejs/kit';
 import { command, getRequestEvent } from '$app/server';
 import { and, eq, gt } from 'drizzle-orm';
 import { z } from 'zod';
-import { isPresenterRole, requireRoomShortCode, requireUser } from '$lib/server/auth';
-import { db, ensureDatabase } from '$lib/server/db';
-import { chatMutes } from '$lib/server/db/schema';
-import { publishToRoom } from '$lib/server/room-events';
+import { isPresenterRole, requireRoomShortCode, requireUser } from '#lib/server/auth.js';
+import { db, ensureDatabase } from '#lib/server/db/index.js';
+import { chatMutes } from '#lib/server/db/schema.js';
+import { publishToRoom } from '#lib/server/room-events.js';
 
 /*
   `unmuteChat` — the lift, and the half of the pair that was never built.

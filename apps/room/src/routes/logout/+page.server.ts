@@ -1,6 +1,6 @@
 import { type Actions, type ServerLoad } from '@sveltejs/kit';
-import { logout, requireUser } from '$lib/server/auth';
-import { redirectSignedOut } from '$lib/server/control-plane';
+import { logout, requireUser } from '#lib/server/auth.js';
+import { redirectSignedOut } from '#lib/server/control-plane.js';
 
 export const load: ServerLoad = async ({ locals }) => {
   const user = requireUser(locals);

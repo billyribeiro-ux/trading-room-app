@@ -1,10 +1,10 @@
-import { signedOutDestination } from '$lib/server/control-plane';
+import { signedOutDestination } from '#lib/server/control-plane.js';
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { eq } from 'drizzle-orm';
-import { db, ensureDatabase } from '$lib/server/db';
-import { notes, sessions, userSettings, users, type User } from '$lib/server/db/schema';
+import { db, ensureDatabase } from '#lib/server/db/index.js';
+import { notes, sessions, userSettings, users, type User } from '#lib/server/db/schema.js';
 import { actions } from '../routes/+page.server';
-import { callRemote } from '$lib/server/remote-command-harness';
+import { callRemote } from '#lib/server/remote-command-harness.js';
 
 /*
   Characterization tests for the last nine actions: the six session-note commands, plus

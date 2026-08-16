@@ -1,4 +1,4 @@
-import type { ToastNotice } from '$lib/toast';
+import type { ToastNotice } from '#lib/toast.js';
 
 /*
   The room's toast queue — `alertService` in the capture, which is ngx-toastr.

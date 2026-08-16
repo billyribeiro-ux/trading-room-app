@@ -4,9 +4,9 @@
     isChatMode,
     isWebinarMode,
     type ChatMode
-  } from '$lib/chat-mode';
-  import { RoomMenus } from '$lib/room/menus.svelte';
-  import { RoomPolls } from '$lib/room/polls.svelte';
+  } from '#lib/chat-mode.js';
+  import { RoomMenus } from '#lib/room/menus.svelte.js';
+  import { RoomPolls } from '#lib/room/polls.svelte.js';
   import { page } from '$app/state';
   import { invalidate, invalidateAll } from '$app/navigation';
   // The first remote function in this app. Aliased because the local wrapper below keeps the name.
@@ -41,97 +41,97 @@
   } from '$app/env/public';
   import { onMount, tick } from 'svelte';
   import { SvelteSet } from 'svelte/reactivity';
-  import { checkPermissionState } from '$lib/media-capture-error';
-  import { MtxStreamTabs } from '$lib/room-mtx.svelte';
-  import ScreenVolumeControl from '$lib/components/ScreenVolumeControl.svelte';
+  import { checkPermissionState } from '#lib/media-capture-error.js';
+  import { MtxStreamTabs } from '#lib/room-mtx.svelte.js';
+  import ScreenVolumeControl from '#lib/components/ScreenVolumeControl.svelte';
   import {
     rosterRowClass,
     rosterRowVisible,
     locationVisibleTo
-  } from '$lib/roster-gates';
-  import { RoomRoster } from '$lib/room/roster.svelte';
-  import { RoomAlerts } from '$lib/room/alerts.svelte';
-  import { ALERTS_LOG, RoomLogPages } from '$lib/room/log-pages.svelte';
-  import { RoomArrivals, RoomOrderedArrivals } from '$lib/room/arrivals';
-  import { RoomScrollFollow } from '$lib/room/scroll-follow';
-  import { RoomDialogs } from '$lib/room/dialogs.svelte';
-  import { RoomPrefs } from '$lib/room/prefs.svelte';
-  import { RoomVolume } from '$lib/room/volume.svelte';
-  import { RoomBroadcasts } from '$lib/room/broadcasts.svelte';
-  import { RoomToasts } from '$lib/room/toasts.svelte';
-  import { RoomFiles } from '$lib/room/files.svelte';
-  import { RoomPrivateChat } from '$lib/room/private-chat.svelte';
-  import { RoomComposer } from '$lib/room/composer.svelte';
-  import { RoomAlertsPane } from '$lib/room/alerts-pane';
-  import { RoomFeedScroll } from '$lib/room/feed-scroll';
-  import { RoomGates } from '$lib/room/gates.svelte';
-  import { RoomModals } from '$lib/room/modals.svelte';
-  import { RoomNotes } from '$lib/room/notes.svelte';
-  import { RoomFeeds } from '$lib/room/feeds.svelte';
-  import { RoomMessageActions } from '$lib/room/message-actions.svelte';
-  import { RoomEventStream } from '$lib/room/events.svelte';
-  import { RoomMediaTransport } from '$lib/room/media-transport.svelte';
-  import { RoomRecording } from '$lib/room/recording';
-  import { RoomWindowHandlers } from '$lib/room/window-handlers';
+  } from '#lib/roster-gates.js';
+  import { RoomRoster } from '#lib/room/roster.svelte.js';
+  import { RoomAlerts } from '#lib/room/alerts.svelte.js';
+  import { ALERTS_LOG, RoomLogPages } from '#lib/room/log-pages.svelte.js';
+  import { RoomArrivals, RoomOrderedArrivals } from '#lib/room/arrivals.js';
+  import { RoomScrollFollow } from '#lib/room/scroll-follow.js';
+  import { RoomDialogs } from '#lib/room/dialogs.svelte.js';
+  import { RoomPrefs } from '#lib/room/prefs.svelte.js';
+  import { RoomVolume } from '#lib/room/volume.svelte.js';
+  import { RoomBroadcasts } from '#lib/room/broadcasts.svelte.js';
+  import { RoomToasts } from '#lib/room/toasts.svelte.js';
+  import { RoomFiles } from '#lib/room/files.svelte.js';
+  import { RoomPrivateChat } from '#lib/room/private-chat.svelte.js';
+  import { RoomComposer } from '#lib/room/composer.svelte.js';
+  import { RoomAlertsPane } from '#lib/room/alerts-pane.js';
+  import { RoomFeedScroll } from '#lib/room/feed-scroll.js';
+  import { RoomGates } from '#lib/room/gates.svelte.js';
+  import { RoomModals } from '#lib/room/modals.svelte.js';
+  import { RoomNotes } from '#lib/room/notes.svelte.js';
+  import { RoomFeeds } from '#lib/room/feeds.svelte.js';
+  import { RoomMessageActions } from '#lib/room/message-actions.svelte.js';
+  import { RoomEventStream } from '#lib/room/events.svelte.js';
+  import { RoomMediaTransport } from '#lib/room/media-transport.svelte.js';
+  import { RoomRecording } from '#lib/room/recording.js';
+  import { RoomWindowHandlers } from '#lib/room/window-handlers.js';
   import {
     RoomWebcams,
     setAutoplayAttribute,
     setWebcamAudioAttributes
-  } from '$lib/room/webcams';
-  import { RoomScreens } from '$lib/room/screens.svelte';
-  import { RoomUserActions } from '$lib/room/user-actions.svelte';
+  } from '#lib/room/webcams.js';
+  import { RoomScreens } from '#lib/room/screens.svelte.js';
+  import { RoomUserActions } from '#lib/room/user-actions.svelte.js';
   import {
     DAY_TRADE_ALERT_FEED,
     type DayTradeAlertAction,
     SWING_ALERT_FEED,
     type SwingAlertAction,
     RoomTradeAlerts
-  } from '$lib/room/trade-alerts.svelte';
-  import type { RoomMessageChrome } from '$lib/room-message-chrome';
-  import { EXTRA_COMPOSER, RoomChat } from '$lib/room/chat.svelte';
-  import { RoomMedia } from '$lib/room/media.svelte';
-  import { tawkAttributes, tawkScript } from '$lib/tawk-support';
+  } from '#lib/room/trade-alerts.svelte.js';
+  import type { RoomMessageChrome } from '#lib/room-message-chrome.js';
+  import { EXTRA_COMPOSER, RoomChat } from '#lib/room/chat.svelte.js';
+  import { RoomMedia } from '#lib/room/media.svelte.js';
+  import { tawkAttributes, tawkScript } from '#lib/tawk-support.js';
   import {
     RoomSplit,
     isRoomSplitDir,
     splitPairFromValue,
     splitStorageKeys
-  } from '$lib/room/split.svelte';
-  import { shouldDisableSelection } from '$lib/room-key-gates';
-  import AlertChatArea from '$lib/components/AlertChatArea.svelte';
-  import PresentationArea from '$lib/components/PresentationArea.svelte';
-  import RoomOverlays from '$lib/components/RoomOverlays.svelte';
-  import ExtraChatPane from '$lib/components/ExtraChatPane.svelte';
-  import { resolveNoteSurfaceGates } from '$lib/components/notes/note-gates';
-  import { swingAlertsTabVisible } from '$lib/swing-alerts';
-  import type { SwingAlertRow } from '$lib/types';
-  import { alertFilterAvailable, alertPassesFilter } from '$lib/alert-filter';
-  import { dayTradeAlertsTabVisible } from '$lib/day-trade-alerts';
-  import type { DayTradeAlertRow } from '$lib/types';
-  import { isMentionOf } from '$lib/mention';
-  import PrivateChatPanel from '$lib/components/PrivateChatPanel.svelte';
+  } from '#lib/room/split.svelte.js';
+  import { shouldDisableSelection } from '#lib/room-key-gates.js';
+  import AlertChatArea from '#lib/components/AlertChatArea.svelte';
+  import PresentationArea from '#lib/components/PresentationArea.svelte';
+  import RoomOverlays from '#lib/components/RoomOverlays.svelte';
+  import ExtraChatPane from '#lib/components/ExtraChatPane.svelte';
+  import { resolveNoteSurfaceGates } from '#lib/components/notes/note-gates.js';
+  import { swingAlertsTabVisible } from '#lib/swing-alerts.js';
+  import type { SwingAlertRow } from '#lib/types.js';
+  import { alertFilterAvailable, alertPassesFilter } from '#lib/alert-filter.js';
+  import { dayTradeAlertsTabVisible } from '#lib/day-trade-alerts.js';
+  import type { DayTradeAlertRow } from '#lib/types.js';
+  import { isMentionOf } from '#lib/mention.js';
+  import PrivateChatPanel from '#lib/components/PrivateChatPanel.svelte';
   import {
     NO_SPEAKER_TEXT,
     SHARE_SCREEN_TEXT,
     STOP_SHARING_ALL_TEXT,
     VIRTUAL_CAM_TEXT
-  } from '$lib/navbar-labels';
-  import RoomNavbar from '$lib/components/RoomNavbar.svelte';
-  import RoomSidebar from '$lib/components/RoomSidebar.svelte';
-  import { resolveAlertDelivery } from '$lib/alert-delivery';
-  import { DUMP_CONTRACT } from '$lib/dump-contract';
+  } from '#lib/navbar-labels.js';
+  import RoomNavbar from '#lib/components/RoomNavbar.svelte';
+  import RoomSidebar from '#lib/components/RoomSidebar.svelte';
+  import { resolveAlertDelivery } from '#lib/alert-delivery.js';
+  import { DUMP_CONTRACT } from '#lib/dump-contract.js';
   import {
     initializeSoundEffects,
     playSoundEffect,
     setSoundEffectsVolume,
     unloadSoundEffects
-  } from '$lib/sound-effects';
+  } from '#lib/sound-effects.js';
   import type {
     ChatTab,
     FollowChatStyle,
     MainTab,
     Theme
-  } from '$lib/types';
+  } from '#lib/types.js';
   import type { PageProps } from './$types';
 
   /**
@@ -175,7 +175,7 @@
   let { data }: PageProps = $props();
 
   /*
-    Every preference this viewer owns, in `$lib/room/prefs.svelte.ts`.
+    Every preference this viewer owns, in `#lib/room/prefs.svelte.ts`.
 
     Twenty-seven of them were declared across eleven hundred lines of this file, and the function
     that writes them sat two thousand lines below the values it assigned. TWENTY-FIVE now have no
@@ -189,7 +189,7 @@
     forces it on at zero volume).
 
     `persist` is injected rather than imported, which keeps a route-level remote function out of
-    `$lib` and lets the write path be tested without mocking the wire.
+    `#lib` and lets the write path be tested without mocking the wire.
   */
   // The server settings are the intentional one-time seed for editable client preference state.
   // svelte-ignore state_referenced_locally
@@ -226,7 +226,7 @@
   });
 
   /*
-    Every volume in the room, in `$lib/room/volume.svelte.ts`.
+    Every volume in the room, in `#lib/room/volume.svelte.ts`.
 
     The first class to take another as a dependency: `mute()` and `unmute()` set
     `preferences.doNotDisturbOn` in the reference itself, so the coupling is captured behaviour
@@ -330,11 +330,11 @@
     console.error('TODO: toggleLockScreenMTX', streamId);
   }
   /*
-    Who is in the room, in `$lib/room/roster.svelte.ts`.
+    Who is in the room, in `#lib/room/roster.svelte.ts`.
 
     The fourth room state class: the live roster, the four header controls that sort and search it,
     the badge count and the random-user draw. The two transcribed pipes and the four gates stay in
-    `$lib/roster-gates`, where their truth tables are; this class holds the state they run on.
+    `#lib/roster-gates.js`, where their truth tables are; this class holds the state they run on.
 
     Two thunks rather than a snapshot, which is the shape `$state`'s "passing state into functions"
     documents: `data` is a `$props()` value, so passing `data.connectedUsers` would hand over the
@@ -366,7 +366,7 @@
   let chatAlertsDetached = $state(false);
 
   /*
-    The two chat columns, in `$lib/room/chat.svelte.ts`.
+    The two chat columns, in `#lib/room/chat.svelte.ts`.
 
     Which channel each shows, what is typed in each, which one the viewer last touched, and the
     mention routing that reads three of those at once. They were declared 650 lines apart and the
@@ -523,7 +523,7 @@
    * why a member never saw it.
    */
   /*
-    The room's media STATE, in `$lib/room/media.svelte.ts`.
+    The room's media STATE, in `#lib/room/media.svelte.ts`.
 
     Every flag the interface renders from — mic, camera, screen, this browser's media.recording and the
     ROOM's, who has a microphone open, and whether this member has been handed limited-presenter
@@ -555,7 +555,7 @@
     ...loadedChatStyle
   });
   /*
-    The room's two nested splits, in `$lib/room/split.svelte.ts`.
+    The room's two nested splits, in `#lib/room/split.svelte.ts`.
 
     The third room state class, and the largest so far: seven pieces of reactive state, five plain
     ones and twenty derived values that were spread from the seed here to the drag handlers 5,500
@@ -567,7 +567,7 @@
   */
   const split = new RoomSplit(loadedRoomSplitDir, settingsSplitPair);
   /*
-    The poll modal's four fields, in `$lib/room/polls.svelte.ts`.
+    The poll modal's four fields, in `#lib/room/polls.svelte.ts`.
 
     The first of the room state classes. A class rather than four `let`s because that is the only
     shape reactive state can leave a component in — `svelte/svelte-js-files` says reassigned state
@@ -587,7 +587,7 @@
   // header and the scroller. It is absent from the default capture (alert-section/1.html states
   // "No alertsToolbar search strip in this snapshot"), so it is toggled, not permanent.
   /*
-    The alerts pane's own state, in `$lib/room/alerts.svelte.ts`: the two-state toolbar, this
+    The alerts pane's own state, in `#lib/room/alerts.svelte.ts`: the two-state toolbar, this
     viewer's Alert Filter, the archive cut-off and the search term — with the citations for each.
 
     The fifth room state class. It deliberately does NOT own `visibleAlerts` / `searchableAlerts`,
@@ -605,7 +605,7 @@
       typeof prefs.loaded.alertsArchivedAt === 'number' ? prefs.loaded.alertsArchivedAt : null
   });
   /*
-    The eleven floating menus, in `$lib/room/menus.svelte.ts`.
+    The eleven floating menus, in `#lib/room/menus.svelte.ts`.
 
     They were eleven separate flags closed by TWO functions with two different lists — `openModal`
     left the top-bar dropdowns open, `closeFloatingMenus` left the emoji and GIF pickers open. Both
@@ -614,7 +614,7 @@
   */
   const menus = new RoomMenus();
   /*
-    The room's three bootbox dialogs, in `$lib/room/dialogs.svelte.ts`.
+    The room's three bootbox dialogs, in `#lib/room/dialogs.svelte.ts`.
 
     Three fields and not one discriminated union, because they STACK: a prompt's `onconfirm` raises
     an alert, a confirm's handler raises an alert on failure, and the Escape handler at the bottom
@@ -626,7 +626,7 @@
   */
   const dialogs = new RoomDialogs();
   /*
-    The screen VIEWER, in `$lib/room/screens.svelte.ts`.
+    The screen VIEWER, in `#lib/room/screens.svelte.ts`.
 
     Phase 5 slice 11. Which tab is showing, how far it is zoomed, where it is panned, and the popout
     windows a presenter can detach a screen into.
@@ -654,7 +654,7 @@
   });
 
   /*
-    Everything a presenter plays for the WHOLE ROOM, in `$lib/room/broadcasts.svelte.ts`.
+    Everything a presenter plays for the WHOLE ROOM, in `#lib/room/broadcasts.svelte.ts`.
 
     The three commands are one shape: a button, a server command, and every browser reacting to what
     comes back on the `cmds` channel. The dispatch below calls RECEIVERS rather than assigning the
@@ -673,7 +673,7 @@
     }
   });
   /*
-    The file drive, in `$lib/room/files.svelte.ts`.
+    The file drive, in `#lib/room/files.svelte.ts`.
 
     The slice with the clearest payoff beyond its own line count. Fifteen of these props were handed
     to `PresentationArea`, which passed the same fifteen straight through to `FilesPane` while
@@ -706,7 +706,7 @@
     onRoomDataChanged: () => invalidate('room:data')
   });
   /*
-    The two trade alert feeds, in `$lib/room/trade-alerts.svelte.ts` — ONE class, two instances.
+    The two trade alert feeds, in `#lib/room/trade-alerts.svelte.ts` — ONE class, two instances.
 
     Phase 5 slice 15, and the slice that removes a duplicate rather than moving one. The swing half
     and the day trade half were fourteen declarations each, in the same order, and folding the day
@@ -740,7 +740,7 @@
     uploadImages: (files) => composer.uploadAlertFiles(files)
   });
   /*
-    The private-chat panel, in `$lib/room/private-chat.svelte.ts`.
+    The private-chat panel, in `#lib/room/private-chat.svelte.ts`.
 
     Phase 5 slice 7. Twenty-four declarations and functions that were spread across four regions of
     this file — the state at 1,263, the roster entry points at 2,000 and the behaviour at 4,585 —
@@ -775,7 +775,7 @@
     onThreadDeleted: () => invalidateAll()
   });
   /*
-    The room's toast queue, in `$lib/room/toasts.svelte.ts`.
+    The room's toast queue, in `#lib/room/toasts.svelte.ts`.
 
     The first slice of the phase that moves BEHAVIOUR out of this file rather than declarations —
     the queue, its timers, the duplicate guard and the browser notification left together, because
@@ -791,7 +791,7 @@
   */
   const toasts = new RoomToasts();
   /*
-    The SFU TRANSPORT, in `$lib/room/media-transport.svelte.ts`.
+    The SFU TRANSPORT, in `#lib/room/media-transport.svelte.ts`.
 
     Phase 5 slice 4, the largest of the phase: the session, the producers this browser publishes,
     the consumers it subscribes to, and every stream on either side.
@@ -830,7 +830,7 @@
     }
   });
   /*
-    Everything that can be DONE to a user, in `$lib/room/user-actions.svelte.ts`.
+    Everything that can be DONE to a user, in `#lib/room/user-actions.svelte.ts`.
 
     Phase 5 slice 13, and the largest single function in this file went with it: `handleUserAction`
     was 249 lines. What holds the twenty-three declarations together is that every one of them reads
@@ -846,7 +846,7 @@
     captured colour rather than about this class.
   */
   /*
-    Everything that LEAVES this browser as content, in `$lib/room/composer.svelte.ts`.
+    Everything that LEAVES this browser as content, in `#lib/room/composer.svelte.ts`.
 
     Phase 5 slice 10. Five entry points — plain composer, extra column, rich text, image upload,
     GIF — that all funnel into one `sendBody`, plus the two alert paths that share its uploader.
@@ -888,7 +888,7 @@
     uploadKey: PUBLIC_PTR_CDN_UPLOAD_KEY ?? ''
   });
   /*
-    What a click on a MESSAGE can do, in `$lib/room/message-actions.svelte.ts`.
+    What a click on a MESSAGE can do, in `#lib/room/message-actions.svelte.ts`.
 
     Phase 5 slice 8, and it went LAST of the domain slices deliberately. This dispatcher reached
     into rich-text composer state, the private-chat panel, the evidence overlay, the modal shell and
@@ -937,7 +937,7 @@
   });
 
   /*
-    THE WEBCAM CARDS, in `$lib/room/webcams.ts`.
+    THE WEBCAM CARDS, in `#lib/room/webcams.ts`.
 
     Phase 5 slice 21. It RENDERS; it does not capture — `mediaTransport` acquires the camera and
     produces it, and this decides what a card looks like and which element the stream lands in. The
@@ -945,7 +945,7 @@
     any instance state.
   */
   /*
-    THE WINDOW LISTENERS' bodies, in `$lib/room/window-handlers.ts`.
+    THE WINDOW LISTENERS' bodies, in `#lib/room/window-handlers.ts`.
 
     Phase 5 slice 18. The bindings stay on `<svelte:window>` at the bottom of this file, because
     that is how Svelte says to attach a window listener and it owns the add and the remove. What
@@ -1000,7 +1000,7 @@
   });
 
   /*
-    The room's REALTIME CHANNEL, in `$lib/room/events.svelte.ts`.
+    The room's REALTIME CHANNEL, in `#lib/room/events.svelte.ts`.
 
     Phase 5 slice 5, and the largest single function left after slice 4: `subscribeToRoomEvents`
     was 575 lines routing six channels. The browser-side geolocation travels with it because it is
@@ -1201,7 +1201,7 @@
    * `sessData.disableCopy` — "Disable Copy?", content protection for the AUDIENCE.
    *
    * Read the same way every other room setting here is. The presenter exemption is not applied at
-   * this line: it belongs to each gate, in `$lib/room-key-gates`, because all three bindings carry
+   * this line: it belongs to each gate, in `#lib/room-key-gates.js`, because all three bindings carry
    * the same two terms and folding `!isPresenter` in here would hide that they are one rule.
    */
   const disableCopy = $derived(data.sessData?.disableCopy === true);
@@ -1285,7 +1285,7 @@
   }
 
   /**
-   * The sidebar's gates. Every one is a transcription in `$lib/roster-gates`, tested there against
+   * The sidebar's gates. Every one is a transcription in `#lib/roster-gates.js`, tested there against
    * its truth table; this file only supplies the viewer and the session.
    */
   /*
@@ -1303,7 +1303,7 @@
   const rosterSession = $derived(data.sessData ?? {});
 
   /*
-    WHAT THIS VIEWER MAY SEE, in `$lib/room/gates.svelte.ts`.
+    WHAT THIS VIEWER MAY SEE, in `#lib/room/gates.svelte.ts`.
 
     Phase 5 slice 27. Sixteen `$derived` predicates answering one question sixteen ways: given this
     room's configuration and this viewer's role, what is on screen.
@@ -1313,7 +1313,7 @@
     an `undefined` evaluation. `RoomFiles.filesHidden` is where that was first paid for. A getter is
     exactly as reactive: a `$derived` read through one is the same signal read.
 
-    The RULES stay in `$lib/*-gates.ts` with their own tests. This asks them.
+    The RULES stay in `#lib/*-gates.ts` with their own tests. This asks them.
   */
   const gates = new RoomGates({
     prefs,
@@ -1442,7 +1442,7 @@
     no channel — `getAlertsLog {page}` against `getChatLog {channel, page}`.
   */
   /*
-    Older-page state for BOTH logs, in `$lib/room/log-pages.svelte.ts`.
+    Older-page state for BOTH logs, in `#lib/room/log-pages.svelte.ts`.
 
     The room held this machinery twice and in two shapes — scalars for alerts, per-channel maps for
     chat — and neither was wrong, which is what let the duplication survive. Upstream keeps the
@@ -1529,7 +1529,7 @@
    * `RoomOrderedArrivals` owns which messages are new, and it is deliberately NOT `RoomArrivals`:
    * this marks a POSITION in the server's ordering and re-seeds silently when that marker has been
    * trimmed out of the newest page, where an identity set would announce the entire log. Both live
-   * in `$lib/room/arrivals.ts`, next to each other, so nobody merges them. Arriving in a room with
+   * in `#lib/room/arrivals.ts`, next to each other, so nobody merges them. Arriving in a room with
    * fifty unread mentions is silent; only messages that appear afterwards pop.
    */
   $effect(() => {
@@ -1560,7 +1560,7 @@
    */
   const chatPages = new RoomLogPages<(typeof data.messages)[number]>();
   /*
-    What each pane actually RENDERS, in `$lib/room/feeds.svelte.ts`.
+    What each pane actually RENDERS, in `#lib/room/feeds.svelte.ts`.
 
     Phase 5 slice 9. The read pipelines and the client-side evidence overlay, which look separate
     and are one thing: every pipeline filters on the overlay and maps it, so a class holding the
@@ -1589,7 +1589,7 @@
   });
 
   /*
-    THE ALERTS PANE's own actions, in `$lib/room/alerts-pane.ts`.
+    THE ALERTS PANE's own actions, in `#lib/room/alerts-pane.ts`.
 
     Phase 5 slice 22: archive, export, detach and the two toolbar toggles — what a viewer DOES to
     the pane, as against what `RoomAlerts` and `RoomFeeds` know about the alerts themselves.
@@ -1599,7 +1599,7 @@
     eslint refused it as a collaborator nothing consumes.
   */
   /*
-    SCROLL-FOLLOW and PAGING for all three feeds, in `$lib/room/feed-scroll.ts`.
+    SCROLL-FOLLOW and PAGING for all three feeds, in `#lib/room/feed-scroll.ts`.
 
     Phase 5 slice 23. One mechanism and three instances of it: a flag per feed saying the reader has
     scrolled up into history, a tracker that sets it, and a paging arm that is disarmed while it is
@@ -1612,7 +1612,7 @@
     `stopReadingHistory` to clear.
   */
   /*
-    WHICH OVERLAY IS SHOWING, in `$lib/room/modals.svelte.ts`.
+    WHICH OVERLAY IS SHOWING, in `#lib/room/modals.svelte.ts`.
 
     Phase 5 slice 24: the modal name, the tab each modal opens on, the image the lightbox holds, and
     the two actions reached only from inside one.
@@ -1634,7 +1634,7 @@
   });
 
   /*
-    THE NOTES TAB s own actions, in `$lib/room/notes.svelte.ts`.
+    THE NOTES TAB s own actions, in `#lib/room/notes.svelte.ts`.
 
     Phase 5 slice 25. The two link mounts came with them because each wires a link that only exists
     inside note or file markup - content this class is responsible for - while the page s other
@@ -2923,7 +2923,7 @@
       </div>
     </div>
     <!--
-      Everything that floats above the room, in `$lib/components/RoomOverlays.svelte`.
+      Everything that floats above the room, in `#lib/components/RoomOverlays.svelte`.
 
       Phase 5 slice 17, and the largest single template region left after Phase 2: the modal host,
       the seven dialog blocks, the toast host, the image lightbox, the hidden remote-audio sinks and

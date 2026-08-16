@@ -184,7 +184,11 @@ export function mtxPlaybackPath(stream: MtxStream, streamServerMTX: string): str
  * ingest names 8889 explicitly. The token rides as `jwt`, the same parameter name the RTMP ingest
  * URL uses, which is why the controller's media-auth reads `jwt` for both.
  */
-export function mtxPlaylistUrl(stream: MtxStream, streamServerMTX: string, mtxToken: string): string {
+export function mtxPlaylistUrl(
+  stream: MtxStream,
+  streamServerMTX: string,
+  mtxToken: string
+): string {
   return `https://${streamServerMTX}/${mtxPlaybackPath(stream, streamServerMTX)}/index.m3u8?jwt=${mtxToken}`;
 }
 

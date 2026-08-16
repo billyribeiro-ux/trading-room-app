@@ -2,9 +2,9 @@
   lang="ts"
   generics="Entry extends { id: number; displayName: string; avatarUrl: string; locStr?: string | null; isP?: boolean; isFT?: boolean }"
 >
-  import type { RoomMenus } from '$lib/room/menus.svelte';
-  import type { RoomRoster, RosterMember } from '$lib/room/roster.svelte';
-  import type { RosterSessionFlags } from '$lib/roster-gates';
+  import type { RoomMenus } from '#lib/room/menus.svelte.js';
+  import type { RoomRoster, RosterMember } from '#lib/room/roster.svelte.js';
+  import type { RosterSessionFlags } from '#lib/roster-gates.js';
 
   /*
     `.room-sidebar` — the room's left rail: the viewer's own card, the Users block with its four
@@ -24,7 +24,7 @@
     ## What stayed on the page
 
     Every GATE — `rosterVisible`, `rosterCountVisible`, `archivesAvailable`, `rowVisible` — is a
-    transcription in `$lib/roster-gates` evaluated against the viewer and the session, both of which
+    transcription in `#lib/roster-gates.js` evaluated against the viewer and the session, both of which
     come from the page load. They are passed as computed booleans rather than recomputed here: a
     component that re-derived them would be a second place for the room's authority model to live,
     which is the opposite of this repository's first rule.
@@ -79,7 +79,7 @@
     chatAlertsDetached: boolean;
 
     /*
-      The gates, computed by the page from `$lib/roster-gates` and passed as answers.
+      The gates, computed by the page from `#lib/roster-gates.js` and passed as answers.
 
       Not recomputed here on purpose: every authority decision in this room is made in one place
       from data the server owns, and a component that evaluated its own copy would be a second

@@ -1,6 +1,6 @@
 <script lang="ts">
-  import BootboxDialog from '$lib/components/BootboxDialog.svelte';
-  import type { DayTradeAlertRow } from '$lib/types';
+  import BootboxDialog from '#lib/components/BootboxDialog.svelte';
+  import type { DayTradeAlertRow } from '#lib/types.js';
   import {
     DAY_TRADE_ALERT_DEFAULT_LIMIT,
     DAY_TRADE_ALERT_DEFAULT_MONTHS,
@@ -16,7 +16,7 @@
     formatDayTradeAlertDate,
     limitDayTradeLogs,
     searchDayTradeLogs
-  } from '$lib/day-trade-alerts';
+  } from '#lib/day-trade-alerts.js';
   import DayTradeAlertForm from './DayTradeAlertForm.svelte';
   import {
     dayTradeAlertDraftFrom,
@@ -144,7 +144,7 @@
    * `onDayTradeAlertSubmit` — validate, then confirm, then send.
    *
    * The validation messages and their order are `dayTradeAlertSubmitError`'s; the confirmation is
-   * `dayTradeAlertSubmitConfirm`'s. Both live in `$lib/day-trade-alerts` so they can be asserted
+   * `dayTradeAlertSubmitConfirm`'s. Both live in `#lib/day-trade-alerts.js` so they can be asserted
    * without rendering a pane.
    */
   function requestSubmit(): void {

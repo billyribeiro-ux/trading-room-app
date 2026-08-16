@@ -35,12 +35,12 @@
    * ## The traps, each reproduced deliberately
    *
    * - **The icon branches are STRICT** (`> 50`, `< 50 && > 4`, `< 4`), so at exactly 50 and exactly
-   *   4 the button renders EMPTY. `volumeIcon()` in `$lib/screen-volume` owns that and
+   *   4 the button renders EMPTY. `volumeIcon()` in `#lib/screen-volume.js` owns that and
    *   `screen-volume-contract.test.ts` fails if anyone relaxes a bound.
    * - **`value="Presenter audiob"`** on the checkbox (const 112) is the reference's typo, reproduced
    *   the same way this codebase already reproduces `clas=` and `noboby`.
    * - **`audioMutedFor[userID]` is an object `{name}`**, so "muted" is a truthiness check and
-   *   unmuting is a `delete`. See `$lib/screen-volume`.
+   *   unmuting is a `delete`. See `#lib/screen-volume.js`.
    * - **Mute and Unmute are two separate gated buttons**, not one button with a swapped label:
    *   const 109 and const 110 differ only in their `title`, and each has its own click handler.
    *
@@ -49,8 +49,8 @@
    * `submit`, and this cluster is one `<form>` away from being a live defect. Nothing else is
    * changed — every class, attribute, order and text node is the reference's, spaces included.
    */
-  import PresenterMuteRows from '$lib/components/PresenterMuteRows.svelte';
-  import { type PresenterAudioPreferences, type TalkingPresenter } from '$lib/screen-volume';
+  import PresenterMuteRows from '#lib/components/PresenterMuteRows.svelte';
+  import { type PresenterAudioPreferences, type TalkingPresenter } from '#lib/screen-volume.js';
 
   type Props = {
     /**

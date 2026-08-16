@@ -1,12 +1,12 @@
 <script lang="ts">
-  import { ngbTooltip, ngbTooltipWith } from '$lib/ngb-tooltip';
-  import { alertDateFormatter } from '$lib/message-formatters';
+  import { ngbTooltip, ngbTooltipWith } from '#lib/ngb-tooltip.js';
+  import { alertDateFormatter } from '#lib/message-formatters.js';
   import {
     CONNECTIVITY_ROWS,
     connectivityGlyph,
     connectivityRowClasses
-  } from '$lib/connectivity-status-rows';
-  import { rtmpIngestUrl, whipIngestUrl, type StreamIngestKey } from '$lib/stream-ingest';
+  } from '#lib/connectivity-status-rows.js';
+  import { rtmpIngestUrl, whipIngestUrl, type StreamIngestKey } from '#lib/stream-ingest.js';
   import { invalidateAll } from '$app/navigation';
   import { resolve } from '$app/paths';
   import { onMount, untrack } from 'svelte';
@@ -20,7 +20,7 @@
     SavedPoll,
     SettingsTab,
     Theme
-  } from '$lib/types';
+  } from '#lib/types.js';
   import BootboxDialog from './BootboxDialog.svelte';
   import EmojiPicker from './EmojiPicker.svelte';
   import Modal from './Modal.svelte';
@@ -28,14 +28,14 @@
   import PostAlertModal from './PostAlertModal.svelte';
   import RichTextEditor from './RichTextEditor.svelte';
   import RoomMessage from './RoomMessage.svelte';
-  import { chatModeConfirmPrompt, type ChatMode } from '$lib/chat-mode';
-  import { refusalMessage, refusalOrTransportMessage } from '$lib/refusal-message';
+  import { chatModeConfirmPrompt, type ChatMode } from '#lib/chat-mode.js';
+  import { refusalMessage, refusalOrTransportMessage } from '#lib/refusal-message.js';
   import { uploadFile } from '../../routes/files-pane.remote';
   import {
     giveMicScreen as giveMicScreenCommand,
     presenterCommand
   } from '../../routes/presenter-commands.remote';
-  import type { PastedImageSubmission, PostAlertSubmission } from '$lib/post-alert-behavior';
+  import type { PastedImageSubmission, PostAlertSubmission } from '#lib/post-alert-behavior.js';
   import {
     alertFilterAvailable,
     alertFilterConfirm,
@@ -47,7 +47,7 @@
     unselectAllTraders,
     type AlertFilterFor,
     type AlertFilterTrader
-  } from '$lib/alert-filter';
+  } from '#lib/alert-filter.js';
   import {
     CAPTURED_TRADERS,
     canSearch,
@@ -59,7 +59,7 @@
     toggleKey,
     SYNC_ROOMS_CONFIRM,
     type SearchableAlert
-  } from '$lib/alerts-advanced-search';
+  } from '#lib/alerts-advanced-search.js';
 
   interface Props {
     name: ModalName;
@@ -203,7 +203,7 @@
     /**
      * The room's alerts, for `#alerts-advanced-search-modal`. The captured component calls a
      * server route this room does not have, so the search runs against these real rows - see
-     * `filterAlerts` in `$lib/alerts-advanced-search`.
+     * `filterAlerts` in `#lib/alerts-advanced-search.js`.
      */
     alerts: SearchableAlert[];
     /**
@@ -221,7 +221,7 @@
     rteIsEditing?: boolean;
     /** The room's chat mode — `g`, `p` or `d` — read from `room_state` by the page load. */
     chatMode?: ChatMode;
-    /** `changeChatMode` — a presenter act that changes the room; `$lib/chat-mode.ts` says why typed. */
+    /** `changeChatMode` — a presenter act that changes the room; `#lib/chat-mode.ts` says why typed. */
     onChatModeChange: (mode: ChatMode) => void;
     onRteDraftChange: (html: string) => void;
     onRteSend: () => void;
@@ -1449,7 +1449,7 @@
   /*
     `sendServerAdminCommand('changeChatMode', {mode})`. This used to be
     `onPreferenceChange('chatMode', mode)` — a per-user preference nothing in the room ever read, at
-    the wrong LEVEL besides; `$lib/chat-mode.ts` carries that history.
+    the wrong LEVEL besides; `#lib/chat-mode.ts` carries that history.
 
     What matters HERE is that there is no local assignment. `groupChatMode` is a prop, fed from the
     row the server just wrote, so the radio shows what the room IS rather than what this browser
@@ -5641,7 +5641,7 @@
         {/if}
         <!--
           The four checks, one loop. They were four near-identical blocks stating the same two rules
-          four times; the table and the two pure functions live in `$lib/connectivity-status-rows`,
+          four times; the table and the two pure functions live in `#lib/connectivity-status-rows.js`,
           where they are tested. The TURN row's `–`-for-unconfigured is preserved and is the reason
           the glyph is a function rather than a nested ternary in the markup.
         -->

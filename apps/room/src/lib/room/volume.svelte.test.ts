@@ -8,7 +8,7 @@ import { RoomVolume } from './volume.svelte';
 /*
   The room's volumes, executed rather than read as text.
 
-  `screen-volume-contract.test.ts` already covers the pure transitions in `$lib/screen-volume` and
+  `screen-volume-contract.test.ts` already covers the pure transitions in `#lib/screen-volume.js` and
   the overlay that renders them, and it kept passing through this extraction because it never
   asserted on the page's wiring. What it cannot see is the part that moved: that reading
   `roomVolume.volume` in a template re-runs when the slider moves, and that muting still reaches the

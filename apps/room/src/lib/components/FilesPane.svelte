@@ -20,7 +20,7 @@
 
     Nothing here reads the database, deletes a file or resolves who may. `isPresenter` arrives
     decided, `alertSoundButtonFor` resolves the two complementary alert-sound gates in
-    `$lib/files-gates` where they are tested, and every control calls a page callback. The pane
+    `#lib/files-gates.js` where they are tested, and every control calls a page callback. The pane
     draws; the page acts.
 
     ## `mainTab` is READ here and never written
@@ -37,11 +37,11 @@
     twenty-two was the number the compiler produced when this pane was cut out, and it is eight now.
   */
   import { invalidate } from '$app/navigation';
-  import { alertSoundButtonFor } from '$lib/files-gates';
-  import { fileSizeInKb, fileSortTitle } from '$lib/file-sort';
-  import { mediumDate } from '$lib/message-formatters';
-  import type { MainTab, ModalName } from '$lib/types';
-  import type { RoomFiles } from '$lib/room/files.svelte';
+  import { alertSoundButtonFor } from '#lib/files-gates.js';
+  import { fileSizeInKb, fileSortTitle } from '#lib/file-sort.js';
+  import { mediumDate } from '#lib/message-formatters.js';
+  import type { MainTab, ModalName } from '#lib/types.js';
+  import type { RoomFiles } from '#lib/room/files.svelte.js';
   import type { PageProps } from '../../routes/$types';
 
   interface Props {
@@ -50,7 +50,7 @@
     /** The ROLE, decided on the page. Gates Delete Selected, Upload, and the per-row controls. */
     isPresenter: boolean;
     /**
-     * The file drive, whole — `$lib/room/files.svelte.ts`.
+     * The file drive, whole — `#lib/room/files.svelte.ts`.
      *
      * Fifteen props collapsed into this one object, and the same fifteen disappeared from
      * `PresentationArea`, which passed every one of them straight through. `filesHidden` still
@@ -348,7 +348,7 @@
                           direction. `docs/decoded/files-sort-bar.md` listed this expression as an
                           honest gap; it was opened and the gap is closed.
 
-                          `mo` is quoted verbatim in `$lib/file-sort`, and asserted verbatim against
+                          `mo` is quoted verbatim in `#lib/file-sort.js`, and asserted verbatim against
                           the bundle in `files-pane-contract.test.ts`. It is written out in words
                           HERE because its body is brace-delimited, and a brace-delimited construct
                           inside a Svelte comment is prose to a human and a mustache to a parser.
@@ -513,7 +513,7 @@
                                     The two gates at full.js:1972-1991 are complements over the same
                                     three terms, and written separately a room that never received
                                     `overwriteCashRegisterSound` would render both at once.
-                                    `alertSoundButtonFor` in `$lib/files-gates` resolves them to one
+                                    `alertSoundButtonFor` in `#lib/files-gates.js` resolves them to one
                                     answer and is tested there.
 
                                     TRANSCRIPTION NOTE: const 263 spells the type attribute

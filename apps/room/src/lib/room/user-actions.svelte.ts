@@ -6,14 +6,14 @@ import {
   type RosterAuthority,
   type TalkingEntry,
   nonAdminTalkingUsers
-} from '$lib/mute-all-non-admins';
-import type { FollowChatStyle, ManagedChatUser, ModalName, ModalTargetUser } from '$lib/types';
+} from '#lib/mute-all-non-admins.js';
+import type { FollowChatStyle, ManagedChatUser, ModalName, ModalTargetUser } from '#lib/types.js';
 import {
   MISSING_SCHEME_ALERT,
   addVideoToList,
   isAcceptableSendUrl,
   userActionAlert
-} from '$lib/user-action-intent';
+} from '#lib/user-action-intent.js';
 
 import type { RoomDialogs } from './dialogs.svelte';
 import type { RoomToasts } from './toasts.svelte';
@@ -64,10 +64,10 @@ export interface UserActionCommands {
 
   ## What it does NOT decide
 
-  **The alert table.** `userActionAlert` is a transcription in `$lib/user-action-intent`, tested
+  **The alert table.** `userActionAlert` is a transcription in `#lib/user-action-intent.js`, tested
   there. `handle` looks each action up; it does not carry the strings.
 
-  **Who may mute whom.** `nonAdminTalkingUsers` is in `$lib/mute-all`, and `presenterCommand`
+  **Who may mute whom.** `nonAdminTalkingUsers` is in `#lib/mute-all`, and `presenterCommand`
   re-checks the caller on the SERVER. What moved here is which control is drawn and what it prompts,
   never who may press it.
 
@@ -371,7 +371,7 @@ export class RoomUserActions<
    * speakers silenced their OWN speakers instead, and every one of those microphones stayed open
    * for everybody else. The label and the effect were unrelated.
    *
-   * The selection is `nonAdminTalkingUsers` in `$lib/mute-all-non-admins`, with the four properties
+   * The selection is `nonAdminTalkingUsers` in `#lib/mute-all-non-admins.js`, with the four properties
    * that matter transcribed and tested there — chiefly that a talking user with no roster row is
    * SKIPPED rather than assumed ordinary.
    *

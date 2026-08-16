@@ -1,4 +1,4 @@
-import { type AlertFilterFor, alertPassesFilter, hasActiveAlertFilter } from '$lib/alert-filter';
+import { type AlertFilterFor, alertPassesFilter, hasActiveAlertFilter } from '#lib/alert-filter.js';
 
 /*
   The alerts pane's own state — the two-state toolbar, the viewer's Alert Filter, the archive
@@ -66,7 +66,7 @@ export class RoomAlerts {
    * `globals.user.alertFilterFor` and `preferences.showAlertsFrom` — the Alert Filter.
    *
    * `$state.raw` on the map for the same reason `presenterAudio` uses it: every transition in
-   * `$lib/alert-filter` REPLACES the object rather than mutating it, so a deep proxy would cost a
+   * `#lib/alert-filter.js` REPLACES the object rather than mutating it, so a deep proxy would cost a
    * proxy per key and buy nothing.
    */
   #filterFor = $state.raw<AlertFilterFor>({});
@@ -293,7 +293,7 @@ export class RoomAlerts {
    * the sender's email, which is what the selection is keyed by. `alerts-advanced-search.ts` matches
    * on the same field for the same reason.
    *
-   * The decision itself stays in `$lib/alert-filter` because it fails OPEN in three distinct ways;
+   * The decision itself stays in `#lib/alert-filter.js` because it fails OPEN in three distinct ways;
    * what this adds is that the two viewer-owned halves no longer have to be passed in at each of the
    * call sites, which is where they used to drift apart.
    *

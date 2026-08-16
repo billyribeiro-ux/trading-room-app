@@ -63,7 +63,7 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       reasoning was NOT enough on its own: it landed 15 over, because a `try`/`catch` around a
       command is three lines where a `void fetch(...)` was one, twice over, plus the two imports.
       What paid for it was an EXTRACTION, which is what this file is supposed to provoke —
-      `stripHtmlToText` and its docstring left for `$lib/chat-plain-text.ts`. Pure, twinned with a
+      `stripHtmlToText` and its docstring left for `#lib/chat-plain-text.ts`. Pure, twinned with a
       server derivation it has to agree with, and untestable in here without mounting the page.
 
       That is the ratchet working as designed rather than as an obstacle: the growth was real and it
@@ -71,7 +71,7 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
 
       The eighth (the Files pane and the composer upload) went the same way and cost 20: four call
       sites, each trading a `void fetch(...)` for a `try`/`catch`, plus a five-line import. Paid for
-      by moving `mediumDate` to `$lib/message-formatters.ts` — where the room's four other date
+      by moving `mediumDate` to `#lib/message-formatters.ts` — where the room's four other date
       formatters already live, and where it stopped constructing a fresh `Intl.DateTimeFormat` on
       every call. Then two lines back for `{ cause }` on a re-thrown upload failure, which eslint's
       `preserve-caught-error` was right to demand: an `HttpError` re-thrown as a bare `Error` keeps
@@ -84,14 +84,14 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
 
       The tenth (the four message and alert posts) is the largest single drop this file has recorded
       on the server side — `+page.server.ts` 2,405 -> 2,084 — and cost the component 5. Paid with
-      `fileSizeInKb`, which went to `$lib/file-sort.ts` where the module that owns how the Files pane
+      `fileSizeInKb`, which went to `#lib/file-sort.ts` where the module that owns how the Files pane
       sorts and labels its rows now owns how it formats them; and with the two selected-message sends
       collapsed into one, because they differed only in which command they called.
 
       The eleventh and last — `messageAction`, 314 lines and six operations — cost 4, and paid with a
       duplication the conversion exposed: the reaction toggle existed THREE times, twice on the server
       and once as the page's optimistic copy, and no test had ever read the result of any of them.
-      `$lib/reaction-toggle.ts` states the four rules once, both sides call it, and it is executed.
+      `#lib/reaction-toggle.ts` states the four rules once, both sides call it, and it is executed.
 
       Eleven conversions, and the ceiling has moved once — up, early, on the first one. Everything
       since has been paid for with a module.
@@ -118,7 +118,7 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       name.
 
       `RoomRoster` is the fourth: 13,157 -> 13,048. The two transcribed pipes and the four gates
-      stayed in `$lib/roster-gates` where their truth tables are — what moved is the state they run
+      stayed in `#lib/roster-gates.js` where their truth tables are — what moved is the state they run
       on, plus the random draw and its three-second reveal timer.
 
       `RoomAlerts` is the fifth: 13,048 -> 12,974. A smaller drop than the two before it, and
@@ -176,7 +176,7 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       The conversion cost the file MORE lines than it removed, because the reasoning is longer than
       twelve lines of `addEventListener` plumbing. Rather than raise the ceiling or shorten the
       explanation - the two things this file exists to refuse - it was paid for with an extraction
-      that was overdue anyway: the four captured navbar strings went to `$lib/navbar-labels.ts`,
+      that was overdue anyway: the four captured navbar strings went to `#lib/navbar-labels.ts`,
       where the spacing that has already caused one bug in this repository is documented instead of
       sitting as four bare literals nothing marked as evidence.
 
@@ -233,7 +233,7 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       It takes ~100 props, which is the largest surface of the five and is not defended as elegant —
       it is what the region reads, produced by the compiler rather than by a scan. Two things came
       out of that list which a hand scan would have got wrong: `screenVolume` is a SNIPPET, not a
-      value, and `captureVideoImage` is an import from `$lib/screen-zoom` rather than page state.
+      value, and `captureVideoImage` is an import from `#lib/screen-zoom.js` rather than page state.
 
       DEVIATION, recorded: the page's function names are kept rather than renamed to `on*` as
       `RoomNavbar` and `AlertChatArea` did. A third of the ~45 functions here are QUERIES the markup
@@ -416,7 +416,7 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     /*
       Moved for the first time, and DOWN, by the chat-mode conversion. The two radios each built the
       confirm sentence themselves and only one of them built it right; `chatModeConfirmPrompt` in
-      `$lib/chat-mode.ts` owns the capture's wording now and both call it.
+      `#lib/chat-mode.ts` owns the capture's wording now and both call it.
 
       Down again on the last conversion. `uploadFile` was the eleventh call site and the one I did
       not know about — it lived HERE, not in `+page.svelte`, and a comment of mine had asserted it
@@ -426,7 +426,7 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       `presenterCommand` and `giveMicScreen` were called from here too, and `presenterCommand`'s
       call site was BROKEN — its action had been removed three commits earlier while this file went
       on posting to it. Both are commands now. Held at the same number: the three command imports and
-      the bug's explanation were paid for by `$lib/refusal-message.ts`, which eleven call sites had
+      the bug's explanation were paid for by `#lib/refusal-message.ts`, which eleven call sites had
       been writing out by hand.
     */
     /*
@@ -442,7 +442,7 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       four rounds were: with a real extraction. The conversion had exposed the candidate itself —
       the connectivity test's four rows were four near-identical 22-line blocks stating ONE
       pass/fail rule and ONE glyph rule four times over. They are a single `{#each}` over
-      `$lib/connectivity-status-rows` now, and those rules are EXECUTED by a test for the first
+      `#lib/connectivity-status-rows.js` now, and those rules are EXECUTED by a test for the first
       time: a ternary inside an attribute is not reachable without mounting this 6,000-line host.
 
       5,982 -> 5,965, so the file is smaller than it was before Phase 4 rather than merely level.
@@ -580,7 +580,13 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
   },
   {
     file: 'lib/room/files.svelte.ts',
-    max: 382,
+    /*
+      +5, 2026-08-16, and it is the `$lib` -> `#lib` migration rather than anything this module did.
+      Kit 3's subpath imports require an explicit extension, so `$lib/file-sort` became
+      `#lib/file-sort.js` — eleven characters longer, which pushed a four-name import statement past
+      the print width and prettier wrapped it onto six lines. Zero code, zero comment: one import.
+    */
+    max: 387,
     why: 'the file drive; the first slice to collapse a prop list at TWO call sites rather than one'
   },
   {
@@ -623,7 +629,8 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
   },
   {
     file: 'lib/room/private-chat.svelte.ts',
-    max: 521,
+    /* +3, 2026-08-16: the same `#lib/*.js` import reflow as `files.svelte.ts` above. */
+    max: 524,
     why: 'the private-chat panel; generic over the roster row so the full row reaches selectRosterUser'
   },
   /*
@@ -830,7 +837,7 @@ describe('the files that outgrew the standard do not grow further', () => {
   policed.
 
   It also enforces something worth having on its own: an extraction has to land INSIDE this catalog,
-  in `lib/room/` or `lib/components/`. Move a region to some new corner of `$lib` and the total
+  in `lib/room/` or `lib/components/`. Move a region to some new corner of `#lib` and the total
   falls and this goes red. That is not a false positive; that is the gate asking why the room's
   reasoning just left the room.
 */

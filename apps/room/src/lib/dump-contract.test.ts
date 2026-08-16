@@ -489,7 +489,7 @@ describe('part 1 capture contract', () => {
     expect(NAVBAR).toContain('onclick={() => (sidebarOpen = !sidebarOpen)}');
     expect(NAVBAR).toContain("class={sidebarOpen ? 'fas fa-arrow-left' : 'fas fa-bars'}");
     /*
-      The four captured strings live in `$lib/navbar-labels.ts` since 2026-08-15, with the warning
+      The four captured strings live in `#lib/navbar-labels.ts` since 2026-08-15, with the warning
       that the uneven spacing around the slashes in the virtual-cam label is the reference's and has
       already caused a bug here — a menu item went unclicked because a regex was built out of it.
       Asserted by VALUE rather than by declaration text, so the module is free to rename them.

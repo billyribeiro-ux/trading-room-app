@@ -1,16 +1,16 @@
 import { readFileSync } from 'node:fs';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { eq } from 'drizzle-orm';
-import { callRemote } from '$lib/server/remote-command-harness';
-import { db, ensureDatabase } from '$lib/server/db';
-import { sharedFiles, users } from '$lib/server/db/schema';
+import { callRemote } from '#lib/server/remote-command-harness.js';
+import { db, ensureDatabase } from '#lib/server/db/index.js';
+import { sharedFiles, users } from '#lib/server/db/schema.js';
 import {
   INITIAL_FILE_SORT,
   fileSizeInKb,
   fileSortTitle,
   sortFiles,
   toggleFileSort
-} from '$lib/file-sort';
+} from '#lib/file-sort.js';
 
 /*
   The controller, stubbed — for the ONE action in this pane that talks to it.
@@ -27,7 +27,7 @@ const controller = vi.hoisted(() => ({
   writes: [] as Array<{ shortCode: string; email: string; name: string; value: string }>,
   refuse: false
 }));
-vi.mock('$lib/server/room-config-client', () => ({
+vi.mock('#lib/server/room-config-client.js', () => ({
   readRoomConfig: async () => {
     throw new Error('files-pane-contract does not exercise the config read');
   },
@@ -106,7 +106,7 @@ const presentationArea = readFileSync(
 const page = readFileSync(new URL('../routes/+page.svelte', import.meta.url), 'utf8');
 /*
   The file drive's state and every handler behind it, extracted from the page in Phase 5 slice 6.
-  `$lib/room/files.svelte.ts` — see `RoomFiles`.
+  `#lib/room/files.svelte.ts` — see `RoomFiles`.
 */
 const filesModule = readFileSync(new URL('room/files.svelte.ts', import.meta.url), 'utf8');
 const bundle = readFileSync(
@@ -187,7 +187,7 @@ describe('files table', () => {
 
   it('reports size the way the capture does', () => {
     /*
-      `fileSizeInKb` moved to `$lib/file-sort.ts` — the module that already owns how this pane sorts
+      `fileSizeInKb` moved to `#lib/file-sort.ts` — the module that already owns how this pane sorts
       and labels its rows. Asserting the expression as a STRING here only ever proved the text
       existed; it is EXECUTED now, which is what the move bought.
     */

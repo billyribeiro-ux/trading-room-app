@@ -43,7 +43,7 @@ const REMOTE = readFileSync(
   'utf8'
 );
 /*
-  The gate itself moved a SECOND time, to `$lib/server/auth.ts`, when `for-all-broadcast.remote.ts`
+  The gate itself moved a SECOND time, to `#lib/server/auth.ts`, when `for-all-broadcast.remote.ts`
   needed it too — leaving it in one `.remote.ts` would have recreated the duplication between
   modules instead of between actions. Asserted where it lives, so this stays a real check rather
   than a check of where a helper happens to sit today.

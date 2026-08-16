@@ -1,14 +1,14 @@
 import { getRequestEvent, query } from '$app/server';
 import { z } from 'zod';
-import { requireRoomShortCode, requireUser } from '$lib/server/auth';
-import { ensureDatabase } from '$lib/server/db';
+import { requireRoomShortCode, requireUser } from '#lib/server/auth.js';
+import { ensureDatabase } from '#lib/server/db/index.js';
 import {
   MAX_CHAT_LOG_PAGE,
   isChatChannel,
   loadChatPage,
   type ChatChannel
-} from '$lib/server/chat-log';
-import { loadAlertPage } from '$lib/server/alert-log';
+} from '#lib/server/chat-log.js';
+import { loadAlertPage } from '#lib/server/alert-log.js';
 
 /*
   One page older of chat, and one page older of alerts. `loadMoreLogs({type, channel, page})`

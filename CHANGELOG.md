@@ -24,6 +24,80 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-16
 
+### 2026-08-16 19:44 EDT — `$lib` → `#lib`: the room moves to Node subpath imports, and the codemod is reviewed rather than trusted
+
+**`+page.svelte` unchanged at 3,021.** Suite 2,378 across 161 files (+4, one new gate).
+`svelte-check` 1,190 files, 0 errors, 0 warnings. All four CI steps green locally.
+**Runtime impact: no** — 480 import specifiers changed shape; nothing they resolve to did.
+
+SvelteKit 3 replaces the `$lib` alias with Node's own subpath imports. `vite.config.ts` had carried
+`alias: { $lib: 'src/lib' }` since the Kit 3 upgrade as a deliberate shim, under a note saying
+"Migrating to `#lib` is its own change." This is that change, and the alias is gone — with it, the
+deprecation warning that printed on every `check`, `test` and `build` in this repository.
+
+**Run with the OFFICIAL codemod**, scoped to one task rather than all twelve:
+`sv migrate sveltekit-3 --tasks lib-alias`. 480 specifiers across 151 files, 440 of them `.js`, 39
+`.svelte`, one `.json`.
+
+**`.js`, not `.ts`, and the two published sources disagree.** The RC blog says to import from
+`#lib/foo.ts`; the migration guide's example says `#lib/foo.js`. The codemod — the official
+implementation of both — emits `.js`, and that is what shipped here. It works because Kit's own
+generated base sets `moduleResolution: "bundler"`, under which TypeScript resolves a `.js` specifier
+to the `.ts` beside it. Both forms were proven to build before the choice was made; the tool's own
+answer won.
+
+#### What the codemod did that was NOT wanted, found by reading the diff
+
+It ran two prerequisite tasks and a repository-wide `pnpm run format`, and three of those effects
+were reverted:
+
+1. **It unpinned the framework.** `@sveltejs/kit`, `adapter-node` and `adapter-vercel` were rewritten
+   from exact versions to `"next"`, and the install silently moved Kit from `3.0.0-next.16` to
+   `3.0.0-next.23`. A floating dependency spec on a fintech application's framework is not
+   acceptable at any time, and a major-version bump is not part of an import rename. Pins restored,
+   `pnpm-lock.yaml` reverted, `pnpm install --frozen-lockfile` confirmed `next.16` back in place.
+   **The `next.16` → `next.23` upgrade is a real thing to do and it is its own change, with its own
+   gate run.**
+2. **`prettier --write .` reformatted the SHA-256-pinned capture directories** — seven files under
+   `docs/` including two decoded production bundles, and four `evidence-*/measurements.json`.
+   `CLAUDE.md` forbids reformatting anything in them and `dump-contract.test.ts` pins them. All
+   reverted; zero evidence files remain modified.
+3. **It stripped every comment out of `tsconfig.json`** — the entire explanation of why the file
+   extends `$app/tsconfig`, what Kit 2 used to supply, and why the `include` is stated by hand.
+   Restored and extended.
+
+**One thing it removed that SHOULD have gone.** The `paths` block carrying `$lib` and `$lib/*` was
+redundant — `node_modules/$app/tsconfig.json` ships those paths itself — and because `extends`
+REPLACES `paths` rather than merging it, ours overwrote the generated one. `vite build` said so
+outright once `#lib` specifiers existed: `"paths" was overwritten. Imports from "#lib" may not
+typecheck`. Gone with the alias it existed for; that warning is gone too.
+
+#### `lib-subpath-imports.test.ts` — the new gate, and the near miss that earned it
+
+The codemod also rewrote `$lib` inside STRING LITERALS in four contract tests, where the text is an
+assertion about source rather than an import — and there it wrote `#lib/chat-mode` with no
+extension, because there was no import statement to resolve. Those four failed loudly and were
+fixed.
+
+They failed only because something happened to assert on them. Subpath imports resolve LITERALLY —
+`#lib/*` maps to `./src/lib/*` with no extension search and no index lookup — so an extensionless
+specifier anywhere else would have been silently wrong. The new gate resolves every `from '#lib/…'`
+in `src` against the filesystem and fails naming the file and specifier, and it asserts the
+`package.json` `imports` field itself, because that field is the single point of failure for all 480.
+
+Its narrowing is stated in the file: PROSE is not checked. The codemod rewrote `$lib/mention` to
+`#lib/mention` inside four comments — sentences like "See `#lib/mention` for the reference's own
+three terms" — and those are pointers for a human, not specifiers. The first draft demanded `.js`
+there and reported all four, plus six matches inside its own explanation of the rule.
+
+**Two ceilings rose, both pure import reflow.** `files.svelte.ts` +5 and `private-chat.svelte.ts` +3:
+`#lib/file-sort.js` is eleven characters longer than `$lib/file-sort`, which pushed a four-name
+import past the print width and prettier wrapped it onto six lines. Zero code, zero comment.
+
+**The controller is NOT migrated** — 204 specifiers, its own `paths` block, and no alias in its Vite
+config at all. Same change, separate app, separate gate run.
+
+
 ### 2026-08-16 19:28 EDT — SvelteKit 3 RC conformance: audited against the guide published three days ago
 
 **A conformance pass, not a refactor.** Suite 2,374 across 160. `svelte-check` 1,190/0/0. All four

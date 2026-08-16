@@ -1,5 +1,5 @@
-import { startSpeechRecognition } from '$lib/media/speech-reco';
-import { chooseRecordingOptions } from '$lib/recording-codec';
+import { startSpeechRecognition } from '#lib/media/speech-reco.js';
+import { chooseRecordingOptions } from '#lib/recording-codec.js';
 
 import { recordingState } from '../../routes/recording-state.remote';
 

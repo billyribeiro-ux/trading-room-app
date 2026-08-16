@@ -4,7 +4,7 @@ import { and, asc, desc, eq, gt } from 'drizzle-orm';
 // `chat-messages.remote.ts` and the edit branch in `message-actions.remote.ts`.
 // `pruneDeadPreferenceKeys` left with `savePreference` for `user-settings.remote.ts`; the browser
 // half went to `mirrorPreferenceToLocalStorage`, beside the list it evicts.
-import { calculatePollTotals, parsePollChoices } from '$lib/poll-behavior';
+import { calculatePollTotals, parsePollChoices } from '#lib/poll-behavior.js';
 import {
   deleteSessionNoteTabSchema,
   newSessionNoteTabSchema,
@@ -12,44 +12,44 @@ import {
   restoreNoteVersionSchema,
   saveSessionNoteSchema,
   setWelcomeMatNoteTabSchema
-} from '$lib/notes-command';
-import { db, ensureDatabase } from '$lib/server/db';
+} from '#lib/notes-command.js';
+import { db, ensureDatabase } from '#lib/server/db/index.js';
 import {
   isPresenterRole,
   logout,
   requireRoomShortCode,
   requireSessionId,
   requireUser
-} from '$lib/server/auth';
-import { redirectSignedOut } from '$lib/server/control-plane';
+} from '#lib/server/auth.js';
+import { redirectSignedOut } from '#lib/server/control-plane.js';
 import {
   CAPTURE_REFERENCE_ROOM,
   capturedRoomItems,
   noCapturedRoomItems
-} from '$lib/server/captured-room';
-import { hashEmail, publicSessionHandle } from '$lib/server/connection';
+} from '#lib/server/captured-room.js';
+import { hashEmail, publicSessionHandle } from '#lib/server/connection.js';
 // `MAX_CHAT_LOG_PAGE`, `isChatChannel` and `loadChatPage` left with the paging queries for
 // `log-pages.remote.ts`. What stays is the FIRST page, which the loader still sends with the room.
-import { loadNewestChatPages } from '$lib/server/chat-log';
-import { loadAlertPage, loadQuestionsForAlerts } from '$lib/server/alert-log';
+import { loadNewestChatPages } from '#lib/server/chat-log.js';
+import { loadAlertPage, loadQuestionsForAlerts } from '#lib/server/alert-log.js';
 // `isChatMode` left with `changeChatMode` for `chat-mode.remote.ts`, where it is `z.enum(CHAT_MODES)`.
-import { parseReactions } from '$lib/server/reactions';
+import { parseReactions } from '#lib/server/reactions.js';
 // `requestMobilePin` left with `getMyMobilePin` for `mobile-pin.remote.ts`; this file no longer calls it.
 // `writeRoomSetting` and `alertSoundCommandValue` left with `overwriteCashRegisterSound` for
 // `files-pane.remote.ts`; nothing else in this file writes a room setting.
-import { readRoomConfig, requestStreamReadToken } from '$lib/server/room-config-client';
-import { memberDeniedArchives } from '$lib/roster-gates';
-import { isBannedFromRoom, isShutOutByRoomState, roomRoleFor } from '$lib/server/room-role';
-import { consumeRateLimit } from '$lib/server/rate-limit';
-import { mediaSignallingUrl } from '$lib/server/media-grant';
-import { publishToRoom } from '$lib/server/room-events';
+import { readRoomConfig, requestStreamReadToken } from '#lib/server/room-config-client.js';
+import { memberDeniedArchives } from '#lib/roster-gates.js';
+import { isBannedFromRoom, isShutOutByRoomState, roomRoleFor } from '#lib/server/room-role.js';
+import { consumeRateLimit } from '#lib/server/rate-limit.js';
+import { mediaSignallingUrl } from '#lib/server/media-grant.js';
+import { publishToRoom } from '#lib/server/room-events.js';
 // `grantMediaElevation` / `revokeMediaElevation` left with `giveMicScreen` for
 // `presenter-commands.remote.ts`; nothing else in this file elevates anybody.
 // `deleteStoredFile` and `storeUpload` left with the Files-pane commands; nothing here stores a
 // file any more.
 // `deleteThread`, `insertPrivateMessage`, `loadThread` and `searchThread` left with the trio for
 // `private-chat.remote.ts`. What stays is the CONVERSATION LIST, which the loader still sends.
-import { loadConversations } from '$lib/server/private-chat';
+import { loadConversations } from '#lib/server/private-chat.js';
 
 /**
  * The single room this build serves.
@@ -73,31 +73,31 @@ import {
   restoreNoteVersion,
   saveNote,
   setWelcomeMatNote
-} from '$lib/server/notes-repository';
+} from '#lib/server/notes-repository.js';
 import {
   createSwingAlert,
   deleteSwingAlert,
   editSwingAlert,
   getSwingAlerts
-} from '$lib/server/swing-alerts-repository';
+} from '#lib/server/swing-alerts-repository.js';
 import {
   deleteSwingAlertMsgSchema,
   editSwingAlertMsgSchema,
   swingAlertMsgSchema
-} from '$lib/swing-alerts-command';
-import { SWING_ALERT_INITIAL_DAYS, swingAlertsTabVisible } from '$lib/swing-alerts';
+} from '#lib/swing-alerts-command.js';
+import { SWING_ALERT_INITIAL_DAYS, swingAlertsTabVisible } from '#lib/swing-alerts.js';
 import {
   createDayTradeAlert,
   deleteDayTradeAlert,
   editDayTradeAlert,
   getDayTradeAlerts
-} from '$lib/server/day-trade-alerts-repository';
+} from '#lib/server/day-trade-alerts-repository.js';
 import {
   dayTradeAlertMsgSchema,
   deleteDayTradeAlertMsgSchema,
   editDayTradeAlertMsgSchema
-} from '$lib/day-trade-alerts-command';
-import { DAY_TRADE_ALERT_INITIAL_DAYS, dayTradeAlertsTabVisible } from '$lib/day-trade-alerts';
+} from '#lib/day-trade-alerts-command.js';
+import { DAY_TRADE_ALERT_INITIAL_DAYS, dayTradeAlertsTabVisible } from '#lib/day-trade-alerts.js';
 import {
   capturedItemOverrides,
   chatMutes,
@@ -109,17 +109,17 @@ import {
   sharedFiles,
   users,
   userSettings
-} from '$lib/server/db/schema';
+} from '#lib/server/db/schema.js';
 // `isChatTab` left with `sendMessage` for `chat-messages.remote.ts`; the loader reads the channel
 // from the row, not from a request.
-import type { ActivePoll } from '$lib/types';
+import type { ActivePoll } from '#lib/types.js';
 
 /*
   Body caps. The adapter's request-size limit already stops a multi-megabyte upload, but a
   half-megabyte "chat message" is still absurd: it is stored forever and re-sent to every
   reader on every five-second poll.
 */
-// `MAX_MESSAGE_BODY` and `MAX_ALERT_BODY` left for `$lib/message-bounds.ts`, which exists because a
+// `MAX_MESSAGE_BODY` and `MAX_ALERT_BODY` left for `#lib/message-bounds.ts`, which exists because a
 // `.remote.ts` file cannot export a constant and three commands across two modules need them.
 import type { Actions, PageServerLoad } from './$types';
 
@@ -463,14 +463,14 @@ export const load: PageServerLoad = async ({ depends, locals, request, cookies }
     every SSE event calls `invalidateAll()`, so a room with 50,000 messages re-read and
     re-serialised all of them each time anybody said anything. Older pages are fetched on demand by
     `loadOlderChatMessages` and held in client state, so nothing became unreachable; see
-    `$lib/server/chat-log.ts` for why a bare LIMIT would have been worse than the bug.
+    `#lib/server/chat-log.ts` for why a bare LIMIT would have been worse than the bug.
   */
   const messageRows = loadNewestChatPages(requireRoomShortCode(locals));
 
   /*
     THE NEWEST PAGE, not every alert the room has ever posted.
 
-    The same defect the chat log had and the same cure — see `$lib/server/alert-log.ts`. Older
+    The same defect the chat log had and the same cure — see `#lib/server/alert-log.ts`. Older
     pages come from `loadOlderAlerts` and are held in client state, so an `invalidateAll()` cannot
     throw away what a reader scrolled back to.
   */
@@ -962,7 +962,7 @@ export const actions: Actions = {
     ── Swing Trade Alerts ──────────────────────────────────────────────────────────────────────
 
     The three mutations, named for the wire commands they reproduce — `swingAlertMsg`,
-    `editSwingAlertMsg`, `deleteSwingAlertMsg`. `SWING_ALERT_COMMANDS` in `$lib/swing-alerts` holds
+    `editSwingAlertMsg`, `deleteSwingAlertMsg`. `SWING_ALERT_COMMANDS` in `#lib/swing-alerts.js` holds
     those three plus the log read and the two feed-mirror commands, and
     `swing-alerts-contract.test.ts` asserts that the actions declared here still match it, because a
     renamed action is a 404 the browser reports only as "Unable to save".
@@ -1107,7 +1107,7 @@ export const actions: Actions = {
 
     The three mutations, named for the wire commands they reproduce — `dayTradeAlertMsg`,
     `editDayTradeAlertMsg`, `deleteDayTradeAlertMsg`. `DAY_TRADE_ALERT_COMMANDS` in
-    `$lib/day-trade-alerts` holds those three plus the log read and the two feed-mirror commands,
+    `#lib/day-trade-alerts.js` holds those three plus the log read and the two feed-mirror commands,
     and `day-trade-alerts-contract.test.ts` asserts that the actions declared here still match it,
     because a renamed action is a 404 the browser reports only as "Unable to save".
 
@@ -1287,7 +1287,7 @@ export const actions: Actions = {
          not. Both call `refuseIfMuted` now. **A muted member who could previously reply cannot.**
       2. THE LENGTH BOUND APPLIED TO ONE OF THEM. `MAX_MESSAGE_BODY` was checked on send and not on
          reply, and `askQuestion` had no bound at all. All three are bounded now, from
-         `$lib/message-bounds.ts` — which exists because a `.remote.ts` file cannot export a
+         `#lib/message-bounds.ts` — which exists because a `.remote.ts` file cannot export a
          constant, so the alternative was the same number written three times.
       3. The rate limit and the `chat` publish were written out verbatim twice. Declared once.
 

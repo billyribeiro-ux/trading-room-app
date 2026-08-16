@@ -3,7 +3,7 @@ import { flushSync } from 'svelte';
 import { describe, expect, it } from 'vitest';
 
 import { RoomPolls } from './polls.svelte';
-import type { ActivePoll } from '$lib/types';
+import type { ActivePoll } from '#lib/types.js';
 
 /*
   `RoomPolls` is the first of the six room state classes, so this file is the first proof that the

@@ -1,10 +1,10 @@
 import { command } from '$app/server';
 import { z } from 'zod';
-import { CHAT_MODES } from '$lib/chat-mode';
-import { presenterRoom } from '$lib/server/auth';
-import { db, ensureDatabase } from '$lib/server/db';
-import { roomState } from '$lib/server/db/schema';
-import { publishToRoom } from '$lib/server/room-events';
+import { CHAT_MODES } from '#lib/chat-mode.js';
+import { presenterRoom } from '#lib/server/auth.js';
+import { db, ensureDatabase } from '#lib/server/db/index.js';
+import { roomState } from '#lib/server/db/schema.js';
+import { publishToRoom } from '#lib/server/room-events.js';
 
 /*
   `sendServerAdminCommand('changeChatMode', {mode})` — a PRESENTER act that changes the room.
@@ -36,7 +36,7 @@ import { publishToRoom } from '$lib/server/room-events';
   purest example of the defect class this repository hunts: a control whose only effect is changing
   its own label. It was modelled at the wrong LEVEL too, as a per-user preference, which could not
   have expressed a presenter act that changes the room for everyone even if something had read it.
-  `$lib/chat-mode.ts` carries the rest of that story and what each of the three modes does.
+  `#lib/chat-mode.ts` carries the rest of that story and what each of the three modes does.
 */
 
 /**
@@ -46,7 +46,7 @@ import { publishToRoom } from '$lib/server/room-events';
  *
  * `z.enum(CHAT_MODES)` rather than the `isChatMode(mode)` guard the action called. Same three
  * letters, same deny-by-default posture — but sourced from the one exported constant that
- * `$lib/chat-mode.ts` already owns, so a fourth mode cannot be added there and silently refused
+ * `#lib/chat-mode.ts` already owns, so a fourth mode cannot be added there and silently refused
  * here. The type flows to the caller as well: `+page.svelte` no longer takes a bare `string` it
  * cannot check.
  *

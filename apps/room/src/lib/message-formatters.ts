@@ -17,7 +17,7 @@
  * literal — so hoisting cannot change a single rendered string, and SSR and the client still agree
  * for the same reason they did before: the locale is pinned rather than taken from the environment.
  *
- * Found by the quality review of 2026-08-11. A `$lib` module rather than a `<script module>` block
+ * Found by the quality review of 2026-08-11. A `#lib` module rather than a `<script module>` block
  * because this tree has no `<script module>` anywhere, and one import reads like the rest of it.
  */
 

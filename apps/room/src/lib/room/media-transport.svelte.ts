@@ -1,6 +1,6 @@
 import { SvelteMap } from 'svelte/reactivity';
 
-import type { ScreenTab } from '$lib/components/ScreenTabs.svelte';
+import type { ScreenTab } from '#lib/components/ScreenTabs.svelte';
 import {
   type MediaCaptureKind,
   type MediaPermissionKind,
@@ -8,11 +8,11 @@ import {
   captureErrorName,
   mediaCaptureErrorMessage,
   permissionForCapture
-} from '$lib/media-capture-error';
-import { MediaSession } from '$lib/media/session';
-import { joinsMediaAsProducer } from '$lib/roster-gates';
-import { SignallingClient, legacyUserId, type ProducerInfo } from '$lib/media/signalling';
-import type { WebcamPresenter } from '$lib/types';
+} from '#lib/media-capture-error.js';
+import { MediaSession } from '#lib/media/session.js';
+import { joinsMediaAsProducer } from '#lib/roster-gates.js';
+import { SignallingClient, legacyUserId, type ProducerInfo } from '#lib/media/signalling.js';
+import type { WebcamPresenter } from '#lib/types.js';
 
 import type { RoomDialogs } from './dialogs.svelte';
 import type { RoomMedia } from './media.svelte';

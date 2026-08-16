@@ -167,7 +167,7 @@ describe('it is the reference’s handler, its number and its binding', () => {
       still reaches the release on a real pointer event. Drop any link and the attribute is
       decorative again, which is the defect this file was written to close.
     */
-    expect(split).toContain("from '$lib/split-gutter'");
+    expect(split).toContain("from '#lib/split-gutter.js'");
     expect(split).toContain('togglePresentation(): void {');
     expect(split).toContain('this.#main = togglePresentationSplit(this.resolvedMainSplit);');
     expect(split).toContain('const release = gutterRelease(this.#lastClickAt, now, this.#moved);');

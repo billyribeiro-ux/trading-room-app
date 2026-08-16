@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import fixture from '$lib/server/captured-message-fixture.json';
+import fixture from '#lib/server/captured-message-fixture.json';
 import {
   capturedMenuAllows,
   MESSAGE_MENU_LABEL,
