@@ -15,6 +15,7 @@
   import type { RoomMedia } from '$lib/room/media.svelte';
   import type { RoomMediaTransport } from '$lib/room/media-transport.svelte';
   import type { RoomMessageActions } from '$lib/room/message-actions.svelte';
+  import type { RoomModals } from '$lib/room/modals.svelte';
   import type { RoomPolls } from '$lib/room/polls.svelte';
   import type { RoomPrefs } from '$lib/room/prefs.svelte';
   import type { RoomPrivateChat } from '$lib/room/private-chat.svelte';
@@ -28,12 +29,9 @@
   } from '$lib/room/trade-alerts.svelte';
   import type { RoomUserActions } from '$lib/room/user-actions.svelte';
   import type {
-    AlertTab,
     DayTradeAlertRow,
     FollowChatStyle,
     ModalName,
-    SessionControlTab,
-    SettingsTab,
     SwingAlertRow,
     Theme
   } from '$lib/types';
@@ -96,14 +94,10 @@
     userActions,
 
     // Page state this layer renders from. Only these two are written back.
-    modal = $bindable(),
-    selectedImageUrl = $bindable(),
-    alertTab,
+    modals,
     chatMode,
     globalChatStyle,
     mobilePin,
-    sessionControlInitialTab,
-    settingsTab,
     theme,
 
     // Page actions, passed as callbacks rather than reached for: the component asks and the page
@@ -136,14 +130,11 @@
     swingAlerts: RoomTradeAlerts<SwingAlertRow, SwingAlertAction>;
     toasts: RoomToasts;
     userActions: RoomUserActions<PageData['connectedUsers'][number]>;
-    modal: ModalName;
-    selectedImageUrl: string | null;
-    alertTab: AlertTab;
+    /** Which overlay is showing, and how it is configured. Owned by the class, not by props. */
+    modals: RoomModals;
     chatMode: ChatMode;
     globalChatStyle: FollowChatStyle;
     mobilePin: string;
-    sessionControlInitialTab: SessionControlTab;
-    settingsTab: SettingsTab;
     theme: Theme;
     changeChatMode: (mode: ChatMode) => void;
     closeActiveModal: () => void;
@@ -188,7 +179,7 @@ audio elements out of sight the same way (`#mp3player` is `display: none`). -->
   Conected<i class="fas fa-check"></i>
 </div>
 <ModalHost
-  name={modal}
+  name={modals.modal}
   mediaIceServers={media.iceServers}
   {mobilePin}
   modAlertFilterList={data.sessData?.modAlertFilterList}
@@ -211,11 +202,11 @@ audio elements out of sight the same way (`#mp3player` is `display: none`). -->
   rteIsEditing={composer.rteIsEditing}
   onRteDraftChange={(html) => (composer.rteDraft = html)}
   onRteSend={() => void composer.sendRTE()}
-  {settingsTab}
-  {alertTab}
+  settingsTab={modals.settingsTab}
+  alertTab={modals.alertTab}
   {theme}
   roomSplitDir={split.direction}
-  {sessionControlInitialTab}
+  sessionControlInitialTab={modals.sessionControlInitialTab}
   chatStyle={globalChatStyle}
   doNotDisturbOn={prefs.doNotDisturbOn}
   alertSoundOn={prefs.alertSoundOn}
@@ -229,8 +220,8 @@ audio elements out of sight the same way (`#mp3player` is `display: none`). -->
   activePoll={data.activePoll}
   savedPolls={data.savedPolls}
   onclose={closeActiveModal}
-  onSettingsTab={(tab) => (settingsTab = tab)}
-  onAlertTab={(tab) => (alertTab = tab)}
+  onSettingsTab={(tab) => (modals.settingsTab = tab)}
+  onAlertTab={(tab) => (modals.alertTab = tab)}
   onTheme={setTheme}
   onPreferenceChange={(key, value) => prefs.save(key, value)}
   saveData={mediaTransport.saveData}
@@ -271,9 +262,9 @@ audio elements out of sight the same way (`#mp3player` is `display: none`). -->
   followedUsers={userActions.followedUsers}
   targetMessage={messageActions.selected}
 />
-{#if modal === 'image-upload'}
+{#if modals.modal === 'image-upload'}
   <ImageUploadDialog
-    onclose={() => (modal = null)}
+    onclose={() => (modals.modal = null)}
     onupload={(files, message) => void composer.uploadImages(files, message)}
   />
 {/if}
@@ -426,7 +417,7 @@ audio elements out of sight the same way (`#mp3player` is `display: none`). -->
   onstick={(id) => toasts.stick(id)}
   onresume={(id) => toasts.resume(id)}
 />
-{#if selectedImageUrl}
+{#if modals.selectedImageUrl}
   <div
     class="bootbox modal fade imgur-modal show"
     tabindex="-1"
@@ -434,7 +425,7 @@ audio elements out of sight the same way (`#mp3player` is `display: none`). -->
     aria-hidden="true"
     style="display: block;"
     onclick={(event) => {
-      if (event.target === event.currentTarget) selectedImageUrl = null;
+      if (event.target === event.currentTarget) modals.selectedImageUrl = null;
     }}
   >
     <div class="modal-dialog modal-lg">
@@ -447,19 +438,19 @@ audio elements out of sight the same way (`#mp3player` is `display: none`). -->
             class="bootbox-close-button close btn-close"
             aria-hidden="true"
             aria-label="Close"
-            onclick={() => (selectedImageUrl = null)}
+            onclick={() => (modals.selectedImageUrl = null)}
           ></button>
         </div>
         <div class="modal-body">
           <div class="bootbox-body">
             <img
-              src={selectedImageUrl}
-              alt={selectedImageUrl.substring(selectedImageUrl.lastIndexOf('/') + 1)}
+              src={modals.selectedImageUrl}
+              alt={modals.selectedImageUrl.substring(modals.selectedImageUrl.lastIndexOf('/') + 1)}
             />
             <hr />
             <button
               class="btn btn-primary btn-sm"
-              onclick={() => downloadImage(selectedImageUrl as string)}
+              onclick={() => downloadImage(modals.selectedImageUrl as string)}
               ><i class="fa fa-download"></i> Download Image</button
             >
           </div>

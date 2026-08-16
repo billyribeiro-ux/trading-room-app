@@ -27,7 +27,7 @@
     overwriteCashRegisterSound
   } from './files-pane.remote';
   import { uploadComposerImage } from './composer-image.remote';
-  import { savePreference as savePreferenceCommand, saveTheme } from './user-settings.remote';
+  import { savePreference as savePreferenceCommand } from './user-settings.remote';
   import { editUsername } from './username.remote';
   import { replyMessage, sendMessage as sendMessageCommand } from './chat-messages.remote';
   import { askQuestion } from './alert-questions.remote';
@@ -71,6 +71,7 @@
   import { RoomComposer } from '$lib/room/composer.svelte';
   import { RoomAlertsPane } from '$lib/room/alerts-pane';
   import { RoomFeedScroll } from '$lib/room/feed-scroll';
+  import { RoomModals } from '$lib/room/modals.svelte';
   import { RoomFeeds } from '$lib/room/feeds.svelte';
   import { RoomMessageActions } from '$lib/room/message-actions.svelte';
   import { RoomEventStream } from '$lib/room/events.svelte';
@@ -132,14 +133,10 @@
     unloadSoundEffects
   } from '$lib/sound-effects';
   import type {
-    AlertTab,
     ChatTab,
     FollowChatStyle,
     MainTab,
-    ModalName,
     NoteVersion,
-    SessionControlTab,
-    SettingsTab,
     Theme
   } from '$lib/types';
   import type { PageProps } from './$types';
@@ -680,7 +677,6 @@
     that reassigning a shared value breaks the link for everything reading it downstream.
   */
   const split = new RoomSplit(loadedRoomSplitDir, settingsSplitPair);
-  let modal: ModalName = $state(null);
   /*
     The poll modal's four fields, in `$lib/room/polls.svelte.ts`.
 
@@ -698,9 +694,6 @@
     the modal should open and this file performs the write.
   */
   const polls = new RoomPolls();
-  let settingsTab: SettingsTab = $state('app');
-  let alertTab: AlertTab = $state('text');
-  let sessionControlInitialTab = $state<SessionControlTab>('reset-session');
   // The captured alerts toolbar (alert-section/datach-alerts-1) is a strip between the alerts
   // header and the scroller. It is absent from the default capture (alert-section/1.html states
   // "No alertsToolbar search strip in this snapshot"), so it is toggled, not permanent.
@@ -732,7 +725,6 @@
   */
   const menus = new RoomMenus();
   let newNoteOpen = $state(false);
-  let selectedImageUrl = $state<string | null>(null);
   /*
     The room's three bootbox dialogs, in `$lib/room/dialogs.svelte.ts`.
 
@@ -990,8 +982,8 @@
     session: () => data,
     prefs,
     isPresenter: () => isPresenter,
-    openModal: (name) => openModal(name),
-    closeModal: () => (modal = null),
+    openModal: (name) => modals.open(name),
+    closeModal: () => (modals.modal = null),
     closeMenu: (name, open) => menus.set(name, open),
     editMessage: (kind, item, body, bodyHtml) => messageActions.editMessage(kind, item, body, bodyHtml),
     onSent: () => invalidateAll(),
@@ -1020,7 +1012,7 @@
     sendOperation: (payload) => messageAction(payload),
     askQuestion: (payload) => askQuestion(payload),
     replyMessage: (payload) => replyMessage(payload),
-    openModal: (name) => openModal(name),
+    openModal: (name) => modals.open(name),
     closeMessageMenu: () => menus.openMessageMenu(null),
     selectUser: (user) => (userActions.selectedMessageUser = user),
     patchEvidence: (item, patch) => feeds.patchEvidence(item, patch),
@@ -1028,7 +1020,7 @@
       privateChat.show();
       void privateChat.switchToUser(peerId);
     },
-    openImage: (event, url) => openImageModal(event, url),
+    openImage: (event, url) => modals.openImage(event, url),
     clearUnreadQa: (id) => unreadQaAlertIds.delete(id),
     focusComposer: () =>
       requestAnimationFrame(() => {
@@ -1077,8 +1069,8 @@
     disableCopy: () => disableCopy,
     isPresenter: () => isPresenter,
     chatOnlyMode: () => chatOnlyMode,
-    selectedImageUrl: () => selectedImageUrl,
-    clearSelectedImage: () => (selectedImageUrl = null)
+    selectedImageUrl: () => modals.selectedImageUrl,
+    clearSelectedImage: () => (modals.selectedImageUrl = null)
   });
 
   const webcams = new RoomWebcams({
@@ -1100,8 +1092,8 @@
     talking: () => media.talking,
     rosterUsers: () => roster.users,
     savePreference: (key, value) => prefs.save(key, value),
-    openModal: (name) => openModal(name),
-    closeModal: () => (modal = null),
+    openModal: (name) => modals.open(name),
+    closeModal: () => (modals.modal = null),
     closeUserMenu: () => menus.openUserMenu(null),
     mentionUser: (name) => messageActions.mention(name),
     clearSelectedMessage: () => messageActions.clearSelected(),
@@ -1534,7 +1526,7 @@
     // Open first. The capture's button opens the modal through `data-bs-toggle` regardless of what
     // the handler does, so the pin arriving late shows as `N/A` becoming a number, not as a delay
     // before anything appears.
-    openModal('mobile');
+    modals.open('mobile');
     mobilePin = 'N/A';
     try {
       mobilePin = await getMyMobilePin();
@@ -1931,6 +1923,28 @@
     while its reader is halfway up the log. The effects now ask: `…ReadingHistory` to read,
     `stopReadingHistory` to clear.
   */
+  /*
+    WHICH OVERLAY IS SHOWING, in `$lib/room/modals.svelte.ts`.
+
+    Phase 5 slice 24: the modal name, the tab each modal opens on, the image the lightbox holds, and
+    the two actions reached only from inside one.
+
+    The STATE moved with the functions, which is why nothing crosses back. An earlier measurement of
+    the same ten functions reported three fields written on both sides — because the functions were
+    leaving and their state was not.
+
+    `theme` deliberately stayed: `setTheme` writes it, but thirteen other places read it, so it
+    crosses as a receiver.
+  */
+  const modals = new RoomModals({
+    menus,
+    polls,
+    messageActions,
+    userActions,
+    unreadQaAlertIds,
+    setTheme: (next) => (theme = next)
+  });
+
   const feedScroll = new RoomFeedScroll({
     alerts,
     chat,
@@ -2103,7 +2117,7 @@
   $effect(() => {
     // The decision is `RoomPolls.deliver` — who may see this poll, and whether this browser has
     // already shown it. What is left here is the one thing the class does not own: the modal.
-    if (polls.deliver(data.activePoll, data.user.id)) modal = 'poll';
+    if (polls.deliver(data.activePoll, data.user.id)) modals.modal = 'poll';
   });
 
   /**
@@ -2247,122 +2261,16 @@
 
 
 
-  function openModal(name: Exclude<ModalName, null>) {
-    if (name === 'muted' || name === 'followed' || name === 'user') userActions.loadManaged();
-    modal = name;
-    menus.closeForModal();
-  }
-
-  function openPollUI() {
-    /*
-      `requestOpen` restores a minimised poll rather than rebuilding it, and says so by bumping the
-      token the modal watches. Both paths open the modal; only a fresh one goes through `openModal`,
-      which closes the floating menus on the way.
-    */
-    const wasMinimized = polls.minimized;
-    polls.requestOpen();
-    if (wasMinimized) modal = 'poll';
-    else openModal('poll');
-  }
-
-  function minimizePoll() {
-    polls.minimize();
-    modal = null;
-  }
-
-  function closeActiveModal() {
-    if (modal === 'poll') polls.closed();
-    // The modal component clears the marker again on the way out, which is the path that matters
-    // when an answer lands while the modal is already open - that update sets unreadQA and emits
-    // `openAlertQAModal` with `openModal: !1`, so only the close can clear it:
-    //   yi(`.${e._id}`).on('hidden.bs.modal', () => { ... delete e.unreadQA })
-    if (modal === 'qa' && messageActions.selected) unreadQaAlertIds.delete(messageActions.selected.id);
-    modal = null;
-  }
-
-  async function submitPollAction(
-    action: 'savePoll' | 'deleteSavedPoll' | 'sendPoll' | 'sendPollAnswer' | 'pollDone',
-    values: Record<string, string | number> = {}
-  ) {
-    const body = new FormData();
-    for (const [key, value] of Object.entries(values)) body.set(key, String(value));
-
-    const response = await fetch(`?/${action}`, { method: 'POST', body });
-    if (!response.ok) return false;
-    await invalidateAll();
-    return true;
-  }
-
-  function openSessionControl(tab: SessionControlTab = 'reset-session') {
-    sessionControlInitialTab = tab;
-    openModal('session');
-  }
-
-  function setTheme(nextTheme: Theme) {
-    theme = nextTheme;
-    // Optimistic as always; the catch is here because a `void`-ed rejection is a swallowed error.
-    void saveTheme(nextTheme).catch((cause) => console.error('saveTheme', nextTheme, cause));
-  }
 
 
 
-  function openImageModal(event: MouseEvent | undefined, url: string) {
-    const ctrlClick = (event as (MouseEvent & { ctrlClick?: boolean }) | undefined)?.ctrlClick;
-    if (event && (event.shiftKey || event.altKey || ctrlClick)) {
-      const imageWindow = window.open('', '', 'toolbar=0,location=0,resizable=1,scrollbars=1');
-      if (!imageWindow) return;
-      imageWindow.document.write(`<!DOCTYPE html>
-              <html lang="en">
-              <head>
-                <meta charset="UTF-8">
-                <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                <title>${url}</title>
-                <style>
-                  html,
-                  body {
-                      height: 100%;
-                      width: 100%;
-                      overflow-x: hidden;
-                      overflow-y: auto;
-                      background-color: #000;
-                  }
 
-                  body {
-                      display: flex;
-                      align-items: center;
-                      justify-content: center;
-                  }
-                </style>
-              </head>
-              <body>
-                <img src="${url}" alt="${url}" />
-              </body>
-            </html>`);
-      return;
-    }
-    selectedImageUrl = url;
-  }
 
-  function downloadImage(url: string) {
-    const xhr = new XMLHttpRequest();
-    xhr.open('GET', url, true);
-    xhr.responseType = 'blob';
-    xhr.onload = () => {
-      const urlCreator = window.URL;
-      const imageUrl = urlCreator.createObjectURL(xhr.response);
-      const tag = document.createElement('a');
-      let imageName = url.split('/').pop() || 'image.jpg';
-      imageName = imageName.replace(/^[^_]+_/, '').replace(/_[^_]+(\.[^.]+)$/, '$1');
-      tag.href = imageUrl;
-      tag.download = imageName;
-      tag.style.display = 'none';
-      document.body.appendChild(tag);
-      tag.click();
-      tag.remove();
-      urlCreator.revokeObjectURL(imageUrl);
-    };
-    xhr.send();
-  }
+
+
+
+
+
 
 
 
@@ -2641,9 +2549,6 @@
     menus.set('soundcloud', false);
   }
 
-  function toggleTopMenu(menu: 'recording' | 'soundcloud' | 'screen') {
-    menus.toggleTop(menu);
-  }
 
   function requestReload() {
     dialogs.confirmation = {
@@ -2795,7 +2700,7 @@
       openImageModal?: (event: MouseEvent | undefined, url: string) => void;
     };
     const previousOpenImageModal = imageModalWindow.openImageModal;
-    imageModalWindow.openImageModal = openImageModal;
+    imageModalWindow.openImageModal = modals.openImage;
     // `ngAfterViewInit`: `sessData.tawkPresenterSupport && (loadTawkSupport(), setTAWKAttributes())`.
     // Gated on `tawkAvailable`, which adds the configured-property term — with none, no script.
     const stopTawk = tawkAvailable ? loadTawkSupport() : () => {};
@@ -3323,7 +3228,7 @@
     link.addEventListener('click', (event) => {
       event.preventDefault();
       menus.set('files', false);
-      openModal('file-upload');
+      modals.open('file-upload');
     });
     item.append(link);
     menu.append(item);
@@ -3449,7 +3354,7 @@
           stopSharingAllText={STOP_SHARING_ALL_TEXT}
           {setInputChecked}
           {setRangeValue}
-          ontoggletopmenu={toggleTopMenu}
+          ontoggletopmenu={(menu) => modals.toggleTopMenu(menu)}
           onstartrecording={() => void recording.startRecording()}
           onstoprecording={() => void recording.stopRecording()}
           onpauserecording={() => recording.pauseRecording()}
@@ -3462,7 +3367,7 @@
           ontogglewebcam={() => void mediaTransport.toggleWebcam()}
           onpromptforscreenname={(source) => void mediaTransport.promptForScreenName(source)}
           onstopscreensharing={() => void mediaTransport.stopScreenSharing()}
-          onopensessioncontrol={openSessionControl}
+          onopensessioncontrol={(tab) => modals.openSessionControl(tab)}
           onsetmastervolume={(level) => roomVolume.setMasterVolume(level)}
           onsetbackgroundvolume={(level) => roomVolume.setBackgroundVolume(level)}
           ontogglemute={() => roomVolume.toggleMute()}
@@ -3528,7 +3433,7 @@
           {benzingaUrl}
           benzingaLogoUrl={data.sessData?.altBenzingaLogoURL}
           dumpVersion={DUMP_CONTRACT.version}
-          onopenmodal={openModal}
+          onopenmodal={(name) => modals.open(name)}
           onopenrosteruserinfo={(user) => userActions.openInfoFor(user)}
           onopenrosterprivatechat={(user) => privateChat.openFromRoster(user)}
           onmentionrosteruser={(user) => userActions.mentionFromRoster(user)}
@@ -3614,8 +3519,8 @@
               {captureChatScroller}
               {captureComposerElement}
               {observeComposerWidth}
-              onopenmodal={openModal}
-              onopenpoll={openPollUI}
+              onopenmodal={(name) => modals.open(name)}
+              onopenpoll={() => modals.openPollUI()}
               ontogglealertstoolbar={() => alertsPane.toggleToolbar()}
               ontogglealertssearch={() => alertsPane.toggleToolbarSearchOnly()}
               ondetachalerts={alertsPane.detach}
@@ -3717,7 +3622,7 @@
               {mountUploadFileLink}
               playMp3ForAll={(url) => broadcasts.playMp3ForAll(url)}
               stopMp3ForAll={() => broadcasts.stopMp3ForAll()}
-              {openModal}
+              openModal={(name) => modals.open(name)}
               youtubeForAllUrl={broadcasts.youtubeForAllUrl}
               stopYoutubeForAll={() => broadcasts.stopYoutubeForAll()}
               closeYoutubeFrame={() => broadcasts.closeYoutubeFrame()}
@@ -3764,8 +3669,8 @@
                 onscroll={(scroller) => feedScroll.trackExtraChatScroll(scroller)}
                 onscrollerready={(scroller) => (extraChatScroller = scroller)}
                 onprivatechat={() => privateChat.show()}
-                onsearch={() => openModal('chat-logs')}
-                onsettings={() => openModal('settings')}
+                onsearch={() => modals.open('chat-logs')}
+                onsettings={() => modals.open('settings')}
                 onimageupload={() => composer.openImageUpload()}
                 onrte={() => composer.openExtraRTE()}
                 onselectgif={(url) => composer.selectGif('', url)}
@@ -3865,23 +3770,19 @@
       {swingAlerts}
       {toasts}
       {userActions}
-      bind:modal
-      bind:selectedImageUrl
-      {alertTab}
+      {modals}
       {chatMode}
       {globalChatStyle}
       {mobilePin}
-      {sessionControlInitialTab}
-      {settingsTab}
       {theme}
       changeChatMode={(mode) => void changeChatMode(mode)}
-      {closeActiveModal}
-      {downloadImage}
-      {minimizePoll}
-      {openModal}
+      closeActiveModal={() => modals.closeActive()}
+      downloadImage={(url) => modals.downloadImage(url)}
+      minimizePoll={() => modals.minimizePoll()}
+      openModal={(name) => modals.open(name)}
       saveAlertFilter={alertsPane.saveFilter}
-      {setTheme}
-      {submitPollAction}
+      setTheme={(next) => modals.setTheme(next)}
+      submitPollAction={(action, values) => modals.submitPollAction(action, values)}
     />
     <!--
       `app-privchat` is its own component since 2026-08-15 — the first of the five template

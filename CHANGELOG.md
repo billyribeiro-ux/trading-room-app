@@ -24,6 +24,60 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-16
 
+### 2026-08-16 17:07 EDT — Phase 5 slice 24: `RoomModals`, and a third control that was invisible
+
+**`+page.svelte` 3,936 → 3,836 (−100).** `RoomOverlays.svelte` 471 → 462. Suite 2,308 → 2,318
+across 157 files. `svelte-check` 1,185 files, 0 errors, 0 warnings. All four CI steps green locally.
+**Runtime impact: yes** — the overlay state machine moved. No behaviour changed.
+
+**`src/lib/room/modals.svelte.ts` (244).** Which overlay is showing and how it is configured: the
+modal name, the tab each modal opens on, the image the lightbox holds, and the two actions — poll
+submission and image download — reached only from inside one.
+
+**The STATE moved with the functions, which is why this slice has no shared fields.** An earlier
+measurement of the same ten functions reported `modal`, `sessionControlInitialTab` and
+`selectedImageUrl` as written on both sides — because the functions were leaving and their state was
+not. Taking both makes this class the single writer, and three reader-plus-receiver crossings simply
+do not exist. That is the difference between extracting a DOMAIN and extracting a list of functions,
+and the dependency scan is what makes it visible before the code is written.
+
+**`theme` deliberately did NOT come.** `setTheme` writes it, so it looked like part of this — but
+thirteen other places read it, including the sidebar, the feeds and the modal host. It crosses as a
+receiver instead.
+
+**`RoomOverlays` now takes `modals` WHOLE, replacing five props and two binds** — the facade payoff
+the plan costed for, arriving one slice after the component. Slice 17 moved the markup while the
+state was still five `let`s, so it took five props and bound two back. `bind:` is what forced the
+change rather than a preference: `bind:modals.modal` is not valid, because a binding target must be
+state or a prop and not a member expression.
+
+**A THIRD NEGATIVE CONTROL THAT WAS INVISIBLE TO EVERY GATE**, and that is the finding. Demoting
+`#modal` from `$state` to a plain field — so the room renders whichever overlay was showing at load
+and never changes again — broke nothing: `svelte-check` reports 0 errors and 0 warnings, because
+Svelte's `non_reactive_update` warning is about a `let` in a COMPONENT and says nothing about a class
+field, and all 2,311 assertions passed. `modals.svelte.test.ts` now holds one assertion per
+independently reactive field — five different elements render from them — and the control is red.
+
+The other two were slice 22's detach receiver and the client half of the mention bit. All three were
+missing tests rather than missing behaviour, and all three were found by running the control before
+committing rather than after.
+
+**Twelve methods passed by reference, caught by the prototype contract** — the same finding as
+slices 20 and 22, and it sees them together rather than one per click.
+
+**Two rewriter/generator gaps closed, both first hit here.** An OPTIONAL property key is `name?:`,
+which the `name:` guard did not exclude: `openImageModal?: (event, url) => void` inside a type
+literal became `modals.openImage?: …`, 346 parse errors from one match. And a MULTI-LINE TEMPLATE
+LITERAL is data the line scanner cannot see across — `openImageModal` writes a 60-line HTML document
+into a popup — so `xform` tracks them now and ABORTS if a skipped line interpolates a name being
+renamed, rather than silently dropping a rewrite.
+
+**Two errors of my own cleanup, caught by the gate before the commit:** `ModalName` removed one step
+too far while `openModal`'s parameter still named it, and a `toggleTopMenu()` wrapper that dropped
+the menu argument it was handed.
+
+Not verified: no browser run.
+
 ### 2026-08-16 16:52 EDT — Phase 5 slice 23: `RoomFeedScroll`, and a flag with two writers
 
 **`+page.svelte` 4,083 → 3,936 (−147).** Suite 2,305 → 2,308 across 156 files. `svelte-check` 1,183

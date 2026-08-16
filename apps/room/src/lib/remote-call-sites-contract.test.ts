@@ -120,8 +120,8 @@ type Dispatcher = {
 
 const DISPATCHERS: readonly Dispatcher[] = [
   {
-    file: 'routes/+page.svelte',
-    fn: 'async function submitPollAction(',
+    file: 'lib/room/modals.svelte.ts',
+    fn: '  async submitPollAction(',
     actions: ['savePoll', 'deleteSavedPoll', 'sendPoll', 'sendPollAnswer', 'pollDone']
   },
   {
