@@ -24,6 +24,60 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-16
 
+### 2026-08-16 06:50 EDT — The room gets its first gap register, and its own re-run corrects two of its rows
+
+**Branch `feat/extra-chat-column`. Runtime impact: none** — `docs/reference/room-component-gap-register.md`
+(new), `TODO.md`. No source file changed.
+
+**The finding that made this necessary:** `docs/reference/evidence-gap-register.md` — 70 rows, the
+thing everyone reaches for — **covers the controller only.** It tracks
+`apps/controller/evidence-dumps/` and says nothing about `apps/room`. Nothing systematic had ever
+tracked the room against the v4 bundle; room gaps sat ad hoc in `TODO.md` rows.
+`pull-everything-contract.test.ts` is a *decoder* contract, proving all 51 components were extracted
+from the bundle — not a gap tracker, though it reads like one.
+
+**Inventory, derived twice independently:** 51 reference components, **42 render the reference custom
+element, 9 do not.** Three of the nine are built without the wrapper — `app-session-login` is a whole
+route, `app-streaming-view` is `StreamingView.svelte`, `app-screenshare-view` is `ScreenPane.svelte` —
+so a marker search alone would have called them missing. All six genuinely absent components were
+read whole and now carry rows with citations:
+
+- **`app-typing-indicator-dots`** — rendered upstream by `app-chat` AND `app-extra-chat`, which are
+  our `AlertChatArea` and `ExtraChatPane`. **A gap inside two components we call finished.** Our CSS
+  carries `.typing-indicator-container` rules; nothing renders a typing indicator.
+- **`app-closed-session-page`** — not a message but a **complete second application shell**: its own
+  navbar, its own sidebar, nine modals of its own, around one `[innerHTML]` of `sessData.closedTxt`.
+- **`app-session-transcript`** — a full paginated page (300/page, five buttons rendered twice,
+  13:00 UTC query vs 08:00 local picker). Our `openTranscriptPage()` stub is honest and correct.
+- **`app-detached-screen`** — upstream `?dscreen=1` switches the whole app to a bare screen viewer;
+  ours opens the entire room with a `.detach-screen` class. A defensible divergence that was never
+  written down.
+- **`app-positions-container`**, **`app-kicked-page`** — as previously captured.
+
+**Two cross-cutting rows nobody had recorded, both from reading `app-root` whole:** the
+**fourteen-parameter query contract** (six absent here; `sl` and `forcedStream` are links this app
+*generates and cannot honour*), and `app-root`'s **five-page switch and thirteen event
+subscriptions** — including `deleteAlertPW`, so a password-protected alert deletion is not
+password-protected here.
+
+**The re-run is the point of this entry.** The audit was run, then re-run twice as instructed. Pass 2
+re-derived 51/42/9 from scratch and diffed the file against its own snapshot — 454 → 632 lines, zero
+deletions. **Pass 3 attacked the absence claims and found two of mine wrong:**
+
+1. R-14 called the YouTube late-join seek "documented and then not built", implying an oversight.
+   `+page.svelte:7196-7198` already declares the gap, explains it needs persisted room video state,
+   and **warns against inventing a `startTime` to make the branch look implemented** — the exact fix
+   my wording invited.
+2. R-6 claimed nothing in `apps/room/src` listens for a `message` event. `+page.svelte:6979` does —
+   an `EventSource`, not `window`, so the point stood but the sentence did not.
+
+Both errors were mine, both in new material, and neither would have survived being acted on.
+
+**Verified:** the inventory by two independent derivations; every reference claim by reading the
+`.full.js` whole; every citation by opening the cited line. **Not run:** any test or gate — no source
+file was touched. **Not done:** 33 of the 42 rendered components are still unaudited for
+completeness, and they are listed by name rather than summarised as a count.
+
 ### 2026-08-16 06:12 EDT — Row AE re-measured after Phase 4, and the seven lines say the thing outright
 
 **Branch `feat/extra-chat-column`. Runtime impact: none** — `TODO.md` only.

@@ -445,11 +445,34 @@ they are removed, and their history lives in `CHANGELOG.md`, dated and timed, wi
 closed each one. Two places recording the same thing is how one of them goes stale, and a list that
 is mostly strikethrough is a list nobody reads to the bottom of.
 
-### THE REGISTER: `docs/reference/evidence-gap-register.md`
+### THE CONTROLLER REGISTER: `docs/reference/evidence-gap-register.md`
 
 Every gap from the full read of `apps/controller/evidence-dumps/` now lives there with a status, in
 five tiers. **That file is the tracker — this section is only the index to it.** Do not record a
 gap's status in both places; one of them will go stale.
+
+**It covers the CONTROLLER ONLY.** That was not obvious and cost a pass to establish: it tracks
+`page.manageSession.html`, `page.welcome.html` and their siblings, and says nothing whatever about
+`apps/room`. Room gaps used to be scattered through the rows of this file instead.
+
+### THE ROOM REGISTER: `docs/reference/room-component-gap-register.md`
+
+**Opened 2026-08-16.** The room's equivalent, tracking the v4 Angular bundle in
+`apps/room/docs/source/` (51 components, 194 decoded files) against `apps/room/src`. Same rule: a row
+closes only with a citation, never on reasoning.
+
+As of 2026-08-16 06:50 EDT: **51 components · 42 render the reference element · 9 absent.** All nine
+absent ones are now read whole and carry rows (R-1…R-9), three of which — `app-session-login`,
+`app-streaming-view`, `app-screenshare-view` — turned out to be **built without the custom-element
+wrapper**, so a marker search alone would have reported them missing.
+
+**The open work is step 2: 9 of the 42 rendered components have been audited for completeness, 33
+have not.** Element present is not the same as every gate and branch ported, and that is where the
+divergences are — `app-typing-indicator-dots` is missing from inside `AlertChatArea` and
+`ExtraChatPane`, two components anyone would call finished.
+
+Two rows in that file were **corrected by its own re-run** rather than by review, and the pass log at
+the end of it records both. Do not act on a row there without re-reading its citation first.
 
 As of 2026-08-15 20:52 EDT: **68 CLOSED, 5 OPEN, 14 parked/won't-fix, 87 total.**
 
