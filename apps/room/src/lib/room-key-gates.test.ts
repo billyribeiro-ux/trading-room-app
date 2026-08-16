@@ -25,6 +25,12 @@ const APPLIED_CSS = readFileSync(
   'utf8'
 );
 const PAGE = readFileSync(new URL('../routes/+page.svelte', import.meta.url), 'utf8');
+/*
+  The handler BODIES moved to `RoomWindowHandlers` in Phase 5 slice 18; the bindings stayed on
+  `<svelte:window>` in the page. So the page is still where you check that the listener exists, and
+  the module is where you check what it does.
+*/
+const HANDLERS = readFileSync(new URL('./room/window-handlers.ts', import.meta.url), 'utf8');
 const compact = (source: string) => source.replace(/\s+/g, '');
 
 const CTRL_RIGHT = { code: PUSH_TO_TALK_CODE, key: 'Control' };
@@ -171,15 +177,23 @@ describe('it is the reference’s handlers, bound to the reference’s events', 
       here, so a content-protection checkbox an owner could tick protected nothing. An export
       nothing calls would be the same defect wearing a test.
     */
-    expect(PAGE).toContain("from '$lib/room-key-gates'");
-    expect(PAGE).toContain(
-      'pushToTalkShouldUnmute(event, { pushToTalk: prefs.pushToTalk, micMuted: media.micMuted })'
+    expect(HANDLERS).toContain("from '$lib/room-key-gates'");
+    expect(HANDLERS).toMatch(
+      /pushToTalkShouldUnmute\(event, \{\s*pushToTalk: this\.#prefs\.pushToTalk,\s*micMuted: this\.#media\.micMuted\s*\}\)/
     );
-    expect(PAGE).toContain(
-      'pushToTalkShouldMute(event, { pushToTalk: prefs.pushToTalk, micMuted: media.micMuted })'
+    expect(HANDLERS).toMatch(
+      /pushToTalkShouldMute\(event, \{\s*pushToTalk: this\.#prefs\.pushToTalk,\s*micMuted: this\.#media\.micMuted\s*\}\)/
     );
-    expect(PAGE).toContain('shouldBlockCopyKey(event, { disableCopy, isPresenter })');
-    expect(PAGE).toContain('shouldBlockContextMenu({ disableCopy, isPresenter })');
+    expect(HANDLERS).toMatch(
+      /shouldBlockCopyKey\(event, \{\s*disableCopy: this\.#disableCopy\(\),\s*isPresenter: this\.#isPresenter\(\)\s*\}\)/
+    );
+    expect(HANDLERS).toMatch(
+      /shouldBlockContextMenu\(\{\s*disableCopy: this\.#disableCopy\(\),\s*isPresenter: this\.#isPresenter\(\)\s*\}\)/
+    );
+    // And the page still BINDS them, which is the half the module cannot show.
+    expect(PAGE).toContain('onkeydown={(event) => windowHandlers.keyDown(event)}');
+    expect(PAGE).toContain('onkeyup={(event) => windowHandlers.keyUp(event)}');
+    expect(PAGE).toContain('oncontextmenu={(event) => windowHandlers.contextMenu(event)}');
     expect(PAGE).toContain("document.body.classList.add('noselect')");
     // The setting has to cross the boundary, or every gate above is permanently false.
     expect(PAGE).toContain('data.sessData?.disableCopy === true');

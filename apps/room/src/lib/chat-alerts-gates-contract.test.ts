@@ -39,6 +39,14 @@ const compact = (source: string) => source.replace(/\s+/g, '');
 const ROOM_FULL_COMPACT = compact(ROOM_FULL);
 const ROOM_HELPERS_COMPACT = compact(ROOM_HELPERS);
 const PAGE_COMPACT = compact(PAGE);
+/*
+  The `beforeunload` BODY moved to `RoomWindowHandlers` in Phase 5 slice 18; the binding stayed on
+  `<svelte:window>`. So the post is asserted in the module and the listener in the page - both
+  halves, because a body nobody binds and a binding with no body each look correct alone.
+*/
+const HANDLERS_COMPACT = compact(
+  readFileSync(new URL('./room/window-handlers.ts', import.meta.url), 'utf8')
+);
 
 describe('hideChatAlerts is ONE flag, not one mechanism per writer', () => {
   it('is the sole gate on the chat/alerts column upstream', () => {
@@ -140,9 +148,11 @@ describe('hidePresentation gates the presentation column on the mode AND the set
       "window.addEventListener('beforeunload',()=>{window.opener.postMessage('windowClosing',window.location.origin);})"
     );
     // Ours posts the same message and origin, gated on the mode that means "this is a popout".
-    expect(PAGE_COMPACT).toContain(
+    expect(HANDLERS_COMPACT).toContain(
       "window.opener?.postMessage('windowClosing',window.location.origin)"
     );
+    // And the page still binds it, which is the half the module cannot show.
+    expect(PAGE).toContain('onbeforeunload={() => windowHandlers.beforeUnload()}');
   });
 });
 

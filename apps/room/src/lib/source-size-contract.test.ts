@@ -260,7 +260,7 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       What the slice actually proves is the pattern, which is why it was chosen first: state and the
       functions that write it leaving TOGETHER, where Phase 1 moved fields and left 248 bodies here.
     */
-    max: 4152,
+    max: 4083,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {
@@ -301,6 +301,19 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     */
     max: 291,
     why: 'the alerts pane actions - eight functions, and only the detach receiver crosses back'
+  },
+  {
+    file: 'lib/room/window-handlers.ts',
+    /*
+      The window listeners bodies. The BINDINGS stay on `<svelte:window>`, which is how Svelte s
+      own best-practices doc says to attach one; what moved is the hundred lines of body and
+      citation that were living inside the attribute values, where no reader looks for logic.
+
+      Five unrelated features share these listeners and the class does not pretend otherwise -
+      they are together because the EVENT is one, which is the reference s arrangement too.
+    */
+    max: 214,
+    why: 'the window listeners - bindings stay on the element, bodies and citations move here'
   },
   {
     file: 'lib/room/recording.ts',

@@ -24,6 +24,51 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-16
 
+### 2026-08-16 16:24 EDT — Phase 5 slice 18: the window listeners' bodies, and the mention in a docstring that nearly ate the file
+
+**`+page.svelte` 4,151 → 4,083 (−68).** Suite 2,294 → 2,297 across 155 files. `svelte-check` 1,181
+files, 0 errors, 0 warnings. **All four CI steps green locally: `lint`, `check`, `test`, `build`.**
+**Runtime impact: yes** — the window handlers moved. No behaviour changed.
+
+**`src/lib/room/window-handlers.ts` (214).** The bodies of `onclick`, `onpointermove`, `onkeydown`,
+`onkeyup`, `oncontextmenu` and `onbeforeunload` — a hundred lines of logic and citation that were
+living inside attribute values, where no reader looks for logic and no test can reach them except
+as template text.
+
+**The BINDINGS stay on `<svelte:window>`, and that is the docs' instruction rather than a
+preference.** Svelte's best-practices page: *"If you need to attach listeners to `window` or
+`document` you can use `<svelte:window>` and `<svelte:document>` … Avoid using `onMount` or
+`$effect` for this."* The element keeps ownership of add and remove; only the bodies moved.
+
+**Five unrelated features share these listeners and the class does not pretend otherwise.** The
+click handler closes two kinds of menu, `keydown` carries push-to-talk AND the copy restriction AND
+Escape, and `beforeunload` exists only to tell a popout's opener that it closed. They are together
+because the EVENT is one — which is the reference's arrangement too, every one of them a host
+binding on `app-room`. Splitting by feature would put five classes on one listener and lose the
+ordering the citations record.
+
+**`selectedImageUrl` crosses BOTH ways**, unlike slice 22's detach flag: Escape reads it to decide
+what to close and then clears it, so it is a reader plus a receiver.
+
+**A locator bug of mine that framed 128,000 bytes.** `src.indexOf('<svelte:window')` found the
+*prose* at line 559 — a docstring quoting Svelte's own advice about `<svelte:window>` — and the
+region it then framed ran past the element and swallowed most of the file. The script aborted on a
+later anchor instead of writing, which is the only reason it cost nothing; the locator is anchored
+at the start of a line now and asserts what it found.
+
+**And the shorthand trap again, in a new place.** `{ disableCopy, isPresenter }` renames to
+`{ this.#disableCopy(), this.#isPresenter() }`, which is not an object literal. The main generator
+repairs this for script moves; these bodies come out of the TEMPLATE and went through a different
+script, which needed the same repair.
+
+**Five dead declarations removed from the page**: four gate predicates that left with the handlers
+calling them, and `closeFloatingMenus`, a one-line alias whose only caller was the window click.
+
+**Negative control seen red:** dropping the `postMessage` from `beforeUnload`, so an opener never
+learns its popout closed and the column never comes back.
+
+Not verified: no browser run.
+
 ### 2026-08-16 16:17 EDT — Phase 5 slice 22: `RoomAlertsPane`, a negative control that stayed green, and two CI gates I was not running
 
 **`+page.svelte` 4,323 → 4,151 (−172).** Suite 2,286 → 2,294 across 155 files. `svelte-check`
