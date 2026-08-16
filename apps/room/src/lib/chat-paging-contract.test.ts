@@ -88,6 +88,51 @@ describe('the read is bounded', () => {
     expect(serverCode).not.toContain('.orderBy(asc(messages.createdAt))');
   });
 
+  it('the THIRD unbounded read is bounded too — alert questions', () => {
+    /*
+      Found 2026-08-15 and fixed the same day. `messages` and `alerts` were both `.all()` with no
+      LIMIT until 2026-08-14; `alert_questions` was the same defect in the same load and was missed,
+      so every SSE event re-read and re-serialised every question the room had ever had — bodies,
+      sender names, avatars and roles — into the SSR HTML and the payload.
+
+      Bounded differently from the other two ON PURPOSE, and that is the assertion worth having. A
+      LIMIT here would drop questions belonging to an alert that IS on screen. Questions exist only
+      for alerts, and the load already ships ONE PAGE of alerts, so scoping the questions to exactly
+      those alerts bounds them by that page and needs no second cursor to keep in step with the
+      first.
+    */
+    // The load hands the alert page's ids to the module that owns alert paging, and reads nothing
+    // from `alert_questions` itself any more.
+    expect(serverCode).toContain('loadQuestionsForAlerts(');
+    expect(serverCode).toContain('alertRows.map((alert) => alert.id)');
+    expect(serverCode, 'the page must not query that table directly').not.toContain(
+      '.from(alertQuestions)'
+    );
+
+    /*
+      ANCHORED TO THE FUNCTION, not to the file. `alert-log.ts` holds TWO room-scoped reads —
+      `loadAlertPage` filters by `eq(alerts.roomShortCode, roomShortCode)` as well — so asserting
+      "the module contains a room filter" passed with the filter DELETED from this one. Found by
+      running the control, which is the third time today a guard has matched the wrong one of two
+      sites; the same shape as the two `.from(rooms)` reads in the controller's account page.
+    */
+    const at = alertLogCode.indexOf('export function loadQuestionsForAlerts');
+    expect(at, 'loadQuestionsForAlerts is not in alert-log.ts').toBeGreaterThan(-1);
+    const read = alertLogCode.slice(at);
+
+    // The bound itself: the alert id list.
+    expect(read).toContain('inArray(alertQuestions.alertId, alertIds)');
+
+    // The tenancy term stays IN the statement beside the id list. An id list is not a substitute:
+    // this read was a cross-tenant leak until 2026-08-14 and the filter is why it is not one now.
+    expect(read).toContain('eq(alerts.roomShortCode, roomShortCode)');
+  });
+
+  it('asks nothing at all when the page holds no alerts', () => {
+    // `IN ()` is not a statement worth generating, and a room with no alerts has no question.
+    expect(alertLogCode).toContain('if (alertIds.length === 0) return [];');
+  });
+
   it('and pages per CHANNEL, so the quiet one is not starved', () => {
     /*
       A single global page of 50 would leave `off-topic` empty in any room where `main` is busy.

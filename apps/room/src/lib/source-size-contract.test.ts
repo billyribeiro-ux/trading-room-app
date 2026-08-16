@@ -234,7 +234,7 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
   },
   {
     file: 'routes/+page.server.ts',
-    max: 1617,
+    max: 1584,
     why: 'the loader and every form action left; 3,233 before the remote-function conversions began'
   }
 ];
