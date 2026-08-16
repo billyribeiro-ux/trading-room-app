@@ -675,9 +675,12 @@ describe('room-wide sound', () => {
   it('gates Stop For All on BOTH presenter and playing', () => {
     // `O(83, o.isP && o.mp3Playing ? 83 : -1)` — a control that is inert most of the time should
     // not be on screen most of the time.
-    const paneSource = readFileSync('src/lib/components/PresentationArea.svelte', 'utf8');
-    expect(paneSource).toContain('{#if isPresenter && mp3Playing}');
-    expect(paneSource).toContain('Stop For All');
+    // The toolbar moved on into `FilesPane.svelte` on 2026-08-16, one pass after
+    // `PresentationArea` took it out of the page. The flag is still the page's, handed down.
+    const filesPane = readFileSync('src/lib/components/FilesPane.svelte', 'utf8');
+    expect(filesPane).toContain('{#if isPresenter && mp3Playing}');
+    expect(filesPane).toContain('Stop For All');
+    expect(pageSource).toContain('{mp3Playing}');
   });
 
   it('keeps mp3Playing as its own flag rather than deriving it from the url', () => {

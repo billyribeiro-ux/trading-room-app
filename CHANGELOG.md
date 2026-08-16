@@ -22,6 +22,64 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ---
 
+## 2026-08-16
+
+### 2026-08-16 05:43 EDT — `FilesPane`: the last inline pane, and every pane now owns its own file
+
+**Branch `feat/extra-chat-column`. Runtime impact: none intended** — a region moved from one
+component into another, with no behavioural change.
+
+Closes **`TODO.md` row AK**. `PresentationArea` **1,652 → 1,192 (−460)**, `FilesPane.svelte` at 569:
+the three-tab strip, the toolbar, the sort bar and the files table with every per-row control.
+
+**Row AK's measurements were right and that is the point of writing them down.** It predicted ~480
+lines and ~25 identifiers; the region was 482 lines and the compiler produced 22 props plus 5
+imports. Nothing had to be rediscovered — the props were already named in the row, because they were
+`PresentationArea`'s and the compiler had produced them the pass before.
+
+**`mainTab` is a plain prop here, not a bindable**, and that is deliberate: the main tab strip stays
+in `PresentationArea`, so this pane only needs to know whether it is the visible one. A bindable
+would hand it an authority it never uses, and `svelte-check` is silent on a bindable nobody writes.
+
+**The `hideFiles` gate is now split across two files, and both halves are asserted.** The TAB is in
+the main strip and the PANE is this component. Either one alone leaves a tab that opens nothing or a
+pane reachable from a tab that is gone, which is what that assertion has always been for.
+
+**One vacuous assertion, written by me and caught by its own negative control.** The first version of
+the hand-off check was `expect(presentationArea).toContain('{filesHidden}')` — which the tab's own
+`hidden={filesHidden}` satisfies as a substring, so it could never fail. Deleting the entire prop
+hand-off left the file green. It now slices to the `<FilesPane` invocation and asserts the slice was
+found first; re-run against the same mutation, it goes red. **This is the fourth time this session a
+control has come back green and the fault was in my instrument** — and the only reason to run
+controls at all.
+
+**The police list was updated BEFORE the re-point, for the first time.** `AlertChatArea` and
+`PresentationArea` were both added to `EXTRACTION_SOURCES` after the fact, once a dropped test count
+gave the game away. `components/FilesPane.svelte` went in first, so the count never moved off 1,891
+at any point in this change. That is the habit those two retrofits exist to teach.
+
+**Verified, and how:**
+
+- `svelte-check --threshold error` — **0 errors, 0 warnings across 1,140 files**.
+- `npx eslint src` — clean. It named exactly the five imports the new pane took (`invalidate`,
+  `alertSoundButtonFor`, `fileSizeInKb`, `fileSortTitle`, `mediumDate`), which is independent
+  confirmation `PresentationArea` no longer uses any of them. `FileSortField` stayed, because
+  `fileSort` and `applyFileSort` are still passed through.
+- `npx vitest run` — **136 files, 1,891 tests, all passing.**
+- `svelte-autofixer` on the whole component — **zero issues.** All 15 suggestions are the same one,
+  and all 15 are REFUSED with cause: the `{' '}` mustaches are the capture's own padded text nodes,
+  Svelte trims whitespace at element edges, and `files-pane-contract` has a test asserting exactly
+  those spaces survive into the DOM.
+- **Four negative controls, each with the mutation verified to have landed**: un-gating Delete
+  Selected and Upload, dropping a padded text node, breaking the `filesHidden` hand-off, and moving
+  the sort bar outside the file-count gate.
+
+Only `files-pane-contract` and one assertion in `roster-gates` needed re-pointing — row AK said this
+extraction would "re-point `pane` and nothing else", and that held.
+
+**The decomposition's component work is now complete: `+page.svelte` 13,663 → 9,612, and every pane
+of the room is its own file.**
+
 ## 2026-08-15
 
 ### 2026-08-15 22:48 EDT — `PresentationArea`: the last of the five, 10,860 → 9,612, and Phase 2 closes
