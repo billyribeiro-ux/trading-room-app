@@ -39,7 +39,6 @@
     computed once on the page from data the server owns. Nothing here opens a device, starts a
     stream, or writes a file.
   */
-  import type { FileSortField } from '$lib/file-sort';
   import { NEUTRAL_PAN, captureVideoImage, type Pan } from '$lib/screen-zoom';
   import DayTradeAlertsPane from '$lib/components/day-trade-alerts/DayTradeAlertsPane.svelte';
   import FilesPane from '$lib/components/FilesPane.svelte';
@@ -57,12 +56,15 @@
   import type { MtxStreamTabs } from '$lib/room-mtx.svelte';
   import type { RoomMedia } from '$lib/room/media.svelte';
   import type { RoomMenus } from '$lib/room/menus.svelte';
+  import type { RoomFiles } from '$lib/room/files.svelte';
+  import type {
+    DayTradeAlertAction,
+    RoomTradeAlerts,
+    SwingAlertAction
+  } from '$lib/room/trade-alerts.svelte';
   import type { RoomSplit } from '$lib/room/split.svelte';
-  import type { SwingAlertDraft } from '$lib/components/swing-alerts/draft';
-  import type { DayTradeAlertDraft } from '$lib/components/day-trade-alerts/draft';
   import type {
     DayTradeAlertRow,
-    FileTab,
     MainTab,
     ModalName,
     NoteVersion,
@@ -164,26 +166,16 @@
     uploadAlertFiles: (files: readonly File[]) => Promise<readonly string[]>;
 
     // ── #swingAlerts and #dayTradeAlerts ───────────────────────────────────────
-    swingAlertsEnabled: boolean;
-    swingAlertsLog: readonly SwingAlertRow[];
-    submitSwingCommand: (
-      action: 'swingAlertMsg' | 'editSwingAlertMsg' | 'deleteSwingAlertMsg',
-      values: Record<string, string | number>
-    ) => Promise<void>;
-    swingAlertPayload: (draft: SwingAlertDraft) => Record<string, string>;
-    changeSwingAlertMonths: (months: number) => Promise<void>;
-    requestSwingImageUpload: () => Promise<string | null>;
-    requestSwingImagePaste: (file: File) => Promise<string | null>;
-    dayTradeAlertsEnabled: boolean;
-    dayTradeAlertsLog: readonly DayTradeAlertRow[];
-    submitDayTradeCommand: (
-      action: 'dayTradeAlertMsg' | 'editDayTradeAlertMsg' | 'deleteDayTradeAlertMsg',
-      values: Record<string, string | number>
-    ) => Promise<void>;
-    dayTradeAlertPayload: (draft: DayTradeAlertDraft) => Record<string, string>;
-    changeDayTradeAlertMonths: (months: number) => Promise<void>;
-    requestDayTradeImageUpload: () => Promise<string | null>;
-    requestDayTradeImagePaste: (file: File) => Promise<string | null>;
+    /**
+     * The two trade alert feeds, whole — `$lib/room/trade-alerts.svelte.ts`.
+     *
+     * Fourteen props, seven per feed, and the two sevens were the same seven twice. They are one
+     * class with two instances now, so the pane calls below read `swingAlerts.log` where they read
+     * `swingAlertsLog`, and the wire action names stay at the call sites where they belong —
+     * `submit()` is generic over them precisely so this component keeps naming them.
+     */
+    swingAlerts: RoomTradeAlerts<SwingAlertRow, SwingAlertAction>;
+    dayTradeAlerts: RoomTradeAlerts<DayTradeAlertRow, DayTradeAlertAction>;
 
     // ── #videoplayer ───────────────────────────────────────────────────────────
     /** Set by `playVideoForAll` and cleared by `stopVideoForAll`, both on the `cmds` channel. */
@@ -195,34 +187,19 @@
     stopVideoForAll: () => Promise<void>;
 
     // ── #files ─────────────────────────────────────────────────────────────────
-    filesHidden: boolean;
-    /** BINDABLE: the three file tabs write it. */
-    fileTab: FileTab;
-    /** BINDABLE: the search box writes it. */
     /**
-     * A CALLBACK, not a bindable, and that distinction was made by ESLint rather than by me.
+     * The file drive, whole — `$lib/room/files.svelte.ts`.
      *
-     * The search box only ever WRITES this value — the page's `searchedFiles()` is what reads it,
-     * and nothing in this component consults it. A `$bindable()` would therefore be a prop whose
-     * incoming half is dead, which `no-useless-assignment` reported precisely. Reporting the value
-     * up is what is actually happening, so that is what the prop says.
+     * This was fifteen props, and every one of them arrived from the page and left again for
+     * `FilesPane` unread: the only member this component itself touches is `filesHidden`, on the
+     * main tab `li` below. Passing the object rather than its parts is what `RoomSidebar` does
+     * with `roster` and `menus`, and it is why `bind:fileTab` is gone — the pane writes
+     * `files.fileTab` directly, so there is no value to bind back up through here.
      */
-    onfilesearch: (value: string) => void;
-    fileSort: { field: FileSortField; direction: 'asc' | 'desc' };
-    selectedFileIds: Set<number>;
-    playingForMe: Set<number>;
+    files: RoomFiles;
     mountUploadFileLink: (menu: HTMLUListElement) => void;
-    countFiles: (kind: FileTab) => number;
-    searchedFiles: () => readonly PageProps['data']['files'][number][];
-    matchesFileTab: (item: { kind: string }) => boolean;
-    applyFileSort: (field: FileSortField) => void;
-    toggleFileSelection: (id: number, selected: boolean) => void;
-    deleteSelectedFiles: () => void;
-    deleteFile: (file: { id: number; name: string }) => void;
-    playMp3ForMe: (file: { id: number; url: string; contentType: string }) => void;
     playMp3ForAll: (url: string) => Promise<void>;
     stopMp3ForAll: () => Promise<void>;
-    setAlertSound: (url: string, on: boolean) => Promise<void>;
     openModal: (name: Exclude<ModalName, null>) => void;
 
     // ── the overlays that sit under the tab content ────────────────────────────
@@ -292,44 +269,18 @@
     submitNoteMutation,
     loadNoteVersions,
     uploadAlertFiles,
-    swingAlertsEnabled,
-    swingAlertsLog,
-    submitSwingCommand,
-    swingAlertPayload,
-    changeSwingAlertMonths,
-    requestSwingImageUpload,
-    requestSwingImagePaste,
-    dayTradeAlertsEnabled,
-    dayTradeAlertsLog,
-    submitDayTradeCommand,
-    dayTradeAlertPayload,
-    changeDayTradeAlertMonths,
-    requestDayTradeImageUpload,
-    requestDayTradeImagePaste,
+    swingAlerts,
+    dayTradeAlerts,
     hideVideoPlayer,
     videoPlayerUrl,
     scheduledVideoForAll,
     playVideoForAll,
     scheduleVideoForAll,
     stopVideoForAll,
-    filesHidden,
-    fileTab = $bindable('files'),
-    onfilesearch,
-    fileSort,
-    selectedFileIds,
-    playingForMe,
+    files,
     mountUploadFileLink,
-    countFiles,
-    searchedFiles,
-    matchesFileTab,
-    applyFileSort,
-    toggleFileSelection,
-    deleteSelectedFiles,
-    deleteFile,
-    playMp3ForMe,
     playMp3ForAll,
     stopMp3ForAll,
-    setAlertSound,
     openModal,
     youtubeForAllUrl,
     stopYoutubeForAll,
@@ -596,7 +547,7 @@
 
                     The icon is `fas fa-bell` (const 64), shared with the Day Trades tab.
                   -->
-        {#if swingAlertsEnabled}
+        {#if swingAlerts.enabled}
           <li role="presentation" class="nav-item">
             <a
               id="swingAlerts-tab"
@@ -634,7 +585,7 @@
                     own heading says "Latest Day Trade Alerts" and the tab says the short form. The
                     icon is `fas fa-bell` (const 64), the same tuple the Swing tab uses.
                   -->
-        {#if dayTradeAlertsEnabled}
+        {#if dayTradeAlerts.enabled}
           <li role="presentation" class="nav-item">
             <a
               id="dayTradeAlerts-tab"
@@ -670,7 +621,7 @@
                     client global, set from the `r` query parameter, and this room has no media.recording
                     bot to model.
                   -->
-        <li role="presentation" class="nav-item" hidden={filesHidden}>
+        <li role="presentation" class="nav-item" hidden={files.filesHidden}>
           <!-- svelte-ignore a11y_missing_attribute -->
           <a
             class={['nav-link', { active: mainTab === 'files' }]}
@@ -1005,7 +956,7 @@
                     it is what lets the contract test prove the component renders nothing on a false
                     entitlement without standing up this whole page.
                   -->
-        {#if swingAlertsEnabled}
+        {#if swingAlerts.enabled}
           <div
             id="swingAlerts"
             class={mainTab === 'swingAlerts'
@@ -1015,24 +966,24 @@
             aria-labelledby="swingAlerts-tab"
           >
             <SwingAlertsPane
-              alerts={swingAlertsLog}
-              hasSwingTradeAlerts={swingAlertsEnabled}
+              alerts={swingAlerts.log}
+              hasSwingTradeAlerts={swingAlerts.enabled}
               {isPresenter}
               onCreate={async (draft) => {
-                await submitSwingCommand('swingAlertMsg', swingAlertPayload(draft));
+                await swingAlerts.submit('swingAlertMsg', swingAlerts.payload(draft));
               }}
               onDelete={async (swingAlertID) => {
-                await submitSwingCommand('deleteSwingAlertMsg', { swingAlertID });
+                await swingAlerts.submit('deleteSwingAlertMsg', { swingAlertID });
               }}
               onEdit={async (draft) => {
-                await submitSwingCommand('editSwingAlertMsg', {
-                  ...swingAlertPayload(draft),
+                await swingAlerts.submit('editSwingAlertMsg', {
+                  ...swingAlerts.payload(draft),
                   swingAlertID: draft.swingAlertID ?? 0
                 });
               }}
-              onMonthsChange={(months) => void changeSwingAlertMonths(months)}
-              onPasteImage={requestSwingImagePaste}
-              onUploadImage={requestSwingImageUpload}
+              onMonthsChange={(months) => void swingAlerts.changeMonths(months)}
+              onPasteImage={(file) => swingAlerts.requestImagePaste(file)}
+              onUploadImage={() => swingAlerts.requestImageUpload()}
               sessionHandle={data.sessionHandle}
             />
           </div>
@@ -1047,7 +998,7 @@
                     it is what lets the contract test prove the component renders nothing on a false
                     entitlement without standing up this whole page.
                   -->
-        {#if dayTradeAlertsEnabled}
+        {#if dayTradeAlerts.enabled}
           <div
             id="dayTradeAlerts"
             class={mainTab === 'dayTradeAlerts'
@@ -1057,26 +1008,26 @@
             aria-labelledby="dayTradeAlerts-tab"
           >
             <DayTradeAlertsPane
-              alerts={dayTradeAlertsLog}
-              hasDayTradeAlerts={dayTradeAlertsEnabled}
+              alerts={dayTradeAlerts.log}
+              hasDayTradeAlerts={dayTradeAlerts.enabled}
               {isPresenter}
               onCreate={async (draft) => {
-                await submitDayTradeCommand('dayTradeAlertMsg', dayTradeAlertPayload(draft));
+                await dayTradeAlerts.submit('dayTradeAlertMsg', dayTradeAlerts.payload(draft));
               }}
               onDelete={async (dayTradeAlertID) => {
-                await submitDayTradeCommand('deleteDayTradeAlertMsg', {
+                await dayTradeAlerts.submit('deleteDayTradeAlertMsg', {
                   dayTradeAlertID
                 });
               }}
               onEdit={async (draft) => {
-                await submitDayTradeCommand('editDayTradeAlertMsg', {
-                  ...dayTradeAlertPayload(draft),
+                await dayTradeAlerts.submit('editDayTradeAlertMsg', {
+                  ...dayTradeAlerts.payload(draft),
                   dayTradeAlertID: draft.dayTradeAlertID ?? 0
                 });
               }}
-              onMonthsChange={(months) => void changeDayTradeAlertMonths(months)}
-              onPasteImage={requestDayTradeImagePaste}
-              onUploadImage={requestDayTradeImageUpload}
+              onMonthsChange={(months) => void dayTradeAlerts.changeMonths(months)}
+              onPasteImage={(file) => dayTradeAlerts.requestImagePaste(file)}
+              onUploadImage={() => dayTradeAlerts.requestImageUpload()}
               sessionHandle={data.sessionHandle}
             />
           </div>
@@ -1112,25 +1063,11 @@
         <FilesPane
           {data}
           {isPresenter}
-          {filesHidden}
+          {files}
           {mainTab}
-          bind:fileTab
-          {fileSort}
-          {selectedFileIds}
-          {playingForMe}
           {mp3Playing}
-          {countFiles}
-          {searchedFiles}
-          {matchesFileTab}
-          {applyFileSort}
-          {onfilesearch}
-          {toggleFileSelection}
-          {deleteSelectedFiles}
-          {deleteFile}
-          {playMp3ForMe}
           {playMp3ForAll}
           {stopMp3ForAll}
-          {setAlertSound}
           {openModal}
         />
       </div>

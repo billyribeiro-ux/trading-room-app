@@ -37,6 +37,11 @@ const stripComments = (source: string) =>
   source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/<!--[\s\S]*?-->/g, '');
 
 const serverCode = stripComments(SERVER);
+/*
+  The read pipelines left the page for `RoomFeeds` in Phase 5 slice 9. Read as their own source, so
+  an assertion about what a pane renders cannot pass against a file that no longer builds it.
+*/
+const feedsModule = readFileSync(new URL('room/feeds.svelte.ts', import.meta.url), 'utf8');
 const pageCode = stripComments(PAGE);
 const paneCode = stripComments(PANE);
 const modalCode = stripComments(MODAL);
@@ -264,11 +269,15 @@ describe('what each mode does', () => {
       re-reads its log from the server on every invalidate, so a drop-on-arrival would be undone by
       the next load — it is a view filter here instead.
     */
-    expect(pageCode).toContain('webinarMessageVisible(');
-    expect(pageCode).toContain('hasAdminChat: data.user.hasAdminChat === true');
+    expect(feedsModule).toContain('webinarMessageVisible(');
+    expect(feedsModule).toContain('hasAdminChat: this.#session().user.hasAdminChat === true');
     // One mention rule, shared with the highlight and the popup — not a second `indexOf('@')`.
-    expect(pageCode).toContain(
-      'isMention: isMentionOf(item.body, data.user.displayName, item.isAdmin === true)'
-    );
+    // Asserted on the three ARGUMENTS rather than on one line: prettier wraps this call, and a
+    // test that breaks on a reformat is a test about formatting.
+    const call = feedsModule.slice(feedsModule.indexOf('isMention: isMentionOf('));
+    const args = call.slice(0, 220);
+    expect(args).toContain('item.body');
+    expect(args).toContain('this.#session().user.displayName');
+    expect(args).toContain('item.isAdmin === true');
   });
 });

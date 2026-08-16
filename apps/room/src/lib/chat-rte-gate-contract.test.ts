@@ -52,6 +52,12 @@ const ROOM_CONFIG_CLIENT = readFileSync(
 const stripComments = (source: string) =>
   source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/<!--[\s\S]*?-->/g, '');
 
+/*
+  The composer left the page for `RoomComposer` in Phase 5 slice 10. Read as its own source, so an
+  assertion about the RTE gate cannot pass against a file that no longer holds it — and so the
+  NEGATIVES below still point at something that could hold the wrong version.
+*/
+const composerModule = readFileSync(new URL('room/composer.svelte.ts', import.meta.url), 'utf8');
 const pageCode = stripComments(PAGE);
 const prefsCode = stripComments(PREFS_SOURCE);
 const modalCode = stripComments(MODAL);
@@ -60,8 +66,13 @@ const serverCode = stripComments(SERVER);
 
 describe('the gate is the reference expression, resolved once', () => {
   it('all three terms, in one derived value', () => {
-    expect(pageCode).toContain(
-      'const canUseRTE = $derived(data.sessData?.enableRTE === true && prefs.enableRTE && isPresenter);'
+    /*
+      A GETTER since slice 10, not a `$derived` — it reads two constructor-assigned thunks, and a
+      derived class field initialises before the constructor runs. The three TERMS are what this
+      test is about, and all three are still here, in the same order and with the room's flag first.
+    */
+    expect(composerModule).toContain(
+      'this.#session().sessData?.enableRTE === true && this.#prefs.enableRTE && this.#isPresenter()'
     );
   });
 
@@ -96,8 +107,8 @@ describe('every consumer reads that one value', () => {
       new URL('./components/AlertChatArea.svelte', import.meta.url),
       'utf8'
     );
-    expect(pageCode).toContain('{canUseRTE}');
-    expect(pageCode).toContain('onrte={openRTEModal}');
+    expect(pageCode).toContain('canUseRTE={composer.canUseRTE}');
+    expect(pageCode).toContain('onrte={() => composer.openRTE()}');
 
     const from = paneCode.indexOf('{#if canUseRTE}');
     expect(from, 'the composer must gate its button on canUseRTE').toBeGreaterThan(-1);
@@ -140,8 +151,10 @@ describe('every consumer reads that one value', () => {
       The second ask is upstream's own defence and is reproduced rather than trimmed as redundant:
       it is what stops a click that reached the button after the gate closed from posting.
     */
-    expect(pageCode).toContain("const html = canUseRTE ? rteDraft.trim() : '';");
-    expect(pageCode).toContain("dialogs.alert = 'Empty message. Please type a message...';");
+    expect(composerModule).toContain("const html = this.canUseRTE ? this.#rteDraft.trim() : '';");
+    expect(composerModule).toContain(
+      "this.#dialogs.alert = 'Empty message. Please type a message...';"
+    );
   });
 
   it('and refuses on the SERVER emptiness rule, so formatting-only cannot fail silently', () => {
@@ -150,8 +163,8 @@ describe('every consumer reads that one value', () => {
       the server, and is refused there with a 400 this modal has nowhere to display. Asking the
       question `isEmptyChatHtml` asks means the person is told instead.
     */
-    expect(pageCode).toContain('const text = stripHtmlToText(html);');
-    expect(pageCode).toContain('if (!text) {');
+    expect(composerModule).toContain('const text = stripHtmlToText(html);');
+    expect(composerModule).toContain('if (!text) {');
   });
 });
 
@@ -167,18 +180,20 @@ describe('the two entry points', () => {
       WITH you into the editor, and the composer is left empty so the same words cannot be sent
       twice from two places — but they can no longer be separated by an early return between them.
     */
-    expect(pageCode).toContain("rteDraft = textToEditorHtml(chat.take('textAreaTxt'));");
+    expect(composerModule).toContain(
+      "this.#rteDraft = this.#textToEditorHtml(this.#chat.take('textAreaTxt'));"
+    );
     const chatClass = readFileSync(new URL('./room/chat.svelte.ts', import.meta.url), 'utf8');
     expect(chatClass).toContain('take(composer: ChatComposerId): string {');
     expect(chatClass).toContain('this.clear(composer);');
-    expect(pageCode).toContain("openModal('rich-text');");
+    expect(composerModule).toContain("this.#openModal('rich-text');");
   });
 
   it('that text is ESCAPED, because a textarea holds text and not markup', () => {
     // The reference hands its composer value straight to `summernote('code', …)`, which parses it.
     // Somebody who types a less-than must see the character they typed.
-    expect(pageCode).toContain('holder.textContent = text;');
-    expect(pageCode).toContain('return holder.innerHTML;');
+    expect(composerModule).toContain('holder.textContent = text;');
+    expect(composerModule).toContain('return holder.innerHTML;');
   });
 
   it('the edit routes on the COLUMN, never on a sniff for markup', () => {
@@ -187,8 +202,15 @@ describe('the two entry points', () => {
       records which kind it is, so the same decision is a column read — the same rule the renderer
       follows in `chat-rich-text-contract.test.ts`.
     */
-    expect(pageCode).toContain("if (kind === 'chat' && canUseRTE && item.bodyHtml) {");
+    /*
+      Still on the page, because deciding WHICH editor to open is the message-action path's job.
+      Slice 10 moved the editor's own state, so the branch now hands off to `editInRTE` rather than
+      writing three fields inline — which is what stops a draft and its target disagreeing.
+    */
+    expect(pageCode).toContain("if (kind === 'chat' && composer.canUseRTE && item.bodyHtml) {");
+    expect(pageCode).toContain('composer.editInRTE(item, item.bodyHtml);');
     expect(pageCode).not.toContain('containsHtml');
+    expect(composerModule).not.toContain('containsHtml');
   });
 
   it('the edit is NARROWED to the full gate, deliberately', () => {

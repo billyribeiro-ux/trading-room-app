@@ -39,6 +39,11 @@ const stripComments = (source: string) =>
   source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/<!--[\s\S]*?-->/g, '');
 
 const serverCode = stripComments(SERVER);
+/*
+  The read pipelines left the page for `RoomFeeds` in Phase 5 slice 9. Read as their own source, so
+  an assertion about what a pane renders cannot pass against a file that no longer builds it.
+*/
+const feedsModule = readFileSync(new URL('room/feeds.svelte.ts', import.meta.url), 'utf8');
 const pageCode = stripComments(PAGE);
 const remoteCode = stripComments(REMOTE);
 const chatLogCode = stripComments(CHAT_LOG);
@@ -197,12 +202,19 @@ describe('and nothing became unreachable', () => {
       keyed by the parameter rather than by the main column's tab. A second derived would have been
       a second copy of six steps, and the copies drift.
     */
-    expect(pageCode).toContain('function chatMessagesFor(tab: ChatTab) {');
-    expect(pageCode).toContain('mergeOlderChatMessages(chatPages.older(tab), data.messages)');
-    expect(pageCode).toContain('const visibleChatMessages = $derived(chatMessagesFor(chat.tab));');
-    expect(pageCode).toContain(
-      'const visibleExtraChatMessages = $derived(chatMessagesFor(chat.extraTab));'
+    /*
+      GETTERS since slice 9, not \`$derived\` — a derived class field initialises before the
+      constructor assigns the thunks it reads. The property this test is about is unchanged: ONE
+      function, called twice, keyed on the channel parameter.
+    */
+    expect(feedsModule).toContain('chatMessagesFor(tab: ChatTab) {');
+    expect(feedsModule).toContain(
+      'mergeOlderChatMessages(this.#chatPages.older(tab), this.#session().messages)'
     );
+    expect(feedsModule).toContain('get visibleChat() {');
+    expect(feedsModule).toContain('return this.chatMessagesFor(this.#chat.tab);');
+    expect(feedsModule).toContain('get visibleExtraChat() {');
+    expect(feedsModule).toContain('return this.chatMessagesFor(this.#chat.extraTab);');
   });
 
   it('the trim runs AFTER the merge, so the cap still holds', () => {
@@ -211,8 +223,8 @@ describe('and nothing became unreachable', () => {
       `trimLogSize` by exactly the pages this feature adds — the preference would stop meaning
       anything for the readers most likely to have it on.
     */
-    const from = pageCode.indexOf('function chatMessagesFor(tab: ChatTab) {');
-    const derived = pageCode.slice(from, pageCode.indexOf('.filter(', from));
+    const from = feedsModule.indexOf('chatMessagesFor(tab: ChatTab) {');
+    const derived = feedsModule.slice(from, feedsModule.indexOf('.filter(', from));
     expect(derived).toContain('trimChatLog(');
     expect(derived).toContain('mergeOlderChatMessages(');
     expect(derived.indexOf('trimChatLog(')).toBeLessThan(
@@ -334,7 +346,9 @@ describe('the alerts log is paged by the same machinery', () => {
   it('older pages are fetched and survive the invalidate', () => {
     expect(remoteCode).toContain('export const loadOlderAlerts = query(pageNumber,');
     expect(pageCode).toContain('await loadOlderAlertsPage(page)');
-    expect(pageCode).toContain('mergeOlderChatMessages(alertPages.older(ALERTS_LOG), data.alerts)');
+    expect(feedsModule).toContain(
+      'mergeOlderChatMessages(this.#alertPages.older(this.#alertsLogKey), this.#session().alerts)'
+    );
   });
 
   it('and it refuses page 0 and an unbounded offset, like the chat query', () => {

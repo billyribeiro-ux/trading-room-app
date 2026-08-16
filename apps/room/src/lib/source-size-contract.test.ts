@@ -260,7 +260,7 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       What the slice actually proves is the pattern, which is why it was chosen first: state and the
       functions that write it leaving TOGETHER, where Phase 1 moved fields and left 248 bodies here.
     */
-    max: 8899,
+    max: 7162,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {
@@ -415,6 +415,36 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     file: 'lib/room/prefs.svelte.ts',
     max: 590,
     why: 'every viewer preference and the one write path; 25 of 27 have no public setter'
+  },
+  {
+    file: 'lib/room/files.svelte.ts',
+    max: 382,
+    why: 'the file drive; the first slice to collapse a prop list at TWO call sites rather than one'
+  },
+  {
+    file: 'lib/room/feeds.svelte.ts',
+    max: 359,
+    why: 'what each pane renders, and the evidence overlay every pipeline consults'
+  },
+  {
+    file: 'lib/room/composer.svelte.ts',
+    max: 553,
+    why: 'everything that leaves the browser as content; five entry points, one refusal path'
+  },
+  {
+    file: 'lib/room/user-actions.svelte.ts',
+    max: 730,
+    why: 'everything that can be done TO a user; handle() alone was 249 lines on the page'
+  },
+  {
+    file: 'lib/room/private-chat.svelte.ts',
+    max: 521,
+    why: 'the private-chat panel; generic over the roster row so the full row reaches selectRosterUser'
+  },
+  {
+    file: 'lib/room/trade-alerts.svelte.ts',
+    max: 337,
+    why: 'ONE class, two instances; 9 of its 14 declaration pairs were byte-identical before the merge'
   }
 ];
 

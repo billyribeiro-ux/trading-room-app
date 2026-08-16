@@ -250,6 +250,11 @@ describe('the row icon', () => {
 */
 describe('the filter is applied at all THREE sites, not just the visible one', () => {
   const page = readFileSync(new URL('../routes/+page.svelte', import.meta.url), 'utf8');
+  /*
+  The read pipelines left the page for `RoomFeeds` in Phase 5 slice 9. Read as their own source, so
+  an assertion about what a pane renders cannot pass against a file that no longer builds it.
+*/
+  const feedsModule = readFileSync(new URL('room/feeds.svelte.ts', import.meta.url), 'utf8');
   const source = page.replace(/\/\*[\s\S]*?\*\//g, '').replace(/<!--[\s\S]*?-->/g, '');
 
   /*
@@ -273,7 +278,9 @@ describe('the filter is applied at all THREE sites, not just the visible one', (
   it('calls the shared predicate at every site, never re-deriving it inline', () => {
     expect(callSites, 'the live arrival guard reads the values at delivery time').toHaveLength(1);
     expect(classCallSites, 'the rendered list and the search rows share one').toHaveLength(1);
-    expect(source).toContain('.filter(alerts.passesFilter(data.sessData?.modAlertFilterList))');
+    expect(feedsModule).toContain(
+      '.filter(this.#alerts.passesFilter(this.#session().sessData?.modAlertFilterList))'
+    );
     // The predicate itself must not be reimplemented at a call site: `showAlertsFrom ? … : …`
     // against the selection map is the exact expression that has to live in one place.
     expect(source).not.toContain('showAlertsFrom ? alertFilterFor[');
@@ -295,11 +302,11 @@ describe('the filter is applied at all THREE sites, not just the visible one', (
   });
 
   it('feeds the advanced-search modal the filtered rows, not the raw log', () => {
-    expect(source).toContain('alerts={searchableAlerts}');
+    expect(source).toContain('alerts={feeds.searchableAlerts}');
     expect(source).not.toContain('alerts={data.alerts}');
     // `searchableAlerts` must come off `data.alerts` rather than off `visibleAlerts`, or the search
     // silently inherits the toolbar search term and the archive cut-off.
-    const derived = source.slice(source.indexOf('const searchableAlerts'));
-    expect(derived.slice(0, derived.indexOf(');'))).toContain('data.alerts.filter(');
+    const derived = feedsModule.slice(feedsModule.indexOf('get searchableAlerts()'));
+    expect(derived.slice(0, derived.indexOf(');'))).toContain('this.#session().alerts.filter(');
   });
 });

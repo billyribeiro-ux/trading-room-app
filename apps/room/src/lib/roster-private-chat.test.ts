@@ -41,7 +41,14 @@ describe('roster private-chat evidence contract', () => {
     expect(SIDEBAR).toContain('<i class="fas fa-comments"></i>&nbsp;&nbsp;Private Chat');
     // The handler is the page's, reached through a callback prop — the gate stays in one place.
     expect(SIDEBAR).toContain('onclick={() => onopenrosterprivatechat(user)}');
-    expect(pageSource).toContain('onopenrosterprivatechat={openRosterPrivateChat}');
+    /*
+      WRAPPED since Phase 5 slice 7, and that is the assertion rather than an incidental change of
+      spelling: `openRosterPrivateChat` was a function and is a method now, so passing it by
+      reference would leave `this` as the component. The arrow is what keeps the gate reachable.
+    */
+    expect(pageSource).toContain(
+      'onopenrosterprivatechat={(user) => privateChat.openFromRoster(user)}'
+    );
   });
 
   it('shows the action to presenters', () => {

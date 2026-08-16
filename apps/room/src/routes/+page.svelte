@@ -4,16 +4,13 @@
     chatComposerEnabled,
     isChatMode,
     isWebinarMode,
-    webinarMessageVisible,
     type ChatMode
   } from '$lib/chat-mode';
   import {
     CHAT_PAGE_ARRIVAL_NUDGE,
     CHAT_PAGE_REQUEST_NUDGE,
-    mergeOlderChatMessages,
     shouldLoadOlderMessages
   } from '$lib/chat-paging';
-  import { stripHtmlToText } from '$lib/chat-plain-text';
   import { toggleReaction } from '$lib/reaction-toggle';
   import { RoomMenus } from '$lib/room/menus.svelte';
   import { RoomPolls } from '$lib/room/polls.svelte';
@@ -64,7 +61,6 @@
   import { MediaSession } from '$lib/media/session';
   import { startSpeechRecognition } from '$lib/media/speech-reco';
   import { isMtxStream } from '$lib/mtx-streams';
-  import { MISSING_SCHEME_ALERT, addVideoToList, isAcceptableSendUrl, userActionAlert } from '$lib/user-action-intent';
   import {
     captureErrorMessage,
     captureErrorName,
@@ -101,21 +97,24 @@
   import { RoomVolume } from '$lib/room/volume.svelte';
   import { RoomBroadcasts } from '$lib/room/broadcasts.svelte';
   import { RoomToasts } from '$lib/room/toasts.svelte';
+  import { RoomFiles } from '$lib/room/files.svelte';
+  import {
+    type PrivateChatMessage,
+    RoomPrivateChat
+  } from '$lib/room/private-chat.svelte';
+  import { RoomComposer } from '$lib/room/composer.svelte';
+  import { RoomFeeds } from '$lib/room/feeds.svelte';
+  import { RoomUserActions } from '$lib/room/user-actions.svelte';
+  import {
+    DAY_TRADE_ALERT_FEED,
+    type DayTradeAlertAction,
+    SWING_ALERT_FEED,
+    type SwingAlertAction,
+    RoomTradeAlerts
+  } from '$lib/room/trade-alerts.svelte';
   import type { RoomMessageChrome } from '$lib/room-message-chrome';
   import { EXTRA_COMPOSER, RoomChat } from '$lib/room/chat.svelte';
   import { RoomMedia } from '$lib/room/media.svelte';
-  import { filesSectionHidden } from '$lib/files-gates';
-  import {
-    INITIAL_FILE_SORT,
-    type FileSortField,
-    sortFiles,
-    toggleFileSort
-  } from '$lib/file-sort';
-  import {
-    MUTE_ALL_CONFIRM,
-    MUTE_STAGGER_MS,
-    nonAdminTalkingUsers
-  } from '$lib/mute-all-non-admins';
   import { tawkAttributes, tawkScript, tawkSupportAvailable } from '$lib/tawk-support';
   import {
     RoomSplit,
@@ -137,25 +136,13 @@
   import ImageUploadDialog from '$lib/components/ImageUploadDialog.svelte';
   import ModalHost from '$lib/components/ModalHost.svelte';
   import { resolveNoteSurfaceGates } from '$lib/components/notes/note-gates';
-  import type { SwingAlertDraft } from '$lib/components/swing-alerts/draft';
-  import {
-    SWING_ALERT_INITIAL_DAYS,
-    swingAlertLogDays,
-    swingAlertsTabVisible
-  } from '$lib/swing-alerts';
+  import { swingAlertsTabVisible } from '$lib/swing-alerts';
   import type { SwingAlertRow } from '$lib/types';
   import { parseAlertLabels } from '$lib/alert-labels';
   import { alertFilterAvailable, alertPassesFilter, type AlertFilterFor } from '$lib/alert-filter';
-  import type { DayTradeAlertDraft } from '$lib/components/day-trade-alerts/draft';
-  import {
-    DAY_TRADE_ALERT_INITIAL_DAYS,
-    dayTradeAlertLogDays,
-    dayTradeAlertsTabVisible
-  } from '$lib/day-trade-alerts';
+  import { dayTradeAlertsTabVisible } from '$lib/day-trade-alerts';
   import type { DayTradeAlertRow } from '$lib/types';
-  import type { MessageBadge } from '$lib/types';
   import { isMentionOf } from '$lib/mention';
-  import { trimChatLog } from '$lib/room-scroller';
   import PrivateChatPanel from '$lib/components/PrivateChatPanel.svelte';
   import {
     NO_SPEAKER_TEXT,
@@ -168,20 +155,9 @@
   import ToastHost from '$lib/components/ToastHost.svelte';
   import { resolveAlertDelivery } from '$lib/alert-delivery';
   import { DUMP_CONTRACT } from '$lib/dump-contract';
-  import {
-    composePastedImageAlert,
-    composeUploadedAlert,
-    postOnXIntent,
-    type PastedImageSubmission,
-    type PostAlertSubmission
-  } from '$lib/post-alert-behavior';
   // `shouldAutoScrollForMessage` is no longer imported here: `RoomScrollFollow` calls it, which is
   // where the rule about the alerts column not taking the override now lives with it.
   import { isRoomScrollerReadingHistory, scrollRoomScrollerToBottom } from '$lib/room-scroller';
-  import {
-    canShowRosterPrivateChat,
-    resolveRosterPrivateChatStart
-  } from '$lib/roster-private-chat';
   import {
     initializeSoundEffects,
     playSoundEffect,
@@ -192,15 +168,11 @@
     AlertTab,
     ChatTab,
     MessageAction,
-    FileTab,
     FollowChatStyle,
     MainTab,
-    ManagedChatUser,
     MessageActionItem,
     MessageReactionPayload,
-    MessageReactions,
     ModalName,
-    ModalTargetUser,
     NoteVersion,
     SettingsTab,
     Theme,
@@ -747,16 +719,6 @@
     if (forcedScreenId === screenId) forcedScreenId = null;
     if (lockedScreenId === screenId) lockedScreenId = null;
   }
-  let fileTab: FileTab = $state('files');
-  /**
-   * "Hide Files Section?" — `filesSectionHidden` in `$lib/files-gates`, tested there.
-   *
-   * `hidden` on BOTH the main-tab `li` and the `#files` pane, which is what the reference binds
-   * (`z('hidden', o.hideFiles)` at full.js:5375 and 5410-5413). Derived rather than copied into
-   * `$state` so a controller change picked up by the five-second `invalidate('room:data')` takes
-   * effect without a reload.
-   */
-  const filesHidden = $derived(filesSectionHidden(data.sessData ?? {}));
   /*
     The two chat columns, in `$lib/room/chat.svelte.ts`.
 
@@ -862,54 +824,6 @@
   const showBadgesToPresentersOnly = $derived(data.sessData?.showBadgesToPresentersOnly === true);
   const disableStarYears = $derived(data.sessData?.disableStarYears === true);
 
-  /**
-   * A sender's badges, resolved the way `app-st-message.full.js` byte 28120 resolves them.
-   *
-   * ```js
-   * for (let o = 0; o < this.msg.b.length; o++) {
-   *   let r = sessData.badgesH[this.msg.b[o]];
-   *   r && r.darkTheme && 'darkTheme' === preferences.theme && (r = sessData.badgesH[r.darkTheme]);
-   *   r && (this.badges += r.imgURL ? '<img …>' : '<span class="badge …">' + r.text + '</span>');
-   * }
-   * ```
-   *
-   * Three things carried across exactly:
-   *
-   * * **The dark-theme swap is a LOOKUP, not a flag.** `r.darkTheme` holds the id of a variant
-   *   badge and the whole definition is replaced with it. This is the render-site proof of T5-27,
-   *   which had been established from the manage page alone.
-   * * **An id with no definition renders nothing.** `r &&` — a badge deleted from the account while
-   *   still assigned to a member is skipped, not drawn as a blank chip.
-   * * **A missing variant falls back to the original.** `badgesH[r.darkTheme]` can itself be
-   *   undefined if the variant was deleted; upstream would then render nothing, so the `?? badge`
-   *   here is a deliberate divergence — losing a badge because its DARK variant was deleted is a
-   *   worse outcome than showing the light one.
-   *
-   * Returns `[]` rather than undefined so `RoomMessage`'s own gate chain does the deciding; this
-   * function answers "which badges", never "should badges show".
-   */
-  function badgesForSender(emailHash: string | null | undefined): MessageBadge[] {
-    if (!emailHash) return [];
-    const ids = data.badges?.byEmailHash?.[emailHash];
-    if (!ids?.length) return [];
-    const definitions = data.badges?.definitions ?? {};
-    const resolved: MessageBadge[] = [];
-    for (const id of ids) {
-      const badge = definitions[String(id)];
-      if (!badge) continue;
-      const variant =
-        theme === 'dark' && typeof badge.darkTheme === 'number'
-          ? (definitions[String(badge.darkTheme)] ?? badge)
-          : badge;
-      resolved.push({
-        text: variant.text,
-        color: variant.color,
-        backgroundColor: variant.backgroundColor,
-        imageUrl: variant.imageUrl
-      });
-    }
-    return resolved;
-  }
   
   
 
@@ -1149,19 +1063,6 @@
   */
   const menus = new RoomMenus();
   let newNoteOpen = $state(false);
-  let evidenceMessageState = $state<
-    Record<
-      string,
-      {
-        hidden?: boolean;
-        answered?: boolean;
-        body?: string;
-        reactions?: MessageReactions;
-      }
-    >
-  >({});
-  let selectedUserId = $state<number | null>(null);
-  let selectedMessageUser = $state<ModalTargetUser | null>(null);
   let selectedMessage = $state<MessageActionItem | null>(null);
   let selectedImageUrl = $state<string | null>(null);
   /*
@@ -1197,6 +1098,108 @@
     }
   });
   /*
+    The file drive, in `$lib/room/files.svelte.ts`.
+
+    The slice with the clearest payoff beyond its own line count. Fifteen of these props were handed
+    to `PresentationArea`, which passed the same fifteen straight through to `FilesPane` while
+    reading only `filesHidden` itself — so one object removes thirty prop declarations, not fifteen.
+
+    `files` and `sessData` go in as THUNKS rather than as values. `data` is a `$props()` value, so
+    handing over `data.files` would hand over THAT array and the pane would still be showing it
+    after a navigation replaced it; a thunk read inside the class tracks whatever it touches. This
+    is the shape `$state`'s "passing state into functions" section documents, and `RoomRoster`
+    already uses it.
+
+    The two commands are injected for the reason `RoomBroadcasts` records: the class needs no route
+    import and its refusal paths can be tested without the wire. Neither is an authority — both
+    `deleteFile` and `overwriteCashRegisterSound` re-check `presenterRoom()` on the server, so what
+    moved here is which button is drawn, never who may press it.
+
+    The two invalidations are injected for the same reason and are deliberately NOT the same call:
+    a delete re-reads the whole page, while setting the alert sound only needs the room's settings
+    back. Collapsing them would make every "Set as alert sound" click re-run every load function.
+  */
+  const files = new RoomFiles({
+    dialogs,
+    files: () => data.files,
+    sessData: () => data.sessData ?? {},
+    commands: {
+      deleteFile: (payload) => deleteFileCommand(payload),
+      setAlertSound: (payload) => overwriteCashRegisterSound(payload)
+    },
+    onFilesChanged: () => invalidateAll(),
+    onRoomDataChanged: () => invalidate('room:data')
+  });
+  /*
+    The two trade alert feeds, in `$lib/room/trade-alerts.svelte.ts` — ONE class, two instances.
+
+    Phase 5 slice 15, and the slice that removes a duplicate rather than moving one. The swing half
+    and the day trade half were fourteen declarations each, in the same order, and folding the day
+    trade vocabulary onto the swing one left NINE of the fourteen pairs byte-identical. Of the five
+    that differed, four differed only in prose. The only code difference in 297 lines was the
+    endpoint and the failure sentence, which is why `TradeAlertFeed` has four members.
+
+    The log goes in as a ONE-TIME SEED rather than a thunk, which is the opposite of `RoomFiles`
+    two constructions above and is deliberate: the load always answers one fixed window, so a value
+    that kept following `data` would throw away the presenter's chosen months window on the next
+    `invalidateAll()`. The entitlement IS a thunk, so a mid-session configuration re-read reaches
+    the tab.
+  */
+  // The page data is the intentional ONE-TIME seed; every later value comes from the feed's own
+  // refetch, which is what keeps the presenter's chosen months window across an `invalidateAll()`.
+  // svelte-ignore state_referenced_locally
+  const swingAlerts = new RoomTradeAlerts<SwingAlertRow, SwingAlertAction>({
+    dialogs,
+    feed: SWING_ALERT_FEED,
+    seed: data.swingAlerts,
+    enabled: () => swingAlertsTabVisible(data.sessData ?? {}),
+    uploadImages: (files) => composer.uploadAlertFiles(files)
+  });
+  // The same one-time seed, for the same reason.
+  // svelte-ignore state_referenced_locally
+  const dayTradeAlerts = new RoomTradeAlerts<DayTradeAlertRow, DayTradeAlertAction>({
+    dialogs,
+    feed: DAY_TRADE_ALERT_FEED,
+    seed: data.dayTradeAlerts,
+    enabled: () => dayTradeAlertsTabVisible(data.sessData ?? {}),
+    uploadImages: (files) => composer.uploadAlertFiles(files)
+  });
+  /*
+    The private-chat panel, in `$lib/room/private-chat.svelte.ts`.
+
+    Phase 5 slice 7. Twenty-four declarations and functions that were spread across four regions of
+    this file — the state at 1,263, the roster entry points at 2,000 and the behaviour at 4,585 —
+    and that read each other constantly: `ingest` alone touches six of the nine fields.
+
+    The session goes in as a THUNK, so a navigation reaches the tab strip. The roster row type is a
+    class parameter rather than a narrowed copy, because `openFromRoster` hands the row straight on
+    to `selectRosterUser` and that wants all of it.
+
+    `onCleared` is `selectedMessageUser`, which the panel's close clears and which belongs to the
+    message-action path rather than to the panel. It crosses as a callback rather than as a field
+    the class would then co-own with a feature it knows nothing about.
+  */
+  // The roster row type, given explicitly: nothing in the options infers it, so without this the
+  // class would be instantiated at its constraint and `selectRosterUser` would receive a narrowed
+  // row where the roster wants the whole one.
+  const privateChat = new RoomPrivateChat<(typeof data.connectedUsers)[number]>({
+    dialogs,
+    prefs,
+    commands: {
+      loadLog: (payload) => loadPrivateChatLogCommand(payload),
+      send: (payload) => sendPrivateMessageCommand(payload),
+      deleteLog: (payload) => deletePrivateChatLogCommand(payload)
+    },
+    session: () => data,
+    isPresenter: () => isPresenter,
+    viewerOnlyMode: () => viewerOnlyMode,
+    playSound: (name) => playSoundEffect(name),
+    closeUserMenu: () => menus.openUserMenu(null),
+    selectRosterUser: (user) => userActions.select(user),
+    onCleared: () => userActions.clearSelectedMessageUser(),
+    onThreadDeleted: () => invalidateAll()
+  });
+  /*
     The room's toast queue, in `$lib/room/toasts.svelte.ts`.
 
     The first slice of the phase that moves BEHAVIOUR out of this file rather than declarations —
@@ -1212,11 +1215,78 @@
     reactive value breaks the link for everything reading it downstream.
   */
   const toasts = new RoomToasts();
-  let tweetWindow: Window | null = null;
-  let privateChatOpen = $state(false);
-  // The private-chat gear is a toolbar toggle, not a dropdown: `<li class="nav-item dropdown"
-  // (click)="togglePMToolbar()">`, with the toolbar rendered as a sibling of the nav inside
-  let pmSearchTerm = $state('');
+  /*
+    Everything that can be DONE to a user, in `$lib/room/user-actions.svelte.ts`.
+
+    Phase 5 slice 13, and the largest single function in this file went with it: `handleUserAction`
+    was 249 lines. What holds the twenty-three declarations together is that every one of them reads
+    the same two things — WHO is selected, and what this viewer may do — and `ModalHost` reads the
+    resolved `target` a hundred times.
+
+    Constructed after `toasts` because it needs one, and after `privateChat` even though
+    `privateChat` is handed `select`. That is not a cycle: the hand-off is an arrow, evaluated
+    when a roster row is clicked rather than when the class is built.
+
+    `defaultFollowStyle` is injected rather than moved — it reads the theme preference, and
+    `alerts-background-contract.test.ts` pins it against THIS file by name because it is about a
+    captured colour rather than about this class.
+  */
+  /*
+    Everything that LEAVES this browser as content, in `$lib/room/composer.svelte.ts`.
+
+    Phase 5 slice 10. Five entry points — plain composer, extra column, rich text, image upload,
+    GIF — that all funnel into one `sendBody`, plus the two alert paths that share its uploader.
+    They were spread from line 1,326 to line 5,215 and every one of them had its own refusal
+    handling.
+
+    `editMessage` is injected rather than moved: opening the editor on an EXISTING message is the
+    message-action path's job, and injecting it is what leaves slice 8 free to move that later.
+
+    The upload server and key cross as values rather than being imported inside, so the class has no
+    opinion about where configuration comes from and its fallback can be exercised by passing empty
+    strings.
+  */
+  const composer = new RoomComposer({
+    dialogs,
+    chat,
+    commands: {
+      send: (payload) => sendMessageCommand(payload),
+      uploadImage: (payload) => uploadComposerImage(payload),
+      postAlert: (payload) => postAlertCommand(payload)
+    },
+    session: () => data,
+    prefs,
+    isPresenter: () => isPresenter,
+    openModal: (name) => openModal(name),
+    closeModal: () => (modal = null),
+    closeMenu: (name, open) => menus.set(name, open),
+    editMessage: (kind, item, body, bodyHtml) => editMessage(kind, item, body, bodyHtml),
+    onSent: () => invalidateAll(),
+    uploadServer: PUBLIC_PTR_UPLOAD_SERVER ?? '',
+    uploadKey: PUBLIC_PTR_CDN_UPLOAD_KEY ?? ''
+  });
+  const userActions = new RoomUserActions<(typeof data.connectedUsers)[number]>({
+    dialogs,
+    toasts,
+    commands: {
+      presenter: (payload) => presenterCommand(payload),
+      editUsername: (payload) => editUsername(payload),
+      unmuteChat: (payload) => unmuteChatCommand(payload)
+    },
+    session: () => data,
+    isPresenter: () => isPresenter,
+    talking: () => media.talking,
+    rosterUsers: () => roster.users,
+    savePreference: (key, value) => prefs.save(key, value),
+    openModal: (name) => openModal(name),
+    closeModal: () => (modal = null),
+    closeUserMenu: () => menus.openUserMenu(null),
+    mentionUser: (name) => mentionUser(name),
+    clearSelectedMessage: () => (selectedMessage = null),
+    hidePreviewWindows: () => (previewWindowsVisible = false),
+    defaultFollowStyle: () => defaultFollowChatStyle(),
+    reload: () => invalidateAll()
+  });
   /**
    * `app-privchat`'s state, in the capture's own shapes.
    *
@@ -1227,101 +1297,15 @@
    * `msgs` is whichever array the open tab points at. `chatTabs` is the strip, most-recently-active
    * last, because `newMessage()` splices a tab out and pushes it to the end.
    */
-  type PrivateChatMessage = {
-    _id: string;
-    t: number;
-    n: string;
-    txt: string;
-    uid: number;
-    recvdID: number;
-    avt: string;
-    pic: string;
-    isA: boolean;
-  };
-  type PrivateChatTab = {
-    name: string;
-    uid: number;
-    avt: string;
-    pic: string;
-    unread: number;
-    isA: boolean;
-    online: boolean;
-  };
 
-  let privChatLog = $state<Record<number, PrivateChatMessage[]>>({});
-  /**
-   * The tab strip: the server's conversation list MERGED with what has happened since.
-   *
-   * Deliberately not a writable `$derived` overridden by hand. Overriding a derived is documented
-   * as temporary - it survives only until a dependency changes - and `data` changes on every
-   * `invalidateAll()`, which silently reset every unread count back to zero. Measured: an SSE
-   * frame arrived correctly and the badge still read 0.
-   *
-   * So the local deltas live in their own state and the strip is a pure function of both. Nothing
-   * to reset, and a conversation started this session appears without waiting for a refetch.
-   */
-  let unreadByPeer = $state<Record<number, number>>({});
-  let lastActivityByPeer = $state<Record<number, number>>({});
-  // An array, not a Record. `Object.entries` stringifies its keys, so reading a peer id back out
-  // means `Number(uid)` - and this project forbids arithmetic on an id, because the room-to-API
-  // cutover turns them into uuids (`docs/CUTOVER-ROOM-TO-API.md` §1, pinned by
-  // `id-opacity-contract.test.ts`). Keeping the id inside the object never coerces it.
-  let peerProfiles = $state<PrivateChatTab[]>([]);
 
-  const chatTabs: PrivateChatTab[] = $derived.by(() => {
-    const byId = new Map<number, PrivateChatTab>();
-    for (const tab of data.privateChats ?? []) {
-      byId.set(tab.uid, {
-        name: tab.name,
-        uid: tab.uid,
-        avt: tab.avt,
-        pic: tab.pic,
-        unread: 0,
-        isA: tab.isA,
-        online: false
-      });
-    }
-    // Conversations that started after this page loaded.
-    for (const profile of peerProfiles) {
-      if (!byId.has(profile.uid)) byId.set(profile.uid, profile);
-    }
-    return [...byId.values()]
-      .map((tab) => ({ ...tab, unread: unreadByPeer[tab.uid] ?? 0 }))
-      // `newMessage()` splices a tab out and pushes it, so the most recent sits last.
-      .sort((a, b) => (lastActivityByPeer[a.uid] ?? 0) - (lastActivityByPeer[b.uid] ?? 0));
-  });
-  /** `this.currUser` - the peer id whose thread is on screen, `''` when none. */
-  let currUser = $state<number | null>(null);
-  let pmSearching = $state(false);
-  let privateChatDraft = $state('');
-  const privateChatLog = $derived(currUser === null ? [] : (privChatLog[currUser] ?? []));
   let previewWindowsVisible = $state(true);
   let showMessageOptions = $state(false);
-  let sendingGif = $state(false);
-  let pendingGifUrl = $state<string | null>(null);
   
   
   
   
   
-  let fileSearch = $state('');
-  /*
-    The Files sort bar's state - ONE field and ONE direction, opening on date/desc.
-
-    This used to be three variables (`fileSortKey`, `nameAscending`, `dateNewestFirst`) built from
-    the owner's pasted markup, because the capture we held at the time contained no sort bar at all.
-    The v4 bundle does contain it, and it disagrees on two points that a per-button direction cannot
-    express: both icons read the same `fileSortDir` (bytes 1,946,450 and 1,946,605), and switching
-    field RESETS that direction to the new field's default rather than restoring a remembered one
-    (byte 1,975,308). `$lib/file-sort` holds the decode and the reasoning.
-
-    `$state.raw`, not `$state`: this object is only ever REPLACED, by `toggleFileSort` returning a
-    new pair, so a deep proxy over it would be per-read overhead buying nothing. The pair is one
-    value rather than two so the field and the direction cannot drift apart.
-  */
-  let fileSort = $state.raw(INITIAL_FILE_SORT);
-  // The row checkboxes that feed "Delete Selected"; `#filesDriveList input:checked` in the capture.
-  let selectedFileIds = $state<Set<number>>(new Set());
   
   
   
@@ -1560,8 +1544,6 @@
   const alertArrivals = new RoomArrivals<(typeof data.alerts)[number]>();
   let alertScrollTimer: ReturnType<typeof globalThis.setTimeout> | undefined;
   let chatScrollTimer: ReturnType<typeof globalThis.setTimeout> | undefined;
-  let mutedUsers = $state<Record<string, ManagedChatUser>>({});
-  let followedUsers = $state<Record<string, ManagedChatUser>>({});
   /**
    * The other half of `onResize`, and the half that is easy to miss: crossing the threshold REFETCHES
    * (`app-room.full.js:2987-2999`).
@@ -1858,7 +1840,6 @@
       data.sessData?.userToPresenterPM === true) &&
       !(data.user.isFT === true && data.sessData?.disablePMForTrials === true)
   );
-  const canUseRTE = $derived(data.sessData?.enableRTE === true && prefs.enableRTE && isPresenter);
   /**
    * The room's chat mode — `g` group, `p` webinar, `d` disabled.
    *
@@ -1913,133 +1894,14 @@
    */
   const extraChatColumnVisible = $derived(prefs.extraChatColumn && !split.chatCollapsed);
 
-  const targetUser = $derived.by<ModalTargetUser>(() => {
-    if (selectedMessageUser) return selectedMessageUser;
-    const user = data.connectedUsers.find((connectedUser) => connectedUser.id === selectedUserId);
-    if (!user) {
-      return {
-        id: 0,
-        nick: '',
-        emailHash: 'undefined',
-        pic: 'https://secure.gravatar.com/avatar/undefined?d=mm&s=80',
-        status: 'offline',
-        ip: 'n/a'
-      };
-    }
-    return {
-      id: user.id,
-      nick: user.displayName,
-      email: user.email,
-      emailHash: user.emailHash,
-      pic: user.avatarUrl,
-      status: user.status,
-      permissions: user.role === 'user' ? 'r' : 'a',
-      ...(user.status !== 'offline' ? { userXrefID: String(user.id), _id: String(user.id) } : {})
-    };
-  });
 
-  function rosterUserTarget(user: (typeof data.connectedUsers)[number]): ModalTargetUser {
-    return {
-      id: user.id,
-      nick: user.displayName,
-      email: user.email,
-      emailHash: user.emailHash,
-      pic: user.avatarUrl,
-      status: user.status,
-      permissions: user.role === 'user' ? 'r' : 'a',
-      ...(user.status !== 'offline' ? { userXrefID: String(user.id), _id: String(user.id) } : {})
-    };
-  }
 
-  function selectRosterUser(user: (typeof data.connectedUsers)[number]) {
-    selectedUserId = user.id;
-    selectedMessageUser = rosterUserTarget(user);
-    selectedMessage = null;
-    menus.openUserMenu(null);
-  }
 
-  function openRosterUserInfo(user: (typeof data.connectedUsers)[number]) {
-    selectRosterUser(user);
-    openModal('user');
-  }
 
-  function mentionRosterUser(user: (typeof data.connectedUsers)[number]) {
-    selectRosterUser(user);
-    mentionUser(user.displayName);
-  }
 
-  function canOpenRosterPrivateChat(user: (typeof data.connectedUsers)[number]) {
-    return canShowRosterPrivateChat(
-      {
-        isPresenter,
-        userPmEnabled: data.sessData?.userPM,
-        userToPresenterPmEnabled: data.sessData?.userToPresenterPM,
-        // Both of these were absent, which made the helper's trial branch unreachable.
-        currentUserIsTrial: data.user.isFT,
-        disablePmForTrials: data.sessData?.disablePMForTrials
-      },
-      {
-        id: user.id,
-        permissions: user.isP ? 'a' : 'r',
-        // The row's OWN flag, not `role !== 'user'` - an admin-chat member is neither a presenter
-        // nor an ordinary row, and that distinction is the whole point of the flag.
-        hasAdminChat: user.hasAdminChat
-      }
-    );
-  }
 
-  function openRosterPrivateChat(user: (typeof data.connectedUsers)[number]) {
-    const start = resolveRosterPrivateChatStart(data.user.id, user.id);
-    menus.openUserMenu(null);
 
-    if (start.kind === 'self') {
-      dialogs.alert = start.message;
-      return;
-    }
 
-    selectRosterUser(user);
-    showPrivateChat();
-  }
-  function withEvidenceState<T extends MessageActionItem>(item: T): T {
-    if (!item.evidenceKey) return item;
-    const state = evidenceMessageState[item.evidenceKey];
-    if (!state) return item;
-
-    return {
-      ...item,
-      ...(state.answered === undefined ? {} : { answered: state.answered }),
-      ...(state.body === undefined
-        ? {}
-        : {
-            body: state.body,
-            evidenceBodySegments: undefined
-          }),
-      ...(state.reactions === undefined ? {} : { reactions: state.reactions })
-    } as T;
-  }
-
-  function isEvidenceMessageHidden(item: MessageActionItem) {
-    return Boolean(item.evidenceKey && evidenceMessageState[item.evidenceKey]?.hidden);
-  }
-
-  function updateEvidenceMessage(
-    item: MessageActionItem,
-    patch: {
-      hidden?: boolean;
-      answered?: boolean;
-      body?: string;
-      reactions?: MessageReactions;
-    }
-  ) {
-    if (!item.evidenceKey) return;
-    evidenceMessageState = {
-      ...evidenceMessageState,
-      [item.evidenceKey]: {
-        ...evidenceMessageState[item.evidenceKey],
-        ...patch
-      }
-    };
-  }
 
   // `unreadQA` is a transient per-viewer marker in the source, not a property of the alert: it is
   // set when a Q&A update arrives (`o.unreadQA = !0` in updateAlertMsg) and deleted when this
@@ -2180,57 +2042,10 @@
     prefs.save('showAlertsFrom', write.showAlertsFrom);
   }
 
-  const visibleAlerts = $derived(
-    mergeOlderChatMessages(alertPages.older(ALERTS_LOG), data.alerts)
-      .filter((item) => !isEvidenceMessageHidden(item))
-      .map(withEvidenceState)
-      .filter(alerts.matchesSearch)
-      /*
-        THE ALERT FILTER — the second of the reference's three sites, `case "getAlertsLog"` at byte
-        1,017,070.
 
-        `senderEmailHash` is this room's name for what the reference calls `avt`: the gravatar hash
-        of the sender's email, which is what the selection is keyed by. `alerts-advanced-search.ts`
-        matches on the same field for the same reason.
-
-        The predicate lives in `$lib/alert-filter` rather than here because it fails OPEN in three
-        distinct ways and inlining it would put that logic in three places.
-      */
-      .filter(alerts.passesFilter(data.sessData?.modAlertFilterList))
-      .filter(alerts.afterArchive)
-      .map((item) => ({ ...item, unreadQa: unreadQaAlertIds.has(item.id) }))
-  );
-
-  /**
-   * THE ALERT FILTER, site three of three — the alerts SEARCH results, byte 1,020,817.
-   *
-   * `case "doChatLogSearch"`, in the `"alerts" == i.type` branch:
-   *
-   * ```js
-   * try {
-   *   sessData.modAlertFilterList?.trim()?.length > 0 &&
-   *     Object.keys(user.alertFilterFor).length > 0 &&
-   *     (i.data = i.data.filter(se =>
-   *       preferences.showAlertsFrom ? user.alertFilterFor[se.avt] : !user.alertFilterFor[se.avt]))
-   * } catch {}
-   * globals.alertsSearchResults = i.data.reverse();
-   * ```
-   *
-   * The reference filters the RESULTS the server sent back; `#alerts-advanced-search-modal` here
-   * searches the rows this room already holds, so the filter is applied to the input instead. Same
-   * observable result — a filtered-out trader's alerts cannot appear in a search — and it keeps the
-   * predicate in one place rather than reaching into `filterAlerts`.
-   *
-   * Separate from `visibleAlerts` because the advanced search deliberately does NOT inherit the
-   * toolbar's search term, the archive cut-off or the evidence-hidden rules; sharing that chain
-   * would quietly narrow the search to whatever the list happens to be showing.
-   */
-  const searchableAlerts = $derived(
-    data.alerts.filter(alerts.passesFilter(data.sessData?.modAlertFilterList))
-  );
 
   function archiveAlerts() {
-    const archivable = visibleAlerts.length;
+    const archivable = feeds.visibleAlerts.length;
     if (archivable === 0) {
       dialogs.alert = 'There are no alerts to archive.';
       return;
@@ -2248,11 +2063,11 @@
 
   // "Save alerts messages" exports what is currently listed, mirroring how a note is downloaded.
   function saveAlerts() {
-    if (visibleAlerts.length === 0) {
+    if (feeds.visibleAlerts.length === 0) {
       dialogs.alert = 'There are no alerts to save.';
       return;
     }
-    const lines = visibleAlerts.map((item) => {
+    const lines = feeds.visibleAlerts.map((item) => {
       // Captured alerts carry the timestamp text exactly as it was rendered; database rows do not.
       const stamp =
         'evidenceTimestampText' in item && item.evidenceTimestampText
@@ -2416,76 +2231,37 @@
    * every message row would cost a proxy read per field on every render and buy nothing.
    */
   const chatPages = new RoomLogPages<(typeof data.messages)[number]>();
-
   /*
-    The live tail from the load, with whatever older pages the reader has scrolled back to in front
-    of it.
+    What each pane actually RENDERS, in `$lib/room/feeds.svelte.ts`.
 
-    The two halves have different lifetimes on purpose: `data.messages` is replaced by every
-    `invalidateAll()`, which is every SSE event, while the held older pages survive them. Merging
-    rather than concatenating because offset paging over a live tail can hand the boundary row back
-    twice — see `mergeOlderChatMessages`, which matches on identity and never on order.
+    Phase 5 slice 9. The read pipelines and the client-side evidence overlay, which look separate
+    and are one thing: every pipeline filters on the overlay and maps it, so a class holding the
+    state without the pipelines would be a field with four readers across a boundary.
 
-    The trim runs AFTER the merge, so `prefs.trimChatLogs` still caps what is held at the reference's 300
-    however far back somebody paged. Trimming first would let the cap be exceeded by exactly the
-    pages this feature adds.
+    Generic over BOTH row types. `RoomAlerts`'s predicates take `AlertRow` — body, sender, hash,
+    timestamp — which is narrower than `MessageActionItem`, and widening it to make one type fit
+    would have loosened a contract four other call sites depend on.
+
+    The unbounded `visibleAlerts` pass is recorded in the class and in `TODO.md` and deliberately
+    NOT fixed here: it changes behaviour, and that belongs in its own change with its own
+    measurement rather than inside a move.
   */
-  /*
-    The extra column's rows, through the SAME pipeline as the main column's — merge, trim, hide,
-    badge, and the webinar filter — differing only in which channel it reads. Written as a function
-    so the two columns cannot drift: a second derived would be a second copy of six steps.
-  */
-  const visibleExtraChatMessages = $derived(chatMessagesFor(chat.extraTab));
+  const feeds = new RoomFeeds<(typeof data.alerts)[number], (typeof data.messages)[number]>({
+    alerts,
+    chat,
+    alertPages,
+    chatPages,
+    session: () => data,
+    prefs,
+    isPresenter: () => isPresenter,
+    webinarMode: () => webinarMode,
+    theme: () => theme,
+    unreadQa: unreadQaAlertIds,
+    alertsLogKey: ALERTS_LOG
+  });
 
-  function chatMessagesFor(tab: ChatTab) {
-    return trimChatLog(
-      mergeOlderChatMessages(chatPages.older(tab), data.messages),
-      prefs.trimChatLogs
-    )
-      .filter((item) => item.room === tab && !isEvidenceMessageHidden(item))
-      /*
-        WEBINAR MODE. Upstream applies this as messages ARRIVE, dropping them before they ever reach
-        the log; applied here as a view filter instead, because this room re-reads its log from the
-        server on every invalidate and a drop-on-arrival would be undone by the next load.
 
-        The rule is the reference's, term for term — see `webinarMessageVisible`, including the
-        asymmetry that a message containing an `@` is dropped even when it is an admin message.
 
-        `isMention` is computed with the SAME rule the highlight and the popup use, rather than the
-        loose `indexOf('@')` upstream tests separately: one mention rule, in `$lib/mention`.
-      */
-      .filter((item) =>
-        !webinarMode
-          ? true
-          : webinarMessageVisible(
-              {
-                isAdmin: item.isAdmin === true,
-                senderId: item.senderId,
-                body: item.body,
-                isMention: isMentionOf(item.body, data.user.displayName, item.isAdmin === true)
-              },
-              {
-                id: data.user.id,
-                isPresenter,
-                hasAdminChat: data.user.hasAdminChat === true
-              }
-            )
-      )
-      .map(withEvidenceState)
-      /*
-        `msg.b` — the sender's badges, attached here rather than stored on the row.
-
-        Upstream they ride on the message itself, because that server owns both the chat log and
-        the badge assignments. Ours do not: badges live in the controller and messages in the room's
-        own database, so they are joined at render time on `senderEmailHash`, which every message
-        already carries. A member given a badge mid-session sees it on their NEXT message upstream
-        and on ALL of them here — a divergence in our favour, and the alternative would be
-        denormalising controller state into room rows that then go stale.
-      */
-      .map((item) => ({ ...item, badges: badgesForSender(item.senderEmailHash) }));
-  }
-
-  const visibleChatMessages = $derived(chatMessagesFor(chat.tab));
 
   function forceAlertsToBottom(scroller: HTMLElement) {
     if (alertScrollTimer !== undefined) globalThis.clearTimeout(alertScrollTimer);
@@ -2505,7 +2281,7 @@
     if (
       !shouldLoadOlderMessages({
         scrollTop: scroller.scrollTop,
-        messageCount: visibleAlerts.length,
+        messageCount: feeds.visibleAlerts.length,
         /* REAL here, unlike the chat log: the alerts pane has a live search field, and
            `matchesAlertSearch` filters the rendered list by it. Upstream refuses to page while a
            term is set because a filtered log is not a paged one — asking for page 2 of a filter the
@@ -2567,7 +2343,7 @@
     if (
       !shouldLoadOlderMessages({
         scrollTop: scroller.scrollTop,
-        messageCount: visibleChatMessages.length,
+        messageCount: feeds.visibleChat.length,
         /*
           Always empty HERE, and deliberately not invented. The reference's roomlog component has
           its own `searchTerm` that filters the live log in place, and refuses to page while one is
@@ -2629,8 +2405,8 @@
 
   $effect(() => {
     const scroller = alertsScroller;
-    const count = visibleAlerts.length;
-    const newestMessage = visibleAlerts.at(-1);
+    const count = feeds.visibleAlerts.length;
+    const newestMessage = feeds.visibleAlerts.at(-1);
 
     if (!scroller) return;
 
@@ -2652,8 +2428,8 @@
   $effect(() => {
     const scroller = chatScroller;
     const activeTab = chat.tab;
-    const count = visibleChatMessages.length;
-    const newestMessage = visibleChatMessages.at(-1);
+    const count = feeds.visibleChat.length;
+    const newestMessage = feeds.visibleChat.at(-1);
 
     if (!scroller) return;
 
@@ -2685,8 +2461,8 @@
   $effect(() => {
     const scroller = extraChatScroller;
     const activeTab = chat.extraTab;
-    const count = visibleExtraChatMessages.length;
-    const newestMessage = visibleExtraChatMessages.at(-1);
+    const count = feeds.visibleExtraChat.length;
+    const newestMessage = feeds.visibleExtraChat.at(-1);
 
     if (!scroller) return;
 
@@ -2798,149 +2574,14 @@
         };
   }
 
-  function readManagedUsers(key: 'mutedUsers' | 'followedUsers') {
-    if (typeof localStorage === 'undefined') return {};
-    try {
-      const stored = localStorage.getItem(key);
-      if (!stored) return {};
-      const parsed = JSON.parse(stored);
-      return parsed && typeof parsed === 'object'
-        ? (parsed as Record<string, ManagedChatUser>)
-        : {};
-    } catch {
-      return {};
-    }
-  }
 
-  function loadManagedUsers() {
-    mutedUsers = readManagedUsers('mutedUsers');
-    followedUsers = readManagedUsers('followedUsers');
-  }
 
-  function storeManagedUsers(
-    key: 'mutedUsers' | 'followedUsers',
-    users: Record<string, ManagedChatUser>
-  ) {
-    if (typeof localStorage !== 'undefined') {
-      localStorage.setItem(key, JSON.stringify(users));
-    }
-  }
 
-  function applyFollowToggle(user: ModalTargetUser) {
-    const next = { ...followedUsers };
-    if (next[user.emailHash]) {
-      delete next[user.emailHash];
-    } else {
-      next[user.emailHash] = {
-        nick: user.nick,
-        emailHash: user.emailHash,
-        pic: user.pic,
-        userXrefID: user.userXrefID,
-        _id: user._id,
-        followChatStyle: defaultFollowChatStyle()
-      };
-    }
-    followedUsers = next;
-    storeManagedUsers('followedUsers', next);
-  }
 
-  function applyFollowStyle(user: ModalTargetUser, style: FollowChatStyle) {
-    const existing = followedUsers[user.emailHash];
-    if (!existing) return;
-    const next = {
-      ...followedUsers,
-      [user.emailHash]: {
-        ...existing,
-        followChatStyle: { ...style }
-      }
-    };
-    followedUsers = next;
-    storeManagedUsers('followedUsers', next);
-  }
 
-  function applyMuteToggle(user: ModalTargetUser) {
-    const next = { ...mutedUsers };
-    if (next[user.emailHash]) {
-      delete next[user.emailHash];
-    } else {
-      next[user.emailHash] = {
-        nick: user.nick,
-        emailHash: user.emailHash,
-        pic: user.pic
-      };
-    }
-    mutedUsers = next;
-    storeManagedUsers('mutedUsers', next);
-  }
 
-  function requestFollowToggle(user: ModalTargetUser) {
-    dialogs.confirmation = {
-      message: `Do you want to ${followedUsers[user.emailHash] ? 'un' : ''}follow ${user.nick}?`,
-      className: 'manage-user-list',
-      onconfirm: () => {
-        dialogs.confirmation = null;
-        applyFollowToggle(user);
-      }
-    };
-  }
 
-  function requestMuteToggle(user: ModalTargetUser) {
-    dialogs.confirmation = {
-      message: `Do you want to ${mutedUsers[user.emailHash] ? 'un' : ''}mute ${user.nick}?`,
-      className: 'manage-user-list',
-      onconfirm: () => {
-        dialogs.confirmation = null;
-        applyMuteToggle(user);
-      }
-    };
-  }
 
-  /**
-   * `muteAllNonAdmins()` — `app-room.full.js:2963-2986`, reached through
-   * `appEventBus.subscribe('muteAllNonAdmins', …)` (`:2219-2221`), which in this room is the
-   * session-control action of the same name.
-   *
-   * **This replaced a control that did the wrong thing quietly.** It read
-   * `muted = true; volume = 0` — so a presenter who asked the room to silence its non-admin
-   * speakers silenced their OWN speakers instead, and every one of those microphones stayed open
-   * for everybody else. The label and the effect were unrelated.
-   *
-   * The selection is `nonAdminTalkingUsers` in `$lib/mute-all-non-admins`, with the four properties
-   * that matter transcribed and tested there — chiefly that a talking user with no roster row is
-   * SKIPPED rather than assumed ordinary.
-   *
-   * **One mapping, stated because it is not a transcription.** Upstream sends its own
-   * `sendServerCommand('muteTalkingUser', muser)`. This room has no such command; it has
-   * `remotePresCommand` / `mutemic`, which is the same act addressed to one peer and is already
-   * carried out by that peer's own browser (`:5917`). The server re-checks that the caller is a
-   * presenter and that the subCmd is one of three (`+page.server.ts:1654-1670`), so authority is
-   * decided there rather than asserted here.
-   *
-   * The 100ms stagger is the reference's and is not cosmetic: this is one request per muted member.
-   */
-  function muteAllNonAdmins() {
-    // `if (!globals.user.isPresenter) return` — the first line of the method, before the dialog.
-    if (!isPresenter) return;
-    // `!e || 0 === e.length ||` — with nobody speaking the confirm never opens at all.
-    if (media.talking.length === 0) return;
-
-    dialogs.confirmation = {
-      message: MUTE_ALL_CONFIRM,
-      onconfirm: () => {
-        dialogs.confirmation = null;
-        const targets = nonAdminTalkingUsers(media.talking, roster.users);
-        // `0 !== r.length &&` — an empty selection sends nothing, which is the case where every
-        // open microphone belongs to a presenter.
-        targets.forEach((entry, index) => {
-          globalThis.setTimeout(() => {
-            void presenterCommand({ subCmd: 'mutemic', targetUserId: entry.userID }).catch(
-              (cause) => console.error('[presenterCommand]', cause)
-            );
-          }, MUTE_STAGGER_MS * index);
-        });
-      }
-    };
-  }
 
   /**
    * Tawk.to presenter support — `app-room.full.js:2224-2298`.
@@ -3035,322 +2676,10 @@
     tawkWidgetOpen = true;
   }
 
-  function requestManagedUserRemoval(list: 'mutedUsers' | 'followedUsers', user: ManagedChatUser) {
-    dialogs.confirmation = {
-      message: `Do you want to un${list === 'mutedUsers' ? 'mute' : 'follow'} ${user.nick}?`,
-      className: 'manage-user-list',
-      onconfirm: () => {
-        dialogs.confirmation = null;
-        const next = { ...(list === 'mutedUsers' ? mutedUsers : followedUsers) };
-        delete next[user.emailHash];
-        if (list === 'mutedUsers') mutedUsers = next;
-        else followedUsers = next;
-        storeManagedUsers(list, next);
-      }
-    };
-  }
 
-  function openManagedUserInfo(user: ManagedChatUser) {
-    if (!user.userXrefID || !user._id) {
-      dialogs.alert = 'User is not logged in.';
-      return;
-    }
-    selectedMessageUser = {
-      id: Number(user._id),
-      nick: user.nick,
-      emailHash: user.emailHash,
-      pic: user.pic,
-      status: 'online',
-      userXrefID: user.userXrefID,
-      _id: user._id
-    };
-    openModal('user');
-  }
 
-  /** `invalidateAll()` only on the resolved path — the roster is this route's `load`, not a query. */
-  async function updateUsername(user: ModalTargetUser, username: string) {
-    const trimmed = username.trim();
-    if (!trimmed) return;
-    try {
-      await editUsername({ userId: user.id, username: trimmed });
-    } catch (cause) {
-      dialogs.alert = isHttpError(cause) ? cause.body.message : 'Could not change that username.';
-      return;
-    }
-    await invalidateAll();
-  }
 
-  /**
-   * Lifts a member's chat mute — the other half of `mute24`.
-   *
-   * The mute was enforced on the server and the unmute was not sent anywhere: the modal's button
-   * raised the reference's alert and stopped. `invalidateAll()` refreshes the presenter's own view
-   * of the roster; the MEMBER learns about it on the `privCmds` channel, because their gate is
-   * server-read and nothing local to them changed.
-   *
-   * That `invalidateAll()` runs by hand and has to: single-flight mutations refresh remote QUERIES,
-   * and the presenter's roster is not one — it comes from this route's `load`. Converting it is its
-   * own change, and doing it here would be claiming a refresh that never happens.
-   *
-   * The caller does not await this — `handleUserAction` is synchronous — but it DOES catch it. A
-   * remote command rejects where the old `fetch('?/unmuteChat')` returned `response.ok === false`
-   * for anyone who bothered to look, and nobody did; that is the same silent success this whole
-   * path was built to fix. `chat-mute.remote.ts` carries the rest of the reasoning.
-   */
-  async function unmuteChat(user: ModalTargetUser) {
-    await unmuteChatCommand({ targetUserId: user.id });
-    await invalidateAll();
-  }
 
-  function handleUserAction(action: string, user: ModalTargetUser) {
-    if (action === 'session-reload-config') {
-      dialogs.confirm('Are you sure you want to reload tge session config?', () => {
-        modal = null;
-        void invalidateAll();
-        dialogs.alert = 'Session config reloaded...';
-      });
-      return;
-    }
-
-    /*
-      The reference raises `alertService.success("Copied to clipboard.")` from all three of its
-      copy buttons (`main.d6d3c112b59b7d0d.js` bytes 2168500-2169300). `alertService` is
-      ngx-toastr, which is what `ToastHost` reproduces — so this is the same transient success
-      toast, not a modal.
-    */
-    if (action === 'copied-to-clipboard') {
-      toasts.show({ kind: 'success', message: 'Copied to clipboard.', enableHtml: false });
-      return;
-    }
-
-    if (action === 'session-refresh-roster') {
-      void invalidateAll();
-      dialogs.alert =
-        'Command send OK. Please allow 1/2 minute for old entries to get deleted from the list';
-      return;
-    }
-
-    if (action === 'session-soft-reset') {
-      dialogs.confirm('Are you sure you want to soft reset the room?', () => {
-        modal = null;
-        void invalidateAll();
-        dialogs.alert = 'Soft reset request sent...';
-      });
-      return;
-    }
-
-    if (action === 'session-hard-reset' || action === 'session-hard-reset-revoke') {
-      dialogs.confirm('Are you sure you want to reset the room?', () => {
-        modal = null;
-        prefs.save('sessionTokensRevoked', action === 'session-hard-reset-revoke');
-        void invalidateAll();
-      });
-      return;
-    }
-
-    if (action === 'session-save-close') {
-      prefs.save('sessionOpen', false);
-      modal = null;
-      return;
-    }
-
-    if (action === 'session-save-close-message') {
-      dialogs.alert = 'Message Saved';
-      return;
-    }
-
-    if (action === 'session-open') {
-      prefs.save('sessionOpen', true);
-      modal = null;
-      return;
-    }
-
-    if (action === 'session-lock' || action === 'session-lock-kick') {
-      prefs.save('sessionLocked', true);
-      prefs.save('sessionLockKick', action === 'session-lock-kick');
-      dialogs.alert = 'Session Locked';
-      return;
-    }
-
-    if (action === 'session-unlock') {
-      prefs.save('sessionLocked', false);
-      dialogs.alert = 'Session Unlocked';
-      return;
-    }
-
-    if (action === 'invalid-restream-link') {
-      dialogs.alert =
-        'Invalid RTMP link!, please make sure it starts with "rtmp://" and does not contain spaces or special characters. For example: rtmp://example.com/live/stream';
-      return;
-    }
-
-    if (
-      action === 'session-send-video' ||
-      action === 'session-send-sales-image' ||
-      action === 'session-send-users-url'
-    ) {
-      dialogs.prompt = {
-        title: 'Please enter the URL:',
-        value: '',
-        onconfirm: (value) => {
-          const url = value.trim();
-          dialogs.prompt = null;
-          if (!isAcceptableSendUrl(url)) {
-            dialogs.alert = MISSING_SCHEME_ALERT;
-            return;
-          }
-          if (action === 'session-send-video') {
-            const key = `videos-${data.sessionHandle}`;
-            const stored = JSON.parse(localStorage.getItem(key) ?? '[]') as string[];
-            const result = addVideoToList(stored, url);
-            if (!result.added) {
-              dialogs.alert = 'Video already exists.';
-              return;
-            }
-            localStorage.setItem(key, JSON.stringify(result.videos));
-            modal = null;
-            dialogs.alert = 'Video added.';
-            return;
-          }
-          modal = null;
-          dialogs.alert = 'Command send OK.';
-        }
-      };
-      return;
-    }
-
-    if (action === 'edit-my-info') {
-      selectedMessageUser = null;
-      selectedUserId = data.user.id;
-      modal = 'user';
-      return;
-    }
-
-    if (action === 'remove-preview-windows') {
-      previewWindowsVisible = false;
-      return;
-    }
-
-    if (action === 'mute-all-non-admins') {
-      muteAllNonAdmins();
-      return;
-    }
-
-    if (action === 'edit-username') {
-      // `editUsername(e)` - a presenter renaming somebody else. No pre-filled value, no length or
-      // character rules: the capture accepts whatever a presenter types.
-      dialogs.prompt = {
-        title: `Enter a new username for "${user.nick}":`,
-        value: '',
-        onconfirm: (value) => {
-          dialogs.prompt = null;
-          void updateUsername(user, value);
-        }
-      };
-      return;
-    }
-
-    if (action === 'edit-username-by-user') {
-      /*
-        `editUsernameByUser(e)` - a member renaming THEMSELVES, and a different function from the
-        one above in four ways the capture is explicit about:
-
-          bootbox.prompt({ title: "Enter a new username for yourself:", value: this.user.nick, … })
-          if (!/^[a-zA-Z0-9]+$/.test(o))  "Username can only contain letters and numbers"
-          if (o.length < 3)               "Username must be at least 3 characters long"
-          if (o.length >= 30)             "Username must be less than 30 characters long"
-          … && this.user.nick?.trim() != o && (… setPreference("savedNick", o) …)
-
-        The rules exist because this one is reachable by the person being renamed. Every string is
-        the capture's, including "less than 30" on a `>= 30` test.
-      */
-      dialogs.prompt = {
-        title: 'Enter a new username for yourself:',
-        value: user.nick,
-        onconfirm: (value) => {
-          dialogs.prompt = null;
-          const next = value?.trim() ?? '';
-          if (next.length === 0) return;
-          if (!/^[a-zA-Z0-9]+$/.test(next)) {
-            dialogs.alert = 'Username can only contain letters and numbers';
-            return;
-          }
-          if (next.length < 3) {
-            dialogs.alert = 'Username must be at least 3 characters long';
-            return;
-          }
-          if (next.length >= 30) {
-            dialogs.alert = 'Username must be less than 30 characters long';
-            return;
-          }
-          // Unchanged is a no-op, not a round trip.
-          if (user.nick?.trim() === next) return;
-          void updateUsername(user, next);
-        }
-      };
-      return;
-    }
-
-    if (action === 'kick' || action === 'kick-ban') {
-      dialogs.prompt = {
-        title: 'Enter the kick message for this user',
-        value: 'You have been kicked from the room by an administrator',
-        onconfirm: () => {
-          dialogs.prompt = null;
-          modal = null;
-          dialogs.alert = 'User kicked OK';
-        }
-      };
-      return;
-    }
-
-    if (action === 'kick-duplicates') {
-      dialogs.prompt = {
-        title: `Kick all other duplicates of ${user.nick} with the following message:`,
-        value: 'You have been kicked from the room by an administrator',
-        onconfirm: () => {
-          dialogs.prompt = null;
-          modal = null;
-          dialogs.alert = `No duplicates found for ${user.nick}`;
-        }
-      };
-      return;
-    }
-
-    if (action === 'admin-notes-password') {
-      dialogs.prompt = {
-        title: "Please enter the password to manage user's notes:",
-        value: '',
-        onconfirm: () => {
-          dialogs.prompt = null;
-          dialogs.alert = 'Wrong password!';
-        }
-      };
-      return;
-    }
-
-    /*
-      Ahead of `userActionAlert` below because this one sends something — see `EXACT_ALERTS` in
-      `user-action-intent.ts` for why leaving it in that table was the bug. The alert is raised
-      first because the reference raises it immediately; `Command failed.` is inherited from the
-      sibling handlers in this file, not captured, because the reference never showed us a failure
-      for this control.
-    */
-    if (action === 'unmute-chat') {
-      dialogs.alert = 'user chat unmuted';
-      void unmuteChat(user).catch(() => {
-        dialogs.alert = 'Command failed.';
-      });
-      return;
-    }
-
-    // The table moved to `user-action-intent.ts`; the state writes stay here. See it for why.
-    const fixedAlert = userActionAlert(action);
-    if (fixedAlert) {
-      if (action === 'save-permissions') modal = null;
-      dialogs.alert = fixedAlert;
-    }
-  }
 
   /**
    * `toggleAlertsToolbar()` - the gear (`app-alerts.compiled.js:134-140`):
@@ -3400,7 +2729,7 @@
   }
 
   function openModal(name: Exclude<ModalName, null>) {
-    if (name === 'muted' || name === 'followed' || name === 'user') loadManagedUsers();
+    if (name === 'muted' || name === 'followed' || name === 'user') userActions.loadManaged();
     modal = name;
     menus.closeForModal();
   }
@@ -4282,7 +3611,7 @@
       reactionPayload.emoji,
       data.user.emailHash
     );
-    updateEvidenceMessage(item, { reactions });
+    feeds.patchEvidence(item, { reactions });
   }
 
   /**
@@ -4349,7 +3678,7 @@
   ) {
     if (action !== 'reaction') menus.openMessageMenu(null);
     selectedMessage = item;
-    selectedMessageUser = {
+    userActions.selectedMessageUser = {
       id: item.senderId,
       nick: item.senderName,
       emailHash: item.senderEmailHash,
@@ -4391,9 +3720,9 @@
         dialogs.alert = 'Chatting with yourself again?';
         return;
       }
-      showPrivateChat();
+      privateChat.show();
       // `PCfocusOnUser` - open straight onto that person's thread rather than the tab list.
-      void switchChatToUser(item.senderId);
+      void privateChat.switchToUser(item.senderId);
     }
     if (action === 'image' && item.targetUrl) {
       openImageModal(payload instanceof MouseEvent ? payload : undefined, item.targetUrl);
@@ -4406,12 +3735,12 @@
         // from the fixture on every poll, forever. The local hide stays as the optimistic update,
         // because the server round-trip and its invalidate take a moment and the row should not
         // linger under the cursor; the server call is what makes it stick for the room.
-        if (item.evidenceKey) updateEvidenceMessage(item, { hidden: true });
+        if (item.evidenceKey) feeds.patchEvidence(item, { hidden: true });
         void runMessageOperation(kind, item, 'delete').then((succeeded) => {
           // A member may only delete what the capture attributes to them, and the server is what
           // decides that. Put a refused item back rather than leaving it hidden for this viewer
           // alone - that is the same one-sided disappearance this change exists to remove.
-          if (!succeeded && item.evidenceKey) updateEvidenceMessage(item, { hidden: false });
+          if (!succeeded && item.evidenceKey) feeds.patchEvidence(item, { hidden: false });
         });
       };
       if (event?.shiftKey) {
@@ -4452,9 +3781,9 @@
       // Optimistic for the captured case, then persisted - the same shape the delete uses. Marking
       // answered in this browser alone left the ✅ invisible to everyone else, which is the whole
       // point of the marker.
-      if (item.evidenceKey) updateEvidenceMessage(item, { answered: true });
+      if (item.evidenceKey) feeds.patchEvidence(item, { answered: true });
       void runMessageOperation(kind, item, 'markAnswered').then((succeeded) => {
-        if (!succeeded && item.evidenceKey) updateEvidenceMessage(item, { answered: false });
+        if (!succeeded && item.evidenceKey) feeds.patchEvidence(item, { answered: false });
       });
     }
     if (action === 'copy' && typeof navigator !== 'undefined') {
@@ -4485,11 +3814,8 @@
         plain prompt and sees the characters they typed, rather than an editor that treats their
         sentence as tags. Same rule the renderer follows, for the same reason.
       */
-      if (kind === 'chat' && canUseRTE && item.bodyHtml) {
-        rteIsEditing = true;
-        rteEditTarget = item;
-        rteDraft = item.bodyHtml;
-        openModal('rich-text');
+      if (kind === 'chat' && composer.canUseRTE && item.bodyHtml) {
+        composer.editInRTE(item, item.bodyHtml);
         return;
       }
       dialogs.prompt = {
@@ -4500,9 +3826,9 @@
           if (!newBody) return;
           dialogs.prompt = null;
           const previousBody = item.body;
-          if (item.evidenceKey) updateEvidenceMessage(item, { body: newBody });
+          if (item.evidenceKey) feeds.patchEvidence(item, { body: newBody });
           void editMessage(kind, item, newBody).then((succeeded) => {
-            if (!succeeded && item.evidenceKey) updateEvidenceMessage(item, { body: previousBody });
+            if (!succeeded && item.evidenceKey) feeds.patchEvidence(item, { body: previousBody });
           });
         }
       };
@@ -4514,7 +3840,7 @@
       if (item.evidenceKey) toggleEvidenceReaction(item, payload);
       void toggleMessageReaction(kind, item, payload).then((succeeded) => {
         if (!succeeded && previousReactions) {
-          updateEvidenceMessage(item, { reactions: previousReactions });
+          feeds.patchEvidence(item, { reactions: previousReactions });
         }
         window.setTimeout(() => {
           menus.openMessageMenu(null);
@@ -4523,10 +3849,6 @@
     }
   }
 
-  function countFiles(kind: FileTab) {
-    const singularKind = kind === 'files' ? 'file' : kind.slice(0, -1);
-    return data.files.filter((item) => item.kind === singularKind).length;
-  }
 
   function setInputChecked(checked: boolean) {
     return (node: HTMLInputElement) => {
@@ -4557,198 +3879,15 @@
 
   
 
-  /**
-   * `newMessage(e)` - one frame off the private channel.
-   *
-   * The capture's rules, kept: bucket by peer; if the tab exists but is not the open one, move it
-   * to the end of the strip and increment `unread`; if it does not exist, create it. The unread
-   * count is only bumped for messages that are NOT mine, which is why `isMine` is computed first -
-   * our own echo must not make our own conversation look unread.
-   */
-  function ingestPrivateMessage(message: PrivateChatMessage) {
-    const isMine = message.uid === data.user.id;
-    const peerId = isMine ? message.recvdID : message.uid;
 
-    const thread = privChatLog[peerId] ?? [];
-    // Re-entrancy guard: the sender gets an echo AND may already have the row from the action's
-    // response. Two copies of one message is worse than none.
-    if (thread.some((existing) => existing._id === message._id)) return;
-    privChatLog = { ...privChatLog, [peerId]: [...thread, message] };
 
-    // A peer we have never had a tab for: remember enough to draw one.
-    if (!chatTabs.some((tab) => tab.uid === peerId)) {
-      peerProfiles = [
-        ...peerProfiles.filter((profile) => profile.uid !== peerId),
-        {
-          name: isMine ? `User ${peerId}` : message.n,
-          uid: peerId,
-          avt: message.avt,
-          pic: message.pic,
-          unread: 0,
-          isA: message.isA,
-          online: true
-        }
-      ];
-    }
-    lastActivityByPeer = { ...lastActivityByPeer, [peerId]: message.t };
 
-    // Only somebody else's message, and only when their tab is not the one on screen.
-    if (!isMine && currUser !== peerId) {
-      unreadByPeer = { ...unreadByPeer, [peerId]: (unreadByPeer[peerId] ?? 0) + 1 };
-    }
 
-    if (!prefs.doNotDisturbOn && !isMine && prefs.chatSoundOn) playSoundEffect('pling');
-    if (currUser === peerId) scrollPrivateChatToBottom();
-  }
 
-  /** `app-st-compactmessage` shows a short local time against each row. */
-  function privateChatTime(at: number) {
-    return new Date(at).toLocaleTimeString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: true
-    });
-  }
 
-  /** `scrollPCLogToBottom` - the scroller's own handler, which also re-runs after a tick. */
-  function scrollPrivateChatToBottom() {
-    const run = () => {
-      const scroller = document.querySelector('.pc-messages');
-      if (scroller) scroller.scrollTop = scroller.scrollHeight;
-    };
-    run();
-    setTimeout(run, 60);
-  }
 
-  /**
-   * `switchChatToUser(uid, user)` - open a thread.
-   *
-   * Clears `unread` on the tab it opens, seeds an empty array so the scroller has something to
-   * bind to, and loads the first page.
-   */
-  async function switchChatToUser(peerId: number) {
-    currUser = peerId;
-    pmSearchTerm = '';
-    if (!privChatLog[peerId]) privChatLog = { ...privChatLog, [peerId]: [] };
-    unreadByPeer = { ...unreadByPeer, [peerId]: 0 };
-    await loadPrivateChatLog(peerId, 0);
-    scrollPrivateChatToBottom();
-  }
 
-  /** `loadPClogForUID(uid, page)` -> `getPCLog {page, peerID}`; with a term it is `doPCLogSearch`. */
-  async function loadPrivateChatLog(peerId: number, page = 0, searchTerm = '') {
-    let incoming: PrivateChatMessage[];
-    try {
-      incoming = await loadPrivateChatLogCommand({ peerId, page, searchTerm });
-    } catch {
-      return; // Non-fatal: the held log stays as it was. See `private-chat.remote.ts`.
-    }
 
-    // Page 0 replaces; a later page is older history and goes in front of what is already there.
-    privChatLog = {
-      ...privChatLog,
-      [peerId]:
-        page === 0 || searchTerm ? incoming : [...incoming, ...(privChatLog[peerId] ?? [])]
-    };
-  }
-
-  /** `sendMessage()` - `sendPrivChat(currUser, text, recvdUser)`. Empty text sends nothing. */
-  async function sendPrivateMessage() {
-    const text = privateChatDraft.trim();
-    if (!text || currUser === null) return;
-
-    try {
-      await sendPrivateMessageCommand({ peerId: currUser, body: text });
-    } catch (cause) {
-      // The server's own wording, which includes the capture's `Chatting with yourself again?`.
-      dialogs.alert = isHttpError(cause) ? cause.body.message : 'Message not sent.';
-      return;
-    }
-    privateChatDraft = '';
-    // The echo on `/privChat` is what actually appends it, so nothing is inserted here.
-    scrollPrivateChatToBottom();
-  }
-
-  /** `deleteThisPM()` - confirm, then `deletePeerPCLog {peerID}`, then drop the tab. */
-  function deleteThisPM() {
-    if (currUser === null) return;
-    const peerId = currUser;
-    dialogs.confirmation = {
-      message: 'Are you sure you want to delete all messages in this chat?',
-      onconfirm: async () => {
-        dialogs.confirmation = null;
-        await deletePrivateChatLogCommand({ peerId });
-        const { [peerId]: _dropped, ...remainingLog } = privChatLog;
-        privChatLog = remainingLog;
-        const { [peerId]: _unread, ...remainingUnread } = unreadByPeer;
-        unreadByPeer = remainingUnread;
-        peerProfiles = peerProfiles.filter((profile) => profile.uid !== peerId);
-        await invalidateAll();
-        currUser = null;
-        selectedMessageUser = null;
-      }
-    };
-  }
-
-  /**
-   * `closePanel()` - the X in the private-chat header:
-   *
-   * ```js
-   * closePanel(){
-   *   guiEventBus.emit('PCClosePanel');
-   *   this.notificationInterval && (clearInterval(this.notificationInterval),
-   *                                 document.title = globals.sessionName);
-   *   this.user = null; this.recvdUser = null; this.currUser = '';
-   * }
-   * ```
-   *
-   * Closing DESELECTS the thread. Hiding the panel alone - which is all the X used to do - means
-   * reopening lands straight back in the last conversation, where the capture returns to
-   * "No active chat".
-   */
-  /**
-   * `showPrivateChat()` — the ONE door into the private-chat panel, and its refusal.
-   *
-   * `app-room.compiled.js:855-861`, verbatim in shape:
-   *
-   * ```js
-   * showPrivateChat(e = null, i = null) {
-   *   this.appService.globals.videoOnlyMode ||
-   *     this.appService.globals.viewerOnlyMode ||
-   *     (this.privChatInited || (…initPMDrag()), this.privChatVisible = !0, …)
-   * }
-   * ```
-   *
-   * A leading `a || b || (…)`: in video-only or viewer-only mode the panel does not open at all,
-   * silently. Four call sites in this file each set `privateChatOpen = true` on their own, so the
-   * guard has to live in one place or it is four places to forget it.
-   *
-   * `videoOnlyMode` is the `r` query parameter — the media.recording-bot mode — which this room does not
-   * model, the same honest gap `files-gates.ts` already records for `hideFiles`. The half that is
-   * modelled is enforced.
-   */
-  function showPrivateChat() {
-    if (viewerOnlyMode) return;
-    privateChatOpen = true;
-  }
-
-  function closePrivateChatPanel() {
-    privateChatOpen = false;
-    currUser = null;
-    selectedMessageUser = null;
-    pmSearchTerm = '';
-    pmSearching = false;
-    privateChatDraft = '';
-  }
-
-  /** `onEnterSearchChat(value)` - a term searches this thread; an empty one restores it. */
-  async function onEnterSearchPrivateChat(term: string) {
-    if (currUser === null) return;
-    pmSearchTerm = term;
-    pmSearching = Boolean(term.trim());
-    await loadPrivateChatLog(currUser, 0, term.trim());
-    scrollPrivateChatToBottom();
-  }
 
   /**
    * The private-chat toolbar's "Don't Disturb" button. `app-privchat`'s `setDND()` flips the one
@@ -4760,40 +3899,6 @@
     prefs.doNotDisturbOn = !prefs.doNotDisturbOn;
   }
 
-  /**
-   * The toolbar's "Download Log" button, transcribed from `app-privchat`'s `downloadLog()`: one
-   * `toLocaleTimeString('en-us', ...)` line per message, CRLF-terminated, offered as a text blob
-   * named `${name}_${date}_${time}.txt` with the space in the name replaced (the capture calls
-   * `replace(' ', '_')`, which replaces only the first - kept as-is).
-   *
-   * The private-chat message log itself is still a stub here, so this currently writes an empty
-   * file. That is the honest state, not a placeholder transcript.
-   */
-  function downloadPrivateChatLog() {
-    const openTab = chatTabs.find((tab) => tab.uid === currUser);
-    if (!openTab) return;
-    const format: Intl.DateTimeFormatOptions = {
-      year: 'numeric',
-      month: 'numeric',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    };
-    const lines = privateChatLog.map(
-      (message) =>
-        `${new Date(message.t).toLocaleTimeString('en-us', format)} [${message.n}]: ${message.txt}\r\n`
-    );
-    const url = URL.createObjectURL(new Blob(lines, { type: 'text/plain;charset=utf-8' }));
-    const link = document.createElement('a');
-    link.href = url;
-    const now = new Date();
-    link.download = `${openTab.name.replace(' ', '_')}_${now.toLocaleDateString()}_${now.toLocaleTimeString()}.txt`;
-    link.style.display = 'none';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-  }
 
   function stopStream(stream: MediaStream | null) {
     stream?.getTracks().forEach((track) => track.stop());
@@ -5521,166 +4626,13 @@
     };
   }
 
-  /** True when a file belongs to the tab on screen - `Ywe`'s `O(1, ...)`, keyed on content type. */
-  function matchesFileTab(item: { kind: string }) {
-    return item.kind === (fileTab === 'files' ? 'file' : fileTab.slice(0, -1));
-  }
 
-  /**
-   * Every file matching the SEARCH box, sorted - not filtered by tab.
-   *
-   * The capture's `{#each}` equivalent runs over `filter(sessionFiles, filesSearch)` and emits a
-   * `<tr>` for each, leaving the row EMPTY when it belongs to another tab. `more-fucking-evidence/
-   * sounds` shows exactly that: 30 `<tr class="ng-star-inserted"><!----></tr>` around the two mp3s.
-   *
-   * Those empty rows are not inert. `.st-fileTable tbody tr:nth-of-type(2n+1)` stripes on position
-   * among ALL rows, so filtering them out here would shift every visible row's stripe by one and
-   * invert the banding against the capture.
-   */
-  /*
-    The search matches EVERY string field, not just the name.
 
-    The reference's `filter` pipe lower-cases the query and walks `Object.keys(row)`, testing every
-    string-valued property — so a member can find a file by its content type, its id, its date or
-    its path, and typing "png" or "mp3" narrows the list. Ours tested `item.name` alone, which
-    silently returned nothing for all of those.
-  */
-  function searchedFiles() {
-    const query = fileSearch.trim().toLowerCase();
-    const matching = data.files.filter((item) =>
-      Object.values(item).some(
-        (field) => typeof field === 'string' && field.toLowerCase().includes(query)
-      )
-    );
-    /*
-      SEARCH FIRST, THEN SORT, which is the order the reference composes its two pipes in - read at
-      byte 1,951,076:
 
-          pt(rg(16,9,Ct(15,6,e.sessionFiles,e.filesSearch),e.fileSortField,e.fileSortDir))
 
-      `Ct` binds the two-argument `filter`, and its result is the FIRST argument to the
-      three-argument `sortFiles`. Sorting first and filtering after would give the same rows here,
-      but it is not what the reference does and it costs a comparison pass over rows that are about
-      to be discarded.
 
-      `sortFiles` copies before it sorts, so the array `filter` just allocated is not sorted in
-      place either; see property 1 in `$lib/file-sort`.
-    */
-    return sortFiles(matching, fileSort.field, fileSort.direction);
-  }
 
-  /**
-   * One click on one of the two sort buttons.
-   *
-   * The whole transition lives in `$lib/file-sort` so it can be exercised without rendering this
-   * component; all this does is hand the current pair in and store the pair that comes back. The
-   * single assignment is deliberate - `$state.raw` reacts to reassignment, and assigning field and
-   * direction separately is what would let a stale direction survive a field change.
-   */
-  function applyFileSort(field: FileSortField) {
-    fileSort = toggleFileSort(fileSort, field);
-  }
 
-  /**
-   * `deleteFile(name, id)`:
-   *
-   * ```js
-   * bootbox.confirm(`Delete file: "${e}" ?`, s => { s && (r.fileID = i, post(cmd), getSessionFiles()) })
-   * ```
-   */
-  function deleteFile(file: { id: number; name: string }) {
-    dialogs.confirmation = {
-      message: `Delete file: "${file.name}" ?`,
-      onconfirm: async () => {
-        dialogs.confirmation = null;
-        await postDeleteFile(file.id);
-        await invalidateAll();
-      }
-    };
-  }
-
-  /**
-   * `deleteSelected()` - the checked boxes, a count in the prompt, then the same command per file:
-   *
-   * ```js
-   * $('#filesDriveList input:checked').each(function(){ i.push(this.value) });
-   * 0 != i.length
-   *   ? bootbox.confirm('Are you sure you want to delete ' + i.length + ' files ?', ...)
-   *   : bootbox.alert('No files where checked...');
-   * ```
-   *
-   * The misspelling in the empty-selection alert is the capture's, kept verbatim.
-   */
-  function deleteSelectedFiles() {
-    const ids = [...selectedFileIds];
-    if (!ids.length) {
-      dialogs.alert = 'No files where checked...';
-      return;
-    }
-    dialogs.confirmation = {
-      message: `Are you sure you want to delete ${ids.length} files ?`,
-      onconfirm: async () => {
-        dialogs.confirmation = null;
-        for (const id of ids) await postDeleteFile(id);
-        selectedFileIds = new Set();
-        await invalidateAll();
-      }
-    };
-  }
-
-  /** One delete; the loop above drives it, as the capture's `deleteSelected()` does. */
-  async function postDeleteFile(fileId: number) {
-    try {
-      await deleteFileCommand({ fileId });
-    } catch (cause) {
-      dialogs.alert = isHttpError(cause) ? cause.body.message : 'Delete failed.';
-    }
-  }
-
-  /**
-   * `playMp3ForMe(e)` - a toggle that builds a hidden `<audio>` keyed by the file id and removes
-   * that same element to stop:
-   *
-   * ```js
-   * this.isPlayingForMe[e._id] = !this.isPlayingForMe?.[e._id];
-   * if (playing) { const i = document.createElement('audio');
-   *   i.controls = !0; i.type = e.contentType; i.src = e.vidPath; i.id = e._id;
-   *   i.style.display = 'none'; document.body.appendChild(i); i.play(); }
-   * else { document.body.removeChild(document.getElementById(e._id)); }
-   * ```
-   */
-  let playingForMe = $state<Set<number>>(new Set());
-
-  function playMp3ForMe(file: { id: number; url: string; contentType: string }) {
-    const elementId = `file-audio-${file.id}`;
-    const existing = document.getElementById(elementId);
-    if (existing) {
-      existing.remove();
-      const next = new Set(playingForMe);
-      next.delete(file.id);
-      playingForMe = next;
-      return;
-    }
-    const audio = document.createElement('audio');
-    audio.controls = true;
-    // `i.type = e.contentType` in the capture. `type` is not a property of HTMLAudioElement, so
-    // that line only ever set a JS expando; written as the attribute it actually reaches the DOM.
-    audio.setAttribute('type', file.contentType);
-    audio.src = file.url;
-    audio.id = elementId;
-    audio.style.display = 'none';
-    // The capture leaves the element behind on natural end, so the button stays showing "Stop"
-    // until pressed. Clearing the flag keeps the label honest about what is actually playing.
-    audio.addEventListener('ended', () => {
-      audio.remove();
-      const next = new Set(playingForMe);
-      next.delete(file.id);
-      playingForMe = next;
-    });
-    document.body.appendChild(audio);
-    void audio.play();
-    playingForMe = new Set(playingForMe).add(file.id);
-  }
 
   
   
@@ -5691,173 +4643,17 @@
 
   
 
-  /**
-   * `overwriteCashRegisterSound(e, i)` — "Set as alert sound" and "Remove as alert sound".
-   *
-   * The reference posts an admin command and then writes the new value into its own
-   * `globals.sessData` (full.js:3084-3086). Here the action writes it through to the controller,
-   * which is where a room's settings live, and `invalidate('room:data')` re-reads it — so the label
-   * changes because the stored value changed, not instead of it. A button whose only effect is
-   * changing its own label is the failure mode this avoids.
-   */
-  async function setAlertSound(url: string, on: boolean) {
-    try {
-      // `on` crosses as a real boolean now; the action carried the strings 'true' / 'false'.
-      await overwriteCashRegisterSound({ url, on });
-    } catch (cause) {
-      dialogs.alert = isHttpError(cause) ? cause.body.message : 'Command failed.';
-      // Returned, not fallen through: re-reading after a refusal redraws the button at a setting
-      // the controller never stored, which is the label-only lie this whole path exists to avoid.
-      return;
-    }
-    await invalidate('room:data');
-  }
 
-  function toggleFileSelection(id: number, selected: boolean) {
-    const next = new Set(selectedFileIds);
-    if (selected) next.add(id);
-    else next.delete(id);
-    selectedFileIds = next;
-  }
 
-  async function sendComposerMessage() {
-    const body = chat.composer.trim();
-    if (!body) return;
 
-    if (await sendMessageBody(body)) chat.clear('textAreaTxt');
-  }
-
-  /**
-   * @param bodyHtml Rich text from the editor, when the message was written with it.
-   *
-   * Sent as a SEPARATE field rather than folded into `body`, because which kind of message this is
-   * has to be a fact the row carries — see `chat-rich-text-contract.test.ts`. The server sanitises
-   * it and derives its own `body` from the result, so what arrives here as plain text is the
-   * optimistic copy and never the stored one.
-   */
-  async function sendMessageBody(body: string, bodyHtml?: string, room: ChatTab = chat.tab) {
-    const trimmedBody = body.trim();
-    if (!trimmedBody) return false;
-
-    try {
-      await sendMessageCommand({ body: trimmedBody, bodyHtml, room });
-    } catch (cause) {
-      dialogs.alert = isHttpError(cause) ? cause.body.message : 'Message not sent.';
-      return false;
-    }
-    await invalidateAll();
-    return true;
-  }
 
   /* ── The chat rich text editor ────────────────────────────────────────────────────────────────
      The editor lives in `ModalHost`; its session lives here, because the composer hands work to it
      and the send hands work back to the same code path an ordinary message uses. */
 
-  /** The message being composed in the editor, as HTML. */
-  let rteDraft = $state('');
-  /** `Save` rather than `Send`, and an edit rather than a post. */
-  let rteIsEditing = $state(false);
-  /**
-   * The message being edited, when editing. Null for a new message.
-   *
-   * `$state.raw`, not `$state`: this is a message row that is only ever REPLACED, never mutated
-   * field by field, so a deep proxy over it would cost a proxy read on every property access and
-   * buy nothing. Reassignment still triggers, which is the only reactivity this needs.
-   */
-  let rteEditTarget = $state.raw<MessageActionItem | null>(null);
 
-  /**
-   * Text typed in the plain composer, as HTML for the editor.
-   *
-   * The reference hands its composer's value straight to `summernote('code', …)`, which parses it
-   * as markup. Ours escapes it, and that is not a deviation from the feature: `#textAreaTxt` is a
-   * `<textarea>`, so its value is TEXT, and rendering text as markup is a category error whoever
-   * typed it. Somebody who types a less-than and switches to the editor should see the character
-   * they typed, exactly as `chat-rich-text-contract` requires of the renderer.
-   *
-   * The escaping is the platform's — assign to `textContent`, read back `innerHTML` — rather than a
-   * hand-rolled replace over three characters that always turns out to be four.
-   */
-  function textToEditorHtml(text: string) {
-    const holder = document.createElement('div');
-    holder.textContent = text;
-    return holder.innerHTML;
-  }
 
-  /**
-   * `openRTEModal()` — the composer's `fa-font` button.
-   *
-   * ```js
-   * openRTEModal() {
-   *   this.appService.guiEventBus.emit("doRTEModal", {
-   *     channel: this.channel, txt: $("#textAreaTxt")?.val()?.toString()?.trim() || "" });
-   *   $("#textAreaTxt")?.val("");
-   * }
-   * ```
-   *
-   * Both halves are load-bearing: the composer's text comes WITH you into the editor, and the
-   * composer is left empty so the same words cannot be sent twice from two places.
-   */
-  function openRTEModal() {
-    menus.set('emoji', false);
-    menus.set('giphy', false);
-    rteIsEditing = false;
-    rteEditTarget = null;
-    // One step, so a half-written message cannot exist in the modal AND behind it — which is a
-    // message sent twice.
-    rteDraft = textToEditorHtml(chat.take('textAreaTxt'));
-    openModal('rich-text');
-  }
 
-  /**
-   * The editor's Send / Save.
-   *
-   * ```js
-   * sendMessage() {
-   *   let e = this.retriveRTEContent();
-   *   if (!e || "" === e.trim()) return P("Empty message. Please type a message..."), !1;
-   *   this.isEditing ? (sendServerCommand("editChatMessage", {msgID: this.msg._id, newMsg: e}), …)
-   *                  : (sendGrpChat(this.channel, e),
-   *                     guiEventBus.emit("scrollChatLogToBottom", {force:!0, repeat:!1}));
-   *   this.destroyRTE(); $("#rteModal").modal("hide");
-   * }
-   * ```
-   *
-   * `retriveRTEContent()` is the gate asked a second time, and it is reproduced rather than
-   * skipped: with the gate shut it returns an empty string, so this refuses in the same words.
-   *
-   * THE EMPTINESS TEST IS THE SERVER'S, not the reference's. Upstream compares against four
-   * literal strings, so `<b></b>` — formatting with nothing in it, which is what you get by
-   * pressing Bold and then Send — passes, and is then refused by the server with a 400 the modal
-   * has nowhere to show. Asking the same question `isEmptyChatHtml` asks (tags stripped, `&nbsp;`
-   * treated as the space it looks like) means the person is TOLD, in the reference's own words,
-   * rather than left in front of a button that appears to do nothing.
-   */
-  async function sendRTEMessage() {
-    const html = canUseRTE ? rteDraft.trim() : '';
-    const text = stripHtmlToText(html);
-    if (!text) {
-      dialogs.alert = 'Empty message. Please type a message...';
-      return;
-    }
-    const target = rteEditTarget;
-    const succeeded = target
-      ? await editMessage('chat', target, text, html)
-      : await sendMessageBody(text, html);
-    if (!succeeded) return;
-    rteDraft = '';
-    rteIsEditing = false;
-    rteEditTarget = null;
-    modal = null;
-    /*
-      NOT scrolled here, and the omission is the point. The reference follows its send with
-      `scrollChatLogToBottom {force:!0}`; this room reaches the same place through the autoscroll
-      effect above, whose `shouldAutoScrollForMessage` returns true when
-      `senderId === connectedUserId` — your own message always wins, whatever you were reading.
-      Adding a second scroll would be a duplicate writer of somebody else's scroll position, which
-      is how the alerts scroller went wrong once already.
-    */
-  }
 
   /**
    * `sendServerAdminCommand('changeChatMode', {mode})` — presenter-only, and re-checked there.
@@ -5876,12 +4672,6 @@
     await invalidateAll();
   }
 
-  /** The extra column's composer, sending into the channel that column is showing. */
-  async function sendExtraComposerMessage() {
-    const body = chat.extraComposer.trim();
-    if (!body) return;
-    if (await sendMessageBody(body, undefined, chat.extraTab)) chat.clear(EXTRA_COMPOSER);
-  }
 
   /**
    * The extra column's scroll handler.
@@ -5897,7 +4687,7 @@
     if (
       !shouldLoadOlderMessages({
         scrollTop: scroller.scrollTop,
-        messageCount: visibleExtraChatMessages.length,
+        messageCount: feeds.visibleExtraChat.length,
         searchTerm: '',
         hasMoreData: chatPages.hasMore(chat.extraTab),
         loadingMore: chatPages.loading
@@ -5909,217 +4699,17 @@
     void loadOlderChatMessages(chat.extraTab, scroller);
   }
 
-  /**
-   * The extra column's rich-text button — `openRTEModal()` on `app-extra-chat`, which reads
-   * `#textAreaTxtExtra` rather than `#textAreaTxt` and clears that one.
-   */
-  function openExtraRTEModal() {
-    rteIsEditing = false;
-    rteEditTarget = null;
-    rteDraft = textToEditorHtml(chat.take(EXTRA_COMPOSER));
-    openModal('rich-text');
-  }
 
-  function openImageUpload() {
-    menus.set('emoji', false);
-    menus.set('giphy', false);
-    openModal('image-upload');
-  }
 
-  /**
-   * Upload one image and return the URL to put in the message body.
-   *
-   * The capture posts to an external CDN, `Client-ID`-authenticated, and reads `data.link` back:
-   *
-   * ```js
-   * fetch(`${uploadServer}/image/${sessionHandle}`, { method:'POST',
-   *   headers:{ Authorization:`Client-ID ${uploadKey}` }, body: form })  // -> { data: { link } }
-   * ```
-   *
-   * `PUBLIC_PTR_UPLOAD_SERVER` and `PUBLIC_PTR_CDN_UPLOAD_KEY` are both empty here - we do not have
-   * that service - and the code threw "Missing captured upload configuration.", which is where
-   * posting an alert with an image died. Rather than fail, it falls back to the room's OWN upload,
-   * which stores the bytes and hands back a real `/uploads/<uuid>` URL. Same contract: a URL that
-   * resolves to the image the user picked.
-   *
-   * The captured path is kept and still wins when the environment provides it.
-   */
-  async function uploadOneImage(file: File): Promise<string> {
-    const uploadServer = PUBLIC_PTR_UPLOAD_SERVER ?? '';
-    const uploadKey = PUBLIC_PTR_CDN_UPLOAD_KEY ?? '';
 
-    if (uploadServer && uploadKey) {
-      const upload = new FormData();
-      upload.append('image', file);
-      upload.append('name', file.name);
-      const response = await fetch(`${uploadServer}/image/${data.sessionHandle}`, {
-        method: 'POST',
-        headers: { Authorization: `Client-ID ${uploadKey}` },
-        body: upload
-      });
-      if (!response.ok) throw new Error(`Image upload failed with ${response.status}.`);
-      const payload = (await response.json()) as { data?: { link?: string } };
-      const link = payload.data?.link;
-      if (!link) throw new Error('Image upload response did not include data.link.');
-      return link;
-    }
 
-    /*
-      `composer-image.remote.ts`, NOT the Files pane's `uploadFile` — that one is presenter-only and
-      refused every member while their own upload button sat there enabled. The `File` goes as
-      itself; that module cites the two functions in Kit that reduce and revive it.
 
-      Re-thrown, not caught: `uploadComposerImages` already turns a failure into the dialog, so
-      swallowing here would post a message with an image that never uploaded.
-    */
-    try {
-      return await uploadComposerImage({ file, originalName: file.name });
-    } catch (cause) {
-      // `{ cause }` because the rejection is the only record of WHY — an `HttpError` re-thrown as a
-      // bare `Error` keeps the sentence and loses the status the server actually answered with.
-      throw new Error(isHttpError(cause) ? cause.body.message : 'Upload failed.', { cause });
-    }
-  }
 
-  async function uploadComposerImages(files: File[], message: string) {
-    modal = null;
-    if (files.length === 0) return;
 
-    const uploadedUrls: string[] = [];
-    try {
-      for (const [index, file] of files.entries()) {
-        dialogs.alert = `Uploading ${index}/${files.length}: ${file.name}. Please wait...`;
-        uploadedUrls.push(await uploadOneImage(file));
-      }
 
-      const body = `${uploadedUrls.join(' ')}${message ? ` ${message}` : ''}`;
-      dialogs.alert = null;
-      await sendMessageBody(body);
-    } catch (error) {
-      console.error(error);
-      dialogs.alert = 'Upload Failed...';
-    }
-  }
 
-  async function uploadAlertFiles(files: readonly File[]) {
-    const uploadedUrls: string[] = [];
-    for (const file of files) uploadedUrls.push(await uploadOneImage(file));
-    return uploadedUrls;
-  }
 
-  function postAlertOnX(body: string) {
-    if (!body) return;
-    const intent = postOnXIntent(body);
-    if (tweetWindow && !tweetWindow.closed) {
-      tweetWindow.focus();
-      tweetWindow.location.href = intent;
-      return;
-    }
-    tweetWindow = window.open(
-      intent,
-      'TweetWindow',
-      'width=800,height=800,scrollbars=yes,resizable=yes'
-    );
-  }
 
-  async function persistPostedAlert(
-    kind: AlertTab,
-    body: string,
-    targetUrl: string | null,
-    nonTradeAlert: boolean,
-    dontPush: boolean
-  ) {
-    // `dontPush` is NOT sent: the action received it and never read it, and `post-alert.remote.ts`
-    // refuses it rather than accept a field nothing consumes. The parameter stays; the caller
-    // computes it, and the push suppression it names has no consumer in this room yet.
-    void dontPush;
-    try {
-      await postAlertCommand({ kind, body, targetUrl, nonTradeAlert });
-    } catch (cause) {
-      dialogs.alert = isHttpError(cause) ? cause.body.message : 'Alert not posted.';
-      return false;
-    }
-    await invalidateAll();
-    return true;
-  }
-
-  async function postAlert(submission: PostAlertSubmission) {
-    let body: string;
-    let targetUrl: string | null;
-
-    if (submission.composition.status === 'upload') {
-      try {
-        const uploadedUrls = await uploadAlertFiles(submission.files);
-        body = composeUploadedAlert(
-          submission.composition.bodyBeforeUploads,
-          uploadedUrls,
-          submission.legalDisclosure,
-          submission.legalDisclosureText
-        );
-        targetUrl = uploadedUrls[0] ?? null;
-      } catch (error) {
-        console.error(error);
-        dialogs.alert = 'Upload Failed...';
-        return false;
-      }
-    } else {
-      body = submission.composition.body;
-      targetUrl = null;
-    }
-
-    if (submission.postOnX) postAlertOnX(body);
-    return persistPostedAlert(
-      submission.composition.kind,
-      body,
-      targetUrl,
-      submission.nonTradeAlert,
-      submission.dontPush
-    );
-  }
-
-  async function postPastedAlertImage(submission: PastedImageSubmission) {
-    try {
-      const [uploadedUrl] = await uploadAlertFiles([submission.file]);
-      if (!uploadedUrl) throw new Error('Image upload response did not include data.link.');
-      const body = composePastedImageAlert(
-        submission.alertText,
-        uploadedUrl,
-        submission.legalDisclosure,
-        submission.legalDisclosureText
-      );
-      if (submission.postOnX) postAlertOnX(body);
-      return persistPostedAlert(
-        'media',
-        body,
-        uploadedUrl,
-        submission.nonTradeAlert,
-        submission.dontPush
-      );
-    } catch (error) {
-      console.error(error);
-      dialogs.alert = 'Upload Failed...';
-      return false;
-    }
-  }
-
-  function selectGif(_title: string, url: string) {
-    if (sendingGif) return;
-    menus.set('giphy', false);
-    sendingGif = true;
-    pendingGifUrl = url;
-  }
-
-  function cancelGif() {
-    pendingGifUrl = null;
-    sendingGif = false;
-  }
-
-  async function confirmGif() {
-    const url = pendingGifUrl;
-    pendingGifUrl = null;
-    if (url) await sendMessageBody(url);
-    sendingGif = false;
-  }
 
   
 
@@ -6727,7 +5317,7 @@
           void invalidateAll();
           return;
         }
-        ingestPrivateMessage(priv.message);
+        privateChat.ingest(priv.message);
         return;
       }
 
@@ -6738,7 +5328,7 @@
         The chat ding, transcribed from `app-chat.compiled.js:112-137`:
 
           !preferences.doNotDisturbOn && preferences.chatSoundOn
-            ? followedUsers[e.avt].followChatStyle.playSound
+            ? userActions.followedUsers[e.avt].followChatStyle.playSound
                 ? pling.play()
                 : ((playChatMessageSoundFor.length && hashEmail(user.email) !== e.avt
                      && playChatMessageSoundFor.includes(e.avt))
@@ -6763,7 +5353,9 @@
       */
       if (payload.channel === 'chat' && !prefs.doNotDisturbOn && prefs.chatSoundOn) {
         const senderHash = (payload.data as { senderEmailHash?: string } | undefined)?.senderEmailHash;
-        const followStyle = senderHash ? followedUsers[senderHash]?.followChatStyle : undefined;
+        const followStyle = senderHash
+      ? userActions.followedUsers[senderHash]?.followChatStyle
+      : undefined;
         if (followStyle?.playSound) playSoundEffect('pling');
         else if (data.sessData?.dingOnNewMessage) playSoundEffect('followed');
       }
@@ -6846,7 +5438,7 @@
     const stopTawk = tawkAvailable ? loadTawkSupport() : () => {};
     initializeSoundEffects();
     setSoundEffectsVolume(roomVolume.volume / 100);
-    loadManagedUsers();
+    userActions.loadManaged();
     promoteLegacySplitSizes();
 
     /*
@@ -7570,328 +6162,31 @@
 
   /* ── Swing Trade Alerts ──────────────────────────────────────────────────────────────────── */
 
-  /**
-   * `hasSwingTradeAlerts` — the per-room entitlement, gating the nav item AND the pane.
-   *
-   * `$derived` rather than copied into a `let`, so a room whose configuration is re-read mid-session
-   * cannot leave the tab showing after the owner turned the feature off. The reference reads it once
-   * in `ngOnInit` and therefore does NOT react; reacting is the safer direction of that divergence
-   * and costs nothing.
-   */
-  const swingAlertsEnabled = $derived(swingAlertsTabVisible(data.sessData ?? {}));
 
-  /**
-   * `globals.swingAlertsLog`.
-   *
-   * `$state.raw` because it is only ever REPLACED — by the page load's seed and by
-   * `refreshSwingAlerts` — and never mutated in place. A deep proxy over a list of a few hundred
-   * rows would cost on every read of every cell and buy nothing.
-   *
-   * Seeded from `data.swingAlerts` and thereafter owned here. It deliberately does NOT track
-   * `data.swingAlerts` afterwards: the load always answers the 42-day window, so a `$derived` would
-   * throw away the presenter's chosen months window the next time anything else on the page called
-   * `invalidateAll()`. Every swing mutation refetches this list itself instead.
-   */
-  // The page data is the intentional one-time seed; every later value comes from the refetch below.
-  // svelte-ignore state_referenced_locally
-  let swingAlertsLog = $state.raw<readonly SwingAlertRow[]>(data.swingAlerts);
-  /** The window currently displayed, so a refetch after a mutation asks for the same one. */
-  let swingAlertsDays = $state(SWING_ALERT_INITIAL_DAYS);
 
-  /** A pending image upload for the swing form, and its `resolve`. `imgUpload('swing')`. */
-  let swingImageUpload = $state.raw<{ resolve: (url: string | null) => void } | null>(null);
-  /** A pasted image awaiting the confirmation `onImagePaste` shows before uploading. */
-  let swingImagePaste = $state.raw<{
-    file: File;
-    previewUrl: string;
-    resolve: (url: string | null) => void;
-  } | null>(null);
 
-  /**
-   * `getSwingAlertsLog` — refetch the log for the current window.
-   *
-   * A plain GET rather than a form action, for the reason `loadNoteVersions` gives: this changes
-   * nothing, so it must not go through `invalidateAll()` and re-run every load function on the page
-   * to answer a question about one table.
-   */
-  async function refreshSwingAlerts(): Promise<void> {
-    const response = await fetch(`/api/swing-alerts?days=${swingAlertsDays}`);
-    if (!response.ok) throw new Error('Unable to load swing trade alerts.');
-    swingAlertsLog = (await response.json()) as readonly SwingAlertRow[];
-  }
 
-  /**
-   * The three swing mutations. Named for the wire commands, which are the action names.
-   *
-   * No `invalidateAll()`, unlike `submitNoteMutation`: the only page data these change is the swing
-   * log, and re-running every load function would additionally reset the log to the 42-day window
-   * the load always returns. The explicit refetch below keeps the presenter's chosen window.
-   */
-  async function submitSwingCommand(
-    action: 'swingAlertMsg' | 'editSwingAlertMsg' | 'deleteSwingAlertMsg',
-    values: Record<string, string | number>
-  ): Promise<void> {
-    const body = new FormData();
-    for (const [key, value] of Object.entries(values)) body.set(key, String(value));
-    const response = await fetch(`?/${action}`, { method: 'POST', body });
-    const result = deserialize<Record<string, unknown>, { message?: string }>(await response.text());
 
-    if (result.type === 'failure') throw new Error(result.data?.message ?? 'Unable to save.');
-    if (result.type === 'error') throw new Error(result.error.message ?? 'Unable to save.');
-    if (result.type !== 'success') throw new Error('Unable to save.');
 
-    await refreshSwingAlerts();
-  }
 
-  function swingAlertPayload(draft: SwingAlertDraft): Record<string, string> {
-    return {
-      symbol: draft.symbol,
-      direction: draft.direction,
-      entryPrice: draft.entryPrice,
-      stop: draft.stop,
-      target: draft.target,
-      image: draft.image
-    };
-  }
 
-  /** `onTradeAlertWeeksChange('Swing')` — clear the list, then refetch for the new window. */
-  async function changeSwingAlertMonths(months: number): Promise<void> {
-    swingAlertsDays = swingAlertLogDays(months);
-    /*
-      The reference empties `globals.swingAlertsLog` BEFORE sending the command, so the list is
-      blank while the refetch is in flight rather than showing the previous window under the new
-      label. Reproduced, including the flash of the empty-state heading that comes with it.
-    */
-    swingAlertsLog = [];
-    await refreshSwingAlerts();
-  }
 
-  function requestSwingImageUpload(): Promise<string | null> {
-    return new Promise((resolve) => {
-      swingImageUpload = { resolve };
-    });
-  }
 
-  async function completeSwingImageUpload(files: readonly File[]): Promise<void> {
-    const pending = swingImageUpload;
-    swingImageUpload = null;
-    if (!pending) return;
-    /*
-      One file. The reference's own dialog sets `multiple='false'`; `ImageUploadDialog` is shared
-      with the chat composer, which does allow several, so the extras are dropped here rather than
-      by forking the component.
-    */
-    const [file] = files;
-    if (!file) {
-      pending.resolve(null);
-      return;
-    }
-    try {
-      const [url] = await uploadAlertFiles([file]);
-      pending.resolve(url ?? null);
-    } catch (error) {
-      console.error(error);
-      dialogs.alert = 'Upload Failed...';
-      pending.resolve(null);
-    }
-  }
 
-  /**
-   * `onImagePaste(event, 'swing')` — confirm the pasted image, then upload it.
-   *
-   * The object URL is created for the confirmation's preview and revoked when the dialog closes,
-   * whichever way it closes. Leaking one per paste would pin the image bytes for the life of the
-   * tab.
-   */
-  function requestSwingImagePaste(file: File): Promise<string | null> {
-    return new Promise((resolve) => {
-      swingImagePaste = { file, previewUrl: URL.createObjectURL(file), resolve };
-    });
-  }
-
-  function closeSwingImagePaste(): { file: File; resolve: (url: string | null) => void } | null {
-    const pending = swingImagePaste;
-    swingImagePaste = null;
-    if (!pending) return null;
-    URL.revokeObjectURL(pending.previewUrl);
-    return { file: pending.file, resolve: pending.resolve };
-  }
-
-  async function confirmSwingImagePaste(): Promise<void> {
-    const pending = closeSwingImagePaste();
-    if (!pending) return;
-    try {
-      const [url] = await uploadAlertFiles([pending.file]);
-      pending.resolve(url ?? null);
-    } catch (error) {
-      console.error(error);
-      dialogs.alert = 'Upload Failed...';
-      pending.resolve(null);
-    }
-  }
 
   /* ── Day Trade Alerts ────────────────────────────────────────────────────────────────────── */
 
-  /**
-   * `hasDayTradeAlerts` — the per-room entitlement, gating the nav item AND the pane.
-   *
-   * `$derived` rather than copied into a `let`, so a room whose configuration is re-read mid-session
-   * cannot leave the tab showing after the owner turned the feature off. The reference reads it once
-   * in `ngOnInit` (byte 1,955,967) and therefore does NOT react; reacting is the safer direction of
-   * that divergence and costs nothing.
-   */
-  const dayTradeAlertsEnabled = $derived(dayTradeAlertsTabVisible(data.sessData ?? {}));
 
-  /**
-   * `globals.dayTradeAlertsLog`.
-   *
-   * `$state.raw` because it is only ever REPLACED — by the page load's seed and by
-   * `refreshDayTradeAlerts` — and never mutated in place. A deep proxy over a list of a few hundred
-   * rows would cost on every read of every cell and buy nothing.
-   *
-   * Seeded from `data.dayTradeAlerts` and thereafter owned here. It deliberately does NOT track
-   * `data.dayTradeAlerts` afterwards: the load always answers the 21-day window, so a `$derived`
-   * would throw away the presenter's chosen months window the next time anything else on the page
-   * called `invalidateAll()`. Every day trade mutation refetches this list itself instead.
-   */
-  // The page data is the intentional one-time seed; every later value comes from the refetch below.
-  // svelte-ignore state_referenced_locally
-  let dayTradeAlertsLog = $state.raw<readonly DayTradeAlertRow[]>(data.dayTradeAlerts);
-  /** The window currently displayed, so a refetch after a mutation asks for the same one. */
-  let dayTradeAlertsDays = $state(DAY_TRADE_ALERT_INITIAL_DAYS);
 
-  /** A pending image upload for the day trade form, and its `resolve`. `imgUpload('dayTrade')`. */
-  let dayTradeImageUpload = $state.raw<{ resolve: (url: string | null) => void } | null>(null);
-  /** A pasted image awaiting the confirmation `onImagePaste` shows before uploading. */
-  let dayTradeImagePaste = $state.raw<{
-    file: File;
-    previewUrl: string;
-    resolve: (url: string | null) => void;
-  } | null>(null);
 
-  /**
-   * `getDayTradeAlertsLog` — refetch the log for the current window.
-   *
-   * A plain GET rather than a form action, for the reason `refreshSwingAlerts` gives: this changes
-   * nothing, so it must not go through `invalidateAll()` and re-run every load function on the page
-   * to answer a question about one table.
-   */
-  async function refreshDayTradeAlerts(): Promise<void> {
-    const response = await fetch(`/api/day-trade-alerts?days=${dayTradeAlertsDays}`);
-    if (!response.ok) throw new Error('Unable to load day trade alerts.');
-    dayTradeAlertsLog = (await response.json()) as readonly DayTradeAlertRow[];
-  }
 
-  /**
-   * The three day trade mutations. Named for the wire commands, which are the action names.
-   *
-   * No `invalidateAll()`: the only page data these change is the day trade log, and re-running
-   * every load function would additionally reset the log to the 21-day window the load always
-   * returns. The explicit refetch below keeps the presenter's chosen window.
-   */
-  async function submitDayTradeCommand(
-    action: 'dayTradeAlertMsg' | 'editDayTradeAlertMsg' | 'deleteDayTradeAlertMsg',
-    values: Record<string, string | number>
-  ): Promise<void> {
-    const body = new FormData();
-    for (const [key, value] of Object.entries(values)) body.set(key, String(value));
-    const response = await fetch(`?/${action}`, { method: 'POST', body });
-    const result = deserialize<Record<string, unknown>, { message?: string }>(await response.text());
 
-    if (result.type === 'failure') throw new Error(result.data?.message ?? 'Unable to save.');
-    if (result.type === 'error') throw new Error(result.error.message ?? 'Unable to save.');
-    if (result.type !== 'success') throw new Error('Unable to save.');
 
-    await refreshDayTradeAlerts();
-  }
 
-  function dayTradeAlertPayload(draft: DayTradeAlertDraft): Record<string, string> {
-    return {
-      symbol: draft.symbol,
-      direction: draft.direction,
-      entryPrice: draft.entryPrice,
-      stop: draft.stop,
-      target: draft.target,
-      image: draft.image
-    };
-  }
 
-  /** `onTradeAlertWeeksChange('DayTrade')` — clear the list, then refetch for the new window. */
-  async function changeDayTradeAlertMonths(months: number): Promise<void> {
-    dayTradeAlertsDays = dayTradeAlertLogDays(months);
-    /*
-      The reference empties `globals.dayTradeAlertsLog` BEFORE sending the command (byte
-      1,993,666), so the list is blank while the refetch is in flight rather than showing the
-      previous window under the new label. Reproduced, including the flash of the empty-state
-      heading that comes with it.
-    */
-    dayTradeAlertsLog = [];
-    await refreshDayTradeAlerts();
-  }
 
-  function requestDayTradeImageUpload(): Promise<string | null> {
-    return new Promise((resolve) => {
-      dayTradeImageUpload = { resolve };
-    });
-  }
 
-  async function completeDayTradeImageUpload(files: readonly File[]): Promise<void> {
-    const pending = dayTradeImageUpload;
-    dayTradeImageUpload = null;
-    if (!pending) return;
-    /*
-      One file. The reference's own dialog sets `multiple='false'`; `ImageUploadDialog` is shared
-      with the chat composer, which does allow several, so the extras are dropped here rather than
-      by forking the component.
-    */
-    const [file] = files;
-    if (!file) {
-      pending.resolve(null);
-      return;
-    }
-    try {
-      const [url] = await uploadAlertFiles([file]);
-      pending.resolve(url ?? null);
-    } catch (error) {
-      console.error(error);
-      dialogs.alert = 'Upload Failed...';
-      pending.resolve(null);
-    }
-  }
 
-  /**
-   * `onImagePaste(event, 'dayTrade')` — confirm the pasted image, then upload it.
-   *
-   * The object URL is created for the confirmation's preview and revoked when the dialog closes,
-   * whichever way it closes. Leaking one per paste would pin the image bytes for the life of the
-   * tab.
-   */
-  function requestDayTradeImagePaste(file: File): Promise<string | null> {
-    return new Promise((resolve) => {
-      dayTradeImagePaste = { file, previewUrl: URL.createObjectURL(file), resolve };
-    });
-  }
-
-  function closeDayTradeImagePaste(): { file: File; resolve: (url: string | null) => void } | null {
-    const pending = dayTradeImagePaste;
-    dayTradeImagePaste = null;
-    if (!pending) return null;
-    URL.revokeObjectURL(pending.previewUrl);
-    return { file: pending.file, resolve: pending.resolve };
-  }
-
-  async function confirmDayTradeImagePaste(): Promise<void> {
-    const pending = closeDayTradeImagePaste();
-    if (!pending) return;
-    try {
-      const [url] = await uploadAlertFiles([pending.file]);
-      pending.resolve(url ?? null);
-    } catch (error) {
-      console.error(error);
-      dialogs.alert = 'Upload Failed...';
-      pending.resolve(null);
-    }
-  }
 
   function mountUploadFileLink(menu: HTMLUListElement) {
     const item = document.createElement('li');
@@ -8193,17 +6488,17 @@
           {rowVisible}
           {rosterRowClass}
           locationVisible={(entry) => locationVisibleTo({ isPresenter }, entry)}
-          {canOpenRosterPrivateChat}
+          canOpenRosterPrivateChat={(user) => privateChat.canOpenFor(user)}
           {mobileAppAvailable}
           {benzingaVisible}
           {benzingaUrl}
           benzingaLogoUrl={data.sessData?.altBenzingaLogoURL}
           dumpVersion={DUMP_CONTRACT.version}
           onopenmodal={openModal}
-          onopenrosteruserinfo={openRosterUserInfo}
-          onopenrosterprivatechat={openRosterPrivateChat}
-          onmentionrosteruser={mentionRosterUser}
-          onselectuser={(id) => (selectedUserId = id)}
+          onopenrosteruserinfo={(user) => userActions.openInfoFor(user)}
+          onopenrosterprivatechat={(user) => privateChat.openFromRoster(user)}
+          onmentionrosteruser={(user) => userActions.mentionFromRoster(user)}
+          onselectuser={(id) => userActions.selectUserId(id)}
           onusersearchkey={doUserSearch}
           ongetmobilepin={() => void getMyPinAndDoInfo()}
           ongetrandomuser={getRandomUser}
@@ -8272,14 +6567,14 @@
               {chatEnabled}
               {selfMutedUntil}
               {canPostImages}
-              {canUseRTE}
+              canUseRTE={composer.canUseRTE}
               {giphyApiKey}
               bind:showMessageOptions
-              {visibleAlerts}
-              {visibleChatMessages}
+              visibleAlerts={feeds.visibleAlerts}
+              visibleChatMessages={feeds.visibleChat}
               {alertLabels}
               {messageChrome}
-              {followedUsers}
+              followedUsers={userActions.followedUsers}
               {captureAlertChatElement}
               {captureAlertsScroller}
               {captureChatScroller}
@@ -8295,12 +6590,12 @@
               onalertsscroll={trackAlertsScroll}
               onchatscroll={trackChatScroll}
               onmessageaction={handleMessageAction}
-              onprivatechat={showPrivateChat}
+              onprivatechat={() => privateChat.show()}
               onexpandcomposer={autoExpandComposer}
-              onsend={sendComposerMessage}
-              onimageupload={openImageUpload}
-              onrte={openRTEModal}
-              onselectgif={selectGif}
+              onsend={() => composer.send()}
+              onimageupload={() => composer.openImageUpload()}
+              onrte={() => composer.openRTE()}
+              onselectgif={(title, url) => composer.selectGif(title, url)}
               onbeginsplit={beginSplit}
             />
           {/snippet}
@@ -8374,45 +6669,19 @@
               {mountNewNoteLink}
               {submitNoteMutation}
               {loadNoteVersions}
-              {uploadAlertFiles}
-              {swingAlertsEnabled}
-              {swingAlertsLog}
-              {submitSwingCommand}
-              {swingAlertPayload}
-              {changeSwingAlertMonths}
-              {requestSwingImageUpload}
-              {requestSwingImagePaste}
-              {dayTradeAlertsEnabled}
-              {dayTradeAlertsLog}
-              {submitDayTradeCommand}
-              {dayTradeAlertPayload}
-              {changeDayTradeAlertMonths}
-              {requestDayTradeImageUpload}
-              {requestDayTradeImagePaste}
+              uploadAlertFiles={(files) => composer.uploadAlertFiles(files)}
+              {swingAlerts}
+              {dayTradeAlerts}
               hideVideoPlayer={broadcasts.hideVideoPlayer}
               videoPlayerUrl={broadcasts.videoPlayerUrl}
               scheduledVideoForAll={broadcasts.scheduledVideoForAll}
               playVideoForAll={(url) => broadcasts.playVideoForAll(url)}
               scheduleVideoForAll={(url, whenLocal) => broadcasts.scheduleVideoForAll(url, whenLocal)}
               stopVideoForAll={() => broadcasts.stopVideoForAll()}
-              {filesHidden}
-              bind:fileTab
-              onfilesearch={(value) => (fileSearch = value)}
-              {fileSort}
-              {selectedFileIds}
-              {playingForMe}
+              {files}
               {mountUploadFileLink}
-              {countFiles}
-              {searchedFiles}
-              {matchesFileTab}
-              {applyFileSort}
-              {toggleFileSelection}
-              {deleteSelectedFiles}
-              {deleteFile}
-              {playMp3ForMe}
               playMp3ForAll={(url) => broadcasts.playMp3ForAll(url)}
               stopMp3ForAll={() => broadcasts.stopMp3ForAll()}
-              {setAlertSound}
               {openModal}
               youtubeForAllUrl={broadcasts.youtubeForAllUrl}
               stopYoutubeForAll={() => broadcasts.stopYoutubeForAll()}
@@ -8440,31 +6709,31 @@
               <ExtraChatPane
                 bind:tab={chat.extraTab}
                 bind:composer={chat.extraComposer}
-                messages={visibleExtraChatMessages}
+                messages={feeds.visibleExtraChat}
                 doNotDisturbOn={prefs.doNotDisturbOn}
                 {chatEnabled}
                 {webinarMode}
                 {selfMutedUntil}
                 {showPmButton}
                 {canPostImages}
-                {canUseRTE}
+                canUseRTE={composer.canUseRTE}
                 {giphyApiKey}
                 chrome={messageChrome}
-                {followedUsers}
+                followedUsers={userActions.followedUsers}
                 openMenuKey={menus.messageId}
                 onmenutoggle={(key) => menus.openMessageMenu(key)}
                 onaction={(action, message, event) =>
                   handleMessageAction('chat', action, message, event, true)}
                 onfocus={() => chat.focused(EXTRA_COMPOSER)}
-                onsend={() => void sendExtraComposerMessage()}
+                onsend={() => void composer.sendExtra()}
                 onscroll={(scroller) => trackExtraChatScroll(scroller)}
                 onscrollerready={(scroller) => (extraChatScroller = scroller)}
-                onprivatechat={showPrivateChat}
+                onprivatechat={() => privateChat.show()}
                 onsearch={() => openModal('chat-logs')}
                 onsettings={() => openModal('settings')}
-                onimageupload={openImageUpload}
-                onrte={openExtraRTEModal}
-                onselectgif={(url) => selectGif('', url)}
+                onimageupload={() => composer.openImageUpload()}
+                onrte={() => composer.openExtraRTE()}
+                onselectgif={(url) => composer.selectGif('', url)}
               />
             </as-split-area>
           {/snippet}
@@ -8575,14 +6844,14 @@
       hideMobileCredentials={Boolean(data.sessData?.hideMobileCredentials)}
       isLimitedPresenter={media.limitedPresenter}
       canEditUsername={Boolean(data.sessData?.allowUsersToChangeUsername)}
-      alerts={searchableAlerts}
+      alerts={feeds.searchableAlerts}
       {chatMode}
       onChatModeChange={(mode) => void changeChatMode(mode)}
-      {canUseRTE}
-      {rteDraft}
-      {rteIsEditing}
-      onRteDraftChange={(html) => (rteDraft = html)}
-      onRteSend={() => void sendRTEMessage()}
+      canUseRTE={composer.canUseRTE}
+      rteDraft={composer.rteDraft}
+      rteIsEditing={composer.rteIsEditing}
+      onRteDraftChange={(html) => (composer.rteDraft = html)}
+      onRteSend={() => void composer.sendRTE()}
       {settingsTab}
       {alertTab}
       {theme}
@@ -8609,8 +6878,8 @@
       onSaveDataChange={setSaveData}
       onDoNotDisturbChange={(enabled) => (prefs.doNotDisturbOn = enabled)}
       onPlayYoutube={(url) => void broadcasts.playYoutubeForAll(url)}
-      onPostAlert={postAlert}
-      onPastePostAlert={postPastedAlertImage}
+      onPostAlert={(submission) => composer.postAlert(submission)}
+      onPastePostAlert={(submission) => composer.postPastedImage(submission)}
       onPollMinimize={minimizePoll}
       onPollSave={(question, choices) =>
         submitPollAction('savePoll', { q: question, choices: JSON.stringify(choices) })}
@@ -8618,7 +6887,7 @@
       onPollSend={(question, choices) =>
         submitPollAction('sendPoll', { q: question, choices: JSON.stringify(choices) })}
       onPollAnswer={(choiceIndex) => submitPollAction('sendPollAnswer', { a: choiceIndex })}
-      onPollPostResults={(body) => persistPostedAlert('text', body, null, false, false)}
+      onPollPostResults={(body) => composer.postPollResults(body)}
       onPollEnd={() => submitPollAction('pollDone')}
       onAlert={(message) => (dialogs.alert = message)}
       onConfirm={(message, onconfirm) => dialogs.confirm(message, onconfirm)}
@@ -8627,26 +6896,26 @@
       alertQuestions={data.alertQuestions}
       onMentionUser={mentionUser}
       onPrivateChat={(user) => {
-        selectedMessageUser = user;
-        showPrivateChat();
+        userActions.selectedMessageUser = user;
+        privateChat.show();
       }}
-      onFollowToggle={requestFollowToggle}
-      onFollowStyleChange={applyFollowStyle}
-      onMuteToggle={requestMuteToggle}
-      onUserAction={handleUserAction}
+      onFollowToggle={(user) => userActions.requestFollowToggle(user)}
+      onFollowStyleChange={(user, style) => userActions.applyFollowStyle(user, style)}
+      onMuteToggle={(user) => userActions.requestMuteToggle(user)}
+      onUserAction={(action, user) => userActions.handle(action, user)}
       streamingType={typeof prefs.loaded.streamingType === 'string' ? prefs.loaded.streamingType : ''}
-      onManagedUserRemoval={requestManagedUserRemoval}
-      onManagedUserInfo={openManagedUserInfo}
+      onManagedUserRemoval={(list, user) => userActions.requestManagedRemoval(list, user)}
+      onManagedUserInfo={(user) => userActions.openManagedInfo(user)}
       currentUser={data.user}
-      {targetUser}
-      {mutedUsers}
-      {followedUsers}
+      targetUser={userActions.target}
+      mutedUsers={userActions.mutedUsers}
+      followedUsers={userActions.followedUsers}
       targetMessage={selectedMessage}
     />
     {#if modal === 'image-upload'}
       <ImageUploadDialog
         onclose={() => (modal = null)}
-        onupload={(files, message) => void uploadComposerImages(files, message)}
+        onupload={(files, message) => void composer.uploadImages(files, message)}
       />
     {/if}
     <!--
@@ -8657,26 +6926,23 @@
       completion belongs to that feature, and routing the swing upload through the composer's
       handler would post the image into chat instead of putting its URL in the form.
     -->
-    {#if swingImageUpload}
+    {#if swingAlerts.imageUpload}
       <ImageUploadDialog
-        onclose={() => {
-          swingImageUpload?.resolve(null);
-          swingImageUpload = null;
-        }}
-        onupload={(files) => void completeSwingImageUpload(files)}
+        onclose={() => swingAlerts.cancelImageUpload()}
+        onupload={(files) => void swingAlerts.completeImageUpload(files)}
       />
     {/if}
     <!--
       `onImagePaste(event, 'swing')` puts the pasted image in a `bootbox.confirm` before uploading,
       so a stray paste cannot silently push bytes to the upload server.
     -->
-    {#if swingImagePaste}
-      {@const pastePreviewUrl = swingImagePaste.previewUrl}
+    {#if swingAlerts.imagePaste}
+      {@const pastePreviewUrl = swingAlerts.imagePaste.previewUrl}
       <BootboxDialog
         mode="confirm"
         message=""
-        onclose={() => closeSwingImagePaste()?.resolve(null)}
-        onconfirm={() => void confirmSwingImagePaste()}
+        onclose={() => swingAlerts.closeImagePaste()?.resolve(null)}
+        onconfirm={() => void swingAlerts.confirmImagePaste()}
       >
         <div class="text-center">
           <img src={pastePreviewUrl} class="img-fluid" alt="Pasted screenshot" />
@@ -8692,37 +6958,34 @@
       1,992,037 — so the completion belongs to exactly one feature. Routing this through either of
       the others would put the URL in the wrong box or post the image into chat.
     -->
-    {#if dayTradeImageUpload}
+    {#if dayTradeAlerts.imageUpload}
       <ImageUploadDialog
-        onclose={() => {
-          dayTradeImageUpload?.resolve(null);
-          dayTradeImageUpload = null;
-        }}
-        onupload={(files) => void completeDayTradeImageUpload(files)}
+        onclose={() => dayTradeAlerts.cancelImageUpload()}
+        onupload={(files) => void dayTradeAlerts.completeImageUpload(files)}
       />
     {/if}
     <!--
       `onImagePaste(event, 'dayTrade')` puts the pasted image in a `bootbox.confirm` before
       uploading, so a stray paste cannot silently push bytes to the upload server.
     -->
-    {#if dayTradeImagePaste}
-      {@const dayTradePastePreviewUrl = dayTradeImagePaste.previewUrl}
+    {#if dayTradeAlerts.imagePaste}
+      {@const dayTradePastePreviewUrl = dayTradeAlerts.imagePaste.previewUrl}
       <BootboxDialog
         mode="confirm"
         message=""
-        onclose={() => closeDayTradeImagePaste()?.resolve(null)}
-        onconfirm={() => void confirmDayTradeImagePaste()}
+        onclose={() => dayTradeAlerts.closeImagePaste()?.resolve(null)}
+        onconfirm={() => void dayTradeAlerts.confirmImagePaste()}
       >
         <div class="text-center">
           <img src={dayTradePastePreviewUrl} class="img-fluid" alt="Pasted screenshot" />
         </div>
       </BootboxDialog>
     {/if}
-    {#if pendingGifUrl}
+    {#if composer.pendingGifUrl}
       <GifConfirmDialog
-        url={pendingGifUrl}
-        onclose={cancelGif}
-        onconfirm={() => void confirmGif()}
+        url={composer.pendingGifUrl}
+        onclose={() => composer.cancelGif()}
+        onconfirm={() => void composer.confirmGif()}
       />
     {/if}
     {#if dialogs.confirmation}
@@ -8776,7 +7039,7 @@
             <button
               type="button"
               class="btn btn-warning btn-random-user"
-              onclick={() => roster.pick && openRosterUserInfo(roster.pick.entry)}
+              onclick={() => roster.pick && userActions.openInfoFor(roster.pick.entry)}
             >
               User Info
             </button>
@@ -8861,30 +7124,30 @@
       a line rather than relocating one.
     -->
     <PrivateChatPanel
-      open={privateChatOpen}
+      open={privateChat.open}
       doNotDisturb={prefs.doNotDisturbOn}
       {isPresenter}
-      peer={selectedMessageUser}
-      tabs={chatTabs}
-      currentUserId={currUser}
-      log={privateChatLog}
-      searching={pmSearching}
-      bind:searchTerm={pmSearchTerm}
-      bind:draft={privateChatDraft}
+      peer={userActions.selectedMessageUser}
+      tabs={privateChat.tabs}
+      currentUserId={privateChat.peerId}
+      log={privateChat.log}
+      searching={privateChat.searching}
+      searchTerm={privateChat.searchTerm}
+      bind:draft={privateChat.draft}
       body={bodySegmentsPrivate}
-      formatTime={privateChatTime}
+      formatTime={(at) => privateChat.formatTime(at)}
       onclosepeer={() => {
-        selectedMessageUser = null;
+        userActions.clearSelectedMessageUser();
         selectedMessage = null;
       }}
-      ondeletethis={deleteThisPM}
-      onclose={closePrivateChatPanel}
-      onsearch={(term) => void onEnterSearchPrivateChat(term)}
+      ondeletethis={() => privateChat.deleteThread()}
+      onclose={() => privateChat.close()}
+      onsearch={(term) => void privateChat.search(term)}
       ondonotdisturb={setDND}
-      ondownload={downloadPrivateChatLog}
-      onswitchuser={switchChatToUser}
-      onloadmore={(uid, page) => loadPrivateChatLog(uid, page)}
-      onsend={() => void sendPrivateMessage()}
+      ondownload={() => privateChat.downloadLog()}
+      onswitchuser={(uid) => void privateChat.switchToUser(uid)}
+      onloadmore={(uid, page) => void privateChat.loadLog(uid, page)}
+      onsend={() => void privateChat.send()}
     />
   </app-room>
   <audio

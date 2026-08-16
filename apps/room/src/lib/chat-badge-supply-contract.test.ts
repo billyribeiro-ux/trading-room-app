@@ -49,6 +49,11 @@ const stripComments = (source: string) =>
   source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/<!--[\s\S]*?-->/g, '');
 
 const endpointCode = stripComments(ENDPOINT);
+/*
+  The read pipelines left the page for `RoomFeeds` in Phase 5 slice 9. Read as their own source, so
+  an assertion about what a pane renders cannot pass against a file that no longer builds it.
+*/
+const feedsModule = readFileSync(new URL('room/feeds.svelte.ts', import.meta.url), 'utf8');
 const pageCode = stripComments(PAGE);
 const messageCode = stripComments(MESSAGE);
 
@@ -109,23 +114,25 @@ describe('level 2 — the room carries it to the page', () => {
 
 describe('level 3 — the page joins it onto each message', () => {
   it('resolves a sender by the hash the message already carries', () => {
-    expect(pageCode).toContain('badgesForSender(item.senderEmailHash)');
-    expect(pageCode).toContain('const ids = data.badges?.byEmailHash?.[emailHash];');
+    expect(feedsModule).toContain('this.badgesFor(item.senderEmailHash)');
+    expect(feedsModule).toContain('const ids = this.#session().badges?.byEmailHash?.[emailHash];');
   });
 
   it('skips an id with no definition rather than drawing a blank chip', () => {
     // `r &&` upstream — a badge deleted from the account while still assigned to a member.
-    expect(pageCode).toContain('if (!badge) continue;');
+    expect(feedsModule).toContain('if (!badge) continue;');
   });
 
   it('swaps in the dark variant by LOOKUP, and falls back if it was deleted', () => {
-    expect(pageCode).toContain("theme === 'dark' && typeof badge.darkTheme === 'number'");
+    expect(feedsModule).toContain(
+      "this.#theme() === 'dark' && typeof badge.darkTheme === 'number'"
+    );
     /*
       `?? badge` is a deliberate divergence: upstream renders NOTHING when the variant id names a
       badge that no longer exists. Losing a badge because its dark variant was deleted is a worse
       outcome than showing the light one.
     */
-    expect(pageCode).toContain('(definitions[String(badge.darkTheme)] ?? badge)');
+    expect(feedsModule).toContain('(definitions[String(badge.darkTheme)] ?? badge)');
   });
 
   it('feeds all four gates the component already had', () => {

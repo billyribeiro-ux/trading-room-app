@@ -513,8 +513,18 @@ describe('viewer-only mode drives every binding the reference gives it', () => {
     expect(ROOM_COMPILED.replace(/\s+/g, '')).toContain(
       'this.appService.globals.videoOnlyMode||this.appService.globals.viewerOnlyMode||'
     );
-    expect(PAGE).toContain('function showPrivateChat()');
-    expect(PAGE).toContain('if (viewerOnlyMode) return;');
+    /*
+      The refusal moved into `RoomPrivateChat.show()` in Phase 5 slice 7. Both halves are read: the
+      class refuses, and the PAGE is what tells it what viewer-only means — a class that refused
+      against a flag nobody supplied would pass a source assertion and never fire.
+    */
+    const privateChatModule = readFileSync(
+      new URL('room/private-chat.svelte.ts', import.meta.url),
+      'utf8'
+    );
+    expect(privateChatModule).toContain('show() {');
+    expect(privateChatModule).toContain('if (this.#viewerOnlyMode()) return;');
+    expect(PAGE).toContain('viewerOnlyMode: () => viewerOnlyMode,');
   });
 
   it('removes the navbar and the sidebar, and reclaims the 49px they reserved', () => {
