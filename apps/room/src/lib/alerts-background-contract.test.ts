@@ -1,6 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
+import { defaultChatStyleForTheme, defaultFollowChatStyle } from './chat-style';
+
 /*
   The alerts panel and an alert card are two different colours, and they must stay two.
 
@@ -108,7 +110,6 @@ describe('chat message background', () => {
     new URL('../../docs/source/main.d6d3c112b59b7d0d.js', import.meta.url),
     'utf8'
   );
-  const page = readFileSync(new URL('../routes/+page.svelte', import.meta.url), 'utf8');
 
   it('reads both captured defaults, so neither can be quietly dropped', () => {
     expect(main).toContain(
@@ -117,23 +118,33 @@ describe('chat message background', () => {
     expect(main).toContain('bgColor:"#ffffff",fontSize:14,playSound:!0');
   });
 
+  /*
+    RE-POINTED 2026-08-17: both functions moved from `+page.svelte` to `#lib/chat-style.ts`, where
+    they are pure and `chat-style.test.ts` asserts their RETURN VALUES.
+
+    These two are rewritten to CALL them rather than to slice their source, and that is an upgrade
+    rather than a relocation. Reading a function body for the characters `bgColor: '#e8e8e8'` proves
+    the literal is written somewhere between two braces; it cannot prove the light branch returns it,
+    cannot tell the two branches apart, and would pass against a function that returned the dark
+    object for both. Executing it proves the thing the room actually depends on.
+  */
   it('gives the room style the room bgColor', () => {
-    const at = page.indexOf('function defaultChatStyleForTheme');
-    expect(at).toBeGreaterThan(-1);
-    const body = page.slice(at, page.indexOf('\n  }', at));
-    expect(body).toContain(`bgColor: '${CARD}'`);
-    expect(body).toContain('fontSize: 13');
-    expect(body).not.toContain("bgColor: '#ffffff'");
+    expect(defaultChatStyleForTheme('light').bgColor).toBe(CARD);
+    expect(defaultChatStyleForTheme('light').fontSize).toBe(13);
+    expect(defaultChatStyleForTheme('light').bgColor).not.toBe('#ffffff');
   });
 
   it('keeps the follow style separate, on the follow bgColor', () => {
-    const at = page.indexOf('function defaultFollowChatStyle');
-    expect(at).toBeGreaterThan(-1);
-    const body = page.slice(at, page.indexOf('\n  }', at));
-    expect(body).toContain("bgColor: '#ffffff'");
-    expect(body).toContain('fontSize: 14');
-    // The bug was this function delegating to the other one.
-    expect(body).not.toContain('defaultChatStyleForTheme');
+    expect(defaultFollowChatStyle('light').bgColor).toBe('#ffffff');
+    expect(defaultFollowChatStyle('light').fontSize).toBe(14);
+    /*
+      The bug was one function serving both. Asserted as a VALUE difference now rather than as the
+      absence of a call: a merged implementation could inline the other body and pass a
+      `not.toContain`, but it cannot return two different backgrounds.
+    */
+    expect(defaultFollowChatStyle('light').bgColor).not.toBe(
+      defaultChatStyleForTheme('light').bgColor
+    );
   });
 
   it('defines the theme mapping blocks the generated sheet needs', () => {

@@ -209,6 +209,40 @@ follow symlinks. Chasing it produced a corroboration instead of a defect — the
 `apps/room/vite.config.ts:81-87`. That is the mechanism the 10:52 entry recorded as closed,
 confirmed by trying to break it.
 
+### 2026-08-17 19:53 EDT — the two captured chat styles become a pure module, and are asserted by VALUE for the first time
+
+**Runtime impact: none intended** — 68 lines moved unchanged. Gate: **2,454 tests / 171 files**,
+`eslint src/` clean, `svelte-check` **1,206 / 0 / 0**, prettier clean. `+page.svelte` 1,663 →
+**1,595**.
+
+**They were checked by slicing the page and reading the literals back as text.** That instrument can
+confirm the characters `#e8e8e8` appear between two braces. It cannot confirm the function RETURNS
+them, cannot tell the light branch from the dark, and would pass against a function that returned the
+dark object for both.
+
+**`defaultFollowChatStyle` was not pure** — it took no argument and read `theme` from the page's
+scope. It now takes the theme, which is what makes both testable by value.
+
+**The defect they exist because of, now guarded by execution.** They were ONE function returning the
+FOLLOW default. `RoomMessage` applies the global style inline to every chat message without a colour
+of its own, and an inline style beats every stylesheet rule — so every chat message carried
+`background-color: #ffffff` while alerts sat on `#e8e8e8`. Chat white, alerts grey, where the capture
+has them identical.
+
+`chat-style.test.ts` asserts the difference rather than only the values: the two styles differ in
+**exactly two fields**, `bgColor` and `fontSize`, which are precisely the two the merge got wrong.
+**Negative control:** returning `#ffffff` from the room style turns **five** assertions red across
+both files.
+
+**Two source-slicing assertions in `alerts-background-contract.test.ts` were rewritten to CALL the
+functions**, which is an upgrade rather than a relocation — and the "must not delegate" guard is now
+a VALUE difference rather than a `not.toContain`, because a merged implementation could inline the
+other body and pass the string check while returning one background.
+
+**One thing recorded because it looks like a bug and is not:** in dark theme both styles are
+`#000000`. The capture genuinely agrees there; they differ on `fontSize`. Asserted, so nobody
+"fixes" it into a difference the reference does not have.
+
 ### 2026-08-17 20:05 EDT — CORRECTION: component-render coverage was mis-stated, and my own audit had the bug
 
 **Runtime impact: none** — `TODO.md` row AE. Verified: the controller's
