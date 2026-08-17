@@ -209,6 +209,17 @@ follow symlinks. Chasing it produced a corroboration instead of a defect — the
 `apps/room/vite.config.ts:81-87`. That is the mechanism the 10:52 entry recorded as closed,
 confirmed by trying to break it.
 
+### 2026-08-17 11:56 EDT — PR #103 merged to `main`: S5 ships
+
+**Runtime impact: yes** — this is the production release of the S5 entry below. Merge commit
+`5260b64`, one commit (`5e7387a`). S3 shipped separately in PR #102 (`0a5b776`).
+
+Merged on the green from the final push, checked rather than assumed: `Backend quality` and
+`Frontend quality` both `success` on `5e7387a`, which is simultaneously the PR head, the branch tip
+and local `HEAD`. `MERGEABLE`; the PR read `BLOCKED` until the frontend job finished, which is the
+branch protection doing its job rather than a problem. No re-run of the local gate — it had passed on
+this exact SHA minutes earlier and the tree was byte-identical.
+
 ### 2026-08-17 11:52 EDT — S5: the SFU spatial-layer effect reaches the screen it controls, and the wiring it depends on turned out to have no guard at all
 
 **Runtime impact: none intended** — one four-line `$effect` moved from `+page.svelte` to
