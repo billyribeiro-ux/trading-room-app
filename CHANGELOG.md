@@ -33,6 +33,73 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-17
 
+### 2026-08-17 11:14 EDT — every citation in the rewritten `TODO.md` opened and checked; three were wrong, and one of them was invented
+
+**Runtime impact: no** — `TODO.md` only. The one test that reads it stays green.
+
+The 10:52 rewrite was right in structure and wrong in detail, because a number of its `file:line`
+citations came from audit agents' reports rather than from my own read. **That is the failure this
+repository names first**, and the same audit had already overturned agents ten times out of sixteen,
+so carrying their citations verbatim was not a defensible shortcut. All 58 were then opened.
+**55 resolved, 1 had drifted, 2 were wrong.**
+
+**The invented one is the important one.** The AngularJS bullet cited `manage-menu-scope.test.ts` as
+pinning `data-menu-control`. **No such file exists anywhere in the repository.** The test that
+actually pins it is `apps/controller/src/lib/manage-menu-stays-open.test.ts:41`, whose docstring at
+`:10-21` gives the same reasoning. A plausible-sounding filename that resolves to nothing is exactly
+what `~/CLAUDE.md` §2 forbids, and only opening the path caught it.
+
+**The second confused a policy target for a privilege.** The role-retirement row said `ptr_clone_app`
+"still holds object privileges granted at `0005:85`". Line 85 of `0005` is a `TO ptr_clone_app`
+clause inside a `CREATE POLICY`, and **`0005` contains no `GRANT` at all** — verified by reading
+`:81-87` and counting `GRANT` in the file: zero. Worse, that clause does not survive a migration,
+because `0009:199-258` retargets every policy and RAISEs if a residual remains. The privileges that
+genuinely block retirement are at `0001_baseline.sql:1821-1938`, `0006:69-107` and `0007:134`.
+Whoever writes that migration would have opened the wrong file.
+
+**The drifted one:** `streaming-choices.md`'s self-description is at `:3` and reads "Nothing here is
+implemented except the entry marked DONE", not "except row 1" — recorded together with a second stale
+line nothing had flagged: its "What is already true" table at `:23` still records
+`Screen track contentHint` as **unset**, though it is set in `media-transport.svelte.ts`.
+
+**ROW W WAS UNDERCOUNTED BY EVERYONE, INCLUDING ME.** The row said seven; an audit pass said nine
+without adding up its own list; I repeated the nine while printing eleven items. Counted properly by
+reading `handle()` from `:480` to `:728` and every key of `EXACT_ALERTS`: **twelve controls report
+success and send nothing.** The twelfth had never been recorded anywhere —
+`session-save-close-message` (`user-actions.svelte.ts:532-535`), whose entire body is
+`alert = 'Message Saved'`. It is the "Just Save Close Message" button at `ModalHost.svelte:4128`, and
+nothing in `apps/room/src` persists a close message, so its sibling "Save Message and Close Session"
+does not save one either — **two buttons offer to save it and neither does.** Two further controls
+(`session-refresh-roster`, `session-soft-reset`) are recorded as a separate milder family: they do a
+real local refetch while their message promises a server command.
+
+**Row G had been narrowed on half the evidence.** It claimed `NEXT-SESSION.md:406-410` settles that
+Postgres stays managed. That line does say so — but `:245-246` lists "whether Postgres stays managed
+or moves self-hosted" under **Open sub-questions**. The document answers twice and disagrees with
+itself; the row now says that rather than picking a side.
+
+**The structural fix, and it is what keeps the file correct.** Row AE now states **no line counts at
+all**. The version it replaced was wrong by 3.3× within a day, and the figures I wrote at 10:52 were
+wrong within the hour — `+page.svelte` 2,947 → 2,955, components 40 → 39, test files 46 → 47, Svelte
+total 37,357 → 37,411, and "180 cases" was 181 — because another session is decomposing continuously.
+A number re-measured on every suite run does not belong in prose edited by hand once a week.
+`source-size-contract.test.ts` (37 ceilings, 181 cases, a staleness check) is named as the authority
+instead, and row AH's counts were made deliberately approximate for the same reason.
+
+**Also corrected:** row AG states the arithmetic explicitly (nineteen actions exported = seventeen
+dispatched + `logout`, a real form POST + `forceReload`, which has no caller); row AD names which app
+owns `/internal/stream-read/[code]` (the controller); the two live capture files are in two different
+directories, not one.
+
+**One scare ruled out before it was reported — the rule working in the other direction.** A sweep
+said the three decoded reference components under `docs/source/components/` did not exist. They do:
+`apps/room/docs/source` is a **symlink** to `~/Desktop/new-room/docs/source`, and `find` does not
+follow symlinks. Chasing it produced a corroboration instead of a defect — the corpus is gitignored
+(`.gitignore:77`) and untracked, **49** room test files read it, `EVIDENCE_BOUND_FILE_COUNT = 49` in
+`evidence-partition.test.ts` matches that count exactly, and the exclusion is wired at
+`apps/room/vite.config.ts:81-87`. That is the mechanism the 10:52 entry recorded as closed,
+confirmed by trying to break it.
+
 ### 2026-08-17 11:04 EDT — PR #100 merged to `main`, delayed by a GitHub major outage
 
 **Runtime impact: yes — this is the production release of the three entries below it, 10:33 to
