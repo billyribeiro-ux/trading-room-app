@@ -28,6 +28,7 @@
   import { EXTRA_COMPOSER } from '#lib/room/chat.svelte.js';
     import { createTawkRuntime } from '#lib/tawk-runtime.js';
   import { splitPairFromValue, splitStorageKeys } from '#lib/room/split.svelte.js';
+  import { defaultChatStyleForTheme, defaultFollowChatStyle } from '#lib/chat-style.js';
   import { shouldDisableSelection } from '#lib/room-key-gates.js';
   import AlertChatArea from '#lib/components/AlertChatArea.svelte';
   import PresentationArea from '#lib/components/PresentationArea.svelte';
@@ -50,43 +51,6 @@
   import type { FollowChatStyle, MainTab, Theme } from '#lib/types.js';
   import type { PageProps } from './$types';
 
-  /**
-   * The ROOM's chat/alert style - `globals.chatStyle`, verbatim:
-   *
-   * ```js
-   * this.chatStyle = {
-   *   lightTheme:{color:"#1a1a1a",tickerColor:"#1a1a1a",usernameColor:"#365d7d",bgColor:"#e8e8e8",fontSize:"13"},
-   *   darkTheme: {color:"#f7fd37",tickerColor:"#f7fd37",usernameColor:"#c0d8ed",bgColor:"#000",  fontSize:"13"}}
-   * ```
-   *
-   * `this.alertStyle` is the same object, which is why an alert and a chat message share a
-   * background in the capture.
-   *
-   * This is NOT the follow-a-user style - see {@link defaultFollowChatStyle}. One function used to
-   * serve both, returning the FOLLOW default (`bgColor: #ffffff`, `fontSize: 14`, `playSound`), and
-   * `RoomMessage` applies the global style inline to every chat message that has no colour of its
-   * own. So every chat message carried `background-color: #ffffff` as an inline style - which beats
-   * every stylesheet rule - and chat sat white while alerts sat on #e8e8e8.
-   */
-  function defaultChatStyleForTheme(theme: Theme): FollowChatStyle {
-    return theme === 'light'
-      ? {
-          color: '#1a1a1a',
-          tickerColor: '#1a1a1a',
-          usernameColor: '#365d7d',
-          bgColor: '#e8e8e8',
-          fontSize: 13,
-          playSound: true
-        }
-      : {
-          color: '#f7fd37',
-          tickerColor: '#f7fd37',
-          usernameColor: '#c0d8ed',
-          bgColor: '#000000',
-          fontSize: 13,
-          playSound: true
-        };
-  }
 
   let { data }: PageProps = $props();
 
@@ -169,7 +133,7 @@
     mtx,
     unreadQaAlertIds,
     settingsSplitPair,
-    defaultFollowChatStyle
+    defaultFollowChatStyle: () => defaultFollowChatStyle(theme)
   });
 
   let sidebarOpen = $state(false);
@@ -729,37 +693,6 @@
     if (polls.deliver(data.activePoll, data.user.id)) modals.modal = 'poll';
   });
 
-  /**
-   * The FOLLOW-a-user style, a different captured default:
-   *
-   * ```js
-   * "lightTheme" === preferences.theme
-   *   ? {color:"#1a1a1a",tickerColor:"#1a1a1a",usernameColor:"#365d7d",bgColor:"#ffffff",fontSize:14,playSound:!0}
-   *   : {color:"#f7fd37",tickerColor:"#f7fd37",usernameColor:"#c0d8ed",bgColor:"#000000",fontSize:14,playSound:!0}
-   * ```
-   *
-   * White and 14px, where the room style is #e8e8e8 and 13px. A followed user's messages are meant
-   * to stand out from the rest, so the two must not share one function.
-   */
-  function defaultFollowChatStyle(): FollowChatStyle {
-    return theme === 'light'
-      ? {
-          color: '#1a1a1a',
-          tickerColor: '#1a1a1a',
-          usernameColor: '#365d7d',
-          bgColor: '#ffffff',
-          fontSize: 14,
-          playSound: true
-        }
-      : {
-          color: '#f7fd37',
-          tickerColor: '#f7fd37',
-          usernameColor: '#c0d8ed',
-          bgColor: '#000000',
-          fontSize: 14,
-          playSound: true
-        };
-  }
 
   /*
     THE TAWK WIDGET, in `#lib/tawk-runtime.ts`.
