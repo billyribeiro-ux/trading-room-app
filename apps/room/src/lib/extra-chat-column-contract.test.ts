@@ -21,6 +21,20 @@ import { describe, expect, it } from 'vitest';
 
 const PAGE = readFileSync(new URL('../routes/+page.svelte', import.meta.url), 'utf8');
 /*
+  THE ROOM'S LAYOUT MOVED TO `RoomShell.svelte` on 2026-08-17 (Phase 5, S4+S8).
+
+  The `as-split` element, the gutter, the mobile/desktop child ORDER and the two layout effects left
+  `+page.svelte` for the component that owns them. The three panes did NOT: they are still built on
+  the page and handed over as SNIPPETS, which is why every pane prop list and every pane contract is
+  untouched by that move.
+
+  Assertions about layout therefore read `SHELL`, and the ones that still read `PAGE` are the ones
+  about what the page still decides. Where an assertion moved, the page is also asserted NOT to carry
+  it any more — a second `as-split` would render the room twice and the positive half alone would
+  stay green.
+*/
+const SHELL = readFileSync(new URL('./components/RoomShell.svelte', import.meta.url), 'utf8');
+/*
   The preference declarations and the write path moved to `RoomPrefs` in Phase 5 slice 3, so the
   assertions about them read the class that now owns them. The page half is still read above -
   each assertion points at the file that owns its subject.
@@ -72,6 +86,7 @@ const messageActionsModule = readFileSync(
   'utf8'
 );
 const pageCode = stripComments(PAGE);
+const shellCode = stripComments(SHELL);
 /*
   The extra column's SCROLLING moved to `room/feed-scroll.ts` in Phase 5 slice 23 — its tracker, its
   own `extraChatScrollingUp` flag, and the paging arm keyed by its channel.
@@ -117,8 +132,8 @@ describe('the column is its own split area', () => {
       shape too: it assigns `preferences.extraChatColumn` at runtime and remembers the old value in
       `extraChatColumnWasEnabled`.
     */
-    expect(pageCode).toContain(
-      '{#if !gates.hideChatAlerts && extraChatColumnVisible}{@render extraChatPane()}'
+    expect(shellCode).toContain(
+      '{#if !hideChatAlerts && extraChatColumnVisible}{@render extraChatPane()}'
     );
   });
 
@@ -289,7 +304,11 @@ describe('hideChat — the pane collapses for non-presenters while chat is disab
       The predicate stays in the page deliberately: `RoomSplit` owns the geometry and has no business
       knowing what a presenter is, so the page answers WHO and the class answers WHAT MOVES.
     */
-    expect(pageCode).toContain("split.collapseChatForMode(!isPresenter && chatMode === 'd');");
+    expect(shellCode).toContain("split.collapseChatForMode(!isPresenter && chatMode === 'd');");
+    // Moved, not copied: two effects would fight over which size to restore.
+    expect(pageCode, 'the collapse effect moved to RoomShell in S4').not.toContain(
+      'collapseChatForMode'
+    );
   });
 
   it('chat goes to 0 and alerts take the column', () => {
@@ -318,8 +337,8 @@ describe('hideChat — the pane collapses for non-presenters while chat is disab
     expect(pageCode).toContain(
       'const extraChatColumnVisible = $derived(prefs.extraChatColumn && !split.chatCollapsed);'
     );
-    expect(pageCode).toContain(
-      '{#if !gates.hideChatAlerts && extraChatColumnVisible}{@render extraChatPane()}'
+    expect(shellCode).toContain(
+      '{#if !hideChatAlerts && extraChatColumnVisible}{@render extraChatPane()}'
     );
     /*
       The collapse must never write the preference — now a STRUCTURAL guarantee rather than a slice.

@@ -23,6 +23,20 @@ const ROOM_HELPERS = readFileSync(
   'utf8'
 );
 const PAGE = readFileSync(new URL('../routes/+page.svelte', import.meta.url), 'utf8');
+/*
+  THE ROOM'S LAYOUT MOVED TO `RoomShell.svelte` on 2026-08-17 (Phase 5, S4+S8).
+
+  The `as-split` element, the gutter, the mobile/desktop child ORDER and the two layout effects left
+  `+page.svelte` for the component that owns them. The three panes did NOT: they are still built on
+  the page and handed over as SNIPPETS, which is why every pane prop list and every pane contract is
+  untouched by that move.
+
+  Assertions about layout therefore read `SHELL`, and the ones that still read `PAGE` are the ones
+  about what the page still decides. Where an assertion moved, the page is also asserted NOT to carry
+  it any more — a second `as-split` would render the room twice and the positive half alone would
+  stay green.
+*/
+const SHELL = readFileSync(new URL('./components/RoomShell.svelte', import.meta.url), 'utf8');
 const ROOM_CONFIG_CLIENT = readFileSync(
   new URL('./server/room-config-client.ts', import.meta.url),
   'utf8'
@@ -104,7 +118,16 @@ describe('hideChatAlerts is ONE flag, not one mechanism per writer', () => {
   });
 
   it('gates the column exactly once, and no branch tests a single writer directly', () => {
-    expect(PAGE).toContain('{#if !gates.hideChatAlerts}');
+    /*
+      The gate reads `hideChatAlerts` rather than `gates.hideChatAlerts` here, and the rename is the
+      extraction rather than a change of meaning: `RoomShell` receives the RESOLVED boolean as a prop
+      instead of reaching into the gates object. The page still computes it from `gates`, which the
+      call-site assertion below pins, so the flag still has exactly one author.
+    */
+    expect(SHELL).toContain('{#if !hideChatAlerts}');
+    expect(PAGE).toContain('hideChatAlerts={gates.hideChatAlerts}');
+    // ONE `as-split`. A second would render the whole room twice.
+    expect(PAGE, 'the split moved to RoomShell in S8').not.toContain('<as-split\n');
     /*
       The defect this replaced: `viewerOnlyMode` and `chatAlertsDetached` each had their own branch
       on this column, so the room SETTING had nowhere to be read and did nothing. Either name
@@ -144,7 +167,8 @@ describe('hidePresentation gates the presentation column on the mode AND the set
     expect(PAGE_COMPACT).toContain(
       'consthidePresentation=$derived(chatOnlyMode||data.sessData?.isChatOnlyRoom===true)'
     );
-    expect(PAGE).toContain('{#if !hidePresentation}');
+    expect(SHELL).toContain('{#if !hidePresentation}');
+    expect(PAGE).toContain('{hidePresentation}');
     expect(ROOM_CONFIG_CLIENT).toContain('isChatOnlyRoom?: boolean;');
   });
 

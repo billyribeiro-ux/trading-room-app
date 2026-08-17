@@ -29,6 +29,20 @@ const ROOM_COMPILED = readFileSync(
 );
 const PAGE = readFileSync(new URL('../routes/+page.svelte', import.meta.url), 'utf8');
 /*
+  THE ROOM'S LAYOUT MOVED TO `RoomShell.svelte` on 2026-08-17 (Phase 5, S4+S8).
+
+  The `as-split` element, the gutter, the mobile/desktop child ORDER and the two layout effects left
+  `+page.svelte` for the component that owns them. The three panes did NOT: they are still built on
+  the page and handed over as SNIPPETS, which is why every pane prop list and every pane contract is
+  untouched by that move.
+
+  Assertions about layout therefore read `SHELL`, and the ones that still read `PAGE` are the ones
+  about what the page still decides. Where an assertion moved, the page is also asserted NOT to carry
+  it any more — a second `as-split` would render the room twice and the positive half alone would
+  stay green.
+*/
+const SHELL = readFileSync(new URL('./components/RoomShell.svelte', import.meta.url), 'utf8');
+/*
   The split geometry left `+page.svelte` for `room/split.svelte.ts` on 2026-08-15, so half the
   assertions below moved with it. The upstream halves — everything read out of `docs/source/**` —
   are untouched, because the evidence did not move; only our side of each pair did.
@@ -79,14 +93,24 @@ describe('K4e reverses the child order, which is why the DOM is reordered', () =
   });
 
   it('renders the two panes in both orders here, from one pair of snippets', () => {
-    const source = compact(PAGE);
+    /*
+      Read from `RoomShell.svelte` as of S8, and the gate names lost their `gates.` prefix in the
+      same move: the shell takes the RESOLVED booleans as props instead of reaching into the gates
+      object. The decision still has one author — the page computes it and hands it over, which
+      `chat-alerts-gates-contract` pins at the call site.
+    */
+    const source = compact(SHELL);
     // Mobile: presentation, gutter, chat/alerts.
     expect(source).toContain(
-      '{#ifsplit.isMobileScreen}{#if!hidePresentation}{@renderpresentationPane()}{/if}{@rendermainGutter()}{#if!gates.hideChatAlerts}{@renderchatAlertsPane()}{/if}{#if!gates.hideChatAlerts&&extraChatColumnVisible}{@renderextraChatPane()}{/if}'
+      '{#ifsplit.isMobileScreen}{#if!hidePresentation}{@renderpresentationPane()}{/if}{@rendermainGutter()}{#if!hideChatAlerts}{@renderchatAlertsPane()}{/if}{#if!hideChatAlerts&&extraChatColumnVisible}{@renderextraChatPane()}{/if}'
     );
     // Desktop: chat/alerts, the extra column, presentation, gutter.
     expect(source).toContain(
-      '{:else}{#if!gates.hideChatAlerts}{@renderchatAlertsPane()}{/if}{#if!gates.hideChatAlerts&&extraChatColumnVisible}{@renderextraChatPane()}{/if}{#if!hidePresentation}{@renderpresentationPane()}{/if}{@rendermainGutter()}{/if}'
+      '{:else}{#if!hideChatAlerts}{@renderchatAlertsPane()}{/if}{#if!hideChatAlerts&&extraChatColumnVisible}{@renderextraChatPane()}{/if}{#if!hidePresentation}{@renderpresentationPane()}{/if}{@rendermainGutter()}{/if}'
+    );
+    // The ordering exists in ONE place. Two would drift the first time somebody edited one.
+    expect(compact(PAGE), 'the pane ordering moved to RoomShell in S8').not.toContain(
+      '{@rendermainGutter()}'
     );
     /*
       THE THIRD AREA, added 2026-08-14. `K4e` renders three `as-split-area` children and gates the
@@ -185,14 +209,18 @@ describe('crossing the threshold refetches, once, after 500ms', () => {
       wider would refetch the whole room repeatedly for no layout change at all.
     */
     expect(compact(ROOM_FULL)).toContain('this.isMobileScreen!==this.onResizeChange');
-    expect(PAGE).toContain('if (mobile === lastThresholdActedOn) return;');
-    expect(PAGE).toContain('const RESIZE_REFETCH_DELAY_MS = 500;');
+    expect(SHELL).toContain('if (mobile === lastThresholdActedOn) return;');
+    expect(SHELL).toContain('const RESIZE_REFETCH_DELAY_MS = 500;');
+    // The refetch effect MOVED. Two of them would fire two invalidations per threshold flip.
+    expect(PAGE, 'the resize refetch moved to RoomShell in S4').not.toContain(
+      'RESIZE_REFETCH_DELAY_MS'
+    );
     // One invalidation stands in for all three commands — the load returns alerts and messages.
-    expect(PAGE).toContain("void invalidate('room:data');");
+    expect(SHELL).toContain("void invalidate('room:data');");
   });
 
   it('does not refetch on the first measurement, which is not a flip', () => {
     // Upstream gets this from `isMobileScreen = onResizeChange = …` in one statement at init.
-    expect(PAGE).toContain('if (lastThresholdActedOn === null) {');
+    expect(SHELL).toContain('if (lastThresholdActedOn === null) {');
   });
 });

@@ -294,8 +294,20 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       guard. `screen-layer-wiring-contract.test.ts` now holds it, and holds in particular the two
       `void` dependency reads that look exactly like dead code and are the only reason the effect
       re-runs when a viewer switches tabs.
+
+      2,638 -> 2,509 the same day, S4+S8 as ONE slice, because S4 moved the two layout effects and S8
+      created the file they move into: doing them apart would have made either a shell with no
+      effects or two effects with nowhere to go. `RoomShell.svelte` takes the `as-split` element, the
+      gutter, the mobile/desktop child ORDER and both effects.
+
+      129 lines for a 226-line component, and the gap is the point rather than an overhead: the three
+      panes did NOT move. They are still built here and handed over as SNIPPETS. `AlertChatArea`
+      takes 45 props, `PresentationArea` over 90 and `ExtraChatPane` 28, so passing them THROUGH a
+      shell would have meant roughly 160 pass-through props, a second place for each to drift, and a
+      forced edit to every pane contract in the repository. A snippet is a closure over this file's
+      scope, so the shell places markup it knows nothing about.
     */
-    max: 2638,
+    max: 2509,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {
@@ -463,6 +475,21 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     */
     max: 782,
     why: 'the overlay layer - modal host, seven dialogs, toasts, the lightbox, audio sinks, delivery'
+  },
+  {
+    file: 'lib/components/RoomShell.svelte',
+    /*
+      Created 2026-08-17 (S4+S8), and capped IN THE SAME COMMIT — which is the lesson S5 paid for
+      two hours earlier, when `PresentationArea.svelte` turned out to have grown to 1,181 lines with
+      no entry because components are a hand-kept list. A new component gets a ceiling on arrival or
+      it gets one after it has already sprawled.
+
+      Small on purpose: it owns the `as-split` element, the gutter, the child order and the two
+      layout effects, and NOTHING else. The three panes arrive as snippets. If this number starts
+      climbing, the thing to check is whether pane props have begun leaking through it.
+    */
+    max: 239,
+    why: 'the split layout and its two effects; the panes arrive as snippets, not as props'
   },
   {
     file: 'lib/components/PresentationArea.svelte',

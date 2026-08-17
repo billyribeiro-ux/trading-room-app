@@ -53,6 +53,16 @@ const CLUSTER = readFileSync(
 );
 const PAGE = readFileSync(new URL('../routes/+page.svelte', import.meta.url), 'utf8');
 /*
+  THE ROOM'S LAYOUT MOVED TO `RoomShell.svelte` on 2026-08-17 (Phase 5, S4+S8) — the `as-split`
+  element, the gutter, the mobile/desktop child order and the two layout effects. The three panes
+  did NOT: they are still built on `+page.svelte` and handed over as snippets, so every pane prop
+  list and every pane contract is untouched.
+
+  Assertions about layout read `SHELL`; the gate names lost their `gates.` prefix in the same move
+  because the shell takes the RESOLVED booleans as props instead of reaching into the gates object.
+*/
+const SHELL = readFileSync(new URL('./components/RoomShell.svelte', import.meta.url), 'utf8');
+/*
   `PANE` in this file is `ScreenPane.svelte`. This one is the presentation AREA, which took the
   main tab strip and `#screensTabsContent` on 2026-08-15 — named in full so the two cannot be
   confused by the next reader.
@@ -528,7 +538,7 @@ describe('viewer-only mode drives every binding the reference gives it', () => {
     */
     const GATES = readFileSync(new URL('./room/gates.svelte.ts', import.meta.url), 'utf8');
     expect(GATES).toContain('this.viewerOnlyMode ||\n      this.#chatAlertsDetached()');
-    expect(PAGE).toContain('{#if !gates.hideChatAlerts}');
+    expect(SHELL).toContain('{#if !hideChatAlerts}');
   });
 
   it('refuses to open the private chat', () => {
@@ -601,7 +611,8 @@ describe('viewer-only mode drives every binding the reference gives it', () => {
     // `QB = (t) => ({'vh-100': t})`, bound to videoOnly || chatOnly || viewerOnly.
     expect(ROOM_HELPERS).toContain("QB = (t) => ({ 'vh-100': t })");
     expect(ROOM_HELPERS).toContain('e.appService.globals.viewerOnlyMode\n      )');
-    expect(pageMarkup).toContain("'vh-100': chatOnlyMode || gates.viewerOnlyMode");
+    expect(SHELL).toContain("'vh-100': chatOnlyMode || viewerOnlyMode");
+    expect(PAGE).toContain('viewerOnlyMode={gates.viewerOnlyMode}');
   });
 
   it('applies all three viewer-only classes as BINDINGS, never as static classes', () => {
