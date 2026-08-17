@@ -209,6 +209,53 @@ follow symlinks. Chasing it produced a corroboration instead of a defect — the
 `apps/room/vite.config.ts:81-87`. That is the mechanism the 10:52 entry recorded as closed,
 confirmed by trying to break it.
 
+### 2026-08-17 19:40 EDT — `PresenterMuteRows` mounted, and the gap measured again: 33 source assertions blind to a gutted checkbox
+
+**Runtime impact: none** — one new test file. Gate: **2,448 tests / 170 files** (+9), `eslint src/`
+clean, `svelte-check` **1,204 / 0 / 0**, prettier clean.
+
+**Tested the component that OWNS the behaviour, not the one that forwards it.** The defect this
+guards shipped through `RoomNavbar` — `idPrefix="NEGATIVE_CONTROL"` in `HEAD` for three commits,
+emitting DOM ids prefixed `NEGATIVE_CONTROL` while `screen-volume-contract.test.ts:492` asserted its
+absence against a slice that had gone empty. But `RoomNavbar` takes 49 props and only forwards the
+prefix. `PresenterMuteRows` owns the ids, takes 7, and is where the property can actually be
+asserted. Testing the forwarder would have been the wrong file at four times the cost.
+
+**Three things source text cannot reach:**
+
+1. **`id` and `for` are a PAIR.** A `toContain` proves both strings exist; only `label.control` —
+   computed by the DOM from the document — proves they resolve to each other. `screen-volume.ts:111`
+   names the stakes: *"a duplicated form-control id makes the overlay's own checkboxes unclickable by
+   their labels"*. A member clicks "Mute" and nothing happens.
+2. **`idPrefix` exists to keep TWO instances apart** — the navbar dropdown and the viewer-only
+   overlay are in the document at once, and upstream gives both the same ids so the overlay's labels
+   operate the navbar's checkboxes. Both copies are mounted into one document here, which is the only
+   condition under which the collision is observable. The complementary test asserts a shared prefix
+   DOES collide, so the first is not vacuous.
+3. **`checked` is written by an ATTACHMENT, not `bind:`** — recorded in the component as deliberate,
+   because a two-way binding would let the element's default win before the preference is read back.
+   The consequence is that `checked` never appears in the markup, so nothing in source can tell a
+   working attachment from a deleted one.
+
+**The gap was measured, as it was for `FilesPane`.** Gutting the attachment body to `void checked;`
+leaves every string in the markup untouched:
+
+```
+screen-volume-contract.test.ts ..... 33 passed   (blind)
+PresenterMuteRows.test.ts .......... 1 failed    (caught)
+```
+
+Every checkbox renders unchecked, a muted presenter looks unmuted to the member who muted them, and
+the source contract is entirely green. Removing the label's `for=` is the same story: four
+assertions here go red and nothing else notices.
+
+**One error of mine.** The mount-tracking helper was typed `{ component }`, which erased `target`
+from every return and produced thirteen `svelte-check` errors. Fixed by making it generic rather than
+by adding the `as never` that would have silenced it — a cast there would have hidden a real type
+mismatch behind the thing it was meant to check.
+
+**Panes with mount tests: three of seven** (`PrivateChatPanel`, `FilesPane`, `PresenterMuteRows`).
+
 ### 2026-08-17 19:35 EDT — `FilesPane` gets a MOUNT test, and the coverage gap it closes was proven rather than argued
 
 **Runtime impact: none** — one new test file. Gate: **2,439 tests / 169 files** (+4), `eslint src/`
