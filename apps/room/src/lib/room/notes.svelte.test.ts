@@ -57,9 +57,20 @@ describe('creating a note takes you to the tab holding it', () => {
   it('the page supplies the receiver the class calls', () => {
     // Every expectation above is satisfied by a class calling a receiver nobody wires, which would
     // raise no error and move no tab — the exact failure that made the control green.
+    /*
+      RE-POINTED 2026-08-17 (S7). The construction moved to the composition root, and the receiver
+      it calls is now a NAMED member of `RoomDeps` supplied by the page — `setMainTab` — instead of
+      an inline arrow assigning to a page `let`. Both halves are asserted, because either one alone
+      passes while the wire is cut: the root can call a receiver the page never supplies, and the
+      page can supply one the root never calls.
+    */
+    const root = readFileSync('src/lib/room/create-room.svelte.ts', 'utf8');
     const page = readFileSync('src/routes/+page.svelte', 'utf8');
-    expect(page, 'the page no longer wires the Notes tab receiver').toContain(
-      "showNotesTab: () => (mainTab = 'notes')"
+    expect(root, 'the root no longer calls the Notes tab receiver').toContain(
+      "showNotesTab: () => deps.setMainTab('notes')"
+    );
+    expect(page, 'the page no longer supplies setMainTab').toContain(
+      'setMainTab: (tab) => (mainTab = tab)'
     );
   });
 });

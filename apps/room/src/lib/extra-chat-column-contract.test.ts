@@ -21,6 +21,18 @@ import { describe, expect, it } from 'vitest';
 
 const PAGE = readFileSync(new URL('../routes/+page.svelte', import.meta.url), 'utf8');
 /*
+  THE 36 CONSTRUCTIONS MOVED TO `create-room.svelte.ts` on 2026-08-17 (Phase 5, S7).
+
+  `+page.svelte` held 740 lines of `new Room*()` across 22 non-contiguous runs. They are now one
+  composition root, and the page destructures what it returns — so every reference like `prefs.x`
+  still reads exactly as before, and only the CONSTRUCTION text changed address.
+
+  Assertions about how a class is WIRED read `ROOT`. Assertions about what the page DECIDES still
+  read `PAGE`, because that is still where the argument is built.
+*/
+const ROOT = readFileSync(new URL('./room/create-room.svelte.ts', import.meta.url), 'utf8');
+const rootCode = ROOT.replace(/\/\*[\s\S]*?\*\//g, '');
+/*
   THE ROOM'S LAYOUT MOVED TO `RoomShell.svelte` on 2026-08-17 (Phase 5, S4+S8).
 
   The `as-split` element, the gutter, the mobile/desktop child ORDER and the two layout effects left
@@ -506,10 +518,20 @@ describe('the second column follows its own messages', () => {
       message arrived anywhere" through the marker state rather than through the effect graph —
       the same defect the separate-effect test below guards, arriving by a different door.
     */
-    expect(pageCode).toContain('const alertsFollow = new RoomScrollFollow(');
-    expect(pageCode).toContain('const chatFollow = new RoomScrollFollow<ChatTab>(');
-    expect(pageCode).toContain('const extraChatFollow = new RoomScrollFollow<ChatTab>(');
-    expect(pageCode.match(/new RoomScrollFollow/g) ?? []).toHaveLength(3);
+    /*
+      All three now live in the composition root (S7). The COUNT is the load-bearing part and it
+      moved with them: three instances, because the alerts column and the two chat columns each keep
+      their own scroll position, and a shared one would let whichever fed it last decide where the
+      others jump to.
+    */
+    expect(rootCode).toContain('const alertsFollow = new RoomScrollFollow(');
+    expect(rootCode).toContain('const chatFollow = new RoomScrollFollow<ChatTab>(');
+    expect(rootCode).toContain('const extraChatFollow = new RoomScrollFollow<ChatTab>(');
+    expect(rootCode.match(/new RoomScrollFollow/g) ?? []).toHaveLength(3);
+    // And nowhere else: a fourth built on the page would be a second answer for one column.
+    expect(pageCode, 'the scroll-follow instances left the page in S7').not.toContain(
+      'new RoomScrollFollow'
+    );
   });
 
   it('is its own effect, not folded into the main chat’s', () => {
