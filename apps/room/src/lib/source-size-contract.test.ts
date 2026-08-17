@@ -307,7 +307,7 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       forced edit to every pane contract in the repository. A snippet is a closure over this file's
       scope, so the shell places markup it knows nothing about.
     */
-    max: 2509,
+    max: 1729,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {
@@ -776,6 +776,31 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     initialises in declaration order, before the constructor has assigned the thunks it reads.
     `RoomFiles.filesHidden` is the recorded precedent for that and it cost a slice to find.
   */
+  {
+    file: 'lib/room/create-room.svelte.ts',
+    /*
+      THE COMPOSITION ROOT, created 2026-08-17 (S7) and capped in the same commit.
+
+      1,066 lines, and it is the largest module in `lib/room/` by a wide margin — deliberately. It
+      holds 36 `new Room*()` constructions that arrived from `+page.svelte` with their citations
+      intact, which is 740 of those lines. It is NOT a class and owns no behaviour: it wires, and
+      returns. If this number climbs, the question to ask is whether something with behaviour has
+      been added to a file whose job is assembly.
+
+      The page fell 2,509 -> 1,729 in the same move, so the repository is not larger for it in any
+      way that matters: the lines went from a file nobody could hold in their head to one whose
+      entire purpose is legible from its first paragraph.
+
+      +19 before the commit even landed, and they are worth naming because they are the shape this
+      ratchet is supposed to allow: `svelte-autofixer` flagged the three EAGER reads of `data`
+      (`state_referenced_locally`), which are deliberate one-time seeds carried over unchanged from
+      the page. The answer was to write down why they are correct, not to suppress the flag with a
+      `svelte-ignore` that nothing is warning under. Prose explaining a real subtlety is exactly what
+      this file's header says never to shave to hit a number.
+    */
+    max: 1066,
+    why: 'the composition root - 36 constructions and their citations, assembly and nothing else'
+  },
   {
     file: 'lib/room/gates.svelte.ts',
     max: 390,

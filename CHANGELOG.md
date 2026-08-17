@@ -209,6 +209,56 @@ follow symlinks. Chasing it produced a corroboration instead of a defect — the
 `apps/room/vite.config.ts:81-87`. That is the mechanism the 10:52 entry recorded as closed,
 confirmed by trying to break it.
 
+### 2026-08-17 15:07 EDT — S7: the composition root, `+page.svelte` 2,509 → 1,729
+
+**Runtime impact: none intended** — 36 `new Room*()` constructions moved from `+page.svelte` to
+`src/lib/room/create-room.svelte.ts`. Gate: **2,421 tests / 167 files**, `eslint src/` clean,
+`svelte-check` **1,200 files / 0 errors / 0 warnings**, `build` ✓, `prettier --check` clean.
+
+**780 lines out of the page for 26 crossings in.** The design that made it possible is one idea:
+readers arrive as THUNKS and are **re-derived here under their original names**, so the 740 lines of
+construction bodies travelled byte-identical. A body that read `isPresenter` still reads
+`isPresenter`; `data.user.id` is still `data.user.id`. Nine tenths of the risk in this slice was the
+temptation to rewrite those bodies, and this removed it. Only **nine** sites were genuinely
+rewritten — the inline arrows that assigned to a page `let` became named receivers (`setTheme`,
+`setMainTab`, `mergeGlobalChatStyle`), which is an improvement rather than a cost.
+
+**The page destructures the result, so almost no call site changed.** `const { prefs, media, … } =
+createRoom({ … })` means the template and 167 test files keep reading `prefs.x` exactly as before.
+A class would have renamed every one of them to `room.prefs` for no benefit.
+
+**Verified before writing a line of it, not assumed.** `$derived` inside a function in a `.svelte.ts`
+was the load-bearing assumption, so it was PROBED first — and the probe failed twice for reasons that
+had nothing to do with the design: a plain `$effect` does not fire without
+`// @vitest-environment jsdom`, and an empty `seen` array reads exactly like broken wiring. Finding
+that out cost two rounds and is written into the new test so the next person does not repeat it.
+
+**Three values moved IN rather than crossing.** `loadedChatStyle`, `loadedRoomSplitDir` and
+`rosterViewer` read `prefs` and `media` — constructions the root owns — so they could not be passed
+in without a cycle. That was invisible until the compiler said so.
+
+**The reactivity test is the one that matters, and its negative control is the proof.** Six contract
+tests were re-pointed at the root, and every one reads SOURCE TEXT — which cannot distinguish a
+wired root from one that renders correctly once and then stops. Changing `const data =
+$derived(deps.session())` to `const data = deps.session()` turns
+`create-room.svelte.test.ts` red with **`expected [ 1 ] to deeply equal [ 1, 2 ]`** — the room
+serving its first page forever, ignoring every `invalidateAll()`, with no error and no type failure.
+That is the exact silent defect the docs warn about, now caught.
+
+**`svelte-autofixer` earned its place here.** It flagged three EAGER reads of `data`
+(`state_referenced_locally`) that `svelte-check`, eslint and 2,420 tests all passed over. They are
+correct — deliberate one-time seeds, byte-identical to what the page did when `data` was `$props()` —
+and the flag appears only because the compiler can finally see the pattern. Written down rather than
+suppressed: nothing is actually warning, and eslint's `no-unused-svelte-ignore` rightly objects to a
+suppression with no warning under it. It caught one such leftover earlier in this same slice.
+
+**Ceilings.** `+page.svelte` 2,509 → **1,729**. `create-room.svelte.ts` capped at **1,066** in the
+commit that created it.
+
+**The target is still not met, and the number is 1,729 against under-1,000.** What remains is the 495
+lines of page functions and the 557-line template. The projection stands at ~1,038 and there is no
+slack in it.
+
 ### 2026-08-17 14:26 EDT — row AH closed by S9, and the S7 analysis banked instead of the S7 move
 
 **Runtime impact: none** — `TODO.md` and `docs/PHASE-5-DECOMPOSITION.md` only. Verified: room suite

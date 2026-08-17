@@ -208,11 +208,14 @@ describe('both are cleared by the event that makes them false', () => {
     */
     // THREE files now, so the chain is asserted link by link: the page builds the queue, hands it
     // to the transport, and the transport calls methods the queue actually defines.
-    const page = stripComments(readFileSync(resolve(cwd, 'src/routes/+page.svelte'), 'utf8'));
-    expect(page, 'the page no longer constructs the queue it dismisses toasts on').toContain(
+    // `new RoomToasts()` moved to the composition root in S7 (it was on the page).
+    const root = stripComments(
+      readFileSync(resolve(cwd, 'src/lib/room/create-room.svelte.ts'), 'utf8')
+    );
+    expect(root, 'the root no longer constructs the queue it dismisses toasts on').toContain(
       'new RoomToasts()'
     );
-    expect(page, 'the page no longer hands the queue to the transport').toMatch(
+    expect(root, 'the root no longer hands the queue to the transport').toMatch(
       /new RoomMediaTransport\(\{[^}]*\btoasts\b/
     );
     expect(code, 'the transport no longer receives a queue').toContain('toasts: RoomToasts;');

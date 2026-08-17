@@ -27,6 +27,18 @@ import { describe, expect, it } from 'vitest';
 */
 
 const server = readFileSync(new URL('../routes/+page.server.ts', import.meta.url), 'utf8');
+/*
+  THE 36 CONSTRUCTIONS MOVED TO `create-room.svelte.ts` on 2026-08-17 (Phase 5, S7).
+
+  `+page.svelte` held 740 lines of `new Room*()` across 22 non-contiguous runs. They are now one
+  composition root, and the page destructures what it returns — so every reference like `prefs.x`
+  still reads exactly as before, and only the CONSTRUCTION text changed address.
+
+  Assertions about how a class is WIRED read `ROOT`. Assertions about what the page DECIDES still
+  read `PAGE`, because that is still where the argument is built.
+*/
+const ROOT = readFileSync(new URL('./room/create-room.svelte.ts', import.meta.url), 'utf8');
+const rootCode = ROOT.replace(/\/\*[\s\S]*?\*\//g, '');
 const page = readFileSync(new URL('../routes/+page.svelte', import.meta.url), 'utf8');
 const remote = readFileSync(new URL('../routes/chat-mute.remote.ts', import.meta.url), 'utf8');
 /*
@@ -71,11 +83,18 @@ describe('the unmute reaches the server', () => {
   });
 
   it('is the command the modal button actually calls, by name and not by string', () => {
-    expect(pageCode).toContain(
-      "import { unmuteChat as unmuteChatCommand } from './chat-mute.remote';"
+    /*
+      The import travelled with the `RoomUserActions` construction that uses it, into the
+      composition root (S7) — so the path is module-relative now, not page-relative. The property
+      being asserted is unchanged and is the whole point of this test: the command is reached by
+      NAME through a real import, so deleting it is a compile error rather than a silent no-op.
+    */
+    expect(rootCode).toContain(
+      "import { unmuteChat as unmuteChatCommand } from '../../routes/chat-mute.remote';"
     );
-    // The page hands the command in; the CLASS is what calls it.
-    expect(pageCode).toContain('unmuteChat: (payload) => unmuteChatCommand(payload)');
+    // The ROOT hands the command in; the CLASS is what calls it. Both ends asserted, because
+    // either alone passes with the wire cut.
+    expect(rootCode).toContain('unmuteChat: (payload) => unmuteChatCommand(payload)');
     expect(userActions).toContain('await this.#commands.unmuteChat({ targetUserId: user.id });');
     // The endpoint-as-a-magic-string this replaced. Its return is what nobody had to check.
     expect(pageCode).not.toContain("fetch('?/unmuteChat'");

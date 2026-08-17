@@ -34,6 +34,18 @@ const SETTINGS = readFileSync(
   new URL('../../docs/source/components/app-user-settings-modal.full.js', import.meta.url),
   'utf8'
 );
+/*
+  THE 36 CONSTRUCTIONS MOVED TO `create-room.svelte.ts` on 2026-08-17 (Phase 5, S7).
+
+  `+page.svelte` held 740 lines of `new Room*()` across 22 non-contiguous runs. They are now one
+  composition root, and the page destructures what it returns — so every reference like `prefs.x`
+  still reads exactly as before, and only the CONSTRUCTION text changed address.
+
+  Assertions about how a class is WIRED read `ROOT`. Assertions about what the page DECIDES still
+  read `PAGE`, because that is still where the argument is built.
+*/
+const ROOT = readFileSync(new URL('./room/create-room.svelte.ts', import.meta.url), 'utf8');
+const rootCode = ROOT.replace(/\/\*[\s\S]*?\*\//g, '');
 const PAGE = readFileSync(new URL('../routes/+page.svelte', import.meta.url), 'utf8');
 // The recording sounds are played by the SSE dispatch, which moved in Phase 5 slice 5.
 const EVENTS = readFileSync(new URL('./room/events.svelte.ts', import.meta.url), 'utf8');
@@ -394,14 +406,21 @@ describe('the wire has no silent break points', () => {
       both chat columns do. `scroll-follow.test.ts` proves the behaviour that follows from it, by
       calling an alerts column and watching it refuse to move a reader.
     */
-    expect(pageCode).toContain('const alertsFollow = new RoomScrollFollow();');
-    expect(pageCode).toContain('const chatFollow = new RoomScrollFollow<ChatTab>({');
-    expect(pageCode).toContain('const extraChatFollow = new RoomScrollFollow<ChatTab>({');
+    // All three moved to the composition root in S7; the asymmetry they encode is unchanged.
+    expect(rootCode).toContain('const alertsFollow = new RoomScrollFollow();');
+    expect(rootCode).toContain('const chatFollow = new RoomScrollFollow<ChatTab>({');
+    expect(rootCode).toContain('const extraChatFollow = new RoomScrollFollow<ChatTab>({');
 
-    const overrideTakers = pageCode.match(
+    const overrideTakers = rootCode.match(
       /alwaysScrollToBottom: \(\) => prefs.alwaysScrollToBottom/g
     );
     expect(overrideTakers, 'the two chat columns must take the override').toHaveLength(2);
+    /*
+      And the alerts column still does NOT, which is the asymmetry the whole test is about — an
+      alerts reader scrolled up into history must not be yanked to the bottom by a new alert. A
+      count of 2 alone would pass if a third appeared and one of the chat ones vanished.
+    */
+    expect(rootCode.match(/new RoomScrollFollow/g) ?? []).toHaveLength(3);
   });
 
   it('small-image-preview stays UNWIRED, because its class has no rule anywhere', () => {

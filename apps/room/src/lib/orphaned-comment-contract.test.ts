@@ -267,10 +267,24 @@ describe('no block comment has lost the code it explains', () => {
       counted in the page on 2026-08-17 by reading them; the floor is set below that so ordinary
       extraction can move them without a false alarm, and a collapse to zero cannot hide.
     */
-    const cited = pageBlocks.filter((block) => !block.jsdoc && isPoliced(pageLines, block));
+    /*
+      COUNTED ACROSS THE WHOLE POLICED SET, not just the page — corrected 2026-08-17 when S7 moved
+      the 36 `new Room*()` constructions into `create-room.svelte.ts` and took their citations with
+      them. The page fell from 31 citation blocks to 2 and this guard went red.
+
+      That was the gate reporting a real change, and the wrong fix would have been to lower the
+      floor until it passed. The citations did not vanish; they MOVED to a file this same test
+      already polices. So the floor now counts where they actually are.
+    */
+    const cited = POLICED.flatMap((file) => {
+      const lines = readFileSync(file, 'utf8').split('\n');
+      return blockComments(lines.join('\n')).filter(
+        (block) => !block.jsdoc && isPoliced(lines, block)
+      );
+    });
     expect(
       cited.length,
-      'CITES_MODULE matched nothing — the plain-block half is inert'
+      'CITES_MODULE matched nothing across the policed files — the plain-block half is inert'
     ).toBeGreaterThan(20);
   });
 

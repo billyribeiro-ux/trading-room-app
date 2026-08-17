@@ -95,6 +95,17 @@ vi.mock('#lib/server/room-config-client.js', () => ({
 */
 const pane = readFileSync(new URL('./components/FilesPane.svelte', import.meta.url), 'utf8');
 /*
+  THE 36 CONSTRUCTIONS MOVED TO `create-room.svelte.ts` on 2026-08-17 (Phase 5, S7).
+
+  `+page.svelte` held 740 lines of `new Room*()` across 22 non-contiguous runs. They are now one
+  composition root, and the page destructures what it returns — so every reference like `prefs.x`
+  still reads exactly as before, and only the CONSTRUCTION text changed address.
+
+  Assertions about how a class is WIRED read `ROOT`. Assertions about what the page DECIDES still
+  read `PAGE`, because that is still where the argument is built.
+*/
+const ROOT = readFileSync(new URL('./room/create-room.svelte.ts', import.meta.url), 'utf8');
+/*
   The `#files` TAB stayed in the main tab strip when the PANE became its own component on
   2026-08-16, so the two halves of the `hideFiles` gate are now in two files and each is read
   from the one that renders it.
@@ -925,7 +936,9 @@ describe('the alert-sound row buttons', () => {
       two halves and both are read: the page hands the remote command in, and the module is what
       awaits it. Asserting only the page would pass on a class that never called what it was given.
     */
-    expect(page).toContain('setAlertSound: (payload) => overwriteCashRegisterSound(payload)');
+    // The `RoomFiles` construction moved to the composition root in S7; the command wiring is
+    // unchanged and is asserted where it now lives.
+    expect(ROOT).toContain('setAlertSound: (payload) => overwriteCashRegisterSound(payload)');
     expect(filesModule).toContain('await this.#commands.setAlertSound({ url, on });');
   });
 

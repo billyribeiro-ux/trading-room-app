@@ -9,6 +9,17 @@ import { volumeIcon } from './screen-volume';
   Reference-bundle assertions are untouched; ours follow the markup into the component.
 */
 const NAVBAR = readFileSync(new URL('./components/RoomNavbar.svelte', import.meta.url), 'utf8');
+/*
+  THE 36 CONSTRUCTIONS MOVED TO `create-room.svelte.ts` on 2026-08-17 (Phase 5, S7).
+
+  `+page.svelte` held 740 lines of `new Room*()` across 22 non-contiguous runs. They are now one
+  composition root, and the page destructures what it returns — so every reference like `prefs.x`
+  still reads exactly as before, and only the CONSTRUCTION text changed address.
+
+  Assertions about how a class is WIRED read `ROOT`. Assertions about what the page DECIDES still
+  read `PAGE`, because that is still where the argument is built.
+*/
+const ROOT = readFileSync(new URL('./room/create-room.svelte.ts', import.meta.url), 'utf8');
 
 /*
   The screen overlay's volume dropdown, pinned against the DECODED component rather than against a
@@ -560,7 +571,9 @@ describe('viewer-only mode drives every binding the reference gives it', () => {
     );
     expect(privateChatModule).toContain('show() {');
     expect(privateChatModule).toContain('if (this.#viewerOnlyMode()) return;');
-    expect(PAGE).toContain('viewerOnlyMode: () => gates.viewerOnlyMode,');
+    // The `RoomPrivateChat` construction moved to the composition root in S7. The gate it reads is
+    // still computed on the page, by `gates` — the root only asks.
+    expect(ROOT).toContain('viewerOnlyMode: () => gates.viewerOnlyMode,');
   });
 
   it('removes the navbar and the sidebar, and reclaims the 49px they reserved', () => {
