@@ -9,20 +9,77 @@ will be found later.
 end of a session. A change with no entry is a change the next person has to reverse-engineer from
 `git log`.
 
-**Branching: there isn't any, and that is deliberate.** Work is committed and pushed **straight to
-`main`** — confirmed by the owner 2026-08-09. No feature branches, no PRs. The consequence is worth
-stating once, here, rather than rediscovering it: **`main` auto-deploys**, so a push is a production
-release, not a reviewable step. Two things follow, and both are conventions of this file:
+**Branching: a feature branch and a PR per piece of work.** This paragraph used to say the opposite —
+"there isn't any, and that is deliberate… no feature branches, no PRs, confirmed by the owner
+2026-08-09" — and it was **already false on the day it was written**: `e7a0df5`, the merge of PR #1,
+is dated 2026-08-09 12:03 EDT. There are 113 merge commits on `main` as of 2026-08-17 and more than
+twenty entries below this line that open with ``Branch `feat/extra-chat-column` ``. Corrected
+2026-08-17; it is left described rather than silently swapped, because a stale convention paragraph
+is how the next person gets the process wrong.
 
-1. **Every entry says whether it has runtime impact** — whether the push changed what the site
+**What has NOT changed is the consequence, and it is the reason any of this is written down:**
+`main` auto-deploys. `.github/workflows/quality.yml:8` states it and `smoke.yml:17-24` acts on it —
+Vercel deploys the controller on push, and the smoke test runs *after* the deploy is already live
+because it cannot gate one. So a **merge** to `main` is a production release. Two conventions follow:
+
+1. **Every entry says whether it has runtime impact** — whether the merge changed what the site
    serves, or only documentation, comments and tests. That is the first thing anyone reading back
    through an incident wants to know.
-2. **Verification happens before the push, not after**, because there is no review gate to catch it.
-   Each entry records what was run and what could not be.
+2. **Verification happens before the merge, not after.** The PR gate (`Frontend quality` +
+   `Backend quality`) is the only verification a production deploy ever gets — `quality.yml:34` says
+   so in those words. Each entry records what was run and what could not be.
 
 ---
 
 ## 2026-08-17
+
+### 2026-08-17 11:04 EDT — PR #100 merged to `main`, delayed by a GitHub major outage
+
+**Runtime impact: yes — this is the production release of the three entries below it, 10:33 to
+10:52 EDT.** Merge commit `2f6589b`: `65f5dd3` (S1, `{#each}` keys), `d2c9aa8` (S2, `$state.raw`),
+`3ae9369` (the `TODO.md` re-audit and its two live defects). The 10:24 `next.23` entry below is NOT
+in this release — it went out in PR #99 at 10:30. No source changed in this step; the only edits are
+this entry and the branching paragraph at the top of the file, which had to be corrected to describe
+the process actually in use.
+
+**The precondition, checked and not assumed.** The rule here is that a merge happens on the green
+from the *final* push, because each push cancels the in-flight gate — `65f5dd3`'s `Frontend quality`
+run is `cancelled` in the run list, which is that rule visible in the evidence rather than argued
+from. Both jobs report `conclusion: success` for `headSha` `3ae9369…`, which is simultaneously the
+PR head (`headRefOid`), the branch tip and the local `HEAD`; `mergeable: MERGEABLE`,
+`mergeStateStatus: CLEAN`.
+
+**Why it was delayed.** `gh pr merge` returned `503 Service Unavailable` on three attempts spaced by
+20s and 45s backoff. The duration is deliberately not given a number: the first attempt was not
+timestamped, so all that can honestly be said is that it began after `d2c9aa8`'s gate reported green
+(run created 10:45:38 EDT) and ended at the merge, 11:04:57 — under twenty minutes, and `3ae9369` was
+committed at 10:52 while it was still blocked. Diagnosed before retrying blindly, and the diagnosis
+is the point: `gh api rate_limit` and `gh pr view 100` both **succeeded** while the merge failed, so
+reads worked and writes did not — which rules out auth, a stale local ref and a dirty tree in one
+step. `githubstatus.com/api/v2/summary.json` then confirmed it from the other side:
+
+```
+indicator: major — Partial System Outage
+major_outage    Pull Requests, Issues, API Requests, Actions, Copilot
+partial_outage  Webhooks
+```
+
+**What was NOT done, deliberately.** The obvious workaround — merge locally and push straight to
+`main` — was refused and left for the owner to decide. On a repository where `main` auto-deploys,
+that trades a 35-minute wait for an unreviewed production release performed while GitHub's own
+Actions service is in major outage, i.e. at the exact moment the post-deploy smoke test cannot be
+trusted to report. Waiting cost nothing; the outage cleared and the ordinary path worked unchanged.
+
+**Not run: the gate.** No test, `svelte-check` or build was executed here. The four steps had already
+passed in CI on this exact SHA and the working tree was byte-identical to it — re-running them
+locally would have re-proven a green minutes old at real cost. Two things *were* run and are named so
+the sentence above is exact: `eslint` on `state-raw-contract.test.ts`, to confirm a leftover
+`no-unused-vars` error in a stale background-task log was already gone (it was; exit 0), and
+`prettier --check` on this file. **`CHANGELOG.md` fails `prettier --check`, and it did so at `HEAD`
+before this edit** — verified by checking out the previous version to a temporary path and running
+the same command against it. Pre-existing, not a regression, and not "fixed" here: no root `format`
+script reads it, and rewriting 4,500 lines of history to satisfy a check nothing runs would bury
+every entry above in a formatting diff.
 
 ### 2026-08-17 10:52 EDT — `TODO.md` re-audited against the repository: 652 lines → 413, and two live defects found by the audit itself
 
