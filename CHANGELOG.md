@@ -209,6 +209,55 @@ follow symlinks. Chasing it produced a corroboration instead of a defect — the
 `apps/room/vite.config.ts:81-87`. That is the mechanism the 10:52 entry recorded as closed,
 confirmed by trying to break it.
 
+### 2026-08-17 12:14 EDT — S9: the vacuous-guard failure becomes a gate, and it found twelve live instances
+
+**Runtime impact: none** — tests only. Gate: **2,414 tests / 166 files**, `eslint src/` clean,
+`svelte-check` **1,198 files / 0 errors / 0 warnings**, `build` ✓, `prettier --check` clean.
+
+**The failure this closes, in four lines:**
+
+```js
+const at = PAGE.indexOf('<div class="room-sound-options">');   // -1 once the markup moved
+const rows = PAGE.slice(at);                                   // slice(-1) -> one character
+expect(rows).not.toContain('idPrefix');                        // passes. against one character.
+```
+
+That sat green in `screen-volume-contract.test.ts` from 2026-08-15 to 2026-08-17, through three
+later commits to the same file, while the markup it guarded had moved to `RoomNavbar.svelte`. Nothing
+automated could see it, because nothing is wrong: `slice(-1)` is well-defined and `-1` is how
+`indexOf` reports a miss, so every layer behaves to spec and the assertion asks a question about one
+character. It was found by a person reading the file. The same shape produced the `day-separator`
+failure and the `readingHistory` one — **four instances, one shape**, which is the argument for a
+gate rather than for more care.
+
+**`slice-anchor-contract.test.ts`** walks every `src/lib/*.test.ts` with the TypeScript AST — the
+question is whether a VALUE flows from an `indexOf` into a `slice` bound, which no pattern can
+answer — and requires that each such local be asserted found.
+
+**Twelve live instances, and nine of them first-order.** The sharpest is
+`chat-gif-muted-contract.test.ts:138`, which sliced `pageCode` from `indexOf('const messageChrome')`
+with no check — a page marker, in a week spent moving page code. All twelve now carry an anchor
+assertion, and **all twelve pass**, so the pattern was unguarded but not yet broken. Stated plainly
+because "we added twelve assertions" reads like twelve bugs and it was not.
+
+**Two rounds of my own false positives, both caught before reporting.** The first scanner reported
+**zero** unguarded slices repo-wide — not cleanliness but a bug: it detected `.slice(` by reading
+`node.expression.getText()`, which for `code.slice(at)` yields `code.slice` and contains no
+parenthesis. "0 problems" read exactly like success. The second reported nineteen, of which seven
+were correct code: `alerts-background-contract.test.ts` guards with
+`return open === -1 || close === -1 ? null : …`, a conditional rather than an `expect`. Flagging
+correct code is how a gate gets suppressed, so the comparison form is now recognised rather than
+legislated against. A vacuity guard on the guard is included: if the scanner ever stops finding this
+pattern at all, that test fails rather than passing.
+
+**Honest gap, counted rather than hidden.** 142 sites inline their `indexOf` directly into the slice
+bound (`s.slice(s.indexOf(x))`). There is no local to name in a failure message, so this file has
+nothing useful to say about them — the count is pinned as a ceiling that may only go down.
+
+**Negative control:** the anchor removed from `webcam-contract.test.ts` → red naming that exact line;
+reverted → green. The removal was verified to have landed before the test was run, after S8's control
+silently failed to apply.
+
 ### 2026-08-17 12:04 EDT — S4 + S8: `RoomShell.svelte`, and the panes stay where they are, `+page.svelte` 2,638 → 2,509
 
 **Runtime impact: none intended** — the `as-split` element, the gutter, the mobile/desktop child

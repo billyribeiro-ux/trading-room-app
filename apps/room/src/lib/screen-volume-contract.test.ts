@@ -105,6 +105,7 @@ function constTable(compiled: string): unknown[] {
   const from = compiled.indexOf('consts: [');
   expect(from, 'the component must declare a consts table').toBeGreaterThan(-1);
   const open = compiled.indexOf('[', from);
+  expect(open, 'the consts table must open').toBeGreaterThan(-1);
   const close = compiled.indexOf('\n        ],\n        template:', open);
   expect(close, 'the consts table must close before the template').toBeGreaterThan(open);
   return parseConstTable(compiled.slice(open, close + '\n        ]'.length)) as unknown[];
@@ -409,6 +410,9 @@ describe('the NAVBAR dropdown, which is the same control in a different componen
     );
     const rowsAt = soundOptions.indexOf('<PresenterMuteRows');
     const firstCheckbox = soundOptions.indexOf('alert-donot-disturb');
+    expect(firstCheckbox, 'the do-not-disturb row must exist in the sound options').toBeGreaterThan(
+      -1
+    );
     expect(rowsAt, 'the navbar dropdown must render the presenter rows').toBeGreaterThan(-1);
     expect(rowsAt).toBeLessThan(firstCheckbox);
     expect(soundOptions.slice(rowsAt, firstCheckbox)).toContain('trailingRule');

@@ -193,6 +193,10 @@ describe('the renderer', () => {
     // author's own tags. The HTML branch is a sibling of it, not a wrapper around it.
     const branch = messageCode.slice(messageCode.indexOf('{:else if item.bodyHtml}'));
     const nextBranch = branch.indexOf('{:else}');
+    expect(
+      nextBranch,
+      'the branch must have an {:else} for this slice to be a branch'
+    ).toBeGreaterThan(-1);
     expect(branch.slice(0, nextBranch)).not.toContain('bodySegments');
   });
 });

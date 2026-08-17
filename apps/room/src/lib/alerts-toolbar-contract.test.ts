@@ -193,6 +193,7 @@ describe('alerts toolbar: what each state renders', () => {
     */
     const header = paneMarkup.slice(paneMarkup.indexOf('alertHeader'));
     const brandEnd = header.indexOf('</ul>');
+    expect(brandEnd, 'the header must close its brand list').toBeGreaterThan(-1);
     const brand = header.slice(0, brandEnd);
 
     expect(brand).toContain('{#if alertFilterActive}');

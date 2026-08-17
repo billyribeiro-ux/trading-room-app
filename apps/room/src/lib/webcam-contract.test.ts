@@ -73,6 +73,7 @@ function webcamsBodyOf(name: string) {
   const at = webcamsCode.search(new RegExp(`\\n {2}(?:async )?${name}\\(`));
   expect(at, `${name} should exist in the cards module`).toBeGreaterThan(-1);
   const end = webcamsCode.indexOf('\n  }', at);
+  expect(end, 'the method must close at two-space indent').toBeGreaterThan(-1);
   return webcamsCode.slice(at, end);
 }
 

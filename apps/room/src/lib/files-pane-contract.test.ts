@@ -713,6 +713,7 @@ describe('file rows', () => {
     */
     const img = pane.slice(pane.indexOf('class="fileDriveImg"'));
     const tagEnd = img.indexOf('/>');
+    expect(tagEnd, 'the img tag must close').toBeGreaterThan(-1);
     expect(img.slice(0, tagEnd)).not.toMatch(/\bwidth=|\bheight=/);
   });
 });
