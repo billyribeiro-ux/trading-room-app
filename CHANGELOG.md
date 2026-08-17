@@ -209,6 +209,50 @@ follow symlinks. Chasing it produced a corroboration instead of a defect — the
 `apps/room/vite.config.ts:81-87`. That is the mechanism the 10:52 entry recorded as closed,
 confirmed by trying to break it.
 
+### 2026-08-17 19:27 EDT — the Tawk widget's runtime half leaves the page, and becomes testable for the first time
+
+**Runtime impact: none intended** — 90 lines moved unchanged into `#lib/tawk-runtime.ts`. Gate:
+**2,435 tests / 168 files** (+10), `eslint src/` clean, `svelte-check` **1,202 / 0 / 0**, prettier
+clean. `+page.svelte` 1,711 → **1,662**.
+
+**The rules were already extracted; the imperative half was not.** `tawk-support.ts` has owned
+`tawkScript` and `tawkAttributes` — both pure, both tested, eleven assertions. What stayed on the
+page was `document.createElement`, `getElementsByTagName`, `window.Tawk_API`, a 100ms poll and a
+boolean latch. That is the half with no business in a page, and it is now a factory beside the pure
+module.
+
+**A FACTORY, not a rune class, and the departure is stated because every other Phase 5 extraction
+produced a class.** The docs' test decides it: *"Only use the `$state` rune for variables that should
+be reactive — in other words, variables that cause an `$effect`, `$derived` or template expression to
+update."* There is one piece of state, `widgetOpen`, and nothing renders from it — it is a latch read
+only by the next `toggle()`. A module-level `let` was refused for the reason `svelte/context` gives
+about shared modules during SSR (*"may be accessible by the next user"*), so it lives in a closure
+created per call.
+
+**The point of the extraction is not the 90 lines — it is that TEN behaviours became executable.**
+Every imperative behaviour here could previously only be asserted as source text, because nothing can
+mount `+page.svelte`. Two are worth naming:
+
+- **A real leak.** `load()` starts a `setTimeout` chain that re-arms every 100ms until
+  `window.Tawk_API` appears. If the disposer does not cancel it, a viewer who leaves the room inside
+  that window leaves the chain running against a detached document forever — the API never appears
+  for a page that is gone. Negative control: removing `cancelled = true` → red.
+- **The once-only latch.** `toggleVisibility()` fires every time, `setAttributes` only on the first
+  open. A leaking latch re-sends a viewer's name and email on every open. Negative control:
+  removing the guard → red.
+
+**The test file found something about the code, and it is faithful rather than a defect.** With NO
+existing `<script>` in the document, injection silently does nothing: it is
+`first?.parentNode?.insertBefore(element, first)` where `first` is `getElementsByTagName('script')[0]`,
+and both optional chains short-circuit. That is exactly what the capture does — `i.parentNode.insertBefore(e, i)`
+has the same dependency — and it is safe here because a SvelteKit page always ships its own module
+script. It is asserted anyway, because "improving" it to `document.head.append` would load the widget
+in a bare document, pass every other test, and quietly stop matching the reference's insertion point.
+
+**The viewer crosses as a THUNK**, asserted by changing the display name between construction and
+toggle: attributes are sent on the first open, which can be minutes after the factory ran, so a
+captured object would send whatever the name was at page load.
+
 ### 2026-08-17 19:23 EDT — forty lines of duplicated transcription removed, and the one sentence that was not a duplicate moved to the code it explains
 
 **Runtime impact: none** — comments and two ceiling numbers. `getRandomUser`'s body is unchanged.

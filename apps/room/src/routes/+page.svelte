@@ -26,7 +26,7 @@
                         import { setAutoplayAttribute, setWebcamAudioAttributes } from '#lib/room/webcams.js';
         import type { RoomMessageChrome } from '#lib/room-message-chrome.js';
   import { EXTRA_COMPOSER } from '#lib/room/chat.svelte.js';
-    import { tawkAttributes, tawkScript } from '#lib/tawk-support.js';
+    import { createTawkRuntime } from '#lib/tawk-runtime.js';
   import { splitPairFromValue, splitStorageKeys } from '#lib/room/split.svelte.js';
   import { shouldDisableSelection } from '#lib/room-key-gates.js';
   import AlertChatArea from '#lib/components/AlertChatArea.svelte';
@@ -761,78 +761,30 @@
         };
   }
 
-  /** `this.tawkWidgetOpen` — attributes are set once, on the first open. */
-  let tawkWidgetOpen = false;
+  /*
+    THE TAWK WIDGET, in `#lib/tawk-runtime.ts`.
 
-  type TawkApi = {
-    toggleVisibility?: () => void;
-    hideWidget?: () => void;
-    setAttributes?: (
-      attributes: { name: string; email: string },
-      onerror: (error: unknown) => void
-    ) => void;
-  };
+    Ninety lines of script injection, a 100ms poll for `window.Tawk_API`, a once-only attribute
+    latch and the API type left this file on 2026-08-17. The RULES were already elsewhere —
+    `tawk-support.ts` owns which script tag to build and which attributes to send, both pure and
+    both tested — so what moved is the imperative half, which is the half that has no business in a
+    page: `document.createElement`, `getElementsByTagName` and a global.
 
-  function tawkApi(): TawkApi | undefined {
-    return (window as Window & { Tawk_API?: TawkApi }).Tawk_API;
-  }
+    A FACTORY, not a rune class, and the reason is the docs' own test: `widgetOpen` is a latch that
+    nothing renders from, and `$state` is for "variables that cause an `$effect`, `$derived` or
+    template expression to update". The full reasoning, including why it is not a module-level
+    `let`, is at the top of that file.
 
-  /**
-   * `loadTawkSupport()` + `setTAWKAttributes()`, in the order `ngAfterViewInit` runs them.
-   *
-   * `waitForTawkAPI()` upstream polls every 100ms until `window.Tawk_API` exists, then hides the
-   * widget. Reproduced with the script's own `load` event plus the same poll as a fallback, because
-   * the API object is created by the script rather than at load time.
-   */
-  function loadTawkSupport() {
-    const script = tawkScript(PUBLIC_PTR_TAWK_PROPERTY_ID);
-    if (!script) return () => {};
-
-    const element = document.createElement('script');
-    element.async = script.async;
-    element.src = script.src;
-    element.charset = script.charset;
-    element.setAttribute('crossorigin', script.crossorigin);
-    // `i.parentNode.insertBefore(e, i)` where `i` is the first existing script.
-    const first = document.getElementsByTagName('script')[0];
-    first?.parentNode?.insertBefore(element, first);
-
-    // `waitForTawkAPI()` — then `hideWidget()`, so it is invisible until the control is used.
-    let cancelled = false;
-    const waitForApi = () => {
-      if (cancelled) return;
-      const api = tawkApi();
-      if (api?.hideWidget) api.hideWidget();
-      else globalThis.setTimeout(waitForApi, 100);
-    };
-    waitForApi();
-
-    return () => {
-      cancelled = true;
-      element.remove();
-    };
-  }
-
-  /** `toggleTAWKSupport()` — visibility every time, attributes only on the first open. */
-  function toggleTAWKSupport() {
-    const api = tawkApi();
-    if (!api?.toggleVisibility) return;
-    api.toggleVisibility();
-    if (tawkWidgetOpen) return;
-    api.setAttributes?.(
-      tawkAttributes({
-        savedNick: typeof prefs.loaded.savedNick === 'string' ? prefs.loaded.savedNick : null,
-        nick: data.user.displayName,
-        name: data.user.displayName,
-        savedEmail: typeof prefs.loaded.savedEmail === 'string' ? prefs.loaded.savedEmail : null,
-        email: data.user.email
-      }),
-      (error) => {
-        if (error) console.error('Error setting Tawk.to attributes:', error);
-      }
-    );
-    tawkWidgetOpen = true;
-  }
+    The viewer crosses as a THUNK because attributes are sent on the FIRST OPEN, which can be
+    minutes after this line runs.
+  */
+  const tawk = createTawkRuntime(PUBLIC_PTR_TAWK_PROPERTY_ID, () => ({
+    savedNick: typeof prefs.loaded.savedNick === 'string' ? prefs.loaded.savedNick : null,
+    nick: data.user.displayName,
+    name: data.user.displayName,
+    savedEmail: typeof prefs.loaded.savedEmail === 'string' ? prefs.loaded.savedEmail : null,
+    email: data.user.email
+  }));
 
   function setInputChecked(checked: boolean) {
     return (node: HTMLInputElement) => {
@@ -995,7 +947,7 @@
     imageModalWindow.openImageModal = modals.openImage;
     // `ngAfterViewInit`: `sessData.tawkPresenterSupport && (loadTawkSupport(), setTAWKAttributes())`.
     // Gated on `tawkAvailable`, which adds the configured-property term — with none, no script.
-    const stopTawk = gates.tawkAvailable ? loadTawkSupport() : () => {};
+    const stopTawk = gates.tawkAvailable ? tawk.load() : () => {};
     initializeSoundEffects();
     setSoundEffectsVolume(roomVolume.volume / 100);
     userActions.loadManaged();
@@ -1298,7 +1250,7 @@
           onadjustpresentervolume={(user, raw) => roomVolume.adjustPresenterVolume(user, raw)}
           ontoggletalkingpresenteraudio={(user) => roomVolume.toggleTalkingPresenterAudio(user)}
           onupdatesoundcheck={(event) => prefs.updateSoundCheck(event)}
-          ontoggletawksupport={toggleTAWKSupport}
+          ontoggletawksupport={() => tawk.toggle()}
           ongetmypinanddoinfo={() => void getMyPinAndDoInfo()}
           onrequestreload={requestReload}
           onshowrecpreview={() => recording.showRecPreview()}
