@@ -7,8 +7,8 @@
   }
 
   let { onclose, onupload }: Props = $props();
-  let files = $state<File[]>([]);
-  let previews = $state<string[]>([]);
+  let files = $state.raw<File[]>([]);
+  let previews = $state.raw<string[]>([]);
   let message = $state('');
   let dragging = $state(false);
   const imageUploadInputId = 'fupload';

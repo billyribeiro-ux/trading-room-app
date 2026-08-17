@@ -136,8 +136,22 @@ export class RoomFiles {
     */
     this.#fileSort = $state.raw(INITIAL_FILE_SORT);
 
-    // The row checkboxes that feed "Delete Selected"; `#filesDriveList input:checked` in the capture.
-    this.#selectedFileIds = $state<Set<number>>(new Set());
+    /*
+      The row checkboxes that feed "Delete Selected"; `#filesDriveList input:checked` in the capture.
+
+      `$state.raw`, and the change on 2026-08-17 turned a CONVENTION into a GUARANTEE.
+
+      This is one of the eight copy-on-write `Set` sites — `toggleFileSelection` builds
+      `new Set(this.#selectedFileIds)`, mutates the COPY, and reassigns. That pattern is a recorded
+      decision and is not what changed. What changed is that it used to depend on everyone
+      remembering: a `.add()` straight onto a proxied `$state` Set would have worked, so nothing
+      stopped the copy being skipped.
+
+      Raw state cannot be mutated at all — only reassigned — so the discipline is now enforced by the
+      rune rather than by discipline. `state-raw-contract.test.ts` guards the other direction too: a
+      `.add()` on a raw Set updates the Set and notifies NOTHING, which is silent and has no error.
+    */
+    this.#selectedFileIds = $state.raw<Set<number>>(new Set());
 
     /**
      * `playMp3ForMe(e)` - a toggle that builds a hidden `<audio>` keyed by the file id and removes
@@ -151,7 +165,7 @@ export class RoomFiles {
      * else { document.body.removeChild(document.getElementById(e._id)); }
      * ```
      */
-    this.#playingForMe = $state<Set<number>>(new Set());
+    this.#playingForMe = $state.raw<Set<number>>(new Set());
   }
 
   get fileTab() {

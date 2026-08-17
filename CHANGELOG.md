@@ -24,6 +24,200 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-17
 
+### 2026-08-17 10:52 EDT — `TODO.md` re-audited against the repository: 652 lines → 413, and two live defects found by the audit itself
+
+**Runtime impact: yes, in one place** — the dark-theme badge variant now reaches the room. Everything
+else is `TODO.md`, comments and test guards. Tests run: 139 across every file that reads a changed
+one (72 controller, 67 room). **No full gate** — nothing outside those files reads any of them.
+
+**What was done.** Eighty-five claims in `TODO.md` were checked by READING the artefacts they name,
+never by concluding from a search. Every "this is finished" verdict was then handed to a pass whose
+only job was to refute it. **That pass overturned ten of sixteen**, and four rows that were about to
+be deleted turned out to be still carrying open work — which is the whole argument for the pass and
+the reason it is recorded here rather than treated as overhead.
+
+**The single constraint on the edit, found before touching anything:**
+`apps/controller/src/lib/evidence-gap-register-counts.test.ts:36` reads `TODO.md` and requires the
+tally sentence in its exact documented shape, equal to a live recount of the register. It is the only
+tracked file that reads the root `TODO.md`. Recounted with the test's own parser — 68/5/14/87,
+matching — and the sentence was carried across byte-for-byte. A note now sits at the top of `TODO.md`
+saying so, because deleting that one line is the obvious tidy-up and turns the gate red.
+
+**TWO LIVE DEFECTS, neither of which anybody was looking for. Both fixed, both negative-controlled.**
+
+1. **`screen-volume-contract.test.ts:466` had been asserting on the empty string since 2026-08-15.**
+   It sliced `+page.svelte` for `<div class="room-sound-options">`, markup that moved into
+   `RoomNavbar.svelte` in `7023893`. `indexOf` returned -1, `slice(-1)` yielded one character, both
+   inner `indexOf`s returned -1, and `expect('').not.toContain('idPrefix')` passed against nothing —
+   through three later commits to that same file. **Demonstrated rather than argued:** replaying the
+   old expression against the current file prints `navRows = ""`. The sibling slice at `:397` HAD
+   been re-pointed to `navbarMarkup` in that same commit, so this was one missed line. Fixed by
+   slicing `NAVBAR` and asserting the index is `> -1` BEFORE the negative runs. **Negative control:
+   `idPrefix="NEGATIVE_CONTROL"` added to `RoomNavbar.svelte:763` → red at `:492`; reverted → green.**
+   This is the fourth time a `not.toContain` has gone vacuous here after an extraction, and the first
+   caught by anything other than a person reading the file.
+
+2. **The dark-theme badge variant never reached the room — a feature written, migrated, given a
+   picker, and never rendered.** `internal/room-config/[code]/+server.ts` sent
+   `darkTheme: typeof badge.darkTheme === 'number' ? … : undefined`, but `badges.darkTheme` is
+   `boolean('dark_theme')` — superseded by `darkThemeBadgeId` in migration `0013` and kept only
+   because migrations are forward-only. `typeof` is never `'number'`, so the field was **always
+   `undefined`** and the room's swap in `feeds.svelte.ts` could never fire; `darkThemeBadgeId`
+   appeared **zero times** in `apps/room`. The line was honest when written — `0013` did not exist
+   yet — and was simply not revisited when the column landed. Now `darkTheme: badge.darkThemeBadgeId
+   ?? undefined`: the wire name stays the reference's (the room matches on it), the source becomes
+   the column that holds an id, and no `.svelte`/`.svelte.ts` file needed to change.
+   **`chat-badge-supply-contract.test.ts` was PINNING the dead line**, so a green test was holding
+   the defect in place; it now asserts the live form and that the dead one is absent. **Negative
+   control: endpoint reverted → red at `:110`; restored → green.** `schema.ts`'s claim that nothing
+   reads the superseded column was false for two days and now names its one former reader.
+
+**What came OUT of `TODO.md`, on evidence:** the guest-path row (fixed by `ef7d07c`; the controller
+redirects from `load` before its form renders, and the token-minting remedy the row prescribed was
+explicitly REJECTED in code at `session/[code]/+page.server.ts:49-52`), the evidence-partition work,
+the control-plane question, the `svelte.config 2.js` removal, `T5-27`'s migration plan (`0013`
+shipped), the document index, the two-Bootstrap-generations finding, the Scope section, and the
+build narratives in rows AD and AE. All are recorded here or enforced by a named test.
+
+**What STAYED, and two rows got worse rather than better:**
+
+- **Row W is nine toast-only controls, not seven.** The three it explicitly left unchecked have now
+  been checked and none has a reachable wire: `restart-audio` and `save-permissions` have no server
+  half at all, and **`forceReload` has both ends and zero call sites** — a form action and a receiver
+  connected by nothing, the exact `presenterCommand` shape. `mute-chat-indefinitely` was never listed
+  and has no working twin, where `mute-chat-24` at least has the context menu.
+- **Row AE was stale by 3.3×, in the direction of progress.** `+page.svelte` is **2,947** lines, not
+  the 9,605 recorded; `lib/room/` holds 33 modules, not 8; Phase 5 has run slices 0–27 and the row
+  never mentioned Phase 5. Reduced to a pointer at `apps/room/docs/PHASE-5-DECOMPOSITION.md` plus the
+  two things that are genuinely left: no browser check in CI, and five of six panes with no mount
+  test.
+- **Row AF is closable in substance.** Reading the message-send path settled its open question: there
+  are TWO derivations, not three, and `sendMessage`, `editMessage` and the composer all call one
+  `stripHtmlToText`, so the divergence risk it carried is gone. Two comments remain.
+
+**Three rows added:** **AH**, the 45 unswept text-reading tests (46 read `+page.svelte`, 18 read
+`+page.server.ts`, and the decomposition has moved almost everything they read — the guard has to be
+per-SLICE, because `source-size-contract.test.ts`'s one-positive-per-file rule cannot see it);
+**AI**, that the register's status column reads 66/6/15 while the verifier CI enforces computes
+68/5/14, because "CLOSED wins" matches the substring anywhere in a row; and the note that the triage
+document's count of 30 is behind by at least five, which cannot be corrected by hand because the
+script that derives it is one of the 30 untracked ones.
+
+**Structural fixes:** row AC was orphaned after the closing `---`, outside any table; blank lines
+between rows W/AE/AF/AG had split one table into fragments. Now six well-formed tables, no orphans.
+`working-rules.md` was cited as having eight rules while the file has **thirteen** and this file
+itself cited rules 10, 11 and 12.
+
+**ONE THING I DID TO THE TREE AND HAD TO UNDO, recorded because it reached a commit.** The negative
+control for defect 1 put `idPrefix="NEGATIVE_CONTROL"` into `RoomNavbar.svelte` for roughly thirty
+seconds. The concurrent session committed in that window, and `d2c9aa8` carries the marker. The
+deletion in this change removes it, and the file is byte-identical to `65f5dd3` — verified with
+`diff`, not assumed. **The lesson is mine: a negative control mutates a shared working tree, and
+another session's commit does not know it is a probe.** Run them against a scratch copy, or check
+`git log` before and after.
+
+### 2026-08-17 10:44 EDT — S2: nineteen replace-only objects move to `$state.raw`, and the pattern becomes structural
+
+**Suite 2,402 across 164 files** (+4, a new gate). `svelte-check` 1,195/0/0. Lint clean. Build ✓.
+**Runtime impact: yes** — nineteen fields stopped being deep proxies. No behaviour changed; the
+proxies were never being used for what they cost.
+
+The docs' rule: *"in exchange for fine-grained reactivity, the objects must be proxied, which has
+performance overhead. In cases where you're dealing with large objects that are only ever reassigned
+(rather than mutated), use `$state.raw` instead."* Note what the trade-off actually is — if nothing
+ever mutates, the fine-grained half is never used, so the proxy is not a trade at all. It is pure
+cost. "Large" is the docs' motivating case, not the condition.
+
+**Measured with TypeScript's AST, not a pattern**, because the question is how a field is WRITTEN
+across a whole file and no regex can answer that. Nineteen fields held an object or array that no
+code path mutates in place. Two are on hot paths and are the reason this is not cosmetic:
+
+* **`RoomFeeds.#evidence`** — all six chained pipeline passes call `#isHidden` and `#withEvidence`
+  PER ROW, and both index into it. A proxied record meant a proxy hop per row per pass, on the path
+  that renders the log.
+* **`RoomToasts.#notices`** — read on every render of the toast host, replaced on every add and
+  every expiry.
+
+The other seventeen are small — poll choices, upload previews, GIF results, roster records — and
+were converted for consistency, which is stated so nobody reads a performance number into them.
+
+#### The copy-on-write `Set` sites: a convention became a guarantee
+
+Eight of the nineteen are the copy-on-write `new Set()` / `{ ...record }` sites that `TODO.md`
+records as deliberate decisions. **That decision is not what changed, and it was checked before
+anything was touched** — `toggleFileSelection` builds `new Set(this.#selectedFileIds)`, mutates the
+COPY and reassigns; `#threads` and `#unreadByPeer` use rest-destructuring, which builds a new object
+rather than mutating.
+
+What changed is that the pattern used to depend on everyone remembering it: a `.add()` straight onto
+a proxied `$state` Set would have worked, so nothing stopped the copy being skipped. **Raw state
+cannot be mutated at all — only reassigned — so the rune now enforces what discipline was enforcing.**
+
+#### The gate, and its more dangerous half
+
+`state-raw-contract.test.ts` re-runs the audit and fails naming the file and field. It checks BOTH
+directions, and the second is the one that matters: a `.push()` onto a `$state.raw` array updates
+the array and **notifies nothing** — the screen keeps the old value, with no error and no warning.
+Both controls seen red.
+
+Two scanner corrections worth recording, because both were mine. The first draft read only class
+field initialisers and missed `RoomFeeds.#evidence`, which is assigned in the constructor — one of
+the two that mattered most. And the first run's output was truncated by my own `head -10`, so I
+worked from eight findings when there were nine; the gate caught the ninth.
+
+**Two ceilings rose**, both for the explanatory comments: `files.svelte.ts` +14 for the note on why
+`.raw` makes the Set convention structural, `feeds.svelte.ts` +14 for the note on the per-row cost.
+
+
+### 2026-08-17 10:33 EDT — S1: `{#each}` keys, and one rule that turned out to be two cases
+
+**Suite 2,398 across 163 files** (+5, a new gate). `svelte-check` 1,193/0/0. Lint clean. Build ✓.
+**Runtime impact: no** — DOM reuse is byte-identical either way. What changed is what the code
+CLAIMS.
+
+First slice of the Svelte-idiom plan. A structural audit (`svelte.parse`, never a regex over Svelte
+structure) across every `.svelte` file found the legacy surface already clean — **zero** `export
+let`, `$:`, `on:click`, `<slot>`, `$$props`, `<svelte:component>`, `<svelte:self>`,
+`<svelte:fragment>` or unkeyed-by-accident `{#each}`. Three flags came back; two were false
+positives worth recording so they are not re-flagged: `use:enhance` is SvelteKit 3's own current
+form API, and the eight `class:` directives are all inside `class-clsx-equivalence.svelte`, an
+untracked fixture that exists to prove the clsx migration.
+
+**The real finding: five index-keyed `{#each}` blocks.** The docs are blunt — *"The key must
+uniquely identify the object. Do not use the index as a key."* Reading them turned one rule into two
+cases, which is why this is a gate and not a five-line fix.
+
+**Case one — no identity, so the key was a false signal.** `RoomMessage.bodySegments`,
+`RoomMessage`'s evidence segments and the page's private-chat segments all iterate arrays PARSED
+from a single message body and replaced wholesale. A segment never moves position while surviving,
+so there is nothing to key by. An index key and no key produce IDENTICAL reuse — so this was never a
+bug. It was a claim with nothing behind it. Keys removed.
+
+**Case two — position IS the identity, so the index is correct.** `PollPanel`'s two blocks iterate
+`pollChoices`, and reading the component settles it: `onanswer(index)` means **the vote sent to the
+server is the index**, `totals[index]` is that choice's result count, and `calculatePollSeries`
+pairs the two arrays by position. The index satisfies "uniquely identifies the object" here rather
+than violating it. Synthetic ids would add a SECOND identity to keep in step with the wire's, and
+the failure mode of that drifting is a vote recorded against the wrong choice — strictly worse. Kept,
+with the reasoning at both sites.
+
+That distinction is the whole value of the slice. Applying the rule mechanically would have "fixed"
+the two blocks where it does not apply and left the three where it does looking equally fine.
+
+**`each-key-contract.test.ts`** discovers every `{#each}` via `svelte.parse` and fails on any
+index-keyed block not on an allow-list WITH a written reason. It also has a staleness half — an
+allow-list entry whose block no longer exists must be removed, because a permission nobody uses is
+one the next person inherits by accident. Negative control seen red on both halves.
+
+**A genuine conflict between two authorities, resolved and recorded.**
+`eslint-plugin-svelte`'s `require-each-key` demands a key on EVERY block, so removing the three
+meaningless ones turned the lint gate red. The plugin is a heuristic that cannot express "this list
+has no identity"; the docs' rule is the specific one and it forbids the only key available. The docs
+win, with `eslint-disable-next-line svelte/require-each-key` and the reasoning in a SEPARATE comment
+above — because an eslint justification uses a double hyphen and a double hyphen inside an HTML
+comment is illegal, which shipped here once already and went silently unrecognised.
+
+
 ### 2026-08-17 10:24 EDT — SvelteKit `3.0.0-next.16` → `next.23`, both apps, and the last two `$lib` shims
 
 **Room** suite 2,393 across 162, `svelte-check` 1,192/0/0, lint clean, build ✓.

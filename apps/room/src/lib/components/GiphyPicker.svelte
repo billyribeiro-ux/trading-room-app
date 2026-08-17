@@ -21,7 +21,7 @@
 
   let { apiKey, popoverId, onclose, onselect }: Props = $props();
   let query = $state('');
-  let results = $state<GiphyResult[]>([]);
+  let results = $state.raw<GiphyResult[]>([]);
 
   async function search() {
     const url = new URL('https://api.giphy.com/v1/gifs/search');

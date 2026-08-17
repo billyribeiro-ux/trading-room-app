@@ -158,9 +158,9 @@ export class RoomUserActions<
     this.#hidePreviewWindows = options.hidePreviewWindows;
     this.#reload = options.reload;
 
-    this.#mutedUsers = $state<Record<string, ManagedChatUser>>({});
+    this.#mutedUsers = $state.raw<Record<string, ManagedChatUser>>({});
 
-    this.#followedUsers = $state<Record<string, ManagedChatUser>>({});
+    this.#followedUsers = $state.raw<Record<string, ManagedChatUser>>({});
 
     this.#selectedUserId = $state<number | null>(null);
 

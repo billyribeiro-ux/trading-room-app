@@ -148,11 +148,28 @@ export const GET: RequestHandler = async ({ params, request, url }) => {
         /* `imgURL` upstream. Null becomes undefined so the room's `badge.imageUrl ? … : …` branch
            reads the same for "no image" as for a badge that never had one. */
         imageUrl: badge.imageUrl ?? undefined,
-        /* `darkTheme` holds the ID of a variant badge, not a boolean — proven at the render site
-           by `r.darkTheme && 'darkTheme' === preferences.theme && (r = badgesH[r.darkTheme])`.
-           Our column is still the superseded boolean (T5-27), so it is sent only when it is a
-           number; `true` would name no badge and the room would look up `badgesH[true]`. */
-        darkTheme: typeof badge.darkTheme === 'number' ? badge.darkTheme : undefined
+        /*
+          `darkTheme` holds the ID of a variant badge, not a boolean — proven at the render site by
+          `r.darkTheme && 'darkTheme' === preferences.theme && (r = badgesH[r.darkTheme])`.
+
+          THE WIRE NAME IS THE REFERENCE'S; THE COLUMN IS OURS. It reads `darkTheme` because that is
+          what the room's consumer matches (`feeds.svelte.ts` `definitions[String(badge.darkTheme)]`),
+          and it is sourced from `darkThemeBadgeId` because that is the column that actually holds an
+          id. `badges.darkTheme` is the SUPERSEDED boolean kept only because migrations are
+          forward-only — see migration `0013-badge-dark-theme-badge-id.js`.
+
+          THIS LINE READ `typeof badge.darkTheme === 'number' ? … : undefined` UNTIL 2026-08-17, AND
+          THAT WAS DEAD. `badges.darkTheme` is `boolean('dark_theme')`, so `typeof` was never
+          `'number'`, so the field was ALWAYS undefined and the room's dark-variant swap could never
+          fire — a feature written, migrated, given a picker on the account page, and never rendered.
+          It was honest when written (migration `0013` did not exist yet) and was simply not revisited
+          when the column landed. `null` becomes `undefined` for the same reason `imageUrl` above
+          does: the room gates on `typeof badge.darkTheme === 'number'` (`feeds.svelte.ts`), which
+          must read the same for "no variant set" as for a badge that never had one. `??` and not
+          `||`, because `||` would also discard a legitimate id — badge ids are a serial sequence, so
+          0 is not one today, but a gate that depends on that is a gate waiting to be wrong.
+        */
+        darkTheme: badge.darkThemeBadgeId ?? undefined
       }
     ])
   );

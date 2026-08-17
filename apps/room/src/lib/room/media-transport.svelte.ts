@@ -291,7 +291,7 @@ export class RoomMediaTransport {
      * Empty until the media session is wired in: nothing in this app produces or consumes screen
      * media yet, so inventing entries here would put fabricated presenters on screen.
      */
-    this.#sharedScreens = $state<ScreenTab[]>([]);
+    this.#sharedScreens = $state.raw<ScreenTab[]>([]);
 
     /**
      * The live MediaStream behind each screen tab, keyed by producer id.
