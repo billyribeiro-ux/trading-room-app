@@ -595,6 +595,25 @@
                 </span>
               </div>
               <ol>
+                <!--
+                  KEYED BY INDEX, and here that satisfies the rule rather than breaking it.
+
+                  Svelte's best-practices page says *"the key must uniquely identify the object"* and
+                  warns against the index. In this component the index IS what uniquely identifies a
+                  choice, because position is the choice's identity on the WIRE and in every array
+                  paired with it:
+
+                    onanswer(index)   — the vote sent to the server is the index
+                    totals[index]     — the result count for that choice
+                    calculatePollSeries(pollChoices, totals, total)  — paired by position
+
+                  So a synthetic id would not make this safer; it would introduce a SECOND identity
+                  that has to be kept in step with the one the server already uses, and the failure
+                  mode of that drifting is a vote recorded against the wrong choice.
+
+                  `each-key-contract.test.ts` allows exactly these two blocks and fails on any new
+                  index key elsewhere.
+                -->
                 {#each pollChoices as choice, index (index)}
                   <li>
                     {choice}
@@ -685,6 +704,7 @@
           <h1>{pollQuestion}</h1>
           <hr />
           <ol style="text-align: left;">
+            <!-- Index-keyed for the same reason as the edit list above: `onanswer(index)` IS the vote. -->
             {#each pollChoices as choice, index (index)}
               <li class="p-2">
                 {choice}

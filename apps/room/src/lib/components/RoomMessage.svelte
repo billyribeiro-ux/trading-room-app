@@ -513,7 +513,31 @@
 </script>
 
 {#snippet bodySegments(segments: BodySegment[])}
-  {#each segments as segment, index (index)}
+  <!--
+    UNKEYED, deliberately, and that is a correction rather than an omission.
+
+    This was `(index)`, which Svelte's best-practices page names outright: *"The key MUST uniquely
+    identify the object. Do not use the index as a key."* The reason it is wrong here is subtler than
+    the reason it is usually wrong — an index key and no key at all produce IDENTICAL reuse, so this
+    was never a bug. It was a false signal: it reads as a guarantee of identity across updates, and
+    there is none to give.
+
+    A segment has no identity. `segments` is parsed from one message body and replaced wholesale
+    whenever that body changes; a segment never moves from one position to another while surviving.
+    Writing no key says exactly that, and the next person is not told a promise that cannot be kept.
+
+    ON THE DISABLE BELOW: `eslint-plugin-svelte`'s `require-each-key` wants a key on EVERY block, and
+    here it and the official docs genuinely disagree. The plugin is a heuristic that cannot express
+    "this list has no identity"; the docs' rule is the specific one and it forbids the only key
+    available. The docs win, and the reason is written down rather than the rule silently satisfied
+    with `(index)` again.
+
+    The justification is in THIS comment and not on the disable line, because an eslint justification
+    uses a double hyphen and a double hyphen inside an HTML comment is illegal — that exact mistake
+    shipped once here and was silently unrecognised.
+  -->
+  <!-- eslint-disable-next-line svelte/require-each-key -->
+  {#each segments as segment}
     {#if segment.kind === 'label' && segment.label}<span
         class={ALERT_LABEL_BADGE_CLASS}
         style={alertLabelBadgeStyle(segment.label)}>{segment.label.name}</span
@@ -818,7 +842,9 @@
             {:else}
               <div class={messageBodyClass} style={bodyStyle}>
                 {#if item.evidenceBodySegments}
-                  {#each item.evidenceBodySegments as segment, index (index)}
+                  <!-- Unkeyed for the same reason as `bodySegments` above: parsed, never reordered. -->
+                  <!-- eslint-disable-next-line svelte/require-each-key -->
+                  {#each item.evidenceBodySegments as segment}
                     {#if segment.kind === 'stock'}
                       <span class="stockColor" style={stockStyle}>{segment.text}</span>
                     {:else if segment.kind === 'image' && segment.url}

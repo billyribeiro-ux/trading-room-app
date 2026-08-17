@@ -24,6 +24,55 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-17
 
+### 2026-08-17 10:33 EDT — S1: `{#each}` keys, and one rule that turned out to be two cases
+
+**Suite 2,398 across 163 files** (+5, a new gate). `svelte-check` 1,193/0/0. Lint clean. Build ✓.
+**Runtime impact: no** — DOM reuse is byte-identical either way. What changed is what the code
+CLAIMS.
+
+First slice of the Svelte-idiom plan. A structural audit (`svelte.parse`, never a regex over Svelte
+structure) across every `.svelte` file found the legacy surface already clean — **zero** `export
+let`, `$:`, `on:click`, `<slot>`, `$$props`, `<svelte:component>`, `<svelte:self>`,
+`<svelte:fragment>` or unkeyed-by-accident `{#each}`. Three flags came back; two were false
+positives worth recording so they are not re-flagged: `use:enhance` is SvelteKit 3's own current
+form API, and the eight `class:` directives are all inside `class-clsx-equivalence.svelte`, an
+untracked fixture that exists to prove the clsx migration.
+
+**The real finding: five index-keyed `{#each}` blocks.** The docs are blunt — *"The key must
+uniquely identify the object. Do not use the index as a key."* Reading them turned one rule into two
+cases, which is why this is a gate and not a five-line fix.
+
+**Case one — no identity, so the key was a false signal.** `RoomMessage.bodySegments`,
+`RoomMessage`'s evidence segments and the page's private-chat segments all iterate arrays PARSED
+from a single message body and replaced wholesale. A segment never moves position while surviving,
+so there is nothing to key by. An index key and no key produce IDENTICAL reuse — so this was never a
+bug. It was a claim with nothing behind it. Keys removed.
+
+**Case two — position IS the identity, so the index is correct.** `PollPanel`'s two blocks iterate
+`pollChoices`, and reading the component settles it: `onanswer(index)` means **the vote sent to the
+server is the index**, `totals[index]` is that choice's result count, and `calculatePollSeries`
+pairs the two arrays by position. The index satisfies "uniquely identifies the object" here rather
+than violating it. Synthetic ids would add a SECOND identity to keep in step with the wire's, and
+the failure mode of that drifting is a vote recorded against the wrong choice — strictly worse. Kept,
+with the reasoning at both sites.
+
+That distinction is the whole value of the slice. Applying the rule mechanically would have "fixed"
+the two blocks where it does not apply and left the three where it does looking equally fine.
+
+**`each-key-contract.test.ts`** discovers every `{#each}` via `svelte.parse` and fails on any
+index-keyed block not on an allow-list WITH a written reason. It also has a staleness half — an
+allow-list entry whose block no longer exists must be removed, because a permission nobody uses is
+one the next person inherits by accident. Negative control seen red on both halves.
+
+**A genuine conflict between two authorities, resolved and recorded.**
+`eslint-plugin-svelte`'s `require-each-key` demands a key on EVERY block, so removing the three
+meaningless ones turned the lint gate red. The plugin is a heuristic that cannot express "this list
+has no identity"; the docs' rule is the specific one and it forbids the only key available. The docs
+win, with `eslint-disable-next-line svelte/require-each-key` and the reasoning in a SEPARATE comment
+above — because an eslint justification uses a double hyphen and a double hyphen inside an HTML
+comment is illegal, which shipped here once already and went silently unrecognised.
+
+
 ### 2026-08-17 10:24 EDT — SvelteKit `3.0.0-next.16` → `next.23`, both apps, and the last two `$lib` shims
 
 **Room** suite 2,393 across 162, `svelte-check` 1,192/0/0, lint clean, build ✓.
