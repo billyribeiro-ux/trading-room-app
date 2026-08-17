@@ -259,8 +259,24 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
 
       What the slice actually proves is the pattern, which is why it was chosen first: state and the
       functions that write it leaving TOGETHER, where Phase 1 moved fields and left 248 bodies here.
+
+      3,021 -> 2,943 on 2026-08-17, and NOT from an extraction — from deleting prose, which is the
+      one thing this ratchet is otherwise written to forbid. It is recorded here so the exception is
+      legible rather than looking like the practice.
+
+      Seven block comments in this file had lost the code they explained. Five were moved down onto
+      the declarations they describe, which costs nothing and is the ordinary fix. Two were DELETED:
+      the older-chat-history note, whose subject now lives in `+page.server.ts:462-476`, and the
+      second-chat-column note, whose subject moved to `ExtraChatPane.svelte:220-250` on 2026-08-16
+      and took a better-worded copy of the same reasoning with it. Both were verified to survive at
+      those references BEFORE the delete — the rule is that comments move with their code, and a
+      third copy of a sentence that already exists twice is not the asset, it is the drift.
+
+      The second one is why this was worth doing at all rather than tidying: it had come to rest
+      directly above the ALERT-ARRIVAL effect, so this file explained chat scrolling and then showed
+      the alert filter. `svelte-check`, eslint, the autofixer and 2,402 tests were all green.
     */
-    max: 3021,
+    max: 2943,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {
@@ -527,8 +543,19 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       explanation, so it had come to rest above an unrelated statement where it read as a note about
       something else. This is the "arrival" case the block above names: what grew is prose that
       belongs to `iceServers`, and the page shed the same lines.
+
+      +8, 2026-08-17, and it is the SAME case a second time on the same file — which is the finding,
+      not the number. The `[ REC ]` badge's docblock was stranded on `+page.svelte` when the four
+      `roomState` fields moved into this class: the fields travelled and the sentence recording WHY
+      the badge must follow the server rather than the local `MediaRecorder` flag — a member never
+      saw it while a presenter recorded — did not. It now sits on the field group it describes.
+
+      Twice on one file is what turned a per-slice habit into a gate. `orphaned-comment-contract`
+      could not see either of these when they happened; it now polices any block comment citing a
+      `#lib/room/…` module, which is the form both of them took. Seven were adrift in the page when
+      that half was switched on.
     */
-    max: 386,
+    max: 394,
     why: 'every media flag the interface renders from; STATE, never transport'
   },
   {

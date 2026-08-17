@@ -100,6 +100,60 @@ follow symlinks. Chasing it produced a corroboration instead of a defect — the
 `apps/room/vite.config.ts:81-87`. That is the mechanism the 10:52 entry recorded as closed,
 confirmed by trying to break it.
 
+### 2026-08-17 11:20 EDT — seven comments in `+page.svelte` had lost the code they explained, and the gate that could not see them now can
+
+**Runtime impact: none.** Comments only, and PROVEN so rather than asserted: with every block comment
+stripped, `+page.svelte` is byte-identical to `HEAD` (1,572 code lines before and after) and so is
+`media.svelte.ts`. Run: the full room gate — 2,402 tests across 164 files, `eslint src/` clean,
+`svelte-check` 1,195 files / 0 errors / 0 warnings, `build` ✓. `svelte-autofixer` on the modified
+`.svelte.ts`: no issues, no suggestions.
+
+**How they were found, which matters more than the count.** Not by a sweep — by opening the region
+around the page's remaining `$effect`s to plan the next slice and reading it. The first one found was
+the sharpest: a comment headed *"The SECOND chat column, following its own messages"* sitting
+directly on top of the ALERT-ARRIVAL effect. Two correct things read as one wrong thing purely
+because of what sat between them, and `svelte-check`, `eslint`, the autofixer and 2,402 tests were
+all green.
+
+**The gate had a documented hole and this fell straight through it.**
+`orphaned-comment-contract.test.ts` policed JSDoc (`/**`) only, and said so, with a stated reason:
+a plain `/*` is how this codebase writes a SLICE CITATION and a GROUP HEADER, and those legitimately
+stack. All seven orphans were plain blocks. The narrowing was REPLACED rather than widened — a plain
+block is now policed **when it cites a module**, i.e. when its body names a `#lib/room/…` path. That
+is the citation form, used 31 times in the page alone, and it always means "the subject named here
+now lives there", which is only true of the code immediately below it. Group headers do not carry a
+citation; both examples the original narrowing named were checked before the line was drawn there.
+
+**Five moved, two deleted, and the difference is the point.** Five citations were moved down onto the
+constructions they describe — `RoomUserActions`, `RoomWebcams`, `RoomAlertsPane`, `RoomFeedScroll`,
+and the `[ REC ]` badge's docblock, which went to `media.svelte.ts` because that is where its fields
+went. Two were DELETED, and only after verifying each one's reasoning survives elsewhere: the
+older-chat-history note (`+page.server.ts:462-476`, `chat-paging-contract.test.ts:193-198`) and the
+second-chat-column note (`ExtraChatPane.svelte:220-250`, which took a better-worded copy with it on
+2026-08-16). A third copy of a sentence that already exists twice is not the asset; it is the drift.
+
+**A regression of my own, in the same change, reported rather than quietly fixed.** Widening what the
+scanner COLLECTS silently changed what it PAIRS: a JSDoc began pairing with the plain block below it,
+and three correct files went red — `files.svelte.ts:239-257` is two notes on one method, which is
+legitimate and common. The fix is that a non-policed comment counts as neither a boundary nor as
+code; the search steps over it and keeps looking for the declaration. Recorded in the test, because
+the shape recurs.
+
+**Both halves negative-controlled, both seen RED, both reverted.** A fake citation block inserted
+above a real one → red at that line. `CITES_MODULE` broken to match nothing → the vacuity guard fires
+with *"CITES_MODULE matched nothing — the plain-block half is inert"*, which is the failure this file
+exists to prevent, one level up.
+
+**Ceilings: one down, one up, and the raise is the framework's own provision.** The page ratchets
+3,021 → 2,943. `media.svelte.ts` goes 386 → 394 under the "arrival" case already recorded on that
+exact file at slice 27 — prose that belongs to the module arriving from the page while the page sheds
+the same lines. That it is now the SECOND time on the same file is the finding, and is what turned a
+per-slice habit into a gate.
+
+**Honest gap.** Two of the seven carried no citation and no JSDoc, so nothing structural can see
+them; they were found by reading and fixed by hand. The gate covers the citation form, which is what
+the other five took and what an extraction produces.
+
 ### 2026-08-17 11:04 EDT — PR #100 merged to `main`, delayed by a GitHub major outage
 
 **Runtime impact: yes — this is the production release of the three entries below it, 10:33 to

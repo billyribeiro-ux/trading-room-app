@@ -501,13 +501,6 @@
 
   
 
-  /**
-   * The ROOM's media.recording state - `globals.roomState.isRecording` / `isRecordingPaused` / `recName`.
-   *
-   * Distinct from `media.recording`, which is this browser's own `MediaRecorder`. The `[ REC ]` badge is
-   * a report about the room, so it must follow what the server says; gating it on the local flag is
-   * why a member never saw it.
-   */
   /*
     The room's media STATE, in `#lib/room/media.svelte.ts`.
 
@@ -816,22 +809,6 @@
     }
   });
   /*
-    Everything that can be DONE to a user, in `#lib/room/user-actions.svelte.ts`.
-
-    Phase 5 slice 13, and the largest single function in this file went with it: `handleUserAction`
-    was 249 lines. What holds the twenty-three declarations together is that every one of them reads
-    the same two things — WHO is selected, and what this viewer may do — and `ModalHost` reads the
-    resolved `target` a hundred times.
-
-    Constructed after `toasts` because it needs one, and after `privateChat` even though
-    `privateChat` is handed `select`. That is not a cycle: the hand-off is an arrow, evaluated
-    when a roster row is clicked rather than when the class is built.
-
-    `defaultFollowStyle` is injected rather than moved — it reads the theme preference, and
-    `alerts-background-contract.test.ts` pins it against THIS file by name because it is about a
-    captured colour rather than about this class.
-  */
-  /*
     Everything that LEAVES this browser as content, in `#lib/room/composer.svelte.ts`.
 
     Phase 5 slice 10. Five entry points — plain composer, extra column, rich text, image upload,
@@ -923,14 +900,6 @@
   });
 
   /*
-    THE WEBCAM CARDS, in `#lib/room/webcams.ts`.
-
-    Phase 5 slice 21. It RENDERS; it does not capture — `mediaTransport` acquires the camera and
-    produces it, and this decides what a card looks like and which element the stream lands in. The
-    two attribute setters beside it are module functions rather than methods, because neither reads
-    any instance state.
-  */
-  /*
     THE WINDOW LISTENERS' bodies, in `#lib/room/window-handlers.ts`.
 
     Phase 5 slice 18. The bindings stay on `<svelte:window>` at the bottom of this file, because
@@ -956,12 +925,36 @@
     clearSelectedImage: () => (modals.selectedImageUrl = null)
   });
 
+  /*
+    THE WEBCAM CARDS, in `#lib/room/webcams.ts`.
+
+    Phase 5 slice 21. It RENDERS; it does not capture — `mediaTransport` acquires the camera and
+    produces it, and this decides what a card looks like and which element the stream lands in. The
+    two attribute setters beside it are module functions rather than methods, because neither reads
+    any instance state.
+  */
   const webcams = new RoomWebcams({
     media,
     mediaTransport,
     sessionHandle: () => data.sessionHandle
   });
 
+  /*
+    Everything that can be DONE to a user, in `#lib/room/user-actions.svelte.ts`.
+
+    Phase 5 slice 13, and the largest single function in this file went with it: `handleUserAction`
+    was 249 lines. What holds the twenty-three declarations together is that every one of them reads
+    the same two things — WHO is selected, and what this viewer may do — and `ModalHost` reads the
+    resolved `target` a hundred times.
+
+    Constructed after `toasts` because it needs one, and after `privateChat` even though
+    `privateChat` is handed `select`. That is not a cycle: the hand-off is an arrow, evaluated
+    when a roster row is clicked rather than when the class is built.
+
+    `defaultFollowStyle` is injected rather than moved — it reads the theme preference, and
+    `alerts-background-contract.test.ts` pins it against THIS file by name because it is about a
+    captured colour rather than about this class.
+  */
   const userActions = new RoomUserActions<(typeof data.connectedUsers)[number]>({
     dialogs,
     toasts,
@@ -1587,29 +1580,6 @@
   });
 
   /*
-    THE ALERTS PANE's own actions, in `#lib/room/alerts-pane.ts`.
-
-    Phase 5 slice 22: archive, export, detach and the two toolbar toggles — what a viewer DOES to
-    the pane, as against what `RoomAlerts` and `RoomFeeds` know about the alerts themselves.
-
-    `chatAlertsDetached` is written on both sides of this boundary, so only the RECEIVER crosses:
-    the class writes it and this file reads it to lay out. A reader thunk was supplied at first and
-    eslint refused it as a collaborator nothing consumes.
-  */
-  /*
-    SCROLL-FOLLOW and PAGING for all three feeds, in `#lib/room/feed-scroll.ts`.
-
-    Phase 5 slice 23. One mechanism and three instances of it: a flag per feed saying the reader has
-    scrolled up into history, a tracker that sets it, and a paging arm that is disarmed while it is
-    set.
-
-    The three flags MOVED rather than staying here, and that is a change of ownership. They were
-    written from two sides — the trackers, and the follow effects below that clear them on the tick
-    they pull a feed to the bottom — and two writers of one flag is how a feed ends up following
-    while its reader is halfway up the log. The effects now ask: `…ReadingHistory` to read,
-    `stopReadingHistory` to clear.
-  */
-  /*
     WHICH OVERLAY IS SHOWING, in `#lib/room/modals.svelte.ts`.
 
     Phase 5 slice 24: the modal name, the tab each modal opens on, the image the lightbox holds, and
@@ -1646,6 +1616,19 @@
     showNotesTab: () => (mainTab = 'notes')
   });
 
+  /*
+    SCROLL-FOLLOW and PAGING for all three feeds, in `#lib/room/feed-scroll.ts`.
+
+    Phase 5 slice 23. One mechanism and three instances of it: a flag per feed saying the reader has
+    scrolled up into history, a tracker that sets it, and a paging arm that is disarmed while it is
+    set.
+
+    The three flags MOVED rather than staying here, and that is a change of ownership. They were
+    written from two sides — the trackers, and the follow effects below that clear them on the tick
+    they pull a feed to the bottom — and two writers of one flag is how a feed ends up following
+    while its reader is halfway up the log. The effects now ask: `…ReadingHistory` to read,
+    `stopReadingHistory` to clear.
+  */
   const feedScroll = new RoomFeedScroll({
     alerts,
     chat,
@@ -1654,6 +1637,16 @@
     feeds
   });
 
+  /*
+    THE ALERTS PANE's own actions, in `#lib/room/alerts-pane.ts`.
+
+    Phase 5 slice 22: archive, export, detach and the two toolbar toggles — what a viewer DOES to
+    the pane, as against what `RoomAlerts` and `RoomFeeds` know about the alerts themselves.
+
+    `chatAlertsDetached` is written on both sides of this boundary, so only the RECEIVER crosses:
+    the class writes it and this file reads it to lay out. A reader thunk was supplied at first and
+    eslint refused it as a collaborator nothing consumes.
+  */
   const alertsPane = new RoomAlertsPane<(typeof data.alerts)[number]>({
     alerts,
     dialogs,
@@ -1666,21 +1659,15 @@
   });
 
   /*
-    ── Older chat history ───────────────────────────────────────────────────────────────────────
-    The page load sends the NEWEST page per channel. Everything before that is fetched here, one
-    page at a time, and held in client state so an `invalidateAll()` — which every SSE event
-    triggers — refreshes the live tail without throwing away what the reader scrolled back to.
-  */
+    A LIVE ALERT ARRIVES — the toast, the sound and the filter that suppresses both.
 
-
-  /*
-    The SECOND chat column, following its own messages.
-
-    Deliberately a separate effect rather than a loop over both: the two columns have independent
-    tabs, independent message lists and independent reader scroll positions, so one effect reading
-    both would re-run each column's scroll logic whenever the other changed. That is the difference
-    between "a message arrived here" and "a message arrived anywhere", and it is what would make a
-    reader scrolled up in this column get yanked to the bottom by traffic in the other one.
+    Two block comments used to stand here and NEITHER described this effect. One explained where
+    older chat pages come from; the other explained why the second chat column follows its own
+    messages. Both had lost their code — the paging to `+page.server.ts:462-476`, the scroll-follow
+    to `ExtraChatPane.svelte:220-250` on 2026-08-16 — and both came to rest on top of the alert
+    filter, so a reader arriving here was told about chat scrolling and then shown alert delivery.
+    Removed 2026-08-17, verified first that each one's reasoning survives at the reference given
+    above, so this deletes a stale duplicate rather than the last copy of anything.
   */
   $effect(() => {
     const unseenAlerts = alertArrivals.fresh(data.alerts);

@@ -82,6 +82,14 @@ export class RoomMedia {
     The first three are this browser's own `MediaRecorder` session. The last four are what the room
     reports over the command channel, which is what a member sees when somebody ELSE is recording.
     Collapsing them would mean a member's own idle recorder hid the presenter's live one.
+
+    The last four are `globals.roomState.isRecording` / `isRecordingPaused` / `recName` in the
+    capture, and the distinction is not academic — it is a FIXED DEFECT. The `[ REC ]` badge is a
+    report about the room, so it must follow what the server says; it was gated on the local flag,
+    which is why a member never saw it while a presenter was recording. That sentence arrived here
+    on 2026-08-17 from a docblock stranded on `+page.svelte` when these fields moved: the fields
+    travelled and their reason did not, so for a while the only record of the defect sat above an
+    unrelated declaration. `orphaned-comment-contract.test.ts` is what found it.
   */
   #recording = $state(false);
   #recordingPaused = $state(false);
