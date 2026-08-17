@@ -209,6 +209,57 @@ follow symlinks. Chasing it produced a corroboration instead of a defect — the
 `apps/room/vite.config.ts:81-87`. That is the mechanism the 10:52 entry recorded as closed,
 confirmed by trying to break it.
 
+### 2026-08-17 11:52 EDT — S5: the SFU spatial-layer effect reaches the screen it controls, and the wiring it depends on turned out to have no guard at all
+
+**Runtime impact: none intended** — one four-line `$effect` moved from `+page.svelte` to
+`PresentationArea.svelte`, unchanged. Gate run: **2,408 tests / 165 files**, `eslint src/` clean,
+`svelte-check` **1,196 files / 0 errors / 0 warnings**, `build` ✓, `prettier --check` clean,
+`svelte-autofixer` **zero issues**.
+
+**The move.** `RoomMediaTransport.applyScreenLayers()` asks the SFU for the top spatial layer on the
+screen a viewer is watching and layer 0 on the rest — without it a room with four shared screens
+pulls full-resolution video for all four while somebody looks at one. The effect deciding WHEN to
+call it sat on the page, 700 lines from anything to do with screens. It now sits in the component
+that renders `ScreenPane`, which is what the call is about: the screen being watched is the one that
+gets the bandwidth. It is an `$effect` for the second reason the docs give — *"calling third-party
+libraries"* — not for DOM, and `createSubscriber` was considered and rejected because nothing reads a
+value back.
+
+**THE FINDING, which is worth more than the four lines.** `applyScreenLayers` appeared in exactly two
+files under `src/` — the class and its one caller — and **in no test whatsoever**. Deleting the
+effect outright left the suite green at 2,402. The wiring for the room's entire screen-quality
+behaviour was unguarded, and it was found by asking the question rather than by anything failing.
+
+`screen-layer-wiring-contract.test.ts` now holds it, and the assertion carrying the weight is not
+"the effect exists" but **"the two `void` reads exist"**:
+
+```js
+void screens.selectedTab;                 // <- looks like dead code
+void mediaTransport.screenStreams.size;   // <- looks like dead code
+void mediaTransport.applyScreenLayers();
+```
+
+`applyScreenLayers` reads both INTERNALLY through `this`, and it is `async` — so everything past its
+first `await` is untracked, and an effect only tracks what it reads synchronously in its own body.
+Strip those two lines and the effect runs once on mount and never again: switching tabs leaves the
+newly selected screen on layer 0. Soft video, no error, no failing test, and a plausible-looking
+tidy-up in the commit that caused it. **Negative control: the two lines deleted → red with exactly
+that message; reverted → green.**
+
+**A second gap, found the same way.** `PresentationArea.svelte` is 1,181 lines and renders twelve
+child components — the largest Svelte file after the page — and it had **no ceiling entry**. Gate 0b
+made ceilings mandatory per discovered `lib/room/*.svelte.ts` module; components stayed a hand-kept
+list, and a hand-kept list is how this was missed. Every Phase 5 slice that pushed work down into it
+was uncapped. Noticed only because S5 added lines there and nothing objected. Now capped at what it
+measures today — the number's job is to stop the next 200 lines, not to judge the existing 1,181.
+
+**Scope held deliberately.** The two facades added here (`screens`, `mediaTransport`) sit BESIDE the
+twelve drilled screen props rather than replacing them. Collapsing those twelve is a real slice with
+its own ripple through `ScreenPane`, `ScreenTabs` and their contract tests; folding it into an effect
+move would have made one commit that did two things and could not be reverted separately.
+
+**Ceilings.** `+page.svelte` 2,642 → **2,638**. `PresentationArea.svelte` new entry at **1,181**.
+
 ### 2026-08-17 11:39 EDT — S3: the four delivery effects reach the layer that shows them, `+page.svelte` 2,943 → 2,642
 
 **Runtime impact: none intended** — four `$effect`s, two policy functions and four arrival trackers

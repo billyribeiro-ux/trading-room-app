@@ -276,7 +276,7 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       directly above the ALERT-ARRIVAL effect, so this file explained chat scrolling and then showed
       the alert filter. `svelte-check`, eslint, the autofixer and 2,402 tests were all green.
 
-      2,943 -> 2,641 on 2026-08-17, S3, and this one IS an extraction: the four delivery effects, the
+      2,943 -> 2,642 on 2026-08-17, S3, and this one IS an extraction: the four delivery effects, the
       two policy functions and the four arrival trackers went to `RoomOverlays.svelte`, which renders
       the toast host they drive. 308 lines out for two props in.
 
@@ -285,8 +285,17 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       the policy "reads six preferences that still live in this file, so they stay here until those
       do". Slice 3 moved those six. The note named its own trigger, the trigger fired, and it is
       updated in place rather than dropped — which is the only reason anyone noticed.
+
+      2,642 -> 2,638 the same day, S5: the SFU spatial-layer effect went to
+      `PresentationArea.svelte`, which renders the screen whose bandwidth it decides. Four lines, and
+      the slice earned its place for what it EXPOSED rather than for the number. `applyScreenLayers`
+      appeared in two files under `src/` and in no test at all, so deleting the effect outright left
+      the suite green at 2,402 — the wiring for the room's whole screen-quality behaviour had no
+      guard. `screen-layer-wiring-contract.test.ts` now holds it, and holds in particular the two
+      `void` dependency reads that look exactly like dead code and are the only reason the effect
+      re-runs when a viewer switches tabs.
     */
-    max: 2642,
+    max: 2638,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {
@@ -454,6 +463,25 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     */
     max: 782,
     why: 'the overlay layer - modal host, seven dialogs, toasts, the lightbox, audio sinks, delivery'
+  },
+  {
+    file: 'lib/components/PresentationArea.svelte',
+    /*
+      ADDED 2026-08-17 (S5), and the reason it did not exist until then is the finding.
+
+      This file is 1,181 lines and renders TWELVE child components. It is the second-largest Svelte
+      file in the repository after `+page.svelte`, and it had no ceiling — so every slice of Phase 5
+      that pushed work down into it was uncapped, which is precisely the growth this ratchet was
+      written to stop. Gate 0b made ceilings MANDATORY per discovered `lib/room/*.svelte.ts` module;
+      components stayed a hand-kept list, and a hand-kept list is how this was missed. Noticed only
+      because S5 added 39 lines here and nothing objected.
+
+      Set at what it measures TODAY rather than at something aspirational: the number's job is to
+      stop the next 200 lines, not to pass judgement on the existing 1,181. The twelve drilled screen
+      props are the obvious next extraction and will bring it down on their own.
+    */
+    max: 1181,
+    why: 'the room stage - twelve child components, and the largest file after the page itself'
   },
   {
     file: 'lib/components/ModalHost.svelte',

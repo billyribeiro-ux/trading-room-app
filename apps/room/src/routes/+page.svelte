@@ -1693,12 +1693,6 @@
   }
 
 
-  $effect(() => {
-    // Re-runs when the viewer switches tabs or a screen arrives/leaves.
-    void screens.selectedTab;
-    void mediaTransport.screenStreams.size;
-    void mediaTransport.applyScreenLayers();
-  });
 
 
   function setInputChecked(checked: boolean) {
@@ -2349,6 +2343,8 @@
           {#snippet presentationPane()}
             <PresentationArea
               {data}
+              {screens}
+              {mediaTransport}
               {split}
               {media}
               {menus}

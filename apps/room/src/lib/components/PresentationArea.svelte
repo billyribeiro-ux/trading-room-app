@@ -55,6 +55,8 @@
   import type { Snippet } from 'svelte';
   import type { MtxStreamTabs } from '#lib/room-mtx.svelte.js';
   import type { RoomMedia } from '#lib/room/media.svelte.js';
+  import type { RoomMediaTransport } from '#lib/room/media-transport.svelte.js';
+  import type { RoomScreens } from '#lib/room/screens.svelte.js';
   import type { RoomMenus } from '#lib/room/menus.svelte.js';
   import type { RoomFiles } from '#lib/room/files.svelte.js';
   import type {
@@ -113,6 +115,16 @@
     // ── #screens ───────────────────────────────────────────────────────────────
     /** This viewer's "off to preserve data" switch, which replaces the WHOLE pane. */
     videoDisabled: boolean;
+    /**
+     * The two facades the SPATIAL-LAYER effect below needs, and nothing else reads yet.
+     *
+     * They sit beside the twelve drilled screen props rather than replacing them, deliberately:
+     * collapsing those twelve is a real slice with its own ripple through `ScreenPane`,
+     * `ScreenTabs` and their contract tests, and folding it into an effect move would have made
+     * one commit that did two things and could not be reverted separately.
+     */
+    screens: RoomScreens;
+    mediaTransport: RoomMediaTransport;
     sharedScreens: ScreenTab[];
     selectedScreenTab: string | null;
     forcedScreenId: string | null;
@@ -236,6 +248,8 @@
     attachRemoteWebcam,
     closeWebcamPreview,
     videoDisabled,
+    screens,
+    mediaTransport,
     sharedScreens,
     selectedScreenTab,
     forcedScreenId,
@@ -292,6 +306,46 @@
     mp3Url,
     setAutoplayAttribute
   }: Props = $props();
+
+  /*
+    THE SFU SPATIAL LAYER FOLLOWS THE SELECTED TAB.
+
+    `setPreferredLayers(id, TOP)` for the screen being watched and layer 0 for the rest, so the room
+    is not pulling full-resolution video for four screens when a viewer is looking at one. The work
+    is `RoomMediaTransport.applyScreenLayers`; what lives here is WHEN to ask.
+
+    ## Why this is an `$effect`, and why it is in this component
+
+    It is not DOM manipulation — it touches no node. It is the other case the docs name for effects:
+    *"calling third-party libraries"*. The library is the SFU client, and this pushes state INTO it.
+    `createSubscriber` was considered and does not fit, because that is for making an external source
+    readable as a getter and nothing here reads a value back.
+
+    `svelte-autofixer` returns zero issues and one suggestion — *"you are calling a function inside an
+    $effect… could it use `$derived`?"* Declined, for the reason above: what this produces is a
+    round trip to the SFU, not a value, and a `$derived` that performed network I/O on read would be
+    the actual malpractice. Recorded rather than ignored, the same way `ExtraChatPane.svelte` records
+    the decline on its scroll-follow effect.
+
+    It belongs to THIS component because this is what the effect is about: `ScreenPane` below renders
+    the selected screen, and the whole point of the call is that the screen a viewer is actually
+    watching is the one that gets the bandwidth. On `+page.svelte` it sat 700 lines from anything to
+    do with screens.
+
+    ## The two `void` reads are load-bearing, and are not dead code
+
+    `applyScreenLayers` reads `selectedTab` and the stream map INTERNALLY, through `this`. An effect
+    only tracks what it reads SYNCHRONOUSLY in its own body, and the method is `async` — everything
+    after its first `await` is untracked. So without these two lines the effect would run once and
+    never again, and switching tabs would leave the new screen on layer 0: visibly soft video with
+    no error anywhere. They are dependency declarations, and `void` says the value is not wanted.
+  */
+  $effect(() => {
+    // Re-runs when the viewer switches tabs or a screen arrives/leaves.
+    void screens.selectedTab;
+    void mediaTransport.screenStreams.size;
+    void mediaTransport.applyScreenLayers();
+  });
 </script>
 
 <as-split-area
