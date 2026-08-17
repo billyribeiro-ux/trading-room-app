@@ -209,6 +209,42 @@ follow symlinks. Chasing it produced a corroboration instead of a defect — the
 `apps/room/vite.config.ts:81-87`. That is the mechanism the 10:52 entry recorded as closed,
 confirmed by trying to break it.
 
+### 2026-08-17 20:05 EDT — CORRECTION: component-render coverage was mis-stated, and my own audit had the bug
+
+**Runtime impact: none** — `TODO.md` row AE. Verified: the controller's
+`evidence-gap-register-counts.test.ts`, the only tracked file that parses `TODO.md`, still 4/4.
+
+**The claim I repeated, and where it came from.** Row AE said "five of the six extracted panes have
+no mount test… `PrivateChatPanel.test.ts` is still the only one". I audited it before acting — and
+my audit AGREED, which is why it went unquestioned through two commits and several reports.
+
+**Both were wrong, and the audit was wrong for a reason worth writing down.** The filter was
+`grep -l "from 'svelte'"` — with a closing quote. `import { render } from 'svelte/server'` does not
+match it. An entire testing pattern was invisible to the instrument I used to check the claim, and
+it agreed with the stale row, which is the most convincing way to be wrong.
+
+**Measured properly: THIRTEEN files render a component**, not two.
+
+| form | count | files |
+| --- | ---: | --- |
+| client `mount` | 4 | `PrivateChatPanel`, `FilesPane`, `PresenterMuteRows`, the clsx fixture |
+| `render` from `svelte/server` + `parse5` | 9 | `RoomMessage`, `NotesPane`, `NoteEditor`, `NoteVersionHistory`, `PostAlert`, `SpeechRecoOverlay`, `StreamTabs`, `SwingAlerts`, `DayTradeAlerts` |
+
+**The two forms are NOT interchangeable, and that was tested rather than assumed.** Rendering
+`PresenterMuteRows` through `svelte/server` emits the row ids and **no `checked`** — attachments are
+client-only, so `{@attach setChecked(muted)}` never runs. So the two mount tests added earlier today
+are not redundant with the SSR pattern: `input.checked`, `label.control` and `click()` require a live
+document; structure and attributes do not.
+
+**What is genuinely still open**, now stated with its limit: `AlertChatArea`, `RoomSidebar`,
+`PresentationArea` and `RoomNavbar` have neither form. `AlertChatArea`'s headline behaviour is
+scroll-follow, which reads `scrollHeight`/`offsetHeight` — both `0` in jsdom — so a test there would
+assert something that cannot fail honestly. That is a real limit of the instrument, recorded as such
+rather than left as a backlog item somebody will later "close" with a test that proves nothing.
+
+**Row AE now carries the measurement instead of the count**, because the old wording is what sent a
+session hunting a gap that was half-filled.
+
 ### 2026-08-17 19:40 EDT — `PresenterMuteRows` mounted, and the gap measured again: 33 source assertions blind to a gutted checkbox
 
 **Runtime impact: none** — one new test file. Gate: **2,448 tests / 170 files** (+9), `eslint src/`
