@@ -39,25 +39,89 @@ touch `PresentationArea`'s surface, so the same arithmetic applies to them.
 
 ---
 
-## 2. What is left
+## 2. What is left — measured 2026-08-17, after S9
 
-**Group B — domains.** Independent of each other, so the ORDER IS FREE. Take small ones first; the
-reordering of `RoomVolume` and `RoomBroadcasts` ahead of media transport is why six slices landed
-rather than three.
+**Group B and Group C are DONE.** Every module the old table listed has landed, and so have 17
+(`RoomOverlays`), 18 (window handlers) and 19 (`RoomShell`). The table is replaced rather than ticked
+off, because a list of finished work reads like outstanding work to the next person opening this file.
 
-| #   | module                    | ~script lines | note                                                                              |
-| --- | ------------------------- | ------------: | --------------------------------------------------------------------------------- |
-| 16  | `RoomNotes` + attachments |           340 | the seam I am least sure of — split if it does not read as one thing              |
-| 8   | `RoomMessageActions`      |           380 | `handleMessageAction` + evidence state                                            |
-| 7   | `RoomPrivateChat`         |           430 |                                                                                   |
-| 11  | `RoomScreens`             |           450 | tabs, zoom, popouts, detach                                                       |
-| 10  | `RoomComposer`            |           520 | sending, RTE, uploads, post-alert                                                 |
-| 5   | `RoomEventStream`         |           650 | `subscribeToRoomEvents`; `createSubscriber` applies to `roomEventsConnected` ONLY |
-| 9   | `RoomFeeds`               |           700 | the three scroll effects go to the panes that own the scrollers                   |
-| 13  | `RoomUserActions`         |           700 | `handleUserAction` (249 lines)                                                    |
-| 4   | media transport           |         1,700 | largest; `RoomMedia` keeps the state, transport goes to a sibling                 |
+`+page.svelte` is **2,508 lines** — script 1,952, template 557. Do not trust that number for long;
+`source-size-contract.test.ts` is the authority and re-measures on every run.
 
-**Group C — the template.** 17 `RoomOverlays.svelte`, 18 document/window handlers, 19 `RoomShell.svelte`.
+### What the remaining 2,508 lines actually are
+
+Measured with `svelte.parse`, every statement's leading comment attributed to it:
+
+| block                          |   lines | disposition                                      |
+| ------------------------------ | ------: | ------------------------------------------------ |
+| 36 `new Room*()` constructions | **740** | **S7** — the composition root                    |
+| 35 function declarations       | **495** | extract to the modules that own them             |
+| template                       | **557** | prop-list collapse behind facades                |
+| `$derived`                     |     176 | mostly stays; it is what the template reads      |
+| imports                        |     131 | leave with their consumers (~40 remain after S7) |
+| `$effect` + `onMount`          |     105 | **two effects stay deliberately** (below)        |
+| `$state` / `$props` / other    |     147 | stays                                            |
+| type aliases                   |      23 | move with their domain                           |
+
+**Projection to the under-1,000 target, stated so a miss is visible rather than quiet:** S7 takes the
+740 to ~40 and the imports to ~40; the functions to ~150; the template to ~380. That lands at
+**~1,038** — over the target, not under it. The target is reachable but there is no slack in it, and
+anyone who reports "under 1,000" without a fresh measurement is guessing.
+
+### S7 — the composition root. The analysis is done; the move is not.
+
+This is the largest and the most dangerous remaining slice, and the danger is specific: its failure
+mode is SILENT. Reassigning a shared reactive value breaks the link for everything reading it
+downstream — Svelte's own docs say _"you cannot export reassigned state"_ — so a mis-wired root
+renders the room correctly once and then stops updating, with no error, no failing type-check and no
+red test. That is why the measurements below were taken BEFORE any code moved, and why they are
+recorded here rather than re-derived.
+
+**Measured facts, each by reading the AST rather than by searching:**
+
+1. **36 constructions, 740 lines, in 22 NON-CONTIGUOUS runs** spanning lines 175 to 1516. They are
+   interleaved with the `$derived` values they depend on. This is the fact that makes S7 a real
+   refactor rather than a cut-and-paste, and it was not obvious before it was measured.
+2. **26 page bindings cross into them** — 11 `const`, 2 functions, 13 `let`.
+3. **ZERO of the 13 `let`s is written by the TEMPLATE.** Every write is script-side. This is the
+   finding that makes the slice tractable: the root can take readers as thunks and writers as
+   receivers without the template changing at all.
+4. **Four of the 13 are DOM handles** — `mainElement`, `alertChatElement`, `composerElement`,
+   `alertsScroller` — written by `{@attach}` capture functions. These CANNOT move; they cross as
+   thunks, and a root that tried to own them would be reaching for elements it does not render.
+5. **The contract-test ripple is small: 6 files, 19 references.** Far smaller than the layout slice's
+   twelve assertions across six files, because the classes keep their names and the template keeps
+   reading `prefs.x` unchanged.
+
+**The shape that follows from those five facts:**
+
+```ts
+// src/lib/room/create-room.svelte.ts
+export function createRoom(deps: RoomDeps) {
+  /* the 36 constructions, in their existing relative order */
+  return { prefs, media, split /* … */ } as const;
+}
+```
+
+- The page does `const { prefs, media, … } = createRoom({ … })`. Destructuring is safe — it binds the
+  same instances, and the docs' warning is about REASSIGNMENT, not about binding.
+- Every downstream reference (`prefs.doNotDisturbOn`, the template, all 166 test files) keeps working
+  unchanged. That is the property worth protecting, and it is why the classes must keep their names.
+- Readers cross as thunks (`isPresenter: () => isPresenter`), writers as named receivers
+  (`setChatAlertsDetached`). The inline arrows currently written at each construction become named
+  members of `RoomDeps`, which is strictly better: the receiver is declared once instead of being
+  re-derived at each site.
+- **The root must never be reassigned**, and the same `const`-instance rule the state classes already
+  carry applies to it.
+
+**Do not start this at the end of a session.** Half-moved wiring is the worst state this file can be
+left in, and the failure is invisible to every gate the repository has.
+
+### Two effects stay on the page, and it is a decision, not a leftover
+
+- the `noselect` body class — direct DOM manipulation of a node no element owns, which is `$effect`'s
+  documented use;
+- `polls.deliver` → open modal — `RoomPolls` already returns the decision; the page owns the modal.
 
 ---
 

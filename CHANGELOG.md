@@ -209,6 +209,48 @@ follow symlinks. Chasing it produced a corroboration instead of a defect — the
 `apps/room/vite.config.ts:81-87`. That is the mechanism the 10:52 entry recorded as closed,
 confirmed by trying to break it.
 
+### 2026-08-17 14:26 EDT — row AH closed by S9, and the S7 analysis banked instead of the S7 move
+
+**Runtime impact: none** — `TODO.md` and `docs/PHASE-5-DECOMPOSITION.md` only. Verified: room suite
+**2,414 / 166**, and the controller's `evidence-gap-register-counts.test.ts` — the only tracked file
+that parses `TODO.md` — still green on 4/4 after the row edit.
+
+**Row AH is CLOSED, and by the thing it asked for in its own words.** It said the standing gate
+*"belongs in `gate/` as a catalog-driven test, with the three known false-positive classes encoded so
+it does not cry wolf."* `slice-anchor-contract.test.ts` is exactly that, and it found **twelve live
+instances beyond the three AH's sweep had fixed**. The row now records the closure, the twelve, and
+the 142-site honest gap rather than being deleted, because AH's value is the METHOD it documents.
+
+**Section 2 of `PHASE-5-DECOMPOSITION.md` was stale and is replaced, not ticked off.** Every module
+in its table had landed, and so had Group C — a list of finished work reads like outstanding work to
+the next person who opens it.
+
+**What the section now carries is the S7 analysis, which is the expensive part of that slice.**
+Measured before any code moved, by reading the AST rather than searching:
+
+- **36 constructions, 740 lines, in 22 NON-CONTIGUOUS runs** spanning lines 175–1516, interleaved
+  with the `$derived` values they depend on. This is the fact that makes S7 a refactor rather than a
+  cut-and-paste, and it was not visible before it was measured.
+- **26 page bindings cross into them** — 11 `const`, 2 functions, 13 `let`.
+- **ZERO of the 13 `let`s is written by the TEMPLATE.** Every write is script-side, which is what
+  makes the slice tractable: readers cross as thunks, writers as named receivers, and the template
+  does not change at all.
+- **Four of the 13 are DOM handles** written by `{@attach}` capture functions and cannot move.
+- **The contract-test ripple is 6 files, 19 references** — smaller than the layout slice's, because
+  the classes keep their names and the template keeps reading `prefs.x` unchanged.
+
+**And the projection, stated so a miss is visible rather than quiet: ~1,038 lines after S7, the
+function extraction and the template pass — OVER the under-1,000 target, not under it.** The target
+is reachable with no slack. Anyone reporting "under 1,000" without a fresh measurement is guessing;
+`source-size-contract.test.ts` is the authority.
+
+**Why the analysis was banked and the move was not.** S7's failure mode is SILENT — the docs say *"you
+cannot export reassigned state"*, so a mis-wired root renders the room correctly once and then stops
+updating, with no error, no failing type-check and no red test. Starting a 740-line move across 22
+regions at the end of a long session risks leaving the room's entire wiring half-moved, which is the
+worst state this file can be in. The document now says so in as many words, so the next session
+starts with the measurement done rather than re-deriving it.
+
 ### 2026-08-17 12:14 EDT — S9: the vacuous-guard failure becomes a gate, and it found twelve live instances
 
 **Runtime impact: none** — tests only. Gate: **2,414 tests / 166 files**, `eslint src/` clean,
