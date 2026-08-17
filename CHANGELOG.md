@@ -209,6 +209,51 @@ follow symlinks. Chasing it produced a corroboration instead of a defect — the
 `apps/room/vite.config.ts:81-87`. That is the mechanism the 10:52 entry recorded as closed,
 confirmed by trying to break it.
 
+### 2026-08-17 19:35 EDT — `FilesPane` gets a MOUNT test, and the coverage gap it closes was proven rather than argued
+
+**Runtime impact: none** — one new test file. Gate: **2,439 tests / 169 files** (+4), `eslint src/`
+clean, `svelte-check` **1,203 / 0 / 0**, prettier clean.
+
+**Audited first, because the claim came from a `TODO.md` row and rows go stale.** Measured directly:
+exactly two files in the repository mount a component — `class-clsx-equivalence.test.ts` (a fixture)
+and `PrivateChatPanel.test.ts` (25 tests). So the row was right: of the extracted panes, only one had
+a mount test. `FilesPane` is the second.
+
+**The audit corrected something on the way.** `PresentationArea.svelte`'s comment says `FilesPane`'s
+"22 props are still declared below and passed straight through". It takes **8**. The `RoomFiles`
+facade collapsed them in slice 6 and the comment was never updated.
+
+**Why this pane, on evidence rather than size.** It has a behaviour where source text and the browser
+come apart badly: a file belonging to another tab still emits its `<tr>`, empty, because the captured
+stylesheet stripes on POSITION —
+`.st-fileTable tbody tr:nth-of-type(odd)` / `(2n)`. `~/CLAUDE.md` records where that came from:
+reading `more-fucking-evidence/sounds` end to end showed 30 empty `<tr>` elements around 2 populated
+ones, which no search for a class name would ever have surfaced.
+
+**The gap was MEASURED, not asserted.** `files-pane-contract.test.ts:623` already `toContain`s the
+two relevant source strings, so the obvious objection is that a mount test adds nothing. That was
+tested with a mutation chosen to keep both strings intact while destroying the behaviour — wrapping
+the `<tr>` in `{#if files.matchesFileTab(item)}`:
+
+```
+files-pane-contract.test.ts ....... 64 passed   (blind)
+FilesPane.test.ts ................. 2 failed    (caught)
+```
+
+Every empty row gone, the banding inverted on every visible row, and the source-text contract
+entirely green. **A `toContain` proves a string is present; it cannot prove the element it describes
+reaches the document.**
+
+**jsdom's lack of layout does not bite here**, and the reason is stated rather than hand-waved:
+`:nth-of-type` is a SELECTOR. `element.matches(':nth-of-type(odd)')` resolves against real parsed DOM
+exactly as a browser would. The banding is checkable even though the colours are not.
+
+**Two errors of mine, both caught by running it.** The `data` stub omitted `data.files`, which
+`FilesPane.svelte:316` reads to gate the sort bar separately from the facade it renders from. And the
+search is `search(value)` — a METHOD, recorded at `files.svelte.ts:216` as deliberately not bindable
+— where the first draft assigned `files.fileSearch` and silently set an arbitrary property, leaving
+the search empty and every row rendered.
+
 ### 2026-08-17 19:27 EDT — the Tawk widget's runtime half leaves the page, and becomes testable for the first time
 
 **Runtime impact: none intended** — 90 lines moved unchanged into `#lib/tawk-runtime.ts`. Gate:
