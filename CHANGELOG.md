@@ -33,6 +33,48 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-17
 
+### 2026-08-17 11:42 EDT — row AH's sweep actually run: 253 markers, three dead guards, all three fixed and negative-controlled
+
+**Runtime impact: no** — two contract tests and `TODO.md`. No source behaviour changed; the two
+`.svelte.ts` files touched by the negative controls were restored byte-identical to HEAD, verified
+with `git status`, not assumed.
+
+The previous three rounds each ended with me calling the audit complete while an untested surface
+remained. This closes the last one I had named myself: row AH said "nobody has swept the text-reading
+tests", and the suite's own credibility rests on that sweep, because every "confirmed open" verdict in
+`TODO.md` leans on tests that a dead slice would silently stop guarding.
+
+**THE SWEEP: 253 markers across 52 test files. Three genuinely dead, all now fixed.**
+`screen-volume-contract.test.ts:466` (fixed earlier today), `focus-on-screen-contract.test.ts`
+(`function selectScreenTabOfId(`, now a method on `RoomMediaTransport`) and
+`private-chat-remote-contract.test.ts` (`async function loadPrivateChatLog(`, now
+`RoomPrivateChat.loadLog`). Each sliced a source file for a marker the decomposition had moved, so
+`indexOf` returned -1 and every `not.toContain` built on it ran against `''`.
+
+**Both new fixes are negative-controlled, and the controls are the evidence.** Adding
+`void this.focusOnScreen(producerId)` to `selectScreenTabOfId`, and `this.#threads = {}` to
+`loadLog`'s catch, each turns its guard red — and the assertion messages show real content
+(`'selectScreenTabOfId(producerId: strin…'`, `'} catch {\n this.#threads = {};…'`) rather than the
+empty string. **Before the fix those same two mutations left the suite entirely green**, which is
+what a dead guard costs.
+
+**RULING OUT MY OWN INSTRUMENT WAS MOST OF THE WORK, and it is the transferable part.** The first
+scan reported SIX and four were its own fault: it mapped each `const` to one file and missed local
+re-binding (`APPLIED` is one CSS file at module scope and a different one inside a test body); it
+read a marker quoted in PROSE as a live call (`chat-mode-contract.test.ts` explains its own deleted
+slice in a comment); and it assumed every `.indexOf` runs on a file when
+`speech-reco-overlay-render.test.ts` runs one on rendered DOM. **Running the tests exposed it** —
+three of the four assert `toBeGreaterThan(-1)` and were green, impossible if the marker were absent.
+Reporting that scan unchecked would have produced four fictitious defects and sent somebody to read
+working tests, which this repository rates as worse than saying nothing. The second scan asks a
+weaker question that needs no binding resolution — is this marker in ANY file this test reads — and
+found three, all real.
+
+**What row AH now tracks is the standing gate, not the sweep.** Nothing prevents a fourth:
+`source-size-contract.test.ts`'s rule is one positive assertion per FILE and these files are full of
+positive assertions elsewhere, so it cannot see one dead slice. The scan lives in `/tmp` today and
+belongs in `gate/`, with the three false-positive classes encoded so it does not cry wolf.
+
 ### 2026-08-17 11:34 EDT — the other half of the audit finally run: 23 of 49 "still open" items were mislabelled, and "NOT BUILT" was the wrong words for most of them
 
 **Runtime impact: no** — `TODO.md` only. The one test that reads it stays green.
