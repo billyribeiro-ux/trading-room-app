@@ -209,6 +209,51 @@ follow symlinks. Chasing it produced a corroboration instead of a defect — the
 `apps/room/vite.config.ts:81-87`. That is the mechanism the 10:52 entry recorded as closed,
 confirmed by trying to break it.
 
+### 2026-08-17 19:16 EDT — the `viewerOnlyMode` gap closed from the capture: it was never a defect, and is now enforceable
+
+**Runtime impact: none** — one contract file. No component changed. Gate: **2,425 tests / 167 files**,
+`eslint src/` clean, `svelte-check` **1,200 / 0 / 0**, `prettier` clean.
+
+**The question.** `ScreenZoomControls` declares `viewerOnlyMode` and is rendered TWICE — from
+`PresentationArea` with the flag, from `ScreenPane`'s detached branch without it. That reads exactly
+like a missed prop. It was recorded as a possible gap rather than "fixed", because guessing is how a
+class the reference does not have gets shipped.
+
+**The answer, read out of the capture rather than reasoned about.** The component cited
+`app-screenshare-view.render-helpers.js`, function `Y0e`. Opening it:
+
+```js
+d(0, 'div', 4)            // <div class="zoom-controls-container-detached" [ngClass]>
+  d(1, 'button', 13)      // togglePanZoomDetached
+  d(3, 'button', 13)      // captureVideoImage
+  H(5, K0e, 7, 0, 'div')  // the trio wrapper — FOURTH ARGUMENT IS 0: no attributes, no class
+```
+
+`viewerOnlyMode` does not appear in `Y0e` at all. **Attached-only is correct and the gap is not a
+gap.** Our detached branch renders a bare `<div>`, matching that `0` exactly.
+
+**One thing the reading turned up that the citation had not recorded.** `Y0e`'s update block DOES
+carry an `ngClass` — `$0e = (t) => ({ hidden: t })`, driven by `!isDetached && (!isConnected ||
+(isPresentingThisScreen && !localpreview) || saveData)`. We reproduce none of it, and that is
+equivalent rather than missing: the condition is `!isDetached && (…)`, so when the window IS detached
+the whole expression is false and the cluster can never be hidden by it. The binding only ever fires
+in the ATTACHED case, where `ScreenPane` renders nothing at all under `{#if detached}`. Not-rendered
+and `display: none` are the same picture.
+
+**What was actually wrong: the correctness was held by prose.** Nothing stopped a future reader from
+"fixing" the asymmetry by passing `viewerOnlyMode` to the detached call site, which would paint a
+class the reference does not have. Four assertions now pin it, anchored into the capture by SEARCHING
+FOR THE FUNCTION rather than by line number, because a re-capture renumbers everything.
+
+**Negative controls, both directions, both seen RED and reverted:** passing `viewerOnlyMode` to the
+detached variant → red; removing it from the attached variant → red. The second matters as much as
+the first — without it, "detached does not pass it" would be satisfied by nobody passing it anywhere.
+
+**My own S9 gate caught me mid-slice, and the ceiling did not move.** The new assertions inlined two
+`indexOf` calls into slice bounds, pushing `slice-anchor-contract`'s pinned count past 142. Its
+failure message says to bind the position to a local and assert it; that is what was done, rather
+than raising a number whose whole rule is that it only goes DOWN.
+
 ### 2026-08-17 16:25 EDT — Svelte conformance audited against the docs, and S6 CANCELLED because the evidence refuted it
 
 **Runtime impact: none** — one comment and one document. No source changed. Verified: **2,421 tests /

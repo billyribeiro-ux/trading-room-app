@@ -33,6 +33,17 @@ const controls = readFileSync(
   'utf8'
 );
 const pane = readFileSync(new URL('./components/ScreenPane.svelte', import.meta.url), 'utf8');
+/* The DETACHED cluster's own compiled component - the evidence for `viewerOnlyMode` being
+   attached-only. Read whole; the assertions below anchor into it rather than trusting a line
+   number, because a re-capture renumbers everything. */
+const screenshareView = readFileSync(
+  new URL('../../docs/source/components/app-screenshare-view.render-helpers.js', import.meta.url),
+  'utf8'
+);
+const presentation = readFileSync(
+  new URL('./components/PresentationArea.svelte', import.meta.url),
+  'utf8'
+);
 const tabs = readFileSync(new URL('./components/ScreenTabs.svelte', import.meta.url), 'utf8');
 const zoom = readFileSync(new URL('./screen-zoom.ts', import.meta.url), 'utf8');
 /*
@@ -193,5 +204,99 @@ describe('screen controls', () => {
     // The pane receives them; it no longer owns them.
     expect(pane).not.toMatch(/let showZoomCtrl = \$state/);
     expect(pane).toContain('showZoomCtrl: boolean');
+  });
+});
+
+describe('viewerOnlyMode is ATTACHED-ONLY, and the capture is what says so', () => {
+  /*
+    ## The question this answers, and why it was asked
+
+    `ScreenZoomControls` declares `viewerOnlyMode` and is rendered TWICE — from `PresentationArea`
+    with the flag, and from `ScreenPane`'s detached branch WITHOUT it. That asymmetry looks exactly
+    like a missed prop, and it was recorded as a possible gap on 2026-08-17 rather than "fixed",
+    because guessing is how a class the reference does not have gets shipped.
+
+    It is not a gap. The capture says attached-only, and these assertions are that reading made
+    executable so the answer does not have to be re-derived by the next person who notices.
+
+    ## What the capture actually says
+
+    `app-screenshare-view.render-helpers.js`, function `Y0e` — the detached cluster:
+
+    ```js
+    d(0, 'div', 4)            // <div class="zoom-controls-container-detached" [ngClass]>
+      d(1, 'button', 13)      // togglePanZoomDetached
+      d(3, 'button', 13)      // captureVideoImage
+      H(5, K0e, 7, 0, 'div')  // the trio wrapper: FOURTH ARGUMENT IS 0 — no attributes, no class
+    ```
+
+    `viewerOnlyMode` does not appear in `Y0e` at all. The one `ngClass` in its update block is
+    `$0e = (t) => ({ hidden: t })`, driven by
+    `!isDetached && (!isConnected || (isPresentingThisScreen && !localpreview) || saveData)`.
+
+    ## Why we do not reproduce that `hidden` binding, and why that is equivalent rather than missing
+
+    The condition is `!isDetached && (…)`. When the window IS detached the whole expression is
+    false, so the cluster can never be hidden by it — the binding only ever fires in the ATTACHED
+    case. `ScreenPane` renders this cluster under `{#if detached}`, so in the attached case it
+    renders nothing where the reference renders a `hidden` element. Not-rendered and
+    `display: none` are the same picture; the difference is one DOM node nobody can see.
+  */
+
+  it('the capture citation is real, so this reasoning cannot rot', () => {
+    // Positive anchor first: if `Y0e` were renamed, every assertion below would describe nothing.
+    const at = screenshareView.indexOf('function Y0e(');
+    expect(at, 'Y0e is the detached cluster; the citation must resolve').toBeGreaterThan(-1);
+    const next = screenshareView.indexOf('\nfunction ', at + 10);
+    expect(next, 'Y0e must be followed by another function for this slice to end').toBeGreaterThan(
+      at
+    );
+    const body = screenshareView.slice(at, next);
+
+    // The trio wrapper, with its attribute count of 0 — this is the whole evidence for "no class".
+    expect(body).toContain("H(5, K0e, 7, 0, 'div')");
+    // And the flag is absent from the detached arrangement entirely.
+    expect(
+      body,
+      'the capture would have to change before we pass viewerOnlyMode here'
+    ).not.toContain('viewerOnlyMode');
+    // The only ngClass here toggles `hidden`, not the viewer-only reposition.
+    expect(screenshareView).toContain('$0e = (t) => ({ hidden: t });');
+  });
+
+  it('the ATTACHED arrangement is where the flag belongs, and still carries it', () => {
+    /*
+      The other end. Without this, "detached does not pass it" would be satisfied by nobody passing
+      it anywhere — the class would silently stop being applied in the arrangement that needs it,
+      and the trio would sit 66px from where the reference puts it in viewer-only mode.
+    */
+    expect(presentation).toContain('<ScreenZoomControls');
+    const at = presentation.indexOf('variant="attached"');
+    expect(at, 'the attached call site must exist').toBeGreaterThan(-1);
+    expect(presentation.slice(at, at + 400)).toContain('{viewerOnlyMode}');
+  });
+
+  it('the DETACHED call site does not pass it, and its trio wrapper has no class', () => {
+    const at = pane.indexOf('variant="detached"');
+    expect(at, 'the detached call site must exist').toBeGreaterThan(-1);
+    const callEnd = pane.indexOf('/>', at);
+    expect(callEnd, 'the detached call site must be closed').toBeGreaterThan(at);
+    const call = pane.slice(at, callEnd);
+    expect(call, 'the capture gives the detached trio wrapper no class').not.toContain(
+      'viewerOnlyMode'
+    );
+
+    // And the wrapper we render for it is a bare <div>, matching `H(5, K0e, 7, 0, 'div')`.
+    const elseAt = controls.lastIndexOf('{:else}');
+    expect(elseAt, 'the detached branch must exist').toBeGreaterThan(-1);
+    const detachedBranch = controls.slice(elseAt);
+    expect(detachedBranch).toContain('<div>');
+    expect(detachedBranch).not.toContain('viewer-only-screen-zoom-controls');
+  });
+
+  it('the detached cluster is gated by `detached`, which is what replaces the hidden binding', () => {
+    // If this gate were removed, the attached view would grow a cluster the reference hides.
+    expect(pane).toContain('{#if detached}');
+    expect(pane).toContain('<div class="zoom-controls-container-detached">');
   });
 });
