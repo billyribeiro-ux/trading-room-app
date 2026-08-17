@@ -21,7 +21,7 @@
   } from '#lib/auth-modes.js';
   import { settingHelp, type SettingHelp } from '#lib/room-settings-help.js';
   import type { RoomSettingDef } from '#lib/room-settings-schema.js';
-  import type { SubmitFunction } from '@sveltejs/kit';
+  import type { SubmitFunction } from '$app/forms';
   import { untrack } from 'svelte';
   import type { PageProps } from './$types';
 

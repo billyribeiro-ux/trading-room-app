@@ -10,7 +10,7 @@ import {
   type User
 } from '#lib/server/db/schema.js';
 import { resetRateLimits } from '#lib/server/rate-limit.js';
-import { callRemote } from '#lib/server/remote-command-harness.js';
+import { callRemote, expectSchemaRefusal } from '#lib/server/remote-command-harness.js';
 
 /*
   Characterization tests for the four actions that create content: sendMessage, replyMessage,
@@ -124,11 +124,11 @@ describe('sendMessage', () => {
     hence the cast, which is what lets this keep proving the runtime guard is still there.
   */
   it('refuses a channel outside CHAT_TABS', async () => {
-    await expect(
+    await expectSchemaRefusal(
       callRemote(locals(member), () =>
         sendMessage({ body: 'hidden', room: 'not-a-channel' as 'main' })
       )
-    ).rejects.toMatchObject({ status: 400 });
+    );
     expect(db.select().from(messages).all()).toHaveLength(0);
 
     // Both real channels are accepted.
@@ -211,11 +211,11 @@ describe('replyMessage', () => {
     await expect(
       callRemote(locals(member), () => replyMessage({ body: 'hi', messageId: 999999 }))
     ).rejects.toMatchObject({ status: 404 });
-    await expect(
+    await expectSchemaRefusal(
       callRemote(locals(member), () =>
         replyMessage({ body: 'hi', messageId: 'abc' as unknown as number })
       )
-    ).rejects.toMatchObject({ status: 400 });
+    );
   });
 
   /*
@@ -279,9 +279,9 @@ describe('postAlert', () => {
         kind
       ).resolves.toBeUndefined();
     }
-    await expect(
+    await expectSchemaRefusal(
       post(presenter, { kind: 'video' as 'text', body: 'nope', nonTradeAlert: false })
-    ).rejects.toMatchObject({ status: 400 });
+    );
   });
 
   /*
@@ -313,10 +313,10 @@ describe('postAlert', () => {
 
   it('refuses an empty body and one over 8,000 characters', async () => {
     for (const body of ['', 'x'.repeat(8_001)]) {
-      await expect(
+      await expectSchemaRefusal(
         post(presenter, { kind: 'text', body, nonTradeAlert: false }),
         `${body.length} chars`
-      ).rejects.toMatchObject({ status: 400 });
+      );
     }
   });
 
@@ -326,14 +326,14 @@ describe('postAlert', () => {
       something consumes it. Nothing does — the suppression it names has no consumer in this room —
       so the client stopped sending it.
     */
-    await expect(
+    await expectSchemaRefusal(
       post(presenter, {
         kind: 'text',
         body: 'a',
         nonTradeAlert: false,
         dontPush: true
       } as unknown as Parameters<typeof postAlert>[0])
-    ).rejects.toMatchObject({ status: 400 });
+    );
   });
 });
 
@@ -443,10 +443,10 @@ describe('askQuestion', () => {
     await expect(
       callRemote(locals(member), () => askQuestion({ body: 'x'.repeat(4_001), alertId: alert.id }))
     ).rejects.toMatchObject({ status: 400 });
-    await expect(
+    await expectSchemaRefusal(
       callRemote(locals(member), () =>
         askQuestion({ body: 'why?', alertId: 'abc' as unknown as number })
       )
-    ).rejects.toMatchObject({ status: 400 });
+    );
   });
 });

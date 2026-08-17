@@ -24,6 +24,66 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-17
 
+### 2026-08-17 10:24 EDT — SvelteKit `3.0.0-next.16` → `next.23`, both apps, and the last two `$lib` shims
+
+**Room** suite 2,393 across 162, `svelte-check` 1,192/0/0, lint clean, build ✓.
+**Controller** suite 985 across 94, `svelte-check` 1,527/0/0, lint clean, build ✓.
+**Runtime impact: yes** — one error-log field changed and a validation failure now surfaces in a
+different shape. No user-visible behaviour changed.
+
+The bump the `lib-alias` codemod tried to slip in on 2026-08-16 and which was reverted then, done
+deliberately this time with its own gate run. Seven RC versions in one step, and it broke four things
+— every one loudly, with the exact member named, which is the good kind of breaking change.
+
+**1. Hook types moved to `@sveltejs/kit/hooks`.** `Handle`, `HandleServerError` and `ServerInit`
+were still re-exported from the package root in `next.16`, so the guide's "Hook types moved" item
+only became visible here. Each removal cascaded into four to eight
+`implicitly has an 'any' type` errors from the handlers those types annotated — 30 errors in the
+controller, 5 in the room, from four import lines.
+
+**2. `SubmitFunction` moved to `$app/forms`**, across three controller pages.
+
+**3. `handleError`'s `status` became `kind`.** Kit 3 replaced the input's status with a discriminant
+— `'app' | 'framework' | 'validation' | 'unknown'` — and moved status the other way, as an optional
+RETURN that overrides the default. This handler does not return one, deliberately: it has never
+wanted to change what the user is sent.
+
+The swap is an upgrade for the exact reason that hook's own note records. When the home page began
+answering 500 in production on 2026-08-10, the whole diagnostic was `status: 500` — *"a notification
+that an error happened"*. `kind` separates the four cases that need different responses from an
+operator: `'app'` is our own `error()` call and usually intentional, `'framework'` is a 404 or a
+malformed request, `'validation'` is a remote function called with bad arguments, and `'unknown'` is
+the only one where something threw where nothing should. Alerting on 500s treated all four alike.
+
+**4. `handleValidationError` is gone, and 19 assertions went red at once.** The guide lists the hook
+as removed; `next.23` implements it — read from the installed package at
+`src/runtime/app/server/remote/shared.js:33-36`, the validator now does
+`throw new ValidationError(result.issues)` directly, and the status is applied further out where
+`handleError` receives it with `kind: 'validation'`. So `remote-command-harness`'s shim reproducing
+Kit's old default became config nothing reads, and a schema refusal is a `ValidationError` carrying
+`issues` rather than an `HttpError` carrying `status`.
+
+**The fix is one named helper, not nineteen edits.** `expectSchemaRefusal(call, label?)` lives beside
+the harness that knows the framework's shape. That matters more than the line count: **37**
+`.rejects.toMatchObject({ status: 400 })` assertions exist across six files and only **19** are
+schema refusals — the other 18 are `error(400, …)` raised by our own code and are still `HttpError`.
+A blanket replace would have quietly loosened all 18. The helper also asserts something the literal
+never did: that `issues` is a non-empty array, so a handler that merely threw fails it. "It rejected"
+was not the contract.
+
+Its `label` parameter is `expect(…, message)`'s second argument, kept because one caller loops over
+a list of bad values; dropping it would have turned a precise failure into "one of these three was
+accepted".
+
+**Two `$lib` shims came out with the bump.** The controller's alias lived in `kit.config.ts`, NOT
+`vite.config.ts` — which is worth recording because it is where I did not look: the migration
+commit's note said the controller had "no alias in its Vite config at all", true of that file and
+false about the app. Removed, and with it the `config.alias is deprecated` warning that
+`svelte-kit sync` printed on every controller run. `next.23` also began naming an extensionless
+`import { kitConfig } from './kit.config'` in `vite.config.ts`; now `./kit.config.js`, the same
+explicit-extension discipline as `#lib`.
+
+
 ### 2026-08-17 08:57 EDT — the last two scroll-follow effects reach the components that own their scrollers
 
 **`+page.svelte` 2,985 → 2,948 (−37).** Suite 2,393 across 162 files (+4, the new cross-column

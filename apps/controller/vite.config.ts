@@ -1,5 +1,14 @@
 import { sveltekit } from '@sveltejs/kit/vite';
-import { kitConfig } from './kit.config';
+/*
+  The EXTENSION is required, and `svelte-kit sync` on 3.0.0-next.23 says so by name:
+  `import "./kit.config" without a file extension (vite.config.ts:2:27)`.
+
+  Same discipline as the `#lib` migration in the same week — Vite's native config loader resolves
+  specifiers the way Node does, so an extensionless relative import is ambiguous rather than
+  convenient. `.js` maps to the `.ts` on disk under `moduleResolution: "bundler"`, which is the form
+  Kit's own codemod emits.
+*/
+import { kitConfig } from './kit.config.js';
 import { configDefaults, defineConfig } from 'vitest/config';
 
 /*

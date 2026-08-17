@@ -2,7 +2,7 @@ import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { db, ensureDatabase } from '#lib/server/db/index.js';
 import { alerts, chatMutes, messages, users, type User } from '#lib/server/db/schema.js';
-import { callRemote } from '#lib/server/remote-command-harness.js';
+import { callRemote, expectSchemaRefusal } from '#lib/server/remote-command-harness.js';
 import { parseReactions } from '#lib/server/reactions.js';
 
 /*
@@ -156,9 +156,9 @@ describe('delete', () => {
     await expect(
       act(presenter, { operation: 'delete', kind: 'chat', id: 999999 })
     ).rejects.toMatchObject({ status: 404 });
-    await expect(
+    await expectSchemaRefusal(
       act(presenter, { operation: 'delete', kind: 'chat', id: 'abc' as unknown as number })
-    ).rejects.toMatchObject({ status: 400 });
+    );
   });
 
   it('refuses a `kind` that is neither alert nor chat, where it used to mean chat', async () => {
@@ -170,10 +170,10 @@ describe('delete', () => {
     */
     const message = newMessage(author);
     for (const kind of ['', 'Chat', 'alerts']) {
-      await expect(
+      await expectSchemaRefusal(
         act(presenter, { operation: 'delete', kind: kind as 'chat', id: message.id }),
         kind
-      ).rejects.toMatchObject({ status: 400 });
+      );
     }
     expect(db.select().from(messages).all()).toHaveLength(1);
   });
@@ -285,7 +285,7 @@ describe('reaction', () => {
       ['thumbsup', ''],
       ['   ', '\u{1F44D}']
     ]) {
-      await expect(
+      await expectSchemaRefusal(
         act(bystander, {
           operation: 'reaction',
           kind: 'chat',
@@ -294,7 +294,7 @@ describe('reaction', () => {
           reactionEmoji
         }),
         `${reactionKey}/${reactionEmoji}`
-      ).rejects.toMatchObject({ status: 400 });
+      );
     }
   });
 });
@@ -346,10 +346,10 @@ describe('presenter-only operations', () => {
     // NEW: `Number.isInteger` let 0 and negatives through to insert a row against nobody.
     const message = newMessage(author);
     for (const targetUserId of [0, -1]) {
-      await expect(
+      await expectSchemaRefusal(
         act(presenter, { operation: 'mute24', kind: 'chat', id: message.id, targetUserId }),
         String(targetUserId)
-      ).rejects.toMatchObject({ status: 400 });
+      );
     }
     expect(db.select().from(chatMutes).all()).toHaveLength(0);
   });
@@ -378,13 +378,13 @@ describe('presenter-only operations', () => {
       handler runs — and now a compile error too, hence the cast.
     */
     const message = newMessage(author);
-    await expect(
+    await expectSchemaRefusal(
       act(presenter, {
         operation: 'launchMissiles',
         kind: 'chat',
         id: message.id
       } as unknown as Args)
-    ).rejects.toMatchObject({ status: 400 });
+    );
   });
 
   it('refuses `targetUserId` on an operation that is not mute24', async () => {
@@ -393,14 +393,14 @@ describe('presenter-only operations', () => {
       read it on one, so a delete carried a field nothing looked at and nothing anywhere said so.
     */
     const message = newMessage(author);
-    await expect(
+    await expectSchemaRefusal(
       act(presenter, {
         operation: 'delete',
         kind: 'chat',
         id: message.id,
         targetUserId: author.id
       } as unknown as Args)
-    ).rejects.toMatchObject({ status: 400 });
+    );
     expect(db.select().from(messages).all()).toHaveLength(1);
   });
 });

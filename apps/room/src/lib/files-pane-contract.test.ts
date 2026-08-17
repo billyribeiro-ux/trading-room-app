@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { eq } from 'drizzle-orm';
-import { callRemote } from '#lib/server/remote-command-harness.js';
+import { callRemote, expectSchemaRefusal } from '#lib/server/remote-command-harness.js';
 import { db, ensureDatabase } from '#lib/server/db/index.js';
 import { sharedFiles, users } from '#lib/server/db/schema.js';
 import {
@@ -1181,10 +1181,10 @@ describe('setting the alert sound', () => {
     */
     controller.writes.length = 0;
     for (const on of ['', 'yes', '1', 0, null]) {
-      await expect(
+      await expectSchemaRefusal(
         setAlertSound(presenterLocals, { url: MP3, on } as unknown as { url: string; on: boolean }),
         String(on)
-      ).rejects.toMatchObject({ status: 400 });
+      );
     }
     expect(controller.writes).toEqual([]);
   });
@@ -1237,12 +1237,12 @@ describe('playing a sound to the room', () => {
 
   it('refuses a command name that is not one of the two', async () => {
     // An unknown string would reach every client in the room and be dispatched by none.
-    await expect(
+    await expectSchemaRefusal(
       callRemote(presenterLocals, () =>
         fileMediaCommand({ cmd: 'playMp3ForAll' } as unknown as { cmd: 'stopMp3ForAll' })
       ),
       'the capture capitalises MP3 on play and not on stop; a tidied-up name dispatches nowhere'
-    ).rejects.toMatchObject({ status: 400 });
+    );
   });
 });
 

@@ -66,7 +66,7 @@
   import { enhance } from '$app/forms';
   import { resolve } from '$app/paths';
   import { bootbox } from '#lib/bootbox.svelte.js';
-  import type { SubmitFunction } from '@sveltejs/kit';
+  import type { SubmitFunction } from '$app/forms';
   import type { PageProps } from './$types';
   import PasswordReveal from '#lib/components/PasswordReveal.svelte';
   import EmojiPicker from '#lib/components/EmojiPicker.svelte';
