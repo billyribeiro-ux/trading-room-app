@@ -13,7 +13,7 @@
    */
   import type { Attachment } from 'svelte/attachments';
   import { resolve } from '$app/paths';
-  import { gsap, magnetic, prefersReducedMotion, splitChars } from '$lib/motion';
+  import { gsap, magnetic, prefersReducedMotion, splitChars } from '#lib/motion.js';
   import {
     HERO_CHIPS,
     HERO_CTA_PRIMARY,
@@ -23,7 +23,7 @@
     HERO_SUB,
     SIMULATED_FEED_LABEL,
     TICKER
-  } from '$lib/content/home';
+  } from '#lib/content/home.js';
 
   let sceneEnabled = $state(false);
   let sceneActive = $state(true);

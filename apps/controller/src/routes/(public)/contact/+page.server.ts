@@ -1,5 +1,5 @@
 import { fail } from '@sveltejs/kit';
-import { controlPlaneMode } from '$lib/server/control-plane-runtime';
+import { controlPlaneMode } from '#lib/server/control-plane-runtime.js';
 import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = () => ({

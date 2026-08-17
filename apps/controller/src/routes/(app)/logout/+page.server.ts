@@ -1,5 +1,5 @@
 import { redirect } from '@sveltejs/kit';
-import { destroyLoginSession } from '$lib/server/auth';
+import { destroyLoginSession } from '#lib/server/auth.js';
 import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = () => redirect(303, '/login');

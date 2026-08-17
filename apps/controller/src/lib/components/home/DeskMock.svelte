@@ -10,7 +10,7 @@
    * load.
    */
   import type { Attachment } from 'svelte/attachments';
-  import { gsap, prefersReducedMotion } from '$lib/motion';
+  import { gsap, prefersReducedMotion } from '#lib/motion.js';
   import { createWalk } from './market-feed';
 
   const CANDLES = 30;

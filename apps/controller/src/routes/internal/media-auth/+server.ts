@@ -1,6 +1,6 @@
 import { json, text } from '@sveltejs/kit';
 import { ROOM_JWT_SECRET } from '$app/env/private';
-import { decideIngestAuth, tokenFromAuthRequest } from '$lib/server/stream-ingest';
+import { decideIngestAuth, tokenFromAuthRequest } from '#lib/server/stream-ingest.js';
 import type { RequestHandler } from './$types';
 
 /**

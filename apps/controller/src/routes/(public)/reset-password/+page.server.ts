@@ -1,9 +1,9 @@
 import { fail, redirect } from '@sveltejs/kit';
 import { eq } from 'drizzle-orm';
-import { getDb } from '$lib/server/db';
-import { ACCOUNT_ACTIVE, accounts, users } from '$lib/server/db/schema';
-import { MIN_PASSWORD, createLoginSession, setPasswordFromReset } from '$lib/server/auth';
-import { inspectToken, redeemToken, type RedeemFailureReason } from '$lib/server/email-verification';
+import { getDb } from '#lib/server/db/index.js';
+import { ACCOUNT_ACTIVE, accounts, users } from '#lib/server/db/schema.js';
+import { MIN_PASSWORD, createLoginSession, setPasswordFromReset } from '#lib/server/auth.js';
+import { inspectToken, redeemToken, type RedeemFailureReason } from '#lib/server/email-verification.js';
 import type { Actions, PageServerLoad } from './$types';
 
 /**
@@ -12,7 +12,7 @@ import type { Actions, PageServerLoad } from './$types';
  * inference would make both optional in both branches.
  *
  * The refused branch carries the finished SENTENCE, not the reason code. The page would otherwise
- * need its own copy of the three strings — and a type imported from `$lib/server`, which client
+ * need its own copy of the three strings — and a type imported from `#lib/server`, which client
  * code may not touch. One wording, on the server, used by both the load and the action.
  */
 type ResetPage = { valid: true; token: string; minPassword: number } | { valid: false; message: string };

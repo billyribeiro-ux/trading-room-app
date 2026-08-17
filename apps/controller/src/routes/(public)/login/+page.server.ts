@@ -1,10 +1,10 @@
 import { fail, redirect } from '@sveltejs/kit';
 import { eq, lt } from 'drizzle-orm';
-import { getDb } from '$lib/server/db';
-import { ACCOUNT_ACTIVE, accounts, loginAttempts, users } from '$lib/server/db/schema';
-import { createLoginSession, verifyPassword } from '$lib/server/auth';
-import { LOGIN_ATTEMPT_RETENTION_MS, loginIdentity, nextLoginAttempt } from '$lib/server/login-attempts';
-import { RECAPTCHA_FIELD, recaptchaFailureMessage, verifyRecaptcha } from '$lib/server/recaptcha';
+import { getDb } from '#lib/server/db/index.js';
+import { ACCOUNT_ACTIVE, accounts, loginAttempts, users } from '#lib/server/db/schema.js';
+import { createLoginSession, verifyPassword } from '#lib/server/auth.js';
+import { LOGIN_ATTEMPT_RETENTION_MS, loginIdentity, nextLoginAttempt } from '#lib/server/login-attempts.js';
+import { RECAPTCHA_FIELD, recaptchaFailureMessage, verifyRecaptcha } from '#lib/server/recaptcha.js';
 import type { Actions, PageServerLoad } from './$types';
 
 /**

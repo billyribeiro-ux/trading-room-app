@@ -1,8 +1,8 @@
 <script lang="ts">
-  import { bootbox } from '$lib/bootbox.svelte';
-  import SanitizedHtml from '$lib/components/SanitizedHtml.svelte';
-  import { sanitizeHtml } from '$lib/sanitize-html';
-  import type { SanitizedHtml as SanitizedHtmlValue } from '$lib/sanitized-html';
+  import { bootbox } from '#lib/bootbox.svelte.js';
+  import SanitizedHtml from '#lib/components/SanitizedHtml.svelte';
+  import { sanitizeHtml } from '#lib/sanitize-html.js';
+  import type { SanitizedHtml as SanitizedHtmlValue } from '#lib/sanitized-html.js';
   import type { Attachment } from 'svelte/attachments';
 
   /**

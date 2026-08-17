@@ -1,16 +1,16 @@
 import { fail, redirect } from '@sveltejs/kit';
 import { eq } from 'drizzle-orm';
-import { getDb } from '$lib/server/db';
-import { users } from '$lib/server/db/schema';
-import { issueToken } from '$lib/server/email-verification';
+import { getDb } from '#lib/server/db/index.js';
+import { users } from '#lib/server/db/schema.js';
+import { issueToken } from '#lib/server/email-verification.js';
 import {
   GENERIC_REQUEST_ACK,
   RESET_TTL_MS,
   resetEnabled,
   resetRequestedRecently,
   sendPasswordResetEmail
-} from '$lib/server/password-reset';
-import { RECAPTCHA_FIELD, recaptchaFailureMessage, verifyRecaptcha } from '$lib/server/recaptcha';
+} from '#lib/server/password-reset.js';
+import { RECAPTCHA_FIELD, recaptchaFailureMessage, verifyRecaptcha } from '#lib/server/recaptcha.js';
 import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = ({ locals }) => {

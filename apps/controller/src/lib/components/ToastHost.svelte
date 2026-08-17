@@ -8,7 +8,7 @@
    * have.
    */
   import { fade, fly } from 'svelte/transition';
-  import { dismiss, toasts } from '$lib/toast.svelte';
+  import { dismiss, toasts } from '#lib/toast.svelte.js';
 </script>
 
 {#if toasts.length > 0}

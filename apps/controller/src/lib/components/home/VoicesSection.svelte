@@ -5,8 +5,8 @@
    * closes the marquee loop. Under prefers-reduced-motion the rails become static wrapped rows and
    * the duplicates disappear, so every quote stays readable.
    */
-  import { TESTIMONIALS, VOICES } from '$lib/content/home';
-  import { reveal } from '$lib/motion';
+  import { TESTIMONIALS, VOICES } from '#lib/content/home.js';
+  import { reveal } from '#lib/motion.js';
 
   /*
    * Each rail run repeats its quotes three times: a run must be at least as wide as the viewport

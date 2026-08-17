@@ -1,7 +1,7 @@
 <script lang="ts">
   import { resolve } from '$app/paths';
   import { untrack } from 'svelte';
-  import Recaptcha from '$lib/components/Recaptcha.svelte';
+  import Recaptcha from '#lib/components/Recaptcha.svelte';
   import '../../../account.css';
   import type { PageProps } from './$types';
 

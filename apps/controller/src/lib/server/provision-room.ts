@@ -2,7 +2,7 @@ import { randomBytes } from 'node:crypto';
 import { eq, sql } from 'drizzle-orm';
 import { getDb } from './db';
 import { roomSettings, roomUsers, rooms } from './db/schema';
-import { newRoomSettings } from '$lib/room-settings-profile';
+import { newRoomSettings } from '#lib/room-settings-profile.js';
 
 /**
  * Everything that has to exist for a room to work, in one place.

@@ -1,13 +1,13 @@
 import { error, json } from '@sveltejs/kit';
 import { eq } from 'drizzle-orm';
 import { ROOM_JWT_SECRET } from '$app/env/private';
-import { getDb } from '$lib/server/db';
-import { ACCOUNT_ACTIVE, accounts, badges, roomUsers, rooms, users } from '$lib/server/db/schema';
-import { parseBadgeIds, readPermissions, readSettings } from '$lib/server/rooms';
-import { roomVisibleConfig } from '$lib/room-config';
-import { isRoomPresenter } from '$lib/room-member-role';
+import { getDb } from '#lib/server/db/index.js';
+import { ACCOUNT_ACTIVE, accounts, badges, roomUsers, rooms, users } from '#lib/server/db/schema.js';
+import { parseBadgeIds, readPermissions, readSettings } from '#lib/server/rooms.js';
+import { roomVisibleConfig } from '#lib/room-config.js';
+import { isRoomPresenter } from '#lib/room-member-role.js';
 import { createHash } from 'node:crypto';
-import { verifyConfigReadToken } from '$lib/server/room-handoff';
+import { verifyConfigReadToken } from '#lib/server/room-handoff.js';
 import type { RequestHandler } from './$types';
 
 /**
@@ -21,7 +21,7 @@ import type { RequestHandler } from './$types';
  * controller owns per-room state.
  *
  * This is the read that removes it. Precedence is decided by `resolveRoomConfig()` in
- * `$lib/room-config` — already documented there as "the single seam between the controller and the
+ * `#lib/room-config` — already documented there as "the single seam between the controller and the
  * room" — and nothing is recomputed here.
  *
  * ## What it deliberately does NOT return

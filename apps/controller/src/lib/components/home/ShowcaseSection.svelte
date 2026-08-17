@@ -4,8 +4,8 @@
    * DeskMock and PhoneMock are decorative illustrations; every claim they dramatize is stated in
    * accessible copy here.
    */
-  import { MOBILE, SHOWCASE, SHOWCASE_FEATURES } from '$lib/content/home';
-  import { parallax, reveal } from '$lib/motion';
+  import { MOBILE, SHOWCASE, SHOWCASE_FEATURES } from '#lib/content/home.js';
+  import { parallax, reveal } from '#lib/motion.js';
   import DeskMock from './DeskMock.svelte';
   import PhoneMock from './PhoneMock.svelte';
 </script>

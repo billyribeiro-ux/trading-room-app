@@ -1,7 +1,7 @@
 <script lang="ts">
   import { enhance } from '$app/forms';
-  import { editableText, isEditableEmpty } from '$lib/editable-display';
-  import type { RoomSettingDef } from '$lib/room-settings-schema';
+  import { editableText, isEditableEmpty } from '#lib/editable-display.js';
+  import type { RoomSettingDef } from '#lib/room-settings-schema.js';
 
   /**
    * One angular-xeditable field.
@@ -49,7 +49,7 @@
 
   const isCheckbox = $derived(def.type === 'checkbox');
 
-  /* Both rules, and the node tally behind them, are in `$lib/editable-display`. */
+  /* Both rules, and the node tally behind them, are in `#lib/editable-display.js`. */
   const empty = $derived(isEditableEmpty(value, isCheckbox));
   const shown = $derived(editableText(value, isCheckbox, options));
 

@@ -1,6 +1,6 @@
 import { fail, redirect } from '@sveltejs/kit';
 import { count, desc, eq, sql } from 'drizzle-orm';
-import { getDb } from '$lib/server/db';
+import { getDb } from '#lib/server/db/index.js';
 import {
   ACCOUNT_ACTIVE,
   ACCOUNT_SUSPENDED,
@@ -10,9 +10,9 @@ import {
   roomUsers,
   rooms,
   users
-} from '$lib/server/db/schema';
-import { recordAdminWrite, requireSuperadmin, superadminCount } from '$lib/server/superadmin';
-import { beginImpersonation, endImpersonation } from '$lib/server/impersonation';
+} from '#lib/server/db/schema.js';
+import { recordAdminWrite, requireSuperadmin, superadminCount } from '#lib/server/superadmin.js';
+import { beginImpersonation, endImpersonation } from '#lib/server/impersonation.js';
 import type { Actions, PageServerLoad } from './$types';
 
 /**

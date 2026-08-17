@@ -3,8 +3,8 @@
    * The proof bar: four engineering claims, stated plainly. The strip's only motion is the shared
    * scroll reveal — the values are content, not effects.
    */
-  import { reveal } from '$lib/motion';
-  import { STATS } from '$lib/content/home';
+  import { reveal } from '#lib/motion.js';
+  import { STATS } from '#lib/content/home.js';
 </script>
 
 <section class="strip" aria-label="Platform proof points" {@attach reveal({ children: '.stat', stagger: 0.12 })}>

@@ -5,4 +5,4 @@
  * authoritative security control even though the editor also sanitizes its
  * local preview for immediate user safety.
  */
-export { sanitizeHtml } from '$lib/sanitize-html';
+export { sanitizeHtml } from '#lib/sanitize-html.js';

@@ -3,9 +3,9 @@ import { randomBytes } from 'node:crypto';
 import { count, desc, eq } from 'drizzle-orm';
 import { PUBLIC_SITE_ORIGIN } from '$app/env/public';
 import { ROOM_BASE_URL, ROOM_JWT_SECRET } from '$app/env/private';
-import { getDb } from '$lib/server/db';
-import { badges, roomSessions, roomUsers, rooms } from '$lib/server/db/schema';
-import { requireOwnedRoom, requireUser } from '$lib/server/auth';
+import { getDb } from '#lib/server/db/index.js';
+import { badges, roomSessions, roomUsers, rooms } from '#lib/server/db/schema.js';
+import { requireOwnedRoom, requireUser } from '#lib/server/auth.js';
 import {
   MANY_OPCODES,
   PERMISSION_KEYS,
@@ -45,17 +45,17 @@ import {
   type ManyOpcode,
   type PermissionKey,
   type UserOpcode
-} from '$lib/server/rooms';
-import { FcmCredentialInvalid, FcmNotConfigured, FcmUnreachable } from '$lib/server/fcm';
-import { MailEnvMissing, sendWebinarReminderToRoom, sendWelcomeEmailToMember } from '$lib/server/member-email';
-import { MailDeliveryFailed } from '$lib/server/mail';
-import { launchHref } from '$lib/server/room-handoff';
-import { ROOM_SETTINGS, ROOM_SETTING_BY_NAME } from '$lib/room-settings-schema';
-import { resolveRoomConfig } from '$lib/room-config';
-import { isRoomPresenter, isRoomTrial } from '$lib/room-member-role';
-import { FEATURES, resolveFeatureReadiness, type FeatureId } from '$lib/features';
-import { resolveAccountEntitlements } from '$lib/server/account-entitlements';
-import { sanitizeHtml } from '$lib/server/sanitize-html';
+} from '#lib/server/rooms.js';
+import { FcmCredentialInvalid, FcmNotConfigured, FcmUnreachable } from '#lib/server/fcm.js';
+import { MailEnvMissing, sendWebinarReminderToRoom, sendWelcomeEmailToMember } from '#lib/server/member-email.js';
+import { MailDeliveryFailed } from '#lib/server/mail.js';
+import { launchHref } from '#lib/server/room-handoff.js';
+import { ROOM_SETTINGS, ROOM_SETTING_BY_NAME } from '#lib/room-settings-schema.js';
+import { resolveRoomConfig } from '#lib/room-config.js';
+import { isRoomPresenter, isRoomTrial } from '#lib/room-member-role.js';
+import { FEATURES, resolveFeatureReadiness, type FeatureId } from '#lib/features.js';
+import { resolveAccountEntitlements } from '#lib/server/account-entitlements.js';
+import { sanitizeHtml } from '#lib/server/sanitize-html.js';
 import type { Actions, PageServerLoad } from './$types';
 
 /**
@@ -210,7 +210,7 @@ export const load: PageServerLoad = async ({ params, locals, url }) => {
      *
      * This was held at `null` pending the owner's decision, because building the URL tells
      * Automattic that the hash of a given address was viewed. That is a real cost and it was not
-     * mine to accept silently — the full trade-off is in `$lib/server/gravatar`.
+     * mine to accept silently — the full trade-off is in `#lib/server/gravatar.js`.
      *
      * STILL null, and not for want of trying. Wiring `gravatarUrl(u.email)` here was blocked as
      * data exfiltration: it sends a hash of every member's real address to a third party. The
@@ -229,7 +229,7 @@ export const load: PageServerLoad = async ({ params, locals, url }) => {
       (page.manageSession.html:353), so the page needs to know whether this member has any push
       tokens — not what they are.
 
-      Counted HERE rather than in the component because `readPushTokens` lives in `$lib/server` and
+      Counted HERE rather than in the component because `readPushTokens` lives in `#lib/server` and
       a component cannot import it. The count is the whole of what the icon needs, which is why the
       raw column is stripped from the payload further down — see the note above the `members` map.
     */
@@ -317,13 +317,10 @@ export const load: PageServerLoad = async ({ params, locals, url }) => {
     unbounded second SELECT of every row in a large room to call `.length` on it is the shape this
     repository asks about at 10,000 rows.
   */
-  const [rosterRow] = await getDb()
-    .select({ n: count() })
-    .from(roomUsers)
-    .where(eq(roomUsers.roomId, room.id));
+  const [rosterRow] = await getDb().select({ n: count() }).from(roomUsers).where(eq(roomUsers.roomId, room.id));
   const rosterCount = rosterRow?.n ?? 0;
 
-    /*
+  /*
     `visits` — one row per ARRIVAL, which is what the reference's `statXrefs` is.
 
     ## It was removed, and it is back by an explicit decision

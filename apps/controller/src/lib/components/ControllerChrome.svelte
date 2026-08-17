@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { animateOnce } from '$lib/animate-once';
+  import { animateOnce } from '#lib/animate-once.js';
   import AppFooter from './AppFooter.svelte';
   import AppNavbar from './AppNavbar.svelte';
   import Bootbox from './Bootbox.svelte';

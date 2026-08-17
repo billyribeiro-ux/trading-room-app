@@ -1,10 +1,10 @@
 import { error } from '@sveltejs/kit';
 import { and, desc, eq } from 'drizzle-orm';
-import { getDb } from '$lib/server/db';
-import { roomSessions, roomUsers, rooms, users } from '$lib/server/db/schema';
-import { requireOwnedRoom, requireUser } from '$lib/server/auth';
-import { readSettings } from '$lib/server/rooms';
-import { buildStatsCsv, statsFilename } from '$lib/stats-csv';
+import { getDb } from '#lib/server/db/index.js';
+import { roomSessions, roomUsers, rooms, users } from '#lib/server/db/schema.js';
+import { requireOwnedRoom, requireUser } from '#lib/server/auth.js';
+import { readSettings } from '#lib/server/rooms.js';
+import { buildStatsCsv, statsFilename } from '#lib/stats-csv.js';
 import type { RequestHandler } from './$types';
 
 /**

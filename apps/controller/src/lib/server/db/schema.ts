@@ -244,7 +244,7 @@ export const rooms = pgTable(
      * control at all: its Sessions row Actions cell holds Launch, Manage and Marketplace and nothing
      * else (evidence-dumps/login-page/logged-in-page:471-479). Archiving is `sess.isArchivedRoom`,
      * an `editable-checkbox` labelled "Is Archived Room?" on the MANAGE page's Settings tab
-     * (evidence-dumps/login-page/manage:1405-1408), and `$lib/room-settings-schema.ts:183` already
+     * (evidence-dumps/login-page/manage:1405-1408), and `#lib/room-settings-schema.ts:183` already
      * carries that key — with `wired: false`.
      *
      * The account page still needs a durable, queryable answer: its
@@ -264,7 +264,7 @@ export const rooms = pgTable(
  * All 269 settings for one room, as a single JSON document.
  *
  * One column rather than 266: the key set is defined by
- * `$lib/room-settings-schema.ts`, which is generated from the reference capture,
+ * `#lib/room-settings-schema.ts`, which is generated from the reference capture,
  * so the shape can change with a regenerate instead of a migration each time.
  * Reads go through resolveRoomConfig(), never straight into this blob.
  */

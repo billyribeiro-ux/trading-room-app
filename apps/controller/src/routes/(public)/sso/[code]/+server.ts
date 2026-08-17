@@ -1,13 +1,13 @@
 import { error, redirect } from '@sveltejs/kit';
 import { ROOM_BASE_URL, ROOM_JWT_SECRET } from '$app/env/private';
 import { and, eq } from 'drizzle-orm';
-import { getDb } from '$lib/server/db';
-import { roomUsers, rooms, users } from '$lib/server/db/schema';
-import { readSettings } from '$lib/server/rooms';
-import { isRoomPresenter } from '$lib/room-member-role';
-import { guestHandoffToken, handoffUrl } from '$lib/server/room-handoff';
-import { evaluateEntitlement } from '$lib/server/sso-entitlement';
-import { resolveMaxTokenAge, verifySsoToken, type SsoRejection } from '$lib/server/sso-token';
+import { getDb } from '#lib/server/db/index.js';
+import { roomUsers, rooms, users } from '#lib/server/db/schema.js';
+import { readSettings } from '#lib/server/rooms.js';
+import { isRoomPresenter } from '#lib/room-member-role.js';
+import { guestHandoffToken, handoffUrl } from '#lib/server/room-handoff.js';
+import { evaluateEntitlement } from '#lib/server/sso-entitlement.js';
+import { resolveMaxTokenAge, verifySsoToken, type SsoRejection } from '#lib/server/sso-token.js';
 import type { RequestHandler } from './$types';
 
 /**

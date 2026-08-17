@@ -3,7 +3,7 @@ export type Chrome = 'none' | 'controller' | 'marketing';
 /**
  * Which shell a path renders inside.
  *
- * ## Why this is a function in `$lib` rather than four lines in the layout
+ * ## Why this is a function in `#lib` rather than four lines in the layout
  *
  * It was four lines in the layout, and a page was filed under the wrong shell without anything
  * noticing. `/forgot-password` and `/reset-password` were added to `(public)/` and fell through to

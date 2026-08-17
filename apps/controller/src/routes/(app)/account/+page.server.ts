@@ -2,15 +2,15 @@ import { fail } from '@sveltejs/kit';
 import { API_KEY_ENCRYPTION_KEY, ROOM_BASE_URL, ROOM_JWT_SECRET } from '$app/env/private';
 import { randomBytes, createHash } from 'node:crypto';
 import { and, count, eq, inArray, sql } from 'drizzle-orm';
-import { getDb } from '$lib/server/db';
-import { adminUsers, apiKeys, badges, rooms, roomUsers } from '$lib/server/db/schema';
-import { emailIsProved, hashPassword, requireUser } from '$lib/server/auth';
-import { issueToken, sendVerificationEmail, verificationEnforced } from '$lib/server/email-verification';
-import { resolveAccountEntitlements } from '$lib/server/account-entitlements';
-import { decryptApiKeySecret, encryptApiKeySecret } from '$lib/server/api-key-secret';
-import { API_SCOPES, parseIpList, readRestrictions } from '$lib/server/rooms';
-import { launchHref } from '$lib/server/room-handoff';
-import { NoRoomCodeAvailable, provisionRoom } from '$lib/server/provision-room';
+import { getDb } from '#lib/server/db/index.js';
+import { adminUsers, apiKeys, badges, rooms, roomUsers } from '#lib/server/db/schema.js';
+import { emailIsProved, hashPassword, requireUser } from '#lib/server/auth.js';
+import { issueToken, sendVerificationEmail, verificationEnforced } from '#lib/server/email-verification.js';
+import { resolveAccountEntitlements } from '#lib/server/account-entitlements.js';
+import { decryptApiKeySecret, encryptApiKeySecret } from '#lib/server/api-key-secret.js';
+import { API_SCOPES, parseIpList, readRestrictions } from '#lib/server/rooms.js';
+import { launchHref } from '#lib/server/room-handoff.js';
+import { NoRoomCodeAvailable, provisionRoom } from '#lib/server/provision-room.js';
 import type { Actions, PageServerLoad } from './$types';
 
 function apiKeyEncryptionMaster() {

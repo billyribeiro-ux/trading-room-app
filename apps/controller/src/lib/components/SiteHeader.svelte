@@ -1,6 +1,6 @@
 <script lang="ts">
   import { asset, resolve } from '$app/paths';
-  import { IMAGE_SIZES } from '$lib/content/home';
+  import { IMAGE_SIZES } from '#lib/content/home.js';
 
   interface Props {
     /** Signed-in visitors get "My account" instead of the Register/Login dropdown. */

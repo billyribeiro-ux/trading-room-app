@@ -1,6 +1,6 @@
 <script lang="ts">
   import { resolve } from '$app/paths';
-  import PasswordReveal from '$lib/components/PasswordReveal.svelte';
+  import PasswordReveal from '#lib/components/PasswordReveal.svelte';
   import '../../../account.css';
   import type { PageProps } from './$types';
 

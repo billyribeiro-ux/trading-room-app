@@ -1,9 +1,9 @@
 <script lang="ts">
   import { asset, resolve } from '$app/paths';
   import { untrack } from 'svelte';
-  import Recaptcha from '$lib/components/Recaptcha.svelte';
+  import Recaptcha from '#lib/components/Recaptcha.svelte';
   import type { PageProps } from './$types';
-  import PasswordReveal from '$lib/components/PasswordReveal.svelte';
+  import PasswordReveal from '#lib/components/PasswordReveal.svelte';
 
   /**
 	 * Rebuilt from `evidence-dumps/register-page/register-page-file` — the served HTML of the

@@ -1,12 +1,12 @@
 import { error, json } from '@sveltejs/kit';
 import { eq } from 'drizzle-orm';
 import { ROOM_JWT_SECRET } from '$app/env/private';
-import { getDb } from '$lib/server/db';
-import { rooms } from '$lib/server/db/schema';
-import { readSettings } from '$lib/server/rooms';
-import { resolveRoomConfig } from '$lib/room-config';
-import { decideRoomEntry, type RoomEntrySettings } from '$lib/room-entry';
-import { verifyConfigReadToken } from '$lib/server/room-handoff';
+import { getDb } from '#lib/server/db/index.js';
+import { rooms } from '#lib/server/db/schema.js';
+import { readSettings } from '#lib/server/rooms.js';
+import { resolveRoomConfig } from '#lib/room-config.js';
+import { decideRoomEntry, type RoomEntrySettings } from '#lib/room-entry.js';
+import { verifyConfigReadToken } from '#lib/server/room-handoff.js';
 import type { RequestHandler } from './$types';
 
 /**

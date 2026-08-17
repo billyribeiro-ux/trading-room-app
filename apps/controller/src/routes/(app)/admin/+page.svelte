@@ -1,6 +1,6 @@
 <script lang="ts">
   import { enhance } from '$app/forms';
-  import { bootbox } from '$lib/bootbox.svelte';
+  import { bootbox } from '#lib/bootbox.svelte.js';
   import type { SubmitFunction } from '@sveltejs/kit';
   import type { PageProps } from './$types';
 

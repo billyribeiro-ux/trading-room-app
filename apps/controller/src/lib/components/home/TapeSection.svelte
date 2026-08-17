@@ -12,8 +12,8 @@
   import { max, min } from 'd3-array';
   import { scaleLinear } from 'd3-scale';
   import { area, curveMonotoneX, line } from 'd3-shape';
-  import { SIMULATED_FEED_LABEL, TAPE, TAPE_SPARKLINE_SYMBOLS } from '$lib/content/home';
-  import { prefersReducedMotion, reveal } from '$lib/motion';
+  import { SIMULATED_FEED_LABEL, TAPE, TAPE_SPARKLINE_SYMBOLS } from '#lib/content/home.js';
+  import { prefersReducedMotion, reveal } from '#lib/motion.js';
   import { createWalk } from './market-feed';
 
   const W = 980;

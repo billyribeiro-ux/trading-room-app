@@ -8,15 +8,22 @@
   // 1238 errors that were entirely an artefact of the missing list.
   "extends": "$app/tsconfig",
   "compilerOptions": {
-    "esModuleInterop": true,
     "sourceMap": true,
-    "strict": true,
-    // Kit 3's base ships `paths: {}` where Kit 2's supplied these, so `$lib` stops resolving and
-    // every `$lib/...` import becomes "cannot find module". Relative to THIS file, not the base.
-    "paths": {
-      "$lib": ["./src/lib"],
-      "$lib/*": ["./src/lib/*"]
-    }
+    "strict": true
+    // NO `paths` BLOCK, removed 2026-08-16 with the `$lib` specifiers it existed for.
+    //
+    // It used to carry `$lib` and `$lib/*` under a comment saying "Kit 3's base ships `paths: {}`
+    // where Kit 2's supplied these". That was false for this version — the generated base ships
+    // `$lib` paths of its own — so the block was a redundant copy, and because `extends` REPLACES
+    // `paths` rather than merging it, ours overwrote the generated one. In the room, `vite build`
+    // said so outright once `#lib` specifiers existed: `"paths" was overwritten. Imports from
+    // "#lib" may not typecheck`.
+    //
+    // `#lib` resolves through the `imports` field in `package.json` instead, which TypeScript reads
+    // natively under `moduleResolution: "bundler"` and Vite resolves without a plugin — that being
+    // the reason SvelteKit 3 dropped the alias at all.
+    //
+    // `esModuleInterop` also went: the generated base already sets it.
   },
   // Mirrors what Kit 2's generated base included: application source and the Vite config, and
   // nothing else. `scripts/**` is tooling and `e2e/**` is Playwright — neither was type-checked

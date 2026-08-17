@@ -1,6 +1,6 @@
-import { requireUser } from '$lib/server/auth';
-import { sanitizeHtml } from '$lib/server/sanitize-html';
-import { API_POST_ROUTES_HTML } from '$lib/content/api-post-routes';
+import { requireUser } from '#lib/server/auth.js';
+import { sanitizeHtml } from '#lib/server/sanitize-html.js';
+import { API_POST_ROUTES_HTML } from '#lib/content/api-post-routes.js';
 import type { PageServerLoad } from './$types';
 
 /**

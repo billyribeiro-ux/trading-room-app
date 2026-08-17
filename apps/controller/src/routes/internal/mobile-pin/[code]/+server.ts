@@ -1,10 +1,10 @@
 import { error, json } from '@sveltejs/kit';
 import { eq } from 'drizzle-orm';
 import { ROOM_JWT_SECRET } from '$app/env/private';
-import { getDb } from '$lib/server/db';
-import { rooms, roomUsers, users } from '$lib/server/db/schema';
-import { issueMobilePairCode, readSettings } from '$lib/server/rooms';
-import { verifyConfigReadToken } from '$lib/server/room-handoff';
+import { getDb } from '#lib/server/db/index.js';
+import { rooms, roomUsers, users } from '#lib/server/db/schema.js';
+import { issueMobilePairCode, readSettings } from '#lib/server/rooms.js';
+import { verifyConfigReadToken } from '#lib/server/room-handoff.js';
 import type { RequestHandler } from './$types';
 
 /**

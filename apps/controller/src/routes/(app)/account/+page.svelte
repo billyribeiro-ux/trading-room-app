@@ -62,14 +62,14 @@
 </script>
 
 <script lang="ts">
-  import { formatShortDateTime } from '$lib/last-login-format';
+  import { formatShortDateTime } from '#lib/last-login-format.js';
   import { enhance } from '$app/forms';
   import { resolve } from '$app/paths';
-  import { bootbox } from '$lib/bootbox.svelte';
+  import { bootbox } from '#lib/bootbox.svelte.js';
   import type { SubmitFunction } from '@sveltejs/kit';
   import type { PageProps } from './$types';
-  import PasswordReveal from '$lib/components/PasswordReveal.svelte';
-  import EmojiPicker from '$lib/components/EmojiPicker.svelte';
+  import PasswordReveal from '#lib/components/PasswordReveal.svelte';
+  import EmojiPicker from '#lib/components/EmojiPicker.svelte';
 
   let { data, form }: PageProps = $props();
 

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import RoomLogin from '$lib/components/RoomLogin.svelte';
+  import RoomLogin from '#lib/components/RoomLogin.svelte';
   import '../../../../auth.css';
   import type { PageProps } from './$types';
 

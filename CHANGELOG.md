@@ -24,6 +24,46 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-16
 
+### 2026-08-16 20:09 EDT — `$lib` → `#lib` in the CONTROLLER, and a documented-count gate that was already red
+
+**Controller suite 985 across 94 files** (+4, the new gate). `svelte-check` 1,527 files, 0 errors,
+0 warnings. eslint clean. `vite build` ✓.
+**Runtime impact: no** — 204 import specifiers changed shape; nothing they resolve to did.
+
+The second half of the migration the room took at 19:44. Same official codemod, same single task
+(`sv migrate sveltekit-3 --tasks lib-alias`), same review. 204 specifiers across 65 files — 174
+`.js`, 30 `.svelte`, and this time **no extensionless output at all**, because the string-literal
+case that produced four of them in the room does not occur here.
+
+**The same two unwanted prerequisite effects, reverted the same way:** `@sveltejs/kit` and
+`adapter-vercel` were rewritten from exact versions to `"next"` (pins restored), and every comment
+was stripped out of `tsconfig.json` (restored). The third — a repository-wide `prettier --write` —
+could not happen here: the controller has no `format` script, so the codemod's format step had
+nothing to run. That is luck rather than design, and it is the reason the room's capture
+directories needed rescuing and the controller's did not.
+
+**The redundant `paths` block went too**, for the reason the room's did: `node_modules/$app/tsconfig.json`
+ships `$lib` paths of its own, and because `extends` REPLACES `paths` rather than merging it, ours
+overwrote the generated one. `#lib` resolves through `package.json`'s `imports` field instead.
+
+**`lib-subpath-imports.test.ts` is duplicated rather than shared**, and the file says why: the two
+apps have separate manifests with separate `imports` fields, and this asserts THIS app's. A shared
+helper would have to be told which app it was checking — the same information, in a less obvious
+place.
+
+#### A pre-existing gate failure, found by running it
+
+`verify-documented-test-counts.mjs` asserts that four documentation sites state the real Vitest
+total. It reported **963 documented against 985 measured**. Four of that gap are the tests added
+here; the other **eighteen predate this change**, so the controller's `pnpm test` was already
+failing at `2155e46` and at every commit back to whenever the drift began.
+
+Not introduced here and not silently absorbed either: the four sites now read **985 tests across 94
+files**, and the verifier passes naming all four. Worth stating plainly because a count-checking
+gate that has been red for a while is a gate nobody is running — and this one exists precisely to
+stop documented numbers going stale.
+
+
 ### 2026-08-16 19:55 EDT — `trimFat()`: the unbounded alerts list was a missing HALF of an upstream branch
 
 **Suite 2,389 across 162 files** (+11, one new contract). `svelte-check` 1,192 files, 0 errors,

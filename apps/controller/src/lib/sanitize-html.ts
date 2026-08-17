@@ -1,4 +1,4 @@
-import type { SanitizedHtml } from '$lib/sanitized-html';
+import type { SanitizedHtml } from '#lib/sanitized-html.js';
 
 /**
  * Shared allowlist sanitiser for the room's landing-page HTML.

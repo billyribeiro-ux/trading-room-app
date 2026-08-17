@@ -1,26 +1,26 @@
 <script lang="ts">
   import { enhance } from '$app/forms';
   import { asset, resolve } from '$app/paths';
-  import { bootbox } from '$lib/bootbox.svelte';
-  import ToastHost from '$lib/components/ToastHost.svelte';
-  import { toast } from '$lib/toast.svelte';
-  import Editable from '$lib/components/Editable.svelte';
-  import { formatLastLogin, formatShortDate } from '$lib/last-login-format';
-  import { formatMoney } from '$lib/money';
-  import { stripeStatusClass } from '$lib/stripe-status';
-  import { focusDateField } from '$lib/focus-date-field';
-  import { editableText, isBlank, isEditableEmpty } from '$lib/editable-display';
-  import PermissionsModal from '$lib/components/PermissionsModal.svelte';
-  import RichTextEditor from '$lib/components/RichTextEditor.svelte';
+  import { bootbox } from '#lib/bootbox.svelte.js';
+  import ToastHost from '#lib/components/ToastHost.svelte';
+  import { toast } from '#lib/toast.svelte.js';
+  import Editable from '#lib/components/Editable.svelte';
+  import { formatLastLogin, formatShortDate } from '#lib/last-login-format.js';
+  import { formatMoney } from '#lib/money.js';
+  import { stripeStatusClass } from '#lib/stripe-status.js';
+  import { focusDateField } from '#lib/focus-date-field.js';
+  import { editableText, isBlank, isEditableEmpty } from '#lib/editable-display.js';
+  import PermissionsModal from '#lib/components/PermissionsModal.svelte';
+  import RichTextEditor from '#lib/components/RichTextEditor.svelte';
   import {
     AUTH_MODES,
     isRegistrationMode,
     isSsoMode,
     showsRoomLinks,
     usesRoomPassword
-  } from '$lib/auth-modes';
-  import { settingHelp, type SettingHelp } from '$lib/room-settings-help';
-  import type { RoomSettingDef } from '$lib/room-settings-schema';
+  } from '#lib/auth-modes.js';
+  import { settingHelp, type SettingHelp } from '#lib/room-settings-help.js';
+  import type { RoomSettingDef } from '#lib/room-settings-schema.js';
   import type { SubmitFunction } from '@sveltejs/kit';
   import { untrack } from 'svelte';
   import type { PageProps } from './$types';
@@ -349,7 +349,7 @@
       webinarPWFreeTrial                                    file2:1027
         ng-show="sess.authMode=='webinarRoom' || sess.authMode=='unamePW' || sess.allowPWLoginWithSSO"
 
-    `isSsoMode` and `usesRoomPassword` are the same two predicates `$lib/auth-modes` already
+    `isSsoMode` and `usesRoomPassword` are the same two predicates `#lib/auth-modes.js` already
     derived from those expressions for the link block — the JWT gate goes through `isSsoMode`
     because their codebase spells the one mode both 'jwt' and 'sso' (see the note there).
 
@@ -780,7 +780,7 @@
    * a page payload at all, the rows are read when the file is asked for, and the 5,000 cap is gone
    * because truncating an export silently is worse than a slow one.
    *
-   * The format moved to `$lib/stats-csv.ts` rather than being copied, so the endpoint and its tests
+   * The format moved to `#lib/stats-csv.ts` rather than being copied, so the endpoint and its tests
    * share one definition of the nine columns.
    *
    * A navigation, not a `fetch`. The browser's own download handling takes the filename from
@@ -794,7 +794,7 @@
 
   /*
     `statsWhen` was here and is gone, 2026-08-14. It was a byte-for-byte DUPLICATE of the formatter
-    in `$lib/stats-csv` — same `MM/DD/YYYY hh:mm a`, same `N/A`, same doc comment — and nothing on
+    in `#lib/stats-csv` — same `MM/DD/YYYY hh:mm a`, same `N/A`, same doc comment — and nothing on
     this page ever called it. Deleting it loses nothing: the one in `stats-csv.ts` has callers and
     tests, so the reference's format is still recorded and still enforced.
 
@@ -912,7 +912,7 @@
   those omit the `<br>` (file2:1903, 2112, 2117, 2415), and three carry the copy as a bare text
   node on the row's own `<p>` with no element and no `<br>` at all (file2:2459, 2469, 2477) — the
   same shape `dtNote` above models for the DON'T TOUCH block. Which row is which is read off the
-  capture line by line in `$lib/room-settings-help`; this snippet only renders what that says.
+  capture line by line in `#lib/room-settings-help.js`; this snippet only renders what that says.
 
   The labels label no control — they are copy sitting beside an editable, exactly like the row
   label — so the a11y rule is silenced with the reason rather than satisfied with a `for` pointing
@@ -935,7 +935,7 @@
         <span>Manage Room id: {data.room.shortCode}&nbsp;&nbsp;( {data.room.publicId} )</span>
         <!--
           `Current: {{sess.current_capacity}} / Max {{sess.recordedMaxCapacity}}` — two DIFFERENT
-          fields, and the reference's own API documentation (`$lib/content/api-docs.ts:127-130`)
+          fields, and the reference's own API documentation (`#lib/content/api-docs.ts:127-130`)
           proves it carries three: `current_capacity` 25, `current_max` 100,
           `recordedMaxCapacity` 150. The mark exceeding the limit in its own example is what settles
           that the mark is a recorded observation, not configuration.
@@ -2872,7 +2872,7 @@ Please click this link to attend: ______ unique link will be here_____
 
                           41 of them carry NO class in the capture, four of those drop the `<br>`
                           as well, and three are not an element at all — `helpCopy` above renders
-                          the three shapes and `$lib/room-settings-help` says which row is which,
+                          the three shapes and `#lib/room-settings-help.js` says which row is which,
                           and why the generated schema cannot.
                         -->
                         {@render helpCopy(help)}
