@@ -275,8 +275,18 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       The second one is why this was worth doing at all rather than tidying: it had come to rest
       directly above the ALERT-ARRIVAL effect, so this file explained chat scrolling and then showed
       the alert filter. `svelte-check`, eslint, the autofixer and 2,402 tests were all green.
+
+      2,943 -> 2,641 on 2026-08-17, S3, and this one IS an extraction: the four delivery effects, the
+      two policy functions and the four arrival trackers went to `RoomOverlays.svelte`, which renders
+      the toast host they drive. 308 lines out for two props in.
+
+      What made the timing right was a condition somebody wrote down instead of remembering.
+      `RoomToasts`'s construction note said the class owns the mechanism and not the policy, because
+      the policy "reads six preferences that still live in this file, so they stay here until those
+      do". Slice 3 moved those six. The note named its own trigger, the trigger fired, and it is
+      updated in place rather than dropped — which is the only reason anyone noticed.
     */
-    max: 2943,
+    max: 2642,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {
@@ -427,9 +437,23 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       which is what a facade boundary costs and is why the template savings in the phase plan
       were costed at ~218 rather than an optimistic ~140. Nineteen of the thirty-six props are
       state classes handed over whole; the rest are page state and callbacks.
+
+      462 -> 782 on 2026-08-17, S3, and this is an ARRIVAL rather than growth: 308 lines left
+      `+page.svelte` in the same commit and it ratchets 2,943 -> 2,641. Four delivery effects, the
+      two policy functions they call and the four arrival trackers that feed them.
+
+      They are here because Svelte says an effect belongs to a component and not to a class — *"if
+      `$state` and `$derived` are used directly inside the `$effect` (for example, during creation of
+      a reactive class), those values will not be treated as dependencies"* — which for these four
+      would mean a toast that never notices Do Not Disturb being switched on. The side effect is a
+      toast, a sound and an OS notification, and this component renders the host for all three.
+
+      It cost only TWO new props, `isPresenter` and `unreadQaAlertIds`, because the four trackers had
+      exactly one reader each and came across as local state. That ratio is the evidence this is the
+      right home rather than a convenient one: a wrong home shows up as a long props list.
     */
-    max: 462,
-    why: 'the overlay layer - modal host, seven dialogs, toasts, the lightbox and the audio sinks'
+    max: 782,
+    why: 'the overlay layer - modal host, seven dialogs, toasts, the lightbox, audio sinks, delivery'
   },
   {
     file: 'lib/components/ModalHost.svelte',

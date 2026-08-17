@@ -28,30 +28,61 @@ import { describe, expect, it } from 'vitest';
  * has happened twice in this repository, most recently four hours after it was predicted.
  */
 const pageSource = readFileSync(new URL('../routes/+page.svelte', import.meta.url), 'utf8');
+/*
+  ALL THREE DELIVERIES MOVED TO `RoomOverlays.svelte` on 2026-08-17 (Phase 5, S3).
+
+  They are `$effect`s, and Svelte's docs place an effect in the component that owns the side effect
+  rather than in a class: *"if `$state` and `$derived` are used directly inside the `$effect` (for
+  example, during creation of a reactive class), those values will not be treated as dependencies"*.
+  For these three that would mean the alert toast, the Q&A toast and the chat ding all ignoring a
+  Do Not Disturb toggle. The side effect is a toast and a sound; `RoomOverlays` renders the host.
+
+  `pageSource` is still read, and the reason is the whole lesson of this file. Re-pointing a guard at
+  the file the code moved to makes it pass. Asserting the OLD file no longer carries it is what
+  proves a MOVE rather than a COPY — and a copy here is not a cosmetic defect: two chat-ding effects
+  ring twice per message, and every positive assertion below stays green while it happens.
+*/
+const overlaysSource = readFileSync(
+  new URL('./components/RoomOverlays.svelte', import.meta.url),
+  'utf8'
+);
 
 /** The body between a marker and the closing of the effect that contains it. */
 function effectContaining(marker: string): string {
-  const at = pageSource.indexOf(marker);
+  const at = overlaysSource.indexOf(marker);
   // The positive assertion, made before anything is read out of the slice.
-  expect(at, `'${marker}' is not in +page.svelte; this guard has nothing to test`).toBeGreaterThan(
-    -1
-  );
-  const opened = pageSource.lastIndexOf('$effect(() => {', at);
+  expect(
+    at,
+    `'${marker}' is not in RoomOverlays.svelte; this guard has nothing to test`
+  ).toBeGreaterThan(-1);
+  const opened = overlaysSource.lastIndexOf('$effect(() => {', at);
   expect(opened, `'${marker}' is not inside an $effect`).toBeGreaterThan(-1);
-  const closed = pageSource.indexOf('\n  });', at);
+  const closed = overlaysSource.indexOf('\n  });', at);
   expect(closed, `the $effect holding '${marker}' is not closed`).toBeGreaterThan(at);
-  return pageSource.slice(opened, closed);
+  return overlaysSource.slice(opened, closed);
 }
 
 describe('the three arrival deliveries', () => {
   it('routes all three lists through RoomArrivals, and there are exactly three', () => {
-    const constructed = pageSource.match(/new RoomArrivals</g) ?? [];
+    const constructed = overlaysSource.match(/new RoomArrivals</g) ?? [];
 
     // Positive first: the three instances are found, by name, before anything is asserted absent.
-    expect(pageSource).toContain('const alertArrivals = new RoomArrivals<');
-    expect(pageSource).toContain('const qaArrivals = new RoomArrivals<');
-    expect(pageSource).toContain('const chatArrivals = new RoomArrivals<');
+    expect(overlaysSource).toContain('const alertArrivals = new RoomArrivals<');
+    expect(overlaysSource).toContain('const qaArrivals = new RoomArrivals<');
+    expect(overlaysSource).toContain('const chatArrivals = new RoomArrivals<');
     expect(constructed).toHaveLength(3);
+
+    /*
+      AND NOWHERE ELSE. A tracker left behind on the page keeps its own marker, so the page and the
+      overlay layer would each independently decide a message was "new" — two toasts, two dings, and
+      three green assertions above.
+    */
+    expect(pageSource, 'the arrival trackers left the page in S3').not.toContain(
+      'new RoomArrivals<'
+    );
+    expect(pageSource, 'the arrival trackers left the page in S3').not.toContain(
+      'new RoomOrderedArrivals<'
+    );
   });
 
   it('holds one marker set per list, so one table cannot silence another', () => {
@@ -60,9 +91,9 @@ describe('the three arrival deliveries', () => {
       whichever arrived first swallow the other two — silently, and only for ids that collide, which
       is the kind of defect that reproduces once a month and never on demand.
     */
-    expect(pageSource).toContain('alertArrivals.fresh(');
-    expect(pageSource).toContain('qaArrivals.fresh(');
-    expect(pageSource).toContain('chatArrivals.fresh(data.messages)');
+    expect(overlaysSource).toContain('alertArrivals.fresh(');
+    expect(overlaysSource).toContain('qaArrivals.fresh(');
+    expect(overlaysSource).toContain('chatArrivals.fresh(data.messages)');
   });
 
   it('never pings you for your own chat message', () => {
@@ -107,11 +138,15 @@ describe('the three arrival deliveries', () => {
     expect(delivery).toContain('deliverQaNotice(question)');
   });
 
-  it('has no priming latch left in the page', () => {
+  it('has no priming latch left in the page or in the overlay layer', () => {
     /*
       Paired with the positive assertions above, which is what stops this going vacuous: the three
       instances were FOUND, so these names are absent because `RoomArrivals` replaced them and not
       because the region moved somewhere this file does not read.
+
+      BOTH files are swept as of S3. Reading only the page would have gone green the moment delivery
+      left it — the latches would be "absent" from a file that no longer delivers anything, which is
+      absence by relocation and is the failure this repository keeps rediscovering.
     */
     for (const latch of [
       'alertDeliveryInitialized',
@@ -122,6 +157,7 @@ describe('the three arrival deliveries', () => {
       'seenMessageIds'
     ]) {
       expect(pageSource).not.toContain(latch);
+      expect(overlaysSource).not.toContain(latch);
     }
   });
 });

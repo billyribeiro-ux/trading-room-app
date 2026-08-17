@@ -167,6 +167,66 @@ follow symlinks. Chasing it produced a corroboration instead of a defect — the
 `apps/room/vite.config.ts:81-87`. That is the mechanism the 10:52 entry recorded as closed,
 confirmed by trying to break it.
 
+### 2026-08-17 11:39 EDT — S3: the four delivery effects reach the layer that shows them, `+page.svelte` 2,943 → 2,642
+
+**Runtime impact: none intended** — four `$effect`s, two policy functions and four arrival trackers
+moved from `+page.svelte` to `RoomOverlays.svelte` unchanged. Nothing was rewritten; the regions were
+cut by line boundary and spliced, so the moved prose and code are byte-identical. Full gate run:
+**2,402 tests / 164 files**, `eslint src/` clean, `svelte-check` **1,195 files / 0 errors / 0
+warnings**, `build` ✓, `prettier --check` clean, `svelte-autofixer` **zero issues**.
+
+**What moved, and why there.** The mention popup, the live alert arrival, the Q&A arrival and the
+chat ding, plus `deliverAlert` and `deliverQaNotice`. `RoomOverlays` renders the `ToastHost` all four
+drive. They did NOT go into a class, and the reason is in the docs rather than in taste: *"if `$state`
+and `$derived` are used directly inside the `$effect` (for example, during creation of a reactive
+class), those values will not be treated as dependencies."* A constructor-registered effect reading
+`prefs.doNotDisturbOn` would never re-run when a viewer switched Do Not Disturb on — four toasts that
+ignore the preference that exists to silence them.
+
+**The timing was decided by a note that named its own trigger, four slices earlier.** `RoomToasts`'s
+construction comment said the class owns the mechanism and deliberately not the policy, because the
+policy *"reads six preferences that still live in this file, so they stay here until those do."*
+Slice 3 moved those six into `RoomPrefs`. The condition had been true for a while and nobody had
+looked. It is updated in place rather than deleted, because a note that can be checked is worth more
+than one that has to be remembered — and this is the second time in two commits that a written-down
+condition, not a test, is what surfaced the work.
+
+**Two new props for 308 lines out, and the ratio is the evidence.** `mentionArrivals`,
+`alertArrivals`, `qaArrivals` and `chatArrivals` had exactly one reader each — their own effect — so
+they crossed as local state, not as props. Only `isPresenter` and `unreadQaAlertIds` were added;
+`unreadQaAlertIds` is the page's INSTANCE rather than a copy, because `RoomFeeds` reads it for the
+unread badge and `RoomModals` clears it, and a second set would be a second answer to "which alerts
+are unread". A wrong home shows up as a long props list.
+
+**Fourteen contract tests went red, which is the system working.** Three files read `+page.svelte` as
+text and asserted on delivery that had moved. Each was re-pointed at `RoomOverlays.svelte` **and
+given the other half**: the page is now asserted to no longer carry it. That half is not ceremony —
+re-pointing alone passes just as happily against a COPY, and a copy here rings twice per message,
+pops twice per mention, and leaves every positive assertion green. Four `not.toContain` guards in
+this repository have gone vacuous after an extraction; asserting both ends is the cure.
+
+**The autofixer's seventeen suggestions were answered, not ignored.** All seventeen are the same
+advisory — *"you are calling a function inside an `$effect`… could it use `$derived`?"* Zero issues.
+Declined with the reasoning recorded in the component, following `ExtraChatPane.svelte:233-249`:
+these produce an event (a toast, a sound, an OS notification), not a value, so there is nothing for
+`$derived` to hold; the trigger is a row ARRIVING as changed props, so there is no handler to hang
+them on; and nine of the seventeen name pure functions the autofixer cannot see across the import.
+The one genuinely shared write — `unreadQaAlertIds.add(…)` — is defended on its own: "unread" means
+*arrived since this viewer last looked*, which is a fact about time and not a function of the rows.
+
+**A tooling error of mine, caught before it shipped.** The first extraction pass cut regions with
+`"  }\n"` as an end anchor, which matched as a SUBSTRING inside `"      }\n"` and truncated
+`deliverAlert` mid-expression. Caught by checking the block was 20 lines when the source region was
+35 — not by a test, which would have failed later and less clearly. Reverted and redone with
+full-line boundary matching. Recorded because `.indexOf` on an indented brace looks exact and is not.
+
+**Negative controls, both halves, both seen RED and reverted.** Breaking the chat-ding self-message
+gate in its new home → *"never pings you for your own chat message"* red. Leaving a duplicate
+`RoomArrivals` on the page → *"the arrival trackers left the page in S3"* red.
+
+**Ceilings.** `+page.svelte` 2,943 → **2,642**. `RoomOverlays.svelte` 462 → **782**, an arrival: 308
+lines left the page in the same commit, plus the recorded autofixer reasoning.
+
 ### 2026-08-17 11:20 EDT — seven comments in `+page.svelte` had lost the code they explained, and the gate that could not see them now can
 
 **Runtime impact: none.** Comments only, and PROVEN so rather than asserted: with every block comment
