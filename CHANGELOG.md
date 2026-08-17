@@ -33,6 +33,115 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-17
 
+### 2026-08-17 11:42 EDT — row AH's sweep actually run: 253 markers, three dead guards, all three fixed and negative-controlled
+
+**Runtime impact: no** — two contract tests and `TODO.md`. No source behaviour changed; the two
+`.svelte.ts` files touched by the negative controls were restored byte-identical to HEAD, verified
+with `git status`, not assumed.
+
+The previous three rounds each ended with me calling the audit complete while an untested surface
+remained. This closes the last one I had named myself: row AH said "nobody has swept the text-reading
+tests", and the suite's own credibility rests on that sweep, because every "confirmed open" verdict in
+`TODO.md` leans on tests that a dead slice would silently stop guarding.
+
+**THE SWEEP: 253 markers across 52 test files. Three genuinely dead, all now fixed.**
+`screen-volume-contract.test.ts:466` (fixed earlier today), `focus-on-screen-contract.test.ts`
+(`function selectScreenTabOfId(`, now a method on `RoomMediaTransport`) and
+`private-chat-remote-contract.test.ts` (`async function loadPrivateChatLog(`, now
+`RoomPrivateChat.loadLog`). Each sliced a source file for a marker the decomposition had moved, so
+`indexOf` returned -1 and every `not.toContain` built on it ran against `''`.
+
+**Both new fixes are negative-controlled, and the controls are the evidence.** Adding
+`void this.focusOnScreen(producerId)` to `selectScreenTabOfId`, and `this.#threads = {}` to
+`loadLog`'s catch, each turns its guard red — and the assertion messages show real content
+(`'selectScreenTabOfId(producerId: strin…'`, `'} catch {\n this.#threads = {};…'`) rather than the
+empty string. **Before the fix those same two mutations left the suite entirely green**, which is
+what a dead guard costs.
+
+**RULING OUT MY OWN INSTRUMENT WAS MOST OF THE WORK, and it is the transferable part.** The first
+scan reported SIX and four were its own fault: it mapped each `const` to one file and missed local
+re-binding (`APPLIED` is one CSS file at module scope and a different one inside a test body); it
+read a marker quoted in PROSE as a live call (`chat-mode-contract.test.ts` explains its own deleted
+slice in a comment); and it assumed every `.indexOf` runs on a file when
+`speech-reco-overlay-render.test.ts` runs one on rendered DOM. **Running the tests exposed it** —
+three of the four assert `toBeGreaterThan(-1)` and were green, impossible if the marker were absent.
+Reporting that scan unchecked would have produced four fictitious defects and sent somebody to read
+working tests, which this repository rates as worse than saying nothing. The second scan asks a
+weaker question that needs no binding resolution — is this marker in ANY file this test reads — and
+found three, all real.
+
+**What row AH now tracks is the standing gate, not the sweep.** Nothing prevents a fourth:
+`source-size-contract.test.ts`'s rule is one positive assertion per FILE and these files are full of
+positive assertions elsewhere, so it cannot see one dead slice. The scan lives in `/tmp` today and
+belongs in `gate/`, with the three false-positive classes encoded so it does not cry wolf.
+
+### 2026-08-17 11:34 EDT — the other half of the audit finally run: 23 of 49 "still open" items were mislabelled, and "NOT BUILT" was the wrong words for most of them
+
+**Runtime impact: no** — `TODO.md` only. The one test that reads it stays green.
+
+**THE FAILURE THIS CORRECTS IS MINE AND IT IS STRUCTURAL.** Both earlier passes hardened the
+DELETIONS adversarially and never tested the RETENTIONS: the auditors were told to default to "still
+open", and only "done" verdicts were attacked. So a row whose UI was built and whose wire was missing
+sailed through as "not built" unchallenged. Worse, the 10:52 rewrite put *"re-audited 2026-08-17
+against the repository itself"* at the top of the file and pushed it — **stamping a verification claim
+on rows that had not been verified**, which makes the next reader trust the wrong ones harder than
+they would have trusted the original.
+
+Corrected by running the mirror image: 49 open items, one instruction — *prove this is already built*.
+**23 came back mislabelled: 21 partly built, 2 built outright.** A 43% mislabel rate on the side
+nobody was checking, against the 21% false-gap rate the triage document already records for the other
+side.
+
+**THE TAXONOMY IS THE DELIVERABLE, not the count.** "NOT BUILT" reads as *nothing is there*; for most
+of these the truth is *it is there, it is live, and it is lying*. Four kinds now written into
+`TODO.md`, each verified by reading the control end to end:
+
+1. **Lying controls** — report success, send nothing. Row W's twelve, plus `remoteRestartAudio`, plus
+   **`focusOnSessionNote`, which the triage doc files as NOT BUILT while both its controls are live**:
+   "Bring everyone here" (`NoteTabContent.svelte:104`) and "Bring **E**veryone here"
+   (`NoteEditor.svelte:583` — the capture's own inconsistent capitalisation, faithfully ported) both
+   resolve to `selectNote(id)`, whose whole body is `requestedNoteId = noteId; openMenuNoteId = null`.
+   They bring nobody. The identical defect was found and fixed for SCREENS —
+   `focus-on-screen-contract.test.ts:12` says *"The menu item said 'Bring everyone here' and brought
+   nobody"* — and the note pair was never noticed.
+2. **Dead controls** — no handler at all, not even a toast. `getDebugLog`: `'debug-log'` occurs
+   **exactly once in the whole source**, at its own call site; its modal is unreachable and its
+   textarea is never filled. `setUserProfilePic` likewise. The archive pair's `Reload Log List` button
+   (`ModalHost.svelte:3913`) **has no `onclick` attribute at all**, above a hardcoded "There are no
+   archived chats at this time" that renders whether or not it is true — the same hardcoded-negative
+   defect as `kick-duplicates`.
+3. **Silent correctness gaps** — `doChatLogSearch`'s input is ported verbatim down to the dangling
+   `aria-describedby`, but `alerts.svelte.ts:271-275` filters locally with `includes()` where upstream
+   searches the SERVER. Search an old message, get nothing, no indication the server was never asked.
+4. **Honest partials** — `forceStopScreen` stops your own screen for real and drops somebody else's
+   tab with the reason written down. That is the standard being MET, and lumping it with the above
+   would have been a manufactured defect.
+
+**A FIFTH FINDING, not a control:** `+page.server.ts:381` sends `muted: roomConfig.member?.muted ??
+false` into the room and **that is its only occurrence in the entire source**. The controller's
+permanent mute (`applyUserOpcode` case 3, role 3) crosses and does nothing — **a member muted
+indefinitely from the manage page can still post.** The room enforces only its own `chat_mutes`
+table. Distinct from the viewer's own mute at `:628-640`, which IS enforced; I withheld this claim
+for one round rather than assert an agent's word, and confirmed it by reading.
+
+**A THIRD DEAD TEST GUARD:** `focus-on-screen-contract.test.ts:216-219` slices for
+`function selectScreenTabOfId(`, which has left `+page.svelte`. Executing the test's own expression
+returns **-1**, so both `not.toContain` assertions run against `''`. Recorded in row AH, not yet
+fixed.
+
+**Three row-W entries were too coarse and are now scoped**: `save-permissions` writes the SAME five
+checkboxes in the controller (`PERMISSION_KEYS`, `server/rooms.ts:90-114`), so it needs a call and not
+a feature — an earlier draft dismissed that as "a different feature", which was too quick; `kick-ban`'s
+BAN half is built and enforced, leaving only the live eject; `mute-chat-24` is keyed on a message, so
+what is missing is a user-targeted entry point. **Alert Scheduler is likewise smaller than stated:**
+`alerts.scheduled_for` and its index already exist (`0001_baseline.sql:165`, `:990`) — a column and
+an index nothing writes.
+
+**Also recorded:** `presAreaTabs-videoplayer` is built end to end, so of the two presentation-area
+tabs reported missing only `recordings` is real; and the triage document's `ours` line pointers are
+stale repo-wide after the decomposition, so following one and finding unrelated code must not be read
+as the feature being gone.
+
 ### 2026-08-17 11:14 EDT — every citation in the rewritten `TODO.md` opened and checked; three were wrong, and one of them was invented
 
 **Runtime impact: no** — `TODO.md` only. The one test that reads it stays green.
@@ -99,6 +208,66 @@ follow symlinks. Chasing it produced a corroboration instead of a defect — the
 `evidence-partition.test.ts` matches that count exactly, and the exclusion is wired at
 `apps/room/vite.config.ts:81-87`. That is the mechanism the 10:52 entry recorded as closed,
 confirmed by trying to break it.
+
+### 2026-08-17 11:39 EDT — S3: the four delivery effects reach the layer that shows them, `+page.svelte` 2,943 → 2,642
+
+**Runtime impact: none intended** — four `$effect`s, two policy functions and four arrival trackers
+moved from `+page.svelte` to `RoomOverlays.svelte` unchanged. Nothing was rewritten; the regions were
+cut by line boundary and spliced, so the moved prose and code are byte-identical. Full gate run:
+**2,402 tests / 164 files**, `eslint src/` clean, `svelte-check` **1,195 files / 0 errors / 0
+warnings**, `build` ✓, `prettier --check` clean, `svelte-autofixer` **zero issues**.
+
+**What moved, and why there.** The mention popup, the live alert arrival, the Q&A arrival and the
+chat ding, plus `deliverAlert` and `deliverQaNotice`. `RoomOverlays` renders the `ToastHost` all four
+drive. They did NOT go into a class, and the reason is in the docs rather than in taste: *"if `$state`
+and `$derived` are used directly inside the `$effect` (for example, during creation of a reactive
+class), those values will not be treated as dependencies."* A constructor-registered effect reading
+`prefs.doNotDisturbOn` would never re-run when a viewer switched Do Not Disturb on — four toasts that
+ignore the preference that exists to silence them.
+
+**The timing was decided by a note that named its own trigger, four slices earlier.** `RoomToasts`'s
+construction comment said the class owns the mechanism and deliberately not the policy, because the
+policy *"reads six preferences that still live in this file, so they stay here until those do."*
+Slice 3 moved those six into `RoomPrefs`. The condition had been true for a while and nobody had
+looked. It is updated in place rather than deleted, because a note that can be checked is worth more
+than one that has to be remembered — and this is the second time in two commits that a written-down
+condition, not a test, is what surfaced the work.
+
+**Two new props for 308 lines out, and the ratio is the evidence.** `mentionArrivals`,
+`alertArrivals`, `qaArrivals` and `chatArrivals` had exactly one reader each — their own effect — so
+they crossed as local state, not as props. Only `isPresenter` and `unreadQaAlertIds` were added;
+`unreadQaAlertIds` is the page's INSTANCE rather than a copy, because `RoomFeeds` reads it for the
+unread badge and `RoomModals` clears it, and a second set would be a second answer to "which alerts
+are unread". A wrong home shows up as a long props list.
+
+**Fourteen contract tests went red, which is the system working.** Three files read `+page.svelte` as
+text and asserted on delivery that had moved. Each was re-pointed at `RoomOverlays.svelte` **and
+given the other half**: the page is now asserted to no longer carry it. That half is not ceremony —
+re-pointing alone passes just as happily against a COPY, and a copy here rings twice per message,
+pops twice per mention, and leaves every positive assertion green. Four `not.toContain` guards in
+this repository have gone vacuous after an extraction; asserting both ends is the cure.
+
+**The autofixer's seventeen suggestions were answered, not ignored.** All seventeen are the same
+advisory — *"you are calling a function inside an `$effect`… could it use `$derived`?"* Zero issues.
+Declined with the reasoning recorded in the component, following `ExtraChatPane.svelte:233-249`:
+these produce an event (a toast, a sound, an OS notification), not a value, so there is nothing for
+`$derived` to hold; the trigger is a row ARRIVING as changed props, so there is no handler to hang
+them on; and nine of the seventeen name pure functions the autofixer cannot see across the import.
+The one genuinely shared write — `unreadQaAlertIds.add(…)` — is defended on its own: "unread" means
+*arrived since this viewer last looked*, which is a fact about time and not a function of the rows.
+
+**A tooling error of mine, caught before it shipped.** The first extraction pass cut regions with
+`"  }\n"` as an end anchor, which matched as a SUBSTRING inside `"      }\n"` and truncated
+`deliverAlert` mid-expression. Caught by checking the block was 20 lines when the source region was
+35 — not by a test, which would have failed later and less clearly. Reverted and redone with
+full-line boundary matching. Recorded because `.indexOf` on an indented brace looks exact and is not.
+
+**Negative controls, both halves, both seen RED and reverted.** Breaking the chat-ding self-message
+gate in its new home → *"never pings you for your own chat message"* red. Leaving a duplicate
+`RoomArrivals` on the page → *"the arrival trackers left the page in S3"* red.
+
+**Ceilings.** `+page.svelte` 2,943 → **2,642**. `RoomOverlays.svelte` 462 → **782**, an arrival: 308
+lines left the page in the same commit, plus the recorded autofixer reasoning.
 
 ### 2026-08-17 11:20 EDT — seven comments in `+page.svelte` had lost the code they explained, and the gate that could not see them now can
 

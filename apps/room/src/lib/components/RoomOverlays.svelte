@@ -1,5 +1,11 @@
 <script lang="ts">
-  import type { AlertFilterFor } from '#lib/alert-filter.js';
+  import type { SvelteSet } from 'svelte/reactivity';
+
+  import { alertPassesFilter, type AlertFilterFor } from '#lib/alert-filter.js';
+  import { resolveAlertDelivery } from '#lib/alert-delivery.js';
+  import { isMentionOf } from '#lib/mention.js';
+  import { RoomArrivals, RoomOrderedArrivals } from '#lib/room/arrivals.js';
+  import { playSoundEffect } from '#lib/sound-effects.js';
   import type { ChatMode } from '#lib/chat-mode.js';
   import BootboxDialog from '#lib/components/BootboxDialog.svelte';
   import GifConfirmDialog from '#lib/components/GifConfirmDialog.svelte';
@@ -94,6 +100,8 @@
     userActions,
 
     // Page state this layer renders from. Only these two are written back.
+    isPresenter,
+    unreadQaAlertIds,
     modals,
     chatMode,
     globalChatStyle,
@@ -130,6 +138,13 @@
     swingAlerts: RoomTradeAlerts<SwingAlertRow, SwingAlertAction>;
     toasts: RoomToasts;
     userActions: RoomUserActions<PageData['connectedUsers'][number]>;
+    /** Resolved on the SERVER from `data.user.role`. Read here only to decide who gets a toast. */
+    isPresenter: boolean;
+    /**
+     * The page's INSTANCE, not a copy — `RoomFeeds` reads it for the badge and `RoomModals`
+     * clears it, so a second set would be a second answer to which alerts are unread.
+     */
+    unreadQaAlertIds: SvelteSet<number>;
     /** Which overlay is showing, and how it is configured. Owned by the class, not by props. */
     modals: RoomModals;
     chatMode: ChatMode;
@@ -150,6 +165,311 @@
       values?: Record<string, string | number>
     ) => Promise<boolean>;
   } = $props();
+
+  /*
+    ── DELIVERY: what a viewer is TOLD when something arrives ───────────────────────────────────
+    Phase 5 S3. Four effects, two policy functions and the four arrival trackers they read.
+
+    ## Why they are HERE and not in a class
+
+    Svelte's `$effect` docs are explicit about the trap a class would walk into: *"If `$state` and
+    `$derived` are used directly inside the `$effect` (for example, during creation of a reactive
+    class), those values will not be treated as dependencies."* A constructor-registered effect
+    reading `prefs.doNotDisturbOn` would therefore never re-run when the viewer toggled Do Not
+    Disturb. So an effect belongs to a COMPONENT, and best-practices names the component it belongs
+    to: an effect is an escape hatch for side effects, and the side effect here is a toast and an OS
+    notification — the layer this component renders. `ToastHost` is twelve lines below.
+
+    ## Why they moved NOW rather than with slice 1
+
+    Because the condition written down at the time was met, and it was written down precisely so it
+    could be checked rather than remembered. `RoomToasts`'s construction note said the class *"owns
+    the MECHANISM and deliberately not the policy: `deliverAlert` and `deliverQaNotice` decide who is
+    told and with which sound, reading six preferences that still live in this file, so they stay
+    here until those do."* Slice 3 moved those six into `RoomPrefs`. The trigger fired; this is the
+    move it was waiting for, and the note on the page has been updated to say so rather than being
+    silently dropped.
+
+    ## The four trackers are LOCAL, and that is the test that this is the right home
+
+    `mentionArrivals`, `alertArrivals`, `qaArrivals` and `chatArrivals` had exactly one reader each —
+    their own effect — so they came across as local state rather than as props. State whose only
+    reader is one component belongs to that component; `PrivateChatPanel` is the recorded precedent.
+
+    `unreadQaAlertIds` did NOT, and so is a prop: `RoomFeeds` reads it for the unread badge and
+    `RoomModals` clears it. It is the page's INSTANCE, not a copy — a `SvelteSet` handed over whole,
+    the same shape `ExtraChatPane` uses for its `follow`, because a second set would be a second
+    answer to "which alerts are unread".
+
+    Nothing here decides AUTHORITY. `isPresenter` arrives already resolved from `data.user.role` on
+    the server; this only decides who gets a toast.
+
+    ## Why these are `$effect`s at all, since the autofixer asks — and it asks seventeen times
+
+    `svelte-autofixer` returns zero ISSUES here and seventeen SUGGESTIONS, every one the same
+    sentence: *"You are calling a function inside an $effect… check if it could use `$derived`
+    instead."* It is right that state is written. The suggestion is still declined, and the reasons
+    are written down rather than the warning ignored — the same treatment, and for the same reason,
+    that `ExtraChatPane.svelte` gives its scroll-follow effect.
+
+    * **What these produce is not a VALUE.** A toast, a sound and an OS notification are events. There
+      is nothing for `$derived` to hold: you cannot derive "the room played a sound". The docs name
+      this case in as many words — an effect is for side effects, and lists "analytics" beside DOM
+      work, which is exactly the shape of "tell the member something arrived".
+    * **They are not event handlers either.** The trigger is a row ARRIVING from the server, which
+      reaches this component as changed props after an `invalidateAll()`, not as a user gesture. There
+      is no `onclick` to hang them on.
+    * **Nine of the seventeen name a pure function** — `isMentionOf`, `alertPassesFilter`,
+      `queueMicrotask` — which write nothing at all. The autofixer cannot see across the import and
+      says so ("ignore this suggestion if you are sure"); these were checked, and they are pure.
+
+    The one write worth defending on its own is `unreadQaAlertIds.add(…)` in the Q&A effect, because
+    that IS shared state written from inside an effect. It is not derivable: "unread" means *arrived
+    since this viewer last looked*, which is a fact about time and not a function of the current
+    rows. The CLEARING half beside it looks derivable and deliberately is not folded in — it encodes
+    a stated deviation from the capture (an alert stops flashing once nothing is unanswered), and
+    splitting the pair across a `$derived` and an effect would put half a rule in each.
+  */
+  /**
+   * Which chat messages are new since the popup last looked.
+   *
+   * `RoomOrderedArrivals`, not `RoomArrivals` — it marks a POSITION and re-seeds silently when the
+   * marker has been trimmed away, and its `Row` is constrained to `{ id: unknown }` so the id stays
+   * the opaque key `id-opacity-contract.test.ts` requires. The reasoning lives with the class.
+   */
+  const mentionArrivals = new RoomOrderedArrivals<(typeof data.messages)[number]>();
+
+  /**
+   * Which alerts are NEW since the last load — see `RoomArrivals` for why the three lists that ask
+   * this question share one implementation, and why it is a plain class rather than a rune module.
+   */
+  const alertArrivals = new RoomArrivals<(typeof data.alerts)[number]>();
+
+  // app-chat plays `pling` for an incoming chat message under exactly this gate:
+  //   preferences.doNotDisturbOn || (preferences.chatSoundOn && soundEffectsService.pling.play())
+  // Your own message does not ring, and one ring covers a batch that arrives together rather than
+  // one per message.
+  const chatArrivals = new RoomArrivals<(typeof data.messages)[number]>();
+
+  function deliverAlert(alert: {
+    senderName: string;
+    senderEmailHash: string;
+    senderAvatarUrl?: string | null;
+    body: string;
+    nonTrade?: boolean;
+  }) {
+    const delivery = resolveAlertDelivery(
+      {
+        senderName: alert.senderName,
+        body: alert.body,
+        nonTradeAlert: alert.nonTrade === true
+      },
+      {
+        doNotDisturbOn: prefs.doNotDisturbOn,
+        alertSoundOn: prefs.alertSoundOn,
+        nonTradeSound: prefs.nonTradeSound,
+        alertPopup: prefs.alertPopup,
+        longerAlertPopup: prefs.longerAlertPopup
+      }
+    );
+    if (!delivery) return;
+
+    if (delivery.sound) playSoundEffect(delivery.sound);
+    if (!delivery.toast) return;
+
+    const { timeOut, ...toast } = delivery.toast;
+    toasts.show(toast, timeOut);
+    toasts.notify(
+      delivery.toast.title,
+      delivery.toast.message,
+      alert.senderAvatarUrl,
+      alert.senderEmailHash
+    );
+  }
+
+  /**
+   * The mention popup — `prefs.chatPopup`'s half of the reference's notification block.
+   *
+   * Driven off `data.messages` rather than off the SSE payload, and that is a deliberate security
+   * choice rather than convenience. The chat event carries only `senderId`, `senderEmailHash` and
+   * the CHANNEL — never the text — because `room` is a chat channel and can be an admin one; a
+   * payload carrying message bodies would put admin chat on every subscriber's wire. The refetched
+   * `data.messages` has already been filtered by the server for THIS viewer, so reading the text
+   * from there cannot show anybody something they were not already entitled to see.
+   *
+   * An `$effect` because this IS a side effect — a toast and an OS notification — not a derivation.
+   *
+   * `RoomOrderedArrivals` owns which messages are new, and it is deliberately NOT `RoomArrivals`:
+   * this marks a POSITION in the server's ordering and re-seeds silently when that marker has been
+   * trimmed out of the newest page, where an identity set would announce the entire log. Both live
+   * in `#lib/room/arrivals.ts`, next to each other, so nobody merges them. Arriving in a room with
+   * fifty unread mentions is silent; only messages that appear afterwards pop.
+   */
+  $effect(() => {
+    const fresh = mentionArrivals.fresh(data.messages);
+    if (fresh.length === 0) return;
+
+    // `prefs.doNotDisturbOn ||` — the outer gate on the whole block, sound and popup alike.
+    if (prefs.doNotDisturbOn || !prefs.chatPopup) return;
+
+    for (const item of fresh) {
+      // Your own message is never a mention of you, whatever it says.
+      if (item.senderId === data.user.id) continue;
+      if (!isMentionOf(item.body, data.user.displayName, item.isAdmin === true)) continue;
+
+      const title = `Mention from @${item.senderName ?? 'Unknown'}`;
+      /*  — the reference passes the body as the
+         toast TEXT and the title second, and enables HTML because chat bodies carry markup. */
+      toasts.show({ kind: 'info', title, message: item.body, enableHtml: true });
+      toasts.notify(title, item.body, null, item.senderEmailHash ?? '');
+    }
+  });
+
+  /*
+    A LIVE ALERT ARRIVES — the toast, the sound and the filter that suppresses both.
+
+    Two block comments used to stand here and NEITHER described this effect. One explained where
+    older chat pages come from; the other explained why the second chat column follows its own
+    messages. Both had lost their code — the paging to `+page.server.ts:462-476`, the scroll-follow
+    to `ExtraChatPane.svelte:220-250` on 2026-08-16 — and both came to rest on top of the alert
+    filter, so a reader arriving here was told about chat scrolling and then shown alert delivery.
+    Removed 2026-08-17, verified first that each one's reasoning survives at the reference given
+    above, so this deletes a stale duplicate rather than the last copy of anything.
+  */
+  $effect(() => {
+    const unseenAlerts = alertArrivals.fresh(data.alerts);
+    if (unseenAlerts.length === 0) return;
+
+    queueMicrotask(() => {
+      /*
+        THE ALERT FILTER, site one of three — the LIVE arrival, byte 1,004,533.
+
+        This is a genuinely separate site from the paged log, not a duplicate of it, and the reason
+        is where the reference puts its two `continue`s:
+
+          if (sessData.modAlertFilterList?.trim()?.length > 0 &&
+              Object.keys(user.alertFilterFor).length > 0) {
+            P("filtered out alert for " + te.avt);
+            if (preferences.showAlertsFrom && !user.alertFilterFor[te.avt]) continue;
+            if (!preferences.showAlertsFrom && user.alertFilterFor[te.avt]) continue;
+          }
+          globals.alertsLog.push(te);
+          appEventBus.emit("alertMsg", te);
+
+        BOTH the push and the emit are skipped, so a filtered-out alert makes no toast and plays no
+        sound. Filtering only at render — which `visibleAlerts` already does, and which is this
+        room's equivalent of the push — would still have popped and beeped for every alert the
+        reader asked not to see.
+
+        The two `continue`s are one predicate: skip unless `showAlertsFrom ? selected : !selected`.
+        That is `alertPassesFilter`, so it is called rather than re-derived here.
+
+        Read inside the microtask, deliberately: the values are wanted as of DELIVERY, and reading
+        them in the effect body would make the filter a dependency, so toggling it would re-run
+        this and re-deliver alerts that already arrived.
+
+        NOT reproduced: the reference logs "filtered out alert for …" BEFORE both conditionals, so
+        it claims to have filtered every alert once a selection exists, including the ones it then
+        keeps. That is a defect in a debug line, and there is no `P()` here to carry it.
+      */
+      for (const alert of unseenAlerts) {
+        if (
+          !alertPassesFilter({
+            avatarHash: alert.senderEmailHash,
+            alertFilterFor: alerts.filterFor,
+            showAlertsFrom: alerts.showFrom,
+            modAlertFilterListRaw: data.sessData?.modAlertFilterList
+          })
+        ) {
+          continue;
+        }
+        deliverAlert(alert);
+      }
+    });
+  });
+
+  // A new Q&A entry notifies exactly the people the compiled roomscroller notifies:
+  //
+  //   if (s.uid !== globals.user.userXrefID && !r) {
+  //     const f = s.isA ? 'answer' : 'question';
+  //     for (let _ of o.qa) _.uid === globals.user.userXrefID && (
+  //       preferences.doNotDisturbOn || (!l && preferences.qaSoundOn && soundEffectsService.qaAlert.play()),
+  //       !l && preferences.alertPopup && alertService.info(
+  //         `"${s.txt}" for alert: "${o.txt}" by ${o.n}`, `Alert ${f} from @${s.n}`)) }
+  //   globals.user.isPresenter && ( ...the same... );
+  //
+  // so: never for your own post, otherwise every presenter plus anyone who has asked on that same
+  // alert. `alertService.info` is the cyan `.toast-info` skin (background rgb(47, 150, 180)) and
+  // `qaAlert` is clearly.mp3, which is why it sounds different from an alert's `cash`.
+  const qaArrivals = new RoomArrivals<(typeof data.alertQuestions)[number]>();
+
+  function deliverQaNotice(question: (typeof data.alertQuestions)[number]) {
+    if (question.senderId === data.user.id) return;
+
+    const alert = data.alerts.find((item) => item.id === question.alertId);
+    if (!alert) return;
+
+    const askedOnThisAlert = data.alertQuestions.some(
+      (other) => other.alertId === question.alertId && other.senderId === data.user.id
+    );
+    if (!isPresenter && !askedOnThisAlert) return;
+
+    if (!prefs.doNotDisturbOn && prefs.qaSoundOn) playSoundEffect('qaAlert');
+    if (!prefs.alertPopup) return;
+
+    const senderIsPresenter = question.senderRole === 'staff' || question.senderRole === 'admin';
+    toasts.show({
+      kind: 'info',
+      title: `Alert ${senderIsPresenter ? 'answer' : 'question'} from @${question.senderName}`,
+      message: `"${question.body}" for alert: "${alert.body}" by ${alert.senderName}`,
+      enableHtml: false
+    });
+  }
+
+  $effect(() => {
+    const questions = data.alertQuestions;
+
+    // The first pass is whatever was already stored when the page loaded, not news, and
+    // `RoomArrivals` returns nothing for it — a reader opening the room gets no toast per
+    // historical question.
+    for (const question of qaArrivals.fresh(questions)) {
+      // updateAlertMsg sets the marker for whoever receives the update, with no role check.
+      unreadQaAlertIds.add(question.alertId);
+      deliverQaNotice(question);
+    }
+
+    // DELIBERATE DEVIATION from the captured app, on an explicit product decision.
+    //
+    // Upstream the flash is purely an unread marker: the class binds to `msg.unreadQA` alone
+    // (`ut(4, mge, (null == e.msg ? null : e.msg.unreadQA) || !1)` - `msg.ans` never appears in
+    // it), it is set by updateAlertMsg on any Q&A update, and the only two things that clear it
+    // are opening the modal (`openAlertQAModal`) and hiding it (`hidden.bs.modal`). Answering
+    // clears nothing upstream; even app-alert-qa-modal, which handles answering, touches
+    // `unreadQA` only in its hide handler.
+    //
+    // Here an alert stops flashing as soon as it has no unanswered question left, so the flash
+    // reads as "someone is waiting on you" rather than "there is something you have not opened".
+    // The two upstream clears still apply in the meantime.
+    //
+    // The priming pass used to `return` above this, so this ran from the SECOND pass onwards; it now
+    // runs from the first. That is a no-op and not a behaviour change: `unreadQaAlertIds` is
+    // declared empty and only ever filled by the loop directly above, so on the first pass there is
+    // nothing to clear.
+    const answered = [...unreadQaAlertIds].filter(
+      (alertId) =>
+        !questions.some((question) => question.alertId === alertId && !question.answeredAt)
+    );
+    for (const alertId of answered) unreadQaAlertIds.delete(alertId);
+  });
+
+  $effect(() => {
+    // ONE ring for a batch that arrives together, not one per message — `.some` is that rule, and
+    // it is why the sound is decided after the whole arrival is known rather than inside the loop.
+    const arrived = chatArrivals.fresh(data.messages);
+    const incoming = arrived.some((message) => message.senderId !== data.user.id);
+
+    if (incoming && !prefs.doNotDisturbOn && prefs.chatSoundOn) playSoundEffect('pling');
+  });
 </script>
 
 One hidden sink per remote microphone. A consumed audio track produces no sound until it is attached

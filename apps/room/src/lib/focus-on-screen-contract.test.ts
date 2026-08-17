@@ -62,6 +62,13 @@ const serverCode = stripComments(SERVER);
   an assertion about which screen is shown cannot pass against a file that no longer decides it.
 */
 const screensModule = readFileSync(new URL('room/screens.svelte.ts', import.meta.url), 'utf8');
+/*
+  `selectScreenTabOfId` is a METHOD on `RoomMediaTransport` now, not a function in `+page.svelte`.
+  Added 2026-08-17 when the guard below was found asserting on the empty string.
+*/
+const transportCode = stripComments(
+  readFileSync(new URL('room/media-transport.svelte.ts', import.meta.url), 'utf8')
+);
 const pageCode = stripComments(PAGE);
 const eventsCode = stripComments(EVENTS);
 const remoteCode = stripComments(REMOTE);
@@ -212,9 +219,24 @@ describe('the client', () => {
     // WRAPPED since slice 11: `selectTab` is a method, and a bare reference would lose `this`.
     expect(pageCode).toContain('selectScreenTabByUser={(id) => screens.selectTab(id)}');
 
-    // The programmatic path must NOT broadcast, or receiving a focus command would send one back.
-    const from = pageCode.indexOf('function selectScreenTabOfId(');
-    const body = pageCode.slice(from, pageCode.indexOf('\n  }', from));
+    /*
+      The programmatic path must NOT broadcast, or receiving a focus command would send one back.
+
+      RE-POINTED 2026-08-17, AND IT HAD BEEN ASSERTING ON THE EMPTY STRING. This read
+      `pageCode.indexOf('function selectScreenTabOfId(')`; that function became a method on
+      `RoomMediaTransport` during the decomposition, so `indexOf` returned -1, `pageCode.slice(-1)`
+      was one character, and both `not.toContain`s below passed against `''`. The irony is exact —
+      this is the file whose subject is a control that said "Bring everyone here" and brought
+      nobody, and its own guard had stopped saying anything.
+
+      The index is asserted found FIRST. A negative assertion cannot announce that its subject has
+      left; only a positive one can, which is why this pattern is the fix rather than the
+      re-pointing on its own.
+    */
+    const from = transportCode.indexOf('selectScreenTabOfId(producerId: string) {');
+    expect(from, 'RoomMediaTransport.selectScreenTabOfId must exist').toBeGreaterThan(-1);
+    const body = transportCode.slice(from, transportCode.indexOf('\n  }', from));
+    expect(body.length, 'the method body must not be empty').toBeGreaterThan(0);
     expect(body).not.toContain('bringEveryoneToScreen');
     expect(body).not.toContain('focusOnScreen');
   });

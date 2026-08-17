@@ -251,8 +251,32 @@ describe('the client’s own half', () => {
   });
 
   it('leaves the held log alone when a load fails, rather than blanking the pane', () => {
-    const fn = pageCode.slice(pageCode.indexOf('async function loadPrivateChatLog('));
-    const failure = fn.slice(fn.indexOf('} catch {'), fn.indexOf('}\n'));
-    expect(failure).not.toContain('privChatLog =');
+    /*
+      RE-POINTED 2026-08-17, AND IT HAD BEEN ASSERTING ON THE EMPTY STRING.
+
+      This read `pageCode.indexOf('async function loadPrivateChatLog(')` — a function that left
+      `+page.svelte` when the loader moved into `RoomPrivateChat`. `indexOf` returned -1, so
+      `pageCode.slice(-1)` was one character, both inner `indexOf`s were -1, `failure` was `''`, and
+      `expect('').not.toContain('privChatLog =')` passed against nothing. Found by a mechanical sweep
+      of every `indexOf` marker in this suite against every file its test reads — the third such
+      guard, after `screen-volume-contract.test.ts` and `focus-on-screen-contract.test.ts`.
+
+      The marker is asserted FOUND before anything is asserted about the slice, which is the whole
+      lesson: a positive assertion fails loudly when its subject moves, a negative one goes quietly
+      green. The `slice()` helper at the top of this file already does this; this assertion had been
+      written inline and bypassed it.
+    */
+    const from = privateChatModule.indexOf('async loadLog(');
+    expect(from, 'RoomPrivateChat.loadLog must exist').toBeGreaterThan(-1);
+    const catchAt = privateChatModule.indexOf('} catch {', from);
+    expect(catchAt, 'loadLog must still guard the command call with a catch').toBeGreaterThan(from);
+    const failure = privateChatModule.slice(catchAt, privateChatModule.indexOf('\n    }', catchAt));
+    expect(failure.length, 'the catch body must not be empty').toBeGreaterThan(0);
+    /*
+      The state this must not touch is `#threads` — the per-peer map that replaced the capture's
+      `privChatLog`. A `return` is the whole body; any assignment here would blank the pane on a
+      transient failure.
+    */
+    expect(failure).not.toContain('#threads');
   });
 });

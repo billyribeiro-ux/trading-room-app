@@ -261,19 +261,31 @@ describe('the filter is applied at all THREE sites, not just the visible one', (
   /*
     TWO of the three call sites moved into `RoomAlerts.passesFilter` on 2026-08-15 — the rendered
     list and the advanced-search rows both went from restating the filter's two viewer-owned halves
-    inline to `.filter(alerts.passesFilter(raw))`. The THIRD, the live arrival guard, stayed in the
-    page, because it reads the values inside a microtask on purpose: as of DELIVERY, not as of the
-    effect body, or toggling the filter would re-run it and re-deliver alerts that already arrived.
+    inline to `.filter(alerts.passesFilter(raw))`. The THIRD is the live arrival guard, and it stays
+    its own site because it reads the values inside a microtask on purpose: as of DELIVERY, not as of
+    the effect body, or toggling the filter would re-run it and re-deliver alerts that already
+    arrived.
 
-    So the count is now 1 here and 1 in the class, and the assertion checks BOTH files rather than
-    dropping to two. A count that only ever looked at the page would have gone green at 1 after this
-    extraction while two sites quietly vanished, which is the exact failure mode this file guards.
+    So the count is 1 for the arrival and 1 in the class, and the assertion checks BOTH files rather
+    than dropping to two. A count that only ever looked at one file would have gone green at 1 after
+    an extraction while two sites quietly vanished, which is the exact failure mode this file guards.
+
+    WHERE the arrival site lives changed on 2026-08-17 (S3): the four delivery effects moved from
+    `+page.svelte` to `RoomOverlays.svelte`, the component that renders the `ToastHost` they drive.
+    So this now reads `overlaysCode` where it read `source`.
+
+    AND THE PAGE IS ASSERTED EMPTY, which is the half that matters. Re-pointing a test at the new
+    file makes it pass; asserting the OLD file no longer carries the call is what proves the move was
+    a move rather than a copy, and it is what keeps this from silently passing against a page that
+    still delivers alerts behind the component's back. This repository has had four `not.toContain`
+    guards go vacuous after an extraction; the cure each time was to assert both ends.
   */
+  const overlaysCode = overlays.replace(/\/\*[\s\S]*?\*\//g, '').replace(/<!--[\s\S]*?-->/g, '');
   const alertsClass = readFileSync(
     new URL('./room/alerts.svelte.ts', import.meta.url),
     'utf8'
   ).replace(/\/\*[\s\S]*?\*\//g, '');
-  const callSites = source.match(/alertPassesFilter\(/g) ?? [];
+  const callSites = overlaysCode.match(/alertPassesFilter\(/g) ?? [];
   const classCallSites = alertsClass.match(/alertPassesFilter\(/g) ?? [];
 
   it('calls the shared predicate at every site, never re-deriving it inline', () => {
@@ -282,14 +294,23 @@ describe('the filter is applied at all THREE sites, not just the visible one', (
     expect(feedsModule).toContain(
       '.filter(this.#alerts.passesFilter(this.#session().sessData?.modAlertFilterList))'
     );
+    // The page shed the arrival site entirely. Without this the test above passes while a second,
+    // unguarded delivery path survives on the page.
+    expect(source, 'alert delivery left the page in S3').not.toContain('alertPassesFilter(');
+    expect(source, 'alert delivery left the page in S3').not.toContain('deliverAlert(');
     // The predicate itself must not be reimplemented at a call site: `showAlertsFrom ? … : …`
     // against the selection map is the exact expression that has to live in one place.
     expect(source).not.toContain('showAlertsFrom ? alertFilterFor[');
+    expect(overlaysCode).not.toContain('showAlertsFrom ? alertFilterFor[');
     expect(alertsClass).not.toContain('this.#showFrom ? this.#filterFor[');
   });
 
   it('guards the live arrival BEFORE delivery, so a hidden alert makes no toast and no sound', () => {
-    const effect = source.slice(source.indexOf('const unseenAlerts'));
+    const at = overlaysCode.indexOf('const unseenAlerts');
+    // Anchor first. `slice(-1)` on a miss yields one character and every assertion below it then
+    // runs against nothing — the vacuity this file has already been bitten by twice.
+    expect(at, 'the live-arrival effect should be in RoomOverlays').toBeGreaterThan(-1);
+    const effect = overlaysCode.slice(at);
     const body = effect.slice(0, effect.indexOf('$effect', 1));
 
     const guard = body.indexOf('alertPassesFilter(');

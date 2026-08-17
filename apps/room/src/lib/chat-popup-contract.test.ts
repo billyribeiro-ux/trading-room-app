@@ -34,12 +34,28 @@ const BUNDLE = readFileSync(
   'utf8'
 );
 const PAGE = readFileSync(new URL('../routes/+page.svelte', import.meta.url), 'utf8');
+/*
+  THE MENTION POPUP LIVES IN `RoomOverlays.svelte` as of 2026-08-17 (Phase 5, S3).
+
+  It is an `$effect`, and Svelte's docs put an effect in the component that owns the side effect
+  rather than in a class — *"if `$state` and `$derived` are used directly inside the `$effect` (for
+  example, during creation of a reactive class), those values will not be treated as dependencies"*,
+  which for this effect would mean the popup silently ignoring a Do Not Disturb toggle. The side
+  effect is a toast and an OS notification, and `RoomOverlays` renders the `ToastHost`.
+
+  `PAGE` is still read, and NOT as a leftover. Every assertion below now has two halves: the
+  behaviour is asserted against `OVERLAYS`, and the page is asserted to no longer carry it. Only the
+  second half proves the popup moved rather than being duplicated — a room with two mention effects
+  pops twice per mention, and every assertion here would pass.
+*/
+const OVERLAYS = readFileSync(new URL('./components/RoomOverlays.svelte', import.meta.url), 'utf8');
 // `SERVER` is gone with `serverCode`: `+page.server.ts` no longer holds any of this.
 
 const stripComments = (source: string) =>
   source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/<!--[\s\S]*?-->/g, '');
 
 const pageCode = stripComments(PAGE);
+const overlaysCode = stripComments(OVERLAYS);
 // `serverCode` is gone: everything this file asserted about the server moved to the remote
 // modules, and a reader that nothing reads is the next person's dead end.
 
@@ -107,29 +123,37 @@ describe('ours', () => {
     // RE-POINTED 2026-08-15: the log is now handed to `RoomOrderedArrivals` rather than bound to a
     // local first. The point of the assertion is unchanged — the text comes from `data.messages`,
     // which the server has already filtered for THIS viewer, and never from the SSE payload.
-    expect(pageCode).toContain('mentionArrivals.fresh(data.messages)');
-    expect(pageCode).toContain('toasts.show({');
+    expect(overlaysCode).toContain('mentionArrivals.fresh(data.messages)');
+    expect(overlaysCode).toContain('toasts.show({');
     // `requestAlertBrowserNotification` became `RoomToasts.notify` in Phase 5 slice 1. The call site
-    // stays here, because deciding to notify is the mention effect's job and not the queue's.
-    expect(pageCode).toContain('toasts.notify(title, item.body');
+    // stays with the EFFECT, because deciding to notify is the mention effect's job and not the
+    // queue's — which is why it travelled to `RoomOverlays` in S3 rather than into `RoomToasts`.
+    expect(overlaysCode).toContain('toasts.notify(title, item.body');
+
+    /*
+      THE MOVE, ASSERTED. Two mention effects would pop and notify twice for one mention, and every
+      assertion above would still pass. This is the half that makes them mean something.
+    */
+    expect(pageCode, 'the mention popup left the page in S3').not.toContain('mentionArrivals');
+    expect(pageCode, 'the mention popup left the page in S3').not.toContain('isMentionOf(');
   });
 
   it('honours BOTH gates, do-not-disturb first', () => {
-    expect(pageCode).toContain('if (prefs.doNotDisturbOn || !prefs.chatPopup) return;');
+    expect(overlaysCode).toContain('if (prefs.doNotDisturbOn || !prefs.chatPopup) return;');
   });
 
   it('never announces your own message', () => {
-    expect(pageCode).toContain('if (item.senderId === data.user.id) continue;');
+    expect(overlaysCode).toContain('if (item.senderId === data.user.id) continue;');
   });
 
   it('uses the shared mention rule, with the admin flag for @all', () => {
-    expect(pageCode).toContain(
+    expect(overlaysCode).toContain(
       'if (!isMentionOf(item.body, data.user.displayName, item.isAdmin === true)) continue;'
     );
   });
 
   it('titles it exactly as the reference does', () => {
-    expect(pageCode).toContain("`Mention from @${item.senderName ?? 'Unknown'}`");
+    expect(overlaysCode).toContain("`Mention from @${item.senderName ?? 'Unknown'}`");
   });
 
   it('asks RoomOrderedArrivals which messages are new, and nothing else', () => {
@@ -144,12 +168,15 @@ describe('ours', () => {
       identity set has no way to express the re-seed, so wiring the wrong one here would compile,
       type-check, and replay the whole log as toasts the first time a marker was ever trimmed.
     */
-    expect(pageCode).toContain('new RoomOrderedArrivals<');
-    expect(pageCode).toContain('const fresh = mentionArrivals.fresh(data.messages);');
-    expect(pageCode).toContain('if (fresh.length === 0) return;');
+    expect(overlaysCode).toContain('new RoomOrderedArrivals<');
+    expect(overlaysCode).toContain('const fresh = mentionArrivals.fresh(data.messages);');
+    expect(overlaysCode).toContain('if (fresh.length === 0) return;');
+    // Not `RoomArrivals` by accident: the two are imported together, and picking the wrong one
+    // compiles, type-checks, and replays the whole log as toasts the first time a marker is trimmed.
+    expect(overlaysCode).toContain('const mentionArrivals = new RoomOrderedArrivals<');
   });
 
-  it('does no arithmetic on a message id, anywhere in the page', () => {
+  it('does no arithmetic on a message id, in the page or in the overlay layer', () => {
     /*
       `id-opacity-contract.test.ts` caught the first draft doing `Math.max(highest, item.id)`. The
       room-to-API cutover replaces numeric ids with uuids, and `Math.max` over a uuid is not a type
@@ -157,9 +184,13 @@ describe('ours', () => {
 
       The class now makes this UNWRITABLE rather than merely absent: `RoomOrderedArrivals` constrains
       its row to `{ id: unknown }`, so equality and position are the only operations available. This
-      keeps watching the page anyway, because the page is where the mistake was made.
+      keeps watching the page anyway, because the page is where the mistake was made — and watches
+      `RoomOverlays` too as of S3, because that is where the code now is and a guard that follows the
+      code only half way is a guard that stopped guarding.
     */
-    expect(pageCode).not.toMatch(/Math\.max\([^)]*item\.id/);
-    expect(pageCode).not.toMatch(/item\.id\s*>\s*lastPopupChatId/);
+    for (const source of [pageCode, overlaysCode]) {
+      expect(source).not.toMatch(/Math\.max\([^)]*item\.id/);
+      expect(source).not.toMatch(/item\.id\s*>\s*lastPopupChatId/);
+    }
   });
 });
