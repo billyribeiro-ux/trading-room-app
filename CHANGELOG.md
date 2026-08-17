@@ -209,6 +209,55 @@ follow symlinks. Chasing it produced a corroboration instead of a defect — the
 `apps/room/vite.config.ts:81-87`. That is the mechanism the 10:52 entry recorded as closed,
 confirmed by trying to break it.
 
+### 2026-08-17 12:04 EDT — S4 + S8: `RoomShell.svelte`, and the panes stay where they are, `+page.svelte` 2,638 → 2,509
+
+**Runtime impact: none intended** — the `as-split` element, the gutter, the mobile/desktop child
+order and the two layout effects moved to a new component, unchanged. Regions were cut on full-line
+boundaries and spliced, so the markup and its citations are byte-identical. Gate: **2,411 tests / 165
+files**, `eslint src/` clean, `svelte-check` **1,197 files / 0 errors / 0 warnings**, `build` ✓,
+`prettier --check` clean, `svelte-autofixer` **zero issues**.
+
+**ONE slice, not two.** S4 moves the two layout effects; S8 creates the file they move into. Doing
+them apart would have produced either a shell with no effects or two effects with nowhere to go.
+
+**The design decision that made it cheap: the panes did NOT move.** They are still built on
+`+page.svelte` and handed over as **snippets**. `AlertChatArea` takes 45 props, `PresentationArea`
+over 90 and `ExtraChatPane` 28 — passing them THROUGH a shell would have meant roughly 160
+pass-through props, a second place for every one to drift, and a forced edit to every pane contract
+in the repository. A snippet is a closure over the page's scope, so the shell places markup it knows
+nothing about. 129 lines left the page for a 238-line component, and that gap is the point rather
+than overhead: what arrived is the layout plus the reasoning, not the panes.
+
+**Why the effects are here and not in `RoomSplit`.** The docs again: *"if `$state` and `$derived` are
+used directly inside the `$effect` (for example, during creation of a reactive class), those values
+will not be treated as dependencies"* — a constructor-registered effect reading
+`split.isMobileScreen` would never see the viewport change, which is the one thing both exist to
+watch. Not on the page either, now that there is somewhere better: one refetches when the layout
+crosses the mobile threshold because the two templates render different numbers of messages; the
+other collapses the chat pane of the split this file renders.
+
+**Twelve assertions across six contract files went red and were re-pointed with both halves** —
+`chat-alerts-gates`, `extra-chat-column`, `mobile-layout`, `screen-volume`, `split-gutter`,
+`source-size`. The gate names lost their `gates.` prefix in the move, because the shell takes the
+**resolved** booleans as props instead of reaching into the gates object; the page still computes
+them, and the call site is now pinned so the flag still has exactly one author.
+
+**A false green in my own negative control, caught and redone.** The first attempt to mutate the pane
+order used an anchor prettier had since reformatted, so the mutation silently did not apply and the
+test "passed". That is the precise failure this repository keeps writing rules about — a control that
+proves nothing while looking green. Redone with an assertion that the mutation LANDED before the test
+was run, and the printed result verified by eye. Both controls then behaved: flipping the mobile
+order → red; leaving a duplicate `as-split` on the page → red on *"the split element moved to
+RoomShell in S8"*.
+
+**A moved comment that had gone wrong in its new home.** One block said the collapse was "the ONE
+piece of the split still driven from here" — "here" meant `+page.svelte`. Corrected in place and the
+correction explained, because a moved comment still saying "here" points at the wrong file.
+
+**Ceilings.** `+page.svelte` 2,638 → **2,509**. `RoomShell.svelte` capped at **239 in the same commit
+that created it** — which is the lesson S5 paid for two hours earlier, when `PresentationArea.svelte`
+turned out to have reached 1,181 lines with no entry at all because components are a hand-kept list.
+
 ### 2026-08-17 11:56 EDT — PR #103 merged to `main`: S5 ships
 
 **Runtime impact: yes** — this is the production release of the S5 entry below. Merge commit

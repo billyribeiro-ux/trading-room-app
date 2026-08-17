@@ -23,6 +23,16 @@ const ROOM_COMPILED = readFileSync(
   'utf8'
 );
 const PAGE = readFileSync(new URL('../routes/+page.svelte', import.meta.url), 'utf8');
+/*
+  THE ROOM'S LAYOUT MOVED TO `RoomShell.svelte` on 2026-08-17 (Phase 5, S4+S8) — the `as-split`
+  element, the gutter, the mobile/desktop child order and the two layout effects. The three panes
+  did NOT: they are still built on `+page.svelte` and handed over as snippets, so every pane prop
+  list and every pane contract is untouched.
+
+  Assertions about layout read `SHELL`; the gate names lost their `gates.` prefix in the same move
+  because the shell takes the RESOLVED booleans as props instead of reaching into the gates object.
+*/
+const SHELL = readFileSync(new URL('./components/RoomShell.svelte', import.meta.url), 'utf8');
 const compact = (source: string) => source.replace(/\s+/g, '');
 
 /**
@@ -150,7 +160,11 @@ describe('it is the reference’s handler, its number and its binding', () => {
     expect(compact(ROOM_COMPILED)).toContain("'gutterDblClickDuration','400'");
     expect(GUTTER_DOUBLE_CLICK_MS).toBe(400);
     // And the room still renders the attribute the number came from.
-    expect(PAGE).toContain('gutterdblclickduration="400"');
+    expect(SHELL).toContain('gutterdblclickduration="400"');
+    // ONE `as-split`, in the shell. A second would render the whole room twice.
+    expect(PAGE, 'the split element moved to RoomShell in S8').not.toContain(
+      'gutterdblclickduration'
+    );
   });
 
   it('is actually wired into the room, not just exported', () => {
