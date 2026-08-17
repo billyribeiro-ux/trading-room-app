@@ -1,7 +1,7 @@
 <script lang="ts">
   import { enhance } from '$app/forms';
   import { bootbox } from '#lib/bootbox.svelte.js';
-  import type { SubmitFunction } from '@sveltejs/kit';
+  import type { SubmitFunction } from '$app/forms';
   import type { PageProps } from './$types';
 
   let { data, form }: PageProps = $props();

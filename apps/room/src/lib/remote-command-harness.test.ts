@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { beforeAll, describe, expect, it } from 'vitest';
-import { callRemote } from './server/remote-command-harness';
+import { callRemote, expectSchemaRefusal } from './server/remote-command-harness';
 import { db, ensureDatabase } from './server/db';
 import { users } from './server/db/schema';
 
@@ -68,9 +68,7 @@ describe('the remote-command harness', () => {
       A validation failure is a 400 and it happens for the PRESENTER, who would otherwise get past
       the gate. Both halves matter: the wrong status would mean the gate refused it first.
     */
-    await expect(
-      callRemote(presenter, () => unmuteChat({ targetUserId: -1 }))
-    ).rejects.toMatchObject({ status: 400 });
+    await expectSchemaRefusal(callRemote(presenter, () => unmuteChat({ targetUserId: -1 })));
   });
 
   it('reproduces the validation body this app ACTUALLY serves, and says so if that changes', () => {
@@ -103,9 +101,7 @@ describe('the remote-command harness', () => {
     await expect(callRemote(member, () => unmuteChat({ targetUserId: 1 }))).rejects.toMatchObject({
       status: 403
     });
-    await expect(
-      callRemote(presenter, () => unmuteChat({ targetUserId: -1 }))
-    ).rejects.toMatchObject({ status: 400 });
+    await expectSchemaRefusal(callRemote(presenter, () => unmuteChat({ targetUserId: -1 })));
     await expect(callRemote(member, () => unmuteChat({ targetUserId: 1 }))).rejects.toMatchObject({
       status: 403
     });

@@ -1,4 +1,12 @@
-import { error, type Handle } from '@sveltejs/kit';
+/*
+  `Handle` comes from `@sveltejs/kit/hooks` as of `3.0.0-next.23`, while `error` stays on the
+  package root — the migration guide's "Hook types moved to `@sveltejs/kit/hooks`". `next.16` still
+  re-exported the types from the root, so the move only became visible on this bump, and it fails
+  loudly rather than silently: "has no exported member 'Handle'", followed by four
+  `implicitly has an 'any' type` errors from the handlers that were typed by it.
+*/
+import { error } from '@sveltejs/kit';
+import type { Handle } from '@sveltejs/kit/hooks';
 import { resolveConnectedIdentity } from '#lib/server/connection.js';
 
 /**

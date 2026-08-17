@@ -20,12 +20,18 @@ export const kitConfig = {
   preprocess: vitePreprocess(),
   adapter: adapter(),
   /*
-    Kit 3 removed `$lib` in favour of `#lib` and offers this alias to keep the old specifier
-    working — the error names it directly. Taken deliberately rather than renaming several hundred
-    import sites inside the same diff as a framework major. Kit warns that `config.alias` is itself
-    deprecated, so migrating to `#lib` is a follow-up, not a permanent position.
+    NO `alias`, removed 2026-08-17 with the last `$lib` specifier it existed for.
+
+    It held `{ $lib: 'src/lib' }` as a deliberate shim through the Kit 3 upgrade, under a note saying
+    migrating to `#lib` was "a follow-up, not a permanent position". That follow-up landed in
+    `e270fad`; this is the shim coming out behind it, and with it the `config.alias is deprecated`
+    warning that `svelte-kit sync` printed on every run.
+
+    It lived HERE rather than in `vite.config.ts`, which is worth recording because it is where I did
+    not look: the migration commit's note said the controller had "no alias in its Vite config at
+    all", which was true of that file and false about the app. `#lib` now resolves through the
+    `imports` field in `package.json`, which Vite and TypeScript both read natively.
   */
-  alias: { $lib: 'src/lib' },
   paths: {
     // The captured application is hosted at the domain root and emits root-relative URLs. Keep
     // SvelteKit route resolution without rewriting SSR output to page-relative forms such as

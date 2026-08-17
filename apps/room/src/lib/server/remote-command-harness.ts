@@ -20,7 +20,10 @@ import type { RequestEvent } from '@sveltejs/kit';
  *
  * ## What was READ to build it, rather than assumed
  *
- * `@sveltejs/kit@3.0.0-next.16`, in `node_modules`, four files:
+ * `@sveltejs/kit`, in `node_modules`, four files. Read against `3.0.0-next.16` when this was
+ * written and RE-READ against `3.0.0-next.23` on 2026-08-17 — the version matters, because the
+ * fifth thing it used to reproduce (`handleValidationError`) was removed between the two and the
+ * note on `state` below records what replaced it. All four of these are unchanged:
  *
  * - `src/exports/internal/server/event.js` — `with_request_store(store, fn)` sets a module-level
  *   `sync_store` and runs `fn` inside an `AsyncLocalStorage`. It is exported from
@@ -70,34 +73,79 @@ export function callRemote<T>(locals: App.Locals, run: () => T | Promise<T>): Pr
   const state = {
     is_in_remote_query: false,
     is_in_remote_prerender: false,
-    is_in_render: false,
+    is_in_render: false
     /*
-      What Kit does when a schema REFUSES an argument, transcribed from
-      `src/runtime/server/index.js:149-153`:
+      NO `handleValidationError`, and its removal on 2026-08-17 is a FRAMEWORK change rather than a
+      simplification.
 
-        handleValidationError:
-          module.handleValidationError ||
-          (({ issues }) => {
-            console.error('Remote function schema validation failed:', issues);
-            return { message: 'Bad Request', status: 400 };
-          })
+      Through `3.0.0-next.16` this shim reproduced Kit's default: `create_validator` called
+      `state.handleValidationError({ issues })` and then `error(body.status ?? 400, body)`, so a
+      schema refusal surfaced as a 400 `HttpError`. The Kit 3 migration guide removes that hook —
+      *"`handleValidationError` hook removed"* — and `next.23` implements it: read from the installed
+      package at `src/runtime/app/server/remote/shared.js:33-36`,
 
-      `create_validator` calls it and then `error(body.status ?? 400, body)`, so without it a
-      validation failure throws `state.handleValidationError is not a function` — a TypeError that
-      looks nothing like the 400 the real endpoint returns, and a test asserting on rejection alone
-      would have accepted it.
+        if (result.issues) {
+          throw new ValidationError(result.issues);
+        }
 
-      `module` is `src/hooks.server.ts`, which does NOT export `handleValidationError`, so this app
-      runs Kit's default and this reproduces it exactly. `remote-command-harness.test.ts` asserts
-      that the hook is still absent, so the day somebody adds one this goes red rather than quietly
-      testing against a body the server stopped returning.
+      so the validator now throws directly and the status is applied further out, where `handleError`
+      receives it with `kind: 'validation'`. Nothing calls this property any more, which makes
+      keeping it the "config nothing reads" defect in harness form.
 
-      The one deliberate divergence: Kit's `console.error` is not reproduced. It is the server's
-      logging, not its contract, and a harness that logs on every intentional refusal trains people
-      to ignore test output. Stated here rather than silently dropped.
+      What that changes for a test: a schema refusal is a `ValidationError` carrying `issues`, not an
+      `HttpError` carrying `status`. `expectSchemaRefusal` below is the one place that knows it.
     */
-    handleValidationError: () => ({ message: 'Bad Request', status: 400 })
   };
 
   return Promise.resolve(with_request_store({ event, state } as never, run) as T | Promise<T>);
+}
+
+/**
+ * A remote function REFUSED its argument at the schema, asserted in one place.
+ *
+ * ## Why this is a helper and not `.rejects.toMatchObject({ status: 400 })`
+ *
+ * It was that, thirty-seven times across six files, and on 2026-08-17 nineteen of them went red at
+ * once: SvelteKit 3 `next.23` removed the `handleValidationError` hook, so the validator throws a
+ * `ValidationError` carrying `issues` instead of an `HttpError` carrying `status`. The behaviour a
+ * reader cares about — *"this call was refused before it could do anything"* — did not change at
+ * all; only the shape the framework expresses it in did.
+ *
+ * Thirty-seven literals meant thirty-seven edits and a real chance of "fixing" the eighteen that
+ * were never about schema validation. Those assert `error(400, …)` raised by our OWN code and are
+ * still `HttpError` with a `status`; a blanket replace would have quietly loosened every one of
+ * them. One named helper means the next framework change is one edit, and the eighteen keep saying
+ * what they always said.
+ *
+ * ## What it asserts
+ *
+ * The refusal came from the SCHEMA, not from a handler that happened to throw: `issues` must be a
+ * non-empty array, which is the thing only a validator produces. A handler that threw a bare
+ * `Error` fails here, which is the point — "it rejected" is not the contract.
+ */
+export async function expectSchemaRefusal(call: Promise<unknown>, label?: string): Promise<void> {
+  /*
+    `label` is `expect(…, message)`'s second argument, kept because one caller loops over a list of
+    bad values and needs to say WHICH one got through. Dropping it would have turned a precise
+    failure into "one of these three values was accepted".
+  */
+  const where = label === undefined ? '' : ` [${label}]`;
+
+  let thrown: unknown;
+  try {
+    await call;
+  } catch (caught) {
+    thrown = caught;
+  }
+
+  if (thrown === undefined) {
+    throw new Error(`expected the remote function to refuse its argument, but it resolved${where}`);
+  }
+
+  const issues = (thrown as { issues?: unknown }).issues;
+  if (!Array.isArray(issues) || issues.length === 0) {
+    throw new Error(
+      `expected a schema ValidationError carrying issues, got ${String(thrown)}${where}. If this call is refused by \`error(400, …)\` in our own code rather than by its schema, assert the HttpError directly — that is a different contract and this helper is not it.`
+    );
+  }
 }

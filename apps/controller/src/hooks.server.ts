@@ -1,5 +1,14 @@
 import { randomUUID } from 'node:crypto';
-import type { Handle, HandleServerError, ServerInit } from '@sveltejs/kit';
+/*
+  `@sveltejs/kit/hooks`, not the package root, as of `3.0.0-next.23`.
+
+  The Kit 3 migration guide lists it under "@sveltejs/kit Exports" — *"Hook types moved to
+  `@sveltejs/kit/hooks`"* — and `next.16` still re-exported them from the root, so the move only
+  became visible on this bump. It fails LOUDLY and specifically ("has no exported member 'Handle'"),
+  which is the good kind of breaking change: the three type imports go, and then eight
+  `implicitly has an 'any' type` errors follow from the handlers that were typed by them.
+*/
+import type { Handle, HandleServerError, ServerInit } from '@sveltejs/kit/hooks';
 import {
   applySecurityHeaders,
   controlPlaneUnavailableResponse,
@@ -40,7 +49,22 @@ export const handle: Handle = async ({ event, resolve }) => {
  * the browser. The server log intentionally excludes query strings, request
  * bodies, cookies, user data, and the raw error message.
  */
-export const handleError: HandleServerError = ({ error, event, status }) => {
+/*
+  `kind`, not `status`, as of `3.0.0-next.23`.
+
+  Kit 3 replaced the input's `status` with a DISCRIMINANT — `'app' | 'framework' | 'validation' |
+  'unknown'` — and moved status the other way: the hook may now RETURN one to override the default.
+  This handler does not, deliberately, because it has never wanted to change what the user is sent;
+  it only wants the log line.
+
+  The swap is an upgrade for exactly the reason the note below records. `status: 500` said an error
+  happened and nothing about its origin. `kind` separates the four cases that need different
+  responses from an operator: `'app'` is our own `error()` call and usually intentional,
+  `'framework'` is a 404 or a malformed request, `'validation'` is a remote function called with
+  bad arguments, and `'unknown'` is the only one that means something threw where nothing should.
+  Alerting on 500s treated all four alike.
+*/
+export const handleError: HandleServerError = ({ error, event, kind }) => {
   const errorId = randomUUID();
   /*
     THE MESSAGE AND STACK GO TO THE SERVER LOG. They used to be dropped, and that cost real time.
@@ -59,7 +83,7 @@ export const handleError: HandleServerError = ({ error, event, status }) => {
   */
   console.error('[request-error]', {
     errorId,
-    status,
+    kind,
     method: event.request.method,
     route: event.route.id,
     url: event.url.pathname,

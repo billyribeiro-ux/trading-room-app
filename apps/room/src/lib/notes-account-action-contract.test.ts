@@ -4,7 +4,7 @@ import { eq } from 'drizzle-orm';
 import { db, ensureDatabase } from '#lib/server/db/index.js';
 import { notes, sessions, userSettings, users, type User } from '#lib/server/db/schema.js';
 import { actions } from '../routes/+page.server';
-import { callRemote } from '#lib/server/remote-command-harness.js';
+import { callRemote, expectSchemaRefusal } from '#lib/server/remote-command-harness.js';
 
 /*
   Characterization tests for the last nine actions: the six session-note commands, plus
@@ -272,16 +272,16 @@ describe('editUsername', () => {
       is a runtime one, which is why it is cast.
     */
     for (const userId of ['abc', 0, -1, 1.5]) {
-      await expect(
+      await expectSchemaRefusal(
         callRemote(locals(member), () =>
           editUsername({ userId, username: 'x' } as unknown as { userId: number; username: string })
         ),
         String(userId)
-      ).rejects.toMatchObject({ status: 400 });
+      );
     }
-    await expect(
+    await expectSchemaRefusal(
       callRemote(locals(member), () => editUsername({ userId: member.id, username: '   ' }))
-    ).rejects.toMatchObject({ status: 400 });
+    );
   });
 
   /*
@@ -333,10 +333,10 @@ describe('saveTheme', () => {
     */
     await callRemote(locals(member), () => saveTheme('dark'));
     for (const theme of ['solarized', '', 'DARK']) {
-      await expect(
+      await expectSchemaRefusal(
         callRemote(locals(member), () => saveTheme(theme as 'dark')),
         theme
-      ).rejects.toMatchObject({ status: 400 });
+      );
       expect(
         db.select().from(userSettings).where(eq(userSettings.userId, member.id)).get()?.theme
       ).toBe('dark');
@@ -481,20 +481,20 @@ describe('savePreference', () => {
       function, a `Date`, `undefined` — which is a stronger check than the one it replaced, applied
       to the real value rather than to somebody's stringification of it.
     */
-    await expect(
+    await expectSchemaRefusal(
       callRemote(locals(member), () => savePreference({ key: '   ', value: 1 }))
-    ).rejects.toMatchObject({ status: 400 });
-    await expect(
+    );
+    await expectSchemaRefusal(
       callRemote(locals(member), () => savePreference({ key: 'k'.repeat(101), value: 1 }))
-    ).rejects.toMatchObject({ status: 400 });
+    );
 
     for (const value of [() => {}, new Date(0), undefined]) {
-      await expect(
+      await expectSchemaRefusal(
         callRemote(locals(member), () =>
           savePreference({ key: 'ok', value } as unknown as { key: string; value: null })
         ),
         String(value)
-      ).rejects.toMatchObject({ status: 400 });
+      );
     }
 
     expect(stored()).toEqual({});
