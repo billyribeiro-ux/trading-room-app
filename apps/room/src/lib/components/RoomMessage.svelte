@@ -314,7 +314,7 @@
    * MESSAGE, so a message containing two gifs would give both the same id upstream. The id is still
    * rendered for fidelity, but nothing here resolves anything through it.
    */
-  let revealedGifs = $state<Record<string, boolean>>({});
+  let revealedGifs = $state.raw<Record<string, boolean>>({});
 
   /** `!i && -1 !== r.indexOf('.gif')` — the muting applies to gifs only, case-insensitively. */
   function isMutedGif(url: string) {

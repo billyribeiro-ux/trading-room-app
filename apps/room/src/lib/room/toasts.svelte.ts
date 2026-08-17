@@ -42,7 +42,7 @@ import type { ToastNotice } from '#lib/toast.js';
   evidence rather than a guess.
 */
 export class RoomToasts {
-  #notices = $state<ToastNotice[]>([]);
+  #notices = $state.raw<ToastNotice[]>([]);
   /*
     A plain counter, not `$state`: it is the id source and nothing renders from it. Making it
     reactive would add a dependency to every reader of the list and change no pixel.

@@ -64,7 +64,7 @@
   let pollTab = $state<PollTab>('new');
   let pollQuestion = $state('');
   let pollChoice = $state('');
-  let pollChoices = $state<string[]>([]);
+  let pollChoices = $state.raw<string[]>([]);
   let anonymousPoll = $state(false);
   let answered = $state(false);
   let isMinimized = $state(false);

@@ -602,7 +602,12 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       `#lib/file-sort.js` — eleven characters longer, which pushed a four-name import statement past
       the print width and prettier wrapped it onto six lines. Zero code, zero comment: one import.
     */
-    max: 387,
+    /*
+      +14, 2026-08-17 (S2): the note on `#selectedFileIds` explaining that `$state.raw` turns the
+      copy-on-write Set convention into a guarantee — raw state cannot be mutated, so the pattern is
+      enforced by the rune instead of by everyone remembering it.
+    */
+    max: 401,
     why: 'the file drive; the first slice to collapse a prop list at TWO call sites rather than one'
   },
   {
@@ -627,7 +632,13 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       performance finding this class does NOT fix" became a record of where the fix went and why it
       is not here: the bound belongs to whatever holds the pages, and this class only pays for them.
     */
-    max: 372,
+    /*
+      +14, 2026-08-17 (S2): the note on `#evidence` recording why it is `$state.raw`. It is the
+      hottest read in this class — six chained passes call `#isHidden` and `#withEvidence` PER ROW
+      and both index into it, so a proxied record cost a proxy hop per row per pass for a
+      fine-grained update the code never performs.
+    */
+    max: 386,
     why: 'what each pane renders, and the evidence overlay every pipeline consults'
   },
   {

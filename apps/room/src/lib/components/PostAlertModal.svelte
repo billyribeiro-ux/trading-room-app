@@ -26,8 +26,8 @@
   let alertUrl = $state('');
   let linkAlertText = $state('');
   let imageAlertText = $state('');
-  let files = $state<File[]>([]);
-  let previews = $state<string[]>([]);
+  let files = $state.raw<File[]>([]);
+  let previews = $state.raw<string[]>([]);
   let dragging = $state(false);
   let fileInput = $state<HTMLInputElement>();
   let keepOpen = $state(false);

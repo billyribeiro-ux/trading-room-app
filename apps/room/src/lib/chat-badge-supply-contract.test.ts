@@ -91,11 +91,24 @@ describe('level 1 — the controller sends it', () => {
     expect(endpointCode).toContain('if (ids.length === 0) continue;');
   });
 
-  it('sends darkTheme only when it names a badge', () => {
-    // Our column is still the superseded boolean; `badgesH[true]` could only ever fail.
-    expect(endpointCode).toContain(
-      "darkTheme: typeof badge.darkTheme === 'number' ? badge.darkTheme : undefined"
-    );
+  it('sources darkTheme from the id column, never from the superseded boolean', () => {
+    /*
+      THE WIRE FIELD IS `darkTheme`; THE COLUMN BEHIND IT IS `darkThemeBadgeId`. The name is the
+      reference's, matched by `feeds.svelte.ts` (`definitions[String(badge.darkTheme)]`); the source
+      has to be the column that holds an ID, because the swap is a LOOKUP and not a flag.
+
+      WHY THIS ASSERTS BOTH DIRECTIONS. Until 2026-08-17 this test pinned
+      `typeof badge.darkTheme === 'number' ? badge.darkTheme : undefined`, and that expression was
+      DEAD: `badges.darkTheme` is `boolean('dark_theme')`, so `typeof` was never `'number'` and the
+      field was always undefined. The test was green the whole time, because it asserted the presence
+      of a string rather than the behaviour — it pinned the defect in place instead of catching it.
+
+      So the negative half below is the half that matters, and it is the one that goes red if anybody
+      restores the boolean. `darkThemeBadgeId` is `integer(...)` and nullable (migration `0013`), so
+      `?? undefined` is the whole of the conditioning that is needed.
+    */
+    expect(endpointCode).toContain('darkTheme: badge.darkThemeBadgeId ?? undefined');
+    expect(endpointCode).not.toContain("typeof badge.darkTheme === 'number'");
   });
 
   it('loads the member list ONCE for both the membership lookup and the map', () => {

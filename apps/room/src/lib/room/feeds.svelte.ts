@@ -122,7 +122,21 @@ export class RoomFeeds<
     this.#unreadQa = options.unreadQa;
     this.#alertsLogKey = options.alertsLogKey;
 
-    this.#evidence = $state<
+    /*
+      `$state.raw`, because this record is only ever REPLACED.
+
+      `patchEvidence` builds a whole new object — `{ ...this.#evidence, [key]: { … } }` — and nothing
+      writes a key in place. The docs reserve `.raw` for exactly that: *"In cases where you're
+      dealing with large objects that are only ever reassigned (rather than mutated), use
+      `$state.raw` instead."*
+
+      What a deep proxy was costing here is not hypothetical. Every one of the six pipeline passes
+      calls `#isHidden` and `#withEvidence` PER ROW, and each of those reads
+      `this.#evidence[item.evidenceKey]` — so a proxied record meant a proxy hop per row per pass,
+      on the hot path that renders the log. Replacing the object is what the code already does, so
+      the fine-grained tracking bought nothing and charged for it on every render.
+    */
+    this.#evidence = $state.raw<
       Record<
         string,
         {

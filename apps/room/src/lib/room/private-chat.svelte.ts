@@ -173,7 +173,7 @@ export class RoomPrivateChat<User extends { id: number; isP: boolean; hasAdminCh
 
     this.#searching = $state(false);
 
-    this.#threads = $state<Record<number, PrivateChatMessage[]>>({});
+    this.#threads = $state.raw<Record<number, PrivateChatMessage[]>>({});
 
     /**
      * The tab strip: the server's conversation list MERGED with what has happened since.
@@ -186,15 +186,15 @@ export class RoomPrivateChat<User extends { id: number; isP: boolean; hasAdminCh
      * So the local deltas live in their own state and the strip is a pure function of both. Nothing
      * to reset, and a conversation started this session appears without waiting for a refetch.
      */
-    this.#unreadByPeer = $state<Record<number, number>>({});
+    this.#unreadByPeer = $state.raw<Record<number, number>>({});
 
-    this.#lastActivityByPeer = $state<Record<number, number>>({});
+    this.#lastActivityByPeer = $state.raw<Record<number, number>>({});
 
     // An array, not a Record. `Object.entries` stringifies its keys, so reading a peer id back out
     // means `Number(uid)` - and this project forbids arithmetic on an id, because the room-to-API
     // cutover turns them into uuids (`docs/CUTOVER-ROOM-TO-API.md` §1, pinned by
     // `id-opacity-contract.test.ts`). Keeping the id inside the object never coerces it.
-    this.#peerProfiles = $state<PrivateChatTab[]>([]);
+    this.#peerProfiles = $state.raw<PrivateChatTab[]>([]);
 
     /** `this.currUser` - the peer id whose thread is on screen, `''` when none. */
     this.#peerId = $state<number | null>(null);

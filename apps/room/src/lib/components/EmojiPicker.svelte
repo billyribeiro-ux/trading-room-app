@@ -75,7 +75,7 @@
   let skinsOpened = $state(false);
   let hovered = $state<EmojiDumpEntry | null>(null);
   let searchResults = $state<EmojiDumpEntry[] | null>(null);
-  let frequentIds = $state<string[]>(FREQUENTLY_DEFAULTS.slice(0, PER_LINE));
+  let frequentIds = $state.raw<string[]>(FREQUENTLY_DEFAULTS.slice(0, PER_LINE));
 
   let emojiSearchInput: HTMLInputElement | undefined;
   let emojiScrollElement: HTMLElement | undefined;

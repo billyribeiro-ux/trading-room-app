@@ -462,12 +462,33 @@ describe('the NAVBAR dropdown, which is the same control in a different componen
     expect(ROOM_HELPERS).toContain("ei('name', 'talkingPresenter', i, '-donot-disturb')");
     expect(rows).toContain("idPrefix = 'talkingPresenter'");
     expect(controlMarkup).toContain('idPrefix="screenTalkingPresenter"');
-    // The navbar copy must NOT pass a prefix: it keeps the captured ids exactly.
-    const soundOptions = PAGE.slice(PAGE.indexOf('<div class="room-sound-options">'));
-    const navRows = soundOptions.slice(
-      soundOptions.indexOf('<PresenterMuteRows'),
-      soundOptions.indexOf('/>', soundOptions.indexOf('<PresenterMuteRows'))
+    /*
+      The navbar copy must NOT pass a prefix: it keeps the captured ids exactly.
+
+      THIS ASSERTION WAS VACUOUS FROM 2026-08-15 TO 2026-08-17 AND THE FIX IS THE POSITIVE ONE
+      BELOW, NOT THE RE-POINTING. It used to slice `PAGE`, but `.room-sound-options` moved into
+      `RoomNavbar.svelte` with the rest of `.mainAppNav` in `7023893`. `indexOf` then returned -1,
+      `PAGE.slice(-1)` yielded the file's last character, both inner `indexOf`s returned -1, `navRows`
+      was the empty string, and `expect('').not.toContain('idPrefix')` passed against nothing. The
+      sibling slice at the top of this file WAS re-pointed to `navbarMarkup` in that same commit, so
+      this was one missed line rather than an intended narrowing — and it survived three later commits
+      to this file, because a negative assertion has no way to announce that its subject has left.
+
+      That is the exact failure mode `source-size-contract.test.ts` was built to make visible and
+      cannot catch here: its rule is one POSITIVE assertion per text-reading file, and this file has
+      dozens elsewhere. Only a positive assertion on THIS slice can fail when the markup moves again,
+      which is why `rowsAt` is asserted found BEFORE the negative runs.
+    */
+    const soundOptions = navbarMarkup.slice(
+      navbarMarkup.indexOf('<div class="room-sound-options">')
     );
+    const navRowsAt = soundOptions.indexOf('<PresenterMuteRows');
+    expect(
+      navRowsAt,
+      'the navbar dropdown must still render PresenterMuteRows — if this fails the markup moved and the guard below is asserting on nothing'
+    ).toBeGreaterThan(-1);
+    const navRows = soundOptions.slice(navRowsAt, soundOptions.indexOf('/>', navRowsAt));
+    expect(navRows.length, 'the PresenterMuteRows tag must be non-empty').toBeGreaterThan(0);
     expect(navRows).not.toContain('idPrefix');
   });
 });

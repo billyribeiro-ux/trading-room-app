@@ -24,6 +24,59 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-17
 
+### 2026-08-17 10:44 EDT — S2: nineteen replace-only objects move to `$state.raw`, and the pattern becomes structural
+
+**Suite 2,402 across 164 files** (+4, a new gate). `svelte-check` 1,195/0/0. Lint clean. Build ✓.
+**Runtime impact: yes** — nineteen fields stopped being deep proxies. No behaviour changed; the
+proxies were never being used for what they cost.
+
+The docs' rule: *"in exchange for fine-grained reactivity, the objects must be proxied, which has
+performance overhead. In cases where you're dealing with large objects that are only ever reassigned
+(rather than mutated), use `$state.raw` instead."* Note what the trade-off actually is — if nothing
+ever mutates, the fine-grained half is never used, so the proxy is not a trade at all. It is pure
+cost. "Large" is the docs' motivating case, not the condition.
+
+**Measured with TypeScript's AST, not a pattern**, because the question is how a field is WRITTEN
+across a whole file and no regex can answer that. Nineteen fields held an object or array that no
+code path mutates in place. Two are on hot paths and are the reason this is not cosmetic:
+
+* **`RoomFeeds.#evidence`** — all six chained pipeline passes call `#isHidden` and `#withEvidence`
+  PER ROW, and both index into it. A proxied record meant a proxy hop per row per pass, on the path
+  that renders the log.
+* **`RoomToasts.#notices`** — read on every render of the toast host, replaced on every add and
+  every expiry.
+
+The other seventeen are small — poll choices, upload previews, GIF results, roster records — and
+were converted for consistency, which is stated so nobody reads a performance number into them.
+
+#### The copy-on-write `Set` sites: a convention became a guarantee
+
+Eight of the nineteen are the copy-on-write `new Set()` / `{ ...record }` sites that `TODO.md`
+records as deliberate decisions. **That decision is not what changed, and it was checked before
+anything was touched** — `toggleFileSelection` builds `new Set(this.#selectedFileIds)`, mutates the
+COPY and reassigns; `#threads` and `#unreadByPeer` use rest-destructuring, which builds a new object
+rather than mutating.
+
+What changed is that the pattern used to depend on everyone remembering it: a `.add()` straight onto
+a proxied `$state` Set would have worked, so nothing stopped the copy being skipped. **Raw state
+cannot be mutated at all — only reassigned — so the rune now enforces what discipline was enforcing.**
+
+#### The gate, and its more dangerous half
+
+`state-raw-contract.test.ts` re-runs the audit and fails naming the file and field. It checks BOTH
+directions, and the second is the one that matters: a `.push()` onto a `$state.raw` array updates
+the array and **notifies nothing** — the screen keeps the old value, with no error and no warning.
+Both controls seen red.
+
+Two scanner corrections worth recording, because both were mine. The first draft read only class
+field initialisers and missed `RoomFeeds.#evidence`, which is assigned in the constructor — one of
+the two that mattered most. And the first run's output was truncated by my own `head -10`, so I
+worked from eight findings when there were nine; the gate caught the ninth.
+
+**Two ceilings rose**, both for the explanatory comments: `files.svelte.ts` +14 for the note on why
+`.raw` makes the Set convention structural, `feeds.svelte.ts` +14 for the note on the per-row cost.
+
+
 ### 2026-08-17 10:33 EDT — S1: `{#each}` keys, and one rule that turned out to be two cases
 
 **Suite 2,398 across 163 files** (+5, a new gate). `svelte-check` 1,193/0/0. Lint clean. Build ✓.
