@@ -33,6 +33,73 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-17
 
+### 2026-08-17 11:34 EDT — the other half of the audit finally run: 23 of 49 "still open" items were mislabelled, and "NOT BUILT" was the wrong words for most of them
+
+**Runtime impact: no** — `TODO.md` only. The one test that reads it stays green.
+
+**THE FAILURE THIS CORRECTS IS MINE AND IT IS STRUCTURAL.** Both earlier passes hardened the
+DELETIONS adversarially and never tested the RETENTIONS: the auditors were told to default to "still
+open", and only "done" verdicts were attacked. So a row whose UI was built and whose wire was missing
+sailed through as "not built" unchallenged. Worse, the 10:52 rewrite put *"re-audited 2026-08-17
+against the repository itself"* at the top of the file and pushed it — **stamping a verification claim
+on rows that had not been verified**, which makes the next reader trust the wrong ones harder than
+they would have trusted the original.
+
+Corrected by running the mirror image: 49 open items, one instruction — *prove this is already built*.
+**23 came back mislabelled: 21 partly built, 2 built outright.** A 43% mislabel rate on the side
+nobody was checking, against the 21% false-gap rate the triage document already records for the other
+side.
+
+**THE TAXONOMY IS THE DELIVERABLE, not the count.** "NOT BUILT" reads as *nothing is there*; for most
+of these the truth is *it is there, it is live, and it is lying*. Four kinds now written into
+`TODO.md`, each verified by reading the control end to end:
+
+1. **Lying controls** — report success, send nothing. Row W's twelve, plus `remoteRestartAudio`, plus
+   **`focusOnSessionNote`, which the triage doc files as NOT BUILT while both its controls are live**:
+   "Bring everyone here" (`NoteTabContent.svelte:104`) and "Bring **E**veryone here"
+   (`NoteEditor.svelte:583` — the capture's own inconsistent capitalisation, faithfully ported) both
+   resolve to `selectNote(id)`, whose whole body is `requestedNoteId = noteId; openMenuNoteId = null`.
+   They bring nobody. The identical defect was found and fixed for SCREENS —
+   `focus-on-screen-contract.test.ts:12` says *"The menu item said 'Bring everyone here' and brought
+   nobody"* — and the note pair was never noticed.
+2. **Dead controls** — no handler at all, not even a toast. `getDebugLog`: `'debug-log'` occurs
+   **exactly once in the whole source**, at its own call site; its modal is unreachable and its
+   textarea is never filled. `setUserProfilePic` likewise. The archive pair's `Reload Log List` button
+   (`ModalHost.svelte:3913`) **has no `onclick` attribute at all**, above a hardcoded "There are no
+   archived chats at this time" that renders whether or not it is true — the same hardcoded-negative
+   defect as `kick-duplicates`.
+3. **Silent correctness gaps** — `doChatLogSearch`'s input is ported verbatim down to the dangling
+   `aria-describedby`, but `alerts.svelte.ts:271-275` filters locally with `includes()` where upstream
+   searches the SERVER. Search an old message, get nothing, no indication the server was never asked.
+4. **Honest partials** — `forceStopScreen` stops your own screen for real and drops somebody else's
+   tab with the reason written down. That is the standard being MET, and lumping it with the above
+   would have been a manufactured defect.
+
+**A FIFTH FINDING, not a control:** `+page.server.ts:381` sends `muted: roomConfig.member?.muted ??
+false` into the room and **that is its only occurrence in the entire source**. The controller's
+permanent mute (`applyUserOpcode` case 3, role 3) crosses and does nothing — **a member muted
+indefinitely from the manage page can still post.** The room enforces only its own `chat_mutes`
+table. Distinct from the viewer's own mute at `:628-640`, which IS enforced; I withheld this claim
+for one round rather than assert an agent's word, and confirmed it by reading.
+
+**A THIRD DEAD TEST GUARD:** `focus-on-screen-contract.test.ts:216-219` slices for
+`function selectScreenTabOfId(`, which has left `+page.svelte`. Executing the test's own expression
+returns **-1**, so both `not.toContain` assertions run against `''`. Recorded in row AH, not yet
+fixed.
+
+**Three row-W entries were too coarse and are now scoped**: `save-permissions` writes the SAME five
+checkboxes in the controller (`PERMISSION_KEYS`, `server/rooms.ts:90-114`), so it needs a call and not
+a feature — an earlier draft dismissed that as "a different feature", which was too quick; `kick-ban`'s
+BAN half is built and enforced, leaving only the live eject; `mute-chat-24` is keyed on a message, so
+what is missing is a user-targeted entry point. **Alert Scheduler is likewise smaller than stated:**
+`alerts.scheduled_for` and its index already exist (`0001_baseline.sql:165`, `:990`) — a column and
+an index nothing writes.
+
+**Also recorded:** `presAreaTabs-videoplayer` is built end to end, so of the two presentation-area
+tabs reported missing only `recordings` is real; and the triage document's `ours` line pointers are
+stale repo-wide after the decomposition, so following one and finding unrelated code must not be read
+as the feature being gone.
+
 ### 2026-08-17 11:14 EDT — every citation in the rewritten `TODO.md` opened and checked; three were wrong, and one of them was invented
 
 **Runtime impact: no** — `TODO.md` only. The one test that reads it stays green.
