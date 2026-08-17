@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { EMOJI_GROUPS } from '$lib/content/emoji-picker';
+  import { EMOJI_GROUPS } from '#lib/content/emoji-picker.js';
 
   /**
    * The badge editor's emoji picker — `page.welcome.html:476` onward.

@@ -62,13 +62,20 @@ export interface EvidencePatch {
 
   **Ordering and paging.** `RoomLogPages` holds the older pages; this class merges them.
 
-  ## A performance finding this class does NOT fix
+  ## The performance finding this class used to carry, and where it went
 
-  `visibleAlerts` runs six chained passes over a list NOTHING bounds — `data.alerts` plus every
-  older page the reader has scrolled back to. `trimChatLog` caps the chat columns at the
-  reference's 300; alerts have no equivalent. At 10,000 alerts that is 60,000 operations per render.
-  Pre-existing, recorded in `TODO.md`, and deliberately not fixed inside a move — the fix changes
-  behaviour and belongs in its own change with its own measurement.
+  `visibleAlerts` runs six chained passes over `data.alerts` merged with every older page the reader
+  has scrolled back to, and until 2026-08-16 NOTHING bounded the second half: it grew with each page
+  pulled and never shrank for the life of the session.
+
+  Fixed where the bound belongs, which is not here. The reference releases that history the moment
+  the reader returns to the bottom — `currPage > 0 && this.trimFat()` — and this room implemented
+  only the other half of that same expression. `RoomLogPages.releaseHistory` carries the
+  transcription; `RoomFeedScroll` calls it beside the `arm()` it always called.
+
+  Worth keeping in view here anyway, because this is where the cost is PAID: the passes below are
+  proportional to what `RoomLogPages` is holding, so the two files have to stay honest together.
+  Nothing in this class caps anything, and it should not start.
 */
 export class RoomFeeds<
   Alert extends MessageActionItem & AlertRow,

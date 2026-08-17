@@ -1,12 +1,12 @@
 <script lang="ts">
   import { afterNavigate } from '$app/navigation';
   import { page } from '$app/state';
-  import ControllerChrome from '$lib/components/ControllerChrome.svelte';
-  import ConsentBanner from '$lib/components/home/ConsentBanner.svelte';
-  import HomeFooter from '$lib/components/home/HomeFooter.svelte';
-  import HomeNav from '$lib/components/home/HomeNav.svelte';
-  import SiteFooter from '$lib/components/SiteFooter.svelte';
-  import SiteHeader from '$lib/components/SiteHeader.svelte';
+  import ControllerChrome from '#lib/components/ControllerChrome.svelte';
+  import ConsentBanner from '#lib/components/home/ConsentBanner.svelte';
+  import HomeFooter from '#lib/components/home/HomeFooter.svelte';
+  import HomeNav from '#lib/components/home/HomeNav.svelte';
+  import SiteFooter from '#lib/components/SiteFooter.svelte';
+  import SiteHeader from '#lib/components/SiteHeader.svelte';
   import '../account.css';
   import '../manage.css';
   import '../public.css';
@@ -41,7 +41,7 @@
    */
   import '@fortawesome/fontawesome-free/css/all.min.css';
   import 'font-awesome/css/font-awesome.min.css';
-  import { resolveChrome } from '$lib/chrome';
+  import { resolveChrome } from '#lib/chrome.js';
 import type { LayoutProps } from './$types';
 
   /**
@@ -82,7 +82,7 @@ import type { LayoutProps } from './$types';
   const fluid = $derived(/^\/account\/rooms\//.test(page.url.pathname));
 
   /*
-    The decision itself lives in `$lib/chrome.ts` so it can be tested.
+    The decision itself lives in `#lib/chrome.ts` so it can be tested.
 
     It was inlined here, and a page was filed under the wrong shell without anything noticing:
     `/forgot-password` and `/reset-password` fell through to `marketing` and rendered inside

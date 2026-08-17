@@ -1,9 +1,9 @@
 import { error, json } from '@sveltejs/kit';
 import { timingSafeEqual } from 'node:crypto';
 import { eq } from 'drizzle-orm';
-import { getDb } from '$lib/server/db';
-import { rooms } from '$lib/server/db/schema';
-import { inviteRoomUser, readSettings } from '$lib/server/rooms';
+import { getDb } from '#lib/server/db/index.js';
+import { rooms } from '#lib/server/db/schema.js';
+import { inviteRoomUser, readSettings } from '#lib/server/rooms.js';
 import type { RequestHandler } from './$types';
 
 /**

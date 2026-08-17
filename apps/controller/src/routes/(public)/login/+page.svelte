@@ -1,10 +1,10 @@
 <script lang="ts">
   import { resolve } from '$app/paths';
   import { untrack } from 'svelte';
-  import Recaptcha from '$lib/components/Recaptcha.svelte';
+  import Recaptcha from '#lib/components/Recaptcha.svelte';
   import '../../../account.css';
   import type { PageProps } from './$types';
-  import PasswordReveal from '$lib/components/PasswordReveal.svelte';
+  import PasswordReveal from '#lib/components/PasswordReveal.svelte';
 
   /**
 	 * Rebuilt from `evidence-dumps/login-page/login` — the served HTML of the controller's

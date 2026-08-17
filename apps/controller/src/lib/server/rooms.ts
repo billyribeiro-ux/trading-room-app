@@ -4,8 +4,8 @@ import { hashPassword } from './auth';
 import { randomInt } from 'node:crypto';
 import { FcmNotConfigured, FcmUnreachable, fcmConfigured, sendPush } from './fcm';
 import { roomSettings, roomUsers, rooms, users } from './db/schema';
-import { ROOM_SETTINGS_BY_NAME, type RoomSettings } from '$lib/room-settings-schema';
-import { shouldRemoveAsFreeTrial, shouldRemoveAsNonPresenter } from '$lib/room-member-role';
+import { ROOM_SETTINGS_BY_NAME, type RoomSettings } from '#lib/room-settings-schema.js';
+import { shouldRemoveAsFreeTrial, shouldRemoveAsNonPresenter } from '#lib/room-member-role.js';
 
 export function listRooms(accountId: number) {
   return getDb().select().from(rooms).where(eq(rooms.accountId, accountId));
@@ -291,7 +291,7 @@ export function listRoomUsers(roomId: number) {
 
         `stripeLastPaidAmount` is minor units and MUST be rendered through `formatMoney` with its
         companion currency. Anything that divides it by 100 unconditionally is a 100x error on
-        every zero-decimal currency; see `$lib/money`.
+        every zero-decimal currency; see `#lib/money.js`.
       */
       isMarketplaceUser: roomUsers.isMarketplaceUser,
       stripeSubscriptionStatus: roomUsers.stripeSubscriptionStatus,
@@ -577,12 +577,7 @@ export function isMemberGrant(value: unknown): value is MemberGrant {
   return typeof value === 'string' && Object.hasOwn(MEMBER_GRANT_COLUMNS, value);
 }
 
-export async function setMemberGrant(
-  roomId: number,
-  roomUserId: number,
-  grant: MemberGrant,
-  granted: boolean
-) {
+export async function setMemberGrant(roomId: number, roomUserId: number, grant: MemberGrant, granted: boolean) {
   /*
     The column NAME comes from the static map and from nowhere else, so the `SET` clause cannot be
     steered by a request body. `isMemberGrant` is the only way to obtain a `MemberGrant`, and this

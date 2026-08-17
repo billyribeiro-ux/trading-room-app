@@ -4,8 +4,8 @@
    * the same visual note it opened with.
    */
   import { resolve } from '$app/paths';
-  import { CTA } from '$lib/content/home';
-  import { magnetic, reveal } from '$lib/motion';
+  import { CTA } from '#lib/content/home.js';
+  import { magnetic, reveal } from '#lib/motion.js';
 </script>
 
 <section class="cta" id="cta">

@@ -18,17 +18,12 @@
  *   default and it is worth keeping.
  *
  * The one thing NOT ported is the reference's `formatStripeAmount`, whose unconditional divide-by-
- * 100 renders every zero-decimal currency a hundredfold low. Use `formatMoney` from `$lib/money`;
+ * 100 renders every zero-decimal currency a hundredfold low. Use `formatMoney` from `#lib/money.js`;
  * `money.test.ts` holds the reference implementation as a negative control.
  */
 
 /** The Bootstrap 3 contextual label classes this can return. Deny-by-default: nothing else. */
-export type StripeStatusClass =
-  | 'label-default'
-  | 'label-success'
-  | 'label-warning'
-  | 'label-danger'
-  | 'label-info';
+export type StripeStatusClass = 'label-default' | 'label-success' | 'label-warning' | 'label-danger' | 'label-info';
 
 /*
   Frozen sets rather than a switch, so the membership is data and reads as a table. The comparison

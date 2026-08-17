@@ -1,4 +1,4 @@
-import { recordAdminAccess, requireSuperadmin } from '$lib/server/superadmin';
+import { recordAdminAccess, requireSuperadmin } from '#lib/server/superadmin.js';
 import type { LayoutServerLoad } from './$types';
 
 /**

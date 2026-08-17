@@ -1,6 +1,6 @@
 <script lang="ts">
   import { resolve } from '$app/paths';
-  import { bottomTooltip } from '$lib/bootstrap-tooltip';
+  import { bottomTooltip } from '#lib/bootstrap-tooltip.js';
 
   interface Props {
     signedIn?: boolean;

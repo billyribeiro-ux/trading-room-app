@@ -1,11 +1,11 @@
 import { fail, redirect } from '@sveltejs/kit';
 import { eq } from 'drizzle-orm';
-import { getDb } from '$lib/server/db';
-import { accounts, users } from '$lib/server/db/schema';
-import { MIN_PASSWORD, createLoginSession, hashPassword } from '$lib/server/auth';
-import { RECAPTCHA_FIELD, recaptchaFailureMessage, verifyRecaptcha } from '$lib/server/recaptcha';
-import { issueToken, sendVerificationEmail, verificationEnforced } from '$lib/server/email-verification';
-import { provisionRoom } from '$lib/server/provision-room';
+import { getDb } from '#lib/server/db/index.js';
+import { accounts, users } from '#lib/server/db/schema.js';
+import { MIN_PASSWORD, createLoginSession, hashPassword } from '#lib/server/auth.js';
+import { RECAPTCHA_FIELD, recaptchaFailureMessage, verifyRecaptcha } from '#lib/server/recaptcha.js';
+import { issueToken, sendVerificationEmail, verificationEnforced } from '#lib/server/email-verification.js';
+import { provisionRoom } from '#lib/server/provision-room.js';
 import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = ({ locals }) => {

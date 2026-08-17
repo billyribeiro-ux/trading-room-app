@@ -305,7 +305,14 @@ describe('the client stops asking at the end of history', () => {
       start of `main` also stopped `off-topic` from ever paging. The reference keeps this state on
       the roomlog component, and it renders one per channel.
     */
-    expect(pageCode).toContain('if (!this.#chatScrollingUp) this.#chatPages.arm(this.#chat.tab);');
+    /*
+      The re-arm, which since 2026-08-16 shares its guard with the history RELEASE — upstream puts
+      both in one expression (`hasMoreData = !0, this.currPage > 0 && this.trimFat()`) and this room
+      had only ever implemented the first. Asserted as the two statements rather than the old single
+      line, so the pair cannot drift apart; `feed-scroll-release-contract.test.ts` owns the release.
+    */
+    expect(pageCode).toContain('this.#chatPages.arm(this.#chat.tab);');
+    expect(pageCode).toContain('if (!this.#chatScrollingUp) {');
     // PER CHANNEL is now structural: `arm` takes the key, so there is no shared flag to reach for.
     expect(pagesClass).toContain('arm(key: string): void {');
     expect(pagesClass).toContain('this.#hasMore = { ...this.#hasMore, [key]: true };');
@@ -375,7 +382,9 @@ describe('the alerts log is paged by the same machinery', () => {
 
   it('and stops at the first empty page, re-arming at the bottom', () => {
     expect(pageCode).toContain('alertPages.exhausted(ALERTS_LOG);');
-    expect(pageCode).toContain('if (!this.#alertsScrollingUp) this.#alertPages.arm(ALERTS_LOG);');
+    /* Same pairing as the chat log above — the re-arm and the release share one guard. */
+    expect(pageCode).toContain('this.#alertPages.arm(ALERTS_LOG);');
+    expect(pageCode).toContain('if (!this.#alertsScrollingUp) {');
   });
 });
 
@@ -397,5 +406,76 @@ describe('both logs nudge twice, which is what upstream does', () => {
     */
     expect(pageCode.match(/scrollTop \+= CHAT_PAGE_REQUEST_NUDGE;/g)).toHaveLength(3);
     expect(pageCode.match(/scrollTop \+= CHAT_PAGE_ARRIVAL_NUDGE;/g)).toHaveLength(2);
+  });
+});
+
+/*
+  EACH FOLLOW EFFECT READS ITS OWN COLUMN'S FLAG, and nothing else did.
+
+  The three scroll-follow effects moved out of `+page.svelte` and into the components that own their
+  scrollers on 2026-08-16 and -17 — the extra column to `ExtraChatPane`, the alerts log and the main
+  chat column to `AlertChatArea`. Which flag each one reads survived the move, and NOTHING checked
+  that it had.
+
+  Proved by control rather than assumed: swapping the alerts effect's `alertsReadingHistory` for
+  `chatReadingHistory` left all 2,389 assertions green. That is the sixth control in this phase to
+  come back green on a weak test rather than on missing behaviour, and every one of them has been
+  the same shape — two things that read correctly in isolation and are wrong only in combination.
+
+  What that defect would do is not subtle: a reader scrolled up in the alerts log would be yanked to
+  the newest alert whenever a CHAT message arrived, because the guard protecting them would be
+  reporting on the wrong column. `RoomScrollFollow` cannot catch it — which flag it is handed is the
+  CALLER's decision, and the class would answer a question about the other column just as happily.
+  That is exactly why `extra-chat-column-contract` already asserts the same thing for the third
+  column; this is the pair it was missing.
+*/
+describe('the three follow effects do not cross their columns', () => {
+  const AREA = stripComments(
+    readFileSync(new URL('./components/AlertChatArea.svelte', import.meta.url), 'utf8')
+  );
+  const PANE = stripComments(
+    readFileSync(new URL('./components/ExtraChatPane.svelte', import.meta.url), 'utf8')
+  );
+
+  /** The body of one effect, sliced from the line that reads its scroller. */
+  const effectFrom = (source: string, anchor: string) => {
+    const from = source.indexOf(anchor);
+    expect(from, `the effect anchored on "${anchor}" is gone`).toBeGreaterThan(-1);
+    return source.slice(from, source.indexOf('\n  });', from));
+  };
+
+  it('the alerts log reads the alerts flag, and never the chat one', () => {
+    const effect = effectFrom(AREA, 'const current = alertsScroller;');
+    expect(effect).toContain('readingHistory: feedScroll.alertsReadingHistory');
+    expect(effect).not.toContain('chatReadingHistory');
+    expect(effect).not.toContain('extraChatReadingHistory');
+    // And it stops the right one, which is the same mistake one line later.
+    expect(effect).toContain("feedScroll.stopReadingHistory('alerts')");
+  });
+
+  it('the main chat column reads the chat flag, and never the alerts one', () => {
+    const effect = effectFrom(AREA, 'const current = chatScroller;');
+    expect(effect).toContain('readingHistory: feedScroll.chatReadingHistory');
+    expect(effect).not.toContain('alertsReadingHistory');
+    expect(effect).not.toContain('extraChatReadingHistory');
+    expect(effect).toContain("feedScroll.stopReadingHistory('chat')");
+  });
+
+  it('and the alerts log asks WITHOUT a tab, because it has no channels', () => {
+    /*
+      `RoomScrollFollow` reads a missing `tab` as `undefined !== undefined`, which is false, so the
+      channel-switch condition never fires for a log that has no channels. Passing one would arm a
+      fourth scroll trigger on the alerts pane that upstream does not have.
+    */
+    const alerts = effectFrom(AREA, 'const current = alertsScroller;');
+    expect(alerts).not.toContain('tab:');
+    const chat = effectFrom(AREA, 'const current = chatScroller;');
+    expect(chat).toContain('tab: activeTab');
+  });
+
+  it('the extra column is the third, in its own file, with its own flag', () => {
+    // Its own contract owns the detail; asserted here so all three are counted in one place.
+    expect(PANE).toContain('const current = scroller;');
+    expect(PAGE).toContain('get extraChatReadingHistory()');
   });
 });

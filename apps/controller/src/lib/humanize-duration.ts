@@ -1,8 +1,8 @@
 /**
  * The reference's duration string, for the participant stats CSV.
  *
- * Lives OUTSIDE `$lib/server` because both halves need it: the export runs in the browser, and
- * anything server-side that summarises a visit runs on the server. SvelteKit refuses a `$lib/server`
+ * Lives OUTSIDE `#lib/server` because both halves need it: the export runs in the browser, and
+ * anything server-side that summarises a visit runs on the server. SvelteKit refuses a `#lib/server`
  * import from a component, and duplicating the thresholds is how two files quietly disagree about
  * what "an hour" means.
  *

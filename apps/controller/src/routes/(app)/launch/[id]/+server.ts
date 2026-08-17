@@ -1,19 +1,19 @@
 import { error, redirect } from '@sveltejs/kit';
 import { ROOM_BASE_URL, ROOM_JWT_SECRET } from '$app/env/private';
 import { and, eq } from 'drizzle-orm';
-import { getDb } from '$lib/server/db';
-import { roomUsers, rooms } from '$lib/server/db/schema';
-import { requireOwnedRoom, requireUser } from '$lib/server/auth';
-import { handoffUrl, siteHandoffToken } from '$lib/server/room-handoff';
-import { recordVisit } from '$lib/server/room-visits';
-import { isRoomPresenter } from '$lib/room-member-role';
+import { getDb } from '#lib/server/db/index.js';
+import { roomUsers, rooms } from '#lib/server/db/schema.js';
+import { requireOwnedRoom, requireUser } from '#lib/server/auth.js';
+import { handoffUrl, siteHandoffToken } from '#lib/server/room-handoff.js';
+import { recordVisit } from '#lib/server/room-visits.js';
+import { isRoomPresenter } from '#lib/room-member-role.js';
 import type { RequestHandler } from './$types';
 
 /**
  * The owner's door into the live room.
  *
  * The token shape, its 60-second life and the reasoning behind both now live in
- * `$lib/server/room-handoff`, which the guest door (`/session/[code]/joined`) also uses. They were
+ * `#lib/server/room-handoff`, which the guest door (`/session/[code]/joined`) also uses. They were
  * about to become two implementations of one credential.
  */
 /*

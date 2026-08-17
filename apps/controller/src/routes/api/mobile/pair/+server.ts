@@ -1,5 +1,5 @@
 import { json, type RequestHandler } from '@sveltejs/kit';
-import { redeemPairCode, validatePairRequest } from '$lib/server/mobile-pairing';
+import { redeemPairCode, validatePairRequest } from '#lib/server/mobile-pairing.js';
 
 /**
  * `POST /api/mobile/pair` — the device-facing door, and the writer `push_tokens_json` never had.

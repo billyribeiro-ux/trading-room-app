@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { SanitizedHtml } from '$lib/sanitized-html';
+  import type { SanitizedHtml } from '#lib/sanitized-html.js';
   import type { Attachment } from 'svelte/attachments';
   import { createRawSnippet } from 'svelte';
 

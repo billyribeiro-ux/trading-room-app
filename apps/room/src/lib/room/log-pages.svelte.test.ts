@@ -241,3 +241,93 @@ describe('the getters are REACTIVE, which no other gate can see', () => {
     expect(seen, 'the in-flight guard is not reactive').toEqual([false, true, false]);
   });
 });
+
+/*
+  `trimFat()` — the release the reference performs and this room did not, until 2026-08-16.
+
+  Asserted here rather than in `RoomFeeds` on purpose: what grew unboundedly was the HELD PAGES, and
+  the pipeline that reads them is only expensive in proportion to this. A test that measured
+  `visibleAlerts` would be measuring the symptom through six filters.
+
+  The trigger is not tested here — it lives in `RoomFeedScroll.trackAlertsScroll`, which needs a DOM
+  scroller — and `feed-scroll-release-contract.test.ts` covers that half. Both halves, because a
+  release nobody calls and a call with nothing behind it each read correctly on their own.
+*/
+describe('releaseHistory drops the paged-in history, as trimFat does', () => {
+  it('does nothing at page 0, which is the reference’s own currPage > 0 guard', () => {
+    const pages = new RoomLogPages<Row>();
+    /*
+      The guard is load-bearing rather than defensive: this runs on every scroll event that ends at
+      the bottom, and `$state.raw` compares by reference — an unguarded write would hand every
+      reader a new record per frame for no change at all.
+    */
+    expect(pages.releaseHistory(ALERTS_LOG)).toBe(false);
+    const before = pages.older(ALERTS_LOG);
+    expect(pages.releaseHistory(ALERTS_LOG)).toBe(false);
+    expect(pages.older(ALERTS_LOG)).toBe(before);
+  });
+
+  it('releases the held rows and resets the page once a reader HAS paged', () => {
+    const pages = new RoomLogPages<Row>();
+    pages.arrived(ALERTS_LOG, [row(3), row(4)], 1);
+    pages.arrived(ALERTS_LOG, [row(1), row(2)], 2);
+    expect(pages.older(ALERTS_LOG)).toHaveLength(4);
+    expect(pages.page(ALERTS_LOG)).toBe(2);
+
+    expect(pages.releaseHistory(ALERTS_LOG)).toBe(true);
+    expect(pages.older(ALERTS_LOG)).toEqual([]);
+    // Page 0 is what the load already sent, so the next scroll up asks for page 1 again.
+    expect(pages.page(ALERTS_LOG)).toBe(0);
+  });
+
+  it('releases ONE key and leaves the other log alone', () => {
+    /*
+      The property the unification has to keep, applied to the new method: one instance holds both
+      logs, and a reader returning to the bottom of the alerts pane must not discard the chat
+      history they are still scrolled up into in the other column.
+    */
+    const pages = new RoomLogPages<Row>();
+    pages.arrived(ALERTS_LOG, [row(1)], 1);
+    pages.arrived('main', [row(2)], 1);
+
+    pages.releaseHistory(ALERTS_LOG);
+
+    expect(pages.older(ALERTS_LOG)).toEqual([]);
+    expect(pages.older('main')).toHaveLength(1);
+    expect(pages.page('main')).toBe(1);
+  });
+
+  it('clears the in-flight flag, which is upstream’s own line', () => {
+    const pages = new RoomLogPages<Row>();
+    pages.arrived(ALERTS_LOG, [row(1)], 1);
+    pages.requesting(ALERTS_LOG);
+    expect(pages.loading).toBe(true);
+    pages.releaseHistory(ALERTS_LOG);
+    expect(pages.loading).toBe(false);
+  });
+
+  it('is REACTIVE, so the pipeline that reads it recomputes on release', () => {
+    /*
+      The half that makes this worth anything. A release that did not notify would leave the six
+      passes iterating the released rows until something else happened to invalidate them, and every
+      assertion above would still pass.
+
+      `room-mtx.svelte.test.ts`'s shape: mutate and flush INSIDE the root, assert OUTSIDE it.
+    */
+    const pages = new RoomLogPages<Row>();
+    const seen: number[] = [];
+    const stop = $effect.root(() => {
+      $effect(() => {
+        seen.push(pages.older(ALERTS_LOG).length);
+      });
+      flushSync();
+      pages.arrived(ALERTS_LOG, [row(1), row(2)], 1);
+      flushSync();
+      pages.releaseHistory(ALERTS_LOG);
+      flushSync();
+    });
+    stop();
+
+    expect(seen).toEqual([0, 2, 0]);
+  });
+});

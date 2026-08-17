@@ -39,7 +39,7 @@
     PUBLIC_PTR_TAWK_PROPERTY_ID,
     PUBLIC_PTR_UPLOAD_SERVER
   } from '$app/env/public';
-  import { onMount, tick } from 'svelte';
+  import { onMount } from 'svelte';
   import { SvelteSet } from 'svelte/reactivity';
   import { checkPermissionState } from '#lib/media-capture-error.js';
   import { MtxStreamTabs } from '#lib/room-mtx.svelte.js';
@@ -413,20 +413,6 @@
   
 
   
-  /**
-   * The extra chat column's scroll container, and the three trackers its autoscroll needs.
-   *
-   * `onscrollerready` wrote this element in and NOTHING read it until 2026-08-14, so the second
-   * chat column never followed a new message while the first one did — a message arrived, the
-   * column stayed where it was, and the reader saw nothing. ESLint is what surfaced it, as an
-   * "assigned but never used" that turned out to be a missing feature.
-   *
-   * The effect below is a deliberate parallel of the main chat's, not a new design: same four
-   * conditions (first view, channel switch, new message, and the reader's own scroll position via
-   * `shouldAutoScrollForMessage`), same `tick()` before measuring, and the same identity re-check
-   * afterwards so a scroller swapped out mid-await is not written to.
-   */
-  let extraChatScroller = $state<HTMLElement | undefined>();
 
   
   let appHasFocus = $state(true);
@@ -1116,8 +1102,20 @@
   let mainElement: HTMLElement | undefined;
   let alertChatElement: HTMLElement | undefined;
   let composerElement: HTMLTextAreaElement | undefined;
+  /*
+    The alerts scroller, and it is the ONLY one of the three still held here.
+
+    `RoomAlertsPane.toggleToolbar()` reads it: the toolbar strip changes height, so the log has to be
+    pulled back to the newest alert afterwards, which is upstream's
+    `guiEventBus.emit('scrollAlertLogToBottom')`. Two owners, so the element crosses the boundary —
+    the "written on both sides" rule, the same one `followedUsers` paid for.
+
+    The chat scroller and the extra column's are NOT here any more. Their only reader was a
+    page-level `$effect` that scrolled an element the pane owned, and both effects moved into the
+    panes on 2026-08-16 and -17. A `let` whose whole purpose was to let this file reach into a
+    component's DOM is exactly what those moves were for.
+  */
   let alertsScroller = $state<HTMLElement | undefined>();
-  let chatScroller = $state<HTMLElement | undefined>();
   /*
     ONE INSTANCE PER COLUMN, and that is the whole point rather than an implementation detail: the
     three columns have independent tabs, independent lists and independent reader scroll positions,
@@ -1674,51 +1672,6 @@
     triggers — refreshes the live tail without throwing away what the reader scrolled back to.
   */
 
-  $effect(() => {
-    const scroller = alertsScroller;
-    const count = feeds.visibleAlerts.length;
-    const newestMessage = feeds.visibleAlerts.at(-1);
-
-    if (!scroller) return;
-
-    if (
-      alertsFollow.follows({
-        count,
-        newestSenderId: newestMessage?.senderId,
-        viewerId: data.user.id,
-        readingHistory: feedScroll.alertsReadingHistory
-      })
-    ) {
-      feedScroll.stopReadingHistory('alerts');
-      void tick().then(() => {
-        if (alertsScroller === scroller) feedScroll.forceAlertsToBottom(scroller);
-      });
-    }
-  });
-
-  $effect(() => {
-    const scroller = chatScroller;
-    const activeTab = chat.tab;
-    const count = feeds.visibleChat.length;
-    const newestMessage = feeds.visibleChat.at(-1);
-
-    if (!scroller) return;
-
-    if (
-      chatFollow.follows({
-        count,
-        tab: activeTab,
-        newestSenderId: newestMessage?.senderId,
-        viewerId: data.user.id,
-        readingHistory: feedScroll.chatReadingHistory
-      })
-    ) {
-      feedScroll.stopReadingHistory('chat');
-      void tick().then(() => {
-        if (chatScroller === scroller) feedScroll.forceChatToBottom(scroller);
-      });
-    }
-  });
 
   /*
     The SECOND chat column, following its own messages.
@@ -1729,32 +1682,6 @@
     between "a message arrived here" and "a message arrived anywhere", and it is what would make a
     reader scrolled up in this column get yanked to the bottom by traffic in the other one.
   */
-  $effect(() => {
-    const scroller = extraChatScroller;
-    const activeTab = chat.extraTab;
-    const count = feeds.visibleExtraChat.length;
-    const newestMessage = feeds.visibleExtraChat.at(-1);
-
-    if (!scroller) return;
-
-    if (
-      extraChatFollow.follows({
-        count,
-        tab: activeTab,
-        newestSenderId: newestMessage?.senderId,
-        viewerId: data.user.id,
-        // THIS column's flag. Passing `chatScrollingUp` would let the main column's reader position
-        // decide whether this one jumps, which is the defect its own contract test guards.
-        readingHistory: feedScroll.extraChatReadingHistory
-      })
-    ) {
-      feedScroll.stopReadingHistory('extraChat');
-      void tick().then(() => {
-        if (extraChatScroller === scroller) feedScroll.forceChatToBottom(scroller);
-      });
-    }
-  });
-
   $effect(() => {
     const unseenAlerts = alertArrivals.fresh(data.alerts);
     if (unseenAlerts.length === 0) return;
@@ -2385,13 +2312,6 @@
     };
   }
 
-  function captureChatScroller(node: HTMLElement) {
-    chatScroller = node;
-
-    return () => {
-      if (chatScroller === node) chatScroller = undefined;
-    };
-  }
 
   // The captured `offsetWidth >= 400` rule lives in app.css as a container query, so the right
   // button set is painted by the server instead of measured a frame after hydration. This observer
@@ -2696,9 +2616,12 @@
               followedUsers={userActions.followedUsers}
               {captureAlertChatElement}
               {captureAlertsScroller}
-              {captureChatScroller}
               {captureComposerElement}
               {observeComposerWidth}
+              {feedScroll}
+              {alertsFollow}
+              {chatFollow}
+              viewerId={data.user.id}
               onopenmodal={(name) => modals.open(name)}
               onopenpoll={() => modals.openPollUI()}
               ontogglealertstoolbar={() => alertsPane.toggleToolbar()}
@@ -2851,7 +2774,11 @@
                 onfocus={() => chat.focused(EXTRA_COMPOSER)}
                 onsend={() => void composer.sendExtra()}
                 onscroll={(scroller) => feedScroll.trackExtraChatScroll(scroller)}
-                onscrollerready={(scroller) => (extraChatScroller = scroller)}
+                follow={extraChatFollow}
+                viewerId={data.user.id}
+                readingHistory={feedScroll.extraChatReadingHistory}
+                onstopreadinghistory={() => feedScroll.stopReadingHistory('extraChat')}
+                onscrolltobottom={(scroller) => feedScroll.forceChatToBottom(scroller)}
                 onprivatechat={() => privateChat.show()}
                 onsearch={() => modals.open('chat-logs')}
                 onsettings={() => modals.open('settings')}

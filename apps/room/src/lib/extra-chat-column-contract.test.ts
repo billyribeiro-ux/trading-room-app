@@ -74,9 +74,12 @@ const messageActionsModule = readFileSync(
 const pageCode = stripComments(PAGE);
 /*
   The extra column's SCROLLING moved to `room/feed-scroll.ts` in Phase 5 slice 23 — its tracker, its
-  own `extraChatScrollingUp` flag, and the paging arm keyed by its channel. What stayed on the page
-  is the follow effect, which now reads that flag through a getter, so both files are named and each
-  assertion points at the one that owns its subject.
+  own `extraChatScrollingUp` flag, and the paging arm keyed by its channel.
+
+  The follow EFFECT stayed on the page until 2026-08-16 and then went to `ExtraChatPane` itself,
+  which owns the scroller it drives. So three files are named here and each assertion points at the
+  one that owns its subject: the tracker in `feed-scroll.ts`, the effect in the pane, and the props
+  that feed it on the page.
 */
 const scrollCode = stripComments(
   readFileSync(new URL('./room/feed-scroll.ts', import.meta.url), 'utf8')
@@ -203,10 +206,14 @@ describe('both columns share one pipeline, and that is the point', () => {
     */
     expect(scrollCode).toContain('void this.loadOlderChatMessages(this.#chat.extraTab, scroller);');
     expect(scrollCode).toContain('hasMoreData: this.#chatPages.hasMore(this.#chat.extraTab),');
-    // ONE instance for both columns, so "keyed by channel rather than by column" is structural.
-    expect(scrollCode).toContain(
-      'if (!this.#extraChatScrollingUp) this.#chatPages.arm(this.#chat.extraTab);'
-    );
+    /*
+      ONE instance for both columns, so "keyed by channel rather than by column" is structural — and
+      that now covers the history RELEASE as well as the re-arm, both keyed by `extraTab`. If this
+      column released by COLUMN rather than by channel it would drop history the main column is
+      still scrolled up into.
+    */
+    expect(scrollCode).toContain('this.#chatPages.arm(this.#chat.extraTab);');
+    expect(scrollCode).toContain('this.#chatPages.releaseHistory(this.#chat.extraTab);');
   });
 
   it('but each column scrolls independently', () => {
@@ -358,11 +365,23 @@ describe('the second column follows its own messages', () => {
     The four conditions below are the main chat's, reproduced rather than reinvented, because the
     two columns should not disagree about when a reader is left alone.
   */
-  it('reads the scroller it is handed', () => {
-    expect(pageCode).toContain('const scroller = extraChatScroller;');
-    expect(pageCode).toContain(
-      'if (extraChatScroller === scroller) feedScroll.forceChatToBottom(scroller);'
-    );
+  /*
+    RE-POINTED 2026-08-16, from `+page.svelte` to `ExtraChatPane.svelte`.
+
+    The effect moved into the component that OWNS the scroller, which is what Svelte's
+    best-practices page asks for and what `scroll-follow.ts` had already written down for its own
+    reasons: *"the `tick()`-then-check dance around a scroller that may have been replaced
+    mid-flight belongs where the element lives."* The element always lived here; the dance did not.
+
+    Nothing about what these four assert changed — only which file is read. The `extraChatScroller`
+    `let` on the page and the `onscrollerready` prop that fed it are both gone, because their only
+    reader was the effect that left.
+  */
+  it('reads the scroller it owns', () => {
+    expect(paneCode).toContain('const current = scroller;');
+    expect(paneCode).toContain('if (scroller === current) onscrolltobottom(current);');
+    // And the page no longer holds an element it cannot use.
+    expect(pageCode).not.toContain('extraChatScroller');
   });
 
   it('scrolls on first view, on a channel switch, and on a new message', () => {
@@ -377,10 +396,12 @@ describe('the second column follows its own messages', () => {
       with its own tab and its own count. Deleting the assertions instead would have been the
       vacuous-guard failure this repository has already shipped twice.
     */
-    const from = pageCode.indexOf('const scroller = extraChatScroller;');
-    expect(from, 'the extra column scroll effect is not in +page.svelte').toBeGreaterThan(-1);
-    const effect = pageCode.slice(from, pageCode.indexOf('\n  });', from));
-    expect(effect).toContain('extraChatFollow.follows({');
+    const from = paneCode.indexOf('const current = scroller;');
+    expect(from, 'the extra column scroll effect is not in ExtraChatPane.svelte').toBeGreaterThan(
+      -1
+    );
+    const effect = paneCode.slice(from, paneCode.indexOf('\n  });', from));
+    expect(effect).toContain('follow.follows({');
     expect(effect).toContain('tab: activeTab');
     expect(effect).toContain('count,');
   });
@@ -395,11 +416,28 @@ describe('the second column follows its own messages', () => {
       this. Which flag is handed in is the CALLER's decision, and the class would answer a question
       about the main column just as happily.
     */
-    const from = pageCode.indexOf('const scroller = extraChatScroller;');
-    expect(from, 'the extra column scroll effect is not in +page.svelte').toBeGreaterThan(-1);
-    const effect = pageCode.slice(from, pageCode.indexOf('\n  });', from));
-    expect(effect).toContain('readingHistory: feedScroll.extraChatReadingHistory');
-    expect(effect).not.toContain('readingHistory: chatScrollingUp');
+    const from = paneCode.indexOf('const current = scroller;');
+    expect(from, 'the extra column scroll effect is not in ExtraChatPane.svelte').toBeGreaterThan(
+      -1
+    );
+    const effect = paneCode.slice(from, paneCode.indexOf('\n  });', from));
+    /*
+      The flag arrives as THIS column's prop, passed through in SHORTHAND — and the shorthand is the
+      assertion rather than a detail of style.
+
+      `toContain('readingHistory')` was the first version and its negative control came back GREEN:
+      replacing the prop with `readingHistory: false` still contains the string, so the guard would
+      have watched this column stop honouring the reader's scroll position and said nothing. That is
+      the fifth control in this phase to expose a weak test rather than missing behaviour.
+
+      A COLON here means a value is being supplied at the call rather than the prop being passed
+      through, which is exactly the substitution that must not happen.
+    */
+    expect(effect).toContain('readingHistory');
+    expect(effect).not.toContain('readingHistory:');
+    expect(effect).not.toContain('chatScrollingUp');
+    // And the page hands it THIS column's flag, not the main column's.
+    expect(pageCode).toContain('readingHistory={feedScroll.extraChatReadingHistory}');
   });
 
   it('gets the SAME message chrome as the main column, which the capture requires', () => {
@@ -460,10 +498,30 @@ describe('the second column follows its own messages', () => {
       One effect reading both columns would re-run each column's scroll logic whenever the other
       changed — "a message arrived anywhere" instead of "a message arrived here".
     */
-    const main = pageCode.indexOf('const scroller = chatScroller;');
-    const extra = pageCode.indexOf('const scroller = extraChatScroller;');
-    expect(main).toBeGreaterThan(-1);
-    expect(extra).toBeGreaterThan(main);
-    expect(pageCode.slice(main, extra)).toContain('});');
+    /*
+      Since 2026-08-16 the two are not merely separate effects, they are in separate FILES — this
+      column's went to `ExtraChatPane`, which owns its scroller. That is a stronger form of the same
+      property and it is asserted as such: one effect per column, each reading only its own column's
+      tab, count and reading-history flag.
+
+      The main chat's followed into `AlertChatArea` on 2026-08-17, one day later, exactly as this
+      note predicted — and the assertion moved with it, which is what "re-point, never delete" looks
+      like when the prediction comes true. The property being guarded did not change: one effect per
+      column, each reading only its own column's tab, count and reading-history flag.
+
+      All three feeds now sit in the component that owns their scroller, and NONE is on the page.
+    */
+    const areaCode = stripComments(
+      readFileSync(new URL('./components/AlertChatArea.svelte', import.meta.url), 'utf8')
+    );
+    expect(areaCode).toContain('const current = chatScroller;');
+    expect(areaCode).toContain('const current = alertsScroller;');
+    expect(paneCode).toContain('const current = scroller;');
+    // And the page holds none of the three.
+    expect(pageCode).not.toContain('chatFollow.follows(');
+    expect(pageCode).not.toContain('alertsFollow.follows(');
+    // Neither reads the other's column: the extra pane cannot see the main chat's tab or flag.
+    expect(paneCode).not.toContain('chat.tab');
+    expect(paneCode).not.toContain('visibleChat');
   });
 });

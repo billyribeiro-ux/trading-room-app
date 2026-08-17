@@ -49,7 +49,7 @@
  * already integers in the smallest currency unit, so nothing is converted on the way in. The
  * companion `stripe_last_paid_currency` is what decides the scale on the way out — the reference's
  * own formatter divides by 100 unconditionally and therefore renders every zero-decimal currency
- * (JPY, KRW, VND and thirteen more) a hundredfold low. `$lib/money` already handles that correctly
+ * (JPY, KRW, VND and thirteen more) a hundredfold low. `#lib/money.js` already handles that correctly
  * and is what this column must be rendered through.
  *
  * **Stripe timestamps are `timestamptz`.** They describe instants that cross timezones — a billing

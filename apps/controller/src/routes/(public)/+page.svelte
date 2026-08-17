@@ -1,13 +1,13 @@
 <script lang="ts">
   import { asset } from '$app/paths';
-  import CtaSection from '$lib/components/home/CtaSection.svelte';
-  import EngineeringSection from '$lib/components/home/EngineeringSection.svelte';
-  import HeroCinematic from '$lib/components/home/HeroCinematic.svelte';
-  import ShowcaseSection from '$lib/components/home/ShowcaseSection.svelte';
-  import StatStrip from '$lib/components/home/StatStrip.svelte';
-  import TapeSection from '$lib/components/home/TapeSection.svelte';
-  import VoicesSection from '$lib/components/home/VoicesSection.svelte';
-  import { HERO_SUB } from '$lib/content/home';
+  import CtaSection from '#lib/components/home/CtaSection.svelte';
+  import EngineeringSection from '#lib/components/home/EngineeringSection.svelte';
+  import HeroCinematic from '#lib/components/home/HeroCinematic.svelte';
+  import ShowcaseSection from '#lib/components/home/ShowcaseSection.svelte';
+  import StatStrip from '#lib/components/home/StatStrip.svelte';
+  import TapeSection from '#lib/components/home/TapeSection.svelte';
+  import VoicesSection from '#lib/components/home/VoicesSection.svelte';
+  import { HERO_SUB } from '#lib/content/home.js';
 
   // The hero headline is set in self-hosted Roboto 300 and is above the fold; preload the exact
   // binary pinned by docs/reference/font-contract.md.

@@ -4,8 +4,8 @@ import {
   applySecurityHeaders,
   controlPlaneUnavailableResponse,
   decideControlPlaneRequest
-} from '$lib/server/control-plane-policy';
-import { controlPlaneMode } from '$lib/server/control-plane-runtime';
+} from '#lib/server/control-plane-policy.js';
+import { controlPlaneMode } from '#lib/server/control-plane-runtime.js';
 
 export const init: ServerInit = async () => {
   if (controlPlaneMode !== 'postgres') return;
@@ -13,7 +13,7 @@ export const init: ServerInit = async () => {
   // This dynamic boundary keeps the database out of the normal marketing-only
   // startup path. The DB module itself is independently lazy because SvelteKit may
   // evaluate matched route modules before this hook.
-  const { ensureDatabase } = await import('$lib/server/db');
+  const { ensureDatabase } = await import('#lib/server/db/index.js');
   await ensureDatabase();
 };
 
@@ -26,7 +26,7 @@ export const handle: Handle = async ({ event, resolve }) => {
   // page — including a reachable login form — with no CSP, no `nosniff`, no `DENY` and no
   // `noindex`. An enabled deployment needs those headers more than a marketing one, not less.
   if (controlPlaneMode === 'postgres') {
-    const { readUser } = await import('$lib/server/auth');
+    const { readUser } = await import('#lib/server/auth.js');
     event.locals.user = await readUser(event.cookies);
     return applySecurityHeaders(await resolve(event));
   }

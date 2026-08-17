@@ -22,7 +22,216 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ---
 
+## 2026-08-17
+
+### 2026-08-17 08:57 EDT — the last two scroll-follow effects reach the components that own their scrollers
+
+**`+page.svelte` 2,985 → 2,948 (−37).** Suite 2,393 across 162 files (+4, the new cross-column
+contract). `svelte-check` 1,192 files, 0 errors, 0 warnings. All four CI steps green locally.
+**Runtime impact: yes** — both effects run in a different component. Behaviour unchanged.
+
+The alerts log and the main chat column follow the extra column into the component that owns their
+DOM. **All three feeds now decide and act on scrolling where their scroller lives, and `+page.svelte`
+holds none of it.**
+
+`feedScroll` arrives WHOLE rather than as six callbacks, which is the shape `AlertChatArea` already
+uses for `split`, `alerts`, `chat`, `polls` and `menus`. The two `RoomScrollFollow` instances are the
+page's, not fresh ones: their markers make the decision stateful across renders, and the alerts
+instance is deliberately built WITHOUT the `alwaysScrollToBottom` override the chat one gets —
+`shouldAutoScrollForMessage` records that rule, and constructing them locally would have handed the
+alerts log an override it must not have.
+
+**An asymmetry that is the point rather than an oversight.** `captureChatScroller` is gone — its only
+reader was the page effect that has now moved. `captureAlertsScroller` STAYED, because
+`RoomAlertsPane.toggleToolbar()` reads that element too: toggling the toolbar changes the strip's
+height, so the log is pulled back to the newest alert afterwards, which is upstream's
+`guiEventBus.emit('scrollAlertLogToBottom')`. Two owners, so the element still crosses the boundary
+— the "written on both sides" rule this decomposition paid for once already with `followedUsers`.
+
+`tick` is no longer imported by the page at all; all three of its consumers left.
+
+#### A SIXTH green negative control, and the gap it exposed was real
+
+Swapping the alerts effect's `alertsReadingHistory` for `chatReadingHistory` left all 2,389
+assertions green. Nothing anywhere checked that each effect reads its OWN column's flag — the extra
+column had that assertion since yesterday and the other two never did.
+
+The defect it would have allowed is not subtle: a reader scrolled up in the alerts log would be
+yanked to the newest alert whenever a CHAT message arrived, because the guard protecting them would
+be reporting on the wrong column. `RoomScrollFollow` cannot catch it — which flag it is handed is
+the CALLER's decision, and the class answers a question about either column just as happily.
+
+`chat-paging-contract.test.ts` now asserts all three: each effect reads its own `readingHistory` and
+stops its own history, the alerts effect passes NO `tab` (it has no channels, and passing one would
+arm a fourth scroll trigger upstream does not have), and the chat effect does. Control re-run: red,
+then green on revert.
+
+That is the sixth control in this phase to come back green on a weak test rather than on missing
+behaviour, and all six have had the same shape — two things that read correctly in isolation and are
+wrong only in combination.
+
+---
+
 ## 2026-08-16
+
+### 2026-08-16 20:23 EDT — the extra column's scroll-follow effect moves to the component that owns the scroller
+
+**`+page.svelte` 3,021 → 2,985 (−36).** Suite 2,389 across 162 files. `svelte-check` 1,192 files,
+0 errors, 0 warnings. All four CI steps green locally.
+**Runtime impact: yes** — the effect runs in a different component. Behaviour is unchanged and the
+contract that guards it was tightened, not relaxed.
+
+The first of the three scroll-follow effects to move, and the smallest, chosen to prove the shape
+before the two that share `AlertChatArea`.
+
+**Svelte's own best-practices page is the argument**: an effect is for "direct DOM manipulation",
+and the DOM here is `ExtraChatPane`'s scroller. `scroll-follow.ts` had already reached the same
+conclusion for its own reasons — *"the `tick()`-then-check dance around a scroller that may have
+been replaced mid-flight belongs where the element lives"* — and the element has always lived in the
+pane while the dance lived on the page.
+
+**What that deletes rather than moves.** `extraChatScroller` was a page `let` fed by an
+`onscrollerready` prop whose ONLY job was handing an element upward so a page-level effect could
+reach it. With the effect in the pane, the round trip has no reader: the `let`, the prop and the
+callback are all gone. A prop that exists to move an element out of the component that owns it is
+"no config nothing reads" in prop form.
+
+The pane now takes `follow`, `viewerId`, `readingHistory` and two receivers. `follow` is the page's
+INSTANCE rather than a fresh one, because its markers make the decision stateful across renders and
+because the alerts column deliberately gets a differently-configured one — constructing it locally
+would silently hand this column the `alwaysScrollToBottom` override the alerts instance is forbidden.
+
+**The autofixer's suggestion was answered, not ignored.** It flags `onstopreadinghistory()` as state
+written inside an effect, and it is right that it is. Declined with the reasoning recorded in the
+file: what this produces is a scroll POSITION, not a value, so `$derived` cannot express it; the
+trigger is a message arriving as new props, not a user gesture, so an event handler cannot either;
+and the flag is cleared BECAUSE we are about to scroll, which is part of the same act rather than
+state being synchronised. `$effect.pre` was considered and rejected — the docs' chat-autoscroll
+example uses it because it MEASURES the viewport before the DOM updates, and this decides from
+counts and a flag the scroll handler already set, then must scroll AFTER the new rows render.
+
+**A GREEN negative control, and it was a weak test rather than missing behaviour — the fifth of that
+shape in this phase.** The re-pointed assertion read `toContain('readingHistory')`, which still
+matches `readingHistory: false`; the control substituted exactly that and passed. The guard would
+have watched this column stop honouring the reader's scroll position and said nothing. Tightened to
+forbid a COLON — a value supplied at the call site instead of the prop passed through — and the
+control then went red and green again on revert.
+
+Four assertions were RE-POINTED from the page to the pane, and the "is its own effect" one now
+asserts a stronger form of the same property: the two columns are in separate FILES, and the pane
+cannot see the main chat's tab or message list at all.
+
+
+### 2026-08-16 20:09 EDT — `$lib` → `#lib` in the CONTROLLER, and a documented-count gate that was already red
+
+**Controller suite 985 across 94 files** (+4, the new gate). `svelte-check` 1,527 files, 0 errors,
+0 warnings. eslint clean. `vite build` ✓.
+**Runtime impact: no** — 204 import specifiers changed shape; nothing they resolve to did.
+
+The second half of the migration the room took at 19:44. Same official codemod, same single task
+(`sv migrate sveltekit-3 --tasks lib-alias`), same review. 204 specifiers across 65 files — 174
+`.js`, 30 `.svelte`, and this time **no extensionless output at all**, because the string-literal
+case that produced four of them in the room does not occur here.
+
+**The same two unwanted prerequisite effects, reverted the same way:** `@sveltejs/kit` and
+`adapter-vercel` were rewritten from exact versions to `"next"` (pins restored), and every comment
+was stripped out of `tsconfig.json` (restored). The third — a repository-wide `prettier --write` —
+could not happen here: the controller has no `format` script, so the codemod's format step had
+nothing to run. That is luck rather than design, and it is the reason the room's capture
+directories needed rescuing and the controller's did not.
+
+**The redundant `paths` block went too**, for the reason the room's did: `node_modules/$app/tsconfig.json`
+ships `$lib` paths of its own, and because `extends` REPLACES `paths` rather than merging it, ours
+overwrote the generated one. `#lib` resolves through `package.json`'s `imports` field instead.
+
+**`lib-subpath-imports.test.ts` is duplicated rather than shared**, and the file says why: the two
+apps have separate manifests with separate `imports` fields, and this asserts THIS app's. A shared
+helper would have to be told which app it was checking — the same information, in a less obvious
+place.
+
+#### A pre-existing gate failure, found by running it
+
+`verify-documented-test-counts.mjs` asserts that four documentation sites state the real Vitest
+total. It reported **963 documented against 985 measured**. Four of that gap are the tests added
+here; the other **eighteen predate this change**, so the controller's `pnpm test` was already
+failing at `2155e46` and at every commit back to whenever the drift began.
+
+Not introduced here and not silently absorbed either: the four sites now read **985 tests across 94
+files**, and the verifier passes naming all four. Worth stating plainly because a count-checking
+gate that has been red for a while is a gate nobody is running — and this one exists precisely to
+stop documented numbers going stale.
+
+
+### 2026-08-16 19:55 EDT — `trimFat()`: the unbounded alerts list was a missing HALF of an upstream branch
+
+**Suite 2,389 across 162 files** (+11, one new contract). `svelte-check` 1,192 files, 0 errors,
+0 warnings. All four CI steps green locally.
+**Runtime impact: yes** — a reader who scrolls back to the bottom now releases the history they
+paged in, as the reference does.
+
+`RoomFeeds` has carried a recorded performance finding since Phase 5 slice 9: `visibleAlerts` runs
+six chained passes over `data.alerts` merged with every older page the reader pulled, and nothing
+bounded the second half — it grew for the life of the session and never shrank. At 10,000 alerts
+that is 60,000 operations per render.
+
+**It was not a missing cap. It was a missing half of an expression this room already implemented.**
+Read from `docs/source-v3-2026-08-15/main.99a5781d1d7a7775.js` byte 1,318,297, `app-roomscroller`'s
+scroll handler:
+
+```js
+i.scrollHeight - i.scrollTop <= i.offsetHeight + 20
+  ? (this.isScrollingUp = !1, this.shouldtrimFat = !0, this.hasMoreData = !0,
+     this.currPage > 0 && this.trimFat())
+  : this.isScrollingUp = !0
+```
+
+This room implemented `hasMoreData = !0` — our `arm()` — in all three feed handlers, and never
+implemented `trimFat()`. The re-arm worked perfectly while the held pages accumulated beside it.
+
+**The bound is 50, and the obvious guess was wrong by 250 rows.** `trimFat` emits `trimAlertsLog` /
+`trimChatLog`, and both handlers splice the log back to `globals.chatLogPageSize` — **50** (byte
+1,051,216). `globals.trimLogSize` is **300** and caps the chat log ON ARRIVAL (byte 928,060); it
+says nothing about paged-in history. Two constants, two mechanisms. Reusing the familiar `trimChatLog`
+here would have looked right and been wrong.
+
+**Why clearing the held pages IS that splice.** Upstream keeps one array per log and splices it.
+This room keeps two halves with different lifetimes — `data.alerts`, the server's newest page and
+already bounded server-side, plus the paged-in older pages. Splicing back to one page-size window is
+therefore exactly "drop the held older pages", and the live tail is untouched.
+
+`RoomLogPages.releaseHistory(key)` carries the transcription; `RoomFeedScroll` calls it beside the
+`arm()` it always called, in **all three** handlers, because upstream's `trimFat` is one function
+serving both log types. The extra column releases by CHANNEL, not by column, which is why two
+columns on one channel cannot discard each other's history.
+
+**`currPage > 0` is reproduced and is load-bearing**, not defensive: this runs on every scroll event
+that ends at the bottom, and `$state.raw` compares by reference — an unguarded write would hand
+every reader a new record object per frame for no change at all. The same reason `arm` reads through
+its accessor.
+
+**One inherited race, reproduced rather than quietly improved on.** `trimFat` sets
+`this.loadingMore = !1`, so a request already in flight can land and re-populate what was just
+released. Stated in the method rather than "fixed", because diverging from the capture on a path
+nobody has measured is the larger risk.
+
+**Both halves tested, because four negative controls in this phase came back green on exactly this
+shape** — a receiver nobody calls, a rune nobody reads. `log-pages.svelte.test.ts` proves the
+release drops the rows, resets the page, leaves the OTHER key alone, and is REACTIVE (the half that
+matters: a release that did not notify would leave the six passes iterating released rows).
+`feed-scroll-release-contract.test.ts` proves it is wired in all three handlers, guarded on the way
+down only, and reads the two constants out of the bundle at runtime so a reference that changes
+tomorrow makes this file say so. Negative control seen RED on both halves.
+
+**Two of my own assertions were wrong first** and are recorded in the file rather than smoothed
+over: `compact()` strips whitespace inside string literals too, so quoting across
+`U("Trimming the fat a little")` asserts a string that exists nowhere; and counting `releaseHistory(`
+gave four because the structural `LogPages` interface declares it.
+
+**Three ceilings rose**, each with its measured reason: `log-pages` 173 → 237 (64 lines for a
+seven-line method — the citation is the change), `feed-scroll` 319 → 343, `feeds` 365 → 372. Three
+existing contracts were RE-POINTED, not relaxed: they pinned the old single-line `if`, and now
+assert the re-arm and the release as the pair they are upstream.
+
 
 ### 2026-08-16 19:44 EDT — `$lib` → `#lib`: the room moves to Node subpath imports, and the codemod is reviewed rather than trusted
 

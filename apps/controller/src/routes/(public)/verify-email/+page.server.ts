@@ -1,4 +1,4 @@
-import { markEmailVerified, redeemToken, type RedeemFailureReason } from '$lib/server/email-verification';
+import { markEmailVerified, redeemToken, type RedeemFailureReason } from '#lib/server/email-verification.js';
 import type { PageServerLoad } from './$types';
 
 /**

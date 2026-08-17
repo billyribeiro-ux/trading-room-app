@@ -6,7 +6,7 @@
    */
   import type { Attachment } from 'svelte/attachments';
   import { resolve } from '$app/paths';
-  import { BRAND } from '$lib/content/home';
+  import { BRAND } from '#lib/content/home.js';
 
   interface Props {
     /** Signed-in visitors get "My account" instead of "Log in". */

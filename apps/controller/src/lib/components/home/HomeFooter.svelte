@@ -5,7 +5,7 @@
    * deployment actually serves accounts, mirroring the header's gating.
    */
   import { resolve } from '$app/paths';
-  import { BRAND, FOOTER } from '$lib/content/home';
+  import { BRAND, FOOTER } from '#lib/content/home.js';
 
   interface Props {
     signedIn?: boolean;

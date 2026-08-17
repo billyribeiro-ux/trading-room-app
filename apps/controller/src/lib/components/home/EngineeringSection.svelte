@@ -4,8 +4,8 @@
    * stack, over a wire diagram of the request path with a separate media lane. The diagram's
    * moving pulses are decoration; the lane text carries the claim.
    */
-  import { ARCH_FLOW, ARCH_MEDIA_LANE, ENGINEERING, PILLARS } from '$lib/content/home';
-  import { reveal } from '$lib/motion';
+  import { ARCH_FLOW, ARCH_MEDIA_LANE, ENGINEERING, PILLARS } from '#lib/content/home.js';
+  import { reveal } from '#lib/motion.js';
 </script>
 
 <section class="engineering" id="engineering">

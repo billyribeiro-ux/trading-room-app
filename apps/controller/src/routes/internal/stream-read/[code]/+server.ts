@@ -1,10 +1,10 @@
 import { error, json } from '@sveltejs/kit';
 import { eq } from 'drizzle-orm';
 import { ROOM_JWT_SECRET, STREAM_SERVER_MTX } from '$app/env/private';
-import { getDb } from '$lib/server/db';
-import { ACCOUNT_ACTIVE, accounts, roomUsers, rooms, users } from '$lib/server/db/schema';
-import { verifyConfigReadToken } from '$lib/server/room-handoff';
-import { READ_TOKEN_TTL_SECONDS, mintRoomReadToken } from '$lib/server/stream-ingest';
+import { getDb } from '#lib/server/db/index.js';
+import { ACCOUNT_ACTIVE, accounts, roomUsers, rooms, users } from '#lib/server/db/schema.js';
+import { verifyConfigReadToken } from '#lib/server/room-handoff.js';
+import { READ_TOKEN_TTL_SECONDS, mintRoomReadToken } from '#lib/server/stream-ingest.js';
 import type { RequestHandler } from './$types';
 
 /**

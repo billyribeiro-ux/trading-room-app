@@ -1,6 +1,6 @@
 <script lang="ts">
   import { resolve } from '$app/paths';
-  import SanitizedHtml from '$lib/components/SanitizedHtml.svelte';
+  import SanitizedHtml from '#lib/components/SanitizedHtml.svelte';
   import type { PageProps } from './$types';
 
   /**

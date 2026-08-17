@@ -1,11 +1,11 @@
 import { error, fail, redirect } from '@sveltejs/kit';
 import { createHash } from 'node:crypto';
 import { eq } from 'drizzle-orm';
-import { getDb } from '$lib/server/db';
-import { rooms } from '$lib/server/db/schema';
-import { readSettings } from '$lib/server/rooms';
-import { resolveRoomConfig } from '$lib/room-config';
-import { decideRoomEntry, type RoomEntrySettings } from '$lib/room-entry';
+import { getDb } from '#lib/server/db/index.js';
+import { rooms } from '#lib/server/db/schema.js';
+import { readSettings } from '#lib/server/rooms.js';
+import { resolveRoomConfig } from '#lib/room-config.js';
+import { decideRoomEntry, type RoomEntrySettings } from '#lib/room-entry.js';
 import { ROOM_BASE_URL } from '$app/env/private';
 import type { Actions, PageServerLoad } from './$types';
 
@@ -103,7 +103,7 @@ export const actions: Actions = {
     const remember = form.get('remember') === 'on';
 
     /*
-      One decision, in `$lib/room-entry`, rather than a run of ad-hoc checks here.
+      One decision, in `#lib/room-entry.js`, rather than a run of ad-hoc checks here.
 
       What was here enforced four of the room's rules and got one of them wrong: it demanded
       `webinarPW` in EVERY auth mode, when the reference only offers a room password under

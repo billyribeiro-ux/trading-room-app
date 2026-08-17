@@ -13,7 +13,7 @@ import { ROOM_SETTINGS } from './room-settings-schema';
  *
  *     Current …: {{sess.current_capacity}} / Max … {{sess.recordedMaxCapacity}}
  *
- * and the reference's own API documentation — in this repository at `$lib/content/api-docs.ts:127`,
+ * and the reference's own API documentation — in this repository at `#lib/content/api-docs.ts:127`,
  * transcribed from the original — lists THREE:
  *
  *     "current_capacity":     25    live occupancy

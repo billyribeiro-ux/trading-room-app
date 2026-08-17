@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { bootbox } from '$lib/bootbox.svelte';
+  import { bootbox } from '#lib/bootbox.svelte.js';
   import type { Attachment } from 'svelte/attachments';
 
   /**

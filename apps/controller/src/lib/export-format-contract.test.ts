@@ -20,7 +20,7 @@ import { buildStatsCsv, statsFilename } from './stats-csv';
   The stats CSV moved out of the page on 2026-08-11 — `TODO.md` item W. It was built in the browser
   from a `data.visits` array the loader shipped on every load, up to 5,000 rows each carrying a
   visitor's IP address and email. It is now produced by
-  `GET /account/rooms/<shortCode>/stats.csv`, and the FORMAT lives in `$lib/stats-csv.ts` so the
+  `GET /account/rooms/<shortCode>/stats.csv`, and the FORMAT lives in `#lib/stats-csv.ts` so the
   endpoint and this test share one definition rather than two that can drift.
 
   Both files are read and concatenated, because the four downloads did not all move: the participant

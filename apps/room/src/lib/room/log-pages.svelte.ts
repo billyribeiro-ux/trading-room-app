@@ -120,6 +120,70 @@ export class RoomLogPages<Row extends Identified> {
   }
 
   /**
+   * `trimFat()` — the reader came back to the bottom, so the paged-in history is released.
+   *
+   * ## This is a TRANSCRIPTION, and the number in it is not the one you would guess
+   *
+   * `app-roomscroller`'s scroll handler, read from `main.99a5781d1d7a7775.js` byte 1,318,297:
+   *
+   * ```js
+   * i.scrollHeight - i.scrollTop <= i.offsetHeight + 20
+   *   ? (this.isScrollingUp = !1, this.shouldtrimFat = !0, this.hasMoreData = !0,
+   *      this.currPage > 0 && this.trimFat())
+   *   : this.isScrollingUp = !0
+   * ```
+   *
+   * and `trimFat` itself, byte 1,319,464:
+   *
+   * ```js
+   * trimFat() {
+   *   this.currPage = 0;
+   *   this.loadingMore = !1;
+   *   'chat' == this.logType ? emit('trimChatLog', this.channel) : emit('trimAlertsLog');
+   *   this.scrollToBottom(!0, !0);
+   * }
+   * ```
+   *
+   * whose handler splices the log back down to `chatLogPageSize` — **50**, not the `trimLogSize`
+   * of 300 that caps the chat log on arrival (byte 1,051,216). Two different bounds for two
+   * different mechanisms, and assuming the familiar one would have been wrong by 250 rows.
+   *
+   * ## Why clearing the held pages IS that splice, here
+   *
+   * Upstream keeps ONE array per log and splices it. This room keeps two halves with different
+   * lifetimes: `data.alerts` — the server's newest page, already bounded server-side — plus
+   * whatever older pages the reader paged in. Splicing back to one page-size window is therefore
+   * exactly "drop the held older pages", and the live tail is left alone.
+   *
+   * ## What this fixes
+   *
+   * `RoomFeeds.visibleAlerts` runs six chained passes over the merge of those two halves, and
+   * nothing bounded the second one — it grew with every page the reader pulled and never shrank,
+   * for the life of the session. This is the release the reference performs and this room never
+   * implemented; it is not a cap invented to make a number look better.
+   *
+   * `currPage > 0` is the reference's own guard and is load-bearing: `arm()` beside this runs on
+   * every scroll event that ends at the bottom, and an unguarded write would hand every reader a
+   * new record object per frame for no change at all — the same reason `arm` reads through its
+   * accessor.
+   *
+   * @returns whether anything was released, so a caller can pair it with a scroll-to-bottom.
+   */
+  releaseHistory(key: string): boolean {
+    if (this.page(key) === 0) return false;
+    this.#page = { ...this.#page, [key]: 0 };
+    this.#older = { ...this.#older, [key]: EMPTY };
+    /*
+      `this.loadingMore = !1`, upstream's own line, and it is reproduced rather than improved on.
+      It means a request already in flight can still land and re-populate what was just released —
+      a race this room inherits rather than introduces. Stated here instead of silently "fixed",
+      because the alternative diverges from the capture on a path nobody has measured.
+    */
+    this.#loading = false;
+    return true;
+  }
+
+  /**
    * A request is going out. Returns the page number to ask for.
    *
    * The caller must pair this with {@link settled} in a `finally`, exactly as the two loaders it

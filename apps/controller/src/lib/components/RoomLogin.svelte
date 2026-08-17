@@ -1,7 +1,7 @@
 <script lang="ts">
   import { enhance } from '$app/forms';
   import { asset } from '$app/paths';
-  import PasswordReveal from '$lib/components/PasswordReveal.svelte';
+  import PasswordReveal from '#lib/components/PasswordReveal.svelte';
 
   /**
    * The room entry screen, reproduced from `app-session-login`.
