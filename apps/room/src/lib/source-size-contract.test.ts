@@ -307,7 +307,7 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       forced edit to every pane contract in the repository. A snippet is a closure over this file's
       scope, so the shell places markup it knows nothing about.
     */
-    max: 1729,
+    max: 1711,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {
@@ -649,7 +649,19 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
   },
   {
     file: 'lib/room/roster.svelte.ts',
-    max: 321,
+    /*
+      +17, 2026-08-17, and it is the "arrival" case this file already records twice — prose moving
+      IN while the page sheds it. `+page.svelte`'s `getRandomUser` carried forty lines transcribing
+      the draw, and `roster.svelte.ts` already said the same things: the same JS quote, the same
+      "both answers run the same code path", the same "No users to pick from." note. Verified phrase
+      by phrase, then deleted from the page — which fell 19.
+
+      What actually grew here is the ONE sentence that was not duplicated: that the three-second
+      reveal is the POINT of the dialog rather than a loading state, quoted from the capture's
+      `setTimeout(..., 3e3)`. It now sits beside `#revealTimer`, where somebody minded to "make it
+      instant" will read it before deleting the feature.
+    */
+    max: 338,
     why: 'the live roster, its four header controls, the badge count and the random draw'
   },
   {

@@ -287,6 +287,23 @@ export class RoomRoster<Entry extends RosterMember> {
    * it is why this returns rather than picking. An earlier version alerted "No users to pick from."
    * on an empty field and named the only candidate on a field of one, neither of which the capture
    * does.
+   *
+   * ## Why the reveal is on a TIMER, which is the part that looks like a bug
+   *
+   * `#pick` is set with `revealed: false` and only flips true after `RANDOM_USER_REVEAL_MS`. That
+   * delay is not a loading state and there is nothing to wait for — the winner is already chosen on
+   * the line above. **The three-second suspense IS the point of the dialog:** upstream shows a giphy
+   * spinner, then replaces it with the name and only THEN makes "User Info" clickable —
+   *
+   * ```js
+   * a.init(() => { setTimeout(() => {
+   *   a.find(".bootbox-body").html('<h2 class="text-center flash animated">' + r.nick + "</h2>"),
+   *   $(".btn-random-user").css("display","inline-block") }, 3e3) })
+   * ```
+   *
+   * — so removing the timer to "make it instant" would delete the feature. That sentence lived on
+   * `+page.svelte` until 2026-08-17, forty lines from the timer it explains and the only part of
+   * that docblock not already duplicated here.
    */
   draw(trialsOnly: boolean): void {
     const candidates = randomUserCandidates(this.#users, trialsOnly);

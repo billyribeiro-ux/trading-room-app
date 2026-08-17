@@ -209,6 +209,45 @@ follow symlinks. Chasing it produced a corroboration instead of a defect — the
 `apps/room/vite.config.ts:81-87`. That is the mechanism the 10:52 entry recorded as closed,
 confirmed by trying to break it.
 
+### 2026-08-17 19:23 EDT — forty lines of duplicated transcription removed, and the one sentence that was not a duplicate moved to the code it explains
+
+**Runtime impact: none** — comments and two ceiling numbers. `getRandomUser`'s body is unchanged.
+Gate: **2,425 tests / 167 files**, `eslint src/` clean, `svelte-check` **1,200 / 0 / 0**, prettier
+clean.
+
+**Found while measuring the page's 35 remaining functions**, not by looking for it. `getRandomUser`
+showed as 51 lines, of which only twelve were code — and `RoomRoster.draw()` already owns the logic.
+Reading both revealed the same drift this session has now hit three times: the reasoning moved with
+the code and a copy stayed behind.
+
+**Verified phrase by phrase before deleting anything**, because "it looks duplicated" is not
+evidence:
+
+| phrase | also lives in | verdict |
+| --- | --- | --- |
+| `randomUser(s)` quote | `roster.svelte.ts` | duplicate |
+| "`if (o >= 2)` has NO else" | `roster.svelte.ts` | duplicate |
+| "No users to pick from." | `roster.svelte.ts` | duplicate |
+| `btn-random-user` / `random-user-modal` | `RoomOverlays`, `BootboxDialog`, `roster.svelte.ts` | duplicate |
+| **"the three-second suspense"** | **nowhere else** | **UNIQUE — moved, not deleted** |
+
+**The unique sentence is the whole point of the slice.** `RoomRoster.draw` sets `revealed: false` and
+flips it after `RANDOM_USER_REVEAL_MS`. Nothing in that code says why — it reads exactly like a
+loading state for a value that is already computed on the line above. The sentence that explains it
+(the capture's `setTimeout(…, 3e3)` swaps a giphy spinner for the name and only then enables "User
+Info") was sitting forty lines away on `+page.svelte`. It now sits beside `#revealTimer`, where
+somebody minded to "make it instant" will read it before deleting the feature.
+
+**Negative control, and it reported something better than expected.** Removing the timer turns TWO
+existing assertions in `roster.svelte.test.ts` red — "draws a non-presenter and holds the name back
+for three seconds" and "a second draw restarts the three seconds". So the BEHAVIOUR was never at
+risk; what was at risk was the REASON, which is exactly what this moved. Recorded that way rather
+than claiming the slice fixed a live defect.
+
+**Ceilings.** `+page.svelte` 1,729 → **1,711**. `roster.svelte.ts` 321 → **338**, the "arrival" case
+this file already records twice: 19 lines left the page and 17 landed here, and what grew is the one
+sentence that was not a duplicate.
+
 ### 2026-08-17 19:16 EDT — the `viewerOnlyMode` gap closed from the capture: it was never a defect, and is now enforceable
 
 **Runtime impact: none** — one contract file. No component changed. Gate: **2,425 tests / 167 files**,
