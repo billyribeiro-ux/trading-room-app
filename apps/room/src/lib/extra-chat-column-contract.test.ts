@@ -504,13 +504,22 @@ describe('the second column follows its own messages', () => {
       property and it is asserted as such: one effect per column, each reading only its own column's
       tab, count and reading-history flag.
 
-      The main chat's is still on `+page.svelte` and is expected to follow into `AlertChatArea`,
-      which owns ITS scroller. When it does, the first assertion here moves with it — and the
-      property being guarded does not change.
+      The main chat's followed into `AlertChatArea` on 2026-08-17, one day later, exactly as this
+      note predicted — and the assertion moved with it, which is what "re-point, never delete" looks
+      like when the prediction comes true. The property being guarded did not change: one effect per
+      column, each reading only its own column's tab, count and reading-history flag.
+
+      All three feeds now sit in the component that owns their scroller, and NONE is on the page.
     */
-    const main = pageCode.indexOf('const scroller = chatScroller;');
-    expect(main, 'the main chat scroll effect is not in +page.svelte').toBeGreaterThan(-1);
+    const areaCode = stripComments(
+      readFileSync(new URL('./components/AlertChatArea.svelte', import.meta.url), 'utf8')
+    );
+    expect(areaCode).toContain('const current = chatScroller;');
+    expect(areaCode).toContain('const current = alertsScroller;');
     expect(paneCode).toContain('const current = scroller;');
+    // And the page holds none of the three.
+    expect(pageCode).not.toContain('chatFollow.follows(');
+    expect(pageCode).not.toContain('alertsFollow.follows(');
     // Neither reads the other's column: the extra pane cannot see the main chat's tab or flag.
     expect(paneCode).not.toContain('chat.tab');
     expect(paneCode).not.toContain('visibleChat');

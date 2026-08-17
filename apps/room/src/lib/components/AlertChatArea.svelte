@@ -35,6 +35,8 @@
     `chatEnabled`, `alertFilterConfigured`. Authority is computed once, on the page, from data the
     server owns. A pane that re-derived any of them would be a second opinion about permission.
   */
+  import { tick } from 'svelte';
+
   import { ngbTooltip } from '#lib/ngb-tooltip.js';
   import { formatChatMutedTill, sameCalendarDay } from '#lib/message-formatters.js';
   import EmojiPicker from '#lib/components/EmojiPicker.svelte';
@@ -44,10 +46,13 @@
   import type { RoomMessageChrome } from '#lib/room-message-chrome.js';
   import type { RoomAlerts } from '#lib/room/alerts.svelte.js';
   import type { RoomChat } from '#lib/room/chat.svelte.js';
+  import type { RoomFeedScroll } from '#lib/room/feed-scroll.js';
   import type { RoomMenus } from '#lib/room/menus.svelte.js';
   import type { RoomPolls } from '#lib/room/polls.svelte.js';
+  import type { RoomScrollFollow } from '#lib/room/scroll-follow.js';
   import type { RoomSplit } from '#lib/room/split.svelte.js';
   import type {
+    ChatTab,
     FollowChatStyle,
     MessageAction,
     MessageActionItem,
@@ -109,14 +114,44 @@
 
     /*
       Attachments the PAGE owns, because each writes to DOM the page also reads: the split element
-      it measures, the two scrollers whose follow state it holds, and the textarea it focuses and
-      auto-expands. Handing the nodes back is the whole job; none of them belongs here.
+      it measures, and the textarea it focuses and auto-expands. Handing the nodes back is the whole
+      job; none of them belongs here.
+
+      `captureChatScroller` LEFT this list on 2026-08-17. Its only reader was a page-level `$effect`
+      that scrolled this component's element, and that effect is below now — so the round trip had
+      nothing left to serve.
+
+      `captureAlertsScroller` STAYED, and the asymmetry is the point rather than an oversight:
+      `RoomAlertsPane.toggleToolbar()` reads that element too. Toggling the toolbar changes the
+      strip's height, so the log has to be pulled back to the newest alert afterwards — upstream's
+      `guiEventBus.emit('scrollAlertLogToBottom')`. Two owners, so the element is still handed up.
+      That is the "written on both sides of a boundary" rule this decomposition already paid for
+      once with `followedUsers`: shared means thunk-and-receiver, never extracted to one side.
     */
     captureAlertChatElement: (node: HTMLElement) => void;
     captureAlertsScroller: (node: HTMLElement) => void;
-    captureChatScroller: (node: HTMLElement) => void;
     captureComposerElement: (node: HTMLTextAreaElement) => void;
     observeComposerWidth: (node: HTMLElement) => void;
+
+    /**
+     * SCROLL-FOLLOW for both feeds, decided and acted on HERE.
+     *
+     * Svelte's best-practices page keeps `$effect` for "direct DOM manipulation", and the DOM these
+     * two manipulate is this component's scrollers. `scroll-follow.ts` says the same thing from the
+     * other direction — *"the `tick()`-then-check dance around a scroller that may have been
+     * replaced mid-flight belongs where the element lives"*.
+     *
+     * `feedScroll` arrives WHOLE rather than as six callbacks, which is the shape this component
+     * already uses for `split`, `alerts`, `chat`, `polls` and `menus`. The two `RoomScrollFollow`
+     * instances are the page's, not fresh ones: their markers make the decision stateful across
+     * renders, and the alerts instance is deliberately constructed WITHOUT the
+     * `alwaysScrollToBottom` override that the chat one gets — `shouldAutoScrollForMessage` records
+     * that rule. Building them here would hand the alerts log an override it must not have.
+     */
+    feedScroll: RoomFeedScroll;
+    alertsFollow: RoomScrollFollow;
+    chatFollow: RoomScrollFollow<ChatTab>;
+    viewerId: number;
 
     onopenmodal: (name: Exclude<ModalName, null>) => void;
     onopenpoll: () => void;
@@ -174,9 +209,12 @@
     followedUsers,
     captureAlertChatElement,
     captureAlertsScroller,
-    captureChatScroller,
     captureComposerElement,
     observeComposerWidth,
+    feedScroll,
+    alertsFollow,
+    chatFollow,
+    viewerId,
     onopenmodal,
     onopenpoll,
     ontogglealertstoolbar,
@@ -195,6 +233,104 @@
     onselectgif,
     onbeginsplit
   }: Props = $props();
+
+  /**
+   * The two scrollers, held HERE because the effects below are the things that move them.
+   *
+   * The alerts one is captured TWICE on purpose — locally, and through the page's
+   * `captureAlertsScroller` — because `RoomAlertsPane.toggleToolbar()` reads it too. See the note on
+   * the props. The chat one has no second reader and so has no prop at all.
+   */
+  let alertsScroller = $state<HTMLElement | undefined>();
+  let chatScroller = $state<HTMLElement | undefined>();
+
+  function holdAlertsScroller(node: HTMLElement) {
+    alertsScroller = node;
+    captureAlertsScroller(node);
+    return () => {
+      if (alertsScroller === node) alertsScroller = undefined;
+    };
+  }
+
+  function holdChatScroller(node: HTMLElement) {
+    chatScroller = node;
+    return () => {
+      if (chatScroller === node) chatScroller = undefined;
+    };
+  }
+
+  /*
+    THE ALERTS LOG FOLLOWING ITS NEWEST ALERT.
+
+    Moved from `+page.svelte` on 2026-08-17, unchanged in behaviour: same order (clear the flag,
+    then `tick`, then scroll) and the same identity re-check afterwards, because the scroller can be
+    replaced while the microtask is pending.
+
+    No `tab`, unlike the chat effect below — the alerts pane is one log with no channels, and
+    `RoomScrollFollow` reads `undefined !== undefined` as false so the channel-switch condition
+    simply never fires for it.
+
+    On the autofixer's suggestion that `stopReadingHistory` is state written inside an effect: it
+    is, and the suggestion is declined for the reason recorded in `ExtraChatPane` — what this
+    produces is a scroll POSITION rather than a value, so `$derived` cannot express it; the trigger
+    is an alert arriving as new props rather than a gesture, so an event handler cannot either; and
+    the flag is cleared BECAUSE we are about to scroll, which is one act rather than two.
+  */
+  $effect(() => {
+    const current = alertsScroller;
+    const count = visibleAlerts.length;
+    const newestMessage = visibleAlerts.at(-1);
+
+    if (!current) return;
+
+    if (
+      alertsFollow.follows({
+        count,
+        newestSenderId: newestMessage?.senderId,
+        viewerId,
+        readingHistory: feedScroll.alertsReadingHistory
+      })
+    ) {
+      feedScroll.stopReadingHistory('alerts');
+      void tick().then(() => {
+        if (alertsScroller === current) feedScroll.forceAlertsToBottom(current);
+      });
+    }
+  });
+
+  /*
+    THE MAIN CHAT COLUMN FOLLOWING ITS OWN MESSAGES.
+
+    Its own effect rather than a loop over both feeds: alerts and chat have independent lists and
+    independent reader positions, so one effect reading both would re-run each feed's scroll logic
+    whenever the other changed — "a message arrived anywhere" instead of "a message arrived here".
+
+    `tab` IS read here, because the chat column has channels and a channel switch is one of the four
+    conditions that scrolls.
+  */
+  $effect(() => {
+    const current = chatScroller;
+    const activeTab = chat.tab;
+    const count = visibleChatMessages.length;
+    const newestMessage = visibleChatMessages.at(-1);
+
+    if (!current) return;
+
+    if (
+      chatFollow.follows({
+        count,
+        tab: activeTab,
+        newestSenderId: newestMessage?.senderId,
+        viewerId,
+        readingHistory: feedScroll.chatReadingHistory
+      })
+    ) {
+      feedScroll.stopReadingHistory('chat');
+      void tick().then(() => {
+        if (chatScroller === current) feedScroll.forceChatToBottom(current);
+      });
+    }
+  });
 </script>
 
 <as-split-area
@@ -498,7 +634,7 @@
           {/if}
 
           <app-roomscroller
-            {@attach captureAlertsScroller}
+            {@attach holdAlertsScroller}
             id="chatScrollViewParentAlerts"
             style="overflow-y: scroll; height: 100%;"
             onscroll={onalertsscroll}
@@ -605,7 +741,7 @@
           </div>
 
           <app-roomscroller
-            {@attach captureChatScroller}
+            {@attach holdChatScroller}
             style="overflow-y: scroll; overflow-x: hidden; height: 100%;"
             onscroll={onchatscroll}
           >

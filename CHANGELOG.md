@@ -22,6 +22,56 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ---
 
+## 2026-08-17
+
+### 2026-08-17 08:57 EDT — the last two scroll-follow effects reach the components that own their scrollers
+
+**`+page.svelte` 2,985 → 2,948 (−37).** Suite 2,393 across 162 files (+4, the new cross-column
+contract). `svelte-check` 1,192 files, 0 errors, 0 warnings. All four CI steps green locally.
+**Runtime impact: yes** — both effects run in a different component. Behaviour unchanged.
+
+The alerts log and the main chat column follow the extra column into the component that owns their
+DOM. **All three feeds now decide and act on scrolling where their scroller lives, and `+page.svelte`
+holds none of it.**
+
+`feedScroll` arrives WHOLE rather than as six callbacks, which is the shape `AlertChatArea` already
+uses for `split`, `alerts`, `chat`, `polls` and `menus`. The two `RoomScrollFollow` instances are the
+page's, not fresh ones: their markers make the decision stateful across renders, and the alerts
+instance is deliberately built WITHOUT the `alwaysScrollToBottom` override the chat one gets —
+`shouldAutoScrollForMessage` records that rule, and constructing them locally would have handed the
+alerts log an override it must not have.
+
+**An asymmetry that is the point rather than an oversight.** `captureChatScroller` is gone — its only
+reader was the page effect that has now moved. `captureAlertsScroller` STAYED, because
+`RoomAlertsPane.toggleToolbar()` reads that element too: toggling the toolbar changes the strip's
+height, so the log is pulled back to the newest alert afterwards, which is upstream's
+`guiEventBus.emit('scrollAlertLogToBottom')`. Two owners, so the element still crosses the boundary
+— the "written on both sides" rule this decomposition paid for once already with `followedUsers`.
+
+`tick` is no longer imported by the page at all; all three of its consumers left.
+
+#### A SIXTH green negative control, and the gap it exposed was real
+
+Swapping the alerts effect's `alertsReadingHistory` for `chatReadingHistory` left all 2,389
+assertions green. Nothing anywhere checked that each effect reads its OWN column's flag — the extra
+column had that assertion since yesterday and the other two never did.
+
+The defect it would have allowed is not subtle: a reader scrolled up in the alerts log would be
+yanked to the newest alert whenever a CHAT message arrived, because the guard protecting them would
+be reporting on the wrong column. `RoomScrollFollow` cannot catch it — which flag it is handed is
+the CALLER's decision, and the class answers a question about either column just as happily.
+
+`chat-paging-contract.test.ts` now asserts all three: each effect reads its own `readingHistory` and
+stops its own history, the alerts effect passes NO `tab` (it has no channels, and passing one would
+arm a fourth scroll trigger upstream does not have), and the chat effect does. Control re-run: red,
+then green on revert.
+
+That is the sixth control in this phase to come back green on a weak test rather than on missing
+behaviour, and all six have had the same shape — two things that read correctly in isolation and are
+wrong only in combination.
+
+---
+
 ## 2026-08-16
 
 ### 2026-08-16 20:23 EDT — the extra column's scroll-follow effect moves to the component that owns the scroller
