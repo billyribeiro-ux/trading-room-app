@@ -268,9 +268,10 @@ describe('no block comment has lost the code it explains', () => {
       extraction can move them without a false alarm, and a collapse to zero cannot hide.
     */
     const cited = pageBlocks.filter((block) => !block.jsdoc && isPoliced(pageLines, block));
-    expect(cited.length, 'CITES_MODULE matched nothing — the plain-block half is inert').toBeGreaterThan(
-      20
-    );
+    expect(
+      cited.length,
+      'CITES_MODULE matched nothing — the plain-block half is inert'
+    ).toBeGreaterThan(20);
   });
 
   it.each(POLICED)('%s has no block comment immediately followed by another', (file) => {

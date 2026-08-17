@@ -136,6 +136,10 @@ describe('ours', () => {
     expect(paneCode.slice(chat, chat + 200)).toContain('{...messageChrome}');
 
     const from = pageCode.indexOf('const messageChrome');
+    expect(
+      from,
+      'messageChrome must exist on the page for this guard to test anything'
+    ).toBeGreaterThan(-1);
     expect(pageCode.slice(from, pageCode.indexOf('\n  });', from))).toContain('chatGif');
   });
 

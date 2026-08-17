@@ -122,6 +122,7 @@ describe('the entry decision lives in one place', () => {
       outcome this door must never produce.
     */
     const from = serverCode.indexOf('decideRoomEntryRemotely');
+    expect(from, 'decideRoomEntryRemotely must exist in the server code').toBeGreaterThan(-1);
     const region = serverCode.slice(from, serverCode.indexOf('if (!decision.ok)', from));
     expect(region).toContain('return fail(503,');
     expect(clientCode).toContain('export async function decideRoomEntryRemotely(');

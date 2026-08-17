@@ -76,6 +76,7 @@ function constTable(compiled: string): unknown[] {
   const from = compiled.indexOf('consts: [');
   expect(from, 'the component must declare a consts table').toBeGreaterThan(-1);
   const open = compiled.indexOf('[', from);
+  expect(open, 'the consts table must open').toBeGreaterThan(-1);
   const close = compiled.indexOf('\n        ],\n        template:', open);
   expect(close, 'the consts table must close before the template').toBeGreaterThan(open);
   return parseConstTable(compiled.slice(open, close + '\n        ]'.length)) as unknown[];
@@ -139,6 +140,9 @@ describe('the reference: what disableVideo does upstream', () => {
     expect(body).not.toContain('setPreference');
 
     const neighbour = SETTINGS.indexOf('beepOnUserLeaveChange() {');
+    expect(neighbour, 'beepOnUserLeaveChange must exist in the settings component').toBeGreaterThan(
+      -1
+    );
     expect(SETTINGS.slice(neighbour, SETTINGS.indexOf('\n    }', neighbour))).toContain(
       'setPreference'
     );

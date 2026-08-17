@@ -776,6 +776,7 @@ describe('a role change restarts the media session', () => {
       `connect()` ABOVE it, so the old marker sliced backwards and produced an empty string.
     */
     const from = code.indexOf('async restart(): Promise<void> {');
+    expect(from, 'restart() must exist in the module').toBeGreaterThan(-1);
     const body = code.slice(from, code.indexOf('\n  }', from));
     /*
       `signalling`, not `media` — the local `const media = new SignallingClient(...)` was renamed on

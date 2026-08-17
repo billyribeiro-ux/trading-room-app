@@ -66,6 +66,7 @@ describe('the sound on an incoming chat message', () => {
     code that was correct. A test that slices source has to anchor both ends.
   */
   const start = code.indexOf("payload.channel === 'chat' && !this.#prefs.doNotDisturbOn");
+  expect(start, 'the chat-sound gate must exist in the module').toBeGreaterThan(-1);
   const block = code.slice(start, code.indexOf('void invalidateAll()', start));
 
   it('is gated on do-not-disturb AND the chat-sound preference', () => {
