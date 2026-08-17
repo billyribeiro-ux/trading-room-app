@@ -117,6 +117,42 @@ export function createRoom(deps: RoomDeps) {
 **Do not start this at the end of a session.** Half-moved wiring is the worst state this file can be
 left in, and the failure is invisible to every gate the repository has.
 
+### S6 (`createContext`) is CANCELLED — the plan was wrong and the measurement says so
+
+The plan instructed "`PresentationArea` → its own panes: `createContext`". It is refuted, and the
+refutation is recorded rather than the row quietly deleted, because the plan's sentence is still
+readable and would otherwise be obeyed by the next person.
+
+`svelte/context` exists for values reaching a descendant "potentially through many layers of
+intermediate components". That is a claim about LAYERS, so it was counted by walking each child's own
+template for the prop names its parent had handed it:
+
+|                                                     | measured 2026-08-17 |
+| --------------------------------------------------- | ------------------: |
+| props `PresentationArea` forwards unchanged         |              **50** |
+| of those, forwarded ON by the child to a grandchild |               **0** |
+
+Fifty one-level hops to direct children is a wide component, not prop-drilling. Context would have
+added indirection with no reader — the thing `PrivateChatPanel.svelte`'s own note refuses — and cost
+the property this repository leans on hardest: 49 contract tests assert on these hand-offs as source
+text, and a context hand-off is invisible to every one of them.
+
+**Two things nearly made it look like drilling, and both dissolved on READING rather than counting.**
+`viewerOnlyMode` appears in `ScreenTabs` only inside a capture citation, not as a prop. And
+`ScreenPane` renders `ScreenZoomControls` WITHOUT forwarding either shared gate — it passes a locally
+derived `showZoomCtrlDetached`. A count would have called both of those drilling.
+
+The condition worth watching is therefore not "a component has many props" but **"a prop is forwarded
+by a child it was given to"**, and it is now written that way in the component that owns the note.
+
+**One honest gap fell out of this and is NOT fixed here.** `ScreenZoomControls` declares
+`viewerOnlyMode` and is rendered twice — from `PresentationArea` with the flag, and from `ScreenPane`
+(the detached variant) WITHOUT it. The flag gates one CSS class, `viewer-only-screen-zoom-controls`,
+which the component's own note says "moves the gated trio rather than hiding it", so this is
+positioning and not authority. Whether the capture applies that class to the DETACHED window is not
+established from the evidence read so far, and it is not guessed: it needs the detached component's
+markup from a capture, and until then the asymmetry is recorded rather than "corrected".
+
 ### Two effects stay on the page, and it is a decision, not a leftover
 
 - the `noselect` body class — direct DOM manipulation of a node no element owns, which is `$effect`'s

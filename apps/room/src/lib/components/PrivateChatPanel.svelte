@@ -23,6 +23,33 @@
     Context earns its place the moment a pane grows children that need the same state. When that
     happens the change is mechanical and this note should be revisited rather than obeyed.
 
+    ## REVISITED 2026-08-17, and the condition has NOT fired. Measured, not felt.
+
+    The phase plan instructed the opposite — "`PresentationArea` → its own panes: `createContext`" —
+    and a first pass at it got as far as a written provider before the evidence refuted it. Recording
+    that here because the plan's sentence is still readable and would otherwise be obeyed again.
+
+    What the trigger above actually asks is whether state passes THROUGH a layer. The docs define
+    the problem the same way: values owned by a parent reaching a descendant "potentially through
+    many layers of intermediate components". So it was counted, by walking each child's own template
+    for the prop names its parent had handed it:
+
+      `PresentationArea` forwards 50 props unchanged to 12 children.
+      Of those 50, the number a child forwards ON to a grandchild is ZERO.
+
+    Fifty one-level hops is not drilling; it is a wide component with direct children. Context would
+    have bought nothing and cost the thing this repository values most — 49 contract tests assert on
+    these hand-offs as source text, and context makes a hand-off invisible to all of them.
+
+    Two things nearly made it look like drilling, and both dissolved on reading rather than counting:
+    `viewerOnlyMode` appears in `ScreenTabs` only inside a CAPTURE CITATION, not as a prop; and
+    `ScreenPane` renders `ScreenZoomControls` without forwarding either shared gate — it passes a
+    locally derived `showZoomCtrlDetached` instead.
+
+    So the note stands, now with a measurement behind it instead of an argument. The condition to
+    watch is unchanged and is worth restating precisely: not "a component has many props", but
+    "a prop is forwarded by a child it was given to".
+
     ## What moved INTO this component, and why that is a reduction rather than a relocation
 
     `showPMToolbar` was page state read and written by nothing outside this markup. State whose only

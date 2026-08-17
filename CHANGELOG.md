@@ -209,6 +209,70 @@ follow symlinks. Chasing it produced a corroboration instead of a defect — the
 `apps/room/vite.config.ts:81-87`. That is the mechanism the 10:52 entry recorded as closed,
 confirmed by trying to break it.
 
+### 2026-08-17 16:25 EDT — Svelte conformance audited against the docs, and S6 CANCELLED because the evidence refuted it
+
+**Runtime impact: none** — one comment and one document. No source changed. Verified: **2,421 tests /
+167 files**, `eslint src/` clean, `svelte-check` **1,200 / 0 / 0**.
+
+**The audit, and it is clean.** Measured across all 45 tracked components with a null-delimited
+pipeline, after two earlier attempts produced garbage:
+
+| docs say avoid | count | | docs say prefer | count |
+| --- | ---: | --- | --- | ---: |
+| `export let`, `on:*=`, `<slot` | **0** | | `{@attach}` | **115** |
+| `$$props`, `$$restProps` | **0** | | `{#snippet}` / `{@render}` | **38 / 27** |
+| `<svelte:component/self/fragment>` | **0** | | | |
+| `createEventDispatcher`, `svelte/store` | **0** | | | |
+
+**27 `$effect`s, and ZERO inside a class** — which matters more than the count, because the docs'
+trap is that `$state`/`$derived` read during creation of a reactive class are not tracked as
+dependencies. That is avoided structurally here, not by discipline. The two apparent exceptions were
+both verified correct: the single `use:` is `use:enhance`, which `$app/forms` defines as an action
+with no attachment form in Kit 3, and all eight `class:` directives live in
+`class-clsx-equivalence.svelte`, the fixture that exists to prove `class:` and clsx compile
+identically — they are the control group.
+
+**MY OWN MEASUREMENTS WERE WRONG TWICE, and both were caught before reporting.** The first grep
+scanned `src/node_modules` — a Vite cache inside `src/` — and counted Svelte's own compiled
+internals as this app's code, reporting ten files using `export let`. The second passed 45 filenames
+to grep as one filename, because zsh does not word-split. Either would have sent somebody to audit
+working code. The zeros above are trustworthy only because the *modern* counts in the same run are
+non-zero, which is the instrument proving itself.
+
+**S6 is CANCELLED, and this is the substantive finding.** The plan instructed
+"`PresentationArea` → its own panes: `createContext`", and a first pass got as far as a written
+provider and a `screen-surface.ts` before the evidence refuted it. `svelte/context` is for values
+reaching a descendant *"potentially through many layers of intermediate components"* — a claim about
+LAYERS. So the layers were counted, by walking each child's own template for the prop names its
+parent had handed it:
+
+```
+props PresentationArea forwards unchanged ............ 50
+of those, forwarded ON by the child to a grandchild ... 0
+```
+
+Fifty one-level hops to direct children is a wide component, not prop-drilling. Context would have
+added indirection with no reader — exactly what `PrivateChatPanel.svelte`'s own note refuses — and
+cost the property this repository leans on hardest: 49 contract tests assert on those hand-offs as
+source text, and a context hand-off is invisible to all of them. **The provider was deleted rather
+than kept "since it was written."**
+
+**Two things nearly made it look like drilling, and both dissolved on READING rather than counting:**
+`viewerOnlyMode` appears in `ScreenTabs` only inside a capture citation, not as a prop; and
+`ScreenPane` renders `ScreenZoomControls` WITHOUT forwarding either shared gate, passing a locally
+derived `showZoomCtrlDetached` instead. A count would have called both of those drilling.
+
+**The recorded condition is now stated precisely** in the component that owns it: not "a component
+has many props", but **"a prop is forwarded by a child it was given to"**. That is checkable; the
+old wording was not.
+
+**One honest gap, recorded and NOT guessed at.** `ScreenZoomControls` declares `viewerOnlyMode` and
+is rendered twice — from `PresentationArea` with the flag, and from `ScreenPane` (detached) without
+it. The flag gates one CSS class that the component's own note says "moves the gated trio rather than
+hiding it", so it is positioning, not authority. Whether the capture applies that class to the
+detached window is not established by any evidence read so far, so it is written down rather than
+"corrected".
+
 ### 2026-08-17 15:07 EDT — S7: the composition root, `+page.svelte` 2,509 → 1,729
 
 **Runtime impact: none intended** — 36 `new Room*()` constructions moved from `+page.svelte` to
