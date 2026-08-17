@@ -531,43 +531,25 @@
   });
 
   /**
-   * `getRandomUser()`, transcribed:
+   * The "Random User" control — this page's half, which is the CONFIRM and nothing else.
    *
    * ```js
    * bootbox.confirm({ message: "Only select from Trials?",
    *   buttons: { confirm: {label:"Yes", className:"btn-success"},
    *              cancel:  {label:"No",  className:"btn-danger"} },
-   *   callback(i){ let o = globals.roster.filter(r => !r.isP);
-   *                let {uniqueUsers: s} = uniqueRoster(o);
-   *                i && (s = s.filter(r => r.isFT));
-   *                randomUser(s) } })
+   *   callback(i){ … randomUser(s) } })
    * ```
    *
-   * Presenters only, and it draws from NON-presenters. Both answers run the SAME code path - "Yes"
-   * only adds the `isFT` filter - so the No branch is not a dismissal to be ignored.
+   * THE DRAW ITSELF IS `RoomRoster.draw`, and so is the reasoning: who is eligible, why `if (o >= 2)`
+   * has no else, and why the reveal sits on a three-second timer. Forty lines of that transcription
+   * stood here until 2026-08-17 as a SECOND copy of what `roster.svelte.ts:271-306` already said —
+   * the same JS quote, the same "both answers run the same code path", the same "No users to pick
+   * from." note. Verified duplicated phrase by phrase before deleting, and the one sentence that was
+   * NOT duplicated — that the suspense is the point of the dialog — moved to the timer it explains
+   * rather than being dropped with the rest.
    *
-   * `randomUser(e)`:
-   *
-   * ```js
-   * randomUser(e){ const i=this; var o=e.length;
-   *   if(o>=2){ var r=e[Math.floor(Math.random()*o)],
-   *     a=bootbox.dialog({title:"Random User", message:'<p class="text-center"><img src="…giphy.gif" alt=""></p>',
-   *       className:"random-user-modal",
-   *       buttons:{ noclose:{label:"User Info", className:"btn-warning btn-random-user",
-   *                          callback:()=>(i.appService.getUserInfo(r.userXrefID,r._id,null,null,!0),
-   *                                        i.appService.guiEventBus.emit("doUserInfo",r.userXrefID),!1)},
-   *                 cancel:{label:"Close", className:"btn-danger", callback(){}}}});
-   *     a.init(()=>{ setTimeout(()=>{ a.find(".bootbox-body").html('<h2 class="text-center flash animated">'+r.nick+"</h2>"),
-   *                                   $(".btn-random-user").css("display","inline-block") }, 3e3) }) } }
-   * ```
-   *
-   * `if (o >= 2)` has NO else: fewer than two candidates and nothing opens at all. That is the
-   * captured behaviour and it is deliberate - drawing a "random" user from a field of one is not a
-   * draw. This used to alert "No users to pick from." on an empty field and name the only candidate
-   * on a field of one, both of which the capture does not do.
-   *
-   * The three-second suspense is the point of the dialog: the giphy spinner shows, then the name
-   * replaces it and only then does "User Info" become clickable.
+   * What stays here is what this function actually is: the page owns `dialogs`, so the page raises
+   * the question and hands the answer to the roster.
    */
   function getRandomUser() {
     dialogs.confirmation = {
