@@ -24,6 +24,54 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-16
 
+### 2026-08-16 20:23 EDT — the extra column's scroll-follow effect moves to the component that owns the scroller
+
+**`+page.svelte` 3,021 → 2,985 (−36).** Suite 2,389 across 162 files. `svelte-check` 1,192 files,
+0 errors, 0 warnings. All four CI steps green locally.
+**Runtime impact: yes** — the effect runs in a different component. Behaviour is unchanged and the
+contract that guards it was tightened, not relaxed.
+
+The first of the three scroll-follow effects to move, and the smallest, chosen to prove the shape
+before the two that share `AlertChatArea`.
+
+**Svelte's own best-practices page is the argument**: an effect is for "direct DOM manipulation",
+and the DOM here is `ExtraChatPane`'s scroller. `scroll-follow.ts` had already reached the same
+conclusion for its own reasons — *"the `tick()`-then-check dance around a scroller that may have
+been replaced mid-flight belongs where the element lives"* — and the element has always lived in the
+pane while the dance lived on the page.
+
+**What that deletes rather than moves.** `extraChatScroller` was a page `let` fed by an
+`onscrollerready` prop whose ONLY job was handing an element upward so a page-level effect could
+reach it. With the effect in the pane, the round trip has no reader: the `let`, the prop and the
+callback are all gone. A prop that exists to move an element out of the component that owns it is
+"no config nothing reads" in prop form.
+
+The pane now takes `follow`, `viewerId`, `readingHistory` and two receivers. `follow` is the page's
+INSTANCE rather than a fresh one, because its markers make the decision stateful across renders and
+because the alerts column deliberately gets a differently-configured one — constructing it locally
+would silently hand this column the `alwaysScrollToBottom` override the alerts instance is forbidden.
+
+**The autofixer's suggestion was answered, not ignored.** It flags `onstopreadinghistory()` as state
+written inside an effect, and it is right that it is. Declined with the reasoning recorded in the
+file: what this produces is a scroll POSITION, not a value, so `$derived` cannot express it; the
+trigger is a message arriving as new props, not a user gesture, so an event handler cannot either;
+and the flag is cleared BECAUSE we are about to scroll, which is part of the same act rather than
+state being synchronised. `$effect.pre` was considered and rejected — the docs' chat-autoscroll
+example uses it because it MEASURES the viewport before the DOM updates, and this decides from
+counts and a flag the scroll handler already set, then must scroll AFTER the new rows render.
+
+**A GREEN negative control, and it was a weak test rather than missing behaviour — the fifth of that
+shape in this phase.** The re-pointed assertion read `toContain('readingHistory')`, which still
+matches `readingHistory: false`; the control substituted exactly that and passed. The guard would
+have watched this column stop honouring the reader's scroll position and said nothing. Tightened to
+forbid a COLON — a value supplied at the call site instead of the prop passed through — and the
+control then went red and green again on revert.
+
+Four assertions were RE-POINTED from the page to the pane, and the "is its own effect" one now
+asserts a stronger form of the same property: the two columns are in separate FILES, and the pane
+cannot see the main chat's tab or message list at all.
+
+
 ### 2026-08-16 20:09 EDT — `$lib` → `#lib` in the CONTROLLER, and a documented-count gate that was already red
 
 **Controller suite 985 across 94 files** (+4, the new gate). `svelte-check` 1,527 files, 0 errors,

@@ -28,7 +28,10 @@
    * `changeChatMode` handler only re-runs its own resize. That asymmetry is upstream's and is kept:
    * the extra column is not the thing that collapses the layout.
    */
+  import { tick } from 'svelte';
+
   import { ngbTooltip } from '#lib/ngb-tooltip.js';
+  import type { RoomScrollFollow } from '#lib/room/scroll-follow.js';
   import { formatChatMutedTill, sameCalendarDay } from '#lib/message-formatters.js';
   import EmojiPicker from './EmojiPicker.svelte';
   import GiphyPicker from './GiphyPicker.svelte';
@@ -116,7 +119,27 @@
     onfocus: () => void;
     onsend: () => void;
     onscroll: (scroller: HTMLElement) => void;
-    onscrollerready: (scroller: HTMLElement | undefined) => void;
+    /**
+     * This column's scroll-follow decision, and the four things it needs.
+     *
+     * The `$effect` that acts on it lives HERE, not on the page, which is what Svelte's own
+     * best-practices page asks for: an effect is for "direct DOM manipulation", and the DOM in
+     * question is this component's scroller. `scroll-follow.ts` had already written down the same
+     * conclusion for its own reasons — *"the `tick()`-then-check dance around a scroller that may
+     * have been replaced mid-flight belongs where the element lives"* — and until 2026-08-16 the
+     * element lived here while the dance lived on `+page.svelte`.
+     *
+     * `follow` is the page's INSTANCE rather than a fresh one, because its markers are what make
+     * the decision stateful across renders and because the alerts column deliberately gets a
+     * differently-configured one. Constructing it here would silently give this column the
+     * `alwaysScrollToBottom` override the alerts instance is forbidden.
+     */
+    follow: RoomScrollFollow<ChatTab>;
+    viewerId: number;
+    /** THIS column's flag — see the note on the effect. */
+    readingHistory: boolean;
+    onstopreadinghistory: () => void;
+    onscrolltobottom: (scroller: HTMLElement) => void;
     onprivatechat: () => void;
     onsearch: () => void;
     onsettings: () => void;
@@ -145,7 +168,11 @@
     onfocus,
     onsend,
     onscroll,
-    onscrollerready,
+    follow,
+    viewerId,
+    readingHistory,
+    onstopreadinghistory,
+    onscrolltobottom,
     onprivatechat,
     onsearch,
     onsettings,
@@ -163,10 +190,91 @@
     which sends `doMentionExtra` instead of `doMention` when this composer is the focused one. The
     page holds the flag because it is the thing that routes mentions; this only reports.
   */
+  /**
+   * The extra chat column's scroll container, and the autoscroll it drives.
+   *
+   * `onscrollerready` wrote this element up to `+page.svelte` and NOTHING read it until 2026-08-14,
+   * so the second chat column never followed a new message while the first one did — a message
+   * arrived, the column stayed where it was, and the reader saw nothing. ESLint is what surfaced
+   * it, as an "assigned but never used" that turned out to be a missing feature.
+   *
+   * The effect below is a deliberate parallel of the main chat's, not a new design: same four
+   * conditions (first view, channel switch, new message, and the reader's own scroll position via
+   * `shouldAutoScrollForMessage`), same `tick()` before measuring, and the same identity re-check
+   * afterwards so a scroller swapped out mid-await is not written to.
+   *
+   * It is a local `$state` here as of 2026-08-16, rather than a `let` on the page fed by that
+   * callback. The round trip existed only so a page-level `$effect` could reach an element this
+   * component owns; with the effect here it has no reader, and a prop whose whole job was to hand
+   * an element upward is "no config nothing reads" in prop form.
+   */
+  let scroller = $state<HTMLElement | undefined>();
+
   function captureScroller(node: HTMLElement) {
-    onscrollerready(node);
-    return () => onscrollerready(undefined);
+    scroller = node;
+    return () => {
+      if (scroller === node) scroller = undefined;
+    };
   }
+
+  /*
+    THIS COLUMN FOLLOWING ITS OWN MESSAGES.
+
+    Deliberately its own effect rather than a loop over both columns: the two have independent tabs,
+    independent message lists and independent reader scroll positions, so one effect reading both
+    would re-run each column's scroll logic whenever the other changed. That is the difference
+    between "a message arrived here" and "a message arrived anywhere", and it is what would make a
+    reader scrolled up in this column get yanked to the bottom by traffic in the other one.
+
+    Moved from `+page.svelte` on 2026-08-16, unchanged in behaviour: same order (clear the flag,
+    then `tick`, then scroll), and the same identity re-check afterwards, because the scroller can
+    be replaced while the microtask is pending.
+
+    ## Why this is an `$effect` at all, since the autofixer asks
+
+    `svelte-autofixer` flags `onstopreadinghistory()` as state written inside an effect, and it is
+    right that it is — the receiver clears this column's reading-history marker. The suggestion is
+    still declined, with the reason recorded rather than the warning ignored:
+
+    * What this produces is a SCROLL POSITION, not a value. `$derived` cannot express it, and the
+      docs keep effects for exactly this — "direct DOM manipulation" is the first use they name.
+    * It is not an event handler either. The trigger is a message ARRIVING, which reaches this
+      component as new props, not as a user gesture.
+    * The flag is cleared BECAUSE we are about to scroll, so it is part of the same act rather than
+      state being synchronised. Deriving it would invert the causality.
+
+    `$effect.pre` was considered and rejected: the docs' chat-autoscroll example uses it because it
+    MEASURES the viewport before the DOM updates. This decides from counts and a flag the scroll
+    handler already set, and it must scroll AFTER the new rows render — which is what `tick()` is
+    waiting for.
+  */
+  $effect(() => {
+    const current = scroller;
+    const activeTab = tab;
+    const count = messages.length;
+    const newestMessage = messages.at(-1);
+
+    if (!current) return;
+
+    if (
+      follow.follows({
+        count,
+        tab: activeTab,
+        newestSenderId: newestMessage?.senderId,
+        viewerId,
+        /*
+          THIS column's flag. Passing the main column's would let its reader position decide whether
+          this one jumps, which is the defect `extra-chat-column-contract.test.ts` guards.
+        */
+        readingHistory
+      })
+    ) {
+      onstopreadinghistory();
+      void tick().then(() => {
+        if (scroller === current) onscrolltobottom(current);
+      });
+    }
+  });
 
   function submitOnEnter(event: KeyboardEvent) {
     if (event.key !== 'Enter' || event.shiftKey) return;

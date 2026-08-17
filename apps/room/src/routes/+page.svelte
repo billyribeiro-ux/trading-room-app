@@ -413,20 +413,6 @@
   
 
   
-  /**
-   * The extra chat column's scroll container, and the three trackers its autoscroll needs.
-   *
-   * `onscrollerready` wrote this element in and NOTHING read it until 2026-08-14, so the second
-   * chat column never followed a new message while the first one did — a message arrived, the
-   * column stayed where it was, and the reader saw nothing. ESLint is what surfaced it, as an
-   * "assigned but never used" that turned out to be a missing feature.
-   *
-   * The effect below is a deliberate parallel of the main chat's, not a new design: same four
-   * conditions (first view, channel switch, new message, and the reader's own scroll position via
-   * `shouldAutoScrollForMessage`), same `tick()` before measuring, and the same identity re-check
-   * afterwards so a scroller swapped out mid-await is not written to.
-   */
-  let extraChatScroller = $state<HTMLElement | undefined>();
 
   
   let appHasFocus = $state(true);
@@ -1730,32 +1716,6 @@
     reader scrolled up in this column get yanked to the bottom by traffic in the other one.
   */
   $effect(() => {
-    const scroller = extraChatScroller;
-    const activeTab = chat.extraTab;
-    const count = feeds.visibleExtraChat.length;
-    const newestMessage = feeds.visibleExtraChat.at(-1);
-
-    if (!scroller) return;
-
-    if (
-      extraChatFollow.follows({
-        count,
-        tab: activeTab,
-        newestSenderId: newestMessage?.senderId,
-        viewerId: data.user.id,
-        // THIS column's flag. Passing `chatScrollingUp` would let the main column's reader position
-        // decide whether this one jumps, which is the defect its own contract test guards.
-        readingHistory: feedScroll.extraChatReadingHistory
-      })
-    ) {
-      feedScroll.stopReadingHistory('extraChat');
-      void tick().then(() => {
-        if (extraChatScroller === scroller) feedScroll.forceChatToBottom(scroller);
-      });
-    }
-  });
-
-  $effect(() => {
     const unseenAlerts = alertArrivals.fresh(data.alerts);
     if (unseenAlerts.length === 0) return;
 
@@ -2851,7 +2811,11 @@
                 onfocus={() => chat.focused(EXTRA_COMPOSER)}
                 onsend={() => void composer.sendExtra()}
                 onscroll={(scroller) => feedScroll.trackExtraChatScroll(scroller)}
-                onscrollerready={(scroller) => (extraChatScroller = scroller)}
+                follow={extraChatFollow}
+                viewerId={data.user.id}
+                readingHistory={feedScroll.extraChatReadingHistory}
+                onstopreadinghistory={() => feedScroll.stopReadingHistory('extraChat')}
+                onscrolltobottom={(scroller) => feedScroll.forceChatToBottom(scroller)}
                 onprivatechat={() => privateChat.show()}
                 onsearch={() => modals.open('chat-logs')}
                 onsettings={() => modals.open('settings')}
