@@ -626,8 +626,16 @@ export const badges = pgTable('badges', {
   /**
    * SUPERSEDED 2026-08-15 by `darkThemeBadgeId`, and kept because migrations are forward-only.
    *
-   * Nothing reads it any more. It records only that somebody once pressed a control this repository
-   * had modelled as a toggle, and it cannot say WHICH badge they meant — see the column below.
+   * Nothing reads it. It records only that somebody once pressed a control this repository had
+   * modelled as a toggle, and it cannot say WHICH badge they meant — see the column below.
+   *
+   * THAT SENTENCE WAS FALSE FOR TWO DAYS, WHICH IS WHY IT NOW NAMES ITS ONE FORMER READER.
+   * `internal/room-config/[code]/+server.ts` went on reading THIS column after `darkThemeBadgeId`
+   * landed, as `typeof badge.darkTheme === 'number' ? … : undefined` — an expression that is
+   * unsatisfiable against a boolean, so the room was sent `undefined` every time and the dark-theme
+   * variant never rendered. Corrected 2026-08-17; the endpoint now reads the column below. A
+   * "nothing reads it" comment is exactly the kind this repository requires to match the next line,
+   * and this one did not.
    */
   darkTheme: boolean('dark_theme').notNull().default(false),
   /**

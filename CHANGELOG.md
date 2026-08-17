@@ -24,6 +24,98 @@ release, not a reviewable step. Two things follow, and both are conventions of t
 
 ## 2026-08-17
 
+### 2026-08-17 10:52 EDT — `TODO.md` re-audited against the repository: 652 lines → 413, and two live defects found by the audit itself
+
+**Runtime impact: yes, in one place** — the dark-theme badge variant now reaches the room. Everything
+else is `TODO.md`, comments and test guards. Tests run: 139 across every file that reads a changed
+one (72 controller, 67 room). **No full gate** — nothing outside those files reads any of them.
+
+**What was done.** Eighty-five claims in `TODO.md` were checked by READING the artefacts they name,
+never by concluding from a search. Every "this is finished" verdict was then handed to a pass whose
+only job was to refute it. **That pass overturned ten of sixteen**, and four rows that were about to
+be deleted turned out to be still carrying open work — which is the whole argument for the pass and
+the reason it is recorded here rather than treated as overhead.
+
+**The single constraint on the edit, found before touching anything:**
+`apps/controller/src/lib/evidence-gap-register-counts.test.ts:36` reads `TODO.md` and requires the
+tally sentence in its exact documented shape, equal to a live recount of the register. It is the only
+tracked file that reads the root `TODO.md`. Recounted with the test's own parser — 68/5/14/87,
+matching — and the sentence was carried across byte-for-byte. A note now sits at the top of `TODO.md`
+saying so, because deleting that one line is the obvious tidy-up and turns the gate red.
+
+**TWO LIVE DEFECTS, neither of which anybody was looking for. Both fixed, both negative-controlled.**
+
+1. **`screen-volume-contract.test.ts:466` had been asserting on the empty string since 2026-08-15.**
+   It sliced `+page.svelte` for `<div class="room-sound-options">`, markup that moved into
+   `RoomNavbar.svelte` in `7023893`. `indexOf` returned -1, `slice(-1)` yielded one character, both
+   inner `indexOf`s returned -1, and `expect('').not.toContain('idPrefix')` passed against nothing —
+   through three later commits to that same file. **Demonstrated rather than argued:** replaying the
+   old expression against the current file prints `navRows = ""`. The sibling slice at `:397` HAD
+   been re-pointed to `navbarMarkup` in that same commit, so this was one missed line. Fixed by
+   slicing `NAVBAR` and asserting the index is `> -1` BEFORE the negative runs. **Negative control:
+   `idPrefix="NEGATIVE_CONTROL"` added to `RoomNavbar.svelte:763` → red at `:492`; reverted → green.**
+   This is the fourth time a `not.toContain` has gone vacuous here after an extraction, and the first
+   caught by anything other than a person reading the file.
+
+2. **The dark-theme badge variant never reached the room — a feature written, migrated, given a
+   picker, and never rendered.** `internal/room-config/[code]/+server.ts` sent
+   `darkTheme: typeof badge.darkTheme === 'number' ? … : undefined`, but `badges.darkTheme` is
+   `boolean('dark_theme')` — superseded by `darkThemeBadgeId` in migration `0013` and kept only
+   because migrations are forward-only. `typeof` is never `'number'`, so the field was **always
+   `undefined`** and the room's swap in `feeds.svelte.ts` could never fire; `darkThemeBadgeId`
+   appeared **zero times** in `apps/room`. The line was honest when written — `0013` did not exist
+   yet — and was simply not revisited when the column landed. Now `darkTheme: badge.darkThemeBadgeId
+   ?? undefined`: the wire name stays the reference's (the room matches on it), the source becomes
+   the column that holds an id, and no `.svelte`/`.svelte.ts` file needed to change.
+   **`chat-badge-supply-contract.test.ts` was PINNING the dead line**, so a green test was holding
+   the defect in place; it now asserts the live form and that the dead one is absent. **Negative
+   control: endpoint reverted → red at `:110`; restored → green.** `schema.ts`'s claim that nothing
+   reads the superseded column was false for two days and now names its one former reader.
+
+**What came OUT of `TODO.md`, on evidence:** the guest-path row (fixed by `ef7d07c`; the controller
+redirects from `load` before its form renders, and the token-minting remedy the row prescribed was
+explicitly REJECTED in code at `session/[code]/+page.server.ts:49-52`), the evidence-partition work,
+the control-plane question, the `svelte.config 2.js` removal, `T5-27`'s migration plan (`0013`
+shipped), the document index, the two-Bootstrap-generations finding, the Scope section, and the
+build narratives in rows AD and AE. All are recorded here or enforced by a named test.
+
+**What STAYED, and two rows got worse rather than better:**
+
+- **Row W is nine toast-only controls, not seven.** The three it explicitly left unchecked have now
+  been checked and none has a reachable wire: `restart-audio` and `save-permissions` have no server
+  half at all, and **`forceReload` has both ends and zero call sites** — a form action and a receiver
+  connected by nothing, the exact `presenterCommand` shape. `mute-chat-indefinitely` was never listed
+  and has no working twin, where `mute-chat-24` at least has the context menu.
+- **Row AE was stale by 3.3×, in the direction of progress.** `+page.svelte` is **2,947** lines, not
+  the 9,605 recorded; `lib/room/` holds 33 modules, not 8; Phase 5 has run slices 0–27 and the row
+  never mentioned Phase 5. Reduced to a pointer at `apps/room/docs/PHASE-5-DECOMPOSITION.md` plus the
+  two things that are genuinely left: no browser check in CI, and five of six panes with no mount
+  test.
+- **Row AF is closable in substance.** Reading the message-send path settled its open question: there
+  are TWO derivations, not three, and `sendMessage`, `editMessage` and the composer all call one
+  `stripHtmlToText`, so the divergence risk it carried is gone. Two comments remain.
+
+**Three rows added:** **AH**, the 45 unswept text-reading tests (46 read `+page.svelte`, 18 read
+`+page.server.ts`, and the decomposition has moved almost everything they read — the guard has to be
+per-SLICE, because `source-size-contract.test.ts`'s one-positive-per-file rule cannot see it);
+**AI**, that the register's status column reads 66/6/15 while the verifier CI enforces computes
+68/5/14, because "CLOSED wins" matches the substring anywhere in a row; and the note that the triage
+document's count of 30 is behind by at least five, which cannot be corrected by hand because the
+script that derives it is one of the 30 untracked ones.
+
+**Structural fixes:** row AC was orphaned after the closing `---`, outside any table; blank lines
+between rows W/AE/AF/AG had split one table into fragments. Now six well-formed tables, no orphans.
+`working-rules.md` was cited as having eight rules while the file has **thirteen** and this file
+itself cited rules 10, 11 and 12.
+
+**ONE THING I DID TO THE TREE AND HAD TO UNDO, recorded because it reached a commit.** The negative
+control for defect 1 put `idPrefix="NEGATIVE_CONTROL"` into `RoomNavbar.svelte` for roughly thirty
+seconds. The concurrent session committed in that window, and `d2c9aa8` carries the marker. The
+deletion in this change removes it, and the file is byte-identical to `65f5dd3` — verified with
+`diff`, not assumed. **The lesson is mine: a negative control mutates a shared working tree, and
+another session's commit does not know it is a probe.** Run them against a scratch copy, or check
+`git log` before and after.
+
 ### 2026-08-17 10:44 EDT — S2: nineteen replace-only objects move to `$state.raw`, and the pattern becomes structural
 
 **Suite 2,402 across 164 files** (+4, a new gate). `svelte-check` 1,195/0/0. Lint clean. Build ✓.

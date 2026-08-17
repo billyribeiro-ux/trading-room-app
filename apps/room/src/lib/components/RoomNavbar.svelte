@@ -764,7 +764,6 @@
               talkingUsers={media.talking}
               preferences={presenterAudio}
               {individualVolumeControls}
-              idPrefix="NEGATIVE_CONTROL"
               trailingRule
               ontogglepresenter={ontoggletalkingpresenteraudio}
               onpresentervolume={onadjustpresentervolume}
