@@ -9,20 +9,198 @@ will be found later.
 end of a session. A change with no entry is a change the next person has to reverse-engineer from
 `git log`.
 
-**Branching: there isn't any, and that is deliberate.** Work is committed and pushed **straight to
-`main`** — confirmed by the owner 2026-08-09. No feature branches, no PRs. The consequence is worth
-stating once, here, rather than rediscovering it: **`main` auto-deploys**, so a push is a production
-release, not a reviewable step. Two things follow, and both are conventions of this file:
+**Branching: a feature branch and a PR per piece of work.** This paragraph used to say the opposite —
+"there isn't any, and that is deliberate… no feature branches, no PRs, confirmed by the owner
+2026-08-09" — and it was **already false on the day it was written**: `e7a0df5`, the merge of PR #1,
+is dated 2026-08-09 12:03 EDT. There are 113 merge commits on `main` as of 2026-08-17 and more than
+twenty entries below this line that open with ``Branch `feat/extra-chat-column` ``. Corrected
+2026-08-17; it is left described rather than silently swapped, because a stale convention paragraph
+is how the next person gets the process wrong.
 
-1. **Every entry says whether it has runtime impact** — whether the push changed what the site
+**What has NOT changed is the consequence, and it is the reason any of this is written down:**
+`main` auto-deploys. `.github/workflows/quality.yml:8` states it and `smoke.yml:17-24` acts on it —
+Vercel deploys the controller on push, and the smoke test runs *after* the deploy is already live
+because it cannot gate one. So a **merge** to `main` is a production release. Two conventions follow:
+
+1. **Every entry says whether it has runtime impact** — whether the merge changed what the site
    serves, or only documentation, comments and tests. That is the first thing anyone reading back
    through an incident wants to know.
-2. **Verification happens before the push, not after**, because there is no review gate to catch it.
-   Each entry records what was run and what could not be.
+2. **Verification happens before the merge, not after.** The PR gate (`Frontend quality` +
+   `Backend quality`) is the only verification a production deploy ever gets — `quality.yml:34` says
+   so in those words. Each entry records what was run and what could not be.
 
 ---
 
 ## 2026-08-17
+
+### 2026-08-17 11:14 EDT — every citation in the rewritten `TODO.md` opened and checked; three were wrong, and one of them was invented
+
+**Runtime impact: no** — `TODO.md` only. The one test that reads it stays green.
+
+The 10:52 rewrite was right in structure and wrong in detail, because a number of its `file:line`
+citations came from audit agents' reports rather than from my own read. **That is the failure this
+repository names first**, and the same audit had already overturned agents ten times out of sixteen,
+so carrying their citations verbatim was not a defensible shortcut. All 58 were then opened.
+**55 resolved, 1 had drifted, 2 were wrong.**
+
+**The invented one is the important one.** The AngularJS bullet cited `manage-menu-scope.test.ts` as
+pinning `data-menu-control`. **No such file exists anywhere in the repository.** The test that
+actually pins it is `apps/controller/src/lib/manage-menu-stays-open.test.ts:41`, whose docstring at
+`:10-21` gives the same reasoning. A plausible-sounding filename that resolves to nothing is exactly
+what `~/CLAUDE.md` §2 forbids, and only opening the path caught it.
+
+**The second confused a policy target for a privilege.** The role-retirement row said `ptr_clone_app`
+"still holds object privileges granted at `0005:85`". Line 85 of `0005` is a `TO ptr_clone_app`
+clause inside a `CREATE POLICY`, and **`0005` contains no `GRANT` at all** — verified by reading
+`:81-87` and counting `GRANT` in the file: zero. Worse, that clause does not survive a migration,
+because `0009:199-258` retargets every policy and RAISEs if a residual remains. The privileges that
+genuinely block retirement are at `0001_baseline.sql:1821-1938`, `0006:69-107` and `0007:134`.
+Whoever writes that migration would have opened the wrong file.
+
+**The drifted one:** `streaming-choices.md`'s self-description is at `:3` and reads "Nothing here is
+implemented except the entry marked DONE", not "except row 1" — recorded together with a second stale
+line nothing had flagged: its "What is already true" table at `:23` still records
+`Screen track contentHint` as **unset**, though it is set in `media-transport.svelte.ts`.
+
+**ROW W WAS UNDERCOUNTED BY EVERYONE, INCLUDING ME.** The row said seven; an audit pass said nine
+without adding up its own list; I repeated the nine while printing eleven items. Counted properly by
+reading `handle()` from `:480` to `:728` and every key of `EXACT_ALERTS`: **twelve controls report
+success and send nothing.** The twelfth had never been recorded anywhere —
+`session-save-close-message` (`user-actions.svelte.ts:532-535`), whose entire body is
+`alert = 'Message Saved'`. It is the "Just Save Close Message" button at `ModalHost.svelte:4128`, and
+nothing in `apps/room/src` persists a close message, so its sibling "Save Message and Close Session"
+does not save one either — **two buttons offer to save it and neither does.** Two further controls
+(`session-refresh-roster`, `session-soft-reset`) are recorded as a separate milder family: they do a
+real local refetch while their message promises a server command.
+
+**Row G had been narrowed on half the evidence.** It claimed `NEXT-SESSION.md:406-410` settles that
+Postgres stays managed. That line does say so — but `:245-246` lists "whether Postgres stays managed
+or moves self-hosted" under **Open sub-questions**. The document answers twice and disagrees with
+itself; the row now says that rather than picking a side.
+
+**The structural fix, and it is what keeps the file correct.** Row AE now states **no line counts at
+all**. The version it replaced was wrong by 3.3× within a day, and the figures I wrote at 10:52 were
+wrong within the hour — `+page.svelte` 2,947 → 2,955, components 40 → 39, test files 46 → 47, Svelte
+total 37,357 → 37,411, and "180 cases" was 181 — because another session is decomposing continuously.
+A number re-measured on every suite run does not belong in prose edited by hand once a week.
+`source-size-contract.test.ts` (37 ceilings, 181 cases, a staleness check) is named as the authority
+instead, and row AH's counts were made deliberately approximate for the same reason.
+
+**Also corrected:** row AG states the arithmetic explicitly (nineteen actions exported = seventeen
+dispatched + `logout`, a real form POST + `forceReload`, which has no caller); row AD names which app
+owns `/internal/stream-read/[code]` (the controller); the two live capture files are in two different
+directories, not one.
+
+**One scare ruled out before it was reported — the rule working in the other direction.** A sweep
+said the three decoded reference components under `docs/source/components/` did not exist. They do:
+`apps/room/docs/source` is a **symlink** to `~/Desktop/new-room/docs/source`, and `find` does not
+follow symlinks. Chasing it produced a corroboration instead of a defect — the corpus is gitignored
+(`.gitignore:77`) and untracked, **49** room test files read it, `EVIDENCE_BOUND_FILE_COUNT = 49` in
+`evidence-partition.test.ts` matches that count exactly, and the exclusion is wired at
+`apps/room/vite.config.ts:81-87`. That is the mechanism the 10:52 entry recorded as closed,
+confirmed by trying to break it.
+
+### 2026-08-17 11:20 EDT — seven comments in `+page.svelte` had lost the code they explained, and the gate that could not see them now can
+
+**Runtime impact: none.** Comments only, and PROVEN so rather than asserted: with every block comment
+stripped, `+page.svelte` is byte-identical to `HEAD` (1,572 code lines before and after) and so is
+`media.svelte.ts`. Run: the full room gate — 2,402 tests across 164 files, `eslint src/` clean,
+`svelte-check` 1,195 files / 0 errors / 0 warnings, `build` ✓. `svelte-autofixer` on the modified
+`.svelte.ts`: no issues, no suggestions.
+
+**How they were found, which matters more than the count.** Not by a sweep — by opening the region
+around the page's remaining `$effect`s to plan the next slice and reading it. The first one found was
+the sharpest: a comment headed *"The SECOND chat column, following its own messages"* sitting
+directly on top of the ALERT-ARRIVAL effect. Two correct things read as one wrong thing purely
+because of what sat between them, and `svelte-check`, `eslint`, the autofixer and 2,402 tests were
+all green.
+
+**The gate had a documented hole and this fell straight through it.**
+`orphaned-comment-contract.test.ts` policed JSDoc (`/**`) only, and said so, with a stated reason:
+a plain `/*` is how this codebase writes a SLICE CITATION and a GROUP HEADER, and those legitimately
+stack. All seven orphans were plain blocks. The narrowing was REPLACED rather than widened — a plain
+block is now policed **when it cites a module**, i.e. when its body names a `#lib/room/…` path. That
+is the citation form, used 31 times in the page alone, and it always means "the subject named here
+now lives there", which is only true of the code immediately below it. Group headers do not carry a
+citation; both examples the original narrowing named were checked before the line was drawn there.
+
+**Five moved, two deleted, and the difference is the point.** Five citations were moved down onto the
+constructions they describe — `RoomUserActions`, `RoomWebcams`, `RoomAlertsPane`, `RoomFeedScroll`,
+and the `[ REC ]` badge's docblock, which went to `media.svelte.ts` because that is where its fields
+went. Two were DELETED, and only after verifying each one's reasoning survives elsewhere: the
+older-chat-history note (`+page.server.ts:462-476`, `chat-paging-contract.test.ts:193-198`) and the
+second-chat-column note (`ExtraChatPane.svelte:220-250`, which took a better-worded copy with it on
+2026-08-16). A third copy of a sentence that already exists twice is not the asset; it is the drift.
+
+**A regression of my own, in the same change, reported rather than quietly fixed.** Widening what the
+scanner COLLECTS silently changed what it PAIRS: a JSDoc began pairing with the plain block below it,
+and three correct files went red — `files.svelte.ts:239-257` is two notes on one method, which is
+legitimate and common. The fix is that a non-policed comment counts as neither a boundary nor as
+code; the search steps over it and keeps looking for the declaration. Recorded in the test, because
+the shape recurs.
+
+**Both halves negative-controlled, both seen RED, both reverted.** A fake citation block inserted
+above a real one → red at that line. `CITES_MODULE` broken to match nothing → the vacuity guard fires
+with *"CITES_MODULE matched nothing — the plain-block half is inert"*, which is the failure this file
+exists to prevent, one level up.
+
+**Ceilings: one down, one up, and the raise is the framework's own provision.** The page ratchets
+3,021 → 2,943. `media.svelte.ts` goes 386 → 394 under the "arrival" case already recorded on that
+exact file at slice 27 — prose that belongs to the module arriving from the page while the page sheds
+the same lines. That it is now the SECOND time on the same file is the finding, and is what turned a
+per-slice habit into a gate.
+
+**Honest gap.** Two of the seven carried no citation and no JSDoc, so nothing structural can see
+them; they were found by reading and fixed by hand. The gate covers the citation form, which is what
+the other five took and what an extraction produces.
+
+### 2026-08-17 11:04 EDT — PR #100 merged to `main`, delayed by a GitHub major outage
+
+**Runtime impact: yes — this is the production release of the three entries below it, 10:33 to
+10:52 EDT.** Merge commit `2f6589b`: `65f5dd3` (S1, `{#each}` keys), `d2c9aa8` (S2, `$state.raw`),
+`3ae9369` (the `TODO.md` re-audit and its two live defects). The 10:24 `next.23` entry below is NOT
+in this release — it went out in PR #99 at 10:30. No source changed in this step; the only edits are
+this entry and the branching paragraph at the top of the file, which had to be corrected to describe
+the process actually in use.
+
+**The precondition, checked and not assumed.** The rule here is that a merge happens on the green
+from the *final* push, because each push cancels the in-flight gate — `65f5dd3`'s `Frontend quality`
+run is `cancelled` in the run list, which is that rule visible in the evidence rather than argued
+from. Both jobs report `conclusion: success` for `headSha` `3ae9369…`, which is simultaneously the
+PR head (`headRefOid`), the branch tip and the local `HEAD`; `mergeable: MERGEABLE`,
+`mergeStateStatus: CLEAN`.
+
+**Why it was delayed.** `gh pr merge` returned `503 Service Unavailable` on three attempts spaced by
+20s and 45s backoff. The duration is deliberately not given a number: the first attempt was not
+timestamped, so all that can honestly be said is that it began after `d2c9aa8`'s gate reported green
+(run created 10:45:38 EDT) and ended at the merge, 11:04:57 — under twenty minutes, and `3ae9369` was
+committed at 10:52 while it was still blocked. Diagnosed before retrying blindly, and the diagnosis
+is the point: `gh api rate_limit` and `gh pr view 100` both **succeeded** while the merge failed, so
+reads worked and writes did not — which rules out auth, a stale local ref and a dirty tree in one
+step. `githubstatus.com/api/v2/summary.json` then confirmed it from the other side:
+
+```
+indicator: major — Partial System Outage
+major_outage    Pull Requests, Issues, API Requests, Actions, Copilot
+partial_outage  Webhooks
+```
+
+**What was NOT done, deliberately.** The obvious workaround — merge locally and push straight to
+`main` — was refused and left for the owner to decide. On a repository where `main` auto-deploys,
+that trades a 35-minute wait for an unreviewed production release performed while GitHub's own
+Actions service is in major outage, i.e. at the exact moment the post-deploy smoke test cannot be
+trusted to report. Waiting cost nothing; the outage cleared and the ordinary path worked unchanged.
+
+**Not run: the gate.** No test, `svelte-check` or build was executed here. The four steps had already
+passed in CI on this exact SHA and the working tree was byte-identical to it — re-running them
+locally would have re-proven a green minutes old at real cost. Two things *were* run and are named so
+the sentence above is exact: `eslint` on `state-raw-contract.test.ts`, to confirm a leftover
+`no-unused-vars` error in a stale background-task log was already gone (it was; exit 0), and
+`prettier --check` on this file. **`CHANGELOG.md` fails `prettier --check`, and it did so at `HEAD`
+before this edit** — verified by checking out the previous version to a temporary path and running
+the same command against it. Pre-existing, not a regression, and not "fixed" here: no root `format`
+script reads it, and rewriting 4,500 lines of history to satisfy a check nothing runs would bury
+every entry above in a formatting diff.
 
 ### 2026-08-17 10:52 EDT — `TODO.md` re-audited against the repository: 652 lines → 413, and two live defects found by the audit itself
 
