@@ -12,7 +12,10 @@ import {
 } from './room-events';
 
 /*
-  A MEMBER MUST NEVER RECEIVE ANOTHER MEMBER'S LOCATION — on the wire, not merely on the screen.
+  A MEMBER MUST NEVER RECEIVE ANOTHER MEMBER'S PRIVATE FIELDS — on the wire, not merely on screen.
+
+  Two fields are presenter-only, and they are guarded together because they are one question: may
+  this recipient see another member's personal details? `locStr` is the city; `email` is the address.
 
   ## The defect, found 2026-08-18 by reading the fan-out path
 
@@ -33,6 +36,17 @@ import {
   That is the shape the root standard names in as many words: *"Every authority decision is made on
   the server from data the server owns — never asserted by the client, ever, for any reason."* A
   render gate is not an authority decision; it is a decoration over one nobody made.
+
+  ## `email` followed the same day, on the owner's decision
+
+  The REFERENCE never puts an address in a roster entry — `roster-gates.ts` records it verbatim:
+  *"its roster entries carry only `emailHash`, never the address. Ours carry `email`, so the second
+  clause is a direct comparison — same result, without an md5 implementation in the browser."* That
+  shortcut broadcast every member's address to every other member.
+
+  Chosen over adding md5 to the client bundle, with the cost stated rather than discovered: a MEMBER
+  can no longer match the roster search box against a full address. Name search is untouched, and
+  `emailHash` still travels, so avatars, chat badges and `uniqueRoster` are unaffected.
 
   ## Why this file EXECUTES rather than reads source
 
@@ -95,7 +109,7 @@ afterEach(() => {
 });
 
 describe('roster location is redacted per recipient, at the hub', () => {
-  it('a MEMBER receives no location for anybody, including a presenter', () => {
+  it('a MEMBER receives no location and no email for anybody', () => {
     const presenter = rosterUser(1, true);
     const member = rosterUser(2, false);
     const presenterFrames = listen(presenter);
@@ -112,15 +126,28 @@ describe('roster location is redacted per recipient, at the hub', () => {
       seenByMember.map((entry) => entry.locStr),
       'a member must receive no location at all - not even their own neighbours’'
     ).toEqual(['', '']);
+    expect(
+      seenByMember.map((entry) => entry.email),
+      'nor any address: the reference never puts one in a roster entry'
+    ).toEqual(['', '']);
 
-    // And the roster is otherwise intact: redaction must not cost a row or a name.
+    /*
+      Redaction must not cost a row, a name, or the HASH. `emailHash` is what gravatar URLs, chat
+      badges and `uniqueRoster` are keyed on, so blanking it would break three things that have
+      nothing to do with privacy.
+    */
     expect(seenByMember.map((entry) => entry.displayName).sort()).toEqual(['User 1', 'User 2']);
+    expect(seenByMember.map((entry) => entry.emailHash).sort()).toEqual(['hash-1', 'hash-2']);
 
     const seenByPresenter = lastRoster(presenterFrames);
     expect(
       seenByPresenter.map((entry) => entry.locStr).sort(),
       'a presenter is the one role that may see them'
     ).toEqual(['Lisbon, PT', 'Waterbury, CT, US']);
+    expect(
+      seenByPresenter.map((entry) => entry.email).sort(),
+      'the presenter keeps the address for the roster search and the mailto: link'
+    ).toEqual(['user1@example.test', 'user2@example.test']);
   });
 
   it('an ANONYMOUS listener is redacted, because absent authority is not presenter', () => {
@@ -131,9 +158,14 @@ describe('roster location is redacted per recipient, at the hub', () => {
     expect(setRosterLocation(ROOM, presenter.id, 'Waterbury, CT, US')).toBe(true);
     publishRosterToRoom(ROOM);
 
+    const seen = lastRoster(anonymousFrames);
     expect(
-      lastRoster(anonymousFrames).map((entry) => entry.locStr),
+      seen.map((entry) => entry.locStr),
       'no RosterUser means no presenter claim, so it fails closed'
+    ).toEqual(['']);
+    expect(
+      seen.map((entry) => entry.email),
+      'and the address is withheld too'
     ).toEqual(['']);
   });
 

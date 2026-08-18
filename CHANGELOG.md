@@ -211,6 +211,46 @@ confirmed by trying to break it.
 
 ## 2026-08-18
 
+### 2026-08-18 10:12 EDT — SECURITY: the roster was also broadcasting every member's EMAIL ADDRESS
+
+**The same leak, one field over, and this one is a documented divergence from the reference.** Full
+gate: **2,499 tests / 174 files**, `eslint src/` clean, `svelte-check` **1,211 / 0 / 0**, prettier
+clean, `vite build` done.
+
+**Found by asking what else `roomRoster()` carries.** Having fixed `locStr`, the same payload was
+read field by field: `email`, `emailHash`, `userXrefID`, `status`, `createdAt`. The address is the
+one that matters, and `roster-gates.ts:190-197` had already written down why:
+
+> The capture hashes the term because its roster entries carry only `emailHash`, **never the
+> address**. Ours carry `email`, so the second clause is a direct comparison — same result, without
+> an md5 implementation in the browser to reach it.
+
+So the reference never puts an address in a roster entry, and this app sends **both** the address
+and its hash (`sess/[room]/events/+server.ts:139` and `:146`) to every subscriber in the room.
+
+**Not fixed unilaterally, because it was a real decision rather than a violated invariant.** Unlike
+`locStr` there was no stated rule being broken — the shortcut was deliberate and recorded, and the
+address has two live consumers: the roster's exact-email search and `ModalHost`'s `mailto:` link.
+The three options were put to the owner with their costs: add md5 to the client bundle and match the
+reference exactly; redact per recipient; or leave it and keep the record.
+
+**The owner chose to redact per recipient**, so `publishRosterToRoom` now blanks `email` alongside
+`locStr` for anyone who is not a presenter. One guard covers both, because they are one question.
+
+**The cost is stated rather than discovered later:** a MEMBER can no longer match the roster search
+box against a full address — a flow that requires already knowing it. Name search is untouched, and
+`emailHash` still travels, so avatars, chat badges and `uniqueRoster` are unaffected. That paragraph
+is written into `roster-gates.ts` beside the search itself, along with the one-line path back to the
+reference form if the browser ever gains an md5.
+
+**Negative controls, in BOTH directions.** Redacting `locStr` but not `email` fails — *"nor any
+address: expected [ 'user1@example.test', …(1) ] to deeply equal [ '', '' ]"*. Over-redacting by
+blanking `emailHash` too also fails — *"expected [ '', '' ] to deeply equal [ 'hash-1', 'hash-2' ]"*
+— so the guard is bounded on both sides rather than only forbidding.
+
+`roster-location-privacy.test.ts` is now `roster-privacy.test.ts`: it guards two fields, and a
+filename that under-describes its own scope is a small lie that compounds.
+
 ### 2026-08-18 10:06 EDT — SECURITY: every member was receiving every other member's city over the SSE stream
 
 **A real privacy defect, found by auditing server state against `kit/state-management` and fixed at

@@ -404,7 +404,26 @@ export function publishToRoom(room: string, event: RoomEvent): void {
 }
 
 /**
- * Fan the ROSTER out, deciding per recipient whether they may see anyone's location.
+ * Fan the ROSTER out, deciding per recipient which private fields they may see.
+ *
+ * Two fields are presenter-only: `locStr` and `email`. They are redacted together because they are
+ * one question — "may this recipient see another member's personal details" — and splitting them
+ * would be two answers to it.
+ *
+ * ## `email`, added 2026-08-18 on the owner's decision
+ *
+ * The REFERENCE never puts an address in a roster entry. `roster-gates.ts` records it verbatim:
+ * *"The capture hashes the term because its roster entries carry only `emailHash`, never the
+ * address. Ours carry `email`, so the second clause is a direct comparison — same result, without
+ * an md5 implementation in the browser to reach it."* That shortcut put every member's address in
+ * every other member's browser.
+ *
+ * The address is kept for PRESENTERS because two features need it — the roster's exact-email search
+ * and the user-info modal's `mailto:` link — and a presenter is the role the reference trusts with
+ * `privData` anyway. A member keeps `emailHash`, so avatars and badge lookups are unaffected; what
+ * they lose is matching the roster search box against a full address, which is a flow that requires
+ * already knowing the address. Recorded as the accepted cost of the choice rather than discovered
+ * later as a regression.
  *
  * ## The defect this closes, found 2026-08-18
  *
@@ -437,21 +456,23 @@ export function publishRosterToRoom(room: string): void {
   const listeners = subscribers.get(room);
   if (!listeners) return;
 
-  const withLocation = roomRoster(room);
+  const forPresenters = roomRoster(room);
   /*
-    Redacted ONCE per publish rather than per listener: this runs on every join and leave, so a room
-    of fifty is one pass over the roster and not fifty. Entries with no location are passed through
-    by reference, because the common case is a room where nobody's lookup has answered yet.
+    Redacted ONCE per publish rather than per listener: this runs on every join and every leave, so
+    a room of fifty is one pass over the roster and not fifty.
+
+    An entry with neither field set is passed through BY REFERENCE — that is the common case for
+    `locStr`, which stays empty until a browser's geolocation lookup answers.
   */
-  const withoutLocation = withLocation.map((entry) =>
-    entry.locStr === '' ? entry : { ...entry, locStr: '' }
+  const forMembers = forPresenters.map((entry) =>
+    entry.locStr === '' && entry.email === '' ? entry : { ...entry, locStr: '', email: '' }
   );
 
   for (const [listener, viewer] of listeners) {
     try {
       listener({
         channel: 'roster',
-        data: { cmd: 'getRoster', users: viewer?.isP === true ? withLocation : withoutLocation }
+        data: { cmd: 'getRoster', users: viewer?.isP === true ? forPresenters : forMembers }
       });
     } catch (error) {
       // Same contract as `publishToRoom`: one dead connection must not silence the room.
