@@ -450,6 +450,9 @@ export function createRoom(deps: RoomDeps) {
   */
   const broadcasts = new RoomBroadcasts({
     dialogs,
+    menus,
+    setSoundCloudUrl: (url) => (media.soundCloudUrl = url),
+    setSoundCloudPlaying: (playing) => (media.soundCloudPlaying = playing),
     commands: {
       video: (payload) => videoForAll(payload),
       youtube: (payload) => youtubeForAll(payload),

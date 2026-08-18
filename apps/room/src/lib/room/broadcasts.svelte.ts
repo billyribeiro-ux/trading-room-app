@@ -1,6 +1,7 @@
 import { isHttpError } from '@sveltejs/kit';
 
 import type { RoomDialogs } from './dialogs.svelte';
+import type { RoomMenus } from '#lib/room/menus.svelte.js';
 
 /** The three wire commands this class sends, injected so it needs no route import and stays testable. */
 export interface RoomBroadcastCommands {
@@ -44,6 +45,9 @@ export interface RoomBroadcastCommands {
 */
 export class RoomBroadcasts {
   readonly #dialogs: RoomDialogs;
+  readonly #menus: RoomMenus;
+  readonly #setSoundCloudUrl: (url: string) => void;
+  readonly #setSoundCloudPlaying: (playing: boolean) => void;
   readonly #commands: RoomBroadcastCommands;
   #youtubeForAllUrl;
   #videoPlayerUrl;
@@ -53,9 +57,28 @@ export class RoomBroadcasts {
   #mp3Playing;
   #mp3Url;
 
-  constructor(options: { dialogs: RoomDialogs; commands: RoomBroadcastCommands }) {
+  constructor(options: {
+    dialogs: RoomDialogs;
+    menus: RoomMenus;
+    commands: RoomBroadcastCommands;
+    /*
+      The SoundCloud pair are RECEIVERS rather than a handed-over `RoomMedia`, and the two are
+      separate because the captured behaviour is asymmetric: starting a track sets the url AND the
+      flag, while both stop paths clear only the FLAG and leave the url in place. One combined
+      setter would have invited a caller to null the url on stop, which loses the track a presenter
+      is about to resume.
+
+      Handing over `media` itself would also have given this class write access to twenty-odd
+      unrelated flags to reach two.
+    */
+    setSoundCloudUrl: (url: string) => void;
+    setSoundCloudPlaying: (playing: boolean) => void;
+  }) {
     this.#dialogs = options.dialogs;
+    this.#menus = options.menus;
     this.#commands = options.commands;
+    this.#setSoundCloudUrl = options.setSoundCloudUrl;
+    this.#setSoundCloudPlaying = options.setSoundCloudPlaying;
 
     this.#youtubeForAllUrl = $state('');
 
@@ -345,5 +368,77 @@ export class RoomBroadcasts {
   clearScheduledVideoTimer() {
     if (this.#scheduledVideoTimer !== undefined) window.clearTimeout(this.#scheduledVideoTimer);
     this.#scheduledVideoTimer = undefined;
+  }
+  /*
+    SOUNDCLOUD FOR ALL — arrived from `+page.svelte` on 2026-08-17.
+
+    It belongs here for the reason this class already states about the video player: this is where
+    the room-wide "play for all" family lives. SoundCloud was the last member still on the page,
+    beside `videoForAll`, `youtubeForAll` and the mp3 pair which are all methods here.
+
+    ## The state is deliberately NOT moved with them, and that is recorded rather than tidy
+
+    `soundCloudUrl` and `soundCloudPlaying` remain on `RoomMedia`, so they cross as the two
+    receivers above. That is INCONSISTENT with `videoPlayerUrl` and `youtubeForAllUrl`, which live
+    here — same feature family, two homes — and the inconsistency is real, not a subtlety.
+
+    It was left because moving the state ripples through `PresentationArea` and `RoomNavbar`, which
+    both read `media.soundCloudPlaying` and would each need a new prop. That is its own change with
+    its own contract-test ripple, and folding it in would have made one commit that did two things.
+  */
+
+  /**
+   * `playSoundCloudForAll()` — the prompt, its validation and the room-wide dispatch.
+   *
+   * The `https://soundcloud.com` prefix check is the capture's, and it is a PREFIX check
+   * (`indexOf(...) !== 0`) rather than a parse: a share url from the app is always that origin, and
+   * anything else is refused with the reference's own wording.
+   */
+  promptForSoundCloud(): void {
+    this.#dialogs.prompt = {
+      title:
+        'You can play SoundCloud music for all. Click on "Share" from your track or playlist, copy and paste the share url here',
+      value: '',
+      onconfirm: (value) => {
+        this.#dialogs.prompt = null;
+        if (!value) return;
+        if (value.indexOf('https://soundcloud.com') !== 0) {
+          this.#dialogs.alert = 'Invalid SoundCloud URL...';
+          return;
+        }
+        this.#setSoundCloudUrl(value);
+        this.#setSoundCloudPlaying(true);
+        this.#menus.set('soundcloud', false);
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('playSoundCloudForAll', { detail: { url: value } }));
+        }
+      }
+    };
+  }
+
+  /**
+   * Stop it for the WHOLE ROOM — the flag and the broadcast.
+   *
+   * The url is deliberately left set. Only the flag clears, so a presenter who stops and starts
+   * again keeps the track they had; nulling it here would lose it.
+   */
+  stopSoundCloud(): void {
+    this.#setSoundCloudPlaying(false);
+    this.#menus.set('soundcloud', false);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('stopSoundCloudForAll', { detail: { url: null } }));
+    }
+  }
+
+  /**
+   * Stop it for THIS viewer only — the same two writes, and no broadcast.
+   *
+   * The absence of the dispatch is the entire difference between this and `stopSoundCloud`, which
+   * is why they are two methods rather than one with a flag: a boolean argument here is one
+   * mis-call away from silencing the room.
+   */
+  stopSoundCloudForMe(): void {
+    this.#setSoundCloudPlaying(false);
+    this.#menus.set('soundcloud', false);
   }
 }
