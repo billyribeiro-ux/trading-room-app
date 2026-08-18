@@ -209,6 +209,44 @@ follow symlinks. Chasing it produced a corroboration instead of a defect — the
 `apps/room/vite.config.ts:81-87`. That is the mechanism the 10:52 entry recorded as closed,
 confirmed by trying to break it.
 
+### 2026-08-17 20:11 EDT — the split helpers find their owners, and an existing guard overruled my first choice
+
+**Runtime impact: none intended** — three functions moved, none rewritten. Gate: **2,467 tests / 172
+files** (+13), `eslint src/` clean, `svelte-check` **1,208 / 0 / 0**, prettier clean. `+page.svelte`
+1,595 → **1,566**.
+
+**The plan said all five split helpers go to `RoomShell`. The evidence says three different homes.**
+
+- **`finishSplit` → `RoomWindowHandlers.pointerUp`.** It was bound to `<svelte:window onpointerup>`
+  beside `pointerMove`, which was ALREADY a method on that class — the two halves of one gesture sat
+  in two files. The binding stays on the page, because a drag ends anywhere in the window; only the
+  body moved.
+- **`beginSplit` STAYS, and the plan was wrong.** It has two consumers, `RoomShell` and
+  `AlertChatArea`, so the page is correctly its owner. A shared handler is not a window handler.
+- **`storedSplitPair` + `promoteLegacySplitSizes` → a new `split-legacy-migration.ts`.**
+
+**A GUARD OVERRULED MY FIRST CHOICE, which is the best thing that happened here.** I put the
+migration in `split.svelte.ts`, beside the `splitStorageKeys` and `splitPairFromValue` it calls.
+`extra-chat-column-contract.test.ts:366` refused it — *"the class must have no way to write a
+preference"*, asserted as that file not containing `localStorage`. The guard is right and my
+placement was wrong: `RoomSplit` computes geometry and must not be able to reach storage, or the next
+person adding a "just persist this" line has somewhere to put it. It is a sibling module instead.
+
+**The migration is now EXECUTED, which nothing did before.** Nine assertions. An untested migration
+is worse than an untested feature: one that silently does nothing is indistinguishable from one that
+ran and found nothing to do — same screen, no error, no log. Asserted: the server's value wins over a
+stale local one; both directions and both keys are covered; a corrupt entry returns null rather than
+taking the room's boot down; and it only ever WRITES, never reading sizes back into the live layout
+— which is the post-paint shift the promotion exists to remove.
+
+**The test corrected me too.** I asserted `[1, 2, 3]` was rejected. It is not — the guard is
+`value.length >= 2`, so it yields `[1, 2]`. Pinned as it behaves rather than "fixed", because a
+future `=== 2` would silently change behaviour for anyone whose storage carries a longer array. Noted
+alongside: the docblock says "if it really is two numbers", which is stricter in prose than in code.
+
+**Negative controls, both red:** dropping the server-wins check → 2 red; making `pointerUp` write
+unconditionally → red in two other contracts.
+
 ### 2026-08-17 20:02 EDT — a comment named a Svelte mechanism the code does not use, and the audit behind it found two patterns with no rule
 
 **Runtime impact: none** — one corrected comment and one recorded measurement. Gate: **2,454 tests /

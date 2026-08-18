@@ -103,6 +103,26 @@ export class RoomWindowHandlers {
       this.#split.dragTo(event, this.#mainElement(), this.#alertChatElement());
   }
 
+  /**
+   * The pointer was released ANYWHERE in the room, which is why this is a window handler and not a
+   * gutter one — a drag that leaves the 11px gutter must still finish, and on the gutter alone it
+   * would not.
+   *
+   * `endDrag` is where the decisions are: the double-click toggle, the mobile no-write rule and
+   * which of the two storage keys applies, each with its citations in `RoomSplit`. What is left
+   * here is the WRITE, and it is conditional because `endDrag` returns nothing on the paths that
+   * must not persist — a mobile drag, or a release that was really a double-click.
+   *
+   * Arrived from `+page.svelte` on 2026-08-17. It sat there as `finishSplit`, bound to
+   * `<svelte:window onpointerup>` beside `pointerMove`, which was already a method here — so the
+   * two halves of one gesture were in two files. `beginSplit` deliberately did NOT come with it:
+   * it has two consumers (`RoomShell` and `AlertChatArea`), so the page stays its owner.
+   */
+  pointerUp(): void {
+    const write = this.#split.endDrag(performance.now());
+    if (write) this.#prefs.save(write.key, write.pair);
+  }
+
   keyDown(event: KeyboardEvent): void {
     /*
     `onKeyDown` — `app-room.full.js:3011-3021`, bound as a host listener on `keydown`

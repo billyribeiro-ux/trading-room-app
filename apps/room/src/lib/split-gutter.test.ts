@@ -186,8 +186,19 @@ describe('it is the reference’s handler, its number and its binding', () => {
     expect(split).toContain('this.#main = togglePresentationSplit(this.resolvedMainSplit);');
     expect(split).toContain('const release = gutterRelease(this.#lastClickAt, now, this.#moved);');
     // `now` is a parameter so the 400ms window is drivable by a test; the page supplies the clock.
-    expect(PAGE).toContain('const write = split.endDrag(performance.now());');
-    expect(PAGE).toContain('onpointerup={finishSplit}');
+    /*
+      MOVED 2026-08-17: this was `finishSplit` on the page, bound to `<svelte:window onpointerup>`.
+      It is now `RoomWindowHandlers.pointerUp`, beside `pointerMove` which was already a method
+      there — the two halves of one gesture had been in two files.
+    */
+    const handlers = readFileSync(new URL('./room/window-handlers.ts', import.meta.url), 'utf8');
+    expect(handlers).toContain('const write = this.#split.endDrag(performance.now());');
+    expect(PAGE, 'the pointer-up handler moved to RoomWindowHandlers').not.toContain(
+      'function finishSplit'
+    );
+    // The binding is still on the page — a drag ends anywhere in the window, so it must be a
+    // `<svelte:window>` listener; only the BODY moved to the class that owns window handlers.
+    expect(PAGE).toContain('onpointerup={() => windowHandlers.pointerUp()}');
   });
 
   it('does not persist, because printSizes only logs', () => {

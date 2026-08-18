@@ -27,7 +27,8 @@
         import type { RoomMessageChrome } from '#lib/room-message-chrome.js';
   import { EXTRA_COMPOSER } from '#lib/room/chat.svelte.js';
     import { createTawkRuntime } from '#lib/tawk-runtime.js';
-  import { splitPairFromValue, splitStorageKeys } from '#lib/room/split.svelte.js';
+  import { promoteLegacySplitSizes } from '#lib/room/split-legacy-migration.js';
+  import { splitPairFromValue } from '#lib/room/split.svelte.js';
   import { defaultChatStyleForTheme, defaultFollowChatStyle } from '#lib/chat-style.js';
   import { shouldDisableSelection } from '#lib/room-key-gates.js';
   import AlertChatArea from '#lib/components/AlertChatArea.svelte';
@@ -819,31 +820,6 @@
     return splitPairFromValue(prefs.loaded[key]);
   }
 
-  // Browser-only sizes written by earlier builds, kept as a one-time migration source.
-  function storedSplitPair(key: string): [number, number] | null {
-    if (typeof localStorage === 'undefined') return null;
-    try {
-      return splitPairFromValue(JSON.parse(localStorage.getItem(key) ?? 'null'));
-    } catch {
-      return null;
-    }
-  }
-
-  // Sizes that exist only in this browser are promoted to the server so the NEXT server render
-  // already contains them. They are deliberately NOT applied to the live layout: doing that would
-  // move the alerts column, the chat column and the whole presentation area (screens / notes /
-  // videoplayer / files) after first paint, which is exactly the shift this promotion removes.
-  function promoteLegacySplitSizes() {
-    for (const direction of ['ltr', 'ttb'] as const) {
-      const { roomKey, chatKey } = splitStorageKeys(direction);
-      for (const key of [roomKey, chatKey]) {
-        if (settingsSplitPair(key)) continue;
-        const legacy = storedSplitPair(key);
-        if (legacy) prefs.save(key, legacy);
-      }
-    }
-  }
-
   function beginSplit(event: PointerEvent, target: 'main' | 'chat-alerts') {
     split.beginDrag(event, target, event.currentTarget as HTMLElement);
     /*
@@ -864,11 +840,6 @@
    * snapshot, re-seeds the split on a direction change and forwards to the server; a geometry class
    * calling that would own half the room's preference system by accident.
    */
-  function finishSplit() {
-    const write = split.endDrag(performance.now());
-    if (write) prefs.save(write.key, write.pair);
-  }
-
   onMount(() => {
     const stopRoomEvents = roomEvents.subscribe();
     // After subscribe, never before: the stream must not wait on a third-party host.
@@ -884,7 +855,7 @@
     initializeSoundEffects();
     setSoundEffectsVolume(roomVolume.volume / 100);
     userActions.loadManaged();
-    promoteLegacySplitSizes();
+    promoteLegacySplitSizes(settingsSplitPair, (key, value) => prefs.save(key, value));
 
     /*
      * Connect to the media server.
@@ -1089,8 +1060,8 @@
   bind:innerWidth={split.viewportWidth}
   onclick={(event) => windowHandlers.click(event)}
   onpointermove={(event) => windowHandlers.pointerMove(event)}
-  onpointerup={finishSplit}
-  onpointercancel={finishSplit}
+  onpointerup={() => windowHandlers.pointerUp()}
+  onpointercancel={() => windowHandlers.pointerUp()}
   onkeydown={(event) => windowHandlers.keyDown(event)}
   onkeyup={(event) => windowHandlers.keyUp(event)}
   oncontextmenu={(event) => windowHandlers.contextMenu(event)}
