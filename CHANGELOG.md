@@ -211,6 +211,38 @@ confirmed by trying to break it.
 
 ## 2026-08-18
 
+### 2026-08-18 10:40 EDT — the roster gates, mounted: the CLIENT half of the location fix
+
+**Full gate: 2,515 tests / 176 files**, `eslint src/` clean, `svelte-check` **1,212 / 0 / 0**,
+prettier clean, `vite build` done.
+
+**Two layers, both now asserted.** The morning's security work moved `locStr` and `email` behind a
+per-recipient redaction in the SSE hub, and `roster-privacy.test.ts` proves the server withholds
+them. This proves the other half: handed a location anyway, a member's sidebar renders none. A layer
+that only works when the first one already did is not a layer.
+
+**`RoomSidebar` had no mount coverage at all** — every assertion about it read source text, which can
+prove an `{#if}` exists and cannot prove what a member's browser ends up with. That is the only
+question a privacy gate is actually asking.
+
+**The gates are the REAL ones.** `rosterRowVisible`, `rosterRowClass` and `locationVisibleTo` are
+imported and passed exactly as `+page.svelte` passes them. Stubbing them would prove the component
+calls a function, which was never in doubt.
+
+**A POSITIVE CONTROL CAUGHT MY OWN TEST PASSING FOR THE WRONG REASON.** The first draft seeded the
+session with `{}` — under which `rosterRowVisible` admits **no row at all** for a member — so "a
+member sees no location" was green against an EMPTY roster. The `toHaveLength(2)` assertion placed
+before the location check is what turned it red. Every test in the file now counts rows before it
+says anything about their contents, and the helper's docblock records why.
+
+**Negative controls, both red:** replacing the gate with a truthiness check → *"the element must be
+absent, not merely empty or hidden: expected 2 to be +0"*; ignoring the row gate → *"the ordinary
+member is not in the document at all in this room mode"*.
+
+Asserted at the DOM rather than in source because **"hidden" and "absent" are not the same thing** —
+a hidden row is still in the document, still searchable, still readable in DevTools, which is the
+distinction the whole day's work has been about.
+
 ### 2026-08-18 10:36 EDT — one rule for getting a DOM reference, decided on the platform's actual behaviour
 
 **An open question closed with evidence rather than a preference.** Full gate: **2,510 tests / 175
