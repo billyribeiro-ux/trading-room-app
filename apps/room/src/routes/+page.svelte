@@ -750,41 +750,6 @@
    * rather than at each of the four `void`-ed call sites.
    */
 
-  function promptForSoundCloud() {
-    dialogs.prompt = {
-      title:
-        'You can play SoundCloud music for all. Click on "Share" from your track or playlist, copy and paste the share url here',
-      value: '',
-      onconfirm: (value) => {
-        dialogs.prompt = null;
-        if (!value) return;
-        if (value.indexOf('https://soundcloud.com') !== 0) {
-          dialogs.alert = 'Invalid SoundCloud URL...';
-          return;
-        }
-        media.soundCloudUrl = value;
-        media.soundCloudPlaying = true;
-        menus.set('soundcloud', false);
-        if (typeof window !== 'undefined') {
-          window.dispatchEvent(new CustomEvent('playSoundCloudForAll', { detail: { url: value } }));
-        }
-      }
-    };
-  }
-
-  function stopSoundCloud() {
-    media.soundCloudPlaying = false;
-    menus.set('soundcloud', false);
-    if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('stopSoundCloudForAll', { detail: { url: null } }));
-    }
-  }
-
-  function stopSoundCloudForMe() {
-    media.soundCloudPlaying = false;
-    menus.set('soundcloud', false);
-  }
-
   function requestReload() {
     dialogs.confirmation = {
       message: 'Are you sure you want to reload the page?',
@@ -1140,9 +1105,9 @@
           onpauserecording={() => recording.pauseRecording()}
           onresumerecording={() => recording.resumeRecording()}
           ondownloadrecording={() => recording.downloadRecording()}
-          onpromptforsoundcloud={promptForSoundCloud}
-          onstopsoundcloud={stopSoundCloud}
-          onstopsoundcloudforme={stopSoundCloudForMe}
+          onpromptforsoundcloud={() => broadcasts.promptForSoundCloud()}
+          onstopsoundcloud={() => broadcasts.stopSoundCloud()}
+          onstopsoundcloudforme={() => broadcasts.stopSoundCloudForMe()}
           ontogglemicrophone={() => void mediaTransport.toggleMicrophone()}
           ontogglewebcam={() => void mediaTransport.toggleWebcam()}
           onpromptforscreenname={(source) => void mediaTransport.promptForScreenName(source)}

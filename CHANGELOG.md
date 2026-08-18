@@ -209,6 +209,39 @@ follow symlinks. Chasing it produced a corroboration instead of a defect — the
 `apps/room/vite.config.ts:81-87`. That is the mechanism the 10:52 entry recorded as closed,
 confirmed by trying to break it.
 
+### 2026-08-17 20:39 EDT — SoundCloud joins the rest of the "play for all" family, and gets executed for the first time
+
+**Runtime impact: none intended** — three handlers moved, behaviour preserved exactly. Gate:
+**2,472 tests / 172 files** (+5), `eslint src/` clean, `svelte-check` **1,208 / 0 / 0**, prettier
+clean. `+page.svelte` 1,566 → **1,531**.
+
+**It was the last member still on the page.** `videoForAll`, `youtubeForAll` and the mp3 pair were
+already methods on `RoomBroadcasts` — "everything a presenter plays for the WHOLE ROOM". SoundCloud
+sat in `+page.svelte` as three handlers passed to `RoomNavbar` as props, reachable by no test.
+
+**Receivers, not a handed-over `RoomMedia`.** `soundCloudUrl` and `soundCloudPlaying` cross as two
+separate setters, and they are separate because the captured behaviour is asymmetric: starting sets
+the url AND the flag, while BOTH stop paths clear only the flag and leave the url in place. One
+combined setter invites a caller to null the url on stop, losing the track a presenter is about to
+resume. Handing over `media` would also have given this class write access to twenty-odd unrelated
+flags to reach two.
+
+**Five assertions where there were none**, and each is a rule the source cannot state: the capture's
+`https://soundcloud.com` PREFIX check (not a parse) with its exact refusal wording; the empty prompt
+as a no-op rather than an error; the url surviving a stop; and the whole difference between the two
+stop paths — `stopSoundCloud` dispatches to the room, `stopSoundCloudForMe` does not. That is why
+they are two methods rather than one with a boolean: a mis-passed flag would silence the room.
+
+**RECORDED INCONSISTENCY, not hidden.** `soundCloudUrl`/`soundCloudPlaying` remain on `RoomMedia`
+while their siblings `videoPlayerUrl`/`youtubeForAllUrl` live on `RoomBroadcasts` — same feature
+family, two homes. It was left because moving the state ripples through `PresentationArea` and
+`RoomNavbar`, both of which read `media.soundCloudPlaying` and would each need a new prop. Its own
+change, with its own contract ripple.
+
+**Two errors of mine, both caught by running it:** the existing test had two construction sites that
+needed the new deps, and I called `menus.open('soundcloud')` when `RoomMenus` exposes a `soundcloud`
+getter. Neither reached a commit.
+
 ### 2026-08-17 20:11 EDT — the split helpers find their owners, and an existing guard overruled my first choice
 
 **Runtime impact: none intended** — three functions moved, none rewritten. Gate: **2,467 tests / 172

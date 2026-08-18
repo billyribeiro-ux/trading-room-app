@@ -3,6 +3,7 @@ import { flushSync } from 'svelte';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { RoomDialogs } from './dialogs.svelte';
+import { RoomMenus } from './menus.svelte';
 import { RoomBroadcasts } from './broadcasts.svelte';
 
 /*
@@ -17,15 +18,21 @@ import { RoomBroadcasts } from './broadcasts.svelte';
 const make = () => {
   const sent: { channel: string; payload: unknown }[] = [];
   const dialogs = new RoomDialogs();
+  const menus = new RoomMenus();
+  /* The SoundCloud pair are receivers, so the test holds the state they write. */
+  const soundCloud = { url: '', playing: false };
   const broadcasts = new RoomBroadcasts({
     dialogs,
+    menus,
+    setSoundCloudUrl: (url) => (soundCloud.url = url),
+    setSoundCloudPlaying: (playing) => (soundCloud.playing = playing),
     commands: {
       video: (payload) => (sent.push({ channel: 'video', payload }), Promise.resolve()),
       youtube: (payload) => (sent.push({ channel: 'youtube', payload }), Promise.resolve()),
       fileMedia: (payload) => (sent.push({ channel: 'fileMedia', payload }), Promise.resolve())
     }
   });
-  return { broadcasts, dialogs, sent };
+  return { broadcasts, dialogs, menus, soundCloud, sent };
 };
 
 beforeEach(() => vi.useFakeTimers());
@@ -55,6 +62,9 @@ describe('the senders post what the reference posts', () => {
     const dialogs = new RoomDialogs();
     const broadcasts = new RoomBroadcasts({
       dialogs,
+      menus: new RoomMenus(),
+      setSoundCloudUrl: () => {},
+      setSoundCloudPlaying: () => {},
       commands: {
         video: () => Promise.reject(new Error('nope')),
         youtube: () => Promise.resolve(),
@@ -192,5 +202,82 @@ describe('it is actually reactive — one assertion per exposed getter group', (
     });
     stop();
     expect(seen, 'mp3Playing is not reactive').toEqual([false, true]);
+  });
+});
+
+describe('SoundCloud for all', () => {
+  /*
+    Arrived from `+page.svelte` on 2026-08-17 and executed here for the first time. On the page these
+    were three handlers passed to `RoomNavbar` as props, reachable by no test — so the prefix check,
+    the asymmetry between the two stop paths and the room-wide dispatch were all unasserted.
+  */
+
+  it("refuses a url that is not a SoundCloud share link, with the capture's wording", () => {
+    const { broadcasts, dialogs, soundCloud } = make();
+    broadcasts.promptForSoundCloud();
+    dialogs.prompt?.onconfirm('https://evil.invalid/track');
+
+    expect(dialogs.alert).toBe('Invalid SoundCloud URL...');
+    expect(soundCloud.playing, 'a refused url must not start playback').toBe(false);
+    expect(soundCloud.url).toBe('');
+  });
+
+  it('accepts a share link, sets BOTH fields and closes the menu', () => {
+    const { broadcasts, dialogs, menus, soundCloud } = make();
+    menus.set('soundcloud', true);
+    broadcasts.promptForSoundCloud();
+    dialogs.prompt?.onconfirm('https://soundcloud.com/artist/track');
+
+    expect(soundCloud.url).toBe('https://soundcloud.com/artist/track');
+    expect(soundCloud.playing).toBe(true);
+    expect(menus.soundcloud).toBe(false);
+    expect(dialogs.prompt, 'the prompt closes itself on confirm').toBeNull();
+  });
+
+  it('an EMPTY value is a no-op, not an error', () => {
+    // The capture returns early on a blank prompt rather than alerting at the member.
+    const { broadcasts, dialogs, soundCloud } = make();
+    broadcasts.promptForSoundCloud();
+    dialogs.prompt?.onconfirm('');
+
+    expect(dialogs.alert).toBeNull();
+    expect(soundCloud.playing).toBe(false);
+  });
+
+  it('stopping clears the FLAG and keeps the url, so the track can resume', () => {
+    /*
+      The asymmetry that makes this worth executing. Nulling the url on stop would lose the track a
+      presenter is about to restart, and nothing in the source says so — only the behaviour does.
+    */
+    const { broadcasts, dialogs, soundCloud } = make();
+    broadcasts.promptForSoundCloud();
+    dialogs.prompt?.onconfirm('https://soundcloud.com/artist/track');
+
+    broadcasts.stopSoundCloud();
+
+    expect(soundCloud.playing).toBe(false);
+    expect(soundCloud.url, 'the url must survive a stop').toBe(
+      'https://soundcloud.com/artist/track'
+    );
+  });
+
+  it('"for me" does the same two writes and does NOT broadcast', () => {
+    /*
+      The entire difference between the two stop paths is the dispatch, which is why they are two
+      methods rather than one with a boolean — a mis-passed flag would silence the whole room.
+    */
+    const events: string[] = [];
+    const listener = (event: Event) => events.push(event.type);
+    window.addEventListener('stopSoundCloudForAll', listener);
+
+    const { broadcasts, soundCloud } = make();
+    broadcasts.stopSoundCloudForMe();
+    expect(soundCloud.playing).toBe(false);
+    expect(events, 'stopping for ME must not reach the room').toEqual([]);
+
+    broadcasts.stopSoundCloud();
+    expect(events).toEqual(['stopSoundCloudForAll']);
+
+    window.removeEventListener('stopSoundCloudForAll', listener);
   });
 });

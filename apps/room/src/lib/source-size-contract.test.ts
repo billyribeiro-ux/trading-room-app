@@ -307,7 +307,7 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       forced edit to every pane contract in the repository. A snippet is a closure over this file's
       scope, so the shell places markup it knows nothing about.
     */
-    max: 1567,
+    max: 1532,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {
@@ -730,7 +730,21 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
   },
   {
     file: 'lib/room/broadcasts.svelte.ts',
-    max: 350,
+    /*
+      +95, 2026-08-17: the SoundCloud trio arrived from `+page.svelte` — the last member of the
+      room-wide "play for all" family still living on the page, beside `videoForAll`,
+      `youtubeForAll` and the mp3 pair which were already methods here.
+
+      Most of it is prose. What matters is that three handlers reachable by no test became five
+      executed assertions: the capture's prefix check, the empty-prompt no-op, and the asymmetry
+      between the two stop paths — `stopSoundCloud` broadcasts, `stopSoundCloudForMe` does not, and
+      both keep the url so a presenter can resume.
+
+      RECORDED INCONSISTENCY, not hidden: `soundCloudUrl`/`soundCloudPlaying` stay on `RoomMedia`
+      and cross as receivers, while their siblings `videoPlayerUrl`/`youtubeForAllUrl` live here.
+      Moving them ripples through `PresentationArea` and `RoomNavbar`, which is its own change.
+    */
+    max: 445,
     why: 'the video, YouTube and mp3 broadcasts; receivers rather than setters, so a stop cannot be half-applied'
   },
   {
@@ -843,7 +857,7 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       `svelte-ignore` that nothing is warning under. Prose explaining a real subtlety is exactly what
       this file's header says never to shave to hit a number.
     */
-    max: 1073,
+    max: 1076,
     why: 'the composition root - 36 constructions and their citations, assembly and nothing else'
   },
   {
