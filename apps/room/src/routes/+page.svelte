@@ -177,19 +177,6 @@
   const mtxToken = $derived(data.streamRead?.mtxToken ?? '');
 
   /**
-   * A stream tab the USER clicked — the counterpart of `selectScreenTabByUser`, and deliberately
-   * NOT the same function.
-   *
-   * `onStreamTabChange(e)` is two assignments and nothing else (`:2722-2725`). It does not emit the
-   * `stopWatchScreenOf` / `startWatchScreenOf` pair that `onScreenShareTabChange` does, because
-   * every stream pane stays mounted and only its classes change. It also does not broadcast: the
-   * `prefs.makeUsersFollowMyScreens` clause lives on the SCREENSHARE path alone.
-   */
-  function selectStreamTabByUser(streamId: string) {
-    mtx.selectByUser(streamId);
-  }
-
-  /**
    * "Bring everyone here" on a STREAM tab. It sends, and that is genuinely all it does.
    *
    * Upstream this is `bringFocusToScreen(e)` — the very same method the screenshare menu calls
@@ -1328,7 +1315,7 @@
               {hideStreams}
               {streamServerMTX}
               {mtxToken}
-              {selectStreamTabByUser}
+              selectStreamTabByUser={(streamId) => mtx.selectByUser(streamId)}
               {bringEveryoneToStream}
               {toggleLockStreamMtx}
               {noteGates}

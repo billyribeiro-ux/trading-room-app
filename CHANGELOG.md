@@ -209,6 +209,55 @@ follow symlinks. Chasing it produced a corroboration instead of a defect — the
 `apps/room/vite.config.ts:81-87`. That is the mechanism the 10:52 entry recorded as closed,
 confirmed by trying to break it.
 
+## 2026-08-18
+
+### 2026-08-18 08:56 EDT — a forensic audit of all 392 tracked files, and one passthrough deleted
+
+**Runtime impact: none** — one pure-passthrough function removed, one citation moved. Gate: **2,472
+tests / 172 files**, `eslint src/` clean, `svelte-check` **1,208 / 0 / 0**, prettier clean.
+`+page.svelte` 1,531 → **1,518**.
+
+**THE AUDIT: 392 tracked files, 5.8MB, six dimensions. It came back clean.** Every instrument was
+written to a file and run over the whole tree rather than sampled.
+
+| dimension | checked | real findings |
+| --- | ---: | ---: |
+| path citations resolve | 345 | 0 |
+| `#lib/…` specifiers resolve | 669 | 0 |
+| `.only` / `.skip` in tests | 172 files | **0** |
+| test blocks with no assertion | 172 files | 0 |
+| source constants read but unused | 172 files | **0** |
+| `TODO`/`FIXME`/`HACK` markers | 375 files | 0 |
+
+**Everything the instruments flagged was the instrument, and each was run down rather than reported.**
+36 "missing files" were Rust paths under `services/`, SvelteKit internals, two truncated by my own
+regex, and one valid cross-repo citation into `new-room-control` that I confirmed exists. 7 "tests
+with no assertion" call `expectSchemaRefusal(...)`, which asserts internally. 7 "empty test files"
+use `test(` where my regex matched only `it(`. All 8 TODO markers quote the CAPTURE's own shipped
+`console.error('TODO: toggleLockScreenMTX')` — faithful reproduction of upstream's unfinished state,
+already documented as such.
+
+**ONE FINDING I RAISED AND THEN DISPROVED, recorded because the error was mine.** I reported that
+`docs/generated/realtime-protocol.json` — cited by seven files including `schema.ts` four times as
+database-column provenance — could not be produced, and said "no generator exists anywhere". That
+was FALSE. `scripts/extract-realtime-protocol.mjs` exists and works; running it regenerated the file
+in one command. My search had been `find … | head -80 | xargs grep`, and the cap silently truncated
+it. **A truncated search reported as a forensic conclusion** is the same failure this session has
+found four times in the codebase's own tests, committed by me while auditing for it. The evidence
+chain is intact: tracked capture → working generator → derived artefact, with the generator
+gitignored deliberately because it targets a live third-party app and this repository is public.
+
+**The one real change.** `selectStreamTabByUser` was a pure passthrough — `mtx.selectByUser(streamId)`
+and nothing else — carrying a docblock the class already had. Verified phrase by phrase before
+deleting: "two assignments and nothing else", `stopWatchScreenOf`, "every stream pane stays mounted"
+and the `makeUsersFollowMyScreens` clause are all in `room-mtx.svelte.ts:49-56`. The page's ONLY
+unique content was the bundle citation `app-room.full.js:2722-2725`, which moved onto `selectByUser`
+rather than being deleted with the rest.
+
+The call site is now an ARROW, not a method reference — `selectStreamTabByUser={(streamId) =>
+mtx.selectByUser(streamId)}`. A class method passed as a prop loses `this`, which is the recorded
+unbound-method trap this repository already paid for once.
+
 ### 2026-08-17 20:39 EDT — SoundCloud joins the rest of the "play for all" family, and gets executed for the first time
 
 **Runtime impact: none intended** — three handlers moved, behaviour preserved exactly. Gate:
