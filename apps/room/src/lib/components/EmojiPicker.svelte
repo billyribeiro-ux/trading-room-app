@@ -78,7 +78,7 @@
   let searchResults = $state.raw<EmojiDumpEntry[] | null>(null);
   let frequentIds = $state.raw<string[]>(FREQUENTLY_DEFAULTS.slice(0, PER_LINE));
 
-  let emojiSearchInput: HTMLInputElement | undefined;
+  let emojiSearchInput: HTMLInputElement | null = null;
   let emojiScrollElement: HTMLElement | undefined;
   const categorySections: Array<HTMLElement | undefined> = [];
 
@@ -393,14 +393,6 @@
   let scrollbarWidth = $state(0);
   const pickerWidth = $derived(EMOJI_BASE_WIDTH + scrollbarWidth);
 
-  function captureEmojiSearchInput(node: HTMLInputElement) {
-    emojiSearchInput = node;
-
-    return () => {
-      if (emojiSearchInput === node) emojiSearchInput = undefined;
-    };
-  }
-
   function captureCategorySection(index: number) {
     return (node: HTMLElement) => {
       categorySections[index] = node;
@@ -525,7 +517,7 @@
               class="ng-untouched ng-pristine ng-valid"
               type="search"
               placeholder="Search"
-              {@attach captureEmojiSearchInput}
+              bind:this={emojiSearchInput}
               oninput={(event) => handleSearch(event.currentTarget.value)}
             />
             <label class="emoji-mart-sr-only" for="emoji-mart-search-2">Search</label>

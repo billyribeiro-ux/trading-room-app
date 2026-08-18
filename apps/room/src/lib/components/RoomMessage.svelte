@@ -128,8 +128,8 @@
 
   let reactionPickerOpen = $state(false);
   let reactionPickerTrigger = $state<'menu' | 'pill' | null>(null);
-  let menuTriggerElement: HTMLAnchorElement | undefined;
-  let menuElement: HTMLDivElement | undefined;
+  let menuTriggerElement: HTMLAnchorElement | null = null;
+  let menuElement: HTMLDivElement | null = null;
   const kebabText = '⠇ ';
 
   const isOwnMessage = $derived(item.senderId === currentUserId);
@@ -421,19 +421,6 @@
     }, 500);
   }
 
-  function captureMenuTrigger(node: HTMLAnchorElement) {
-    menuTriggerElement = node;
-    return () => {
-      if (menuTriggerElement === node) menuTriggerElement = undefined;
-    };
-  }
-
-  function captureMenu(node: HTMLDivElement) {
-    menuElement = node;
-    return () => {
-      if (menuElement === node) menuElement = undefined;
-    };
-  }
 
   function hideMenuPosition() {
     if (!menuElement) return;
@@ -583,7 +570,7 @@
           <!-- svelte-ignore a11y_click_events_have_key_events -->
           <!-- svelte-ignore a11y_interactive_supports_focus -->
           <a
-            {@attach captureMenuTrigger}
+            bind:this={menuTriggerElement}
             role="button"
             id="dropdownMenuLink"
             data-bs-toggle="dropdown"
@@ -599,7 +586,7 @@
             }}>{kebabText}</a
           >
           <div
-            {@attach captureMenu}
+            bind:this={menuElement}
             aria-labelledby="dropdownMenuLink"
             class={menuOpen
               ? 'dropdown-menu users-dropdown-options show'

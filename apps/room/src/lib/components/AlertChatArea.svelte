@@ -248,20 +248,15 @@
    * the props. The chat one has no second reader and so has no prop at all.
    */
   let alertsScroller = $state<HTMLElement | undefined>();
-  let chatScroller = $state<HTMLElement | undefined>();
+  /* `| null`, because that is what `bind:this` writes on teardown — proven in
+     `dom-reference-contract.svelte.test.ts`, not assumed. */
+  let chatScroller = $state<HTMLElement | null>(null);
 
   function holdAlertsScroller(node: HTMLElement) {
     alertsScroller = node;
     captureAlertsScroller(node);
     return () => {
       if (alertsScroller === node) alertsScroller = undefined;
-    };
-  }
-
-  function holdChatScroller(node: HTMLElement) {
-    chatScroller = node;
-    return () => {
-      if (chatScroller === node) chatScroller = undefined;
     };
   }
 
@@ -747,7 +742,7 @@
           </div>
 
           <app-roomscroller
-            {@attach holdChatScroller}
+            bind:this={chatScroller}
             style="overflow-y: scroll; overflow-x: hidden; height: 100%;"
             onscroll={(event: Event) => feedScroll.trackChatScroll(event)}
           >

@@ -208,14 +208,8 @@
    * component owns; with the effect here it has no reader, and a prop whose whole job was to hand
    * an element upward is "no config nothing reads" in prop form.
    */
-  let scroller = $state<HTMLElement | undefined>();
-
-  function captureScroller(node: HTMLElement) {
-    scroller = node;
-    return () => {
-      if (scroller === node) scroller = undefined;
-    };
-  }
+  /* `| null` — what `bind:this` writes on teardown. `if (!current) return` below covers it. */
+  let scroller = $state<HTMLElement | null>(null);
 
   /*
     THIS COLUMN FOLLOWING ITS OWN MESSAGES.
@@ -369,7 +363,7 @@
       component: two scrollers with two independent positions.
     -->
     <app-extra-roomscroller
-      {@attach captureScroller}
+      bind:this={scroller}
       style="overflow-y: scroll; overflow-x: hidden; height: 100%;"
       onscroll={(event: Event) => onscroll(event.currentTarget as HTMLElement)}
     >

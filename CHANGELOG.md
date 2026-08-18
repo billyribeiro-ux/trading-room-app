@@ -211,6 +211,55 @@ confirmed by trying to break it.
 
 ## 2026-08-18
 
+### 2026-08-18 10:36 EDT — one rule for getting a DOM reference, decided on the platform's actual behaviour
+
+**An open question closed with evidence rather than a preference.** Full gate: **2,510 tests / 175
+files**, `eslint src/` clean, `svelte-check` **1,212 / 0 / 0**, prettier clean, `vite build` done.
+
+**The question.** Two forms were in use with no stated rule: `bind:this`, and a hand-written capture
+attachment — `function captureX(node) { x = node; return () => { if (x === node) x = undefined; } }`.
+A count on 2026-08-17 found the split and could not explain it; the note recorded that the obvious
+rule was false for most sites and left it open.
+
+**Measured properly, the split was not what the earlier note said.** There are 114 attachments, not
+ten — but most are BEHAVIOUR attachments (`ngbTooltip`, `setInputChecked`, `attachStream`,
+`panelDragResize`), which the docs prescribe and which were never in question. The real population
+is twelve CAPTURE attachments against seven `bind:this`.
+
+**The rule comes from the docs**: *"To get a reference to a DOM node, use `bind:this`."* So a capture
+attachment needs a reason `bind:this` cannot serve, and there turn out to be exactly three, each a
+structural limit rather than a taste:
+
+1. **It crosses a component boundary.** The page needs a node owned by `RoomShell` or
+   `AlertChatArea`; there is no `bind:this` form for that. Four sites.
+2. **It fans one node to two owners.** `holdAlertsScroller` sets the component's own reference AND
+   calls the page's prop, because `RoomAlertsPane` reads it too. `bind:this` writes one lvalue.
+3. **It does something to the node as well.** `captureFileInput` also sets `multiple`;
+   `captureCategorySection(index)` writes one array slot per item.
+
+**The other five were hand-rolling `bind:this`, teardown guard included** — and `~/CLAUDE.md` says
+it in as many words: *"Do not hand-roll what the platform already does."* Converted.
+
+**BUT THE GUARD WAS ONLY REDUNDANT IF THE PLATFORM REALLY DOES BOTH HALVES, so that is executed
+rather than assumed.** `BindThisProbe.svelte` alternates two elements binding one variable — the
+exact ordering the `=== node` check protects against — and the test mounts it and swaps. `bind:this`
+survives: the new element wins and the reference never flickers through empty.
+
+**And the probe caught something that would otherwise have shipped silently:** `bind:this` clears to
+**`null`**, where every hand-rolled capture cleared to `undefined`. The first draft asserted
+`toBeUndefined()` and went red — the instrument was wrong about the platform, not the reverse. Safe
+at all five sites only because every reader is a falsy check, which was verified at each one rather
+than assumed; the declarations now say `| null` so the type tells the truth.
+
+**`dom-reference-contract.svelte.test.ts` keeps it decided.** A capture attachment that only stores
+the node fails, naming the file and line, unless it is listed with which of the three limits
+applies — and a listed name that no longer appears anywhere fails too, so the list cannot become
+cover.
+
+**Negative controls, both red:** hand-rolling one again → *"RoomMessage.svelte:596 — {@attach
+captureMenu} … Use bind:this, or add the name to SANCTIONED"*; a stale entry → *"captureGhost is
+sanctioned but appears in no component"*.
+
 ### 2026-08-18 10:28 EDT — the roster payload gets the allow-list the page load has had all along
 
 **The class of bug, not a third instance of it.** Full gate: **2,503 tests / 174 files**, `eslint
