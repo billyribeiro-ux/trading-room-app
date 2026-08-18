@@ -242,7 +242,21 @@ export type RosterUser = {
   avatarUrl: string;
   role: string;
   status: string;
-  createdAt: Date;
+  /*
+    `createdAt` STOOD HERE and was removed on 2026-08-18, because nothing read it.
+
+    It was written once — `createdAt: user.createdAt` in the SSE route — and consumed by no client
+    code at all: not `RosterMember`, not `RosterEntryFlags`, not `RoomSidebar`'s entry generic, not
+    `targetFor`. So every member was being handed every other member's account creation date, on
+    every join and every leave, for nothing.
+
+    Deleted rather than redacted, because there is no reader to redact FOR. That is DPE rule 3 —
+    nothing exists without a consumer — and it is the cheaper half of the same lesson `locStr` and
+    `email` taught the hard way on the same day.
+
+    Note that `data.user.createdAt` on the page load is untouched and correct: that is the viewer's
+    OWN account, and `page-load-contract.test.ts` pins it in that object's allow-list deliberately.
+  */
   emailHash: string;
   /**
    * `r.isP` - the entry is a presenter.

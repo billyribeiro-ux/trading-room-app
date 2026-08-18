@@ -142,7 +142,6 @@ export const GET: RequestHandler = async ({ params, locals, request }) => {
         // They are holding an open stream, so they are online by definition - the stored column
         // is a stale snapshot from whenever it was last written.
         status: 'online',
-        createdAt: user.createdAt,
         emailHash: hashEmail(user.email),
         /*
           The real per-room standing, read once when the connection opens.

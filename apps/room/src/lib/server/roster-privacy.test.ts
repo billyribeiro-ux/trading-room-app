@@ -76,7 +76,6 @@ const rosterUser = (id: number, isP: boolean): RosterUser => ({
   avatarUrl: '',
   role: isP ? 'staff' : 'member',
   status: 'active',
-  createdAt: new Date(0),
   emailHash: `hash-${id}`,
   isP,
   isFT: false,
@@ -199,6 +198,129 @@ describe('roster location is redacted per recipient, at the hub', () => {
 
     expect(() => publishRosterToRoom(ROOM)).not.toThrow();
     expect(lastRoster(memberFrames), 'the surviving listener still got the roster').toHaveLength(2);
+  });
+});
+
+describe('the roster payload is an EXACT key set, per role', () => {
+  /*
+    THE GUARD THE SSE ROSTER NEVER HAD, and the asymmetry that let three fields through.
+
+    `page-load-contract.test.ts` pins `data.user` as an exact key set, and says why in its own
+    words: *"Pinned as an exact key set rather than as 'does not contain scrypt$': a hash format can
+    change, and an allow-list is the only form of this assertion that also catches the NEXT
+    sensitive column somebody adds to `users`."*
+
+    That guard was on the page load, which carries the viewer's OWN account. It was never on the SSE
+    roster, which carries EVERYBODY's — the strictly larger surface. So `locStr`, `email` and
+    `createdAt` all reached every member's browser, and each was found by hand rather than by a
+    failing test.
+
+    Two lists, because the two roles legitimately receive different payloads now. A new field is a
+    deliberate decision on BOTH sides: add it here and say which role may see it, or it fails.
+  */
+  const PRESENTER_KEYS = [
+    'avatarUrl',
+    'displayName',
+    // Presenter-only. Feeds the roster's exact-email search and the user-info modal's mailto: link.
+    'email',
+    // The gravatar key and `uniqueRoster`'s dedupe key. Not the address, and every role gets it.
+    'emailHash',
+    'hasAdminChat',
+    'id',
+    // `r.isFT` — the "Only select from Trials?" filter on the random draw.
+    'isFT',
+    // `r.isP` — four gates read the presenter flag off the ENTRY rather than off `role`.
+    'isP',
+    // Presenter-only. The city line, resolved by the browser and posted back after subscribe.
+    'locStr',
+    'role',
+    'status',
+    // The identity the per-row roster gate compares against.
+    'userXrefID'
+  ];
+  /* Same SHAPE for a member — the private fields arrive blank rather than absent, so the sidebar
+     renders one roster type whichever source filled it. What differs is the VALUES, asserted above. */
+  const MEMBER_KEYS = PRESENTER_KEYS;
+
+  it('sends a presenter exactly these keys and no others', () => {
+    const presenterFrames = listen(rosterUser(8, true));
+    listen(rosterUser(9, false));
+    publishRosterToRoom(ROOM);
+
+    for (const entry of lastRoster(presenterFrames)) {
+      expect(
+        Object.keys(entry).sort(),
+        'a field reached the wire that this list does not name. Add it here and say which role may see it - that is the decision this list exists to force, and skipping it is how locStr, email and createdAt each shipped.'
+      ).toEqual([...PRESENTER_KEYS].sort());
+    }
+  });
+
+  it('sends a member exactly these keys and no others', () => {
+    listen(rosterUser(10, true));
+    const memberFrames = listen(rosterUser(11, false));
+    publishRosterToRoom(ROOM);
+
+    for (const entry of lastRoster(memberFrames)) {
+      expect(Object.keys(entry).sort()).toEqual([...MEMBER_KEYS].sort());
+    }
+  });
+
+  it('agrees with the PAGE-LOAD roster on every field the sidebar reads', () => {
+    /*
+      `+page.server.ts` states the invariant — *"The roster shape must agree between the page load
+      and the SSE hub, because the sidebar renders whichever it has"* — and removing `createdAt`
+      from the hub put a difference between them for the first time. Proven here rather than
+      asserted in a comment, because a claim about two files agreeing is exactly the kind that goes
+      stale in one of them.
+
+      The consumers are what "agree" means, so they are the list: `RosterMember`,
+      `RosterEntryFlags`, `RoomSidebar`'s entry generic and `userActions.targetFor` between them
+      read these. A field either source stops sending breaks a roster the other source filled.
+    */
+    const READ_BY_THE_SIDEBAR = [
+      'id',
+      'displayName',
+      'avatarUrl',
+      'email',
+      'emailHash',
+      'role',
+      'status',
+      'userXrefID',
+      'isP',
+      'isFT',
+      'hasAdminChat',
+      'locStr'
+    ];
+
+    const pageLoad = readFileSync('src/routes/+page.server.ts', 'utf8');
+    const from = pageLoad.indexOf('const connectedUser = {');
+    expect(from, 'the page load must still build a connectedUser').toBeGreaterThan(-1);
+
+    const frames = listen(rosterUser(13, true));
+    publishRosterToRoom(ROOM);
+    const fromHub = Object.keys(lastRoster(frames)[0]);
+
+    for (const field of READ_BY_THE_SIDEBAR) {
+      expect(fromHub, `the hub must send ${field}`).toContain(field);
+      expect(
+        pageLoad.slice(from).includes(`${field}:`),
+        `the page load must send ${field}, or the sidebar breaks depending on which source filled it`
+      ).toBe(true);
+    }
+  });
+
+  it('carries no `createdAt`, which nothing ever read', () => {
+    /*
+      Named rather than left to the sweep above, because this one was not a redaction decision — it
+      was a field written once and consumed by nobody: not `RosterMember`, not `RosterEntryFlags`,
+      not `RoomSidebar`'s generic, not `targetFor`. Deleted rather than blanked, because there is no
+      reader to redact for.
+    */
+    const frames = listen(rosterUser(12, true));
+    publishRosterToRoom(ROOM);
+    for (const entry of lastRoster(frames)) {
+      expect(entry).not.toHaveProperty('createdAt');
+    }
   });
 });
 

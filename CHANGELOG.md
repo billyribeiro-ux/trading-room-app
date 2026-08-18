@@ -211,6 +211,48 @@ confirmed by trying to break it.
 
 ## 2026-08-18
 
+### 2026-08-18 10:28 EDT — the roster payload gets the allow-list the page load has had all along
+
+**The class of bug, not a third instance of it.** Full gate: **2,503 tests / 174 files**, `eslint
+src/` clean, `svelte-check` **1,211 / 0 / 0**, prettier clean, `vite build` done.
+
+**Every remaining field audited against its consumer.** `RosterMember`, `RosterEntryFlags`,
+`RoomSidebar`'s entry generic and `userActions.targetFor` between them declare exactly what a roster
+entry is read for. Twelve of the thirteen fields have a consumer. **`createdAt` has none** — written
+once in the SSE route and read by nothing, so every member was handed every other member's account
+creation date on every join and every leave.
+
+**Deleted rather than redacted**, because there is no reader to redact for — DPE rule 3. The
+viewer's own `data.user.createdAt` is untouched and still pinned in that object's allow-list, which
+is correct: that one is your own account.
+
+**THE REAL FINDING WAS THE ASYMMETRY.** `page-load-contract.test.ts` pins `data.user` as an exact
+key set and says why: *"an allow-list is the only form of this assertion that also catches the NEXT
+sensitive column somebody adds to `users`."* That guard was on the page load — which carries the
+viewer's OWN account — and never on the SSE roster, which carries EVERYBODY's. That is precisely how
+`locStr`, `email` and `createdAt` all reached the wire, each found by hand rather than by a failing
+test.
+
+The roster payload now has the same guard, as two lists because the two roles legitimately receive
+different values. A new field is a deliberate decision on both sides: name it and say which role may
+see it, or the suite fails.
+
+**A cross-shape invariant became executable.** `+page.server.ts` claims *"The roster shape must agree
+between the page load and the SSE hub, because the sidebar renders whichever it has"*, and removing
+`createdAt` put a difference between them for the first time. Rather than annotate the claim, a test
+now reads that file and checks it field by field.
+
+**Negative controls, three of them:** adding a `phoneNumber` to a roster entry →
+*"a field reached the wire that this list does not name"*; putting `createdAt` back → same, plus the
+named assertion; renaming `emailHash` in the page load → *"the page load must send emailHash, or the
+sidebar breaks depending on which source filled it"*.
+
+**One comment was written and then deliberately not shipped.** `+page.server.ts` sits exactly at its
+size ceiling, so the five lines explaining the `createdAt` difference would have raised it. The rule
+is that ceilings only go down, and the fact is already proven by a named assertion that reads that
+very file — so the assertion is the record, and the comment was dropped rather than the ceiling
+moved.
+
 ### 2026-08-18 10:12 EDT — SECURITY: the roster was also broadcasting every member's EMAIL ADDRESS
 
 **The same leak, one field over, and this one is a documented divergence from the reference.** Full
