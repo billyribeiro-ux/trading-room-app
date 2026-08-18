@@ -211,6 +211,44 @@ confirmed by trying to break it.
 
 ## 2026-08-18
 
+### 2026-08-18 11:05 EDT — the scroll-follow effects, executed: an instrument limit that was not one
+
+**The last recorded gap, closed — and the note that recorded it was wrong.** Full gate: **2,541
+tests / 180 files**, `eslint src/` clean, `svelte-check` **1,212 / 0 / 0**, prettier clean,
+`vite build` done.
+
+**What the note said.** `AlertChatArea`'s follow behaviour was written down as blocked on jsdom:
+`scrollHeight` and `offsetHeight` report `0`, so anything touching a scroller was said to need a
+real browser. I repeated that claim myself earlier today.
+
+**It is true of one function and it is not this one.** `isRoomScrollerReadingHistory` reads geometry
+— and `feed-scroll-wiring-contract.test.ts` already covers it by defining those properties on a real
+element, so even that half was never actually blocked. The two follow EFFECTS read no geometry at
+all: their decision is `alertsFollow.follows({ count, newestSenderId, viewerId, readingHistory })`,
+a pure function of counts, ids and a flag. Geometry appears only inside `forceAlertsToBottom`, which
+is the collaborator being asserted rather than exercised.
+
+**Removing the false limit is worth more than the tests.** A gap declared impossible is a gap nobody
+re-checks, and this one would have sat there for years.
+
+**Four properties pinned, each of which has been wrong in this room before:** a message arriving at
+the bottom pulls the feed down; a message arriving while the reader is UP THE LOG does not; the two
+columns are independent, so an alert must not scroll the chat; and the bottom-scroll is handed the
+scroller element it decided about, through `tick()`, only if that element is still on screen.
+
+**The suspicious part was that it passed first time**, so two assertions were tightened before being
+believed. The effect also runs on MOUNT, so the calls are cleared after the initial settle — without
+that, "an arriving alert pulls the log down" would have been green on the render and silent about
+the reactive path. And the negative is now DIFFERENTIAL: a second mount with `follows()` true proves
+the fixture can scroll, because a bare `toEqual([])` cannot tell "correctly declined" from "the
+effect never ran".
+
+**Negative controls, three, each landing on the right assertion:** deleting the follow call →
+*"expected undefined to be defined"* plus *"the control arm must scroll, or the assertion below is
+vacuous"*; ignoring `readingHistory` → *"a reader in history is left where they are"*; making the
+alerts effect depend on the chat list → *"only the chat column may move: expected
+[ 'forceAlertsToBottom', …(1) ] to deeply equal [ 'forceChatToBottom' ]"*.
+
 ### 2026-08-18 10:53 EDT — a mechanical rename had corrupted two on-screen sentences, two class names and the recording download filename
 
 **A real shipped defect, found by READING a component while writing a render test for something
