@@ -1173,8 +1173,6 @@
               ondetachalerts={() => alertsPane.detach()}
               onsavealerts={() => alertsPane.save()}
               onarchivealerts={() => alertsPane.archive()}
-              onalertsscroll={(event) => feedScroll.trackAlertsScroll(event)}
-              onchatscroll={(event) => feedScroll.trackChatScroll(event)}
               onmessageaction={(kind, action, item, payload) =>
                 messageActions.handle(kind, action, item, payload)}
               onprivatechat={() => privateChat.show()}
@@ -1348,13 +1346,7 @@
       {mobilePin}
       {theme}
       changeChatMode={(mode) => void changeChatMode(mode)}
-      closeActiveModal={() => modals.closeActive()}
-      downloadImage={(url) => modals.downloadImage(url)}
-      minimizePoll={() => modals.minimizePoll()}
-      openModal={(name) => modals.open(name)}
       saveAlertFilter={(next) => alertsPane.saveFilter(next)}
-      setTheme={(next) => modals.setTheme(next)}
-      submitPollAction={(action, values) => modals.submitPollAction(action, values)}
     />
     <!--
       `app-privchat` is its own component since 2026-08-15 — the first of the five template

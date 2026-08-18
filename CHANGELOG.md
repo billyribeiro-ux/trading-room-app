@@ -211,6 +211,45 @@ confirmed by trying to break it.
 
 ## 2026-08-18
 
+### 2026-08-18 09:38 EDT — the last two duplications, and a probe that found the scroll wiring guarded by nothing
+
+**Runtime impact: none intended** — behaviour preserved exactly. Full gate: **2,487 tests / 173
+files** (was 2,479 / 172), `eslint src/` clean, `svelte-check` **1,211 / 0 / 0**, prettier clean,
+`vite build` done. `+page.svelte` 1,408 → **1,400**.
+
+**Measured, not guessed.** An AST pass over every remaining component call site on the page counted
+props of the shape `facade.member` and flagged which facades were ALSO passed whole. Two were, and
+needed no new argument — they are exactly what the 09:16 commit settled:
+
+- **`feedScroll` in `AlertChatArea`.** That component's own note at line 144 reads *"`feedScroll`
+  arrives WHOLE rather than as six callbacks"* — and twenty lines below it, two of those callbacks
+  were declared as props anyway. It read the same object both ways.
+- **`modals` in `RoomOverlays`.** Six wrapper props beside an object the markup already reaches for
+  directly — it writes `modals.settingsTab`, `modals.modal` and `modals.selectedImageUrl`. The
+  paragraph above those props claimed *"the component asks and the page decides"*; that boundary was
+  not the one the file had for this object, and the note now says which two props it IS true of
+  (`changeChatMode`, the page's own async function, and `saveAlertFilter`, whose class is not a prop
+  here).
+
+**A PROBE, BEFORE CLAIMING THE REWRITE WAS SAFE — and it came back worse than expected.** The alerts
+scroll wiring was deleted outright and the whole suite run: **2,479 tests, 172 files, all green**,
+with read-history detection and infinite scroll disconnected. Not a defect the collapse introduced —
+the drilled prop was equally unguarded — but one it exposed.
+
+**`feed-scroll-wiring-contract.test.ts` closes it**, in two halves. Structural: `svelte.parse` pulls
+every `onscroll` expression off the `RegularElement` nodes and asserts the count FIRST, then that
+each column names its OWN tracker, because crossing them is silent — identical signatures, different
+paging and search rules. Runtime: `RoomFeedScroll` is executed against real elements, since source
+text cannot show a tracker still decides anything.
+
+**Negative controls:** the deletion that was green now fails three assertions
+(*"expected [ Array(1) ] to have a length of 2"*); crossing the trackers fails one.
+
+**One failure in that new test was MINE and is recorded as such.** The scroller stub defined
+`clientHeight`; `isRoomScrollerReadingHistory` reads `offsetHeight`, jsdom answers 0 for it, and
+"back at the bottom" came out as history. The instrument was wrong, not the code — the helper's
+docblock says so, so the next person does not re-derive it.
+
 ### 2026-08-18 09:30 EDT — three more facades, an extraction instead of a raised ceiling, and a gate widened to see attachments
 
 **Runtime impact: none intended** — behaviour preserved exactly. Full gate: **2,479 tests / 172
