@@ -23,8 +23,7 @@ function person(id: number, displayName: string): RosterUser {
     email: `${displayName.toLowerCase()}@example.test`,
     avatarUrl: '',
     role: 'user',
-    status: 'online',
-    createdAt: new Date(0)
+    status: 'online'
   } as RosterUser;
 }
 

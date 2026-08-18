@@ -21,6 +21,7 @@ export const config = {
 import {
   publishToRoom,
   roomRoster,
+  publishRosterToRoom,
   subscribeToRoom,
   type RoomEvent
 } from '#lib/server/room-events.js';
@@ -100,7 +101,7 @@ export const GET: RequestHandler = async ({ params, locals, request }) => {
       channel: 'roster',
       data: { cmd: 'getRosterCount', data: roomRoster(room).length }
     });
-    publishToRoom(room, { channel: 'roster', data: { cmd: 'getRoster', users: roomRoster(room) } });
+    publishRosterToRoom(room);
   };
 
   /*
@@ -141,7 +142,6 @@ export const GET: RequestHandler = async ({ params, locals, request }) => {
         // They are holding an open stream, so they are online by definition - the stored column
         // is a stale snapshot from whenever it was last written.
         status: 'online',
-        createdAt: user.createdAt,
         emailHash: hashEmail(user.email),
         /*
           The real per-room standing, read once when the connection opens.
@@ -189,10 +189,7 @@ export const GET: RequestHandler = async ({ params, locals, request }) => {
       });
       // `onUserJoin` in the capture. The list goes out with the count so a client never has to
       // refetch the page to learn who arrived.
-      publishToRoom(room, {
-        channel: 'roster',
-        data: { cmd: 'getRoster', users: roomRoster(room) }
-      });
+      publishRosterToRoom(room);
 
       /*
         Start reconciling this room's MediaMTX streams, if nothing already is.
@@ -228,10 +225,7 @@ export const GET: RequestHandler = async ({ params, locals, request }) => {
         data: { cmd: 'getRosterCount', data: roomRoster(room).length }
       });
       // `onUserLeave`.
-      publishToRoom(room, {
-        channel: 'roster',
-        data: { cmd: 'getRoster', users: roomRoster(room) }
-      });
+      publishRosterToRoom(room);
     }
   });
 

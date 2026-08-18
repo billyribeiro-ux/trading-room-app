@@ -165,7 +165,7 @@
   (`css/complete-app-styles.css:4992`) is what makes the screen fill the window instead of
   keeping the height it had beside them.
 
-  `videoOnlyMode` is the `r` query parameter — the media.recording-bot mode — which this room does
+  `videoOnlyMode` is the `r` query parameter — the recording-bot mode — which this room does
   not model; the same honest gap `files-gates.ts` already records for `hideFiles`. The two
   modes this room does model are bound.
 -->

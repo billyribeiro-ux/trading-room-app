@@ -34,13 +34,11 @@
     SwingAlertAction
   } from '#lib/room/trade-alerts.svelte.js';
   import type { RoomUserActions } from '#lib/room/user-actions.svelte.js';
-  import type {
-    DayTradeAlertRow,
-    FollowChatStyle,
-    ModalName,
-    SwingAlertRow,
-    Theme
-  } from '#lib/types.js';
+  /*
+    `ModalName` went with `openModal` on 2026-08-18 — the last thing in this file that named the
+    union was the removed callback's signature. `modals.open()` carries it now, from the class.
+  */
+  import type { DayTradeAlertRow, FollowChatStyle, SwingAlertRow, Theme } from '#lib/types.js';
 
   import type { PageData } from '../../routes/$types';
 
@@ -108,16 +106,24 @@
     mobilePin,
     theme,
 
-    // Page actions, passed as callbacks rather than reached for: the component asks and the page
-    // decides, which is the boundary every pane from Phase 2 already uses.
+    /*
+      Page actions, passed as callbacks rather than reached for: the component asks and the page
+      decides, which is the boundary every pane from Phase 2 already uses.
+
+      TWO OF THEM, since 2026-08-18. Six more stood here — `closeActiveModal`, `downloadImage`,
+      `minimizePoll`, `openModal`, `setTheme`, `submitPollAction` — and every one was a method of
+      `modals`, which is a prop of this component and which the markup below ALREADY reaches for
+      directly: it writes `modals.settingsTab`, `modals.modal` and `modals.selectedImageUrl` and
+      reads four more. So the boundary this paragraph describes was not the one the file had for
+      that object; the callbacks were a second path to something already in scope.
+
+      The two that remain are genuinely the page's. `changeChatMode` is the page's own async
+      function — a remote command plus `invalidateAll()` — and belongs to no class here.
+      `saveAlertFilter` is `RoomAlertsPane`'s, and that object is NOT a prop of this component, so
+      passing it to remove one callback would add one.
+    */
     changeChatMode,
-    closeActiveModal,
-    downloadImage,
-    minimizePoll,
-    openModal,
-    saveAlertFilter,
-    setTheme,
-    submitPollAction
+    saveAlertFilter
   }: {
     alerts: RoomAlerts;
     broadcasts: RoomBroadcasts;
@@ -152,18 +158,8 @@
     mobilePin: string;
     theme: Theme;
     changeChatMode: (mode: ChatMode) => void;
-    closeActiveModal: () => void;
-    downloadImage: (url: string) => void;
-    minimizePoll: () => void;
-    openModal: (name: Exclude<ModalName, null>) => void;
     /* It takes the NEXT filter - `ModalHost` calls it with the pair the modal collected. */
     saveAlertFilter: (next: { alertFilterFor: AlertFilterFor; showAlertsFrom: boolean }) => void;
-    setTheme: (theme: Theme) => void;
-    /* The page's own signature: a five-member union and a form-value record, not a loose pair. */
-    submitPollAction: (
-      action: 'savePoll' | 'deleteSavedPoll' | 'sendPoll' | 'sendPollAnswer' | 'pollDone',
-      values?: Record<string, string | number>
-    ) => Promise<boolean>;
   } = $props();
 
   /*
@@ -506,7 +502,7 @@ audio elements out of sight the same way (`#mp3player` is `display: none`). -->
   bind:alertFilterFor={alerts.filterFor}
   bind:showAlertsFrom={alerts.showFrom}
   onsavealertfilter={saveAlertFilter}
-  onopenalertfilter={() => openModal('alert-filter')}
+  onopenalertfilter={() => modals.open('alert-filter')}
   mobileAndroidUrl={data.sessData?.customMobileAppEnabled
     ? data.sessData?.customMobileAppAndroidUrl
     : null}
@@ -539,10 +535,10 @@ audio elements out of sight the same way (`#mp3player` is `display: none`). -->
   pollRestoreToken={polls.restoreToken}
   activePoll={data.activePoll}
   savedPolls={data.savedPolls}
-  onclose={closeActiveModal}
+  onclose={() => modals.closeActive()}
   onSettingsTab={(tab) => (modals.settingsTab = tab)}
   onAlertTab={(tab) => (modals.alertTab = tab)}
-  onTheme={setTheme}
+  onTheme={(next) => modals.setTheme(next)}
   onPreferenceChange={(key, value) => prefs.save(key, value)}
   saveData={mediaTransport.saveData}
   onSaveDataChange={(enabled) => mediaTransport.setSaveData(enabled)}
@@ -550,15 +546,15 @@ audio elements out of sight the same way (`#mp3player` is `display: none`). -->
   onPlayYoutube={(url) => void broadcasts.playYoutubeForAll(url)}
   onPostAlert={(submission) => composer.postAlert(submission)}
   onPastePostAlert={(submission) => composer.postPastedImage(submission)}
-  onPollMinimize={minimizePoll}
+  onPollMinimize={() => modals.minimizePoll()}
   onPollSave={(question, choices) =>
-    submitPollAction('savePoll', { q: question, choices: JSON.stringify(choices) })}
-  onPollDelete={(pollId) => submitPollAction('deleteSavedPoll', { pollId })}
+    modals.submitPollAction('savePoll', { q: question, choices: JSON.stringify(choices) })}
+  onPollDelete={(pollId) => modals.submitPollAction('deleteSavedPoll', { pollId })}
   onPollSend={(question, choices) =>
-    submitPollAction('sendPoll', { q: question, choices: JSON.stringify(choices) })}
-  onPollAnswer={(choiceIndex) => submitPollAction('sendPollAnswer', { a: choiceIndex })}
+    modals.submitPollAction('sendPoll', { q: question, choices: JSON.stringify(choices) })}
+  onPollAnswer={(choiceIndex) => modals.submitPollAction('sendPollAnswer', { a: choiceIndex })}
   onPollPostResults={(body) => composer.postPollResults(body)}
-  onPollEnd={() => submitPollAction('pollDone')}
+  onPollEnd={() => modals.submitPollAction('pollDone')}
   onAlert={(message) => (dialogs.alert = message)}
   onConfirm={(message, onconfirm) => dialogs.confirm(message, onconfirm)}
   onReplySend={messageActions.sendReplyMessage}
@@ -770,7 +766,7 @@ audio elements out of sight the same way (`#mp3player` is `display: none`). -->
             <hr />
             <button
               class="btn btn-primary btn-sm"
-              onclick={() => downloadImage(modals.selectedImageUrl as string)}
+              onclick={() => modals.downloadImage(modals.selectedImageUrl as string)}
               ><i class="fa fa-download"></i> Download Image</button
             >
           </div>

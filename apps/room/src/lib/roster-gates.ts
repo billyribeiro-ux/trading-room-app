@@ -195,6 +195,21 @@ export function uniqueRoster<T extends { emailHash?: string }>(entries: readonly
  * The capture hashes the term because its roster entries carry only `emailHash`, never the
  * address. Ours carry `email`, so the second clause is a direct comparison - same result, without
  * an md5 implementation in the browser to reach it.
+ *
+ * ## AND THAT IS TRUE FOR A PRESENTER ONLY, since 2026-08-18
+ *
+ * The sentence above described a shortcut whose real cost was privacy: carrying the address instead
+ * of the hash meant `publishRosterToRoom` handed every member every other member's email. It now
+ * redacts `email` alongside `locStr` for anyone who is not a presenter, so a member's entries
+ * arrive with `email: ''` and this second clause simply never matches for them.
+ *
+ * That is the accepted cost of the fix, chosen by the owner over adding md5 to the client bundle:
+ * a MEMBER can no longer find someone by typing their full address, which is a flow that requires
+ * already knowing it. Name search is untouched for everyone, and `emailHash` still travels, so
+ * avatars, badges and `uniqueRoster` are unaffected.
+ *
+ * If the browser ever gains an md5, the reference-faithful form is one line - compare
+ * `entry.emailHash` against the hashed term - and the address can leave the payload entirely.
  */
 export function searchRoster<T extends { displayName: string; email: string }>(
   entries: readonly T[],

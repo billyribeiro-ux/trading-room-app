@@ -36,7 +36,6 @@ const member = (id: number, displayName: string): RosterUser => ({
   avatarUrl: '',
   role: 'member',
   status: '',
-  createdAt: new Date(0),
   emailHash: `hash${id}`,
   isP: false,
   isFT: false,

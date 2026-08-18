@@ -211,6 +211,529 @@ confirmed by trying to break it.
 
 ## 2026-08-18
 
+### 2026-08-18 11:05 EDT — the scroll-follow effects, executed: an instrument limit that was not one
+
+**The last recorded gap, closed — and the note that recorded it was wrong.** Full gate: **2,541
+tests / 180 files**, `eslint src/` clean, `svelte-check` **1,212 / 0 / 0**, prettier clean,
+`vite build` done.
+
+**What the note said.** `AlertChatArea`'s follow behaviour was written down as blocked on jsdom:
+`scrollHeight` and `offsetHeight` report `0`, so anything touching a scroller was said to need a
+real browser. I repeated that claim myself earlier today.
+
+**It is true of one function and it is not this one.** `isRoomScrollerReadingHistory` reads geometry
+— and `feed-scroll-wiring-contract.test.ts` already covers it by defining those properties on a real
+element, so even that half was never actually blocked. The two follow EFFECTS read no geometry at
+all: their decision is `alertsFollow.follows({ count, newestSenderId, viewerId, readingHistory })`,
+a pure function of counts, ids and a flag. Geometry appears only inside `forceAlertsToBottom`, which
+is the collaborator being asserted rather than exercised.
+
+**Removing the false limit is worth more than the tests.** A gap declared impossible is a gap nobody
+re-checks, and this one would have sat there for years.
+
+**Four properties pinned, each of which has been wrong in this room before:** a message arriving at
+the bottom pulls the feed down; a message arriving while the reader is UP THE LOG does not; the two
+columns are independent, so an alert must not scroll the chat; and the bottom-scroll is handed the
+scroller element it decided about, through `tick()`, only if that element is still on screen.
+
+**The suspicious part was that it passed first time**, so two assertions were tightened before being
+believed. The effect also runs on MOUNT, so the calls are cleared after the initial settle — without
+that, "an arriving alert pulls the log down" would have been green on the render and silent about
+the reactive path. And the negative is now DIFFERENTIAL: a second mount with `follows()` true proves
+the fixture can scroll, because a bare `toEqual([])` cannot tell "correctly declined" from "the
+effect never ran".
+
+**Negative controls, three, each landing on the right assertion:** deleting the follow call →
+*"expected undefined to be defined"* plus *"the control arm must scroll, or the assertion below is
+vacuous"*; ignoring `readingHistory` → *"a reader in history is left where they are"*; making the
+alerts effect depend on the chat list → *"only the chat column may move: expected
+[ 'forceAlertsToBottom', …(1) ] to deeply equal [ 'forceChatToBottom' ]"*.
+
+### 2026-08-18 10:53 EDT — a mechanical rename had corrupted two on-screen sentences, two class names and the recording download filename
+
+**A real shipped defect, found by READING a component while writing a render test for something
+else.** Full gate: **2,536 tests / 179 files**, `eslint src/` clean, `svelte-check` **1,212 / 0 / 0**,
+prettier clean, `vite build` done.
+
+**What was wrong.** A substitution of `recording` → `media.recording` was applied across
+`+page.svelte` before Phase 5 slice 20 and travelled into every file the extractions carried it to.
+Correct for the FIELD — `media.recording` really is where that state lives — and wrong everywhere
+else it landed:
+
+- **`<span>You are not media.recording!</span>`** — on screen, in the recording reminder.
+- **`Can't start media.recording without screenshare`** — on screen, in the recording menu.
+- **`class="media.recording-reminder"`** and `class="media.recording-reminder-arrow"`. The captured
+  stylesheet defines `.recording-reminder` / `.recording-reminder-arrow`
+  (`captured-runtime-components.css:3993,4039`), so the banner **matched no rule and rendered
+  unstyled**.
+- **`` `room-media.recording-${stamp}.${extension}` ``** — the DOWNLOAD FILENAME a presenter gets for
+  their own recording. Twice.
+- Six comment citations, two naming files that do not exist (`media.recording-codec.ts`,
+  `media.recording-state.remote.ts`; the real ones drop the prefix).
+
+**Every one passed `svelte-check`, eslint, prettier and 2,523 tests**, because none is a type error
+and no assertion happened to read those strings.
+
+**Repaired against evidence, not inference.** "You are not recording" and "Can't start recording
+without screenshare" are both in `main.d6d3c112b59b7d0d.js` verbatim. The class names are in the
+captured stylesheet. And the filename was recovered from `media.svelte.test.ts`, which uses
+`room-recording-2026` as the recording name in seven assertions — so the intended shape was already
+pinned elsewhere in the repository while the code shipped the corrupted one.
+
+**`mechanical-rename-contract.test.ts` holds the mechanism.** One rule, chosen because it has zero
+false positives: **a static `class` attribute may not contain a `.`** A CSS class name here never
+does, so a dot is always the fingerprint of a substitution that escaped its scope. It deliberately
+does NOT try to police string content in general — "which sentences are user-visible" is not
+decidable, and a guard that guesses either misses the next one or cries wolf. The four corrupted
+strings are pinned by name beside it.
+
+**Negative controls, all three red:** the class → *"class=\"media.recording-reminder\" … the
+fingerprint of a rename that escaped its scope"*; the sentence → *"expected … to contain '<span>You
+are not recording!</span>'"*; the filename → *"expected … to contain
+'`room-recording-${stamp}.${extension}`'"*.
+
+`unbound-method-contract.test.ts` already records eleven handler props broken in one commit by "a
+mechanical rename". This is the same failure at a different target, and the gate goes in with the
+repair rather than after the next one.
+
+### 2026-08-18 10:46 EDT — the main tab strip: what a room has PAID FOR is absent, what it is merely not shown is hidden
+
+**Full gate: 2,523 tests / 177 files**, `eslint src/` clean, `svelte-check` **1,212 / 0 / 0**,
+prettier clean, `vite build` done.
+
+**A gap found by measuring, not by guessing where to look.** Every trade-alert PANE re-applies its
+own entitlement and is already rendered by a contract test — and `PresentationArea` records that the
+duplication is deliberate, *"what lets the contract test prove the component renders nothing on a
+false entitlement without standing up this whole page."* So the pane half was covered by design.
+
+**The TAB half was covered by nothing.** A search across every test file for `swingAlerts-tab`,
+`dayTradeAlerts-tab`, `videoplayer-tab` or their gate expressions returned zero hits. Delete
+`{#if swingAlerts.enabled}` from the `<li>` and leave it on the pane, and a room that never bought
+Swing Alerts shows a tab that opens an empty panel — silently, with the whole suite green.
+
+**And the real subject is sharper than "is it gated".** The capture uses TWO mechanisms and the
+component transcribes both:
+
+- **`{#if}` for ENTITLEMENTS.** `O(26, o.hasSwingTradeAlerts ? 26 : -1)`, where `-1` is
+  `ɵɵconditional`'s "instantiate nothing". The component's note: *"An entitlement that ships hidden
+  markup has already told the member the feature exists, and this one is what a room pays for."*
+- **`hidden` for MODES and ROOM SETTINGS.** `z('hidden', o.hideStreams)`, `z('hidden', o.hideFiles)`,
+  and `viewerOnlyMode` on the whole `ul#mainTabs`. The feature exists; this viewer is not being shown
+  it.
+
+A source-text assertion cannot tell those apart — both read as a conditional beside an id. **Only a
+render can**, because one produces no element and the other produces an element carrying `hidden`.
+Swapping them is invisible to every other instrument here and leaks what a room has paid for.
+
+**SSR rather than a mount**, because the question is pure markup and `{@attach}` never runs during
+SSR — no ResizeObserver, no media attachment, no jsdom, which is what makes a component with twelve
+facade props affordable to render at all.
+
+**Negative controls, both red:** ungating the tab while leaving the pane gated → *"no swingAlerts tab
+id may appear"*; dropping `hidden={hideStreams}` → *"carrying the hidden attribute"*.
+
+**Two of my own gates caught me while writing it**, which is the point of having them. The fixture's
+`data` stub omitted `files` and `FilesPane` failed on `data.files.length` — a shape guessed from the
+type rather than from what the render demanded. Then `slice-anchor-contract.test.ts` refused an
+`indexOf` used as a slice bound with nothing asserting it was found: *"`slice(-1)` yields one
+character, and every assertion below runs against that character and PASSES."* Both fixed at the
+source rather than worked around.
+
+### 2026-08-18 10:40 EDT — the roster gates, mounted: the CLIENT half of the location fix
+
+**Full gate: 2,515 tests / 176 files**, `eslint src/` clean, `svelte-check` **1,212 / 0 / 0**,
+prettier clean, `vite build` done.
+
+**Two layers, both now asserted.** The morning's security work moved `locStr` and `email` behind a
+per-recipient redaction in the SSE hub, and `roster-privacy.test.ts` proves the server withholds
+them. This proves the other half: handed a location anyway, a member's sidebar renders none. A layer
+that only works when the first one already did is not a layer.
+
+**`RoomSidebar` had no mount coverage at all** — every assertion about it read source text, which can
+prove an `{#if}` exists and cannot prove what a member's browser ends up with. That is the only
+question a privacy gate is actually asking.
+
+**The gates are the REAL ones.** `rosterRowVisible`, `rosterRowClass` and `locationVisibleTo` are
+imported and passed exactly as `+page.svelte` passes them. Stubbing them would prove the component
+calls a function, which was never in doubt.
+
+**A POSITIVE CONTROL CAUGHT MY OWN TEST PASSING FOR THE WRONG REASON.** The first draft seeded the
+session with `{}` — under which `rosterRowVisible` admits **no row at all** for a member — so "a
+member sees no location" was green against an EMPTY roster. The `toHaveLength(2)` assertion placed
+before the location check is what turned it red. Every test in the file now counts rows before it
+says anything about their contents, and the helper's docblock records why.
+
+**Negative controls, both red:** replacing the gate with a truthiness check → *"the element must be
+absent, not merely empty or hidden: expected 2 to be +0"*; ignoring the row gate → *"the ordinary
+member is not in the document at all in this room mode"*.
+
+Asserted at the DOM rather than in source because **"hidden" and "absent" are not the same thing** —
+a hidden row is still in the document, still searchable, still readable in DevTools, which is the
+distinction the whole day's work has been about.
+
+### 2026-08-18 10:36 EDT — one rule for getting a DOM reference, decided on the platform's actual behaviour
+
+**An open question closed with evidence rather than a preference.** Full gate: **2,510 tests / 175
+files**, `eslint src/` clean, `svelte-check` **1,212 / 0 / 0**, prettier clean, `vite build` done.
+
+**The question.** Two forms were in use with no stated rule: `bind:this`, and a hand-written capture
+attachment — `function captureX(node) { x = node; return () => { if (x === node) x = undefined; } }`.
+A count on 2026-08-17 found the split and could not explain it; the note recorded that the obvious
+rule was false for most sites and left it open.
+
+**Measured properly, the split was not what the earlier note said.** There are 114 attachments, not
+ten — but most are BEHAVIOUR attachments (`ngbTooltip`, `setInputChecked`, `attachStream`,
+`panelDragResize`), which the docs prescribe and which were never in question. The real population
+is twelve CAPTURE attachments against seven `bind:this`.
+
+**The rule comes from the docs**: *"To get a reference to a DOM node, use `bind:this`."* So a capture
+attachment needs a reason `bind:this` cannot serve, and there turn out to be exactly three, each a
+structural limit rather than a taste:
+
+1. **It crosses a component boundary.** The page needs a node owned by `RoomShell` or
+   `AlertChatArea`; there is no `bind:this` form for that. Four sites.
+2. **It fans one node to two owners.** `holdAlertsScroller` sets the component's own reference AND
+   calls the page's prop, because `RoomAlertsPane` reads it too. `bind:this` writes one lvalue.
+3. **It does something to the node as well.** `captureFileInput` also sets `multiple`;
+   `captureCategorySection(index)` writes one array slot per item.
+
+**The other five were hand-rolling `bind:this`, teardown guard included** — and `~/CLAUDE.md` says
+it in as many words: *"Do not hand-roll what the platform already does."* Converted.
+
+**BUT THE GUARD WAS ONLY REDUNDANT IF THE PLATFORM REALLY DOES BOTH HALVES, so that is executed
+rather than assumed.** `BindThisProbe.svelte` alternates two elements binding one variable — the
+exact ordering the `=== node` check protects against — and the test mounts it and swaps. `bind:this`
+survives: the new element wins and the reference never flickers through empty.
+
+**And the probe caught something that would otherwise have shipped silently:** `bind:this` clears to
+**`null`**, where every hand-rolled capture cleared to `undefined`. The first draft asserted
+`toBeUndefined()` and went red — the instrument was wrong about the platform, not the reverse. Safe
+at all five sites only because every reader is a falsy check, which was verified at each one rather
+than assumed; the declarations now say `| null` so the type tells the truth.
+
+**`dom-reference-contract.svelte.test.ts` keeps it decided.** A capture attachment that only stores
+the node fails, naming the file and line, unless it is listed with which of the three limits
+applies — and a listed name that no longer appears anywhere fails too, so the list cannot become
+cover.
+
+**Negative controls, both red:** hand-rolling one again → *"RoomMessage.svelte:596 — {@attach
+captureMenu} … Use bind:this, or add the name to SANCTIONED"*; a stale entry → *"captureGhost is
+sanctioned but appears in no component"*.
+
+### 2026-08-18 10:28 EDT — the roster payload gets the allow-list the page load has had all along
+
+**The class of bug, not a third instance of it.** Full gate: **2,503 tests / 174 files**, `eslint
+src/` clean, `svelte-check` **1,211 / 0 / 0**, prettier clean, `vite build` done.
+
+**Every remaining field audited against its consumer.** `RosterMember`, `RosterEntryFlags`,
+`RoomSidebar`'s entry generic and `userActions.targetFor` between them declare exactly what a roster
+entry is read for. Twelve of the thirteen fields have a consumer. **`createdAt` has none** — written
+once in the SSE route and read by nothing, so every member was handed every other member's account
+creation date on every join and every leave.
+
+**Deleted rather than redacted**, because there is no reader to redact for — DPE rule 3. The
+viewer's own `data.user.createdAt` is untouched and still pinned in that object's allow-list, which
+is correct: that one is your own account.
+
+**THE REAL FINDING WAS THE ASYMMETRY.** `page-load-contract.test.ts` pins `data.user` as an exact
+key set and says why: *"an allow-list is the only form of this assertion that also catches the NEXT
+sensitive column somebody adds to `users`."* That guard was on the page load — which carries the
+viewer's OWN account — and never on the SSE roster, which carries EVERYBODY's. That is precisely how
+`locStr`, `email` and `createdAt` all reached the wire, each found by hand rather than by a failing
+test.
+
+The roster payload now has the same guard, as two lists because the two roles legitimately receive
+different values. A new field is a deliberate decision on both sides: name it and say which role may
+see it, or the suite fails.
+
+**A cross-shape invariant became executable.** `+page.server.ts` claims *"The roster shape must agree
+between the page load and the SSE hub, because the sidebar renders whichever it has"*, and removing
+`createdAt` put a difference between them for the first time. Rather than annotate the claim, a test
+now reads that file and checks it field by field.
+
+**Negative controls, three of them:** adding a `phoneNumber` to a roster entry →
+*"a field reached the wire that this list does not name"*; putting `createdAt` back → same, plus the
+named assertion; renaming `emailHash` in the page load → *"the page load must send emailHash, or the
+sidebar breaks depending on which source filled it"*.
+
+**One comment was written and then deliberately not shipped.** `+page.server.ts` sits exactly at its
+size ceiling, so the five lines explaining the `createdAt` difference would have raised it. The rule
+is that ceilings only go down, and the fact is already proven by a named assertion that reads that
+very file — so the assertion is the record, and the comment was dropped rather than the ceiling
+moved.
+
+### 2026-08-18 10:12 EDT — SECURITY: the roster was also broadcasting every member's EMAIL ADDRESS
+
+**The same leak, one field over, and this one is a documented divergence from the reference.** Full
+gate: **2,499 tests / 174 files**, `eslint src/` clean, `svelte-check` **1,211 / 0 / 0**, prettier
+clean, `vite build` done.
+
+**Found by asking what else `roomRoster()` carries.** Having fixed `locStr`, the same payload was
+read field by field: `email`, `emailHash`, `userXrefID`, `status`, `createdAt`. The address is the
+one that matters, and `roster-gates.ts:190-197` had already written down why:
+
+> The capture hashes the term because its roster entries carry only `emailHash`, **never the
+> address**. Ours carry `email`, so the second clause is a direct comparison — same result, without
+> an md5 implementation in the browser to reach it.
+
+So the reference never puts an address in a roster entry, and this app sends **both** the address
+and its hash (`sess/[room]/events/+server.ts:139` and `:146`) to every subscriber in the room.
+
+**Not fixed unilaterally, because it was a real decision rather than a violated invariant.** Unlike
+`locStr` there was no stated rule being broken — the shortcut was deliberate and recorded, and the
+address has two live consumers: the roster's exact-email search and `ModalHost`'s `mailto:` link.
+The three options were put to the owner with their costs: add md5 to the client bundle and match the
+reference exactly; redact per recipient; or leave it and keep the record.
+
+**The owner chose to redact per recipient**, so `publishRosterToRoom` now blanks `email` alongside
+`locStr` for anyone who is not a presenter. One guard covers both, because they are one question.
+
+**The cost is stated rather than discovered later:** a MEMBER can no longer match the roster search
+box against a full address — a flow that requires already knowing it. Name search is untouched, and
+`emailHash` still travels, so avatars, chat badges and `uniqueRoster` are unaffected. That paragraph
+is written into `roster-gates.ts` beside the search itself, along with the one-line path back to the
+reference form if the browser ever gains an md5.
+
+**Negative controls, in BOTH directions.** Redacting `locStr` but not `email` fails — *"nor any
+address: expected [ 'user1@example.test', …(1) ] to deeply equal [ '', '' ]"*. Over-redacting by
+blanking `emailHash` too also fails — *"expected [ '', '' ] to deeply equal [ 'hash-1', 'hash-2' ]"*
+— so the guard is bounded on both sides rather than only forbidding.
+
+`roster-location-privacy.test.ts` is now `roster-privacy.test.ts`: it guards two fields, and a
+filename that under-describes its own scope is a small lie that compounds.
+
+### 2026-08-18 10:06 EDT — SECURITY: every member was receiving every other member's city over the SSE stream
+
+**A real privacy defect, found by auditing server state against `kit/state-management` and fixed at
+the hub.** Full gate: **2,499 tests / 174 files**, `eslint src/` clean, `svelte-check`
+**1,211 / 0 / 0**, prettier clean, `vite build` done.
+
+**What was wrong.** `RosterUser.locStr` is a member's city — `Waterbury, CT, US`. Its own docblock
+in `room-events.ts` states the invariant: *"It sits beside the IP under `privData` in the reference
+and is presenter-only on the way out — `locationVisibleTo` is the gate, and nothing here may publish
+it to a member."*
+
+The gate existed and worked. It is `roster-gates.ts:locationVisibleTo`, and `RoomSidebar.svelte`
+wraps the city line in `{#if locationVisible(user)}`, so a member's SCREEN showed nothing.
+
+**The wire was never filtered.** `roomRoster()` returns whole `RosterUser` objects, `publishToRoom`
+hands the identical object to every listener in the room, and **four** call sites published it — on
+join, on leave, on stream teardown, and every time a browser's geolocation lookup answered. A member
+with DevTools open could read every other member's city straight out of the SSE payload. The UI was
+declining to draw data it had already been handed.
+
+That is the shape the root standard names in as many words: *"Every authority decision is made on
+the server from data the server owns — never asserted by the client, ever, for any reason, because
+that was the 2026-08-07 privilege escalation and it will not be reintroduced."* A render gate is not
+an authority decision; it is a decoration over one nobody made.
+
+**The fix is `publishRosterToRoom`, and it is this file's own existing shape.** `publishChatToRoom`
+already fans out per recipient — it computes `isMention` per listener, and its docblock explains
+that the hub is the only place that knows who each recipient is. The roster now does the same:
+presenters get the roster with locations, everyone else gets it with `locStr` blanked, redacted once
+per publish rather than once per listener. Authority is the subscriber's own `isP`, set at subscribe
+time from the room's membership row server-side — which the note at that assignment records
+deliberately choosing as the SINGLE source rather than falling back to the session role.
+
+**Fails closed:** an anonymous listener has no `RosterUser`, so it is not a presenter, so it is
+redacted.
+
+**No UI change for anyone.** `locationVisibleTo` already returns false on an empty string, so a
+member's sidebar renders exactly as before; a presenter's is unchanged.
+
+**`roster-location-privacy.test.ts` EXECUTES the hub** — subscribes a real presenter and a real
+member to a real room, sets real locations, publishes, and inspects what each listener was handed.
+Source text cannot answer the only question that matters, which is what bytes reach a member. A
+second half guards the bypass: no module outside `room-events.ts` may assemble a `getRoster` frame,
+because one built elsewhere cannot redact per recipient.
+
+**Negative controls, both red.** Reverting to the shipped behaviour reproduces the leak exactly —
+*"a member must receive no location at all: expected [ 'Waterbury, CT, US', 'Lisbon, PT' ] to deeply
+equal [ '', '' ]"*. A route assembling its own frame trips the bypass guard.
+
+**The rest of the server audit was clean:** 58 server-only modules, **zero** `load()` side-effects,
+and five module-scope mutable bindings — a bootstrap latch, a rate limiter, an SSE hub, a reconcile
+registry, and a `WeakMap` keyed by the request object, which is exactly the request-scoped pattern
+the docs prescribe.
+
+### 2026-08-18 09:55 EDT — a conformance audit against the official best-practices page, and the guard that was narrower than its own rule
+
+**Runtime impact: none intended** — behaviour preserved exactly, eight values changed from a deeply
+reactive proxy to raw state. Full gate: **2,493 tests / 173 files**, `eslint src/` clean,
+`svelte-check` **1,211 / 0 / 0**, prettier clean, `vite build` done.
+
+**The audit, and it is mostly a clean bill.** Every `.svelte` file parsed with `svelte.parse` and
+every module with the TypeScript AST, checked against `svelte/best-practices` as read from the MCP
+docs this session. **Zero** `export let`, `$:`, `on:`, `<slot>`, `<svelte:fragment>`,
+`<svelte:component>`, `<svelte:self>`, `$$props`/`$$restProps`/`$$slots`, `svelte/store`,
+`$app/stores`, `$derived` handed a function, or `if (browser)` inside an effect.
+
+**Eight imperative `window`/`document` listeners: examined, none is a defect.** The docs prefer
+`<svelte:window>`, and the reason these cannot use it is technical, not stylistic: three of the four
+sites register `scroll` in the CAPTURE phase (`addEventListener('scroll', place, true)`), which the
+element form cannot express — scroll does not bubble, so a popover inside a nested scroller would
+stop tracking. The rest are node-scoped attachments, conditional-while-open, or pointer handlers
+attached for the duration of a drag inside an event handler, which is what the docs prescribe.
+
+**THE REAL FINDING WAS THE GUARD.** `state-raw-contract.test.ts` already enforced the
+`$state`-vs-`$state.raw` rule and enforced it well — but its corpus was
+`readdirSync('src/lib/room')` and it read only class fields. It had never seen a `.svelte`
+component or a plain `let x = $state(…)`. Eight replace-only objects were sitting in that blind
+spot, and the two that matter are hot:
+
+- **`captionHistory`** — 500 entries, replaced wholesale up to twice a second; every entry
+  re-proxied on each arrival.
+- **`globalChatStyle`** — read by `messageChrome`, so the proxy landed on EVERY rendered message.
+
+Plus `advancedSearchResults` (unbounded by anything the room controls), `uploadQueue`,
+`searchResults`, `micDevices`, `audioDevices`, `videoDevices`. Same failure shape
+`source-size-contract` and `unbound-method-contract` each record paying for once: a guard whose
+corpus is narrower than its rule reads as coverage.
+
+**AND THE FIRST SWEEP GOT THREE OF THEM WRONG, which is why the widening carries a second half.**
+`userPermissions`, `followChatStyle` and `chatStyle` are mutated by `bind:checked={…​.hasMic}` and
+friends — a two-way binding to a MEMBER is a property write, and the sweep had walked only the
+`<script>` AST. Converting them would have silently broken six settings toggles and a colour picker
+**with the suite fully green**, because mutating raw state does not throw. Mutation is now decided
+from the script AST *and* the template's `BindDirective` nodes.
+
+**Negative controls, both directions red:** reverting `captionHistory` to `$state` →
+*"src/routes/+page.svelte — captionHistory"*; making the bind-mutated `userPermissions` raw →
+*"and no $state.raw is mutated in place, which would silently do nothing"*.
+
+**The evidence for each conversion is an ASSERTION, not a comment.** Both files sit at a size
+ceiling, and the rule is that ceilings only go down — so rather than raise one or shorten prose, the
+per-site notes moved into the contract's named-assertion block, which is where `#evidence` and
+`#notices` already were. A check re-proves the claim on every run; a comment only repeats it.
+
+### 2026-08-18 09:38 EDT — the last two duplications, and a probe that found the scroll wiring guarded by nothing
+
+**Runtime impact: none intended** — behaviour preserved exactly. Full gate: **2,487 tests / 173
+files** (was 2,479 / 172), `eslint src/` clean, `svelte-check` **1,211 / 0 / 0**, prettier clean,
+`vite build` done. `+page.svelte` 1,408 → **1,400**.
+
+**Measured, not guessed.** An AST pass over every remaining component call site on the page counted
+props of the shape `facade.member` and flagged which facades were ALSO passed whole. Two were, and
+needed no new argument — they are exactly what the 09:16 commit settled:
+
+- **`feedScroll` in `AlertChatArea`.** That component's own note at line 144 reads *"`feedScroll`
+  arrives WHOLE rather than as six callbacks"* — and twenty lines below it, two of those callbacks
+  were declared as props anyway. It read the same object both ways.
+- **`modals` in `RoomOverlays`.** Six wrapper props beside an object the markup already reaches for
+  directly — it writes `modals.settingsTab`, `modals.modal` and `modals.selectedImageUrl`. The
+  paragraph above those props claimed *"the component asks and the page decides"*; that boundary was
+  not the one the file had for this object, and the note now says which two props it IS true of
+  (`changeChatMode`, the page's own async function, and `saveAlertFilter`, whose class is not a prop
+  here).
+
+**A PROBE, BEFORE CLAIMING THE REWRITE WAS SAFE — and it came back worse than expected.** The alerts
+scroll wiring was deleted outright and the whole suite run: **2,479 tests, 172 files, all green**,
+with read-history detection and infinite scroll disconnected. Not a defect the collapse introduced —
+the drilled prop was equally unguarded — but one it exposed.
+
+**`feed-scroll-wiring-contract.test.ts` closes it**, in two halves. Structural: `svelte.parse` pulls
+every `onscroll` expression off the `RegularElement` nodes and asserts the count FIRST, then that
+each column names its OWN tracker, because crossing them is silent — identical signatures, different
+paging and search rules. Runtime: `RoomFeedScroll` is executed against real elements, since source
+text cannot show a tracker still decides anything.
+
+**Negative controls:** the deletion that was green now fails three assertions
+(*"expected [ Array(1) ] to have a length of 2"*); crossing the trackers fails one.
+
+**One failure in that new test was MINE and is recorded as such.** The scroller stub defined
+`clientHeight`; `isRoomScrollerReadingHistory` reads `offsetHeight`, jsdom answers 0 for it, and
+"back at the bottom" came out as history. The instrument was wrong, not the code — the helper's
+docblock says so, so the next person does not re-derive it.
+
+### 2026-08-18 09:30 EDT — three more facades, an extraction instead of a raised ceiling, and a gate widened to see attachments
+
+**Runtime impact: none intended** — behaviour preserved exactly. Full gate: **2,479 tests / 172
+files**, `eslint src/` clean, `svelte-check` **1,210 / 0 / 0**, prettier clean, `vite build` done.
+`+page.svelte` 1,431 → **1,408**; `PresentationArea.svelte` 1,159 → **1,112**; new
+`WebcamStrip.svelte` at 124.
+
+**The same collapse, three more times, each with its own argument** — because the previous commit's
+note said `webcams` / `notes` / `broadcasts` were "a different slice, with its own argument to
+make", and a note that defers work is worth nothing if the work then happens unargued.
+
+- **`webcams`** — the four props were arrows wrapping four methods of one object, and the wrapping
+  was not stylistic. `unbound-method-contract.test.ts` records that **the four webcam attachments
+  were among thirteen props that threw on the first click in every room**. Passing the object
+  removes the hazard instead of wrapping around it.
+- **`notes`** — six props, and one is the reason. `submitMutation` is GENERIC, and a generic cannot
+  survive a prop hop by itself, so the page carried a **five-line wrapper whose entire job was to
+  re-declare the type parameter and forward it**. Twelve lines of interface and five of markup
+  existed to move one method across one boundary with its type intact. All seventeen are gone.
+- **`broadcasts`** — thirteen props spread across three sections of the interface because they
+  arrived with three features. The page was already handing this same object WHOLE to `RoomOverlays`
+  twenty lines below where it decomposed it for this component.
+
+**IT LANDED OVER, AND THE ANSWER WAS ANOTHER EXTRACTION.** The page fell 23 but `PresentationArea`
+rose to 1,174, because each argument arrived as prose. The ratchet's own rule is that ceilings only
+go down and *"if you find yourself raising one, that is the conversation this file exists to
+force"*. So it was not raised: **`app-webcam-holder` left for `WebcamStrip.svelte`**, which is the
+seam the CAPTURE draws — that file held the markup of two Angular components and its own header
+opens by naming both. Its "one component and not seven" argument covers the seven tab panes, which
+share `mainTab`; the strip shares nothing with any tab. 84 lines out, ending at 1,112.
+
+**A GATE WIDENED IN THE COMMIT THAT CREATED THE EXPOSURE.** `unbound-method-contract.test.ts`
+inspected `Attribute` nodes only, so `{@attach instance.method}` was invisible to it — the same
+`this`-loss failure in a different AST node. Moving the strip put two attach sites into a new file
+where `attachLocal` IS the attachment and must be wrapped, and nothing in the toolchain would have
+reported dropping that wrapper. It now reads `AttachTag` too, and unwraps ternaries, because the
+strip's own attach is a conditional with one wrapped branch and one factory call.
+
+**Negative controls, both red with exact diagnostics:** dropping the wrapper →
+*"WebcamStrip.svelte:102 — {@attach webcams.attachLocal} passes a METHOD by reference"*; wiring both
+YouTube buttons to one handler → *"expected '() => void broadcasts.stopYoutubeForA…' to contain
+'broadcasts.closeYoutubeFrame()'"*.
+
+**`WebcamStrip` got its ceiling in the commit that created it**, because `PresentationArea` went
+uncapped for all of Phase 5 for exactly the opposite reason. And `webcam-contract.test.ts` stopped
+reading `PresentationArea` entirely — after the strip moved, not one assertion had anything left to
+ask of it, which is the cleanest evidence the seam was real.
+
+### 2026-08-18 09:16 EDT — twenty-one props that were members of two objects already being passed
+
+**Runtime impact: none intended** — behaviour preserved exactly. Full gate: **2,476 tests / 172
+files**, `eslint src/` clean, `svelte-check` **1,209 / 0 / 0**, prettier clean, `vite build` done.
+`+page.svelte` 1,452 → **1,431**; `PresentationArea.svelte` 1,181 → **1,159**.
+
+**The slice was named in the code, by whoever deferred it.** `PresentationArea.svelte` carried a
+note on its `screens` prop: *"They sit beside the twelve drilled screen props rather than replacing
+them, deliberately: collapsing those twelve is a real slice with its own ripple … and folding it
+into an effect move would have made one commit that did two things."* Its ceiling entry made the
+same prediction. Counted rather than trusted, it was **twenty-one, not twelve**: seventeen members
+of `screens` and four of `mediaTransport`, both already props here.
+
+**Every one was the shape `member={facade.member}`** — the page handing over a getter it had just
+handed over. The duplication was already visible INSIDE the one file: the spatial-layer effect read
+`mediaTransport.screenStreams.size` through the facade while `ScreenPane` five hundred lines below
+read a drilled `screenStreams` prop. Same map, two names.
+
+**`isFullScreenshare` stopped being `$bindable`.** `RoomScreens` declares a real setter, so the
+fullscreen control writes `screens.isFullScreenshare` directly — the pattern `files` already
+records for `bind:fileTab`, and the `$props` docs' warning about mutating props is about state
+PROXIES a component does not own, not about a setter on a class instance.
+
+**`volume` and the four webcam callbacks are deliberately still drilled**, and the interface says
+why: `RoomVolume` and `RoomWebcams` are not passed here, so collapsing those would ADD a prop
+rather than remove one. A different slice with its own argument to make.
+
+**Four assertions broke; one is now read from the AST.** `focus-on-screen-contract`'s loop guard
+spanned two files as two substring checks, because the wiring travelled through the deleted prop.
+Re-typing them as one new string would have rebuilt the weakness — a `toContain` cannot tell an
+attribute on `<ScreenTabs>` from the same characters in a comment or in dead markup. It now locates
+the component node and reads `onselect`'s own expression through `svelte.parse`, the idiom
+`each-key-contract.test.ts` established. **Negative controls, both red:** wiring the click to the
+silent `selectScreenTabOfId` → *"expected '(id) => mediaTransport.selectScreenTa…' to be '(id) =>
+screens.selectTab(id)'"*; deleting the strip entirely → *"<ScreenTabs onselect> must exist:
+expected null not to be null"* — the helper returns `null`, never `''`, which is the exact failure
+this file records shipping once already.
+
+**`+page.svelte` is no longer read by that contract at all, and the constant was deleted rather
+than left.** An unread `readFileSync` is how a guard goes green against nothing.
+
 ### 2026-08-18 09:03 EDT — the freshness poll and the visibility rules leave the page, and four assertions stop reading text
 
 **Runtime impact: none intended** — behaviour preserved exactly. Gate: **2,476 tests / 172 files**,

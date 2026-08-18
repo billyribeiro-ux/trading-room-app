@@ -349,7 +349,7 @@
    * `this.msgs = []`, `this.loading = !1`, and the `search` object.
    */
   let advancedSearch = $state(emptySearch());
-  let advancedSearchResults = $state<SearchableAlert[]>([]);
+  let advancedSearchResults = $state.raw<SearchableAlert[]>([]);
   let advancedSearchLoading = $state(false);
   /** `selectedTradersStr` / `selectedRoomsStr` - empty string means "show the placeholder span". */
   const selectedTradersStr = $derived(selectedLabel(advancedSearch.traders));
@@ -537,13 +537,13 @@
   let echoCancellation = $state(false);
   let noiseSuppression = $state(false);
   let autoGainControl = $state(false);
-  let audioDevices = $state([
+  let audioDevices = $state.raw([
     {
       deviceId: '953f11aeca98147407fe5afe290dc18b384306c979179ce7a96ec4b92148ab5b',
       label: 'Studio Display Microphone (05ac:1118)'
     }
   ]);
-  let videoDevices = $state([
+  let videoDevices = $state.raw([
     {
       deviceId: '2da3a3313185023c68e57b8bd07c010fe3975db1a2962584c0b6b493aa5c708a',
       label: 'Studio Display Camera (15bc:0000)'
@@ -668,7 +668,7 @@
   let isTestRunning = $state(false);
   let showConnectivityMessage = $state(false);
   let connectivityMessageText = $state('');
-  let micDevices = $state<Array<{ deviceId: string; label: string }>>([]);
+  let micDevices = $state.raw<Array<{ deviceId: string; label: string }>>([]);
   let micDevicesLoading = $state(false);
   let micDevicesLoaded = $state(false);
   let selectedMicDeviceId = $state('');
@@ -1173,7 +1173,7 @@
    * Note it REPLACES the list each time rather than appending, so picking files twice keeps only
    * the second selection. Reproduced.
    */
-  let uploadQueue = $state<File[]>([]);
+  let uploadQueue = $state.raw<File[]>([]);
   let uploadListVisible = $state(false);
   let dragHover = $state(false);
   let uploadStatus = $state<string | null>(null);

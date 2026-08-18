@@ -669,13 +669,19 @@ describe('room-wide sound', () => {
 
   it('binds the audio element to the url, so something actually plays', () => {
     // It was `src=""`, which is the whole reason the feature made no sound.
-    // The element moved to `PresentationArea.svelte` on 2026-08-15; `mp3Url` is still the
-    // page's state, handed over as a prop.
+    /*
+      The element moved to `PresentationArea.svelte` on 2026-08-15, and the URL stopped being a
+      drilled prop on 2026-08-18: `broadcasts` is passed WHOLE, so the pane reads the member off the
+      object that owns it instead of off a copy the page forwarded. `RoomBroadcasts.mp3Url` is a
+      getter over `#mp3Url`, which `mp3Started` / `mp3Stopped` write from the `cmds` channel — one
+      source, read where it lives.
+    */
     const paneSource = readFileSync('src/lib/components/PresentationArea.svelte', 'utf8');
-    expect(paneSource).toContain("src={mp3Url ?? ''}");
+    expect(paneSource).toContain("src={broadcasts.mp3Url ?? ''}");
     // `#mp3player` is the capture's id and setBkgMusicVol reaches it by that selector.
     expect(paneSource).toContain('id="mp3player"');
-    expect(pageSource).toContain('mp3Url={broadcasts.mp3Url}');
+    // The page's job is now only to hand the object over; it names no member of it.
+    expect(pageSource).toContain('{broadcasts}');
   });
 
   it('gates Stop For All on BOTH presenter and playing', () => {
@@ -686,7 +692,10 @@ describe('room-wide sound', () => {
     const filesPane = readFileSync('src/lib/components/FilesPane.svelte', 'utf8');
     expect(filesPane).toContain('{#if isPresenter && mp3Playing}');
     expect(filesPane).toContain('Stop For All');
-    expect(pageSource).toContain('mp3Playing={broadcasts.mp3Playing}');
+    // Still handed down, one hop shorter: the page gives `PresentationArea` the object and IT
+    // names the member for `FilesPane`, which is the pane that renders the control.
+    const paneSource = readFileSync('src/lib/components/PresentationArea.svelte', 'utf8');
+    expect(paneSource).toContain('mp3Playing={broadcasts.mp3Playing}');
   });
 
   it('keeps mp3Playing as its own flag rather than deriving it from the url', () => {

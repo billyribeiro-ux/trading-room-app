@@ -242,7 +242,21 @@ export type RosterUser = {
   avatarUrl: string;
   role: string;
   status: string;
-  createdAt: Date;
+  /*
+    `createdAt` STOOD HERE and was removed on 2026-08-18, because nothing read it.
+
+    It was written once — `createdAt: user.createdAt` in the SSE route — and consumed by no client
+    code at all: not `RosterMember`, not `RosterEntryFlags`, not `RoomSidebar`'s entry generic, not
+    `targetFor`. So every member was being handed every other member's account creation date, on
+    every join and every leave, for nothing.
+
+    Deleted rather than redacted, because there is no reader to redact FOR. That is DPE rule 3 —
+    nothing exists without a consumer — and it is the cheaper half of the same lesson `locStr` and
+    `email` taught the hard way on the same day.
+
+    Note that `data.user.createdAt` on the page load is untouched and correct: that is the viewer's
+    OWN account, and `page-load-contract.test.ts` pins it in that object's allow-list deliberately.
+  */
   emailHash: string;
   /**
    * `r.isP` - the entry is a presenter.
@@ -398,6 +412,84 @@ export function publishToRoom(room: string, event: RoomEvent): void {
     try {
       listener(event);
     } catch (error) {
+      console.error('[room-events] subscriber failed', error);
+    }
+  }
+}
+
+/**
+ * Fan the ROSTER out, deciding per recipient which private fields they may see.
+ *
+ * Two fields are presenter-only: `locStr` and `email`. They are redacted together because they are
+ * one question — "may this recipient see another member's personal details" — and splitting them
+ * would be two answers to it.
+ *
+ * ## `email`, added 2026-08-18 on the owner's decision
+ *
+ * The REFERENCE never puts an address in a roster entry. `roster-gates.ts` records it verbatim:
+ * *"The capture hashes the term because its roster entries carry only `emailHash`, never the
+ * address. Ours carry `email`, so the second clause is a direct comparison — same result, without
+ * an md5 implementation in the browser to reach it."* That shortcut put every member's address in
+ * every other member's browser.
+ *
+ * The address is kept for PRESENTERS because two features need it — the roster's exact-email search
+ * and the user-info modal's `mailto:` link — and a presenter is the role the reference trusts with
+ * `privData` anyway. A member keeps `emailHash`, so avatars and badge lookups are unaffected; what
+ * they lose is matching the roster search box against a full address, which is a flow that requires
+ * already knowing the address. Recorded as the accepted cost of the choice rather than discovered
+ * later as a regression.
+ *
+ * ## The defect this closes, found 2026-08-18
+ *
+ * `locStr` is documented three hundred lines above as *"presenter-only on the way out —
+ * `locationVisibleTo` is the gate, and nothing here may publish it to a member."* The gate existed
+ * and worked, but it is `roster-gates.ts:locationVisibleTo`, which runs in the BROWSER: the sidebar
+ * wraps the city line in `{#if locationVisible(user)}` and draws nothing for a member.
+ *
+ * The wire was never filtered. `roomRoster()` returns whole `RosterUser` objects, `publishToRoom`
+ * hands the same object to every listener, and three call sites published it on every join, every
+ * leave, and every time a browser's geolocation lookup answered. So a member's DevTools network tab
+ * showed every other member's city — the UI declined to draw data it had already been given.
+ *
+ * That is the exact shape the root standard forbids: *"Every authority decision is made on the
+ * server from data the server owns — never asserted by the client, ever, for any reason."* A render
+ * gate is not an authority decision; it is a decoration over one that was never made.
+ *
+ * ## Why the decision is safe to make here
+ *
+ * The subscriber map already holds WHO each listener is, and `RosterUser.isP` is set at subscribe
+ * time from `membership?.isP` — read from the room's own membership row, server-side, and the note
+ * at that assignment records deliberately choosing it as the SINGLE source rather than falling back
+ * to the session role. So the authority is server-owned, and an anonymous listener (`user === null`)
+ * is not a presenter and is redacted, which fails closed.
+ *
+ * This is `publishChatToRoom`'s shape, for `publishChatToRoom`'s reason: the answer differs per
+ * recipient, and the hub is the only place that knows who each recipient is.
+ */
+export function publishRosterToRoom(room: string): void {
+  const listeners = subscribers.get(room);
+  if (!listeners) return;
+
+  const forPresenters = roomRoster(room);
+  /*
+    Redacted ONCE per publish rather than per listener: this runs on every join and every leave, so
+    a room of fifty is one pass over the roster and not fifty.
+
+    An entry with neither field set is passed through BY REFERENCE — that is the common case for
+    `locStr`, which stays empty until a browser's geolocation lookup answers.
+  */
+  const forMembers = forPresenters.map((entry) =>
+    entry.locStr === '' && entry.email === '' ? entry : { ...entry, locStr: '', email: '' }
+  );
+
+  for (const [listener, viewer] of listeners) {
+    try {
+      listener({
+        channel: 'roster',
+        data: { cmd: 'getRoster', users: viewer?.isP === true ? forPresenters : forMembers }
+      });
+    } catch (error) {
+      // Same contract as `publishToRoom`: one dead connection must not silence the room.
       console.error('[room-events] subscriber failed', error);
     }
   }

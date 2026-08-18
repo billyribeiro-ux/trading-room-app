@@ -222,7 +222,10 @@ describe('the screens tab bar is not conditional on anyone sharing', () => {
     // defect, and a test that matches its own explanation proves nothing.
     const source = page.replace(/<!--[\s\S]*?-->/g, '').replace(/\/\*[\s\S]*?\*\//g, '');
 
-    const guard = source.indexOf('sharedScreens.length === 0');
+    // `mediaTransport.screens` since 2026-08-18: the drilled `sharedScreens` prop was one of the
+    // twenty-one members re-passed beside a facade the component already had. Same list, read
+    // through the object that owns it — the ORDER this test is about is untouched.
+    const guard = source.indexOf('mediaTransport.screens.length === 0');
     expect(guard, 'the idle heading guard must still exist').toBeGreaterThan(-1);
 
     const heading = source.indexOf('No one is presenting right now...', guard);

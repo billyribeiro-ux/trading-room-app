@@ -28,8 +28,27 @@ const stripComments = (source: string) =>
   point at whichever file owns each subject: markup here, the handlers and gates behind it on the
   page.
 */
-const paneCode = stripComments(
-  readFileSync(new URL('./components/PresentationArea.svelte', import.meta.url), 'utf8')
+/*
+  `PresentationArea.svelte` IS NO LONGER READ HERE, and that is the cleanest evidence the seam was
+  a real one: after the strip moved, not one assertion in this file had anything left to ask of that
+  component. The constant is deleted rather than left reading a file nothing questions — an unread
+  `readFileSync` is how a guard goes green against nothing.
+*/
+/*
+  THE STRIP MOVED AGAIN on 2026-08-18, to `WebcamStrip.svelte`, and this is the file the card
+  markup now lives in.
+
+  `PresentationArea` held the markup of two Angular components — its own header opens
+  "`app-webcam-holder` + `app-presentationarea`" — and its argument for staying one component
+  covers the seven TAB PANES, which share `mainTab`. The strip is a sibling of the tab area upstream
+  and shares nothing with any tab, so it is the reference's seam rather than an invented one.
+
+  Read as its OWN source. Leaving this pointed at `PresentationArea` would have left the card
+  assertions passing against a file that no longer renders a card — the shape this suite has been
+  caught in before.
+*/
+const stripCode = stripComments(
+  readFileSync(new URL('./components/WebcamStrip.svelte', import.meta.url), 'utf8')
 );
 
 /*
@@ -134,7 +153,17 @@ describe('webcam: this room reproduces that split', () => {
     // `removePresenterWebcam` calls `container.remove(idx)`; here the {#each} drops the node.
     const remove = bodyOf('removeWebcamPresenter');
     expect(remove).toContain('splice');
-    expect(paneCode).toContain('{#each webcamPresenters as presenter, index (presenter.id)}');
+    /*
+      KEYED, and that is the point: `(presenter.id)` is what lets Svelte remove the card's own node
+      rather than reuse it for the next presenter, which is `container.remove(idx)`.
+
+      The list arrives as `presenters` now. `WebcamStrip` takes the transport's array as a VALUE
+      rather than taking the transport — it reads one member of it, and passing the whole object to
+      reach one list would be the drilling the 2026-08-18 slices removed, in reverse.
+    */
+    expect(stripCode).toContain('{#each presenters as presenter, index (presenter.id)}');
+    // And the card is still keyed to the presenter, which is what the capture's ids do.
+    expect(stripCode).toContain('id="webcamsHolder-{presenter.id}"');
   });
 });
 

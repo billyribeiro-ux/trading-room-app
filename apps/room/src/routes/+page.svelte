@@ -274,8 +274,10 @@
   
 
   
+  /* RAW: `mergeGlobalChatStyle` replaces it whole; `ModalHost` spread-copies before binding, so no
+     one writes through this reference. Read by `messageChrome`, i.e. on every rendered message. */
   // svelte-ignore state_referenced_locally
-  let globalChatStyle = $state<FollowChatStyle>({
+  let globalChatStyle = $state.raw<FollowChatStyle>({
     ...defaultChatStyleForTheme(theme),
     ...loadedChatStyle
   });
@@ -332,9 +334,11 @@
   let currentCaption = $state<{ timestamp: number; sender: string; text: string; live?: boolean } | null>(
     null
   );
-  let captionHistory = $state<{ timestamp: number; sender: string; text: string; live?: boolean }[]>(
-    []
-  );
+  /* RAW: replaced whole by `pushCaptionHistory` (spread + `slice`), never written into. 500 entries
+     rebuilt up to twice a second is the worst proxy cost in the room. `state-raw-contract.test.ts`. */
+  let captionHistory = $state.raw<
+    { timestamp: number; sender: string; text: string; live?: boolean }[]
+  >([]);
   let speechRecoHistoryMode = $state(false);
   /**
    * How many finalised lines the transcript keeps.
@@ -665,7 +669,7 @@
   }
 
   /**
-   * Tells the room what this presenter's recorder is doing. `media.recording-state.remote.ts` carries the
+   * Tells the room what this presenter's recorder is doing. `recording-state.remote.ts` carries the
    * reasoning for all of it: why the room is told rather than each browser reading its own flag, why
    * `cmd` is the command's schema instead of four restated strings, and why the catch is here once
    * rather than at each of the four `void`-ed call sites.
@@ -1173,8 +1177,6 @@
               ondetachalerts={() => alertsPane.detach()}
               onsavealerts={() => alertsPane.save()}
               onarchivealerts={() => alertsPane.archive()}
-              onalertsscroll={(event) => feedScroll.trackAlertsScroll(event)}
-              onchatscroll={(event) => feedScroll.trackChatScroll(event)}
               onmessageaction={(kind, action, item, payload) =>
                 messageActions.handle(kind, action, item, payload)}
               onprivatechat={() => privateChat.show()}
@@ -1218,34 +1220,10 @@
               archivesAvailable={gates.archivesAvailable}
               openTranscriptPage={() => alertsPane.openTranscript()}
               {previewWindowsVisible}
-              webcamPresenters={mediaTransport.webcamPresenters}
-              webcamCard={(presenter, index) => webcams.card(presenter, index)}
-              attachLocalWebcam={(node) => webcams.attachLocal(node)}
-              attachRemoteWebcam={(producerId) => webcams.attachRemote(producerId)}
-              closeWebcamPreview={(presenter) => webcams.closePreview(presenter)}
+              {webcams}
               videoDisabled={prefs.videoDisabled}
-              sharedScreens={mediaTransport.screens}
-              selectedScreenTab={screens.selectedTab}
-              forcedScreenId={screens.forcedId}
-              lockedScreenId={screens.lockedId}
-              detachedScreenId={screens.detachedScreenId}
-              screenStreams={mediaTransport.screenStreams}
-              screenPans={screens.pans}
-              zoomLevel={screens.zoomLevel}
-              showZoomCtrl={screens.showZoomCtrl}
-              bind:isFullScreenshare={screens.isFullScreenshare}
               volume={roomVolume.volume}
-              saveData={mediaTransport.saveData}
               {screenVolume}
-              selectScreenTabByUser={(id) => screens.selectTab(id)}
-              detachScreen={(id) => screens.detach(id)}
-              toggleLockScreen={(id) => screens.toggleLock(id)}
-              bringEveryoneToScreen={(id) => screens.bringEveryoneTo(id)}
-              stopSharedScreen={(id) => screens.stop(id)}
-              togglePanZoom={() => screens.toggleZoomControls()}
-              panZoomIn={() => screens.zoomIn()}
-              panZoomOut={() => screens.zoomOut()}
-              panZoomReset={() => screens.resetZoom()}
               {hideStreams}
               {streamServerMTX}
               {mtxToken}
@@ -1254,33 +1232,13 @@
               {toggleLockStreamMtx}
               {noteGates}
               {giphyApiKey}
-              newNoteOpen={notes.newNoteOpen}
-              onNewNoteOpenChange={(open) => (notes.newNoteOpen = open)}
-              mountNewNoteLink={(menu) => notes.mountNewNoteLink(menu)}
-              submitNoteMutation={<Success extends Record<string, unknown>>(
-                action: Parameters<typeof notes.submitMutation>[0],
-                values: Parameters<typeof notes.submitMutation>[1]
-              ) => notes.submitMutation<Success>(action, values)}
-              loadNoteVersions={(noteId) => notes.loadVersions(noteId)}
+              {notes}
               uploadAlertFiles={(files) => composer.uploadAlertFiles(files)}
               {swingAlerts}
               {dayTradeAlerts}
-              hideVideoPlayer={broadcasts.hideVideoPlayer}
-              videoPlayerUrl={broadcasts.videoPlayerUrl}
-              scheduledVideoForAll={broadcasts.scheduledVideoForAll}
-              playVideoForAll={(url) => broadcasts.playVideoForAll(url)}
-              scheduleVideoForAll={(url, whenLocal) => broadcasts.scheduleVideoForAll(url, whenLocal)}
-              stopVideoForAll={() => broadcasts.stopVideoForAll()}
+              {broadcasts}
               {files}
-              mountUploadFileLink={(menu) => notes.mountUploadFileLink(menu)}
-              playMp3ForAll={(url) => broadcasts.playMp3ForAll(url)}
-              stopMp3ForAll={() => broadcasts.stopMp3ForAll()}
               openModal={(name) => modals.open(name)}
-              youtubeForAllUrl={broadcasts.youtubeForAllUrl}
-              stopYoutubeForAll={() => broadcasts.stopYoutubeForAll()}
-              closeYoutubeFrame={() => broadcasts.closeYoutubeFrame()}
-              mp3Playing={broadcasts.mp3Playing}
-              mp3Url={broadcasts.mp3Url}
               {setAutoplayAttribute}
             />
           {/snippet}
@@ -1392,13 +1350,7 @@
       {mobilePin}
       {theme}
       changeChatMode={(mode) => void changeChatMode(mode)}
-      closeActiveModal={() => modals.closeActive()}
-      downloadImage={(url) => modals.downloadImage(url)}
-      minimizePoll={() => modals.minimizePoll()}
-      openModal={(name) => modals.open(name)}
       saveAlertFilter={(next) => alertsPane.saveFilter(next)}
-      setTheme={(next) => modals.setTheme(next)}
-      submitPollAction={(action, values) => modals.submitPollAction(action, values)}
     />
     <!--
       `app-privchat` is its own component since 2026-08-15 — the first of the five template

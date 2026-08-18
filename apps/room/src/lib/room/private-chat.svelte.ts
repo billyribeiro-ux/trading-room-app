@@ -443,7 +443,7 @@ export class RoomPrivateChat<User extends { id: number; isP: boolean; hasAdminCh
    * silently. Four call sites in this file each set `privateChatOpen = true` on their own, so the
    * guard has to live in one place or it is four places to forget it.
    *
-   * `videoOnlyMode` is the `r` query parameter — the media.recording-bot mode — which this room does not
+   * `videoOnlyMode` is the `r` query parameter — the recording-bot mode — which this room does not
    * model, the same honest gap `files-gates.ts` already records for `hideFiles`. The half that is
    * modelled is enforced.
    */

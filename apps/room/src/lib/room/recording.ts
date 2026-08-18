@@ -127,7 +127,7 @@ export class RoomRecording {
       With none, the browser chose both the container and roughly 2.5 Mbps. `docs/streaming-choices.md`
       row 4 measured, on realistic chart content, that VP9 produces 3841 kbps at an 8 Mbps cap and
       keeps scaling, while H.264 saturates near 2033 and ignores anything higher — so the detail was
-      available and simply never asked for. See `media.recording-codec.ts` for the full ordering and for
+      available and simply never asked for. See `recording-codec.ts` for the full ordering and for
       why 8 Mbps rather than 12: a second 1080p encode competes with the live encoder, and the share
       members are watching matters more than the presenter's own file.
     */
@@ -159,14 +159,11 @@ export class RoomRecording {
       { once: true }
     );
     // A timeslice, so `dataavailable` fires periodically instead of only at stop. Without it a
-    // media.recording lost to a crash or a closed tab is a media.recording with zero chunks.
+    // recording lost to a crash or a closed tab is a recording with zero chunks.
     this.#screenRecorder.start(1000);
     this.#media.recording = true;
     // The room learns from the server, never from this flag - see `broadcastRecordingState`.
-    void this.#broadcastRecordingState(
-      'startRec',
-      `room-media.recording-${new Date().toISOString()}`
-    );
+    void this.#broadcastRecordingState('startRec', `room-recording-${new Date().toISOString()}`);
     this.#media.recordingPaused = false;
     this.#media.recordingReminder = true;
     this.#menus.set('recording', false);
@@ -219,7 +216,7 @@ export class RoomRecording {
     const stamp = new Date().toLocaleString('sv-SE').replace(/[: ]/g, '-');
     const link = document.createElement('a');
     link.href = this.#media.recordedUrl;
-    link.download = `room-media.recording-${stamp}.${extension}`;
+    link.download = `room-recording-${stamp}.${extension}`;
     link.style.display = 'none';
     document.body.appendChild(link);
     link.click();

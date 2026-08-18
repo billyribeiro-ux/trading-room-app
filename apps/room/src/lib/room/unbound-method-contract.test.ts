@@ -179,6 +179,47 @@ const svelteFiles = [
   stopped after three tags on an apostrophe inside a JS handler and reported a clean run with a
   wrong answer; the compiler's own parser is the only instrument this file will trust.
 */
+/**
+ * `instance.method` written as a bare reference — the shape that drops `this`.
+ *
+ * Returns the `instance.method` text when the expression is exactly that and the property really is
+ * a method on the class; `null` for anything else. A CALL (`webcams.card(presenter, index)`) is
+ * safe, because `this` is bound at the call and only the RESULT travels.
+ */
+const unboundMethodIn = (expression: Record<string, unknown> | undefined): string | null => {
+  if (
+    expression?.type !== 'MemberExpression' ||
+    (expression.object as { type?: string })?.type !== 'Identifier' ||
+    (expression.property as { type?: string })?.type !== 'Identifier'
+  ) {
+    return null;
+  }
+  const instance = (expression.object as { name: string }).name;
+  const property = (expression.property as { name: string }).name;
+  const constructor = INSTANCES[instance];
+  if (!constructor || !methodNames(constructor).has(property)) return null;
+  return `${instance}.${property}`;
+};
+
+/**
+ * The expressions an attachment could actually resolve to.
+ *
+ * A ternary is unwrapped because each branch is independently the thing that gets attached, and
+ * `WebcamStrip.svelte` has exactly that: one branch wraps and the other calls a factory. Checking
+ * only the top-level node would see a `ConditionalExpression`, find no member expression, and pass.
+ */
+const attachmentCandidates = (
+  expression: Record<string, unknown> | undefined
+): (Record<string, unknown> | undefined)[] => {
+  if (expression?.type === 'ConditionalExpression') {
+    return [
+      ...attachmentCandidates(expression.consequent as Record<string, unknown>),
+      ...attachmentCandidates(expression.alternate as Record<string, unknown>)
+    ];
+  }
+  return [expression];
+};
+
 const unboundReferences = (file: string) => {
   const source = readFileSync(new URL(file, SOURCE), 'utf8');
   const ast = parse(source, { modern: true });
@@ -196,18 +237,39 @@ const unboundReferences = (file: string) => {
       const tag = Array.isArray(value) ? value[0] : value;
       const expression = (tag as { type?: string; expression?: Record<string, unknown> })
         ?.expression;
-      if (
-        (tag as { type?: string })?.type === 'ExpressionTag' &&
-        expression?.type === 'MemberExpression' &&
-        (expression.object as { type?: string; name?: string })?.type === 'Identifier' &&
-        (expression.property as { type?: string; name?: string })?.type === 'Identifier'
-      ) {
-        const instance = (expression.object as { name: string }).name;
-        const property = (expression.property as { name: string }).name;
-        const constructor = INSTANCES[instance];
-        if (constructor && methodNames(constructor).has(property)) {
+      if ((tag as { type?: string })?.type === 'ExpressionTag') {
+        const unbound = unboundMethodIn(expression);
+        if (unbound) {
           found.push(
-            `${file}:${lineOf(candidate.start as number)} — ${String(candidate.name)}={${instance}.${property}} passes a METHOD by reference`
+            `${file}:${lineOf(candidate.start as number)} — ${String(candidate.name)}={${unbound}} passes a METHOD by reference`
+          );
+        }
+      }
+    }
+
+    /*
+      ATTACHMENTS TOO, added 2026-08-18 — and the gap was real rather than theoretical.
+
+      This file only ever looked at `Attribute` nodes, so `{@attach instance.method}` was invisible
+      to it. That is the SAME failure in a different node type: the attach directive calls what it
+      is given with the element, so a bare method reference reaches its first private-field read
+      with `this` undefined and throws on mount. Every reason listed at the top of this file for why
+      nothing else catches it applies unchanged — the types line up, eslint is happy, the autofixer
+      has no opinion.
+
+      Found while moving `app-webcam-holder` into `WebcamStrip.svelte`, which put two attach sites
+      into a new file where `attachLocal` is the attachment itself and must be wrapped. Nothing in
+      the toolchain would have reported it if that wrapping were dropped, so the gate is widened in
+      the commit that created the exposure rather than after something breaks.
+    */
+    if (candidate.type === 'AttachTag') {
+      for (const branch of attachmentCandidates(
+        candidate.expression as Record<string, unknown> | undefined
+      )) {
+        const unbound = unboundMethodIn(branch);
+        if (unbound) {
+          found.push(
+            `${file}:${lineOf(candidate.start as number)} — {@attach ${unbound}} passes a METHOD by reference`
           );
         }
       }

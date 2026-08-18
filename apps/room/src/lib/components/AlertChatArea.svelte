@@ -160,8 +160,16 @@
     ondetachalerts: () => void;
     onsavealerts: () => void;
     onarchivealerts: () => void;
-    onalertsscroll: (event: Event) => void;
-    onchatscroll: (event: Event) => void;
+    /*
+      `onalertsscroll` and `onchatscroll` WERE HERE, and the note twenty lines above already said
+      why they should not have been: *"`feedScroll` arrives WHOLE rather than as six callbacks"*.
+      Two of those callbacks were passed beside it anyway, so this component read the same object
+      two ways — `feedScroll.alertsReadingHistory` through the facade, `onalertsscroll` through a
+      prop the page built out of the same instance.
+
+      Removed 2026-08-18. The two scrollers below call `feedScroll.trackAlertsScroll` and
+      `trackChatScroll` directly, which is what every other member of it already did here.
+    */
     /**
      * Takes the KIND as its first argument rather than being two callbacks, because the page's
      * handler is one function branching on it — splitting it here would put that branch in this
@@ -222,8 +230,6 @@
     ondetachalerts,
     onsavealerts,
     onarchivealerts,
-    onalertsscroll,
-    onchatscroll,
     onmessageaction,
     onprivatechat,
     onexpandcomposer,
@@ -242,20 +248,15 @@
    * the props. The chat one has no second reader and so has no prop at all.
    */
   let alertsScroller = $state<HTMLElement | undefined>();
-  let chatScroller = $state<HTMLElement | undefined>();
+  /* `| null`, because that is what `bind:this` writes on teardown — proven in
+     `dom-reference-contract.svelte.test.ts`, not assumed. */
+  let chatScroller = $state<HTMLElement | null>(null);
 
   function holdAlertsScroller(node: HTMLElement) {
     alertsScroller = node;
     captureAlertsScroller(node);
     return () => {
       if (alertsScroller === node) alertsScroller = undefined;
-    };
-  }
-
-  function holdChatScroller(node: HTMLElement) {
-    chatScroller = node;
-    return () => {
-      if (chatScroller === node) chatScroller = undefined;
     };
   }
 
@@ -637,7 +638,7 @@
             {@attach holdAlertsScroller}
             id="chatScrollViewParentAlerts"
             style="overflow-y: scroll; height: 100%;"
-            onscroll={onalertsscroll}
+            onscroll={(event: Event) => feedScroll.trackAlertsScroll(event)}
           >
             <div>
               {#each visibleAlerts as item, index (item.id)}
@@ -741,9 +742,9 @@
           </div>
 
           <app-roomscroller
-            {@attach holdChatScroller}
+            bind:this={chatScroller}
             style="overflow-y: scroll; overflow-x: hidden; height: 100%;"
-            onscroll={onchatscroll}
+            onscroll={(event: Event) => feedScroll.trackChatScroll(event)}
           >
             <div>
               {#each visibleChatMessages as item, index (item.id)}
