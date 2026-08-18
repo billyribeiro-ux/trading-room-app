@@ -211,6 +211,49 @@ confirmed by trying to break it.
 
 ## 2026-08-18
 
+### 2026-08-18 10:46 EDT — the main tab strip: what a room has PAID FOR is absent, what it is merely not shown is hidden
+
+**Full gate: 2,523 tests / 177 files**, `eslint src/` clean, `svelte-check` **1,212 / 0 / 0**,
+prettier clean, `vite build` done.
+
+**A gap found by measuring, not by guessing where to look.** Every trade-alert PANE re-applies its
+own entitlement and is already rendered by a contract test — and `PresentationArea` records that the
+duplication is deliberate, *"what lets the contract test prove the component renders nothing on a
+false entitlement without standing up this whole page."* So the pane half was covered by design.
+
+**The TAB half was covered by nothing.** A search across every test file for `swingAlerts-tab`,
+`dayTradeAlerts-tab`, `videoplayer-tab` or their gate expressions returned zero hits. Delete
+`{#if swingAlerts.enabled}` from the `<li>` and leave it on the pane, and a room that never bought
+Swing Alerts shows a tab that opens an empty panel — silently, with the whole suite green.
+
+**And the real subject is sharper than "is it gated".** The capture uses TWO mechanisms and the
+component transcribes both:
+
+- **`{#if}` for ENTITLEMENTS.** `O(26, o.hasSwingTradeAlerts ? 26 : -1)`, where `-1` is
+  `ɵɵconditional`'s "instantiate nothing". The component's note: *"An entitlement that ships hidden
+  markup has already told the member the feature exists, and this one is what a room pays for."*
+- **`hidden` for MODES and ROOM SETTINGS.** `z('hidden', o.hideStreams)`, `z('hidden', o.hideFiles)`,
+  and `viewerOnlyMode` on the whole `ul#mainTabs`. The feature exists; this viewer is not being shown
+  it.
+
+A source-text assertion cannot tell those apart — both read as a conditional beside an id. **Only a
+render can**, because one produces no element and the other produces an element carrying `hidden`.
+Swapping them is invisible to every other instrument here and leaks what a room has paid for.
+
+**SSR rather than a mount**, because the question is pure markup and `{@attach}` never runs during
+SSR — no ResizeObserver, no media attachment, no jsdom, which is what makes a component with twelve
+facade props affordable to render at all.
+
+**Negative controls, both red:** ungating the tab while leaving the pane gated → *"no swingAlerts tab
+id may appear"*; dropping `hidden={hideStreams}` → *"carrying the hidden attribute"*.
+
+**Two of my own gates caught me while writing it**, which is the point of having them. The fixture's
+`data` stub omitted `files` and `FilesPane` failed on `data.files.length` — a shape guessed from the
+type rather than from what the render demanded. Then `slice-anchor-contract.test.ts` refused an
+`indexOf` used as a slice bound with nothing asserting it was found: *"`slice(-1)` yields one
+character, and every assertion below runs against that character and PASSES."* Both fixed at the
+source rather than worked around.
+
 ### 2026-08-18 10:40 EDT — the roster gates, mounted: the CLIENT half of the location fix
 
 **Full gate: 2,515 tests / 176 files**, `eslint src/` clean, `svelte-check` **1,212 / 0 / 0**,
