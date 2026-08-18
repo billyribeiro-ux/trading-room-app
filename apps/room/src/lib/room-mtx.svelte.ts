@@ -47,9 +47,11 @@ export class MtxStreamTabs {
   }
 
   /**
-   * A stream tab the USER clicked.
+   * A stream tab the USER clicked — the counterpart of the screenshare path, and deliberately NOT
+   * the same function.
    *
-   * `onStreamTabChange(e)` is two assignments and nothing else. It does not emit the
+   * `onStreamTabChange(e)` (`app-room.full.js:2722-2725`) is two assignments and nothing else. It
+   * does not emit the
    * `stopWatchScreenOf` / `startWatchScreenOf` pair that the screenshare path does, because every
    * stream pane stays mounted and only its classes change, and it does not broadcast — the
    * `makeUsersFollowMyScreens` clause lives on the screenshare path alone.

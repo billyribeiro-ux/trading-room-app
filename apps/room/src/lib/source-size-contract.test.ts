@@ -307,7 +307,7 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       forced edit to every pane contract in the repository. A snippet is a closure over this file's
       scope, so the shell places markup it knows nothing about.
     */
-    max: 1532,
+    max: 1519,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {
