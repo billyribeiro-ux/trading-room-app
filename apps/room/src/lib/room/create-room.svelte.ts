@@ -682,8 +682,15 @@ export function createRoom(deps: RoomDeps) {
 
     `openPrivateChat` is ONE receiver rather than two calls, because showing the panel and opening
     the thread must happen together — a caller with both can show an empty panel. `focusComposer`
-    stays here because the element does: `composerElement` is a `bind:this`, and a class cannot
-    hold it without also owning when it mounts.
+    stays here because the element does, and a class cannot hold it without also owning when it
+    mounts.
+
+    THE MECHANISM NAMED HERE WAS WRONG until 2026-08-17: this said `composerElement` "is a
+    `bind:this`". It is not. It is populated by `captureComposerElement`, an ATTACHMENT the page
+    hands to `AlertChatArea` as a prop (`AlertChatArea.svelte:826`), because the `<textarea>` lives
+    in that component and `bind:this` cannot cross a component boundary. The REASONING above was
+    right and is unchanged; only the mechanism was misnamed, which is the kind of error that sends
+    the next reader looking for a binding that does not exist.
   */
   const messageActions = new RoomMessageActions({
     dialogs,

@@ -793,7 +793,7 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     /*
       THE COMPOSITION ROOT, created 2026-08-17 (S7) and capped in the same commit.
 
-      1,066 lines, and it is the largest module in `lib/room/` by a wide margin — deliberately. It
+      1,073 lines, and it is the largest module in `lib/room/` by a wide margin — deliberately. It
       holds 36 `new Room*()` constructions that arrived from `+page.svelte` with their citations
       intact, which is 740 of those lines. It is NOT a class and owns no behaviour: it wires, and
       returns. If this number climbs, the question to ask is whether something with behaviour has
@@ -810,7 +810,7 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       `svelte-ignore` that nothing is warning under. Prose explaining a real subtlety is exactly what
       this file's header says never to shave to hit a number.
     */
-    max: 1066,
+    max: 1073,
     why: 'the composition root - 36 constructions and their citations, assembly and nothing else'
   },
   {
