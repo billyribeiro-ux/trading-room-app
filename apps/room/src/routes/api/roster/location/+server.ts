@@ -21,7 +21,7 @@
  */
 import { json } from '@sveltejs/kit';
 import { requireRoomShortCode, requireUser } from '#lib/server/auth.js';
-import { publishToRoom, roomRoster, setRosterLocation } from '#lib/server/room-events.js';
+import { publishRosterToRoom, setRosterLocation } from '#lib/server/room-events.js';
 import type { RequestHandler } from './$types';
 
 /**
@@ -74,7 +74,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
     The whole roster, not a delta: `getRoster` is how every other change reaches the sidebar, and a
     second message shape for one field would be two ways of updating one list.
   */
-  publishToRoom(room, { channel: 'roster', data: { cmd: 'getRoster', users: roomRoster(room) } });
+  publishRosterToRoom(room);
 
   return json({ ok: true, applied: true }, { headers: { 'cache-control': 'no-store' } });
 };

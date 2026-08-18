@@ -21,6 +21,7 @@ export const config = {
 import {
   publishToRoom,
   roomRoster,
+  publishRosterToRoom,
   subscribeToRoom,
   type RoomEvent
 } from '#lib/server/room-events.js';
@@ -100,7 +101,7 @@ export const GET: RequestHandler = async ({ params, locals, request }) => {
       channel: 'roster',
       data: { cmd: 'getRosterCount', data: roomRoster(room).length }
     });
-    publishToRoom(room, { channel: 'roster', data: { cmd: 'getRoster', users: roomRoster(room) } });
+    publishRosterToRoom(room);
   };
 
   /*
@@ -189,10 +190,7 @@ export const GET: RequestHandler = async ({ params, locals, request }) => {
       });
       // `onUserJoin` in the capture. The list goes out with the count so a client never has to
       // refetch the page to learn who arrived.
-      publishToRoom(room, {
-        channel: 'roster',
-        data: { cmd: 'getRoster', users: roomRoster(room) }
-      });
+      publishRosterToRoom(room);
 
       /*
         Start reconciling this room's MediaMTX streams, if nothing already is.
@@ -228,10 +226,7 @@ export const GET: RequestHandler = async ({ params, locals, request }) => {
         data: { cmd: 'getRosterCount', data: roomRoster(room).length }
       });
       // `onUserLeave`.
-      publishToRoom(room, {
-        channel: 'roster',
-        data: { cmd: 'getRoster', users: roomRoster(room) }
-      });
+      publishRosterToRoom(room);
     }
   });
 

@@ -404,6 +404,63 @@ export function publishToRoom(room: string, event: RoomEvent): void {
 }
 
 /**
+ * Fan the ROSTER out, deciding per recipient whether they may see anyone's location.
+ *
+ * ## The defect this closes, found 2026-08-18
+ *
+ * `locStr` is documented three hundred lines above as *"presenter-only on the way out —
+ * `locationVisibleTo` is the gate, and nothing here may publish it to a member."* The gate existed
+ * and worked, but it is `roster-gates.ts:locationVisibleTo`, which runs in the BROWSER: the sidebar
+ * wraps the city line in `{#if locationVisible(user)}` and draws nothing for a member.
+ *
+ * The wire was never filtered. `roomRoster()` returns whole `RosterUser` objects, `publishToRoom`
+ * hands the same object to every listener, and three call sites published it on every join, every
+ * leave, and every time a browser's geolocation lookup answered. So a member's DevTools network tab
+ * showed every other member's city — the UI declined to draw data it had already been given.
+ *
+ * That is the exact shape the root standard forbids: *"Every authority decision is made on the
+ * server from data the server owns — never asserted by the client, ever, for any reason."* A render
+ * gate is not an authority decision; it is a decoration over one that was never made.
+ *
+ * ## Why the decision is safe to make here
+ *
+ * The subscriber map already holds WHO each listener is, and `RosterUser.isP` is set at subscribe
+ * time from `membership?.isP` — read from the room's own membership row, server-side, and the note
+ * at that assignment records deliberately choosing it as the SINGLE source rather than falling back
+ * to the session role. So the authority is server-owned, and an anonymous listener (`user === null`)
+ * is not a presenter and is redacted, which fails closed.
+ *
+ * This is `publishChatToRoom`'s shape, for `publishChatToRoom`'s reason: the answer differs per
+ * recipient, and the hub is the only place that knows who each recipient is.
+ */
+export function publishRosterToRoom(room: string): void {
+  const listeners = subscribers.get(room);
+  if (!listeners) return;
+
+  const withLocation = roomRoster(room);
+  /*
+    Redacted ONCE per publish rather than per listener: this runs on every join and leave, so a room
+    of fifty is one pass over the roster and not fifty. Entries with no location are passed through
+    by reference, because the common case is a room where nobody's lookup has answered yet.
+  */
+  const withoutLocation = withLocation.map((entry) =>
+    entry.locStr === '' ? entry : { ...entry, locStr: '' }
+  );
+
+  for (const [listener, viewer] of listeners) {
+    try {
+      listener({
+        channel: 'roster',
+        data: { cmd: 'getRoster', users: viewer?.isP === true ? withLocation : withoutLocation }
+      });
+    } catch (error) {
+      // Same contract as `publishToRoom`: one dead connection must not silence the room.
+      console.error('[room-events] subscriber failed', error);
+    }
+  }
+}
+
+/**
  * Fan a CHAT frame out, deciding per recipient whether it mentions them.
  *
  * ## Why this is not `publishToRoom`

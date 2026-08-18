@@ -211,6 +211,60 @@ confirmed by trying to break it.
 
 ## 2026-08-18
 
+### 2026-08-18 10:06 EDT — SECURITY: every member was receiving every other member's city over the SSE stream
+
+**A real privacy defect, found by auditing server state against `kit/state-management` and fixed at
+the hub.** Full gate: **2,499 tests / 174 files**, `eslint src/` clean, `svelte-check`
+**1,211 / 0 / 0**, prettier clean, `vite build` done.
+
+**What was wrong.** `RosterUser.locStr` is a member's city — `Waterbury, CT, US`. Its own docblock
+in `room-events.ts` states the invariant: *"It sits beside the IP under `privData` in the reference
+and is presenter-only on the way out — `locationVisibleTo` is the gate, and nothing here may publish
+it to a member."*
+
+The gate existed and worked. It is `roster-gates.ts:locationVisibleTo`, and `RoomSidebar.svelte`
+wraps the city line in `{#if locationVisible(user)}`, so a member's SCREEN showed nothing.
+
+**The wire was never filtered.** `roomRoster()` returns whole `RosterUser` objects, `publishToRoom`
+hands the identical object to every listener in the room, and **four** call sites published it — on
+join, on leave, on stream teardown, and every time a browser's geolocation lookup answered. A member
+with DevTools open could read every other member's city straight out of the SSE payload. The UI was
+declining to draw data it had already been handed.
+
+That is the shape the root standard names in as many words: *"Every authority decision is made on
+the server from data the server owns — never asserted by the client, ever, for any reason, because
+that was the 2026-08-07 privilege escalation and it will not be reintroduced."* A render gate is not
+an authority decision; it is a decoration over one nobody made.
+
+**The fix is `publishRosterToRoom`, and it is this file's own existing shape.** `publishChatToRoom`
+already fans out per recipient — it computes `isMention` per listener, and its docblock explains
+that the hub is the only place that knows who each recipient is. The roster now does the same:
+presenters get the roster with locations, everyone else gets it with `locStr` blanked, redacted once
+per publish rather than once per listener. Authority is the subscriber's own `isP`, set at subscribe
+time from the room's membership row server-side — which the note at that assignment records
+deliberately choosing as the SINGLE source rather than falling back to the session role.
+
+**Fails closed:** an anonymous listener has no `RosterUser`, so it is not a presenter, so it is
+redacted.
+
+**No UI change for anyone.** `locationVisibleTo` already returns false on an empty string, so a
+member's sidebar renders exactly as before; a presenter's is unchanged.
+
+**`roster-location-privacy.test.ts` EXECUTES the hub** — subscribes a real presenter and a real
+member to a real room, sets real locations, publishes, and inspects what each listener was handed.
+Source text cannot answer the only question that matters, which is what bytes reach a member. A
+second half guards the bypass: no module outside `room-events.ts` may assemble a `getRoster` frame,
+because one built elsewhere cannot redact per recipient.
+
+**Negative controls, both red.** Reverting to the shipped behaviour reproduces the leak exactly —
+*"a member must receive no location at all: expected [ 'Waterbury, CT, US', 'Lisbon, PT' ] to deeply
+equal [ '', '' ]"*. A route assembling its own frame trips the bypass guard.
+
+**The rest of the server audit was clean:** 58 server-only modules, **zero** `load()` side-effects,
+and five module-scope mutable bindings — a bootstrap latch, a rate limiter, an SSE hub, a reconcile
+registry, and a `WeakMap` keyed by the request object, which is exactly the request-scoped pattern
+the docs prescribe.
+
 ### 2026-08-18 09:55 EDT — a conformance audit against the official best-practices page, and the guard that was narrower than its own rule
 
 **Runtime impact: none intended** — behaviour preserved exactly, eight values changed from a deeply
