@@ -39,12 +39,12 @@
     computed once on the page from data the server owns. Nothing here opens a device, starts a
     stream, or writes a file.
   */
-  import { NEUTRAL_PAN, captureVideoImage, type Pan } from '#lib/screen-zoom.js';
+  import { NEUTRAL_PAN, captureVideoImage } from '#lib/screen-zoom.js';
   import DayTradeAlertsPane from '#lib/components/day-trade-alerts/DayTradeAlertsPane.svelte';
   import FilesPane from '#lib/components/FilesPane.svelte';
   import NotesPane from '#lib/components/notes/NotesPane.svelte';
   import ScreenPane from '#lib/components/ScreenPane.svelte';
-  import ScreenTabs, { type ScreenTab } from '#lib/components/ScreenTabs.svelte';
+  import ScreenTabs from '#lib/components/ScreenTabs.svelte';
   import ScreenZoomControls from '#lib/components/ScreenZoomControls.svelte';
   import SpeechRecoOverlay from '#lib/components/SpeechRecoOverlay.svelte';
   import StreamingView from '#lib/components/StreamingView.svelte';
@@ -106,7 +106,6 @@
 
     // ── the webcam strip ───────────────────────────────────────────────────────
     previewWindowsVisible: boolean;
-    webcamPresenters: WebcamPresenter[];
     webcamCard: (presenter: WebcamPresenter, index: number) => (node: HTMLElement) => void;
     attachLocalWebcam: (node: HTMLVideoElement) => void;
     attachRemoteWebcam: (producerId: string) => (node: HTMLVideoElement) => void;
@@ -116,39 +115,40 @@
     /** This viewer's "off to preserve data" switch, which replaces the WHOLE pane. */
     videoDisabled: boolean;
     /**
-     * The two facades the SPATIAL-LAYER effect below needs, and nothing else reads yet.
+     * The screen VIEWER and the SFU TRANSPORT, whole — and every member is read through them.
      *
-     * They sit beside the twelve drilled screen props rather than replacing them, deliberately:
-     * collapsing those twelve is a real slice with its own ripple through `ScreenPane`,
-     * `ScreenTabs` and their contract tests, and folding it into an effect move would have made
-     * one commit that did two things and could not be reverted separately.
+     * ## What this replaced, because the note that stood here promised it
+     *
+     * Both objects were already props, for the spatial-layer effect below. Beside them stood
+     * TWENTY-ONE more props that were nothing but their own members handed over a second time:
+     * seventeen of `screens` and four of `mediaTransport`. The note here said collapsing them was
+     * "a real slice with its own ripple" and deferred it so that one commit would not do two
+     * things. This is that slice.
+     *
+     * The duplication was not theoretical and it was already visible inside this one file: the
+     * effect read `mediaTransport.screenStreams.size` through the facade while `ScreenPane` below
+     * read a drilled `screenStreams` prop — the same map, two names, five hundred lines apart.
+     *
+     * ## Why `isFullScreenshare` stopped being `$bindable`
+     *
+     * `RoomScreens` declares a real setter for it, so the zoom cluster's fullscreen control writes
+     * `screens.isFullScreenshare` directly and there is no value to bind back up through here.
+     * That is not a new pattern: `files` below records the same reasoning for `bind:fileTab`, and
+     * the `$props` docs' warning about mutating props is about STATE PROXIES the component does
+     * not own — a setter on a class instance is a method call, which is what the room's facades
+     * exist to expose.
+     *
+     * ## What is deliberately still drilled, and why
+     *
+     * `volume` is `RoomVolume`'s and `webcamCard` / `attachLocalWebcam` / `attachRemoteWebcam` /
+     * `closeWebcamPreview` are `RoomWebcams`'s. Neither facade is passed here, so collapsing those
+     * would ADD a prop rather than remove one — a different slice, with its own argument to make.
      */
     screens: RoomScreens;
     mediaTransport: RoomMediaTransport;
-    sharedScreens: ScreenTab[];
-    selectedScreenTab: string | null;
-    forcedScreenId: string | null;
-    lockedScreenId: string | null;
-    detachedScreenId: string | null;
-    screenStreams: Map<string, MediaStream>;
-    screenPans: Map<string, Pan>;
-    zoomLevel: number;
-    showZoomCtrl: boolean;
-    /** BINDABLE: the zoom cluster's fullscreen control writes it. */
-    isFullScreenshare: boolean;
     volume: number;
-    saveData: boolean;
     /** The volume dropdown, passed as a SNIPPET — it is markup the page owns, not a value. */
     screenVolume: Snippet;
-    selectScreenTabByUser: (screenId: string) => void;
-    detachScreen: (screenId: string) => void;
-    toggleLockScreen: (screenId: string) => void;
-    bringEveryoneToScreen: (screenId: string) => void;
-    stopSharedScreen: (screenId: string) => void;
-    togglePanZoom: () => void;
-    panZoomIn: () => void;
-    panZoomOut: () => void;
-    panZoomReset: () => void;
 
     // ── #streams ───────────────────────────────────────────────────────────────
     hideStreams: boolean;
@@ -242,7 +242,6 @@
     archivesAvailable,
     openTranscriptPage,
     previewWindowsVisible,
-    webcamPresenters,
     webcamCard,
     attachLocalWebcam,
     attachRemoteWebcam,
@@ -250,28 +249,8 @@
     videoDisabled,
     screens,
     mediaTransport,
-    sharedScreens,
-    selectedScreenTab,
-    forcedScreenId,
-    lockedScreenId,
-    detachedScreenId,
-    screenStreams,
-    screenPans,
-    zoomLevel,
-    showZoomCtrl,
-    isFullScreenshare = $bindable(false),
     volume,
-    saveData,
     screenVolume,
-    selectScreenTabByUser,
-    detachScreen,
-    toggleLockScreen,
-    bringEveryoneToScreen,
-    stopSharedScreen,
-    togglePanZoom,
-    panZoomIn,
-    panZoomOut,
-    panZoomReset,
     hideStreams,
     streamServerMTX,
     mtxToken,
@@ -398,7 +377,7 @@
                     cards put two empty black boxes on screen before anyone touched the camera,
                     and gave the second one an X that could not close anything.
                   -->
-        {#each webcamPresenters as presenter, index (presenter.id)}
+        {#each mediaTransport.webcamPresenters as presenter, index (presenter.id)}
           <app-presenter-cams>
             <div
               class="card webcamsHolder"
@@ -738,7 +717,7 @@
             {
               show: mainTab === 'screens',
               active: mainTab === 'screens',
-              'is-fullscreenshare': isFullScreenshare
+              'is-fullscreenshare': screens.isFullScreenshare
             }
           ]}
           role="tabpanel"
@@ -783,20 +762,20 @@
                       `.nav-tabs .nav-item { margin-bottom: -1px }` cancels the bar's own border
                       once it has tabs.
                     -->
-            {#if sharedScreens.length === 0}
+            {#if mediaTransport.screens.length === 0}
               <h3 class="text-center mt-4">No one is presenting right now...</h3>
             {/if}
             <ScreenTabs
-              screens={sharedScreens}
-              selectedScreenId={selectedScreenTab}
-              {forcedScreenId}
-              {lockedScreenId}
+              screens={mediaTransport.screens}
+              selectedScreenId={screens.selectedTab}
+              forcedScreenId={screens.forcedId}
+              lockedScreenId={screens.lockedId}
               {isPresenter}
-              onselect={selectScreenTabByUser}
-              ondetach={detachScreen}
-              ontogglelock={toggleLockScreen}
-              onbringeveryone={bringEveryoneToScreen}
-              onstopscreen={stopSharedScreen}
+              onselect={(id) => screens.selectTab(id)}
+              ondetach={(id) => screens.detach(id)}
+              ontogglelock={(id) => screens.toggleLock(id)}
+              onbringeveryone={(id) => screens.bringEveryoneTo(id)}
+              onstopscreen={(id) => screens.stop(id)}
             >
               <!--
                         The `li.nav-item.ms-auto` slot, which the capture fills and this page
@@ -808,20 +787,20 @@
               {#snippet controls()}
                 <ScreenZoomControls
                   variant="attached"
-                  {showZoomCtrl}
+                  showZoomCtrl={screens.showZoomCtrl}
                   {viewerOnlyMode}
-                  ontoggle={togglePanZoom}
+                  ontoggle={() => screens.toggleZoomControls()}
                   volume={screenVolume}
                   oncapture={() => {
                     // The captured payload names the screen, and only that screen's view
                     // answers: `e.screenId !== this.muser._id` returns early.
-                    if (selectedScreenTab) captureVideoImage(selectedScreenTab);
+                    if (screens.selectedTab) captureVideoImage(screens.selectedTab);
                   }}
-                  onzoomin={panZoomIn}
-                  onzoomout={panZoomOut}
-                  onreset={panZoomReset}
-                  fullscreen={isFullScreenshare}
-                  onfullscreen={() => (isFullScreenshare = !isFullScreenshare)}
+                  onzoomin={() => screens.zoomIn()}
+                  onzoomout={() => screens.zoomOut()}
+                  onreset={() => screens.resetZoom()}
+                  fullscreen={screens.isFullScreenshare}
+                  onfullscreen={() => (screens.isFullScreenshare = !screens.isFullScreenshare)}
                 />
               {/snippet}
             </ScreenTabs>
@@ -847,24 +826,24 @@
               id="screensTabsContent"
               class={['tab-content', { 'viewer-only-screen-tab': viewerOnlyMode }]}
             >
-              {#each sharedScreens as screen (screen.id)}
+              {#each mediaTransport.screens as screen (screen.id)}
                 <ScreenPane
                   id={screen.id}
-                  stream={screenStreams.get(screen.id) ?? null}
-                  active={screen.id === selectedScreenTab}
+                  stream={mediaTransport.screenStreams.get(screen.id) ?? null}
+                  active={screen.id === screens.selectedTab}
                   {viewerOnlyMode}
                   {volume}
                   muted={volume === 0}
-                  {showZoomCtrl}
-                  {zoomLevel}
-                  pan={screenPans.get(screen.id) ?? NEUTRAL_PAN}
-                  detached={detachedScreenId !== null}
-                  {saveData}
-                  onpan={(x, y) => screenPans.set(screen.id, { x, y })}
-                  ontogglezoom={togglePanZoom}
-                  onzoomin={panZoomIn}
-                  onzoomout={panZoomOut}
-                  onreset={panZoomReset}
+                  showZoomCtrl={screens.showZoomCtrl}
+                  zoomLevel={screens.zoomLevel}
+                  pan={screens.pans.get(screen.id) ?? NEUTRAL_PAN}
+                  detached={screens.detachedScreenId !== null}
+                  saveData={mediaTransport.saveData}
+                  onpan={(x, y) => screens.pans.set(screen.id, { x, y })}
+                  ontogglezoom={() => screens.toggleZoomControls()}
+                  onzoomin={() => screens.zoomIn()}
+                  onzoomout={() => screens.zoomOut()}
+                  onreset={() => screens.resetZoom()}
                 />
               {/each}
             </div>

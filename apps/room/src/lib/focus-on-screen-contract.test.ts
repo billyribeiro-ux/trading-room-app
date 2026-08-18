@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { parse } from 'svelte/compiler';
 import { describe, expect, it } from 'vitest';
 
 /*
@@ -28,7 +29,6 @@ const BUNDLE = readFileSync(
   'utf8'
 );
 const SERVER = readFileSync(new URL('../routes/+page.server.ts', import.meta.url), 'utf8');
-const PAGE = readFileSync(new URL('../routes/+page.svelte', import.meta.url), 'utf8');
 const EVENTS = readFileSync(new URL('./room/events.svelte.ts', import.meta.url), 'utf8');
 /*
   Added 2026-08-15: both actions became remote commands in `presenter-commands.remote.ts`. The
@@ -56,6 +56,55 @@ const stripComments = (source: string) =>
     .replace(/<!--[\s\S]*?-->/g, '')
     .replace(/^\s*\/\/.*$/gm, '');
 
+/**
+ * One component's one attribute, as the COMPILER sees it — the source text of the expression.
+ *
+ * `svelte.parse` rather than a regex, for the reason `each-key-contract.test.ts` gives: a pattern
+ * built over markup matches the same characters wherever they sit, and what is being asserted here
+ * is specifically that a named attribute of a named component carries a particular handler.
+ *
+ * Returns `null` when the component or the attribute is absent, so the caller asserts it was found
+ * before asserting anything about it. A helper that returned `''` for "missing" would hand every
+ * `not.toContain` below a free pass.
+ */
+const componentAttribute = (
+  source: string,
+  component: string,
+  attribute: string
+): string | null => {
+  const ast = parse(source, { modern: true });
+  let found: string | null = null;
+
+  const visit = (node: unknown): void => {
+    if (found !== null || !node || typeof node !== 'object') return;
+    const candidate = node as {
+      type?: string;
+      name?: string;
+      attributes?: { type?: string; name?: string; value?: unknown }[];
+    };
+
+    if (candidate.type === 'Component' && candidate.name === component) {
+      for (const attr of candidate.attributes ?? []) {
+        if (attr.type !== 'Attribute' || attr.name !== attribute) continue;
+        // An `ExpressionTag` value; its expression carries the offsets into the original source.
+        const value = attr.value as { expression?: { start?: number; end?: number } } | undefined;
+        const expression = value?.expression;
+        if (expression?.start === undefined || expression.end === undefined) continue;
+        found = source.slice(expression.start, expression.end);
+        return;
+      }
+    }
+
+    for (const value of Object.values(node as Record<string, unknown>)) {
+      if (Array.isArray(value)) value.forEach(visit);
+      else if (value && typeof value === 'object') visit(value);
+    }
+  };
+
+  visit(ast.fragment);
+  return found;
+};
+
 const serverCode = stripComments(SERVER);
 /*
   The screen viewer left the page for `RoomScreens` in Phase 5 slice 11. Read as its own source, so
@@ -69,7 +118,17 @@ const screensModule = readFileSync(new URL('room/screens.svelte.ts', import.meta
 const transportCode = stripComments(
   readFileSync(new URL('room/media-transport.svelte.ts', import.meta.url), 'utf8')
 );
-const pageCode = stripComments(PAGE);
+/*
+  `+page.svelte` IS NO LONGER READ HERE, and its absence is the finding rather than an oversight.
+
+  Until 2026-08-18 the tab strip's wiring spanned two files: `PresentationArea` declared a
+  `selectScreenTabByUser` prop and the page filled it with `(id) => screens.selectTab(id)`, so this
+  contract needed both halves to say anything. The facade slice deleted the prop — the pane holds
+  `screens` and calls the method — so the whole loop guard is now assertable in the one file that
+  owns it. The constant is deleted rather than left reading a file nothing asks about, because an
+  unread `readFileSync` is the exact shape that let this file's guard assert on the empty string
+  once already, recorded a hundred lines below.
+*/
 const eventsCode = stripComments(EVENTS);
 const remoteCode = stripComments(REMOTE);
 
@@ -210,14 +269,34 @@ describe('the client', () => {
     expect(screensModule).toContain(
       'if (this.#isPresenter() && this.#followMyScreens()) this.bringEveryoneTo(screenId);'
     );
-    // The tab strip moved to `PresentationArea.svelte`; the handler behind it did not.
-    const paneCode = readFileSync(
+    /*
+      The tab strip moved to `PresentationArea.svelte`; the handler behind it did not.
+
+      READ FROM THE AST SINCE 2026-08-18, and the re-point is why. This was two substring checks
+      spanning two files — `onselect={selectScreenTabByUser}` in the pane and
+      `selectScreenTabByUser={(id) => screens.selectTab(id)}` on the page — because the wiring
+      travelled through a drilled prop. The facade slice deleted that prop, so both strings went,
+      and re-typing them as one new string would rebuild the same weakness: a `toContain` cannot
+      tell an attribute on `<ScreenTabs>` from the same characters in a comment, in a sibling
+      component, or in dead markup.
+
+      So the ATTRIBUTE is located instead. Find the `ScreenTabs` node, take its `onselect`, and
+      read the expression's own source. It cannot pass on a missing node, because the node is
+      asserted found first — which is the lesson the block below this one records paying for.
+    */
+    const paneSource = readFileSync(
       new URL('./components/PresentationArea.svelte', import.meta.url),
       'utf8'
     );
-    expect(paneCode).toContain('onselect={selectScreenTabByUser}');
+    const onselect = componentAttribute(paneSource, 'ScreenTabs', 'onselect');
+    expect(onselect, '<ScreenTabs onselect> must exist in PresentationArea').not.toBeNull();
     // WRAPPED since slice 11: `selectTab` is a method, and a bare reference would lose `this`.
-    expect(pageCode).toContain('selectScreenTabByUser={(id) => screens.selectTab(id)}');
+    expect(onselect).toBe('(id) => screens.selectTab(id)');
+    /*
+      And the strip must not reach the SILENT path. `selectScreenTabOfId` is what receives this very
+      command; wiring the user's click to it would make a presenter's tab click move nobody.
+    */
+    expect(onselect).not.toContain('selectScreenTabOfId');
 
     /*
       The programmatic path must NOT broadcast, or receiving a focus command would send one back.

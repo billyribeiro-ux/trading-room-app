@@ -1218,34 +1218,13 @@
               archivesAvailable={gates.archivesAvailable}
               openTranscriptPage={() => alertsPane.openTranscript()}
               {previewWindowsVisible}
-              webcamPresenters={mediaTransport.webcamPresenters}
               webcamCard={(presenter, index) => webcams.card(presenter, index)}
               attachLocalWebcam={(node) => webcams.attachLocal(node)}
               attachRemoteWebcam={(producerId) => webcams.attachRemote(producerId)}
               closeWebcamPreview={(presenter) => webcams.closePreview(presenter)}
               videoDisabled={prefs.videoDisabled}
-              sharedScreens={mediaTransport.screens}
-              selectedScreenTab={screens.selectedTab}
-              forcedScreenId={screens.forcedId}
-              lockedScreenId={screens.lockedId}
-              detachedScreenId={screens.detachedScreenId}
-              screenStreams={mediaTransport.screenStreams}
-              screenPans={screens.pans}
-              zoomLevel={screens.zoomLevel}
-              showZoomCtrl={screens.showZoomCtrl}
-              bind:isFullScreenshare={screens.isFullScreenshare}
               volume={roomVolume.volume}
-              saveData={mediaTransport.saveData}
               {screenVolume}
-              selectScreenTabByUser={(id) => screens.selectTab(id)}
-              detachScreen={(id) => screens.detach(id)}
-              toggleLockScreen={(id) => screens.toggleLock(id)}
-              bringEveryoneToScreen={(id) => screens.bringEveryoneTo(id)}
-              stopSharedScreen={(id) => screens.stop(id)}
-              togglePanZoom={() => screens.toggleZoomControls()}
-              panZoomIn={() => screens.zoomIn()}
-              panZoomOut={() => screens.zoomOut()}
-              panZoomReset={() => screens.resetZoom()}
               {hideStreams}
               {streamServerMTX}
               {mtxToken}

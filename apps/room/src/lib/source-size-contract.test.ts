@@ -306,8 +306,15 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       shell would have meant roughly 160 pass-through props, a second place for each to drift, and a
       forced edit to every pane contract in the repository. A snippet is a closure over this file's
       scope, so the shell places markup it knows nothing about.
+
+      1,452 -> 1,431 on 2026-08-18, and this one removed no behaviour at all. Twenty-one props at the
+      `<PresentationArea>` call site were members of two objects the same call site ALREADY passed
+      whole — seventeen off `screens`, four off `mediaTransport`. Every one of them was the shape
+      `member={facade.member}`, so the page was hand-forwarding a getter it had just handed over.
+      The line count is the smallest part of it: adding a screen control used to cost three edits in
+      two files, and now costs none.
     */
-    max: 1453,
+    max: 1432,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {
@@ -514,8 +521,15 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       Set at what it measures TODAY rather than at something aspirational: the number's job is to
       stop the next 200 lines, not to pass judgement on the existing 1,181. The twelve drilled screen
       props are the obvious next extraction and will bring it down on their own.
+
+      THEY DID, ON 2026-08-18, and the prediction is left above rather than tidied away because a
+      ceiling note that names its own trigger and then records the trigger firing is the only kind
+      that stays honest. It was twenty-one props rather than twelve once counted: seventeen members
+      of `screens` and four of `mediaTransport`, both of which were already props here for the
+      spatial-layer effect. 1,181 -> 1,159, and that is NET of a twenty-line comment explaining the
+      collapse — the interface and the destructure shed forty-two between them.
     */
-    max: 1181,
+    max: 1160,
     why: 'the room stage - twelve child components, and the largest file after the page itself'
   },
   {

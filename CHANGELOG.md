@@ -211,6 +211,47 @@ confirmed by trying to break it.
 
 ## 2026-08-18
 
+### 2026-08-18 09:41 EDT — twenty-one props that were members of two objects already being passed
+
+**Runtime impact: none intended** — behaviour preserved exactly. Full gate: **2,476 tests / 172
+files**, `eslint src/` clean, `svelte-check` **1,209 / 0 / 0**, prettier clean, `vite build` done.
+`+page.svelte` 1,452 → **1,431**; `PresentationArea.svelte` 1,181 → **1,159**.
+
+**The slice was named in the code, by whoever deferred it.** `PresentationArea.svelte` carried a
+note on its `screens` prop: *"They sit beside the twelve drilled screen props rather than replacing
+them, deliberately: collapsing those twelve is a real slice with its own ripple … and folding it
+into an effect move would have made one commit that did two things."* Its ceiling entry made the
+same prediction. Counted rather than trusted, it was **twenty-one, not twelve**: seventeen members
+of `screens` and four of `mediaTransport`, both already props here.
+
+**Every one was the shape `member={facade.member}`** — the page handing over a getter it had just
+handed over. The duplication was already visible INSIDE the one file: the spatial-layer effect read
+`mediaTransport.screenStreams.size` through the facade while `ScreenPane` five hundred lines below
+read a drilled `screenStreams` prop. Same map, two names.
+
+**`isFullScreenshare` stopped being `$bindable`.** `RoomScreens` declares a real setter, so the
+fullscreen control writes `screens.isFullScreenshare` directly — the pattern `files` already
+records for `bind:fileTab`, and the `$props` docs' warning about mutating props is about state
+PROXIES a component does not own, not about a setter on a class instance.
+
+**`volume` and the four webcam callbacks are deliberately still drilled**, and the interface says
+why: `RoomVolume` and `RoomWebcams` are not passed here, so collapsing those would ADD a prop
+rather than remove one. A different slice with its own argument to make.
+
+**Four assertions broke; one is now read from the AST.** `focus-on-screen-contract`'s loop guard
+spanned two files as two substring checks, because the wiring travelled through the deleted prop.
+Re-typing them as one new string would have rebuilt the weakness — a `toContain` cannot tell an
+attribute on `<ScreenTabs>` from the same characters in a comment or in dead markup. It now locates
+the component node and reads `onselect`'s own expression through `svelte.parse`, the idiom
+`each-key-contract.test.ts` established. **Negative controls, both red:** wiring the click to the
+silent `selectScreenTabOfId` → *"expected '(id) => mediaTransport.selectScreenTa…' to be '(id) =>
+screens.selectTab(id)'"*; deleting the strip entirely → *"<ScreenTabs onselect> must exist:
+expected null not to be null"* — the helper returns `null`, never `''`, which is the exact failure
+this file records shipping once already.
+
+**`+page.svelte` is no longer read by that contract at all, and the constant was deleted rather
+than left.** An unread `readFileSync` is how a guard goes green against nothing.
+
 ### 2026-08-18 09:03 EDT — the freshness poll and the visibility rules leave the page, and four assertions stop reading text
 
 **Runtime impact: none intended** — behaviour preserved exactly. Gate: **2,476 tests / 172 files**,

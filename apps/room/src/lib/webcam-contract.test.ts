@@ -134,7 +134,15 @@ describe('webcam: this room reproduces that split', () => {
     // `removePresenterWebcam` calls `container.remove(idx)`; here the {#each} drops the node.
     const remove = bodyOf('removeWebcamPresenter');
     expect(remove).toContain('splice');
-    expect(paneCode).toContain('{#each webcamPresenters as presenter, index (presenter.id)}');
+    /*
+      KEYED, and over the transport's own list — `mediaTransport.webcamPresenters` since
+      2026-08-18, when the drilled `webcamPresenters` prop went with the other twenty re-passed
+      facade members. The key is the point: `(presenter.id)` is what lets Svelte remove the card's
+      node rather than reuse it for the next presenter, which is `container.remove(idx)`.
+    */
+    expect(paneCode).toContain(
+      '{#each mediaTransport.webcamPresenters as presenter, index (presenter.id)}'
+    );
   });
 });
 
