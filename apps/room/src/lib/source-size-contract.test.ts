@@ -323,8 +323,13 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
 
       `PresentationArea` is also down to 1,112 rather than up, and the note on its own entry records
       why that took an extraction rather than a raise.
+
+      1,408 -> 1,404 on the `$state.raw` sweep, and it FELL while gaining two explanatory comments:
+      `captionHistory` and `globalChatStyle` are replace-only, so the generic collapsed onto fewer
+      lines than the proxied declarations took. Not a saving worth chasing - recorded because a
+      ceiling that moves for a reason nobody wrote down is the thing this file exists to prevent.
     */
-    max: 1409,
+    max: 1405,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {

@@ -274,8 +274,10 @@
   
 
   
+  /* RAW: `mergeGlobalChatStyle` replaces it whole; `ModalHost` spread-copies before binding, so no
+     one writes through this reference. Read by `messageChrome`, i.e. on every rendered message. */
   // svelte-ignore state_referenced_locally
-  let globalChatStyle = $state<FollowChatStyle>({
+  let globalChatStyle = $state.raw<FollowChatStyle>({
     ...defaultChatStyleForTheme(theme),
     ...loadedChatStyle
   });
@@ -332,9 +334,11 @@
   let currentCaption = $state<{ timestamp: number; sender: string; text: string; live?: boolean } | null>(
     null
   );
-  let captionHistory = $state<{ timestamp: number; sender: string; text: string; live?: boolean }[]>(
-    []
-  );
+  /* RAW: replaced whole by `pushCaptionHistory` (spread + `slice`), never written into. 500 entries
+     rebuilt up to twice a second is the worst proxy cost in the room. `state-raw-contract.test.ts`. */
+  let captionHistory = $state.raw<
+    { timestamp: number; sender: string; text: string; live?: boolean }[]
+  >([]);
   let speechRecoHistoryMode = $state(false);
   /**
    * How many finalised lines the transcript keeps.

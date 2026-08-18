@@ -211,6 +211,56 @@ confirmed by trying to break it.
 
 ## 2026-08-18
 
+### 2026-08-18 09:55 EDT — a conformance audit against the official best-practices page, and the guard that was narrower than its own rule
+
+**Runtime impact: none intended** — behaviour preserved exactly, eight values changed from a deeply
+reactive proxy to raw state. Full gate: **2,493 tests / 173 files**, `eslint src/` clean,
+`svelte-check` **1,211 / 0 / 0**, prettier clean, `vite build` done.
+
+**The audit, and it is mostly a clean bill.** Every `.svelte` file parsed with `svelte.parse` and
+every module with the TypeScript AST, checked against `svelte/best-practices` as read from the MCP
+docs this session. **Zero** `export let`, `$:`, `on:`, `<slot>`, `<svelte:fragment>`,
+`<svelte:component>`, `<svelte:self>`, `$$props`/`$$restProps`/`$$slots`, `svelte/store`,
+`$app/stores`, `$derived` handed a function, or `if (browser)` inside an effect.
+
+**Eight imperative `window`/`document` listeners: examined, none is a defect.** The docs prefer
+`<svelte:window>`, and the reason these cannot use it is technical, not stylistic: three of the four
+sites register `scroll` in the CAPTURE phase (`addEventListener('scroll', place, true)`), which the
+element form cannot express — scroll does not bubble, so a popover inside a nested scroller would
+stop tracking. The rest are node-scoped attachments, conditional-while-open, or pointer handlers
+attached for the duration of a drag inside an event handler, which is what the docs prescribe.
+
+**THE REAL FINDING WAS THE GUARD.** `state-raw-contract.test.ts` already enforced the
+`$state`-vs-`$state.raw` rule and enforced it well — but its corpus was
+`readdirSync('src/lib/room')` and it read only class fields. It had never seen a `.svelte`
+component or a plain `let x = $state(…)`. Eight replace-only objects were sitting in that blind
+spot, and the two that matter are hot:
+
+- **`captionHistory`** — 500 entries, replaced wholesale up to twice a second; every entry
+  re-proxied on each arrival.
+- **`globalChatStyle`** — read by `messageChrome`, so the proxy landed on EVERY rendered message.
+
+Plus `advancedSearchResults` (unbounded by anything the room controls), `uploadQueue`,
+`searchResults`, `micDevices`, `audioDevices`, `videoDevices`. Same failure shape
+`source-size-contract` and `unbound-method-contract` each record paying for once: a guard whose
+corpus is narrower than its rule reads as coverage.
+
+**AND THE FIRST SWEEP GOT THREE OF THEM WRONG, which is why the widening carries a second half.**
+`userPermissions`, `followChatStyle` and `chatStyle` are mutated by `bind:checked={…​.hasMic}` and
+friends — a two-way binding to a MEMBER is a property write, and the sweep had walked only the
+`<script>` AST. Converting them would have silently broken six settings toggles and a colour picker
+**with the suite fully green**, because mutating raw state does not throw. Mutation is now decided
+from the script AST *and* the template's `BindDirective` nodes.
+
+**Negative controls, both directions red:** reverting `captionHistory` to `$state` →
+*"src/routes/+page.svelte — captionHistory"*; making the bind-mutated `userPermissions` raw →
+*"and no $state.raw is mutated in place, which would silently do nothing"*.
+
+**The evidence for each conversion is an ASSERTION, not a comment.** Both files sit at a size
+ceiling, and the rule is that ceilings only go down — so rather than raise one or shorten prose, the
+per-site notes moved into the contract's named-assertion block, which is where `#evidence` and
+`#notices` already were. A check re-proves the claim on every run; a comment only repeats it.
+
 ### 2026-08-18 09:38 EDT — the last two duplications, and a probe that found the scroll wiring guarded by nothing
 
 **Runtime impact: none intended** — behaviour preserved exactly. Full gate: **2,487 tests / 173

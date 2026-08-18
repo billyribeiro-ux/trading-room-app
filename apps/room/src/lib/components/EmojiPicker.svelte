@@ -74,7 +74,8 @@
   let skin = $state(1);
   let skinsOpened = $state(false);
   let hovered = $state<EmojiDumpEntry | null>(null);
-  let searchResults = $state<EmojiDumpEntry[] | null>(null);
+  /* RAW: `runSearch` returns a fresh array and `null` clears it; never written into. */
+  let searchResults = $state.raw<EmojiDumpEntry[] | null>(null);
   let frequentIds = $state.raw<string[]>(FREQUENTLY_DEFAULTS.slice(0, PER_LINE));
 
   let emojiSearchInput: HTMLInputElement | undefined;

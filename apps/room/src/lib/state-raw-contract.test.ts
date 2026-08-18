@@ -1,5 +1,7 @@
-import { readFileSync, readdirSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
+import { execSync } from 'node:child_process';
 import ts from 'typescript';
+import { parse } from 'svelte/compiler';
 import { describe, expect, it } from 'vitest';
 
 /*
@@ -40,9 +42,36 @@ import { describe, expect, it } from 'vitest';
 
   It deliberately does NOT flag `$state` on primitives — `.raw` means nothing for a string or a
   boolean, and the docs' rule is explicitly about objects and arrays.
-*/
 
-const MODULE_DIR = 'src/lib/room';
+  ## WIDENED 2026-08-18, because it had been reading one directory and one declaration shape
+
+  As written above, the corpus was `readdirSync('src/lib/room')` and the two declaration forms were
+  a class field and a `this.#x = $state(…)` in a constructor. That is every state CLASS in the room
+  and nothing else — so all 46 `.svelte` components and every plain `let x = $state(…)` were outside
+  it. A conformance sweep on 2026-08-18 found five replace-only objects sitting in exactly that
+  blind spot:
+
+  * `captionHistory` in `+page.svelte` — 500 entries, replaced wholesale up to twice a second.
+  * `globalChatStyle` in `+page.svelte` — read by `messageChrome`, i.e. on every rendered message.
+  * `advancedSearchResults`, `audioDevices`, `videoDevices` in `ModalHost.svelte`.
+
+  This is the same failure shape `source-size-contract.test.ts` and `unbound-method-contract.test.ts`
+  each record paying for once: a guard whose corpus is narrower than the rule it enforces reads as
+  coverage. The corpus is now every tracked `.ts` module and every `.svelte` script block.
+
+  ## AND THE `bind:` HALF, WITHOUT WHICH THE WIDENING WOULD HAVE BEEN WORSE THAN USELESS
+
+  The first draft of that sweep reported EIGHT findings. Three were wrong: `userPermissions`,
+  `followChatStyle` and `chatStyle` in `ModalHost` are each mutated by
+  `bind:checked={userPermissions.hasMic}` and friends, and a two-way binding to a MEMBER is a
+  property write. The sweep had walked only the `<script>` AST, so every one of those writes was
+  invisible to it — and converting them would have silently broken six settings toggles and a colour
+  picker with the suite fully green, because a mutation of raw state does not throw.
+
+  So for a component, mutation is decided from BOTH halves: the script AST *and* the template's
+  `BindDirective` nodes. That is the most important line in this file, and the negative controls at
+  the bottom pin it in both directions.
+*/
 
 /** Mutating array/Map/Set methods. A call to one of these is proof the value is not replace-only. */
 const MUTATORS = new Set([
@@ -76,8 +105,11 @@ interface Field {
  * assignment to a property inside the constructor. The first draft of this scanner read only the
  * former and missed `RoomFeeds.#evidence`, which is one of the two that mattered.
  */
-const objectStateFields = (path: string): Field[] => {
-  const text = readFileSync(path, 'utf8');
+const objectStateFields = (
+  path: string,
+  text: string,
+  boundRoots: ReadonlySet<string>
+): Field[] => {
   const source = ts.createSourceFile(path, text, ts.ScriptTarget.ESNext, true);
   const found = new Map<string, { raw: boolean; mutated: boolean }>();
 
@@ -110,6 +142,15 @@ const objectStateFields = (path: string): Field[] => {
       const rune = runeOf(node.right);
       if (rune) found.set(node.left.name.getText(source), { raw: rune.raw, mutated: false });
     }
+    /*
+      `let x = $state(…)` — the component shape, added with the 2026-08-18 widening. Every finding
+      that had been hiding from this file was one of these; the two branches above only ever see a
+      class.
+    */
+    if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name)) {
+      const rune = runeOf(node.initializer);
+      if (rune) found.set(node.name.text, { raw: rune.raw, mutated: false });
+    }
     ts.forEachChild(node, declare);
   };
   declare(source);
@@ -119,33 +160,101 @@ const objectStateFields = (path: string): Field[] => {
     if (ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.EqualsToken) {
       const left = node.left;
       if (ts.isPropertyAccessExpression(left) || ts.isElementAccessExpression(left)) {
-        const base = left.expression.getText(source);
-        for (const name of found.keys()) {
-          if (base === `this.${name}`) found.get(name)!.mutated = true;
-        }
+        markBase(left.expression.getText(source));
       }
     }
-    // `this.#x.push(…)`
+    // `this.#x.push(…)` / `list.push(…)`
     if (
       ts.isCallExpression(node) &&
       ts.isPropertyAccessExpression(node.expression) &&
       MUTATORS.has(node.expression.name.getText(source))
     ) {
-      const base = node.expression.expression.getText(source);
-      for (const name of found.keys()) {
-        if (base === `this.${name}`) found.get(name)!.mutated = true;
-      }
+      markBase(node.expression.expression.getText(source));
     }
     ts.forEachChild(node, markMutations);
   };
+
+  /*
+    A field is `this.#x` inside a class and a bare `x` in a component script, so both spellings
+    count. Matching only `this.${name}` is what the pre-widening version did, and it was correct for
+    the corpus it had.
+  */
+  function markBase(base: string): void {
+    for (const name of found.keys()) {
+      if (base === name || base === `this.${name}`) found.get(name)!.mutated = true;
+    }
+  }
+
   markMutations(source);
+
+  /* The template's two-way bindings, which no amount of script-walking can see. */
+  for (const name of found.keys()) {
+    if (boundRoots.has(name)) found.get(name)!.mutated = true;
+  }
 
   return [...found].map(([name, state]) => ({ file: path, name, ...state }));
 };
 
-const allFields = readdirSync(MODULE_DIR)
-  .filter((name) => name.endsWith('.ts') && !name.endsWith('.test.ts'))
-  .flatMap((name) => objectStateFields(`${MODULE_DIR}/${name}`));
+/**
+ * The roots of every `bind:` whose target is a MEMBER expression.
+ *
+ * `bind:checked={userPermissions.hasMic}` writes a property of `userPermissions` every time the box
+ * is ticked, so the object is mutated. `bind:value={name}` REPLACES a variable, which raw state
+ * permits, so a plain identifier target is deliberately not counted.
+ */
+const boundMemberRoots = (source: string): Set<string> => {
+  const roots = new Set<string>();
+
+  const visit = (node: unknown): void => {
+    if (!node || typeof node !== 'object') return;
+    const candidate = node as { type?: string; expression?: Record<string, unknown> };
+
+    if (candidate.type === 'BindDirective' && candidate.expression) {
+      let cursor = candidate.expression;
+      let sawMember = false;
+      while (cursor.type === 'MemberExpression') {
+        sawMember = true;
+        cursor = cursor.object as Record<string, unknown>;
+      }
+      if (sawMember && cursor.type === 'Identifier') roots.add(cursor.name as string);
+    }
+
+    for (const value of Object.values(node as Record<string, unknown>)) {
+      if (Array.isArray(value)) value.forEach(visit);
+      else if (value && typeof value === 'object') visit(value);
+    }
+  };
+
+  visit(parse(source, { modern: true }).fragment);
+  return roots;
+};
+
+const tracked = execSync("git ls-files 'src/**'", { encoding: 'utf8' }).trim().split('\n');
+
+const allFields: Field[] = [
+  ...tracked
+    .filter((file) => file.endsWith('.ts') && !file.endsWith('.test.ts') && !file.endsWith('.d.ts'))
+    .flatMap((file) => objectStateFields(file, readFileSync(file, 'utf8'), new Set())),
+  ...tracked
+    .filter((file) => file.endsWith('.svelte'))
+    .flatMap((file) => {
+      const text = readFileSync(file, 'utf8');
+      const ast = parse(text, { modern: true });
+      const bound = boundMemberRoots(text);
+      /*
+        `content` is typed as an ESTree `Program`, which does not DECLARE the `start` / `end`
+        offsets Svelte attaches to every node at runtime. Widened at the read rather than cast away
+        with `as never`, so the two properties being relied on are named — the same reason the
+        tracking helper in `create-room.svelte.test.ts` took a generic instead of a cast.
+      */
+      return [ast.instance, ast.module]
+        .filter((block) => block !== null && block !== undefined)
+        .flatMap((block) => {
+          const { start, end } = block.content as unknown as { start: number; end: number };
+          return objectStateFields(file, text.slice(start, end), bound);
+        });
+    })
+];
 
 describe('replace-only objects use $state.raw', () => {
   it('found the fields it is meant to police', () => {
@@ -191,5 +300,88 @@ describe('replace-only objects use $state.raw', () => {
 
     expect(byName('feeds.svelte.ts', '#evidence')?.raw, '#evidence must stay raw').toBe(true);
     expect(byName('toasts.svelte.ts', '#notices')?.raw, '#notices must stay raw').toBe(true);
+  });
+
+  it('the eight found by the 2026-08-18 widening are raw, with the evidence for each', () => {
+    /*
+      NAMED HERE RATHER THAN COMMENTED AT EACH DECLARATION, deliberately, and the reason is the same
+      one that put `#evidence` and `#notices` above: an assertion re-checks the claim on every run,
+      where a comment only repeats it. Both of these files sit at a size ceiling, and a note that
+      merely restates what the sweep above already proves is the weaker of the two places to spend
+      the lines.
+
+      What each one's writers actually are, verified by reading every reference in the repository
+      rather than by searching for a pattern:
+
+      * `captionHistory`      — `[...captionHistory, caption].slice(-500)`; 500 entries rebuilt up
+                                to twice a second, the worst proxy cost in the room.
+      * `globalChatStyle`     — `{ ...globalChatStyle, ...patch }`; read by `messageChrome`, so it
+                                lands on EVERY rendered message.
+      * `advancedSearchResults` — `= []`, `= filterAlerts(...)`, `= []`; size is however many alerts
+                                match across the whole loaded log, bounded by nothing.
+      * `uploadQueue`         — `= [...list]` or `= []`; the send loop only reads it, via `.entries()`.
+      * `searchResults`       — `runSearch(value)` or `null`, over the full emoji set.
+      * `micDevices`, `audioDevices`, `videoDevices` — assigned whole from `enumerateDevices`; an
+                                option is never edited after it is built.
+
+      The three that are NOT here are the ones the first draft of that sweep got WRONG:
+      `userPermissions`, `followChatStyle` and `chatStyle` are each mutated by `bind:` to a member,
+      so they are correctly `$state`. The header explains what that cost.
+    */
+    const rawByName = (file: string, name: string) =>
+      allFields.find((field) => field.file.endsWith(file) && field.name === name)?.raw;
+
+    expect(rawByName('routes/+page.svelte', 'captionHistory')).toBe(true);
+    expect(rawByName('routes/+page.svelte', 'globalChatStyle')).toBe(true);
+    expect(rawByName('ModalHost.svelte', 'advancedSearchResults')).toBe(true);
+    expect(rawByName('ModalHost.svelte', 'uploadQueue')).toBe(true);
+    expect(rawByName('ModalHost.svelte', 'micDevices')).toBe(true);
+    expect(rawByName('ModalHost.svelte', 'audioDevices')).toBe(true);
+    expect(rawByName('ModalHost.svelte', 'videoDevices')).toBe(true);
+    expect(rawByName('EmojiPicker.svelte', 'searchResults')).toBe(true);
+
+    // And the three that must NOT be, because `bind:` writes their members.
+    expect(rawByName('ModalHost.svelte', 'userPermissions'), 'bind:checked writes it').toBe(false);
+    expect(rawByName('ModalHost.svelte', 'followChatStyle'), 'bind:value writes it').toBe(false);
+    expect(rawByName('ModalHost.svelte', 'chatStyle'), 'bind:value writes it').toBe(false);
+  });
+});
+
+describe('the detector itself, in both directions', () => {
+  /*
+    The `bind:` half is the part that was wrong once, and a guard nobody has watched fail is not a
+    guard. These run the discriminator directly rather than by editing a real file.
+  */
+  it('counts a bind: to a MEMBER as a mutation', () => {
+    const source =
+      '<script lang="ts">let box = $state({ on: false });</script><input bind:checked={box.on} />';
+    expect(boundMemberRoots(source), 'bind:checked={box.on} writes a property of box').toEqual(
+      new Set(['box'])
+    );
+  });
+
+  it('does NOT count a bind: to a plain variable, which is a reassignment raw allows', () => {
+    const source = '<script lang="ts">let name = $state("");</script><input bind:value={name} />';
+    expect(boundMemberRoots(source)).toEqual(new Set());
+  });
+
+  it('sees a mutating method and a property write on a plain let, not just on this.#field', () => {
+    const fields = objectStateFields(
+      'probe.ts',
+      'let list = $state([]); let map = $state({}); list.push(1); map.key = 2;',
+      new Set()
+    );
+    expect(fields.find((f) => f.name === 'list')?.mutated, 'list.push(1)').toBe(true);
+    expect(fields.find((f) => f.name === 'map')?.mutated, 'map.key = 2').toBe(true);
+  });
+
+  it('does NOT treat a whole reassignment as a mutation, which is the entire point', () => {
+    const fields = objectStateFields(
+      'probe.ts',
+      'let list = $state([]); list = [1, 2];',
+      new Set()
+    );
+    expect(fields[0]?.name).toBe('list');
+    expect(fields[0]?.mutated, 'replacing the array is exactly what $state.raw is for').toBe(false);
   });
 });
