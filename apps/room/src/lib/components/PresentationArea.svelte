@@ -606,7 +606,7 @@
 
                     The reference feeds the binding `sessData.hideFiles || globals.videoOnlyMode`
                     (2289-2290). Only the first term is implemented, and `filesSectionHidden` in
-                    `#lib/files-gates.js` says why: the second is not a setting but the media.recording-bot
+                    `#lib/files-gates.js` says why: the second is not a setting but the recording-bot
                     client global, set from the `r` query parameter, and this room has no media.recording
                     bot to model.
                   -->

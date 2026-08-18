@@ -211,6 +211,53 @@ confirmed by trying to break it.
 
 ## 2026-08-18
 
+### 2026-08-18 10:53 EDT — a mechanical rename had corrupted two on-screen sentences, two class names and the recording download filename
+
+**A real shipped defect, found by READING a component while writing a render test for something
+else.** Full gate: **2,536 tests / 179 files**, `eslint src/` clean, `svelte-check` **1,212 / 0 / 0**,
+prettier clean, `vite build` done.
+
+**What was wrong.** A substitution of `recording` → `media.recording` was applied across
+`+page.svelte` before Phase 5 slice 20 and travelled into every file the extractions carried it to.
+Correct for the FIELD — `media.recording` really is where that state lives — and wrong everywhere
+else it landed:
+
+- **`<span>You are not media.recording!</span>`** — on screen, in the recording reminder.
+- **`Can't start media.recording without screenshare`** — on screen, in the recording menu.
+- **`class="media.recording-reminder"`** and `class="media.recording-reminder-arrow"`. The captured
+  stylesheet defines `.recording-reminder` / `.recording-reminder-arrow`
+  (`captured-runtime-components.css:3993,4039`), so the banner **matched no rule and rendered
+  unstyled**.
+- **`` `room-media.recording-${stamp}.${extension}` ``** — the DOWNLOAD FILENAME a presenter gets for
+  their own recording. Twice.
+- Six comment citations, two naming files that do not exist (`media.recording-codec.ts`,
+  `media.recording-state.remote.ts`; the real ones drop the prefix).
+
+**Every one passed `svelte-check`, eslint, prettier and 2,523 tests**, because none is a type error
+and no assertion happened to read those strings.
+
+**Repaired against evidence, not inference.** "You are not recording" and "Can't start recording
+without screenshare" are both in `main.d6d3c112b59b7d0d.js` verbatim. The class names are in the
+captured stylesheet. And the filename was recovered from `media.svelte.test.ts`, which uses
+`room-recording-2026` as the recording name in seven assertions — so the intended shape was already
+pinned elsewhere in the repository while the code shipped the corrupted one.
+
+**`mechanical-rename-contract.test.ts` holds the mechanism.** One rule, chosen because it has zero
+false positives: **a static `class` attribute may not contain a `.`** A CSS class name here never
+does, so a dot is always the fingerprint of a substitution that escaped its scope. It deliberately
+does NOT try to police string content in general — "which sentences are user-visible" is not
+decidable, and a guard that guesses either misses the next one or cries wolf. The four corrupted
+strings are pinned by name beside it.
+
+**Negative controls, all three red:** the class → *"class=\"media.recording-reminder\" … the
+fingerprint of a rename that escaped its scope"*; the sentence → *"expected … to contain '<span>You
+are not recording!</span>'"*; the filename → *"expected … to contain
+'`room-recording-${stamp}.${extension}`'"*.
+
+`unbound-method-contract.test.ts` already records eleven handler props broken in one commit by "a
+mechanical rename". This is the same failure at a different target, and the gate goes in with the
+repair rather than after the next one.
+
 ### 2026-08-18 10:46 EDT — the main tab strip: what a room has PAID FOR is absent, what it is merely not shown is hidden
 
 **Full gate: 2,523 tests / 177 files**, `eslint src/` clean, `svelte-check` **1,212 / 0 / 0**,

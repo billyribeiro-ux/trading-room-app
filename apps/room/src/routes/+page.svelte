@@ -669,7 +669,7 @@
   }
 
   /**
-   * Tells the room what this presenter's recorder is doing. `media.recording-state.remote.ts` carries the
+   * Tells the room what this presenter's recorder is doing. `recording-state.remote.ts` carries the
    * reasoning for all of it: why the room is told rather than each browser reading its own flag, why
    * `cmd` is the command's schema instead of four restated strings, and why the catch is here once
    * rather than at each of the four `void`-ed call sites.

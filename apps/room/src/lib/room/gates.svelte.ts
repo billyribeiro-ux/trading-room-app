@@ -182,7 +182,7 @@ export class RoomGates {
    *   PLAYBACK mode — the only other thing that reads it raises "The stream has ended. You can
    *   close this page now." on `streamPlayerEnded` (`full.js:2162-2165`). This room has no such
    *   mode, so there is nothing to read.
-   * - `videoOnlyMode` is the `r` query parameter, the media.recording-bot mode — the same gap
+   * - `videoOnlyMode` is the `r` query parameter, the recording-bot mode — the same gap
    *   `files-gates.ts` already records for `hideFiles`. `recordChat` is deliberately not on the
    *   wire either, because it appears ONLY inside that writer and would arrive with no reader.
    *
@@ -298,7 +298,7 @@ export class RoomGates {
   }
 
   /*
-    The OWNER term of the media.recording-reminder banner, byte 2,477,770.
+    The OWNER term of the recording-reminder banner, byte 2,477,770.
 
     Upstream shares this name between a room setting and a local runtime flag, and the gate needs
     BOTH. The room already had the flag and the banner, so this is the missing half rather than a

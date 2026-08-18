@@ -290,7 +290,7 @@
         </li>
       {/if}
       <!--
-          The room's media.recording badge, for EVERYONE - this reports state, it does not change
+          The room's recording badge, for EVERYONE - this reports state, it does not change
           it, so it is deliberately outside the presenter block below.
 
           Consts 92/93/94, and the gating from the update block:
@@ -353,9 +353,9 @@
             <span class="ml-2 mainNavItem">Start/Stop Recording</span>
           </a>
           {#if recordingReminderAllowed && media.recordingReminder && (!media.recording || media.recordingPaused)}
-            <div class="media.recording-reminder">
-              <span class="media.recording-reminder-arrow"></span>
-              <span>You are not media.recording!</span>
+            <div class="recording-reminder">
+              <span class="recording-reminder-arrow"></span>
+              <span>You are not recording!</span>
               <button
                 type="button"
                 class="btn-close"
@@ -374,7 +374,7 @@
             style={menus.recording ? 'display: block;' : undefined}
           >
             {#if !media.screenSharing}
-              <li class="nav-item">Can't start media.recording without screenshare</li>
+              <li class="nav-item">Can't start recording without screenshare</li>
             {:else}
               {#if !media.recording}
                 <!-- svelte-ignore a11y_click_events_have_key_events -->
