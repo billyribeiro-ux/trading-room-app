@@ -211,6 +211,54 @@ confirmed by trying to break it.
 
 ## 2026-08-18
 
+### 2026-08-18 09:30 EDT — three more facades, an extraction instead of a raised ceiling, and a gate widened to see attachments
+
+**Runtime impact: none intended** — behaviour preserved exactly. Full gate: **2,479 tests / 172
+files**, `eslint src/` clean, `svelte-check` **1,210 / 0 / 0**, prettier clean, `vite build` done.
+`+page.svelte` 1,431 → **1,408**; `PresentationArea.svelte` 1,159 → **1,112**; new
+`WebcamStrip.svelte` at 124.
+
+**The same collapse, three more times, each with its own argument** — because the previous commit's
+note said `webcams` / `notes` / `broadcasts` were "a different slice, with its own argument to
+make", and a note that defers work is worth nothing if the work then happens unargued.
+
+- **`webcams`** — the four props were arrows wrapping four methods of one object, and the wrapping
+  was not stylistic. `unbound-method-contract.test.ts` records that **the four webcam attachments
+  were among thirteen props that threw on the first click in every room**. Passing the object
+  removes the hazard instead of wrapping around it.
+- **`notes`** — six props, and one is the reason. `submitMutation` is GENERIC, and a generic cannot
+  survive a prop hop by itself, so the page carried a **five-line wrapper whose entire job was to
+  re-declare the type parameter and forward it**. Twelve lines of interface and five of markup
+  existed to move one method across one boundary with its type intact. All seventeen are gone.
+- **`broadcasts`** — thirteen props spread across three sections of the interface because they
+  arrived with three features. The page was already handing this same object WHOLE to `RoomOverlays`
+  twenty lines below where it decomposed it for this component.
+
+**IT LANDED OVER, AND THE ANSWER WAS ANOTHER EXTRACTION.** The page fell 23 but `PresentationArea`
+rose to 1,174, because each argument arrived as prose. The ratchet's own rule is that ceilings only
+go down and *"if you find yourself raising one, that is the conversation this file exists to
+force"*. So it was not raised: **`app-webcam-holder` left for `WebcamStrip.svelte`**, which is the
+seam the CAPTURE draws — that file held the markup of two Angular components and its own header
+opens by naming both. Its "one component and not seven" argument covers the seven tab panes, which
+share `mainTab`; the strip shares nothing with any tab. 84 lines out, ending at 1,112.
+
+**A GATE WIDENED IN THE COMMIT THAT CREATED THE EXPOSURE.** `unbound-method-contract.test.ts`
+inspected `Attribute` nodes only, so `{@attach instance.method}` was invisible to it — the same
+`this`-loss failure in a different AST node. Moving the strip put two attach sites into a new file
+where `attachLocal` IS the attachment and must be wrapped, and nothing in the toolchain would have
+reported dropping that wrapper. It now reads `AttachTag` too, and unwraps ternaries, because the
+strip's own attach is a conditional with one wrapped branch and one factory call.
+
+**Negative controls, both red with exact diagnostics:** dropping the wrapper →
+*"WebcamStrip.svelte:102 — {@attach webcams.attachLocal} passes a METHOD by reference"*; wiring both
+YouTube buttons to one handler → *"expected '() => void broadcasts.stopYoutubeForA…' to contain
+'broadcasts.closeYoutubeFrame()'"*.
+
+**`WebcamStrip` got its ceiling in the commit that created it**, because `PresentationArea` went
+uncapped for all of Phase 5 for exactly the opposite reason. And `webcam-contract.test.ts` stopped
+reading `PresentationArea` entirely — after the strip moved, not one assertion had anything left to
+ask of it, which is the cleanest evidence the seam was real.
+
 ### 2026-08-18 09:16 EDT — twenty-one props that were members of two objects already being passed
 
 **Runtime impact: none intended** — behaviour preserved exactly. Full gate: **2,476 tests / 172

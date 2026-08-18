@@ -1218,10 +1218,7 @@
               archivesAvailable={gates.archivesAvailable}
               openTranscriptPage={() => alertsPane.openTranscript()}
               {previewWindowsVisible}
-              webcamCard={(presenter, index) => webcams.card(presenter, index)}
-              attachLocalWebcam={(node) => webcams.attachLocal(node)}
-              attachRemoteWebcam={(producerId) => webcams.attachRemote(producerId)}
-              closeWebcamPreview={(presenter) => webcams.closePreview(presenter)}
+              {webcams}
               videoDisabled={prefs.videoDisabled}
               volume={roomVolume.volume}
               {screenVolume}
@@ -1233,33 +1230,13 @@
               {toggleLockStreamMtx}
               {noteGates}
               {giphyApiKey}
-              newNoteOpen={notes.newNoteOpen}
-              onNewNoteOpenChange={(open) => (notes.newNoteOpen = open)}
-              mountNewNoteLink={(menu) => notes.mountNewNoteLink(menu)}
-              submitNoteMutation={<Success extends Record<string, unknown>>(
-                action: Parameters<typeof notes.submitMutation>[0],
-                values: Parameters<typeof notes.submitMutation>[1]
-              ) => notes.submitMutation<Success>(action, values)}
-              loadNoteVersions={(noteId) => notes.loadVersions(noteId)}
+              {notes}
               uploadAlertFiles={(files) => composer.uploadAlertFiles(files)}
               {swingAlerts}
               {dayTradeAlerts}
-              hideVideoPlayer={broadcasts.hideVideoPlayer}
-              videoPlayerUrl={broadcasts.videoPlayerUrl}
-              scheduledVideoForAll={broadcasts.scheduledVideoForAll}
-              playVideoForAll={(url) => broadcasts.playVideoForAll(url)}
-              scheduleVideoForAll={(url, whenLocal) => broadcasts.scheduleVideoForAll(url, whenLocal)}
-              stopVideoForAll={() => broadcasts.stopVideoForAll()}
+              {broadcasts}
               {files}
-              mountUploadFileLink={(menu) => notes.mountUploadFileLink(menu)}
-              playMp3ForAll={(url) => broadcasts.playMp3ForAll(url)}
-              stopMp3ForAll={() => broadcasts.stopMp3ForAll()}
               openModal={(name) => modals.open(name)}
-              youtubeForAllUrl={broadcasts.youtubeForAllUrl}
-              stopYoutubeForAll={() => broadcasts.stopYoutubeForAll()}
-              closeYoutubeFrame={() => broadcasts.closeYoutubeFrame()}
-              mp3Playing={broadcasts.mp3Playing}
-              mp3Url={broadcasts.mp3Url}
               {setAutoplayAttribute}
             />
           {/snippet}

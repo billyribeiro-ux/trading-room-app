@@ -313,8 +313,18 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       `member={facade.member}`, so the page was hand-forwarding a getter it had just handed over.
       The line count is the smallest part of it: adding a screen control used to cost three edits in
       two files, and now costs none.
+
+      1,431 -> 1,408 the same day, and the same shape a third time: `webcams`, `notes` and
+      `broadcasts`, twenty-three more props that were members of objects this page holds. `notes` is
+      the one to read the diff for — it was carrying a FIVE-LINE generic wrapper whose entire job was
+      to re-declare `submitMutation`'s type parameter so the generic survived being handed through a
+      prop. Passing the object deleted the wrapper outright, which is a kind of line this ratchet
+      does not otherwise know how to ask for.
+
+      `PresentationArea` is also down to 1,112 rather than up, and the note on its own entry records
+      why that took an extraction rather than a raise.
     */
-    max: 1432,
+    max: 1409,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {
@@ -528,9 +538,42 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       of `screens` and four of `mediaTransport`, both of which were already props here for the
       spatial-layer effect. 1,181 -> 1,159, and that is NET of a twenty-line comment explaining the
       collapse — the interface and the destructure shed forty-two between them.
+
+      1,159 -> 1,112 the same day, and the ROUTE THERE is the part worth recording. Collapsing the
+      next three facades — `webcams`, `notes`, `broadcasts`, another twenty-three props — took the
+      page down twenty-three and pushed this file UP to 1,174, because the argument for each
+      collapse arrived here as prose. That is a raise, and the rule at the top of this file says a
+      raise is a conversation rather than a number to edit.
+
+      So it was not raised. `app-webcam-holder` left for `WebcamStrip.svelte`, which is the seam the
+      CAPTURE draws: this file held the markup of two Angular components and its own header opens by
+      naming both. The "one component and not seven" argument it makes covers the seven tab panes,
+      which share `mainTab`; the strip shares nothing with any tab. Eighty-four lines out, and the
+      answer to an over-projection stayed what the plan says it is — another extraction.
     */
-    max: 1160,
+    max: 1113,
     why: 'the room stage - twelve child components, and the largest file after the page itself'
+  },
+  {
+    file: 'lib/components/WebcamStrip.svelte',
+    /*
+      DECLARED IN THE COMMIT THAT CREATED THE FILE, which is the only reason this list is worth
+      keeping by hand at all.
+
+      `PresentationArea` went uncapped for the whole of Phase 5 because components are a hand-kept
+      catalog and nobody added it — its own entry below records that, and records that S5 pushed 39
+      lines into it with nothing objecting. A new component that ships without a number here repeats
+      exactly that, so the number goes in with the file.
+
+      Small on purpose, and it should stay small: three props, no state of its own, and every
+      decision it renders belongs to `RoomWebcams`. Most of the file is the two transcriptions that
+      came with the markup — why the cards are created dynamically rather than as the two static
+      `app-presenter-cams` the captured template appears to hold, and why the ids carry the
+      presenter suffix. If this number climbs, the thing to check is whether card BEHAVIOUR has
+      started leaking out of `webcams.ts` and into the markup.
+    */
+    max: 125,
+    why: 'app-webcam-holder - the card strip, three props, and the two transcriptions behind it'
   },
   {
     file: 'lib/components/ModalHost.svelte',

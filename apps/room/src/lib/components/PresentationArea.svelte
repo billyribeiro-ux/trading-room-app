@@ -45,6 +45,7 @@
   import NotesPane from '#lib/components/notes/NotesPane.svelte';
   import ScreenPane from '#lib/components/ScreenPane.svelte';
   import ScreenTabs from '#lib/components/ScreenTabs.svelte';
+  import WebcamStrip from '#lib/components/WebcamStrip.svelte';
   import ScreenZoomControls from '#lib/components/ScreenZoomControls.svelte';
   import SpeechRecoOverlay from '#lib/components/SpeechRecoOverlay.svelte';
   import StreamingView from '#lib/components/StreamingView.svelte';
@@ -59,20 +60,27 @@
   import type { RoomScreens } from '#lib/room/screens.svelte.js';
   import type { RoomMenus } from '#lib/room/menus.svelte.js';
   import type { RoomFiles } from '#lib/room/files.svelte.js';
+  import type { RoomNotes } from '#lib/room/notes.svelte.js';
+  import type { RoomWebcams } from '#lib/room/webcams.js';
+  import type { RoomBroadcasts } from '#lib/room/broadcasts.svelte.js';
   import type {
     DayTradeAlertAction,
     RoomTradeAlerts,
     SwingAlertAction
   } from '#lib/room/trade-alerts.svelte.js';
   import type { RoomSplit } from '#lib/room/split.svelte.js';
+  /*
+    `NoteVersion` and `WebcamPresenter` went with their props on 2026-08-18 — the first with the
+    hand-forwarded `loadNoteVersions`, the second with the four webcam callbacks and then the strip
+    itself. eslint's `no-unused-vars` is what named them, which is the point of leaving that rule on
+    for type imports: a type nothing annotates is a claim about a shape this file no longer handles.
+  */
   import type {
     DayTradeAlertRow,
     MainTab,
     ModalName,
-    NoteVersion,
     RoomNote,
-    SwingAlertRow,
-    WebcamPresenter
+    SwingAlertRow
   } from '#lib/types.js';
   import type { PageProps } from '../../routes/$types';
 
@@ -106,10 +114,23 @@
 
     // ── the webcam strip ───────────────────────────────────────────────────────
     previewWindowsVisible: boolean;
-    webcamCard: (presenter: WebcamPresenter, index: number) => (node: HTMLElement) => void;
-    attachLocalWebcam: (node: HTMLVideoElement) => void;
-    attachRemoteWebcam: (producerId: string) => (node: HTMLVideoElement) => void;
-    closeWebcamPreview: (presenter: WebcamPresenter) => void;
+    /**
+     * The webcam attachments, whole — `#lib/room/webcams.ts`.
+     *
+     * Four props, and every one of them was an arrow on the page wrapping one method of this
+     * object. The wrapping was not stylistic: `unbound-method-contract.test.ts` records that **the
+     * four webcam attachments were among thirteen props that threw on the first click in every
+     * room**, because a method handed over by reference loses `this` and `svelte-check`, eslint and
+     * the autofixer all pass on it. Passing the object removes the hazard rather than wrapping
+     * around it — there is nothing left to hand over by reference.
+     *
+     * The two `{@attach}` positions below are unchanged in behaviour. The docs are explicit that an
+     * attachment re-runs on *"state read inside the function"*, not on the identity of the
+     * expression, and `card` / `attachRemote` are CALLED rather than referenced, so `this` is bound
+     * at the call. If anything this is steadier than the props were: the page rebuilt those four
+     * arrows on every one of its own renders.
+     */
+    webcams: RoomWebcams;
 
     // ── #screens ───────────────────────────────────────────────────────────────
     /** This viewer's "off to preserve data" switch, which replaces the WHOLE pane. */
@@ -140,9 +161,14 @@
      *
      * ## What is deliberately still drilled, and why
      *
-     * `volume` is `RoomVolume`'s and `webcamCard` / `attachLocalWebcam` / `attachRemoteWebcam` /
-     * `closeWebcamPreview` are `RoomWebcams`'s. Neither facade is passed here, so collapsing those
-     * would ADD a prop rather than remove one — a different slice, with its own argument to make.
+     * `volume` alone, and it is `RoomVolume`'s. That class is not passed here, so collapsing it
+     * would ADD a prop to remove one, and the pane reads exactly one member of it.
+     *
+     * The three that WERE in this paragraph — `webcams`, `notes` and `broadcasts` — are facades
+     * now, in the commit after this one. The argument each needed is written at its own prop
+     * rather than here, because the reason differs in each case: `webcams` was a shipped
+     * `this`-loss hazard, `notes` was carrying a generic through a prop by hand, and `broadcasts`
+     * was already being passed whole to `RoomOverlays` from the same page.
      */
     screens: RoomScreens;
     mediaTransport: RoomMediaTransport;
@@ -161,22 +187,29 @@
     // ── #notes ─────────────────────────────────────────────────────────────────
     noteGates: { surfaceVisible: boolean; editorMounted: boolean };
     giphyApiKey: string;
-    /** BINDABLE: `NotesPane` reports the new-note form opening and closing. */
-    newNoteOpen: boolean;
-    /** Forwarded from `NotesPane`. The flag is `RoomNotes`s; this pane only relays it. */
-    onNewNoteOpenChange: (open: boolean) => void;
-    mountNewNoteLink: (menu: HTMLUListElement) => void;
-    submitNoteMutation: <Success extends Record<string, unknown> = Record<string, unknown>>(
-      action:
-        | 'deleteSessionNoteTab'
-        | 'newSessionNoteTab'
-        | 'renameSessionNoteTab'
-        | 'restoreNoteVersion'
-        | 'saveSessionNote'
-        | 'setWelcomeMatNoteTab',
-      values: Record<string, boolean | string | number>
-    ) => Promise<Success | undefined>;
-    loadNoteVersions: (noteId: number) => Promise<readonly NoteVersion[]>;
+    /**
+     * The notes surface, whole — `#lib/room/notes.svelte.ts`.
+     *
+     * Six props, and one of them was the reason to do this rather than the count. `submitMutation`
+     * is GENERIC in its success type, and a generic cannot survive being handed through a prop by
+     * itself, so the page carried a five-line wrapper whose entire job was to re-declare the type
+     * parameter and forward it:
+     *
+     * ```svelte
+     * submitNoteMutation={<Success extends Record<string, unknown>>(
+     *   action: Parameters<typeof notes.submitMutation>[0],
+     *   values: Parameters<typeof notes.submitMutation>[1]
+     * ) => notes.submitMutation<Success>(action, values)}
+     * ```
+     *
+     * Twelve lines of interface here and five of markup there existed to move one method across
+     * one boundary with its type intact. Passing the object deletes all seventeen and the call
+     * sites below name `notes.submitMutation` directly, which is what they meant all along.
+     *
+     * `newNoteOpen` stops being a bind-and-relay pair for the same reason `isFullScreenshare` did
+     * above: `RoomNotes` declares a real setter, so `NotesPane`'s report writes through it.
+     */
+    notes: RoomNotes;
     uploadAlertFiles: (files: readonly File[]) => Promise<readonly string[]>;
 
     // ── #swingAlerts and #dayTradeAlerts ───────────────────────────────────────
@@ -191,14 +224,21 @@
     swingAlerts: RoomTradeAlerts<SwingAlertRow, SwingAlertAction>;
     dayTradeAlerts: RoomTradeAlerts<DayTradeAlertRow, DayTradeAlertAction>;
 
-    // ── #videoplayer ───────────────────────────────────────────────────────────
-    /** Set by `playVideoForAll` and cleared by `stopVideoForAll`, both on the `cmds` channel. */
-    hideVideoPlayer: boolean;
-    videoPlayerUrl: string;
-    scheduledVideoForAll: { videoURL: string; videoPlayTime: string | null };
-    playVideoForAll: (url: string) => Promise<void>;
-    scheduleVideoForAll: (url: string, whenLocal: string) => void;
-    stopVideoForAll: () => Promise<void>;
+    // ── #videoplayer, the mp3 sink and the YouTube overlay ─────────────────────
+    /**
+     * Everything a presenter plays FOR THE ROOM, whole — `#lib/room/broadcasts.svelte.ts`.
+     *
+     * Thirteen props, spread across three separate sections of this interface because they arrived
+     * with three different features — the video player, the mp3 element and the YouTube overlay —
+     * and reassembled here because they were always one object. `hideVideoPlayer` is set by
+     * `playVideoForAll` and cleared by `stopVideoForAll`, both on the `cmds` channel; that
+     * sentence is the whole argument, and it was previously attached to one of the thirteen.
+     *
+     * The inconsistency this removes is visible on the page rather than here: `+page.svelte` hands
+     * this same object WHOLE to `RoomOverlays` twenty lines below where it decomposed it into
+     * thirteen for this component.
+     */
+    broadcasts: RoomBroadcasts;
 
     // ── #files ─────────────────────────────────────────────────────────────────
     /**
@@ -211,17 +251,7 @@
      * `files.fileTab` directly, so there is no value to bind back up through here.
      */
     files: RoomFiles;
-    mountUploadFileLink: (menu: HTMLUListElement) => void;
-    playMp3ForAll: (url: string) => Promise<void>;
-    stopMp3ForAll: () => Promise<void>;
     openModal: (name: Exclude<ModalName, null>) => void;
-
-    // ── the overlays that sit under the tab content ────────────────────────────
-    youtubeForAllUrl: string;
-    stopYoutubeForAll: () => Promise<void>;
-    closeYoutubeFrame: () => void;
-    mp3Playing: boolean;
-    mp3Url: string | null;
     setAutoplayAttribute: (node: HTMLMediaElement) => void;
   }
 
@@ -242,10 +272,7 @@
     archivesAvailable,
     openTranscriptPage,
     previewWindowsVisible,
-    webcamCard,
-    attachLocalWebcam,
-    attachRemoteWebcam,
-    closeWebcamPreview,
+    webcams,
     videoDisabled,
     screens,
     mediaTransport,
@@ -259,30 +286,13 @@
     toggleLockStreamMtx,
     noteGates,
     giphyApiKey,
-    newNoteOpen,
-    onNewNoteOpenChange,
-    mountNewNoteLink,
-    submitNoteMutation,
-    loadNoteVersions,
+    notes,
     uploadAlertFiles,
     swingAlerts,
     dayTradeAlerts,
-    hideVideoPlayer,
-    videoPlayerUrl,
-    scheduledVideoForAll,
-    playVideoForAll,
-    scheduleVideoForAll,
-    stopVideoForAll,
+    broadcasts,
     files,
-    mountUploadFileLink,
-    playMp3ForAll,
-    stopMp3ForAll,
     openModal,
-    youtubeForAllUrl,
-    stopYoutubeForAll,
-    closeYoutubeFrame,
-    mp3Playing,
-    mp3Url,
     setAutoplayAttribute
   }: Props = $props();
 
@@ -332,80 +342,23 @@
   class="presentation-box as-split-area"
   style={split.presentationAreaStyle}
 >
-  <app-webcam-holder>
-    {#if previewWindowsVisible}
-      <div class="webcam-wrapper d-flex justify-content-center flex-wrap align-items-end w-100">
-        <!--
-                    Slot 0 is this peer's own camera. The capture keys both the card and the video
-                    by the presenter id (`webcamsHolder-{id}` / `webcamVideo-{id}`); this room
-                    rendered the templates with an empty suffix and fed neither of them, which is
-                    why turning the camera on lit the browser's in-use indicator and showed
-                    nothing. Slot 1 stays an unfed placeholder: a second presenter's camera
-                    arrives over the SFU, and that path is not wired yet.
-                  -->
-        <!--
-                    ONE card per webcaming user, created and destroyed with the list - never a
-                    fixed pair.
+  <!--
+    `app-webcam-holder`, in `#lib/components/WebcamStrip.svelte` since 2026-08-18.
 
-                    `app-room` keeps `webcamingUsers` and drives the cards through the gui bus:
+    Eighty-two lines and the capture's own component boundary: the header above argues the seven TAB
+    PANES stay together because `mainTab` is one value every tab reads and writes, and that argument
+    never covered this. The strip is a SIBLING of the tab area upstream, shares no state with any
+    tab, and reads exactly three things.
 
-                      // camera on
-                      this.webcamingUsers.push(r); r.isMe = a;
-                      a && (r.localstream = mediaSoupService.localWebcamStream, this.camMuted = !1);
-                      this.guiEventBus.emit("newWebcamPresenter", r)
-
-                      subscribe("newWebcamPresenter",  i => this.addPresenterdWebcam(i))
-                      subscribe("removeWebcamPresenter", i => this.removePresenterWebcam(i))
-
-                      addPresenterdWebcam(e) {
-                        if (this.webcamsIdxs.includes(e._id)) return;          // NOP if present
-                        const s = this.container.createComponent(sL, i);       // sL = app-presenter-cams
-                        s.instance.muser = e; s.instance.pID = e._id;
-                        s.instance.pName = e.mediaValue.name;
-                      }
-                      removePresenterWebcam(e) { this.container.remove(o); delete this.webcams[e._id] }
-
-                    So the real cards are CREATED DYNAMICALLY, one per user with a live camera, and
-                    `removePresenterWebcam` destroys the component outright.
-
-                    The two static `<app-presenter-cams>` in `app-webcam-holder`'s template are a
-                    red herring: that template is
-                    `T(1,'app-presenter-cams')(2,'app-presenter-cams')` with NO inputs bound, so
-                    `muser` is undefined, `ngOnInit`'s `this.muser && (…)` short-circuits,
-                    `initDrag()` never runs - and `initDrag()` is the only thing that calls
-                    `.show()`. They are inert and never visible. Reproducing them as two rendered
-                    cards put two empty black boxes on screen before anyone touched the camera,
-                    and gave the second one an X that could not close anything.
-                  -->
-        {#each mediaTransport.webcamPresenters as presenter, index (presenter.id)}
-          <app-presenter-cams>
-            <div
-              class="card webcamsHolder"
-              id="webcamsHolder-{presenter.id}"
-              {@attach webcamCard(presenter, index)}
-            >
-              <video
-                {@attach presenter.isMe ? attachLocalWebcam : attachRemoteWebcam(presenter.id)}
-                {...{ autoplay: 'autoplay' } as Record<string, string>}
-                class="webcamsHolderVideo"
-                id="webcamVideo-{presenter.id}"
-              ></video>
-              <div class="overlay">
-                <h5 class="pNameLabel m-0">
-                  {presenter.name}
-                  <!-- svelte-ignore a11y_click_events_have_key_events -->
-                  <!-- svelte-ignore a11y_no_static_element_interactions -->
-                  <span class="closeIcon" onclick={() => closeWebcamPreview(presenter)}>
-                    <i class="fas fa-times"></i>
-                  </span>
-                </h5>
-              </div>
-            </div>
-          </app-presenter-cams>
-        {/each}
-      </div>
-    {/if}
-  </app-webcam-holder>
+    The two long transcriptions — why the cards are created dynamically rather than as the two
+    static `app-presenter-cams` the template appears to hold, and why the ids carry the presenter
+    suffix — went WITH the markup they explain.
+  -->
+  <WebcamStrip
+    visible={previewWindowsVisible}
+    presenters={mediaTransport.webcamPresenters}
+    {webcams}
+  />
   <app-presentationarea>
     <div class="mainPresentationAreaHolder">
       <!--
@@ -522,7 +475,7 @@
                 <ul
                   aria-labelledby="dropdownMenuButton"
                   class={['dropdown-menu', { show: menus.notes }]}
-                  {@attach mountNewNoteLink}
+                  {@attach (menu: HTMLUListElement) => notes.mountNewNoteLink(menu)}
                 ></ul>
               </div>
             </div>
@@ -550,7 +503,7 @@
                     taken WHILE a video was playing exists, so the true branch is transcribed from
                     the bundle above rather than from a rendered page.
                   -->
-        {#if (hideVideoPlayer && !isPresenter) || isPresenter}
+        {#if (broadcasts.hideVideoPlayer && !isPresenter) || isPresenter}
           <li role="presentation" class="nav-item">
             <a
               id="videoplayer-tab"
@@ -701,7 +654,7 @@
                 <ul
                   aria-labelledby="dropdownMenuFiles"
                   class={['dropdown-menu', { show: menus.files }]}
-                  {@attach mountUploadFileLink}
+                  {@attach (menu: HTMLUListElement) => notes.mountUploadFileLink(menu)}
                 ></ul>
               </div>
             </div>
@@ -950,30 +903,30 @@
               canEdit={noteGates.editorMounted}
               {giphyApiKey}
               notes={data.notes}
-              {newNoteOpen}
+              newNoteOpen={notes.newNoteOpen}
               onCreate={async (name) => {
-                const result = await submitNoteMutation<{
+                const result = await notes.submitMutation<{
                   success: boolean;
                   note: RoomNote;
                 }>('newSessionNoteTab', { name });
                 return result?.note;
               }}
               onDelete={async (noteId) => {
-                await submitNoteMutation('deleteSessionNoteTab', { noteId });
+                await notes.submitMutation('deleteSessionNoteTab', { noteId });
               }}
-              onLoadVersions={loadNoteVersions}
-              {onNewNoteOpenChange}
+              onLoadVersions={(noteId) => notes.loadVersions(noteId)}
+              onNewNoteOpenChange={(open) => (notes.newNoteOpen = open)}
               onRename={async (noteId, newName) => {
-                await submitNoteMutation('renameSessionNoteTab', { noteId, newName });
+                await notes.submitMutation('renameSessionNoteTab', { noteId, newName });
               }}
               onRestoreVersion={async (noteId, versionId) => {
-                await submitNoteMutation('restoreNoteVersion', { noteId, versionId });
+                await notes.submitMutation('restoreNoteVersion', { noteId, versionId });
               }}
               onSave={async (noteId, contentHtml) => {
-                await submitNoteMutation('saveSessionNote', { noteId, contentHtml });
+                await notes.submitMutation('saveSessionNote', { noteId, contentHtml });
               }}
               onSetWelcomeMat={async (noteId, allRooms) => {
-                await submitNoteMutation('setWelcomeMatNoteTab', {
+                await notes.submitMutation('setWelcomeMatNoteTab', {
                   noteId,
                   allRooms
                 });
@@ -1069,7 +1022,7 @@
           </div>
         {/if}
         <!-- Slot 47 carries the same gate as the tab above. -->
-        {#if (hideVideoPlayer && !isPresenter) || isPresenter}
+        {#if (broadcasts.hideVideoPlayer && !isPresenter) || isPresenter}
           <div
             id="videoplayer"
             class={mainTab === 'videoplayer'
@@ -1081,11 +1034,11 @@
             <VideoPlayer
               sessionId={data.sessionHandle}
               {isPresenter}
-              {videoPlayerUrl}
-              scheduledVideo={scheduledVideoForAll}
-              onplaynow={(url) => void playVideoForAll(url)}
-              onschedule={scheduleVideoForAll}
-              onstopforall={() => void stopVideoForAll()}
+              videoPlayerUrl={broadcasts.videoPlayerUrl}
+              scheduledVideo={broadcasts.scheduledVideoForAll}
+              onplaynow={(url) => void broadcasts.playVideoForAll(url)}
+              onschedule={(url, whenLocal) => broadcasts.scheduleVideoForAll(url, whenLocal)}
+              onstopforall={() => void broadcasts.stopVideoForAll()}
             />
           </div>
         {/if}
@@ -1101,24 +1054,24 @@
           {isPresenter}
           {files}
           {mainTab}
-          {mp3Playing}
-          {playMp3ForAll}
-          {stopMp3ForAll}
+          mp3Playing={broadcasts.mp3Playing}
+          playMp3ForAll={(url) => broadcasts.playMp3ForAll(url)}
+          stopMp3ForAll={() => broadcasts.stopMp3ForAll()}
           {openModal}
         />
       </div>
-      {#if youtubeForAllUrl}
+      {#if broadcasts.youtubeForAllUrl}
         <!--
                     Two DIFFERENT handlers, which is the whole point of the two buttons: `onstop`
                     posts `stopYTForAll` and takes the video off the room, `onclose` dismisses this
                     viewer's own iframe and nothing else. Both were wired to one function.
                   -->
         <YoutubePlayerOverlay
-          url={youtubeForAllUrl}
+          url={broadcasts.youtubeForAllUrl}
           {isPresenter}
           muted={doNotDisturbOn}
-          onstop={() => void stopYoutubeForAll()}
-          onclose={closeYoutubeFrame}
+          onstop={() => void broadcasts.stopYoutubeForAll()}
+          onclose={() => broadcasts.closeYoutubeFrame()}
         />
       {/if}
       {#if media.soundCloudUrl && media.soundCloudPlaying}
@@ -1152,7 +1105,7 @@
         {@attach setAutoplayAttribute}
         {...{ autoplay: 'autoplay' } as Record<string, string>}
         id="mp3player"
-        src={mp3Url ?? ''}
+        src={broadcasts.mp3Url ?? ''}
       ></audio>
     </div>
   </app-presentationarea>

@@ -378,17 +378,37 @@ describe('the client sends, instead of moving its own screen', () => {
   });
 
   it('"Stop For All" and "×" invoke DIFFERENT things', () => {
-    // Same function behind both props is the defect; the props must not name one handler.
-    // The overlay moved to `PresentationArea.svelte`; the two handlers behind it did not, so
-    // the wiring is asserted at both ends rather than at one.
+    /*
+      Same function behind both props is the defect, so DIFFERENCE is what gets asserted — not two
+      spellings that happen to differ today.
+
+      This used to span two files, four `toContain`s, because the handlers were drilled props the
+      page filled. `broadcasts` is passed whole since 2026-08-18, so both attributes are on one
+      element and the check can be what it always meant: slice the overlay's own call site, pull
+      each handler out of it, and require them to be unequal. Four loose substring checks over two
+      whole files could all pass while the two attributes sat on different elements.
+    */
     const paneCode = readFileSync(
       new URL('./components/PresentationArea.svelte', import.meta.url),
       'utf8'
     );
-    expect(paneCode).toContain('onstop={() => void stopYoutubeForAll()}');
-    expect(paneCode).toContain('onclose={closeYoutubeFrame}');
-    expect(pageCode).toContain('stopYoutubeForAll={() => broadcasts.stopYoutubeForAll()}');
-    expect(pageCode).toContain('closeYoutubeFrame={() => broadcasts.closeYoutubeFrame()}');
+    const from = paneCode.indexOf('<YoutubePlayerOverlay');
+    expect(from, 'the overlay call site must exist').toBeGreaterThan(-1);
+    const callSite = paneCode.slice(from, paneCode.indexOf('/>', from));
+    expect(callSite.length, 'the call site must not be empty').toBeGreaterThan(0);
+
+    const handlerFor = (prop: string) => {
+      const match = new RegExp(`\\b${prop}=\\{([^}]*)\\}`).exec(callSite);
+      return match?.[1] ?? null;
+    };
+    const onstop = handlerFor('onstop');
+    const onclose = handlerFor('onclose');
+    expect(onstop, 'onstop must be bound').not.toBeNull();
+    expect(onclose, 'onclose must be bound').not.toBeNull();
+    expect(onstop).toContain('broadcasts.stopYoutubeForAll()');
+    expect(onclose).toContain('broadcasts.closeYoutubeFrame()');
+    // THE assertion: one handler behind both buttons is the bug this whole test exists for.
+    expect(onstop, '"Stop For All" and "×" must not run the same thing').not.toBe(onclose);
 
     // "Stop For All" reaches the server.
     expect(functionBody(BROADCASTS, 'async stopYoutubeForAll()')).toContain(
@@ -448,8 +468,10 @@ describe('the client receives, so it reaches another browser', () => {
       new URL('./components/PresentationArea.svelte', import.meta.url),
       'utf8'
     );
+    // `broadcasts.hideVideoPlayer` since 2026-08-18 — the flag is read off the object that owns it
+    // rather than off a prop the page copied out of it. Still BOTH places: the tab and the pane.
     expect(
-      paneCode.split('{#if (hideVideoPlayer && !isPresenter) || isPresenter}').length - 1
+      paneCode.split('{#if (broadcasts.hideVideoPlayer && !isPresenter) || isPresenter}').length - 1
     ).toBe(2);
   });
 
