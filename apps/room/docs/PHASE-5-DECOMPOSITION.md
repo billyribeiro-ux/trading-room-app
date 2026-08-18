@@ -153,6 +153,41 @@ positioning and not authority. Whether the capture applies that class to the DET
 established from the evidence read so far, and it is not guessed: it needs the detached component's
 markup from a capture, and until then the asymmetry is recorded rather than "corrected".
 
+### OPEN QUESTION, measured 2026-08-17: two patterns do the same job and nothing says which
+
+Getting an element reference is done TWO ways in this repository, and no note anywhere states when
+to use which:
+
+| pattern                        | count | where                                                                                               |
+| ------------------------------ | ----: | --------------------------------------------------------------------------------------------------- |
+| `bind:this`                    |     9 | `ModalHost` (5), `RichTextEditor` (2), `PollPanel` (1), `StreamingView` (1)                         |
+| hand-rolled capture attachment |    10 | `+page.svelte` (4), `EmojiPicker` (2), `RoomMessage` (2), `ExtraChatPane` (1), `PostAlertModal` (1) |
+
+Eight of the ten attachments are the SAME four lines — assign the node, return a cleanup that clears
+the variable only `if (current === node)`. That guard is subtle, identical in all eight, and exactly
+the kind of thing one copy loses.
+
+**The obvious rule does not hold.** The plausible story is "attachments where the element lives in a
+CHILD component, because `bind:this` cannot cross that boundary" — true for the page's four, which
+are handed to `AlertChatArea` as props. But **six of the ten are same-component** (`captureScroller`,
+`captureMenu`, `captureMenuTrigger`, `captureFileInput`, `captureEmojiSearchInput`,
+`captureCategorySection`) and could be `bind:this` today.
+
+**Two real differences were found and are worth weighing before anyone unifies them:** an attachment
+can do SETUP as well as capture — `captureFileInput` also sets `multiple` — and it can hold an
+INDEXED slot, which `captureCategorySection(index)` uses with a recorded reason for clearing in place
+rather than splicing. Neither is expressible with `bind:this`. So a blanket conversion is wrong; a
+blanket "always attachments" is also wrong.
+
+**Not resolved here, deliberately.** Picking one would be a preference dressed as a standard, and the
+evidence supports a rule with exceptions rather than a rule. What IS recorded is the measurement, so
+the next person starts from it instead of re-counting — and so the inconsistency is a known open
+question rather than something discovered a fourth time.
+
+**One defect this turned up and DID get fixed:** `create-room.svelte.ts` asserted "`composerElement`
+is a `bind:this`". It is an attachment. The reasoning around it was right; the mechanism was
+misnamed, which sends a reader looking for a binding that does not exist.
+
 ### Two effects stay on the page, and it is a decision, not a leftover
 
 - the `noselect` body class — direct DOM manipulation of a node no element owns, which is `$effect`'s

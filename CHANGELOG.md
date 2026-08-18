@@ -209,6 +209,80 @@ follow symlinks. Chasing it produced a corroboration instead of a defect — the
 `apps/room/vite.config.ts:81-87`. That is the mechanism the 10:52 entry recorded as closed,
 confirmed by trying to break it.
 
+### 2026-08-17 20:11 EDT — the split helpers find their owners, and an existing guard overruled my first choice
+
+**Runtime impact: none intended** — three functions moved, none rewritten. Gate: **2,467 tests / 172
+files** (+13), `eslint src/` clean, `svelte-check` **1,208 / 0 / 0**, prettier clean. `+page.svelte`
+1,595 → **1,566**.
+
+**The plan said all five split helpers go to `RoomShell`. The evidence says three different homes.**
+
+- **`finishSplit` → `RoomWindowHandlers.pointerUp`.** It was bound to `<svelte:window onpointerup>`
+  beside `pointerMove`, which was ALREADY a method on that class — the two halves of one gesture sat
+  in two files. The binding stays on the page, because a drag ends anywhere in the window; only the
+  body moved.
+- **`beginSplit` STAYS, and the plan was wrong.** It has two consumers, `RoomShell` and
+  `AlertChatArea`, so the page is correctly its owner. A shared handler is not a window handler.
+- **`storedSplitPair` + `promoteLegacySplitSizes` → a new `split-legacy-migration.ts`.**
+
+**A GUARD OVERRULED MY FIRST CHOICE, which is the best thing that happened here.** I put the
+migration in `split.svelte.ts`, beside the `splitStorageKeys` and `splitPairFromValue` it calls.
+`extra-chat-column-contract.test.ts:366` refused it — *"the class must have no way to write a
+preference"*, asserted as that file not containing `localStorage`. The guard is right and my
+placement was wrong: `RoomSplit` computes geometry and must not be able to reach storage, or the next
+person adding a "just persist this" line has somewhere to put it. It is a sibling module instead.
+
+**The migration is now EXECUTED, which nothing did before.** Nine assertions. An untested migration
+is worse than an untested feature: one that silently does nothing is indistinguishable from one that
+ran and found nothing to do — same screen, no error, no log. Asserted: the server's value wins over a
+stale local one; both directions and both keys are covered; a corrupt entry returns null rather than
+taking the room's boot down; and it only ever WRITES, never reading sizes back into the live layout
+— which is the post-paint shift the promotion exists to remove.
+
+**The test corrected me too.** I asserted `[1, 2, 3]` was rejected. It is not — the guard is
+`value.length >= 2`, so it yields `[1, 2]`. Pinned as it behaves rather than "fixed", because a
+future `=== 2` would silently change behaviour for anyone whose storage carries a longer array. Noted
+alongside: the docblock says "if it really is two numbers", which is stricter in prose than in code.
+
+**Negative controls, both red:** dropping the server-wins check → 2 red; making `pointerUp` write
+unconditionally → red in two other contracts.
+
+### 2026-08-17 20:02 EDT — a comment named a Svelte mechanism the code does not use, and the audit behind it found two patterns with no rule
+
+**Runtime impact: none** — one corrected comment and one recorded measurement. Gate: **2,454 tests /
+171 files**, `eslint src/` clean, `svelte-check` **1,206 / 0 / 0**, prettier clean.
+
+**The defect.** `create-room.svelte.ts` asserted *"`composerElement` is a `bind:this`"*. It is not.
+It is populated by `captureComposerElement`, an ATTACHMENT the page hands to `AlertChatArea` as a
+prop (`AlertChatArea.svelte:826`), because the `<textarea>` lives in that component and `bind:this`
+cannot cross a component boundary. The surrounding REASONING was right and is unchanged; only the
+mechanism was misnamed — which sends the next reader looking for a binding that does not exist.
+
+**What the audit behind it found, and did NOT act on.** Getting an element reference is done two ways
+here, with nothing stating when to use which:
+
+| pattern | count |
+| --- | ---: |
+| `bind:this` | **9** — `ModalHost` (5), `RichTextEditor` (2), `PollPanel` (1), `StreamingView` (1) |
+| hand-rolled capture attachment | **10** — `+page.svelte` (4), `EmojiPicker` (2), `RoomMessage` (2), `ExtraChatPane` (1), `PostAlertModal` (1) |
+
+Eight of the ten attachments are the same four lines, including a subtle guard — clear the variable
+only `if (current === node)` — identical in all eight and exactly what one copy loses.
+
+**The obvious rule does not hold, and that is why nothing was unified.** "Attachments where the
+element is in a CHILD component" is true for the page's four and false for the other six, which are
+same-component and could be `bind:this` today. Two real differences were found that make a blanket
+conversion wrong in the other direction too: an attachment can also do SETUP (`captureFileInput`
+sets `multiple`) and can hold an INDEXED slot (`captureCategorySection(index)`, with a recorded
+reason for clearing in place rather than splicing). Neither is expressible with `bind:this`.
+
+**So the evidence supports a rule WITH EXCEPTIONS, not a rule** — and picking one anyway would be a
+preference dressed as a standard. What is recorded instead is the measurement, in
+`PHASE-5-DECOMPOSITION.md`, so the next person starts from it rather than re-counting and so the
+inconsistency is a known open question rather than something discovered a fourth time.
+
+**Ceiling.** `create-room.svelte.ts` 1,066 → **1,073**, seven lines of corrected comment.
+
 ### 2026-08-17 19:53 EDT — the two captured chat styles become a pure module, and are asserted by VALUE for the first time
 
 **Runtime impact: none intended** — 68 lines moved unchanged. Gate: **2,454 tests / 171 files**,

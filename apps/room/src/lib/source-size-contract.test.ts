@@ -307,7 +307,7 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       forced edit to every pane contract in the repository. A snippet is a closure over this file's
       scope, so the shell places markup it knows nothing about.
     */
-    max: 1596,
+    max: 1567,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {
@@ -359,7 +359,15 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       Five unrelated features share these listeners and the class does not pretend otherwise -
       they are together because the EVENT is one, which is the reference s arrangement too.
     */
-    max: 214,
+    /*
+      +20, 2026-08-17: `pointerUp` arrived from `+page.svelte`, where it was `finishSplit` bound to
+      `<svelte:window onpointerup>` — beside `pointerMove`, which was ALREADY a method here. The two
+      halves of one gesture were in two files. An arrival, and the page fell by more than this.
+
+      `beginSplit` deliberately did NOT come with it: it has two consumers (`RoomShell` and
+      `AlertChatArea`), so the page stays its owner. A shared handler is not a window handler.
+    */
+    max: 234,
     why: 'the window listeners - bindings stay on the element, bodies and citations move here'
   },
   {
@@ -670,8 +678,33 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     why: 'one instance per column; a plain .ts on purpose'
   },
   {
+    file: 'lib/room/split-legacy-migration.ts',
+    /*
+      Created 2026-08-17 and capped in the same commit. It exists as its OWN file because a guard
+      said so: the first attempt put it in `split.svelte.ts`, and
+      `extra-chat-column-contract.test.ts:366` refused it — "the class must have no way to write a
+      preference", asserted as that file not containing `localStorage`. The guard is right;
+      `RoomSplit` computes geometry and must not be able to reach storage.
+    */
+    max: 71,
+    why: 'the one-time localStorage -> server promotion of split sizes, kept away from RoomSplit'
+  },
+  {
     file: 'lib/room/split.svelte.ts',
-    max: 724,
+    /*
+      +58, 2026-08-17: `storedSplitPair` and `promoteLegacySplitSizes` arrived from `+page.svelte`,
+      with the reasoning that explains why the migration is a WRITE and never a read-back. They
+      belong beside `splitStorageKeys` and `splitPairFromValue`, which they call and which define
+      the key names and the shape being migrated — three functions describing one storage format.
+
+      `RoomPrefs` was the alternative and is refused: it would have to learn what a split pair is
+      and which two keys exist per direction, which is split geometry leaking into a preferences bag.
+
+      Most of the 58 is prose. The functions themselves are 20 lines, and they are now EXECUTED by
+      `split-legacy-migration.test.ts` — a migration that silently does nothing was previously
+      indistinguishable from one that ran and found nothing to do.
+    */
+    max: 782,
     why: "the room's two nested splits and twenty derived geometry values"
   },
   /*
@@ -793,7 +826,7 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     /*
       THE COMPOSITION ROOT, created 2026-08-17 (S7) and capped in the same commit.
 
-      1,066 lines, and it is the largest module in `lib/room/` by a wide margin — deliberately. It
+      1,073 lines, and it is the largest module in `lib/room/` by a wide margin — deliberately. It
       holds 36 `new Room*()` constructions that arrived from `+page.svelte` with their citations
       intact, which is 740 of those lines. It is NOT a class and owns no behaviour: it wires, and
       returns. If this number climbs, the question to ask is whether something with behaviour has
@@ -810,7 +843,7 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       `svelte-ignore` that nothing is warning under. Prose explaining a real subtlety is exactly what
       this file's header says never to shave to hit a number.
     */
-    max: 1066,
+    max: 1073,
     why: 'the composition root - 36 constructions and their citations, assembly and nothing else'
   },
   {
