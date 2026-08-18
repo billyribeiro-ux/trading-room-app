@@ -211,6 +211,41 @@ confirmed by trying to break it.
 
 ## 2026-08-18
 
+### 2026-08-18 09:03 EDT — the freshness poll and the visibility rules leave the page, and four assertions stop reading text
+
+**Runtime impact: none intended** — behaviour preserved exactly. Gate: **2,476 tests / 172 files**,
+`eslint src/` clean, `svelte-check` **1,209 / 0 / 0**, prettier clean. `+page.svelte` 1,518 →
+**1,452**.
+
+**One cohesive unit, and that is why it moved together.** The five-second `invalidate` timer, the two
+flags that gate it, and the catch-up on the way back to a hidden tab. Visibility is the only thing
+that writes either flag, so they belong with it rather than as page `let`s. `missedChatWhileHidden`
+no longer crosses any boundary at all — the realtime stream calls a named method instead of assigning
+a page variable.
+
+**A factory, and the rune choice is per the docs rather than by habit:** `appHasFocus` is read
+reactively (`RoomShell` renders from it, the composition root hands it on) so it is `$state`;
+`missedChatWhileHidden` is a latch nothing renders from and stays a plain `let`; the timer handle is
+a plain `let` because nothing renders from a timer.
+
+**FOUR ASSERTIONS WERE CONVERTED FROM READING TEXT TO EXECUTING CODE**, and that is the real gain —
+the extraction is what made it possible. What they used to be:
+
+- `expect(pageCode).toContain('appHasFocus = false;')` — satisfied by those characters existing in
+  either branch, in either order, or in dead code. Now: set hidden, read the flag; set visible, read
+  it again.
+- The poll's pause/restart was a source slice for the two call NAMES, which cannot tell a running
+  interval from a deleted one. Now: fake timers, count the ticks across hidden and visible.
+- **The sharpest one.** `expect(body.split('refreshRoom()')).toHaveLength(2)` counted occurrences in
+  the handler's SOURCE to prove exactly one request goes out — satisfied by two calls on the same
+  branch, or by one inside an `if` that never runs. Now both counters are real, and a third case was
+  added that the text version could not express at all: the missed-chat latch is ONE-SHOT, so a
+  second return does not catch up again.
+
+**Negative controls, both red with exact diagnostics:** firing both re-reads on a catch-up →
+*"a catch-up is ONE wide re-read, not both: expected { narrow: 2, wide: 1 }"*; a hidden tab that keeps
+polling → *"a hidden tab must not poll: expected 8 to be 2"*.
+
 ### 2026-08-18 08:56 EDT — a forensic audit of all 392 tracked files, and one passthrough deleted
 
 **Runtime impact: none** — one pure-passthrough function removed, one citation moved. Gate: **2,472

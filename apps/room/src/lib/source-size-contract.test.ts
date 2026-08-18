@@ -307,7 +307,7 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       forced edit to every pane contract in the repository. A snippet is a closure over this file's
       scope, so the shell places markup it knows nothing about.
     */
-    max: 1519,
+    max: 1453,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {
@@ -654,6 +654,20 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     file: 'lib/room/polls.svelte.ts',
     max: 119,
     why: "the poll modal's four fields; the first of the room state classes"
+  },
+  {
+    file: 'lib/room/refresh.svelte.ts',
+    /*
+      Created 2026-08-18 and capped in the same commit. The five-second `invalidate` poll, the two
+      flags that gate it and the catch-up on the way back — one cohesive unit, because visibility is
+      the only thing that writes either flag.
+
+      It is a factory rather than a class for the reason the docs give: `appHasFocus` is read
+      reactively so it is `$state`, while `missedChatWhileHidden` is a latch nothing renders from and
+      the timer handle is a plain `let`.
+    */
+    max: 114,
+    why: 'the freshness poll and the tab-visibility rules, executable at last'
   },
   {
     file: 'lib/room/roster.svelte.ts',

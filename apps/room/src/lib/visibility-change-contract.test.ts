@@ -1,5 +1,7 @@
 import { readFileSync } from 'node:fs';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
+import { createRoomRefresh } from './room/refresh.svelte';
 
 /*
   `visibilityChangeEnabled` — pause chat work while the tab is hidden, catch up when it returns.
@@ -81,7 +83,10 @@ describe('the hidden tab stops refetching', () => {
     );
     expect(streamCode).toContain('this.#chatMissedWhileHidden();');
     // The page end of the receiver, so the pair cannot drift apart silently.
-    expect(pageCode).toContain('chatMissedWhileHidden: () => (missedChatWhileHidden = true)');
+    // The page end of the receiver, so the pair cannot drift apart silently. It is a NAMED method
+    // as of 2026-08-18 — the flag moved into `createRoomRefresh` and no longer exists as a page
+    // `let` for anything to assign.
+    expect(pageCode).toContain('chatMissedWhileHidden: () => roomRefresh.chatMissedWhileHidden()');
   });
 
   it('the ding plays BEFORE the gate, so a hidden tab is still audible', () => {
@@ -123,10 +128,23 @@ describe('and catches up when the tab comes back', () => {
       `document` you can use `<svelte:window>` and `<svelte:document>` … Avoid using `onMount` or
       `$effect` for this."*
     */
-    expect(pageCode).toContain('<svelte:document onvisibilitychange={onVisibilityChange} />');
-    expect(pageCode).toContain('function onVisibilityChange() {');
-    expect(pageCode).toContain('appHasFocus = false;');
-    expect(pageCode).toContain('appHasFocus = true;');
+    // The BINDING is still page markup and is still asserted as text — that is what `<svelte:document>`
+    // is, and there is nothing to execute about it.
+    expect(pageCode).toContain('<svelte:document onvisibilitychange={');
+    expect(pageCode).toContain('roomRefresh.visibilityChanged(document.hidden)');
+
+    /*
+      The focus TRACKING is now executed rather than read. Until 2026-08-18 this asserted the strings
+      `appHasFocus = false;` and `appHasFocus = true;` appeared in the page — which is satisfied by
+      those characters existing in either order, in either branch, or in dead code.
+    */
+    const refresh = createRoomRefresh({ refresh: async () => {}, refreshAll: async () => {} });
+    expect(refresh.appHasFocus, 'a room starts focused').toBe(true);
+    refresh.visibilityChanged(true);
+    expect(refresh.appHasFocus).toBe(false);
+    refresh.visibilityChanged(false);
+    expect(refresh.appHasFocus).toBe(true);
+    refresh.stop();
   });
 
   it('cannot leak the listener, because it is no longer hand-managed', () => {
@@ -161,13 +179,35 @@ describe('and catches up when the tab comes back', () => {
       Both directions asserted, because pausing without resuming is the same bug wearing a
       different hat.
     */
-    const handler = pageCode.slice(pageCode.indexOf('function onVisibilityChange() {'));
-    const body = handler.slice(0, handler.indexOf('\n  }'));
+    /*
+      EXECUTED as of 2026-08-18. The old version sliced the handler's source for the two call names,
+      which cannot tell a running interval from a deleted one.
+    */
+    vi.useFakeTimers();
+    let refreshes = 0;
+    const refresh = createRoomRefresh({
+      refresh: async () => void (refreshes += 1),
+      refreshAll: async () => {}
+    });
 
-    expect(body, 'hidden must stop the timer').toContain('stopRefresh();');
-    expect(body, 'visible must start it again').toContain('startRefresh();');
-    // And a tab that is already hidden at mount must not start one.
-    expect(pageCode).toContain('if (!document.hidden) startRefresh();');
+    refresh.start();
+    vi.advanceTimersByTime(11_000);
+    const whileVisible = refreshes;
+    expect(whileVisible, 'the poll must fire while visible').toBeGreaterThan(0);
+
+    refresh.visibilityChanged(true);
+    vi.advanceTimersByTime(30_000);
+    expect(refreshes, 'a hidden tab must not poll').toBe(whileVisible);
+
+    refresh.visibilityChanged(false);
+    vi.advanceTimersByTime(11_000);
+    expect(refreshes, 'returning must restart the poll').toBeGreaterThan(whileVisible + 1);
+
+    refresh.stop();
+    vi.useRealTimers();
+
+    // A tab already hidden at mount must not start one — still the page's decision, so still text.
+    expect(pageCode).toContain('if (!document.hidden) roomRefresh.start();');
   });
 
   it('refetches ONCE on return, and the wider re-read only when something was missed', () => {
@@ -189,15 +229,35 @@ describe('and catches up when the tab comes back', () => {
       `appHasFocusGetChatLog` is still one refetch rather than a replay, because the load already
       returns the newest page per channel — the room re-reads itself and is current.
     */
-    expect(pageCode).toContain('if (!missedChatWhileHidden) {');
-    expect(pageCode).toContain('missedChatWhileHidden = false;');
-    expect(pageCode).toContain('void invalidateAll();');
+    /*
+      EXECUTED as of 2026-08-18, and this is the assertion that gains most from it. The old version
+      counted occurrences of `refreshRoom()` and `invalidateAll()` in the handler's SOURCE to prove
+      exactly one request goes out — a count that is satisfied by two calls on the same branch, or
+      by one inside an `if` that never runs. Now both counters are real.
+    */
+    const calls = { narrow: 0, wide: 0 };
+    const refresh = createRoomRefresh({
+      refresh: async () => void (calls.narrow += 1),
+      refreshAll: async () => void (calls.wide += 1)
+    });
 
-    // The branch that fires the cheap refresh must not also fall through to the wide one.
-    const handler = pageCode.slice(pageCode.indexOf('function onVisibilityChange() {'));
-    const body = handler.slice(0, handler.indexOf('\n  }'));
-    expect(body.split('refreshRoom()')).toHaveLength(2);
-    expect(body.split('invalidateAll()')).toHaveLength(2);
+    // Nothing missed: exactly one NARROW re-read, and no wide one.
+    refresh.visibilityChanged(true);
+    refresh.visibilityChanged(false);
+    expect(calls, 'a quiet return costs one narrow refresh').toEqual({ narrow: 1, wide: 0 });
+
+    // Chat missed while hidden: exactly one WIDE re-read, and no second narrow one.
+    refresh.visibilityChanged(true);
+    refresh.chatMissedWhileHidden();
+    refresh.visibilityChanged(false);
+    expect(calls, 'a catch-up is ONE wide re-read, not both').toEqual({ narrow: 1, wide: 1 });
+
+    // And the latch is consumed — a second return does not catch up again.
+    refresh.visibilityChanged(true);
+    refresh.visibilityChanged(false);
+    expect(calls, 'the missed-chat latch must be one-shot').toEqual({ narrow: 2, wide: 1 });
+
+    refresh.stop();
   });
 });
 

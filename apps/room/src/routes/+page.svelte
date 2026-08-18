@@ -27,6 +27,7 @@
         import type { RoomMessageChrome } from '#lib/room-message-chrome.js';
   import { EXTRA_COMPOSER } from '#lib/room/chat.svelte.js';
     import { createTawkRuntime } from '#lib/tawk-runtime.js';
+    import { createRoomRefresh } from '#lib/room/refresh.svelte.js';
   import { promoteLegacySplitSizes } from '#lib/room/split-legacy-migration.js';
   import { splitPairFromValue } from '#lib/room/split.svelte.js';
   import { defaultChatStyleForTheme, defaultFollowChatStyle } from '#lib/chat-style.js';
@@ -116,7 +117,7 @@
     rosterSession: () => rosterSession,
     theme: () => theme,
     chatAlertsDetached: () => chatAlertsDetached,
-    appHasFocus: () => appHasFocus,
+    appHasFocus: () => roomRefresh.appHasFocus,
     mainElement: () => mainElement,
     alertChatElement: () => alertChatElement,
     composerElement: () => composerElement,
@@ -129,7 +130,7 @@
     pushCaptionHistory: (caption) => {
       captionHistory = [...captionHistory, caption].slice(-CAPTION_HISTORY_LIMIT);
     },
-    chatMissedWhileHidden: () => (missedChatWhileHidden = true),
+    chatMissedWhileHidden: () => roomRefresh.chatMissedWhileHidden(),
     hidePreviewWindows: () => (previewWindowsVisible = false),
     mtx,
     unreadQaAlertIds,
@@ -253,89 +254,22 @@
   const disableStarYears = $derived(data.sessData?.disableStarYears === true);
 
   
-  let appHasFocus = $state(true);
-  /** Set while hidden, so the catch-up only runs when something was actually missed. */
-  let missedChatWhileHidden = false;
-
-  /**
-   * `visibilitychange` — `globals.appHasFocus`, and the catch-up on the way back.
-   *
-   * NO LONGER AN EFFECT. `svelte/best-practices` names this case by itself: *"If you need to attach
-   * listeners to `window` or `document` you can use `<svelte:window>` and `<svelte:document>` …
-   * Avoid using `onMount` or `$effect` for this."* The handler is bound on `<svelte:document>` at
-   * the bottom of this file and Svelte owns the add and the remove, so the twelve lines of manual
-   * `addEventListener` / teardown are gone with them.
-   *
-   * The comment that used to sit here weighed `{@attach}` and kept the effect, on the grounds that
-   * the listener must exist whether or not an element is mounted. That was true of an attachment
-   * and irrelevant to an event ATTRIBUTE: `<svelte:document>` is present for the component's whole
-   * lifetime, which is exactly as long as the listener should be.
-   *
-   * The catch-up fires ONCE rather than replaying what was missed, because the load already returns
-   * the newest page per channel — the room re-reads itself and is current, which is what upstream's
-   * `appHasFocusGetChatLog` does.
-   */
   /*
-    The five-second refresh poll, hoisted here from `onMount` so ONE handler owns visibility.
+    THE FRESHNESS POLL AND THE VISIBILITY RULES, in `#lib/room/refresh.svelte.ts`.
 
-    Nothing is pushed from the server for a reader's question, alert or chat message, so a presenter
-    sat on a stale tab saw an empty Q&A while the row was already stored. This re-fetches on a
-    timer, and only while the tab is visible, so a backgrounded room is not polling. `invalidate`
-    re-runs the load and patches the data; it is not a navigation, so scroll positions and open
-    modals are left alone.
+    Eighty lines left this file on 2026-08-18: the five-second `invalidate` timer, the two flags
+    that decide whether it runs, and the catch-up on the way back to a hidden tab. One cohesive
+    unit — visibility is the only thing that writes either flag — and now executable, where the page
+    could only ever be read as text.
 
-    Plain `let`/`function`, not `$state`: nothing renders from a timer handle.
+    `appHasFocus` stays REACTIVE and is read through the object. `missedChatWhileHidden` does not
+    cross at all any more: the only thing outside that ever wrote it is the realtime stream, which
+    now calls a named method instead of assigning a page `let`.
   */
-  const REFRESH_MS = 5000;
-  let refreshTimer: ReturnType<typeof globalThis.setInterval> | undefined;
-
-  /**
-   * A poll that loses the network must not become an unhandled rejection.
-   *
-   * `void invalidate(...)` discards the promise without a handler, so a single dropped request — a
-   * dev-server restart, a laptop waking up — surfaced as an uncaught error in the console with a
-   * stack trace pointing here, and looked like a fault in the room rather than one skipped refresh.
-   * The next tick retries anyway; that is what a poll is for.
-   */
-  function refreshRoom() {
-    void invalidate('room:data').catch((error: unknown) => {
-      console.warn('[room] a refresh was skipped; the next one will retry', error);
-    });
-  }
-
-  function startRefresh() {
-    if (refreshTimer !== undefined) return;
-    refreshTimer = globalThis.setInterval(() => refreshRoom(), REFRESH_MS);
-  }
-
-  function stopRefresh() {
-    if (refreshTimer !== undefined) globalThis.clearInterval(refreshTimer);
-    refreshTimer = undefined;
-  }
-
-  function onVisibilityChange() {
-    if (document.hidden) {
-      appHasFocus = false;
-      stopRefresh();
-      return;
-    }
-    appHasFocus = true;
-    startRefresh();
-    /*
-      The catch-up and the poll's own immediate refresh are the SAME request, so only one goes out.
-
-      `missedChatWhileHidden` is set while hidden; when it is set this is a catch-up and
-      `invalidateAll()` is the wider re-read. When it is not, the tab was never away long enough to
-      miss anything and `refreshRoom()` — the poll's `invalidate('room:data')` — is all that is
-      owed. Firing both would double every return to the tab.
-    */
-    if (!missedChatWhileHidden) {
-      refreshRoom();
-      return;
-    }
-    missedChatWhileHidden = false;
-    void invalidateAll();
-  }
+  const roomRefresh = createRoomRefresh({
+    refresh: () => invalidate('room:data'),
+    refreshAll: () => invalidateAll()
+  });
 
   
 
@@ -843,7 +777,7 @@
       used to sit 240 lines apart here, and the review of 2026-08-11 found the gap between them.
     */
     const stopMedia = mediaTransport.connect();
-    if (!document.hidden) startRefresh();
+    if (!document.hidden) roomRefresh.start();
 
     return () => {
       stopRoomEvents();
@@ -855,7 +789,7 @@
       recording.endSpeechRecognition();
       mediaTransport.signalling = null;
       stopMedia();
-      stopRefresh();
+      roomRefresh.stop();
       if (previousOpenImageModal) imageModalWindow.openImageModal = previousOpenImageModal;
       else delete imageModalWindow.openImageModal;
       feedScroll.destroy();
@@ -1006,7 +940,7 @@
 {/snippet}
 
 <!-- Not an effect: see `onVisibilityChange`. Svelte owns the add and the remove. -->
-<svelte:document onvisibilitychange={onVisibilityChange} />
+<svelte:document onvisibilitychange={() => roomRefresh.visibilityChanged(document.hidden)} />
 
 <svelte:window
   bind:innerWidth={split.viewportWidth}
