@@ -211,7 +211,7 @@ confirmed by trying to break it.
 
 ## 2026-08-18
 
-### 2026-08-18 09:41 EDT — twenty-one props that were members of two objects already being passed
+### 2026-08-18 09:16 EDT — twenty-one props that were members of two objects already being passed
 
 **Runtime impact: none intended** — behaviour preserved exactly. Full gate: **2,476 tests / 172
 files**, `eslint src/` clean, `svelte-check` **1,209 / 0 / 0**, prettier clean, `vite build` done.
