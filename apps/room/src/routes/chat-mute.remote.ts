@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { isPresenterRole, requireRoomShortCode, requireUser } from '#lib/server/auth.js';
 import { db, ensureDatabase } from '#lib/server/db/index.js';
 import { chatMutes } from '#lib/server/db/schema.js';
-import { publishToRoom } from '#lib/server/room-events.js';
+import { publishToUsers } from '#lib/server/room-events.js';
 
 /*
   `unmuteChat` — the lift, and the half of the pair that was never built.
@@ -92,7 +92,13 @@ export const unmuteChat = command(unmuteChatArgs, async ({ targetUserId }) => {
     Without this the unmuted member keeps the disabled composer until they happen to reload, which
     is the same silence the mute already had: the state changed and nobody was told.
   */
-  publishToRoom(roomShortCode, {
+  /*
+    ADDRESSED — 2026-08-19. This channel's own docblock says "Both are addressed to ONE member,
+    which is what this channel is for", and it was published to the whole room with the browser
+    doing the filtering. Being muted is a disciplinary state; who has just been un-muted is between
+    the presenter and that member.
+  */
+  publishToUsers(roomShortCode, [targetUserId], {
     channel: 'privCmds',
     data: { cmd: 'unmuteChat', targetUserId }
   });

@@ -42,7 +42,7 @@ import { memberDeniedArchives } from '#lib/roster-gates.js';
 import { isBannedFromRoom, isShutOutByRoomState, roomRoleFor } from '#lib/server/room-role.js';
 import { consumeRateLimit } from '#lib/server/rate-limit.js';
 import { mediaSignallingUrl } from '#lib/server/media-grant.js';
-import { publishToRoom } from '#lib/server/room-events.js';
+import { publishToRoom, publishToUsers } from '#lib/server/room-events.js';
 // `grantMediaElevation` / `revokeMediaElevation` left with `giveMicScreen` for
 // `presenter-commands.remote.ts`; nothing else in this file elevates anybody.
 // `deleteStoredFile` and `storeUpload` left with the Files-pane commands; nothing here stores a
@@ -1325,7 +1325,7 @@ export const actions: Actions = {
     const targetUserId = Number(data.get('targetUserId') ?? NaN);
     if (!Number.isInteger(targetUserId)) return fail(400, { message: 'No target.' });
 
-    publishToRoom(requireRoomShortCode(locals), {
+    publishToUsers(requireRoomShortCode(locals), [targetUserId], {
       channel: 'privCmds',
       data: { cmd: 'forceReload', targetUserId }
     });
