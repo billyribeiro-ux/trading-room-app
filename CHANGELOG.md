@@ -211,6 +211,53 @@ confirmed by trying to break it.
 
 ## 2026-08-18
 
+### 2026-08-19 10:20 EDT — the whole class: five addressed frames were broadcast, and the rule is now a gate
+
+**Full gate: 2,555 tests / 182 files**, `eslint src/` clean, `svelte-check` **1,212 / 0 / 0**,
+prettier clean, `vite build` done.
+
+**An end-to-end pass over every server→client surface**, asking what CONNECTS the leaks rather than
+hunting one more. All 28 surfaces — 16 remote functions, 9 API routes, 3 loads — audited for their
+authority source. **Every one takes scope from the session, none from the request.** The tenancy
+kernel is sound: `presenterRoom()` is role-check-then-room, both from `locals`; the media webhook
+uses a timing-safe secret and refuses everything when unconfigured; `uploads/[name]` carries a room
+predicate and answers 404 rather than 403; private-chat reads are scoped by
+`(room, pairKey(user, peer))`, so a caller can only read a thread they are party to.
+
+**So the defect was never authority — it was BREADTH.** And the mechanical connector is exact: a
+frame carrying `targetUserId` or `toUserId` is by definition addressed to somebody. Searching for
+the client-side filters found **five**, of which the private log was only the third:
+
+| frame | what every member received |
+| --- | --- |
+| roster `locStr` | every other member's city |
+| roster `email` | every other member's address |
+| `privChat` message | every private message in the room, in plaintext |
+| `privCmds` forceReload / unmuteChat | who a presenter had just reloaded or un-muted |
+| `cmds` remotePresCommand / giveMicScreen | whose microphone was cut, whose rights changed |
+
+The last two were still live. `privCmds` contradicted its own docblock — *"Both are addressed to ONE
+member, which is what this channel is for"* — while being published room-wide. `remotePresCommand`
+and `giveMicScreen` both carry a target and both return early in every other browser, so no client
+ever used the broadcast; it only announced moderation and permission changes about a named member to
+everyone. All four now use `publishToUsers`, verified by reading each handler first to confirm no
+other client consumes them.
+
+**`channel-audience-contract.test.ts` makes the rule outlive the instances.** Every channel in the
+`RoomEvent` union must be classified `room` or `addressed` — a new one with no entry fails, so
+adding a channel is a decision about who may read it rather than a default. And no frame naming a
+target may use `publishToRoom`, which is what catches the two `cmds` commands that a channel-level
+rule cannot: `cmds` is correctly room-wide for everything else it carries.
+
+**Negative controls, both red:** broadcasting an addressed frame again → *"A frame carrying
+targetUserId or toUserId is addressed to one person"*; adding an unclassified channel → *"auditTrail
+appears in RoomEvent with no audience"*.
+
+**One comment was written and deliberately not shipped, for the second time.** `+page.server.ts`
+sits exactly at its size ceiling, so five lines explaining the `forceReload` fix would have raised
+it. Ceilings only go down; `publishToUsers(..., [targetUserId], ...)` reads as its own
+documentation, and the contract names that site in its table and fails if anyone reverts it.
+
 ### 2026-08-19 09:33 EDT — SECURITY: every private message in a room was broadcast to everyone in it
 
 **Found by tracing every publisher in the codebase, after the roster fixes raised the obvious

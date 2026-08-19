@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { presenterRoom, requireUser } from '#lib/server/auth.js';
 import { ensureDatabase } from '#lib/server/db/index.js';
 import { grantMediaElevation, revokeMediaElevation } from '#lib/server/media-elevation.js';
-import { publishToRoom } from '#lib/server/room-events.js';
+import { publishToRoom, publishToUsers } from '#lib/server/room-events.js';
 
 /*
   A presenter commands the room: mute somebody's mic, or pull everybody to one screen.
@@ -62,7 +62,13 @@ export const presenterCommand = command(
   }),
   async ({ subCmd, targetUserId }) => {
     ensureDatabase();
-    publishToRoom(presenterRoom(), {
+    /*
+      ADDRESSED, not broadcast — 2026-08-19. `events.svelte.ts` reads this frame and returns
+      immediately unless `targetUserId` is its own id, so no other client ever used it; sending it
+      to the whole room told every member that a presenter had cut a NAMED person's microphone.
+      Moderation state about an individual is not the room's business.
+    */
+    publishToUsers(presenterRoom(), [targetUserId], {
       channel: 'cmds',
       data: { cmd: 'remotePresCommand', subCmd, targetUserId }
     });
@@ -140,6 +146,14 @@ export const giveMicScreen = command(
     if (give) grantMediaElevation(room, targetUserId, actor.id);
     else revokeMediaElevation(room, targetUserId);
 
-    publishToRoom(room, { channel: 'cmds', data: { cmd: 'giveMicScreen', targetUserId, give } });
+    /*
+      Addressed for the same reason: only the recipient acts on it — it grants them limited-presenter
+      status and raises their own toast — and every other client returns early. Broadcasting it
+      announced a permission change about a named member to everyone.
+    */
+    publishToUsers(room, [targetUserId], {
+      channel: 'cmds',
+      data: { cmd: 'giveMicScreen', targetUserId, give }
+    });
   }
 );
