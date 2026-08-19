@@ -12,8 +12,9 @@ import {
   loadThread,
   searchThread
 } from '#lib/server/private-chat.js';
+import { hashEmail } from '#lib/server/connection.js';
 import { consumeRateLimit } from '#lib/server/rate-limit.js';
-import { publishToRoom } from '#lib/server/room-events.js';
+import { publishToUsers } from '#lib/server/room-events.js';
 
 /*
   The private-chat wire: read a thread, send to it, delete it.
@@ -144,21 +145,36 @@ export const sendPrivateMessage = command(
       txt: row.body,
       uid: user.id,
       recvdID: peer,
-      avt: user.email,
+      /*
+        THE HASH, not the address — `avt` is the avatar key. Every sibling in this codebase already
+        does it (`chat-messages.remote.ts` sends `senderEmailHash: hashEmail(...)`, both alert
+        repositories send `senderAvt: hashEmail(...)`) and the reference's own comparison is
+        `hashEmail(user.email) !== e.avt`. This line alone carried the raw address, so a private
+        message handed the recipient the sender's email for no reader that wanted it.
+      */
+      avt: hashEmail(user.email),
       pic: user.avatarUrl,
       isA: isPresenterRole(user.role)
     };
 
     /*
-      Both parties. The sender's own copy is how their message reaches their log — the client
-      deliberately inserts nothing locally, so losing this publish would make a sent message vanish
-      until a reload.
+      Both parties, and ONLY both parties.
+
+      The sender's own copy is how their message reaches their log — the client deliberately inserts
+      nothing locally, so losing this publish would make a sent message vanish until a reload. That
+      part is the capture's design and is unchanged.
+
+      What changed on 2026-08-19 is the DELIVERY. These were `publishToRoom`, which hands the
+      identical object to EVERY listener in the room, and `events.svelte.ts` dropped the ones not
+      addressed to it — so every member received every private message in plaintext and their
+      browser threw it away. `publishToUsers` addresses them at the hub, where the subscriber map
+      knows which connections belong to a person.
     */
-    publishToRoom(room, {
+    publishToUsers(room, [peer], {
       channel: 'privChat',
       data: { toUserId: peer, fromUserId: user.id, message }
     });
-    publishToRoom(room, {
+    publishToUsers(room, [user.id], {
       channel: 'privChat',
       data: { toUserId: user.id, fromUserId: user.id, message }
     });
@@ -178,7 +194,14 @@ export const deletePrivateChatLog = command(
     const room = requireRoomShortCode(locals);
 
     deleteThread(room, user.id, peer);
-    // The peer's copy is gone too, so their open tab is now lying to them.
-    publishToRoom(room, { channel: 'privChat', data: { toUserId: peer, fromUserId: user.id } });
+    /*
+      The peer's copy is gone too, so their open tab is now lying to them. Addressed for the same
+      reason as the message publishes: who deleted a conversation with whom is not the room's
+      business, even though this frame carries no body.
+    */
+    publishToUsers(room, [peer], {
+      channel: 'privChat',
+      data: { toUserId: peer, fromUserId: user.id }
+    });
   }
 );

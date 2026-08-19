@@ -544,6 +544,59 @@ export function publishChatToRoom(
   }
 }
 
+/**
+ * Deliver an event to NAMED PEOPLE ONLY, rather than to everyone in the room.
+ *
+ * ## The defect this closes, found 2026-08-19 by tracing every publisher
+ *
+ * `publishToRoom` hands the identical object to every listener. That is correct for the channels it
+ * was written for — a chat message, a screen command, a roster count are all things the whole room
+ * is entitled to. It was also being used for PRIVATE CHAT, where it is not.
+ *
+ * The three `privChat` publishes sent a message carrying `txt` — the body — to every subscriber in
+ * the room, and `events.svelte.ts` discarded the ones not addressed to it:
+ *
+ * ```js
+ * if (priv?.toUserId !== this.#session().user.id) return;
+ * ```
+ *
+ * A CLIENT-SIDE filter over a server-side broadcast. Every member of a room received every private
+ * message sent in it, in plaintext, and their browser politely threw it away. Anyone with the
+ * network tab open read the lot.
+ *
+ * This is the same shape as the roster's `locStr` and `email` on 2026-08-18, and the root standard
+ * names it exactly: *"Every authority decision is made on the server from data the server owns —
+ * never asserted by the client, ever, for any reason."* Private chat is the sharpest instance of it
+ * in this application, because privacy is the entire product of the feature.
+ *
+ * ## Why an id list rather than a predicate
+ *
+ * The caller names WHO, and this decides HOW — the subscriber map is the only thing that knows
+ * which connections belong to a person, and one person may hold several tabs. Passing ids keeps the
+ * authority here and makes the call site read as the delivery address it is.
+ *
+ * ## Fails closed
+ *
+ * An anonymous listener has no `RosterUser`, so it matches no id and receives nothing. A room with
+ * no such person delivers to nobody rather than to everybody, which is the direction a mistake here
+ * has to fail in.
+ */
+export function publishToUsers(room: string, userIds: readonly number[], event: RoomEvent): void {
+  const listeners = subscribers.get(room);
+  if (!listeners) return;
+  const addressed = new Set(userIds);
+
+  for (const [listener, user] of listeners) {
+    if (user === null || !addressed.has(user.id)) continue;
+    try {
+      listener(event);
+    } catch (error) {
+      // Same contract as every other fan-out here: one dead connection must not silence the rest.
+      console.error('[room-events] subscriber failed', error);
+    }
+  }
+}
+
 /** Listener count, for tests and for proving fan-out actually happened. */
 export function roomSubscriberCount(room: string): number {
   return subscribers.get(room)?.size ?? 0;
