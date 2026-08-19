@@ -211,6 +211,53 @@ confirmed by trying to break it.
 
 ## 2026-08-18
 
+### 2026-08-19 09:33 EDT — SECURITY: every private message in a room was broadcast to everyone in it
+
+**Found by tracing every publisher in the codebase, after the roster fixes raised the obvious
+question: what else uses `publishToRoom` that should not?** Full gate: **2,550 tests / 181 files**,
+`eslint src/` clean, `svelte-check` **1,212 / 0 / 0**, prettier clean, `vite build` done.
+
+**What was wrong.** `private-chat.remote.ts` built a message carrying `txt` — the body — and
+published it three times with `publishToRoom`, which hands the identical object to **every listener
+in the room**. The only thing that made it look private was one line in the browser:
+
+```js
+if (priv?.toUserId !== this.#session().user.id) return;
+```
+
+A client-side filter over a server-side broadcast. **Every member of a room received every private
+message sent in it, in plaintext**, and their browser discarded the ones not addressed to them.
+Anyone with the network tab open read all of it — in a trading room, where a PM may carry a
+position.
+
+The same frame also carried **`avt: user.email`**, the sender's raw address, where every sibling in
+this codebase sends the hash: `chat-messages.remote.ts` sends `hashEmail(...)`, both alert
+repositories send `senderAvt: hashEmail(...)`, and the reference's own comparison is
+`hashEmail(user.email) !== e.avt`. That one line was the only place carrying the address.
+
+**Third instance of one shape in two days** — `locStr`, then `email` on the roster, now the private
+log. The root standard names it exactly: *"Every authority decision is made on the server from data
+the server owns — never asserted by the client, ever, for any reason."* Private chat is its sharpest
+case, because privacy is the entire product of the feature.
+
+**`publishToUsers(room, ids, event)`** now addresses at the hub, where the subscriber map is the only
+thing that knows which connections belong to a person. All three sites converted. It reaches **every
+tab** a person holds, because one person is not one socket; it delivers **nothing** to an anonymous
+listener; and it delivers to **nobody** rather than everybody when the addressee is absent.
+
+**AND THE OLD GUARD AGREED WITH THE BUG.** `private-chat-remote-contract.test.ts` asserted
+`avt: user.email,` and counted `publishToRoom(room, {` occurrences — so it pinned the address in
+place and proved the echo existed while saying nothing about who received it. Both re-pointed and
+strengthened; the count is now of the ADDRESSED publisher and `publishToRoom` is forbidden on this
+path.
+
+**Negative controls, three, all red:** reverting to the broadcast → *"A privChat frame must be
+published with publishToUsers"*; removing the id filter → *"the recipient: expected […] to have a
+length of 1 but got 2"* and *"no RosterUser means no id … expected [ {…} ] to deeply equal []"*;
+restoring the raw email → *"avt is the avatar key, and it is hashed everywhere else"*.
+
+**Not merged.** This sits on `fix/private-chat-fanout` awaiting review.
+
 ### 2026-08-18 11:05 EDT — the scroll-follow effects, executed: an instrument limit that was not one
 
 **The last recorded gap, closed — and the note that recorded it was wrong.** Full gate: **2,541

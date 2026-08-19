@@ -122,8 +122,18 @@ describe('nothing about the OTHER party is taken from the sender', () => {
     // `n`, `avt`, `pic` and `isA` all come off `user`, which is `requireUser(locals)` — never off
     // the argument. This is the assertion that would fail if somebody "helpfully" accepted a nick.
     expect(send()).toContain('n: user.displayName,');
-    expect(send()).toContain('avt: user.email,');
     expect(send()).toContain('isA: isPresenterRole(user.role)');
+    /*
+      `avt` IS THE HASH, since 2026-08-19. It read `avt: user.email,` and this assertion pinned it
+      that way — so the sender's raw address travelled with every private message, and the guard
+      agreed with it.
+
+      `avt` is the avatar key: `chat-messages.remote.ts` sends `hashEmail(...)`, both alert
+      repositories send `senderAvt: hashEmail(...)`, and the reference's own comparison is
+      `hashEmail(user.email) !== e.avt`. This one line was the only place carrying the address.
+    */
+    expect(send()).toContain('avt: hashEmail(user.email),');
+    expect(send(), 'the raw address must not come back').not.toContain('avt: user.email,');
   });
 });
 
@@ -229,16 +239,34 @@ describe('both parties are told', () => {
       appends it. Losing the second publish would make a sent message vanish until a reload, and it
       would look like a delivery bug rather than a missing echo.
     */
-    expect((send().match(/publishToRoom\(room, \{/g) ?? []).length).toBe(2);
+    /*
+      ADDRESSED, not broadcast — changed 2026-08-19, and this assertion is why it survived so long.
+      It counted `publishToRoom(room, {` and was satisfied by two of them, which is exactly what
+      shipped: the message went to EVERY listener in the room and `events.svelte.ts` discarded the
+      ones not addressed to it. Counting the publisher proved the echo existed and said nothing
+      about who received it.
+
+      `private-chat-delivery.test.ts` now executes the hub and proves a third party gets nothing.
+      What is asserted here is that both call sites name the ADDRESSEE.
+    */
+    expect((send().match(/publishToUsers\(room, \[/g) ?? []).length).toBe(2);
+    expect(send(), 'the recipient').toContain('publishToUsers(room, [peer]');
+    expect(send(), 'and the sender’s own copy').toContain('publishToUsers(room, [user.id]');
     expect(send()).toContain('toUserId: peer, fromUserId: user.id, message');
     expect(send()).toContain('toUserId: user.id, fromUserId: user.id, message');
+    expect(send(), 'a private message may never go to the whole room').not.toContain(
+      'publishToRoom'
+    );
     // The client's half moved to `RoomPrivateChat` in Phase 5 slice 7; the assertion moved with it.
     expect(privateChatModule).toContain("this.#draft = '';");
   });
 
   it('publishes once on delete, to the peer whose tab is now lying to them', () => {
-    expect((deleteLog().match(/publishToRoom\(room, \{/g) ?? []).length).toBe(1);
+    expect((deleteLog().match(/publishToUsers\(room, \[/g) ?? []).length).toBe(1);
+    expect(deleteLog()).toContain('publishToUsers(room, [peer]');
     expect(deleteLog()).toContain('toUserId: peer, fromUserId: user.id');
+    // Who deleted a conversation with whom is not the room's business, body or no body.
+    expect(deleteLog()).not.toContain('publishToRoom');
   });
 });
 
