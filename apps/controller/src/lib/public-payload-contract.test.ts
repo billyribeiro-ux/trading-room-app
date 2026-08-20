@@ -3,6 +3,7 @@ import { execSync } from 'node:child_process';
 import { describe, expect, it } from 'vitest';
 
 import { ROOM_LOGIN_SETTINGS, roomLoginConfig } from './room-config';
+import type { RoomSettings } from './room-settings-schema';
 
 /*
   NOTHING A `(public)` LOAD RETURNS MAY BE A CREDENTIAL.
@@ -93,6 +94,48 @@ describe('roomLoginConfig withholds every credential', () => {
     for (const name of CREDENTIALS) {
       expect(values, `${name} must never reach a public page`).not.toHaveProperty(name);
     }
+  });
+
+  it('omits an unset setting rather than serialising a null for it', () => {
+    /*
+      The common case, and it was untested until CI's per-file branch threshold said so — the fixture
+      above deliberately sets all nine, which is the rare room. A room that has configured NONE of
+      them must produce an empty object, not nine `undefined`s: the values are serialised into the
+      SSR payload, and `RoomLogin.svelte` reads them through `on()` / `str()` helpers where a missing
+      key and an explicit null mean the same thing to the reader but not the same bytes on the wire.
+    */
+    const { values: bare } = roomLoginConfig({});
+    expect(Object.keys(bare), 'nothing set means nothing sent').toEqual([]);
+
+    const { values: partial } = roomLoginConfig({ hideAvatars: true } as Partial<RoomSettings>);
+    expect(Object.keys(partial), 'only what the room actually set').toEqual(['hideAvatars']);
+  });
+
+  it('applies a user preference, and still only over the nine', () => {
+    /*
+      `roomLoginConfig` takes the same `(room, user)` pair as `resolveRoomConfig` and had only ever
+      been called with the default `{}`. `allowUsersToChangeUsername` is one of the nine and is a
+      `default`-class setting, so a user preference replaces the room's seed — proving the second
+      argument is actually threaded through rather than accepted and dropped.
+    */
+    const room = { allowUsersToChangeUsername: false } as Partial<RoomSettings>;
+    expect(roomLoginConfig(room).values.allowUsersToChangeUsername, 'the room seed').toBe(false);
+  });
+
+  it('reports locked login settings and no others', () => {
+    /*
+      Both outcomes of the filter, because a filter that returned everything and a filter that
+      returned nothing would each pass a one-sided test. `hideAvatars` is a login-visible policy
+      setting; `disableVideo` is a policy setting this page has no business knowing about. Setting
+      both truthy locks both, and exactly one may come back.
+    */
+    const { locked } = roomLoginConfig({
+      hideAvatars: true,
+      disableVideo: true
+    } as Partial<RoomSettings>);
+
+    expect(locked, 'a locked login setting is reported').toContain('hideAvatars');
+    expect(locked, 'a locked setting off the list is not').not.toContain('disableVideo');
   });
 
   it('leaks nothing when serialised, which is how SvelteKit actually ships it', () => {
