@@ -106,13 +106,27 @@
    * `scrollSpeechRecoToBottom()`. The capture defers with `setTimeout(..., 0)` because it runs
    * before the new line is laid out; an attachment re-runs after the DOM update, which is the same
    * guarantee without the timer.
+   *
+   * ## The reads are in the BODY, and that is the whole of it — fixed 2026-08-20
+   *
+   * They used to be inside a function this returned, and a returned function is the TEARDOWN: the
+   * docs call it "a function that is called before the attachment re-runs, or after the element is
+   * later removed from the DOM". Only state read in the attachment's own body is a dependency.
+   *
+   * So the reads created no dependency, the attachment never re-ran, the teardown was therefore
+   * never called — and the transcript had never scrolled, not even on the first caption. The
+   * `void current` / `void history.length` lines show the dependencies were known to be needed;
+   * they were one closure too deep.
+   *
+   * Nothing reported this. No error, no warning, `svelte-check` green: a silently missing feature
+   * is the entire failure mode of this mistake, which is why the platform behaviour is now pinned in
+   * `attachment-dependency-contract.svelte.test.ts` against a probe component rather than trusted to
+   * a reading of the docs.
    */
   function followTail(node: HTMLElement) {
-    return () => {
-      void current;
-      void history.length;
-      if (autoScroll) node.scrollTop = node.scrollHeight;
-    };
+    void current;
+    void history.length;
+    if (autoScroll) node.scrollTop = node.scrollHeight;
   }
 
   /**

@@ -33,6 +33,45 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-20 10:22 EDT — the caption transcript had never scrolled: an attachment's deps were one closure too deep
+
+**Runtime impact: yes.** Closed captions in history mode now follow their tail. They never had.
+
+`SpeechRecoOverlay`'s `followTail` returned a function, and a returned function is the TEARDOWN —
+the docs call it *"a function that is called before the attachment re-runs, or after the element is
+later removed from the DOM"*. Only state read in the attachment's OWN BODY becomes a dependency. The
+`void current` / `void history.length` lines show the dependencies were known to be needed; they were
+inside the returned closure, so they created none. The attachment therefore never re-ran, which meant
+the teardown was never called either — so `node.scrollTop = node.scrollHeight` had not run once, not
+even on the first caption. The docblock's claim that "an attachment re-runs after the DOM update" was
+true of attachments and not of this one.
+
+Nothing reported it. No error, no warning, `svelte-check` green: a silently absent feature is the
+entire failure mode, which is why the platform behaviour is now PINNED rather than argued.
+`AttachDepsProbe.svelte` puts one reactive read in an attachment body and another in a teardown, and
+`attachment-dependency-contract.svelte.test.ts` measures which one Svelte re-ran — **3 runs against
+1**, with the teardown never invoked at all. The rule is asserted against the real compiler, not
+quoted from the docs.
+
+**The class, not the instance.** All **27 bare `{@attach name}` call sites** were enumerated and
+every one's declaration read — including the 13 defined outside the file that uses them, which a
+first pass of the scan silently skipped and which are reported here rather than assumed covered.
+`followTail` was the only instance. The rest are correct in two documented shapes: the body does the
+work and the teardown genuinely cleans up (`captureMainElement`, `attachHost`,
+`captureComposerElement`), or the body wraps its reactive reads in a nested `$effect`
+(`releaseFocusWhenClosed`) — the pattern the `{@attach}` docs give for exactly this.
+
+**Two instrument bugs of mine, caught before either was reported as a finding.** The probe first
+wrote its tallies into `$state`, and writing a reactive proxy from inside an attachment — which runs
+in an effect — is a write-read cycle: `effect_update_depth_exceeded`, thrown by my own probe. And
+jsdom does not merely report `scrollHeight` as 0; it silently IGNORES a `scrollTop` assignment on an
+element with no layout box, so stubbing the height alone left the positive control failing against
+code that had genuinely executed. Both sides are now instrumented and both notes are in the files.
+
+**Verified.** Room **2,562 tests / 183 files**, `svelte-check` **1,224 / 0 / 0**, `eslint` and
+`prettier` clean, `svelte-autofixer` clean on the probe. Negative control: the reads put back inside
+the teardown, the transcript test RED, green on restore.
+
 ### 2026-08-20 10:13 EDT — SECURITY: an invited room member could take the room owner's whole account
 
 **Runtime impact: yes.** A privilege escalation is closed, one public page stops shipping every room
