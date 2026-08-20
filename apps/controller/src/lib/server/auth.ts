@@ -1,5 +1,5 @@
 import { randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, isNotNull } from 'drizzle-orm';
 import { error, redirect } from '@sveltejs/kit';
 import type { Cookies } from '@sveltejs/kit';
 import { getDb } from './db';
@@ -69,6 +69,28 @@ export async function destroyLoginSession(cookies: Cookies) {
  * Same reason as `markEmailVerified`: the reset token names the address it was issued to. If the
  * account's address changed after the link was sent, the link is stale and must not set a password
  * on whatever address is there now. Zero rows updated is reported back rather than assumed away.
+ *
+ * ## Why a null `passwordHash` is a predicate too — a privilege escalation, closed 2026-08-20
+ *
+ * A reset changes a password that EXISTS. It is not a way to grant one, and the difference is a
+ * tenancy boundary rather than a nicety, because a row with no hash is not a dormant login — it is
+ * somebody ELSE's member record filed inside the owner's account:
+ *
+ *  - `inviteRoomUser` (`rooms.ts`) creates invited members with `accountId: room.accountId` — the
+ *    ROOM OWNER's tenant — and `passwordHash: null`.
+ *  - `verifyPassword` refuses those rows in as many words, and `schema.ts` calls them "a member
+ *    record, not a login". Both were true, and this function was the one place that made them false.
+ *  - There is no per-user role: `requireOwnedRoom` admits any session whose `accountId` matches. So
+ *    a member who obtained a session held the owner's ENTIRE account — every room, every setting.
+ *
+ * The path was: be invited to a room (or hold that room's `ptr_app/.../addUser` pair link, which
+ * that endpoint's own docblock promises "can only ever create a plain member"), ask to reset the
+ * address you already control, and arrive signed in as a peer of the owner. `forgot-password`
+ * declines to issue the token as well, but THIS is the fence that matters — it is at the write, so
+ * it holds for any caller that ever reaches here, including a future one.
+ *
+ * Nothing legitimate is refused: `register` is the only other writer of `users` and it always hashes
+ * a password, so every row that can sign in has a non-null hash by construction.
  */
 export async function setPasswordFromReset(input: {
   userId: number;
@@ -99,7 +121,14 @@ export async function setPasswordFromReset(input: {
         */
         emailVerifiedAt: now
       })
-      .where(and(eq(users.id, input.userId), eq(users.email, input.email)))
+      .where(
+        and(
+          eq(users.id, input.userId),
+          eq(users.email, input.email),
+          // A member record has no password to reset. See the escalation note above.
+          isNotNull(users.passwordHash)
+        )
+      )
       .returning({ id: users.id });
 
     if (changed.length === 0) return false;

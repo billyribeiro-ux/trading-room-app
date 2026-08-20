@@ -11,6 +11,7 @@
   import GifConfirmDialog from '#lib/components/GifConfirmDialog.svelte';
   import ImageUploadDialog from '#lib/components/ImageUploadDialog.svelte';
   import ModalHost from '#lib/components/ModalHost.svelte';
+  import RemoteAudioSinks from '#lib/components/RemoteAudioSinks.svelte';
   import ToastHost from '#lib/components/ToastHost.svelte';
   import type { RoomAlerts } from '#lib/room/alerts.svelte.js';
   import type { RoomBroadcasts } from '#lib/room/broadcasts.svelte.js';
@@ -314,8 +315,15 @@
       if (!isMentionOf(item.body, data.user.displayName, item.isAdmin === true)) continue;
 
       const title = `Mention from @${item.senderName ?? 'Unknown'}`;
-      /*  — the reference passes the body as the
-         toast TEXT and the title second, and enables HTML because chat bodies carry markup. */
+      /*
+        `alertService.info(e.txt, "Mention from @" + e.n, { enableHtml: !0 })` — byte 1431320 of
+        `docs/source-v4-2026-08-15/main.d1d09071be31f1ba.js`. The reference passes the body as the
+        toast TEXT and the title SECOND, and enables HTML because chat bodies carry markup.
+
+        The citation is restored, not written: this comment has read `/*  — the reference passes…`
+        since the commit that created it, with its subject missing and nothing left to say what
+        "the reference" did. Recovered by reading the bundle at the offset above.
+      */
       toasts.show({ kind: 'info', title, message: item.body, enableHtml: true });
       toasts.notify(title, item.body, null, item.senderEmailHash ?? '');
     }
@@ -468,25 +476,8 @@
   });
 </script>
 
-One hidden sink per remote microphone. A consumed audio track produces no sound until it is attached
-to an element, and the room has no visible control for a peer's voice - the capture keeps its own
-audio elements out of sight the same way (`#mp3player` is `display: none`). -->
-{#each [...mediaTransport.remoteAudioStreams.keys()] as producerId (producerId)}
-  <!--
-      `msRemAudio-{userID}` is the capture's own id and it is load-bearing, not decorative:
-      `adjustVol` does `$("[id^=msRemAudio-]").prop("roomVolume.volume", …)` (bundle byte 2517022),
-      `adjustVolPres` targets one peer's element, and `reconnectAudio` does
-      `$("[id^='msRemAudio-']").remove()` before re-subscribing. This room already queries that
-      exact prefix in `roomVolume.setMasterVolume`, against elements that had no id at all - so the master
-      roomVolume.volume slider moved nothing.
-    -->
-  <audio
-    id="msRemAudio-{mediaTransport.audioProducerOwners.get(producerId)?.userID ?? producerId}"
-    {@attach mediaTransport.attachRemoteAudio(producerId)}
-    autoplay
-    style="display: none;"
-  ></audio>
-{/each}
+<!-- One hidden sink per remote microphone. The reasoning travelled with the markup. -->
+<RemoteAudioSinks {mediaTransport} />
 <div
   id="connectedMsg"
   class="notConnectedOverlay animated fadeIn"

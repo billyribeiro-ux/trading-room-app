@@ -4,7 +4,7 @@ import { eq } from 'drizzle-orm';
 import { getDb } from '#lib/server/db/index.js';
 import { rooms } from '#lib/server/db/schema.js';
 import { readSettings } from '#lib/server/rooms.js';
-import { resolveRoomConfig } from '#lib/room-config.js';
+import { resolveRoomConfig, roomLoginConfig } from '#lib/room-config.js';
 import { decideRoomEntry, type RoomEntrySettings } from '#lib/room-entry.js';
 import { ROOM_BASE_URL } from '$app/env/private';
 import type { Actions, PageServerLoad } from './$types';
@@ -63,7 +63,16 @@ export const load: PageServerLoad = async ({ params, cookies, locals }) => {
 
   // The screen the guest sees is decided by the room's settings, exactly as the
   // reference does it — resolveRoomConfig applies policy/default precedence.
-  const resolved = resolveRoomConfig(await readSettings(room.id));
+  /*
+    `roomLoginConfig`, NOT `resolveRoomConfig` — changed 2026-08-20.
+
+    This is a `(public)` load, so whatever it returns is serialised into the SSR payload of an
+    UNAUTHENTICATED page. `resolveRoomConfig` returns all 269 settings, among them `webinarPW`
+    ("Room Password:"), `ssoJWTSecret`, `secTok` and `pairSecretKey` — every visitor who could reach
+    a room's login URL was handed them. Nothing rendered them, which is exactly why it went
+    unnoticed: `RoomLogin.svelte` reads nine keys and ignores the rest.
+  */
+  const resolved = roomLoginConfig(await readSettings(room.id));
 
   const raw = cookies.get(IDENTITY);
   const cookieIdentity = readRoomIdentity(raw);

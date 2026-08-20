@@ -31,6 +31,155 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ---
 
+## 2026-08-20
+
+### 2026-08-20 10:22 EDT — the caption transcript had never scrolled: an attachment's deps were one closure too deep
+
+**Runtime impact: yes.** Closed captions in history mode now follow their tail. They never had.
+
+`SpeechRecoOverlay`'s `followTail` returned a function, and a returned function is the TEARDOWN —
+the docs call it *"a function that is called before the attachment re-runs, or after the element is
+later removed from the DOM"*. Only state read in the attachment's OWN BODY becomes a dependency. The
+`void current` / `void history.length` lines show the dependencies were known to be needed; they were
+inside the returned closure, so they created none. The attachment therefore never re-ran, which meant
+the teardown was never called either — so `node.scrollTop = node.scrollHeight` had not run once, not
+even on the first caption. The docblock's claim that "an attachment re-runs after the DOM update" was
+true of attachments and not of this one.
+
+Nothing reported it. No error, no warning, `svelte-check` green: a silently absent feature is the
+entire failure mode, which is why the platform behaviour is now PINNED rather than argued.
+`AttachDepsProbe.svelte` puts one reactive read in an attachment body and another in a teardown, and
+`attachment-dependency-contract.svelte.test.ts` measures which one Svelte re-ran — **3 runs against
+1**, with the teardown never invoked at all. The rule is asserted against the real compiler, not
+quoted from the docs.
+
+**The class, not the instance.** All **27 bare `{@attach name}` call sites** were enumerated and
+every one's declaration read — including the 13 defined outside the file that uses them, which a
+first pass of the scan silently skipped and which are reported here rather than assumed covered.
+`followTail` was the only instance. The rest are correct in two documented shapes: the body does the
+work and the teardown genuinely cleans up (`captureMainElement`, `attachHost`,
+`captureComposerElement`), or the body wraps its reactive reads in a nested `$effect`
+(`releaseFocusWhenClosed`) — the pattern the `{@attach}` docs give for exactly this.
+
+**Two instrument bugs of mine, caught before either was reported as a finding.** The probe first
+wrote its tallies into `$state`, and writing a reactive proxy from inside an attachment — which runs
+in an effect — is a write-read cycle: `effect_update_depth_exceeded`, thrown by my own probe. And
+jsdom does not merely report `scrollHeight` as 0; it silently IGNORES a `scrollTop` assignment on an
+element with no layout box, so stubbing the height alone left the positive control failing against
+code that had genuinely executed. Both sides are now instrumented and both notes are in the files.
+
+**Verified.** Room **2,562 tests / 183 files**, `svelte-check` **1,224 / 0 / 0**, `eslint` and
+`prettier` clean, `svelte-autofixer` clean on the probe. Negative control: the reads put back inside
+the teardown, the transcript test RED, green on restore.
+
+### 2026-08-20 10:13 EDT — SECURITY: an invited room member could take the room owner's whole account
+
+**Runtime impact: yes.** A privilege escalation is closed, one public page stops shipping every room
+credential to the browser, and two comment repairs put developer prose back inside its comment.
+
+**The escalation, traced end to end by reading rather than by search.** `inviteRoomUser`
+(`rooms.ts:435-450`) files an invited room member as a `users` row carrying `accountId:
+room.accountId` — the ROOM OWNER's tenant — with `passwordHash: null`. Two places state in as many
+words that such a row is not a login: `schema.ts` ("a member record, not a login") and
+`verifyPassword` ("null means 'cannot authenticate'"), and the login action honours it.
+`setPasswordFromReset` did not. Its WHERE was `id AND email` with no hash predicate, so redeeming a
+reset link SET a password on a member record, and `reset-password/+page.server.ts:109` then calls
+`createLoginSession`. Since `requireOwnedRoom` admits any session whose `accountId` matches and there
+is **no per-user role column anywhere**, that member arrived holding the owner's entire account —
+every room, every setting, every member list.
+
+Reachable two ways, neither needing anything the attacker was not already handed: be invited to a
+room at an address you control, or hold that room's `ptr_app/sessions/v2/addUser` pair link — whose
+own docblock promised it "can only ever create a **plain member**". That sentence was false, and it
+was false because of a file two directories away. It now says so, with the date.
+
+There is **no invite-acceptance route in this app**, so `rooms.ts`'s comment promising that "an
+invited member sets one when they first sign in" described a flow that has never existed; the reset
+route was its unintended implementation. That comment is corrected rather than deleted.
+
+**Fixed at the write, which is the fence that holds.** `setPasswordFromReset` now carries
+`isNotNull(users.passwordHash)` in the UPDATE's own WHERE, so it holds for any caller that ever
+reaches it including a future one. `forgot-password` also declines to issue the token, and that
+branch falls through to the same `GENERIC_REQUEST_ACK` as "no account" and "inside the cooldown" —
+answering differently would have added a **sharper** oracle than the one that function is shaped to
+avoid, one distinguishing people merely invited to somebody's room from strangers.
+
+Nothing legitimate is refused: `register` is the only other writer of `users` and always hashes a
+password, so every row that can sign in has a non-null hash by construction. Proved, not assumed —
+the third case asserts an ordinary account still resets and the new password still verifies.
+
+**SECURITY: nine room credentials were in the public login page's SSR payload.**
+`(public)/session/[code]/+page.server.ts` returned `resolveRoomConfig(...).values` — all 269 room
+settings — from a load on an unauthenticated route, so every visitor who could reach a room's login
+URL was handed `webinarPW`, `webinarPW2`, `webinarPW3`, `webinarPWFreeTrial`, `ssoJWTSecret`,
+`secTok`, `pairSecretKey` and `login_webhook_url`. Nothing rendered them, which is exactly why it
+survived — `RoomLogin.svelte` reads nine keys and ignores the rest. Only the component's restraint
+kept them off the screen, never a filter, and they were in the page source, in any cache in front of
+it and in any HAR attached to a support ticket. Note the overlap with the item above: `pairSecretKey`
+is the secret gating the pair link that fed the escalation.
+
+`ROOM_LOGIN_SETTINGS` / `roomLoginConfig` is a **second** allow-list rather than a reuse of
+`ROOM_VISIBLE_SETTINGS`, and that was checked rather than assumed: four of the nine keys this page
+reads — `hideAvatars`, `hideWelcomeTo`, `hidePoweredBy`, `claimNickName` — are not in that list and
+correctly so. Reusing it would have shipped a broken login page. Two consumers, two questions, two
+lists. The action beneath still calls `resolveRoomConfig`, legitimately: `decideRoomEntry` needs
+`webinarPW`, `secTok` and `banIPList`, runs server-side and serialises none of them.
+
+**Two comments that had shipped broken.** `RoomOverlays.svelte:471` began `One hidden sink per remote
+microphone.` with no `<!` `--` opener and a closer three lines later, so three lines of developer
+prose plus a literal marker rendered as the first visible node of the overlay layer — which
+`+page.svelte` mounts at page top level. `git log -L` attributes it to the commit that created the
+file: the opener never existed. Separately, the mention-toast comment had read `/*  — the reference
+passes…` since the commit that wrote it, its subject simply missing. Recovered by reading the capture
+bundle at byte 1431320 of `docs/source-v4-2026-08-15/main.d1d09071be31f1ba.js`:
+`alertService.info(e.txt, "Mention from @" + e.n, { enableHtml: !0 })`. The citation is restored, not
+invented — and the file's own comment says which.
+
+The existing comment gate could not have caught the first and could not have been made to: its
+pattern requires a well-formed opener to match at all, so an orphan closer is not a malformed comment
+to it — it is simply not a comment. A **second** rule was needed, not a better regex, and it asks the
+COMPILER: parse each template and flag any `Text` node carrying a comment marker, since a real
+comment is a `Comment` node and never appears as `Text`.
+
+**The ceiling did its job rather than being edited.** Those two repairs took `RoomOverlays.svelte` to
+787 against a ceiling of 782. Ceilings here only go down and prose is never trimmed to hit a number,
+so `RemoteAudioSinks.svelte` was extracted instead — the one thing in a *visual* layer that is never
+visible. 782 -> 769, and the new component is capped on arrival, which is the lesson the `RoomShell`
+entry beside it already records.
+
+**One withdrawn migration deleted — from the working copy only, and that is the whole point.**
+`services/api/migrations/0009_rename_runtime_roles.sql` sat beside
+`0009_provision_tradingroom_app.sql`: two files at the same version. It was **untracked**, so it was
+never in the repository, CI never saw it and this commit does not remove it from anything — no diff
+here touches `services/`. What it did break is the machine it was on, and it would break any machine
+that still has a copy, because `sqlx::migrate!("./migrations")` resolves from DISK at compile time:
+being untracked exempts a file from git, not from the macro. `verify-backend-provenance.mjs:77-83`
+already records it as withdrawn on 2026-08-15 as non-convergent — it renamed a cluster-global role
+from a per-database chain, so the second database on a cluster could never migrate. The migration
+integrity gate was failing outright with it present and reports `PASS … 9 pinned migrations` without
+it. Recorded here so the next person who finds a stray copy knows it is withdrawn rather than missing.
+
+**Verified.** Controller **994 tests / 95 files** and `svelte-check` **1,529 files, 0 errors, 0
+warnings**; room **2,559 tests / 182 files**, `svelte-check` **1,222 / 0 / 0**, `eslint` clean on
+every touched file; `svelte-autofixer` clean on the new component. The escalation is proved against a
+**real PostgreSQL** in `password-reset.db.test.ts` (12 tests), which builds the attacker's row by
+calling `inviteRoomUser` itself rather than inserting a null hash by hand — a hand-built row would
+still pass if the invite path stopped producing one. Its negative control was seen RED on exactly the
+right assertion and green on restore, with the other three cases staying green, so the guard refuses
+members rather than everybody. `member-record-cannot-authenticate.test.ts` is the CI-runnable half,
+because `vite.config.ts` excludes `*.db.test.ts` where there is no `initdb`; both its fences were
+negative-controlled independently. The orphan-closer rule was negative-controlled by re-removing the
+opener.
+
+**One defect in this work was mine and is recorded rather than quietly fixed.** The first draft of
+that CI test extracted a function body by searching for the next `\n}`, and
+`setPasswordFromReset`'s parameter is an inline type literal — so five lines in there is a
+column-zero `}` in `}): Promise<…> {` and the "body" was the argument list. It failed against correct
+code before any mutation was applied, which is a manufactured defect, not a finding. Caught by
+running the positive control first; the helper now terminates on `}` + newline and says why.
+
+---
+
 ## 2026-08-17
 
 ### 2026-08-17 11:42 EDT — row AH's sweep actually run: 253 markers, three dead guards, all three fixed and negative-controlled
