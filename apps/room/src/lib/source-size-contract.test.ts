@@ -502,9 +502,34 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       It cost only TWO new props, `isPresenter` and `unreadQaAlertIds`, because the four trackers had
       exactly one reader each and came across as local state. That ratio is the evidence this is the
       right home rather than a convenient one: a wrong home shows up as a long props list.
+
+      782 -> 768 on 2026-08-20, and the ceiling did its job rather than being edited. Two comment
+      repairs took the file to 787: a hidden-audio comment that had shipped with no `<!--` opener at
+      all, and a citation that had been missing its subject since the commit that wrote it. Neither
+      was shortened to fit — the rule is that ceilings only go down and prose is not trimmed to hit a
+      number — so `RemoteAudioSinks.svelte` left instead, taking the one part of a VISUAL layer that
+      is never visible.
+
+      The number is 769 and not 768 because THIS test's count is the authority: it splits on newlines
+      and `wc -l` counts them, which differ by one on any file ending in a newline. Setting a ceiling
+      from `wc -l` puts it one under the real figure and fails on arrival.
     */
-    max: 782,
-    why: 'the overlay layer - modal host, seven dialogs, toasts, the lightbox, audio sinks, delivery'
+    max: 769,
+    why: 'the overlay layer - modal host, seven dialogs, toasts, the lightbox, delivery'
+  },
+  {
+    file: 'lib/components/RemoteAudioSinks.svelte',
+    /*
+      Born capped, 2026-08-20, for the reason the `RoomShell` entry below records: a component
+      without an entry is one nobody is watching.
+
+      It is mostly prose and that is deliberate — six lines of markup under a docblock explaining why
+      an invisible element is load-bearing, plus the `msRemAudio-` citation that the volume sliders
+      depend on. The ceiling is set just above what arrived, so the next thing added to it has to be
+      justified.
+    */
+    max: 55,
+    why: 'the hidden <audio> sink per remote peer - six lines of markup, the rest is why'
   },
   {
     file: 'lib/components/RoomShell.svelte',

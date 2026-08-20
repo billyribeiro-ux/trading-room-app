@@ -345,3 +345,138 @@ describe('resetRequestedRecently, against real SQL', () => {
     expect(await resetRequestedRecently(user.userId), 'spending it opens it again').toBe(false);
   }, 60_000);
 });
+
+/*
+  AN INVITED MEMBER MAY NEVER BECOME A LOGIN — the 2026-08-20 escalation, closed and pinned.
+
+  ## What was possible
+
+  `inviteRoomUser` files an invited room member as a `users` row inside the ROOM OWNER's account
+  (`accountId: room.accountId`) with `passwordHash: null`. Two places state in as many words that
+  such a row cannot authenticate — `schema.ts` ("a member record, not a login") and `verifyPassword`
+  ("null means 'cannot authenticate'") — and `login` honours it, because `verifyPassword` returns
+  false for a null hash.
+
+  `setPasswordFromReset` did not. Its WHERE was `id AND email`, so redeeming a reset link SET a hash
+  on a member record, and `reset-password/+page.server.ts` then calls `createLoginSession`. Since
+  `requireOwnedRoom` admits any session whose `accountId` matches and there is NO per-user role
+  column, the member arrived holding the owner's entire account: every room, every setting.
+
+  Reachable two ways, neither of them requiring anything the attacker was not already given: be
+  invited to a room at an address you control, or hold that room's `ptr_app/.../addUser` pair link —
+  whose own docblock promises it "can only ever create a plain member".
+
+  ## Why this is a DATABASE test and not a unit test
+
+  The guard is a predicate in the UPDATE's own WHERE clause. A stubbed Drizzle would prove only that
+  a shape somebody wrote down was passed to a stub; the question is what the row contains afterwards,
+  and whether zero rows came back. `account-row-scope.db.test.ts` says the same thing about the same
+  kind of guard, and this file's harness is the one it uses.
+
+  The member row is built by calling `inviteRoomUser` itself rather than by inserting a null hash by
+  hand. A hand-built row would still pass if the invite path stopped producing one, and then this
+  test would be guarding a shape that no longer occurs.
+*/
+describe('a member record cannot be turned into a login', () => {
+  /** Owner, room and an invited member — the exact three rows the real attack needs. */
+  async function makeInvitedMember(ownerEmail: string, memberEmail: string) {
+    const { getDb } = await import('./db');
+    const { accounts, rooms, users } = await import('./db/schema');
+    const { hashPassword } = await import('./auth');
+    const { inviteRoomUser } = await import('./rooms');
+    const { eq } = await import('drizzle-orm');
+
+    const db = getDb();
+    const now = new Date();
+    const [account] = await db
+      .insert(accounts)
+      .values({ name: 'Owner Co', ownerEmail, createdAt: now })
+      .returning({ id: accounts.id });
+    const [owner] = await db
+      .insert(users)
+      .values({
+        accountId: account.id,
+        email: ownerEmail,
+        displayName: 'The Owner',
+        passwordHash: hashPassword('the-owners-password-12'),
+        createdAt: now
+      })
+      .returning({ id: users.id });
+    const [room] = await db
+      .insert(rooms)
+      .values({
+        accountId: account.id,
+        shortCode: `esc-${memberEmail.split('@')[0]}`,
+        name: 'The Room',
+        createdAt: now
+      })
+      .returning({ id: rooms.id });
+
+    await inviteRoomUser(room.id, 'Invited Member', memberEmail);
+
+    const [member] = await db.select().from(users).where(eq(users.email, memberEmail)).limit(1);
+    return { accountId: account.id, ownerId: owner.id, roomId: room.id, member };
+  }
+
+  it('the invite really does produce a null-hash row inside the OWNER account — the positive control', async () => {
+    /*
+      First, because every refusal below would pass trivially against a row that did not exist or
+      that already had a password. This is the premise the whole escalation rests on, so it is
+      asserted rather than assumed.
+    */
+    const { accountId, member } = await makeInvitedMember('owner-a@example.test', 'member-a@example.test');
+
+    expect(member, 'the invite must have created a row').toBeTruthy();
+    expect(member.passwordHash, 'an invited member has no password').toBeNull();
+    expect(member.accountId, "and is filed in the ROOM OWNER's tenant, which is what makes it dangerous").toBe(
+      accountId
+    );
+  }, 60_000);
+
+  it('refuses to set a password on it, and leaves the row untouched', async () => {
+    const { setPasswordFromReset } = await import('./auth');
+    const { member } = await makeInvitedMember('owner-b@example.test', 'member-b@example.test');
+
+    const granted = await setPasswordFromReset({
+      userId: member.id,
+      email: member.email,
+      password: 'attacker-chosen-pw-12'
+    });
+
+    expect(granted, 'a member record has no password to reset').toBe(false);
+
+    const after = await userRow(member.id);
+    expect(after.passwordHash, 'no hash may be written').toBeNull();
+    /*
+      `emailVerifiedAt` is set in the same `.set()` as the hash, so a WHERE that admitted this row
+      would mark the address proved even if the hash were somehow withheld. Asserting it separately
+      means a partial guard cannot pass.
+    */
+    expect(after.emailVerifiedAt, 'and nothing else in that .set() may land either').toBeNull();
+  }, 60_000);
+
+  it('still resets a REAL account, so the guard refuses members rather than everybody', async () => {
+    /*
+      The negative-control direction, run every time rather than once by hand: a guard that refused
+      all rows would make both assertions above pass and silently break password reset for every
+      genuine customer.
+    */
+    const { setPasswordFromReset, verifyPassword } = await import('./auth');
+    const user = await makeUser('genuine-reset@example.test');
+
+    expect(
+      await setPasswordFromReset({ userId: user.userId, email: user.email, password: 'a-brand-new-password-12' }),
+      'an ordinary account must still be able to reset'
+    ).toBe(true);
+
+    const after = await userRow(user.userId);
+    expect(verifyPassword('a-brand-new-password-12', after.passwordHash), 'and the new password must work').toBe(true);
+  }, 60_000);
+
+  it('the login door was already shut, and stays shut', async () => {
+    // `verifyPassword` is the other half of the invariant. If this ever returns true, the WHERE
+    // clause above is the only thing standing between an invited member and the owner's account.
+    const { verifyPassword } = await import('./auth');
+    expect(verifyPassword('anything at all', null)).toBe(false);
+  });
+});

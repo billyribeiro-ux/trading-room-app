@@ -38,6 +38,14 @@ import type { RequestHandler } from './$types';
  *
  *  * it can only ever create a **plain member** — never a presenter, never an admin, never a
  *    permission. `inviteRoomUser` writes role 2 and this handler passes it nothing else;
+ *
+ *    This promise was FALSE between this endpoint being written and 2026-08-20, and not because of
+ *    anything on this page. The member row it creates carries the room owner's `accountId` and a
+ *    null `passwordHash`; the password-reset flow would set a hash on any row and sign it in, and
+ *    `requireOwnedRoom` gates on `accountId` alone. So a holder of this link could add an address
+ *    they controlled and arrive holding the owner's whole account. `setPasswordFromReset` now
+ *    refuses rows that cannot authenticate, which is what makes the sentence above true;
+ *    `member-record-cannot-authenticate.test.ts` fails if that guard is removed.
  *  * it is off unless the owner turns it on AND sets a secret;
  *  * the secret is compared in constant time, so the endpoint cannot be used to recover it a byte
  *    at a time;
