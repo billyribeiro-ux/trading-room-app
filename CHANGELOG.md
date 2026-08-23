@@ -33,6 +33,57 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-23 13:15 EDT — the CI crash that was not ours, and the top bar's first render test
+
+**Runtime impact: no.** A CI retry and a new test; no application code changed.
+
+**`Frontend quality` died before running anything.** The log, in full:
+
+```
+Adding pnpm@11.21.0 to the cache...
+AssertionError [ERR_ASSERTION]: assert(!this.paused)
+    at Parser.finish (node:internal/deps/undici/undici:7388:9)
+    at TLSSocket.onHttpSocketEnd (node:internal/deps/undici/undici:7827:34)
+Node.js v24.19.0
+```
+
+That is Node's **own bundled undici** HTTP parser aborting the process when a TLS socket ends while
+the parser is paused — a race inside `corepack install`'s download. Not a bad pin, not a bad
+lockfile, not a test: the job reported `exit code 1` with no line of this repository having run.
+`.node-version` is `24.19.0`, which matches the crash exactly.
+
+**Retried rather than worked around**, in both `quality.yml` and `backend-quality.yml`. `corepack
+install` is idempotent and reads the pin from `package.json` every time, so a second attempt asks
+for the identical version — the comparison against `packageManager` still runs and a genuinely wrong
+version still fails on the first pass. `ci-package-manager-pin.test.ts` passes unchanged, which is
+what proves no version literal crept in.
+
+**NOT fixed by changing `.node-version`,** and that is a decision rather than an omission: the bug is
+in the runtime's bundled dependency, no evidence was read naming a version where it is fixed, and
+that file governs the runtime every job uses. Guessing a Node version to dodge a race would be the
+opposite of what this repository asks for.
+
+Both halves of the loop were controlled before it shipped: an always-failing `corepack` makes three
+attempts and then exits 1 with the annotation, and one that fails twice then succeeds proceeds to the
+version check. `set -e` does not abort the loop because a condition in `until` is exempt.
+
+**`RoomNavbar` has a render test.** 904 lines, three state classes, thirty-odd callbacks, and it had
+never been rendered by anything here — every assertion about it was source text. It is served through
+`svelte/server` now, and the subject is the gate the component's own comment describes: broadcast
+controls are presenter-only, and `{#if isPresenter}` appearing in a file proves the string exists,
+not that the block closes around the controls it should. Seven cases, including the positive control
+without which `not.toContain` proves nothing, and TAWK's two-term gate.
+
+One assertion of mine was WRONG and the component was right: I expected "Stop Sharing All" for any
+presenter, and `{#if media.screenSharing}` correctly withholds it from one who is not sharing. Kept
+as a two-sided assertion rather than deleted — a control offering to stop something that is not
+happening is the dead scaffolding this repository refuses.
+
+**Verified:** room `vitest` **2,630 across 188 files**; `svelte-check` **1,236 / 0 / 0**; `eslint`
+and `prettier` clean. Negative control: `{#if isPresenter}` replaced with `{#if true}` turns the
+member assertion red, and restoring it turns it green. **NOT verified:** the CI fix cannot be proven
+locally — only a run on the runner shows it, and a race that has fired once may not fire again soon.
+
 ### 2026-08-23 13:08 EDT — the alert search asks the database, and the filter it would have dropped
 
 **Runtime impact: yes.** `#alerts-advanced-search-modal` searches the room's whole alert log instead
