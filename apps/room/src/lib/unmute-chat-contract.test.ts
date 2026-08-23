@@ -170,7 +170,15 @@ describe('the member is told, on the channel meant for one member', () => {
   });
 
   it('is a command the event type admits', () => {
-    expect(eventsCode).toContain("cmd: 'forceReload' | 'unmuteChat'");
+    /*
+      Asserts MEMBERSHIP, not the whole union. This pinned the exact string
+      `cmd: 'forceReload' | 'unmuteChat'` and therefore went red on 2026-08-23 for a change that did
+      nothing to unmute — adding `kickUser` beside it. A test for "unmuteChat is admitted" should not
+      fail because a THIRD command was admitted; that is the union's business, not this file's.
+    */
+    expect(eventsCode).toContain("channel: 'privCmds'");
+    expect(eventsCode).toMatch(/cmd: '[^']*'( \| '[^']*')*/);
+    expect(eventsCode).toContain("'unmuteChat'");
   });
 
   it('only reacts on the addressed member', () => {

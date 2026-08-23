@@ -94,6 +94,7 @@ const make = () => {
     byte 995901 — from the outside. A boolean sampled afterwards would be true either way.
   */
   const reloadAsked: boolean[] = [];
+  const kicked: { message: string; closedAlready: boolean }[] = [];
   const stream = new RoomEventStream<{ id: number }>({
     prefs: { doNotDisturbOn: false } as never,
     toasts: { show: () => null } as never,
@@ -113,9 +114,17 @@ const make = () => {
     showTab: (tab) => tabs.push(tab),
     focusSessionNote: () => {},
     chatMissedWhileHidden: () => missed.push(true),
-    forceReloadRequested: () => reloadAsked.push(FakeEventSource.last?.closed === true)
+    forceReloadRequested: () => reloadAsked.push(FakeEventSource.last?.closed === true),
+    /*
+      Records the message AND whether the stream was already closed when it arrived. That second
+      field is the whole point: the reference emits BEFORE disconnecting on a kick, the exact
+      opposite of `forceReload` above, so a test that only checked the message would pass against
+      either ordering.
+    */
+    kicked: (message: string) =>
+      kicked.push({ message, closedAlready: FakeEventSource.last?.closed === true })
   });
-  return { stream, missed, tabs, played, reloadAsked };
+  return { stream, missed, tabs, played, reloadAsked, kicked };
 };
 
 /** Read inside an effect root, mutate inside it, assert on the result outside. */
@@ -242,7 +251,8 @@ const hiddenTabStream = (missed: true[]) =>
     showTab: () => {},
     focusSessionNote: () => {},
     chatMissedWhileHidden: () => missed.push(true),
-    forceReloadRequested: () => {}
+    forceReloadRequested: () => {},
+    kicked: () => {}
   });
 
 describe('the two receivers reach the page', () => {

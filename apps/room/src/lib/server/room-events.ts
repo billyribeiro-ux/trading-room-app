@@ -228,7 +228,15 @@ export type RoomEvent =
    * per room, not per user; the client compares `targetUserId` against its own id, exactly as it
    * already does for `forceReload`.
    */
-  | { channel: 'privCmds'; data: { cmd: 'forceReload' | 'unmuteChat'; targetUserId?: number } };
+  /*
+    `privCmds` — addressed to ONE member. `msg` is optional because only `kickUser` carries one:
+    the reference's frame is `{cmd:"kickUser", msg}` and its receiver reads `xe.msg`, while
+    `forceReload` and `unmuteChat` carry nothing but the target.
+  */
+  | {
+      channel: 'privCmds';
+      data: { cmd: 'forceReload' | 'unmuteChat' | 'kickUser'; targetUserId?: number; msg?: string };
+    };
 
 type Subscriber = (event: RoomEvent) => void;
 
