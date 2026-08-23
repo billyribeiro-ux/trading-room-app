@@ -181,6 +181,149 @@ describe('every dispatched action has exactly one disposition', () => {
     ).toEqual([]);
   });
 
+  /**
+   * THE FOURTH DISPOSITION, which this file spent months insisting did not exist.
+   *
+   * ## What it missed, and how
+   *
+   * The docblock at the top says every action falls in exactly one of handled / alerted / inert and
+   * that "anything else fails". `kick` fell in none of them and passed anyway: it had a BRANCH, so
+   * `handledActions()` counted it, and that branch opened a prompt, closed the modal and alerted
+   * *"User kicked OK"* while sending nothing — because no kick command existed to send. A presenter
+   * clicked Kick, was told the person was gone, and the person stayed.
+   *
+   * A branch that raises a dialog and does not act is the fourth option. It is WORSE than `inert`,
+   * which at least stays silent, and worse than `alerted`, where the lie is at least tracked in
+   * `EXACT_ALERTS`. Counting it as `handled` is how six of them accumulated unseen.
+   *
+   * ## The rule
+   *
+   * A handled branch must ACT: reach a command, write state, or delegate to a method that does.
+   * Anything that only touches `#dialogs` / `#toasts` must be declared below with what is missing.
+   *
+   * ## Why a declared list rather than a cleverer scanner
+   *
+   * The same shape as `INERT_ACTIONS`: an entry is not permission, it is a record. Four of these
+   * five cannot be built today — `kick-duplicates` needs `emailHash` on a roster that carries only
+   * `{id, isP?}`, `admin-notes-password` needs `deleteAlertPW` to reach this room at all — and
+   * inventing behaviour for them is what this repository forbids. Writing them down is what stops
+   * a seventh joining them quietly.
+   *
+   * The probe that found them flagged SIX branches; three were false positives of its own marker
+   * list and were read before being believed. That is why this is a list of names rather than a
+   * heuristic left running: a heuristic that is right about five things and wrong about three is not
+   * a gate, it is a rumour.
+   */
+  /**
+   * NOTICES — a message ABOUT something the caller has already done or already refused.
+   *
+   * Deliberately separate from `DIALOG_ONLY_ACTIONS` below, which records LIES. These two are not
+   * the same thing and collapsing them would turn that list into a suppression file, which is
+   * exactly what this file's docblock says an entry must never be.
+   *
+   * `copied-to-clipboard` fires after the component has already copied; `invalid-restream-link`
+   * reports a validation the caller has already failed. Neither claims the room did something it
+   * did not. There is nothing for either to act on.
+   */
+  const NOTICE_ACTIONS: Readonly<Record<string, string>> = {
+    'copied-to-clipboard': 'the copy already happened in the component; this is the confirmation',
+    'invalid-restream-link': 'the caller already rejected the URL; this reports why'
+  };
+
+  const DIALOG_ONLY_ACTIONS: Readonly<Record<string, string>> = {
+    'kick-duplicates':
+      'alerts "No duplicates found for <nick>" HARDCODED, never reading a roster — needs emailHash on RosterAuthority',
+    'admin-notes-password':
+      'alerts "Wrong password!" HARDCODED, never comparing — needs sessData.deleteAlertPW delivered to the room',
+    'session-save-close-message':
+      'alerts "Message Saved" and writes nothing — needs somewhere to save it',
+    'session-send-sales-image':
+      'alerts "Command send OK." and sends nothing — shares a branch with the GENUINE session-send-video, which is what made it easy to miss',
+    'session-send-users-url':
+      'alerts "Command send OK." and sends nothing — same branch, same reason'
+  };
+
+  it('a handled branch that only raises a dialog is DECLARED, not silently counted as handled', () => {
+    /*
+      Reads each branch of the dispatch chain and asks whether it does anything beyond dialogs and
+      toasts. The markers are the ways this class acts: a server command, the managed lists, a
+      preference, a modal, a rename, a delegate method call, or writing its own selection state.
+    */
+    const session = readFileSync('src/lib/room/session-control.svelte.ts', 'utf8');
+    const source = readFileSync('src/lib/room/user-actions.svelte.ts', 'utf8');
+    const tail = source.indexOf('const fixedAlert = userActionAlert(action)');
+    const body = source.slice(0, tail) + session;
+
+    const ACTS = [
+      'this.#commands.',
+      'this.#managed.',
+      'this.#savePreference',
+      'this.#openModal',
+      'this.#mentionUser',
+      'this.#hidePreviewWindows',
+      'this.#reload',
+      'this.#clearSelectedMessage',
+      'this.#selected',
+      'this.#closeUserMenu',
+      'this.#announceThenSend',
+      'this.#updateUsername',
+      'this.#unmuteChat',
+      'this.muteAllNonAdmins',
+      'localStorage.setItem',
+      'playSoundEffect'
+    ];
+
+    const undeclared: string[] = [];
+    /*
+      TOP-LEVEL branches only — `\n    if (action === `, at four spaces.
+
+      Splitting on every `if (action === ` cut the `session-send-*` branch at its NESTED
+      `if (action === 'session-send-video')`, which put that branch's `localStorage.setItem` in a
+      different chunk from its header and reported working code as dialog-only. The instrument was
+      wrong, not the code; fixed here rather than by adding a true entry to the list below, which
+      would have buried a real defect under a false one.
+    */
+    const branches = body.split(/(?=\n {4}if \(action === ')/g).slice(1);
+    expect(
+      branches.length,
+      'the branch split matched nothing — this assertion would be vacuous'
+    ).toBeGreaterThan(10);
+
+    for (const branch of branches) {
+      if (ACTS.some((marker) => branch.includes(marker))) continue;
+      for (const name of [...branch.matchAll(/action === '([a-z0-9-]+)'/g)].map((m) => m[1])) {
+        if (name in DIALOG_ONLY_ACTIONS || name in NOTICE_ACTIONS) continue;
+        if (alerted.has(name) || inert.has(name)) continue;
+        undeclared.push(name);
+      }
+    }
+
+    expect(
+      [...new Set(undeclared)],
+      `These actions have a branch that raises a dialog and does NOTHING else — no command, no ` +
+        `state, no delegate. They are counted as "handled" and they are not: the control reports ` +
+        `success and the room does not move, which is the defect kick shipped with.\n  ` +
+        `${[...new Set(undeclared)].join('\n  ')}\n\nEither make it act, or add it to ` +
+        `DIALOG_ONLY_ACTIONS with what is missing.`
+    ).toEqual([]);
+  });
+
+  it('every DIALOG_ONLY_ACTIONS entry is real: dispatched, and still not acting', () => {
+    /*
+      The staleness half, matching what `INERT_ACTIONS` gets next door. An entry that has since been
+      wired must be DELETED from the list rather than left as a false accusation against working
+      code — the same direction `kick` travelled out of it.
+    */
+    const stale: string[] = [];
+    for (const name of Object.keys(DIALOG_ONLY_ACTIONS)) {
+      if (!dispatched.has(name))
+        stale.push(`${name} is declared dialog-only but nothing dispatches it`);
+      if (!handled.has(name))
+        stale.push(`${name} is declared dialog-only but has no branch at all`);
+    }
+    expect(stale, `Stale DIALOG_ONLY_ACTIONS entries:\n  ${stale.join('\n  ')}`).toEqual([]);
+  });
+
   it('every INERT_ACTIONS entry is still dispatched somewhere, and still unhandled', () => {
     /*
       The other direction, which is what stops this map becoming a graveyard. An entry for a control

@@ -33,6 +33,143 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-23 18:05 EDT — a forensic audit: four things I said did not exist, all of them do
+
+**Runtime impact: no.** No code changed. Four false claims of mine were corrected against the files.
+
+**Branch `feat/save-permissions`.**
+
+#### The claim, and why it was wrong
+
+I closed the previous report saying six TODO rows "cannot be fixed by me" because each needed
+something "that doesn't exist yet in this repo". The owner said it does exist and to audit end to
+end. **They were right, and the error has one cause: I searched `apps/room/src` and called the
+result the repository.** The controller owns room configuration and both database schemas.
+
+#### Four corrections
+
+**`emailHash` is on the roster, so `kick-duplicates` is buildable today.** I wrote that it needed
+`emailHash` added. `apps/room/src/lib/types.ts:58` declares `emailHash: string` on `User` and
+`+page.server.ts:318` fills it with `hashEmail(account.email)`. `RoomUserActions` already reads
+`this.#session().connectedUsers` at `user-actions.svelte.ts:265`, typed `readonly User[]`. What
+misled me was `RosterAuthority` — `{id, isP?}` — which is a **narrow local interface for
+`mute-all-non-admins`**, not the roster. I read one type and generalised from it.
+
+**`deleteAlertPW` exists.** I wrote it "appears nowhere in `apps/room/src`", which was true and
+irrelevant. `apps/controller/src/lib/room-settings-schema.ts:88` defines it with the label *"Delete
+Alert Password"* and the help *"If set, Presenters will need to enter the password to delete an
+alert"*, typed at `:385`, with a fixture at `room-config-boundary.test.ts:28`. It carries
+**`wired: false`**, which is why it does not reach the room — a deliberate gate, not an absence.
+
+**A ban store exists — twice.** I wrote that `kick-ban` needs "durable storage this room does not
+have". `apps/controller/src/lib/server/db/schema.ts:335` is
+`banned: boolean('banned').notNull().default(false)` on `room_users`, and the role model at `:322`
+reads *"0 owner · 1 presenter · 2 participant · 3 chat muted · 4 banned"*. A third exists on the
+entry path: `banIPList` and `isBannedIp()` at `room-entry.ts:197`, used at `:227`.
+
+**Two things really are absent**, and the audit is what makes that claim worth anything now:
+`refreshRoster` / `softReset` appear in neither `apps/controller/src` nor `services/**`, and
+`reAuthSessionTok` exists only in this repository's own comments about it.
+
+#### The lesson, and it is the session's third of this shape
+
+"X does not exist" is a claim about a search, not about a repository, and it is only as wide as the
+directory it ran in. The same error produced "no browser coverage" twice — once for the controller,
+once for the room — and both times the answer was in a directory I had not opened.
+
+### 2026-08-23 17:40 EDT — the fourth disposition is now a gate, and TODO is pruned to residue
+
+**Runtime impact: no.** A contract gained three assertions; `TODO.md` lost the rows that were done.
+
+**Branch `feat/save-permissions`.**
+
+#### The contract now asserts what it used to merely claim
+
+`user-action-disposition-contract.test.ts` opened with *"EVERY USER ACTION HAS A DISPOSITION, AND
+THERE IS NO FOURTH OPTION."* There was one, and it had six members. A branch that raises a dialog and
+does not act was counted as `handled` because a branch existed — which is how `kick` shipped telling
+presenters *"User kicked OK"* while sending nothing.
+
+It now reads each top-level branch and asks whether it does anything beyond dialogs and toasts. If
+not, the action must be declared in `DIALOG_ONLY_ACTIONS` with what is missing. A **staleness half**
+fails if a declared entry is later wired or stops being dispatched, so the list cannot rot into a
+suppression file — the same discipline `INERT_ACTIONS` carries next door.
+
+**Notices are a separate list.** `copied-to-clipboard` fires after the component has already copied;
+`invalid-restream-link` reports a validation the caller already failed. Neither claims the room did
+something it did not, and collapsing them into the liars' list would have been exactly the dilution
+this file forbids.
+
+#### The instrument was wrong before the code was
+
+The first run flagged `session-send-video`, which genuinely acts — it validates a URL, refuses a
+duplicate and writes `localStorage`. The splitter had cut that branch at its NESTED
+`if (action === 'session-send-video')`, separating the header from the work. **Fixed the instrument
+rather than adding a true entry to the list**, which would have buried a real defect under a false
+one. Splitting now anchors on the four-space indent of a top-level branch.
+
+#### Negative control, and the first attempt that did not count
+
+Removing `session-save-close-message` from the list must fail. The first attempt reported 11 passed —
+because prettier had reflowed the entry and my string match silently missed, so **the mutation never
+landed**. Re-run against the real lines it failed correctly: `expected [ 'session-save-close-message' ]
+to deeply equal []`. A negative control that was never applied is not a green result, it is no result.
+
+#### `TODO.md` pruned
+
+Eleven rows to ten, each cut to its residue rather than its history — the CHANGELOG holds the
+narrative now, and two places recording the same thing is how one goes stale. `askQuestion` is
+**deleted outright**: the reference has no mute gate on Q&A either, so ours is a match, not a gap.
+
+**Verified:** room `vitest` **2,638 passed / 188 files**; `svelte-check` **0 errors, 0 warnings**;
+`eslint` clean; the new assertion's negative control seen RED and restored.
+
+### 2026-08-23 17:15 EDT — `kick` was not alone: five more controls report success and do nothing
+
+**Runtime impact: no.** No code changed. Five defects of the same class are now written down with the
+line each was read at.
+
+**Branch `feat/save-permissions`.** `TODO.md` row 8, new.
+
+#### Asking the gate's question by hand
+
+`kick` hid in the `handled` bucket because a branch existed. If that hole let one through, it can let
+others through, so the question was asked of every branch: **does this actually act?**
+
+A probe over the dispatch body flagged six branches with no acting marker. **Three were false
+positives of my own marker list**, and each was read before being believed — `copied-to-clipboard`
+and `invalid-restream-link` are notices about something the caller has already done, and
+`mute-all-non-admins` calls `this.muteAllNonAdmins()`, a real method my marker list simply did not
+name. A probe is not a finding.
+
+#### The five that survived reading
+
+| control | what it says | what it does |
+| --- | --- | --- |
+| `kick-duplicates` | `"No duplicates found for <nick>"` | **hardcoded** — never looks at a roster |
+| `admin-notes-password` | `"Wrong password!"` | **hardcoded** — never compares anything |
+| `session-save-close-message` | `"Message Saved"` | writes nothing |
+| `session-send-sales-image` | `"Command send OK."` | sends nothing |
+| `session-send-users-url` | `"Command send OK."` | sends nothing |
+
+The last two are the instructive ones. They share a branch with `session-send-video`, which is
+**genuine** — it validates the URL, reads the stored list, refuses a duplicate and writes
+`localStorage`. Its two siblings fall past all of that to `closeModal()` and `'Command send OK.'`.
+A reader checking that branch sees real work and moves on.
+
+#### Why this is one finding and not five
+
+Each is small. Together they are the shape of a gate that measures the wrong thing:
+`user-action-disposition-contract.test.ts` sorts actions into handled / alerted / inert and states
+there is *"no fourth option"*. **There is, and it now has five members plus the `kick` that was fixed
+this afternoon.** Until that contract asserts a `handled` branch must reach a command or write state,
+every one of these counts as done.
+
+Not fixed here, deliberately: four of the five need a wire or a store that does not exist
+(`kick-duplicates` needs the roster's `emailHash`, `admin-notes-password` needs `deleteAlertPW` to
+reach the room), and inventing behaviour for them is what this repository forbids. What is buildable
+first is the contract.
+
 ### 2026-08-23 16:55 EDT — `kick` sends for the first time; `kick-ban` becomes honestly inert
 
 **Runtime impact: YES.** A presenter's Kick now removes the person. It previously said it had and did
