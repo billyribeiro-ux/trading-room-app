@@ -474,6 +474,14 @@ export class RoomUserActions<
    * for anyone who bothered to look, and nobody did; that is the same silent success this whole
    * path was built to fix. `chat-mute.remote.ts` carries the rest of the reasoning.
    */
+  /** Raise the captured alert, fire the command, and replace the alert only if it refuses. */
+  #announceThenSend(alert: string, send: () => Promise<unknown>): void {
+    this.#dialogs.alert = alert;
+    void send().catch(() => {
+      this.#dialogs.alert = 'Command failed.';
+    });
+  }
+
   async #unmuteChat(user: ModalTargetUser) {
     await this.#commands.unmuteChat({ targetUserId: user.id });
     await this.#reload();
@@ -707,34 +715,24 @@ export class RoomUserActions<
     }
 
     /*
-      Ahead of `userActionAlert` below because this one sends something — see `EXACT_ALERTS` in
-      `user-action-intent.ts` for why leaving it in that table was the bug. The alert is raised
-      first because the reference raises it immediately; `Command failed.` is inherited from the
-      sibling handlers in this file, not captured, because the reference never showed us a failure
-      for this control.
+      THE TWO CONTROLS THAT ACTUALLY SEND, ahead of the alert tail because they do.
+
+      Both were keys of `EXACT_ALERTS` once, and in both cases their presence in that table WAS the
+      bug — see `user-action-intent.ts` for each. They are written through one helper rather than
+      twice, which is this module's own argument applied to itself: the invariant is declared once
+      and both callers use it, so the two cannot drift the way the mute check did between
+      `sendMessage` and `replyMessage`.
+
+      The alert is raised BEFORE the command resolves because the reference raises it immediately.
+      `Command failed.` is inherited from the sibling handlers here, not captured — the reference
+      never showed us a failure for either control.
     */
     if (action === 'unmute-chat') {
-      this.#dialogs.alert = 'user chat unmuted';
-      void this.#unmuteChat(user).catch(() => {
-        this.#dialogs.alert = 'Command failed.';
-      });
+      this.#announceThenSend('user chat unmuted', () => this.#unmuteChat(user));
       return;
     }
-
-    /*
-      Ahead of the alert tail because this one SENDS — the same position, and the same reason, as
-      `unmute-chat` directly above. `force-reload` was a key of `EXACT_ALERTS` until 2026-08-23,
-      raising "Reload request sent OK" over a wire that already existed and that nothing called.
-
-      The alert is raised first because the reference raises it immediately; `Command failed.` is
-      inherited from the sibling handlers here, not captured, because the reference never showed us
-      a failure for this control.
-    */
     if (action === 'force-reload') {
-      this.#dialogs.alert = 'Reload request sent OK';
-      void this.#commands.forceReload(user.id).catch(() => {
-        this.#dialogs.alert = 'Command failed.';
-      });
+      this.#announceThenSend('Reload request sent OK', () => this.#commands.forceReload(user.id));
       return;
     }
 
