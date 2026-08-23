@@ -1056,6 +1056,30 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     why: 'everything that leaves the browser as content; five entry points, one refusal path'
   },
   {
+    file: 'lib/room/managed-users.svelte.ts',
+    /*
+      Born capped, 2026-08-23, and born for the reason this contract exists.
+
+      Wiring `test-follow-sound` — the one inert control that needed no server — put
+      `user-actions.svelte.ts` at 814 lines against 775. The owner ruled extraction rather than a
+      raise, which is what this file's own failure message asks for and what the Phase 5 plan says:
+      the answer to an overrun is another extraction, never a shortened comment, never a raised
+      number.
+
+      The seam is the viewer/server line, not a convenient cut. The muted and followed lists are
+      LOCAL: they never reach the server, they are not room settings, and `localStorage` is the only
+      reason they survive a reload. Everything else `RoomUserActions` does ends in a command. That
+      also matches the reference, which reaches these through `addUserToList` / `removeUserFromList`
+      rather than `sendServerAdminCommand`.
+
+      175 against an actual of 175 would leave no room to explain the next thing learned about these
+      lists, and the SLACK check refuses a ceiling far above the actual — so this is deliberately
+      close.
+    */
+    max: 185,
+    why: 'the two viewer-local chat lists, muted and followed; localStorage in, localStorage out, no server'
+  },
+  {
     file: 'lib/room/session-control.svelte.ts',
     /*
       Born capped, 2026-08-23, as the destination of an extraction rather than a new feature.

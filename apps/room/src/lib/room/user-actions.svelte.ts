@@ -8,6 +8,7 @@ import {
   nonAdminTalkingUsers
 } from '#lib/mute-all-non-admins.js';
 import type { RoomPermissionKey } from '#lib/permission-keys.js';
+import { playSoundEffect } from '#lib/sound-effects.js';
 import type { FollowChatStyle, ManagedChatUser, ModalName, ModalTargetUser } from '#lib/types.js';
 import {
   MISSING_SCHEME_ALERT,
@@ -17,6 +18,7 @@ import {
 } from '#lib/user-action-intent.js';
 
 import type { RoomDialogs } from './dialogs.svelte';
+import { RoomManagedUsers } from './managed-users.svelte';
 import { RoomSessionControl } from './session-control.svelte';
 import type { RoomToasts } from './toasts.svelte';
 
@@ -129,12 +131,17 @@ export class RoomUserActions<
   readonly #closeModal: () => void;
   readonly #closeUserMenu: () => void;
   readonly #mentionUser: (name: string) => void;
-  readonly #defaultFollowStyle: () => FollowChatStyle;
   readonly #clearSelectedMessage: () => void;
   readonly #hidePreviewWindows: () => void;
   readonly #reload: () => Promise<void>;
-  #mutedUsers: Record<string, ManagedChatUser>;
-  #followedUsers: Record<string, ManagedChatUser>;
+  /*
+    The two viewer-local lists moved to `RoomManagedUsers` on 2026-08-23, under the owner's ruling
+    that a file over its ceiling is extracted rather than raised. The getters below still expose
+    them from here because `ModalHost` reads them through this object and re-pointing every call
+    site would be a wider change than the extraction itself — and because a `$derived` read through
+    a getter is the same signal read, so nothing is lost.
+  */
+  readonly #managed: RoomManagedUsers;
   #selectedUserId: number | null;
   #selectedMessageUser: ModalTargetUser | null;
 
@@ -190,14 +197,11 @@ export class RoomUserActions<
     this.#closeModal = options.closeModal;
     this.#closeUserMenu = options.closeUserMenu;
     this.#mentionUser = options.mentionUser;
-    this.#defaultFollowStyle = options.defaultFollowStyle;
     this.#clearSelectedMessage = options.clearSelectedMessage;
     this.#hidePreviewWindows = options.hidePreviewWindows;
     this.#reload = options.reload;
 
-    this.#mutedUsers = $state.raw<Record<string, ManagedChatUser>>({});
-
-    this.#followedUsers = $state.raw<Record<string, ManagedChatUser>>({});
+    this.#managed = new RoomManagedUsers(options.defaultFollowStyle);
 
     this.#selectedUserId = $state<number | null>(null);
 
@@ -205,11 +209,11 @@ export class RoomUserActions<
   }
 
   get mutedUsers() {
-    return this.#mutedUsers;
+    return this.#managed.mutedUsers;
   }
 
   get followedUsers() {
-    return this.#followedUsers;
+    return this.#managed.followedUsers;
   }
 
   get selectedUserId() {
@@ -318,96 +322,40 @@ export class RoomUserActions<
     this.#mentionUser(user.displayName);
   }
 
-  #readManaged(key: 'mutedUsers' | 'followedUsers') {
-    if (typeof localStorage === 'undefined') return {};
-    try {
-      const stored = localStorage.getItem(key);
-      if (!stored) return {};
-      const parsed = JSON.parse(stored);
-      return parsed && typeof parsed === 'object'
-        ? (parsed as Record<string, ManagedChatUser>)
-        : {};
-    } catch {
-      return {};
-    }
-  }
-
+  /** Called once on mount by `+page.svelte`. Both lists come back, or both come back empty. */
   loadManaged() {
-    this.#mutedUsers = this.#readManaged('mutedUsers');
-    this.#followedUsers = this.#readManaged('followedUsers');
+    this.#managed.load();
   }
 
-  #storeManaged(key: 'mutedUsers' | 'followedUsers', users: Record<string, ManagedChatUser>) {
-    if (typeof localStorage !== 'undefined') {
-      localStorage.setItem(key, JSON.stringify(users));
-    }
-  }
-
-  #applyFollowToggle(user: ModalTargetUser) {
-    const next = { ...this.#followedUsers };
-    if (next[user.emailHash]) {
-      delete next[user.emailHash];
-    } else {
-      next[user.emailHash] = {
-        nick: user.nick,
-        emailHash: user.emailHash,
-        pic: user.pic,
-        userXrefID: user.userXrefID,
-        _id: user._id,
-        followChatStyle: this.#defaultFollowStyle()
-      };
-    }
-    this.#followedUsers = next;
-    this.#storeManaged('followedUsers', next);
-  }
-
+  /**
+   * `saveFollowChatStyle` — kept on THIS object because `RoomOverlays.svelte:560` calls it here.
+   *
+   * A one-line delegate rather than a re-pointed call site: the extraction that moved the storage
+   * was about a ceiling, and widening it into every consumer would have made a bookkeeping change
+   * into a behavioural one.
+   */
   applyFollowStyle(user: ModalTargetUser, style: FollowChatStyle) {
-    const existing = this.#followedUsers[user.emailHash];
-    if (!existing) return;
-    const next = {
-      ...this.#followedUsers,
-      [user.emailHash]: {
-        ...existing,
-        followChatStyle: { ...style }
-      }
-    };
-    this.#followedUsers = next;
-    this.#storeManaged('followedUsers', next);
-  }
-
-  #applyMuteToggle(user: ModalTargetUser) {
-    const next = { ...this.#mutedUsers };
-    if (next[user.emailHash]) {
-      delete next[user.emailHash];
-    } else {
-      next[user.emailHash] = {
-        nick: user.nick,
-        emailHash: user.emailHash,
-        pic: user.pic
-      };
-    }
-    this.#mutedUsers = next;
-    this.#storeManaged('mutedUsers', next);
+    this.#managed.applyFollowStyle(user, style);
   }
 
   requestFollowToggle(user: ModalTargetUser) {
     this.#dialogs.confirmation = {
-      message: `Do you want to ${this.#followedUsers[user.emailHash] ? 'un' : ''}follow ${user.nick}?`,
+      message: `Do you want to ${this.#managed.isFollowed(user.emailHash) ? 'un' : ''}follow ${user.nick}?`,
       className: 'manage-user-list',
       onconfirm: () => {
         this.#dialogs.confirmation = null;
-        this.#applyFollowToggle(user);
+        this.#managed.applyFollowToggle(user);
       }
     };
   }
 
   requestMuteToggle(user: ModalTargetUser) {
     this.#dialogs.confirmation = {
-      message: `Do you want to ${this.#mutedUsers[user.emailHash] ? 'un' : ''}mute ${user.nick}?`,
+      message: `Do you want to ${this.#managed.isMuted(user.emailHash) ? 'un' : ''}mute ${user.nick}?`,
       className: 'manage-user-list',
       onconfirm: () => {
         this.#dialogs.confirmation = null;
-        this.#applyMuteToggle(user);
+        this.#managed.applyMuteToggle(user);
       }
     };
   }
@@ -465,11 +413,7 @@ export class RoomUserActions<
       className: 'manage-user-list',
       onconfirm: () => {
         this.#dialogs.confirmation = null;
-        const next = { ...(list === 'mutedUsers' ? this.#mutedUsers : this.#followedUsers) };
-        delete next[user.emailHash];
-        if (list === 'mutedUsers') this.#mutedUsers = next;
-        else this.#followedUsers = next;
-        this.#storeManaged(list, next);
+        this.#managed.remove(list, user.emailHash);
       }
     };
   }
@@ -728,6 +672,44 @@ export class RoomUserActions<
     }
     if (action === 'force-reload') {
       this.#announceThenSend('Reload request sent OK', () => this.#commands.forceReload(user.id));
+      return;
+    }
+
+    /*
+      `test-follow-sound` — WIRED 2026-08-23, and the sound is `pling` because the reference says so.
+
+      This sat in `INERT_ACTIONS` reading *"which sound the reference plays here is not evidenced"*.
+      It is evidenced. The method is `testFollowChatSound`, which is why three sessions of searching
+      for `testFollowSound` / `followSound` / `Follow Sound` found nothing — the word `Chat` sits in
+      the middle of the name. At byte 2075886 of `docs/source-v4-2026-08-15/main.d1d09071be31f1ba.js`:
+
+        testFollowChatSound(){
+          return this.followChatStyle.playSound && this.soundEffectsService.pling.play(), !1
+        }
+
+      `pling` is already in `SOUND_EFFECT_SOURCES` and `static/assets/sound/pling.{mp3,ogg}` are
+      already on disk, so nothing new is downloaded, added or guessed.
+
+      ## Why there is no `playSound` re-check here, and why that is not a weakening
+
+      The reference guards twice: once on the button — `z("disabled", !e.followChatStyle.playSound)`
+      — and once inside the method. Ours already carries the first, at `ModalHost.svelte:2547`
+      (`disabled={!followChatStyle.playSound}`), against the same flag, with the same two titles
+      (`'Chat sound is on.'` / `'Chat sound is off.'`) and the same `fa-volume-up` / `fa-volume-mute`
+      swap the reference binds beside it.
+
+      The second guard cannot be reproduced without widening the dispatcher: `handle(action, user)`
+      carries no payload, and the style being tested is the LIVE, possibly-unsaved one held in the
+      modal — not `#followedUsers[emailHash].followChatStyle`, which is the SAVED one and would be
+      the wrong value to test. `saveCustomPerms` is a prop for exactly this reason and says so.
+      Reading the saved style here would look faithful and be wrong; a disabled button that cannot
+      be clicked is faithful and right.
+
+      It is the only one of the eleven inert controls that needed no server, which is why it is the
+      only one being built today.
+    */
+    if (action === 'test-follow-sound') {
+      playSoundEffect('pling');
       return;
     }
 

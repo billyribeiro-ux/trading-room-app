@@ -33,6 +33,72 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-23 15:20 EDT — `test-follow-sound` wired, `get-my-token` evidenced, and a ceiling answered by extraction
+
+**Runtime impact: YES, one control.** `test-follow-sound` played nothing and now plays `pling`. The
+other ten inert controls are unchanged.
+
+**Branch `feat/save-permissions`.**
+
+#### The name is why three searches failed
+
+`INERT_ACTIONS` said *"which sound the reference plays here is not evidenced"*. It is, at byte
+2075886 of the v4 bundle:
+
+```js
+testFollowChatSound(){ return this.followChatStyle.playSound && this.soundEffectsService.pling.play(), !1 }
+```
+
+The method is **`testFollowChatSound`** — `Chat` sits in the middle of the name, which is why
+`testFollowSound`, `followSound`, `Follow Sound` and `playSound(` all returned nothing. It was found
+by reading the button's create block instead: `d(42,"button",122), x("click", … testFollowChatSound())`.
+
+`pling` was already in `SOUND_EFFECT_SOURCES` and `static/assets/sound/pling.{mp3,ogg}` were already
+on disk. Nothing new was added, downloaded or guessed.
+
+**One guard, not two, and that is deliberate.** The reference guards on the button
+(`z("disabled", !e.followChatStyle.playSound)`) and again inside the method. Ours already carries the
+first at `ModalHost.svelte:2547`, against the same flag, with the same two titles and the same
+`fa-volume-up`/`fa-volume-mute` swap. The second cannot be reproduced without widening
+`handle(action, user)`, and the style being tested is the LIVE unsaved one — reading the SAVED
+`#followedUsers[…].followChatStyle` instead would look faithful and be wrong.
+
+#### `get-my-token` is now evidenced, and still inert
+
+The row said the token "is not evidenced anywhere read so far". At byte 2255348 it is, and the answer
+is **both** identifiers: a `"Session Information"` bootbox with `globals.sessionID` in a readonly
+`#sessionId` and `globals.sesionToken` (the reference's own one-`s` global) in a readonly
+`#sessionToken`, each beside a `<i class="fas fa-copy"></i> Copy` button, over one `"Close"`. Two
+things recorded for whoever builds it: the reference copies via an inline `onclick` calling
+`navigator.clipboard.writeText` then a bare `alert(...)`, which this repository forbids; and the menu
+label is `" Get my token "`, lower-case.
+
+#### The ceiling was answered by extraction, on the owner's ruling
+
+Wiring the handler put `user-actions.svelte.ts` at **814 against 775**. Asked rather than assumed —
+the standing instruction is to ask every time — and the owner chose extraction, which is what this
+repository's own failure message asks for and what the Phase 5 plan says: the answer to an overrun is
+another extraction, never a shortened comment and never a raised number.
+
+`lib/room/managed-users.svelte.ts` now owns the muted and followed lists. The seam is the
+viewer/server line: both lists are local, never reach the server, are not room settings, and survive
+a reload only because `localStorage` holds them — while everything else `RoomUserActions` does ends
+in a command. The reference draws the same line, reaching these through `addUserToList` /
+`removeUserFromList` rather than `sendServerAdminCommand`.
+
+**A real asymmetry was preserved rather than tidied.** A muted entry stores no `userXrefID` and no
+`_id`; a followed entry stores both. `openManagedInfo` depends on exactly that, refusing with *"User
+is not logged in."* when they are absent. I copied the follow shape into the mute path first and
+caught it by re-reading the original before running anything.
+
+**Three catalog gates fired, each as designed** — the size contract demanded a ceiling entry for the
+new module, `unbound-method-contract` demanded the class be registered, and the disposition contract
+demanded a real handler the moment the `INERT_ACTIONS` entry was deleted. None was worked around.
+
+**Verified:** room `vitest` **2,634 passed / 188 files**; `svelte-check` **0 errors, 0 warnings**;
+`eslint` clean on all three touched files; `user-actions.svelte.ts` **751 lines against 775, under
+its unchanged ceiling**.
+
 ### 2026-08-23 14:35 EDT — the capture was in the repository all along, and six "no evidence" rows were wrong
 
 **Runtime impact: no.** No code changed. What changed is that six rows which said their evidence did

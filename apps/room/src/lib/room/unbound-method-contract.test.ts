@@ -21,6 +21,7 @@ import { RoomScrollFollow } from './scroll-follow';
 import { RoomWebcams } from './webcams';
 import { RoomWindowHandlers } from './window-handlers';
 import { RoomScreens } from './screens.svelte';
+import { RoomManagedUsers } from './managed-users.svelte';
 import { RoomSessionControl } from './session-control.svelte';
 import { RoomUserActions } from './user-actions.svelte';
 import { RoomChat } from './chat.svelte';
@@ -90,6 +91,7 @@ const INSTANCES: Record<string, new (...args: never[]) => object> = {
   mediaTransport: RoomMediaTransport,
   recording: RoomRecording,
   roomEvents: RoomEventStream,
+  managedUsers: RoomManagedUsers,
   sessionControl: RoomSessionControl,
   userActions: RoomUserActions,
   gates: RoomGates,
