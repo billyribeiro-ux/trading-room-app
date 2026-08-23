@@ -33,6 +33,142 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-23 09:51 EDT — eleven presenter controls were dead, not three: the dispatch surface is now deny-by-default
+
+**Runtime impact: no behaviour changed.** Eleven controls that did nothing still do nothing. What
+changed is that a twelfth can no longer be added silently, and that all eleven are now written down
+with the reason each cannot be wired.
+
+**I reported three yesterday and that was an undercount.** I had checked only the three names an
+audit handed me. Diffing the whole surface — every `onUserAction('…')` string against every branch in
+`RoomUserActions.handle` and every key of `EXACT_ALERTS` — gives **42 dispatched, 27 handled, 5
+alerted, 11 reaching nothing**. `TODO.md` knew two. **Nine had never been recorded anywhere**: no
+row, no test, no comment. Corrected in the tracker rather than left standing.
+
+The nine: `stop-screens`, `restart-screens`, `start-recording`, `stop-recording`, `mute-mic`,
+`mute-camera`, `disable-private-chat`, `get-my-token`, `test-follow-sound` — all in
+`ModalHost.svelte:2253-3075`.
+
+**Why it is invisible.** `ModalHost` dispatches actions as STRINGS. Nothing connects the string to a
+handler — not the compiler, not a type, not the build — and `handle()` ends on a bare
+`if (fixedAlert)` with **no `else`**, so an action nobody wrote a branch for returns having done
+nothing: no command, no toast, no error, nothing in the console. Each call site looks perfectly
+correct; the absence is in another file. Same shape as `presenterCommand`, which shipped dead for
+three commits, and `forceReload`, which still has both ends and zero call sites.
+
+**None of the eleven can be wired today, and that was checked rather than assumed.** Searching
+`src/routes` and `src/lib/server` for each name returns **zero files** — there is no server half to
+connect. Each needs the reference's captured wire protocol or an infrastructure decision (recording
+is MediaMTX, `TODO.md` rows X and AC). Inventing either is what this repository forbids, so the
+honest deliverable is the gate, not eleven guesses.
+
+**The implementation: deny-by-default disposition.** `INERT_ACTIONS` in `user-action-intent.ts`
+names each silent control with a reason and a `file:line`; `user-action-disposition-contract.test.ts`
+requires **every** dispatched action to be handled, alerted, or listed there. A twelfth fails the
+suite. Wiring one means deleting its entry — at which point the gate demands a real handler, so the
+map cannot drift out of step with the code in either direction. It additionally refuses dispatch by a
+COMPUTED name, the hole no enumeration could see and the defect `TODO.md` row AG calls the worst form.
+
+**An `INERT_ACTIONS` entry is not permission for a control to be dead.** It is a record that it IS
+dead and why. The entries are a to-do list with evidence attached, not a suppression file, and the
+row in `TODO.md` says so in those words.
+
+**Verified.** Room **2,572 tests / 184 files**, `svelte-check` **1,225 files, 0 errors, 0 warnings**,
+`eslint` and `prettier` clean. Nine cases in the new contract, of which the runtime half executes
+`handle()` for every inert action and asserts no dialog, no toast, no command — behind **two positive
+controls** (a handled action must still move something; an alerted one must still raise its alert),
+because eleven "nothing happened" assertions all pass against a broken harness.
+
+**Negative-controlled three ways, each red on its own assertion and green on restore:** a twelfth
+dead control added to `ModalHost` → *no action is dispatched into the void*; `mute-mic` wired without
+removing its entry → three assertions including the runtime one; a reason replaced by `'TODO'` →
+*every inert entry carries a real reason*.
+
+**One instrument bug of mine, caught by the gate's own first run.** The scanner read the whole of
+`user-actions.svelte.ts` and reported `save-permissions` as "handled AND alerted" — an overlap that
+does not exist. `action === 'save-permissions'` sits INSIDE the `if (fixedAlert)` block, where it
+closes the modal on the alert path; it is not a handler branch. The scanner now stops at the alert
+tail and its docblock says why, because that distinction is what makes the three buckets mean what
+they say.
+
+### 2026-08-23 09:41 EDT — TODO.md audited against the repository: every checkable claim re-read, one row closed, three dead controls found that nothing had recorded
+
+**Runtime impact: no.** `TODO.md` only. No source behaviour changed; the corrections below are to the
+tracker, and the one row removed was already marked CLOSED.
+
+Eight sections of `TODO.md` were checked by OPENING every file they cite, then each "this is
+finished" verdict was put to a pass whose only job was to refute it — the same method the 2026-08-17
+audit used, and for the same reason: that pass previously overturned ten of sixteen.
+
+**A row came OUT.** Row **AH** (the slice-anchor sweep) carried severity `CLOSED — the gate exists`.
+Verified before deleting rather than after: `apps/room/src/lib/slice-anchor-contract.test.ts` exists
+and its three cases pass. `TODO.md`'s own header says a section that is not something somebody still
+has to DO does not belong in it, so it is gone; `CHANGELOG.md` holds its history.
+
+**THREE DEAD CONTROLS THAT NOTHING HAD RECORDED — the only genuinely new finding, and it is work,
+not progress.** `restart-screens` (`ModalHost.svelte:2272`), `start-recording` (`:2279`) and
+`stop-recording` (`:2285`) each dispatch `onUserAction(...)`, and each of those strings occurs
+**exactly once in the whole of `apps/room/src`** — at its own `onclick`. No branch in
+`RoomUserActions.handle`, no key in `EXACT_ALERTS`, and `handle()` ends on a bare `if (fixedAlert)`
+with **no fallback**, so an unrecognised action returns having done nothing at all: no command, no
+toast, not even an error. They are counted apart from row W's twelve, which at least lie; these are
+silent. Zero occurrences of any of the three in `TODO.md` before today.
+
+**Row AE was stale in every number it carried**, which is precisely the failure that row warns about
+in its own text. `source-size-contract.test.ts` holds **44** ceiling entries over **201** cases, not
+37 over 181. **Nineteen** test files render a component, not thirteen — eight by client `mount`,
+eleven by `render` from `svelte/server` — and only two of those parse with `parse5`, so "parsed via
+parse5" was over-general even at nine.
+
+**And one sentence in it had to be DELETED rather than corrected.** Row AE claimed `AlertChatArea`
+could not be tested because jsdom reports `scrollHeight`/`offsetHeight` as `0` — "a real limit rather
+than a backlog item". The repository refutes it in writing: `AlertChatArea.svelte.test.ts:8-25` says
+the behaviour "was written down as blocked on an instrument limit" and that "the 'needs Playwright'
+note was pessimism". A tracker that declares a closed gap impossible is worse than one that omits it.
+Of the four components that row listed as having no render test, **only `RoomNavbar` still has
+neither** — and `PresentationArea` is covered by `main-tab-strip-contract.test.ts`, which is why a
+scan by FILENAME misses it. That mattered: a filename heuristic nearly deleted a gap that was real
+and kept one that was not.
+
+**Two grant sites were missing from the role-retirement row**, found by re-reading every migration
+for `GRANT … ptr_clone_app`: `0003_room_events.sql:106` and `0004_list_memberships.sql:55`. That row
+exists to send whoever writes the retirement migration to every place a privilege is held, so an
+incomplete list is the one defect it cannot afford.
+
+**Four citations had drifted and are re-pointed**, each verified by opening the file:
+`RoomOverlays.svelte:255` → `:562` (that file was edited on 2026-08-20; the citation has now drifted
+three times, so the row says to cite the symbol instead), `+page.server.ts:628-640` → `:646-658` (the
+old range was the explanatory comment above the `chatMutedTill` query, not the query),
+`focus-on-screen-contract.test.ts:12` → `:13`, and the `audit-feature-coverage.mjs` row, which called
+it "one of the 30" in two places — it is a **31st** untracked script and no `package.json` entry
+names it, so "the other 29" was wrong twice over. The privacy-baseline sentence read "Two baseline
+lines" while naming three files in the same breath; it is three.
+
+**What was checked and found STILL TRUE, so it stays** — recorded because "audited and unchanged" is
+a result: `apps/room/scripts` holds 0 tracked files against 78 at `be239b2` on a `PUBLIC` repository;
+**exactly 30** `package.json` entries name untracked files (31 references — `capture:states` names
+two); the highest migration is `0009_provision_tradingroom_app.sql` and no migration contains
+`DROP ROLE` or `REASSIGN OWNED`; the `focusOnSessionNote` pair still brings nobody, with
+`NoteEditor.svelte:583`, `NoteTabContent.svelte:104`, `NotesPane.svelte:316` and `:343` all exact and
+`selectNote`'s body still two assignments; `+page.server.ts` exports **19** actions and `forceReload`
+still has zero call sites; `EXACT_ALERTS` holds exactly the five entries row W names, at
+`user-action-intent.ts:71-77`.
+
+**The tally sentence was NOT touched.** `evidence-gap-register-counts.test.ts:36` reads `TODO.md` and
+requires `**68 CLOSED, 5 OPEN, 14 parked/won't-fix, 87 total.**` in that exact shape, recounted live
+from the register. It is the only test that reads the file — checked, rather than assumed, across all
+19 test files that mention it — and its four cases pass unchanged.
+
+**A second problem from the same ignore rule, unmeasured until now: `apps/room/scripts` holds 146
+files on disk against 0 tracked and 78 at `be239b2`.** The rule is the bare directory line
+`/apps/room/scripts/` at `.gitignore:176`, so every script written since the 2026-08-15 eviction has
+gone into a directory git cannot see — nearly doubling the surface with no review, no CI and no
+privacy scan. The eviction row is about 78 files already published; this is about 68 more nobody
+has ever looked at, and it grows on its own.
+
+**Verified.** Controller **997 tests / 96 files**, room **2,562 tests / 183 files**, and the
+TODO-reading gate green after every edit.
+
 ### 2026-08-20 10:22 EDT — the caption transcript had never scrolled: an attachment's deps were one closure too deep
 
 **Runtime impact: yes.** Closed captions in history mode now follow their tail. They never had.

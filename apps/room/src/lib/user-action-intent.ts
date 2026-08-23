@@ -83,3 +83,79 @@ export function userActionAlert(action: string): string | null {
 
 /** The actions still stuck at "reports success, sends nothing". Exported so the test can count them. */
 export const TOAST_ONLY_ACTIONS: readonly string[] = Object.keys(EXACT_ALERTS);
+
+/*
+  ── THE THIRD DISPOSITION: controls that are SILENT ──────────────────────────────────────────────
+
+  `EXACT_ALERTS` above is the "reports success, sends nothing" family — controls that LIE. This is the
+  quieter family beside it: controls that do not even lie. They dispatch an action string that
+  `RoomUserActions.handle` has no branch for and this file has no entry for, and `handle` ends on a
+  bare `if (fixedAlert)` with **no fallback**, so the call returns having done nothing at all. No
+  command, no toast, no error, nothing in the console.
+
+  ## Why this map exists rather than a comment
+
+  Eleven of them were live on 2026-08-23 and **nine had never been recorded anywhere** — not in
+  `TODO.md`, not in a test, not in a comment. They were found by diffing every `onUserAction('…')`
+  string in the source against every branch in `handle` and every key above; nobody can find that
+  class by eye, and nobody had. `user-action-disposition-contract.test.ts` now makes it impossible to
+  add a twelfth silently: every dispatched action must be handled, alerted, or named HERE with a
+  reason, and the test goes red otherwise. Deny by default.
+
+  ## What an entry means, and what it does NOT mean
+
+  An entry is **not** permission for a control to be dead. It is a record that the control is dead,
+  why it cannot currently be otherwise, and what would unblock it. Removing an entry is how you
+  declare a control fixed — and the test then requires it to actually be handled.
+
+  **None of these eleven has a server half.** Verified 2026-08-23 by searching `src/routes` and
+  `src/lib/server` for each name: zero files. So none can be wired by connecting an existing endpoint;
+  each needs either the reference's captured wire protocol or an infrastructure decision, and this
+  repository forbids inventing either. That is the honest reason they are all still here.
+*/
+export const INERT_ACTIONS: Readonly<Record<string, string>> = {
+  /*
+    The four media controls in the user-info modal's presenter column, `ModalHost.svelte:2253-2272`.
+    The reference drives a peer's capture from the server; this room has no such command, and
+    inventing one would let any presenter silence a member with no server-side authority check —
+    exactly the 2026-08-07 escalation shape. Needs the captured wire protocol first.
+  */
+  'mute-mic':
+    'ModalHost.svelte:2253 — no wire captured; a peer-capture command needs server authority',
+  'mute-camera':
+    'ModalHost.svelte:2259 — no wire captured; same server-authority requirement as mute-mic',
+  'stop-screens':
+    'ModalHost.svelte:2265 — no wire captured. NOTE: distinct from RoomScreens.stop(), which is an HONEST PARTIAL for your OWN screen; this button targets somebody else',
+  'restart-screens': 'ModalHost.svelte:2272 — no wire captured; the restart half was never ported',
+
+  /*
+    Recording is not a room feature in this product — the reference hands it to MediaMTX, and the
+    room only asks the server to record. `TODO.md` rows X and AC hold the detail: there is no room
+    code waiting to be written, there is a host waiting to be stood up.
+  */
+  'start-recording': 'ModalHost.svelte:2279 — blocked on a MediaMTX host (TODO rows X and AC)',
+  'stop-recording': 'ModalHost.svelte:2285 — blocked on a MediaMTX host (TODO rows X and AC)',
+
+  /*
+    `getDebugLog` and `setUserProfilePic` are the two this class was already known by — `TODO.md`
+    records both under "DEAD CONTROLS". Their modals exist and are unreachable: nothing ever sets
+    `name === 'debug'`, and nothing ever fills `debugLogModalTxt`.
+  */
+  'debug-log':
+    'ModalHost.svelte:2306 — no handler; its modal at :3844 is unreachable and nothing fills debugLogModalTxt',
+  'upload-profile-picture':
+    'ModalHost.svelte:2379 — no handler and no upload target (TODO: setUserProfilePic)',
+
+  /*
+    Three more found in the same 2026-08-23 diff, none previously recorded.
+  */
+  'disable-private-chat':
+    'ModalHost.svelte:2373 — no wire captured; the per-user private-chat gate was never ported',
+  'get-my-token':
+    'ModalHost.svelte:3075 — no handler; what token it should show is not evidenced anywhere read so far',
+  'test-follow-sound':
+    'ModalHost.svelte:2505 — no handler. The ONLY one of the eleven that needs no server: it would play the follow sound locally. Left inert deliberately rather than guessed, because which sound the reference plays here is not evidenced'
+};
+
+/** Every action that is knowingly silent. Exported so the disposition contract can read it. */
+export const INERT_ACTION_NAMES: readonly string[] = Object.keys(INERT_ACTIONS);
