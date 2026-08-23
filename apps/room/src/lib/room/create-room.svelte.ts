@@ -67,6 +67,7 @@ import {
 import {
   focusOnScreen,
   focusOnSessionNote,
+  forceReload,
   presenterCommand
 } from '../../routes/presenter-commands.remote';
 import { videoForAll, youtubeForAll } from '../../routes/for-all-broadcast.remote';
@@ -797,7 +798,8 @@ export function createRoom(deps: RoomDeps) {
     commands: {
       presenter: (payload) => presenterCommand(payload),
       editUsername: (payload) => editUsername(payload),
-      unmuteChat: (payload) => unmuteChatCommand(payload)
+      unmuteChat: (payload) => unmuteChatCommand(payload),
+      forceReload: (targetUserId) => forceReload(targetUserId)
     },
     session: () => data,
     isPresenter: () => isPresenter,

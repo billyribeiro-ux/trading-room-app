@@ -333,14 +333,17 @@ blocked on a decision or on hardware**; they are simply not built yet. Ordered b
 | defect | verdict | what is missing |
 | --- | --- | --- |
 | **`save-permissions`** (HIGH) | needs new server code | The controller already writes `roomUsers.permissionsJson` for the SAME five checkboxes (`server/rooms.ts:90-114`). The room has no write path to the controller, so this needs a new internal endpoint — every piece it would call exists |
-| **`forceReload`** (MEDIUM) | **uses only existing code** | Both ends exist and nothing joins them: the action at `+page.server.ts:1318`, the receiver at `events.svelte.ts:656`. The button is in `EXACT_ALERTS`, so it raises "Reload request sent OK" and sends nothing. Wiring it removes a liar AND uses a dead wire |
 | **`session-refresh-roster` / `session-soft-reset`** (MEDIUM) | **uses only existing code** | Both raise an alert asserting a server command was sent; neither sends anything, and the local refetch they do instead has no effect on what the message promises. The honest fix needs no protocol at all — correct the message |
 | **`doChatLogSearch`** (MEDIUM) | needs new server code | The input never reaches the server, and the set it filters is only the newest 50 rows. Either a real search endpoint, or make the limit VISIBLE — a silent wrong answer is worse than an honest one |
 | **`admin-notes-password`** (LOW) | needs new server code | Three stacked causes. The typed value IS delivered and the handler throws it away, so the TODO's stated mechanism was only half right |
 | **`kick-duplicates`** (MEDIUM) | **NOT fixable without inventing** | The reference's own implementation was read in the capture, both arms confirmed. The positive arm needs a kick the room cannot perform. Recorded, not guessed |
 
-**Two were fixed on 2026-08-23** and are recorded above rather than here: the controller's permanent
-mute, and `focusOnSessionNote`.
+**FOUR were fixed on 2026-08-23** and are recorded above rather than here: the controller's permanent
+mute, the missing private-chat mute gate, `focusOnSessionNote`, and **`forceReload`** — whose form
+action and receiver both existed with nothing joining them while its button raised a fixed alert
+and sent nothing. Two defects cancelling into silence: nobody misses a wire nothing calls, and
+nobody doubts a button that reports success. `EXACT_ALERTS` is down from five entries to four, the
+orphaned action is deleted, and the actions export is nineteen to eighteen.
 
 **Ready to build, fully specified:**
 

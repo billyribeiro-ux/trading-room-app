@@ -102,7 +102,7 @@ WHY — the capture byte offsets, the loop-guard proof, and why the server rathe
 authority. The alternative on offer was an extraction invented to satisfy a number, which is the
 thing that file exists to prevent.
 
-**Verified.** Room **2,587 tests / 185 files**, `svelte-check` **1,227 files, 0 errors, 0 warnings**,
+**Verified.** Room **2,588 tests / 185 files**, `svelte-check` **1,227 files, 0 errors, 0 warnings**,
 `eslint` and `prettier` clean on every touched file. The mute fix adds three cases to
 `message-alert-action-contract.test.ts` — refused on send, refused on REPLY (that asymmetry has
 already happened once in that file), and an UNMUTED positive control, because two "refused"
@@ -114,7 +114,19 @@ both refusal cases red while the other 22 stay green; the note sender reverted t
 send assertion red; the menu item put back on `onSelect` → the wiring assertion red; the receiver made
 to re-broadcast → the loop-guard assertion red.
 
-**Six more defects are investigated and recorded in `TODO.md` rather than fixed**, each with what it
+**AND `forceReload` IS NOW WIRED — two defects that cancelled into silence.** A form action and a
+receiver had both shipped with NOTHING joining them (`forceReload` appeared in the actions export and
+zero times as a caller — the `presenterCommand` shape that shipped dead for three commits), while the
+"Force Reload" button dispatched a key of `EXACT_ALERTS` and so raised *"Reload request sent OK"* and
+sent nothing. Each defect hid the other: nobody misses a wire nothing calls, and nobody doubts a
+button that reports success. It is now a real addressed command in `presenter-commands.remote.ts`,
+`publishToUsers` rather than a broadcast for the reason its sibling gives — moderation state about a
+named individual is not the room's business. **`EXACT_ALERTS` drops from five entries to four**, the
+second ever removed after `unmute-chat`; the orphaned form action is deleted, taking the actions
+export from nineteen to eighteen. Pinned by an executable assertion that the TARGET is reloaded and
+not the caller, and caught independently by the disposition gate — negative-controlled.
+
+**Five more defects are investigated and recorded in `TODO.md` rather than fixed**, each with what it
 would cost: `save-permissions`, `forceReload`, the two false "command sent" messages, `doChatLogSearch`,
 and `admin-notes-password`. `kick-duplicates` is the one that CANNOT be fixed without inventing — the
 reference's own implementation was read and its positive arm needs a kick this room cannot perform.

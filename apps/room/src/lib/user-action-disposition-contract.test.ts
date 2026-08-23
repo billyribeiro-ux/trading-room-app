@@ -235,7 +235,8 @@ describe('an inert action really does nothing, executed', () => {
           Promise.resolve(null)
         ),
         editUsername: () => Promise.resolve(null),
-        unmuteChat: () => Promise.resolve(null)
+        unmuteChat: () => Promise.resolve(null),
+        forceReload: () => Promise.resolve(null)
       },
       session: () => ({
         user: { id: 1 },

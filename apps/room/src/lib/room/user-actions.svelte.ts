@@ -40,6 +40,8 @@ export interface UserActionCommands {
   }) => Promise<unknown>;
   editUsername: (payload: { userId: number; username: string }) => Promise<unknown>;
   unmuteChat: (payload: { targetUserId: number }) => Promise<unknown>;
+  /** `forceReload` — reloads ONE member's browser. Presenter-gated on the server. */
+  forceReload: (targetUserId: number) => Promise<unknown>;
 }
 
 /*
@@ -714,6 +716,23 @@ export class RoomUserActions<
     if (action === 'unmute-chat') {
       this.#dialogs.alert = 'user chat unmuted';
       void this.#unmuteChat(user).catch(() => {
+        this.#dialogs.alert = 'Command failed.';
+      });
+      return;
+    }
+
+    /*
+      Ahead of the alert tail because this one SENDS — the same position, and the same reason, as
+      `unmute-chat` directly above. `force-reload` was a key of `EXACT_ALERTS` until 2026-08-23,
+      raising "Reload request sent OK" over a wire that already existed and that nothing called.
+
+      The alert is raised first because the reference raises it immediately; `Command failed.` is
+      inherited from the sibling handlers here, not captured, because the reference never showed us
+      a failure for this control.
+    */
+    if (action === 'force-reload') {
+      this.#dialogs.alert = 'Reload request sent OK';
+      void this.#commands.forceReload(user.id).catch(() => {
         this.#dialogs.alert = 'Command failed.';
       });
       return;
