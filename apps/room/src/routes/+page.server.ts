@@ -42,7 +42,9 @@ import { memberDeniedArchives } from '#lib/roster-gates.js';
 import { isBannedFromRoom, isShutOutByRoomState, roomRoleFor } from '#lib/server/room-role.js';
 import { consumeRateLimit } from '#lib/server/rate-limit.js';
 import { mediaSignallingUrl } from '#lib/server/media-grant.js';
-import { publishToRoom, publishToUsers } from '#lib/server/room-events.js';
+// `publishToUsers` left with the private-message commands for `private-chat.remote.ts`; the three
+// publishes remaining here are all room-wide broadcasts.
+import { publishToRoom } from '#lib/server/room-events.js';
 // `grantMediaElevation` / `revokeMediaElevation` left with `giveMicScreen` for
 // `presenter-commands.remote.ts`; nothing else in this file elevates anybody.
 // `deleteStoredFile` and `storeUpload` left with the Files-pane commands; nothing here stores a

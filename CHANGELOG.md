@@ -33,6 +33,44 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-23 12:29 EDT — the lint error CI was failing on, and why a targeted run could not see it
+
+**Runtime impact: no.** One unused import removed; no behaviour changed.
+
+PR #127's `room quality` job was RED on a single error, and it had nothing to do with the work in
+that PR: `+page.server.ts:45` imported `publishToUsers` and used it nowhere. It is a leftover from
+the addressed-frame change, when the private-message publishes moved to `private-chat.remote.ts` and
+the import stayed. The three publishes remaining in that file are all `publishToRoom`, verified by
+reading every call site (`:1032`, `:1188`, `:1484`).
+
+**Why the repo's own testing rule did not catch it, stated plainly.** The standard says to run what
+changed, and that is what was run — `eslint` over the seventeen touched files, which were all clean.
+`+page.server.ts` was not one of them. The full `eslint .` that CI runs is the gate that finds this
+class of defect, and the rule already says the full gate runs once before a push. It was not run
+before the previous push. That is the miss, and the rule was right.
+
+**A second finding, which is the more useful one.** `eslint .` locally reports **28** errors where CI
+reports **1**. The other 27 are in files CI cannot see: `apps/room/scripts/` is gitignored
+(`.gitignore:176`), so none of it exists in a fresh checkout. Twenty-five of those 27 come from
+macOS duplicate files — the `* 2.*` pattern — of which there are **79** in the working tree, **none
+tracked by git**. Classified with hard evidence rather than assumed: 56 are byte-identical to their
+original, 22 differ and in every one of the 22 the original is NEWER, and the three largest were read
+line by line and are strictly older superseded versions. `room-config-seam-e2e 2.mjs` still contains
+the backtick-in-template-literal bug that the current file documents as fixed.
+
+`CHANGELOG 2.md` — the only one of the 79 that git could see, and therefore the only one at risk of
+being committed — was removed. The remaining 78 are gitignored clutter and are recorded in `TODO.md`
+rather than deleted unilaterally.
+
+**Also fixed:** the two real lint errors in `scripts/ptr-restore-mobile-tokens.js`, which is a real
+script rather than a duplicate. The `this` alias is the entire purpose of a
+`WebSocket.prototype.send` override — an arrow function would capture nothing — so it carries a
+disable with that reason rather than a restructure; and `howSent`'s dead `= null` seed went, because
+the if/else that follows assigns on every path.
+
+**Verified:** `eslint .` over the room app now reports **0 errors in every file git tracks**;
+`svelte-check` 1,230 files 0 errors 0 warnings; `vitest` 2,612 passing across 186 files.
+
 ### 2026-08-23 12:12 EDT — `forceReload` asks before it reloads, and the orphan gate learns to see inside a function
 
 **Runtime impact: yes.** A presenter's `forceReload` no longer destroys a member's unsent message
