@@ -33,6 +33,50 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-23 13:08 EDT — the alert search asks the database, and the filter it would have dropped
+
+**Runtime impact: yes.** `#alerts-advanced-search-modal` searches the room's whole alert log instead
+of the newest fifty rows.
+
+**The defect.** The modal filtered `data.alerts`, which is `loadAlertPage`'s `.limit(CHAT_LOG_PAGE_SIZE)`
+— **fifty**. Every predicate typed into it was applied to those fifty and nothing else, and the date
+range makes it sharp: setting `startDate` to last month searched fifty rows that were all from today
+and returned **"no logs to display"**. Not an error and not an honest empty — a confident wrong answer
+over a log that had the rows. The reference asks its own server (`getAlertsAdvancedSearch`), so a
+server search is the faithful shape rather than an invention.
+
+`searchAlertLog` moves the three predicates that ARE columns — body `LIKE`, the `createdAt` range and
+`nonTrade` — into SQL. The term is escaped for `%` and `_` first, or a reader searching for a literal
+percent sign would match every alert in the room and be told that was the answer. Dates that do not
+parse are IGNORED rather than becoming epoch 0.
+
+**THE REGRESSION THIS ALMOST SHIPPED.** `searchableAlerts` applied the mod-alert filter, and the
+database cannot: `alertFilterFor` is the viewer's own selection, `modAlertFilterList` is session
+state, and `senderEmailHash` is computed from the address at read time rather than stored. Moving the
+search would have let a filtered-out trader's alerts reappear **in search results and nowhere else** —
+the quietest possible way for that rule to break. `alert-filter-contract.test.ts` names this as site
+three of three and went red on the old assertion, which is what surfaced it. The predicate now travels
+to the results as `feeds.alertSearchFilter`, and the contract is re-pointed and stronger.
+
+**The cap is OURS and it is visible.** The reference's server bounds its own answer somewhere the
+bundle does not show, so 500 is a stated choice, not a transcription. The query fetches one over it to
+know whether there were more, and the modal renders a line when there were — because a bound the
+reader cannot see would only have moved the silent wrong answer from fifty rows to five hundred.
+
+**Two smaller corrections fell out.** `passesFilter`'s parameter was `AlertRow` where the body reads
+one field, which made it unusable on the narrower rows the database returns; it is narrowed to what it
+actually reads. And the `alerts` prop `ModalHost` took for this is deleted — it had exactly one
+consumer — which paid eight lines of the growth back.
+
+**Ceilings, owner-approved:** ModalHost 5981→6022, feeds 386→403, alerts 314→320. Each note says what
+it bought.
+
+**Verified:** room `vitest` **2,623 across 187 files**; controller **997 / 96**; `svelte-check`
+**1,235 / 0 / 0**; `eslint .` 0 errors in every tracked file; `prettier --check` clean. A third gate
+fired on the way — `slice-anchor-contract` refused two new `indexOf` slices that inlined their own
+position, so both bind and assert now. **NOT verified:** no browser has run a search against a
+populated log; the SQL is executed only by the type-checker and the contract tests so far.
+
 ### 2026-08-23 12:58 EDT — `save-permissions` actually saves, and the seeding defect that would have made it revoke
 
 **Runtime impact: yes.** The Save button on `#permissionsModal` writes to the controller. It

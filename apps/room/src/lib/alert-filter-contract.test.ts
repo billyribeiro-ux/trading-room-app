@@ -256,6 +256,7 @@ describe('the filter is applied at all THREE sites, not just the visible one', (
   an assertion about what a pane renders cannot pass against a file that no longer builds it.
 */
   const feedsModule = readFileSync(new URL('room/feeds.svelte.ts', import.meta.url), 'utf8');
+  const modalHost = readFileSync(new URL('components/ModalHost.svelte', import.meta.url), 'utf8');
   const source = page.replace(/\/\*[\s\S]*?\*\//g, '').replace(/<!--[\s\S]*?-->/g, '');
 
   /*
@@ -323,14 +324,44 @@ describe('the filter is applied at all THREE sites, not just the visible one', (
     expect(body).toContain('continue;');
   });
 
-  it('feeds the advanced-search modal the filtered rows, not the raw log', () => {
-    // The modal host moved into `RoomOverlays.svelte` in Phase 5 slice 17; the room state it renders
-    // from is handed to that component whole, so the prop is assembled there now.
-    expect(overlays).toContain('alerts={feeds.searchableAlerts}');
+  it('applies the filter to SERVER search results, where no filter can be pushed down', () => {
+    /*
+      RE-POINTED 2026-08-23, and the change is what makes this assertion load-bearing rather than
+      ceremonial.
+
+      The modal used to receive `feeds.searchableAlerts` — rows this room had already loaded and
+      already filtered. It asks the DATABASE now, because filtering the newest fifty rows is what
+      made its date range answer "no results" over a log that had them.
+
+      The database cannot apply this filter. `alertFilterFor` is the VIEWER's own selection and
+      `modAlertFilterList` is session state; neither is a column, and `senderEmailHash` is computed
+      from the address at read time. So the predicate has to travel to the results, and if it ever
+      stops travelling a filtered-out trader's alerts reappear in search and NOWHERE else — the
+      quietest possible way for this rule to break.
+    */
+    expect(overlays).toContain('alertSearchFilter={feeds.alertSearchFilter}');
     expect(source).not.toContain('alerts={data.alerts}');
-    // `searchableAlerts` must come off `data.alerts` rather than off `visibleAlerts`, or the search
-    // silently inherits the toolbar search term and the archive cut-off.
-    const derived = feedsModule.slice(feedsModule.indexOf('get searchableAlerts()'));
+    // The predicate must reach the rows the SERVER returned, not some already-filtered list.
+    expect(modalHost).toContain('found.alerts.filter(alertSearchFilter)');
+    /*
+      And it must be the same predicate as the other two sites. `passesFilter` is the one
+      implementation; a second copy here is how site three drifted from sites one and two before.
+    */
+    const at = feedsModule.indexOf('get alertSearchFilter()');
+    expect(at, 'the getter must exist for this assertion to mean anything').toBeGreaterThan(-1);
+    const derived = feedsModule.slice(at);
+    expect(derived.slice(0, derived.indexOf('\n  }'))).toContain('this.#alerts.passesFilter(');
+  });
+
+  it('the alerts PANE still gets pre-filtered rows, which the modal no longer does', () => {
+    /*
+      `searchableAlerts` did not die with the re-point — `RoomAlertsPane` still reads it for export
+      and detach. Asserted so that "the modal stopped using it" is not mistaken for "it is unused",
+      which is how a live getter gets deleted.
+    */
+    const at = feedsModule.indexOf('get searchableAlerts()');
+    expect(at, 'the pane still reads it, so it must still be here').toBeGreaterThan(-1);
+    const derived = feedsModule.slice(at);
     expect(derived.slice(0, derived.indexOf(');'))).toContain('this.#session().alerts.filter(');
   });
 });

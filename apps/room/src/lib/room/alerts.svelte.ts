@@ -303,7 +303,13 @@ export class RoomAlerts {
    */
   passesFilter =
     (modAlertFilterListRaw: string | null | undefined) =>
-    (item: AlertRow): boolean =>
+    /*
+      `{ senderEmailHash }` and not `AlertRow`, narrowed 2026-08-23 to what the predicate actually
+      reads. The advanced search now asks the DATABASE, and its rows are `SearchableAlert` — a
+      narrower shape with no `senderName`. A parameter wider than the body needs makes a predicate
+      unusable on any row that does not carry fields it never looks at.
+    */
+    (item: { senderEmailHash?: string | null }): boolean =>
       alertPassesFilter({
         avatarHash: item.senderEmailHash,
         alertFilterFor: this.#filterFor,
