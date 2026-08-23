@@ -69,11 +69,42 @@ verify:viewer-only     4/4 layouts render correctly
 verify:mobile-layout   4/4 widths render correctly
 ```
 
-Two of them print an honest NOTE instead of overclaiming, and both notes are preserved in the
-workflow comment: viewer-only measures the reference's own CSS taking effect on our elements rather
-than a pixel diff, because no capture of this product in that mode exists; mobile renders the
-arrangement `K4e` describes rather than the Svelte component, because the room needs a controller
-this machine has no `.env` for.
+Two of them print an honest NOTE instead of overclaiming: viewer-only measures the reference's own
+CSS taking effect on our elements rather than a pixel diff, because no capture of this product in
+that mode exists; mobile renders the arrangement `K4e` describes rather than the Svelte component,
+because the room needs a controller this machine has no `.env` for.
+
+#### THEY CANNOT RUN IN CI, AND THIS ENTRY ORIGINALLY SAID THEY DID
+
+I added them to the `room` leg, wrote here and in `TODO.md` that they "now run in CI", and pushed it.
+Then the runner answered:
+
+```
+Error: Cannot find module '…/apps/room/scripts/verify-tooltip-placements.mjs'
+code: 'MODULE_NOT_FOUND'
+```
+
+`.gitignore:176` ignores `/apps/room/scripts/` **entirely — `git ls-files` returns zero**. The rule
+is deliberate and documented at `.gitignore:160-175`: *"collectors that reach the reference
+application live here and are not published; the repository's own gate lives in `gate/` and is."*
+The four verifiers are off-repo tooling BY DESIGN, and no workflow can run them as written.
+
+The step is reverted and both claims are corrected. **The claim was false when I wrote it, and it was
+false because I asserted a CI outcome before measuring one** — the same error as reading a push's
+success out of `tail`'s exit code earlier in this session.
+
+Worth recording separately, because it nearly produced a second wrong answer: the failing step's own
+log gave the real cause, and an ADJACENT step's log gave a plausible false one. The unit-test step
+printed *"49 evidence-bound test file(s) excluded: this checkout is missing 13 of 14
+reference-capture roots"*, and the missing captures are an entirely believable reason for a rendering
+gate to fail. Reading the step that actually failed is what produced `MODULE_NOT_FOUND` instead.
+
+#### What is genuinely left, and it is the owner's call
+
+Publishing `/apps/room/scripts/` is a decision, not a cleanup: it would put reference-reaching
+collectors into a public repository, which is exactly what that ignore rule exists to prevent. The
+alternative is a gate under `apps/room/gate/` — which IS published — re-implementing the measurements
+against tracked inputs only.
 
 #### One self-inflicted false result, caught before it was reported
 
@@ -90,8 +121,10 @@ written by the same reader, and neither claim had ever been checked. **"We have 
 is a claim like any other and needs opening the directory.**
 
 **Verified:** all four verifiers run green locally; `ci-package-manager-pin`,
-`ci-verification-integrity` and `node-version-pin` (21 tests) green against the edited workflow.
-**Not verified locally:** the steps on a GitHub runner, which is what the next push measures.
+`ci-verification-integrity` and `node-version-pin` (21 tests) green. **Verified ON A RUNNER, which is
+what disproved the claim** — run 32660945805: `controller quality` and `controller end-to-end` both
+`success`, `room quality` **failed** at the step this entry added, with `MODULE_NOT_FOUND`. That is
+the measurement, and it is why the step is gone.
 
 ### 2026-08-23 15:20 EDT — `test-follow-sound` wired, `get-my-token` evidenced, and a ceiling answered by extraction
 
