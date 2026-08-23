@@ -51,6 +51,25 @@ export interface RoomPrompt {
 
 export class RoomDialogs {
   #alert = $state<string | null>(null);
+  /**
+   * `bootbox.alert(message, callback)` — the SECOND argument, which this class did not have.
+   *
+   * NOT reactive, and that is the same reasoning `RoomArrivals` records for its own markers: nothing
+   * renders from it. `BootboxDialog` in `mode="alert"` draws one OK button and a close X, both wired
+   * to `onclose`, so the callback is read at dismissal and never during a render.
+   *
+   * ## It is a SHAPE upstream, not a special case
+   *
+   * Four receivers in one region of the bundle (bytes 2596600-2597200, read end to end) are
+   * `bootbox.alert(text, () => …)`: the room reset — *"The room is being reset by an administrator.
+   * Click OK to continue..."*; `openSession` — *"The session is now open, click here to reload the
+   * page and enter"*; `forceReload` — *"You need to reload this page to continue"*; and
+   * `permsChangeReload`, which navigates to `reAuthSessionTok` rather than reloading. Three reload
+   * and one re-authenticates, so the callback is genuinely a parameter and not a disguised
+   * "reload" flag. Only `forceReload` is wired here; the other three are recorded in `TODO.md` as
+   * gaps rather than built on a guess about who raises them.
+   */
+  #alertDismissed: (() => void) | null = null;
   #confirmation = $state<RoomConfirmation | null>(null);
   /*
     `$state`, not `$state.raw`, and unlike the toast queue this one is not even a candidate: the
@@ -66,6 +85,14 @@ export class RoomDialogs {
 
   set alert(message: string | null) {
     this.#alert = message;
+    /*
+      A PLAIN ASSIGNMENT CARRIES NO CALLBACK, and clearing it here is what makes that true. The
+      forty `dialogs.alert = '…'` sites cannot know whether an `alertThen` ran before them, so
+      without this line an ordinary "Message Saved" would inherit the previous alert's dismissal
+      and reload the room. These dialogs STACK — see the head of the file — so a stale callback is
+      not a hypothetical ordering.
+    */
+    this.#alertDismissed = null;
   }
 
   get confirmation(): RoomConfirmation | null {
@@ -110,5 +137,37 @@ export class RoomDialogs {
         onconfirm();
       }
     };
+  }
+
+  /**
+   * `bootbox.alert(message, callback)` — an alert that does something when it is dismissed.
+   *
+   * `confirm()` was NOT reused for this. It renders a Cancel button (`BootboxDialog.svelte:115-122`)
+   * and `bootbox.alert` renders only OK, so borrowing it would offer a member a refusal the
+   * reference never gives them — a second divergence papering over the first.
+   *
+   * A method rather than another settable property, for the reason `confirm` above gives at length:
+   * it does something beyond storing a value. Call it wrapped, never by reference.
+   */
+  alertThen(message: string, ondismiss: () => void): void {
+    this.#alert = message;
+    this.#alertDismissed = ondismiss;
+  }
+
+  /**
+   * The alert's ONE exit, and therefore where the callback fires.
+   *
+   * `mode="alert"` gives the dialog a single OK button and a close X and wires both to `onclose`, so
+   * unlike `confirm` there is no second branch to tell apart — dismissal is the only outcome, which
+   * is exactly why `bootbox.alert` takes one callback and `bootbox.confirm` takes a boolean.
+   *
+   * The field is READ BEFORE IT IS CLEARED because the handler may raise the next dialog: these
+   * stack, and clearing afterwards would throw away an alert the handler had just set.
+   */
+  dismissAlert(): void {
+    const dismissed = this.#alertDismissed;
+    this.#alert = null;
+    this.#alertDismissed = null;
+    dismissed?.();
   }
 }

@@ -165,3 +165,81 @@ describe('it is actually reactive — one assertion per field', () => {
     expect(seen.length, 'the effect did not re-run').toBeGreaterThan(1);
   });
 });
+
+/*
+  `bootbox.alert(message, callback)` — the second argument, executed.
+
+  The alert carried no callback until 2026-08-23, which is why `forceReload` reloaded a member's page
+  with no warning: the receiver had nowhere to put "and reload when they say so", so it reloaded.
+  Upstream that shape is used by four different receivers in one region of the bundle (see the field's
+  own docblock for all four), so what is pinned here is the PRIMITIVE, not the one caller.
+*/
+describe('an alert can carry what happens when it is dismissed', () => {
+  it('runs the callback on dismissal, and not before', () => {
+    const dialogs = new RoomDialogs();
+    const dismissed = vi.fn();
+
+    dialogs.alertThen('You need to reload this page to continue', dismissed);
+    expect(dialogs.alert).toBe('You need to reload this page to continue');
+    expect(dismissed, 'raising the dialog must not fire it').not.toHaveBeenCalled();
+
+    dialogs.dismissAlert();
+    expect(dismissed).toHaveBeenCalledTimes(1);
+    expect(dialogs.alert, 'and the dialog closed').toBeNull();
+  });
+
+  it('a plain assignment carries NO callback — the stale-callback trap', () => {
+    /*
+      The failure this guards is silent and severe. Forty sites do `dialogs.alert = '…'` and none of
+      them can know whether an `alertThen` ran first. Without the setter clearing the field, an
+      ordinary "Message Saved" dismissed by the reader would run the PREVIOUS alert's callback and
+      reload the room.
+    */
+    const dialogs = new RoomDialogs();
+    const dismissed = vi.fn();
+
+    dialogs.alertThen('You need to reload this page to continue', dismissed);
+    dialogs.alert = 'Message Saved';
+    dialogs.dismissAlert();
+
+    expect(
+      dismissed,
+      'the previous callback must not survive the assignment'
+    ).not.toHaveBeenCalled();
+    expect(dialogs.alert).toBeNull();
+  });
+
+  it('dismissing a plain alert is safe, and clears it', () => {
+    // The overlay calls `dismissAlert()` for EVERY alert now, so the no-callback path is the common
+    // one rather than an edge case.
+    const dialogs = new RoomDialogs();
+    dialogs.alert = 'Session Locked';
+    expect(() => dialogs.dismissAlert()).not.toThrow();
+    expect(dialogs.alert).toBeNull();
+  });
+
+  it('the callback may raise the NEXT alert, because these stack', () => {
+    /*
+      The field is read before it is cleared, which is what makes this work. Clearing afterwards
+      would wipe the alert the handler had just set and the second dialog would never appear.
+    */
+    const dialogs = new RoomDialogs();
+    dialogs.alertThen('First', () => {
+      dialogs.alert = 'Second';
+    });
+    dialogs.dismissAlert();
+
+    expect(dialogs.alert, 'the handler’s own alert survived').toBe('Second');
+  });
+
+  it('a dismissal fires ONCE even if the overlay closes twice', () => {
+    // `onclose` is wired to both the OK button and the close X in `BootboxDialog`, so a double
+    // dispatch is reachable rather than theoretical.
+    const dialogs = new RoomDialogs();
+    const dismissed = vi.fn();
+    dialogs.alertThen('Reload?', dismissed);
+    dialogs.dismissAlert();
+    dialogs.dismissAlert();
+    expect(dismissed).toHaveBeenCalledTimes(1);
+  });
+});

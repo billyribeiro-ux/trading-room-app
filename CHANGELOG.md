@@ -33,6 +33,71 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-23 12:12 EDT — `forceReload` asks before it reloads, and the orphan gate learns to see inside a function
+
+**Runtime impact: yes.** A presenter's `forceReload` no longer destroys a member's unsent message
+without warning, and eleven docblocks now describe the code they are attached to.
+
+**The defect.** `events.svelte.ts` answered a `forceReload` frame with a bare `location.reload()`.
+The reference does neither half of that. Both regions were READ rather than searched, and reading
+them returned things a search never would:
+
+- byte 995901 — `case"forceReload":e.disconnect(),e.appEventBus.emit("forceReload");break;`
+- byte 2597102 — `subscribe("forceReload",oe=>{bootbox.alert("You need to reload this page to
+  continue",()=>{window.location.reload()})})`
+
+So upstream **disconnects, warns, and reloads only when the member dismisses the dialog**. Ours took
+the page instantly, mid-sentence. Now the stream calls `source.close()` and then a
+`forceReloadRequested` receiver; `create-room` raises the captured alert and reloads on dismissal.
+The ordering is asserted at runtime by sampling whether the channel was already closed when the
+receiver ran — negative-controlled by swapping the two statements.
+
+**What reading the region added.** `bootbox.alert(message, callback)` is not a special case: FOUR
+receivers in one 600-byte span use it — the room reset, `openSession`, `forceReload`, and
+`permsChangeReload`, which navigates to `reAuthSessionTok` instead of reloading. Three reload and one
+does not, which is why the callback is a real parameter. The same pass over the `privCmdsIn` switch
+found six commands this room does not handle. Both are now TODO rows 11 and 12, with what is known
+and what is not; nothing was invented to fill them.
+
+**The ceiling was cleared by extraction, and only then by a raise.** All three files were at their
+caps. `events.svelte.ts` came down 903 → 900 — ceiling LOWERED — by two moves that were both real
+rather than invented to satisfy a number:
+
+- The **join/leave announcement** left for `#lib/arrival-announcement.ts`, a pure module beside
+  `alert-delivery.ts`, which answers the identical question for an arriving alert. The evidence for
+  the seam is the class's own docblock: it calls itself a ROUTER that routes each frame "to the class
+  that owns the state it changes", and a join changes no state, so four gates, two toast skins and
+  two sounds had grown in a router with nowhere to go. Thirteen cases now execute them, including the
+  transcribed quirk that the LEAVE beep reads the room's `beepOnUserJoin` — confirmed twice, at byte
+  2507680 in the handler and byte 2230981 where the settings pane renders that one flag for both rows.
+- Two **orphaned docblocks** describing `rosterCount` and `archivesAvailableTo`, neither of which
+  that class holds, went to the code that owns them.
+
+`dialogs.svelte.ts` had no extraction available — its own head argues the three dialogs must stay one
+class because they STACK — so **115 → 174 was taken as a decision with the owner** and recorded in the
+ceiling entry. `roster.svelte.ts` 338 → 342, also approved, for four lines that moved IN.
+
+**The gate that should have caught the orphans could not see inside a function**, and its own
+narrowing said so: `/^ {0,2}\S/`, *"never inside a function"*. A constructor is a function, and a
+constructor is exactly where extractions leave things. Widening it found six more orphans in three
+files. Then the negative control for that widening went GREEN against the very defect that motivated
+it — single-line blocks were never collected, so one sitting between two orphans read as CODE and
+masked them. Closing that found two more. **Eleven orphans, six files, zero false positives**, and
+the paragraph recording the count says plainly that its first two drafts predicted the wrong number.
+
+Two pre-existing defects were cleared on the way past, both mine from the previous commit: a dead
+`#savePreference` field left behind by the `RoomSessionControl` extraction (eslint had been failing on
+it), and an empty comment block that was `source-size-contract.test.ts`'s only prettier failure.
+
+**Verified:** `vitest run` **2,612 passing across 186 files** (from 2,592/185); `svelte-check`
+**1,230 files, 0 errors, 0 warnings**; `eslint` and `prettier --check` clean on all seventeen touched
+files. Svelte MCP consulted and `svelte-autofixer` run on the `RoomOverlays` change. Five negative
+controls seen RED and reverted: the DND/popup split, the per-direction preference, the
+disconnect-before-ask ordering, the stale-callback clear, and both halves of the orphan gate. **Not
+verified:** no browser has watched the dialog appear — the runtime confirmation in a real room is the
+owner's, and it is recorded as owed rather than claimed.
+
+
 ### 2026-08-23 11:08 EDT — state of the repository, and the ratchet reaching its designed limit
 
 **Runtime impact: no.** A status entry plus one measurement, written because the measurement changes

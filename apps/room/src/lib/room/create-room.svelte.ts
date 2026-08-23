@@ -845,7 +845,10 @@ export function createRoom(deps: RoomDeps) {
       Declared below this call — the closure runs on a frame arriving from the server, long after
       `notes` is initialised, so the forward reference is resolved by then.
     */
-    focusSessionNote: (noteId) => notes.focusNote(noteId)
+    focusSessionNote: (noteId) => notes.focusNote(noteId),
+    // Byte 2597102, verbatim. Why it is `alertThen` and not `confirm` is on `RoomDialogs.alertThen`.
+    forceReloadRequested: () =>
+      dialogs.alertThen('You need to reload this page to continue', () => location.reload())
   });
 
   /*

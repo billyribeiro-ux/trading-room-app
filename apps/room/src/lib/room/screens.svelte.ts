@@ -96,6 +96,15 @@ export class RoomScreens {
     this.#lockedScreenId = $state<string | null>(null);
 
     /**
+     * `isFullScreenshare` - `fullScreenshare() { this.isFullScreenshare = !this.isFullScreenshare }`.
+     *
+     * The screens pane takes `is-fullscreenshare` from it via
+     * `UCe = (t, n) => ({'show active': t, 'is-fullscreenshare': n})`, which the captured sheet
+     * makes `position: fixed; 100vw/100vh; z-index: 1030`.
+     */
+    this.#isFullScreenshare = $state(false);
+
+    /**
      * Screen zoom, lifted here from `ScreenPane` because that is where the capture keeps it.
      *
      * `app-presentationarea` - the component this page reproduces - declares `this.showZoomCtrl = !1`
@@ -105,15 +114,6 @@ export class RoomScreens {
      * the state cannot sit inside one pane. `src/lib/screen-zoom.ts` carries the transcription and
      * the reasoning for what is global and what is per screen.
      */
-    /**
-     * `isFullScreenshare` - `fullScreenshare() { this.isFullScreenshare = !this.isFullScreenshare }`.
-     *
-     * The screens pane takes `is-fullscreenshare` from it via
-     * `UCe = (t, n) => ({'show active': t, 'is-fullscreenshare': n})`, which the captured sheet
-     * makes `position: fixed; 100vw/100vh; z-index: 1030`.
-     */
-    this.#isFullScreenshare = $state(false);
-
     this.#showZoomCtrl = $state(false);
 
     this.#zoomLevel = $state(INITIAL_ZOOM_LEVEL);

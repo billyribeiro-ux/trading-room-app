@@ -45,6 +45,10 @@ export interface RosterEntryFlags {
  *       this.appService.globals.user.denyArchivesAccess);
  * ```
  *
+ * In English: a full presenter gets archives unless an explicit allowlist exists and leaves them
+ * out; everyone else needs the session to have opened archives to users AND not be individually
+ * denied. Ours showed Archives to everybody unconditionally until this existed.
+ *
  * Note which side a LIMITED presenter falls on: the viewer branch. An allowlist that names them is
  * therefore irrelevant to them - they need `showArchivesToUsers` like anyone else.
  *

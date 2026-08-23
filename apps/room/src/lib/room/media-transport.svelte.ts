@@ -317,10 +317,10 @@ export class RoomMediaTransport {
      */
     this.#mediaSession = null;
 
-    /** This peer's own screen producer, so stopping the share can close it. */
     /**
-     * The most recent local screen producer. Kept for the single-screen callers (`applyScreenLayers`
-     * skipping our own producer) that only need "one of ours".
+     * The most recent local screen producer — this peer's own, so stopping the share can close it.
+     * Kept for the single-screen callers (`applyScreenLayers` skipping our own producer) that only
+     * need "one of ours".
      */
     this.#localScreenProducerId = null;
 
@@ -360,21 +360,6 @@ export class RoomMediaTransport {
     this.#remoteAudioStreams = new SvelteMap<string, MediaStream>();
 
     /**
-     * The media server's connection toasts, verbatim from the captured room:
-     *
-     *   appEventBus.subscribe("mediaServerConnected", e => {
-     *     this.isMediaConnected = !0, this.alertService.success("Connected to Media Server") })
-     *   appEventBus.subscribe("mediaServerDisconnected", e => {
-     *     this.isMediaConnected = !1,
-     *     this.alertService.error("Disconnected from Media Server... reconnecting...") })
-     *
-     * `success` and `error` are toastr skins, so the geometry and colour come from the captured
-     * stylesheet with nothing declared here: `.ngx-toastr` is 300px wide with
-     * `padding: 15px 15px 15px 50px`, `border-radius: 3px` and a 24px icon inset 15px from the left,
-     * `.toast-success` is `rgb(81, 163, 81)` and `.toast-error` `rgb(189, 54, 47)`. Both messages are
-     * passed with no title, exactly as the capture calls them.
-     */
-    /**
      * The two sticky reconnect toasts, read out of the reference's own room bundle.
      *
      * `docs/source/main.d6d3c112b59b7d0d.js`, in the mediasoup socket's `disconnect` handler:
@@ -406,17 +391,6 @@ export class RoomMediaTransport {
 
     this.#presenterReconnectToastId = null;
 
-    /**
-     * Turns one remote producer into a screen tab with a live picture.
-     *
-     * Only screen shares are handled here: the producing client tags them `{share: true, screenName}`
-     * in `appData` and the server echoes that back verbatim, which is the only thing distinguishing a
-     * screen from a webcam on the same `video` kind.
-     *
-     * Ordering matters. The tab is added BEFORE `consume()` resolves so the bar reflects the room
-     * immediately, and the stream is filled in when it arrives - a tab with no picture is honest,
-     * a picture with no tab is unreachable.
-     */
     /**
      * `mediaService.saveData` — "Disable Video (saves bandwidth)", from the AV settings modal.
      *
@@ -900,6 +874,21 @@ export class RoomMediaTransport {
     if (at > -1) this.#webcamPresenters.splice(at, 1);
   }
 
+  /**
+   * The media server's connection toasts, verbatim from the captured room:
+   *
+   *   appEventBus.subscribe("mediaServerConnected", e => {
+   *     this.isMediaConnected = !0, this.alertService.success("Connected to Media Server") })
+   *   appEventBus.subscribe("mediaServerDisconnected", e => {
+   *     this.isMediaConnected = !1,
+   *     this.alertService.error("Disconnected from Media Server... reconnecting...") })
+   *
+   * `success` and `error` are toastr skins, so the geometry and colour come from the captured
+   * stylesheet with nothing declared here: `.ngx-toastr` is 300px wide with
+   * `padding: 15px 15px 15px 50px`, `border-radius: 3px` and a 24px icon inset 15px from the left,
+   * `.toast-success` is `rgb(81, 163, 81)` and `.toast-error` `rgb(189, 54, 47)`. Both messages are
+   * passed with no title, exactly as the capture calls them.
+   */
   serverConnected(_reconnected: boolean) {
     this.#media.connected = true;
     /*
@@ -1007,6 +996,17 @@ export class RoomMediaTransport {
     }
   }
 
+  /**
+   * Turns one remote producer into a screen tab with a live picture.
+   *
+   * Only screen shares are handled here: the producing client tags them `{share: true, screenName}`
+   * in `appData` and the server echoes that back verbatim, which is the only thing distinguishing a
+   * screen from a webcam on the same `video` kind.
+   *
+   * Ordering matters. The tab is added BEFORE `consume()` resolves so the bar reflects the room
+   * immediately, and the stream is filled in when it arrives - a tab with no picture is honest,
+   * a picture with no tab is unreachable.
+   */
   async addRemoteScreen(session: MediaSession, info: ProducerInfo) {
     const share = info.appData as { share?: unknown; screenName?: unknown } | null;
     if (info.kind !== 'video' || share?.share !== true) return;

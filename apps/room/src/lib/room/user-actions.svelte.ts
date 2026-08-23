@@ -103,7 +103,6 @@ export class RoomUserActions<
   readonly #isPresenter: () => boolean;
   readonly #talking: () => readonly TalkingEntry[];
   readonly #rosterUsers: () => readonly RosterAuthority[];
-  readonly #savePreference: (key: string, value: boolean) => void;
   readonly #openModal: (name: Exclude<ModalName, null>) => void;
   readonly #closeModal: () => void;
   readonly #closeUserMenu: () => void;
@@ -165,7 +164,6 @@ export class RoomUserActions<
     this.#isPresenter = options.isPresenter;
     this.#talking = options.talking;
     this.#rosterUsers = options.rosterUsers;
-    this.#savePreference = options.savePreference;
     this.#openModal = options.openModal;
     this.#closeModal = options.closeModal;
     this.#closeUserMenu = options.closeUserMenu;
@@ -472,6 +470,14 @@ export class RoomUserActions<
     await this.#reload();
   }
 
+  /** Raise the captured alert, fire the command, and replace the alert only if it refuses. */
+  #announceThenSend(alert: string, send: () => Promise<unknown>): void {
+    this.#dialogs.alert = alert;
+    void send().catch(() => {
+      this.#dialogs.alert = 'Command failed.';
+    });
+  }
+
   /**
    * Lifts a member's chat mute — the other half of `mute24`.
    *
@@ -489,14 +495,6 @@ export class RoomUserActions<
    * for anyone who bothered to look, and nobody did; that is the same silent success this whole
    * path was built to fix. `chat-mute.remote.ts` carries the rest of the reasoning.
    */
-  /** Raise the captured alert, fire the command, and replace the alert only if it refuses. */
-  #announceThenSend(alert: string, send: () => Promise<unknown>): void {
-    this.#dialogs.alert = alert;
-    void send().catch(() => {
-      this.#dialogs.alert = 'Command failed.';
-    });
-  }
-
   async #unmuteChat(user: ModalTargetUser) {
     await this.#commands.unmuteChat({ targetUserId: user.id });
     await this.#reload();
