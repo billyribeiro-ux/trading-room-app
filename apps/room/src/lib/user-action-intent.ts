@@ -120,42 +120,104 @@ export const TOAST_ONLY_ACTIONS: readonly string[] = Object.keys(EXACT_ALERTS);
 */
 export const INERT_ACTIONS: Readonly<Record<string, string>> = {
   /*
-    The four media controls in the user-info modal's presenter column, `ModalHost.svelte:2253-2272`.
-    The reference drives a peer's capture from the server; this room has no such command, and
-    inventing one would let any presenter silence a member with no server-side authority check —
-    exactly the 2026-08-07 escalation shape. Needs the captured wire protocol first.
+    "NO WIRE CAPTURED" WAS FALSE FOR ALL SIX OF THESE, AND IT WAS FALSE THE DAY IT WAS WRITTEN.
+
+    ## What the six actually are, read 2026-08-23
+
+    Every one is a `remotePresCommand` sub-command, and all six call sites sit together in one menu
+    at bytes 2063708-2064410 of `apps/room/docs/source-v4-2026-08-15/main.d1d09071be31f1ba.js`:
+
+      remotePresCommand("mutemic")        " Mute Audio "
+      remotePresCommand("mutecam")        " Mute Camera "
+      remotePresCommand("mutescreens")    " Stop Screens "
+      remotePresCommand("restartScreen")  " Restart Screens "     (singular Screen, plural label)
+      remotePresCommand("startRec")       " Start Rec "
+      remotePresCommand("stopRec")        " Stop Rec "
+
+    Both ends are captured:
+
+      SEND     `remotePresCommand(c){ this.appService.sendServerAdminCommand(
+                 "remotePresCommand", {user:this.user, cmd:c}) }`      (byte 2080529)
+      RECEIVE  `case"remotePresCommand": e.appEventBus.emit(
+                 "remotePresCommand", xe.subCmd); break;`              (byte 996380)
+
+    **Note the key changes across the hop**: the presenter sends `cmd`, the member reads `subCmd`.
+    That is the reference's own shape, not a transcription slip — the server is re-wrapping the
+    payload, which is also where the authority check must live.
+
+    ## The security reasoning is UNCHANGED, and it is why these stay inert
+
+    The old note was right that a peer-capture command needs server authority and that inventing one
+    would reproduce the 2026-08-07 escalation. That still holds. What is no longer true is the stated
+    BLOCKER: the wire is not missing, the server-side gate is. These are unblocked for design and
+    still blocked on `services/**` enforcing that the caller is a presenter in that room.
+
+    ## Recording is NOT blocked on a MediaMTX host
+
+    `start-recording` and `stop-recording` were filed as "blocked on a MediaMTX host". The room half
+    is `remotePresCommand("startRec")` / `("stopRec")` — the same peer command as the other four,
+    sent to a MEMBER. Whatever MediaMTX does afterwards, the control this room is missing is this
+    one, and it is captured.
   */
   'mute-mic':
-    'ModalHost.svelte:2253 — no wire captured; a peer-capture command needs server authority',
+    'ModalHost.svelte:2253 — wire IS captured: remotePresCommand("mutemic"). Blocked on a SERVER-side presenter check, not on evidence',
   'mute-camera':
-    'ModalHost.svelte:2259 — no wire captured; same server-authority requirement as mute-mic',
+    'ModalHost.svelte:2259 — wire IS captured: remotePresCommand("mutecam"). Same server-authority requirement as mute-mic',
   'stop-screens':
-    'ModalHost.svelte:2265 — no wire captured. NOTE: distinct from RoomScreens.stop(), which is an HONEST PARTIAL for your OWN screen; this button targets somebody else',
-  'restart-screens': 'ModalHost.svelte:2272 — no wire captured; the restart half was never ported',
+    'ModalHost.svelte:2265 — wire IS captured: remotePresCommand("mutescreens"). NOTE: distinct from RoomScreens.stop(), which is an HONEST PARTIAL for your OWN screen; this button targets somebody else',
+  'restart-screens':
+    'ModalHost.svelte:2272 — wire IS captured: remotePresCommand("restartScreen"), singular, against a " Restart Screens " label',
 
-  /*
-    Recording is not a room feature in this product — the reference hands it to MediaMTX, and the
-    room only asks the server to record. `TODO.md` rows X and AC hold the detail: there is no room
-    code waiting to be written, there is a host waiting to be stood up.
-  */
-  'start-recording': 'ModalHost.svelte:2279 — blocked on a MediaMTX host (TODO rows X and AC)',
-  'stop-recording': 'ModalHost.svelte:2285 — blocked on a MediaMTX host (TODO rows X and AC)',
+  'start-recording':
+    'ModalHost.svelte:2279 — wire IS captured: remotePresCommand("startRec"). NOT blocked on a MediaMTX host; blocked on the same server-side presenter check',
+  'stop-recording':
+    'ModalHost.svelte:2285 — wire IS captured: remotePresCommand("stopRec"). Same as start-recording',
 
   /*
     `getDebugLog` and `setUserProfilePic` are the two this class was already known by — `TODO.md`
     records both under "DEAD CONTROLS". Their modals exist and are unreachable: nothing ever sets
     `name === 'debug'`, and nothing ever fills `debugLogModalTxt`.
   */
+  /*
+    BOTH OF THESE ALSO HAVE THEIR WIRE, found in the same 2026-08-23 read.
+
+    `debug-log` is a THREE-hop exchange, not a modal waiting for content:
+      presenter  `getDebugLog(){ sendServerAdminCommand("getDebugLog", this.user) }`  (2080323)
+      member     `case"getDebugLog": e.send("debugLogResp",{requestor:xe.requestor, log:V1})`
+      presenter  `case"debugLogResp": e.appEventBus.emit("debugLogResp", xe.log)`
+    `V1` is the member's rolling client log. The receiving UI is `app-debug-log-modal`: modal
+    `#debug-log-modal`, `<h3 class="modal-title">Debug Log</h3>`, and ONE readonly
+    `<textarea id="debugLogModalTxt" rows="1000">`. So "nothing fills debugLogModalTxt" was true of
+    OUR room and reads as though the reference had the same hole; it does not.
+
+    `upload-profile-picture` likewise has both halves: the presenter menu button
+    `" Upload Profile Picture "` calls `adminUploadProfilePic($event)`, and the member applies it at
+    `case"updateProfilePic"`, which sets BOTH `globals.preferences.profilePic` and
+    `globals.user.profilePic` and then emits `preferenceChanged {key:"profilePic", value}`.
+  */
   'debug-log':
-    'ModalHost.svelte:2306 — no handler; its modal at :3844 is unreachable and nothing fills debugLogModalTxt',
+    'ModalHost.svelte:2306 — wire IS captured: getDebugLog → member replies debugLogResp{requestor,log:V1} → presenter fills a readonly textarea#debugLogModalTxt rows=1000 in #debug-log-modal titled "Debug Log"',
   'upload-profile-picture':
-    'ModalHost.svelte:2379 — no handler and no upload target (TODO: setUserProfilePic)',
+    'ModalHost.svelte:2379 — wire IS captured: adminUploadProfilePic sends, member applies case"updateProfilePic" setting preferences.profilePic AND user.profilePic then emitting preferenceChanged',
 
   /*
     Three more found in the same 2026-08-23 diff, none previously recorded.
   */
+  /*
+    THE REFERENCE'S OWN BUTTON IS DEAD TOO, which makes ours a MATCH rather than a gap.
+
+    In the presenter menu at byte 2067000ff every button is built the same way — `d(n,"button",40)`
+    followed immediately by `x("click", …)`. `" Disable Private Chat "` is the ONE that is not:
+
+      d(96,"button",49),T(97,"i",50),v(98," Disable Private Chat "),u(),
+      d(99,"button",40),x("click",function(o){… adminUploadProfilePic(o) …})
+
+    Button 96 carries an icon and a label and NO click binding, while 99 beside it does. So upstream
+    renders this control and wires nothing to it. Leaving ours inert reproduces the reference
+    exactly; wiring it would be a divergence, not a fix.
+  */
   'disable-private-chat':
-    'ModalHost.svelte:2373 — no wire captured; the per-user private-chat gate was never ported',
+    'ModalHost.svelte:2373 — MATCHES THE REFERENCE, which renders this button at bundle byte ~2067000 with an icon, a label and no x("click") binding at all while every neighbouring button has one',
   'get-my-token':
     'ModalHost.svelte:3075 — no handler; what token it should show is not evidenced anywhere read so far',
   'test-follow-sound':
