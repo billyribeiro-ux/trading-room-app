@@ -18,6 +18,7 @@ import {
 } from '#lib/user-action-intent.js';
 
 import type { RoomDialogs } from './dialogs.svelte';
+import { RoomKicks } from './kicks.svelte';
 import { RoomManagedUsers } from './managed-users.svelte';
 import { RoomSessionControl } from './session-control.svelte';
 import type { RoomToasts } from './toasts.svelte';
@@ -151,6 +152,7 @@ export class RoomUserActions<
     a getter is the same signal read, so nothing is lost.
   */
   readonly #managed: RoomManagedUsers;
+  readonly #kicks: RoomKicks<User>;
   #selectedUserId: number | null;
   #selectedMessageUser: ModalTargetUser | null;
 
@@ -211,6 +213,13 @@ export class RoomUserActions<
     this.#reload = options.reload;
 
     this.#managed = new RoomManagedUsers(options.defaultFollowStyle);
+    this.#kicks = new RoomKicks<User>({
+      dialogs: options.dialogs,
+      commands: options.commands,
+      roster: () => this.#session().connectedUsers,
+      closeModal: () => this.#closeModal(),
+      announceThenSend: (message, send) => this.#announceThenSend(message, send)
+    });
 
     this.#selectedUserId = $state<number | null>(null);
 
@@ -633,33 +642,12 @@ export class RoomUserActions<
       record it, so aliasing it here would drop the ban silently. It is in `INERT_ACTIONS` with that
       reason.
     */
-    if (action === 'kick') {
-      this.#dialogs.prompt = {
-        title: 'Enter the kick message for this user',
-        value: 'You have been kicked from the room by an administrator',
-        onconfirm: (message: string) => {
-          this.#dialogs.prompt = null;
-          this.#closeModal();
-          this.#announceThenSend('User kicked OK', () =>
-            this.#commands.kickUser({ targetUserId: user.id, message })
-          );
-        }
-      };
-      return;
-    }
-
-    if (action === 'kick-duplicates') {
-      this.#dialogs.prompt = {
-        title: `Kick all other duplicates of ${user.nick} with the following message:`,
-        value: 'You have been kicked from the room by an administrator',
-        onconfirm: () => {
-          this.#dialogs.prompt = null;
-          this.#closeModal();
-          this.#dialogs.alert = `No duplicates found for ${user.nick}`;
-        }
-      };
-      return;
-    }
+    /*
+      `kick` and `kick-duplicates` moved to `RoomKicks` on 2026-08-23 — what a presenter does to
+      remove a PERSON, the other half of the sentence `RoomSessionControl` owns. Delegated here for
+      the same reason session actions are: the chain stays a chain.
+    */
+    if (this.#kicks.handle(action, user)) return;
 
     if (action === 'admin-notes-password') {
       this.#dialogs.prompt = {

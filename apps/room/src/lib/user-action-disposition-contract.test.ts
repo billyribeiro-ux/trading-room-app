@@ -88,13 +88,20 @@ function handledActions(): Set<string> {
     goes red on the refactor and green on the regression.
   */
   const session = readFileSync('src/lib/room/session-control.svelte.ts', 'utf8');
+  /*
+    `RoomKicks` joined them on 2026-08-23, when `kick` and `kick-duplicates` moved out under the
+    owner's extraction ruling. Adding it here is not bookkeeping: this function's own note says a
+    gate that does not follow an extraction "goes red on the refactor and green on the regression",
+    and it did exactly that on this move — which is the second time that note has paid for itself.
+  */
+  const kicks = readFileSync('src/lib/room/kicks.svelte.ts', 'utf8');
   const source = readFileSync('src/lib/room/user-actions.svelte.ts', 'utf8');
   const tail = source.indexOf('const fixedAlert = userActionAlert(action)');
   expect(
     tail,
     "handle()'s alert tail was not found — this scanner would read the whole file and mis-bucket the alert path"
   ).toBeGreaterThan(-1);
-  const dispatchBody = source.slice(0, tail) + session;
+  const dispatchBody = source.slice(0, tail) + session + kicks;
   return new Set([...dispatchBody.matchAll(/action === '([a-z0-9-]+)'/g)].map((m) => m[1]));
 }
 
@@ -231,8 +238,6 @@ describe('every dispatched action has exactly one disposition', () => {
   };
 
   const DIALOG_ONLY_ACTIONS: Readonly<Record<string, string>> = {
-    'kick-duplicates':
-      'alerts "No duplicates found for <nick>" HARDCODED, never reading a roster — needs emailHash on RosterAuthority',
     'admin-notes-password':
       'alerts "Wrong password!" HARDCODED, never comparing — needs sessData.deleteAlertPW delivered to the room',
     'session-save-close-message':
@@ -250,9 +255,10 @@ describe('every dispatched action has exactly one disposition', () => {
       preference, a modal, a rename, a delegate method call, or writing its own selection state.
     */
     const session = readFileSync('src/lib/room/session-control.svelte.ts', 'utf8');
+    const kicks = readFileSync('src/lib/room/kicks.svelte.ts', 'utf8');
     const source = readFileSync('src/lib/room/user-actions.svelte.ts', 'utf8');
     const tail = source.indexOf('const fixedAlert = userActionAlert(action)');
-    const body = source.slice(0, tail) + session;
+    const body = source.slice(0, tail) + session + kicks;
 
     const ACTS = [
       'this.#commands.',

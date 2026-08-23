@@ -33,6 +33,58 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-23 18:40 EDT — `kick-duplicates` kicks, and `RoomKicks` is the domain it lives in
+
+**Runtime impact: YES.** A presenter kicking a person's other logins now kicks them. It previously
+alerted *"No duplicates found"* whatever the roster held.
+
+**Branch `feat/save-permissions`.** Closes `TODO.md` row 1.
+
+#### Built on the audit, not on an assumption
+
+Yesterday's version of me said this needed `emailHash` adding to the roster. The audit showed it was
+already on `User` (`types.ts:58`), already filled (`+page.server.ts:318`), and already read
+(`user-actions.svelte.ts:265`). Nothing was missing; I had generalised from `RosterAuthority`, a
+narrow interface belonging to `mute-all-non-admins`.
+
+The matching rule is **pure**, in `#lib/kick-duplicates.ts`, following `mute-all-non-admins.ts`: the
+selection lives in `#lib/`, the class calls it and sends. It refuses outright on an empty
+`emailHash` — upstream's `if (!i) return`, and the safer reading anyway, since an empty hash would
+match every other entry that also lacks one and kick strangers.
+
+#### `RoomKicks`, on the owner's extraction ruling
+
+The real loop put `user-actions.svelte.ts` at **788 against 777**. Asked, as every raise is. The
+answer was extraction, and the seam was already there: `kick` and `kick-duplicates` are what a
+presenter does to remove a PERSON — the other half of the sentence `RoomSessionControl` owns, whose
+`why:` reads *"what a presenter does to the SESSION"*.
+
+`user-actions.svelte.ts` is now **764 against an unchanged 777**, with headroom for the first time
+today. `lib/room/kicks.svelte.ts` is born capped at 130.
+
+#### The gates caught the extraction, exactly as one of them predicted
+
+`handledActions()` carries a note saying a gate that does not follow an extraction *"goes red on the
+refactor and green on the regression"*. It went red on this refactor — `kick` and `kick-duplicates`
+had left the files it reads — and the fix is the same one that note describes. **Second time that
+comment has paid for itself.**
+
+The staleness half also fired correctly: `kick-duplicates` was in `DIALOG_ONLY_ACTIONS` as a control
+that reports success and does nothing, and it now acts, so the entry had to go. That is the list
+refusing to become a suppression file, working as designed on its first real test.
+
+#### The test was decorative before it was real
+
+The first assertion accepted either arm — `toMatch(/Kicked \d+ …|No duplicates found/)` — and passed
+without proving anything, because the harness roster held no duplicate of the target at all. Replaced
+with a roster carrying two other logins of Bo plus one unrelated Cy, asserting `[7, 8]` exactly.
+**Negative control seen RED on both arms**: matching on `id` alone gives
+`expected [ 3, 7, 8 ] to deeply equal [ 7, 8 ]` — it kicks the stranger, which is the failure that
+makes this feature dangerous rather than merely broken.
+
+**Verified:** room `vitest` **2,644 passed / 188 files**; `svelte-check` **0 errors, 0 warnings**;
+`eslint .` clean; negative control seen red and restored; no ceiling raised.
+
 ### 2026-08-23 18:05 EDT — a forensic audit: four things I said did not exist, all of them do
 
 **Runtime impact: no.** No code changed. Four false claims of mine were corrected against the files.
