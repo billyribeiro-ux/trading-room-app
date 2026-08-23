@@ -56,7 +56,9 @@ const TARGET: ModalTargetUser = {
   status: 'online'
 };
 
-const make = (options: { isPresenter?: boolean; talking?: TalkingEntry[] } = {}) => {
+const make = (
+  options: { isPresenter?: boolean; talking?: TalkingEntry[]; roster?: User[] } = {}
+) => {
   const dialogs = new RoomDialogs();
   const toasts = new RoomToasts();
   const sent: { subCmd: string; targetUserId: number }[] = [];
@@ -98,7 +100,7 @@ const make = (options: { isPresenter?: boolean; talking?: TalkingEntry[] } = {})
     session: () => ({
       user: { id: 1 },
       sessionHandle: 'room-1',
-      connectedUsers: [
+      connectedUsers: options.roster ?? [
         ROW(),
         ROW({ id: 3, displayName: 'Cy', emailHash: 'hash-cy', role: 'staff' })
       ]
@@ -571,5 +573,49 @@ describe('kick', () => {
 
     expect(harness.kicksSent).toEqual([]);
     expect(harness.dialogs.prompt).toBeNull();
+  });
+});
+
+/**
+ * `kick-duplicates` KICKS, which it never did before.
+ *
+ * It alerted ``"No duplicates found for "+nick`` unconditionally and never read a roster — one of
+ * the five controls that reported success while doing nothing. The rule is
+ * `#lib/kick-duplicates.ts`; this asserts the wiring, which is the part a pure test cannot see.
+ *
+ * `ROW({ id: 3, … emailHash: 'hash-cy' })` is a DIFFERENT person, and it must survive: matching on
+ * anything other than `emailHash` would kick them too, which is the failure that makes this feature
+ * dangerous rather than merely broken.
+ */
+describe('kick-duplicates', () => {
+  /*
+    A roster with TWO other logins of Bo (`hash-bo`, ids 7 and 8), one unrelated person (`hash-cy`),
+    and Bo's own row. Cy must survive: matching on anything but `emailHash` would kick a stranger,
+    which is the failure that makes this feature dangerous rather than merely broken.
+  */
+  const CROWD = [
+    ROW({ id: 5, displayName: 'Bo', emailHash: 'hash-bo' }),
+    ROW({ id: 7, displayName: 'Bo', emailHash: 'hash-bo' }),
+    ROW({ id: 8, displayName: 'Bo', emailHash: 'hash-bo' }),
+    ROW({ id: 3, displayName: 'Cy', emailHash: 'hash-cy' })
+  ];
+
+  it('kicks every OTHER login of the same person, never the target, never a stranger', () => {
+    const harness = make({ isPresenter: true, roster: CROWD });
+    harness.actions.handle('kick-duplicates', TARGET);
+    harness.dialogs.prompt?.onconfirm('Two of you.');
+
+    expect(harness.kicksSent.map((k) => k.targetUserId).sort()).toEqual([7, 8]);
+    expect(harness.kicksSent.every((k) => k.message === 'Two of you.')).toBe(true);
+    expect(harness.dialogs.alert).toBe('Kicked 2 duplicate(s) of Bo');
+  });
+
+  it('says so when there are none, without sending anything', () => {
+    const harness = make({ isPresenter: true, roster: [ROW({ id: 3, emailHash: 'hash-cy' })] });
+    harness.actions.handle('kick-duplicates', TARGET);
+    harness.dialogs.prompt?.onconfirm('Please stop.');
+
+    expect(harness.kicksSent).toEqual([]);
+    expect(harness.dialogs.alert).toBe('No duplicates found for Bo');
   });
 });

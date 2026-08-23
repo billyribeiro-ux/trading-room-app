@@ -1067,6 +1067,23 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     why: 'everything that leaves the browser as content; five entry points, one refusal path'
   },
   {
+    file: 'lib/room/kicks.svelte.ts',
+    /*
+      Born capped, 2026-08-23, as the destination of an extraction rather than a new feature.
+
+      Building the real `kick-duplicates` loop put `user-actions.svelte.ts` at 788 against 777. The
+      owner ruled extraction, and the seam was already there: `kick` and `kick-duplicates` are what a
+      presenter does to remove a PERSON, the other half of the sentence `RoomSessionControl` owns.
+      Both share a default message, both prompt, both end in one command, and neither touches roster
+      selection, the managed lists or the permission checkboxes.
+
+      The matching RULE is not here — it is pure, in `#lib/kick-duplicates.ts`, following
+      `mute-all-non-admins.ts`. This class only wires dialogs to it.
+    */
+    max: 130,
+    why: 'what a presenter does to remove a PERSON - kick and kick-duplicates; one command, two prompts'
+  },
+  {
     file: 'lib/room/managed-users.svelte.ts',
     /*
       Born capped, 2026-08-23, and born for the reason this contract exists.
