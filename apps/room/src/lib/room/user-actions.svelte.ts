@@ -47,6 +47,15 @@ export interface UserActionCommands {
   /** `forceReload` — reloads ONE member's browser. Presenter-gated on the server. */
   forceReload: (targetUserId: number) => Promise<unknown>;
   /**
+   * `kickUser` — removes ONE member. Presenter-gated on the server, like `forceReload`.
+   *
+   * NO `ban` FIELD, deliberately. The reference's payload carries `ban` and `kickAllInstances`; a ban
+   * needs somewhere durable to record that the person may not return, and this room has none. Taking
+   * the flag and dropping it would be the same defect this command was added to fix — see
+   * `presenter-commands.remote.ts`.
+   */
+  kickUser: (payload: { targetUserId: number; message: string }) => Promise<unknown>;
+  /**
    * `saveCustomPerms` — the five checkboxes, written through to the CONTROLLER.
    *
    * The only command here that changes something durable rather than broadcasting; see
@@ -615,14 +624,25 @@ export class RoomUserActions<
       return;
     }
 
-    if (action === 'kick' || action === 'kick-ban') {
+    /*
+      `kick` NOW SENDS. It used to alert *"User kicked OK"* while sending nothing, because no kick
+      command existed — a control that reported success. The captured wire, and why that is worse
+      than an inert control, are on `kickUser` in `presenter-commands.remote.ts`.
+
+      `kick-ban` IS DELIBERATELY NOT WIRED: a ban must outlive the frame and this room has nowhere to
+      record it, so aliasing it here would drop the ban silently. It is in `INERT_ACTIONS` with that
+      reason.
+    */
+    if (action === 'kick') {
       this.#dialogs.prompt = {
         title: 'Enter the kick message for this user',
         value: 'You have been kicked from the room by an administrator',
-        onconfirm: () => {
+        onconfirm: (message: string) => {
           this.#dialogs.prompt = null;
           this.#closeModal();
-          this.#dialogs.alert = 'User kicked OK';
+          this.#announceThenSend('User kicked OK', () =>
+            this.#commands.kickUser({ targetUserId: user.id, message })
+          );
         }
       };
       return;

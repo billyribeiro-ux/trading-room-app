@@ -33,6 +33,62 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-23 16:55 EDT — `kick` sends for the first time; `kick-ban` becomes honestly inert
+
+**Runtime impact: YES.** A presenter's Kick now removes the person. It previously said it had and did
+nothing.
+
+**Branch `feat/save-permissions`.** Closes the send half of `TODO.md` row 7.
+
+#### What shipped
+
+`kickUser` in `presenter-commands.remote.ts`, built on the `forceReload` precedent because the shape
+is identical: presenter-gated by `presenterRoom()`, which decides authority AND scopes the frame to
+the caller's own room in one call, so nothing is asserted by the client — the 2026-08-07 rule.
+Addressed with `publishToUsers` on `privCmds`, never broadcast: telling a whole room that a named
+person is being removed is moderation state about an individual.
+
+The payload is `{cmd:'kickUser', targetUserId, msg}`. `msg` is the presenter's own typed text, so it
+is bounded — trimmed, then `min(1).max(500)`. Empty is refused because a member disconnected with no
+reason shown is worse than the click failing.
+
+The receiver **emits, then disconnects** — the reverse of `forceReload`'s disconnect-then-emit two
+cases earlier in the same upstream switch. That asymmetry is reproduced rather than normalised, and
+it reads correctly in that direction: the kick carries a message that must reach the screen.
+
+#### `kick-ban` did NOT come with it, and that is the point
+
+The reference's payload carries `ban`. A ban has to outlive the frame — something durable must record
+that the person may not return — and this room has no such store. **Aliasing `kick-ban` onto the plain
+kick would drop the ban silently, which is the exact defect this change repairs.** So it moved out of
+the lying `handled` branch into `INERT_ACTIONS`, where a dead control is at least declared dead.
+
+That is a real improvement even though nothing was built for it: it went from *claiming success* to
+*declaring itself unbuilt*.
+
+#### The negative control, seen red
+
+The new contract test was mutated before being trusted — `kick` made to alert without sending — and it
+failed with `expected [] to deeply equal [ { targetUserId: 5, …(1) } ]`, which is precisely the defect
+it guards. Restored, 27/27.
+
+#### One brittle assertion re-aimed rather than worked around
+
+`unmute-chat-contract.test.ts` pinned the literal `cmd: 'forceReload' | 'unmuteChat'` and went red for
+a change that does nothing to unmute — adding a third command beside it. A test for *"unmuteChat is
+admitted"* should not fail because a third command was admitted. It now asserts membership.
+
+#### Three ceilings raised, after consolidation was exhausted first
+
+Asked, as every raise here is. The first answer was to consolidate: the same evidence had been written
+three times, at the command, the receiver and the handler. Consolidating took events 931→920,
+user-actions 789→777, create-room 1103→1099 — and could go no further, because the residue is wiring,
+not prose. Raised on the owner's ruling to **920 / 777 / 1099**, each with a recorded reason naming
+the kick. Total +28 lines of ceiling for a feature that removes a lie.
+
+**Verified:** room `vitest` **2,636 passed / 188 files**; `svelte-check` **0 errors, 0 warnings**;
+`eslint .` clean; the new test's negative control seen RED and restored.
+
 ### 2026-08-23 16:10 EDT — `kick` says "User kicked OK" and sends nothing, and I had to correct two of my own corrections
 
 **Runtime impact: no.** No code changed. Three records were corrected, one of them twice.

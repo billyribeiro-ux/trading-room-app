@@ -68,6 +68,7 @@ import {
   focusOnScreen,
   focusOnSessionNote,
   forceReload,
+  kickUser,
   presenterCommand
 } from '../../routes/presenter-commands.remote';
 import { videoForAll, youtubeForAll } from '../../routes/for-all-broadcast.remote';
@@ -801,6 +802,7 @@ export function createRoom(deps: RoomDeps) {
       editUsername,
       unmuteChat,
       forceReload,
+      kickUser,
       savePermissions
     },
     session: () => data,
@@ -855,7 +857,11 @@ export function createRoom(deps: RoomDeps) {
     focusSessionNote: (noteId) => notes.focusNote(noteId),
     // Byte 2597102, verbatim. Why it is `alertThen` and not `confirm` is on `RoomDialogs.alertThen`.
     forceReloadRequested: () =>
-      dialogs.alertThen('You need to reload this page to continue', () => location.reload())
+      dialogs.alertThen('You need to reload this page to continue', () => location.reload()),
+    // The presenter's own message, as text. No page swap: see the receiver in `events.svelte.ts`.
+    kicked: (message: string) => {
+      dialogs.alert = message;
+    }
   });
 
   /*

@@ -141,6 +141,8 @@ export class RoomEventStream<Entry> {
      * not this router's to make — the same reasoning `showTab` and `focusSessionNote` carry.
      */
     forceReloadRequested: () => void;
+    /** `kickUser` — the member is removed; the argument is the presenter's own message. */
+    kicked: (message: string) => void;
   }) {
     this.#prefs = options.prefs;
     this.#toasts = options.toasts;
@@ -159,6 +161,7 @@ export class RoomEventStream<Entry> {
     this.#chatMissedWhileHidden = options.chatMissedWhileHidden;
     this.#focusSessionNote = options.focusSessionNote;
     this.#forceReloadRequested = options.forceReloadRequested;
+    this.#kicked = options.kicked;
 
     /** Whether the SSE channel is up. The sidebar's "Chat" line reports it. */
     this.#roomEventsConnected = $state(false);
@@ -194,6 +197,7 @@ export class RoomEventStream<Entry> {
   readonly #showTab: (tab: 'screens' | 'videoplayer') => void;
   readonly #chatMissedWhileHidden: () => void;
   readonly #forceReloadRequested: () => void;
+  readonly #kicked: (message: string) => void;
 
   get connected(): boolean {
     return this.#roomEventsConnected;
@@ -652,7 +656,8 @@ export class RoomEventStream<Entry> {
 
       /* `/privCmdsIn/{uid}-{id}/` - emits `forceReload` and `unmuteChat`, addressed to one member. */
       if (payload.channel === 'privCmds') {
-        const command = payload.data as { cmd?: string; targetUserId?: number } | undefined;
+        const command = payload.data as
+          { cmd?: string; targetUserId?: number; msg?: unknown } | undefined;
         if (command?.cmd === 'forceReload' && command.targetUserId === this.#session().user.id) {
           /*
             DISCONNECT FIRST, THEN ASK — the order is the reference's, at byte 995901:
@@ -689,6 +694,21 @@ export class RoomEventStream<Entry> {
         if (command?.cmd === 'unmuteChat' && command.targetUserId === this.#session().user.id) {
           this.#toasts.show({ kind: 'info', message: 'Chat enabled', enableHtml: false });
           void invalidateAll();
+        }
+        /*
+          EMIT FIRST, THEN DISCONNECT — the reverse of `forceReload` directly above, and upstream's
+          own asymmetry rather than a normalisation of it. It reads correctly in that direction too:
+          the kick carries a MESSAGE that must reach the screen, so tearing the stream down first
+          risks racing the frame's own handler. The wire and why `ban` is absent are on `kickUser` in
+          `presenter-commands.remote.ts`.
+
+          NOT DONE, a gap rather than a decision: upstream sets `currPage="kicked"` and renders
+          `app-kicked-page`. This room has none, so the member is told why and left disconnected.
+        */
+        if (command?.cmd === 'kickUser' && command.targetUserId === this.#session().user.id) {
+          this.#kicked(typeof command.msg === 'string' ? command.msg : '');
+          source.close();
+          return;
         }
         return;
       }

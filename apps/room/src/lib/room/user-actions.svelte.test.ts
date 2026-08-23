@@ -61,6 +61,7 @@ const make = (options: { isPresenter?: boolean; talking?: TalkingEntry[] } = {})
   const toasts = new RoomToasts();
   const sent: { subCmd: string; targetUserId: number }[] = [];
   const reloadsSent: number[] = [];
+  const kicksSent: { targetUserId: number; message: string }[] = [];
   const opened: string[] = [];
   const mentioned: string[] = [];
   const saved: [string, boolean][] = [];
@@ -81,6 +82,10 @@ const make = (options: { isPresenter?: boolean; talking?: TalkingEntry[] } = {})
       editUsername: () => Promise.resolve(null),
       unmuteChat: () =>
         unmuteFails ? Promise.reject(new Error('refused')) : Promise.resolve(null),
+      kickUser: (payload: { targetUserId: number; message: string }) => (
+        kicksSent.push(payload),
+        Promise.resolve(null)
+      ),
       forceReload: (targetUserId: number) => (
         reloadsSent.push(targetUserId),
         Promise.resolve(null)
@@ -128,6 +133,7 @@ const make = (options: { isPresenter?: boolean; talking?: TalkingEntry[] } = {})
     mentioned,
     saved,
     reloadsSent,
+    kicksSent,
     permsSent,
     failPerms: () => (permsFails = true),
     failUnmute: () => (unmuteFails = true),
@@ -518,5 +524,52 @@ describe('the permission checkboxes seed from the roster row', () => {
       false,
       false
     ]);
+  });
+});
+
+/**
+ * `kick` SENDS, and `kick-ban` deliberately does not.
+ *
+ * ## What this replaces
+ *
+ * Until 2026-08-23 both actions shared one branch that opened a prompt, closed the modal and raised
+ * *"User kicked OK"* — while sending nothing, because this room had no kick command to call. A
+ * presenter clicked Kick, was told the person was gone, and the person stayed.
+ *
+ * It passed `user-action-disposition-contract.test.ts` the whole time, counted as `handled` because
+ * a branch existed. A branch that dialogs and does not act is a fourth disposition that contract
+ * cannot see; `TODO.md` row 7 carries that hole.
+ *
+ * ## Why `kick-ban` is asserted as SILENT rather than as sending
+ *
+ * The reference's payload is `{user, msg, ban, kickAllInstances}`. A ban has to outlive the frame,
+ * and this room has nowhere durable to record that somebody may not return. Pointing `kick-ban` at
+ * the plain kick would drop the ban silently — the same shape of defect the kick fix removes — so it
+ * is inert, declared in `INERT_ACTIONS`, and this asserts that it stays that way rather than
+ * quietly acquiring the wrong behaviour.
+ */
+describe('kick', () => {
+  it('sends the typed message to the selected member, and says so', () => {
+    const harness = make({ isPresenter: true });
+    harness.actions.handle('kick', TARGET);
+
+    // The prompt is seeded with the reference's own default before anything is sent.
+    expect(harness.dialogs.prompt?.value).toBe(
+      'You have been kicked from the room by an administrator'
+    );
+    expect(harness.kicksSent).toEqual([]);
+
+    harness.dialogs.prompt?.onconfirm('Please stop.');
+
+    expect(harness.kicksSent).toEqual([{ targetUserId: TARGET.id, message: 'Please stop.' }]);
+    expect(harness.dialogs.alert).toBe('User kicked OK');
+  });
+
+  it('kick-ban sends NOTHING — a ban needs storage this room does not have', () => {
+    const harness = make({ isPresenter: true });
+    harness.actions.handle('kick-ban', TARGET);
+
+    expect(harness.kicksSent).toEqual([]);
+    expect(harness.dialogs.prompt).toBeNull();
   });
 });

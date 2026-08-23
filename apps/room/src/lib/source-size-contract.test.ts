@@ -378,7 +378,18 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       than trust it. Nothing else in the toolchain can: a comment that miscounts the code beside it
       compiles, type-checks and passes every test in this repository.
     */
-    max: 900,
+    /*
+      900 -> 920 on 2026-08-23, and the owner was asked before it moved, as every raise here is.
+
+      What bought it: `kickUser`. The receiver branch, the `kicked` collaborator on the constructor
+      options, its field and assignment, and widening the `privCmds` payload type so `msg` is
+      readable. All of it is WIRING - the evidence for the command, and why `ban` is absent, lives
+      once on `kickUser` in `presenter-commands.remote.ts` and is pointed at from here rather than
+      repeated, which is what the consolidation pass before this raise was for (931 -> 920).
+
+      It removed a control that told a presenter *"User kicked OK"* and sent nothing.
+    */
+    max: 920,
     why: 'the SSE router - six channels of transcription, and the one block that did not route has gone'
   },
   {
@@ -1126,7 +1137,11 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       already has a `permissions` string meaning something else entirely. Shipping the write path
       without them would have been worse than not shipping it.
     */
-    max: 775,
+    /*
+      775 -> 777 on 2026-08-23. Two lines, for the `kick` branch that finally sends and the
+      `kickUser` member on `UserActionCommands`. Consolidation took this from 789 first.
+    */
+    max: 777,
     why: 'everything that can be done TO a user; handle() alone was 249 lines on the page'
   },
   {
@@ -1184,7 +1199,11 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       is what `remote-call-sites-contract` requires — a namespace or split import defeats it, and
       that gate exists because `presenterCommand` shipped dead for three commits.
     */
-    max: 1093,
+    /*
+      1093 -> 1099 on 2026-08-23: the `kickUser` import, its entry in the commands object, and the
+      `kicked` receiver that shows the presenter's message. Six lines of pure wiring.
+    */
+    max: 1099,
     why: 'the composition root - 36 constructions and their citations, assembly and nothing else'
   },
   {

@@ -145,6 +145,71 @@ export const forceReload = command(z.number().int().positive(), async (targetUse
   });
 });
 
+/**
+ * `kickUser` — a presenter removes one member from the room.
+ *
+ * ## The control it repairs told the presenter it had worked
+ *
+ * `RoomUserActions.handle` answered `kick` by opening a prompt, closing the modal and alerting
+ * *"User kicked OK"*. There was no command in that branch and **no command it could call**: this
+ * room's `UserActionCommands` had `presenter`, `editUsername`, `unmuteChat`, `forceReload` and
+ * `savePermissions`, and the only `kickUser` text in `apps/room/src` was inside a comment. So a
+ * presenter clicked Kick, was told the person was gone, and the person stayed.
+ *
+ * That is a worse failure than the eleven controls in `INERT_ACTIONS`, which at least say nothing —
+ * and it is worse than `forceReload`'s old state too, because `force-reload` at least sat in
+ * `EXACT_ALERTS` where the lie was tracked. This one was in the `handled` bucket of
+ * `user-action-disposition-contract.test.ts`, counted as done, because a branch existed.
+ *
+ * ## The wire, read rather than designed
+ *
+ * Sender, at byte 2078708 of `docs/source-v4-2026-08-15/main.d1d09071be31f1ba.js`:
+ * `sendServerAdminCommand("kickUser",{user:o.user,msg:s,ban:e,kickAllInstances:i})`, followed by
+ * `setPreference("kickMsg",s)`, `doCloseModal()` and `bootbox.alert("User kicked OK")` — so our
+ * message text and our ordering were already faithful and only the send was missing.
+ *
+ * Receiver, at byte 996192: `case"kickUser": e.appEventBus.emit("kickPage", xe.msg), e.disconnect()`.
+ * **Emit THEN disconnect**, which is the opposite of `forceReload`'s `disconnect()` then emit two
+ * cases earlier in the same switch. Both were read in one pass; the asymmetry is upstream's and is
+ * reproduced rather than tidied, for the same reason it is preserved on the receiving side.
+ *
+ * ## `ban` is NOT accepted here, deliberately
+ *
+ * The reference's payload carries `ban` and `kickAllInstances`. A ban has to outlive the frame — it
+ * needs somewhere durable to record that this person may not return — and this room has no such
+ * store. Taking a `ban` flag and dropping it would reproduce the exact defect this command exists to
+ * fix: a control that reports something it did not do. `kick-ban` therefore stays unwired and is
+ * recorded in `TODO.md` rather than quietly aliased onto this.
+ *
+ * ## Addressed, not broadcast
+ *
+ * `publishToUsers` on `privCmds`, for the reason `forceReload` gives above: the frame is meaningful
+ * to exactly one member, and telling a whole room that a named person is being removed is moderation
+ * state about an individual that is not the room's business. `presenterRoom()` is the authority — the
+ * server decides the caller is a presenter and scopes the frame to the caller's own room in one call,
+ * so no client assertion is trusted. That is the 2026-08-07 rule.
+ */
+export const kickUser = command(
+  z.object({
+    targetUserId: z.number().int().positive(),
+    /*
+      Bounded, and trimmed before the bound is applied. The reference seeds this prompt from
+      `getPreference("kickMsg")` and lets the presenter type freely, so the value is genuinely
+      user-authored text arriving from a client — it gets a length it cannot exceed rather than
+      being trusted. Empty is refused because the member would be disconnected with no reason shown.
+    */
+    message: z.string().trim().min(1).max(500)
+  }),
+  async ({ targetUserId, message }) => {
+    ensureDatabase();
+    publishToUsers(presenterRoom(), [targetUserId], {
+      channel: 'privCmds',
+      // `msg`, not `message`: the receiver reads `xe.msg`, and the wire name is the capture's.
+      data: { cmd: 'kickUser', targetUserId, msg: message }
+    });
+  }
+);
+
 export const focusOnSessionNote = command(z.number().int().positive(), async (noteId) => {
   ensureDatabase();
   publishToRoom(presenterRoom(), { channel: 'cmds', data: { cmd: 'focusOnSessionNote', noteId } });
