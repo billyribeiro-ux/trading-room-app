@@ -33,6 +33,46 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-23 11:08 EDT — state of the repository, and the ratchet reaching its designed limit
+
+**Runtime impact: no.** A status entry plus one measurement, written because the measurement changes
+what the next piece of work has to be.
+
+**SHIPPED TO `main` TODAY, all verified and negative-controlled:** the controller's permanent mute
+that was loaded and never read; private chat, which had no mute gate of either kind; the
+`focusOnSessionNote` controls that brought nobody; a deny-by-default gate over the whole user-action
+dispatch surface; and the `TODO.md` audit that found eleven dead controls where two were recorded.
+
+**ON THE BRANCH, green and awaiting merge:** `forceReload` — a working action and a working receiver
+that nothing joined, next to a button that raised "Reload request sent OK" and sent nothing — plus
+the `RoomSessionControl` extraction that made room for it. **2,592 tests / 185 files**, `svelte-check`
+**1,228 / 0 / 0**, and **no ceiling was raised** to get there.
+
+**THE MEASUREMENT, and it is the useful part of this entry.** The next fix — `forceReload` reloads a
+member's page with no warning, where the reference disconnects, warns, and reloads only on dismissal
+(bytes 995901 and 2597102) — touches three files, and every one is EXACTLY at its ceiling:
+`events.svelte.ts` 903/903, `RoomOverlays.svelte` 769/769, `dialogs.svelte.ts` 115/115.
+
+`events.svelte.ts` was then checked for slack rather than assumed to have none: **zero unused imports,
+zero consecutive blank lines**. There is nothing to reclaim.
+
+**That is the ratchet working exactly as designed, not a fault.** Three caps reached at once is the
+system saying the next change to this area pays down size debt BEFORE it adds behaviour. Raising a
+number is not available — that rule was tested today and the two raises made on inference were
+reverted — and shortening a comment never was.
+
+**The seam is measured and waiting.** `events.svelte.ts` dispatches six channels: `cmds` 314 lines,
+`chat` 150, `roster` **93**, `privChat` 43, `privCmds` 34, `cmdsAdmin` 7. The roster block is
+self-contained and needs five collaborators (`isPresenter`, `prefs`, `roster`, `session`, `toasts`),
+so it is the candidate — 93 lines against the ~8 the warning fix needs. Same shape as the extraction
+that took `RoomUserActions` from 749 to 708 earlier today, and that one shipped clean.
+
+**Ten items are open and each says what it needs**, in `TODO.md` under *OPEN RIGHT NOW*. Two are
+blocked on a decision rather than on work: the extraction above, and whether to diverge from a
+captured string for the two controls that promise a server command and only refetch locally — where
+the wire names are now known (`refreshRoster`, `softResetSession`, bytes 2169139 and 2167060) but the
+SERVER half is not in the room bundle, so building it would be inventing.
+
 ### 2026-08-23 10:58 EDT — session control leaves RoomUserActions, because the contract said extract and I had asked a question it already answered
 
 **Runtime impact: no.** Eleven action names moved between modules and behave identically. What changed
