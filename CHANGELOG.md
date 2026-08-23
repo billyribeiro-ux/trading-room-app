@@ -33,6 +33,34 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-23 12:35 EDT — both PRs merged, `main` green, and the two finished rows deleted from `TODO.md`
+
+**Runtime impact: yes, via the merges** — `main` auto-deploys, and PR #127 (`542b038`) plus PR #128
+(`55a92b1`) both landed. No new code in this entry; it records the state after them.
+
+**`main` was RED for twelve minutes and it is worth writing down rather than glossing.** PR #127
+merged at 16:19 UTC carrying the `publishToUsers` lint error, so `Frontend quality` on `main` failed
+(run 32651302292). PR #128 merged at 16:31 with the fix and `main` went green — `Frontend quality`,
+`Backend quality` and `smoke` all success (runs 32651930707 / 32651930759 / 32651930754). The
+sequence is the argument for the repo's own rule that the full gate runs before a push, not after:
+the error was already on the branch at 15:08 and two pushes went out over it.
+
+**`TODO.md` bookkeeping.** The two `forceReload` rows are DELETED, not struck through, which is what
+the root standard asks for — finished work lives here, open work lives there, and a row kept in both
+places is how one of them goes stale. The open list renumbers 1-11.
+
+Renumbering was done wrong on the first attempt and is recorded because the failure is reusable: a
+regex over `| <n> |` matched a numbered table EARLIER in the file as well, so the counter arrived at
+this table already at 3 and every row came out one-based-plus-three. The diff caught it. The fix was
+to slice the file to the section first and renumber inside that slice only. Nothing outside the open
+table was modified, verified by reading the diff rather than by assuming the scope.
+
+**Also corrected:** the section's own intro claimed "the two at the bottom" were the late additions.
+Three were, and they are now named.
+
+**Verified after the merges:** `git log` shows both merge commits on `main`; the three `main`
+workflows are green; the working tree is clean and local `main` is at `55a92b1`.
+
 ### 2026-08-23 12:29 EDT — the lint error CI was failing on, and why a targeted run could not see it
 
 **Runtime impact: no.** One unused import removed; no behaviour changed.
