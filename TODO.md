@@ -311,6 +311,15 @@ control plane on both send paths — server-side, from data the server owns, rat
 value that had already been serialised into the page. Pinned by three cases in
 `message-alert-action-contract.test.ts`, negative-controlled.
 
+**A THIRD PATH had no mute gate at all and is also FIXED: private chat.** `sendPrivateMessage`
+checked NEITHER mute — not `chat_mutes`, not the controller's — so a muted member could DM, which is
+the worse direction because nobody else in the room can see it. In scope rather than assumed: the
+reference gates its own private-chat composer on `e.isConnected && e.chatEnabled` (bundle byte
+2199385) and a mute is what clears `chatEnabled`. The guard now lives in `#lib/server/chat-mute.ts`
+and is SHARED rather than copied — two copies of a rule this small is how one drifts, which is
+precisely what happened to the 24-hour mute when it was enforced on `sendMessage` and not on
+`replyMessage`.
+
 **Still open beside it, and NOT fixed:** `askQuestion` (`alert-questions.remote.ts:56`) has **no mute
 gate of either kind**. Whether a CHAT mute should silence Q&A is a policy question with no evidence
 either way in anything read so far, so it is recorded rather than guessed — extending the gate on a

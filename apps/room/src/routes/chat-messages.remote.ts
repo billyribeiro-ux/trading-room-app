@@ -1,6 +1,6 @@
 import { error } from '@sveltejs/kit';
 import { command, getRequestEvent } from '$app/server';
-import { and, eq, gt } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { z } from 'zod';
 import { MAX_MESSAGE_BODY } from '#lib/message-bounds.js';
 import { isChatTab, type ChatTab } from '#lib/types.js';
@@ -10,9 +10,9 @@ import { capturedRoomItem } from '#lib/server/captured-room.js';
 import { isEmptyChatHtml, sanitizeChatHtml } from '#lib/server/chat-html.js';
 import { hashEmail } from '#lib/server/connection.js';
 import { db, ensureDatabase } from '#lib/server/db/index.js';
-import { chatMutes, messages, users } from '#lib/server/db/schema.js';
+import { messages, users } from '#lib/server/db/schema.js';
 import { consumeRateLimit } from '#lib/server/rate-limit.js';
-import { readRoomConfig } from '#lib/server/room-config-client.js';
+import { refuseIfChatMuted } from '#lib/server/chat-mute.js';
 import { publishChatToRoom } from '#lib/server/room-events.js';
 
 /*
@@ -57,61 +57,13 @@ function requireMessageAllowance(userId: number): void {
   }
 }
 
-/**
- * Refuses while a live mute exists — for BOTH paths, and now for BOTH KINDS of mute.
- *
- * A mute is granted in one room and must not follow somebody into another, which is why the room is
- * part of the predicate rather than just the target.
- *
- * The wording is the action's own: `fail(403, { muted: true })` carried a flag rather than a
- * sentence, because the composer already renders the captured "Chat Disabled" block with the mute's
- * expiry and did not need a second message. `error(403, 'Chat muted.')` is the closest a command can
- * come — the client reads the status, not the sentence.
- *
- * ## THERE ARE TWO MUTES, AND ONLY ONE OF THEM WAS ENFORCED — fixed 2026-08-23
- *
- * `chat_mutes` is the room's own 24-hour mute, granted from the message context menu. The OTHER one
- * is the controller's: the manage page's `applyUserOpcode` writes membership `role = 3`, which the
- * room-config payload surfaces as `member.muted` and which `room-config-client.ts:360` documents as
- * *"3 muted"*. It has no expiry — it is the permanent one, and it is the more severe of the two.
- *
- * **It was loaded and never read.** `+page.server.ts:381` puts `muted: roomConfig.member?.muted ??
- * false` into the page payload and nothing anywhere consumed it, so an owner who muted somebody
- * indefinitely from the manage page watched them keep posting. The control reported success, the
- * database recorded the mute, and the room never asked.
- *
- * ## Why the controller is asked here rather than the payload trusted
- *
- * The payload value is a CLIENT-side fact by the time it exists — it was serialised into the page.
- * Authority is decided on the server from data the server owns, which on this boundary means asking
- * the control plane, and that is what `readRoomConfig` does. This is the 2026-08-07 escalation rule
- * applied to a mute rather than to a role, and the cost is one control-plane read per send, already
- * memoised per request by `readRoomConfig`'s own cache.
- *
- * A `RoomConfigUnavailable` is deliberately NOT caught. `+page.server.ts:257` calls the same function
- * with no try/catch, so a room whose control plane is unreachable does not render at all; a send that
- * fails in that state is the existing policy, not a new one, and the alternative is letting a muted
- * member talk whenever the controller hiccups.
- */
-async function refuseIfMuted(room: string, user: { id: number; email: string }): Promise<void> {
-  const activeMute = db
-    .select({ id: chatMutes.id })
-    .from(chatMutes)
-    .where(
-      and(
-        eq(chatMutes.roomShortCode, room),
-        eq(chatMutes.targetUserId, user.id),
-        gt(chatMutes.expiresAt, new Date())
-      )
-    )
-    .get();
-  if (activeMute) error(403, 'Chat muted.');
+/*
+  The mute guard moved to `#lib/server/chat-mute.ts` on 2026-08-23 and is NOT duplicated here.
 
-  const { request } = getRequestEvent();
-  const membership = await readRoomConfig(request, room, user.email);
-  if (membership.member?.muted === true) error(403, 'Chat muted.');
-}
-
+  Private chat needs the identical answer and a `.remote.ts` module cannot export a non-remote
+  helper, so the invariant left rather than being written a second time — which is the same argument
+  this module's own header makes for declaring it once and having both commands call it.
+*/
 /**
  * Tell the room.
  *
@@ -188,7 +140,7 @@ export const sendMessage = command(
   }),
   async ({ body: submittedBody, bodyHtml: submittedHtml, room }) => {
     ensureDatabase();
-    const { locals } = getRequestEvent();
+    const { locals, request } = getRequestEvent();
     const user = requireUser(locals);
     const shortCode = requireRoomShortCode(locals);
 
@@ -201,7 +153,7 @@ export const sendMessage = command(
     if (!body) error(400, 'A message is required.');
     if (body.length > MAX_MESSAGE_BODY) error(400, 'That message is too long.');
 
-    await refuseIfMuted(shortCode, user);
+    await refuseIfChatMuted(request, shortCode, user);
 
     /*
       Both segments of `/sess/${sessionID}/chat/${channel}/`.
@@ -257,7 +209,7 @@ export const replyMessage = command(
   }),
   async ({ body: submittedBody, messageId }) => {
     ensureDatabase();
-    const { locals } = getRequestEvent();
+    const { locals, request } = getRequestEvent();
     const user = requireUser(locals);
     const shortCode = requireRoomShortCode(locals);
 
@@ -269,7 +221,7 @@ export const replyMessage = command(
     if (body.length > MAX_MESSAGE_BODY) error(400, 'That message is too long.');
 
     // NEW: the mute `sendMessage` always honoured and this path never looked at.
-    await refuseIfMuted(shortCode, user);
+    await refuseIfChatMuted(request, shortCode, user);
 
     const original =
       messageId < 0

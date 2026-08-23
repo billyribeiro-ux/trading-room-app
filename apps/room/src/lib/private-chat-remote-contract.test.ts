@@ -308,3 +308,52 @@ describe('the client’s own half', () => {
     expect(failure).not.toContain('#threads');
   });
 });
+
+/*
+  A MUTED MEMBER MAY NOT DM — the gate this path never had, added 2026-08-23.
+
+  `sendPrivateMessage` checked NO mute of either kind. Not `chat_mutes`, the room's 24-hour one that
+  `mute24` writes and that says it stops somebody posting for a day; and not the controller's
+  permanent `role = 3`, which says it stops them entirely. Both were one click away from being walked
+  around, and privately — the worse direction, because nobody else in the room can see it happening.
+
+  It is the captured behaviour rather than a policy invented here: the reference gates its own
+  private-chat composer on `e.isConnected && e.chatEnabled` (bundle byte 2199385, inside the
+  private-chat template beside `pmSearchTerm`), and a mute is precisely what clears `chatEnabled`.
+
+  Asserted structurally because the executable half lives with the shared guard — this file's job is
+  that the CALL is here, in the right function, before anything is written.
+*/
+describe('the mute reaches private chat too', () => {
+  it('sendPrivateMessage calls the shared guard', () => {
+    const body = send();
+    expect(body, 'private chat must ask the same question chat does').toContain(
+      'await refuseIfChatMuted(request, room, user)'
+    );
+  });
+
+  it('and refuses BEFORE writing anything', () => {
+    /*
+      Order is the whole point. A guard that ran after `insertPrivateMessage` would refuse the caller
+      and still leave the message in the recipient's log, which is worse than not refusing at all.
+    */
+    const body = send();
+    const guard = body.indexOf('refuseIfChatMuted');
+    const write = body.indexOf('insertPrivateMessage');
+    expect(guard, 'the guard must be present').toBeGreaterThan(-1);
+    expect(write, 'the write must be present').toBeGreaterThan(-1);
+    expect(guard, 'the guard must come first').toBeLessThan(write);
+  });
+
+  it('the guard is shared, not copied', () => {
+    /*
+      Two copies of a rule this small is how one of them drifts — which is exactly what happened to
+      the 24-hour mute, enforced on `sendMessage` and not on `replyMessage`, and recorded in
+      `chat-messages.remote.ts`'s own header as the defect that argued for declaring it once.
+    */
+    expect(remoteCode, 'imported from the one module that owns it').toContain(
+      "import { refuseIfChatMuted } from '#lib/server/chat-mute.js'"
+    );
+    expect(remoteCode.includes('from(chatMutes)'), 'and NOT re-implemented here').toBe(false);
+  });
+});
