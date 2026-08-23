@@ -161,3 +161,54 @@ export const youtubeForAll = command(
     publishToRoom(room, { channel: 'cmds', data: { cmd: 'playYTForAll', url: trimmed } });
   }
 );
+
+/**
+ * `sendSalesImageToChat` and `sendUsersToURL` — the two Session Control broadcasts that told the
+ * presenter *"Command send OK."* and sent nothing.
+ *
+ * ## What they were
+ *
+ * `session-send-sales-image` and `session-send-users-url` shared a branch with
+ * `session-send-video`, which is GENUINE — it validates, refuses a duplicate and writes
+ * `localStorage`. Its two siblings fell past all of that to `closeModal()` and an alert. A reader
+ * checking that branch saw real work and moved on, which is exactly why they lasted.
+ *
+ * ## Both ends, read at bytes 1015180 and 1015357 of the v4 bundle
+ *
+ *     case"sendSalesImageToChat": if(!i||!i.url) return;
+ *       this.globals.isPresenter || this.appEventBus.emit("sendSalesImageToChat",i); break;
+ *     case"sendUsersToURL": if(!i||!i.url) return;
+ *       this.globals.isPresenter || this.appEventBus.emit("sendUsersToURL",i); break;
+ *
+ * Two things there are easy to miss and both are reproduced by the receiver, not here:
+ *
+ *  - **the frame is IGNORED without a `url`** — `!i || !i.url` — so an empty broadcast is a no-op
+ *    rather than a member being sent to nowhere;
+ *  - **`globals.isPresenter ||` means the PRESENTER DOES NOT ACT ON THEIR OWN BROADCAST.** The
+ *    sender is deliberately excluded, which is why this module's own note that "the sender learns
+ *    its own command from the channel like everybody else" needs qualifying for these two: they
+ *    learn it and then decline it.
+ *
+ * The senders are the buttons `" Send sales image to chat "` and `" Send users to URL "` at byte
+ * 2147273ff, both taking no argument — the presenter is prompted for the URL first, which is what
+ * our `Please enter the URL:` prompt already does.
+ *
+ * ## Why the same URL gate as the video
+ *
+ * `sendUsersToURL` navigates every member's browser and `sendSalesImageToChat` puts a presenter's
+ * typed string into every member's chat. Both are a presenter's text reaching every browser in the
+ * room, which is precisely the hazard `broadcastableUrl` was written for — parsed, deny-by-default,
+ * not the client's substring test.
+ */
+export const sessionSendUrl = command(
+  forAllArgs(['sendSalesImageToChat', 'sendUsersToURL']),
+  async ({ cmd, url }) => {
+    ensureDatabase();
+    const room = presenterRoom();
+
+    const target = broadcastableUrl(url ?? '');
+    if (!target) error(400, 'That is not a url this room will send.');
+
+    publishToRoom(room, { channel: 'cmds', data: { cmd, url: target } });
+  }
+);

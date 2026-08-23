@@ -241,11 +241,7 @@ describe('every dispatched action has exactly one disposition', () => {
     'admin-notes-password':
       'alerts "Wrong password!" HARDCODED, never comparing — needs sessData.deleteAlertPW delivered to the room',
     'session-save-close-message':
-      'alerts "Message Saved" and writes nothing — needs somewhere to save it',
-    'session-send-sales-image':
-      'alerts "Command send OK." and sends nothing — shares a branch with the GENUINE session-send-video, which is what made it easy to miss',
-    'session-send-users-url':
-      'alerts "Command send OK." and sends nothing — same branch, same reason'
+      'alerts "Message Saved" and writes nothing — needs somewhere to save it'
   };
 
   it('a handled branch that only raises a dialog is DECLARED, not silently counted as handled', () => {

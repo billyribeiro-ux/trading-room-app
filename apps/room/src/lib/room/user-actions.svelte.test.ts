@@ -64,6 +64,7 @@ const make = (
   const sent: { subCmd: string; targetUserId: number }[] = [];
   const reloadsSent: number[] = [];
   const kicksSent: { targetUserId: number; message: string }[] = [];
+  const urlsSent: { cmd: string; url: string }[] = [];
   const opened: string[] = [];
   const mentioned: string[] = [];
   const saved: [string, boolean][] = [];
@@ -84,6 +85,10 @@ const make = (
       editUsername: () => Promise.resolve(null),
       unmuteChat: () =>
         unmuteFails ? Promise.reject(new Error('refused')) : Promise.resolve(null),
+      sessionSendUrl: (payload: { cmd: string; url: string }) => (
+        urlsSent.push(payload),
+        Promise.resolve(null)
+      ),
       kickUser: (payload: { targetUserId: number; message: string }) => (
         kicksSent.push(payload),
         Promise.resolve(null)
@@ -136,6 +141,7 @@ const make = (
     saved,
     reloadsSent,
     kicksSent,
+    urlsSent,
     permsSent,
     failPerms: () => (permsFails = true),
     failUnmute: () => (unmuteFails = true),
@@ -617,5 +623,41 @@ describe('kick-duplicates', () => {
 
     expect(harness.kicksSent).toEqual([]);
     expect(harness.dialogs.alert).toBe('No duplicates found for Bo');
+  });
+});
+
+/**
+ * The two Session Control broadcasts that alerted `Command send OK.` and sent nothing.
+ *
+ * They shared a branch with `session-send-video`, which is GENUINE — it validates, refuses a
+ * duplicate and writes `localStorage`. That is why they lasted: the branch reads as working code.
+ * Command names are the capture's, at bytes 1015180 and 1015357.
+ */
+describe('session send-to-room broadcasts', () => {
+  it('sends the sales image under the captured command name', () => {
+    const harness = make({ isPresenter: true });
+    harness.actions.handle('session-send-sales-image', TARGET);
+    harness.dialogs.prompt?.onconfirm('https://example.test/a.png');
+
+    expect(harness.urlsSent).toEqual([
+      { cmd: 'sendSalesImageToChat', url: 'https://example.test/a.png' }
+    ]);
+    expect(harness.dialogs.alert).toBe('Command send OK.');
+  });
+
+  it('sends the users URL under its own command name, not the image one', () => {
+    const harness = make({ isPresenter: true });
+    harness.actions.handle('session-send-users-url', TARGET);
+    harness.dialogs.prompt?.onconfirm('https://example.test/go');
+
+    expect(harness.urlsSent).toEqual([{ cmd: 'sendUsersToURL', url: 'https://example.test/go' }]);
+  });
+
+  it('refuses a url with no scheme, and sends nothing', () => {
+    const harness = make({ isPresenter: true });
+    harness.actions.handle('session-send-users-url', TARGET);
+    harness.dialogs.prompt?.onconfirm('example.test/go');
+
+    expect(harness.urlsSent).toEqual([]);
   });
 });

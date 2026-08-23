@@ -45,6 +45,11 @@ export interface UserActionCommands {
   }) => Promise<unknown>;
   editUsername: (payload: { userId: number; username: string }) => Promise<unknown>;
   unmuteChat: (payload: { targetUserId: number }) => Promise<unknown>;
+  /** A presenter's url to every OTHER browser — the receiver excludes the sender. */
+  sessionSendUrl: (payload: {
+    cmd: 'sendSalesImageToChat' | 'sendUsersToURL';
+    url: string;
+  }) => Promise<unknown>;
   /** `forceReload` — reloads ONE member's browser. Presenter-gated on the server. */
   forceReload: (targetUserId: number) => Promise<unknown>;
   /**
@@ -554,8 +559,15 @@ export class RoomUserActions<
             this.#dialogs.alert = 'Video added.';
             return;
           }
+          // SENDS since 2026-08-23; both alerted and sent nothing. See `sessionSendUrl`.
           this.#closeModal();
-          this.#dialogs.alert = 'Command send OK.';
+          this.#announceThenSend('Command send OK.', () =>
+            this.#commands.sessionSendUrl({
+              cmd:
+                action === 'session-send-sales-image' ? 'sendSalesImageToChat' : 'sendUsersToURL',
+              url
+            })
+          );
         }
       };
       return;

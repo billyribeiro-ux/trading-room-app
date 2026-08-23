@@ -71,7 +71,7 @@ import {
   kickUser,
   presenterCommand
 } from '../../routes/presenter-commands.remote';
-import { videoForAll, youtubeForAll } from '../../routes/for-all-broadcast.remote';
+import { sessionSendUrl, videoForAll, youtubeForAll } from '../../routes/for-all-broadcast.remote';
 
 import {
   deleteFile as deleteFileCommand,
@@ -803,6 +803,7 @@ export function createRoom(deps: RoomDeps) {
       unmuteChat,
       forceReload,
       kickUser,
+      sessionSendUrl,
       savePermissions
     },
     session: () => data,
@@ -858,10 +859,8 @@ export function createRoom(deps: RoomDeps) {
     // Byte 2597102, verbatim. Why it is `alertThen` and not `confirm` is on `RoomDialogs.alertThen`.
     forceReloadRequested: () =>
       dialogs.alertThen('You need to reload this page to continue', () => location.reload()),
-    // The presenter's own message, as text. No page swap: see the receiver in `events.svelte.ts`.
-    kicked: (message: string) => {
-      dialogs.alert = message;
-    }
+    // The presenter's own message, as text. No page swap: see `events.svelte.ts`.
+    kicked: (message: string) => (dialogs.alert = message)
   });
 
   /*

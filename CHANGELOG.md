@@ -33,6 +33,53 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-23 19:20 EDT — both "Command send OK." liars now send
+
+**Runtime impact: YES, the send half.** Two Session Control broadcasts that alerted success and sent
+nothing now issue a real, presenter-gated, URL-checked command.
+
+**Branch `feat/save-permissions`.**
+
+#### The two, and why they lasted
+
+`session-send-sales-image` and `session-send-users-url` shared a branch with `session-send-video`,
+which is **genuine** — it validates the URL, refuses a duplicate and writes `localStorage`. Its two
+siblings fell past all of that to `closeModal()` and `'Command send OK.'`. **A reader checking that
+branch saw real work and moved on**, which is exactly why they survived every review.
+
+#### Both ends read, and two details that are easy to miss
+
+Bytes 1015180 and 1015357 give the receivers:
+
+```
+case"sendSalesImageToChat": if(!i||!i.url) return;
+  this.globals.isPresenter || this.appEventBus.emit("sendSalesImageToChat",i); break;
+```
+
+The frame is **ignored without a `url`**, so an empty broadcast is a no-op rather than sending members
+nowhere. And `globals.isPresenter ||` means **the presenter does not act on their own broadcast** —
+the sender is deliberately excluded, which qualifies this module's own note that "the sender learns
+its own command from the channel like everybody else": here it learns it and declines.
+
+#### The send only, and the receiver said so
+
+`sessionSendUrl` reuses `broadcastableUrl` — parsed, deny-by-default — because both commands put a
+presenter's typed string into every member's browser, which is the hazard that function exists for.
+**The receiver half is NOT built**: the reference emits an event and what its app then does was not
+read, so building it would be invention. `TODO.md` row 7 says so.
+
+#### Two mistakes of my own, both caught by the gates
+
+The `sessionSendUrl` import landed in the **wrong module's import block** — `presenter-commands`
+rather than `for-all-broadcast` — because the anchor I matched on appeared in both. `svelte-check`
+named it exactly. And the ceiling failed by **one line**, because the contract counts the trailing
+line and `wc -l` does not; reclaimed from my own two-line pointer rather than by raising anything.
+
+**No ceiling was raised.** `user-actions.svelte.ts` 777/777, `create-room.svelte.ts` 1097/1099.
+
+**Verified:** room `vitest` **2,647 passed / 188 files**; `svelte-check` **0 errors, 0 warnings**;
+`eslint .` clean; three new tests including a no-scheme refusal that asserts nothing is sent.
+
 ### 2026-08-23 18:40 EDT — `kick-duplicates` kicks, and `RoomKicks` is the domain it lives in
 
 **Runtime impact: YES.** A presenter kicking a person's other logins now kicks them. It previously
