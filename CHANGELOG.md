@@ -33,6 +33,52 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-23 17:15 EDT — `kick` was not alone: five more controls report success and do nothing
+
+**Runtime impact: no.** No code changed. Five defects of the same class are now written down with the
+line each was read at.
+
+**Branch `feat/save-permissions`.** `TODO.md` row 8, new.
+
+#### Asking the gate's question by hand
+
+`kick` hid in the `handled` bucket because a branch existed. If that hole let one through, it can let
+others through, so the question was asked of every branch: **does this actually act?**
+
+A probe over the dispatch body flagged six branches with no acting marker. **Three were false
+positives of my own marker list**, and each was read before being believed — `copied-to-clipboard`
+and `invalid-restream-link` are notices about something the caller has already done, and
+`mute-all-non-admins` calls `this.muteAllNonAdmins()`, a real method my marker list simply did not
+name. A probe is not a finding.
+
+#### The five that survived reading
+
+| control | what it says | what it does |
+| --- | --- | --- |
+| `kick-duplicates` | `"No duplicates found for <nick>"` | **hardcoded** — never looks at a roster |
+| `admin-notes-password` | `"Wrong password!"` | **hardcoded** — never compares anything |
+| `session-save-close-message` | `"Message Saved"` | writes nothing |
+| `session-send-sales-image` | `"Command send OK."` | sends nothing |
+| `session-send-users-url` | `"Command send OK."` | sends nothing |
+
+The last two are the instructive ones. They share a branch with `session-send-video`, which is
+**genuine** — it validates the URL, reads the stored list, refuses a duplicate and writes
+`localStorage`. Its two siblings fall past all of that to `closeModal()` and `'Command send OK.'`.
+A reader checking that branch sees real work and moves on.
+
+#### Why this is one finding and not five
+
+Each is small. Together they are the shape of a gate that measures the wrong thing:
+`user-action-disposition-contract.test.ts` sorts actions into handled / alerted / inert and states
+there is *"no fourth option"*. **There is, and it now has five members plus the `kick` that was fixed
+this afternoon.** Until that contract asserts a `handled` branch must reach a command or write state,
+every one of these counts as done.
+
+Not fixed here, deliberately: four of the five need a wire or a store that does not exist
+(`kick-duplicates` needs the roster's `emailHash`, `admin-notes-password` needs `deleteAlertPW` to
+reach the room), and inventing behaviour for them is what this repository forbids. What is buildable
+first is the contract.
+
 ### 2026-08-23 16:55 EDT — `kick` sends for the first time; `kick-ban` becomes honestly inert
 
 **Runtime impact: YES.** A presenter's Kick now removes the person. It previously said it had and did
