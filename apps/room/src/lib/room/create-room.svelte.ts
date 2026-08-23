@@ -57,7 +57,7 @@ import { RoomMenus } from '#lib/room/menus.svelte.js';
 import { RoomPolls } from '#lib/room/polls.svelte.js';
 import { page } from '$app/state';
 import { invalidate, invalidateAll } from '$app/navigation';
-import { unmuteChat } from '../../routes/chat-mute.remote';
+import { muteChat, unmuteChat } from '../../routes/chat-mute.remote';
 
 import {
   deletePrivateChatLog as deletePrivateChatLogCommand,
@@ -800,6 +800,7 @@ export function createRoom(deps: RoomDeps) {
     commands: {
       presenter: presenterCommand,
       editUsername,
+      muteChat,
       unmuteChat,
       forceReload,
       kickUser,
@@ -860,7 +861,9 @@ export function createRoom(deps: RoomDeps) {
     forceReloadRequested: () =>
       dialogs.alertThen('You need to reload this page to continue', () => location.reload()),
     // The presenter's own message, as text. No page swap: see `events.svelte.ts`.
-    kicked: (message: string) => (dialogs.alert = message)
+    kicked: (message: string) => (dialogs.alert = message),
+    // ONE instance, shared with the presenter's two buttons — see `RoomChatMute`.
+    chatMute: userActions.chatMute
   });
 
   /*

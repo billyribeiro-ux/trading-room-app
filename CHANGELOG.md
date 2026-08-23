@@ -33,6 +33,90 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-23 22:40 EDT — the chat mute was enforced and never announced. Now the member is told
+
+**Runtime impact: YES.** Two changes a member can see: a mute now says so the moment it lands, and
+the user modal's *" Mute Chat for 24hrs "* actually mutes.
+
+**Branch `feat/save-permissions`.** Closes `TODO.md` row 7's third liar and builds the fourth of
+row 9's eleven `privCmdsIn` receivers.
+
+#### Two defects, one subject
+
+**The mute was enforced and never announced.** `refuseIfChatMuted` has refused sends the whole time
+and the loader exposes `chatMutedTill` so the composer can show the captured `Chat Disabled` block —
+but only on the NEXT page load. Between the mute and that load a member sat in front of an enabled
+composer, typed, pressed send, and watched nothing happen. That is verbatim the silence `unmuteChat`
+had until it was given this channel, and its own docblock said so: *"the state changed and nobody was
+told"*.
+
+**And the modal's mute button lied.** `mute-chat-24` sat in `EXACT_ALERTS` raising the reference's
+own *"user chat muted"* over nothing at all, while a working mute — the message context menu's
+`mute24` — sat in the same source with nothing joining them. That table's docblock had named it in as
+many words: *"`mute-chat-24` from this modal does not mute"*. **Third entry ever removed, after
+`unmute-chat` and `force-reload`, and for the identical reason: its presence in that table WAS the
+bug.** `TOAST_ONLY_ACTIONS` is 5 → 4 → **3**.
+
+#### The asymmetry is upstream's and is reproduced, not normalised
+
+Bundle byte 1430423, both subscriptions on adjacent lines:
+
+```js
+subscribe("muteChat",   e  => { this.chatEnabled = !1, bootbox.alert(e) })
+subscribe("unmuteChat", () => { this.chatEnabled = !0, this.alertService.success("Chat enabled") })
+```
+
+Being SILENCED raises a dialog that must be dismissed; being RELEASED raises a passing toast. A
+member who steps away during a transient toast comes back to a composer that has silently stopped
+working. Acknowledgement belongs on the bad news.
+
+#### NOTHING IS COMPOSED — the sentence is assembled from captured fragments
+
+`bootbox.alert(xe.msg)` renders a sentence built by a server that is **not in the capture**, so no
+sentence is guessed. What crosses the wire is the INSTANT, and the receiver assembles the text from
+the two fragments this repository did read off the reference: the `Chat Disabled` block in
+`AlertChatArea.svelte`, and `formatChatMutedTill` — Angular's `EEE @ h:mm a` from the ` till ` span
+beside it. The dialog therefore says exactly what the composer will say after the reload.
+
+#### One insert, two doors — the lesson from 90 minutes earlier, applied
+
+The message context menu and the modal button are two doors onto the same act. A second copy of the
+insert is precisely how `internal/room-ban` shipped a ban that enforced nothing earlier today. Both
+call `applyChatMute` in `#lib/server/chat-mute.ts`, which writes the row and **then** publishes —
+the reverse of `kickUser`'s order and deliberately so: the kick writes first because publishing
+first would disconnect a member mid-write, while here announcing a mute whose insert then failed
+would be the lie.
+
+#### `RoomChatMute` — 191 lines, and the owner chose extraction over a raise
+
+The mute has four halves and they lived in four files that could not see each other. **That split is
+how the pair drifted.** They are now one module: the presenter's two buttons, the member's two
+receivers, and the rule that those agree. It is built inside `RoomUserActions` — `#announceThenSend`
+is private there, so constructing it outside would mean a second copy — and handed to
+`RoomEventStream`, so both ends share ONE instance.
+
+That extraction took `events.svelte.ts` from 968 to 937 and `user-actions.svelte.ts` from 812 to
+780. Three residual raises were put to the owner with measured alternatives and taken **recorded**:
+920→937, 777→780, 1099→1101. A fourth option — extracting the whole 65-line `privCmds` block, which
+lands events at 880 — was offered, declined, and is written into the ceiling entry for rows 9 and 10.
+
+#### What is NOT built, stated rather than faked
+
+*" Mute Chat indefinately "* (the reference's own spelling) is `muteChat("0")` upstream and stays
+INERT. An indefinite mute **already exists** in this system — the controller's opcode 3 sets
+`role = 3, muted = true` and `refuseIfChatMuted` already enforces it through `member.muted`. What is
+missing is a room→controller door, the equivalent of `internal/room-ban`. Folding it into the
+24-hour mute would ship a control whose label and behaviour disagree.
+
+**Verified:** room `svelte-check` **1,240 files, 0/0**; `vitest` **2,662 / 188**; `eslint` and
+`prettier` clean. **Three negative controls seen RED**, each with the mutation verified to have
+landed first: the branch alerting without sending (`expected [] to deeply equal [{targetUserId: 5}]`),
+a second copy of the insert in the other door, and — the one that mattered — deleting the
+`publishToUsers` call, **which the suite first passed**. Nothing asserted that the server announces a
+mute at all, which is the shape of the original defect; `unmute-chat-contract.test.ts` gained a whole
+block written in answer to that measurement rather than for symmetry. Four moved assertions were
+re-pointed at the slice and each gained a hand-off assertion it could not make before.
+
 ### 2026-08-23 21:05 EDT — the ban I shipped an hour earlier enforced nothing. A ban is a ROLE
 
 **Runtime impact: YES.** A banned member was still admitted on their next page load.

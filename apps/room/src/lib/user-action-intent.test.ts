@@ -73,7 +73,6 @@ describe('the actions that report success and send nothing', () => {
     expect(userActionAlert('save-permissions')).toBe(
       'Permissions applied, user will reload the page now to apply...'
     );
-    expect(userActionAlert('mute-chat-24')).toBe('user chat muted');
     expect(userActionAlert('mute-chat-indefinitely')).toBe('user chat muted');
     expect(userActionAlert('restart-audio')).toBe('Audio restart request sent OK');
   });
@@ -83,6 +82,13 @@ describe('the actions that report success and send nothing', () => {
     expect(userActionAlert('unmute-chat')).toBeNull();
     // And `force-reload` joined it on 2026-08-23, for the same reason. Nor may this one.
     expect(userActionAlert('force-reload')).toBeNull();
+    /*
+      `mute-chat-24` is the third, wired the same day. Note what does NOT move with it:
+      `mute-chat-indefinitely` is still in the table above, because "indefinite" is the controller's
+      opcode 3 and the room has no door to it yet. Folding it into the 24-hour mute would be a
+      control whose label and behaviour disagree — worse than one that is honestly listed as inert.
+    */
+    expect(userActionAlert('mute-chat-24')).toBeNull();
     expect(userActionAlert('kick')).toBeNull();
     expect(userActionAlert('nonsense')).toBeNull();
   });
@@ -97,8 +103,12 @@ describe('the actions that report success and send nothing', () => {
       5 -> 4 on 2026-08-23: `force-reload` was wired for real. Both ends of it already existed — a
       form action and a receiver — and NOTHING joined them, so this entry was covering for a working
       wire nobody called. Second entry ever removed, after `unmute-chat`.
+
+      4 -> 3 later the same day: `mute-chat-24`, and the same story a third time. A working mute
+      already existed — the message context menu's `mute24` — and this button raised the capture's
+      own "user chat muted" beside it with nothing joining them. Both doors now call `applyChatMute`.
     */
-    expect(TOAST_ONLY_ACTIONS).toHaveLength(4);
+    expect(TOAST_ONLY_ACTIONS).toHaveLength(3);
   });
 });
 

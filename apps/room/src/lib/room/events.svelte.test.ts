@@ -2,6 +2,8 @@
 import { flushSync } from 'svelte';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { formatChatMutedTill } from '#lib/message-formatters.js';
+import { RoomChatMute } from './chat-mute.svelte';
 import { RoomEventStream } from './events.svelte';
 
 /*
@@ -95,6 +97,20 @@ const make = () => {
   */
   const reloadAsked: boolean[] = [];
   const kicked: { message: string; closedAlready: boolean }[] = [];
+  /*
+    A REAL `RoomChatMute`, not a stub. The sentence a muted member sees is assembled inside it, so a
+    stub here would assert the wiring and let the wording drift — and the wording is the captured
+    part. Its `invalidateAll` is the module's own; what is recorded is what reached the screen.
+  */
+  const chatMuted: string[] = [];
+  const chatNotices: string[] = [];
+  const chatMute = new RoomChatMute({
+    commands: { muteChat: () => Promise.resolve(null), unmuteChat: () => Promise.resolve(null) },
+    alert: (message) => chatMuted.push(message),
+    notice: (message) => chatNotices.push(message),
+    reload: () => Promise.resolve(),
+    announceThenSend: (_alert, send) => void send()
+  });
   const stream = new RoomEventStream<{ id: number }>({
     prefs: { doNotDisturbOn: false } as never,
     toasts: { show: () => null } as never,
@@ -122,9 +138,10 @@ const make = () => {
       either ordering.
     */
     kicked: (message: string) =>
-      kicked.push({ message, closedAlready: FakeEventSource.last?.closed === true })
+      kicked.push({ message, closedAlready: FakeEventSource.last?.closed === true }),
+    chatMute
   });
-  return { stream, missed, tabs, played, reloadAsked, kicked };
+  return { stream, missed, tabs, played, reloadAsked, kicked, chatMuted, chatNotices };
 };
 
 /** Read inside an effect root, mutate inside it, assert on the result outside. */
@@ -252,7 +269,14 @@ const hiddenTabStream = (missed: true[]) =>
     focusSessionNote: () => {},
     chatMissedWhileHidden: () => missed.push(true),
     forceReloadRequested: () => {},
-    kicked: () => {}
+    kicked: () => {},
+    chatMute: new RoomChatMute({
+      commands: { muteChat: () => Promise.resolve(null), unmuteChat: () => Promise.resolve(null) },
+      alert: () => {},
+      notice: () => {},
+      reload: () => Promise.resolve(),
+      announceThenSend: () => {}
+    })
   });
 
 describe('the two receivers reach the page', () => {
@@ -348,6 +372,70 @@ describe('the two receivers reach the page', () => {
     });
     expect(reloadAsked, 'not this member').toEqual([]);
     expect(FakeEventSource.last?.closed, 'and their channel stays up').toBe(false);
+  });
+
+  it('a muteChat frame tells the addressed member, in the captured wording, and leaves them connected', () => {
+    /*
+      The defect this closes: the mute was ENFORCED and never ANNOUNCED. `refuseIfChatMuted` has
+      refused sends the whole time and the composer only learns why on the NEXT page load, so a
+      member muted mid-conversation typed into a live-looking box and watched nothing happen.
+
+      Upstream raises a DIALOG here and a toast for the opposite (bundle byte 1430423), which is why
+      this asserts the dialog receiver rather than the toast list.
+
+      The SENTENCE is asserted whole, and it is assembled from two captured fragments rather than
+      composed: `Chat Disabled` is the block AlertChatArea renders, and the time is
+      `formatChatMutedTill`, the reference's `EEE @ h:mm a`. Nothing here is a guessed sentence —
+      upstream's own `msg` is built by a server that is not in the capture.
+
+      A fixed instant, never `new Date()`: a relative one would make the expected string depend on
+      the day this runs. 2026-08-24T15:45:00Z is a Monday.
+    */
+    const { stream, chatMuted } = make();
+    stream.subscribe();
+    const till = new Date('2026-08-24T15:45:00.000Z');
+    FakeEventSource.last?.fire('message', {
+      data: JSON.stringify({
+        channel: 'privCmds',
+        data: { cmd: 'muteChat', targetUserId: 1, mutedTill: till.toISOString() }
+      })
+    });
+    expect(chatMuted).toEqual([`Chat Disabled till ${formatChatMutedTill(till)}`]);
+    expect(
+      FakeEventSource.last?.closed,
+      'a mute is not a kick — the member stays in the room and keeps receiving'
+    ).toBe(false);
+  });
+
+  it('and a muteChat aimed at somebody else raises nothing', () => {
+    // The same addressing guard the forceReload pair above tests, on the frame that would otherwise
+    // put a "Chat Disabled" dialog in front of every member in the room at once.
+    const { stream, chatMuted } = make();
+    stream.subscribe();
+    FakeEventSource.last?.fire('message', {
+      data: JSON.stringify({
+        channel: 'privCmds',
+        data: { cmd: 'muteChat', targetUserId: 99, mutedTill: '2026-08-24T15:45:00.000Z' }
+      })
+    });
+    expect(chatMuted).toEqual([]);
+  });
+
+  it('a muteChat with no usable instant still says the member is muted', () => {
+    /*
+      The frame carries an ISO string, so a malformed one is possible in a way a Date is not. Falling
+      back to the bare captured `Chat Disabled` is deliberate: the alternative is either an
+      "Invalid Date" in front of a member or silence about a mute that is already in force.
+    */
+    const { stream, chatMuted } = make();
+    stream.subscribe();
+    FakeEventSource.last?.fire('message', {
+      data: JSON.stringify({
+        channel: 'privCmds',
+        data: { cmd: 'muteChat', targetUserId: 1, mutedTill: 'not-a-date' }
+      })
+    });
+    expect(chatMuted).toEqual(['Chat Disabled']);
   });
 
   it('a room-wide video moves a non-presenter through the tab receiver', () => {

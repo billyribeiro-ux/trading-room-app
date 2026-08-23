@@ -7,6 +7,7 @@ import { formatUserLocation } from '#lib/roster-gates.js';
 import { playSoundEffect } from '#lib/sound-effects.js';
 
 import type { RoomBroadcasts } from './broadcasts.svelte';
+import type { RoomChatMute } from './chat-mute.svelte';
 import type { RoomMedia } from './media.svelte';
 import type { RoomMediaTransport } from './media-transport.svelte';
 import type { RoomPrefs } from './prefs.svelte';
@@ -143,6 +144,14 @@ export class RoomEventStream<Entry> {
     forceReloadRequested: () => void;
     /** `kickUser` — the member is removed; the argument is the presenter's own message. */
     kicked: (message: string) => void;
+    /**
+     * The chat mute, both directions and both ends — `#lib/room/chat-mute.svelte.ts`.
+     *
+     * A COLLABORATOR rather than two callbacks, and the same instance `RoomUserActions` holds. What
+     * a muted member sees and what the presenter pressed are one subject; four callbacks would put
+     * the halves back in files that cannot see each other, which is how they drifted.
+     */
+    chatMute: RoomChatMute;
   }) {
     this.#prefs = options.prefs;
     this.#toasts = options.toasts;
@@ -162,6 +171,7 @@ export class RoomEventStream<Entry> {
     this.#focusSessionNote = options.focusSessionNote;
     this.#forceReloadRequested = options.forceReloadRequested;
     this.#kicked = options.kicked;
+    this.#chatMute = options.chatMute;
 
     /** Whether the SSE channel is up. The sidebar's "Chat" line reports it. */
     this.#roomEventsConnected = $state(false);
@@ -198,6 +208,7 @@ export class RoomEventStream<Entry> {
   readonly #chatMissedWhileHidden: () => void;
   readonly #forceReloadRequested: () => void;
   readonly #kicked: (message: string) => void;
+  readonly #chatMute: RoomChatMute;
 
   get connected(): boolean {
     return this.#roomEventsConnected;
@@ -657,7 +668,8 @@ export class RoomEventStream<Entry> {
       /* `/privCmdsIn/{uid}-{id}/` - emits `forceReload` and `unmuteChat`, addressed to one member. */
       if (payload.channel === 'privCmds') {
         const command = payload.data as
-          { cmd?: string; targetUserId?: number; msg?: unknown } | undefined;
+          | { cmd?: string; targetUserId?: number; msg?: unknown; mutedTill?: unknown }
+          | undefined;
         if (command?.cmd === 'forceReload' && command.targetUserId === this.#session().user.id) {
           /*
             DISCONNECT FIRST, THEN ASK — the order is the reference's, at byte 995901:
@@ -682,18 +694,23 @@ export class RoomEventStream<Entry> {
           return;
         }
         /*
-          The capture's receiver toast for the unmute, verbatim: `Chat enabled`. It is a plain
-          info toast, not the presenter's `user chat unmuted` - those are two different strings on
-          two different screens and collapsing them would put the presenter's wording in front of
-          the member.
+          BOTH DIRECTIONS OF THE CHAT MUTE, in `#lib/room/chat-mute.svelte.ts` — the dialog, the
+          toast, the sentence and the `invalidateAll()` that makes either true. They live together
+          with the presenter's two buttons because that split is how the pair drifted: `unmuteChat`
+          had a real command and a real receiver for months while `mute-chat-24` raised the capture's
+          own "user chat muted" over nothing, and no file held both sides to notice.
 
-          `invalidateAll()` is what actually re-opens the composer: `chatMutedTill` is read on the
-          server, so the gate does not lift until the loader runs again. Toasting without it would
-          tell the member they can type while the box stayed disabled.
+          The addressing test stays HERE, on both, because it is this router's job and not the
+          slice's: `privCmds` is per-member upstream (`/privCmdsIn/{uid}-{id}/`) while this room's
+          stream is per-ROOM, so `targetUserId` is the only thing standing between one presenter
+          muting one member and putting a "Chat Disabled" dialog in front of everybody at once.
         */
+        if (command?.cmd === 'muteChat' && command.targetUserId === this.#session().user.id) {
+          this.#chatMute.muted(command.mutedTill);
+          return;
+        }
         if (command?.cmd === 'unmuteChat' && command.targetUserId === this.#session().user.id) {
-          this.#toasts.show({ kind: 'info', message: 'Chat enabled', enableHtml: false });
-          void invalidateAll();
+          this.#chatMute.unmuted();
         }
         /*
           EMIT FIRST, THEN DISCONNECT — the reverse of `forceReload` directly above, and upstream's

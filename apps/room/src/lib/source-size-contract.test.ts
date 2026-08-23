@@ -389,7 +389,24 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
 
       It removed a control that told a presenter *"User kicked OK"* and sent nothing.
     */
-    max: 920,
+    /*
+      920 -> 937, 2026-08-23. The chat mute's two RECEIVERS were built here and then EXTRACTED the
+      same day: `RoomChatMute` took the dialog, the toast, the sentence and both `invalidateAll()`
+      calls — 191 lines including the presenter's two senders, which came from `RoomUserActions`.
+      That extraction is what the owner chose over a raise, and it did the work: this file dropped
+      from 968 to 937.
+
+      What is left is not the receivers. It is the ELEVEN-LINE note stating that the addressing test
+      stays in this router rather than travelling with them, because `privCmds` is per-member
+      upstream while this room's stream is per-ROOM — so `targetUserId` is the only thing standing
+      between muting one member and putting a "Chat Disabled" dialog in front of everybody at once.
+      That reasoning belongs to the router and cannot leave with the slice.
+
+      MEASURED ALTERNATIVE, offered and declined: extracting the whole 65-line `privCmds` block into
+      a `RoomPrivateCommands` router lands this file at 880. That option stays on the table for rows
+      9 and 10, which add receivers to this same channel.
+    */
+    max: 937,
     why: 'the SSE router - six channels of transcription, and the one block that did not route has gone'
   },
   {
@@ -1158,7 +1175,18 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       775 -> 777 on 2026-08-23. Two lines, for the `kick` branch that finally sends and the
       `kickUser` member on `UserActionCommands`. Consolidation took this from 789 first.
     */
-    max: 777,
+    /*
+      777 -> 780, 2026-08-23. `mute-chat-24` was wired and BOTH mute branches then left this class
+      for `RoomChatMute`, which is built here and handed to `RoomEventStream` so the presenter's
+      buttons and the member's receivers share one instance — the split between them is exactly how
+      the pair drifted, with `unmute-chat` real for months while `mute-chat-24` raised the capture's
+      own "user chat muted" over nothing.
+
+      The residual is the seven-line note on that construction: `#announceThenSend` is private to
+      this class, so building the slice from outside would mean a second copy of it. Three lines
+      over, and the extraction it paid for moved 191.
+    */
+    max: 780,
     why: 'everything that can be done TO a user; handle() alone was 249 lines on the page'
   },
   {
@@ -1173,6 +1201,28 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     initialises in declaration order, before the constructor has assigned the thunks it reads.
     `RoomFiles.filesHidden` is the recorded precedent for that and it cost a slice to find.
   */
+  {
+    file: 'lib/room/chat-mute.svelte.ts',
+    /*
+      THE CHAT MUTE, both directions and both ends, created 2026-08-23 and capped in the same commit.
+
+      191 lines carrying about 40 of code. That ratio is the point rather than an embarrassment: what
+      this module holds is a RULE — that being silenced raises a dialog and being released raises a
+      toast, that the presenter's "user chat unmuted" and the member's "Chat enabled" are two strings
+      on two screens, and that the sentence a muted member reads is assembled from captured fragments
+      because upstream's own `msg` is composed by a server nobody has read.
+
+      It exists because those four halves lived in four files that could not see each other, and that
+      is precisely how they drifted: `unmuteChat` had a real command and a real receiver for months
+      while `mute-chat-24` sat in `EXACT_ALERTS` raising the capture's wording over no wire at all.
+      No file held both sides, so nothing could notice.
+
+      The cap is where it landed. It goes DOWN if the reasoning ever finds a better home, never up to
+      accommodate a fifth half — a fifth half is the signal that something else needs extracting.
+    */
+    max: 191,
+    why: 'the chat mute: two senders, two receivers and the rule that they agree'
+  },
   {
     file: 'lib/room/create-room.svelte.ts',
     /*
@@ -1220,7 +1270,14 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       1093 -> 1099 on 2026-08-23: the `kickUser` import, its entry in the commands object, and the
       `kicked` receiver that shows the presenter's message. Six lines of pure wiring.
     */
-    max: 1099,
+    /*
+      1,099 -> 1,101, 2026-08-23. Two lines: the `muteChat` command joins `unmuteChat` in the import
+      and in `commands`, and `RoomEventStream` is handed `userActions.chatMute` rather than a
+      closure. The composition root grows by construction whenever a slice is added — that is what a
+      composition root is for — and this is the smallest form that growth takes: a hand-off, not a
+      second instance.
+    */
+    max: 1101,
     why: 'the composition root - 36 constructions and their citations, assembly and nothing else'
   },
   {

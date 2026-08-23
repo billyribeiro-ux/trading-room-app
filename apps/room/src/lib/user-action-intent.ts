@@ -70,7 +70,26 @@ export function addVideoToList(existing: readonly string[], url: string): VideoL
  */
 const EXACT_ALERTS: Readonly<Record<string, string>> = {
   'save-permissions': 'Permissions applied, user will reload the page now to apply...',
-  'mute-chat-24': 'user chat muted',
+  /*
+    `mute-chat-24` was HERE and is gone, 2026-08-23 — the THIRD entry ever removed, after
+    `unmute-chat` and `force-reload`, and for the identical reason: its presence WAS the bug. The
+    button raised the reference's own "user chat muted" and sent nothing, while a working mute — the
+    message context menu's `mute24` — sat in the same source with nothing joining them. The docblock
+    above still names it as the example, which is now history rather than a live defect. Both doors
+    call `applyChatMute`, in `#lib/server/chat-mute.ts`.
+  */
+  /*
+    `mute-chat-indefinitely` STAYS, and is the one entry here that is honestly blocked rather than
+    merely unbuilt. The reference reaches it with `muteChat("0")` against a " Mute Chat indefinately "
+    label (its own spelling) at bundle byte 2067543, and `"0" >= 0` is true, so it sends
+    `{user, time:0}` down the same command as the 24-hour one.
+
+    An indefinite mute ALREADY EXISTS in this system and is already enforced: the controller's opcode
+    3 sets `role = 3, muted = true`, and `refuseIfChatMuted` reads `member.muted` on every send. What
+    is missing is a DOOR from the room to it — the equivalent of `internal/room-ban` for a ban. That
+    is a controller endpoint with its own authority checks, not a line here, so it is recorded rather
+    than faked with a 24-hour mute wearing an "indefinite" label.
+  */
   'mute-chat-indefinitely': 'user chat muted',
   'restart-audio': 'Audio restart request sent OK'
   /*

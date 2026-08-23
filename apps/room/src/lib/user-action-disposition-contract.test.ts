@@ -95,13 +95,16 @@ function handledActions(): Set<string> {
     and it did exactly that on this move — which is the second time that note has paid for itself.
   */
   const kicks = readFileSync('src/lib/room/kicks.svelte.ts', 'utf8');
+  // `mute-chat-24` and `unmute-chat` moved into `RoomChatMute` on 2026-08-23. A scanner that does
+  // not read it would file both as UNHANDLED and demand an `INERT_ACTIONS` entry for a live wire.
+  const chatMute = readFileSync('src/lib/room/chat-mute.svelte.ts', 'utf8');
   const source = readFileSync('src/lib/room/user-actions.svelte.ts', 'utf8');
   const tail = source.indexOf('const fixedAlert = userActionAlert(action)');
   expect(
     tail,
     "handle()'s alert tail was not found — this scanner would read the whole file and mis-bucket the alert path"
   ).toBeGreaterThan(-1);
-  const dispatchBody = source.slice(0, tail) + session + kicks;
+  const dispatchBody = source.slice(0, tail) + session + kicks + chatMute;
   return new Set([...dispatchBody.matchAll(/action === '([a-z0-9-]+)'/g)].map((m) => m[1]));
 }
 
@@ -252,9 +255,12 @@ describe('every dispatched action has exactly one disposition', () => {
     */
     const session = readFileSync('src/lib/room/session-control.svelte.ts', 'utf8');
     const kicks = readFileSync('src/lib/room/kicks.svelte.ts', 'utf8');
+  // `mute-chat-24` and `unmute-chat` moved into `RoomChatMute` on 2026-08-23. A scanner that does
+  // not read it would file both as UNHANDLED and demand an `INERT_ACTIONS` entry for a live wire.
+  const chatMute = readFileSync('src/lib/room/chat-mute.svelte.ts', 'utf8');
     const source = readFileSync('src/lib/room/user-actions.svelte.ts', 'utf8');
     const tail = source.indexOf('const fixedAlert = userActionAlert(action)');
-    const body = source.slice(0, tail) + session + kicks;
+    const body = source.slice(0, tail) + session + kicks + chatMute;
 
     const ACTS = [
       'this.#commands.',

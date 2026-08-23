@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { TalkingEntry } from '#lib/mute-all-non-admins.js';
 import type { ModalTargetUser } from '#lib/types.js';
-import { MISSING_SCHEME_ALERT } from '#lib/user-action-intent.js';
+import { MISSING_SCHEME_ALERT, TOAST_ONLY_ACTIONS } from '#lib/user-action-intent.js';
 
 import { RoomDialogs } from './dialogs.svelte';
 import { RoomToasts } from './toasts.svelte';
@@ -65,6 +65,7 @@ const make = (
   const reloadsSent: number[] = [];
   const kicksSent: { targetUserId: number; message: string; ban?: boolean }[] = [];
   const urlsSent: { cmd: string; url: string }[] = [];
+  const mutesSent: { targetUserId: number }[] = [];
   const opened: string[] = [];
   const mentioned: string[] = [];
   const saved: [string, boolean][] = [];
@@ -83,6 +84,10 @@ const make = (
     commands: {
       presenter: (payload) => (sent.push(payload), Promise.resolve(null)),
       editUsername: () => Promise.resolve(null),
+      muteChat: (payload: { targetUserId: number }) => (
+        mutesSent.push(payload),
+        Promise.resolve(null)
+      ),
       unmuteChat: () =>
         unmuteFails ? Promise.reject(new Error('refused')) : Promise.resolve(null),
       sessionSendUrl: (payload: { cmd: string; url: string }) => (
@@ -142,6 +147,7 @@ const make = (
     reloadsSent,
     kicksSent,
     urlsSent,
+    mutesSent,
     permsSent,
     failPerms: () => (permsFails = true),
     failUnmute: () => (unmuteFails = true),
@@ -328,6 +334,39 @@ describe('the dispatcher', () => {
       'Enter a new username for "Bo":'
     );
     expect(dialogs.prompt?.value).toBe('');
+  });
+
+  it('mute-chat-24 sends a real mute and says the captured words, in that order', () => {
+    /*
+      The third entry ever removed from `EXACT_ALERTS`. This button raised the reference's own
+      "user chat muted" over nothing at all while a working mute — the message context menu's
+      `mute24` — sat in the same source with nothing joining them.
+
+      Both halves are asserted, because either alone passes against the bug: the ALERT alone passed
+      for months while nothing was sent, and the SEND alone would not catch the wording drifting off
+      the capture.
+    */
+    const { actions, dialogs, mutesSent } = make();
+    actions.handle('mute-chat-24', TARGET);
+    expect(mutesSent, 'the command is sent, to the member the modal is open on').toEqual([
+      { targetUserId: TARGET.id }
+    ]);
+    expect(dialogs.alert, "the capture's own wording, from muteChat(e) at byte 2080089").toBe(
+      'user chat muted'
+    );
+  });
+
+  it('mute-chat-24 is no longer one of the controls that only talk', () => {
+    /*
+      The structural half. Re-adding the entry to `EXACT_ALERTS` would restore the exact original
+      defect — `handle` consults that table last, so an entry there is reached only when no branch
+      claimed the action, and the branch above would simply be dead. This is what makes that visible.
+    */
+    expect(TOAST_ONLY_ACTIONS).not.toContain('mute-chat-24');
+    expect(
+      TOAST_ONLY_ACTIONS,
+      'and the indefinite one is still honestly listed — it has no door to the controller yet'
+    ).toContain('mute-chat-indefinitely');
   });
 
   it('surfaces a refused unmute rather than dropping it', async () => {

@@ -17,6 +17,7 @@ import {
   userActionAlert
 } from '#lib/user-action-intent.js';
 
+import { RoomChatMute } from './chat-mute.svelte';
 import type { RoomDialogs } from './dialogs.svelte';
 import { RoomKicks } from './kicks.svelte';
 import { RoomManagedUsers } from './managed-users.svelte';
@@ -44,6 +45,8 @@ export interface UserActionCommands {
     targetUserId: number;
   }) => Promise<unknown>;
   editUsername: (payload: { userId: number; username: string }) => Promise<unknown>;
+  /** *" Mute Chat for 24hrs "* — presenter-gated on the server, like its opposite. */
+  muteChat: (payload: { targetUserId: number }) => Promise<unknown>;
   unmuteChat: (payload: { targetUserId: number }) => Promise<unknown>;
   /** A presenter's url to every OTHER browser — the receiver excludes the sender. */
   sessionSendUrl: (payload: {
@@ -149,6 +152,7 @@ export class RoomUserActions<
   readonly #clearSelectedMessage: () => void;
   readonly #hidePreviewWindows: () => void;
   readonly #reload: () => Promise<void>;
+  readonly #chatMute: RoomChatMute;
   /*
     The two viewer-local lists moved to `RoomManagedUsers` on 2026-08-23, under the owner's ruling
     that a file over its ceiling is extracted rather than raised. The getters below still expose
@@ -217,6 +221,22 @@ export class RoomUserActions<
     this.#hidePreviewWindows = options.hidePreviewWindows;
     this.#reload = options.reload;
 
+    /*
+      BUILT HERE, EXPOSED BELOW. `#announceThenSend` is private to this class and both mute buttons
+      need it, so constructing the slice from outside would mean a second copy of it — the same
+      argument that put `RoomKicks` right beneath. The muted MEMBER's two receivers live in
+      `RoomEventStream`, which is handed this instance rather than a second one; the whole reason
+      the slice exists is that those two ends must not sit in files that cannot see each other.
+    */
+    this.#chatMute = new RoomChatMute({
+      commands: options.commands,
+      alert: (message) => (options.dialogs.alert = message),
+      // A TOAST for the release, a DIALOG for the mute. The asymmetry is upstream's — see the slice.
+      notice: (message) => options.toasts.show({ kind: 'info', message, enableHtml: false }),
+      reload: options.reload,
+      announceThenSend: (message, send) => this.#announceThenSend(message, send)
+    });
+
     this.#managed = new RoomManagedUsers(options.defaultFollowStyle);
     this.#kicks = new RoomKicks<User>({
       dialogs: options.dialogs,
@@ -229,6 +249,11 @@ export class RoomUserActions<
     this.#selectedUserId = $state<number | null>(null);
 
     this.#selectedMessageUser = $state<ModalTargetUser | null>(null);
+  }
+
+  /** The chat mute, handed to `RoomEventStream` so both ends share one instance. */
+  get chatMute(): RoomChatMute {
+    return this.#chatMute;
   }
 
   get mutedUsers() {
@@ -481,28 +506,6 @@ export class RoomUserActions<
     });
   }
 
-  /**
-   * Lifts a member's chat mute — the other half of `mute24`.
-   *
-   * The mute was enforced on the server and the unmute was not sent anywhere: the modal's button
-   * raised the reference's alert and stopped. `invalidateAll()` refreshes the presenter's own view
-   * of the roster; the MEMBER learns about it on the `privCmds` channel, because their gate is
-   * server-read and nothing local to them changed.
-   *
-   * That `invalidateAll()` runs by hand and has to: single-flight mutations refresh remote QUERIES,
-   * and the presenter's roster is not one — it comes from this route's `load`. Converting it is its
-   * own change, and doing it here would be claiming a refresh that never happens.
-   *
-   * The caller does not await this — `handleUserAction` is synchronous — but it DOES catch it. A
-   * remote command rejects where the old `fetch('?/unmuteChat')` returned `response.ok === false`
-   * for anyone who bothered to look, and nobody did; that is the same silent success this whole
-   * path was built to fix. `chat-mute.remote.ts` carries the rest of the reasoning.
-   */
-  async #unmuteChat(user: ModalTargetUser) {
-    await this.#commands.unmuteChat({ targetUserId: user.id });
-    await this.#reload();
-  }
-
   handle(action: string, user: ModalTargetUser) {
     /*
       SESSION actions first, and they are not user actions at all — see `RoomSessionControl` for why
@@ -513,6 +516,10 @@ export class RoomUserActions<
       `false` means "not mine", never "nothing happened".
     */
     if (this.#sessionControl.handle(action)) return;
+    // The chat mute owns both of its buttons, for the reason `RoomChatMute` opens with: the pair
+    // drifted while the presenter's half and the member's half lived in files that could not see
+    // each other. `false` means "not mine".
+    if (this.#chatMute.handle(action, user.id)) return;
 
     /*
       The reference raises `alertService.success("Copied to clipboard.")` from all three of its
@@ -686,10 +693,6 @@ export class RoomUserActions<
       `Command failed.` is inherited from the sibling handlers here, not captured — the reference
       never showed us a failure for either control.
     */
-    if (action === 'unmute-chat') {
-      this.#announceThenSend('user chat unmuted', () => this.#unmuteChat(user));
-      return;
-    }
     if (action === 'force-reload') {
       this.#announceThenSend('Reload request sent OK', () => this.#commands.forceReload(user.id));
       return;
