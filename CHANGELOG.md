@@ -113,10 +113,34 @@ nothing here can name the mechanism from one sample, so nothing here claims to. 
 row 7, and `playwright.config.ts` now retries twice **in CI only** — which reports it as flaky rather
 than hiding it, and still fails red if every attempt fails.
 
-**Verified:** `pnpm test:e2e` 9/9 (run 8) and 8/9 with the flake above (run 9); the flaky spec 8/8 on
-targeted repeat; `prettier --check` on `e2e/**`; and `ci-package-manager-pin` +
-`ci-verification-integrity` + `node-version-pin` (21 tests) green against the new job.
-**Not verified locally:** the job on a GitHub runner — that is what the push measures.
+**Verified locally:** `pnpm test:e2e` 9/9 (run 8) and 8/9 with the flake above (run 9); the flaky
+spec 8/8 on targeted repeat; `prettier --check` and `eslint` on the changed files; and
+`ci-package-manager-pin` + `ci-verification-integrity` + `node-version-pin` (21 tests) green against
+the new job.
+
+**Verified ON A RUNNER**, which is the part that could not be assumed —
+[run 32657219155](https://github.com/billyribeiro-ux/trading-room-app/actions/runs/32657219155),
+dispatched on this branch because no PR was open and `quality.yml` triggers on `pull_request` and on
+pushes to `main`, so a feature-branch push alone starts nothing:
+
+```
+controller quality   | completed | success
+controller end-to-end| completed | success
+room quality         | completed | success
+```
+
+`Running 9 tests using 1 worker` … `9 passed (48.2s)`. **No retry was consumed and nothing was
+reported flaky**, so the `retries` setting is a seatbelt rather than something this run leaned on.
+Whole job 18:11:25Z → 18:12:50Z against a 30-minute timeout; chromium download and install was 22
+seconds of it.
+
+**One more of my own errors, since it nearly ended the session with a false claim:** the first push
+reported success and had not happened. `git push … | tail -5; echo "rc=$?"` reports `tail`'s status,
+not git's, and the local branch was `feat/save-permissions` rather than the stale name in my notes —
+so `git push origin fix/addressed-frame-delivery` said "Everything up-to-date" about a different
+branch entirely, and the dispatched workflow ran the OLD file with two jobs. Caught by comparing
+`git ls-remote` against `git rev-parse HEAD` instead of trusting an exit code. The CHANGELOG entry
+above had the branch name wrong for the same reason and is corrected.
 
 ### 2026-08-23 13:32 EDT — two Node pins nobody was comparing, and the smoke job floating across a major
 
