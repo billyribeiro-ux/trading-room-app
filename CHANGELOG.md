@@ -33,6 +33,211 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-23 16:10 EDT — `kick` says "User kicked OK" and sends nothing, and I had to correct two of my own corrections
+
+**Runtime impact: no.** No code changed. Three records were corrected, one of them twice.
+
+**Branch `feat/save-permissions`.**
+
+#### The find: a control that reports success and does nothing
+
+`user-actions.svelte.ts:618-629` handles `kick` and `kick-ban` by opening a prompt seeded with the
+captured default message, and on confirm closing the modal and setting
+`dialogs.alert = 'User kicked OK'`. **There is no command in that branch, and there is no command it
+could call.** `UserActionCommands` exposes `presenter`, `editUsername`, `unmuteChat`, `forceReload`
+and `savePermissions` — no kick — and the only `kickUser` / `kickPage` text anywhere in
+`apps/room/src` is inside a COMMENT at `events.svelte.ts:662`.
+
+This is worse than the eleven inert controls. **A dead control that stays silent is a gap; one that
+reports success is a lie**, and a presenter who clicks Kick is told the person is gone.
+
+It also exposes a hole in the gate that was written to catch exactly this class.
+`user-action-disposition-contract.test.ts` sorts every action into handled / alerted / inert and its
+docblock says there is *"no fourth option"*. There is: **a branch that dialogs and does not act**
+counts as `handled`, because a branch exists. `kick` has been sitting in the safe bucket.
+
+Upstream, for comparison, sends `sendServerAdminCommand("kickUser",{user,msg,ban,kickAllInstances})`,
+then `setPreference("kickMsg",msg)`, then `doCloseModal()`, then the alert — so our message text and
+our ordering are faithful and only the SEND is missing.
+
+#### Two of my own corrections, corrected
+
+Earlier today I rewrote rows 2 and 3 to say **"NOTHING. Build it"**, on the strength of having found
+the reference's implementation. Both were wrong, and both were wrong the same way I had just
+criticised: I checked the REFERENCE and not THIS repository.
+
+- **Row 2, kick-duplicates.** The loop really is client-side — but it calls
+  `sendServerAdminCommand("kickUser", …)`, and this room has no kick command. The row's original
+  wording, *"needs a kick this room cannot perform"*, was right in substance. Also blocking, and also
+  missed: `RosterAuthority` is `{id, isP?}` only, with no `emailHash` and no `_id`, so the duplicate
+  match has nothing to match on.
+- **Row 3, the notes password.** `deleteAlertPW` is the comparison target and it appears **nowhere in
+  `apps/room/src`**. Finding it upstream answered the question the row asked; it did not put the
+  value within reach.
+
+**The pattern, stated plainly so it is not repeated a third time:** finding a mechanism in the
+reference tells you what to build. It does not tell you that you *can* build it. Those are two
+readings and I did one of them.
+
+### 2026-08-23 15:45 EDT — the room's four rendering gates existed too, and CI had never run one either
+
+**Runtime impact: no.** No application code changed. Twenty-two real-Chromium assertions now run on
+every pull request that touches the room.
+
+**Branch `feat/save-permissions`.** Closes half (b) of `TODO.md` row 6 — by discovering its premise
+was false, not by building what it asked for.
+
+#### The same mistake, in the same row, twice
+
+Row 6(b) said *"apps/room has no Playwright at all, which is the real build"*. That is wrong, and it
+is wrong the same way half (a) was wrong: nobody opened the files.
+
+`apps/room/scripts/verify-tooltip-placements.mjs`, `verify-screen-volume.mjs`,
+`verify-viewer-only-layout.mjs` and `verify-mobile-layout.mjs` each launch **real Chromium** through
+`@playwright/test`'s `chromium`. They resolve it from `apps/controller` on purpose, and the reason is
+written at the top of the file — so that adding a browser gate is not a dependency change.
+
+They are not smoke tests. `verify-tooltip-placements.mjs` says what it is for in its own docblock:
+*"jsdom reports every rect as zero, so no vitest run can tell whether the arrow is painted or where
+the bubble lands. Compiling and passing tests is not evidence that a thing renders."* It asserts the
+arrow has a non-zero box and a solid border on the side facing the host, and that the bubble sits the
+6px `k_([0, 6])` specifies away from it.
+
+#### What running them reported
+
+**22 assertions, every one green, and nothing had ever run them** — not CI, and not the room's own
+`test` script, which is `privacy:verify && schema:verify && vitest run`:
+
+```
+verify:tooltips        6/6 placements render correctly
+verify:screen-volume   8/8 states render correctly
+verify:viewer-only     4/4 layouts render correctly
+verify:mobile-layout   4/4 widths render correctly
+```
+
+Two of them print an honest NOTE instead of overclaiming: viewer-only measures the reference's own
+CSS taking effect on our elements rather than a pixel diff, because no capture of this product in
+that mode exists; mobile renders the arrangement `K4e` describes rather than the Svelte component,
+because the room needs a controller this machine has no `.env` for.
+
+#### THEY CANNOT RUN IN CI, AND THIS ENTRY ORIGINALLY SAID THEY DID
+
+I added them to the `room` leg, wrote here and in `TODO.md` that they "now run in CI", and pushed it.
+Then the runner answered:
+
+```
+Error: Cannot find module '…/apps/room/scripts/verify-tooltip-placements.mjs'
+code: 'MODULE_NOT_FOUND'
+```
+
+`.gitignore:176` ignores `/apps/room/scripts/` **entirely — `git ls-files` returns zero**. The rule
+is deliberate and documented at `.gitignore:160-175`: *"collectors that reach the reference
+application live here and are not published; the repository's own gate lives in `gate/` and is."*
+The four verifiers are off-repo tooling BY DESIGN, and no workflow can run them as written.
+
+The step is reverted and both claims are corrected. **The claim was false when I wrote it, and it was
+false because I asserted a CI outcome before measuring one** — the same error as reading a push's
+success out of `tail`'s exit code earlier in this session.
+
+Worth recording separately, because it nearly produced a second wrong answer: the failing step's own
+log gave the real cause, and an ADJACENT step's log gave a plausible false one. The unit-test step
+printed *"49 evidence-bound test file(s) excluded: this checkout is missing 13 of 14
+reference-capture roots"*, and the missing captures are an entirely believable reason for a rendering
+gate to fail. Reading the step that actually failed is what produced `MODULE_NOT_FOUND` instead.
+
+#### What is genuinely left, and it is the owner's call
+
+Publishing `/apps/room/scripts/` is a decision, not a cleanup: it would put reference-reaching
+collectors into a public repository, which is exactly what that ignore rule exists to prevent. The
+alternative is a gate under `apps/room/gate/` — which IS published — re-implementing the measurements
+against tracked inputs only.
+
+#### One self-inflicted false result, caught before it was reported
+
+The first run of all four printed `exit=0` for every one — because I wrapped them in `timeout`, which
+macOS does not ship, so the shell printed `command not found` and `$?` reported the `echo`. Four
+meaningless zeroes that looked like four passes. Re-run without the wrapper, they really do pass, but
+the first result was about my harness and not about the room. Ruling that out before reporting is the
+rule; this is the third time this session it has caught something.
+
+#### The lesson, now twice over
+
+Both halves of row 6 claimed there was no browser coverage. Both were wrong, in the same app family,
+written by the same reader, and neither claim had ever been checked. **"We have no coverage for X"
+is a claim like any other and needs opening the directory.**
+
+**Verified:** all four verifiers run green locally; `ci-package-manager-pin`,
+`ci-verification-integrity` and `node-version-pin` (21 tests) green. **Verified ON A RUNNER, which is
+what disproved the claim** — run 32660945805: `controller quality` and `controller end-to-end` both
+`success`, `room quality` **failed** at the step this entry added, with `MODULE_NOT_FOUND`. That is
+the measurement, and it is why the step is gone.
+
+### 2026-08-23 15:20 EDT — `test-follow-sound` wired, `get-my-token` evidenced, and a ceiling answered by extraction
+
+**Runtime impact: YES, one control.** `test-follow-sound` played nothing and now plays `pling`. The
+other ten inert controls are unchanged.
+
+**Branch `feat/save-permissions`.**
+
+#### The name is why three searches failed
+
+`INERT_ACTIONS` said *"which sound the reference plays here is not evidenced"*. It is, at byte
+2075886 of the v4 bundle:
+
+```js
+testFollowChatSound(){ return this.followChatStyle.playSound && this.soundEffectsService.pling.play(), !1 }
+```
+
+The method is **`testFollowChatSound`** — `Chat` sits in the middle of the name, which is why
+`testFollowSound`, `followSound`, `Follow Sound` and `playSound(` all returned nothing. It was found
+by reading the button's create block instead: `d(42,"button",122), x("click", … testFollowChatSound())`.
+
+`pling` was already in `SOUND_EFFECT_SOURCES` and `static/assets/sound/pling.{mp3,ogg}` were already
+on disk. Nothing new was added, downloaded or guessed.
+
+**One guard, not two, and that is deliberate.** The reference guards on the button
+(`z("disabled", !e.followChatStyle.playSound)`) and again inside the method. Ours already carries the
+first at `ModalHost.svelte:2547`, against the same flag, with the same two titles and the same
+`fa-volume-up`/`fa-volume-mute` swap. The second cannot be reproduced without widening
+`handle(action, user)`, and the style being tested is the LIVE unsaved one — reading the SAVED
+`#followedUsers[…].followChatStyle` instead would look faithful and be wrong.
+
+#### `get-my-token` is now evidenced, and still inert
+
+The row said the token "is not evidenced anywhere read so far". At byte 2255348 it is, and the answer
+is **both** identifiers: a `"Session Information"` bootbox with `globals.sessionID` in a readonly
+`#sessionId` and `globals.sesionToken` (the reference's own one-`s` global) in a readonly
+`#sessionToken`, each beside a `<i class="fas fa-copy"></i> Copy` button, over one `"Close"`. Two
+things recorded for whoever builds it: the reference copies via an inline `onclick` calling
+`navigator.clipboard.writeText` then a bare `alert(...)`, which this repository forbids; and the menu
+label is `" Get my token "`, lower-case.
+
+#### The ceiling was answered by extraction, on the owner's ruling
+
+Wiring the handler put `user-actions.svelte.ts` at **814 against 775**. Asked rather than assumed —
+the standing instruction is to ask every time — and the owner chose extraction, which is what this
+repository's own failure message asks for and what the Phase 5 plan says: the answer to an overrun is
+another extraction, never a shortened comment and never a raised number.
+
+`lib/room/managed-users.svelte.ts` now owns the muted and followed lists. The seam is the
+viewer/server line: both lists are local, never reach the server, are not room settings, and survive
+a reload only because `localStorage` holds them — while everything else `RoomUserActions` does ends
+in a command. The reference draws the same line, reaching these through `addUserToList` /
+`removeUserFromList` rather than `sendServerAdminCommand`.
+
+**A real asymmetry was preserved rather than tidied.** A muted entry stores no `userXrefID` and no
+`_id`; a followed entry stores both. `openManagedInfo` depends on exactly that, refusing with *"User
+is not logged in."* when they are absent. I copied the follow shape into the mute path first and
+caught it by re-reading the original before running anything.
+
+**Three catalog gates fired, each as designed** — the size contract demanded a ceiling entry for the
+new module, `unbound-method-contract` demanded the class be registered, and the disposition contract
+demanded a real handler the moment the `INERT_ACTIONS` entry was deleted. None was worked around.
+
+**Verified:** room `vitest` **2,634 passed / 188 files**; `svelte-check` **0 errors, 0 warnings**;
+`eslint` clean on all three touched files; `user-actions.svelte.ts` **751 lines against 775, under
+its unchanged ceiling**.
+
 ### 2026-08-23 14:35 EDT — the capture was in the repository all along, and six "no evidence" rows were wrong
 
 **Runtime impact: no.** No code changed. What changed is that six rows which said their evidence did

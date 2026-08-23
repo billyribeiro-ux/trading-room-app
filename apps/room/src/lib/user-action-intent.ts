@@ -218,10 +218,37 @@ export const INERT_ACTIONS: Readonly<Record<string, string>> = {
   */
   'disable-private-chat':
     'ModalHost.svelte:2373 — MATCHES THE REFERENCE, which renders this button at bundle byte ~2067000 with an icon, a label and no x("click") binding at all while every neighbouring button has one',
+  /*
+    `test-follow-sound` IS GONE FROM THIS TABLE — it was wired on 2026-08-23 and now has a real
+    branch in `RoomUserActions.handle`, which is what removing an entry here demands. The sound is
+    `pling`, from `testFollowChatSound()` at byte 2075886. See that handler for the full reasoning.
+
+    `get-my-token` is now EVIDENCED and stays inert only because nobody has built it yet. The row
+    said "what token it should show is not evidenced anywhere read so far"; it is, at byte 2255348,
+    and the answer is BOTH identifiers, not one:
+
+      getMyToken(){
+        let e=globals.sessionID, i=globals.sesionToken;      // sesionToken: the reference's own typo
+        $("#user-settings-modal").modal("hide");
+        bootbox.dialog({ title:"Session Information", message:`…`,
+                         buttons:{ok:{label:"Close",className:"btn-primary"}} })
+      }
+
+    The dialog is two `mb-3` blocks, each `<label class="form-label"><strong>…:</strong></label>`
+    over an `input-group` holding a readonly `<input class="form-control">` and a
+    `<button class="btn btn-outline-secondary">` with `<i class="fas fa-copy"></i> Copy`:
+
+      Session ID     input id="sessionId"     copies, then alerts 'Session ID copied!'
+      Session Token  input id="sessionToken"  copies, then alerts 'Session Token copied!'
+
+    Two things to carry when it IS built. The reference copies with an INLINE `onclick` string
+    calling `navigator.clipboard.writeText(...)` and a bare `alert(...)`; this repository forbids
+    `window.alert` and would use the project's dialog primitive, which is a divergence to record
+    rather than hide. And the button label is `" Get my token "` — lower-case `my` and `token` —
+    sitting in the same menu as `" Mute Microphone for all non-admins "`.
+  */
   'get-my-token':
-    'ModalHost.svelte:3075 — no handler; what token it should show is not evidenced anywhere read so far',
-  'test-follow-sound':
-    'ModalHost.svelte:2505 — no handler. The ONLY one of the eleven that needs no server: it would play the follow sound locally. Left inert deliberately rather than guessed, because which sound the reference plays here is not evidenced'
+    'ModalHost.svelte:3075 — no handler, but FULLY EVIDENCED at byte 2255348: a "Session Information" bootbox showing globals.sessionID in a readonly #sessionId and globals.sesionToken in a readonly #sessionToken, each with a Copy button, and one "Close" button'
 };
 
 /** Every action that is knowingly silent. Exported so the disposition contract can read it. */
