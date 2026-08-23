@@ -33,6 +33,50 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-23 18:05 EDT — a forensic audit: four things I said did not exist, all of them do
+
+**Runtime impact: no.** No code changed. Four false claims of mine were corrected against the files.
+
+**Branch `feat/save-permissions`.**
+
+#### The claim, and why it was wrong
+
+I closed the previous report saying six TODO rows "cannot be fixed by me" because each needed
+something "that doesn't exist yet in this repo". The owner said it does exist and to audit end to
+end. **They were right, and the error has one cause: I searched `apps/room/src` and called the
+result the repository.** The controller owns room configuration and both database schemas.
+
+#### Four corrections
+
+**`emailHash` is on the roster, so `kick-duplicates` is buildable today.** I wrote that it needed
+`emailHash` added. `apps/room/src/lib/types.ts:58` declares `emailHash: string` on `User` and
+`+page.server.ts:318` fills it with `hashEmail(account.email)`. `RoomUserActions` already reads
+`this.#session().connectedUsers` at `user-actions.svelte.ts:265`, typed `readonly User[]`. What
+misled me was `RosterAuthority` — `{id, isP?}` — which is a **narrow local interface for
+`mute-all-non-admins`**, not the roster. I read one type and generalised from it.
+
+**`deleteAlertPW` exists.** I wrote it "appears nowhere in `apps/room/src`", which was true and
+irrelevant. `apps/controller/src/lib/room-settings-schema.ts:88` defines it with the label *"Delete
+Alert Password"* and the help *"If set, Presenters will need to enter the password to delete an
+alert"*, typed at `:385`, with a fixture at `room-config-boundary.test.ts:28`. It carries
+**`wired: false`**, which is why it does not reach the room — a deliberate gate, not an absence.
+
+**A ban store exists — twice.** I wrote that `kick-ban` needs "durable storage this room does not
+have". `apps/controller/src/lib/server/db/schema.ts:335` is
+`banned: boolean('banned').notNull().default(false)` on `room_users`, and the role model at `:322`
+reads *"0 owner · 1 presenter · 2 participant · 3 chat muted · 4 banned"*. A third exists on the
+entry path: `banIPList` and `isBannedIp()` at `room-entry.ts:197`, used at `:227`.
+
+**Two things really are absent**, and the audit is what makes that claim worth anything now:
+`refreshRoster` / `softReset` appear in neither `apps/controller/src` nor `services/**`, and
+`reAuthSessionTok` exists only in this repository's own comments about it.
+
+#### The lesson, and it is the session's third of this shape
+
+"X does not exist" is a claim about a search, not about a repository, and it is only as wide as the
+directory it ran in. The same error produced "no browser coverage" twice — once for the controller,
+once for the room — and both times the answer was in a directory I had not opened.
+
 ### 2026-08-23 17:40 EDT — the fourth disposition is now a gate, and TODO is pruned to residue
 
 **Runtime impact: no.** A contract gained three assertions; `TODO.md` lost the rows that were done.
