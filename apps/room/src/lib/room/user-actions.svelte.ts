@@ -7,6 +7,7 @@ import {
   type TalkingEntry,
   nonAdminTalkingUsers
 } from '#lib/mute-all-non-admins.js';
+import type { RoomPermissionKey } from '#lib/permission-keys.js';
 import type { FollowChatStyle, ManagedChatUser, ModalName, ModalTargetUser } from '#lib/types.js';
 import {
   MISSING_SCHEME_ALERT,
@@ -43,6 +44,16 @@ export interface UserActionCommands {
   unmuteChat: (payload: { targetUserId: number }) => Promise<unknown>;
   /** `forceReload` — reloads ONE member's browser. Presenter-gated on the server. */
   forceReload: (targetUserId: number) => Promise<unknown>;
+  /**
+   * `saveCustomPerms` — the five checkboxes, written through to the CONTROLLER.
+   *
+   * The only command here that changes something durable rather than broadcasting; see
+   * `permissions.remote.ts` for why it is a module of one.
+   */
+  savePermissions: (payload: {
+    targetUserId: number;
+    granted: RoomPermissionKey[];
+  }) => Promise<unknown>;
 }
 
 /*
@@ -93,6 +104,17 @@ export class RoomUserActions<
     avatarUrl: string;
     status: string;
     role: string;
+    /*
+      The five permission checkboxes, optional because they reach this class through two paths and
+      `targetFor` must not care which. Both DO carry them — `+page.server.ts` on the load and
+      `sess/[room]/events` on the `/roster/` frame — but a member's copy is redacted to all-false at
+      the hub, so this type must not promise the truth, only the shape.
+    */
+    hasAdminChat?: boolean;
+    hasMic?: boolean;
+    hasScreen?: boolean;
+    hasCam?: boolean;
+    canEditNotes?: boolean;
   }
 > {
   readonly #dialogs: RoomDialogs;
@@ -261,6 +283,20 @@ export class RoomUserActions<
       pic: user.avatarUrl,
       status: user.status,
       permissions: user.role === 'user' ? 'r' : 'a',
+      /*
+        THE FIVE CHECKBOXES, carried through — and note they land on FLAT fields while arriving in a
+        nested one. `ModalTargetUser.permissions` is already taken, by an unrelated `'r' | 'a'`
+        string one line above, so reusing the name here would have silently overwritten it.
+
+        Without this the modal read `undefined` for all five and `Boolean(undefined)` drew every box
+        unchecked, whatever the membership said. Cosmetic while Save sent nothing; a REVOCATION the
+        moment it started, because the endpoint writes `false` for every key it is not given.
+      */
+      hasMic: user.hasMic ?? false,
+      hasScreen: user.hasScreen ?? false,
+      hasCam: user.hasCam ?? false,
+      canEditNotes: user.canEditNotes ?? false,
+      hasAdminChat: user.hasAdminChat ?? false,
       ...(user.status !== 'offline' ? { userXrefID: String(user.id), _id: String(user.id) } : {})
     };
   }
@@ -698,8 +734,41 @@ export class RoomUserActions<
     // The table moved to `user-action-intent.ts`; the state writes stay here. See it for why.
     const fixedAlert = userActionAlert(action);
     if (fixedAlert) {
-      if (action === 'save-permissions') this.#closeModal();
       this.#dialogs.alert = fixedAlert;
     }
+  }
+
+  /**
+   * `saveCustomPerms` — the five permission checkboxes, sent this time.
+   *
+   * NOT part of `handle()`, and the reason is the same one that gave it its own prop in
+   * `ModalHost`: every action `handle` takes is `(name, user)` with no payload, and this one carries
+   * the state of five boxes. Squeezing it in would mean widening the one dispatcher every control in
+   * the modal shares.
+   *
+   * ## The order of the three steps is the capture's
+   *
+   * Byte 2077194: `sendServerAdminCommand(...)`, `doCloseModal()`, `bootbox.alert(...)`, then
+   * `loadRoster()`. The send is FIRST and is not awaited before the modal closes — upstream is
+   * fire-and-forget over a socket, and a presenter who has to watch a spinner for a round trip is a
+   * behaviour the reference does not have.
+   *
+   * ## The refusal replaces the alert rather than adding one
+   *
+   * `#announceThenSend` is the existing shape for exactly this: raise the captured wording, and if
+   * the command rejects, overwrite it with `Command failed.` A second dialog stacked on the first
+   * would leave the presenter reading "Permissions applied" underneath "it did not".
+   *
+   * The reload the alert promises — *"user will reload the page now to apply..."* — is the
+   * `permsChangeReload` receiver, which is NOT built: it navigates to a `reAuthSessionTok` endpoint
+   * this deployment does not have (`TODO.md`). So the member picks the change up on their next load
+   * rather than immediately, and that gap is recorded rather than papered over by inventing a
+   * broadcast the capture does not describe.
+   */
+  savePermissions(user: ModalTargetUser, granted: readonly RoomPermissionKey[]): void {
+    this.#closeModal();
+    this.#announceThenSend(userActionAlert('save-permissions') ?? '', () =>
+      this.#commands.savePermissions({ targetUserId: user.id, granted: [...granted] })
+    );
   }
 }

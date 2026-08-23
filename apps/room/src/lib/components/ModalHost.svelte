@@ -1,5 +1,6 @@
 <script lang="ts">
   import { ngbTooltip, ngbTooltipWith } from '#lib/ngb-tooltip.js';
+  import { ROOM_PERMISSION_KEYS, type RoomPermissionKey } from '#lib/permission-keys.js';
   import { alertDateFormatter } from '#lib/message-formatters.js';
   import {
     CONNECTIVITY_ROWS,
@@ -142,6 +143,15 @@
     onFollowStyleChange: (user: ModalTargetUser, style: FollowChatStyle) => void;
     onMuteToggle: (user: ModalTargetUser) => void;
     onUserAction: (action: string, user: ModalTargetUser) => void;
+    /**
+     * Save the five permission checkboxes — the one control here that carries a PAYLOAD.
+     *
+     * `onUserAction` takes a name and a target and nothing else, so the ticked boxes had no way out
+     * of this component; that is why Save reported success and saved nothing until 2026-08-23.
+     * Widening the shared prop was refused for the reason `focusOnSessionNote` paid for. The rest is
+     * on `permissions.remote.ts`.
+     */
+    onSavePermissions: (user: ModalTargetUser, granted: RoomPermissionKey[]) => void;
     /**
      * The saved `streamingType` preference — `'RTMP'`, `'WHIP'`, or `''` when never chosen.
      *
@@ -302,6 +312,7 @@
     onFollowStyleChange,
     onMuteToggle,
     onUserAction,
+    onSavePermissions,
     streamingType,
     onManagedUserRemoval,
     onManagedUserInfo,
@@ -2149,7 +2160,11 @@
                           <div>
                             <button
                               class="btn btn-outline-success mb-1"
-                              onclick={() => onUserAction('save-permissions', targetUser)}
+                              onclick={() =>
+                                onSavePermissions(
+                                  targetUser,
+                                  ROOM_PERMISSION_KEYS.filter((key) => userPermissions[key])
+                                )}
                             >
                               <i class="icon fa fa-disk"></i> Save
                             </button>

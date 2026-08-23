@@ -30,6 +30,11 @@ type User = {
   avatarUrl: string;
   status: string;
   role: string;
+  hasAdminChat?: boolean;
+  hasMic?: boolean;
+  hasScreen?: boolean;
+  hasCam?: boolean;
+  canEditNotes?: boolean;
 };
 
 const ROW = (over: Partial<User> = {}): User => ({
@@ -64,6 +69,9 @@ const make = (options: { isPresenter?: boolean; talking?: TalkingEntry[] } = {})
   let previewsHidden = 0;
   let reloaded = 0;
   let unmuteFails = false;
+  /* The five checkboxes as they left the class, and a switch to make the control plane refuse. */
+  const permsSent: { targetUserId: number; granted: string[] }[] = [];
+  let permsFails = false;
 
   const actions = new RoomUserActions<User>({
     dialogs,
@@ -71,8 +79,16 @@ const make = (options: { isPresenter?: boolean; talking?: TalkingEntry[] } = {})
     commands: {
       presenter: (payload) => (sent.push(payload), Promise.resolve(null)),
       editUsername: () => Promise.resolve(null),
-      unmuteChat: () => (unmuteFails ? Promise.reject(new Error('refused')) : Promise.resolve(null)),
-      forceReload: (targetUserId: number) => (reloadsSent.push(targetUserId), Promise.resolve(null))
+      unmuteChat: () =>
+        unmuteFails ? Promise.reject(new Error('refused')) : Promise.resolve(null),
+      forceReload: (targetUserId: number) => (
+        reloadsSent.push(targetUserId),
+        Promise.resolve(null)
+      ),
+      savePermissions: (payload) =>
+        permsFails
+          ? Promise.reject(new Error('refused'))
+          : (permsSent.push(payload), Promise.resolve(null))
     },
     session: () => ({
       user: { id: 1 },
@@ -112,6 +128,8 @@ const make = (options: { isPresenter?: boolean; talking?: TalkingEntry[] } = {})
     mentioned,
     saved,
     reloadsSent,
+    permsSent,
+    failPerms: () => (permsFails = true),
     failUnmute: () => (unmuteFails = true),
     modalClosed: () => modalClosed,
     messageCleared: () => messageCleared,
@@ -387,5 +405,118 @@ describe('every public getter is reactive', () => {
     });
     stop();
     expect(seen, 'the target getter is not reactive').toEqual(['', 'Ada']);
+  });
+});
+
+/*
+  THE FIVE PERMISSION CHECKBOXES ARE SENT — the assertion the old code failed.
+
+  Before 2026-08-23 the Save button closed the modal, raised the reference's own alert, and sent
+  nothing. The checkbox values were `$state` local to `ModalHost.svelte` and `onUserAction` carried
+  only `(action, user)`, so they had no way out of the component. An owner ticked "Admin Chat", was
+  told it had applied, and the membership never changed.
+
+  Worse than a dead control, because it reported success. `user-action-intent.ts` had the alert right
+  and the FACT wrong.
+*/
+describe('saveCustomPerms sends the boxes, executed', () => {
+  it('sends exactly the ticked keys, for the named target', () => {
+    const { actions, permsSent } = make();
+    actions.savePermissions({ id: 7 } as never, ['hasMic', 'hasAdminChat']);
+    expect(permsSent, 'the control plane must be told').toEqual([
+      { targetUserId: 7, granted: ['hasMic', 'hasAdminChat'] }
+    ]);
+  });
+
+  it('an EMPTY list is a revocation, not a no-op', () => {
+    /*
+      The endpoint writes `false` for every key absent from `granted`, so unticking all five must
+      still send. A guard that skipped an empty list would make "remove every permission" the one
+      change this control could not perform.
+    */
+    const { actions, permsSent } = make();
+    actions.savePermissions({ id: 7 } as never, []);
+    expect(permsSent).toEqual([{ targetUserId: 7, granted: [] }]);
+  });
+
+  it('raises the captured alert and closes the modal', () => {
+    const { actions, dialogs, modalClosed } = make();
+    actions.savePermissions({ id: 7 } as never, ['hasCam']);
+    expect(dialogs.alert).toBe('Permissions applied, user will reload the page now to apply...');
+    expect(modalClosed(), 'the capture closes the modal before it alerts').toBe(1);
+  });
+
+  it('a REFUSAL replaces the alert instead of stacking a second dialog', async () => {
+    /*
+      `#announceThenSend`'s shape. A presenter reading "Permissions applied" over the top of "it did
+      not" is the failure this avoids — and a silent rejection would put the old lie straight back.
+    */
+    const { actions, dialogs, failPerms } = make();
+    failPerms();
+    actions.savePermissions({ id: 7 } as never, ['hasMic']);
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(dialogs.alert).toBe('Command failed.');
+  });
+});
+
+/*
+  THE MODAL SEEDS FROM THE TRUTH — the half that made the write path dangerous.
+
+  `targetFor` built the modal's target from a roster row and dropped all five permission flags, so
+  `ModalHost`'s `Boolean(targetUser.hasMic)` read `undefined` and drew every box unchecked whatever
+  the membership said. Harmless while Save sent nothing.
+
+  The moment Save started sending it became a REVOCATION: the endpoint writes `false` for every key
+  absent from `granted`, so a presenter opening the modal on a member with mic and screen and
+  pressing Save would have stripped both — and been told "Permissions applied".
+
+  Found by reading the subscribe payload in `sess/[room]/events/+server.ts` while checking something
+  else entirely. Nothing failed; the write path was green and wrong.
+*/
+describe('the permission checkboxes seed from the roster row', () => {
+  it('carries all five through targetFor', () => {
+    const { actions } = make();
+    const target = actions.targetFor(
+      ROW({
+        hasAdminChat: true,
+        hasMic: true,
+        hasScreen: false,
+        hasCam: true,
+        canEditNotes: false
+      })
+    );
+    expect(target.hasMic).toBe(true);
+    expect(target.hasScreen).toBe(false);
+    expect(target.hasCam).toBe(true);
+    expect(target.canEditNotes).toBe(false);
+    expect(target.hasAdminChat).toBe(true);
+  });
+
+  it('does not collide with the unrelated `permissions` string on the same object', () => {
+    /*
+      `ModalTargetUser.permissions` is `'r' | 'a'` and predates all of this. The five flags land on
+      FLAT fields precisely because that name was taken — writing the nested object over it would
+      have been invisible to the compiler and would have broken whatever reads the letter.
+    */
+    const { actions } = make();
+    const target = actions.targetFor(
+      ROW({ role: 'user', hasMic: true, hasScreen: true, hasCam: true, canEditNotes: true })
+    );
+    expect(target.permissions, 'still the role letter').toBe('r');
+    expect(target.hasMic, 'and the flag is beside it, not on top of it').toBe(true);
+  });
+
+  it('a REDACTED row seeds every box false rather than throwing', () => {
+    // A member's copy of the roster is blanked at the hub, and a member cannot open this modal —
+    // but the type must not promise the truth, only the shape.
+    const { actions } = make();
+    const target = actions.targetFor(ROW());
+    expect([target.hasMic, target.hasScreen, target.hasCam, target.canEditNotes]).toEqual([
+      false,
+      false,
+      false,
+      false
+    ]);
   });
 });

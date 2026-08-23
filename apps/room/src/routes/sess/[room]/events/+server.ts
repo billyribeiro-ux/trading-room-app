@@ -171,7 +171,20 @@ export const GET: RequestHandler = async ({ params, locals, request }) => {
         locStr: '',
         isP: membership?.isP === true,
         isFT: membership?.isFT ?? false,
-        hasAdminChat: membership?.permissions.hasAdminChat ?? false
+        hasAdminChat: membership?.permissions.hasAdminChat ?? false,
+        /*
+          The other four, so `#permissionsModal` seeds from the truth rather than from `undefined`.
+
+          Same membership read as `hasAdminChat` above — one config call at subscribe time, already
+          paid for. Absent them the modal showed four boxes unchecked whatever the member actually
+          had, which was cosmetic until Save started sending and then became a revocation.
+
+          Presenter-only on the way out; `publishRosterToRoom` blanks them for members.
+        */
+        hasMic: membership?.permissions.hasMic ?? false,
+        hasScreen: membership?.permissions.hasScreen ?? false,
+        hasCam: membership?.permissions.hasCam ?? false,
+        canEditNotes: membership?.permissions.canEditNotes ?? false
       });
 
       /*
