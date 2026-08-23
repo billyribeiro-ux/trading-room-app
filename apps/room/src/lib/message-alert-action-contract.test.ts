@@ -1,4 +1,4 @@
-import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { db, ensureDatabase } from '#lib/server/db/index.js';
 import {
@@ -11,6 +11,59 @@ import {
 } from '#lib/server/db/schema.js';
 import { resetRateLimits } from '#lib/server/rate-limit.js';
 import { callRemote, expectSchemaRefusal } from '#lib/server/remote-command-harness.js';
+
+/*
+  THE CONTROLLER, STUBBED — required from 2026-08-23, when `refuseIfMuted` began asking it.
+
+  There are two mutes. `chat_mutes` is the room's own 24-hour one and is a local table these tests
+  already write. The other is the controller's permanent mute — membership `role = 3`, surfaced as
+  `member.muted` — and it was loaded into the page payload and read by NOTHING, so an owner who muted
+  somebody indefinitely from the manage page watched them keep posting.
+
+  Enforcing it means the send path asks the control plane, which is not running in a unit test. Same
+  stub and same reasoning as `room-isolation-contract.test.ts` and `page-load-contract.test.ts`.
+
+  `permanentlyMuted` is a mutable knob rather than a fixed value because the interesting assertions
+  are on BOTH sides of it: a stub pinned to `false` would let the refusal tests pass for the wrong
+  reason, and one pinned to `true` would hide every other test in this file behind a 403.
+*/
+const controller = { permanentlyMuted: false };
+
+vi.mock('#lib/server/room-config-client.js', () => ({
+  RoomConfigUnavailable: class RoomConfigUnavailable extends Error {},
+  readRoomConfig: async (_request: Request, shortCode: string, email?: string) => ({
+    room: {
+      shortCode,
+      name: `Room ${shortCode}`,
+      state: 'open',
+      logoUrl: null,
+      publicId: null,
+      maxUsers: 0
+    },
+    settings: {},
+    locked: [],
+    member: {
+      displayName: 'stub',
+      email: email ?? '',
+      role: controller.permanentlyMuted ? 3 : 2,
+      nonPresenter: false,
+      isP: false,
+      isNonPresenterAdmin: false,
+      isFT: false,
+      denyArchivesAccess: false,
+      restrictPmUser: false,
+      muted: controller.permanentlyMuted,
+      banned: false,
+      permissions: {
+        hasMic: false,
+        hasScreen: false,
+        hasCam: false,
+        hasAdminChat: false,
+        canEditNotes: false
+      }
+    }
+  })
+}));
 
 /*
   Characterization tests for the four actions that create content: sendMessage, replyMessage,
@@ -76,6 +129,7 @@ beforeAll(() => {
 });
 
 beforeEach(() => {
+  controller.permanentlyMuted = false;
   resetRateLimits();
   db.delete(alertQuestions).run();
   db.delete(chatMutes).run();
@@ -163,6 +217,62 @@ describe('sendMessage', () => {
       callRemote(locals(member), () => sendMessage({ body: 'let me in', room: 'main' }))
     ).rejects.toMatchObject({ status: 403 });
     expect(db.select().from(messages).all()).toHaveLength(0);
+  });
+
+  /*
+    THE CONTROLLER'S PERMANENT MUTE — the bug this pair exists for, fixed 2026-08-23.
+
+    `applyUserOpcode` on the manage page writes membership `role = 3`, which `room-config-client.ts`
+    documents as "3 muted" and surfaces as `member.muted`. `+page.server.ts:381` loaded it into the
+    page payload and NOTHING read it, so a member muted INDEFINITELY by the owner kept posting. The
+    control reported success and the database recorded the mute; only the room never asked.
+
+    It is asserted on both send paths because that asymmetry has already happened once in this file:
+    the 24-hour mute applied to `sendMessage` and not to `replyMessage`, and a muted member simply
+    used the other door. A gate added to one path is not a gate.
+  */
+  it("refuses a PERMANENTLY muted member — the controller's mute, not the room's", async () => {
+    controller.permanentlyMuted = true;
+
+    await expect(
+      callRemote(locals(member), () => sendMessage({ body: 'muted by the owner', room: 'main' }))
+    ).rejects.toMatchObject({ status: 403 });
+    expect(db.select().from(messages).all(), 'nothing may be written').toHaveLength(0);
+  });
+
+  it('refuses a permanently muted member on the REPLY path too, not just send', async () => {
+    const original = db
+      .insert(messages)
+      .values({
+        roomShortCode: ROOM,
+        room: 'main',
+        senderId: presenter.id,
+        body: 'the original',
+        createdAt: new Date()
+      })
+      .returning()
+      .get();
+
+    controller.permanentlyMuted = true;
+
+    await expect(
+      callRemote(locals(member), () =>
+        replyMessage({ body: 'around the front door', messageId: original.id })
+      )
+    ).rejects.toMatchObject({ status: 403 });
+    expect(db.select().from(messages).all(), 'only the original may remain').toHaveLength(1);
+  });
+
+  it('lets an UNMUTED member through — the positive control for both assertions above', async () => {
+    /*
+      Without this, a stub that refused everything, a harness that threw, or a gate that had become
+      unconditional would make the two refusals above pass while chat was broken for everybody.
+    */
+    controller.permanentlyMuted = false;
+    await expect(
+      callRemote(locals(member), () => sendMessage({ body: 'not muted at all', room: 'main' }))
+    ).resolves.toBeUndefined();
+    expect(db.select().from(messages).all()).toHaveLength(1);
   });
 
   it('lets an expired mute through', async () => {

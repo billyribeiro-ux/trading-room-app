@@ -20,6 +20,8 @@ function renderNotes(notes: readonly RoomNote[]): string {
   return render(NotesPane, {
     props: {
       canEdit: true,
+      focusedNoteId: null,
+      onBringEveryone: () => {},
       giphyApiKey: '',
       newNoteOpen: false,
       notes,
@@ -78,13 +80,13 @@ describe('NotesPane evidence contract', () => {
       props: {
         canEdit: true,
         dirty: false,
+        onBringEveryone: () => {},
         menuId: 'notes-pane-menu-59',
         menuOpen: false,
         note: note(59, 'Bible Verses', 0),
         onDelete: () => undefined,
         onRename: () => undefined,
         onRequestWelcome: () => undefined,
-        onSelect: () => undefined,
         onStartEditing: () => undefined,
         onToggleMenu: () => undefined
       }

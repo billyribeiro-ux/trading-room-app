@@ -11,7 +11,23 @@
     readonly onDelete: () => void;
     readonly onRename: () => void;
     readonly onRequestWelcome: (allRooms: boolean) => void;
-    readonly onSelect: () => void;
+    /**
+     * "Bring everyone here" — a ROOM-WIDE act, deliberately NOT `onSelect`.
+     *
+     * It was wired to `onSelect` until 2026-08-23, which is why it brought nobody: selecting a tab
+     * and telling the room to follow are different things, and sharing one prop made the second
+     * indistinguishable from the first.
+     */
+    readonly onBringEveryone: () => void;
+    /*
+      `onSelect` was REMOVED on 2026-08-23 and is recorded rather than silently dropped.
+
+      It existed for exactly one consumer — the "Bring everyone here" menu item — and that was the
+      bug: the item was wired to "select this tab" instead of "tell the room". Once the item took its
+      own prop, `onSelect` had no reader left, and eslint said so. The tab CLICK is not this
+      component's: `NotesPane` owns the anchor and calls `selectNote` there, with `NoteTabContent`
+      rendered inside it. A prop nothing reads is the dead scaffolding this repository forbids.
+    */
     readonly onStartEditing: () => void;
     readonly onToggleMenu: () => void;
   }
@@ -25,7 +41,7 @@
     onDelete,
     onRename,
     onRequestWelcome,
-    onSelect,
+    onBringEveryone,
     onStartEditing,
     onToggleMenu
   }: Props = $props();
@@ -100,7 +116,7 @@
         </li>
         <li>
           <!-- svelte-ignore a11y_invalid_attribute -->
-          <a href="#" class="dropdown-item" onclick={(event) => activate(event, onSelect)}
+          <a href="#" class="dropdown-item" onclick={(event) => activate(event, onBringEveryone)}
             ><i class="fas fa-eye"></i> Bring everyone here</a
           >
         </li>

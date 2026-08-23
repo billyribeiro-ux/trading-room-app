@@ -31,7 +31,55 @@ import type { RoomModals } from './modals.svelte';
  */
 export class RoomNotes {
   #newNoteOpen: boolean;
+  /**
+   * The note a presenter has pulled the room to, or null.
+   *
+   * `$state.raw` because it is only ever REPLACED — it is an id, never mutated in place, which is
+   * the condition this repository's own rule names for preferring raw over a deep proxy.
+   */
+  #focusedNoteId = $state.raw<number | null>(null);
+
+  /** Read by `NotesPane`, which selects the note when this changes. */
+  get focusedNoteId(): number | null {
+    return this.#focusedNoteId;
+  }
+
+  /**
+   * RECEIVING end — a presenter elsewhere pulled the room here.
+   *
+   * Switches the main tab as well as the note, which is what the reference's own receiver does
+   * (capture byte 1962371 sets `selectedMainTab = "presAreaTabs-notes"` and then
+   * `selectedNoteTab = \`noteTab-${e}\``). Focusing a note on a hidden tab would be a no-op the
+   * member never sees.
+   */
+  focusNote(noteId: number): void {
+    this.#focusedNoteId = noteId;
+    this.#showNotesTab();
+  }
+
+  /**
+   * SENDING end — "Bring everyone here".
+   *
+   * Both halves deliberately: the presenter's own view follows immediately rather than waiting for
+   * their own broadcast to arrive back, and the room is told. The command is fire-and-forget with a
+   * logged failure, the same shape `RoomScreens.focusScreen` uses, because a refused broadcast must
+   * not leave the presenter's own tab unmoved.
+   *
+   * Until 2026-08-23 this sent NOTHING. Both controls were wired to a local `selectNote(id)` and
+   * `focus-on-screen-contract.test.ts` had already recorded the identical defect for screens in as
+   * many words — *"The menu item said 'Bring everyone here' and brought nobody"* — for a control
+   * that is one tab away from this one.
+   */
+  bringEveryoneTo(noteId: number): void {
+    this.focusNote(noteId);
+    void this.#focusOnSessionNote(noteId).catch((cause) =>
+      console.error('[focusOnSessionNote]', cause)
+    );
+  }
+
   constructor(options: {
+    /** The room-wide command. Injected so this class stays testable without a server. */
+    focusOnSessionNote: (noteId: number) => Promise<unknown>;
     menus: RoomMenus;
     modals: RoomModals;
     /** Whether the note editor has mounted; the new-note link reads it to decide its state. */
@@ -47,6 +95,7 @@ export class RoomNotes {
     this.#modals = options.modals;
     this.#noteGates = options.noteGates;
     this.#showNotesTab = options.showNotesTab;
+    this.#focusOnSessionNote = options.focusOnSessionNote;
 
     this.#newNoteOpen = $state(false);
   }
@@ -55,6 +104,7 @@ export class RoomNotes {
   readonly #modals: RoomModals;
   readonly #noteGates: () => { readonly editorMounted: boolean };
   readonly #showNotesTab: () => void;
+  readonly #focusOnSessionNote: (noteId: number) => Promise<unknown>;
 
   /** Whether the new-note editor is open. The Notes pane renders from it. */
   get newNoteOpen(): boolean {

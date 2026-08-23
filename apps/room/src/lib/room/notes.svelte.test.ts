@@ -28,7 +28,8 @@ const make = () => {
     menus: { closeForModal: () => {}, set: () => {} } as never,
     modals: { open: () => {} } as never,
     noteGates: () => ({ editorMounted: false }),
-    showNotesTab: () => shown.push(true)
+    showNotesTab: () => shown.push(true),
+    focusOnSessionNote: async () => undefined
   });
   return { notes, shown };
 };

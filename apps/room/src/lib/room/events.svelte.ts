@@ -108,6 +108,13 @@ export class RoomEventStream<Entry> {
     /** `mainTab = …` — the tab strip is the page's, so this is a receiver rather than a field. */
     showTab: (tab: 'screens' | 'videoplayer') => void;
     /**
+     * A presenter pulled the room to a session note.
+     *
+     * A RECEIVER for the same reason `showTab` is one: acting on it means switching the main tab AND
+     * selecting a note tab, and both of those belong to the page and to `NotesPane`, not here.
+     */
+    focusSessionNote: (noteId: number) => void;
+    /**
      * A chat frame arrived while the tab was hidden.
      *
      * A RECEIVER, not a field, because `missedChatWhileHidden` is written on BOTH sides of this
@@ -132,6 +139,7 @@ export class RoomEventStream<Entry> {
     this.#restartMediaSession = options.restartMediaSession;
     this.#showTab = options.showTab;
     this.#chatMissedWhileHidden = options.chatMissedWhileHidden;
+    this.#focusSessionNote = options.focusSessionNote;
 
     /**
      * Live connected count, from `/sess/{id}/roster/`.
@@ -177,6 +185,7 @@ export class RoomEventStream<Entry> {
   readonly #media: RoomMedia;
   readonly #broadcasts: RoomBroadcasts;
   readonly #mediaTransport: RoomMediaTransport;
+  readonly #focusSessionNote: (noteId: number) => void;
   readonly #mtx: MtxStreamTabs;
   readonly #roster: RosterSink<Entry>;
   readonly #privateChat: PrivateChatSink;
@@ -264,6 +273,8 @@ export class RoomEventStream<Entry> {
               url?: string;
               /** `focusOnScreen` — the producer id of the screen to move to. */
               screenId?: string;
+              /** `focusOnSessionNote` — the note a presenter pulled the room to. */
+              noteId?: number;
               /**
                * `mtxStartStream` / `mtxStopStream` carry the stream under `muser` — the reference's
                * own key (byte 1010826), and the reason `mtx-streams.ts` describes an MTX stream as
@@ -487,6 +498,18 @@ export class RoomEventStream<Entry> {
           */
           if (typeof command.screenId === 'string')
             this.#mediaTransport.selectScreenTabOfId(command.screenId);
+          return;
+        }
+        if (command?.cmd === 'focusOnSessionNote') {
+          /*
+            A presenter pulled the room to a session note. The receiver upstream (byte 1962371)
+            switches the main tab to notes and selects `noteTab-${id}`; ours calls the page's
+            handler, which owns both halves of that.
+
+            No re-broadcast from here, for the same reason the screen case gives: only the
+            user-initiated control sends, so a member receiving this does not echo it back.
+          */
+          if (typeof command.noteId === 'number') this.#focusSessionNote(command.noteId);
           return;
         }
 

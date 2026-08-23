@@ -122,6 +122,12 @@ export type RoomEvent =
          */
         screenId?: string;
         /**
+         * `focusOnSessionNote`'s payload — the note a presenter is pulling the room to. Named
+         * `noteId` for the same reason `screenId` is not `id`: on a union this wide, `id` alone
+         * says nothing about what it identifies. Byte 1023554 of the capture carries it as `{id}`.
+         */
+        noteId?: number;
+        /**
          * `giveMicScreen`'s payload.
          *
          * A top-level command of its own in the capture, not a `remotePresCommand` subCmd:

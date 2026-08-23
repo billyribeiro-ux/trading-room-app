@@ -901,6 +901,8 @@
           {#if noteGates.surfaceVisible}
             <NotesPane
               canEdit={noteGates.editorMounted}
+              focusedNoteId={notes.focusedNoteId}
+              onBringEveryone={(noteId) => notes.bringEveryoneTo(noteId)}
               {giphyApiKey}
               notes={data.notes}
               newNoteOpen={notes.newNoteOpen}
