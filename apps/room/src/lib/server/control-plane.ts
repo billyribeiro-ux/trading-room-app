@@ -144,6 +144,19 @@ export function roomSettingUrl(shortCode: string): string | null {
 }
 
 /**
+ * `saveCustomPerms`: `POST {control}/internal/room-permissions/{shortCode}`.
+ *
+ * The second thing this room writes back, and for the same reason as the first: the five permission
+ * checkboxes live in `roomUsers.permissionsJson` on the CONTROLLER, which is what `readRoomConfig`
+ * hands the room on every load. A room-side write would be a second answer to what a member may do,
+ * and it would lose on the next page load.
+ */
+export function roomPermissionsUrl(shortCode: string): string | null {
+  const origin = controlPlaneOrigin();
+  return origin ? `${origin}/internal/room-permissions/${encodeURIComponent(shortCode)}` : null;
+}
+
+/**
  * `getRTMPToken`: `POST {control}/internal/stream-ingest/{shortCode}`.
  *
  * The reference reaches this over its admin command channel

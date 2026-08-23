@@ -33,6 +33,60 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-23 12:58 EDT — `save-permissions` actually saves, and the seeding defect that would have made it revoke
+
+**Runtime impact: yes.** The Save button on `#permissionsModal` writes to the controller. It
+previously reported success and wrote nothing.
+
+**The defect.** `saveCustomPerms` closed the modal, raised the reference's own alert — *"Permissions
+applied, user will reload the page now to apply..."* — and sent nothing at all. The five checkbox
+values were `$state` local to `ModalHost.svelte`; `onUserAction` carries `(action, targetUser)` and
+no payload, so they had no way out of the component. An owner ticked "Admin Chat", was told it had
+applied, and the membership never changed. `user-action-intent.ts` had the WORDING right and the
+FACT wrong, which is the worst shape a defect takes here — a control nobody thinks to check.
+
+**Nothing was invented.** The reference's method was read at bundle byte 2077194; its log line names
+exactly five keys and they are exactly the controller's `PERMISSION_KEYS`, which its Manage page has
+always written through `savePermissions`. The storage, the writer and the five names all existed on
+the far side of a door the room did not have. What was added is the door:
+`POST /internal/room-permissions/<code>`, built on `internal/room-setting`'s shape.
+
+**THE SECOND DEFECT IS THE IMPORTANT ONE, and it was mine.** While verifying that
+`ModalTargetUser.id` really was the room's `users.id`, reading the subscribe payload showed that the
+roster entry carried `hasAdminChat` and **not** `hasMic`, `hasScreen`, `hasCam`, `canEditNotes` — and
+that `targetFor` dropped all five regardless. So the modal seeded every box from `undefined` and drew
+them unchecked whatever the membership said. Harmless while Save sent nothing. **A silent revocation
+the moment it started**, because the endpoint writes `false` for every key absent from `granted`: a
+presenter opening the modal on a member with mic and screen and pressing Save would have stripped
+both. Nothing failed — the write path was green and wrong.
+
+**A design of mine was also an invention and was reverted.** The first fix carried the four as a
+nested `permissions` object. `+page.server.ts` has emitted them FLAT since long before this, and
+`page-load-contract.test.ts` pins all four by name; a roster row reaches `targetFor` from either
+source, so two shapes would have meant the modal seeded correctly or not depending on the path. The
+existing shape won.
+
+**Three of this repository's own gates caught the wire change and forced a decision**, which is
+exactly what they were written for: `roster-privacy.test.ts`'s exact key set refused a new field
+until it was named and its role stated; `page-load-contract.test.ts` did the same on the load; and
+the ceiling ratchet caught the overrun. The four flags are **presenter-only in value**, redacted at
+the hub like `locStr` and `email` — a member cannot open that modal and no gate a member evaluates
+reads them. `hasAdminChat` stays visible because the per-row visibility gate does read it.
+
+**Ceilings, owner-approved:** RoomOverlays 769→770, create-room 1086→1093, ModalHost 5966→5981,
+user-actions 730→**775**. The last two are recorded as OVERRUNS: user-actions was approved at 750 and
+the +25 is the seeding fix found after the approval; create-room was approved at +1 and `prettier`
+reflowed the `commands` object to six lines. Both say so in their ceiling notes.
+
+**Verified:** room `vitest` **2,622 passing across 187 files**; controller **997 across 96**;
+`svelte-check` **1,233 / 0 / 0** and **1,531 / 0 / 0**; `eslint .` **0 errors in every file git
+tracks**, both apps; `prettier --check` clean on all touched files. Negative controls seen RED: the
+send removed (3 red), a renamed key across the seam, and the redaction assertions run against a
+fixture with all four flags ON so they cannot pass vacuously. **NOT verified:** no browser has
+clicked the button — the round trip to a live controller is the owner's to confirm, and
+`temporaryAccessOnly` remains a sixth checkbox with no column and no captured behaviour, recorded as
+a gap rather than guessed into the payload.
+
 ### 2026-08-23 12:35 EDT — both PRs merged, `main` green, and the two finished rows deleted from `TODO.md`
 
 **Runtime impact: yes, via the merges** — `main` auto-deploys, and PR #127 (`542b038`) plus PR #128

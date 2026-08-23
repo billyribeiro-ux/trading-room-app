@@ -79,6 +79,7 @@ import {
 } from '../../routes/files-pane.remote';
 import { uploadComposerImage } from '../../routes/composer-image.remote';
 import { savePreference as savePreferenceCommand } from '../../routes/user-settings.remote';
+import { savePermissions } from '../../routes/permissions.remote';
 import { editUsername } from '../../routes/username.remote';
 import { replyMessage, sendMessage as sendMessageCommand } from '../../routes/chat-messages.remote';
 import { askQuestion } from '../../routes/alert-questions.remote';
@@ -795,7 +796,13 @@ export function createRoom(deps: RoomDeps) {
   const userActions = new RoomUserActions<(typeof data.connectedUsers)[number]>({
     dialogs,
     toasts,
-    commands: { presenter: presenterCommand, editUsername, unmuteChat, forceReload },
+    commands: {
+      presenter: presenterCommand,
+      editUsername,
+      unmuteChat,
+      forceReload,
+      savePermissions
+    },
     session: () => data,
     isPresenter: () => isPresenter,
     talking: () => media.talking,

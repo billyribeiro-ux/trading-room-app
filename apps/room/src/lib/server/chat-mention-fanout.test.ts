@@ -40,7 +40,11 @@ const member = (id: number, displayName: string): RosterUser => ({
   isP: false,
   isFT: false,
   hasAdminChat: false,
-  locStr: ''
+  locStr: '',
+  hasMic: false,
+  hasScreen: false,
+  hasCam: false,
+  canEditNotes: false
 });
 
 /** Subscribe a set of people and hand back what each of them receives. */

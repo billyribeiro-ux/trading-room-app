@@ -295,6 +295,44 @@ export type RosterUser = {
    * `locationVisibleTo` is the gate, and nothing here may publish it to a member.
    */
   locStr: string;
+  /**
+   * The four remaining permission checkboxes, PRESENTER-ONLY on the way out.
+   *
+   * ## Why they had to arrive here
+   *
+   * `#permissionsModal` seeds its five boxes from the roster entry the presenter clicked
+   * (`ModalHost.svelte`, the `name === 'user'` effect). Four of the five were never carried, so
+   * `Boolean(undefined)` made them all read UNCHECKED however the membership actually stood — and
+   * `hasAdminChat` was carried, which is what made the modal look right enough not to be questioned.
+   *
+   * Harmless while the Save button sent nothing. The moment it started sending (2026-08-23) it
+   * became a silent REVOCATION: the endpoint writes `false` for every key absent from `granted`, so
+   * a presenter opening the modal and pressing Save would have stripped mic, screen, cam and notes
+   * from a member who had them, and been told "Permissions applied".
+   *
+   * Found by reading the subscribe payload while checking whether `targetUser.id` was the room's
+   * `users.id`. Nothing failed; the write path was green and wrong.
+   *
+   * ## Presenter-only, unlike `hasAdminChat` beside them
+   *
+   * `hasAdminChat` is published to everyone because the per-row VISIBILITY gate above reads it off
+   * other people's entries. These four gate nothing a member can see, and their only consumer is a
+   * modal a member cannot open, so they are redacted in `publishRosterToRoom` exactly as `email` and
+   * `locStr` are. The narrower disclosure is the default; carrying them to everybody would be four
+   * more facts about a member in every other member's browser for no reader.
+   *
+   * ## FLAT, because `+page.server.ts` was already flat
+   *
+   * A first draft made this a nested `permissions` object and it was an invention: `connectedUser`
+   * has emitted flat `hasMic` / `hasScreen` / `hasCam` / `canEditNotes` since long before this, and
+   * `page-load-contract.test.ts` pins all four by name. A roster row reaches `targetFor` from EITHER
+   * source, so two shapes would have meant the modal seeded correctly or not depending on which path
+   * filled it. The existing shape wins; the new code matches it.
+   */
+  hasMic: boolean;
+  hasScreen: boolean;
+  hasCam: boolean;
+  canEditNotes: boolean;
 };
 
 /**
@@ -484,9 +522,21 @@ export function publishRosterToRoom(room: string): void {
     An entry with neither field set is passed through BY REFERENCE — that is the common case for
     `locStr`, which stays empty until a browser's geolocation lookup answers.
   */
-  const forMembers = forPresenters.map((entry) =>
-    entry.locStr === '' && entry.email === '' ? entry : { ...entry, locStr: '', email: '' }
-  );
+  /*
+    `permissions` joins `locStr` and `email` in the redaction, and it is why the pass-through
+    shortcut below had to go: those two can legitimately be empty, but the four permission flags are
+    always present, so there is no "already blank" case to skip on. Copying every entry is the same
+    one pass over the roster the comment above describes.
+  */
+  const forMembers = forPresenters.map((entry) => ({
+    ...entry,
+    locStr: '',
+    email: '',
+    hasMic: false,
+    hasScreen: false,
+    hasCam: false,
+    canEditNotes: false
+  }));
 
   for (const [listener, viewer] of listeners) {
     try {

@@ -560,6 +560,7 @@
   onFollowStyleChange={(user, style) => userActions.applyFollowStyle(user, style)}
   onMuteToggle={(user) => userActions.requestMuteToggle(user)}
   onUserAction={(action, user) => userActions.handle(action, user)}
+  onSavePermissions={(user, granted) => userActions.savePermissions(user, granted)}
   streamingType={typeof prefs.loaded.streamingType === 'string' ? prefs.loaded.streamingType : ''}
   onManagedUserRemoval={(list, user) => userActions.requestManagedRemoval(list, user)}
   onManagedUserInfo={(user) => userActions.openManagedInfo(user)}

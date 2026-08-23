@@ -80,7 +80,16 @@ const rosterUser = (id: number, isP: boolean): RosterUser => ({
   isP,
   isFT: false,
   hasAdminChat: false,
-  locStr: ''
+  locStr: '',
+  /*
+    All four ON in the fixture, deliberately. A default of `false` would make the redaction
+    assertions below pass against a hub that forwarded them untouched, which is the vacuous-guard
+    failure this repository keeps finding in its own tests.
+  */
+  hasMic: true,
+  hasScreen: true,
+  hasCam: true,
+  canEditNotes: true
 });
 
 const ROOM = 'privacy-probe-room';
@@ -138,6 +147,25 @@ describe('roster location is redacted per recipient, at the hub', () => {
     expect(seenByMember.map((entry) => entry.displayName).sort()).toEqual(['User 1', 'User 2']);
     expect(seenByMember.map((entry) => entry.emailHash).sort()).toEqual(['hash-1', 'hash-2']);
 
+    /*
+      THE FOUR PERMISSION FLAGS ARE PRESENTER-ONLY TOO, added 2026-08-23 with the write path.
+
+      They exist so `#permissionsModal` can seed its checkboxes from the truth. A member cannot open
+      that modal and no gate a member evaluates reads them, so they are stripped here on the same
+      argument `locStr` and `email` were: the wire is the boundary, and a field with no reader on
+      this side of it is a disclosure with no purpose.
+
+      `hasAdminChat` deliberately stays visible — the per-row VISIBILITY gate reads it off other
+      people's entries, so it has a consumer a member genuinely evaluates.
+    */
+    expect(
+      seenByMember.map((e) => [e.hasMic, e.hasScreen, e.hasCam, e.canEditNotes]),
+      'a member must learn nothing about what another member is permitted to do'
+    ).toEqual([
+      [false, false, false, false],
+      [false, false, false, false]
+    ]);
+
     const seenByPresenter = lastRoster(presenterFrames);
     expect(
       seenByPresenter.map((entry) => entry.locStr).sort(),
@@ -147,6 +175,20 @@ describe('roster location is redacted per recipient, at the hub', () => {
       seenByPresenter.map((entry) => entry.email).sort(),
       'the presenter keeps the address for the roster search and the mailto: link'
     ).toEqual(['user1@example.test', 'user2@example.test']);
+    /*
+      The POSITIVE control for the redaction above, and the reason the write path is safe: the
+      presenter must receive the flags INTACT, because `#permissionsModal` seeds its five checkboxes
+      from them and the Save button posts that state wholesale. A hub that stripped them for
+      everybody would make every Save a revocation — which is exactly what happened while the four
+      were not carried at all.
+    */
+    expect(
+      seenByPresenter.map((e) => [e.hasMic, e.hasScreen, e.hasCam, e.canEditNotes]),
+      'the presenter seeds the permissions modal from these'
+    ).toEqual([
+      [true, true, true, true],
+      [true, true, true, true]
+    ]);
   });
 
   it('an ANONYMOUS listener is redacted, because absent authority is not presenter', () => {
@@ -233,6 +275,23 @@ describe('the roster payload is an EXACT key set, per role', () => {
     'isP',
     // Presenter-only. The city line, resolved by the browser and posted back after subscribe.
     'locStr',
+    /*
+      The four remaining permission checkboxes, added 2026-08-23 — and this list is what forced the
+      disclosure decision rather than letting it be made by omission.
+
+      PRESENTER-ONLY IN VALUE, present in shape for both, exactly like `locStr` and `email` above:
+      the member's copy arrives as four `false`s, asserted in the redaction test earlier in this
+      file. They exist so `#permissionsModal` seeds its checkboxes from the truth; a member cannot
+      open that modal and no gate a member evaluates reads them, so there is no reader to disclose
+      them to.
+
+      `hasAdminChat` is deliberately NOT among them and stays visible to everyone, because the
+      per-row VISIBILITY gate reads it off other people's entries.
+    */
+    'canEditNotes',
+    'hasCam',
+    'hasMic',
+    'hasScreen',
     'role',
     'status',
     // The identity the per-row roster gate compares against.

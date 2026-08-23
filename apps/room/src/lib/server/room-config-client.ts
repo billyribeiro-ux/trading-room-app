@@ -25,6 +25,7 @@ import {
   mobilePinUrl,
   roomConfigUrl,
   roomEntryUrl,
+  roomPermissionsUrl,
   roomSettingUrl,
   streamIngestUrl,
   streamReadUrl
@@ -595,6 +596,77 @@ export async function writeRoomSetting(
   }
 
   if (!response.ok) throw new RoomConfigUnavailable(`the controller answered ${response.status}`);
+}
+
+/**
+ * The five permission checkboxes: `POST {control}/internal/room-permissions/{shortCode}`.
+ *
+ * `saveCustomPerms` in the capture (byte 2077194) sends `changeUserPerms` and then reloads the
+ * roster. Ours writes through the control plane instead, because that is where
+ * `roomUsers.permissionsJson` lives and where every reader of it already looks.
+ *
+ * ## `granted` is the WHOLE state, not a diff
+ *
+ * The endpoint writes `false` for every key absent from the list, so this must be the full set of
+ * ticked boxes. That matches what the modal has — five checkboxes it reads wholesale — and it means
+ * a dropped key revokes rather than preserves, which is the safe direction for a permission.
+ *
+ * ## The refusal is DISTINGUISHED, and that is the point of the second error class
+ *
+ * A 403 here is a correct answer — not a presenter, or the target is not in this room — and retrying
+ * will not change it, so it must not read to the caller as "the control plane is down". Same
+ * reasoning `StreamIngestForbidden` records below.
+ */
+export async function writeRoomPermissions(
+  shortCode: string,
+  callerEmail: string,
+  targetEmail: string,
+  granted: readonly string[]
+): Promise<void> {
+  const secret = ROOM_JWT_SECRET;
+  if (!secret) throw new RoomConfigUnavailable('ROOM_JWT_SECRET is not configured');
+
+  const base = roomPermissionsUrl(shortCode);
+  if (!base) throw new RoomConfigUnavailable('CONTROL_BASE_URL is not configured');
+
+  const url = new URL(base);
+  url.searchParams.set('email', callerEmail);
+
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${configReadToken(secret, shortCode)}`,
+        'content-type': 'application/json'
+      },
+      body: JSON.stringify({ targetEmail, granted }),
+      signal: AbortSignal.timeout(TIMEOUT_MS)
+    });
+  } catch (cause) {
+    throw new RoomConfigUnavailable(`the write failed or timed out after ${TIMEOUT_MS}ms`, {
+      cause
+    });
+  }
+
+  if (response.status === 403 || response.status === 404) {
+    throw new RoomPermissionsRefused(`the controller answered ${response.status}`);
+  }
+  if (!response.ok) throw new RoomConfigUnavailable(`the controller answered ${response.status}`);
+}
+
+/**
+ * The controller refused a permissions write: not a presenter, or the target is not in this room.
+ *
+ * Separate from {@link RoomConfigUnavailable} for the reason {@link StreamIngestForbidden} gives —
+ * this is a correct answer to a question that was allowed to be asked, and it needs to reach the
+ * presenter as a refusal rather than as an outage.
+ */
+export class RoomPermissionsRefused extends Error {
+  constructor(detail: string) {
+    super(`The control plane refused that permissions change (${detail}).`);
+    this.name = 'RoomPermissionsRefused';
+  }
 }
 
 /**
