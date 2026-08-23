@@ -248,25 +248,7 @@ export const INERT_ACTIONS: Readonly<Record<string, string>> = {
     sitting in the same menu as `" Mute Microphone for all non-admins "`.
   */
   'get-my-token':
-    'ModalHost.svelte:3075 — no handler, but FULLY EVIDENCED at byte 2255348: a "Session Information" bootbox showing globals.sessionID in a readonly #sessionId and globals.sesionToken in a readonly #sessionToken, each with a Copy button, and one "Close" button',
-
-  /*
-    `kick-ban` BECAME INERT ON 2026-08-23, and it moved in the honest direction.
-
-    It used to share a branch with `kick`, and that branch alerted *"User kicked OK"* while sending
-    nothing at all — so both controls lied. `kick` now sends a real, presenter-gated `kickUser`.
-
-    `kick-ban` deliberately did NOT come with it. The reference's payload is
-    `{user, msg, ban, kickAllInstances}`, and a ban has to OUTLIVE the frame: something durable must
-    record that this person may not come back. This room has no such store. Pointing `kick-ban` at
-    the plain kick would drop the ban silently and rebuild the exact defect the kick fix removed —
-    a control reporting something it did not do.
-
-    So it is inert and says so here, which is strictly better than what it was: a lie counted as
-    `handled`. `TODO.md` row 7 carries what it needs.
-  */
-  'kick-ban':
-    'ModalHost.svelte:2362 — no handler since 2026-08-23, when `kick` was given a real command and this was NOT: a ban needs durable storage this room does not have, and reusing the plain kick would drop it silently'
+    'ModalHost.svelte:3075 — no handler, but FULLY EVIDENCED at byte 2255348: a "Session Information" bootbox showing globals.sessionID in a readonly #sessionId and globals.sesionToken in a readonly #sessionToken, each with a Copy button, and one "Close" button'
 };
 
 /** Every action that is knowingly silent. Exported so the disposition contract can read it. */

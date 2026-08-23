@@ -63,7 +63,7 @@ const make = (
   const toasts = new RoomToasts();
   const sent: { subCmd: string; targetUserId: number }[] = [];
   const reloadsSent: number[] = [];
-  const kicksSent: { targetUserId: number; message: string }[] = [];
+  const kicksSent: { targetUserId: number; message: string; ban?: boolean }[] = [];
   const urlsSent: { cmd: string; url: string }[] = [];
   const opened: string[] = [];
   const mentioned: string[] = [];
@@ -89,7 +89,7 @@ const make = (
         urlsSent.push(payload),
         Promise.resolve(null)
       ),
-      kickUser: (payload: { targetUserId: number; message: string }) => (
+      kickUser: (payload: { targetUserId: number; message: string; ban?: boolean }) => (
         kicksSent.push(payload),
         Promise.resolve(null)
       ),
@@ -569,16 +569,38 @@ describe('kick', () => {
 
     harness.dialogs.prompt?.onconfirm('Please stop.');
 
-    expect(harness.kicksSent).toEqual([{ targetUserId: TARGET.id, message: 'Please stop.' }]);
+    expect(harness.kicksSent).toEqual([
+      { targetUserId: TARGET.id, message: 'Please stop.', ban: false }
+    ]);
     expect(harness.dialogs.alert).toBe('User kicked OK');
   });
 
-  it('kick-ban sends NOTHING — a ban needs storage this room does not have', () => {
+  /*
+    THIS TEST USED TO ASSERT THE OPPOSITE, and its old name recorded a reason that was false:
+    "kick-ban sends NOTHING — a ban needs storage this room does not have". The store,
+    `roomUsers.banned`, had been in the controller's schema the whole time. Inverted 2026-08-23 with
+    the endpoint that reaches it.
+  */
+  it('kick-ban sends the SAME command with ban:true, as upstream does in one payload', () => {
     const harness = make({ isPresenter: true });
     harness.actions.handle('kick-ban', TARGET);
+    harness.dialogs.prompt?.onconfirm('Banned.');
 
-    expect(harness.kicksSent).toEqual([]);
-    expect(harness.dialogs.prompt).toBeNull();
+    expect(harness.kicksSent).toEqual([{ targetUserId: TARGET.id, message: 'Banned.', ban: true }]);
+  });
+
+  /*
+    The two share ONE branch, as upstream shares one payload — so the flag is what distinguishes
+    them, and it is asserted EXPLICITLY on both sides. `false` rather than absent: the schema
+    defaults it, but a plain kick that silently omitted the field would make "did this ban?"
+    depend on a default rather than on what was sent.
+  */
+  it('a plain kick sends ban:false explicitly, so the two cannot be confused', () => {
+    const harness = make({ isPresenter: true });
+    harness.actions.handle('kick', TARGET);
+    harness.dialogs.prompt?.onconfirm('Please stop.');
+
+    expect(harness.kicksSent[0]?.ban).toBe(false);
   });
 });
 

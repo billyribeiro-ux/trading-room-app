@@ -33,6 +33,64 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-23 20:10 EDT — `kick-ban` is built end to end, and the ban is durable
+
+**Runtime impact: YES.** Kick & Ban now records a ban that survives the disconnect. It previously
+alerted success and did nothing at all.
+
+**Branch `feat/save-permissions`.** Closes `TODO.md` row 6.
+
+#### The claim that blocked it was mine, and it was wrong twice
+
+`kick-ban` sat inert on a recorded reason: a ban "needs durable storage this room does not have".
+`roomUsers.banned` has been in the controller's schema throughout (`schema.ts:335`) and the role
+model directly above it reads *"…4 banned"*. The store was never missing — the door was.
+
+#### Built on the `savePermissions` precedent, read end to end first
+
+`POST /internal/room-ban/<code>?email=<caller>` mirrors `internal/room-permissions`: the same bearer
+MAC, the same account-active check, the same one-read-for-both-memberships, and the same seam rule —
+**the target is named by EMAIL**, because the room's `users.id` and the controller's are different
+rows in different databases.
+
+**Authority is decided twice**, which is the point: `presenterRoom()` refuses a member before a
+request leaves the room process, and the controller re-checks anyway. Neither side may be the only
+check — that was 2026-08-07.
+
+**Two refusals are stricter than the reference, deliberately.** No self-ban, following
+`room-permissions`, which follows `giveMicScreen`'s *"Can't give 'Mic/Screenshare' to yourself."*
+And **no banning the owner**: a room whose owner can be banned by one of their own presenters is a
+room that can be taken from its account holder. No capture says so; it fails closed by choice, and
+the file says that is what it is doing.
+
+The write is one conditional `UPDATE … WHERE id AND roomId … RETURNING` — not SELECT-then-UPDATE,
+which would be the TOCTOU this repository removes everywhere. Zero rows returns 409, and the room
+classes it with 403/404 as a **refusal** rather than an outage.
+
+#### Order is load-bearing
+
+The ban is written **before** the kick frame is published. Kick first and the member is disconnected
+while the write is in flight; if that write then fails they are merely ejected and can walk straight
+back in, having been told they were banned.
+
+#### One branch, both flags asserted
+
+`kick` and `kick-ban` now share a single branch, as upstream shares a single payload
+(`{user, msg, ban, kickAllInstances}`) — merged when the duplicated version pushed `kicks.svelte.ts`
+past its ceiling. **No ceiling was raised**: the duplication was the problem, and removing it took
+the file from 144 to 130 against its unchanged 130.
+
+That merge changed behaviour in one visible way and a test caught it: a plain kick now sends
+`ban: false` explicitly rather than omitting it. Both values are now pinned, because "did this ban?"
+must not depend on a schema default.
+
+`kickAllInstances` is still refused — its behaviour appears nowhere read, and `kick-duplicates`
+already does that job explicitly.
+
+**Verified:** room `vitest` **2,648 / 188**; controller `vitest` **1,001 / 97**; `svelte-check`
+**0/0 in both apps**; `eslint` clean; negative control seen RED (dropping the flag fails the
+assertion) and restored; no ceiling raised.
+
 ### 2026-08-23 19:20 EDT — both "Command send OK." liars now send
 
 **Runtime impact: YES, the send half.** Two Session Control broadcasts that alerted success and sent

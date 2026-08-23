@@ -157,6 +157,17 @@ export function roomPermissionsUrl(shortCode: string): string | null {
 }
 
 /**
+ * `kick-ban`: `POST {control}/internal/room-ban/{shortCode}`.
+ *
+ * A separate endpoint from `room-permissions` because it answers a different question — not what a
+ * member may do, but whether they may be here at all — and writes a different column.
+ */
+export function roomBanUrl(shortCode: string): string | null {
+  const origin = controlPlaneOrigin();
+  return origin ? `${origin}/internal/room-ban/${encodeURIComponent(shortCode)}` : null;
+}
+
+/**
  * `getRTMPToken`: `POST {control}/internal/stream-ingest/{shortCode}`.
  *
  * The reference reaches this over its admin command channel
