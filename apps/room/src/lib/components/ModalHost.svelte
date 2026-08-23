@@ -1,5 +1,7 @@
 <script lang="ts">
   import { ngbTooltip, ngbTooltipWith } from '#lib/ngb-tooltip.js';
+  import { searchAlerts } from '../../routes/alerts-search.remote';
+  import { ALERT_SEARCH_LIMIT } from '#lib/alert-search-limit.js';
   import { ROOM_PERMISSION_KEYS, type RoomPermissionKey } from '#lib/permission-keys.js';
   import { alertDateFormatter } from '#lib/message-formatters.js';
   import {
@@ -211,11 +213,13 @@
       evidenceTimestampText?: string;
     } | null;
     /**
-     * The room's alerts, for `#alerts-advanced-search-modal`. The captured component calls a
-     * server route this room does not have, so the search runs against these real rows - see
-     * `filterAlerts` in `#lib/alerts-advanced-search.js`.
+     * The viewer's mod-alert filter, applied to SERVER search results.
+     *
+     * A predicate rather than the rows, since 2026-08-23. The search asks the database now, and the
+     * database cannot know which traders this viewer filtered out — so the rule travels to the
+     * results. `alert-filter-contract.test.ts` calls this site three of three.
      */
-    alerts: SearchableAlert[];
+    alertSearchFilter: (alert: SearchableAlert) => boolean;
     /**
      * The chat rich text editor's three-way gate, already resolved by the page.
      *
@@ -327,7 +331,7 @@
     mutedUsers,
     followedUsers,
     targetMessage,
-    alerts,
+    alertSearchFilter,
     canUseRTE = false,
     rteDraft = '',
     rteIsEditing = false,
@@ -362,6 +366,9 @@
   let advancedSearch = $state(emptySearch());
   let advancedSearchResults = $state.raw<SearchableAlert[]>([]);
   let advancedSearchLoading = $state(false);
+  /* The search reached `ALERT_SEARCH_LIMIT`, so the list is the newest matches and not all of them.
+     Rendered, because a cap the reader cannot see is the defect this change removed. */
+  let advancedSearchTruncated = $state(false);
   /** `selectedTradersStr` / `selectedRoomsStr` - empty string means "show the placeholder span". */
   const selectedTradersStr = $derived(selectedLabel(advancedSearch.traders));
   const selectedRoomsStr = $derived(selectedLabel(advancedSearch.rooms));
@@ -422,20 +429,42 @@
     saveAlertFilter();
   }
 
-  /** `searchAlerts()` - the early return, then the query. */
-  function runAdvancedSearch() {
+  /**
+   * `searchAlerts()` - the early return, then the query.
+   *
+   * A REAL round trip now, which is what the loading state above was always describing. Until
+   * 2026-08-23 this filtered the `alerts` prop — `loadAlertPage`'s newest FIFTY rows — so a date
+   * range pointing further back searched fifty rows from today and answered "no results" over a log
+   * that had them. `alerts-search.remote.ts` carries the reasoning.
+   *
+   * `filterAlerts` still runs, on the server's answer: the trader predicate matches
+   * `senderEmailHash`, which is computed from the address at read time and is not a column, so no
+   * SQL can express it. Three predicates moved; that one cannot.
+   */
+  async function runAdvancedSearch() {
     if (!canSearch(advancedSearch)) return;
     advancedSearchResults = [];
+    advancedSearchTruncated = false;
     advancedSearchLoading = true;
-    // The capture awaits a server round trip here. This room answers from rows it already holds,
-    // so the loading state is set and cleared in the same tick rather than faked with a timer.
-    advancedSearchResults = filterAlerts(alerts, advancedSearch);
-    advancedSearchLoading = false;
+    try {
+      const found = await searchAlerts({
+        txt: advancedSearch.txt,
+        startDate: advancedSearch.startDate,
+        endDate: advancedSearch.endDate,
+        nonTradeAlert: advancedSearch.nonTradeAlert
+      });
+      advancedSearchResults = filterAlerts(found.alerts.filter(alertSearchFilter), advancedSearch);
+      advancedSearchTruncated = found.truncated;
+    } finally {
+      // `finally`, so a refused or timed-out search clears the spinner instead of hanging it.
+      advancedSearchLoading = false;
+    }
   }
 
   function clearAdvancedSearch() {
     advancedSearch = clearInput();
     advancedSearchResults = [];
+    advancedSearchTruncated = false;
     advancedSearchLoading = false;
   }
 
@@ -5421,6 +5450,18 @@
               ? 's'
               : ''}.
           </p>
+          <!--
+            OURS, not the capture's. The reference's server bounds its own answer somewhere the
+            bundle does not show, so the number is a choice this room made and it says so out loud.
+            A cap the reader cannot see is exactly the silent wrong answer this search was fixed to
+            stop being — it would simply have moved from fifty rows to five hundred.
+          -->
+          {#if advancedSearchTruncated}
+            <p class="text-center text-muted small">
+              Showing the newest {ALERT_SEARCH_LIMIT} matches. Narrow the dates or the text to see older
+              ones.
+            </p>
+          {/if}
           <div class="log-messages">
             {#each advancedSearchResults as result (result.id)}
               <p>{result.body}</p>

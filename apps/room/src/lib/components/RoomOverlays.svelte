@@ -501,7 +501,7 @@
   hideMobileCredentials={Boolean(data.sessData?.hideMobileCredentials)}
   isLimitedPresenter={media.limitedPresenter}
   canEditUsername={Boolean(data.sessData?.allowUsersToChangeUsername)}
-  alerts={feeds.searchableAlerts}
+  alertSearchFilter={feeds.alertSearchFilter}
   {chatMode}
   onChatModeChange={(mode) => void changeChatMode(mode)}
   canUseRTE={composer.canUseRTE}

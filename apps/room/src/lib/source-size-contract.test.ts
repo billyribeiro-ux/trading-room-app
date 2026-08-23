@@ -715,7 +715,21 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       recorded with what it bought rather than taken quietly. The duplicated half of the prose was
       trimmed first and lives on `permissions.remote.ts`, which owns the subject.
     */
-    max: 5981,
+    /*
+      +41, 2026-08-23, owner-approved, for the advanced alert search.
+
+      The modal filtered `data.alerts` — `loadAlertPage`'s newest FIFTY rows — so a date range
+      pointing at last month searched fifty rows from today and answered "no results" over a log
+      that had them. It asks the database now.
+
+      What the lines are: the handler became async around a real round trip (the loading state it
+      already had was describing one that did not exist); a `alertSearchFilter` predicate prop,
+      because the server cannot know which traders this viewer filtered out and the rule has to
+      travel to the results; and a visible notice when the search reaches its cap, since a bound the
+      reader cannot see would only have moved the silent wrong answer from fifty rows to five
+      hundred. The `alerts` prop it replaced was DELETED, which paid eight of the forty-one back.
+    */
+    max: 6022,
     why: 'every modal in the room, in one component'
   },
   {
@@ -753,7 +767,15 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
   */
   {
     file: 'lib/room/alerts.svelte.ts',
-    max: 314,
+    /*
+      +6, 2026-08-23, owner-approved: `passesFilter`'s parameter narrowed from `AlertRow` to the one
+      field it reads, plus the note saying why.
+
+      The predicate now runs over rows the DATABASE returned, which are a narrower shape with no
+      `senderName`. A parameter wider than the body needs makes a predicate unusable on any row that
+      omits a field it never looks at — and the alternative was a second copy of the rule.
+    */
+    max: 320,
     why: "the alerts pane's toolbar, viewer filter, archive cut-off and search term"
   },
   {
@@ -1009,7 +1031,16 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       and both index into it, so a proxied record cost a proxy hop per row per pass for a
       fine-grained update the code never performs.
     */
-    max: 386,
+    /*
+      +17, 2026-08-23, owner-approved: `alertSearchFilter`, and the note recording why it exists.
+
+      A REGRESSION CAUGHT MID-CHANGE, which is what the lines buy. Moving the search to the database
+      would silently have reopened the alert filter — `searchableAlerts` applied it and the server
+      cannot, because `alertFilterFor` is the viewer's own selection and `senderEmailHash` is
+      computed at read time rather than stored. A filtered-out trader's alerts would have come back
+      in search results and nowhere else. `searchableAlerts` stays; the alerts PANE still reads it.
+    */
+    max: 403,
     why: 'what each pane renders, and the evidence overlay every pipeline consults'
   },
   {

@@ -213,6 +213,23 @@ export class RoomFeeds<
     );
   }
 
+  /**
+   * THE SAME PREDICATE, for rows this room did not load — site three-and-a-half.
+   *
+   * `searchableAlerts` above still feeds the alerts PANE. The advanced-search MODAL stopped reading
+   * it on 2026-08-23, because filtering the newest fifty rows is what made its date range answer
+   * "no results" over a log that had them; it asks the database now.
+   *
+   * That move would have silently reopened the alert filter: the server has no idea which traders
+   * this viewer has filtered out, so a muted trader's alerts would have come back in search results
+   * and nowhere else. `alert-filter-contract.test.ts` names this as site three of three and says
+   * the filtered-out must not appear in a search — so the predicate travels to the results instead
+   * of the results coming to the predicate.
+   */
+  get alertSearchFilter() {
+    return this.#alerts.passesFilter(this.#session().sessData?.modAlertFilterList);
+  }
+
   /*
     The live tail from the load, with whatever older pages the reader has scrolled back to in front
     of it.

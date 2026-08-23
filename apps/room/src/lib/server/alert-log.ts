@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, inArray, like, lte } from 'drizzle-orm';
 
 import { db } from './db';
 import { alertQuestions, alerts, users } from './db/schema';
@@ -68,6 +68,118 @@ export function loadAlertPage(roomShortCode: string, page = 0) {
         senderEmailHash: hashEmail(senderEmail)
       }))
   );
+}
+
+/**
+ * The cap on a server-side advanced search, and it is OURS rather than the capture's.
+ *
+ * The reference asks its own server (`getAlertsAdvancedSearch`) and the bundle shows only the
+ * request, so whatever bound that server applies is uncaptured. A number had to be chosen; this one
+ * is stated as a choice instead of being presented as transcribed.
+ *
+ * 500 because the modal renders every hit in one list with no paging of its own — ten times the
+ * fifty a page load carries, and still a list a browser can draw. The count is returned with the
+ * rows so a search that reaches it can SAY so; a cap the reader cannot see is the silent wrong
+ * answer this whole change exists to remove.
+ */
+export { ALERT_SEARCH_LIMIT } from '../alert-search-limit.js';
+import { ALERT_SEARCH_LIMIT } from '../alert-search-limit.js';
+
+/**
+ * `getAlertsAdvancedSearch` — `#alerts-advanced-search-modal`, answered by the DATABASE.
+ *
+ * ## The defect this closes
+ *
+ * The modal filtered `data.alerts`, which is `loadAlertPage`'s newest **fifty** rows. Every
+ * predicate the reader typed was applied to those fifty and to nothing else, and the date range is
+ * what makes it sharp: setting `startDate` to last month searched fifty rows that were all from
+ * today and returned nothing at all. Not an error, not an empty-because-nothing-matched — a
+ * confident "no results" over a log that had them.
+ *
+ * `filterAlerts` in `#lib/alerts-advanced-search.js` is unchanged and still applies, for the reason
+ * its own docblock gives about the reference filtering the RESULTS: the trader predicate matches on
+ * `senderEmailHash`, which is COMPUTED at read time from the sender's address and is not a column,
+ * so no SQL can express it. What moves here are the three predicates that ARE columns, and moving
+ * them is what makes the set they narrow the whole room rather than one page.
+ *
+ * ## `like` on the body, and what that is not
+ *
+ * A substring match, case-insensitive because SQLite's `LIKE` is for ASCII by default — the same
+ * comparison `filterAlerts` does with `toLowerCase().includes()`, so a term behaves identically
+ * whichever side evaluates it. It is not full-text search and does not pretend to be; `alerts` has
+ * no FTS index and adding one is a schema change nobody has asked for.
+ *
+ * The term is escaped for `%` and `_` before it is wrapped, or a reader searching for a literal
+ * percent sign would match every alert in the room and be told that was the answer.
+ */
+export function searchAlertLog(
+  roomShortCode: string,
+  criteria: { txt: string; startDate: string; endDate: string; nonTradeAlert: boolean }
+) {
+  const conditions = [eq(alerts.roomShortCode, roomShortCode)];
+
+  const needle = criteria.txt.trim();
+  // `\` first, or it would re-escape the escapes added after it.
+  if (needle) {
+    const escaped = needle.replace(/\\/g, '\\\\').replace(/[%_]/g, (c) => `\\${c}`);
+    conditions.push(like(alerts.body, `%${escaped}%`));
+  }
+
+  /*
+    `datetime-local` strings, parsed as LOCAL time exactly as `filterAlerts` parses them, so the two
+    halves of this search cannot disagree about what "the 3rd" means. An unparseable value is
+    IGNORED rather than treated as epoch 0 — the input is free text and a half-typed date must not
+    silently become "everything since 1970".
+  */
+  const start = criteria.startDate ? new Date(criteria.startDate) : null;
+  if (start && !Number.isNaN(start.getTime())) conditions.push(gte(alerts.createdAt, start));
+  const end = criteria.endDate ? new Date(criteria.endDate) : null;
+  if (end && !Number.isNaN(end.getTime())) conditions.push(lte(alerts.createdAt, end));
+
+  // Only when SET. `false` means "do not restrict", not "trade alerts only" — the capture's
+  // checkbox has two states and this is the unticked one.
+  if (criteria.nonTradeAlert) conditions.push(eq(alerts.nonTrade, true));
+
+  const rows = db
+    .select({
+      id: alerts.id,
+      senderId: alerts.senderId,
+      kind: alerts.kind,
+      body: alerts.body,
+      targetUrl: alerts.targetUrl,
+      nonTrade: alerts.nonTrade,
+      isAdmin: alerts.isAdmin,
+      backgroundColor: alerts.backgroundColor,
+      fontColor: alerts.fontColor,
+      questionCount: alerts.questionCount,
+      questionAnswered: alerts.questionAnswered,
+      reactionsJson: alerts.reactionsJson,
+      createdAt: alerts.createdAt,
+      senderName: users.displayName,
+      senderEmail: users.email,
+      senderAvatarUrl: users.avatarUrl,
+      senderRole: users.role,
+      senderStatus: users.status
+    })
+    .from(alerts)
+    .innerJoin(users, eq(alerts.senderId, users.id))
+    .where(and(...conditions))
+    /* Newest first so the LIMIT keeps the NEWEST matches — the same ordering and the same tie-break
+       `loadAlertPage` uses, and for the same reason. */
+    .orderBy(desc(alerts.createdAt), desc(alerts.id))
+    // One over the cap, so "there were more" is known rather than guessed from a full page.
+    .limit(ALERT_SEARCH_LIMIT + 1)
+    .all();
+
+  const truncated = rows.length > ALERT_SEARCH_LIMIT;
+  return {
+    truncated,
+    alerts: rows.slice(0, ALERT_SEARCH_LIMIT).map(({ senderEmail, reactionsJson, ...alert }) => ({
+      ...alert,
+      reactions: parseReactions(reactionsJson),
+      senderEmailHash: hashEmail(senderEmail)
+    }))
+  };
 }
 
 /**
