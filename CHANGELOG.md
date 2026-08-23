@@ -33,6 +33,61 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-23 14:35 EDT — the capture was in the repository all along, and six "no evidence" rows were wrong
+
+**Runtime impact: no.** No code changed. What changed is that six rows which said their evidence did
+not exist now carry the evidence, quoted, with byte offsets.
+
+**Branch `feat/save-permissions`.**
+
+#### Why it was never found
+
+`apps/room/docs/source-v4-2026-08-15/main.d1d09071be31f1ba.js` — 2,891,205 bytes — is the bundle
+**every byte offset in `TODO.md` refers to**. Verified rather than assumed: `refreshRoster` sits at
+exactly 2169139 there, and at 2014635 in v3 and 2167016 in `docs/source`, so the offsets identify v4
+uniquely. Beside it, `apps/room/docs/source/components/` holds **49 components as readable
+`.full.js` sources**, and `second-dump/` and `new-evidence/` are on disk too.
+
+**All of it is gitignored** (`.gitignore:53-59`, `:99-101`), which is the whole reason it read as
+missing: every search that only sees tracked files returns nothing, and "nothing" was written down
+as "uncaptured".
+
+#### Six rows, and the same mistake in each
+
+Every one was the result of reading ONE occurrence and concluding from it.
+
+- **Row 1 — `askQuestion` has no mute gate.** Said to have "no evidence either way". The Q&A modal's
+  `sendMessage()` gates only on `canPost`, refusing with `'Sorry, you cannot post to this channel'` —
+  and `canPost` is set `!0` at construction and **never reassigned**, while the `canPostImages`
+  beside it IS derived from `isPresenter || sessData.userUploads`. One flag computed, the one next to
+  it constant: the reference does not mute Q&A either. **Ours is a match, not a gap.**
+- **Row 2 — kick-duplicates.** Said its positive arm "needs a kick this room cannot perform". It is
+  entirely client-side: walk `globals.roster`, match `emailHash` with a different `_id`, send the
+  `kickUser` the room already sends, count, and alert one of two captured strings.
+- **Row 3 — the notes password.** Asked for "a comparison target that exists". It is
+  `globals.sessData.deleteAlertPW`, a `.trim()` comparison with its own `"Wrong password!"` branch,
+  gating several actions. Notes themselves use `addUserNote`/`delUserNote` and carry no password.
+- **Row 4 — refresh roster / soft reset.** Said the server half was uncaptured and needed an owner
+  decision. **The reference describes its own server behaviour on screen**, at byte 2148196 — the
+  template — while the row had only ever read the sender at 2169139. And the method is `softReset()`,
+  not `softResetSession()`.
+- **Row 8 — `privCmdsIn`.** Said six commands. The switch has **eleven cases**; `remotePresCommand`,
+  `updateProfilePic` and `getRoster` were never recorded anywhere, and `getRoster` carries a precise
+  sort (presenters first, then ascending `loggedIn`). The row stopped at byte 996700, mid-switch.
+- **Row 9 — the bootbox receivers.** Asked for "the sender for each". It is `case"changeUserPerms"`
+  on the `/cmds/` channel. Also unrecorded: `hardReset` calls `disconnectAll()` **before** its alert,
+  the same ordering `forceReload` uses.
+
+#### The correction this earns
+
+The owner said the evidence was in the repository and that I should look rather than quote the
+file's own text back. That was right, and the failure mode is worth naming: **`TODO.md` is a record
+of what a previous reader concluded, not evidence.** Six times it was treated as the latter. A row
+that says "no evidence exists" is a claim to be checked like any other.
+
+**Verified:** every quotation above was read out of the bundle or the component source at the offset
+given. Nothing was inferred, and no row was closed on a search result alone.
+
 ### 2026-08-23 14:03 EDT — the end-to-end suite CI never ran, and the six ways it had rotted
 
 **Runtime impact: no.** Nothing the site serves changed. What changed is that nine browser
