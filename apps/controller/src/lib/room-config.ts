@@ -578,6 +578,76 @@ export function roomVisibleConfig(
 }
 
 /**
+ * The settings the PUBLIC ROOM-LOGIN PAGE is allowed to receive. A second allow-list, and it has to
+ * be a second one.
+ *
+ * ## The defect this closes, found 2026-08-20
+ *
+ * `routes/(public)/session/[code]/+page.server.ts` returned `resolveRoomConfig(...).values` — all
+ * 269 settings — from a load on a `(public)` route. SvelteKit serialises a load's return into the
+ * SSR payload, so every visitor who could reach a room's login URL received `webinarPW`
+ * ("Room Password:"), `ssoJWTSecret` ("JWT Secret Key:"), `secTok` ("Secret Token:") and
+ * `pairSecretKey` in the page data. Nothing rendered them; `RoomLogin.svelte` reads nine keys and
+ * ignores the rest, so only the component's restraint kept them off the screen — never a filter.
+ *
+ * The docblock on {@link ROOM_VISIBLE_SETTINGS} had already written down this exact threat, naming
+ * these exact credentials, and `room-config-boundary.test.ts` already proved the unfiltered call
+ * leaks them. The boundary existed, was documented and was tested; ONE route did not use it.
+ *
+ * ## Why not simply reuse `roomVisibleConfig`
+ *
+ * Because it would ship a broken login page, and that was checked rather than assumed. Four of the
+ * nine keys this page reads — `hideAvatars`, `hideWelcomeTo`, `hidePoweredBy`, `claimNickName` —
+ * are NOT in `ROOM_VISIBLE_SETTINGS`, and correctly so: they gate this page's own chrome, and the
+ * room application has no use for them. Two consumers, two questions, two lists — the same
+ * reasoning that already separates `ROOM_VISIBLE_SETTINGS` from `wired`.
+ *
+ * ## Every entry has a consumer, and the consumer is named
+ *
+ * Each key below is read by `RoomLogin.svelte` through its `on()` / `str()` helpers. A key with no
+ * reader does not belong here: it would be a value crossing a trust boundary for nothing.
+ */
+export const ROOM_LOGIN_SETTINGS = [
+  /* The avatar block, the h1 and the footer — `showAvatar`, `showWelcome`, `showPoweredBy`. */
+  'hideAvatars',
+  'hideWelcomeTo',
+  'hidePoweredBy',
+  /* The two conditional fields — `showPhone` and `passwordPreOpen`. */
+  'hasRequiredPhoneInLogin',
+  'showPasswordField',
+  /* The `nickHelpBlock` the reference's `aria-describedby` points at. */
+  'usernameInstructions',
+  /* `nameLocked` reads BOTH: a claimed nick that the user may not change. */
+  'claimNickName',
+  'allowUsersToChangeUsername',
+  /* Rendered as TEXT, never as markup — the owner's words, and the server refuses without it. */
+  'customEnterDisclosure'
+] as const satisfies readonly (keyof RoomSettings)[];
+
+const ROOM_LOGIN_VISIBLE = new Set<string>(ROOM_LOGIN_SETTINGS);
+
+/**
+ * `resolveRoomConfig()` narrowed to what may cross into the PUBLIC login page.
+ *
+ * Fails closed exactly as {@link roomVisibleConfig} does: a setting added to the schema tomorrow is
+ * invisible here until somebody puts it on the list, and putting it there is a decision rather than
+ * an oversight.
+ */
+export function roomLoginConfig(
+  room: Partial<RoomSettings>,
+  user: UserPreferences = {}
+): { values: Readonly<Record<string, unknown>>; locked: readonly string[] } {
+  const resolved = resolveRoomConfig(room, user);
+  const values: Record<string, unknown> = {};
+  for (const name of ROOM_LOGIN_SETTINGS) {
+    const value = resolved.values[name];
+    // Undefined means unset, and unset means off — omit rather than serialise a null.
+    if (value !== undefined) values[name] = value;
+  }
+  return { values, locked: [...resolved.locked].filter((name) => ROOM_LOGIN_VISIBLE.has(name)) };
+}
+
+/**
  * Whether the in-room settings panel should offer this control to the user at all.
  * A locked policy setting must not render as a toggle the user can flip and watch
  * snap back.

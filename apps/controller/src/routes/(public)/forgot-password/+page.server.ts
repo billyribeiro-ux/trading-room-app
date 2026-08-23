@@ -58,7 +58,20 @@ export const actions: Actions = {
     if (!captcha.ok) return fail(400, { email, message: recaptchaFailureMessage() });
 
     const [user] = await getDb()
-      .select({ id: users.id, email: users.email, displayName: users.displayName })
+      .select({
+        id: users.id,
+        email: users.email,
+        displayName: users.displayName,
+        /*
+          Selected so the branch below can refuse a row that cannot authenticate. Null means this is
+          an invited member's record — created by `inviteRoomUser` inside the ROOM OWNER's account —
+          and sending it a "set a new password" link would hand that person a login as a peer of the
+          owner, because `requireOwnedRoom` gates on `accountId` and there is no per-user role.
+          `setPasswordFromReset` refuses it as well; that is the fence, this is not sending mail that
+          could only ever be a lure.
+        */
+        passwordHash: users.passwordHash
+      })
       .from(users)
       .where(eq(users.email, email))
       .limit(1);
@@ -66,9 +79,16 @@ export const actions: Actions = {
     /*
       Everything from here is invisible to whoever pressed the button.
 
-      No account, inside the cooldown, or the provider refused the message: all three fall through
-      to the same acknowledgement below. The first two are silent BY DESIGN — see
-      `GENERIC_REQUEST_ACK`.
+      No account, a member record that cannot authenticate, inside the cooldown, or the provider
+      refused the message: all four fall through to the same acknowledgement below. The first three
+      are silent BY DESIGN — see `GENERIC_REQUEST_ACK`.
+
+      The member-record case is silent for the same reason as the others and for one more. Answering
+      differently would say "this address exists here but is not a login", which is a sharper oracle
+      than the one this whole function is shaped to avoid: it distinguishes people who have merely
+      been INVITED to somebody's room from strangers. Falling through costs the caller nothing real
+      — there is no password behind that row to reset — and `setPasswordFromReset` refuses it in any
+      case, so this branch withholds a lure rather than being the security boundary itself.
 
       The third deserves its own justification, because swallowing a delivery failure normally
       violates this codebase's own rule against it. It is swallowed *for the reader* and reported
@@ -78,7 +98,7 @@ export const actions: Actions = {
       enumeration tool the generic message exists to prevent. The person's recovery path is to try
       again; the operator's is the log line, which carries the address and the cause.
     */
-    if (user) {
+    if (user && user.passwordHash !== null) {
       if (!(await resetRequestedRecently(user.id))) {
         try {
           const token = await issueToken({

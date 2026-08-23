@@ -443,7 +443,18 @@ export async function inviteRoomUser(roomId: number, displayName: string, email:
         accountId: room.accountId,
         email,
         displayName,
-        // No password: an invited member sets one when they first sign in.
+        /*
+          No password, and no way to acquire one. `null` means "cannot authenticate" — `schema.ts`
+          and `verifyPassword` both say so, and there is no sign-in-and-set-a-password route in this
+          app; the only writer that ever sets a hash on an existing row is `setPasswordFromReset`,
+          which refuses null-hash rows for the reason in its docblock.
+
+          That refusal is load-bearing HERE in particular, because `room.accountId` files this row
+          in the ROOM OWNER's tenant and `requireOwnedRoom` gates on `accountId` with no per-user
+          role. A member record that could ever authenticate would be a peer of the owner. Corrected
+          2026-08-20: this comment used to promise a first-sign-in flow that does not exist, and the
+          reset route was the unintended implementation of it.
+        */
         passwordHash: null,
         createdAt: new Date()
       })
