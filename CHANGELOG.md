@@ -33,6 +33,52 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-23 16:10 EDT — `kick` says "User kicked OK" and sends nothing, and I had to correct two of my own corrections
+
+**Runtime impact: no.** No code changed. Three records were corrected, one of them twice.
+
+**Branch `feat/save-permissions`.**
+
+#### The find: a control that reports success and does nothing
+
+`user-actions.svelte.ts:618-629` handles `kick` and `kick-ban` by opening a prompt seeded with the
+captured default message, and on confirm closing the modal and setting
+`dialogs.alert = 'User kicked OK'`. **There is no command in that branch, and there is no command it
+could call.** `UserActionCommands` exposes `presenter`, `editUsername`, `unmuteChat`, `forceReload`
+and `savePermissions` — no kick — and the only `kickUser` / `kickPage` text anywhere in
+`apps/room/src` is inside a COMMENT at `events.svelte.ts:662`.
+
+This is worse than the eleven inert controls. **A dead control that stays silent is a gap; one that
+reports success is a lie**, and a presenter who clicks Kick is told the person is gone.
+
+It also exposes a hole in the gate that was written to catch exactly this class.
+`user-action-disposition-contract.test.ts` sorts every action into handled / alerted / inert and its
+docblock says there is *"no fourth option"*. There is: **a branch that dialogs and does not act**
+counts as `handled`, because a branch exists. `kick` has been sitting in the safe bucket.
+
+Upstream, for comparison, sends `sendServerAdminCommand("kickUser",{user,msg,ban,kickAllInstances})`,
+then `setPreference("kickMsg",msg)`, then `doCloseModal()`, then the alert — so our message text and
+our ordering are faithful and only the SEND is missing.
+
+#### Two of my own corrections, corrected
+
+Earlier today I rewrote rows 2 and 3 to say **"NOTHING. Build it"**, on the strength of having found
+the reference's implementation. Both were wrong, and both were wrong the same way I had just
+criticised: I checked the REFERENCE and not THIS repository.
+
+- **Row 2, kick-duplicates.** The loop really is client-side — but it calls
+  `sendServerAdminCommand("kickUser", …)`, and this room has no kick command. The row's original
+  wording, *"needs a kick this room cannot perform"*, was right in substance. Also blocking, and also
+  missed: `RosterAuthority` is `{id, isP?}` only, with no `emailHash` and no `_id`, so the duplicate
+  match has nothing to match on.
+- **Row 3, the notes password.** `deleteAlertPW` is the comparison target and it appears **nowhere in
+  `apps/room/src`**. Finding it upstream answered the question the row asked; it did not put the
+  value within reach.
+
+**The pattern, stated plainly so it is not repeated a third time:** finding a mechanism in the
+reference tells you what to build. It does not tell you that you *can* build it. Those are two
+readings and I did one of them.
+
 ### 2026-08-23 15:45 EDT — the room's four rendering gates existed too, and CI had never run one either
 
 **Runtime impact: no.** No application code changed. Twenty-two real-Chromium assertions now run on
