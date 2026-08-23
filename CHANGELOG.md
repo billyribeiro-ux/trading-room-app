@@ -33,6 +33,66 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-23 15:45 EDT — the room's four rendering gates existed too, and CI had never run one either
+
+**Runtime impact: no.** No application code changed. Twenty-two real-Chromium assertions now run on
+every pull request that touches the room.
+
+**Branch `feat/save-permissions`.** Closes half (b) of `TODO.md` row 6 — by discovering its premise
+was false, not by building what it asked for.
+
+#### The same mistake, in the same row, twice
+
+Row 6(b) said *"apps/room has no Playwright at all, which is the real build"*. That is wrong, and it
+is wrong the same way half (a) was wrong: nobody opened the files.
+
+`apps/room/scripts/verify-tooltip-placements.mjs`, `verify-screen-volume.mjs`,
+`verify-viewer-only-layout.mjs` and `verify-mobile-layout.mjs` each launch **real Chromium** through
+`@playwright/test`'s `chromium`. They resolve it from `apps/controller` on purpose, and the reason is
+written at the top of the file — so that adding a browser gate is not a dependency change.
+
+They are not smoke tests. `verify-tooltip-placements.mjs` says what it is for in its own docblock:
+*"jsdom reports every rect as zero, so no vitest run can tell whether the arrow is painted or where
+the bubble lands. Compiling and passing tests is not evidence that a thing renders."* It asserts the
+arrow has a non-zero box and a solid border on the side facing the host, and that the bubble sits the
+6px `k_([0, 6])` specifies away from it.
+
+#### What running them reported
+
+**22 assertions, every one green, and nothing had ever run them** — not CI, and not the room's own
+`test` script, which is `privacy:verify && schema:verify && vitest run`:
+
+```
+verify:tooltips        6/6 placements render correctly
+verify:screen-volume   8/8 states render correctly
+verify:viewer-only     4/4 layouts render correctly
+verify:mobile-layout   4/4 widths render correctly
+```
+
+Two of them print an honest NOTE instead of overclaiming, and both notes are preserved in the
+workflow comment: viewer-only measures the reference's own CSS taking effect on our elements rather
+than a pixel diff, because no capture of this product in that mode exists; mobile renders the
+arrangement `K4e` describes rather than the Svelte component, because the room needs a controller
+this machine has no `.env` for.
+
+#### One self-inflicted false result, caught before it was reported
+
+The first run of all four printed `exit=0` for every one — because I wrapped them in `timeout`, which
+macOS does not ship, so the shell printed `command not found` and `$?` reported the `echo`. Four
+meaningless zeroes that looked like four passes. Re-run without the wrapper, they really do pass, but
+the first result was about my harness and not about the room. Ruling that out before reporting is the
+rule; this is the third time this session it has caught something.
+
+#### The lesson, now twice over
+
+Both halves of row 6 claimed there was no browser coverage. Both were wrong, in the same app family,
+written by the same reader, and neither claim had ever been checked. **"We have no coverage for X"
+is a claim like any other and needs opening the directory.**
+
+**Verified:** all four verifiers run green locally; `ci-package-manager-pin`,
+`ci-verification-integrity` and `node-version-pin` (21 tests) green against the edited workflow.
+**Not verified locally:** the steps on a GitHub runner, which is what the next push measures.
+
 ### 2026-08-23 15:20 EDT — `test-follow-sound` wired, `get-my-token` evidenced, and a ceiling answered by extraction
 
 **Runtime impact: YES, one control.** `test-follow-sound` played nothing and now plays `pling`. The
