@@ -37,6 +37,36 @@ export default defineConfig({
   // Serial. These share one database and one dev server; parallel workers would race on both.
   workers: 1,
   fullyParallel: false,
+  /**
+   * Retries in CI only, and the number is a measurement rather than a habit.
+   *
+   * ## What was measured, 2026-08-23
+   *
+   * Nine full runs against a throwaway cluster while this suite was being repaired. Eight were
+   * clean. One had `guest room login preserves an email entered before hydration` fail, and the
+   * shape of that failure is what this setting answers:
+   *
+   *   - the passing runs of that spec take **3.2s**; the failing one took **15.2s**;
+   *   - `#login-nickname-new` kept its typed value and `#login-email`, in the same form, did not;
+   *   - Playwright's call log resolved the field TWICE — first as `<input value="" …>`, the server's
+   *     node, and then as `<input …>` with no `value` attribute at all. **The node was replaced, not
+   *     hydrated**, which is how the typed value went missing.
+   *
+   * Re-running that one spec eight times immediately afterwards: **8 passed, every one at 3.2s.**
+   * So it is load-correlated and rare, and nothing here can honestly name the mechanism from a
+   * single sample. It is written down in `TODO.md` rather than explained away.
+   *
+   * ## Why a retry is not green-washing
+   *
+   * Playwright does not hide a retried test. A spec that fails then passes is reported as **flaky**
+   * and the run says so; a spec that fails every attempt is still red. So this converts an
+   * occasional timing artefact from "the gate is broken" into "the gate says this one is flaky",
+   * which is the honest signal — and the repository's own note about the backend gate applies here
+   * too: a gate that goes red for reasons nobody can attribute is a gate people learn to cancel.
+   *
+   * Zero retries locally, deliberately. A developer chasing this should see it fail the first time.
+   */
+  retries: process.env.CI ? 2 : 0,
   reporter: process.env.CI ? 'list' : [['list'], ['html', { open: 'never' }]],
   use: {
     baseURL: `http://127.0.0.1:${PORT}`,

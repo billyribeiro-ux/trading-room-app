@@ -40,7 +40,27 @@ test('a room is managed at its short code, and the stats dates behave', async ({
     is read rather than assumed: the short code comes from a database sequence, so the test cannot
     know it in advance — which is the point. Asserting a hardcoded code would prove nothing.
   */
-  const manage = page.getByRole('link', { name: /^Manage$/ }).first();
+  /*
+    A plain substring name, NOT the anchored regex `/^Manage$/` this line used to carry.
+
+    The link is icon-prefixed — `<a><i class="fa …"></i> Manage</a>` — so its accessible name begins
+    with the space the icon contributes, and an anchored pattern cannot match it. Playwright's page
+    snapshot at the failure printed the name as `" Manage"`, alongside `" Launch"`, `" Marketplace"`
+    and `" Account"`, every one of them icon-prefixed the same way. The link itself was present and
+    correct the whole time, pointing at `/account/rooms/1006`.
+
+    `{ name: 'Manage', exact: true }` was tried FIRST and MEASURED FAILING, which is why it is named
+    here rather than quietly replaced. Whatever precedes the word in the computed name is therefore
+    not something an exact match reduces away — the icon contributes more than the single space the
+    snapshot prints, and no attempt is made here to say exactly what, because that was not read.
+    What IS proven, on this markup, in this suite: the default substring match works, and
+    `hydration-contract.spec.ts` finds the same anchor with `{ name: 'Manage' }` and passes.
+
+    Nothing is loosened by dropping the anchor, because the two assertions below are what actually
+    pin the target: the href's last segment must be a four-or-more digit short code, and clicking it
+    must land on `/account/rooms/<that code>`. A wrong link fails both.
+  */
+  const manage = page.getByRole('link', { name: 'Manage' }).first();
   const href = await manage.getAttribute('href');
   expect(href, 'the account page must offer a Manage link').toBeTruthy();
 
@@ -53,7 +73,19 @@ test('a room is managed at its short code, and the stats dates behave', async ({
   // The page's own header prints the same identifier, so the URL and the UI agree.
   await expect(page.getByText(new RegExp(`Manage Room id:\\s*${code}`))).toBeVisible();
 
-  await page.goto(`/account/rooms/${code}?tab=stats`);
+  /*
+    THE TAB IS A PATH SEGMENT. `?tab=stats` selected nothing.
+
+    `+page.server.ts:194` reads `params.tab ?? 'users'` — the route is `[[tab]]`, an optional path
+    parameter — and the note above it records the move from a query string deliberately: *"A tab here
+    selects which pane of the room you are looking at, and a pane is a resource, not a filter over
+    one."* A query string is simply ignored, and because the fallback is `'users'`, the page rendered
+    the Users pane and returned 200 while looking nothing like what the rest of this test asserts.
+
+    That is the worst shape a stale locator can take. There was no 404 and no error — the assertion
+    below just could not find a Start Date label, on a pane that has never had one.
+  */
+  await page.goto(`/account/rooms/${code}/stats`);
 
   /*
     AT REST: the label must not point at a control that does not exist.
@@ -73,11 +105,29 @@ test('a room is managed at its short code, and the stats dates behave', async ({
     its only exits are `change` and `blur` and `blur` cannot fire on an element that never held
     focus. One click put the row into an edit state with no way out.
   */
-  await page
-    .locator('a.editable')
-    .filter({ hasText: /\d{2}-\d{2}-\d{4}|Empty/ })
-    .first()
-    .click();
+  /*
+    ADDRESSED BY ITS OWN `aria-label`, not by `.first()` over every editable on the page.
+
+    This selector went through two measured wrong answers, and both are worth leaving recorded
+    because each looked correct until it ran:
+
+      `.filter({ hasText: /…|Empty/ })`   matched NOTHING. `editable-display.ts:56` returns the
+                                          literal lowercase `'empty'` — its docblock tallies the
+                                          reference printing it lowercase 47 times — and `hasText`
+                                          with a RegExp is case-sensitive.
+      `.filter({ hasText: /…|empty/ })`   matched, and then could not be clicked: *"locator resolved
+       plus `.first()`                    to <a href="" class="editable editable-click
+                                          editable-empty">empty</a> … element is not visible"*. The
+                                          manage page renders an editable per setting and keeps
+                                          several behind `hidden` blocks (`hidden={!isWebinar}`,
+                                          `hidden={!isRegistration}`), so the FIRST anchor printing
+                                          `empty` belongs to a pane nobody is looking at.
+
+    `aria-label="Start Date: …"` is on the anchor at `+page.svelte:2472` and names exactly one
+    element on the page. It is also the attribute a screen-reader user navigates by, so a test that
+    cannot find it is a test worth failing.
+  */
+  await page.locator('a.editable[aria-label^="Start Date:"]').click();
 
   const field = page.locator('input.mg-date').first();
   await expect(field, 'the click must produce a date input').toBeVisible();

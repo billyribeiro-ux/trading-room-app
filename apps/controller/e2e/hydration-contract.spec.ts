@@ -178,8 +178,23 @@ async function createOwnerAndRoom(page: Page, testInfo: TestInfo) {
   const createResponse = page.waitForResponse(
     (response) => response.request().method() === 'POST' && response.url().includes('/createRoom')
   );
+  /*
+    ARMED BEFORE THE CLICK, and awaited after: `use:enhance` follows its action POST with an
+    INVALIDATING `__data.json` request, and the action response arrives first.
+
+    A caller that navigates as soon as `createResponse` resolves races that second request, and the
+    browser aborts one of the two — measured here as `page.goto: net::ERR_ABORTED at
+    …/account/rooms/1005/users`, thrown from the very first line after this helper returns.
+
+    This file already knows the hazard: the comment before its `page.reload()` further down records
+    the same thing, *"the action response arrives before `use:enhance` finishes its invalidating data
+    request"*, and waits for the rendered result there. This makes the helper itself safe, so every
+    caller inherits it rather than each having to remember.
+  */
+  const createInvalidation = page.waitForResponse((response) => response.url().includes('__data.json'));
   await page.getByRole('button', { name: 'New Room' }).click();
   expect((await createResponse).ok()).toBeTruthy();
+  await createInvalidation;
 
   const row = page.locator('table.acc-table tbody tr').filter({ hasText: roomName });
   await expect(row).toHaveCount(1);
@@ -224,9 +239,17 @@ test('login preserves the email entered before hydration', async ({ page, baseUR
 test('contact preserves every field entered before hydration', async ({ page, baseURL }, testInfo) => {
   const hydration = await openBeforeHydration(page, baseURL, '/contact', testInfo);
   try {
-    const name = hydration.page.locator('#name');
-    const email = hydration.page.locator('#email');
-    const message = hydration.page.locator('#message');
+    /*
+      `contact-`-prefixed ids, because that is what the page renders.
+
+      `#name` / `#email` / `#message` matched nothing: `(public)/contact/+page.svelte:81,87,99` label
+      and bind `contact-name`, `contact-email` and `contact-message`. The fill simply waited out the
+      whole 60-second test budget on a selector no element has ever carried on this page, which is
+      why the failure arrived as a bare timeout with nothing named in it.
+    */
+    const name = hydration.page.locator('#contact-name');
+    const email = hydration.page.locator('#contact-email');
+    const message = hydration.page.locator('#contact-message');
     await name.fill('Pre-hydration Contact');
     await email.fill('pre-hydration-contact@example.test');
     await message.fill('This complete message was typed before the client started.');
@@ -270,13 +293,58 @@ test('room member, text-list, and branding drafts survive hydration', async ({ p
   // Seed a selectable non-owner through the real enhanced invite form. This is
   // also a regression witness for the page-level outside-click closer: the
   // trigger must remain open long enough for the form to be usable.
-  await page.goto(`${managePath}?tab=users`);
+  /*
+    THE TAB IS A PATH SEGMENT, not a query string.
+
+    `+page.server.ts:194` reads `params.tab ?? 'users'` from the `[[tab]]` optional path parameter,
+    and the note beside it records the move away from `?tab=` as deliberate: a pane is a resource,
+    not a filter over one. Every `?tab=` in this file was therefore inert.
+
+    This particular one was inert and RIGHT BY ACCIDENT — the fallback is `'users'`, so the page it
+    wanted is the page it got. The two below were inert and WRONG: `?tab=text-list` and
+    `?tab=branding` both landed on Users, so those sections asserted against a pane that has neither
+    control. They returned 200 the whole time, which is why nothing ever looked broken.
+  */
+  await page.goto(`${managePath}/users`);
+  /*
+    WAIT FOR HYDRATION BEFORE TOUCHING AN EDITABLE, and this is not belt-and-braces.
+
+    The closed trigger is `<a href="">` whose click handler calls `preventDefault()`. Before Svelte
+    attaches that handler the anchor is an ordinary link, and `href=""` resolves to the current URL —
+    so a click that lands early NAVIGATES instead of opening the editor. Measured: the failure's call
+    log read `waiting for "…/account/rooms/1005?tab=users" navigation to finish… navigated to
+    "…/account/rooms/1005?tab=users"`, which is the page reloading onto itself.
+
+    `responsive-contract.spec.ts` already waits on this exact marker for the same reason, recorded
+    there as "interacting before SvelteKit attaches handlers silently no-ops". The root layout stamps
+    it from `afterNavigate`, so it is the framework's own signal rather than a sleep.
+
+    This is a race the SETUP has to avoid, not a contract being weakened. The pre-hydration
+    assertions this file exists for are the ones inside `openBeforeHydration`, and they are untouched
+    — they deliberately hold the scripts back and interact anyway.
+  */
+  await page.waitForSelector('html[data-proroom-hydrated="true"]');
 
   // Expose the captured room-link mode through the real editable save action.
   // A conditional vanity assertion would silently skip for a new room because
   // its authorization mode begins unset.
   const authModeField = page.locator('#mg-authmode');
-  await authModeField.getByRole('button').click();
+  /*
+    `a.editable`, because the closed trigger is an ANCHOR and has been since 2026-08-14.
+
+    `Editable.svelte` records the change and its reason at its `{:else}` branch: it was a span with
+    `role="button"`, then briefly considered as a real `<button>` — which Chrome refuses to make
+    `display: inline`, adding 1px to each of 260 setting rows — and settled on `<a href="">`, the
+    reference's own element, which is inline, natively focusable and activated by Enter.
+
+    So `getByRole('button')` inside this field has matched nothing since that day, and this line
+    waited out the full 60 seconds for it. `manage-room.spec.ts` already reaches the same control
+    the right way, with `page.locator('a.editable')`; this now agrees with it.
+
+    Note what is NOT changed: the SAVE button below is still found by role, correctly — the open
+    editor really does render `<button aria-label="Save">`.
+  */
+  await authModeField.locator('a.editable').click();
   await authModeField.locator('select[name="value"]').selectOption('open');
   const authModeResponse = page.waitForResponse(
     (response) => response.request().method() === 'POST' && response.url().includes('/saveField')
@@ -284,18 +352,46 @@ test('room member, text-list, and branding drafts survive hydration', async ({ p
   await authModeField.getByRole('button', { name: 'Save' }).click();
   expect((await authModeResponse).ok()).toBeTruthy();
 
-  // Exercise both halves of the outside-click contract without submitting:
-  // clicks inside the vanity panel keep the draft open, while an exterior click
-  // closes it.
+  /*
+    THE VANITY EDITOR IS A BOOTBOX PROMPT. It was an inline panel, and it is not one any more.
+
+    What this block used to do — click Edit, type into `getByPlaceholder('yournamehere')`, then click
+    the panel heading and watch the draft close — described a `form-inline` dropped into the page
+    below the field. `+page.svelte:1152` records replacing it, and why: *"The vanity editor is a
+    BOOTBOX PROMPT, not an inline form. Ours dropped a `form-inline` into the page below the field.
+    The reference opens a modal"*, with the owner's rendered modal markup quoted beneath it.
+
+    `getByPlaceholder('yournamehere')` had no target at all after that. The string survives in the
+    repository only as the `[yournamehere]` stand-in inside the vanity URL itself
+    (`+page.server.ts:410`) — never as a placeholder attribute on anything.
+
+    So the assertion is rewritten against the control that exists rather than deleted. It keeps the
+    original intent — exercise the editor WITHOUT submitting — and it keeps the property that
+    actually matters here: a cancelled edit leaves the room's link untouched.
+
+    The outside-click contract this block used to witness is not lost. The invite trigger, the row
+    dropdown and the email-list prompt below assert it in both directions, including a window-level
+    probe proving the closer could not have run.
+  */
   const vanityEdit = page.locator('#customLinkTxt').locator('..').getByRole('button', { name: 'Edit' });
   await expect(vanityEdit).toBeVisible();
-  const vanitySlug = page.getByPlaceholder('yournamehere');
+  const vanityLink = page.locator('#customLinkTxt');
+  // A room that has never been given a slug advertises the placeholder segment, not a real name.
+  await expect(vanityLink).toHaveValue(/\/room\/\[yournamehere\]$/);
+
   await vanityEdit.click();
-  await expect(vanitySlug).toBeVisible();
-  await vanitySlug.fill('unsaved-hydration-vanity');
-  await expect(vanitySlug).toHaveValue('unsaved-hydration-vanity');
-  await page.locator('.panel-heading').click({ position: { x: 8, y: 8 } });
-  await expect(vanitySlug).toBeHidden();
+  const vanityPrompt = page.locator('input.bootbox-input-text');
+  await expect(vanityPrompt).toBeVisible();
+  await vanityPrompt.fill('unsavedhydrationvanity');
+  await expect(vanityPrompt).toHaveValue('unsavedhydrationvanity');
+
+  // CANCEL, never confirm. `Bootbox.svelte:162` settles the prompt with `null`, and `editVanity`
+  // returns immediately on `null` without touching `vanitySlug` or submitting its form.
+  await page.locator('[data-bb-handler="cancel"]').click();
+  await expect(vanityPrompt).toBeHidden();
+  await expect(vanityLink, 'a cancelled prompt must not have renamed the room').toHaveValue(
+    /\/room\/\[yournamehere\]$/
+  );
 
   const inviteTrigger = page.getByRole('button', { name: 'Add User / Invite' });
   const inviteNameField = page.getByPlaceholder('Name');
@@ -321,7 +417,25 @@ test('room member, text-list, and branding drafts survive hydration', async ({ p
   // cannot leave two independent menus visible.
   const invitedMemberRow = page.locator('table.table-striped tbody tr').filter({ hasText: inviteName });
   await expect(invitedMemberRow).toHaveCount(1);
-  const memberActionsDropdown = invitedMemberRow.locator('.dropdown');
+  /*
+    `[data-menu-control]`, because the row's wrapper is NOT `.dropdown` and deliberately never was.
+
+    `+page.svelte:1823` renders `class="btn-group mb-sm mr"` with a `data-menu-control` attribute,
+    and the comment above it exists precisely because of the difference: the window click handler
+    exempts `.dropdown, [data-menu-control], [data-menu-panel]`, this wrapper matched none of them,
+    and *"the menu opened and shut inside one event, and the button looked inert"*. The attribute is
+    the fix. `.dropdown` here matched zero elements, so every assertion below it was waiting on
+    something that has not existed since that repair.
+
+    The open state is still a class on this same wrapper — `{ open: openRowMenu === member.id }` —
+    so the assertions themselves are unchanged and still mean what they say. Only the element they
+    are asked about is corrected.
+
+    Not changed: `.users-many-actions > .dropdown` further down. That one is right — the bulk menu
+    at `+page.svelte:1370` really is `class={['dropdown', …]}`, which is the contrast the page's own
+    comment draws: *"one class apart, one worked"*.
+  */
+  const memberActionsDropdown = invitedMemberRow.locator('[data-menu-control]');
   const memberActionsTrigger = invitedMemberRow.getByRole('button', { name: 'Actions', exact: true });
 
   await inviteTrigger.click();
@@ -372,7 +486,7 @@ test('room member, text-list, and branding drafts survive hydration', async ({ p
   await expect(memberActionsDropdown).not.toHaveClass(/(?:^|\s)open(?:\s|$)/);
   await expect(page.locator('.users-many-actions > .dropdown')).toHaveClass(/(?:^|\s)open(?:\s|$)/);
 
-  const memberHydration = await openBeforeHydration(page, baseURL, `${managePath}?tab=users`, testInfo);
+  const memberHydration = await openBeforeHydration(page, baseURL, `${managePath}/users`, testInfo);
   try {
     const memberCheckbox = memberHydration.page.getByRole('checkbox', { name: `Select ${inviteName}` });
     await expect(memberCheckbox).toBeVisible();
@@ -394,7 +508,7 @@ test('room member, text-list, and branding drafts survive hydration', async ({ p
   }
 
   // Seed a nonempty server value before testing that a newer DOM value wins.
-  const textListPath = `${managePath}?tab=text-list`;
+  const textListPath = `${managePath}/text-list`;
   await page.goto(textListPath);
   const textList = page.getByLabel('Text list');
   await textList.fill('Server text-list baseline');
@@ -418,7 +532,7 @@ test('room member, text-list, and branding drafts survive hydration', async ({ p
   }
 
   // Seed nonempty sanitized HTML through the real editor and save action.
-  const brandingPath = `${managePath}?tab=branding`;
+  const brandingPath = `${managePath}/branding`;
   await page.goto(brandingPath);
   const toggleHtml = page.getByTitle('Toggle html / Rich Text');
   await toggleHtml.click();

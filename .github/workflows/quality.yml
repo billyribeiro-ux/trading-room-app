@@ -184,3 +184,163 @@ jobs:
         # units are green, a broken build is usually a config or dependency problem, and having the
         # three cheaper answers already in the log is what makes it diagnosable.
         run: pnpm run build
+
+  controller-e2e:
+    name: controller end-to-end
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+
+    # THE HARNESS ALREADY EXISTED. NOTHING EVER RAN IT.
+    #
+    # `apps/controller` has carried `@playwright/test`, a `playwright.config.ts` with a `webServer`,
+    # a `test:e2e` script and four written specs since 2026-08-10. `package.json`'s `quality` script
+    # chains `test:e2e`, so it reads as covered — but `quality` is a LOCAL convenience script that no
+    # workflow invokes, and grepping `.github/workflows/*` for `test:e2e` or `playwright` returned
+    # nothing. Every browser assertion in this repository was, until this job, decorative.
+    #
+    # What that cost, measured on 2026-08-23 by running the suite against a throwaway cluster before
+    # writing this. The first run reported 6 passed and 3 failed; repairing those three uncovered
+    # three more behind them, because each failure had been masking the assertions after it. SIX in
+    # total, and every one was the SPEC having rotted against a deliberate change the application had
+    # made correctly and the spec had never seen —
+    #
+    #   `/^Manage$/`              an anchored pattern against an icon-prefixed accessible name. The
+    #                             link was present and pointing at the right room the whole time.
+    #   `#name` `#email`          the contact fields are `#contact-name`, `#contact-email` and
+    #   `#message`                `#contact-message`.
+    #   `getByRole('button')`     `Editable.svelte`'s closed trigger became an `<a href="">` on
+    #                             2026-08-14, for a reason recorded in that file.
+    #   `?tab=stats` and two      the tab is a PATH SEGMENT; `params.tab ?? 'users'`. The query form
+    #   siblings                  is ignored, so two panes were asserted against the Users pane and
+    #                             the page returned 200 throughout. The worst shape of the six.
+    #   `yournamehere`            the vanity editor is a bootbox prompt, not an inline panel.
+    #   the row's `.dropdown`     that wrapper is `btn-group mb-sm mr` + `data-menu-control`.
+    #
+    # NONE was an application defect, and every one would have been caught the day it appeared. That
+    # is the argument for this job in one paragraph, so it is not a workflow anyone deletes as
+    # redundant.
+    #
+    # One candidate application defect DID surface, and it is the reason `retries` exists in
+    # `playwright.config.ts`: see the note there and `TODO.md` row 7.
+    services:
+      postgres:
+        # The SAME pinned digest `backend-quality.yml` resolved on 2026-08-02, reused rather than
+        # re-resolved: two jobs drifting onto different PostgreSQL builds is a difference nobody
+        # would attribute correctly.
+        image: postgres:17@sha256:a426e44bac0b759c95894d68e1a0ac03ecc20b619f498a91aae373bf06d8508d
+        env:
+          POSTGRES_USER: proroom_e2e
+          # Ephemeral, and deliberately in plain sight. This cluster lives for the length of one job,
+          # is reachable only from it, and holds nothing but accounts the specs register themselves.
+          # A repository secret here would imply it guards something.
+          POSTGRES_PASSWORD: proroom_e2e_ephemeral_ci_password
+          POSTGRES_DB: proroom_e2e
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U proroom_e2e -d proroom_e2e"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    env:
+      CONTROL_PLANE_MODE: postgres
+      DATABASE_URL: postgres://proroom_e2e:proroom_e2e_ephemeral_ci_password@127.0.0.1:5432/proroom_e2e
+      # Nothing migrates this database by hand. `hooks.server.ts`'s `init` calls `ensureDatabase()`,
+      # which takes the advisory lock and runs the numbered migrations under
+      # `src/lib/server/db/migrations/` on first boot — the same path production takes on a cold
+      # start. Verified locally: 16 tables in a cluster that began empty.
+      #
+      # THE FOUR VARIABLES BELOW ARE BLANK ON PURPOSE, and each blank is load-bearing:
+      #
+      #   RESEND_API_KEY / MAIL_FROM               absent, verification mail is neither sent nor
+      #                                            ENFORCED, so a registered account can create a
+      #                                            room. Set, every spec would stall on an unread
+      #                                            inbox.
+      #   PUBLIC_RECAPTCHA_SITE_KEY /              absent TOGETHER, `recaptchaEnabled()` is false and
+      #   RECAPTCHA_SECRET_KEY                     `verifyRecaptcha` returns `{ ok, skipped }`. One
+      #                                            without the other is a deliberate startup error.
+      #                                            Set, registration would demand a token no
+      #                                            headless browser can solve.
+      #
+      # A developer machine with a populated `.env` therefore CANNOT run this suite, which is part of
+      # why nobody noticed it had rotted. The runner has no `.env` at all, so these are already
+      # undefined; they are named here so the requirement is written down rather than inferred from
+      # a passing job.
+      RESEND_API_KEY: ''
+      MAIL_FROM: ''
+      PUBLIC_RECAPTCHA_SITE_KEY: ''
+      RECAPTCHA_SECRET_KEY: ''
+      SUPERADMIN_EMAILS: ''
+      # Throwaway key material for a throwaway cluster. `responsive-contract.spec.ts` mints an API
+      # key, and `api-key-secret.ts` REFUSES rather than degrades when it has no master secret — so
+      # the alternative to a value here is a spec that cannot run, not one that runs unencrypted.
+      ROOM_JWT_SECRET: ci-ephemeral-room-jwt-secret-not-a-real-credential
+      API_KEY_ENCRYPTION_KEY: ci-ephemeral-api-key-encryption-key-not-a-real-credential
+
+    steps:
+      - name: Check out the immutable revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install the repository-pinned Node runtime
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
+
+      - name: Activate the repository pnpm version
+        env:
+          COREPACK_ENABLE_DOWNLOAD_PROMPT: '0'
+        run: |
+          set -euo pipefail
+          corepack enable
+          # No version literal, for the reason `ci-package-manager-pin.test.ts` asserts, and retried
+          # for the reason the frontend job above records — the undici parser crash is a property of
+          # the download, so it can strike any job that installs.
+          attempt=1
+          until corepack install; do
+            if [ "$attempt" -ge 3 ]; then
+              echo "::error title=corepack install failed::three attempts; see the log above"
+              exit 1
+            fi
+            echo "corepack install crashed or failed (attempt $attempt); retrying"
+            sleep "$((attempt * 5))"
+            attempt=$((attempt + 1))
+          done
+          expected="$(node -p "require('./package.json').packageManager.split('@')[1]")"
+          actual="$(pnpm --version)"
+          if [ "$actual" != "$expected" ]; then
+            echo "::error title=pnpm version mismatch::package.json pins $expected, the runner has $actual"
+            exit 1
+          fi
+          echo "pnpm $actual, matching the packageManager pin"
+
+      - name: Install dependencies from the frozen lockfile
+        run: pnpm install --frozen-lockfile
+
+      - name: Install the browser the harness is configured for
+        working-directory: apps/controller
+        # Chromium ALONE, because `playwright.config.ts` declares exactly one project and it is
+        # `chromium`. Installing the full set would download two browsers no line of this repository
+        # asks for. `--with-deps` because a bare runner has none of the shared libraries it needs.
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: End-to-end
+        working-directory: apps/controller
+        # The config owns the server: it starts `vite dev`, waits for `/login`, and tears it down
+        # when the run ends. `reuseExistingServer: false` means a port already answering is a loud
+        # failure rather than a run that silently measured somebody else's application.
+        run: pnpm run test:e2e
+
+      - name: Preserve the traces and screenshots of a failing run
+        # `if: failure()` and not `always()`: the config keeps artefacts only on failure
+        # (`trace: 'retain-on-failure'`, `screenshot: 'only-on-failure'`), so a green run has nothing
+        # to upload and this step would publish an empty archive every time.
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: controller-e2e-failure-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: apps/controller/test-results/
+          if-no-files-found: warn
+          retention-days: 14

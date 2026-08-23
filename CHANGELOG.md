@@ -33,6 +33,91 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-23 14:03 EDT — the end-to-end suite CI never ran, and the six ways it had rotted
+
+**Runtime impact: no.** Nothing the site serves changed. What changed is that nine browser
+assertions now run on every pull request, and that they now assert against the application as it
+actually is.
+
+**Branch `feat/save-permissions`.** Closes half (a) of `TODO.md` row 6.
+
+#### The harness was there the whole time
+
+`apps/controller` has carried `@playwright/test` 1.62.1, a `playwright.config.ts` with a `webServer`,
+a `test:e2e` script and four specs since 2026-08-10. `package.json`'s `quality` script even chains
+`test:e2e` — which is exactly why nobody looked twice. `quality` is a local convenience script that
+no workflow invokes, and grepping `.github/workflows/*` for `test:e2e` or `playwright` returns
+nothing. **Every browser assertion in this repository was decorative.**
+
+That correction is itself worth recording: this row was twice described as greenfield work in this
+session, from memory rather than from reading, before `apps/controller/package.json` was opened.
+
+#### What running it reported
+
+Measured against a throwaway `initdb` cluster on a random loopback port — never the owner's local
+database, which `.env` points at `localhost:5432` and which is live. Proof the run used the
+throwaway: 16 tables in a cluster that began empty, created by `ensureDatabase()` on first request.
+
+**First run: 6 passed, 3 failed, 3.3 minutes. Final run: 9 passed, 0 failed, 25.9 seconds.**
+
+Six distinct defects, and **every one of them was the SPEC being stale against a deliberate,
+correctly-made application change.** No application defect was found:
+
+| the spec said | what the page actually does | since |
+| --- | --- | --- |
+| `getByRole('link', { name: /^Manage$/ })` | the link is icon-prefixed, so an anchored pattern cannot match a name that does not begin with `M` | always |
+| `#name` `#email` `#message` | `contact-name`, `contact-email`, `contact-message` | always |
+| `#mg-authmode` → `getByRole('button')` | `Editable`'s closed trigger is `<a href="">`, for the reason in that file | 2026-08-14 |
+| `?tab=stats` / `?tab=text-list` / `?tab=branding` | the tab is a PATH SEGMENT; `params.tab ?? 'users'` | the `[[tab]]` move |
+| `getByPlaceholder('yournamehere')` | the vanity editor is a bootbox prompt, not an inline panel | when the modal landed |
+| the member row's `.dropdown` | that wrapper is `btn-group mb-sm mr` + `data-menu-control` | when the dead Actions button was fixed |
+
+The tab one is the worst shape a stale locator can take: `?tab=` is simply ignored and the fallback
+is `'users'`, so **two sections of the hydration spec asserted against a pane that has neither
+control, and the page returned 200 the whole time.** Nothing ever looked broken.
+
+#### Two of my own mistakes, recorded rather than quietly fixed
+
+1. **A 500 I caused and nearly reported.** `Editable.svelte:53` threw
+   `Cannot read properties of null (reading 'function')` during SSR, one second after
+   `[vite] (ssr) program reload`. The reload was `.svelte-kit/generated/*` being rewritten by a
+   **vitest run I had started in the same directory**, whose `sveltekit()` plugin re-syncs. Re-run in
+   isolation: zero reloads, no 500. Ruling that out before reporting is the rule; it applied.
+2. **`exact: true` was a guess and the run refuted it.** The replacement for the `/^Manage$/` regex
+   failed the same way. The comment now says only what was measured and does not claim to explain
+   the accessible name's leading content, which was not read.
+
+#### The job
+
+`controller end-to-end` in `quality.yml`: a pinned PostgreSQL 17 service (the same digest
+`backend-quality.yml` already resolved), chromium only because the config declares one project, and
+traces and screenshots uploaded on failure only, because the config keeps them on failure only.
+
+Four environment variables are blank ON PURPOSE and the job says why: `RESEND_API_KEY`/`MAIL_FROM`
+blank means verification mail is not *enforced*, and the reCAPTCHA pair blank means
+`recaptchaEnabled()` is false. Set, registration demands a token no headless browser can solve —
+which is why **a developer machine with a populated `.env` cannot run this suite**, and part of why
+the rot went unseen.
+
+#### One candidate application defect, and it is the only one
+
+The confirmation run came back **8 passed, 1 failed** — and running it twice is the only reason that
+is known. `guest room login preserves an email entered before hydration` lost the typed value. What
+the call log shows is specific: the passing runs take 3.2s and that one took 15.2s;
+`#login-nickname-new` kept its value while `#login-email` in the same form did not; and the field
+resolved **twice**, first as `<input value="" …>` — the SSR node — then as an `<input>` with no
+`value` attribute at all. The node was **replaced rather than hydrated**.
+
+Re-run in isolation eight times: 8 passed, every one at 3.2s. So it is load-correlated and rare, and
+nothing here can name the mechanism from one sample, so nothing here claims to. It is `TODO.md`
+row 7, and `playwright.config.ts` now retries twice **in CI only** — which reports it as flaky rather
+than hiding it, and still fails red if every attempt fails.
+
+**Verified:** `pnpm test:e2e` 9/9 (run 8) and 8/9 with the flake above (run 9); the flaky spec 8/8 on
+targeted repeat; `prettier --check` on `e2e/**`; and `ci-package-manager-pin` +
+`ci-verification-integrity` + `node-version-pin` (21 tests) green against the new job.
+**Not verified locally:** the job on a GitHub runner — that is what the push measures.
+
 ### 2026-08-23 13:32 EDT — two Node pins nobody was comparing, and the smoke job floating across a major
 
 **Runtime impact: no** for the repository; the smoke job now runs on a pinned runtime rather than a
