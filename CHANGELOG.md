@@ -33,6 +33,51 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-23 13:32 EDT — two Node pins nobody was comparing, and the smoke job floating across a major
+
+**Runtime impact: no** for the repository; the smoke job now runs on a pinned runtime rather than a
+moving one.
+
+**Found while checking something else.** The owner mentioned `mise`, and `mise ls node` reports the
+active version's source as **`.nvmrc`** — not `.node-version`, which is what both quality workflows
+hand to `actions/setup-node`. Two tracked files, two different consumers, and nothing making them
+agree. They both said `24.19.0`, by luck rather than by enforcement.
+
+This repository's own standard names the shape: *"Two places recording the same thing is how one of
+them goes stale."* `ci-package-manager-pin.test.ts` next door exists because exactly that happened to
+pnpm. The Node case fails WORSE, because it fails silently — a mismatched pnpm exits 1 on the runner,
+where a mismatched Node just means the suite is green on two different runtimes. This session already
+met a Node-version-specific defect (the `undici` parser crash), and chasing one of those with the two
+files disagreeing would mean debugging a runtime nobody was running.
+
+**`smoke.yml` was worse than a mismatch and the test found it.** It read `node-version: '24'` — a
+FLOATING major, resolving to whatever 24.x is newest that day, on the job that runs **after a
+production deploy**. It now reads `node-version-file: .node-version` like the other two.
+
+**Neither pin file is deleted**, and that is a decision: `.nvmrc` has a real consumer (mise, nvm) and
+so does `.node-version` (both workflows). `node-version-pin.test.ts` keeps them honest instead, and
+fails if one is ever retired — which is a conversation that should happen rather than a pin quietly
+ceasing to be read. **24.19.0 is the intended version, confirmed by the owner** as the current LTS;
+recorded because the test enforces agreement, not a number, and a future reader needs to know which
+of two disagreeing pins to move toward.
+
+**A bug of mine, caught by its own negative control.** The literal-detection assertion went red
+against the workflow it had just fixed, because the comment recording the fix QUOTED the literal it
+was removing. Comments are stripped before that check now. It is the same species this repository has
+written down three times — props invented out of comment text in `RoomNavbar` — and it is why the
+control is run rather than assumed.
+
+**The 79 duplicate files are gone from the tree**, moved to `/tmp/trading-room-dup-quarantine`
+(reversible today) rather than deleted, on the owner's grant. Their classification was recorded on
+2026-08-23: none tracked by git, 56 byte-identical to their original, 22 differing with the ORIGINAL
+newer in every case. The measurable result is that `eslint .` over `apps/room` now reports **0 errors
+across every file**, down from 28 — local finally matches CI, which reported 0 all along because
+`apps/room/scripts/` is gitignored and absent from a fresh checkout.
+
+**Verified:** controller `vitest` **1,001 across 97 files**; room **2,630 across 188**; `eslint` and
+`prettier` clean. Both negative controls seen RED and reverted: `.nvmrc` moved to 24.18.0 fails the
+agreement assertion, and a floating literal restored to `smoke.yml` fails the workflow assertion.
+
 ### 2026-08-23 13:15 EDT — the CI crash that was not ours, and the top bar's first render test
 
 **Runtime impact: no.** A CI retry and a new test; no application code changed.
