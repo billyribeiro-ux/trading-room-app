@@ -953,6 +953,24 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     why: 'everything that leaves the browser as content; five entry points, one refusal path'
   },
   {
+    file: 'lib/room/session-control.svelte.ts',
+    /*
+      Born capped, 2026-08-23, as the destination of an extraction rather than a new feature.
+
+      Eleven action names left `RoomUserActions` because they act on the ROOM and not on a user —
+      that class's own `why:` string says "everything that can be done TO a user", and locking a
+      session is not that. The seam was proven by the dependency surface before anything moved: the
+      whole family needs four collaborators, and touches no roster, no target user and no presenter
+      command.
+
+      The ceiling exists because the contract demands one for every module in `lib/room/`, and that
+      demand is the point: capping only the SOURCE of an extraction lets the destination sprawl
+      instead.
+    */
+    max: 135,
+    why: 'what a presenter does to the SESSION - lock, open, reset, close; eleven names, four collaborators'
+  },
+  {
     file: 'lib/room/user-actions.svelte.ts',
     /*
     */

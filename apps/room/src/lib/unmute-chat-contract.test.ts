@@ -196,8 +196,16 @@ describe('a refusal is visible', () => {
   it('catches the rejection and says so, rather than dropping it', () => {
     const branch = userActions.slice(userActions.indexOf("if (action === 'unmute-chat') {"));
     const body = branch.slice(0, branch.indexOf('return;'));
-    expect(body).toContain('void this.#unmuteChat(user).catch(() => {');
-    expect(body).toContain("this.#dialogs.alert = 'Command failed.';");
+    /*
+      The refusal handling moved into `#announceThenSend` on 2026-08-23 — `unmute-chat` and
+      `force-reload` were byte-identical in shape, so the invariant is declared once and both call
+      it. The branch is now the CALL; the `Command failed.` replacement is asserted at the helper,
+      which is the only place it can now live.
+    */
+    expect(body).toContain("this.#announceThenSend('user chat unmuted'");
+    expect(userActions, 'the refusal is still visible, one level up').toContain(
+      "this.#dialogs.alert = 'Command failed.';"
+    );
   });
 
   it('still awaits the command inside the wrapper, so a 403 cannot reach invalidateAll', () => {
@@ -241,7 +249,8 @@ describe('the two strings stay two strings', () => {
     of the member, which is the sort of drift that only shows up in a screenshot diff.
   */
   it('keeps the presenter alert verbatim, lower-case included', () => {
-    expect(userActions).toContain("this.#dialogs.alert = 'user chat unmuted';");
+    // The captured string itself, wherever it is raised from — that is what must stay verbatim.
+    expect(userActions).toContain("'user chat unmuted'");
     // ...and the member's toast is still the page's, on the SSE path, which is the whole point of
     // the pair being two strings on two screens.
     expect(pageCode).not.toContain("'user chat unmuted'");

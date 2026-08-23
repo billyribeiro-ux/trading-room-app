@@ -79,13 +79,22 @@ function dispatchedActions(): Map<string, string> {
  * buckets mean what they say.
  */
 function handledActions(): Set<string> {
+  /*
+    BOTH dispatchers, since 2026-08-23. Eleven session actions moved to `RoomSessionControl` — they
+    act on the ROOM, not on a user — and `RoomUserActions.handle` now delegates to it before its own
+    chain. Reading only the original file would report every moved action as "dispatched into the
+    void", which is a defect report about working code: the exact manufactured-defect failure this
+    repository forbids. A gate that does not follow an extraction is worse than no gate, because it
+    goes red on the refactor and green on the regression.
+  */
+  const session = readFileSync('src/lib/room/session-control.svelte.ts', 'utf8');
   const source = readFileSync('src/lib/room/user-actions.svelte.ts', 'utf8');
   const tail = source.indexOf('const fixedAlert = userActionAlert(action)');
   expect(
     tail,
     "handle()'s alert tail was not found — this scanner would read the whole file and mis-bucket the alert path"
   ).toBeGreaterThan(-1);
-  const dispatchBody = source.slice(0, tail);
+  const dispatchBody = source.slice(0, tail) + session;
   return new Set([...dispatchBody.matchAll(/action === '([a-z0-9-]+)'/g)].map((m) => m[1]));
 }
 

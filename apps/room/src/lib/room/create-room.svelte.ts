@@ -439,7 +439,7 @@ export function createRoom(deps: RoomDeps) {
     sessionHandle: () => data.sessionHandle,
     isPresenter: () => isPresenter,
     followMyScreens: () => prefs.makeUsersFollowMyScreens,
-    focusOnScreen: (screenId) => focusOnScreen(screenId)
+    focusOnScreen
   });
 
   /*
@@ -796,10 +796,10 @@ export function createRoom(deps: RoomDeps) {
     dialogs,
     toasts,
     commands: {
-      presenter: (payload) => presenterCommand(payload),
+      presenter: presenterCommand,
       editUsername: (payload) => editUsername(payload),
       unmuteChat: (payload) => unmuteChatCommand(payload),
-      forceReload: (targetUserId) => forceReload(targetUserId)
+      forceReload
     },
     session: () => data,
     isPresenter: () => isPresenter,
@@ -992,7 +992,7 @@ export function createRoom(deps: RoomDeps) {
     modals,
     noteGates: () => noteGates,
     showNotesTab: () => deps.setMainTab('notes'),
-    focusOnSessionNote: (noteId) => focusOnSessionNote(noteId)
+    focusOnSessionNote
   });
 
   /*
