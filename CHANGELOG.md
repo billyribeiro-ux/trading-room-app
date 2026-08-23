@@ -33,6 +33,53 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-23 17:40 EDT — the fourth disposition is now a gate, and TODO is pruned to residue
+
+**Runtime impact: no.** A contract gained three assertions; `TODO.md` lost the rows that were done.
+
+**Branch `feat/save-permissions`.**
+
+#### The contract now asserts what it used to merely claim
+
+`user-action-disposition-contract.test.ts` opened with *"EVERY USER ACTION HAS A DISPOSITION, AND
+THERE IS NO FOURTH OPTION."* There was one, and it had six members. A branch that raises a dialog and
+does not act was counted as `handled` because a branch existed — which is how `kick` shipped telling
+presenters *"User kicked OK"* while sending nothing.
+
+It now reads each top-level branch and asks whether it does anything beyond dialogs and toasts. If
+not, the action must be declared in `DIALOG_ONLY_ACTIONS` with what is missing. A **staleness half**
+fails if a declared entry is later wired or stops being dispatched, so the list cannot rot into a
+suppression file — the same discipline `INERT_ACTIONS` carries next door.
+
+**Notices are a separate list.** `copied-to-clipboard` fires after the component has already copied;
+`invalid-restream-link` reports a validation the caller already failed. Neither claims the room did
+something it did not, and collapsing them into the liars' list would have been exactly the dilution
+this file forbids.
+
+#### The instrument was wrong before the code was
+
+The first run flagged `session-send-video`, which genuinely acts — it validates a URL, refuses a
+duplicate and writes `localStorage`. The splitter had cut that branch at its NESTED
+`if (action === 'session-send-video')`, separating the header from the work. **Fixed the instrument
+rather than adding a true entry to the list**, which would have buried a real defect under a false
+one. Splitting now anchors on the four-space indent of a top-level branch.
+
+#### Negative control, and the first attempt that did not count
+
+Removing `session-save-close-message` from the list must fail. The first attempt reported 11 passed —
+because prettier had reflowed the entry and my string match silently missed, so **the mutation never
+landed**. Re-run against the real lines it failed correctly: `expected [ 'session-save-close-message' ]
+to deeply equal []`. A negative control that was never applied is not a green result, it is no result.
+
+#### `TODO.md` pruned
+
+Eleven rows to ten, each cut to its residue rather than its history — the CHANGELOG holds the
+narrative now, and two places recording the same thing is how one goes stale. `askQuestion` is
+**deleted outright**: the reference has no mute gate on Q&A either, so ours is a match, not a gap.
+
+**Verified:** room `vitest` **2,638 passed / 188 files**; `svelte-check` **0 errors, 0 warnings**;
+`eslint` clean; the new assertion's negative control seen RED and restored.
+
 ### 2026-08-23 17:15 EDT — `kick` was not alone: five more controls report success and do nothing
 
 **Runtime impact: no.** No code changed. Five defects of the same class are now written down with the
