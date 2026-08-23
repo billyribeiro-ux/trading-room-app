@@ -349,7 +349,7 @@ export type UserOpcode = keyof typeof USER_OPCODES;
  * right. Trial is not a role at all; it is the `isFreeTrial` flag behind the
  * TRIAL badge.
  */
-export async function applyUserOpcode(roomId: number, roomUserId: number, op: UserOpcode) {
+export function userOpcodePatch(op: UserOpcode): Partial<typeof roomUsers.$inferInsert> {
   const patch: Partial<typeof roomUsers.$inferInsert> = {};
   switch (op) {
     case 1:
@@ -398,9 +398,28 @@ export async function applyUserOpcode(roomId: number, roomUserId: number, op: Us
       patch.denyArchivesAccess = false;
       break;
   }
+  return patch;
+}
+
+/**
+ * Apply one opcode to one membership.
+ *
+ * ## Why the mapping above is a separate exported function rather than inline here
+ *
+ * It has a second caller, and the day it did not it caused a real defect.
+ * `internal/room-ban/[code]` — the room banning a member — was written with its own hand-copied
+ * `.set({ banned })`, which set the boolean and left the role alone. Every consumer of a ban reads
+ * `role === 4` (`internal/room-config:244`, `internal/stream-read:92`, the manage badge), so the ban
+ * recorded nothing anyone asks about and the member came straight back on the next load.
+ *
+ * The fix is not a test asserting the two copies agree. It is having one copy: `userOpcodePatch` is
+ * the single definition of what each opcode means, this function applies it to a row, and the ban
+ * endpoint calls it for opcodes 4 and 2. A mapping that cannot be duplicated cannot drift.
+ */
+export async function applyUserOpcode(roomId: number, roomUserId: number, op: UserOpcode) {
   await getDb()
     .update(roomUsers)
-    .set(patch)
+    .set(userOpcodePatch(op))
     .where(and(eq(roomUsers.id, roomUserId), eq(roomUsers.roomId, roomId)));
 }
 

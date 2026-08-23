@@ -33,6 +33,62 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-23 21:05 EDT — the ban I shipped an hour earlier enforced nothing. A ban is a ROLE
+
+**Runtime impact: YES.** A banned member was still admitted on their next page load.
+
+**Branch `feat/save-permissions`.** This is a correction to the 20:10 entry directly below, found by
+re-reading that diff against `applyUserOpcode` rather than by a test — there was no test.
+
+#### What was wrong
+
+`internal/room-ban/[code]` wrote `.set({ banned })` — the boolean column, alone. Nothing in this
+repository asks about that column when it decides whether somebody is banned. **All three consumers
+read the ROLE:**
+
+```
+internal/room-config/[code]/+server.ts:244   banned: membership.roomUser.role === 4
+internal/stream-read/[code]/+server.ts:92    if (member.roomUser.role === 4) …
+account/rooms/[id]/[[tab]]/+page.svelte:1795 {#if member.role === 4} BANNED
+```
+
+So a member banned from a room kept `role = 2`, `internal/room-config` kept answering
+`banned: false`, and they walked straight back in. The endpoint reported success and enforced
+nothing — **the exact defect class the whole of 2026-08-23 was spent removing, reintroduced by the
+change that was removing it.**
+
+#### The fix is not a test that two copies agree — it is having one copy
+
+`applyUserOpcode` has always held the correct mapping (`case 4: role = 4, banned = true`;
+`case 2: role = 2, banned = false, muted = false`, the reference's own "also Unban"). The endpoint
+had a hand-written second copy, which is how it drifted on day one.
+
+The mapping is now `userOpcodePatch`, a pure exported function split out of `applyUserOpcode`.
+`applyUserOpcode` applies it to a row; the ban endpoint calls `userOpcodePatch(banned ? 4 : 2)`.
+**A mapping that cannot be duplicated cannot drift.**
+
+#### Lifting a ban clears the mute, and that is opcode 2's behaviour rather than an addition
+
+Role holds one value, so a banned member is role 4 and whatever they were before is already gone by
+the time there is a ban to lift. Restoring role 2 with `muted: false` discards nothing that survived
+the ban; leaving `muted: true` beside role 2 would recreate the same role/column disagreement. The
+same argument means a banned PRESENTER returns as a participant — upstream's behaviour, one opcode
+and one destination, reproduced rather than improved on, because a role-restore means storing a
+prior role nothing in the reference stores.
+
+#### The test that should have existed
+
+`ban-is-a-role-contract.test.ts`, four assertions: opcode 4 sets a role and not just a flag, opcode 2
+leaves no flag disagreeing with the role, opcode 3 writes the mute role and flag together, and the
+endpoint is READ to prove it writes through the map rather than an object literal — the one
+assertion that catches the literal shape of the original defect coming back.
+
+**Verified:** controller `svelte-check` **1,535 files, 0 errors, 0 warnings**; `vitest`
+**1,005 / 98** (up 4); `eslint` clean. **Negative control seen RED** — removing `patch.role = 4`
+from case 4 gives `expected { banned: true } to deeply equal { role: 4, banned: true }` — with the
+mutation verified to have landed first, then restored. The room half is untouched, so the room suite
+was not re-run.
+
 ### 2026-08-23 20:10 EDT — `kick-ban` is built end to end, and the ban is durable
 
 **Runtime impact: YES.** Kick & Ban now records a ban that survives the disconnect. It previously

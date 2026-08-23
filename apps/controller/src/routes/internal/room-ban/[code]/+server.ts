@@ -4,6 +4,7 @@ import { ROOM_JWT_SECRET } from '$app/env/private';
 import { getDb } from '#lib/server/db/index.js';
 import { ACCOUNT_ACTIVE, accounts, roomUsers, rooms, users } from '#lib/server/db/schema.js';
 import { isRoomPresenter } from '#lib/room-member-role.js';
+import { userOpcodePatch } from '#lib/server/rooms.js';
 import { verifyConfigReadToken } from '#lib/server/room-handoff.js';
 import type { RequestHandler } from './$types';
 
@@ -21,6 +22,11 @@ import type { RequestHandler } from './$types';
  * `boolean('banned').notNull().default(false)`), and the role model directly above it reads
  * *"0 owner · 1 presenter · 2 participant · 3 chat muted · 4 banned"*. The store was never missing;
  * the door from the room to it was.
+ *
+ * **And the first version of this door wrote the wrong half.** It set `banned` alone. Everything that
+ * enforces a ban reads the ROLE, so the ban recorded nothing anyone asks about and the member walked
+ * back in. Corrected the same day, on the mapping `applyUserOpcode` has always held; the write below
+ * carries the full account.
  *
  * ## Why a controller endpoint rather than a room-side write
  *
@@ -147,18 +153,49 @@ export const POST: RequestHandler = async ({ params, request, url }) => {
   }
 
   /*
-    ONE conditional UPDATE, re-scoped to the room in its own WHERE.
+    THE ROLE IS THE BAN. The column beside it is the mirror, not the record.
 
-    Not a SELECT-then-UPDATE: the membership was read above to decide authority, and re-deciding the
-    row from that read would be the TOCTOU this repository removes everywhere else. The `roomId` in
-    the predicate is redundant against `roomUsers.id` being a primary key, and it is kept because it
-    makes the scope true of the STATEMENT rather than of the query that happened to precede it.
+    This endpoint shipped on 2026-08-23 setting `banned` ALONE, and that made it a member of the very
+    class it was built to end: it reported success and changed nothing that enforces a ban. Every
+    consumer in this repository reads the ROLE —
+
+      internal/room-config/[code]/+server.ts:244   banned: membership.roomUser.role === 4
+      internal/stream-read/[code]/+server.ts:92    if (member.roomUser.role === 4) …
+      account/rooms/[id]/[[tab]]/+page.svelte:1795 {#if member.role === 4} BANNED
+
+    — so a member banned from the room kept `role = 2`, `internal/room-config` kept answering
+    `banned: false`, and they walked straight back in on the next page load. Found by re-reading the
+    diff against `applyUserOpcode`, which is and always was the authority on this mapping:
+
+      case 4:  patch.role = 4; patch.banned = true;                          // Ban
+      case 2:  patch.role = 2; patch.banned = false; patch.muted = false;    // Participant, also Unban
+
+    It does not mirror those two cases — it CALLS them. `userOpcodePatch` was split out of
+    `applyUserOpcode` for this, so there is one definition of what an opcode means and no second copy
+    to drift. A test asserting two copies agree would have been the weaker answer to the same defect.
+
+    ## Why lifting a ban ALSO clears `muted`, which is opcode 2's behaviour and not an extra
+
+    Role holds one value. A banned member is role 4, so whatever they were before — participant,
+    muted, presenter — is already gone by the time there is a ban to lift. Restoring role 2 with
+    `muted: false` therefore discards nothing that survived the ban; leaving `muted: true` beside
+    role 2 would recreate exactly the role/column disagreement this comment exists to record.
+
+    The same argument says a banned PRESENTER comes back as a participant. That is upstream's
+    behaviour too — one opcode, one destination — and it is reproduced rather than improved on,
+    because inventing a role-restore means storing a prior role nothing in the reference stores.
+
+    ONE conditional UPDATE, re-scoped to the room in its own WHERE. Not a SELECT-then-UPDATE: the
+    membership was read above to decide authority, and re-deciding the row from that read would be
+    the TOCTOU this repository removes everywhere else. The `roomId` in the predicate is redundant
+    against `roomUsers.id` being a primary key, and it is kept because it makes the scope true of the
+    STATEMENT rather than of the query that happened to precede it.
   */
   const [updated] = await getDb()
     .update(roomUsers)
-    .set({ banned })
+    .set(userOpcodePatch(banned ? 4 : 2))
     .where(and(eq(roomUsers.id, target.roomUser.id), eq(roomUsers.roomId, room.id)))
-    .returning({ id: roomUsers.id, banned: roomUsers.banned });
+    .returning({ id: roomUsers.id, role: roomUsers.role, banned: roomUsers.banned });
 
   // Zero rows means the row moved between the read and the write. Report it rather than claiming a
   // ban that did not happen — the whole defect class this endpoint was built to end.
