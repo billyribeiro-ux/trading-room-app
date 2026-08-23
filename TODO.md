@@ -325,6 +325,25 @@ gate of either kind**. Whether a CHAT mute should silence Q&A is a policy questi
 either way in anything read so far, so it is recorded rather than guessed — extending the gate on a
 hunch is the invention this file exists to prevent.
 
+### OPEN RIGHT NOW — the running list, 2026-08-23
+
+**Nothing here is parked.** Each row says what it needs and who can move it. A finding that lives only
+in a conversation is a finding already lost, so anything noticed goes in here the moment it is
+noticed — including the two at the bottom, which were spoken before they were written down.
+
+| # | open item | needs |
+| --- | --- | --- |
+| 1 | **`force-reload`'s ceiling raise is UNAUTHORISED and has been reverted.** `user-actions.svelte.ts` is 749 against 730 and `create-room.svelte.ts` 1088 against 1086, so the suite is RED on those two and the `forceReload` fix cannot ship until this is decided. It was raised once on the inference that a prior approval carried over; it does not — the rule is that **every** raise is its own conversation | one owner decision: raise, or extract to fit |
+| 2 | **Does our `forceReload` receiver DISCONNECT before reloading?** The reference does: byte 995901 is `case"forceReload":e.disconnect(),e.appEventBus.emit("forceReload")`. Ours was written against the repo's own comment rather than against that byte, and the disconnect half has **not** been checked. Found while verifying the channel, and recorded rather than assumed either way | one read of `events.svelte.ts`, then match or record the divergence |
+| 3 | **`askQuestion` has no mute gate of either kind** (`alert-questions.remote.ts:56`). Whether a CHAT mute should silence Q&A has no evidence either way in anything read | a capture script (`~/CLAUDE.md` §3) |
+| 4 | **`kick-duplicates` reports a hardcoded negative.** The reference's own implementation was read, both arms confirmed; its positive arm needs a kick this room cannot perform | a capture script, then the wire |
+| 5 | **`save-permissions`** — the controller already writes `roomUsers.permissionsJson` for the same five checkboxes (`server/rooms.ts:90-114`). The room has no write path to the controller | a new internal endpoint; every piece it calls exists |
+| 6 | **`doChatLogSearch`** filters the newest 50 rows locally with `includes()` where upstream is a SERVER search. Silent wrong answers | a search endpoint, or make the limit visible |
+| 7 | **`admin-notes-password`** — the typed value IS delivered and the handler discards it, so the recorded mechanism was half wrong | a comparison target that exists |
+| 8 | **`session-refresh-roster` and `session-soft-reset`** each promise a server command in their message and only refetch locally | pure honesty fix — no protocol needed |
+| 9 | **Nine dead controls** remain inert, gated by `user-action-disposition-contract.test.ts` with a reason each. The gate stops a tenth appearing; it does not build the nine | the captured wire for each |
+| 10 | **`RoomNavbar` has neither a mount nor an SSR render test**, and **no automated browser check runs in CI** | both are work, not blockers |
+
 ### The six defects that are REAL, FIXABLE, and not yet done — investigated 2026-08-23
 
 Each was traced end to end by reading, and each verdict says what it would cost. **None of them is

@@ -955,15 +955,8 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
   {
     file: 'lib/room/user-actions.svelte.ts',
     /*
-      RAISED 730 -> 749 on 2026-08-23, under the same approval as the four raised earlier that
-      day and for the same kind of reason: the real `force-reload` branch that replaced its `EXACT_ALERTS` entry.
-
-      `force-reload` had a working form action and a working receiver with NOTHING joining them,
-      while the button that should have joined them raised a fixed alert and sent nothing — two
-      defects cancelling into silence. Joining them removes an entry from `EXACT_ALERTS` and
-      deletes an orphaned action, so the repository shrank in the ways that matter.
     */
-    max: 749,
+    max: 730,
     why: 'everything that can be done TO a user; handle() alone was 249 lines on the page'
   },
   {
@@ -1010,16 +1003,8 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       re-broadcast, and why `presenterRoom()` rather than the client decides authority. The
       alternative on offer was an extraction invented to satisfy a number, which is the thing
       this file exists to prevent.
-
-      RAISED 1086 -> 1088 on 2026-08-23, under the same approval as the four raised earlier that
-      day and for the same kind of reason: wiring that command through.
-
-      `force-reload` had a working form action and a working receiver with NOTHING joining them,
-      while the button that should have joined them raised a fixed alert and sent nothing — two
-      defects cancelling into silence. Joining them removes an entry from `EXACT_ALERTS` and
-      deletes an orphaned action, so the repository shrank in the ways that matter.
     */
-    max: 1088,
+    max: 1086,
     why: 'the composition root - 36 constructions and their citations, assembly and nothing else'
   },
   {
