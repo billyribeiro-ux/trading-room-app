@@ -55,6 +55,7 @@ const make = (options: { isPresenter?: boolean; talking?: TalkingEntry[] } = {})
   const dialogs = new RoomDialogs();
   const toasts = new RoomToasts();
   const sent: { subCmd: string; targetUserId: number }[] = [];
+  const reloadsSent: number[] = [];
   const opened: string[] = [];
   const mentioned: string[] = [];
   const saved: [string, boolean][] = [];
@@ -70,7 +71,8 @@ const make = (options: { isPresenter?: boolean; talking?: TalkingEntry[] } = {})
     commands: {
       presenter: (payload) => (sent.push(payload), Promise.resolve(null)),
       editUsername: () => Promise.resolve(null),
-      unmuteChat: () => (unmuteFails ? Promise.reject(new Error('refused')) : Promise.resolve(null))
+      unmuteChat: () => (unmuteFails ? Promise.reject(new Error('refused')) : Promise.resolve(null)),
+      forceReload: (targetUserId: number) => (reloadsSent.push(targetUserId), Promise.resolve(null))
     },
     session: () => ({
       user: { id: 1 },
@@ -109,6 +111,7 @@ const make = (options: { isPresenter?: boolean; talking?: TalkingEntry[] } = {})
     opened,
     mentioned,
     saved,
+    reloadsSent,
     failUnmute: () => (unmuteFails = true),
     modalClosed: () => modalClosed,
     messageCleared: () => messageCleared,

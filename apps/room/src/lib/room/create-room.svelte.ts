@@ -57,7 +57,7 @@ import { RoomMenus } from '#lib/room/menus.svelte.js';
 import { RoomPolls } from '#lib/room/polls.svelte.js';
 import { page } from '$app/state';
 import { invalidate, invalidateAll } from '$app/navigation';
-import { unmuteChat as unmuteChatCommand } from '../../routes/chat-mute.remote';
+import { unmuteChat } from '../../routes/chat-mute.remote';
 
 import {
   deletePrivateChatLog as deletePrivateChatLogCommand,
@@ -67,6 +67,7 @@ import {
 import {
   focusOnScreen,
   focusOnSessionNote,
+  forceReload,
   presenterCommand
 } from '../../routes/presenter-commands.remote';
 import { videoForAll, youtubeForAll } from '../../routes/for-all-broadcast.remote';
@@ -438,7 +439,7 @@ export function createRoom(deps: RoomDeps) {
     sessionHandle: () => data.sessionHandle,
     isPresenter: () => isPresenter,
     followMyScreens: () => prefs.makeUsersFollowMyScreens,
-    focusOnScreen: (screenId) => focusOnScreen(screenId)
+    focusOnScreen
   });
 
   /*
@@ -794,11 +795,7 @@ export function createRoom(deps: RoomDeps) {
   const userActions = new RoomUserActions<(typeof data.connectedUsers)[number]>({
     dialogs,
     toasts,
-    commands: {
-      presenter: (payload) => presenterCommand(payload),
-      editUsername: (payload) => editUsername(payload),
-      unmuteChat: (payload) => unmuteChatCommand(payload)
-    },
+    commands: { presenter: presenterCommand, editUsername, unmuteChat, forceReload },
     session: () => data,
     isPresenter: () => isPresenter,
     talking: () => media.talking,
@@ -848,7 +845,10 @@ export function createRoom(deps: RoomDeps) {
       Declared below this call — the closure runs on a frame arriving from the server, long after
       `notes` is initialised, so the forward reference is resolved by then.
     */
-    focusSessionNote: (noteId) => notes.focusNote(noteId)
+    focusSessionNote: (noteId) => notes.focusNote(noteId),
+    // Byte 2597102, verbatim. Why it is `alertThen` and not `confirm` is on `RoomDialogs.alertThen`.
+    forceReloadRequested: () =>
+      dialogs.alertThen('You need to reload this page to continue', () => location.reload())
   });
 
   /*
@@ -990,7 +990,7 @@ export function createRoom(deps: RoomDeps) {
     modals,
     noteGates: () => noteGates,
     showNotesTab: () => deps.setMainTab('notes'),
-    focusOnSessionNote: (noteId) => focusOnSessionNote(noteId)
+    focusOnSessionNote
   });
 
   /*

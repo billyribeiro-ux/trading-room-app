@@ -325,6 +325,27 @@ gate of either kind**. Whether a CHAT mute should silence Q&A is a policy questi
 either way in anything read so far, so it is recorded rather than guessed — extending the gate on a
 hunch is the invention this file exists to prevent.
 
+### OPEN RIGHT NOW — the running list, 2026-08-23
+
+**Nothing here is parked.** Each row says what it needs and who can move it. A finding that lives only
+in a conversation is a finding already lost, so anything noticed goes in here the moment it is
+noticed — including the two at the bottom, which were spoken before they were written down.
+
+| # | open item | needs |
+| --- | --- | --- |
+| 1 | **`forceReload` — DONE 2026-08-23.** Was blocked on a ceiling; resolved by EXTRACTION as the contract prescribes, not by raising a number. `RoomSessionControl` took eleven session action names out of `RoomUserActions` (749 → 708), and `create-room` came down by collapsing a `commands` object that only needed property shorthand once a pointless import alias went. Both under their original ceilings | — |
+| 2 | **`forceReload` — DONE 2026-08-23.** Was the confirmed divergence: ours called `location.reload()` outright, so a member mid-sentence lost what they were typing with no notice. Both capture regions were read, not searched — byte 995901 `case"forceReload":e.disconnect(),e.appEventBus.emit("forceReload")` and byte 2597102 `bootbox.alert("You need to reload this page to continue",()=>{window.location.reload()})`. Now: the stream calls `source.close()`, then a `forceReloadRequested` receiver, and `create-room` raises the captured alert whose dismissal reloads. **The ceiling blocker was cleared by EXTRACTION first** — the join/leave announcement left `events.svelte.ts` for `#lib/arrival-announcement.ts` (903 → 900, ceiling LOWERED), and only `dialogs.svelte.ts` needed a raise, taken as a decision with the owner. `RoomDialogs` gained `alertThen`/`dismissAlert`; the stale-callback trap is negative-controlled | — |
+| 3 | **`askQuestion` has no mute gate of either kind** (`alert-questions.remote.ts:56`). Whether a CHAT mute should silence Q&A has no evidence either way in anything read | a capture script (`~/CLAUDE.md` §3) |
+| 4 | **`kick-duplicates` reports a hardcoded negative.** The reference's own implementation was read, both arms confirmed; its positive arm needs a kick this room cannot perform | a capture script, then the wire |
+| 5 | **`save-permissions`** — the controller already writes `roomUsers.permissionsJson` for the same five checkboxes (`server/rooms.ts:90-114`). The room has no write path to the controller | a new internal endpoint; every piece it calls exists |
+| 6 | **`doChatLogSearch`** filters the newest 50 rows locally with `includes()` where upstream is a SERVER search. Silent wrong answers | a search endpoint, or make the limit visible |
+| 7 | **`admin-notes-password`** — the typed value IS delivered and the handler discards it, so the recorded mechanism was half wrong | a comparison target that exists |
+| 8 | **`session-refresh-roster` and `session-soft-reset` promise a server command and only refetch locally.** Now in `session-control.svelte.ts:74-79` and `:82-89`. **The wire is CAPTURED and the names are exact** (read 2026-08-23): byte 2169139 is `refreshRoster(){sendServerAdminCommand("refreshRoster", null), bootbox.alert("Command send OK. Please allow 1/2 minute for old entries to get deleted from the list")}` and byte 2167060 is `sendServerAdminCommand("softResetSession", {}), this.done(), bootbox.alert("Soft reset request sent...")`. Our alerts are those strings verbatim — the wording is faithful and the FACT is not, because nothing is sent. **What is missing is the SERVER half, and it is not in the room bundle**: the room only shows the send, so what "old entries get deleted" actually does is uncaptured. So this is NOT the pure honesty fix it was filed as. Two routes, and it is a product decision rather than a reading: implement `refreshRoster`/`softResetSession` server-side (needs behaviour nobody has captured), or diverge from the captured string so it stops claiming a send — for which there is precedent under *"Not gaps — decisions taken deliberately"*, where a save shows a toast the reference does not, because a silent success is indistinguishable from a dead control | an owner decision; both wire names now known |
+| 9 | **Nine dead controls** remain inert, gated by `user-action-disposition-contract.test.ts` with a reason each. The gate stops a tenth appearing; it does not build the nine | the captured wire for each |
+| 10 | **`RoomNavbar` has neither a mount nor an SSR render test**, and **no automated browser check runs in CI** | both are work, not blockers |
+| 11 | **The `privCmdsIn` channel carries SIX commands this room does not handle.** Found by READING bytes 995300-996700 end to end while confirming `forceReload`, rather than by searching for it — the whole switch was in the same region. Upstream: `forceReload` ✓, `unmuteChat` ✓, and then `remoteRestartAudio`, `getDebugLog` / `debugLogResp` (a pair — a presenter asks, the member replies with `V1`, its rolling client log), `kickUser` (`emit("kickPage", xe.msg), e.disconnect()` — note the order is the OPPOSITE of `forceReload`'s), `muteChat` (the receiver half of a mute this room enforces server-side instead), and `userInfo`. Each was checked against `apps/room/src` before being written down: `remoteRestartAudio` appears nowhere, and the others appear only in unrelated contexts. **Not invented into existence** — what each SHOULD do beyond the emit is not in the room bundle | a capture per command, then the wire |
+| 12 | **Three more `bootbox.alert(msg, callback)` receivers exist upstream and none is wired here.** Same region, bytes 2596600-2597200, read end to end: the room reset — *"The room is being reset by an administrator. Click OK to continue..."* → reload; `openSession` — *"The session is now open, click here to reload the page and enter"* → reload; and `permsChangeReload` — *"An admin has changed your room permissions, you need to reload this page to continue"* → navigates to `${apiROOT}/sessions/v2/reAuthSessionTok?sessionID=…&tok=…&r=1` rather than reloading. **The PRIMITIVE they need now exists** (`RoomDialogs.alertThen`, shipped with `forceReload`), so each is a receiver plus a sender, not new plumbing. `permsChangeReload` is the odd one — it re-mints a session token against an endpoint this room does not have | the sender for each; the dialog half is built |
+
 ### The six defects that are REAL, FIXABLE, and not yet done — investigated 2026-08-23
 
 Each was traced end to end by reading, and each verdict says what it would cost. **None of them is
@@ -333,14 +354,17 @@ blocked on a decision or on hardware**; they are simply not built yet. Ordered b
 | defect | verdict | what is missing |
 | --- | --- | --- |
 | **`save-permissions`** (HIGH) | needs new server code | The controller already writes `roomUsers.permissionsJson` for the SAME five checkboxes (`server/rooms.ts:90-114`). The room has no write path to the controller, so this needs a new internal endpoint — every piece it would call exists |
-| **`forceReload`** (MEDIUM) | **uses only existing code** | Both ends exist and nothing joins them: the action at `+page.server.ts:1318`, the receiver at `events.svelte.ts:656`. The button is in `EXACT_ALERTS`, so it raises "Reload request sent OK" and sends nothing. Wiring it removes a liar AND uses a dead wire |
 | **`session-refresh-roster` / `session-soft-reset`** (MEDIUM) | **uses only existing code** | Both raise an alert asserting a server command was sent; neither sends anything, and the local refetch they do instead has no effect on what the message promises. The honest fix needs no protocol at all — correct the message |
 | **`doChatLogSearch`** (MEDIUM) | needs new server code | The input never reaches the server, and the set it filters is only the newest 50 rows. Either a real search endpoint, or make the limit VISIBLE — a silent wrong answer is worse than an honest one |
 | **`admin-notes-password`** (LOW) | needs new server code | Three stacked causes. The typed value IS delivered and the handler throws it away, so the TODO's stated mechanism was only half right |
 | **`kick-duplicates`** (MEDIUM) | **NOT fixable without inventing** | The reference's own implementation was read in the capture, both arms confirmed. The positive arm needs a kick the room cannot perform. Recorded, not guessed |
 
-**Two were fixed on 2026-08-23** and are recorded above rather than here: the controller's permanent
-mute, and `focusOnSessionNote`.
+**FOUR were fixed on 2026-08-23** and are recorded above rather than here: the controller's permanent
+mute, the missing private-chat mute gate, `focusOnSessionNote`, and **`forceReload`** — whose form
+action and receiver both existed with nothing joining them while its button raised a fixed alert
+and sent nothing. Two defects cancelling into silence: nobody misses a wire nothing calls, and
+nobody doubts a button that reports success. `EXACT_ALERTS` is down from five entries to four, the
+orphaned action is deleted, and the actions export is nineteen to eighteen.
 
 **Ready to build, fully specified:**
 

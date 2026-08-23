@@ -74,6 +74,10 @@ export class RoomRoster<Entry extends RosterMember> {
    *
    * Null until the first frame lands, which is NOT the same as 0: the server-rendered roster stands
    * in until then rather than the badge flashing through zero on every page load.
+   *
+   * The defect it closed, recorded here because it is invisible from the field alone: before the
+   * `/roster/` channel wrote this, the badge only ever showed the value baked in at page load, so a
+   * member joining or leaving never changed it for anyone else.
    */
   #count = $state<number | null>(null);
 

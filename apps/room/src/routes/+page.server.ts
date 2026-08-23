@@ -1309,28 +1309,14 @@ export const actions: Actions = {
    * that it acts on someone else's machine, so the authority to send it cannot live on the
    * machine that sends it.
    */
-  /**
-   * `forceReload` - the only command on `/sess/{id}/privCmdsIn/{uid}-{id}/`.
-   *
-   * Addressed to one member and carried out by their browser, like `remotePresCommand`. Presenter
-   * only, for the same reason: it acts on someone else's machine.
-   */
-  forceReload: async ({ request, locals }) => {
-    ensureDatabase();
-    const isPresenter =
-      requireUser(locals).role === 'staff' || requireUser(locals).role === 'admin';
-    if (!isPresenter) return fail(403);
+  /*
+    `forceReload` WAS a form action here and is gone, 2026-08-23.
 
-    const data = await request.formData();
-    const targetUserId = Number(data.get('targetUserId') ?? NaN);
-    if (!Number.isInteger(targetUserId)) return fail(400, { message: 'No target.' });
-
-    publishToUsers(requireRoomShortCode(locals), [targetUserId], {
-      channel: 'privCmds',
-      data: { cmd: 'forceReload', targetUserId }
-    });
-    return { success: true };
-  },
+    It had ZERO call sites — both ends shipped and nothing joined them, which is the `presenterCommand`
+    defect that shipped dead for three commits. It is now a remote command in
+    `presenter-commands.remote.ts`, reached by the "Force Reload" button that used to raise a fixed
+    alert and send nothing. Removing it takes the actions export from nineteen to eighteen.
+  */
 
   /**
    * The Files pane upload, from `app-presentationarea`'s `doFileUpload()`:

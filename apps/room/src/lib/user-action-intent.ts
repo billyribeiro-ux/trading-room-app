@@ -72,8 +72,13 @@ const EXACT_ALERTS: Readonly<Record<string, string>> = {
   'save-permissions': 'Permissions applied, user will reload the page now to apply...',
   'mute-chat-24': 'user chat muted',
   'mute-chat-indefinitely': 'user chat muted',
-  'restart-audio': 'Audio restart request sent OK',
-  'force-reload': 'Reload request sent OK'
+  'restart-audio': 'Audio restart request sent OK'
+  /*
+    `force-reload` was HERE and is gone, 2026-08-23 — the second entry ever removed from this table,
+    and for the same reason as `unmute-chat`: its presence WAS the bug. The button raised "Reload
+    request sent OK" and sent nothing, while a working action and a working receiver sat in the
+    source with nothing joining them. It now has a real command in `presenter-commands.remote.ts`.
+  */
 };
 
 /** The fixed alert for an action, or null when the action does something more than talk. */

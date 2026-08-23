@@ -16,6 +16,7 @@ import {
 } from '#lib/user-action-intent.js';
 
 import type { RoomDialogs } from './dialogs.svelte';
+import { RoomSessionControl } from './session-control.svelte';
 import type { RoomToasts } from './toasts.svelte';
 
 /** The load values every one of these actions reads, taken as a thunk. */
@@ -40,6 +41,8 @@ export interface UserActionCommands {
   }) => Promise<unknown>;
   editUsername: (payload: { userId: number; username: string }) => Promise<unknown>;
   unmuteChat: (payload: { targetUserId: number }) => Promise<unknown>;
+  /** `forceReload` — reloads ONE member's browser. Presenter-gated on the server. */
+  forceReload: (targetUserId: number) => Promise<unknown>;
 }
 
 /*
@@ -93,13 +96,13 @@ export class RoomUserActions<
   }
 > {
   readonly #dialogs: RoomDialogs;
+  readonly #sessionControl: RoomSessionControl;
   readonly #toasts: RoomToasts;
   readonly #commands: UserActionCommands;
   readonly #session: () => UserActionSession<User>;
   readonly #isPresenter: () => boolean;
   readonly #talking: () => readonly TalkingEntry[];
   readonly #rosterUsers: () => readonly RosterAuthority[];
-  readonly #savePreference: (key: string, value: boolean) => void;
   readonly #openModal: (name: Exclude<ModalName, null>) => void;
   readonly #closeModal: () => void;
   readonly #closeUserMenu: () => void;
@@ -142,13 +145,25 @@ export class RoomUserActions<
     reload: () => Promise<void>;
   }) {
     this.#dialogs = options.dialogs;
+    /*
+      Built HERE rather than injected, deliberately. It needs four collaborators this class already
+      holds, so injecting it would make every caller assemble the same object out of things it had
+      just handed over — and `create-room` is the one file that would grow to do it. Tests reach the
+      session actions through `handle()` exactly as `ModalHost` does, which is the behaviour worth
+      asserting; nothing needs to substitute this.
+    */
+    this.#sessionControl = new RoomSessionControl({
+      dialogs: options.dialogs,
+      closeModal: options.closeModal,
+      reload: options.reload,
+      savePreference: (key, value) => options.savePreference(key, value)
+    });
     this.#toasts = options.toasts;
     this.#commands = options.commands;
     this.#session = options.session;
     this.#isPresenter = options.isPresenter;
     this.#talking = options.talking;
     this.#rosterUsers = options.rosterUsers;
-    this.#savePreference = options.savePreference;
     this.#openModal = options.openModal;
     this.#closeModal = options.closeModal;
     this.#closeUserMenu = options.closeUserMenu;
@@ -455,6 +470,14 @@ export class RoomUserActions<
     await this.#reload();
   }
 
+  /** Raise the captured alert, fire the command, and replace the alert only if it refuses. */
+  #announceThenSend(alert: string, send: () => Promise<unknown>): void {
+    this.#dialogs.alert = alert;
+    void send().catch(() => {
+      this.#dialogs.alert = 'Command failed.';
+    });
+  }
+
   /**
    * Lifts a member's chat mute — the other half of `mute24`.
    *
@@ -478,14 +501,15 @@ export class RoomUserActions<
   }
 
   handle(action: string, user: ModalTargetUser) {
-    if (action === 'session-reload-config') {
-      this.#dialogs.confirm('Are you sure you want to reload tge session config?', () => {
-        this.#closeModal();
-        void this.#reload();
-        this.#dialogs.alert = 'Session config reloaded...';
-      });
-      return;
-    }
+    /*
+      SESSION actions first, and they are not user actions at all — see `RoomSessionControl` for why
+      eleven names left this file on 2026-08-23. Asked here rather than routed at the call site so
+      `ModalHost` keeps ONE `onUserAction` door: making the caller choose which class owns a string
+      is the coupling that turned "Bring everyone here" into a lie.
+
+      `false` means "not mine", never "nothing happened".
+    */
+    if (this.#sessionControl.handle(action)) return;
 
     /*
       The reference raises `alertService.success("Copied to clipboard.")` from all three of its
@@ -495,61 +519,6 @@ export class RoomUserActions<
     */
     if (action === 'copied-to-clipboard') {
       this.#toasts.show({ kind: 'success', message: 'Copied to clipboard.', enableHtml: false });
-      return;
-    }
-
-    if (action === 'session-refresh-roster') {
-      void this.#reload();
-      this.#dialogs.alert =
-        'Command send OK. Please allow 1/2 minute for old entries to get deleted from the list';
-      return;
-    }
-
-    if (action === 'session-soft-reset') {
-      this.#dialogs.confirm('Are you sure you want to soft reset the room?', () => {
-        this.#closeModal();
-        void this.#reload();
-        this.#dialogs.alert = 'Soft reset request sent...';
-      });
-      return;
-    }
-
-    if (action === 'session-hard-reset' || action === 'session-hard-reset-revoke') {
-      this.#dialogs.confirm('Are you sure you want to reset the room?', () => {
-        this.#closeModal();
-        this.#savePreference('sessionTokensRevoked', action === 'session-hard-reset-revoke');
-        void this.#reload();
-      });
-      return;
-    }
-
-    if (action === 'session-save-close') {
-      this.#savePreference('sessionOpen', false);
-      this.#closeModal();
-      return;
-    }
-
-    if (action === 'session-save-close-message') {
-      this.#dialogs.alert = 'Message Saved';
-      return;
-    }
-
-    if (action === 'session-open') {
-      this.#savePreference('sessionOpen', true);
-      this.#closeModal();
-      return;
-    }
-
-    if (action === 'session-lock' || action === 'session-lock-kick') {
-      this.#savePreference('sessionLocked', true);
-      this.#savePreference('sessionLockKick', action === 'session-lock-kick');
-      this.#dialogs.alert = 'Session Locked';
-      return;
-    }
-
-    if (action === 'session-unlock') {
-      this.#savePreference('sessionLocked', false);
-      this.#dialogs.alert = 'Session Unlocked';
       return;
     }
 
@@ -705,17 +674,24 @@ export class RoomUserActions<
     }
 
     /*
-      Ahead of `userActionAlert` below because this one sends something — see `EXACT_ALERTS` in
-      `user-action-intent.ts` for why leaving it in that table was the bug. The alert is raised
-      first because the reference raises it immediately; `Command failed.` is inherited from the
-      sibling handlers in this file, not captured, because the reference never showed us a failure
-      for this control.
+      THE TWO CONTROLS THAT ACTUALLY SEND, ahead of the alert tail because they do.
+
+      Both were keys of `EXACT_ALERTS` once, and in both cases their presence in that table WAS the
+      bug — see `user-action-intent.ts` for each. They are written through one helper rather than
+      twice, which is this module's own argument applied to itself: the invariant is declared once
+      and both callers use it, so the two cannot drift the way the mute check did between
+      `sendMessage` and `replyMessage`.
+
+      The alert is raised BEFORE the command resolves because the reference raises it immediately.
+      `Command failed.` is inherited from the sibling handlers here, not captured — the reference
+      never showed us a failure for either control.
     */
     if (action === 'unmute-chat') {
-      this.#dialogs.alert = 'user chat unmuted';
-      void this.#unmuteChat(user).catch(() => {
-        this.#dialogs.alert = 'Command failed.';
-      });
+      this.#announceThenSend('user chat unmuted', () => this.#unmuteChat(user));
+      return;
+    }
+    if (action === 'force-reload') {
+      this.#announceThenSend('Reload request sent OK', () => this.#commands.forceReload(user.id));
       return;
     }
 

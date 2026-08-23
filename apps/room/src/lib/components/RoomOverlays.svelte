@@ -706,7 +706,7 @@
   </BootboxDialog>
 {/if}
 {#if dialogs.alert}
-  <BootboxDialog mode="alert" message={dialogs.alert} onclose={() => (dialogs.alert = null)} />
+  <BootboxDialog mode="alert" message={dialogs.alert} onclose={() => dialogs.dismissAlert()} />
 {/if}
 {#if dialogs.prompt}
   <BootboxDialog

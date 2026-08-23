@@ -88,6 +88,12 @@ const make = () => {
   const missed: true[] = [];
   const tabs: string[] = [];
   const played: string[] = [];
+  /*
+    Each entry records whether the CHANNEL WAS ALREADY CLOSED at the moment the receiver ran, which
+    is the only way to assert the reference's ordering — `e.disconnect(), emit("forceReload")` at
+    byte 995901 — from the outside. A boolean sampled afterwards would be true either way.
+  */
+  const reloadAsked: boolean[] = [];
   const stream = new RoomEventStream<{ id: number }>({
     prefs: { doNotDisturbOn: false } as never,
     toasts: { show: () => null } as never,
@@ -106,9 +112,10 @@ const make = () => {
     restartMediaSession: () => null,
     showTab: (tab) => tabs.push(tab),
     focusSessionNote: () => {},
-    chatMissedWhileHidden: () => missed.push(true)
+    chatMissedWhileHidden: () => missed.push(true),
+    forceReloadRequested: () => reloadAsked.push(FakeEventSource.last?.closed === true)
   });
-  return { stream, missed, tabs, played };
+  return { stream, missed, tabs, played, reloadAsked };
 };
 
 /** Read inside an effect root, mutate inside it, assert on the result outside. */
@@ -234,7 +241,8 @@ const hiddenTabStream = (missed: true[]) =>
     restartMediaSession: () => null,
     showTab: () => {},
     focusSessionNote: () => {},
-    chatMissedWhileHidden: () => missed.push(true)
+    chatMissedWhileHidden: () => missed.push(true),
+    forceReloadRequested: () => {}
   });
 
 describe('the two receivers reach the page', () => {
@@ -289,6 +297,47 @@ describe('the two receivers reach the page', () => {
       data: JSON.stringify({ channel: 'chat', data: { senderId: 99 } })
     });
     expect(invalidateAll).not.toHaveBeenCalled();
+  });
+
+  /*
+    `forceReload` ASKS, and it disconnects before it asks.
+
+    Until 2026-08-23 this handler was a bare `location.reload()`: a presenter pressed the button and
+    the member's page went, mid-sentence, with no warning. The reference does neither of those
+    things — byte 995901 is `case "forceReload": e.disconnect(), e.appEventBus.emit("forceReload")`
+    and its subscriber at byte 2597102 is `bootbox.alert("You need to reload this page to continue",
+    () => window.location.reload())`. Both offsets were read in the bundle, not searched for.
+
+    Nothing in this file can assert the DIALOG — that is the page's, and `create-room` wires it. What
+    is asserted here is the half the stream owns: it closes, then it asks, and it asks only the
+    member the frame names.
+  */
+  it('a forceReload addressed to this member closes the channel and ASKS', () => {
+    const { stream, reloadAsked } = make();
+    stream.subscribe();
+    FakeEventSource.last?.fire('message', {
+      data: JSON.stringify({ channel: 'privCmds', data: { cmd: 'forceReload', targetUserId: 1 } })
+    });
+    expect(reloadAsked, 'the receiver ran exactly once').toHaveLength(1);
+    expect(
+      reloadAsked[0],
+      'and the channel was ALREADY closed when it did — disconnect precedes the ask'
+    ).toBe(true);
+  });
+
+  it('and a forceReload aimed at somebody else is ignored entirely', () => {
+    /*
+      The addressing guard. `privCmds` is per-member upstream (`/privCmdsIn/{uid}-{id}/`) while this
+      room's stream is per-ROOM, so the `targetUserId` test is the only thing standing between one
+      presenter reloading one member and reloading everybody at once.
+    */
+    const { stream, reloadAsked } = make();
+    stream.subscribe();
+    FakeEventSource.last?.fire('message', {
+      data: JSON.stringify({ channel: 'privCmds', data: { cmd: 'forceReload', targetUserId: 99 } })
+    });
+    expect(reloadAsked, 'not this member').toEqual([]);
+    expect(FakeEventSource.last?.closed, 'and their channel stays up').toBe(false);
   });
 
   it('a room-wide video moves a non-presenter through the tab receiver', () => {

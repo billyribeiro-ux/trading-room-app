@@ -130,13 +130,7 @@ export class RoomPrefs {
     );
 
     /**
-     * `preferences.recordingStartSound` / `recordingStopSound` - whether this listener hears the room
-     * start and stop media.recording. Both default ON: the capture's checks are
-     * `!doNotDisturbOn && preferences.recordingStartSound && ...`, so an unset preference would
-     * silence a cue the room is meant to give everyone.
-     */
-    /**
-     * The four per-viewer halves of the join/leave gates (`app-room.full.js:2137-2153`).
+     * The four per-viewer halves of the join/leave gates (bundle byte 2507680).
      *
      * Default ON, for the same reason `recordingStartSound` does: the reference's checks are
      * `sessData.X && preferences.Y && …`, so an unset preference would silence a cue the ROOM has
@@ -151,9 +145,14 @@ export class RoomPrefs {
     this.#beepOnUserLeave = $state(loadedSettings.beepOnUserLeave !== false);
 
     /**
-     * `preferences.chatBadges` — the VIEWER's half of the badge gate, distinct from the owner's
-     * `enableBadges`. Ships `!0`, so `!== false`.
+     * `preferences.trimChatLogs` — "Reduce chat log memory", the settings modal's own label.
+     *
+     * `!== false`: the blob ships it ON, and it is the safer default in a room this one cannot bound
+     * — see the note on `visibleChatMessages`. Upstream trims one message per arrival; ours caps the
+     * derived view, which reaches the same steady state and also bounds the DOM.
      */
+    this.#trimChatLogs = $state(loadedSettings.trimChatLogs !== false);
+
     /**
      * `preferences.chatPopup` — a toast and a browser notification when somebody mentions you.
      *
@@ -165,17 +164,12 @@ export class RoomPrefs {
      * `!== false`, because the blob ships it on with its siblings and a viewer who has never opened
      * the settings modal should be told when they are addressed by name.
      */
-    /**
-     * `preferences.trimChatLogs` — "Reduce chat log memory", the settings modal's own label.
-     *
-     * `!== false`: the blob ships it ON, and it is the safer default in a room this one cannot bound
-     * — see the note on `visibleChatMessages`. Upstream trims one message per arrival; ours caps the
-     * derived view, which reaches the same steady state and also bounds the DOM.
-     */
-    this.#trimChatLogs = $state(loadedSettings.trimChatLogs !== false);
-
     this.#chatPopup = $state(loadedSettings.chatPopup !== false);
 
+    /**
+     * `preferences.chatBadges` — the VIEWER's half of the badge gate, distinct from the owner's
+     * `enableBadges`. Ships `!0`, so `!== false`.
+     */
     this.#chatBadges = $state(loadedSettings.chatBadges !== false);
 
     /**
@@ -215,6 +209,12 @@ export class RoomPrefs {
      */
     this.#alwaysScrollToBottom = $state(loadedSettings.alwaysScrollToBottom === true);
 
+    /**
+     * `preferences.recordingStartSound` / `recordingStopSound` - whether this listener hears the room
+     * start and stop media.recording. Both default ON: the capture's checks are
+     * `!doNotDisturbOn && preferences.recordingStartSound && ...`, so an unset preference would
+     * silence a cue the room is meant to give everyone.
+     */
     this.#recordingStartSound = $state(loadedSettings.recordingStartSound !== false);
 
     this.#recordingStopSound = $state(loadedSettings.recordingStopSound !== false);

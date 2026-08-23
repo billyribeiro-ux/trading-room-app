@@ -354,9 +354,32 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       re-broadcast, and why `presenterRoom()` rather than the client decides authority. The
       alternative on offer was an extraction invented to satisfy a number, which is the thing
       this file exists to prevent.
+
+      LOWERED 903 -> 900 on 2026-08-23, which is the ratchet's other half working exactly as the
+      header describes: extract a slice, then lower the number to what the file now measures.
+
+      The extraction was NOT invented to satisfy a number, and the evidence is this class's own
+      docblock: it calls itself a ROUTER that owns almost nothing and routes each frame "to the class
+      that owns the state it changes". The join/leave announcement was the one block in 903 lines
+      that did not route — a join changes no state, so it had no owner and four gates, two toast
+      skins and two sounds had grown here instead. It is now `#lib/arrival-announcement.js`, a pure
+      module beside `alert-delivery.ts`, which answers the identical question for an arriving alert.
+
+      Twenty-two more lines were two ORPHANED docblocks in the constructor, describing `rosterCount`
+      and `archivesAvailableTo` — neither of which this class holds. They went to the code that owns
+      them. The gate that should have caught them could not see inside a function; it can now.
+
+      BOTH NUMBERS IN THAT CLASS DOCBLOCK WERE WRONG, and this is where the history lives rather
+      than in the file, which is what this entry is for. It read "eleven collaborators … four
+      fields"; the truth is SEVENTEEN and THREE. The first correction got the first one wrong a
+      second time by adding one to the stale number instead of counting the list, and this ceiling
+      is what caught the third draft — the fix had grown the file to 906 against the 900 just set.
+      The three fields are now NAMED in the docblock so the next reader can check the claim rather
+      than trust it. Nothing else in the toolchain can: a comment that miscounts the code beside it
+      compiles, type-checks and passes every test in this repository.
     */
-    max: 903,
-    why: 'the SSE router - 351 code lines under 468 of channel transcription'
+    max: 900,
+    why: 'the SSE router - six channels of transcription, and the one block that did not route has gone'
   },
   {
     file: 'lib/room/webcams.ts',
@@ -802,8 +825,15 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       reveal is the POINT of the dialog rather than a loading state, quoted from the capture's
       `setTimeout(..., 3e3)`. It now sits beside `#revealTimer`, where somebody minded to "make it
       instant" will read it before deleting the feature.
+
+      +4, 2026-08-23, with the owner's approval, and it is the SAME arrival case a third time. The
+      four lines say why `#count` exists at all: before the `/roster/` channel wrote it the badge
+      only ever showed the value baked in at page load, so a member joining or leaving never changed
+      it for anyone else. They were found ORPHANED inside `RoomEventStream`'s constructor, stacked
+      above an unrelated `$state` and describing nothing, and `events.svelte.ts` fell 903 -> 900 in
+      the same commit that moved them here.
     */
-    max: 338,
+    max: 342,
     why: 'the live roster, its four header controls, the badge count and the random draw'
   },
   {
@@ -854,8 +884,32 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
   },
   {
     file: 'lib/room/dialogs.svelte.ts',
-    max: 115,
-    why: 'the three bootbox dialogs, which STACK and therefore stay three fields'
+    /*
+      RAISED 115 -> 174 on 2026-08-23, with the owner's explicit approval, for the alert's DISMISSAL
+      CALLBACK. Recorded as a decision rather than edited quietly, because a raise is a conversation.
+
+      What it bought: `forceReload` reloaded a member's page instantly, mid-sentence, with no
+      disconnect and no warning. The reference does neither — byte 995901 is `case "forceReload":
+      e.disconnect(), e.appEventBus.emit("forceReload")` and its subscriber at byte 2597102 is
+      `bootbox.alert("You need to reload this page to continue", () => window.location.reload())`.
+      The room could not express that at all: `alert` was a bare string and only `confirm` carried a
+      handler, so the receiver had nowhere to put "and reload when they say so" and reloaded.
+
+      EXTRACTION WAS THE FIRST ANSWER TRIED, and it is what unblocked the other two files in this
+      change — `events.svelte.ts` came down 903 -> 900 by moving the join/leave announcement out.
+      It is not available here. The file's own head argues that the three dialogs must stay ONE class
+      because they STACK, and splitting the alert from its callback would separate two fields that
+      have to be written together. A 174-line file that is one primitive has no seam to find.
+
+      Roughly forty of the fifty-nine lines are prose, and none of it is padding: the four
+      `bootbox.alert(text, callback)` receivers read end to end at bytes 2596600-2597200 (three
+      reload, one re-authenticates — which is why the callback is a parameter rather than a disguised
+      flag), why `confirm()` was refused (it renders a Cancel button the reference never gives), and
+      the stale-callback trap that makes a plain assignment clear the field. That last one is
+      negative-controlled: delete the line and an ordinary "Message Saved" reloads the room.
+    */
+    max: 174,
+    why: 'the three bootbox dialogs, which STACK and therefore stay three fields; the alert carries a dismissal'
   },
   {
     file: 'lib/room/volume.svelte.ts',
@@ -953,7 +1007,33 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     why: 'everything that leaves the browser as content; five entry points, one refusal path'
   },
   {
+    file: 'lib/room/session-control.svelte.ts',
+    /*
+      Born capped, 2026-08-23, as the destination of an extraction rather than a new feature.
+
+      Eleven action names left `RoomUserActions` because they act on the ROOM and not on a user —
+      that class's own `why:` string says "everything that can be done TO a user", and locking a
+      session is not that. The seam was proven by the dependency surface before anything moved: the
+      whole family needs four collaborators, and touches no roster, no target user and no presenter
+      command.
+
+      The ceiling exists because the contract demands one for every module in `lib/room/`, and that
+      demand is the point: capping only the SOURCE of an extraction lets the destination sprawl
+      instead.
+    */
+    max: 135,
+    why: 'what a presenter does to the SESSION - lock, open, reset, close; eleven names, four collaborators'
+  },
+  {
     file: 'lib/room/user-actions.svelte.ts',
+    /*
+      LOWERED 749 -> 730 on 2026-08-23, when `RoomSessionControl` took eleven session action names
+      out of `handle()`. They act on the ROOM rather than on a user, which is what this entry's own
+      `why:` string had said all along.
+
+      The empty comment block that stood here until then was the file's only `prettier` failure, and
+      dead scaffolding of exactly the kind the root standard forbids.
+    */
     max: 730,
     why: 'everything that can be done TO a user; handle() alone was 249 lines on the page'
   },

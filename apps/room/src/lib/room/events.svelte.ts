@@ -1,5 +1,6 @@
 import { invalidate, invalidateAll } from '$app/navigation';
 
+import { resolveArrivalAnnouncement } from '#lib/arrival-announcement.js';
 import { isMtxStream } from '#lib/mtx-streams.js';
 import type { MtxStreamTabs } from '#lib/room-mtx.svelte.js';
 import { formatUserLocation } from '#lib/roster-gates.js';
@@ -25,36 +26,7 @@ interface EventStreamSession {
 
 /** `setTimeout(…, 3e3)`. */
 const RECONNECTED_FLASH_MS = 3000;
-/**
- * The room's REALTIME CHANNEL, and the browser-side geolocation that rides beside it.
- *
- * Phase 5 slice 5. `subscribeToRoomEvents` was 575 lines — the single largest function left on the
- * page after slice 4 — and it is one subject: every frame the server pushes arrives here and is
- * routed, on six channels, to the class that owns the state it changes.
- *
- * **It is a ROUTER, and it owns almost nothing.** That is the shape, not an accident of extraction:
- * eleven collaborators are injected and exactly four fields travel, all four describing the
- * CONNECTION rather than the room. A frame about a poll answer does not teach this class what a
- * poll is; it calls `invalidateAll()` and the loader decides. That is why the file is 700 lines of
- * transcription and barely any state.
- *
- * **`invalidate` rather than a local push**, wherever the payload could have been believed: the
- * alert list is server-derived — it carries the sender's avatar, role and evidence state, joined in
- * `+page.server.ts` — so refetching keeps one source of truth instead of two shapes of the same
- * row. The event is the TRIGGER, not the payload. `changeChatMode` carries the new mode and it is
- * deliberately not read, because trusting it would put room policy in the gift of whatever arrives
- * on a socket.
- *
- * **`createSubscriber` was evaluated here and REJECTED, which is the opposite of what the phase
- * plan proposed, so the reason is recorded rather than the conclusion.** `roomEventsConnected` is
- * a getter over an external source and looked like the one honest candidate in this file. The docs
- * decide it: *"the returned teardown function will only be called when all effects are destroyed."*
- * That is correct for `MediaQuery`, whose `matchMedia` is free to re-create, and wrong here — it
- * would tie the life of the room's realtime connection to whether anything happens to be reading
- * the sidebar's indicator. The stream must run whether or not anyone is watching the light. A
- * `$state` field written by the two handlers we already own is both simpler and correct, and
- * `createSubscriber` is for integrating state you do NOT own.
- */
+
 /*
   Three collaborators arrive as the NARROW SURFACE the stream uses, not as their whole class.
 
@@ -81,6 +53,41 @@ interface FollowStyleSource {
   readonly followedUsers: Record<string, { followChatStyle?: { playSound?: boolean } } | undefined>;
 }
 
+/**
+ * The room's REALTIME CHANNEL, and the browser-side geolocation that rides beside it.
+ *
+ * Phase 5 slice 5. `subscribeToRoomEvents` was 575 lines — the single largest function left on the
+ * page after slice 4 — and it is one subject: every frame the server pushes arrives here and is
+ * routed, on six channels, to the class that owns the state it changes.
+ *
+ * **It is a ROUTER, and it owns almost nothing.** That is the shape, not an accident of extraction:
+ * seventeen collaborators are injected and exactly three fields travel, all three describing the
+ * CONNECTION rather than the room — `roomEventsConnected`, `hasConnectedBefore`, `reconnectedFlash`.
+ * A frame about a poll answer does not teach this class what a poll is; it calls `invalidateAll()`
+ * and the loader decides. That is why the file is mostly transcription and barely any state.
+ *
+ * That rule is also what sent the join/leave announcement to `#lib/arrival-announcement.js` on
+ * 2026-08-23: it was the one block here that did not route, because a join changes no state and so
+ * has no owner to route it to. Four gates, two toast skins and two sounds were being decided in a
+ * router. The rule was already written down; the block simply predated it being applied.
+ *
+ * **`invalidate` rather than a local push**, wherever the payload could have been believed: the
+ * alert list is server-derived — it carries the sender's avatar, role and evidence state, joined in
+ * `+page.server.ts` — so refetching keeps one source of truth instead of two shapes of the same
+ * row. The event is the TRIGGER, not the payload. `changeChatMode` carries the new mode and it is
+ * deliberately not read, because trusting it would put room policy in the gift of whatever arrives
+ * on a socket.
+ *
+ * **`createSubscriber` was evaluated here and REJECTED, which is the opposite of what the phase
+ * plan proposed, so the reason is recorded rather than the conclusion.** `roomEventsConnected` is
+ * a getter over an external source and looked like the one honest candidate in this file. The docs
+ * decide it: *"the returned teardown function will only be called when all effects are destroyed."*
+ * That is correct for `MediaQuery`, whose `matchMedia` is free to re-create, and wrong here — it
+ * would tie the life of the room's realtime connection to whether anything happens to be reading
+ * the sidebar's indicator. The stream must run whether or not anyone is watching the light. A
+ * `$state` field written by the two handlers we already own is both simpler and correct, and
+ * `createSubscriber` is for integrating state you do NOT own.
+ */
 export class RoomEventStream<Entry> {
   #roomEventsConnected: boolean;
   #hasConnectedBefore: boolean;
@@ -123,6 +130,17 @@ export class RoomEventStream<Entry> {
      * `followedUsers`.
      */
     chatMissedWhileHidden: () => void;
+    /**
+     * A presenter forced this member to reload, and the member has not been told yet.
+     *
+     * A RECEIVER rather than a `location.reload()` here, because the reference does not reload — it
+     * ASKS. Byte 995901: `case "forceReload": e.disconnect(), e.appEventBus.emit("forceReload")`,
+     * and the subscriber at byte 2597102 is
+     * `bootbox.alert("You need to reload this page to continue", () => window.location.reload())`.
+     * The dialog belongs to `RoomDialogs` and the page owns both, so the decision to raise one is
+     * not this router's to make — the same reasoning `showTab` and `focusSessionNote` carry.
+     */
+    forceReloadRequested: () => void;
   }) {
     this.#prefs = options.prefs;
     this.#toasts = options.toasts;
@@ -140,30 +158,9 @@ export class RoomEventStream<Entry> {
     this.#showTab = options.showTab;
     this.#chatMissedWhileHidden = options.chatMissedWhileHidden;
     this.#focusSessionNote = options.focusSessionNote;
+    this.#forceReloadRequested = options.forceReloadRequested;
 
-    /**
-     * Live connected count, from `/sess/{id}/roster/`.
-     *
-     * `handleRosterCmd` sets `globals.rosterCount = parseInt(i.data)` and the header badge renders
-     * it. Seeded from the server-rendered roster so the badge is right before the first event
-     * arrives, then kept current by the channel - previously it only ever showed the value baked in
-     * at page load, so a member joining or leaving never changed it for anyone else.
-     */
     /** Whether the SSE channel is up. The sidebar's "Chat" line reports it. */
-    /**
-     * `archivesAvailableTo()`, transcribed:
-     *
-     * ```js
-     * return isPresenter && !media.limitedPresenter
-     *   ? !(sessData.showArchivesToSpecificPresenters &&
-     *       !sessData.showArchivesToSpecificPresenters.includes(user.email))
-     *   : !(!sessData.showArchivesToUsers || user.denyArchivesAccess);
-     * ```
-     *
-     * A full presenter gets archives unless an explicit allowlist exists and leaves them out;
-     * everyone else needs the session to have opened archives to users AND not be individually
-     * denied. Ours showed Archives to everybody unconditionally.
-     */
     this.#roomEventsConnected = $state(false);
 
     /**
@@ -196,6 +193,7 @@ export class RoomEventStream<Entry> {
   readonly #restartMediaSession: () => (() => Promise<void>) | null;
   readonly #showTab: (tab: 'screens' | 'videoplayer') => void;
   readonly #chatMissedWhileHidden: () => void;
+  readonly #forceReloadRequested: () => void;
 
   get connected(): boolean {
     return this.#roomEventsConnected;
@@ -570,9 +568,14 @@ export class RoomEventStream<Entry> {
       }
 
       /*
-        `/roster/` - `handleRosterCmd`'s only load-bearing case:
-          case "getRosterCount": this.globals.rosterCount = parseInt(i.data)
-        Its sibling `getRosterQueue` logs and does nothing else, so it is not reproduced.
+        `/roster/` - `handleRosterCmd`, whose three load-bearing cases are `getRosterCount`,
+        `getRoster` and the `onUserJoin` / `onUserLeave` pair. Its fourth, `getRosterQueue`, logs and
+        does nothing else, so it is not reproduced.
+
+        This sentence read "its ONLY load-bearing case" until 2026-08-23, having been written when
+        the count was the only one handled; the other two arrived under it and it was never
+        corrected. Recorded rather than silently fixed, because a comment that describes the code it
+        used to sit above is the failure mode the whole comment discipline here exists to catch.
       */
       if (payload.channel === 'roster') {
         /*
@@ -596,55 +599,29 @@ export class RoomEventStream<Entry> {
           this.#roster.countArrived(frame.data);
         }
         /*
-          `onUserJoin` / `onUserLeave` — `app-room.full.js:2134-2155`, verbatim in shape:
+          `onUserJoin` / `onUserLeave`. The four gates, the two toast skins, the two strings and the
+          transcribed `beepOnUserJoin` quirk are all in `#lib/arrival-announcement.js`, with the
+          bundle offsets they were read from — this is the one frame on any channel that changes no
+          state, so there was no class to route it to and the decision had grown here instead.
 
-            isPresenter && user.userXrefID !== i.userXrefID && (
-              sessData.userJoinAndLeavePopup && preferences.popupOnUserJoin
-                && alertsService.info(`${i.nick} logged in.`),
-              sessData.beepOnUserJoin && preferences.beepOnUserJoin
-                && !preferences.doNotDisturbOn && soundEffectsService.userJoin.play())
-
-          Four things about that are load-bearing:
-
-          * PRESENTER ONLY. A member is not told who came and went.
-          * NEVER YOURSELF — `user.userXrefID !== i.userXrefID`. Opening the room would otherwise
-            announce your own arrival to you.
-          * TWO GATES PER EFFECT, and they are different gates. The popup needs the ROOM setting
-            `userJoinAndLeavePopup` and the VIEWER preference `prefs.popupOnUserJoin`; the beep needs the
-            room's `prefs.beepOnUserJoin` and the viewer's `prefs.beepOnUserJoin`. An owner can turn the feature
-            off for the room, and a presenter can turn it off for themselves.
-          * `info` for a join, `warning` for a leave — the reference uses two different toast skins,
-            and the strings are "logged in." / "logged out." with the full stop.
-
-          THE QUIRK, reproduced: the LEAVE beep reads `sessData.beepOnUserJoin`, not a
-          `prefs.beepOnUserLeave` room setting. There is no such room setting upstream — only the viewer
-          preference is per-direction. Transcribed rather than tidied.
+          What is left is the routing this file is for: match the frame, ask, deliver.
         */
         if (
           (frame?.cmd === 'onUserJoin' || frame?.cmd === 'onUserLeave') &&
           typeof frame.userId === 'number'
         ) {
-          const joined = frame.cmd === 'onUserJoin';
-          if (!this.#isPresenter() || frame.userId === this.#session().user.id) return;
-          const nick = typeof frame.nick === 'string' ? frame.nick : '';
-
-          if (
-            this.#session().sessData?.userJoinAndLeavePopup &&
-            (joined ? this.#prefs.popupOnUserJoin : this.#prefs.popupOnUserLeave)
-          ) {
-            this.#toasts.show({
-              kind: joined ? 'info' : 'warning',
-              message: `${nick} logged ${joined ? 'in' : 'out'}.`,
-              enableHtml: false
-            });
-          }
-          if (
-            this.#session().sessData?.beepOnUserJoin &&
-            (joined ? this.#prefs.beepOnUserJoin : this.#prefs.beepOnUserLeave) &&
-            !this.#prefs.doNotDisturbOn
-          ) {
-            playSoundEffect(joined ? 'userJoin' : 'userLeave');
-          }
+          const announcement = resolveArrivalAnnouncement(
+            {
+              direction: frame.cmd === 'onUserJoin' ? 'join' : 'leave',
+              nick: typeof frame.nick === 'string' ? frame.nick : '',
+              isSelf: frame.userId === this.#session().user.id,
+              viewerIsPresenter: this.#isPresenter()
+            },
+            this.#session().sessData ?? {},
+            this.#prefs
+          );
+          if (announcement?.toast) this.#toasts.show(announcement.toast);
+          if (announcement?.sound) playSoundEffect(announcement.sound);
           return;
         }
         // `getRoster` -> `globals.roster`, which is what the sidebar list and
@@ -677,7 +654,27 @@ export class RoomEventStream<Entry> {
       if (payload.channel === 'privCmds') {
         const command = payload.data as { cmd?: string; targetUserId?: number } | undefined;
         if (command?.cmd === 'forceReload' && command.targetUserId === this.#session().user.id) {
-          location.reload();
+          /*
+            DISCONNECT FIRST, THEN ASK — the order is the reference's, at byte 995901:
+
+              case "forceReload": e.disconnect(), e.appEventBus.emit("forceReload")
+
+            and it is the opposite of its neighbour two cases along, `case "kickUser":
+            emit("kickPage", xe.msg), e.disconnect()`. Both were read in the same pass; the
+            asymmetry is upstream's and is reproduced rather than normalised.
+
+            Closing the stream before the dialog goes up is what makes the pause safe. The member
+            may sit on that alert for a minute, and a channel still delivering frames into a page
+            the server has already decided is stale would keep refetching and re-toasting behind
+            it. `source.close()` is the `EventSource` equivalent of `disconnect()` and is in scope
+            here because this handler is inside the closure that owns the stream.
+
+            Until 2026-08-23 this line was a bare `location.reload()`: no disconnect, no warning,
+            no dismissal. A member mid-sentence lost what they were typing with no notice.
+          */
+          source.close();
+          this.#forceReloadRequested();
+          return;
         }
         /*
           The capture's receiver toast for the unmute, verbatim: `Chat enabled`. It is a plain

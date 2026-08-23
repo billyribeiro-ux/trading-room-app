@@ -143,9 +143,62 @@ const blockComments = (source: string): Block[] => {
   for (let i = 0; i < end; i++) {
     const trimmed = lines[i].trim();
     if (open === null) {
-      // Zero or two spaces: a script's own top level, or a class body's — never inside a function.
-      const topLevel = /^ {0,2}\S/.test(lines[i]);
-      if (topLevel && trimmed.startsWith('/*') && !trimmed.endsWith('*/')) {
+      /*
+        INDENT IS NO LONGER A FILTER, and the narrowing it replaced had a measured cost.
+
+        This read `/^ {0,2}\S/` until 2026-08-23 — "zero or two spaces: a script's own top level, or
+        a class body's — never inside a function" — and THREE orphans were living in the gap it
+        left, all inside `RoomEventStream`'s constructor at four spaces. Two docblocks describing
+        `rosterCount` and `archivesAvailableTo`, neither of which this class holds, stacked on top of
+        a one-line note about the SSE flag and attached by the compiler to a `$state` they said
+        nothing about. Twenty-two lines of prose explaining two other files.
+
+        A constructor is a function, so the old filter was working exactly as documented. What the
+        documentation did not say is that a constructor is also where extractions leave things,
+        because that is where the declarations they moved used to be initialised.
+
+        Widening is safe because `isPoliced` already narrows on CONTENT rather than position: a
+        JSDoc, or a plain block citing a module. Prose inside a function body is overwhelmingly the
+        plain `/*` explaining the next statement, and that stays uncollected unless it names a
+        `#lib/room/…` path.
+
+        MEASURED, and the first draft of this very paragraph got the number wrong — it predicted
+        "the three orphans above and nothing else" before the suite had been run. The two widenings
+        found ELEVEN, in six files, and every one was real. Zero false positives:
+
+        * `prefs.svelte.ts` — THREE. `recordingStartSound`/`recordingStopSound` sat above the four
+          join/leave preferences; `chatBadges` and `chatPopup` sat above `trimChatLogs` with their
+          own assignments three and five lines further down, in the opposite order.
+        * `media-transport.svelte.ts` — THREE, two of which had travelled a long way. The
+          connection-toast transcription belonged on `serverConnected()` 540 lines below, and
+          `addRemoteScreen`'s entire docblock was in the constructor, 600 lines from the method,
+          which had none. The third was a superseded one-line duplicate on `localScreenProducerId`.
+        * `events.svelte.ts` — THREE, the ones that started this.
+        * `screens.svelte.ts` — ONE. The zoom docblock introduced `isFullScreenshare`.
+        * `user-actions.svelte.ts` — ONE. `#unmuteChat`'s seventeen-line docblock, the one carrying
+          why `invalidateAll()` is called by hand, had come to rest on `#announceThenSend`.
+
+        The count is written down because the prediction was wrong twice over, and a comment
+        asserting a measurement it did not take is the exact species of defect this file catches.
+      */
+      if (trimmed.startsWith('/*')) {
+        /*
+          A ONE-LINE BLOCK IS STILL A BLOCK, and skipping it is what hid the defect this widening
+          was written for.
+
+          The three orphans in `RoomEventStream`'s constructor were multi-line, one-line, multi-line
+          in that order. Both multi-line blocks were collected; the single-line docblock between
+          them was not, so it was absent from `commentLine` too — which made the scanner read it as
+          CODE and declare the pair healthy. The negative control for the indent widening went GREEN
+          against the exact defect that motivated it, which is the only reason this was found.
+
+          The length test excludes a bare block OPENER alone on its line, which starts a block
+          without closing it and must still be treated as an open rather than as a whole comment.
+        */
+        if (trimmed.endsWith('*/') && trimmed.length > 2) {
+          found.push({ start: i, end: i, jsdoc: trimmed.startsWith('/**') });
+          continue;
+        }
         open = i;
         jsdoc = trimmed.startsWith('/**');
       }

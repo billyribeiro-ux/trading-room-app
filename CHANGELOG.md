@@ -33,6 +33,165 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-23 12:12 EDT — `forceReload` asks before it reloads, and the orphan gate learns to see inside a function
+
+**Runtime impact: yes.** A presenter's `forceReload` no longer destroys a member's unsent message
+without warning, and eleven docblocks now describe the code they are attached to.
+
+**The defect.** `events.svelte.ts` answered a `forceReload` frame with a bare `location.reload()`.
+The reference does neither half of that. Both regions were READ rather than searched, and reading
+them returned things a search never would:
+
+- byte 995901 — `case"forceReload":e.disconnect(),e.appEventBus.emit("forceReload");break;`
+- byte 2597102 — `subscribe("forceReload",oe=>{bootbox.alert("You need to reload this page to
+  continue",()=>{window.location.reload()})})`
+
+So upstream **disconnects, warns, and reloads only when the member dismisses the dialog**. Ours took
+the page instantly, mid-sentence. Now the stream calls `source.close()` and then a
+`forceReloadRequested` receiver; `create-room` raises the captured alert and reloads on dismissal.
+The ordering is asserted at runtime by sampling whether the channel was already closed when the
+receiver ran — negative-controlled by swapping the two statements.
+
+**What reading the region added.** `bootbox.alert(message, callback)` is not a special case: FOUR
+receivers in one 600-byte span use it — the room reset, `openSession`, `forceReload`, and
+`permsChangeReload`, which navigates to `reAuthSessionTok` instead of reloading. Three reload and one
+does not, which is why the callback is a real parameter. The same pass over the `privCmdsIn` switch
+found six commands this room does not handle. Both are now TODO rows 11 and 12, with what is known
+and what is not; nothing was invented to fill them.
+
+**The ceiling was cleared by extraction, and only then by a raise.** All three files were at their
+caps. `events.svelte.ts` came down 903 → 900 — ceiling LOWERED — by two moves that were both real
+rather than invented to satisfy a number:
+
+- The **join/leave announcement** left for `#lib/arrival-announcement.ts`, a pure module beside
+  `alert-delivery.ts`, which answers the identical question for an arriving alert. The evidence for
+  the seam is the class's own docblock: it calls itself a ROUTER that routes each frame "to the class
+  that owns the state it changes", and a join changes no state, so four gates, two toast skins and
+  two sounds had grown in a router with nowhere to go. Thirteen cases now execute them, including the
+  transcribed quirk that the LEAVE beep reads the room's `beepOnUserJoin` — confirmed twice, at byte
+  2507680 in the handler and byte 2230981 where the settings pane renders that one flag for both rows.
+- Two **orphaned docblocks** describing `rosterCount` and `archivesAvailableTo`, neither of which
+  that class holds, went to the code that owns them.
+
+`dialogs.svelte.ts` had no extraction available — its own head argues the three dialogs must stay one
+class because they STACK — so **115 → 174 was taken as a decision with the owner** and recorded in the
+ceiling entry. `roster.svelte.ts` 338 → 342, also approved, for four lines that moved IN.
+
+**The gate that should have caught the orphans could not see inside a function**, and its own
+narrowing said so: `/^ {0,2}\S/`, *"never inside a function"*. A constructor is a function, and a
+constructor is exactly where extractions leave things. Widening it found six more orphans in three
+files. Then the negative control for that widening went GREEN against the very defect that motivated
+it — single-line blocks were never collected, so one sitting between two orphans read as CODE and
+masked them. Closing that found two more. **Eleven orphans, six files, zero false positives**, and
+the paragraph recording the count says plainly that its first two drafts predicted the wrong number.
+
+Two pre-existing defects were cleared on the way past, both mine from the previous commit: a dead
+`#savePreference` field left behind by the `RoomSessionControl` extraction (eslint had been failing on
+it), and an empty comment block that was `source-size-contract.test.ts`'s only prettier failure.
+
+**Verified:** `vitest run` **2,612 passing across 186 files** (from 2,592/185); `svelte-check`
+**1,230 files, 0 errors, 0 warnings**; `eslint` and `prettier --check` clean on all seventeen touched
+files. Svelte MCP consulted and `svelte-autofixer` run on the `RoomOverlays` change. Five negative
+controls seen RED and reverted: the DND/popup split, the per-direction preference, the
+disconnect-before-ask ordering, the stale-callback clear, and both halves of the orphan gate. **Not
+verified:** no browser has watched the dialog appear — the runtime confirmation in a real room is the
+owner's, and it is recorded as owed rather than claimed.
+
+
+### 2026-08-23 11:08 EDT — state of the repository, and the ratchet reaching its designed limit
+
+**Runtime impact: no.** A status entry plus one measurement, written because the measurement changes
+what the next piece of work has to be.
+
+**SHIPPED TO `main` TODAY, all verified and negative-controlled:** the controller's permanent mute
+that was loaded and never read; private chat, which had no mute gate of either kind; the
+`focusOnSessionNote` controls that brought nobody; a deny-by-default gate over the whole user-action
+dispatch surface; and the `TODO.md` audit that found eleven dead controls where two were recorded.
+
+**ON THE BRANCH, green and awaiting merge:** `forceReload` — a working action and a working receiver
+that nothing joined, next to a button that raised "Reload request sent OK" and sent nothing — plus
+the `RoomSessionControl` extraction that made room for it. **2,592 tests / 185 files**, `svelte-check`
+**1,228 / 0 / 0**, and **no ceiling was raised** to get there.
+
+**THE MEASUREMENT, and it is the useful part of this entry.** The next fix — `forceReload` reloads a
+member's page with no warning, where the reference disconnects, warns, and reloads only on dismissal
+(bytes 995901 and 2597102) — touches three files, and every one is EXACTLY at its ceiling:
+`events.svelte.ts` 903/903, `RoomOverlays.svelte` 769/769, `dialogs.svelte.ts` 115/115.
+
+`events.svelte.ts` was then checked for slack rather than assumed to have none: **zero unused imports,
+zero consecutive blank lines**. There is nothing to reclaim.
+
+**That is the ratchet working exactly as designed, not a fault.** Three caps reached at once is the
+system saying the next change to this area pays down size debt BEFORE it adds behaviour. Raising a
+number is not available — that rule was tested today and the two raises made on inference were
+reverted — and shortening a comment never was.
+
+**The seam is measured and waiting.** `events.svelte.ts` dispatches six channels: `cmds` 314 lines,
+`chat` 150, `roster` **93**, `privChat` 43, `privCmds` 34, `cmdsAdmin` 7. The roster block is
+self-contained and needs five collaborators (`isPresenter`, `prefs`, `roster`, `session`, `toasts`),
+so it is the candidate — 93 lines against the ~8 the warning fix needs. Same shape as the extraction
+that took `RoomUserActions` from 749 to 708 earlier today, and that one shipped clean.
+
+**Ten items are open and each says what it needs**, in `TODO.md` under *OPEN RIGHT NOW*. Two are
+blocked on a decision rather than on work: the extraction above, and whether to diverge from a
+captured string for the two controls that promise a server command and only refetch locally — where
+the wire names are now known (`refreshRoster`, `softResetSession`, bytes 2169139 and 2167060) but the
+SERVER half is not in the room bundle, so building it would be inventing.
+
+### 2026-08-23 10:58 EDT — session control leaves RoomUserActions, because the contract said extract and I had asked a question it already answered
+
+**Runtime impact: no.** Eleven action names moved between modules and behave identically. What changed
+is that `forceReload` can now ship, and that no ceiling was raised to let it.
+
+**The decision was already written down.** I had asked which of "raise" or "extract" you wanted, and
+`source-size-contract.test.ts` states it in its own failure message: *"extract a slice into a module
+or component rather than raising this number."* Asking was the error; two raises I had made on
+inference were reverted first.
+
+**The seam was proven before anything moved.** `RoomUserActions`'s own ceiling entry calls it
+"everything that can be done TO a user", and locking a session is not that. The evidence is the
+DEPENDENCY SURFACE: eleven names need four collaborators — `dialogs`, `closeModal`, `reload`,
+`savePreference` — and touch no roster, no target user, no presenter command, no `localStorage` key,
+none of the muted or followed lists. A group that takes a quarter of its old home's collaborators
+with it was already a separate thing. **749 → 708**, under its untouched 730.
+
+**Reading the boundaries is what saved it.** `session-send-video` is a session action by name and did
+NOT move: it is nested inside another action's prompt callback rather than being a branch of its own,
+so a mechanical cut on `if (action === …)` would have taken half and orphaned the rest.
+`session-lock-kick` and `session-hard-reset-revoke` are second names inside their siblings'
+conditions and travelled intact with them.
+
+**`handle` returns a boolean so `ModalHost` keeps ONE door.** Splitting `onUserAction` at the call
+site would make the caller decide which class owns a string — the coupling that made "Bring everyone
+here" a lie. `false` means "not mine", never "nothing happened".
+
+**THREE GATES CAUGHT ME, and each was right.**
+
+* The **disposition contract** read one dispatcher, so every moved action reported as "dispatched
+  into the void" — a defect report about working code. It now reads both; a gate that does not follow
+  an extraction goes red on the refactor and green on the regression.
+* **`remote-call-sites`** refused a namespace import, then refused split import statements. It looks
+  400 characters before the FIRST occurrence of a module specifier, so both defeat the check that
+  every remote function has a caller — and that check exists because `presenterCommand` shipped dead
+  for three commits. Single named import restored, and the two lines found elsewhere.
+* **`unbound-method-contract`** demanded the new class join its registry.
+
+**And the last two lines came from a real simplification rather than a trim.** `create-room` was two
+over. The reorder that would have removed a forward reference turned out to cascade — `notes` depends
+on `modals`, which is built after `roomEvents` — so it was abandoned on the evidence rather than
+forced. What worked: `unmuteChat` was imported under an alias it never needed, since nothing else in
+that file binds the name. Dropping it let all four `commands` properties become shorthand, and the
+object then fit on one line: **six lines to one**, 1088 → 1083.
+
+**Verified.** Room **2,592 tests / 185 files**, `svelte-check` **1,228 files, 0 errors, 0 warnings**,
+`eslint` and `prettier` clean. `RoomSessionControl` is capped on arrival. Four contracts were
+re-pointed at the code that now owns their subject rather than deleted — `unmute-chat`'s three
+assertions, and the room-class registry.
+
+**One defect of mine, caught by the type checker.** Re-pointing an assertion, I substituted a
+TypeScript signature into the middle of a string literal and broke the file's parse. Eight errors,
+all mine, all from one careless replace.
+
 ### 2026-08-23 10:18 EDT — two real bugs fixed: a permanent mute that did nothing, and a second "Bring everyone here" that brought nobody
 
 **Runtime impact: yes, twice.** A member muted indefinitely by the owner can no longer post, and the
@@ -102,7 +261,7 @@ WHY — the capture byte offsets, the loop-guard proof, and why the server rathe
 authority. The alternative on offer was an extraction invented to satisfy a number, which is the
 thing that file exists to prevent.
 
-**Verified.** Room **2,587 tests / 185 files**, `svelte-check` **1,227 files, 0 errors, 0 warnings**,
+**Verified.** Room **2,588 tests / 185 files**, `svelte-check` **1,227 files, 0 errors, 0 warnings**,
 `eslint` and `prettier` clean on every touched file. The mute fix adds three cases to
 `message-alert-action-contract.test.ts` — refused on send, refused on REPLY (that asymmetry has
 already happened once in that file), and an UNMUTED positive control, because two "refused"
@@ -114,7 +273,19 @@ both refusal cases red while the other 22 stay green; the note sender reverted t
 send assertion red; the menu item put back on `onSelect` → the wiring assertion red; the receiver made
 to re-broadcast → the loop-guard assertion red.
 
-**Six more defects are investigated and recorded in `TODO.md` rather than fixed**, each with what it
+**AND `forceReload` IS NOW WIRED — two defects that cancelled into silence.** A form action and a
+receiver had both shipped with NOTHING joining them (`forceReload` appeared in the actions export and
+zero times as a caller — the `presenterCommand` shape that shipped dead for three commits), while the
+"Force Reload" button dispatched a key of `EXACT_ALERTS` and so raised *"Reload request sent OK"* and
+sent nothing. Each defect hid the other: nobody misses a wire nothing calls, and nobody doubts a
+button that reports success. It is now a real addressed command in `presenter-commands.remote.ts`,
+`publishToUsers` rather than a broadcast for the reason its sibling gives — moderation state about a
+named individual is not the room's business. **`EXACT_ALERTS` drops from five entries to four**, the
+second ever removed after `unmute-chat`; the orphaned form action is deleted, taking the actions
+export from nineteen to eighteen. Pinned by an executable assertion that the TARGET is reloaded and
+not the caller, and caught independently by the disposition gate — negative-controlled.
+
+**Five more defects are investigated and recorded in `TODO.md` rather than fixed**, each with what it
 would cost: `save-permissions`, `forceReload`, the two false "command sent" messages, `doChatLogSearch`,
 and `admin-notes-password`. `kick-duplicates` is the one that CANNOT be fixed without inventing — the
 reference's own implementation was read and its positive arm needs a kick this room cannot perform.

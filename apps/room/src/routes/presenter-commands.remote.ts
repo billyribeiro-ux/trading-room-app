@@ -116,6 +116,35 @@ export const focusOnScreen = command(z.string().trim().min(1), async (screenId) 
  * `.positive()` because `notes.id` is an autoincrement primary key, so every real note is >= 1 — the
  * same bound `presenterCommand` puts on `targetUserId`, and the equivalent of the reference's `e &&`.
  */
+/**
+ * `forceReload` — a presenter reloads one member's browser.
+ *
+ * ## Both ends existed and NOTHING joined them
+ *
+ * A form action at `+page.server.ts:1318` and a receiver at `events.svelte.ts` had been shipped, and
+ * no call site connected them: `forceReload` appeared nineteen times in the actions export and zero
+ * times as a caller. Meanwhile the "Force Reload" button dispatched `force-reload`, a key of
+ * `EXACT_ALERTS`, so it raised *"Reload request sent OK"* and sent nothing at all.
+ *
+ * That is two defects that cancel each other into silence: a working wire nobody used, and a control
+ * that lied about using it. Joined 2026-08-23 — the button now reaches this, the alert is gone from
+ * that table, and the orphaned form action is deleted.
+ *
+ * ## Addressed, not broadcast
+ *
+ * `publishToUsers`, for the reason `presenterCommand` gives directly above: the frame is meaningful
+ * to exactly one member, and telling the whole room that a named person is being reloaded is
+ * moderation state about an individual that is not the room's business. `privCmds` is the channel
+ * the capture uses — `/sess/{id}/privCmdsIn/{uid}-{id}/` — and the receiver already reads it.
+ */
+export const forceReload = command(z.number().int().positive(), async (targetUserId) => {
+  ensureDatabase();
+  publishToUsers(presenterRoom(), [targetUserId], {
+    channel: 'privCmds',
+    data: { cmd: 'forceReload', targetUserId }
+  });
+});
+
 export const focusOnSessionNote = command(z.number().int().positive(), async (noteId) => {
   ensureDatabase();
   publishToRoom(presenterRoom(), { channel: 'cmds', data: { cmd: 'focusOnSessionNote', noteId } });
