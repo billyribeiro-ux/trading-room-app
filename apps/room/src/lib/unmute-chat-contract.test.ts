@@ -38,6 +38,11 @@ const server = readFileSync(new URL('../routes/+page.server.ts', import.meta.url
   read `PAGE`, because that is still where the argument is built.
 */
 const ROOT = readFileSync(new URL('./room/create-room.svelte.ts', import.meta.url), 'utf8');
+/** `RoomPrivateCommands` — the addressed channel, and the one gate that makes it addressed. */
+const privCmdsCode = readFileSync(
+  new URL('./room/private-commands.svelte.ts', import.meta.url),
+  'utf8'
+);
 /** `RoomChatMute` — the browser half, both directions and both ends, since 2026-08-23. */
 const chatMuteCode = readFileSync(new URL('./room/chat-mute.svelte.ts', import.meta.url), 'utf8');
 /** `applyChatMute` — the one insert and the one announcement, which both doors call. */
@@ -122,11 +127,9 @@ describe('the unmute reaches the server', () => {
       them than before — the composition root's import, the root's hand-off into `commands`, and the
       slice's own call — because a re-point is the moment to assert the hand-off as well.
     */
-    expect(chatMuteCode).toContain(
-      'await this.#commands.unmuteChat({ targetUserId });'
-    );
+    expect(chatMuteCode).toContain('await this.#commands.unmuteChat({ targetUserId });');
     expect(userActions, 'and the class that used to own it now delegates').toContain(
-      "if (this.#chatMute.handle(action, user.id)) return;"
+      'if (this.#chatMute.handle(action, user.id)) return;'
     );
     // The endpoint-as-a-magic-string this replaced. Its return is what nobody had to check.
     expect(pageCode).not.toContain("fetch('?/unmuteChat'");
@@ -251,9 +254,10 @@ describe('the mute is ANNOUNCED, not only enforced', () => {
   it('decides the authority on the server, exactly as the unmute does', () => {
     // A member who POSTs this endpoint directly must get a 403, not the power to silence somebody.
     const start = remoteCode.indexOf('export const muteChat');
-    expect(start, 'the mute command was FOUND before anything was sliced out of it').toBeGreaterThan(
-      -1
-    );
+    expect(
+      start,
+      'the mute command was FOUND before anything was sliced out of it'
+    ).toBeGreaterThan(-1);
     const end = remoteCode.indexOf('export const unmuteChat', start);
     expect(end).toBeGreaterThan(start);
     expect(remoteCode.slice(start, end)).toContain(
@@ -262,18 +266,29 @@ describe('the mute is ANNOUNCED, not only enforced', () => {
   });
 
   it('only reacts on the addressed member, and re-runs the loader', () => {
-    expect(streamCode).toContain(
-      "if (command?.cmd === 'muteChat' && command.targetUserId === this.#session().user.id) {"
-    );
     /*
       The reload moved WITH the receiver. It is asserted on the slice that now performs it rather
       than on the router that dispatches to it — a test still looking for it in the router would go
       red for a refactor that changed no behaviour, which is the failure mode this file's own note
       about `cmd: 'forceReload' | 'unmuteChat'` records.
     */
-    const branch = streamCode.indexOf("command?.cmd === 'muteChat'");
+    /*
+      RE-POINTED 2026-08-23: the whole addressed channel moved to `RoomPrivateCommands`, and the
+      `targetUserId` test moved with it — from four copies, one per branch, to ONE early return.
+
+      That is why this now asserts the GATE separately from the BRANCH. The old form could only say
+      "this branch tests the target"; the new form says "no branch on this channel is reachable
+      without the test", which is the property that actually matters and which no per-branch
+      assertion could ever establish.
+    */
+    expect(privCmdsCode).toContain('if (command.targetUserId !== this.#viewerId()) return false;');
+    const branch = privCmdsCode.indexOf("command.cmd === 'muteChat'");
     expect(branch, 'the branch was FOUND before its body was read').toBeGreaterThan(-1);
-    expect(streamCode.slice(branch, branch + 300)).toContain('this.#chatMute.muted(command.mutedTill);');
+    expect(privCmdsCode.slice(branch, branch + 200)).toContain(
+      'this.#chatMute.muted(command.mutedTill);'
+    );
+    // ...and the router still recognises the channel and hands it over with a way to disconnect.
+    expect(streamCode).toContain('this.#privateCommands.handle(');
     const muted = chatMuteCode.indexOf('muted(mutedTill: unknown): void {');
     expect(muted).toBeGreaterThan(-1);
     expect(chatMuteCode.slice(muted, muted + 200)).toContain('void invalidateAll();');
@@ -300,9 +315,12 @@ describe('the member is told, on the channel meant for one member', () => {
 
   it('only reacts on the addressed member', () => {
     // The receiving dispatch moved to `RoomEventStream` in Phase 5 slice 5.
-    expect(streamCode).toContain(
-      "if (command?.cmd === 'unmuteChat' && command.targetUserId === this.#session().user.id) {"
-    );
+    /*
+      ONE gate for the channel, not one per branch — see the note in the mute block above. Asserted
+      as the gate plus the branch, because the pair is what makes "only the addressed member" true.
+    */
+    expect(privCmdsCode).toContain('if (command.targetUserId !== this.#viewerId()) return false;');
+    expect(privCmdsCode).toContain("if (command.cmd === 'unmuteChat') {");
   });
 
   it('re-runs the loader, because the gate is server-read', () => {
@@ -310,9 +328,9 @@ describe('the member is told, on the channel meant for one member', () => {
       `chatMutedTill` comes from the server. A toast without this would tell the member their chat
       is back while the composer stayed disabled — the same class of lie as the original bug.
     */
-    const at = streamCode.indexOf("command?.cmd === 'unmuteChat'");
+    const at = privCmdsCode.indexOf("command.cmd === 'unmuteChat'");
     expect(at, 'the branch was FOUND before its body was read').toBeGreaterThan(-1);
-    expect(streamCode.slice(at, at + 200)).toContain('this.#chatMute.unmuted();');
+    expect(privCmdsCode.slice(at, at + 200)).toContain('this.#chatMute.unmuted();');
     const unmuted = chatMuteCode.indexOf('unmuted(): void {');
     expect(unmuted).toBeGreaterThan(-1);
     expect(chatMuteCode.slice(unmuted, unmuted + 200)).toContain('void invalidateAll();');
@@ -343,9 +361,10 @@ describe('a refusal is visible', () => {
     const end = chatMuteCode.indexOf('return true;', at);
     expect(end).toBeGreaterThan(at);
     expect(chatMuteCode.slice(at, end)).toContain("this.#announceThenSend('user chat unmuted'");
-    expect(userActions, 'the refusal is still visible, in the class that owns the helper').toContain(
-      "this.#dialogs.alert = 'Command failed.';"
-    );
+    expect(
+      userActions,
+      'the refusal is still visible, in the class that owns the helper'
+    ).toContain("this.#dialogs.alert = 'Command failed.';");
     expect(
       userActions,
       'and the slice is HANDED that helper rather than holding a copy of it'
@@ -421,7 +440,7 @@ describe('the two strings stay two strings', () => {
     expect(userActions).toContain(
       "notice: (message) => options.toasts.show({ kind: 'info', message, enableHtml: false })"
     );
-    expect(chatMuteCode, 'and the MUTE is a dialog, not a toast — upstream\'s asymmetry').toContain(
+    expect(chatMuteCode, "and the MUTE is a dialog, not a toast — upstream's asymmetry").toContain(
       'this.#alert(chatMutedMessage(mutedTill));'
     );
   });

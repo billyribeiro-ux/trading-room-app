@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { formatChatMutedTill } from '#lib/message-formatters.js';
 import { RoomChatMute } from './chat-mute.svelte';
+import { RoomPrivateCommands } from './private-commands.svelte';
 import { RoomEventStream } from './events.svelte';
 
 /*
@@ -130,16 +131,24 @@ const make = () => {
     showTab: (tab) => tabs.push(tab),
     focusSessionNote: () => {},
     chatMissedWhileHidden: () => missed.push(true),
-    forceReloadRequested: () => reloadAsked.push(FakeEventSource.last?.closed === true),
+    /*
+      A REAL `RoomPrivateCommands`, not a stub. The addressing test is now ONE gate inside it, and a
+      stub would assert that the router recognised the channel while leaving the gate — the thing
+      standing between one member and the whole room — untested.
+    */
+    privateCommands: new RoomPrivateCommands({
+      viewerId: () => 1,
+      chatMute,
+      forceReloadRequested: () => reloadAsked.push(FakeEventSource.last?.closed === true),
+      kicked: (message: string) =>
+        kicked.push({ message, closedAlready: FakeEventSource.last?.closed === true })
+    })
     /*
       Records the message AND whether the stream was already closed when it arrived. That second
       field is the whole point: the reference emits BEFORE disconnecting on a kick, the exact
       opposite of `forceReload` above, so a test that only checked the message would pass against
       either ordering.
     */
-    kicked: (message: string) =>
-      kicked.push({ message, closedAlready: FakeEventSource.last?.closed === true }),
-    chatMute
   });
   return { stream, missed, tabs, played, reloadAsked, kicked, chatMuted, chatNotices };
 };
@@ -268,14 +277,20 @@ const hiddenTabStream = (missed: true[]) =>
     showTab: () => {},
     focusSessionNote: () => {},
     chatMissedWhileHidden: () => missed.push(true),
-    forceReloadRequested: () => {},
-    kicked: () => {},
-    chatMute: new RoomChatMute({
-      commands: { muteChat: () => Promise.resolve(null), unmuteChat: () => Promise.resolve(null) },
-      alert: () => {},
-      notice: () => {},
-      reload: () => Promise.resolve(),
-      announceThenSend: () => {}
+    privateCommands: new RoomPrivateCommands({
+      viewerId: () => 1,
+      chatMute: new RoomChatMute({
+        commands: {
+          muteChat: () => Promise.resolve(null),
+          unmuteChat: () => Promise.resolve(null)
+        },
+        alert: () => {},
+        notice: () => {},
+        reload: () => Promise.resolve(),
+        announceThenSend: () => {}
+      }),
+      forceReloadRequested: () => {},
+      kicked: () => {}
     })
   });
 

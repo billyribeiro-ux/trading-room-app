@@ -23,6 +23,7 @@ import { RoomWindowHandlers } from './window-handlers';
 import { RoomScreens } from './screens.svelte';
 import { RoomChatMute } from './chat-mute.svelte';
 import { RoomKicks } from './kicks.svelte';
+import { RoomPrivateCommands } from './private-commands.svelte';
 import { RoomManagedUsers } from './managed-users.svelte';
 import { RoomSessionControl } from './session-control.svelte';
 import { RoomUserActions } from './user-actions.svelte';
@@ -94,6 +95,7 @@ const INSTANCES: Record<string, new (...args: never[]) => object> = {
   recording: RoomRecording,
   roomEvents: RoomEventStream,
   chatMute: RoomChatMute,
+  privateCommands: RoomPrivateCommands,
   kicks: RoomKicks,
   managedUsers: RoomManagedUsers,
   sessionControl: RoomSessionControl,

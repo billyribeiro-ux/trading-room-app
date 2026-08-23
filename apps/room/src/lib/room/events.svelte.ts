@@ -7,7 +7,7 @@ import { formatUserLocation } from '#lib/roster-gates.js';
 import { playSoundEffect } from '#lib/sound-effects.js';
 
 import type { RoomBroadcasts } from './broadcasts.svelte';
-import type { RoomChatMute } from './chat-mute.svelte';
+import type { AddressedCommand, RoomPrivateCommands } from './private-commands.svelte';
 import type { RoomMedia } from './media.svelte';
 import type { RoomMediaTransport } from './media-transport.svelte';
 import type { RoomPrefs } from './prefs.svelte';
@@ -132,26 +132,13 @@ export class RoomEventStream<Entry> {
      */
     chatMissedWhileHidden: () => void;
     /**
-     * A presenter forced this member to reload, and the member has not been told yet.
+     * Every ADDRESSED command — `#lib/room/private-commands.svelte.ts`.
      *
-     * A RECEIVER rather than a `location.reload()` here, because the reference does not reload — it
-     * ASKS. Byte 995901: `case "forceReload": e.disconnect(), e.appEventBus.emit("forceReload")`,
-     * and the subscriber at byte 2597102 is
-     * `bootbox.alert("You need to reload this page to continue", () => window.location.reload())`.
-     * The dialog belongs to `RoomDialogs` and the page owns both, so the decision to raise one is
-     * not this router's to make — the same reasoning `showTab` and `focusSessionNote` carry.
+     * One collaborator rather than three callbacks and a class. The router's job on this channel is
+     * to recognise the channel and hand the frame over with a way to close the stream; deciding who
+     * the frame is for, and what each command does, belongs to the thing that owns the channel.
      */
-    forceReloadRequested: () => void;
-    /** `kickUser` — the member is removed; the argument is the presenter's own message. */
-    kicked: (message: string) => void;
-    /**
-     * The chat mute, both directions and both ends — `#lib/room/chat-mute.svelte.ts`.
-     *
-     * A COLLABORATOR rather than two callbacks, and the same instance `RoomUserActions` holds. What
-     * a muted member sees and what the presenter pressed are one subject; four callbacks would put
-     * the halves back in files that cannot see each other, which is how they drifted.
-     */
-    chatMute: RoomChatMute;
+    privateCommands: RoomPrivateCommands;
   }) {
     this.#prefs = options.prefs;
     this.#toasts = options.toasts;
@@ -169,9 +156,7 @@ export class RoomEventStream<Entry> {
     this.#showTab = options.showTab;
     this.#chatMissedWhileHidden = options.chatMissedWhileHidden;
     this.#focusSessionNote = options.focusSessionNote;
-    this.#forceReloadRequested = options.forceReloadRequested;
-    this.#kicked = options.kicked;
-    this.#chatMute = options.chatMute;
+    this.#privateCommands = options.privateCommands;
 
     /** Whether the SSE channel is up. The sidebar's "Chat" line reports it. */
     this.#roomEventsConnected = $state(false);
@@ -206,9 +191,7 @@ export class RoomEventStream<Entry> {
   readonly #restartMediaSession: () => (() => Promise<void>) | null;
   readonly #showTab: (tab: 'screens' | 'videoplayer') => void;
   readonly #chatMissedWhileHidden: () => void;
-  readonly #forceReloadRequested: () => void;
-  readonly #kicked: (message: string) => void;
-  readonly #chatMute: RoomChatMute;
+  readonly #privateCommands: RoomPrivateCommands;
 
   get connected(): boolean {
     return this.#roomEventsConnected;
@@ -665,68 +648,23 @@ export class RoomEventStream<Entry> {
         return;
       }
 
-      /* `/privCmdsIn/{uid}-{id}/` - emits `forceReload` and `unmuteChat`, addressed to one member. */
+      /*
+        `/privCmdsIn/{uid}-{id}/` — every command addressed to ONE member, in
+        `#lib/room/private-commands.svelte.ts`.
+
+        The whole channel left this router on 2026-08-23, ahead of the receivers `TODO.md` row 9
+        still owes. Five channels here carry frames for the room; this one names a person, and the
+        `targetUserId` test that makes each frame safe was repeated on every branch — four copies of
+        a security check, with more queued behind them. The slice makes it ONE early return, deny by
+        default, so a receiver added later is covered without its author knowing the rule exists.
+
+        `source.close()` is passed rather than held: the `EventSource` belongs to THIS subscription,
+        and a field would be a stale handle to a closed stream after any reconnect.
+      */
       if (payload.channel === 'privCmds') {
-        const command = payload.data as
-          | { cmd?: string; targetUserId?: number; msg?: unknown; mutedTill?: unknown }
-          | undefined;
-        if (command?.cmd === 'forceReload' && command.targetUserId === this.#session().user.id) {
-          /*
-            DISCONNECT FIRST, THEN ASK — the order is the reference's, at byte 995901:
-
-              case "forceReload": e.disconnect(), e.appEventBus.emit("forceReload")
-
-            and it is the opposite of its neighbour two cases along, `case "kickUser":
-            emit("kickPage", xe.msg), e.disconnect()`. Both were read in the same pass; the
-            asymmetry is upstream's and is reproduced rather than normalised.
-
-            Closing the stream before the dialog goes up is what makes the pause safe. The member
-            may sit on that alert for a minute, and a channel still delivering frames into a page
-            the server has already decided is stale would keep refetching and re-toasting behind
-            it. `source.close()` is the `EventSource` equivalent of `disconnect()` and is in scope
-            here because this handler is inside the closure that owns the stream.
-
-            Until 2026-08-23 this line was a bare `location.reload()`: no disconnect, no warning,
-            no dismissal. A member mid-sentence lost what they were typing with no notice.
-          */
-          source.close();
-          this.#forceReloadRequested();
-          return;
-        }
-        /*
-          BOTH DIRECTIONS OF THE CHAT MUTE, in `#lib/room/chat-mute.svelte.ts` — the dialog, the
-          toast, the sentence and the `invalidateAll()` that makes either true. They live together
-          with the presenter's two buttons because that split is how the pair drifted: `unmuteChat`
-          had a real command and a real receiver for months while `mute-chat-24` raised the capture's
-          own "user chat muted" over nothing, and no file held both sides to notice.
-
-          The addressing test stays HERE, on both, because it is this router's job and not the
-          slice's: `privCmds` is per-member upstream (`/privCmdsIn/{uid}-{id}/`) while this room's
-          stream is per-ROOM, so `targetUserId` is the only thing standing between one presenter
-          muting one member and putting a "Chat Disabled" dialog in front of everybody at once.
-        */
-        if (command?.cmd === 'muteChat' && command.targetUserId === this.#session().user.id) {
-          this.#chatMute.muted(command.mutedTill);
-          return;
-        }
-        if (command?.cmd === 'unmuteChat' && command.targetUserId === this.#session().user.id) {
-          this.#chatMute.unmuted();
-        }
-        /*
-          EMIT FIRST, THEN DISCONNECT — the reverse of `forceReload` directly above, and upstream's
-          own asymmetry rather than a normalisation of it. It reads correctly in that direction too:
-          the kick carries a MESSAGE that must reach the screen, so tearing the stream down first
-          risks racing the frame's own handler. The wire and why `ban` is absent are on `kickUser` in
-          `presenter-commands.remote.ts`.
-
-          NOT DONE, a gap rather than a decision: upstream sets `currPage="kicked"` and renders
-          `app-kicked-page`. This room has none, so the member is told why and left disconnected.
-        */
-        if (command?.cmd === 'kickUser' && command.targetUserId === this.#session().user.id) {
-          this.#kicked(typeof command.msg === 'string' ? command.msg : '');
-          source.close();
-          return;
-        }
+        this.#privateCommands.handle(payload.data as AddressedCommand | undefined, () =>
+          source.close()
+        );
         return;
       }
 

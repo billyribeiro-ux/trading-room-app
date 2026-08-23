@@ -33,6 +33,60 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-24 00:35 EDT — the addressed channel becomes one gate instead of four copies
+
+**Runtime impact: no.** A structural change, taken on the owner's ruling, ahead of the receivers
+`TODO.md` row 9 still owes.
+
+**Branch `feat/save-permissions`.**
+
+#### Why now
+
+`events.svelte.ts` sat at 937/937 with zero headroom, and **41 of 47 capped room files** were in the
+same state — the ratchet's staleness half lowers every ceiling to current size, so a codebase that
+has stopped growing has no slack anywhere. Five more `privCmdsIn` receivers are queued and every one
+of them lands in that file. The owner chose extraction over five consecutive ceiling raises.
+
+#### The real prize is not the line count
+
+`RoomEventStream` routes six channels. Five carry frames for the whole room; this one names a person.
+Upstream does not need an addressing test at all — its channel name contains the member's own id, so
+the server never delivers somebody else's frame. **This room's transport is per-ROOM**, so
+`targetUserId` is the only thing standing between one presenter reloading one member and reloading
+everybody at once, or putting a `Chat Disabled` dialog in front of the entire room.
+
+That test was repeated on every branch: `command?.cmd === 'x' && command.targetUserId === …`. **Four
+copies of a security check is four chances to forget the second half**, with more queued behind them.
+It is now a single early return at the top of `RoomPrivateCommands.handle`, deny by default — a frame
+that is not for this member never reaches a branch, and **a receiver written tomorrow is covered
+without its author knowing the rule exists.** That is the difference between a convention and a
+guarantee, and it is the reason to do this before the five, not after.
+
+`disconnect` is passed per call rather than held: the `EventSource` belongs to one subscription, and
+a field would be a stale handle to a closed stream after any reconnect.
+
+#### The contract got stronger, which is what a re-point is for
+
+Three assertions in `unmute-chat-contract.test.ts` pointed at branches that moved. Re-pointed, they
+now assert the GATE **separately from** the branch. The old form could only say *"this branch tests
+the target"*; the new form says *"no branch on this channel is reachable without the test"* — a
+property no per-branch assertion could ever establish, and the one that actually matters.
+
+The events harness was rebuilt on a real `RoomPrivateCommands` rather than a stub, for the same
+reason: a stub would assert that the router recognised the channel while leaving the gate untested.
+
+#### Ceilings
+
+`events.svelte.ts` **937 → 875**, sixty-two lines under its **unchanged** ceiling — deliberately not
+ratcheted down, because that headroom is what the extraction was for. `create-room.svelte.ts`
+1101 → 1110, recorded: the composition root grows by construction whenever a slice is added, which
+is what a composition root is for. `private-commands.svelte.ts` capped at its measured 152.
+
+**Verified:** room `svelte-check` **1,241 files, 0/0**; `vitest` **2,669 / 188**; `eslint` and
+`prettier` clean. No behaviour changed, which is the claim the 2,669 is evidence for: every existing
+assertion about `forceReload`, `kickUser` and both mute directions still passes against the moved
+code.
+
 ### 2026-08-23 23:55 EDT — three dead buttons whose wire had been built all along
 
 **Runtime impact: YES.** *" Mute Audio "*, *" Mute Camera "* and *" Stop Screens "* in the user modal

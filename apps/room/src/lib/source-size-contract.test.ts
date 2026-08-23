@@ -1217,6 +1217,26 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     `RoomFiles.filesHidden` is the recorded precedent for that and it cost a slice to find.
   */
   {
+    file: 'lib/room/private-commands.svelte.ts',
+    /*
+      THE ADDRESSED CHANNEL, created 2026-08-23 and capped in the same commit.
+
+      Every `/privCmdsIn/` command, taken whole out of `RoomEventStream` — which routes six channels,
+      five of them room-wide. This one names a person, and what made each of its frames safe was the
+      same `targetUserId` test repeated on every branch.
+
+      IT IS NOW ONE GATE. Four copies of a security check is four chances to forget the second half,
+      and `TODO.md` row 9 still owes receivers on this channel. A single deny-by-default early return
+      covers every branch written after it, without its author needing to know the rule exists —
+      which is the difference between a convention and a guarantee.
+
+      The cap goes DOWN as receivers are built and prose settles, never up to fit a fifth copy of the
+      gate. There cannot be a fifth copy; that is the point of the file.
+    */
+    max: 152,
+    why: 'every command addressed to one member, behind one addressing gate'
+  },
+  {
     file: 'lib/room/chat-mute.svelte.ts',
     /*
       THE CHAT MUTE, both directions and both ends, created 2026-08-23 and capped in the same commit.
@@ -1292,7 +1312,16 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       composition root is for — and this is the smallest form that growth takes: a hand-off, not a
       second instance.
     */
-    max: 1101,
+    /*
+      1,101 -> 1,110, 2026-08-23. `RoomPrivateCommands` is CONSTRUCTED here rather than inside the
+      stream, because its three collaborators are the page's — two dialogs and the mute the
+      presenter's buttons also hold. The stream routes to it; it does not own it.
+
+      The composition root grows by construction whenever a slice is added. That is what a
+      composition root is FOR, and it is the trade the same commit takes 62 lines off
+      `events.svelte.ts` to make.
+    */
+    max: 1110,
     why: 'the composition root - 36 constructions and their citations, assembly and nothing else'
   },
   {
