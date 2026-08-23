@@ -33,6 +33,64 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-23 09:51 EDT — eleven presenter controls were dead, not three: the dispatch surface is now deny-by-default
+
+**Runtime impact: no behaviour changed.** Eleven controls that did nothing still do nothing. What
+changed is that a twelfth can no longer be added silently, and that all eleven are now written down
+with the reason each cannot be wired.
+
+**I reported three yesterday and that was an undercount.** I had checked only the three names an
+audit handed me. Diffing the whole surface — every `onUserAction('…')` string against every branch in
+`RoomUserActions.handle` and every key of `EXACT_ALERTS` — gives **42 dispatched, 27 handled, 5
+alerted, 11 reaching nothing**. `TODO.md` knew two. **Nine had never been recorded anywhere**: no
+row, no test, no comment. Corrected in the tracker rather than left standing.
+
+The nine: `stop-screens`, `restart-screens`, `start-recording`, `stop-recording`, `mute-mic`,
+`mute-camera`, `disable-private-chat`, `get-my-token`, `test-follow-sound` — all in
+`ModalHost.svelte:2253-3075`.
+
+**Why it is invisible.** `ModalHost` dispatches actions as STRINGS. Nothing connects the string to a
+handler — not the compiler, not a type, not the build — and `handle()` ends on a bare
+`if (fixedAlert)` with **no `else`**, so an action nobody wrote a branch for returns having done
+nothing: no command, no toast, no error, nothing in the console. Each call site looks perfectly
+correct; the absence is in another file. Same shape as `presenterCommand`, which shipped dead for
+three commits, and `forceReload`, which still has both ends and zero call sites.
+
+**None of the eleven can be wired today, and that was checked rather than assumed.** Searching
+`src/routes` and `src/lib/server` for each name returns **zero files** — there is no server half to
+connect. Each needs the reference's captured wire protocol or an infrastructure decision (recording
+is MediaMTX, `TODO.md` rows X and AC). Inventing either is what this repository forbids, so the
+honest deliverable is the gate, not eleven guesses.
+
+**The implementation: deny-by-default disposition.** `INERT_ACTIONS` in `user-action-intent.ts`
+names each silent control with a reason and a `file:line`; `user-action-disposition-contract.test.ts`
+requires **every** dispatched action to be handled, alerted, or listed there. A twelfth fails the
+suite. Wiring one means deleting its entry — at which point the gate demands a real handler, so the
+map cannot drift out of step with the code in either direction. It additionally refuses dispatch by a
+COMPUTED name, the hole no enumeration could see and the defect `TODO.md` row AG calls the worst form.
+
+**An `INERT_ACTIONS` entry is not permission for a control to be dead.** It is a record that it IS
+dead and why. The entries are a to-do list with evidence attached, not a suppression file, and the
+row in `TODO.md` says so in those words.
+
+**Verified.** Room **2,572 tests / 184 files**, `svelte-check` **1,225 files, 0 errors, 0 warnings**,
+`eslint` and `prettier` clean. Nine cases in the new contract, of which the runtime half executes
+`handle()` for every inert action and asserts no dialog, no toast, no command — behind **two positive
+controls** (a handled action must still move something; an alerted one must still raise its alert),
+because eleven "nothing happened" assertions all pass against a broken harness.
+
+**Negative-controlled three ways, each red on its own assertion and green on restore:** a twelfth
+dead control added to `ModalHost` → *no action is dispatched into the void*; `mute-mic` wired without
+removing its entry → three assertions including the runtime one; a reason replaced by `'TODO'` →
+*every inert entry carries a real reason*.
+
+**One instrument bug of mine, caught by the gate's own first run.** The scanner read the whole of
+`user-actions.svelte.ts` and reported `save-permissions` as "handled AND alerted" — an overlap that
+does not exist. `action === 'save-permissions'` sits INSIDE the `if (fixedAlert)` block, where it
+closes the modal on the alert path; it is not a handler branch. The scanner now stops at the alert
+tail and its docblock says why, because that distinction is what makes the three buckets mean what
+they say.
+
 ### 2026-08-23 09:41 EDT — TODO.md audited against the repository: every checkable claim re-read, one row closed, three dead controls found that nothing had recorded
 
 **Runtime impact: no.** `TODO.md` only. No source behaviour changed; the corrections below are to the

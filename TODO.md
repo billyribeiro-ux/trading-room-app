@@ -261,17 +261,29 @@ occurs **exactly once in the whole source**, at the call site — no branch in `
 nothing ever fills `debugLogModalTxt`. `setUserProfilePic` ("Upload Profile Picture",
 `ModalHost.svelte:2376-2381`) is the same.
 
-**THREE MORE, FOUND 2026-08-23 AND NEVER RECORDED ANYWHERE.** `restart-screens`
-(`ModalHost.svelte:2272`), `start-recording` (`:2279`) and `stop-recording` (`:2285`) each dispatch
-`onUserAction(...)` and each string occurs **exactly once in the whole of `apps/room/src`** — at its
-own `onclick`. There is no branch for them in `RoomUserActions.handle` and no key in `EXACT_ALERTS`,
-and `handle()` ends with a bare `if (fixedAlert)` and **no fallback**, so an unrecognised action
-returns having done nothing: no command, no toast, not even an error. Three presenter-facing
-recording and screen controls are therefore dead in the strictest sense. Counted separately from row
-W's twelve, which at least lie — these are silent. So is the archive pair: the `Reload Log List` button at
-`ModalHost.svelte:3913` **has no `onclick` attribute at all**, and sits above a hardcoded
-`<h5>There are no archived chats at this time</h5>` that renders whether or not that is true — the
-same hardcoded-negative defect as `kick-duplicates`.
+**IT IS ELEVEN, NOT TWO — AND NINE HAD NEVER BEEN RECORDED ANYWHERE.** Established 2026-08-23 by
+diffing every `onUserAction('…')` string in the source against every branch in
+`RoomUserActions.handle` and every key of `EXACT_ALERTS`: **42 dispatched, 27 handled, 5 alerted,
+11 reaching nothing.** `handle()` ends on a bare `if (fixedAlert)` with **no fallback**, so each of
+the eleven returns having done nothing at all — no command, no toast, no error, nothing in the
+console. This section previously named two of them (`getDebugLog`, `setUserProfilePic`); the other
+nine are `stop-screens` (`ModalHost.svelte:2265`), `restart-screens` (`:2272`), `start-recording`
+(`:2279`), `stop-recording` (`:2285`), `mute-mic` (`:2253`), `mute-camera` (`:2259`),
+`disable-private-chat` (`:2373`), `get-my-token` (`:3075`) and `test-follow-sound` (`:2505`).
+**None of the eleven has a server half** — verified by searching `src/routes` and `src/lib/server`
+for each name, which returns zero files — so none can be wired by connecting an existing endpoint.
+Each needs the reference's captured wire protocol or an infrastructure decision, and this
+repository forbids inventing either.
+
+**GUARDED, NOT FIXED — `user-action-disposition-contract.test.ts` (2026-08-23).** Deny by default:
+every dispatched action must be handled, alerted, or carry an entry in `INERT_ACTIONS`
+(`user-action-intent.ts`) with a reason and a `file:line`. A twelfth cannot be added silently, and
+wiring one means deleting its entry — at which point the gate demands a real handler. It also
+refuses dispatch by a COMPUTED name, which no enumeration could see. Nine cases; the runtime half
+executes `handle()` for each inert action and asserts no dialog, no toast, no command, behind two
+positive controls. Negative-controlled three ways: a twelfth dead control, an action wired without
+removing its entry, and a placeholder reason — each red on its own assertion. **The entries are a
+to-do list with evidence attached, not a suppression file: the work is still open.**
 
 **3. SILENT CORRECTNESS GAPS — it works, but not the way the reference works, and nothing says so.**
 `doChatLogSearch`: the input is ported verbatim down to the dangling `aria-describedby`
