@@ -105,7 +105,40 @@ jobs:
           # No version literal here, deliberately, and not even in a comment — `corepack install`
           # installs exactly what `package.json` pins. `ci-package-manager-pin.test.ts` fails if any
           # workflow reintroduces one, which is how the backend gate broke once already.
-          corepack install
+          #
+          # RETRIED, because this step does not FAIL - it CRASHES, and the crash is not ours.
+          #
+          # 2026-08-23, `Frontend quality`, on the line `Adding pnpm@... to the cache...`:
+          #
+          #   AssertionError [ERR_ASSERTION]: assert(!this.paused)
+          #       at Parser.finish (node:internal/deps/undici/undici:7388:9)
+          #       at TLSSocket.onHttpSocketEnd (node:internal/deps/undici/undici:7827:34)
+          #   Node.js v24.19.0
+          #
+          # That is Node's OWN bundled undici HTTP parser aborting the process when a TLS socket
+          # ends while the parser is paused - a race in the download, not a bad pin, a bad lockfile
+          # or anything this repository controls. It happened before a single line of our code ran,
+          # and the job reported "exit code 1" with no test having executed.
+          #
+          # Retried rather than worked around, and the distinction matters: `corepack install` is
+          # idempotent and reads the pin from `package.json` every time, so a second attempt asks
+          # for exactly the same version. Nothing here weakens the pin - the comparison below still
+          # runs, and a genuinely wrong version still fails the job on the first pass.
+          #
+          # NOT fixed by changing `.node-version`. The bug is in the runtime's bundled dependency
+          # and picking a different Node to dodge it would be a guess: no evidence was read that
+          # names a version where it is fixed, and that file governs the runtime every job uses.
+          # Three attempts with a widening pause; a fourth failure is a real one and says so.
+          attempt=1
+          until corepack install; do
+            if [ "$attempt" -ge 3 ]; then
+              echo "::error title=corepack install failed::three attempts; see the log above"
+              exit 1
+            fi
+            echo "corepack install crashed or failed (attempt $attempt); retrying"
+            sleep "$((attempt * 5))"
+            attempt=$((attempt + 1))
+          done
           expected="$(node -p "require('./package.json').packageManager.split('@')[1]")"
           actual="$(pnpm --version)"
           if [ "$actual" != "$expected" ]; then
