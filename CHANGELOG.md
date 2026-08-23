@@ -57,6 +57,17 @@ existing 2s timeout and memoised per request. `readRoomConfig`'s cache is delibe
 no cross-request sharing to lean on. The alternative — enforcing only at page load — is the bug we
 are fixing, just smaller.
 
+**A THIRD PATH had no mute gate at all, found while fixing the first two: PRIVATE CHAT.**
+`sendPrivateMessage` checked neither mute, so a muted member could DM — the worse direction, because
+nobody else in the room can see it happening. Verified as the captured behaviour rather than a policy
+invented here: the reference gates its private-chat composer on `e.isConnected && e.chatEnabled`
+(bundle byte 2199385, read), and a mute is what clears `chatEnabled`. The guard moved to
+`#lib/server/chat-mute.ts` and is SHARED — a `.remote.ts` module cannot export a non-remote helper,
+the same constraint that produced `#lib/message-bounds.ts` — because two copies of a rule this small
+is how one drifts, which is exactly what happened to the 24-hour mute when it applied to `sendMessage`
+and not to `replyMessage`. Pinned by three cases asserting the call is present, that it runs BEFORE
+`insertPrivateMessage`, and that the rule is imported rather than re-implemented; negative-controlled.
+
 **Found beside it and NOT fixed:** `askQuestion` has no mute gate of either kind. Whether a CHAT mute
 should silence Q&A has no evidence either way in anything read, so it is recorded in `TODO.md` rather
 than guessed.
@@ -91,7 +102,7 @@ WHY — the capture byte offsets, the loop-guard proof, and why the server rathe
 authority. The alternative on offer was an extraction invented to satisfy a number, which is the
 thing that file exists to prevent.
 
-**Verified.** Room **2,584 tests / 185 files**, `svelte-check` **1,226 files, 0 errors, 0 warnings**,
+**Verified.** Room **2,587 tests / 185 files**, `svelte-check` **1,227 files, 0 errors, 0 warnings**,
 `eslint` and `prettier` clean on every touched file. The mute fix adds three cases to
 `message-alert-action-contract.test.ts` — refused on send, refused on REPLY (that asymmetry has
 already happened once in that file), and an UNMUTED positive control, because two "refused"

@@ -6,6 +6,7 @@ import { isPresenterRole, requireRoomShortCode, requireUser } from '#lib/server/
 import { MAX_CHAT_LOG_PAGE } from '#lib/server/chat-log.js';
 import { db, ensureDatabase } from '#lib/server/db/index.js';
 import { users } from '#lib/server/db/schema.js';
+import { refuseIfChatMuted } from '#lib/server/chat-mute.js';
 import {
   deleteThread,
   insertPrivateMessage,
@@ -118,7 +119,7 @@ export const sendPrivateMessage = command(
   async ({ peerId: peer, body }) => {
     ensureDatabase();
 
-    const { locals } = getRequestEvent();
+    const { locals, request } = getRequestEvent();
     const user = requireUser(locals);
     const room = requireRoomShortCode(locals);
 
@@ -128,6 +129,20 @@ export const sendPrivateMessage = command(
 
     const recipient = db.select().from(users).where(eq(users.id, peer)).get();
     if (!recipient) error(404, 'No such user.');
+
+    /*
+      A MUTED MEMBER MAY NOT DM EITHER — added 2026-08-23, because this path had NO mute gate at all.
+
+      Not the room's 24-hour one, not the controller's permanent one. `mute24` says it stops somebody
+      posting for a day and an owner's indefinite mute says it stops them entirely; both were a single
+      click away from being walked around, and privately, which is the worse direction.
+
+      In scope rather than assumed: the reference gates its own private-chat composer on
+      `e.isConnected && e.chatEnabled` (capture byte 2199385, inside the private-chat template beside
+      `pmSearchTerm`), and `chatEnabled` is precisely what a mute clears. So silencing private chat is
+      the captured behaviour, not a policy invented here.
+    */
+    await refuseIfChatMuted(request, room, user);
 
     /*
       The same bucket public chat uses. A private message is a message; giving it its own quota
