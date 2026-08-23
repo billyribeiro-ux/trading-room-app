@@ -31,6 +31,10 @@
 
   interface Props {
     readonly canEdit: boolean;
+    /** The note a presenter has pulled the room to, or null. Owned by `RoomNotes`. */
+    readonly focusedNoteId: number | null;
+    /** "Bring everyone here" — tells the room, and is NOT the same act as selecting a tab. */
+    readonly onBringEveryone: (noteId: number) => void;
     readonly giphyApiKey: string;
     readonly notes: readonly RoomNote[];
     readonly newNoteOpen: boolean;
@@ -52,6 +56,8 @@
 
   let {
     canEdit,
+    focusedNoteId,
+    onBringEveryone,
     giphyApiKey,
     notes,
     newNoteOpen,
@@ -155,6 +161,19 @@
     requestedNoteId = noteId;
     openMenuNoteId = null;
   }
+
+  /*
+    A presenter pulled the room here. `RoomNotes` owns which note that is; this selects it.
+
+    An `$effect` because the trigger is a value ARRIVING from the server through a class field, not a
+    user gesture — there is no handler to hang it on. It reads `focusedNoteId` and nothing else, so
+    selecting locally cannot re-enter it: `selectNote` writes `requestedNoteId`, which this never
+    reads.
+  */
+  $effect(() => {
+    const requested = focusedNoteId;
+    if (requested !== null) selectNote(requested);
+  });
 
   function setDirty(noteId: number, dirty: boolean): void {
     if (dirty) dirtyNoteIds.add(noteId);
@@ -313,7 +332,7 @@
             onDelete={() => requestDelete(note.id)}
             onRename={() => requestRename(note)}
             onRequestWelcome={(allRooms) => requestWelcome(note.id, allRooms)}
-            onSelect={() => selectNote(note.id)}
+            onBringEveryone={() => onBringEveryone(note.id)}
             onStartEditing={() => startEditing(note.id)}
             onToggleMenu={() => {
               openMenuNoteId = openMenuNoteId === note.id ? null : note.id;
@@ -340,7 +359,7 @@
               noteId={activeNote.id}
               contentHtml={activeNote.contentHtml ?? ''}
               {giphyApiKey}
-              onBringEveryone={() => selectNote(activeNote.id)}
+              onBringEveryone={() => onBringEveryone(activeNote.id)}
               onDirtyChange={(dirty) => setDirty(activeNote.id, dirty)}
               onDone={() => {
                 setDirty(activeNote.id, false);

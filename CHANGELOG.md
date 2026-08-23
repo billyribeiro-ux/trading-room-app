@@ -33,6 +33,81 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-23 10:18 EDT — two real bugs fixed: a permanent mute that did nothing, and a second "Bring everyone here" that brought nobody
+
+**Runtime impact: yes, twice.** A member muted indefinitely by the owner can no longer post, and the
+session-note "Bring everyone here" controls now move the whole room.
+
+**1. THE CONTROLLER'S PERMANENT MUTE WAS LOADED AND NEVER READ.** The manage page's
+`applyUserOpcode` writes membership `role = 3` — the permanent mute, no expiry, the more severe of
+the two this product has. `+page.server.ts:381` put it into the page payload as `member.muted` and
+**nothing anywhere consumed it**, so the room enforced only its own 24-hour `chat_mutes` table. The
+control reported success, the database recorded the mute, and the muted member kept talking.
+
+`refuseIfMuted` now asks the control plane on both send paths. **Server-side, deliberately:** the
+payload value is a client-side fact by the time it exists, and authority on this boundary is decided
+from data the server owns — the 2026-08-07 escalation rule applied to a mute rather than to a role.
+`RoomConfigUnavailable` is not caught, matching `+page.server.ts:257`, which calls the same function
+with no try/catch: a room whose control plane is unreachable does not render at all, so refusing a
+send in that state is the existing policy rather than a new one.
+
+**The cost is stated rather than hidden:** one control-plane read per message sent, bounded by the
+existing 2s timeout and memoised per request. `readRoomConfig`'s cache is deliberately per-request
+(a `WeakMap` keyed on the request, with a documented reason against a module-level one), so there is
+no cross-request sharing to lean on. The alternative — enforcing only at page load — is the bug we
+are fixing, just smaller.
+
+**Found beside it and NOT fixed:** `askQuestion` has no mute gate of either kind. Whether a CHAT mute
+should silence Q&A has no evidence either way in anything read, so it is recorded in `TODO.md` rather
+than guessed.
+
+**2. "BRING EVERYONE HERE" BROUGHT NOBODY, FOR THE SECOND TIME IN THIS REPOSITORY.** Both session-note
+controls were wired through `NotesPane` to `selectNote(id)`, whose whole body assigned a local id and
+closed a menu. `focus-on-screen-contract.test.ts:13` had already recorded the IDENTICAL defect for
+screens in as many words — *"The menu item said 'Bring everyone here' and brought nobody"* — and the
+note pair one tab away was never looked at.
+
+The protocol was READ out of the capture, not modelled on its sibling, and the two turned out to be
+adjacent cases in the same switch — which is the evidence that reusing the `cmds` channel was right
+rather than convenient. Byte 1474066 and 1970831 are the two senders, 1023554 the server frame
+immediately beside `case"focusOnScreen"`, 1962371 the receiver. **The loop guard is evidenced by
+ABSENCE that was read rather than assumed:** `bringFocusToTab` occurs exactly four times in the
+bundle — two definitions and their two call sites — so nothing on the tab-change path broadcasts, and
+a plain tab click stays local here too.
+
+Authority is `presenterRoom()`, which reads the role off the session and returns the caller's OWN
+short code, so no room identifier is ever accepted from the request.
+
+**`NoteTabContent.onSelect` was deleted with it, and eslint is what found it.** The prop existed for
+exactly one consumer — the mis-wired menu item — so once that item took its own prop it had no reader
+left. A prop nothing reads is the dead scaffolding this repository forbids, and the tab CLICK was
+never this component's: `NotesPane` owns the anchor.
+
+**FOUR CEILINGS WERE RAISED, with the owner's explicit approval and the reason recorded in each
+entry.** `events.svelte.ts` 880→903, `notes.svelte.ts` 153→203, `PresentationArea.svelte` 1113→1115,
+`create-room.svelte.ts` 1076→1086. The standing rule is that a ceiling only ever goes down and a
+raise is a conversation, so it was asked rather than edited. Nearly all of the growth is the mandatory
+WHY — the capture byte offsets, the loop-guard proof, and why the server rather than the client holds
+authority. The alternative on offer was an extraction invented to satisfy a number, which is the
+thing that file exists to prevent.
+
+**Verified.** Room **2,584 tests / 185 files**, `svelte-check` **1,226 files, 0 errors, 0 warnings**,
+`eslint` and `prettier` clean on every touched file. The mute fix adds three cases to
+`message-alert-action-contract.test.ts` — refused on send, refused on REPLY (that asymmetry has
+already happened once in that file), and an UNMUTED positive control, because two "refused"
+assertions both pass against a broken harness. The note fix adds
+`focus-on-session-note-contract.test.ts`, 11 cases.
+
+**Negative-controlled, each red on its own assertion and green on restore:** the mute check removed →
+both refusal cases red while the other 22 stay green; the note sender reverted to local-only → the
+send assertion red; the menu item put back on `onSelect` → the wiring assertion red; the receiver made
+to re-broadcast → the loop-guard assertion red.
+
+**Six more defects are investigated and recorded in `TODO.md` rather than fixed**, each with what it
+would cost: `save-permissions`, `forceReload`, the two false "command sent" messages, `doChatLogSearch`,
+and `admin-notes-password`. `kick-duplicates` is the one that CANNOT be fixed without inventing — the
+reference's own implementation was read and its positive arm needs a kick this room cannot perform.
+
 ### 2026-08-23 09:51 EDT — eleven presenter controls were dead, not three: the dispatch surface is now deny-by-default
 
 **Runtime impact: no behaviour changed.** Eleven controls that did nothing still do nothing. What

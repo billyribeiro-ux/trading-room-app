@@ -92,6 +92,36 @@ export const focusOnScreen = command(z.string().trim().min(1), async (screenId) 
 });
 
 /**
+ * `focusOnSessionNote` — the same act for a session note, and it is the SAME defect fixed twice.
+ *
+ * The screen version's contract test opens by recording that *"the menu item said 'Bring everyone
+ * here' and brought nobody"*. The note version said it too, from two places, and brought nobody
+ * either: both controls were wired to a purely local `selectNote(id)` whose whole body assigned
+ * `requestedNoteId` and closed the menu. Fixed 2026-08-23.
+ *
+ * Read out of the capture rather than modelled on its sibling, and the two turned out to be
+ * identical anyway — which is the evidence that reusing the channel is right rather than convenient:
+ *
+ *   sender A, byte 1474066:  `bringFocusToTab(){…sendServerAdminCommand("focusOnSessionNote",{id:this.tab._id})}`
+ *   sender B, byte 1970831:  `bringFocusToTab(e){…sendServerAdminCommand("focusOnSessionNote",{id:e})}`
+ *   server frame, byte 1023554: `case"focusOnSessionNote":…emit("focusOnSessionNote",i.id);break;`
+ *     — immediately adjacent to `case"focusOnScreen"` in the same switch, same `{id}` shape.
+ *
+ * **A plain note-tab click must not broadcast**, and that is evidenced by ABSENCE that was read
+ * rather than assumed: `bringFocusToTab` occurs exactly four times in the bundle — the two
+ * definitions above and their two template call sites — so nothing on the tab-change path calls it.
+ * The screen side has the same rule for the same reason, enforced there by only the user-initiated
+ * click broadcasting.
+ *
+ * `.positive()` because `notes.id` is an autoincrement primary key, so every real note is >= 1 — the
+ * same bound `presenterCommand` puts on `targetUserId`, and the equivalent of the reference's `e &&`.
+ */
+export const focusOnSessionNote = command(z.number().int().positive(), async (noteId) => {
+  ensureDatabase();
+  publishToRoom(presenterRoom(), { channel: 'cmds', data: { cmd: 'focusOnSessionNote', noteId } });
+});
+
+/**
  * `giveMicScreen` — a presenter hands a member mic and screenshare, or takes them back.
  *
  * ```js

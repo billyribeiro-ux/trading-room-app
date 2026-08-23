@@ -105,6 +105,7 @@ const make = () => {
     appHasFocus: () => true,
     restartMediaSession: () => null,
     showTab: (tab) => tabs.push(tab),
+    focusSessionNote: () => {},
     chatMissedWhileHidden: () => missed.push(true)
   });
   return { stream, missed, tabs, played };
@@ -232,6 +233,7 @@ const hiddenTabStream = (missed: true[]) =>
     appHasFocus: () => false,
     restartMediaSession: () => null,
     showTab: () => {},
+    focusSessionNote: () => {},
     chatMissedWhileHidden: () => missed.push(true)
   });
 

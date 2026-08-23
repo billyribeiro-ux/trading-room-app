@@ -64,7 +64,11 @@ import {
   loadPrivateChatLog as loadPrivateChatLogCommand,
   sendPrivateMessage as sendPrivateMessageCommand
 } from '../../routes/private-chat.remote';
-import { focusOnScreen, presenterCommand } from '../../routes/presenter-commands.remote';
+import {
+  focusOnScreen,
+  focusOnSessionNote,
+  presenterCommand
+} from '../../routes/presenter-commands.remote';
 import { videoForAll, youtubeForAll } from '../../routes/for-all-broadcast.remote';
 
 import {
@@ -839,7 +843,12 @@ export function createRoom(deps: RoomDeps) {
     appHasFocus: () => appHasFocus,
     restartMediaSession: () => () => mediaTransport.restart(),
     showTab: (tab) => deps.setMainTab(tab),
-    chatMissedWhileHidden: deps.chatMissedWhileHidden
+    chatMissedWhileHidden: deps.chatMissedWhileHidden,
+    /*
+      Declared below this call — the closure runs on a frame arriving from the server, long after
+      `notes` is initialised, so the forward reference is resolved by then.
+    */
+    focusSessionNote: (noteId) => notes.focusNote(noteId)
   });
 
   /*
@@ -980,7 +989,8 @@ export function createRoom(deps: RoomDeps) {
     menus,
     modals,
     noteGates: () => noteGates,
-    showNotesTab: () => deps.setMainTab('notes')
+    showNotesTab: () => deps.setMainTab('notes'),
+    focusOnSessionNote: (noteId) => focusOnSessionNote(noteId)
   });
 
   /*

@@ -244,15 +244,19 @@ bottom.
 
 **1. LYING CONTROLS — they report success and send nothing.** The worst kind, because the presenter
 believes the action landed. Row W holds twelve; `remoteRestartAudio` is the same shape
-(`ModalHost.svelte:2300` → `'restart-audio'` → the `EXACT_ALERTS` toast). Add to that
-**`focusOnSessionNote`, which the triage doc files as NOT BUILT while both of its controls are live**:
-"Bring everyone here" at `NoteTabContent.svelte:104` and "Bring **E**veryone here" at
-`NoteEditor.svelte:583` (the capture's own inconsistent capitalisation, faithfully ported) are wired
-at `NotesPane.svelte:316` and `:343` to `selectNote(id)`, whose entire body is
-`requestedNoteId = noteId; openMenuNoteId = null;`. **They bring nobody.** This is the identical
-defect already found and fixed for screens — `focus-on-screen-contract.test.ts:13` says in as many
-words *"The menu item said 'Bring everyone here' and brought nobody"* — and the note pair was never
-noticed.
+(`ModalHost.svelte:2300` → `'restart-audio'` → the `EXACT_ALERTS` toast). **`focusOnSessionNote` WAS in this list and is FIXED, 2026-08-23.** Both controls — "Bring everyone
+here" at `NoteTabContent.svelte` and "Bring **E**veryone here" at `NoteEditor.svelte:583` — were wired
+through `NotesPane` to a purely local `selectNote(id)`, and brought nobody. They now send a real
+`focusOnSessionNote` command on the same `cmds` channel the screen version uses, with the protocol
+READ out of the capture rather than modelled on its sibling (bytes 1474066, 1970831, 1023554, 1962371)
+— the two turned out to be adjacent cases in the same switch, which is the evidence that reusing the
+channel was right rather than convenient. Authority is `presenterRoom()`, so no room identifier is
+accepted from the client. `NoteTabContent`'s `onSelect` prop was deleted with it: once the menu item
+stopped borrowing it, eslint showed it had no other reader. Pinned by
+`focus-on-session-note-contract.test.ts` (11 cases), negative-controlled three ways including the
+re-broadcast loop. It was the identical defect to the screens one that
+`focus-on-screen-contract.test.ts:13` already recorded — *"The menu item said 'Bring everyone here'
+and brought nobody"* — one tab away, and nobody had looked.
 
 **2. DEAD CONTROLS — no handler at all, not even a toast.** Clicking does literally nothing.
 `getDebugLog`: `ModalHost.svelte:2306` dispatches `onUserAction('debug-log', …)` and that string
@@ -298,13 +302,36 @@ with the reason written down — *"Stopping their producer is not ours to do, so
 tab and is deliberately not pretending the remote share ended."* That is the standard being met, not
 missed.
 
-**A FIFTH THING THAT IS NOT A CONTROL AT ALL — a loaded field nothing reads.**
-`+page.server.ts:381` sends `muted: roomConfig.member?.muted ?? false` into the room, and **that is
-its only occurrence in the entire source** — nothing consumes it. The controller's permanent mute
-(`applyUserOpcode` case 3, role 3) therefore crosses into the room and does nothing: **a member muted
-indefinitely from the manage page can still post.** The room enforces only its own `chat_mutes`
-table, which is the 24-hour path. Distinct from the viewer's own mute at `+page.server.ts:646-658` (the `chatMutedTill` query; `:628-640` is the explanatory comment above it, cited by mistake until 2026-08-23),
-which IS enforced and exposed — do not confuse the two.
+**A FIFTH THING THAT IS NOT A CONTROL AT ALL — FIXED 2026-08-23, recorded because the shape recurs.**
+`+page.server.ts:381` sent `muted: roomConfig.member?.muted ?? false` into the room and **nothing read
+it**, so the controller's PERMANENT mute (manage page, `applyUserOpcode` case 3, membership role 3)
+crossed the seam and did nothing: a member muted indefinitely kept posting, because the room enforced
+only its own 24-hour `chat_mutes` table. `refuseIfMuted` in `chat-messages.remote.ts` now asks the
+control plane on both send paths — server-side, from data the server owns, rather than trusting the
+value that had already been serialised into the page. Pinned by three cases in
+`message-alert-action-contract.test.ts`, negative-controlled.
+
+**Still open beside it, and NOT fixed:** `askQuestion` (`alert-questions.remote.ts:56`) has **no mute
+gate of either kind**. Whether a CHAT mute should silence Q&A is a policy question with no evidence
+either way in anything read so far, so it is recorded rather than guessed — extending the gate on a
+hunch is the invention this file exists to prevent.
+
+### The six defects that are REAL, FIXABLE, and not yet done — investigated 2026-08-23
+
+Each was traced end to end by reading, and each verdict says what it would cost. **None of them is
+blocked on a decision or on hardware**; they are simply not built yet. Ordered by severity.
+
+| defect | verdict | what is missing |
+| --- | --- | --- |
+| **`save-permissions`** (HIGH) | needs new server code | The controller already writes `roomUsers.permissionsJson` for the SAME five checkboxes (`server/rooms.ts:90-114`). The room has no write path to the controller, so this needs a new internal endpoint — every piece it would call exists |
+| **`forceReload`** (MEDIUM) | **uses only existing code** | Both ends exist and nothing joins them: the action at `+page.server.ts:1318`, the receiver at `events.svelte.ts:656`. The button is in `EXACT_ALERTS`, so it raises "Reload request sent OK" and sends nothing. Wiring it removes a liar AND uses a dead wire |
+| **`session-refresh-roster` / `session-soft-reset`** (MEDIUM) | **uses only existing code** | Both raise an alert asserting a server command was sent; neither sends anything, and the local refetch they do instead has no effect on what the message promises. The honest fix needs no protocol at all — correct the message |
+| **`doChatLogSearch`** (MEDIUM) | needs new server code | The input never reaches the server, and the set it filters is only the newest 50 rows. Either a real search endpoint, or make the limit VISIBLE — a silent wrong answer is worse than an honest one |
+| **`admin-notes-password`** (LOW) | needs new server code | Three stacked causes. The typed value IS delivered and the handler throws it away, so the TODO's stated mechanism was only half right |
+| **`kick-duplicates`** (MEDIUM) | **NOT fixable without inventing** | The reference's own implementation was read in the capture, both arms confirmed. The positive arm needs a kick the room cannot perform. Recorded, not guessed |
+
+**Two were fixed on 2026-08-23** and are recorded above rather than here: the controller's permanent
+mute, and `focusOnSessionNote`.
 
 **Ready to build, fully specified:**
 

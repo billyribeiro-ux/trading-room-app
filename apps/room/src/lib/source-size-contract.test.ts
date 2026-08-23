@@ -343,8 +343,19 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       chain of equality checks; what is expensive to recover is WHY `changeChatMode` refetches
       instead of reading the mode off the wire, and why the leave beep reads a room setting named
       for joins.
+
+
+      RAISED 880 -> 903 on 2026-08-23, with the owner's explicit approval, for the `focusOnSessionNote` receiver.
+      Recorded as a DECISION rather than edited quietly, because the standing rule is that a
+      ceiling only ever goes down and a raise is a conversation. This one is a genuine
+      capability arriving — "Bring everyone here" on session notes had brought nobody since it
+      was written — and nearly all of the growth is the mandatory WHY: the capture byte offsets
+      for the reference protocol, the read-not-assumed proof that a plain tab click must not
+      re-broadcast, and why `presenterRoom()` rather than the client decides authority. The
+      alternative on offer was an extraction invented to satisfy a number, which is the thing
+      this file exists to prevent.
     */
-    max: 880,
+    max: 903,
     why: 'the SSE router - 351 code lines under 468 of channel transcription'
   },
   {
@@ -431,8 +442,19 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       page's DOM attachment helpers. Measured, they do NOT read as one thing: the capture helpers
       hold handles the whole page reads, while these two mount links into note content. Only the
       note pair came, which is what that plan said to do if the reading came out this way.
+
+
+      RAISED 153 -> 203 on 2026-08-23, with the owner's explicit approval, for the focus pair — `focusNote` (receiving) and `bringEveryoneTo` (sending) — and the capture citations that justify them.
+      Recorded as a DECISION rather than edited quietly, because the standing rule is that a
+      ceiling only ever goes down and a raise is a conversation. This one is a genuine
+      capability arriving — "Bring everyone here" on session notes had brought nobody since it
+      was written — and nearly all of the growth is the mandatory WHY: the capture byte offsets
+      for the reference protocol, the read-not-assumed proof that a plain tab click must not
+      re-broadcast, and why `presenterRoom()` rather than the client decides authority. The
+      alternative on offer was an extraction invented to satisfy a number, which is the thing
+      this file exists to prevent.
     */
-    max: 153,
+    max: 203,
     why: 'the notes tab - four actions, one flag, and the two link mounts that belong to them'
   },
   {
@@ -580,8 +602,19 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       naming both. The "one component and not seven" argument it makes covers the seven tab panes,
       which share `mainTab`; the strip shares nothing with any tab. Eighty-four lines out, and the
       answer to an over-projection stayed what the plan says it is — another extraction.
+
+
+      RAISED 1113 -> 1115 on 2026-08-23, with the owner's explicit approval, for two props threading the note focus to `NotesPane`.
+      Recorded as a DECISION rather than edited quietly, because the standing rule is that a
+      ceiling only ever goes down and a raise is a conversation. This one is a genuine
+      capability arriving — "Bring everyone here" on session notes had brought nobody since it
+      was written — and nearly all of the growth is the mandatory WHY: the capture byte offsets
+      for the reference protocol, the read-not-assumed proof that a plain tab click must not
+      re-broadcast, and why `presenterRoom()` rather than the client decides authority. The
+      alternative on offer was an extraction invented to satisfy a number, which is the thing
+      this file exists to prevent.
     */
-    max: 1113,
+    max: 1115,
     why: 'the room stage - twelve child components, and the largest file after the page itself'
   },
   {
@@ -957,8 +990,19 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       the page. The answer was to write down why they are correct, not to suppress the flag with a
       `svelte-ignore` that nothing is warning under. Prose explaining a real subtlety is exactly what
       this file's header says never to shave to hit a number.
+
+
+      RAISED 1076 -> 1086 on 2026-08-23, with the owner's explicit approval, for the command import and the two receivers it wires.
+      Recorded as a DECISION rather than edited quietly, because the standing rule is that a
+      ceiling only ever goes down and a raise is a conversation. This one is a genuine
+      capability arriving — "Bring everyone here" on session notes had brought nobody since it
+      was written — and nearly all of the growth is the mandatory WHY: the capture byte offsets
+      for the reference protocol, the read-not-assumed proof that a plain tab click must not
+      re-broadcast, and why `presenterRoom()` rather than the client decides authority. The
+      alternative on offer was an extraction invented to satisfy a number, which is the thing
+      this file exists to prevent.
     */
-    max: 1076,
+    max: 1086,
     why: 'the composition root - 36 constructions and their citations, assembly and nothing else'
   },
   {
